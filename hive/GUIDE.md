@@ -12,6 +12,7 @@ Hive runs as a set of Claude Code skills. The orchestrator is always the main se
 
 | Command | Trigger | Purpose |
 |---------|---------|---------|
+| `/hive:kickoff` | "initialize", "onboard", "start new project" | Initialize Hive for a project (brownfield or greenfield) |
 | `/hive:standup` | "start the day", "daily ceremony" | Daily ceremony: standup → planning → execution |
 | `/hive:plan` | "plan this feature", "break into stories" | Decompose a requirement into an epic with stories |
 | `/hive:execute` | "execute the epic", "run the workflow" | Execute stories through development phases |

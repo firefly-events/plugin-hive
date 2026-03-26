@@ -8,6 +8,7 @@ Route the user's request to the appropriate command based on their intent.
 
 | Command | Trigger | Purpose |
 |---------|---------|---------|
+| **kickoff** | `/hive:kickoff`, "initialize", "onboard", "start new project" | Initialize Hive for a project (brownfield discovery or greenfield planning pipeline) |
 | **standup** | `/hive:standup`, "start the day", "daily ceremony" | Run daily ceremony: standup → planning → execution |
 | **plan** | `/hive:plan`, "plan this feature", "break into stories" | Decompose a requirement into an epic with stories |
 | **execute** | `/hive:execute`, "execute the epic", "run the workflow" | Execute stories through development phases |
