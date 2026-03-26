@@ -114,12 +114,38 @@ phases:
     agent: orchestrator
     depends_on: [test-handoff]
 
+  - id: final-review
+    description: >
+      After all tests pass and fixes are committed, run a final code review
+      before pushing. This is the last quality gate before code leaves the
+      machine. Use the code-review.workflow.yaml (analyze → review → summarize).
+
+      The review sees the full picture: all dev work + all fixes, with passing
+      tests as proof. The diff is everything committed since the session started.
+
+      If the review returns needs_revision: route back to fix-loop.
+      If the review returns passed or needs_optimization: proceed to push.
+    agent: orchestrator
+    depends_on: [fix-loop]
+
+  - id: push
+    description: >
+      Push all committed work to the remote branch. This only happens after:
+      1. Tests pass
+      2. Final review passes
+      3. No blocked stories remain
+
+      If a PR is appropriate (feature branch), create one via gh CLI.
+      If working on main, push directly (with user confirmation).
+    agent: orchestrator
+    depends_on: [final-review]
+
   - id: session-end
     description: >
-      After all work and fixes complete:
+      After all work is pushed:
       1. Evaluate staged insights — promote or discard per agent-memory-schema
       2. Update cycle state with the day's decisions
       3. Surface unresolved items for tomorrow's standup
       4. Clean up insight staging area
     agent: orchestrator
-    depends_on: [fix-loop]
+    depends_on: [push]

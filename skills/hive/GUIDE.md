@@ -68,7 +68,17 @@ Hive is designed for a daily restart model. Each day starts fresh with a 1M Opus
    │  → Notify user immediately (don't bury in report)
    │  → Continue with remaining non-blocked work
    │
-7. SESSION END
+7. FINAL REVIEW
+   │  All tests pass → run code review on full session diff
+   │  Last quality gate before code leaves the machine
+   │  If needs_revision → back to fix loop
+   │  If passed → proceed to push
+   │
+8. PUSH
+   │  Push to remote branch (or create PR)
+   │  Only after: tests pass + review passes + no blocked stories
+   │
+9. SESSION END
    │  Evaluate staged insights → promote or discard
    │  Update cycle state with day's decisions
    │  Surface unresolved items for tomorrow's standup
@@ -207,10 +217,11 @@ Select development methodology: `/hive:execute {epic} --methodology tdd`
 **Output:** Test results, coverage report, bug tickets, session report
 **Key feature:** Framework detection — auto-detects Maestro, Playwright, pytest, etc.
 
-### Review Swarm
-**When:** `/hive:review` or after execution
+### Code Review
+**When:** Final review gate before push (step 7 in daily ceremony), or ad-hoc via `/hive:review`
 **Agents:** researcher (scope analysis), reviewer (findings)
 **Output:** Structured review with verdict (passed / needs_optimization / needs_revision)
+**In the daily flow:** Reviews the full session diff after all tests pass — last gate before code leaves the machine
 
 ---
 
