@@ -81,16 +81,40 @@ When spawning agents via the Agent tool, set the `model` parameter to match the 
 
 ## Decision protocols
 
-### When to halt a story
-- Any episode has `status: failed` — halt that story and all dependents
-- Test step fails — write `failed` episode and stop
-- Review verdict `needs_optimization` — execute `optimize` step, then `integrate`
-- Review verdict `passed` — skip `optimize`, proceed to `integrate`
+### Three failure categories
+Every failure is one of: **transient** (retry), **story issue** (back to planning), or **human blocker** (escalate). See `references/error-handling.md` for the full playbook.
 
-### When to escalate
-- Repeated failures with no clear fix — write `escalated` episode, alert user
-- Circular dependencies — halt and report
-- Missing resources (workflow file, agent persona) — report and halt
+**The key rule:** If it's not a human blocker, it goes back to planning — not into an infinite fix loop.
+
+### When to send back to planning (`replanning`)
+- Story assumptions are wrong (architecture, tech stack, API protocol)
+- Acceptance criteria are unimplementable or contradictory
+- Tests reveal the design approach is fundamentally flawed (not just a code bug)
+- Reviewer says the approach is wrong (not just the implementation)
+- Fix loop exceeds 3 iterations without convergence
+- Research reveals the story scope needs to change
+
+Write `status: replanning` marker + `replanning-context.yaml` with what went wrong. The planning swarm receives this context and revises — it doesn't start from scratch.
+
+### When to retry (transient)
+- Agent timeout or crash → fresh instance, max 2 retries
+- Bad output format → retry with explicit format instructions
+- Simple code bugs → fix loop (max 3 iterations)
+- File system / git errors → retry, then investigate
+- Linear API failures → fall back to local mode
+
+### When to escalate to human (`blocked`)
+- Missing credentials, environment access, API keys
+- Business decision needed (scope, priority, trade-off)
+- Merge conflicts that can't be auto-resolved
+- Force push would be needed
+- Repeated transient failures after retries exhausted
+
+### Review verdict handling
+- `passed` — skip `optimize`, proceed to `integrate`
+- `needs_optimization` — execute `optimize` step, then `integrate`
+- `needs_revision` with fixable issues — route to fix loop
+- `needs_revision` with fundamental concerns — **back to planning**
 
 ## Hive system knowledge
 

@@ -225,6 +225,33 @@ Select development methodology: `/hive:execute {epic} --methodology tdd`
 
 ---
 
+## Error Handling
+
+Every failure falls into one of three categories:
+
+| Category | Response | Example |
+|----------|----------|---------|
+| **Transient** | Retry (max 2-3) | Agent timeout, file write failed, Linear API blip |
+| **Story issue** | **Back to planning** | Wrong assumptions, unimplementable criteria, flawed approach |
+| **Human blocker** | Escalate | Missing credentials, business decision, env access |
+
+**The key rule:** If it's not a human blocker, it goes back to planning — not into an infinite fix loop.
+
+### Back to Planning triggers:
+- Story assumptions are wrong (architecture, tech stack, API protocol)
+- Tests reveal the approach is fundamentally flawed (not just a bug)
+- Reviewer says the approach is wrong (not just the code)
+- Fix loop exceeds 3 iterations without convergence
+
+### Stays in fix loop:
+- Simple code bugs (null check, missing import, off-by-one)
+- Lint/format failures
+- Test failures with clear code-level fixes
+
+See `references/error-handling.md` for the full playbook with per-phase failure tables.
+
+---
+
 ## Quality System
 
 ### Three-Tier Gates
@@ -349,7 +376,10 @@ All settings in `skills/hive/hive.config.yaml`:
 | Knowledge Layer | `references/knowledge-layer.md` | External docs, project knowledge, capability catalog |
 | Agent-Ready Checklist | `references/agent-ready-checklist.md` | 8-point story validation before execution |
 | Wireframe Protocol | `references/wireframe-protocol.md` | UI touchpoints during planning |
-| Task Tracking | `references/task-tracking-adapter.md` | Human intervention queue (Linear/GitHub/Jira) |
+| Task Tracking | `references/task-tracking-adapter.md` | Full lifecycle adapter — Linear, GitHub, or local-only |
+| Error Handling | `references/error-handling.md` | Failure categories, per-phase recovery, back-to-planning protocol |
+| Linear Integration | `references/linear-integration.md` | Per-phase Linear operations, GitHub setup |
+| Linear Commands | `references/linear-commands.md` | Copy-paste linearis CLI commands |
 | Token Management | `references/token-management.md` | Budgets, context window, fresh instance spawning |
 | Sandboxing | `references/sandboxing-patterns.md` | Git worktrees for parallel agent isolation |
 | Test Swarm | `references/test-swarm-architecture.md` | 8-task test pipeline, framework detection, bug triage |
