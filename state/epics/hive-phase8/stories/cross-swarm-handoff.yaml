@@ -1,0 +1,37 @@
+id: cross-swarm-handoff
+epic: hive-phase8
+title: Design cross-swarm handoff protocol and schema
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Define how artifacts transfer between swarms (planning → dev → testing).
+  Structured handoff schema with status tracking (pending → consumed → expired).
+  Enables chained workflows where one swarm's output feeds into the next.
+
+acceptance_criteria:
+  - "Given planning completes, then its artifacts can be handed off to a dev swarm"
+  - "Given the handoff schema, then it includes: artifacts, decisions, naming, technology, constraints, status"
+  - "Given a handoff is consumed, then the receiving swarm acknowledges receipt"
+
+steps:
+  - id: design-handoff
+    description: |
+      Create skills/hive/references/cross-swarm-handoff.md defining:
+      - Handoff schema (artifacts, decisions, constraints, status)
+      - Status lifecycle: pending → consumed → expired
+      - How cycle state feeds into handoffs
+      - How the orchestrator manages cross-swarm transitions
+      Source: /Users/don/Documents/project-hive/schemas/handoff.json
+      Also: /Users/don/Documents/project-hive/docs/stories/2.2-1-handoff-schema-persistence.md
+    agent: developer
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/schemas/handoff.json
+    - /Users/don/Documents/project-hive/docs/stories/2.2-1-handoff-schema-persistence.md
+
+files_to_modify:
+  - file: skills/hive/references/cross-swarm-handoff.md
+    change: NEW FILE

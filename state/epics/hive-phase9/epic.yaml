@@ -1,0 +1,34 @@
+name: hive-phase9
+title: "Hive Phase 9: Knowledge Layer & Advanced Features"
+description: |
+  Tier 3 advanced features. Agent-callable knowledge layer with external docs
+  and project knowledge. Agentic sandboxing patterns for parallel dev work.
+  Enhanced memory system with vector storage. Configuration system. Windsurf
+  skill analysis for novel capabilities to port.
+target_codebase: /Users/don/Documents/herd
+
+stories:
+  - id: knowledge-layer-design
+    title: Design agent-callable knowledge layer architecture
+    complexity: high
+    depends_on: []
+  - id: knowledge-external-docs
+    title: Integrate external doc retrieval (context7/chub)
+    complexity: medium
+    depends_on: [knowledge-layer-design]
+  - id: knowledge-project-memory
+    title: Add project knowledge store (past decisions, quality feedback)
+    complexity: medium
+    depends_on: [knowledge-layer-design]
+  - id: sandboxing-patterns
+    title: Implement git worktree isolation for parallel agent work
+    complexity: medium
+    depends_on: []
+  - id: configuration-system
+    title: Create hive.config.yaml for centralized configuration
+    complexity: medium
+    depends_on: []
+  - id: windsurf-skill-analysis
+    title: Analyze 44 Windsurf skills for novel capabilities to port
+    complexity: low
+    depends_on: []

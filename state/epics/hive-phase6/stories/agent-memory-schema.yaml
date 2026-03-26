@@ -1,0 +1,67 @@
+id: agent-memory-schema
+epic: hive-phase6
+title: Design agent memory file format and storage
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Design the file format and storage location for agent memories. Each agent
+  on the roster has a memory directory at skills/hive/agents/memories/{agent-name}/
+  containing markdown files with insights that persist across sessions.
+
+  Agent memories are like user memories but for agents — they capture reusable
+  patterns, pitfall warnings, codebase understanding, and corrective insights
+  that make the agent better at future tasks.
+
+acceptance_criteria:
+  - "Given the memory directory structure, then each agent has skills/hive/agents/memories/{agent-name}/"
+  - "Given a memory file, then it has frontmatter with: name, type (pattern|pitfall|override|codebase), agent, timestamp"
+  - "Given memory types, then they cover: repeatable patterns, pitfall warnings, override insights, codebase-specific understanding"
+  - "Given the schema, then there's a clear distinction between what gets kept vs discarded"
+
+steps:
+  - id: design-schema
+    description: |
+      Design the agent memory system. Create a reference doc at
+      skills/hive/references/agent-memory-schema.md covering:
+
+      **Storage:** skills/hive/agents/memories/{agent-name}/
+      - One markdown file per memory (like user memories)
+      - Frontmatter: name, description, type, agent, timestamp
+
+      **Memory types:**
+      - pattern — repeatable approach that worked ("do this in similar contexts")
+      - pitfall — lesson learned that prevents future mistakes ("don't do X because Y")
+      - override — insight that supersedes an existing memory (update, don't duplicate)
+      - codebase — project-specific understanding that frames future work
+
+      **Keep criteria (promote):**
+      - Repeatable patterns worth applying again
+      - Findings that override existing insights
+      - Lessons learned from failures (future pitfall prevention)
+      - Codebase-specific context that helps frame understanding
+
+      **Discard criteria:**
+      - One-off execution details
+      - Context only relevant to the immediate task
+      - Already captured in existing memories
+      - Derivable from reading current code/config
+
+      Also create the directory structure for all existing agents.
+    agent: developer
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/agents/ — agent personas that will have memories
+    - /Users/don/.claude/projects/-Users-don-Documents-herd/memory/ — user memory system for pattern reference
+
+files_to_modify:
+  - file: skills/hive/references/agent-memory-schema.md
+    change: NEW FILE — agent memory format, types, keep/discard criteria
+  - file: skills/hive/agents/memories/
+    change: NEW DIRECTORIES — per-agent memory directories
+
+references:
+  - /Users/don/.claude/projects/-Users-don-Documents-herd/memory/project_episode_redesign.md — design notes

@@ -1,0 +1,50 @@
+name: hive-phase10
+title: "Hive Phase 10: Test Swarm (Generalized MTS)"
+description: |
+  Generalize the Mobile Test Swarm (MTS) into a universal test swarm for
+  plugin-hive. Supports mobile (Maestro), web, API, and backend testing.
+  Ports the 8-task pipeline (context → baseline → author → validate →
+  execute → file bugs → report) and 6 agent roles. Shindig is the primary
+  test target but the framework is project-agnostic.
+
+  Source: ~/Documents/WorkFlow/src/modules/mts/ and
+  ~/Documents/KMP/Shindig/mts-package/
+target_codebase: /Users/don/Documents/herd
+
+stories:
+  - id: test-swarm-design
+    title: Design generalized test swarm architecture from MTS
+    complexity: high
+    depends_on: []
+  - id: test-agents
+    title: Port MTS agent roles to Hive personas (scout, architect, worker, inspector, sentinel)
+    complexity: medium
+    depends_on: [test-swarm-design]
+  - id: test-workflow
+    title: Create test swarm workflow definition (8-task pipeline)
+    complexity: medium
+    depends_on: [test-swarm-design]
+  - id: context-gathering
+    title: Implement context gathering and baseline management
+    complexity: medium
+    depends_on: [test-agents, test-workflow]
+  - id: test-authoring
+    title: Implement test authoring with framework detection (Maestro, Playwright, pytest, etc.)
+    complexity: high
+    depends_on: [context-gathering]
+  - id: test-execution
+    title: Implement parallel test execution with platform dispatch
+    complexity: high
+    depends_on: [test-authoring]
+  - id: bug-triage
+    title: Implement bug triage with severity classification and auto-routing
+    complexity: medium
+    depends_on: [test-execution]
+  - id: coverage-validation
+    title: Implement coverage validation against story requirements
+    complexity: medium
+    depends_on: [test-authoring]
+  - id: test-reporting
+    title: Implement session report compilation
+    complexity: low
+    depends_on: [test-execution, bug-triage, coverage-validation]

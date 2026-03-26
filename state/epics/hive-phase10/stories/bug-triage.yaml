@@ -1,0 +1,42 @@
+id: bug-triage
+epic: hive-phase10
+title: Implement bug triage with severity classification and auto-routing
+status: pending
+complexity: medium
+depends_on: [test-execution]
+
+description: |
+  Define how the test-sentinel triages test failures: classify severity
+  (critical/high/medium/low), determine auto-routing policy (low-severity
+  auto-routes for fixing, high-severity escalates to human), and generate
+  bug reports with AI hypothesis for root cause.
+
+  Integrates with the task tracking adapter (phase 7) for routing to
+  external trackers.
+
+acceptance_criteria:
+  - "Given test failures, then each is classified by severity"
+  - "Given low-severity bugs, then they auto-route (to task tracker or dev queue)"
+  - "Given high-severity bugs, then they escalate to human with hypothesis"
+  - "Given bug reports, then they include: description, severity, hypothesis, reproduction steps, screenshots"
+
+steps:
+  - id: design-triage
+    description: |
+      Add bug triage protocol to test-swarm-architecture.md:
+      - Severity classification criteria
+      - Auto-routing policy (configurable thresholds)
+      - Bug report format with AI hypothesis
+      - Integration with task tracking adapter
+      - Adaptive learning: sentinel learns triage patterns from user feedback
+      Source: ~/Documents/WorkFlow/src/modules/mts/commands/mts-file-bugs.md
+    agent: developer
+
+context:
+  key_files:
+    - ~/Documents/WorkFlow/src/modules/mts/commands/mts-file-bugs.md
+    - skills/hive/references/task-tracking-adapter.md
+
+files_to_modify:
+  - file: skills/hive/references/test-swarm-architecture.md
+    change: Add bug triage section

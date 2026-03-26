@@ -1,0 +1,34 @@
+id: knowledge-project-memory
+epic: hive-phase9
+title: Add project knowledge store (past decisions, quality feedback)
+status: pending
+complexity: medium
+depends_on: [knowledge-layer-design]
+
+description: |
+  Add project-level knowledge store: past cycle outputs, decision history
+  (from cycle state docs), and quality feedback (what gates rejected and why).
+  Agents query this during execution to avoid repeating past mistakes.
+
+acceptance_criteria:
+  - "Given past cycle states exist, then agents can query decision history"
+  - "Given past gate rejections, then the reasons are queryable for pattern detection"
+  - "Given the project store, then it builds on agent memories + cycle state docs"
+
+steps:
+  - id: design-project-store
+    description: |
+      Update knowledge-layer.md with project knowledge specifics.
+      Define how cycle state history and gate feedback are indexed and queryable.
+      Integrate with existing agent memory system and cycle state schema.
+    agent: developer
+
+context:
+  key_files:
+    - skills/hive/references/knowledge-layer.md
+    - skills/hive/references/cycle-state-schema.md
+    - skills/hive/references/agent-memory-schema.md
+
+files_to_modify:
+  - file: skills/hive/references/knowledge-layer.md
+    change: Add project knowledge section

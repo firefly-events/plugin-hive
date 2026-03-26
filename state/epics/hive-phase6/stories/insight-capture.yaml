@@ -1,0 +1,74 @@
+id: insight-capture
+epic: hive-phase6
+title: Add insight capture during agent execution
+status: pending
+complexity: medium
+depends_on: [agent-memory-schema]
+
+description: |
+  Define how agents capture insights during execution. Not every step produces
+  an insight — only when something non-obvious, reusable, or surprising happens.
+  Insights are written to a staging area during execution and evaluated at
+  session end.
+
+acceptance_criteria:
+  - "Given an agent encounters a non-obvious finding, then they can write an insight to the staging area"
+  - "Given the staging area, then insights are stored at state/insights/{epic-id}/{story-id}/{agent}.yaml"
+  - "Given an insight file, then it contains: agent, type (pattern|pitfall|override|codebase), summary, detail, and relevance scope"
+  - "Given the agent persona docs, then they include instructions for when and how to capture insights"
+
+steps:
+  - id: design-capture-flow
+    description: |
+      Design the insight capture mechanism:
+
+      **Staging location:** state/insights/{epic-id}/{story-id}/
+      - One file per insight (agent may produce 0-N per step)
+      - Named: {agent}-{short-slug}.yaml
+
+      **Insight format:**
+      ```yaml
+      agent: developer
+      type: pitfall
+      summary: "One-line description"
+      detail: |
+        Full explanation of what was found and why it matters.
+      scope: "codebase"  # or "universal"
+      related_files:
+        - path/to/relevant/file
+      ```
+
+      **When to capture (add to agent persona docs):**
+      - "This approach worked — I should do it again in similar contexts" → pattern
+      - "This failed because X — avoid this in the future" → pitfall
+      - "This contradicts what I previously knew about this codebase" → override
+      - "This codebase does X in a non-obvious way" → codebase
+
+      **When NOT to capture:**
+      - Routine step completion
+      - Expected behavior
+      - Information derivable from reading the code
+
+      Update all agent personas with a brief "Insight capture" section.
+    agent: developer
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/references/agent-memory-schema.md — memory types and criteria
+    - skills/hive/agents/ — all personas to update with capture instructions
+
+files_to_modify:
+  - file: skills/hive/references/agent-memory-schema.md
+    change: Add insight staging format and capture criteria
+  - file: skills/hive/agents/developer.md
+    change: Add brief insight capture section
+  - file: skills/hive/agents/researcher.md
+    change: Add brief insight capture section
+  - file: skills/hive/agents/tester.md
+    change: Add brief insight capture section
+  - file: skills/hive/agents/reviewer.md
+    change: Add brief insight capture section
+
+references:
+  - skills/hive/references/agent-memory-schema.md

@@ -1,0 +1,243 @@
+id: quality-gate-hook
+epic: hive-phase2
+title: PostToolUse Quality Gate Hook
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Create a PostToolUse hook that validates code quality after Write/Edit/Bash tool
+  calls during workflow execution. The hook checks for lint failures, test failures,
+  and build errors. It only activates when a Hive workflow is running (detected by
+  the presence of state files).
+
+  The hook follows the pattern from the context-mode plugin's PostToolUse hook at:
+  ~/.claude/plugins/cache/context-mode/context-mode/1.0.22/hooks/posttooluse.mjs
+
+acceptance_criteria:
+  - "Given a Write or Edit tool call during workflow execution, when the hook runs, then it checks if the modified file passes lint"
+  - "Given a Bash tool call that runs tests, when tests fail, then the hook captures pass/fail counts for gate evaluation"
+  - "Given NO active Hive workflow (no state files), when any tool call occurs, then the hook exits immediately without running checks"
+  - "Given the hook output, when it detects a failure, then it returns a message to the user (not a block — hooks inform, the orchestrator decides)"
+  - "Given the hooks.json file, then it registers PostToolUse hooks for Write, Edit, and Bash tool matchers"
+
+steps:
+  - id: study-hook-pattern
+    description: |
+      Read the context-mode PostToolUse hook implementation at:
+      ~/.claude/plugins/cache/context-mode/context-mode/1.0.22/hooks/posttooluse.mjs
+
+      Understand:
+      - How stdin JSON is read (tool_name, tool_input, tool_response)
+      - How the hook determines session context
+      - The <20ms performance requirement
+      - How hooks.json registers matchers
+
+      Also read the context-mode hooks.json to understand the matcher format
+      and ${CLAUDE_PLUGIN_ROOT} variable usage.
+    agent: researcher
+
+  - id: create-hooks-json
+    description: |
+      Create hooks/hooks.json registering PostToolUse hooks for Write, Edit, and Bash.
+      Follow the context-mode pattern:
+      ```json
+      {
+        "hooks": {
+          "PostToolUse": [
+            {
+              "matcher": "Write",
+              "hooks": [{ "type": "command", "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse.mjs" }]
+            },
+            {
+              "matcher": "Edit",
+              "hooks": [{ "type": "command", "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse.mjs" }]
+            },
+            {
+              "matcher": "Bash",
+              "hooks": [{ "type": "command", "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse.mjs" }]
+            }
+          ]
+        }
+      }
+      ```
+    agent: developer
+    depends_on: [study-hook-pattern]
+
+  - id: create-posttooluse-hook
+    description: |
+      Create hooks/posttooluse.mjs — the quality gate hook.
+
+      Logic flow:
+      1. Read stdin JSON (tool_name, tool_input, tool_response)
+      2. Check if a Hive workflow is active (look for state/episodes/ with in-progress status)
+      3. If no active workflow → exit immediately (no output)
+      4. If Write/Edit on a source file:
+         - Note the file path for potential lint check
+         - Output informational message: "Hive gate: file modified: {path}"
+      5. If Bash and command contains test/lint/build keywords:
+         - Parse exit code from tool_response
+         - Output: "Hive gate: {test|lint|build} {passed|failed}"
+
+      Performance: must complete in <20ms. No network calls, no heavy processing.
+      If anything fails, exit silently — hooks must never block the session.
+    agent: developer
+    depends_on: [study-hook-pattern]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - hooks/ — directory to create files in (currently empty or nonexistent)
+    - .claude-plugin/plugin.json — already exists, may need hooks reference
+  inputs_from_previous: []
+
+files_to_modify:
+  - file: hooks/hooks.json
+    change: NEW FILE — hook registration for PostToolUse on Write, Edit, Bash
+  - file: hooks/posttooluse.mjs
+    change: NEW FILE — quality gate hook implementation
+
+code_examples:
+  - title: Hook stdin JSON format (from Claude Code docs)
+    language: json
+    code: |
+      {
+        "tool_name": "Write",
+        "tool_input": {
+          "file_path": "/Users/don/Documents/herd/skills/hive/agents/tester.md",
+          "content": "..."
+        },
+        "tool_response": "File written successfully",
+        "session_id": "abc123",
+        "project_dir": "/Users/don/Documents/herd"
+      }
+  - title: Context-mode hook pattern (reference)
+    language: javascript
+    code: |
+      #!/usr/bin/env node
+      // PostToolUse hook — must be fast (<20ms), silent on failure
+      import { readFileSync } from 'node:fs';
+
+      try {
+        const raw = readFileSync('/dev/stdin', 'utf8');
+        const input = JSON.parse(raw);
+
+        // ... process input ...
+
+        // Output is optional — only output if there's something to report
+      } catch {
+        // Silent failure — hooks must never block
+      }
+  - title: Target hook implementation shape
+    language: javascript
+    code: |
+      #!/usr/bin/env node
+      import { readFileSync, existsSync } from 'node:fs';
+
+      try {
+        const raw = readFileSync('/dev/stdin', 'utf8');
+        const { tool_name, tool_input, tool_response } = JSON.parse(raw);
+
+        // Only run during active Hive workflows
+        const stateDir = `${process.env.CLAUDE_PROJECT_DIR || process.cwd()}/state/episodes`;
+        if (!existsSync(stateDir)) process.exit(0);
+
+        if (tool_name === 'Write' || tool_name === 'Edit') {
+          const filePath = tool_input?.file_path || '';
+          if (filePath.match(/\.(ts|js|py|kt|swift)$/)) {
+            console.log(JSON.stringify({
+              hookSpecificOutput: `[hive-gate] Source file modified: ${filePath}`
+            }));
+          }
+        }
+
+        if (tool_name === 'Bash') {
+          const cmd = tool_input?.command || '';
+          const resp = typeof tool_response === 'string' ? tool_response : '';
+          if (cmd.match(/\b(test|jest|pytest|vitest)\b/i)) {
+            const failed = resp.includes('FAIL') || resp.includes('failed');
+            console.log(JSON.stringify({
+              hookSpecificOutput: `[hive-gate] Tests ${failed ? 'FAILED' : 'passed'}`
+            }));
+          }
+        }
+      } catch {
+        // Silent — hooks must never block
+      }
+
+design_decisions:
+  - decision: Hook is informational, not blocking
+    rationale: |
+      PostToolUse hooks run AFTER the tool completes — they can't prevent the action.
+      The hook informs the orchestrator/user about quality status. The orchestrator
+      (SKILL.md execute logic) decides whether to proceed or iterate based on gate
+      criteria defined in the workflow YAML.
+  - decision: Gate activation requires state/episodes/ directory existence
+    rationale: |
+      The hook fires on EVERY Write/Edit/Bash in the session, not just during workflow
+      execution. Checking for the state directory is a cheap way to determine if a
+      Hive workflow is active without maintaining persistent state.
+  - decision: Use Node.js (mjs) not Python for the hook
+    rationale: |
+      Claude Code hooks use Node.js process spawning. The context-mode plugin uses
+      .mjs files. Node.js startup is faster than Python for small scripts, and the
+      plugin infrastructure already expects Node.
+
+behavior_matrix:
+  - condition: "No state/episodes/ directory exists"
+    behavior: "Exit immediately, no output"
+  - condition: "Write/Edit on .ts/.js/.py/.kt/.swift file during active workflow"
+    behavior: "Output: [hive-gate] Source file modified: {path}"
+  - condition: "Write/Edit on .md/.yaml/.json file"
+    behavior: "No output (non-source files don't need lint gates)"
+  - condition: "Bash command contains test/jest/pytest/vitest"
+    behavior: "Parse output for FAIL/failed, output: [hive-gate] Tests passed/FAILED"
+  - condition: "Bash command contains lint/eslint/ruff"
+    behavior: "Parse exit code, output: [hive-gate] Lint passed/FAILED"
+  - condition: "Bash command contains build/tsc/compile"
+    behavior: "Parse exit code, output: [hive-gate] Build passed/FAILED"
+  - condition: "Any hook error"
+    behavior: "Silent exit — never block the session"
+
+dev_notes: |
+  The ${CLAUDE_PLUGIN_ROOT} variable in hooks.json resolves to the plugin's root
+  directory at runtime. For the hive plugin at /Users/don/Documents/herd, this
+  would be /Users/don/Documents/herd.
+
+  PostToolUse hooks receive the tool response, which is helpful for parsing test
+  results. But the response can be very large (full test output). Keep parsing
+  simple — look for keywords (FAIL, passed, error) rather than parsing full output.
+
+  Future improvement: the hook could write gate results to
+  state/gates/{epic-id}/{story-id}/{step-id}.yaml for the orchestrator to read.
+  For now, the console output is sufficient — the orchestrator sees it in the
+  conversation context.
+
+risks:
+  - severity: medium
+    description: |
+      The hook fires on every Write/Edit/Bash in the session, not just during
+      workflow execution. If the state/episodes/ check is wrong (directory exists
+      from a previous run), the hook may fire unexpectedly.
+    mitigation: |
+      Check for an active (in-progress) episode file, not just directory existence.
+      Or use a dedicated state/active-workflow.yaml marker file.
+  - severity: low
+    description: |
+      Node.js startup time (~30ms) may exceed the <20ms target on some machines.
+    mitigation: |
+      The 20ms target is aspirational. Context-mode's hook is also Node.js and
+      works fine in practice. Keep the script minimal to stay fast.
+  - severity: low
+    description: |
+      Test output parsing is fragile — different test frameworks have different
+      output formats. "FAIL" in jest is different from "FAILED" in pytest.
+    mitigation: |
+      Use broad keyword matching (case-insensitive). False positives (flagging
+      a passing test as failed) are worse than false negatives — err on the side
+      of "passed" if uncertain.
+
+references:
+  - ~/.claude/plugins/cache/context-mode/context-mode/1.0.22/hooks/posttooluse.mjs — pattern
+  - ~/.claude/plugins/cache/context-mode/context-mode/1.0.22/hooks/hooks.json — registration format
+  - .claude-plugin/plugin.json — plugin manifest

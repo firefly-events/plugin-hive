@@ -1,0 +1,34 @@
+id: coverage-validation
+epic: hive-phase10
+title: Implement coverage validation against story requirements
+status: pending
+complexity: medium
+depends_on: [test-authoring]
+
+description: |
+  Define how the test-inspector validates that authored tests adequately
+  cover the story's acceptance criteria. Runs in parallel with test authoring
+  and provides feedback if gaps are found.
+
+acceptance_criteria:
+  - "Given authored tests, then each acceptance criterion has at least one corresponding test"
+  - "Given coverage gaps, then the inspector reports which criteria are untested"
+  - "Given validation runs parallel with authoring, then feedback can iterate"
+
+steps:
+  - id: design-coverage
+    description: |
+      Add coverage validation protocol to test-swarm-architecture.md:
+      - Mapping: acceptance criteria → test cases
+      - Gap detection and reporting
+      - Parallel execution with test authoring (feedback loop)
+      Source: ~/Documents/WorkFlow/src/modules/mts/commands/mts-validate-coverage.md
+    agent: developer
+
+context:
+  key_files:
+    - ~/Documents/WorkFlow/src/modules/mts/commands/mts-validate-coverage.md
+
+files_to_modify:
+  - file: skills/hive/references/test-swarm-architecture.md
+    change: Add coverage validation section

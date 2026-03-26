@@ -1,0 +1,41 @@
+id: knowledge-layer-design
+epic: hive-phase9
+title: Design agent-callable knowledge layer architecture
+status: pending
+complexity: high
+depends_on: []
+
+description: |
+  Design the knowledge layer that agents can query during execution. Three
+  sources: external docs (context7/chub), project knowledge (past decisions,
+  quality feedback), and capability catalog (available tools/agents/workflows).
+
+  Inspired by Pattern 5 from architecture-influences.md. Builds on the agent
+  memory system (phase 6) but broader — cross-agent, cross-session, with
+  annotation capability.
+
+acceptance_criteria:
+  - "Given the knowledge layer design, then it defines three source types and their access patterns"
+  - "Given agents during execution, then they can query the knowledge layer for relevant information"
+  - "Given agents find new knowledge, then they can annotate it back for future sessions"
+  - "Given the architecture, then it integrates with existing agent memory system"
+
+steps:
+  - id: design-architecture
+    description: |
+      Create skills/hive/references/knowledge-layer.md defining:
+      - Three sources: external docs, project knowledge, capability catalog
+      - Access patterns: agent-callable (tool use), context injection (orchestrator pre-fetch), annotation API
+      - Integration with agent memories (phase 6)
+      - How the orchestrator pre-fetches relevant knowledge during story ingestion
+      Source: /Users/don/Documents/project-hive/docs/plans/architecture-influences.md Pattern 5
+    agent: developer
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/docs/plans/architecture-influences.md — Pattern 5
+    - skills/hive/references/agent-memory-schema.md
+
+files_to_modify:
+  - file: skills/hive/references/knowledge-layer.md
+    change: NEW FILE

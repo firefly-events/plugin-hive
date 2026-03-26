@@ -1,0 +1,35 @@
+id: gate-control-plane
+epic: hive-phase8
+title: Create YAML-defined gate policy system
+status: pending
+complexity: medium
+depends_on: [quality-gate-engine]
+
+description: |
+  Gate policies defined in YAML per workflow — structural checks, consistency
+  checks, coverage checks, custom checks. Different workflows have different
+  policies (planning gates check document structure, dev gates check tests pass).
+
+acceptance_criteria:
+  - "Given a workflow, then its gate policies are defined in a YAML file"
+  - "Given policies, then they support: structural, consistency, coverage, and custom evaluators"
+  - "Given new quality rules, then they can be added via YAML without code changes"
+
+steps:
+  - id: design-policies
+    description: |
+      Add gate policy system to quality-gates.md:
+      - Policy file format: skills/hive/gate-policies/{workflow}.yaml
+      - Policy types: structural, consistency, coverage, custom
+      - Evaluator interface per type
+      - How policies integrate with the gate engine
+      Source: /Users/don/Documents/project-hive/docs/plans/architecture-influences.md Pattern 4
+    agent: developer
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/docs/plans/architecture-influences.md — Pattern 4
+
+files_to_modify:
+  - file: skills/hive/references/quality-gates.md
+    change: Add gate policy system section

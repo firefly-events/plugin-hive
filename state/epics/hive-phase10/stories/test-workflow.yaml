@@ -1,0 +1,42 @@
+id: test-workflow
+epic: hive-phase10
+title: Create test swarm workflow definition (8-task pipeline)
+status: pending
+complexity: medium
+depends_on: [test-swarm-design]
+
+description: |
+  Create the test swarm workflow YAML defining the 8-task pipeline.
+  Parallel phases: author+validate run together, platform execution runs
+  together. Framework-specific configuration per project.
+
+acceptance_criteria:
+  - "Given the workflow exists, then /hive:execute can load it for test swarms"
+  - "Given the workflow, then it defines 8 phases with correct dependencies and parallelism"
+  - "Given framework config, then the workflow adapts to the detected test framework"
+
+steps:
+  - id: create-workflow
+    description: |
+      Create skills/hive/workflows/test-swarm.workflow.yaml with 8 phases:
+      1. gather-context (test-scout)
+      2. verify-baseline (test-scout)
+      3. author-tests (test-architect) — parallel with validate-coverage
+      4. validate-coverage (test-inspector) — parallel with author-tests
+      5. execute-platform-a (test-worker) — parallel with platform-b
+      6. execute-platform-b (test-worker) — parallel with platform-a
+      7. file-bugs (test-sentinel)
+      8. compile-report (team-lead)
+
+      Follow workflow-schema.md format.
+    agent: developer
+
+context:
+  key_files:
+    - skills/hive/references/test-swarm-architecture.md
+    - skills/hive/references/workflow-schema.md
+    - skills/hive/workflows/development.classic.workflow.yaml — format reference
+
+files_to_modify:
+  - file: skills/hive/workflows/test-swarm.workflow.yaml
+    change: NEW FILE

@@ -1,0 +1,36 @@
+id: test-authoring
+epic: hive-phase10
+title: Implement test authoring with framework detection
+status: pending
+complexity: high
+depends_on: [context-gathering]
+
+description: |
+  Define how the test-architect authors tests based on detected framework.
+  Framework detection: check project for Maestro (mobile), Playwright (web),
+  pytest (Python), Jest/Vitest (JS), XCTest (iOS), JUnit (Android/JVM).
+  The architect writes tests in the detected framework's format.
+
+acceptance_criteria:
+  - "Given a project with Maestro config, then tests are authored as Maestro YAML flows"
+  - "Given a project with Playwright, then tests are authored as Playwright scripts"
+  - "Given no known framework, then the architect suggests appropriate frameworks"
+  - "Given authored tests, then they're validated against story acceptance criteria"
+
+steps:
+  - id: design-authoring
+    description: |
+      Add test authoring protocol to test-swarm-architecture.md:
+      - Framework detection heuristics (config files, dependencies, project structure)
+      - Per-framework test generation templates
+      - Coverage mapping: acceptance criteria → test cases
+      Source: ~/Documents/WorkFlow/src/modules/mts/commands/mts-author-tests.md
+    agent: developer
+
+context:
+  key_files:
+    - ~/Documents/WorkFlow/src/modules/mts/commands/mts-author-tests.md
+
+files_to_modify:
+  - file: skills/hive/references/test-swarm-architecture.md
+    change: Add test authoring section

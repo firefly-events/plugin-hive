@@ -1,0 +1,120 @@
+id: analyst-agent
+epic: hive-phase4
+title: Port analyst/PM blueprints to Hive agent persona
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Combine the analyst and PM blueprints from Project Hive into a single Hive
+  agent persona at skills/hive/agents/analyst.md. The analyst blueprint focuses
+  on evidence-driven research and requirements analysis, while the PM blueprint
+  focuses on product strategy, prioritization, and success metrics.
+
+  In the Hive context, these roles overlap — the agent needs to decompose
+  requirements, identify gaps, prioritize scope, and define measurable acceptance
+  criteria. Combining them avoids having two very similar agents.
+
+acceptance_criteria:
+  - "Given skills/hive/agents/analyst.md exists, when read, then it follows the same section structure as researcher.md"
+  - "Given the analyst persona, then it covers: requirements decomposition, gap analysis, scope management, prioritization, success metrics"
+  - "Given the analyst produces output, then every requirement has Given/When/Then acceptance criteria"
+  - "Given the analyst produces output, then scope boundaries are explicit (in-scope and out-of-scope with rationale)"
+  - "Given the output format, then it includes: requirements breakdown, gap report, priority matrix, and success metrics"
+
+steps:
+  - id: research-blueprints
+    description: |
+      Read both source blueprints:
+      - /Users/don/Documents/project-hive/blueprints/planning-team/analyst.yaml
+      - /Users/don/Documents/project-hive/blueprints/planning-team/pm.yaml
+
+      Also read the existing researcher.md format at skills/hive/agents/researcher.md.
+
+      Key attributes to merge:
+
+      From analyst.yaml:
+      - Role: Technical Researcher & Analyst
+      - Expertise: research, requirements analysis, gap analysis, edge cases, trade-offs
+      - Capabilities: research-brief, analyze-requirements, validate-completeness
+      - Quality: testability (Given/When/Then), no ambiguity, traceability
+      - Has subagent config (directed-researcher + web-researcher) — note this
+        but don't include in the persona (Hive doesn't use blueprint subagents)
+
+      From pm.yaml:
+      - Role: Product Manager
+      - Expertise: product strategy, roadmap, prioritization, market analysis
+      - Capabilities: product-brief, PRD, feature prioritization, success metrics
+      - Quality: user-value focus, measurable outcomes, scope clarity
+    agent: researcher
+
+  - id: write-persona
+    description: |
+      Create skills/hive/agents/analyst.md combining both blueprints. Structure:
+
+      - Opening paragraph: merge analyst + PM descriptions. Emphasize evidence-driven
+        requirements analysis with product thinking.
+      - "What you do": decompose requirements, identify gaps, define acceptance
+        criteria, prioritize features, define success metrics, validate completeness
+      - "Areas of expertise": union of both blueprints' expertise lists
+      - "Quality standards": merge both — testability, no ambiguity, traceability,
+        user-value focus, measurable outcomes, scope clarity
+      - "Output format": structured requirements analysis template with sections:
+        - Requirements Breakdown (each with Given/When/Then acceptance criteria)
+        - Gap Report (missing requirements, edge cases, ambiguities)
+        - Scope Boundaries (in-scope, out-of-scope with rationale)
+        - Priority Matrix (impact vs effort, with user-value justification)
+        - Success Metrics (quantifiable targets)
+
+      Tone: evidence-driven and concise, every claim cites a source, decisions
+      grounded in user value.
+    agent: developer
+    depends_on: [research-blueprints]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/agents/researcher.md — format to match
+    - skills/hive/agents/developer.md — format to match
+
+files_to_modify:
+  - file: skills/hive/agents/analyst.md
+    change: NEW FILE — combined analyst/PM agent persona
+
+design_decisions:
+  - decision: Combine analyst and PM into one persona rather than two
+    rationale: |
+      In the Hive context, these roles overlap heavily. The analyst does requirements
+      research and the PM does requirements prioritization — both produce requirements
+      artifacts. One persona with both capabilities is simpler and avoids confusion
+      about which to assign.
+  - decision: Name the file analyst.md not pm.md
+    rationale: |
+      "Analyst" better describes the primary function (analysis and decomposition)
+      while PM capabilities (prioritization, success metrics) are included as
+      additional skills. The brief suggested analyst.md.
+  - decision: Do not port the blueprint's subagent config
+    rationale: |
+      The analyst blueprint defines directed-researcher and web-researcher subagents.
+      Hive agents are prompted personas, not runtime configs with subagent spawning.
+      The researcher agent already covers codebase exploration.
+
+dev_notes: |
+  The PM blueprint's "define-success-metrics" capability is valuable for Hive
+  stories — when the analyst agent is used in planning, it can define concrete
+  metrics that the tester agent later validates. This creates a planning → testing
+  feedback loop.
+
+risks:
+  - severity: low
+    description: |
+      Combining two blueprints may lose nuance from either role.
+    mitigation: |
+      The key qualities from both are preserved (evidence-driven analysis from
+      analyst + user-value focus from PM). If more separation is needed later,
+      the persona can be split.
+
+references:
+  - /Users/don/Documents/project-hive/blueprints/planning-team/analyst.yaml — source
+  - /Users/don/Documents/project-hive/blueprints/planning-team/pm.yaml — source
+  - skills/hive/agents/researcher.md — format reference

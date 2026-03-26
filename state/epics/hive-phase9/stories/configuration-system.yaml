@@ -1,0 +1,34 @@
+id: configuration-system
+epic: hive-phase9
+title: Create hive.config.yaml for centralized configuration
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Create a centralized configuration file for all Hive settings: token budgets,
+  gate thresholds, trust decay rates, context window limits, MCP server configs,
+  default methodology, and agent model tier preferences.
+
+acceptance_criteria:
+  - "Given hive.config.yaml exists, then all configurable settings have defaults"
+  - "Given the config, then it covers: token budgets, gate thresholds, trust settings, model tiers"
+  - "Given the orchestrator, then it reads config at session start"
+
+steps:
+  - id: design-config
+    description: |
+      Create skills/hive/references/configuration.md defining the schema.
+      Create a default skills/hive/hive.config.yaml template.
+      Source: /Users/don/Documents/project-hive/hive.config.yaml
+    agent: developer
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/hive.config.yaml
+
+files_to_modify:
+  - file: skills/hive/references/configuration.md
+    change: NEW FILE
+  - file: skills/hive/hive.config.yaml
+    change: NEW FILE — default config template

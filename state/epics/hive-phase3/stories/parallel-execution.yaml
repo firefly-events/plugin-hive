@@ -1,0 +1,233 @@
+id: parallel-execution
+epic: hive-phase3
+title: Add Parallel Execution via Agent Teams
+status: pending
+complexity: high
+depends_on: [agent-teams-guide]
+
+description: |
+  Update the execute command in ORCHESTRATOR.md to detect agent teams availability
+  and use them for parallel story execution when independent stories exist. This is
+  the capstone of Phase 3 — it wires together agent teams detection, epic dependency
+  analysis, and team task generation.
+
+  The execute command already works sequentially (Phase 1). This story adds a
+  parallel path that activates when CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 is set
+  AND the epic has independent stories (stories without mutual dependencies).
+
+acceptance_criteria:
+  - "Given CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1, when /hive:execute runs an epic with independent stories, then it uses agent teams for parallel execution"
+  - "Given agent teams are NOT available (env var not set), when /hive:execute runs, then it falls back to sequential execution (existing behavior)"
+  - "Given an epic where ALL stories have dependencies, when agent teams are available, then sequential execution is used (no benefit to parallelism)"
+  - "Given parallel execution, when independent stories complete, then dependent stories unblock automatically"
+  - "Given the execute command, when it detects agent teams, then it generates a team prompt describing tasks and dependencies"
+  - "Given the ORCHESTRATOR.md execute section, then it references agent-teams-guide.md for team mechanics"
+
+steps:
+  - id: analyze-dependency-graph
+    description: |
+      Read the execute command section in ORCHESTRATOR.md. Understand the current
+      sequential flow. Identify where the parallel path branches:
+
+      After step 3 (topological sort), before step 4 (for each story):
+      - Check if agent teams are available
+      - Check if the epic has independent stories (stories at the same topo level)
+      - If both: generate team prompt and use agent teams
+      - If either fails: continue with sequential (existing behavior)
+    agent: researcher
+
+  - id: update-execute-command
+    description: |
+      Update the Execute Command section in skills/hive/ORCHESTRATOR.md. Add between
+      the topological sort (step 3) and the story loop (step 4):
+
+      **Step 3.5: Choose execution mode.**
+
+      Check `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` env var. If set to `1` AND
+      the topological sort reveals stories at the same depth level (independent
+      stories), use agent teams. Otherwise, continue with sequential execution.
+
+      **For agent team execution:**
+
+      Generate a natural-language team creation prompt that describes:
+      - The epic name and goal
+      - Each story as a task with: ID, title, description summary, agent personas
+      - Dependencies between tasks (maps from story depends_on)
+      - Which tasks can run in parallel (same topo level)
+      - The workflow each task follows (research → implement → test → review → integrate)
+      - Where to write episode records
+
+      The prompt should instruct the lead to:
+      1. Spawn one teammate per independent story group
+      2. Each teammate reads their story YAML file for full context
+      3. Each teammate follows the workflow steps sequentially within their story
+      4. Teammates write episode records as they complete steps
+      5. When all teammates finish, the lead produces the epic summary
+
+      **Important:** Keep the sequential path exactly as-is. The parallel path
+      is additive — it's an alternative to step 4, not a replacement.
+
+      See references/agent-teams-guide.md for team mechanics and limitations.
+    agent: developer
+    depends_on: [analyze-dependency-graph]
+
+  - id: add-execution-mode-flag
+    description: |
+      Update the execute skill (skills/execute/SKILL.md) to mention the
+      --parallel flag or agent teams detection:
+      - Note that parallel execution requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+      - Add --sequential flag to force sequential even when teams are available
+      - Update the description to mention parallel execution capability
+    agent: developer
+    depends_on: [update-execute-command]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/ORCHESTRATOR.md — Execute Command section to update
+    - skills/hive/references/agent-teams-guide.md — agent teams reference (created in this epic)
+    - skills/execute/SKILL.md — execute skill entrypoint to update
+    - state/epics/ — epic YAML files with story dependencies
+  inputs_from_previous:
+    - agent-teams-guide: skills/hive/references/agent-teams-guide.md exists with detection and mapping logic
+
+files_to_modify:
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Update Execute Command section — add step 3.5 for execution mode selection and agent team prompt generation
+  - file: skills/execute/SKILL.md
+    change: Update description to mention parallel execution and --sequential flag
+
+code_examples:
+  - title: Execution mode decision logic
+    language: markdown
+    code: |
+      **Step 3.5: Choose execution mode.**
+
+      Determine whether to use agent teams or sequential execution:
+
+      1. Check: Is `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` set to `1`?
+      2. Check: Does the topological sort reveal multiple stories at depth 0
+         (independent stories with no dependencies)?
+      3. Check: Is `--sequential` flag NOT present in arguments?
+
+      If all three: use **agent team execution** (step 4a below).
+      Otherwise: use **sequential execution** (step 4b — existing behavior).
+  - title: Team creation prompt shape
+    language: markdown
+    code: |
+      Create a team to execute the "hive-phase2" epic.
+
+      ## Tasks
+
+      **Task: tester-agent** (no dependencies — can start immediately)
+      Read the story at state/epics/hive-phase2/stories/tester-agent.yaml
+      and execute the steps described. Write episode records to
+      state/episodes/hive-phase2/tester-agent/.
+
+      **Task: reviewer-agent** (no dependencies — can start immediately)
+      Read the story at state/epics/hive-phase2/stories/reviewer-agent.yaml
+      and execute the steps. Write episodes to state/episodes/hive-phase2/reviewer-agent/.
+
+      **Task: tdd-workflow** (depends on: tester-agent, reviewer-agent, episode-schema)
+      Wait until all dependencies complete, then read and execute the story.
+
+      ## Workflow per task
+      Each task follows the classic development workflow:
+      research → implement → test → review → integrate
+
+      ## Coordination
+      Write episode records after each step. When all tasks complete, report back.
+  - title: Topological depth analysis
+    language: python
+    code: |
+      # Determine which stories can run in parallel
+      # Stories at the same topological depth have no mutual dependencies
+      depth_0 = [s for s in stories if not s.depends_on]  # independent
+      depth_1 = [s for s in stories if all(d in depth_0_ids for d in s.depends_on)]
+      # If len(depth_0) > 1, parallel execution adds value
+
+design_decisions:
+  - decision: Agent teams are used via natural language prompts, not config file generation
+    rationale: |
+      Claude Code creates teams from natural language descriptions. The execute
+      command generates a descriptive prompt explaining the tasks and dependencies,
+      and Claude Code handles the teammate spawning and task management internally.
+  - decision: The --sequential flag forces sequential even when teams are available
+    rationale: |
+      Useful for debugging or when agent teams behave unexpectedly. The user
+      should always be able to fall back to the known-working sequential path.
+  - decision: Each teammate reads the story YAML file directly
+    rationale: |
+      Story files are self-contained by design. The teammate doesn't need the
+      epic context or other stories — just its assigned story file. This was
+      the reason we made stories so detailed.
+
+behavior_matrix:
+  - condition: "AGENT_TEAMS=1, epic has independent stories, no --sequential flag"
+    behavior: "Generate team prompt, use agent teams for parallel execution"
+  - condition: "AGENT_TEAMS=1, epic has NO independent stories (all sequential)"
+    behavior: "Use sequential execution (teams add no value)"
+  - condition: "AGENT_TEAMS not set or =0"
+    behavior: "Use sequential execution (teams not available)"
+  - condition: "AGENT_TEAMS=1 but --sequential flag provided"
+    behavior: "Use sequential execution (user override)"
+  - condition: "Epic has only 1 story"
+    behavior: "Use sequential execution (nothing to parallelize)"
+
+dev_notes: |
+  The parallel execution path is conceptually simple but the prompt generation
+  is the tricky part. The team creation prompt must convey:
+  1. What each task does (summary, not full story content — teammate reads the file)
+  2. Dependencies between tasks (so the system blocks correctly)
+  3. The workflow each task follows (which phases)
+  4. Where to write outputs (episode paths)
+
+  The sequential path must remain EXACTLY as-is. Don't refactor it — just add
+  a conditional branch before step 4 that goes to either 4a (parallel) or 4b
+  (sequential, existing code).
+
+  Agent teams have a limitation: task status can lag. Teammates sometimes fail
+  to mark tasks as completed, blocking dependents. The guide should mention this
+  and suggest the user check /hive:status if execution stalls.
+
+risks:
+  - severity: high
+    description: |
+      Agent teams are experimental. The feature may behave differently than
+      documented, or may have bugs with dependency tracking. Teammates may
+      not properly claim tasks or report completion.
+    mitigation: |
+      The sequential fallback is always available. The parallel path should
+      be presented as an optimization, not the default. Recommend users test
+      with a small epic first.
+  - severity: medium
+    description: |
+      The team creation prompt may be too long or complex for Claude Code to
+      parse correctly. Large epics (10+ stories) could produce unwieldy prompts.
+    mitigation: |
+      For large epics, limit the prompt to the top-level structure (task IDs
+      and dependencies) and instruct each teammate to read their story file
+      for details. Don't inline story content in the prompt.
+  - severity: medium
+    description: |
+      Multiple teammates writing to the same codebase in parallel could cause
+      merge conflicts if stories touch overlapping files.
+    mitigation: |
+      Stories should be decomposed to minimize file overlap (the plan command
+      should surface this risk). Agent teams use git worktrees for isolation
+      when available. If conflicts occur, the integrate step handles resolution.
+  - severity: low
+    description: |
+      The ORCHESTRATOR.md execute section is already long. Adding parallel
+      execution logic makes it longer, potentially exceeding what Claude can
+      reliably follow in one skill invocation.
+    mitigation: |
+      Keep the addition concise. The parallel path should be a self-contained
+      block (step 3.5 + step 4a) that references agent-teams-guide.md for
+      details rather than inlining everything.
+
+references:
+  - skills/hive/ORCHESTRATOR.md — Execute Command section
+  - skills/hive/references/agent-teams-guide.md — agent teams mechanics
+  - skills/execute/SKILL.md — skill entrypoint
+  - https://code.claude.com/docs/en/agent-teams — official docs

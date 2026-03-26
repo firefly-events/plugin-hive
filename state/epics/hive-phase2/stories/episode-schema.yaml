@@ -1,0 +1,140 @@
+id: episode-schema
+epic: hive-phase2
+title: Create Episode Schema Reference
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Create the episode schema reference document for the Hive plugin. Episodes are
+  the inter-phase communication records — after each workflow step completes, the
+  orchestrator writes an episode YAML summarizing what happened, what was decided,
+  and what artifacts were produced. Downstream phases and the status command read
+  these to understand prior context.
+
+  Simplify from the full Hive episode JSON schema at:
+  /Users/don/Documents/project-hive/schemas/episode.json
+
+acceptance_criteria:
+  - "Given the reference doc, when an agent or the orchestrator needs to write an episode, then the format is clearly documented with examples"
+  - "Given an episode record, then it contains: step_id, agent, status, conclusions, decisions, artifacts, and timestamp"
+  - "Given the /hive:status command, then it can parse episode files to report workflow progress"
+  - "Given the execute command, then it can pass episode context from completed steps to downstream steps"
+
+steps:
+  - id: read-hive-schema
+    description: |
+      Read the full Hive episode JSON schema at:
+      /Users/don/Documents/project-hive/schemas/episode.json
+
+      Identify which fields are essential for Claude Code agent-to-agent
+      communication and which are orchestrator-specific (tokenUsage, durationMs)
+      that we can simplify or make optional.
+    agent: researcher
+
+  - id: write-schema-reference
+    description: |
+      Create skills/hive/references/episode-schema.md documenting:
+      1. What episodes are and when they're written
+      2. The YAML format with all fields explained
+      3. A concrete example episode
+      4. How episodes are stored (state/episodes/{epic-id}/{story-id}/{step-id}.yaml)
+      5. How to read episodes for downstream context
+
+      Simplify from Hive's JSON Schema — use YAML since that's the plugin's format.
+      Make tokenUsage and durationMs optional (nice for tracking but not required
+      for agent communication). Add a context_for_next_phase field that Hive's
+      schema didn't have — this is the key handoff content.
+    agent: developer
+    depends_on: [read-hive-schema]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/references/workflow-schema.md — existing reference doc format to match
+    - skills/hive/references/methodology-routing.md — existing reference doc format to match
+
+files_to_modify:
+  - file: skills/hive/references/episode-schema.md
+    change: NEW FILE — episode schema reference document
+
+code_examples:
+  - title: Episode record example
+    language: yaml
+    code: |
+      # state/episodes/hive-phase2/tester-agent/research.yaml
+      step_id: research
+      story_id: tester-agent
+      epic_id: hive-phase2
+      agent: researcher
+      status: completed
+      timestamp: "2026-03-24T23:45:00Z"
+
+      conclusions:
+        - "Hive test-agent blueprint provides comprehensive persona definition"
+        - "Existing agent format uses markdown with consistent section structure"
+        - "TDD context isolation is enforced via prompt inputs, not tool restrictions"
+
+      decisions_made:
+        - "Follow researcher.md / developer.md section structure for consistency"
+        - "Include both TDD and Classic mode descriptions in single persona file"
+
+      artifacts_produced:
+        - skills/hive/agents/tester.md
+
+      context_for_next_phase: |
+        The tester agent persona has been created at skills/hive/agents/tester.md.
+        It supports two modes: TDD (spec-only input, writes failing tests) and
+        Classic (receives implementation code, writes passing tests). The mode is
+        controlled by the workflow definition's input configuration, not the persona.
+  - title: Hive episode schema fields (source)
+    language: json
+    code: |
+      {
+        "required": ["taskId", "agentId", "blueprintName", "status",
+                      "conclusions", "decisionsMade", "artifactsProduced",
+                      "tokenUsage", "durationMs", "timestamp"],
+        "properties": {
+          "status": { "enum": ["completed", "failed", "escalated"] },
+          "episodeType": { "enum": ["standard", "elicitation"] }
+        }
+      }
+
+design_decisions:
+  - decision: Episodes use YAML, not JSON
+    rationale: |
+      All other Hive plugin artifacts use YAML (epics, stories, workflows).
+      YAML is more readable for agents and humans, and the episode doesn't
+      need JSON Schema validation — it's a communication format, not an API contract.
+  - decision: Added context_for_next_phase field (not in Hive original)
+    rationale: |
+      Hive's episodes listed conclusions and artifacts but lacked a direct
+      "here's what the next agent needs to know" summary. In Claude Code, where
+      agents are spawned with limited context, this field is the primary handoff
+      mechanism.
+  - decision: tokenUsage and durationMs are optional
+    rationale: |
+      Claude Code doesn't expose per-subagent token counts easily. These fields
+      are nice for cost tracking but not essential for agent-to-agent communication.
+
+dev_notes: |
+  The episode schema reference is read by:
+  1. The SKILL.md execute command — to know how to write episodes after each step
+  2. The SKILL.md status command — to parse episodes for progress reporting
+  3. Downstream agents — to load context from prior phases
+
+  The storage path convention state/episodes/{epic-id}/{story-id}/{step-id}.yaml
+  matches the existing state/ directory structure used by the plan command.
+
+risks:
+  - severity: low
+    description: |
+      This is a reference document, not executable code. The main risk is the
+      format being too verbose for agents to parse quickly.
+    mitigation: |
+      Keep the format lean — required fields only, with optional fields clearly
+      marked. Include a "minimal episode" example alongside the full example.
+
+references:
+  - /Users/don/Documents/project-hive/schemas/episode.json — source schema
+  - skills/hive/references/workflow-schema.md — format to match

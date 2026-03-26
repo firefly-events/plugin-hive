@@ -1,0 +1,51 @@
+id: pair-programmer-agent
+epic: hive-phase5
+title: Port pair-programmer blueprint to Hive agent persona
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Port the pair-programmer blueprint from Project Hive to a Hive agent persona
+  at skills/hive/agents/pair-programmer.md. This agent acts as a sidecar to
+  either frontend or backend developer — a collaborative coding partner that
+  thinks through edge cases, suggests alternatives, and catches issues in
+  real-time during implementation.
+
+acceptance_criteria:
+  - "Given skills/hive/agents/pair-programmer.md exists, when read, then it follows the Hive persona format"
+  - "Given the pair-programmer is assigned alongside a developer, then it reviews code as it's written and suggests improvements"
+  - "Given the persona, then it covers: real-time code review, edge case identification, alternative approaches, rubber duck debugging"
+
+steps:
+  - id: research-blueprint
+    description: |
+      Read the source blueprint at:
+      /Users/don/Documents/project-hive/blueprints/development-team/pair-programmer.yaml
+      Read skills/hive/agents/developer.md to understand the primary dev persona
+      and how the pair-programmer complements it.
+      Read skills/hive/agents/researcher.md for format reference.
+    agent: researcher
+
+  - id: write-persona
+    description: |
+      Create skills/hive/agents/pair-programmer.md as a sidecar companion to
+      the developer agent. Focus on: collaborative review, edge case thinking,
+      alternative suggestions, and quality improvement during implementation.
+      Match researcher.md section structure.
+    agent: developer
+    depends_on: [research-blueprint]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/agents/developer.md — primary dev persona to complement
+    - skills/hive/agents/researcher.md — format reference
+    - /Users/don/Documents/project-hive/blueprints/development-team/pair-programmer.yaml — source
+
+files_to_modify:
+  - file: skills/hive/agents/pair-programmer.md
+    change: NEW FILE — pair programmer agent persona
+
+references:
+  - /Users/don/Documents/project-hive/blueprints/development-team/pair-programmer.yaml

@@ -1,0 +1,62 @@
+id: test-swarm-design
+epic: hive-phase10
+title: Design generalized test swarm architecture from MTS
+status: pending
+complexity: high
+depends_on: []
+
+description: |
+  Generalize MTS (Mobile Test Swarm) into a universal test swarm. MTS has an
+  8-task pipeline with 6 agent roles, currently mobile-specific (Maestro for
+  device automation). The generalized version supports mobile, web, API, and
+  backend testing by abstracting the test framework layer.
+
+  The 8-task pipeline is framework-agnostic:
+  1. Gather context (from story/PR/commits)
+  2. Verify baseline (project-specific test knowledge)
+  3. Author tests (framework-specific)
+  4. Validate coverage (against requirements)
+  5. Execute tests (platform-specific, parallel)
+  6. File bugs (severity classification, auto-routing)
+  7. Compile report
+
+  Shindig (KMP mobile) is the primary test target but the architecture
+  must support any project type.
+
+acceptance_criteria:
+  - "Given the test swarm design, then the pipeline is framework-agnostic with pluggable test frameworks"
+  - "Given supported frameworks, then the design covers: Maestro (mobile), Playwright (web), pytest (backend), Jest/Vitest (JS)"
+  - "Given the architecture, then it defines: pipeline phases, agent roles, framework detection, and cross-swarm handoff from dev swarm"
+  - "Given Shindig as test target, then Maestro integration is the first implementation"
+
+steps:
+  - id: design-architecture
+    description: |
+      Create skills/hive/references/test-swarm-architecture.md defining:
+      - Generalized 8-task pipeline (abstract from MTS)
+      - Framework abstraction layer (detect project type → select test framework)
+      - Agent role mapping (MTS roles → generic test roles)
+      - Cross-swarm handoff: dev swarm → test swarm (receives: story spec,
+        implementation artifacts, cycle state)
+      - Configuration: test targets, frameworks, device/platform configs
+      - Parallel execution model (per-platform, per-framework)
+
+      Sources:
+      - ~/Documents/WorkFlow/src/modules/mts/ — MTS commands
+      - ~/Documents/WorkFlow/_bmad-output/bmb-creations/modules/module-brief-mts.md
+      - ~/Documents/KMP/Shindig/mts-package/ — deployed MTS
+    agent: developer
+
+context:
+  key_files:
+    - ~/Documents/WorkFlow/src/modules/mts/commands/ — all MTS commands
+    - ~/Documents/WorkFlow/_bmad-output/bmb-creations/modules/module-brief-mts.md — MTS brief
+    - ~/Documents/KMP/Shindig/mts-package/ — deployed instance
+
+files_to_modify:
+  - file: skills/hive/references/test-swarm-architecture.md
+    change: NEW FILE
+
+references:
+  - ~/Documents/WorkFlow/src/modules/mts/
+  - ~/Documents/WorkFlow/_bmad-output/bmb-creations/modules/module-brief-mts.md

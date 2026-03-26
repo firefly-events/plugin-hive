@@ -1,0 +1,67 @@
+# Hive Configuration
+# All settings have sensible defaults. Override only what you need.
+
+# Quality gate thresholds
+quality_gates:
+  auto_pass_threshold: 0.9
+  human_escalation_threshold: 0.3
+
+# Per-agent-pair trust scoring
+trust:
+  initial_score: 0.5
+  high_threshold: 0.8
+  low_threshold: 0.5
+  decay_rate: 0.05
+  decay_interval_days: 7
+
+# Token budget limits
+tokens:
+  per_task_limit: 100000
+  per_story_limit: 500000
+  per_epic_limit: 2000000
+  warning_threshold: 0.8
+
+# Context window management
+context_window:
+  budget_fraction: 0.7
+  degradation_threshold: 0.85
+
+# External task tracking
+task_tracking:
+  adapter: null              # linear, github, jira — null = disabled
+  queue_name: "Hive — Human Intervention"
+  auto_expire_days: 7
+
+# Model tier routing
+# Assigns the right model to the right job. Orchestrator and complex reasoning
+# get Opus. Analytical/implementation work gets Sonnet. Fast execution gets Haiku.
+model_tiers:
+  opus:                          # heavy reasoning, coordination, complex decisions
+    - orchestrator
+    - team-lead
+    - architect
+    - analyst
+  sonnet:                        # analytical, implementation, review
+    - researcher
+    - developer
+    - tester
+    - reviewer
+    - pair-programmer
+    - peer-validator
+    - ui-designer
+    - test-scout
+    - test-architect
+    - test-inspector
+    - test-sentinel
+  haiku:                         # fast execution, mechanical tasks
+    - test-worker
+
+# Override a specific agent's model (takes precedence over tier)
+model_overrides: {}
+  # example: researcher: opus    # promote researcher to opus for complex projects
+
+# Execution defaults
+execution:
+  default_methodology: classic
+  parallel_teams: false
+  max_retry_attempts: 2

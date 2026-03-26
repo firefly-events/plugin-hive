@@ -1,0 +1,33 @@
+name: hive-phase8
+title: "Hive Phase 8: Quality & Scaling"
+description: |
+  Tier 2 features for quality enforcement and multi-swarm coordination.
+  Three-tier quality gates with trust scoring, cross-swarm handoff protocol,
+  YAML-defined gate control plane, and token budget/context window management.
+target_codebase: /Users/don/Documents/herd
+
+stories:
+  - id: quality-gate-engine
+    title: Implement three-tier quality gate engine
+    complexity: high
+    depends_on: []
+  - id: validation-handshake
+    title: Add validation handshake protocol for peer review
+    complexity: medium
+    depends_on: [quality-gate-engine]
+  - id: trust-scoring
+    title: Implement per-agent-pair trust scoring with adaptive validation
+    complexity: high
+    depends_on: [validation-handshake]
+  - id: cross-swarm-handoff
+    title: Design cross-swarm handoff protocol and schema
+    complexity: medium
+    depends_on: []
+  - id: gate-control-plane
+    title: Create YAML-defined gate policy system
+    complexity: medium
+    depends_on: [quality-gate-engine]
+  - id: token-budget-management
+    title: Add token budget tracking and context window monitoring
+    complexity: medium
+    depends_on: []

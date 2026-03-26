@@ -1,0 +1,39 @@
+id: sandboxing-patterns
+epic: hive-phase9
+title: Implement git worktree isolation for parallel agent work
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Use git worktrees for lightweight parallel agent isolation. Claude Code
+  already supports worktrees natively (EnterWorktree tool). Document how
+  the orchestrator uses worktrees for parallel dev teams working on
+  independent stories.
+
+  Source: /Users/don/Documents/project-hive/docs/research/agentic-sandboxing-parallel-execution.md
+
+acceptance_criteria:
+  - "Given parallel dev teams, then each works in its own git worktree"
+  - "Given worktree isolation, then agents can't interfere with each other's changes"
+  - "Given the reference doc, then it covers: worktree creation, cleanup, merge strategy"
+
+steps:
+  - id: design-sandboxing
+    description: |
+      Create skills/hive/references/sandboxing-patterns.md defining:
+      - Git worktree strategy for parallel agents
+      - How orchestrator creates/assigns worktrees per team
+      - Merge strategy when stories complete
+      - Cleanup protocol
+      - Integration with Claude Code's native EnterWorktree
+      Source: /Users/don/Documents/project-hive/docs/research/agentic-sandboxing-parallel-execution.md
+    agent: developer
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/docs/research/agentic-sandboxing-parallel-execution.md
+
+files_to_modify:
+  - file: skills/hive/references/sandboxing-patterns.md
+    change: NEW FILE

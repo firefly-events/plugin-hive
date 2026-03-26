@@ -1,0 +1,54 @@
+id: memory-loading
+epic: hive-phase6
+title: Load agent memories when persona comes off the bench
+status: pending
+complexity: medium
+depends_on: [agent-memory-schema]
+
+description: |
+  When an agent persona is pulled from the bench for a task, their memories
+  should load automatically alongside the system prompt. The team lead queries
+  agent memories during story ingestion and passes relevant ones to the agent.
+
+  This is a protocol/documentation change — how the orchestrator and team lead
+  prompts describe memory loading during execution.
+
+acceptance_criteria:
+  - "Given an agent is assigned a task, then their memories from agents/memories/{agent}/ are available"
+  - "Given the team lead ingests a story, then they query relevant agent memories and include them in the agent's task prompt"
+  - "Given memories exist for an agent, then only relevant ones are passed (not all)"
+  - "Given the protocol is documented, then ORCHESTRATOR.md and team-lead.md describe memory loading"
+
+steps:
+  - id: design-loading-protocol
+    description: |
+      Update ORCHESTRATOR.md Execute Command and agents/team-lead.md (if it
+      exists by then) to describe the memory loading flow:
+
+      1. Team lead receives story assignment
+      2. Team lead identifies which agents will be needed
+      3. For each agent, read skills/hive/agents/memories/{agent}/*.md
+      4. Filter for relevance to the current story (keyword match on memory
+         descriptions vs story description/context)
+      5. Include relevant memories in the agent's task prompt alongside
+         the persona and step instructions
+
+      Also update agents/orchestrator.md Hive system knowledge table to
+      include the agent memories path pattern.
+    agent: developer
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/ORCHESTRATOR.md — execute flow to update
+    - skills/hive/agents/orchestrator.md — system knowledge table
+    - skills/hive/references/agent-memory-schema.md — memory format (from agent-memory-schema story)
+
+files_to_modify:
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Add memory loading to execute flow
+  - file: skills/hive/agents/orchestrator.md
+    change: Add agent memories path to system knowledge table
+
+references:
+  - skills/hive/references/agent-memory-schema.md

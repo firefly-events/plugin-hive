@@ -1,0 +1,133 @@
+name: api-perf-optimization
+title: Shindig Event API Performance Baseline & Optimization
+description: |
+  Establish performance baselines for the Shindig event-api (Fastify/TypeScript/MongoDB),
+  evaluate alternative API protocols (GraphQL, tRPC, optimized REST), and implement
+  optimizations to improve event query speed. The backend has 27 domain modules,
+  uses Mongoose with MongoDB, has Redis for rate limiting/feature gates but no
+  response caching, and OpenTelemetry instrumentation. The KMP Compose frontend
+  calls REST endpoints directly. The heaviest workloads are event listing/search,
+  discovery feeds, and event detail queries with nested data (venues, RSVPs, lists).
+target_codebase: ~/Documents/KMP/Shindig/event-api
+
+stories:
+  - id: baseline-perf-audit
+    title: Establish Event Query Performance Baseline
+    description: |
+      Profile the event-api's highest-traffic endpoints to establish response time
+      and payload baselines. Focus on: event listing/search, event detail with
+      nested data (venue, RSVPs, organizer), discovery feed, trending events,
+      and weekly picks. Analyze MongoDB query patterns (indexes, aggregation
+      pipelines), Mongoose serialization overhead, and payload sizes. Identify
+      over-fetching — which fields the KMP frontend actually uses vs what the
+      API returns. Check existing OpenTelemetry/Sentry data for real-world
+      latency distributions.
+    acceptance_criteria:
+      - Response time measurements for top 10 highest-traffic endpoints
+      - MongoDB query analysis (explain plans) for event list and search queries
+      - Payload size analysis — actual response size vs fields used by KMP client
+      - Index coverage report (db:indexes:verify output)
+      - Identification of N+1 query patterns in event service aggregation pipelines
+      - Baseline report saved as markdown artifact
+    depends_on: []
+    complexity: medium
+
+  - id: api-protocol-research
+    title: Evaluate GraphQL, tRPC, and REST Optimization Approaches
+    description: |
+      Research API protocol alternatives for the Shindig event-api. Consider:
+      - GraphQL with Mercurius (Fastify-native GraphQL) — enables field selection,
+        reduces over-fetching for the KMP client which only needs subset of event fields
+      - tRPC — requires shared TypeScript types, but KMP frontend is Kotlin so
+        type sharing doesn't apply (likely ruled out)
+      - Optimized REST — pagination cursors, sparse fieldsets (?fields=),
+        compound document includes, ETag caching
+      Evaluate against the over-fetching patterns found in baseline. Consider
+      that the KMP client uses Ktor HTTP client and would need a GraphQL
+      client library if switching protocols.
+    acceptance_criteria:
+      - Comparison matrix covering GraphQL (Mercurius), tRPC, and optimized REST
+      - Assessment of KMP/Ktor client impact for each approach
+      - Analysis of which approach best addresses the identified over-fetching
+      - Estimated migration effort given 27 Fastify modules with Zod schemas
+      - Recommendation with rationale and trade-offs
+    depends_on:
+      - baseline-perf-audit
+    complexity: medium
+
+  - id: cache-strategy
+    title: Design Redis Response Caching Strategy
+    description: |
+      Redis is already deployed for rate limiting and feature gates. Design a
+      response caching strategy that leverages the existing Redis instance for
+      read-heavy endpoints. Define cache keys, TTLs, and invalidation rules
+      per endpoint category. Consider: event lists (high traffic, moderate
+      staleness OK), event details (moderate traffic, needs freshness for
+      RSVP counts), trending/weekly picks (low update frequency, high cache
+      value), and user-specific data (no caching or short TTL).
+    acceptance_criteria:
+      - Cache strategy document with per-endpoint-category TTLs
+      - Cache invalidation rules (event update → invalidate list + detail caches)
+      - Redis memory estimation for expected cache size
+      - Fastify plugin design for transparent response caching
+      - Strategy for cache warming on deploy
+    depends_on:
+      - baseline-perf-audit
+    complexity: medium
+
+  - id: mongodb-query-optimization
+    title: Optimize MongoDB Queries and Indexes
+    description: |
+      Based on baseline findings, optimize the MongoDB query layer. Address:
+      - Missing or suboptimal indexes for event search/filter queries
+      - N+1 patterns in event service (venue lookups, organizer lookups)
+      - Aggregation pipeline optimization for discovery feed and trending
+      - Mongoose lean() usage for read-only queries (skip hydration overhead)
+      - Projection to fetch only needed fields at the DB level
+    acceptance_criteria:
+      - All identified slow queries have covering or compound indexes
+      - N+1 patterns replaced with $lookup or batch queries
+      - lean() applied to all read-only list/search endpoints
+      - Projections added to limit fields fetched from MongoDB
+      - Before/after query execution time comparison
+    depends_on:
+      - baseline-perf-audit
+    complexity: high
+
+  - id: implement-caching
+    title: Implement Redis Response Cache Layer
+    description: |
+      Implement the caching strategy as a Fastify plugin. Add transparent
+      response caching for identified read-heavy endpoints. Implement cache
+      invalidation hooks on write operations. Add ETag/conditional request
+      support for the KMP client. Measure improvement against baseline.
+    acceptance_criteria:
+      - Fastify cache plugin implemented using existing Redis connection
+      - Event list, trending, and weekly picks endpoints cached
+      - Cache invalidated on event create/update/delete
+      - ETag headers added for conditional GET support
+      - Before/after performance comparison against baseline
+      - No stale data for RSVP counts or user-specific responses
+    depends_on:
+      - cache-strategy
+      - mongodb-query-optimization
+    complexity: high
+
+  - id: protocol-implementation
+    title: Implement Recommended API Protocol Changes
+    description: |
+      Based on the protocol research findings, implement the recommended
+      changes for the highest-impact endpoints. This may include: cursor-based
+      pagination for event lists, sparse fieldsets for event detail, GraphQL
+      endpoint for the discovery feed, or batch query support. Update the
+      KMP Ktor client to use new query patterns.
+    acceptance_criteria:
+      - Recommended protocol changes implemented for top 3 highest-impact endpoints
+      - KMP Ktor client updated to use new patterns
+      - Performance improvement measured against baseline
+      - Backward compatibility maintained (old endpoints still work)
+      - API documentation updated (Swagger/OpenAPI)
+    depends_on:
+      - api-protocol-research
+      - implement-caching
+    complexity: high

@@ -1,0 +1,38 @@
+id: windsurf-skill-analysis
+epic: hive-phase9
+title: Analyze 44 Windsurf skills for novel capabilities to port
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Analyze the 44 bmad-* Windsurf skills from Project Hive to identify which
+  represent genuinely new capabilities vs duplicates of existing Hive commands.
+  Produce a report categorizing each skill and recommending which to port.
+
+  Skills are at: /Users/don/Documents/project-hive/.windsurf/skills/
+
+acceptance_criteria:
+  - "Given all 44 skills are analyzed, then each is categorized: duplicate, novel, or partial overlap"
+  - "Given novel skills, then a recommendation is made for how to port them"
+  - "Given the analysis, then it informs future epic planning"
+
+steps:
+  - id: analyze-skills
+    description: |
+      Read all 44 skills in .windsurf/skills/. For each, determine:
+      - What it does (one line)
+      - Whether it duplicates an existing Hive command/agent
+      - Whether it offers a genuinely new capability
+      - If novel, how it could be ported (new command, agent capability, workflow)
+      Produce a report at state/epics/hive-phase9/windsurf-skill-analysis.md
+    agent: researcher
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/.windsurf/skills/ — all 44 skills
+    - skills/hive/ORCHESTRATOR.md — existing commands for comparison
+
+files_to_modify:
+  - file: state/epics/hive-phase9/windsurf-skill-analysis.md
+    change: NEW FILE — analysis report

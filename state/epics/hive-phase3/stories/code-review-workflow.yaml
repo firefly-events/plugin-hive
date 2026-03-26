@@ -1,0 +1,119 @@
+id: code-review-workflow
+epic: hive-phase3
+title: Create Code Review Workflow
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Create the code-review workflow YAML. This is a standalone workflow (not part of
+  the development methodology workflows) that reviews existing code changes. It
+  uses the researcher agent to analyze changes and the reviewer agent to produce
+  structured findings.
+
+  Port from Hive's code-review.yaml but adapt the agent names to match our
+  plugin's agent personas (researcher + reviewer instead of analyst + architect + pm).
+
+acceptance_criteria:
+  - "Given staged git changes or a branch, when the code-review workflow runs, then it produces structured review findings"
+  - "Given the workflow, then it has: analyze step (researcher), review step (reviewer), summary step"
+  - "Given the analyze step output, then it feeds into the review step as input"
+  - "Given the workflow YAML, then it follows the same schema as development workflows"
+
+steps:
+  - id: read-hive-workflow
+    description: |
+      Read the Hive code-review workflow at:
+      /Users/don/Documents/project-hive/hive-workflows/code-review.yaml
+
+      Note the 3-step structure: analyze-changes → review-architecture → summarize.
+      We'll adapt this to use our agent personas: researcher (for analysis) and
+      reviewer (for review). The summarize step can use the developer agent or
+      be handled by the orchestrator.
+    agent: researcher
+
+  - id: create-workflow
+    description: |
+      Create workflows/code-review.workflow.yaml with steps:
+      1. analyze-changes (researcher) — analyze the diff, identify affected areas,
+         patterns, and potential issues
+      2. review-findings (reviewer) — review the changes with structured findings,
+         severity tags, and verdict
+      3. summarize (developer) — compile analysis + review into a final summary
+         with actionable items
+
+      The analyze step has no inputs (it reads git diff directly).
+      The review step takes analysis findings as input.
+      The summarize step takes both analysis and review as inputs.
+    agent: developer
+    depends_on: [read-hive-workflow]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - workflows/development.classic.workflow.yaml — workflow YAML format to follow
+    - workflows/development.tdd.workflow.yaml — another workflow YAML example
+    - skills/hive/agents/researcher.md — agent for analyze step
+    - skills/hive/agents/reviewer.md — agent for review step
+    - skills/hive/references/workflow-schema.md — YAML schema
+
+files_to_modify:
+  - file: workflows/code-review.workflow.yaml
+    change: NEW FILE — code review workflow with 3 steps
+
+code_examples:
+  - title: Hive source workflow (to adapt)
+    language: yaml
+    code: |
+      # Hive's code-review.yaml uses analyst/architect/pm agents
+      # We adapt to researcher/reviewer/developer
+      steps:
+        - id: analyze-changes
+          agent: analyst          # → researcher
+          task: "Analyze changes"
+        - id: review-architecture
+          agent: architect        # → reviewer
+          depends_on: [analyze-changes]
+        - id: summarize
+          agent: pm               # → developer
+          depends_on: [analyze-changes, review-architecture]
+  - title: Target workflow shape
+    language: yaml
+    code: |
+      name: code-review
+      description: Structured code review workflow
+      version: "1.0.0"
+      steps:
+        - id: analyze-changes
+          agent: researcher
+          task: >
+            Analyze the code changes (git diff). Identify affected areas,
+            patterns used, potential issues, and architectural implications.
+          outputs:
+            - name: analysis
+              type: string
+        - id: review-findings
+          agent: reviewer
+          task: >
+            Review the changes with fresh context. Produce structured findings
+            with severity, file:line references, and verdict.
+          depends_on: [analyze-changes]
+          inputs:
+            - name: analysis
+              source: step_output
+              step_id: analyze-changes
+              output_name: analysis
+
+risks:
+  - severity: low
+    description: |
+      Simple YAML creation following established patterns. The only risk is
+      the review step not receiving the git diff context — the task description
+      needs to instruct the agent to read the diff.
+    mitigation: |
+      The analyze-changes task should explicitly instruct: "Run git diff to
+      see staged changes" or "Read the changes on the current branch."
+
+references:
+  - /Users/don/Documents/project-hive/hive-workflows/code-review.yaml — source
+  - workflows/development.classic.workflow.yaml — format to follow

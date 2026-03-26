@@ -1,0 +1,43 @@
+id: agent-ready-checklist
+epic: hive-phase7
+title: Add agent-ready story spec checklist to plan command
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Add a validation checklist to the plan command that ensures every story
+  is agent-ready before saving. Based on the research doc at
+  project-hive/docs/research/agent-ready-story-specs.md.
+
+  Checklist criteria: objective in one sentence, all architectural decisions
+  pre-made, exact file paths referenced, executable verification commands,
+  scope explicitly bounded (DO/DO NOT), fits single agent session, reference
+  implementation provided, binary pass/fail success criteria.
+
+acceptance_criteria:
+  - "Given the plan command generates stories, when presenting for confirmation, then each story is checked against the agent-ready checklist"
+  - "Given a story fails checklist items, then the failures are flagged in the confirmation output"
+  - "Given the checklist, then it covers: objective clarity, pre-made decisions, file paths, verification commands, scope boundaries, session fit, reference implementation, binary criteria"
+
+steps:
+  - id: create-checklist
+    description: |
+      Create skills/hive/references/agent-ready-checklist.md from the research doc.
+      Update ORCHESTRATOR.md Plan Command to run the checklist before presenting
+      for confirmation. Flag any stories that fail checklist items.
+      Source: /Users/don/Documents/project-hive/docs/research/agent-ready-story-specs.md
+    agent: developer
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/docs/research/agent-ready-story-specs.md — source
+
+files_to_modify:
+  - file: skills/hive/references/agent-ready-checklist.md
+    change: NEW FILE
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Add checklist validation step to Plan Command
+
+references:
+  - /Users/don/Documents/project-hive/docs/research/agent-ready-story-specs.md

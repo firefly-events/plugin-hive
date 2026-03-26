@@ -1,0 +1,34 @@
+name: hive-phase5
+title: "Hive Plugin Phase 5: Remaining Agent Roster + Workflow Definitions"
+description: |
+  Port the remaining Project Hive blueprints (pair-programmer, peer-validator,
+  team-lead) to Hive agent personas. Create the missing TDD and BDD workflow
+  definitions. Create the code-review workflow YAML. All straightforward
+  porting/creation — no team needed.
+target_codebase: /Users/don/Documents/herd
+
+stories:
+  - id: team-lead-agent
+    title: Port team-lead blueprint to Hive agent persona
+    complexity: medium
+    depends_on: []
+  - id: pair-programmer-agent
+    title: Port pair-programmer blueprint to Hive agent persona
+    complexity: low
+    depends_on: []
+  - id: peer-validator-agent
+    title: Port peer-validator blueprint to Hive agent persona
+    complexity: low
+    depends_on: []
+  - id: tdd-workflow
+    title: Create TDD development workflow definition
+    complexity: low
+    depends_on: []
+  - id: bdd-workflow
+    title: Create BDD development workflow definition
+    complexity: low
+    depends_on: []
+  - id: code-review-workflow
+    title: Create code-review workflow YAML
+    complexity: low
+    depends_on: []

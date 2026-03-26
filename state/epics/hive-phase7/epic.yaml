@@ -1,0 +1,35 @@
+name: hive-phase7
+title: "Hive Phase 7: Core Pipeline Improvements"
+description: |
+  Tier 1 improvements that immediately enhance the existing plan/execute loop.
+  Cycle state document for persistent decision tracking, agent-ready story spec
+  checklist, gate retry with feedback injection, research pipeline upgrade with
+  Firecrawl MCP, and daily ceremony workflow (standup, planning, execution).
+  Also adds task tracking integration for human intervention queuing.
+target_codebase: /Users/don/Documents/herd
+
+stories:
+  - id: cycle-state-document
+    title: Implement cycle state document for persistent decision tracking
+    complexity: medium
+    depends_on: []
+  - id: agent-ready-checklist
+    title: Add agent-ready story spec checklist to plan command
+    complexity: low
+    depends_on: []
+  - id: gate-retry-feedback
+    title: Add gate retry with feedback injection to execute flow
+    complexity: medium
+    depends_on: []
+  - id: research-pipeline-upgrade
+    title: Integrate Firecrawl MCP for real web research in planning
+    complexity: medium
+    depends_on: []
+  - id: task-tracking-integration
+    title: Design task tracking adapter for human intervention queuing
+    complexity: medium
+    depends_on: []
+  - id: daily-ceremony-workflow
+    title: Create daily ceremony workflow (standup, planning, execution)
+    complexity: high
+    depends_on: [cycle-state-document, task-tracking-integration]

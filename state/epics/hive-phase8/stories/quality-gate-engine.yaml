@@ -1,0 +1,57 @@
+id: quality-gate-engine
+epic: hive-phase8
+title: Implement three-tier quality gate engine
+status: pending
+complexity: high
+depends_on: []
+
+description: |
+  Create the quality gate engine that classifies agent outputs into three tiers:
+  auto-pass (high confidence), peer review (moderate), human escalation (low).
+  Configurable thresholds. This is the foundation for trust scoring and the
+  gate control plane.
+
+  Source: Project Hive stories 3-1 through 3-6 and Pattern 4 from
+  architecture-influences.md.
+
+acceptance_criteria:
+  - "Given agent output passes quality threshold, then it auto-passes without review"
+  - "Given moderate confidence, then output is routed to peer review (another agent)"
+  - "Given low confidence or policy violation, then output is escalated to human"
+  - "Given the gate engine, then thresholds are configurable per workflow"
+  - "Given the gate reference doc, then it defines: tiers, routing logic, threshold config"
+
+steps:
+  - id: design-gate-engine
+    description: |
+      Create skills/hive/references/quality-gates.md defining:
+      - Three tiers: auto-pass (≥0.9), peer review (0.3-0.9), human escalation (<0.3)
+      - Routing logic per tier
+      - Configuration schema (thresholds per workflow)
+      - Integration with execute flow (gate check after review/test steps)
+      Sources:
+      - /Users/don/Documents/project-hive/docs/stories/3-1-three-tier-quality-gate-engine.md
+      - /Users/don/Documents/project-hive/docs/plans/architecture-influences.md Pattern 4
+    agent: developer
+
+  - id: update-execute-flow
+    description: |
+      Update ORCHESTRATOR.md execute flow to include gate checks after
+      review and test steps. Route based on tier classification.
+    agent: developer
+    depends_on: [design-gate-engine]
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/docs/stories/3-1-three-tier-quality-gate-engine.md
+    - /Users/don/Documents/project-hive/docs/plans/architecture-influences.md
+
+files_to_modify:
+  - file: skills/hive/references/quality-gates.md
+    change: NEW FILE
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Add gate checks to execute flow
+
+references:
+  - /Users/don/Documents/project-hive/docs/stories/3-1-three-tier-quality-gate-engine.md
+  - /Users/don/Documents/project-hive/docs/stories/3-6-quality-gate-configuration.md

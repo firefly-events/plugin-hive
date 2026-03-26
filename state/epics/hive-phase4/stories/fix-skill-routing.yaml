@@ -1,0 +1,113 @@
+id: fix-skill-routing
+epic: hive-phase4
+title: Fix /hive:hive skill routing conflict
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  The `/hive:hive` catch-all skill is still matched by Claude Code's skill scanner
+  even though `skills/hive/SKILL.md` was removed. The root cause is that
+  `skills/hive/ORCHESTRATOR.md` has YAML frontmatter with `name: hive` and a
+  `description` field — Claude Code's skill scanner picks this up as a skill
+  definition (it scans for markdown files with skill-like frontmatter, not just
+  SKILL.md).
+
+  The fix must prevent `skills/hive/` from being detected as a skill directory
+  while preserving the ORCHESTRATOR.md content that the sub-skills (plan, execute,
+  status, review) delegate to.
+
+  Sub-skills at `skills/plan/SKILL.md`, `skills/execute/SKILL.md`, etc. already
+  have their own frontmatter and instruct the agent to "Read the full Hive skill
+  at skills/hive/ORCHESTRATOR.md". This delegation pattern is correct and must
+  keep working.
+
+acceptance_criteria:
+  - "Given a fresh Claude Code session, when the skill scanner runs, then /hive:hive does NOT appear in the available skills list"
+  - "Given /hive:plan is invoked, when the skill reads skills/hive/ORCHESTRATOR.md, then it still finds the Plan Command section"
+  - "Given /hive:execute, /hive:status, /hive:review are invoked, then they still delegate correctly to ORCHESTRATOR.md"
+
+steps:
+  - id: research-scanner
+    description: |
+      Determine exactly how Claude Code's skill scanner detects skills. Check:
+      1. Does it scan all subdirs of `skills/` for any .md with frontmatter?
+      2. Does it only look for files named SKILL.md?
+      3. Is there a config that excludes directories?
+
+      Check Claude Code plugin docs and the skill-creator plugin behavior.
+      The DeerFlow skill loader at `backend/packages/harness/deerflow/skills/loader.py`
+      is a separate system — focus on Claude Code's native scanning.
+    agent: researcher
+
+  - id: implement-fix
+    description: |
+      Based on research, apply one of these approaches (in preference order):
+
+      **Option A — Strip frontmatter from ORCHESTRATOR.md:**
+      Remove the `---` fenced YAML frontmatter block from ORCHESTRATOR.md. Convert
+      the `name` and `description` into a regular markdown header/paragraph. The
+      sub-skill SKILL.md files already have their own frontmatter, so the orchestrator
+      doesn't need it.
+
+      **Option B — Rename to non-scanned name:**
+      If the scanner looks for specific filenames, rename ORCHESTRATOR.md to something
+      the scanner ignores (e.g., _ORCHESTRATOR.md or REFERENCE.md). Update all
+      sub-skill SKILL.md files to reference the new name.
+
+      **Option C — Add .noskill marker:**
+      If the scanner supports exclusion markers, add one to skills/hive/.
+
+      Whichever approach is chosen, verify the sub-skill delegation still works by
+      reading each SKILL.md and confirming the referenced path is correct.
+    agent: developer
+    depends_on: [research-scanner]
+
+context:
+  codebase: /Users/don/Documents/herd
+  tech_stack:
+    backend: Python (DeerFlow harness)
+    frontend: N/A — this is skill configuration
+  key_files:
+    - skills/hive/ORCHESTRATOR.md — the file causing the conflict (has skill-like frontmatter)
+    - skills/plan/SKILL.md — sub-skill that delegates to ORCHESTRATOR.md
+    - skills/execute/SKILL.md — sub-skill that delegates to ORCHESTRATOR.md
+    - skills/status/SKILL.md — sub-skill that delegates to ORCHESTRATOR.md
+    - skills/review/SKILL.md — sub-skill that delegates to ORCHESTRATOR.md
+
+files_to_modify:
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Remove or restructure YAML frontmatter to prevent skill scanner detection
+
+design_decisions:
+  - decision: Preserve ORCHESTRATOR.md as the central reference document
+    rationale: |
+      All four sub-skills delegate to it. Moving content elsewhere would require
+      updating four files and breaking the established pattern.
+  - decision: Prefer stripping frontmatter over renaming
+    rationale: |
+      Renaming requires updating all sub-skill references. Stripping frontmatter
+      is a smaller change with no downstream impact.
+
+dev_notes: |
+  Claude Code's skill scanner behavior may differ from DeerFlow's loader.py.
+  The DeerFlow loader only looks for SKILL.md files, but Claude Code's native
+  scanner appears to be more aggressive — picking up any markdown with
+  skill-shaped frontmatter (name + description fields).
+
+  After fixing, test by starting a new Claude Code session and checking if
+  /hive:hive still appears in the skill list (it should not).
+
+risks:
+  - severity: low
+    description: |
+      Stripping frontmatter might break something that reads ORCHESTRATOR.md
+      and expects structured metadata.
+    mitigation: |
+      Grep for any code that parses ORCHESTRATOR.md frontmatter. The sub-skills
+      only reference it as "Read the full Hive skill at skills/hive/ORCHESTRATOR.md"
+      — they don't parse its frontmatter.
+
+references:
+  - skills/hive/ORCHESTRATOR.md — source of the routing conflict
+  - skills/plan/SKILL.md — delegation pattern to preserve

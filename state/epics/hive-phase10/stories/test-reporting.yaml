@@ -1,0 +1,34 @@
+id: test-reporting
+epic: hive-phase10
+title: Implement session report compilation
+status: pending
+complexity: low
+depends_on: [test-execution, bug-triage, coverage-validation]
+
+description: |
+  Define how the coordinator compiles the test session report: test results
+  per platform, coverage analysis, filed bugs, severity distribution, and
+  recommendations. This is the final output of a test swarm run.
+
+acceptance_criteria:
+  - "Given all test phases complete, then a session report is compiled"
+  - "Given the report, then it includes: results per platform, coverage status, bugs filed, severity distribution"
+  - "Given the report, then it's actionable — clear next steps for the dev team"
+
+steps:
+  - id: design-reporting
+    description: |
+      Add session report format to test-swarm-architecture.md:
+      - Report structure: summary, per-platform results, coverage analysis,
+        bugs filed, severity distribution, recommendations
+      - Integration with cycle state (test results feed back)
+      - How the dev swarm receives test feedback for the next iteration
+    agent: developer
+
+context:
+  key_files:
+    - skills/hive/references/test-swarm-architecture.md
+
+files_to_modify:
+  - file: skills/hive/references/test-swarm-architecture.md
+    change: Add session report section

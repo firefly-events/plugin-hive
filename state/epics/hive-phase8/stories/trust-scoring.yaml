@@ -1,0 +1,39 @@
+id: trust-scoring
+epic: hive-phase8
+title: Implement per-agent-pair trust scoring with adaptive validation
+status: pending
+complexity: high
+depends_on: [validation-handshake]
+
+description: |
+  Per-agent-pair trust scores (0.0-1.0, neutral=0.5) that update based on
+  validation accuracy. High trust (≥0.8) allows skipping full validation.
+  Low trust (≤0.5) enforces full three-step handshake. Trust decays over
+  time for task types not recently validated.
+
+acceptance_criteria:
+  - "Given agent pairs, then trust scores are tracked per pair"
+  - "Given high trust (≥0.8), then validation can be streamlined (skip full handshake)"
+  - "Given low trust (≤0.5), then full handshake is always enforced"
+  - "Given no recent validation, then trust decays (configurable rate)"
+  - "Given trust scores, then they persist in agent memories"
+
+steps:
+  - id: design-trust-system
+    description: |
+      Add trust scoring to quality-gates.md:
+      - Score per agent-pair (submitter × validator)
+      - Update rules: correct validation → trust up, incorrect → trust down
+      - Decay: configurable rate (default 5% per 7 days)
+      - Storage: agent memories (skills/hive/agents/memories/)
+      - Adaptive validation intensity based on trust level
+      Source: /Users/don/Documents/project-hive/docs/stories/3-3-trust-scoring-adaptive-validation.md
+    agent: developer
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/docs/stories/3-3-trust-scoring-adaptive-validation.md
+
+files_to_modify:
+  - file: skills/hive/references/quality-gates.md
+    change: Add trust scoring section

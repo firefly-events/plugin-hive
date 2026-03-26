@@ -1,0 +1,52 @@
+id: bdd-workflow
+epic: hive-phase5
+title: Create BDD development workflow definition
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Create skills/hive/workflows/development.bdd.workflow.yaml — the BDD
+  methodology workflow. BDD starts with behavior specifications (Given/When/Then
+  scenarios) before implementation. The analyst agent writes behavior specs,
+  then tests are derived from those specs.
+
+acceptance_criteria:
+  - "Given the BDD workflow exists, when /hive:execute --methodology bdd loads it, then steps include a behavior-spec phase before test and implement"
+  - "Given the behavior-spec step, then the analyst produces Given/When/Then scenarios from the story spec"
+  - "Given the test step, then the tester derives tests from the behavior specs"
+
+steps:
+  - id: create-workflow
+    description: |
+      Read skills/hive/workflows/development.classic.workflow.yaml for format.
+      Read skills/hive/references/methodology-routing.md for BDD phase ordering.
+
+      Create development.bdd.workflow.yaml with phases:
+      1. research — same as classic
+      2. behavior-spec — analyst writes Given/When/Then scenarios from story spec
+      3. test — tester derives tests from behavior specs
+      4. implement — developer implements to satisfy behavior specs and tests
+      5. review — same as classic
+      6. optimize — optional, same as classic
+      7. integrate — same as classic
+
+      Key difference: behavior-spec phase between research and test. Analyst
+      agent produces formal behavior specifications that drive both testing
+      and implementation.
+    agent: developer
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/workflows/development.classic.workflow.yaml — format reference
+    - skills/hive/references/methodology-routing.md — BDD phase ordering
+    - skills/hive/agents/analyst.md — behavior spec writer
+
+files_to_modify:
+  - file: skills/hive/workflows/development.bdd.workflow.yaml
+    change: NEW FILE — BDD development workflow
+
+references:
+  - skills/hive/workflows/development.classic.workflow.yaml
+  - skills/hive/references/methodology-routing.md

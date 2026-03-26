@@ -1,0 +1,255 @@
+id: implement-caching
+epic: api-perf-optimization
+title: Implement Redis Response Cache Layer
+status: pending
+complexity: high
+depends_on:
+  - cache-strategy
+  - mongodb-query-optimization
+
+description: |
+  Implement the cache strategy designed in cache-strategy as a Fastify plugin. The
+  plugin transparently caches GET responses in Redis (already deployed for rate
+  limiting), invalidates on writes, and adds ETag support for the KMP Ktor client.
+  This story builds on the query optimizations from mongodb-query-optimization —
+  we're caching the already-optimized responses, not the slow originals.
+
+acceptance_criteria:
+  - "Given a GET /api/events request, when the response is not in cache, then it is stored in Redis with the configured TTL and X-Cache: MISS header is returned"
+  - "Given a GET /api/events request, when the response IS in cache, then the cached response is returned with X-Cache: HIT header and MongoDB is not queried"
+  - "Given a POST/PUT/DELETE to an event, when the write succeeds, then all related cache entries (list caches for the event's city, detail cache for that event ID) are invalidated"
+  - "Given a GET /api/events/:id with If-None-Match header matching the cached ETag, then 304 Not Modified is returned with no body"
+  - "Given trending recomputation runs (cron), then trending cache entries are invalidated"
+  - "Given two concurrent cache misses for the same key, then only one MongoDB query executes (stampede protection)"
+  - "Given baseline response times, when caching is active, then cached endpoint response times improve by at least 60%"
+
+steps:
+  - id: create-cache-plugin
+    description: |
+      Create src/plugins/response-cache.plugin.ts following the fp() pattern
+      from rate-limit.plugin.ts. The plugin should:
+      1. Accept CacheOptions config (Redis client, default TTL, route configs)
+      2. Register onRequest hook for cache lookup
+      3. Register onSend hook for cache storage
+      4. Export as fastify-plugin with name 'response-cache'
+      Use the existing Redis connection from the rate-limit setup (avoid creating
+      a second Redis connection).
+    agent: developer
+
+  - id: implement-stampede-protection
+    description: |
+      Add singleflight/lock pattern to prevent cache stampede. When a cache miss
+      occurs, acquire a short Redis lock (SET key:lock NX EX 5). If lock acquired,
+      compute and store. If lock exists, wait briefly (50ms poll) then re-check
+      cache. Fall through to direct query after 3 retries to avoid deadlock.
+    agent: developer
+    depends_on: [create-cache-plugin]
+
+  - id: configure-routes
+    description: |
+      Configure cache TTLs per route in the plugin registration:
+      - /api/events (list): 30s TTL, key includes query params hash
+      - /api/events/trending: 60s TTL, key includes city
+      - /api/events/weekly-picks: 3600s TTL (1hr), key includes city
+      - /api/events/:id (detail): 10s TTL, key is event ID
+      - /api/events/promoted: 60s TTL, key includes collection + params hash
+      Register the plugin in app.ts after the rate-limit plugin.
+    agent: developer
+    depends_on: [create-cache-plugin]
+
+  - id: implement-invalidation
+    description: |
+      Add cache invalidation on write operations. In event.controller.ts, after
+      successful create/update/delete, call cache invalidation:
+      - Create event → invalidate list caches for event's city
+      - Update event → invalidate detail cache + list caches for event's city
+      - Delete event → invalidate detail cache + list caches for event's city
+      - RSVP action → invalidate detail cache for that event
+
+      Use Redis SCAN with pattern matching (cache:/api/events:*) for list
+      invalidation, or tag-based approach from the cache strategy.
+    agent: developer
+    depends_on: [configure-routes]
+
+  - id: add-etag-support
+    description: |
+      Add ETag headers to cached responses. On cache store, compute ETag as
+      hash of response body. On subsequent requests with If-None-Match header,
+      compare against stored ETag. Return 304 if match.
+
+      The KMP Ktor client supports conditional requests natively via
+      HttpCache plugin — verify this works end-to-end.
+    agent: developer
+    depends_on: [create-cache-plugin]
+
+  - id: measure-improvement
+    description: |
+      Re-run the baseline measurements for all cached endpoints. Compare:
+      - Response time: cache HIT vs original baseline
+      - MongoDB query count: before vs after (should drop significantly)
+      - Redis memory usage: actual vs estimated from cache-strategy
+      - Cache hit rate after 5 minutes of typical traffic
+
+      Document results in:
+      state/epics/api-perf-optimization/artifacts/caching-results.md
+    agent: developer
+    depends_on: [configure-routes, implement-invalidation, add-etag-support, implement-stampede-protection]
+
+context:
+  codebase: ~/Documents/KMP/Shindig/event-api
+  tech_stack:
+    backend: Fastify 5.x + TypeScript + Mongoose/MongoDB + Redis (ioredis)
+    frontend: KMP Compose + Ktor HTTP client
+  key_files:
+    - src/plugins/rate-limit.plugin.ts — existing Redis plugin pattern to follow
+    - src/plugins/featureGate.ts — another Redis usage pattern
+    - src/app.ts — plugin registration order, Redis connection lifecycle
+    - src/modules/events/event.controller.ts — write handlers that need invalidation hooks
+    - src/modules/events/events.routes.ts — route definitions to cache
+    - src/modules/events/trending.routes.ts — trending endpoints
+    - src/modules/events/weekly-picks.routes.ts — weekly picks endpoint (expensive, high cache value)
+  inputs_from_previous:
+    - cache-strategy: TTL values, invalidation rules, key schema, plugin design, memory estimates
+    - mongodb-query-optimization: optimized queries (cache the fast responses, not the slow ones)
+
+files_to_modify:
+  - file: src/plugins/response-cache.plugin.ts
+    change: NEW FILE — Fastify cache-aside plugin with onRequest/onSend hooks
+  - file: src/app.ts
+    change: Register response-cache plugin after rate-limit, pass Redis connection
+  - file: src/modules/events/event.controller.ts
+    change: Add cache invalidation calls after create/update/delete operations
+  - file: src/modules/events/events.routes.ts
+    change: Optional — add route-level cache config if not handled at plugin level
+
+code_examples:
+  - title: Existing plugin registration pattern (app.ts)
+    language: typescript
+    code: |
+      // app.ts — how plugins are registered
+      await fastify.register(rateLimitPlugin);
+      await fastify.register(metricsPlugin);
+      // Cache plugin goes here, after rate-limit (needs Redis connection)
+      await fastify.register(responseCachePlugin, {
+        redis: fastify.redis, // or however Redis is exposed
+        defaultTTL: 30,
+        routes: {
+          '/api/events': { ttl: 30 },
+          '/api/events/trending': { ttl: 60 },
+          '/api/events/weekly-picks': { ttl: 3600 },
+        }
+      });
+  - title: Cache invalidation in controller
+    language: typescript
+    code: |
+      // event.controller.ts — after successful event update
+      async updateEvent(request, reply) {
+        const result = await eventService.updateEvent(id, body);
+        // Invalidate caches
+        const city = result.event.city;
+        await request.server.cacheInvalidate(`cache:/api/events/${id}`); // detail
+        await request.server.cacheInvalidatePattern(`cache:/api/events:*city=${city}*`); // lists
+        return reply.send(result);
+      }
+  - title: Singleflight pattern
+    language: typescript
+    code: |
+      async function getOrCompute(redis, key, ttl, computeFn) {
+        const cached = await redis.get(key);
+        if (cached) return { data: JSON.parse(cached), hit: true };
+
+        const lockKey = `${key}:lock`;
+        const locked = await redis.set(lockKey, '1', 'NX', 'EX', 5);
+        if (!locked) {
+          // Another request is computing — wait and retry
+          await new Promise(r => setTimeout(r, 50));
+          const retried = await redis.get(key);
+          if (retried) return { data: JSON.parse(retried), hit: true };
+        }
+
+        const data = await computeFn();
+        await redis.set(key, JSON.stringify(data), 'EX', ttl);
+        await redis.del(lockKey);
+        return { data, hit: false };
+      }
+
+design_decisions:
+  - decision: Use onRequest/onSend hooks rather than route-level decorators
+    rationale: |
+      Hook-based approach is transparent — existing routes don't need modification.
+      Cache is opt-in via route config, but the mechanism is centralized in one plugin.
+  - decision: Cache invalidation on write rather than TTL-only
+    rationale: |
+      For event detail pages, users expect to see their RSVP reflected immediately.
+      TTL-only with 10s delay would confuse users. Invalidation on write + short TTL
+      as safety net gives both freshness and performance.
+  - decision: Use Redis SCAN for pattern-based invalidation (not KEYS)
+    rationale: |
+      KEYS is O(n) and blocks Redis. SCAN is cursor-based and non-blocking.
+      For list cache invalidation by city, pattern matching via SCAN is safer.
+
+behavior_matrix:
+  - condition: "GET request, route in cache config, cache HIT"
+    behavior: "Return cached response, set X-Cache: HIT header, skip handler"
+  - condition: "GET request, route in cache config, cache MISS"
+    behavior: "Execute handler, store response in Redis with TTL, set X-Cache: MISS"
+  - condition: "GET request, route NOT in cache config"
+    behavior: "Pass through unchanged — no caching"
+  - condition: "Non-GET request (POST/PUT/DELETE)"
+    behavior: "Pass through unchanged — never cache writes"
+  - condition: "Request with X-No-Cache header"
+    behavior: "Bypass cache lookup, execute handler, but still store result"
+  - condition: "Request with If-None-Match matching cached ETag"
+    behavior: "Return 304 Not Modified with no body"
+
+dev_notes: |
+  The Redis connection is already established by the rate-limit plugin. Check how
+  it's exposed — it may be on `fastify.redis` (if using @fastify/redis) or a custom
+  decorator. The cache plugin should reuse this connection, not create its own.
+
+  The weekly-picks endpoint calls the Gemini AI curation service which is slow (~2-5s).
+  Caching this at 1hr TTL is the single biggest performance win in this story since
+  the AI response is deterministic for the same city within a given week.
+
+  The KMP Ktor client has an HttpCache plugin that handles ETags automatically if
+  the server returns proper ETag + Cache-Control headers. Verify this works by
+  checking the Ktor client configuration in the KMP codebase.
+
+risks:
+  - severity: high
+    description: |
+      Cache stampede on trending endpoint at popular times. If 100 users request
+      trending Austin events at the same second and the cache just expired, all
+      100 hit MongoDB simultaneously.
+    mitigation: |
+      Singleflight lock pattern (step implement-stampede-protection). First request
+      acquires lock, others wait 50ms and retry. Max 3 retries, then fall through.
+  - severity: medium
+    description: |
+      Redis connection failure should not break the API. If Redis is down, cache
+      operations should fail silently and the API should serve directly from MongoDB.
+    mitigation: |
+      Wrap all Redis operations in try/catch. On Redis error, log warning and
+      fall through to handler. Never throw from cache operations.
+  - severity: medium
+    description: |
+      Serialization of Mongoose documents to JSON for caching may differ from
+      Fastify's serialization (which uses schema-based serializers). Cached
+      responses might have different field names or formats.
+    mitigation: |
+      Cache the serialized response from onSend (after Fastify serialization),
+      not the raw Mongoose document. This ensures cached and uncached responses
+      are identical.
+  - severity: low
+    description: |
+      Cache key collision if query param ordering varies between requests.
+      /api/events?city=austin&limit=50 vs /api/events?limit=50&city=austin
+    mitigation: |
+      Canonical key function that sorts params alphabetically before hashing.
+
+references:
+  - src/plugins/rate-limit.plugin.ts — Redis plugin pattern
+  - src/plugins/metrics.plugin.ts — Fastify plugin with hooks pattern
+  - src/app.ts — Plugin registration order
+  - src/modules/events/event.controller.ts — Write operations needing invalidation
+  - src/modules/events/events.routes.ts — Routes to cache

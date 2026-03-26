@@ -1,0 +1,63 @@
+id: test-agents
+epic: hive-phase10
+title: Port MTS agent roles to Hive personas
+status: pending
+complexity: medium
+depends_on: [test-swarm-design]
+
+description: |
+  Port the 5 MTS specialist agents + coordinator to Hive personas. Generalize
+  from mobile-specific to universal testing. The coordinator maps to team-lead
+  (already exists); the specialists need new personas.
+
+  MTS agents → Hive test personas:
+  - Scout (Kian) → test-scout.md — context gathering, baseline management
+  - Architect (Yuki) → test-architect.md — test authoring, script generation
+  - Worker (Tomas) → test-worker.md — test execution on target platforms
+  - Inspector (Priya) → test-inspector.md — coverage validation
+  - Sentinel (Ade) → test-sentinel.md — bug triage, severity classification
+  - Coordinator (Amara) → team-lead.md (existing, with test-swarm additions)
+
+acceptance_criteria:
+  - "Given 5 new test agent personas, then each follows the Hive persona format"
+  - "Given the personas, then they're generalized (not Maestro-specific) with framework-specific guidance sections"
+  - "Given the coordinator role, then it maps to the existing team-lead persona with test-specific additions"
+
+steps:
+  - id: port-agents
+    description: |
+      Create 5 new agent personas in skills/hive/agents/:
+      - test-scout.md — from Scout/Kian. Context gathering, baseline management.
+        Generalized: reads stories, PRs, commits. Not mobile-specific.
+      - test-architect.md — from Architect/Yuki. Test authoring.
+        Generalized: detects framework, writes tests in appropriate format.
+      - test-worker.md — from Worker/Tomas. Test execution.
+        Generalized: executes on detected platform (device, browser, CLI).
+      - test-inspector.md — from Inspector/Priya. Coverage validation.
+        Generalized: validates coverage against story requirements.
+      - test-sentinel.md — from Sentinel/Ade. Bug triage.
+        Generalized: severity classification, auto-routing policy.
+
+      Sources: ~/Documents/WorkFlow/.claude/commands/bmad-agent-mts-*.md
+    agent: developer
+
+context:
+  key_files:
+    - ~/Documents/WorkFlow/.claude/commands/bmad-agent-mts-scout.md
+    - ~/Documents/WorkFlow/.claude/commands/bmad-agent-mts-architect.md
+    - ~/Documents/WorkFlow/.claude/commands/bmad-agent-mts-worker.md
+    - ~/Documents/WorkFlow/.claude/commands/bmad-agent-mts-inspector.md
+    - ~/Documents/WorkFlow/.claude/commands/bmad-agent-mts-sentinel.md
+    - skills/hive/agents/researcher.md — format reference
+
+files_to_modify:
+  - file: skills/hive/agents/test-scout.md
+    change: NEW FILE
+  - file: skills/hive/agents/test-architect.md
+    change: NEW FILE
+  - file: skills/hive/agents/test-worker.md
+    change: NEW FILE
+  - file: skills/hive/agents/test-inspector.md
+    change: NEW FILE
+  - file: skills/hive/agents/test-sentinel.md
+    change: NEW FILE

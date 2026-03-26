@@ -1,0 +1,41 @@
+id: token-budget-management
+epic: hive-phase8
+title: Add token budget tracking and context window monitoring
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Track token consumption per agent and per task. Enforce per-task and
+  per-cycle budget ceilings. Monitor context window consumption and trigger
+  fresh instance spawning before degradation. Warn when approaching limits.
+
+acceptance_criteria:
+  - "Given token budgets are configured, then per-task limits are enforced"
+  - "Given consumption approaches limits, then warnings are surfaced"
+  - "Given context window degradation, then fresh agent instances can be spawned with curated context"
+  - "Given the config, then budgets are in hive.config.yaml (or equivalent)"
+
+steps:
+  - id: design-token-management
+    description: |
+      Create skills/hive/references/token-management.md defining:
+      - Budget config: per_task_limit, per_cycle_limit, warning_threshold
+      - Context window monitoring: budget_fraction, degradation_threshold
+      - Fresh instance spawning with curated context
+      - Integration with orchestrator execution flow
+      Sources:
+      - /Users/don/Documents/project-hive/docs/stories/4-1-token-usage-tracking.md
+      - /Users/don/Documents/project-hive/docs/stories/4-2-token-budget-enforcement.md
+      - /Users/don/Documents/project-hive/docs/stories/4-3-context-window-monitoring-fresh-instance-spawning.md
+    agent: developer
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/docs/stories/4-1-token-usage-tracking.md
+    - /Users/don/Documents/project-hive/docs/stories/4-2-token-budget-enforcement.md
+    - /Users/don/Documents/project-hive/docs/stories/4-3-context-window-monitoring-fresh-instance-spawning.md
+
+files_to_modify:
+  - file: skills/hive/references/token-management.md
+    change: NEW FILE

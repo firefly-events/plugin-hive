@@ -1,0 +1,50 @@
+id: task-tracking-integration
+epic: hive-phase7
+title: Design task tracking adapter for human intervention queuing
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Design an adapter interface for external task tracking tools (Linear, Jira,
+  GitHub Issues). Items requiring human intervention get pushed to the tracker
+  as cards/issues in a designated queue or swimlane.
+
+  The orchestrator surfaces these during standup as blockers. When resolved
+  by the human, the item is marked done in the tracker and the orchestrator
+  picks it up in the next session.
+
+  Start with the adapter interface design and a Linear integration (Don's
+  primary tracker). Other integrations follow the same pattern.
+
+acceptance_criteria:
+  - "Given an agent identifies a human dependency, then it can push an item to the external tracker"
+  - "Given the adapter interface, then it supports: create item, update status, list pending items, mark resolved"
+  - "Given the standup ceremony, then pending human items are surfaced from the tracker as blockers"
+  - "Given the adapter design, then it's tool-agnostic with Linear as the first implementation"
+
+steps:
+  - id: design-adapter
+    description: |
+      Create skills/hive/references/task-tracking-adapter.md defining:
+      - Adapter interface: createItem, updateStatus, listPending, markResolved
+      - Item schema: title, description, severity, source (epic/story/step),
+        assignee, status (pending/in-progress/resolved)
+      - Queue/swimlane concept: human-intervention lane in the tracker
+      - How agents push items (via orchestrator, not directly)
+      - How standup reads pending items
+      - Linear integration specifics (gh CLI or Linear API)
+      Also check: /Users/don/Documents/project-hive/docs/stories/2.8-1-task-board-adapter-interface-linear-integration.md
+    agent: developer
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/docs/stories/2.8-1-task-board-adapter-interface-linear-integration.md
+    - /Users/don/Documents/project-hive/docs/stories/2.8-2-jira-rest-integration-bidirectional-sync.md
+
+files_to_modify:
+  - file: skills/hive/references/task-tracking-adapter.md
+    change: NEW FILE — adapter interface and Linear integration design
+
+references:
+  - /Users/don/Documents/project-hive/docs/stories/2.8-1-task-board-adapter-interface-linear-integration.md

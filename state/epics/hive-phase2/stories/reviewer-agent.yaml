@@ -1,0 +1,135 @@
+id: reviewer-agent
+epic: hive-phase2
+title: Port Review Agent Persona
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Create the reviewer agent persona markdown file. The reviewer provides fresh-context
+  code review — they have NOT seen the implementation evolve, giving them independent
+  judgment that catches biases self-review misses. The reviewer evaluates the final
+  code + tests against the story spec and architectural constraints.
+
+  Port from the Hive review-agent blueprint at:
+  /Users/don/Documents/project-hive/blueprints/development-team/review-agent.yaml
+
+acceptance_criteria:
+  - "Given code and tests from developer/tester phases, when the reviewer agent is spawned, then it produces a structured review with severity-tagged findings"
+  - "Given the reviewer has NOT seen the implementation evolve, then it evaluates the final product with fresh perspective"
+  - "Given review findings, then the output includes a verdict: passed | needs_optimization"
+  - "Given a 'passed' verdict with no findings, then the orchestrator knows to skip the optimization phase"
+  - "Given the agent file, then it follows the same markdown structure as researcher.md and developer.md"
+
+steps:
+  - id: read-source-blueprint
+    description: |
+      Read the Hive review-agent blueprint at:
+      /Users/don/Documents/project-hive/blueprints/development-team/review-agent.yaml
+
+      Also read the Phase 4 (Dev Review) design from:
+      /Users/don/Documents/herd/docs/hive-context/dev-swarm-product-brief.md
+      (search for "Phase 4: Dev Review")
+    agent: researcher
+
+  - id: write-reviewer-agent
+    description: |
+      Create skills/hive/agents/reviewer.md following the established pattern.
+
+      Key content from the blueprint:
+      - Role: Independent Code Reviewer (NOT the developer who wrote the code)
+      - Fresh context: reviewer sees final product, not the evolution
+      - Review dimensions: spec fidelity, convention adherence, security, performance,
+        test coverage, architectural constraint compliance
+      - Output: structured findings with { severity, file, line, description, suggestion }
+      - Verdict: passed | needs_optimization
+      - Skip signal: if verdict is "passed" with no suggestions, Phase 5 (optimize) is skipped
+      - Communication style: "constructive and specific, references exact file paths and lines"
+    agent: developer
+    depends_on: [read-source-blueprint]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/agents/researcher.md — format to match
+    - skills/hive/agents/developer.md — format to match
+
+files_to_modify:
+  - file: skills/hive/agents/reviewer.md
+    change: NEW FILE — review agent persona markdown
+
+code_examples:
+  - title: Review findings output format
+    language: markdown
+    code: |
+      ## Review Verdict: needs_optimization
+
+      ## Findings
+
+      ### Critical
+      - **[security]** `src/auth/middleware.ts:42` — JWT secret loaded from env without
+        fallback. If env var is missing, server starts with undefined secret, accepting
+        all tokens. **Suggestion:** Fail fast on startup if JWT_SECRET is not set.
+
+      ### Improvements
+      - **[convention]** `src/auth/middleware.ts:15` — Using `var` instead of `const`.
+        Project convention is `const` for all non-reassigned bindings.
+      - **[test-gap]** No test for expired token rejection. AC-3 is uncovered.
+
+      ## Summary
+      Implementation meets most acceptance criteria. One security issue and one
+      test gap need addressing before integration.
+  - title: Passed verdict (triggers Phase 5 skip)
+    language: markdown
+    code: |
+      ## Review Verdict: passed
+
+      ## Findings
+      No issues found. Implementation is clean, tests are comprehensive,
+      and conventions are followed consistently.
+
+      ## Summary
+      Ready for integration. No optimization phase needed.
+
+design_decisions:
+  - decision: Reviewer is a separate agent, not the developer in review mode
+    rationale: |
+      Fresh context is the key value. The developer has accumulated context and
+      biases during implementation. A reviewer who sees only the final product
+      catches things the developer is blind to — missing edge cases, convention
+      violations, architectural drift.
+  - decision: Verdict drives phase skipping
+    rationale: |
+      If the reviewer says "passed" with no findings, there's nothing for the
+      optimization phase to do. The orchestrator should skip Phase 5 and go
+      straight to Phase 6 (integrate). This saves a subagent spawn.
+
+dev_notes: |
+  The reviewer's input should include:
+  - All code + tests produced in prior phases
+  - Story specification (acceptance criteria)
+  - Research brief (for architectural context)
+
+  The reviewer should NOT receive:
+  - The developer's internal reasoning or episode records
+  - Other stories' code (scoped to current story only)
+
+  The Hive blueprint mentions checking "build passes (compilation check only — NOT
+  full test suite)". In Claude Code, the reviewer can run `tsc --noEmit` or the
+  project's lint command to verify compilation. The full test suite was already run
+  in the test phase.
+
+risks:
+  - severity: low
+    description: |
+      Straightforward port of an existing blueprint. The main risk is the reviewer
+      producing findings that are too vague for the developer agent to act on in
+      Phase 5.
+    mitigation: |
+      The persona should emphasize structured findings with file:line references
+      and concrete suggestions, not abstract observations.
+
+references:
+  - /Users/don/Documents/project-hive/blueprints/development-team/review-agent.yaml — source blueprint
+  - /Users/don/Documents/herd/docs/hive-context/dev-swarm-product-brief.md — Phase 4 design
+  - skills/hive/agents/researcher.md — format to match

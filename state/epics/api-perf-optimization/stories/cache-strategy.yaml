@@ -1,0 +1,205 @@
+id: cache-strategy
+epic: api-perf-optimization
+title: Design Redis Response Caching Strategy
+status: pending
+complexity: medium
+depends_on:
+  - baseline-perf-audit
+
+description: |
+  Redis is already deployed and used by the rate-limit plugin and feature gate system.
+  Design a response caching strategy that leverages this existing Redis instance for
+  read-heavy event endpoints. The goal is to reduce MongoDB load and improve response
+  times for list/discovery endpoints where slight staleness (30-60s) is acceptable.
+
+acceptance_criteria:
+  - Cache strategy document with per-endpoint-category TTLs and invalidation rules
+  - Redis memory estimation for expected cache footprint
+  - Fastify plugin design for transparent cache-aside with request-level granularity
+  - Cache key schema that handles query param variations correctly
+  - Strategy for cache warming on deploy and handling cache stampedes
+
+steps:
+  - id: audit-redis-usage
+    description: |
+      Examine current Redis usage in the codebase:
+      - rate-limit.plugin.ts — how Redis is connected and configured
+      - featureGate.ts — feature flag caching pattern
+      - app.ts — Redis connection lifecycle
+      Document the Redis client library used (ioredis vs redis), connection config,
+      and any existing cache patterns to build on.
+    agent: researcher
+
+  - id: categorize-endpoints
+    description: |
+      Using the baseline data, categorize all event endpoints by cacheability:
+
+      **High cache value (30-60s TTL):**
+      - GET /api/events (list) — same filters return same results for all users
+      - GET /api/events/trending — computed periodically, stable between computations
+      - GET /api/events/weekly-picks — updated weekly, AI-generated, expensive
+
+      **Short cache (5-10s TTL):**
+      - GET /api/events/:id — RSVP counts change, but detail page tolerates 5-10s staleness
+
+      **No cache:**
+      - User-specific endpoints (RSVP status, invited events, notifications)
+      - Write endpoints (POST/PUT/DELETE)
+      - Auth endpoints
+
+      For each cached endpoint, define the cache key schema including relevant
+      query params (city, category, date range, page, limit).
+    agent: researcher
+
+  - id: design-invalidation
+    description: |
+      Define cache invalidation triggers:
+      - Event create/update/delete → invalidate list caches for affected city
+      - RSVP create/update → invalidate event detail cache for that event
+      - Trending recomputation (cron) → invalidate trending caches
+      - Weekly picks generation → invalidate weekly picks cache for that city
+
+      Decide between:
+      - Tag-based invalidation (tag cache entries by city, invalidate all for a city)
+      - Key-pattern deletion (KEYS/SCAN for matching patterns — expensive at scale)
+      - TTL-only (let caches expire naturally, accept staleness)
+    agent: researcher
+
+  - id: design-plugin
+    description: |
+      Design the Fastify cache plugin following the existing plugin pattern
+      (see rate-limit.plugin.ts). The plugin should:
+      - Register as a Fastify plugin via fastify-plugin (fp)
+      - Accept configuration: default TTL, per-route overrides, Redis connection
+      - Implement cache-aside pattern: check cache → return if hit → call handler → store result
+      - Use onRequest hook for cache lookup, onSend hook for cache storage
+      - Handle cache stampede via lock/singleflight pattern
+      - Support cache bypass header (X-No-Cache) for debugging
+    agent: researcher
+
+  - id: estimate-memory
+    description: |
+      Calculate expected Redis memory usage:
+      - Average event list response size × number of unique query combinations
+      - Event detail cache: average detail size × number of active events
+      - Trending: fixed number of cities × response size
+      - Apply Redis overhead factor (~1.5x for data structures)
+      Compare against available Redis memory.
+    agent: researcher
+
+  - id: write-strategy-doc
+    description: |
+      Compile into a cache strategy document at:
+      state/epics/api-perf-optimization/artifacts/cache-strategy.md
+    agent: researcher
+    depends_on: [audit-redis-usage, categorize-endpoints, design-invalidation, design-plugin, estimate-memory]
+
+context:
+  codebase: ~/Documents/KMP/Shindig/event-api
+  key_files:
+    - src/app.ts — Redis connection setup, plugin registration order
+    - src/plugins/rate-limit.plugin.ts — existing Redis-backed Fastify plugin pattern
+    - src/plugins/featureGate.ts — feature flag caching via Redis
+    - src/config/rateLimit.ts — Redis connection configuration
+    - src/modules/events/event.service.ts — read paths to intercept
+    - src/modules/events/event.controller.ts — write operations that trigger invalidation
+    - src/services/trending-events.service.ts — trending recomputation (cron-triggered)
+  inputs_from_previous:
+    - baseline-perf-audit: endpoint traffic, response sizes, query latencies
+
+code_examples:
+  - title: Existing Fastify plugin pattern to follow
+    language: typescript
+    code: |
+      // rate-limit.plugin.ts — pattern for Redis-backed Fastify plugin
+      import fp from 'fastify-plugin';
+      async function rateLimitPlugin(fastify: FastifyInstance) {
+        // Uses fastify.redis or creates connection
+        await fastify.register(rateLimit, {
+          redis: fastify.redis,
+          // ...
+        });
+      }
+      export default fp(rateLimitPlugin, { name: 'rate-limit', fastify: '5.x' });
+  - title: Cache-aside plugin design (target implementation)
+    language: typescript
+    code: |
+      // What the cache plugin should look like
+      import fp from 'fastify-plugin';
+
+      interface CacheOptions {
+        redis: Redis;
+        defaultTTL: number; // seconds
+        routes: Record<string, { ttl: number; keyFn?: (req: FastifyRequest) => string }>;
+      }
+
+      async function cachePlugin(fastify: FastifyInstance, opts: CacheOptions) {
+        fastify.addHook('onRequest', async (request, reply) => {
+          const routeConfig = opts.routes[request.routeOptions.url];
+          if (!routeConfig || request.method !== 'GET') return;
+
+          const key = routeConfig.keyFn?.(request) ?? defaultKey(request);
+          const cached = await opts.redis.get(key);
+          if (cached) {
+            reply.header('X-Cache', 'HIT');
+            reply.send(JSON.parse(cached));
+          }
+        });
+
+        fastify.addHook('onSend', async (request, reply, payload) => {
+          if (reply.getHeader('X-Cache') === 'HIT') return payload;
+          const routeConfig = opts.routes[request.routeOptions.url];
+          if (!routeConfig || request.method !== 'GET') return payload;
+
+          const key = routeConfig.keyFn?.(request) ?? defaultKey(request);
+          await opts.redis.set(key, payload, 'EX', routeConfig.ttl);
+          reply.header('X-Cache', 'MISS');
+          return payload;
+        });
+      }
+
+      export default fp(cachePlugin, { name: 'response-cache', fastify: '5.x' });
+  - title: Cache key schema
+    language: typescript
+    code: |
+      // Cache keys must be deterministic for the same query params
+      function defaultKey(request: FastifyRequest): string {
+        const url = request.url; // includes query string
+        return `cache:${request.routeOptions.url}:${hashQueryParams(url)}`;
+      }
+      // Example keys:
+      // cache:/api/events:sha256(city=austin&limit=50&sort=startTime)
+      // cache:/api/events/:id:abc123def456
+      // cache:/api/events/trending:sha256(city=austin)
+
+risks:
+  - severity: high
+    description: |
+      Cache stampede: when a popular cache key expires, many concurrent requests
+      hit MongoDB simultaneously before any can repopulate the cache. Event list
+      endpoints with high traffic are vulnerable to this.
+    mitigation: |
+      Implement singleflight/lock pattern — first request acquires a short Redis
+      lock, computes the value, and stores it. Other requests wait or serve stale
+      data with stale-while-revalidate semantics.
+  - severity: medium
+    description: |
+      Cache key collisions from query param ordering. ?city=austin&limit=50 and
+      ?limit=50&city=austin must produce the same key, or cache hit rate drops.
+    mitigation: |
+      Sort query params alphabetically before hashing, or use a canonical key
+      function that extracts and orders known params explicitly.
+  - severity: medium
+    description: |
+      Stale RSVP counts in cached event detail responses. If a user RSVPs and
+      immediately views the event, they may see stale counts.
+    mitigation: |
+      Short TTL (5-10s) for event detail, and invalidate on RSVP write. Or
+      exclude RSVP counts from cached response and merge live counts on read.
+  - severity: low
+    description: |
+      Redis memory pressure if cache grows unbounded. Event list queries have
+      high cardinality (many city × category × date × page combinations).
+    mitigation: |
+      Set maxmemory-policy to allkeys-lru on Redis. Monitor memory usage.
+      Consider caching only the most common query patterns (top 10 cities).

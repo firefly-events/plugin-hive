@@ -1,0 +1,209 @@
+id: tdd-workflow
+epic: hive-phase2
+title: Create TDD Workflow Definition
+status: pending
+complexity: medium
+depends_on: [tester-agent, reviewer-agent, episode-schema]
+
+description: |
+  Create the TDD workflow YAML and update SKILL.md's execute command to support it.
+  The TDD workflow reorders phases so tests are written BEFORE implementation:
+  Research → Test Spec → Implement → Review → Optimize → Integrate.
+
+  The key difference from the Classic workflow is Phase 2 (test-spec): the tester
+  agent receives the research brief and story spec but explicitly NOT the implementation
+  code. The developer then writes code to make the tests pass (Phase 3).
+
+  Also needs to update SKILL.md execute command to:
+  - Support --methodology tdd parameter
+  - Load the correct workflow YAML based on methodology
+  - Handle the review verdict skip (if passed, skip optimize phase)
+
+acceptance_criteria:
+  - "Given --methodology tdd, when execute loads the workflow, then it uses workflows/development.tdd.workflow.yaml"
+  - "Given the TDD workflow, when the test-spec step runs, then its inputs include research-brief and story spec but NOT implementation code"
+  - "Given the TDD workflow, when the implement step runs, then its inputs include the test files from the test-spec step"
+  - "Given the review step returns verdict 'passed' with no findings, when the orchestrator checks, then it skips the optimize step and goes to integrate"
+  - "Given the TDD workflow, then it has 6 steps: research, test-spec, implement, review, optimize, integrate"
+  - "Given SKILL.md execute command, then it references methodology-routing.md for phase ordering"
+
+steps:
+  - id: create-tdd-workflow
+    description: |
+      Create workflows/development.tdd.workflow.yaml with 6 steps:
+      1. research (researcher) — same as classic
+      2. test-spec (tester) — inputs: research-brief, story spec. NO implementation.
+      3. implement (developer) — inputs: research-brief, test files from step 2
+      4. review (reviewer) — inputs: research-brief, implementation, tests
+      5. optimize (developer) — inputs: review findings. OPTIONAL (skipped if review passed)
+      6. integrate (developer) — inputs: review findings (if any), final commit
+
+      Follow the workflow schema from references/workflow-schema.md. Use the Classic
+      workflow at workflows/development.classic.workflow.yaml as the structural template
+      but reorder steps and adjust inputs per TDD methodology.
+    agent: developer
+
+  - id: update-skill-execute
+    description: |
+      Update the Execute Command section in skills/hive/SKILL.md to:
+      1. Parse --methodology parameter from arguments (default: classic)
+      2. Load the correct workflow YAML: workflows/development.{methodology}.workflow.yaml
+      3. Add instruction for review-verdict-based skipping:
+         "After the review step, check the reviewer's verdict. If 'passed' with
+         no findings, skip the optimize step and proceed directly to integrate."
+      4. Reference methodology-routing.md for methodology details
+      5. Ensure the execute command writes episode records after each step
+         per the episode-schema.md reference
+    agent: developer
+    depends_on: [create-tdd-workflow]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - workflows/development.classic.workflow.yaml — structural template to adapt
+    - skills/hive/references/workflow-schema.md — YAML format reference
+    - skills/hive/references/methodology-routing.md — TDD phase ordering
+    - skills/hive/agents/tester.md — tester persona (created in tester-agent story)
+    - skills/hive/agents/reviewer.md — reviewer persona (created in reviewer-agent story)
+    - skills/hive/references/episode-schema.md — episode format (created in episode-schema story)
+    - skills/hive/SKILL.md — execute command section to update
+  inputs_from_previous:
+    - tester-agent: skills/hive/agents/tester.md exists
+    - reviewer-agent: skills/hive/agents/reviewer.md exists
+    - episode-schema: skills/hive/references/episode-schema.md exists
+
+files_to_modify:
+  - file: workflows/development.tdd.workflow.yaml
+    change: NEW FILE — TDD workflow with 6 steps, test-before-implement ordering
+  - file: skills/hive/SKILL.md
+    change: Update Execute Command section — methodology selection, review skip logic, episode writing
+
+code_examples:
+  - title: TDD workflow structure (target)
+    language: yaml
+    code: |
+      name: development-tdd
+      description: TDD development workflow — test first, then implement
+      version: "1.0.0"
+      methodology: tdd
+
+      steps:
+        - id: research
+          agent: researcher
+          task: "Analyze codebase areas affected by this story..."
+          outputs:
+            - name: research-brief
+              type: string
+
+        - id: test-spec
+          agent: tester
+          task: >
+            Write tests from the story specification and research brief.
+            You are in TDD mode — write tests that DEFINE expected behavior.
+            You have NOT been given implementation code. This is intentional.
+            Tests should fail initially (red phase).
+          depends_on: [research]
+          inputs:
+            - name: research-brief
+              source: step_output
+              step_id: research
+              output_name: research-brief
+            # NOTE: no implementation input — TDD context isolation
+          outputs:
+            - name: test-files
+              type: json
+            - name: test-manifest
+              type: json
+
+        - id: implement
+          agent: developer
+          task: >
+            Write code to make the tests pass. Follow the research brief
+            for conventions and approach.
+          depends_on: [test-spec]
+          inputs:
+            - name: research-brief
+              source: step_output
+              step_id: research
+              output_name: research-brief
+            - name: test-files
+              source: step_output
+              step_id: test-spec
+              output_name: test-files
+  - title: Review skip logic in SKILL.md
+    language: markdown
+    code: |
+      **e. Check review verdict.** After the review step, read the reviewer's output:
+      - If verdict is `passed` with no findings → skip the `optimize` step, proceed to `integrate`
+      - If verdict is `needs_optimization` → execute the `optimize` step with review findings as input
+  - title: Classic workflow (existing template to adapt)
+    file: workflows/development.classic.workflow.yaml
+    description: |
+      The classic workflow has 5 steps (research → implement → test → review → integrate).
+      TDD reorders to 6 steps (research → test-spec → implement → review → optimize → integrate)
+      and adds the optimize step which is conditionally skipped.
+
+design_decisions:
+  - decision: Optimize step is a separate workflow step marked optional, not inline logic
+    rationale: |
+      Keeping it as a workflow step means the episode record captures whether
+      optimization happened. If it were inline in the integrate step, the
+      optimization work would be invisible in the state tracking.
+  - decision: TDD context isolation enforced via workflow inputs, not agent restrictions
+    rationale: |
+      The workflow YAML controls what inputs each step receives. The test-spec step
+      simply doesn't have an implementation input. The tester agent could technically
+      read files, but the prompt doesn't tell it to — and the persona reinforces
+      working from spec only.
+
+behavior_matrix:
+  - condition: "--methodology tdd"
+    behavior: "Load workflows/development.tdd.workflow.yaml (6 steps, test before implement)"
+  - condition: "--methodology classic or no flag"
+    behavior: "Load workflows/development.classic.workflow.yaml (5 steps, implement before test)"
+  - condition: "Review verdict: passed, no findings"
+    behavior: "Skip optimize step, proceed to integrate"
+  - condition: "Review verdict: needs_optimization"
+    behavior: "Execute optimize step with review findings, then integrate"
+  - condition: "Workflow YAML not found for requested methodology"
+    behavior: "Error: methodology not available. List available methodologies."
+
+dev_notes: |
+  The SKILL.md execute command currently describes sequential execution with
+  subagent spawning. The update needs to:
+  1. Add methodology parameter parsing at the top of the execute flow
+  2. Add the review-verdict skip logic after step (e)
+  3. Add episode writing per the new episode-schema.md reference
+
+  The TDD workflow's test-spec step MUST NOT include implementation code in
+  its inputs. Double-check the workflow YAML — if the inputs section accidentally
+  references a step_output from an implement step, TDD isolation breaks.
+
+  The optimize step receives the reviewer's findings and applies them. It reuses
+  the developer agent persona but with a different task: "apply these review
+  findings" rather than "implement from spec."
+
+risks:
+  - severity: medium
+    description: |
+      The SKILL.md execute command is already the longest section in the file.
+      Adding methodology selection, review skip logic, and episode writing may
+      make it unwieldy for Claude to follow reliably.
+    mitigation: |
+      Keep the additions concise. Reference the methodology-routing.md and
+      episode-schema.md docs rather than inlining their content. The execute
+      command should be a clear control flow, not a reference manual.
+  - severity: low
+    description: |
+      The TDD workflow assumes the test framework is known (e.g., jest, pytest).
+      The tester agent needs to determine the correct test framework from the
+      codebase, which the research brief should provide.
+    mitigation: |
+      The research step already covers "existing patterns and conventions" —
+      the test framework should be identified there and passed via research-brief.
+
+references:
+  - workflows/development.classic.workflow.yaml — structural template
+  - skills/hive/references/workflow-schema.md — YAML format
+  - skills/hive/references/methodology-routing.md — phase ordering
+  - /Users/don/Documents/herd/docs/hive-context/dev-swarm-product-brief.md — TDD design

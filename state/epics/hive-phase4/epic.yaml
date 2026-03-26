@@ -1,0 +1,46 @@
+name: hive-phase4
+title: "Hive Plugin Phase 4: Agent Roster Expansion + UI Agent + Fixes"
+description: |
+  Expand the Hive agent roster with architect, analyst, orchestrator, and UI designer
+  personas. Create the UI agent with Frame0 CLI integration and human approval touchpoints.
+  Update the plan command to auto-detect UI stories. Fix skill routing and add episode
+  record writing from phases 1-3.
+target_codebase: /Users/don/Documents/herd
+
+stories:
+  - id: fix-skill-routing
+    title: Fix /hive:hive skill routing conflict
+    complexity: low
+    depends_on: []
+  - id: episode-writing
+    title: Add episode record writing + classic workflow
+    complexity: medium
+    depends_on: []
+  - id: architect-agent
+    title: Port architect blueprint to Hive agent persona
+    complexity: low
+    depends_on: []
+  - id: analyst-agent
+    title: Port analyst/PM blueprints to Hive agent persona
+    complexity: low
+    depends_on: []
+  - id: orchestrator-agent
+    title: Design Hive orchestrator meta-agent persona
+    complexity: medium
+    depends_on: []
+  - id: ui-agent
+    title: Create UI designer agent with Frame0 integration
+    complexity: high
+    depends_on: []
+  - id: ui-touchpoints
+    title: Add human approval flow for wireframes
+    complexity: medium
+    depends_on: [ui-agent]
+  - id: ui-aware-planning
+    title: Update plan command to detect and inject UI steps
+    complexity: medium
+    depends_on: [ui-touchpoints]
+  - id: ui-marketing
+    title: Extend UI agent for marketing materials
+    complexity: medium
+    depends_on: [ui-agent]

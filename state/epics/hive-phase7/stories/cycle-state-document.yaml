@@ -1,0 +1,63 @@
+id: cycle-state-document
+epic: hive-phase7
+title: Implement cycle state document for persistent decision tracking
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Create a structured, machine-readable cycle state document that accumulates
+  decisions as a workflow runs. Every agent in every phase receives it as context.
+  Prevents re-debating settled decisions (technology choices, naming conventions,
+  scope boundaries). Inspired by Pattern 2 from architecture-influences.md.
+
+  The cycle state lives at state/cycle-state/{epic-id}.yaml and grows as phases
+  complete. After each phase, the orchestrator extracts key decisions and appends
+  them. Downstream agents receive the cycle state as a system-level constraint.
+
+acceptance_criteria:
+  - "Given a planning phase completes, when the orchestrator processes its output, then key decisions are extracted and appended to the cycle state"
+  - "Given a cycle state exists, when a downstream agent starts a step, then the cycle state is included in their context as constraints"
+  - "Given the cycle state format, then it contains: product name, decisions (with phase/key/value/rationale), constraints, and naming conventions"
+  - "Given cross-swarm handoff, then the cycle state transfers to the receiving swarm"
+
+steps:
+  - id: design-schema
+    description: |
+      Create skills/hive/references/cycle-state-schema.md defining:
+      - File path: state/cycle-state/{epic-id}.yaml
+      - Schema: product_name, decisions[] (phase, key, value, rationale),
+        constraints[], naming{}, scope_boundaries{}
+      - How orchestrator extracts decisions after each phase
+      - How cycle state is injected into agent context
+      Reference: /Users/don/Documents/project-hive/docs/plans/architecture-influences.md Pattern 2
+    agent: developer
+
+  - id: update-orchestrator
+    description: |
+      Update ORCHESTRATOR.md execute flow to:
+      1. Load or create cycle state at epic start
+      2. After each phase, extract decisions and append
+      3. Include cycle state in all downstream agent prompts
+      Update agents/orchestrator.md system knowledge table.
+    agent: developer
+    depends_on: [design-schema]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - /Users/don/Documents/project-hive/docs/plans/architecture-influences.md — Pattern 2
+    - skills/hive/ORCHESTRATOR.md — execute flow to update
+    - skills/hive/agents/orchestrator.md — system knowledge
+
+files_to_modify:
+  - file: skills/hive/references/cycle-state-schema.md
+    change: NEW FILE
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Add cycle state management to execute flow
+  - file: skills/hive/agents/orchestrator.md
+    change: Add cycle state to system knowledge
+
+references:
+  - /Users/don/Documents/project-hive/docs/plans/architecture-influences.md
+  - /Users/don/Documents/project-hive/docs/stories/10-1-cycle-state-document.md

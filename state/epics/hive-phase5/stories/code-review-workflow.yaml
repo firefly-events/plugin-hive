@@ -1,0 +1,51 @@
+id: code-review-workflow
+epic: hive-phase5
+title: Create code-review workflow YAML
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Create skills/hive/workflows/code-review.workflow.yaml — the structured
+  workflow for the /hive:review command. ORCHESTRATOR.md Review Command section
+  references this file but it doesn't exist yet. The review command currently
+  works from inline instructions; this formalizes it as a workflow YAML.
+
+acceptance_criteria:
+  - "Given the workflow exists, when /hive:review loads it, then it gets ordered steps: analyze → review → summarize"
+  - "Given the analyze step, then the researcher produces a scope/complexity analysis"
+  - "Given the review step, then the reviewer evaluates correctness, security, conventions, performance"
+  - "Given the workflow follows the same YAML schema as development workflows"
+
+steps:
+  - id: create-workflow
+    description: |
+      Read skills/hive/ORCHESTRATOR.md Review Command section for the expected
+      step structure (analyze, review, summarize).
+      Read skills/hive/workflows/development.classic.workflow.yaml for YAML format.
+      Read skills/hive/references/workflow-schema.md for the schema.
+
+      Create code-review.workflow.yaml with steps:
+      1. analyze — researcher analyzes scope, complexity, affected modules
+      2. review — reviewer evaluates correctness, security, conventions, performance
+      3. summarize — produce structured findings (critical, improvements, nits)
+
+      Also reference the Project Hive code-review workflow at:
+      /Users/don/Documents/project-hive/hive-workflows/code-review.yaml
+    agent: developer
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/ORCHESTRATOR.md — Review Command section
+    - skills/hive/workflows/development.classic.workflow.yaml — format reference
+    - skills/hive/references/workflow-schema.md — schema
+    - /Users/don/Documents/project-hive/hive-workflows/code-review.yaml — source
+
+files_to_modify:
+  - file: skills/hive/workflows/code-review.workflow.yaml
+    change: NEW FILE — code review workflow definition
+
+references:
+  - skills/hive/ORCHESTRATOR.md — Review Command
+  - /Users/don/Documents/project-hive/hive-workflows/code-review.yaml

@@ -1,0 +1,125 @@
+name: daily-ceremony
+description: Daily orchestrator ceremony — standup, planning, execution.
+version: "1.0.0"
+
+# This workflow runs at session start with a fresh 1M Opus orchestrator.
+# It is NOT a development workflow — it coordinates the day's work.
+
+phases:
+  - id: standup
+    description: >
+      Present the current state to the user. Read status markers, cycle state,
+      task tracker, and agent memories to reconstruct context from previous sessions.
+
+      Present:
+      1. Previous session's completed work (from status markers in state/episodes/)
+      2. In-progress items (stories with partial status markers)
+      3. Blockers requiring human input (from task tracker via listPending())
+      4. Recently resolved human items (newly unblocked work)
+      5. Overnight improvements (any agent memory promotions or config changes)
+      6. Continuation items (next stories in active epics)
+
+      Output: structured standup report for user review.
+    agent: orchestrator
+
+  - id: planning
+    description: >
+      After standup, the user short-lists items for today's work. The orchestrator
+      spins up a compressed planning session:
+
+      1. User provides short list (story IDs, feature descriptions, or bug reports)
+      2. Orchestrator evaluates: are these already planned as stories? Need new planning?
+      3. If new work: run analyst + architect (+ ui-designer if UI work) as planning swarm
+      4. Planning swarm reports back with proposed stories
+      5. Run agent-ready checklist on proposed stories
+      6. Present plan for user approval
+
+      This is a compressed version of /hive:plan — the user provides direction,
+      not a full brief.
+    agent: orchestrator
+    depends_on: [standup]
+
+  - id: execution
+    description: >
+      After plan approval, kick off dev team(s) to execute the approved work.
+
+      Current mode: one dev team at a time, epics in sequence.
+      Future mode: parallel dev teams across independent epics.
+
+      For each approved story:
+      1. Load story spec and cycle state
+      2. Evaluate: does this need a team or can the lead handle it solo?
+      3. If team needed: spawn team lead → team lead staffs and executes
+      4. If solo: execute directly
+      5. Write status markers after each step
+      6. Capture insights for session-end evaluation
+      7. Update cycle state with decisions made
+    agent: orchestrator
+    depends_on: [planning]
+
+  - id: commit
+    description: >
+      After dev execution completes, commit all changes before handing off to
+      the test swarm. This creates a clean checkpoint — if tests find issues,
+      fixes are committed separately so the git history shows the dev work
+      and each subsequent fix as distinct commits.
+
+      Commit message should reference the epic and stories completed.
+    agent: orchestrator
+    depends_on: [execution]
+
+  - id: test-handoff
+    description: >
+      Create a cross-swarm handoff from the dev swarm to the test swarm.
+      Package: story specs, implementation artifacts (committed file paths),
+      cycle state, and acceptance criteria.
+
+      Then run the test swarm pipeline (test-swarm.workflow.yaml):
+      context → baseline → author tests → validate coverage →
+      execute (parallel platforms) → file bugs → session report.
+
+      High-severity bugs escalate to human via task tracker.
+      Low-severity bugs auto-route to dev queue for fixing.
+    agent: orchestrator
+    depends_on: [commit]
+
+  - id: fix-loop
+    description: >
+      If the test swarm filed bugs that were auto-routed to the dev queue:
+      1. Dev team picks up each bug
+      2. Implements fix
+      3. Commits the fix (separate commit per fix or grouped by story)
+      4. Re-runs affected tests to verify
+
+      Each fix gets its own commit so git history is traceable:
+      - Commit 1: original dev work
+      - Commit 2: fix for bug #1
+      - Commit 3: fix for bug #2
+
+      If all bugs are resolved, proceed to session end.
+      If bugs remain unresolved, surface them for tomorrow's standup.
+
+      TERMINAL ISSUES: If a bug cannot be resolved by a development fix —
+      architectural flaw, missing dependency, environment issue, broken
+      third-party service, data corruption, or any issue requiring human
+      judgment or access the agent doesn't have — then:
+      1. STOP the fix loop immediately
+      2. Mark the story as BLOCKED (not failed — it's waiting, not dead)
+      3. Push a high-severity item to the task tracker with full context:
+         what was attempted, why it can't be fixed autonomously, what the
+         human needs to do or decide
+      4. Notify the user directly (don't bury it in a report)
+      5. Continue with any remaining non-blocked work
+      6. The blocked item surfaces in tomorrow's standup as a blocker
+    agent: orchestrator
+    depends_on: [test-handoff]
+
+  - id: session-end
+    description: >
+      After all work and fixes complete:
+      1. Evaluate staged insights — promote or discard per agent-memory-schema
+      2. Update cycle state with the day's decisions
+      3. Surface unresolved items for tomorrow's standup
+      4. Clean up insight staging area
+    agent: orchestrator
+    depends_on: [fix-loop]

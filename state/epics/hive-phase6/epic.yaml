@@ -1,0 +1,35 @@
+name: hive-phase6
+title: "Hive Plugin Phase 6: Episode Redesign + Agent Memories"
+description: |
+  Replace the verbose episode system with lightweight status markers and an
+  agent memory system. Status markers track workflow progress cheaply. Agent
+  memories persist reusable insights per-agent across sessions, loaded when
+  the persona comes off the bench. Includes session-end evaluation flow for
+  promoting or discarding insights.
+target_codebase: /Users/don/Documents/herd
+
+stories:
+  - id: status-markers
+    title: Replace episodes with lightweight status markers
+    complexity: medium
+    depends_on: []
+  - id: agent-memory-schema
+    title: Design agent memory file format and storage
+    complexity: medium
+    depends_on: []
+  - id: memory-loading
+    title: Load agent memories when persona comes off the bench
+    complexity: medium
+    depends_on: [agent-memory-schema]
+  - id: insight-capture
+    title: Add insight capture during agent execution
+    complexity: medium
+    depends_on: [agent-memory-schema]
+  - id: session-end-evaluation
+    title: Evaluate and promote/discard insights at session end
+    complexity: high
+    depends_on: [insight-capture]
+  - id: migrate-episodes
+    title: Migrate existing episodes to new format and clean up
+    complexity: low
+    depends_on: [status-markers]

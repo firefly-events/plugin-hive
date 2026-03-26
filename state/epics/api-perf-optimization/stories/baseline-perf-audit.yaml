@@ -1,0 +1,191 @@
+id: baseline-perf-audit
+epic: api-perf-optimization
+title: Establish Event Query Performance Baseline
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Profile the Shindig event-api's highest-traffic endpoints to establish response
+  time and payload baselines. The event-api is a Fastify 5.x / TypeScript / MongoDB
+  backend with 27 domain modules. It already has Prometheus metrics (metrics.plugin.ts
+  tracks request duration via onResponse hook) and OpenTelemetry instrumentation.
+
+  The primary focus is the events module — getEvents, searchEvents, getEventById,
+  trending, and weekly picks — as these are the highest-traffic, heaviest-payload
+  endpoints. The KMP Compose frontend calls these via Ktor HTTP client.
+
+acceptance_criteria:
+  - Response time measurements for top 10 endpoints under typical load
+  - MongoDB explain() analysis for getEvents, searchEvents, and trending queries
+  - Payload size analysis — response JSON size vs fields the KMP client renders
+  - Index coverage report via db:indexes:verify
+  - N+1 pattern identification in event service
+  - Baseline report as markdown with before-metrics for future comparison
+
+steps:
+  - id: inventory-endpoints
+    description: |
+      Catalog all event-related endpoints from events.routes.ts, trending.routes.ts,
+      and weekly-picks.routes.ts. For each, document: HTTP method, path, query params,
+      and which service method it calls. Also check the existing Prometheus metrics
+      at /metrics for any historical latency data.
+    agent: researcher
+
+  - id: profile-queries
+    description: |
+      Add MongoDB explain() calls to the key query paths in event.service.ts:
+      - getEvents() — uses EventModel.find(query).limit().sort().lean()
+      - searchEvents() — uses aggregation pipeline with $geoNear, $match, $sort
+      - getEventById() — uses EventModel.findById().lean()
+      - getPromotedEvents() — uses find with multiple filters
+
+      Run explain('executionStats') for each with representative filter params.
+      Document: executionTimeMillis, totalDocsExamined, nReturned, indexesUsed.
+    agent: researcher
+
+  - id: analyze-payloads
+    description: |
+      Measure response payload sizes for list endpoints. The Event model has ~60
+      fields (title, description, location, venue, organizer, tags, images, RSVP
+      arrays, moderation fields, provider metadata, etc.). The KMP client likely
+      uses <20 of these for list views. Document:
+      - Full response size for GET /api/events?limit=50
+      - Which fields the KMP EventListItem composable actually renders
+      - Calculate potential savings from field projection/selection
+    agent: researcher
+
+  - id: check-indexes
+    description: |
+      Run the existing index verification script and analyze coverage:
+      ```bash
+      cd ~/Documents/KMP/Shindig/event-api
+      npx ts-node scripts/mongodb/create-indexes.ts --verify
+      ```
+      Cross-reference defined indexes against actual query patterns. Look for:
+      - Queries that do COLLSCAN (no index hit)
+      - Compound index field order mismatches with query sort order
+      - Missing indexes for common filter combinations (city + date + category)
+    agent: researcher
+
+  - id: identify-n-plus-one
+    description: |
+      Trace the data flow for getEventById and list endpoints. Known patterns
+      to investigate:
+      - getEventById() calls getInvitedEventIds() and enriches organizer with
+        separate UserModel.findById() and Firebase lookup — 3 sequential queries
+        per event detail view
+      - Trending computation calls EventModel.findById() inside a loop for each
+        trending event (computeTrendingForCity)
+      - List responses call keysToCamelCase() which deep-transforms every doc
+    agent: researcher
+
+  - id: compile-baseline-report
+    description: |
+      Compile all findings into a structured baseline report. Include:
+      - Endpoint inventory with measured response times
+      - Query explain() results with identified bottlenecks
+      - Payload analysis with over-fetching estimates
+      - Index coverage gaps
+      - N+1 patterns with estimated impact
+      - Prioritized list of optimization opportunities
+      Save to state/epics/api-perf-optimization/artifacts/baseline-report.md
+    agent: researcher
+    depends_on: [inventory-endpoints, profile-queries, analyze-payloads, check-indexes, identify-n-plus-one]
+
+context:
+  codebase: ~/Documents/KMP/Shindig/event-api
+  tech_stack:
+    backend: Fastify 5.x + TypeScript + Mongoose/MongoDB
+    frontend: Kotlin Multiplatform (Compose) with Ktor HTTP client
+    monitoring: Prometheus (metrics.plugin.ts), Sentry, PostHog, OpenTelemetry
+    cache: Redis (rate limiting + feature gates only)
+  key_files:
+    - src/modules/events/event.service.ts — getEvents(), searchEvents(), getEventById()
+    - src/modules/events/events.routes.ts — 14 route sections, all event endpoints
+    - src/modules/events/event.model.ts — Mongoose schema, ~60 fields, 6 model sections
+    - src/modules/events/event.controller.ts — request handlers, 10 controller sections
+    - src/modules/events/trending.routes.ts — trending endpoint handlers
+    - src/modules/events/weekly-picks.routes.ts — weekly picks (AI curation via Gemini)
+    - src/services/trending-events.service.ts — trending score calculation
+    - src/services/popularity.service.ts — click/share/RSVP signal aggregation
+    - src/plugins/metrics.plugin.ts — Prometheus metrics with request duration tracking
+    - scripts/mongodb/create-indexes.ts — index definitions and verification
+
+code_examples:
+  - title: Current getEvents query pattern (no projection, full doc returned)
+    language: typescript
+    code: |
+      // event.service.ts — getEvents uses .lean() but no .select()
+      const [rawEvents, total] = await Promise.all([
+        EventModel.find(query).limit(limitVal).sort({ startTime: 1 }).lean(),
+        EventModel.countDocuments(query)
+      ]);
+  - title: Trending N+1 pattern (findById inside loop)
+    language: typescript
+    code: |
+      // trending-events.service.ts — computeTrendingForCity
+      for (const [eventId, counts] of signals) {
+        if (counts.distinctUsers < 50) { continue; }
+        // N+1: one query per trending event
+        const event = await EventModel.findById(eventId)
+          .select('createdAt startTime').lean();
+        // ...
+      }
+  - title: getEventById enrichment chain (3 sequential queries)
+    language: typescript
+    code: |
+      // event.service.ts — getEventById
+      const event = await EventModel.findById(id).lean();        // query 1
+      const invitedEventIds = await this.getInvitedEventIds(userId); // query 2
+      // Then enriches organizer:
+      // UserModel.findById(organizerId).lean()                   // query 3
+      // Plus optional Firebase lookup                            // query 4
+  - title: Existing Prometheus metrics hook (already tracks duration)
+    language: typescript
+    code: |
+      // metrics.plugin.ts — already measures per-route latency
+      fastify.addHook('onResponse', async (request, reply) => {
+        const duration = Number(process.hrtime.bigint() - startTime) / 1e9;
+        httpRequestDuration.observe(
+          { method: request.method, route, status_code: String(reply.statusCode) },
+          duration
+        );
+      });
+  - title: Existing index definitions (from create-indexes.ts)
+    language: typescript
+    code: |
+      // Indexes defined but may not match actual query patterns
+      events: [
+        { key: { location: '2dsphere' }, name: 'location_geo' },
+        { key: { title: 'text', description: 'text', tags: 'text' }, name: 'search_text' },
+        { key: { startDate: 1, location: '2dsphere' }, name: 'date_location' },
+        { key: { provider: 1, externalId: 1 }, name: 'provider_external' },
+        { key: { category: 1, startDate: 1 }, name: 'category_date' },
+        { key: { archived: 1, startDate: 1 }, name: 'archived_date' },
+        { key: { city: 1, startDate: 1 }, name: 'city_date' },
+      ]
+
+risks:
+  - severity: medium
+    description: |
+      The index script uses field names like `startDate` but the event.service.ts
+      queries filter on `startTime`. If the Mongoose schema uses `startTime` but
+      indexes are on `startDate`, queries won't hit the index.
+    mitigation: |
+      Cross-reference Mongoose schema field names against index definitions. Run
+      explain() to verify index usage.
+  - severity: low
+    description: |
+      Prometheus metrics may not have enough historical data if the metrics plugin
+      was recently added. May need to generate load for measurement.
+    mitigation: |
+      Use curl/httpie to generate representative requests for profiling if
+      historical data is insufficient.
+  - severity: medium
+    description: |
+      The weekly picks endpoint calls an AI curation service (Gemini). Profiling
+      this endpoint will have high variance due to external API latency.
+    mitigation: |
+      Profile the weekly picks endpoint separately and note that its latency is
+      dominated by the external Gemini API call, not MongoDB.

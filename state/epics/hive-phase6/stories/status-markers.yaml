@@ -1,0 +1,51 @@
+id: status-markers
+epic: hive-phase6
+title: Replace episodes with lightweight status markers
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Replace the current verbose episode YAML files (~30 lines each) with
+  lightweight status markers (~5 lines). Status markers are the only thing
+  /hive:status needs to track progress. Inter-phase context passing moves
+  to direct agent-to-agent handoff (already happens via prompts).
+
+acceptance_criteria:
+  - "Given a step completes, when a status marker is written, then it contains only: step_id, status, timestamp, and artifacts list"
+  - "Given /hive:status reads markers, then it correctly determines story progress (pending/in-progress/completed/failed)"
+  - "Given the marker format, then file size is under 200 bytes per marker"
+
+steps:
+  - id: design-marker-format
+    description: |
+      Design the minimal status marker format. Read the current episode schema
+      at skills/hive/references/episode-schema.md and strip it to essentials:
+
+      ```yaml
+      step_id: research
+      status: completed
+      timestamp: "2026-03-25T21:00:00Z"
+      artifacts:
+        - path/to/file.md
+      ```
+
+      That's it. No conclusions, decisions, context_for_next_phase.
+      Update episode-schema.md to document the new marker format.
+      Update /hive:status logic in ORCHESTRATOR.md if needed.
+    agent: developer
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/references/episode-schema.md — current format to simplify
+    - skills/hive/ORCHESTRATOR.md — status command that reads markers
+
+files_to_modify:
+  - file: skills/hive/references/episode-schema.md
+    change: Replace verbose episode format with lightweight status marker format
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Update status command and execute command references if needed
+
+references:
+  - skills/hive/references/episode-schema.md

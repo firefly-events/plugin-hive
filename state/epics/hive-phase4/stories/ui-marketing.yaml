@@ -1,0 +1,169 @@
+id: ui-marketing
+epic: hive-phase4
+title: Extend UI agent for marketing materials
+status: pending
+complexity: medium
+depends_on: [ui-agent]
+
+description: |
+  Extend the UI designer agent persona to handle marketing and advertising
+  materials beyond wireframes. This includes social media graphics, landing page
+  mockups, ad banners, app store assets, pitch decks, and brand collateral.
+
+  The extension adds new sections to the existing ui-designer.md persona
+  (created by the ui-agent story) covering marketing-specific workflows,
+  output formats, and tool usage patterns.
+
+  Marketing materials differ from wireframes:
+  - Higher visual fidelity expected (not wireframe-level)
+  - Brand consistency is critical (colors, typography, logo placement)
+  - Multiple format/size variants per asset (social platforms have different specs)
+  - May use image generation tools in addition to Frame0
+
+acceptance_criteria:
+  - "Given the UI agent is asked to create marketing materials, then it knows asset types: social graphics, landing pages, ad banners, app store screenshots, pitch deck slides"
+  - "Given a social media graphic request, then the agent knows platform specs (Instagram 1080x1080, Twitter 1200x675, etc.)"
+  - "Given marketing output, then it includes: asset files, platform-specific variants, and a brand compliance checklist"
+  - "Given the agent's tool discovery finds image generation tools, then it uses them for higher-fidelity marketing assets"
+  - "Given brand guidelines exist in the project, then the agent references them for color, typography, and logo usage"
+
+steps:
+  - id: research-marketing
+    description: |
+      Research marketing material requirements and existing patterns:
+
+      1. Study common marketing asset specs:
+         - Social media: Instagram (1080x1080, 1080x1920), Twitter/X (1200x675),
+           LinkedIn (1200x627), Facebook (1200x630)
+         - App stores: iOS (1290x2796, 1284x2778), Google Play (1024x500 feature, screenshots)
+         - Ad banners: common IAB sizes (300x250, 728x90, 160x600, 320x50)
+
+      2. Check Shindig wireframe examples for any marketing materials:
+         ~/Documents/KMP/Shindig/_bmad-output/planning-artifacts/wireframes/
+
+      3. Evaluate Frame0 for marketing use:
+         - Can it handle arbitrary canvas sizes (not just device presets)?
+         - Image embedding support for logos/photos
+         - Text styling capabilities for headlines
+
+      4. Check what image generation MCP tools might be available:
+         - Are there any image gen tools registered in the session?
+         - What quality/style can they produce?
+
+      5. Look for any brand guidelines in the Shindig project that the
+         agent should reference.
+    agent: researcher
+
+  - id: extend-persona
+    description: |
+      Add marketing sections to skills/hive/agents/ui-designer.md:
+
+      **Marketing materials section:**
+      - Asset types the agent can produce
+      - Per-type workflow (different from wireframe workflow)
+      - Platform specs quick-reference table
+      - Brand consistency checklist
+
+      **Marketing workflow:**
+      1. Read story spec → identify asset types and target platforms
+      2. Discover tools (Frame0 for layout, image gen for visuals)
+      3. Check for brand guidelines in the project
+      4. Create base design at largest size
+      5. Generate platform variants (resize/reformat)
+      6. Produce brand compliance checklist
+      7. Present for approval (uses same touchpoint protocol)
+
+      **Platform specs table:**
+      ```
+      | Platform      | Format          | Size          |
+      |--------------|-----------------|---------------|
+      | Instagram    | Post            | 1080x1080     |
+      | Instagram    | Story           | 1080x1920     |
+      | Twitter/X    | Post            | 1200x675      |
+      | App Store    | iPhone 15 Pro   | 1290x2796     |
+      | Google Play  | Feature graphic | 1024x500      |
+      | Banner       | Medium Rectangle| 300x250       |
+      ```
+
+      **Image generation integration:**
+      If image generation MCP tools are available, the agent can use them for:
+      - Hero images and background graphics
+      - Illustration elements
+      - Photo-style marketing imagery
+      The Frame0 CLI embeds images via the `image` command.
+
+      **Brand compliance checklist:**
+      - Colors match brand palette
+      - Typography uses approved fonts/sizes
+      - Logo placement follows guidelines
+      - Sufficient contrast for accessibility
+      - No trademark violations in copy
+    agent: developer
+    depends_on: [research-marketing]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/agents/ui-designer.md — persona to extend (created by ui-agent story)
+    - ~/Documents/WorkFlow/frame-zero/agent-harness/FRAME-ZERO.md — Frame0 capabilities
+    - ~/Documents/KMP/Shindig/_bmad-output/planning-artifacts/wireframes/ — existing design patterns
+  inputs_from_previous:
+    - ui-agent: base UI designer persona (this story extends it)
+
+files_to_modify:
+  - file: skills/hive/agents/ui-designer.md
+    change: Add marketing materials sections (asset types, platform specs, brand compliance)
+
+design_decisions:
+  - decision: Extend existing ui-designer.md rather than create a separate marketing-agent.md
+    rationale: |
+      Marketing design uses the same tools (Frame0 + image gen) and similar
+      workflows (create → present → approve). A separate agent would duplicate
+      tool discovery and Frame0 reference sections. One persona with specialized
+      sections is more maintainable.
+  - decision: Include platform specs as a quick-reference table in the persona
+    rationale: |
+      Marketing agents need exact pixel dimensions to create correctly-sized
+      assets. Having specs inline avoids a round-trip to look them up.
+  - decision: Brand compliance is a checklist, not a gate
+    rationale: |
+      The agent can't programmatically verify brand compliance (no brand
+      validation tool). A checklist prompts the agent to self-check and
+      surfaces the criteria for the human reviewer at touchpoints.
+
+dev_notes: |
+  Frame0 supports arbitrary canvas sizes via the shape frame command with
+  explicit width/height (not just device presets). This means it can create
+  marketing assets at any platform's required dimensions.
+
+  Image embedding: `cli-anything-frame-zero --project file.f0 shape image --page-id X --path /path/to/logo.png`
+  This is how logos and photos get placed in marketing layouts.
+
+  The marketing workflow reuses the same touchpoint protocol from ui-touchpoints —
+  renditions, approval, brief sign-off. No new interaction patterns needed.
+
+  For Shindig specifically, design tokens ($olive12, $gray11, etc.) from existing
+  wireframe briefs serve as the brand palette. The agent should check for these
+  in the project context.
+
+risks:
+  - severity: medium
+    description: |
+      Marketing materials often need higher visual fidelity than wireframes.
+      Frame0 produces moderate-fidelity output — may not meet expectations
+      for final marketing assets.
+    mitigation: |
+      Position Frame0 output as mockups/layouts for approval, not final
+      production assets. Final assets may need a design tool handoff.
+      Image generation tools can supplement for higher-fidelity elements.
+  - severity: low
+    description: |
+      Platform specs change over time (social media updates dimensions).
+    mitigation: |
+      The specs table is a quick-reference, not authoritative. Note that
+      the agent should verify current specs for production assets.
+
+references:
+  - skills/hive/agents/ui-designer.md — persona to extend
+  - ~/Documents/WorkFlow/frame-zero/agent-harness/FRAME-ZERO.md — Frame0 docs
+  - state/epics/hive-phase4-brief.md — section 3 marketing scope

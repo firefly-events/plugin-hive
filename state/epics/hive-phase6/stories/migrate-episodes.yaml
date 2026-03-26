@@ -1,0 +1,41 @@
+id: migrate-episodes
+epic: hive-phase6
+title: Migrate existing episodes to new format and clean up
+status: pending
+complexity: low
+depends_on: [status-markers]
+
+description: |
+  Migrate existing episode files from the verbose format to lightweight status
+  markers. Scan existing episodes for any insights worth promoting to agent
+  memories. Clean up the old files.
+
+acceptance_criteria:
+  - "Given existing episodes in state/episodes/, then each is converted to a status marker (step_id, status, timestamp, artifacts)"
+  - "Given the migration, then any insights in existing episodes are flagged for evaluation"
+  - "Given migration is complete, then old verbose episode files are removed"
+
+steps:
+  - id: migrate
+    description: |
+      1. Scan state/episodes/ for all existing episode YAML files
+      2. For each, extract: step_id, status, timestamp, artifacts_produced
+      3. Write a new status marker file with just those fields
+      4. Check conclusions and context_for_next_phase for anything that
+         looks like a reusable insight — flag for evaluation
+      5. Remove old verbose episode files
+      6. Update any documentation that references the old format
+    agent: developer
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - state/episodes/ — existing episodes to migrate
+    - skills/hive/references/episode-schema.md — new marker format (from status-markers story)
+
+files_to_modify:
+  - file: state/episodes/**/*.yaml
+    change: Replace verbose episodes with status markers
+
+references:
+  - skills/hive/references/episode-schema.md

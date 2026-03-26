@@ -1,0 +1,47 @@
+id: gate-retry-feedback
+epic: hive-phase7
+title: Add gate retry with feedback injection to execute flow
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  When a review or test step produces a failing verdict, feed the failure
+  findings back into the next attempt. Implements the evaluate → inject
+  findings → retry loop from Pattern 3 (architecture-influences.md).
+
+  Configurable per-workflow: maxRetries, feedbackInjection, escalateAfter.
+  Default: 1 retry with feedback, escalate after 2 failures.
+
+acceptance_criteria:
+  - "Given a review step returns needs_revision, when retry is configured, then the review findings are injected into the developer's retry prompt"
+  - "Given a test step fails, when retry is configured, then test failure output is injected into the next attempt"
+  - "Given maxRetries is exhausted, then the story is escalated (written as escalated status marker)"
+  - "Given gate retry config, then it's defined in the workflow YAML per step"
+
+steps:
+  - id: design-retry-protocol
+    description: |
+      Add retry configuration to workflow-schema.md. Update execute flow in
+      ORCHESTRATOR.md with the retry loop. Update workflow YAML files to
+      include retry config on review and test steps.
+      Source: /Users/don/Documents/project-hive/docs/plans/architecture-influences.md Pattern 3
+    agent: developer
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/docs/plans/architecture-influences.md — Pattern 3
+    - skills/hive/references/workflow-schema.md
+    - skills/hive/ORCHESTRATOR.md
+
+files_to_modify:
+  - file: skills/hive/references/workflow-schema.md
+    change: Add retry config fields to step schema
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Add retry loop to execute flow
+  - file: skills/hive/workflows/development.classic.workflow.yaml
+    change: Add retry config to review/test steps
+
+references:
+  - /Users/don/Documents/project-hive/docs/plans/architecture-influences.md
+  - /Users/don/Documents/project-hive/docs/stories/10-2-gate-retry-with-feedback-injection.md

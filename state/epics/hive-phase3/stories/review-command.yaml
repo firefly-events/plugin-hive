@@ -1,0 +1,104 @@
+id: review-command
+epic: hive-phase3
+title: Implement /hive:review Command
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Update the Review Command section in ORCHESTRATOR.md with full implementation
+  details. Currently it's a stub — 4 lines saying "spawn researcher and reviewer."
+  It needs concrete logic for: identifying what to review, loading the code-review
+  workflow, executing the steps, and formatting the output.
+
+  Also update the skills/review/SKILL.md to pass arguments through correctly.
+
+acceptance_criteria:
+  - "Given staged git changes, when /hive:review is invoked with no args, then it reviews the staged diff"
+  - "Given a branch name, when /hive:review feature-branch is invoked, then it reviews the diff against main"
+  - "Given a PR number, when /hive:review #123 is invoked, then it reviews the PR's changes"
+  - "Given the review completes, then structured findings with severity and verdict are displayed"
+  - "Given the ORCHESTRATOR.md review section, then it references the code-review workflow"
+
+steps:
+  - id: update-orchestrator-review
+    description: |
+      Replace the Review Command section in skills/hive/ORCHESTRATOR.md with:
+
+      1. Input parsing:
+         - No args → review staged changes (git diff --cached, or git diff if nothing staged)
+         - Branch name → review diff against main (git diff main..{branch})
+         - PR number (#123) → use gh pr diff {number}
+      2. Load workflows/code-review.workflow.yaml
+      3. Execute the workflow steps sequentially (same pattern as the execute command
+         but simpler — no epic, no stories, just the workflow steps)
+      4. Display the review findings in structured format
+      5. Write episode records to state/episodes/review/{timestamp}/ for tracking
+    agent: developer
+
+  - id: update-review-skill
+    description: |
+      Update skills/review/SKILL.md to include argument parsing guidance.
+      Currently it just says "read ORCHESTRATOR.md." Add:
+      - Examples: /hive:review, /hive:review feature-branch, /hive:review #42
+      - Note that no args reviews current staged/unstaged changes
+    agent: developer
+    depends_on: [update-orchestrator-review]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/ORCHESTRATOR.md — Review Command section to update
+    - skills/review/SKILL.md — skill entrypoint to update
+    - workflows/code-review.workflow.yaml — workflow to reference (created in code-review-workflow story)
+    - skills/hive/agents/researcher.md — analysis agent
+    - skills/hive/agents/reviewer.md — review agent
+
+files_to_modify:
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Replace Review Command section with full implementation
+  - file: skills/review/SKILL.md
+    change: Add argument examples and parsing guidance
+
+code_examples:
+  - title: Input parsing logic
+    language: markdown
+    code: |
+      **Input parsing:**
+      - No arguments → `git diff --cached` (staged changes). If nothing staged, `git diff` (unstaged).
+      - Branch name → `git diff main..{branch}`
+      - `#123` or PR URL → `gh pr diff 123`
+      - File paths → review only those files
+  - title: Review output format
+    language: markdown
+    code: |
+      ## Code Review Results
+
+      ### Analysis (Researcher)
+      - 5 files changed, 3 modules affected
+      - Changes touch authentication middleware and user model
+
+      ### Review (Reviewer)
+      **Verdict: needs_optimization**
+
+      #### Critical
+      - **[security]** `src/auth/middleware.ts:42` — JWT secret has no fallback
+
+      #### Improvements
+      - **[convention]** `src/auth/middleware.ts:15` — Use const instead of var
+
+      ### Summary
+      One security issue needs addressing before merge.
+
+risks:
+  - severity: low
+    description: |
+      The review command is a simplified version of the execute command. The main
+      risk is the gh CLI not being authenticated for PR review.
+    mitigation: |
+      Check gh auth status before attempting PR diff. Fall back to git diff if
+      gh is unavailable.
+
+references:
+  - skills/hive/ORCHESTRATOR.md — Review Command section
+  - skills/review/SKILL.md — skill entrypoint

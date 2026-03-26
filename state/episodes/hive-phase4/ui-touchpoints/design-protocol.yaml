@@ -1,0 +1,5 @@
+step_id: design-protocol
+status: completed
+timestamp: "2026-03-25T20:56:00Z"
+artifacts:
+  - skills/hive/references/wireframe-protocol.md

@@ -1,0 +1,110 @@
+id: architect-agent
+epic: hive-phase4
+title: Port architect blueprint to Hive agent persona
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Port the architect persona from the Project Hive blueprint at
+  /Users/don/Documents/project-hive/blueprints/planning-team/architect.yaml
+  into a Hive agent markdown file at skills/hive/agents/architect.md.
+
+  The architect agent handles system design, technology evaluation, API design,
+  and scalability patterns. It's used in planning phases and architecture review
+  steps. Every architectural decision must document alternatives considered and
+  why they were rejected.
+
+acceptance_criteria:
+  - "Given skills/hive/agents/architect.md exists, when read, then it follows the same section structure as researcher.md and developer.md"
+  - "Given the architect persona, then it covers: system design, technology evaluation, API design, scalability, security architecture"
+  - "Given the architect produces output, then every decision includes alternatives considered with rationale for rejection"
+  - "Given the output format, then it includes: architecture overview, component boundaries, interface definitions, decision log, and risk assessment"
+
+steps:
+  - id: research-blueprint
+    description: |
+      Read the source blueprint at:
+      /Users/don/Documents/project-hive/blueprints/planning-team/architect.yaml
+
+      Also read existing Hive agent personas to understand the target format:
+      - skills/hive/agents/researcher.md — section structure to match
+      - skills/hive/agents/developer.md — how capabilities map to sections
+
+      Note the key attributes from the blueprint:
+      - Role: Software Architect
+      - Expertise: system design, tech evaluation, API design, scalability, security
+      - Capabilities: design-architecture, evaluate-technology, define-interfaces,
+        review-technical-feasibility, retrieve-documentation
+      - Quality standards: decision-rationale (alternatives required),
+        interface-clarity (types+contracts), scalability-consideration,
+        documentation-citation, convention-priority
+      - Communication style: precise and technical, always provides rationale
+    agent: researcher
+
+  - id: write-persona
+    description: |
+      Create skills/hive/agents/architect.md following the markdown persona format
+      used by researcher.md and developer.md. Map blueprint fields to sections:
+
+      - Blueprint persona.description → opening paragraph
+      - Blueprint persona.expertise → "Areas of expertise" section
+      - Blueprint capabilities → "What you do" section
+      - Blueprint quality_standards → "Quality standards" section
+      - Blueprint communication_style → tone guidance in opening
+
+      Add an "Output format" section with a structured template for architecture
+      documents (matching how researcher.md has a Research Brief template).
+
+      The output format should include:
+      - Architecture Overview (component diagram description)
+      - Component Boundaries (modules, responsibilities, interfaces)
+      - Interface Definitions (API contracts with types)
+      - Decision Log (decision + alternatives + rationale for each)
+      - Risk Assessment (technical risks with severity and mitigation)
+    agent: developer
+    depends_on: [research-blueprint]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/agents/researcher.md — format to match
+    - skills/hive/agents/developer.md — format to match
+  inputs_from_previous: []
+
+files_to_modify:
+  - file: skills/hive/agents/architect.md
+    change: NEW FILE — architect agent persona
+
+design_decisions:
+  - decision: Keep the persona focused on architecture, not implementation
+    rationale: |
+      The developer agent handles implementation. The architect produces designs,
+      evaluations, and interface definitions. Clear role separation prevents
+      scope creep in agent prompts.
+  - decision: Require alternatives in every decision
+    rationale: |
+      The blueprint's decision-rationale standard is valuable — it forces the
+      agent to consider options rather than jumping to a single solution. This
+      matches the blueprint's validation criteria.
+
+dev_notes: |
+  The blueprint has a retrieve-documentation capability referencing Context7-style
+  doc retrieval. In the Hive context, this translates to the agent using available
+  MCP tools or web search to fetch current docs before making technology recommendations.
+  The persona should mention this but not hard-code specific tools.
+
+risks:
+  - severity: low
+    description: |
+      The architect persona may overlap with the researcher persona for
+      technology research tasks.
+    mitigation: |
+      Researcher explores existing codebase and surfaces patterns. Architect
+      evaluates technology choices and designs systems. The distinction is
+      discovery (researcher) vs. design (architect).
+
+references:
+  - /Users/don/Documents/project-hive/blueprints/planning-team/architect.yaml — source blueprint
+  - skills/hive/agents/researcher.md — format reference
+  - skills/hive/agents/developer.md — format reference

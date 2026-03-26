@@ -1,0 +1,167 @@
+id: ui-aware-planning
+epic: hive-phase4
+title: Update plan command to detect and inject UI steps
+status: pending
+complexity: medium
+depends_on: [ui-touchpoints]
+
+description: |
+  Update the plan command logic in ORCHESTRATOR.md so that when decomposing
+  requirements into stories, it automatically detects stories that involve
+  net-new UI work and injects a `ui-design` step BEFORE the implementation step.
+
+  The ui-design step uses the UI designer agent and includes the wireframe
+  approval touchpoints defined in ui-touchpoints. This means developers receive
+  wireframe context (approved design brief + export commands) as input to their
+  implementation step.
+
+  Detection is heuristic — based on keywords in the story description and
+  acceptance criteria that suggest visual/UI work is needed.
+
+acceptance_criteria:
+  - "Given a requirement mentioning 'new screen' or 'redesign', when /hive:plan decomposes it, then affected stories include a ui-design step before implement"
+  - "Given a ui-design step is injected, then it assigns agent: ui-designer and includes wireframe touchpoint references"
+  - "Given a story with no UI keywords, when /hive:plan runs, then no ui-design step is added"
+  - "Given the ui-design step output, then it feeds wireframe references into the implement step's inputs"
+  - "Given the plan is presented for confirmation, then UI stories are clearly marked as having a design phase"
+
+steps:
+  - id: research-planning
+    description: |
+      Study the current plan command flow:
+
+      1. Read ORCHESTRATOR.md Plan Command section — understand how stories
+         and steps are generated
+      2. Read the story file format — where does the ui-design step fit
+         in the steps list?
+      3. Read the workflow schema — how are steps with different agents
+         ordered and connected via inputs/outputs?
+      4. Study the brief's detection heuristics (section 4 of hive-phase4-brief.md)
+
+      Detection keywords from the brief:
+      - Screen/view/page/modal/dialog/sheet
+      - Button/form/input/component
+      - Redesign/layout/visual/UI/UX
+      - Marketing/landing page/ad creative/banner
+
+      Determine where in the plan command flow detection should happen
+      (during story generation, or as a post-processing pass).
+    agent: researcher
+
+  - id: implement-detection
+    description: |
+      Update ORCHESTRATOR.md Plan Command section to include UI detection logic.
+      Add a new subsection after story generation:
+
+      **UI Step Detection and Injection:**
+
+      After generating stories and before presenting for confirmation, scan each
+      story for UI work indicators:
+
+      1. Check story description and acceptance criteria for keywords:
+         - Screen terms: "screen", "view", "page", "modal", "dialog", "sheet",
+           "bottom sheet", "drawer"
+         - Component terms: "button", "form", "input", "component", "widget",
+           "card", "list item"
+         - Design terms: "redesign", "layout", "visual", "UI", "UX", "mockup",
+           "wireframe"
+         - Marketing terms: "marketing", "landing page", "ad creative", "banner",
+           "promotional", "app store"
+
+      2. If keywords match, inject a `ui-design` step:
+         ```yaml
+         - id: ui-design
+           description: |
+             Create wireframes for the UI components described in this story.
+             Follow the wireframe workflow: discover tools, create renditions,
+             present for approval, produce design brief.
+           agent: ui-designer
+           depends_on: [research]  # after research, before implement
+         ```
+
+      3. Update the `implement` step to depend on `ui-design`:
+         ```yaml
+         - id: implement
+           depends_on: [ui-design]  # was: [research]
+           inputs:
+             - source: step_output
+               step: ui-design
+               key: wireframe_brief
+         ```
+
+      4. In the plan confirmation output, mark UI stories:
+         ```
+         Stories:
+           · cache-strategy — Design Redis Caching [3 steps]
+           · event-detail — Redesign Event Detail View [4 steps, includes UI design]
+         ```
+
+      Also add a note that the user can manually add or remove ui-design steps
+      during plan confirmation — the detection is a suggestion, not mandatory.
+    agent: developer
+    depends_on: [research-planning]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/ORCHESTRATOR.md — plan command to update
+    - skills/hive/agents/ui-designer.md — agent assigned to ui-design steps
+    - skills/hive/references/wireframe-protocol.md — touchpoint protocol (from ui-touchpoints)
+  inputs_from_previous:
+    - ui-touchpoints: wireframe approval protocol (needed for touchpoint references in injected steps)
+
+files_to_modify:
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Add UI detection and step injection logic to Plan Command section
+
+design_decisions:
+  - decision: Detection is keyword-based heuristic, not AI classification
+    rationale: |
+      Simple keyword matching is deterministic, fast, and easy to debug.
+      AI classification would add token cost and non-determinism to the
+      planning step. Keywords can be tuned over time.
+  - decision: UI step injection is a suggestion presented during plan confirmation
+    rationale: |
+      The user reviews the plan before saving. They can add or remove ui-design
+      steps during this review. Auto-injection improves the default but doesn't
+      override user judgment.
+  - decision: ui-design step goes after research, before implement
+    rationale: |
+      Research explores the codebase and surfaces constraints. UI design uses
+      those constraints to create wireframes. Implementation uses the wireframe
+      as input. This ordering ensures each step has the context it needs.
+
+dev_notes: |
+  The keyword list should be case-insensitive when matching. Consider both
+  the story description and acceptance criteria fields.
+
+  For marketing-related stories, the ui-design step might be the ONLY
+  implementation step (no code to implement). The plan command should
+  handle this — if a story is purely visual, the step sequence might be:
+  research → ui-design → review (skip implement and test).
+
+  Edge case: a story might mention "button" in a backend context
+  ("submit button handler"). The heuristic may false-positive. This is
+  acceptable because the user reviews the plan and can remove the ui-design
+  step. Better to over-suggest than miss a UI story.
+
+risks:
+  - severity: low
+    description: |
+      Keyword heuristic may produce false positives (backend stories
+      mentioning UI terms in passing).
+    mitigation: |
+      User reviews plan before saving. Over-detection is better than
+      under-detection for UI work.
+  - severity: low
+    description: |
+      Adding a step changes the dependency chain, which could affect
+      parallel execution decisions.
+    mitigation: |
+      The ui-design step is sequential within its story (research → ui-design → implement).
+      Cross-story parallelism is unaffected.
+
+references:
+  - state/epics/hive-phase4-brief.md — section 4 defines detection heuristics
+  - skills/hive/ORCHESTRATOR.md — plan command to update
+  - skills/hive/references/wireframe-protocol.md — touchpoint definitions

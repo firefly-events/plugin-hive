@@ -1,0 +1,152 @@
+id: orchestrator-agent
+epic: hive-phase4
+title: Design Hive orchestrator meta-agent persona
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Design a new agent persona from scratch: the Hive Orchestrator. This is the
+  meta-agent that serves as the "team lead" when agent teams are used for
+  parallel story execution. Unlike other agent personas that do specific work
+  (research, implement, test, review), the orchestrator coordinates work across
+  agents and stories.
+
+  There is no Project Hive blueprint for this role — it's designed from scratch
+  based on the execution logic in ORCHESTRATOR.md and the agent teams mechanics
+  in references/agent-teams-guide.md.
+
+  The orchestrator persona is used when:
+  1. Agent teams are spawned for parallel epic execution (team lead prompt)
+  2. Complex multi-epic coordination is needed
+  3. Cross-story dependency management requires active routing
+
+acceptance_criteria:
+  - "Given skills/hive/agents/orchestrator.md exists, when read, then it follows the Hive agent persona format"
+  - "Given the orchestrator is used as team lead, then it knows how to: read epic/story YAML, create task dependencies, monitor progress, handle failures"
+  - "Given a story fails during team execution, then the orchestrator knows how to: halt dependent stories, report the failure, suggest remediation"
+  - "Given cross-story dependencies, then the orchestrator correctly sequences work and passes context between stories via episode records"
+  - "Given the orchestrator persona, then it references all Hive conventions: episode schema, workflow phases, agent personas, and story format"
+
+steps:
+  - id: research-orchestration
+    description: |
+      Study the orchestration patterns already defined in Hive to understand what
+      the persona needs to know:
+
+      1. Read skills/hive/ORCHESTRATOR.md — especially the Execute Command section
+         (steps 4-7) which describes both sequential and parallel execution
+      2. Read skills/hive/references/agent-teams-guide.md — how agent teams work,
+         team lead responsibilities, task dependency mapping
+      3. Read skills/hive/references/episode-schema.md — how context passes between
+         phases (context_for_next_phase field)
+      4. Read skills/hive/references/workflow-schema.md — workflow step structure
+      5. Check /Users/don/Documents/project-hive/blueprints/planning-team/team-lead.yaml
+         for any relevant patterns from the original team lead blueprint
+
+      The orchestrator needs to understand ALL of these because it's the only agent
+      that operates at the epic level (all others operate at the story/step level).
+    agent: researcher
+
+  - id: write-persona
+    description: |
+      Create skills/hive/agents/orchestrator.md with these sections:
+
+      **Opening paragraph:** Meta-agent that coordinates multi-story execution.
+      Understands the full Hive system — epics, stories, workflows, episodes, and
+      agent personas. Makes routing and parallelization decisions.
+
+      **What you do:**
+      - Load and parse epic YAML and story specifications
+      - Topologically sort stories by dependencies
+      - Decide execution mode (parallel via agent teams vs sequential)
+      - Generate team task descriptions from stories (for agent team mode)
+      - Monitor story progress via episode records
+      - Handle failures: halt dependents, escalate, suggest fixes
+      - Pass context between stories using episode context_for_next_phase
+      - Produce epic-level summaries when all stories complete
+
+      **Areas of expertise:**
+      - Dependency graph analysis and topological ordering
+      - Agent team coordination and task assignment
+      - Failure recovery and escalation protocols
+      - Cross-story context management
+      - Workflow phase sequencing
+
+      **Hive system knowledge** (unique section for this agent):
+      - Epic format: state/epics/{id}/epic.yaml
+      - Story format: state/epics/{id}/stories/{story-id}.yaml
+      - Episode records: state/episodes/{epic-id}/{story-id}/{step-id}.yaml
+      - Workflow definitions: skills/hive/workflows/development.{methodology}.workflow.yaml
+      - Agent personas: skills/hive/agents/{agent}.md
+      - Available agents: researcher, developer, tester, reviewer, architect, analyst
+
+      **Output format:** Epic execution report with per-story status, episode
+      summaries, artifacts produced, and any failures or escalations.
+
+      **Decision protocols:**
+      - When to parallelize: independent stories with no shared deps
+      - When to halt: any story failure blocks its dependents
+      - When to escalate: repeated failures, circular dependencies, missing resources
+    agent: developer
+    depends_on: [research-orchestration]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/ORCHESTRATOR.md — execution logic this persona embodies
+    - skills/hive/references/agent-teams-guide.md — team mechanics
+    - skills/hive/references/episode-schema.md — inter-phase communication
+    - skills/hive/references/workflow-schema.md — workflow step structure
+    - skills/hive/agents/researcher.md — format reference + agent it coordinates
+    - /Users/don/Documents/project-hive/blueprints/planning-team/team-lead.yaml — original team lead blueprint
+
+files_to_modify:
+  - file: skills/hive/agents/orchestrator.md
+    change: NEW FILE — Hive orchestrator meta-agent persona
+
+design_decisions:
+  - decision: Design from scratch rather than porting team-lead.yaml
+    rationale: |
+      The Project Hive team-lead blueprint is a generic coordination role. The Hive
+      orchestrator needs deep knowledge of Hive-specific constructs (epics, stories,
+      episodes, workflows). It's better to design purpose-built than adapt a generic.
+  - decision: Include a "Hive system knowledge" section unique to this persona
+    rationale: |
+      Other agents only need to know their step and the story spec. The orchestrator
+      needs to know the full system — all file paths, formats, and conventions.
+      This section is a quick reference for the agent.
+  - decision: The orchestrator does not implement code
+    rationale: |
+      Like the researcher, the orchestrator produces coordination artifacts
+      (task plans, status reports, routing decisions) but never writes code.
+      Implementation is always delegated to the developer agent.
+
+dev_notes: |
+  This persona is critical for agent team execution. When /hive:execute spawns
+  a team, the team lead session receives this persona as context. It needs to
+  be comprehensive enough that the lead can autonomously coordinate teammates
+  without re-reading the full ORCHESTRATOR.md.
+
+  The persona should also be useful for single-session sequential execution —
+  the orchestrator mindset helps even when not using agent teams.
+
+risks:
+  - severity: medium
+    description: |
+      The orchestrator persona may be too long, consuming excessive context
+      window for team lead sessions.
+    mitigation: |
+      Keep it concise — reference documents by path rather than inlining content.
+      The "Hive system knowledge" section is paths and one-liners, not full docs.
+  - severity: low
+    description: |
+      Agent teams feature may change, invalidating team-specific guidance.
+    mitigation: |
+      Keep team-specific instructions generic ("create tasks with dependencies")
+      rather than coupling to specific API details.
+
+references:
+  - skills/hive/ORCHESTRATOR.md — execution logic
+  - skills/hive/references/agent-teams-guide.md — team mechanics
+  - /Users/don/Documents/project-hive/blueprints/planning-team/team-lead.yaml — prior art

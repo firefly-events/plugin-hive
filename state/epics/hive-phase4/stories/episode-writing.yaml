@@ -1,0 +1,168 @@
+id: episode-writing
+epic: hive-phase4
+title: Add episode record writing + classic workflow
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  The execute command currently runs workflow steps but never writes episode YAML
+  records to `state/episodes/`. Without episodes, `/hive:status` can't track
+  progress — it reads episode files to determine which steps have completed.
+
+  Additionally, `skills/hive/workflows/` is empty — no workflow YAML files exist.
+  The execute command loads `workflows/development.{methodology}.workflow.yaml`
+  but will fail because the file doesn't exist. This story creates the classic
+  workflow definition AND adds episode writing to the execute flow.
+
+acceptance_criteria:
+  - "Given the classic workflow file exists at skills/hive/workflows/development.classic.workflow.yaml, when /hive:execute loads it, then it gets a valid list of ordered steps"
+  - "Given a step completes during execution, when the orchestrator moves to the next step, then an episode YAML file exists at state/episodes/{epic-id}/{story-id}/{step-id}.yaml"
+  - "Given episodes are written, when /hive:status runs, then it correctly reports in-progress and completed stories"
+  - "Given a step fails, when the episode is written, then status is 'failed' and conclusions explain what went wrong"
+
+steps:
+  - id: research-workflow
+    description: |
+      Read the workflow schema at skills/hive/references/workflow-schema.md and
+      the methodology routing at skills/hive/references/methodology-routing.md.
+      Understand the expected YAML structure for a workflow definition.
+
+      Also read the ORCHESTRATOR.md Execute Command section (steps 5-6) to
+      understand how the orchestrator consumes workflow steps and where episode
+      writing should be inserted.
+
+      Check existing agent persona files to map agent names used in steps:
+      - researcher → skills/hive/agents/researcher.md
+      - developer → skills/hive/agents/developer.md
+      - tester → skills/hive/agents/tester.md
+      - reviewer → skills/hive/agents/reviewer.md
+    agent: researcher
+
+  - id: create-workflow
+    description: |
+      Create skills/hive/workflows/development.classic.workflow.yaml with the
+      classic methodology phases:
+
+      1. research — agent: researcher, produces research brief
+      2. implement — agent: developer, depends on research
+      3. test — agent: tester (classic mode), depends on implement
+      4. review — agent: reviewer, depends on test
+      5. optimize — agent: developer, depends on review, OPTIONAL (only if review says needs_optimization)
+      6. integrate — agent: developer, depends on review (or optimize if run)
+
+      Follow the schema from workflow-schema.md. Each step needs: id, agent,
+      task description, depends_on, inputs (from previous step outputs), outputs,
+      optional flag, and timeout_ms.
+    agent: developer
+    depends_on: [research-workflow]
+
+  - id: add-episode-writing
+    description: |
+      Update ORCHESTRATOR.md Execute Command section to include explicit
+      episode-writing instructions after each step. The orchestrator already
+      describes this in step 6d but execution agents need concrete instructions.
+
+      Add to the execute flow:
+      1. After each step completes, write episode YAML to:
+         state/episodes/{epic-id}/{story-id}/{step-id}.yaml
+      2. Follow the schema in references/episode-schema.md
+      3. Include all required fields: step_id, story_id, epic_id, agent, status,
+         timestamp, conclusions, decisions_made, artifacts_produced, context_for_next_phase
+      4. Create the directory structure if it doesn't exist (mkdir -p)
+
+      Also create a helper reference: a "writing episodes" quick-reference
+      section in episode-schema.md with a copy-paste template agents can follow.
+    agent: developer
+    depends_on: [create-workflow]
+
+context:
+  codebase: /Users/don/Documents/herd
+  tech_stack:
+    backend: Python (DeerFlow harness)
+    frontend: N/A — skill system configuration
+  key_files:
+    - skills/hive/references/workflow-schema.md — YAML workflow format definition
+    - skills/hive/references/methodology-routing.md — how methodologies map to workflow files
+    - skills/hive/references/episode-schema.md — episode record format
+    - skills/hive/ORCHESTRATOR.md — execute command that needs episode writing
+    - skills/hive/agents/researcher.md — agent referenced in workflow steps
+    - skills/hive/agents/developer.md — agent referenced in workflow steps
+    - skills/hive/agents/tester.md — agent referenced in workflow steps
+    - skills/hive/agents/reviewer.md — agent referenced in workflow steps
+
+files_to_modify:
+  - file: skills/hive/workflows/development.classic.workflow.yaml
+    change: NEW FILE — classic development workflow definition
+  - file: skills/hive/references/episode-schema.md
+    change: Add quick-reference template section for agents writing episodes
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Reinforce episode-writing instructions in execute flow (minor)
+
+code_examples:
+  - title: Classic workflow step structure
+    language: yaml
+    code: |
+      steps:
+        - id: research
+          agent: researcher
+          task: |
+            Read the story spec and explore the codebase. Produce a research
+            brief covering affected files, existing patterns, and risks.
+          depends_on: []
+          inputs:
+            - source: context
+              key: story_spec
+          outputs:
+            - research_brief
+          timeout_ms: 300000
+
+        - id: implement
+          agent: developer
+          task: |
+            Implement the story according to the spec and research brief.
+          depends_on: [research]
+          inputs:
+            - source: step_output
+              step: research
+              key: research_brief
+          outputs:
+            - implementation
+          timeout_ms: 600000
+
+design_decisions:
+  - decision: Create only the classic workflow initially
+    rationale: |
+      TDD and BDD workflows can be added later. The classic workflow is the default
+      and the only one needed to unblock execute. The methodology routing doc already
+      explains how other methodologies are selected.
+  - decision: Episode writing is an orchestrator responsibility, not an agent responsibility
+    rationale: |
+      Agents produce output. The orchestrator wraps that output into an episode
+      record. This keeps agents focused on their task and ensures consistent
+      episode formatting.
+
+dev_notes: |
+  The execute command in ORCHESTRATOR.md already describes episode writing (step 6d)
+  but it's never been implemented in practice. This story makes it concrete by
+  providing the workflow file that drives step ordering and reinforcing the
+  episode-writing protocol.
+
+  The quick-reference template in episode-schema.md is important — when agents
+  are spawned during execution, they need a fast way to know what fields to populate
+  without reading the full schema doc.
+
+risks:
+  - severity: medium
+    description: |
+      The workflow YAML might not match what the orchestrator expects. If the
+      schema is wrong, execute will fail to parse steps.
+    mitigation: |
+      Follow workflow-schema.md exactly. Test by dry-running /hive:execute on
+      an existing epic (hive-phase2) and verifying step loading works.
+
+references:
+  - skills/hive/references/workflow-schema.md — authoritative schema
+  - skills/hive/references/episode-schema.md — episode format
+  - skills/hive/references/methodology-routing.md — methodology selection
+  - skills/hive/ORCHESTRATOR.md — execute command flow

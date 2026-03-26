@@ -1,0 +1,9 @@
+step_id: add-episode-writing
+status: completed
+timestamp: "2026-03-25T00:02:00Z"
+artifacts:
+  - skills/hive/references/episode-schema.md
+  - skills/hive/workflows/development.classic.workflow.yaml
+  - state/episodes/hive-phase4/episode-writing/research-workflow.yaml
+  - state/episodes/hive-phase4/episode-writing/create-workflow.yaml
+  - state/episodes/hive-phase4/episode-writing/add-episode-writing.yaml

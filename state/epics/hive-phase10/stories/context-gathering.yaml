@@ -1,0 +1,37 @@
+id: context-gathering
+epic: hive-phase10
+title: Implement context gathering and baseline management
+status: pending
+complexity: medium
+depends_on: [test-agents, test-workflow]
+
+description: |
+  Define how the test-scout gathers context (story spec, PR diff, commit
+  history, existing test coverage) and manages baseline knowledge (project
+  structure, nav graphs, existing test suites). First run creates baseline;
+  subsequent runs update incrementally.
+
+acceptance_criteria:
+  - "Given a test session starts, then the scout gathers context from story/PR/commits"
+  - "Given no baseline exists, then the scout runs a discovery pass and creates one"
+  - "Given a baseline exists, then the scout verifies it's current and updates if needed"
+
+steps:
+  - id: design-context-gathering
+    description: |
+      Add context gathering and baseline management protocol to
+      test-swarm-architecture.md. Define what the scout reads, how baselines
+      are stored, and how they're updated.
+      Source: ~/Documents/WorkFlow/src/modules/mts/commands/mts-gather-context.md
+      and mts-discovery-pass.md and mts-update-baseline.md
+    agent: developer
+
+context:
+  key_files:
+    - ~/Documents/WorkFlow/src/modules/mts/commands/mts-gather-context.md
+    - ~/Documents/WorkFlow/src/modules/mts/commands/mts-discovery-pass.md
+    - ~/Documents/WorkFlow/src/modules/mts/commands/mts-update-baseline.md
+
+files_to_modify:
+  - file: skills/hive/references/test-swarm-architecture.md
+    change: Add context gathering section

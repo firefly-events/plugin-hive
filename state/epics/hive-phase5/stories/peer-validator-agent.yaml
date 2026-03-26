@@ -1,0 +1,52 @@
+id: peer-validator-agent
+epic: hive-phase5
+title: Port peer-validator blueprint to Hive agent persona
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Port the peer-validator blueprint from Project Hive to a Hive agent persona
+  at skills/hive/agents/peer-validator.md. This agent provides cross-team
+  validation — checking work from one team against standards, conventions,
+  and the broader project context. Different from the reviewer (which reviews
+  within a story's workflow), the peer-validator checks across stories/teams.
+
+acceptance_criteria:
+  - "Given skills/hive/agents/peer-validator.md exists, when read, then it follows the Hive persona format"
+  - "Given the peer-validator reviews work, then it checks against project-wide conventions, not just story-level spec"
+  - "Given the persona, then it covers: cross-story consistency, convention enforcement, integration risk assessment"
+
+steps:
+  - id: research-blueprint
+    description: |
+      Read the source blueprint at:
+      /Users/don/Documents/project-hive/blueprints/validation-team/peer-validator.yaml
+      Read skills/hive/agents/reviewer.md to understand the boundary:
+      - Reviewer = within-story code review (correctness, conventions, security)
+      - Peer-validator = cross-story/cross-team validation (consistency, integration)
+      Read skills/hive/agents/researcher.md for format reference.
+    agent: researcher
+
+  - id: write-persona
+    description: |
+      Create skills/hive/agents/peer-validator.md. Focus on cross-cutting
+      concerns: project-wide consistency, convention enforcement, integration
+      risk between stories, and broad quality assurance. Distinguish clearly
+      from the reviewer agent. Match researcher.md section structure.
+    agent: developer
+    depends_on: [research-blueprint]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/agents/reviewer.md — boundary definition (within-story review)
+    - skills/hive/agents/researcher.md — format reference
+    - /Users/don/Documents/project-hive/blueprints/validation-team/peer-validator.yaml — source
+
+files_to_modify:
+  - file: skills/hive/agents/peer-validator.md
+    change: NEW FILE — peer validator agent persona
+
+references:
+  - /Users/don/Documents/project-hive/blueprints/validation-team/peer-validator.yaml

@@ -1,0 +1,25 @@
+name: hive-phase3
+title: "Hive Plugin Phase 3: Agent Teams + Parallel Execution"
+description: |
+  Add agent teams support for parallel story execution, create the agent-teams-guide
+  reference doc, create the code-review workflow, update the review command, and
+  update the execute command to detect agent teams and generate team task lists.
+target_codebase: /Users/don/Documents/herd
+
+stories:
+  - id: agent-teams-guide
+    title: Create Agent Teams Reference Guide
+    complexity: medium
+    depends_on: []
+  - id: code-review-workflow
+    title: Create Code Review Workflow
+    complexity: low
+    depends_on: []
+  - id: review-command
+    title: Implement /hive:review Command
+    complexity: low
+    depends_on: []
+  - id: parallel-execution
+    title: Add Parallel Execution via Agent Teams
+    complexity: high
+    depends_on: [agent-teams-guide]

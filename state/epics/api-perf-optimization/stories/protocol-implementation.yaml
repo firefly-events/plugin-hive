@@ -1,0 +1,288 @@
+id: protocol-implementation
+epic: api-perf-optimization
+title: Implement Recommended API Protocol Changes
+status: pending
+complexity: high
+depends_on:
+  - api-protocol-research
+  - implement-caching
+
+description: |
+  Implement the API protocol changes recommended by the api-protocol-research story.
+  The exact scope depends on that recommendation, but the most likely outcome is
+  optimized REST (sparse fieldsets + cursor pagination) given the KMP/Ktor client
+  constraint. This story covers the top 3 highest-impact endpoints, updates the
+  KMP client, and maintains backward compatibility.
+
+  This story is intentionally open-ended — the steps below cover the most likely
+  recommendation (optimized REST). If the research recommends GraphQL (Mercurius),
+  the steps should be adapted accordingly.
+
+acceptance_criteria:
+  - "Given the research recommendation, when the top 3 endpoints are updated, then the new query patterns reduce payload sizes by the amount estimated in the research"
+  - "Given a KMP client request with ?fields=title,startTime,venue, when the server processes it, then only those fields are returned in the response"
+  - "Given a list endpoint with cursor pagination, when the client sends ?cursor=abc, then the next page of results is returned without skip/offset overhead"
+  - "Given an older app version without the new query patterns, when it calls the existing endpoints, then responses are unchanged (backward compatibility)"
+  - "Given the new endpoints, when Swagger/OpenAPI docs are generated, then the new query parameters and response shapes are documented"
+  - "Given baseline measurements, when new patterns are in use, then measurable performance improvement is demonstrated"
+
+steps:
+  - id: read-recommendation
+    description: |
+      Read the protocol recommendation from:
+      state/epics/api-perf-optimization/artifacts/protocol-recommendation.md
+
+      Identify:
+      - Which approach was recommended (likely optimized REST)
+      - Which endpoints are highest priority
+      - What the estimated effort and impact are
+      - Any caveats or prerequisites
+    agent: researcher
+
+  - id: implement-sparse-fieldsets
+    description: |
+      Add ?fields= query parameter support to event list endpoints. This lets the
+      KMP client request only the fields it needs for each view.
+
+      Implementation approach:
+      1. Create a parseFieldSelection() utility in src/utils/
+      2. Add 'fields' to the event list query schema (Zod)
+      3. In event.service.ts getEvents(), convert fields param to Mongoose .select()
+      4. Apply same pattern to searchEvents() and getPromotedEvents()
+      5. Default behavior (no ?fields param) returns full document (backward compat)
+
+      The field selection should work with nested paths: ?fields=title,venue.name,images[0]
+    agent: developer
+    depends_on: [read-recommendation]
+
+  - id: implement-cursor-pagination
+    description: |
+      Replace skip/limit pagination with cursor-based pagination for event list
+      endpoints. Skip-based pagination degrades on large collections because
+      MongoDB must scan past skipped documents.
+
+      Implementation approach:
+      1. Use the last document's _id + startTime as cursor (encoded as base64)
+      2. On next page, query with { startTime: { $gte: cursorTime }, _id: { $gt: cursorId } }
+      3. Return cursor in response: { events: [...], nextCursor: "abc", hasMore: true }
+      4. Keep skip/limit working for backward compatibility (default if no cursor param)
+
+      This is most impactful for the main event list which can have thousands of results.
+    agent: developer
+    depends_on: [read-recommendation]
+
+  - id: update-kmp-client
+    description: |
+      Update the KMP Ktor HTTP client to use the new query patterns:
+      1. Add ?fields= parameter to event list API calls with only the fields
+         needed for each view (list view, detail view, map view use different fields)
+      2. Implement cursor-based pagination in the paging data source
+      3. Ensure backward compatibility — if the server doesn't return a cursor,
+         fall back to offset pagination
+
+      Check the KMP networking layer at:
+      composeApp/src/commonMain/kotlin/com/shindig/ for the API client code.
+    agent: developer
+    depends_on: [implement-sparse-fieldsets, implement-cursor-pagination]
+
+  - id: update-api-docs
+    description: |
+      Update Swagger/OpenAPI documentation:
+      1. Add ?fields query parameter to event list endpoint schemas
+      2. Add ?cursor query parameter and document cursor-based pagination
+      3. Add examples showing field selection and cursor usage
+      4. Mark old skip/limit params as deprecated (not removed)
+
+      The swagger plugin is at src/plugins/swagger.ts and schemas are defined
+      via fastify-zod in each module's .schema.ts file.
+    agent: developer
+    depends_on: [implement-sparse-fieldsets, implement-cursor-pagination]
+
+  - id: measure-improvement
+    description: |
+      Compare against baseline:
+      - Payload size reduction with field selection (expected 60-80% for list views)
+      - Pagination performance: cursor vs skip for page 10, page 50, page 100
+      - End-to-end response time with caching + field selection + cursor pagination
+
+      Document in:
+      state/epics/api-perf-optimization/artifacts/protocol-implementation-results.md
+    agent: developer
+    depends_on: [update-kmp-client, update-api-docs]
+
+context:
+  codebase: ~/Documents/KMP/Shindig/event-api
+  frontend_codebase: ~/Documents/KMP/Shindig/composeApp
+  tech_stack:
+    backend: Fastify 5.x + TypeScript + Mongoose/MongoDB + Zod schemas
+    frontend: KMP Compose + Ktor HTTP client
+  key_files:
+    - src/modules/events/event.service.ts — query methods to add field selection + cursor
+    - src/modules/events/event.schema.ts — Zod schemas to extend with new params
+    - src/modules/events/events.routes.ts — route definitions to update
+    - src/plugins/swagger.ts — OpenAPI documentation
+  inputs_from_previous:
+    - api-protocol-research: recommendation document, migration approach, client impact
+    - implement-caching: cache layer (new patterns should integrate — cache the smaller payloads)
+
+files_to_modify:
+  - file: src/utils/fieldSelection.ts
+    change: NEW FILE — parseFieldSelection() utility converting ?fields=a,b,c to Mongoose projection
+  - file: src/utils/cursorPagination.ts
+    change: NEW FILE — encodeCursor(), decodeCursor(), buildCursorQuery() utilities
+  - file: src/modules/events/event.schema.ts
+    change: Add 'fields' and 'cursor' to query parameter Zod schemas
+  - file: src/modules/events/event.service.ts
+    change: Apply field projection from parsed ?fields param, add cursor pagination path
+  - file: src/modules/events/events.routes.ts
+    change: Pass fields/cursor params through to service layer
+
+code_examples:
+  - title: Sparse fieldsets utility
+    language: typescript
+    code: |
+      // src/utils/fieldSelection.ts
+      export function parseFieldSelection(fields: string): Record<string, 1> {
+        const projection: Record<string, 1> = {};
+        for (const field of fields.split(',').map(f => f.trim()).filter(Boolean)) {
+          projection[field] = 1;
+        }
+        // Always include _id for cursor pagination
+        projection._id = 1;
+        return projection;
+      }
+  - title: Cursor pagination utility
+    language: typescript
+    code: |
+      // src/utils/cursorPagination.ts
+      interface Cursor { id: string; startTime: string; }
+
+      export function encodeCursor(doc: { _id: string; startTime: Date }): string {
+        return Buffer.from(JSON.stringify({
+          id: doc._id, startTime: doc.startTime.toISOString()
+        })).toString('base64url');
+      }
+
+      export function decodeCursor(cursor: string): Cursor {
+        return JSON.parse(Buffer.from(cursor, 'base64url').toString());
+      }
+
+      export function buildCursorQuery(cursor: Cursor, sortDir: 1 | -1 = 1) {
+        const op = sortDir === 1 ? '$gt' : '$lt';
+        return {
+          $or: [
+            { startTime: { [op]: new Date(cursor.startTime) } },
+            { startTime: new Date(cursor.startTime), _id: { [op]: cursor.id } },
+          ]
+        };
+      }
+  - title: Updated getEvents with field selection + cursor
+    language: typescript
+    code: |
+      // event.service.ts — getEvents with new capabilities
+      async getEvents(params: GetEventsQuery) {
+        const { fields, cursor, limit = 50, ...filters } = params;
+        const query = this.buildFilterQuery(filters);
+
+        // Cursor pagination (preferred) or skip-based (backward compat)
+        if (cursor) {
+          const decoded = decodeCursor(cursor);
+          Object.assign(query, buildCursorQuery(decoded));
+        }
+
+        let dbQuery = EventModel.find(query).limit(limit + 1).sort({ startTime: 1 });
+
+        // Field selection
+        if (fields) {
+          dbQuery = dbQuery.select(parseFieldSelection(fields));
+        }
+
+        const results = await dbQuery.lean();
+        const hasMore = results.length > limit;
+        const events = hasMore ? results.slice(0, limit) : results;
+        const nextCursor = hasMore ? encodeCursor(events[events.length - 1]) : null;
+
+        return { events: keysToCamelCase(events), nextCursor, hasMore };
+      }
+
+design_decisions:
+  - decision: Cursor pagination uses _id + startTime composite cursor (not offset)
+    rationale: |
+      Skip-based pagination degrades linearly — page 100 with 50 per page means
+      MongoDB scans past 5000 documents before returning results. Cursor-based
+      uses an indexed seek, which is O(log n) regardless of page depth.
+  - decision: Keep skip/limit as fallback (don't remove)
+    rationale: |
+      Older KMP app versions use skip/limit. Breaking this would crash deployed
+      apps. Cursor is opt-in — client sends ?cursor= or falls back to ?page=.
+  - decision: Field selection at service layer (not route layer)
+    rationale: |
+      Mongoose .select() is the right place for projection — it reduces data
+      transferred from MongoDB, not just from API to client. Route layer would
+      only strip fields from the response, still fetching full documents.
+
+behavior_matrix:
+  - condition: "Request with ?fields=title,startTime,venue.name"
+    behavior: "MongoDB query uses .select({title:1, startTime:1, 'venue.name':1, _id:1}), response contains only those fields"
+  - condition: "Request without ?fields"
+    behavior: "Full document returned (backward compatible)"
+  - condition: "Request with ?cursor=abc123"
+    behavior: "Cursor decoded, query uses startTime/$gt + _id/$gt, response includes nextCursor"
+  - condition: "Request with ?page=3&limit=50 (no cursor)"
+    behavior: "Skip-based pagination (backward compatible), no nextCursor in response"
+  - condition: "Request with both ?cursor and ?page"
+    behavior: "Cursor takes precedence, page is ignored"
+
+dev_notes: |
+  The cache layer from implement-caching must be aware of field selection. If user A
+  requests ?fields=title,startTime and user B requests ?fields=title,venue, the cache
+  keys must differ. The field selection should be part of the cache key hash.
+
+  Cursor pagination interacts with the existing countDocuments() call used for
+  total count. With cursor pagination, total count is expensive and often unnecessary
+  (the client just needs hasMore). Consider making total count optional:
+  ?includeCount=true returns total, otherwise it's omitted.
+
+  The KMP client likely has a Paging3 or custom paging data source. Cursor pagination
+  maps naturally to Paging3's PagingSource — the nextCursor becomes the LoadParams.key.
+
+risks:
+  - severity: high
+    description: |
+      Field selection could break KMP client data class deserialization if the client
+      expects fields that are excluded. Ktor's JSON deserialization may throw on
+      missing required fields.
+    mitigation: |
+      The KMP client controls which fields it requests — it should only request fields
+      its data classes can handle. Add a "required fields" safeguard on the server
+      that always includes _id and any fields needed for navigation/linking.
+  - severity: medium
+    description: |
+      Cursor pagination changes the response shape (adds nextCursor, hasMore).
+      Older clients not expecting these fields may behave unexpectedly.
+    mitigation: |
+      The extra fields are additive — JSON deserialization ignores unknown fields
+      by default in Ktor/kotlinx.serialization. Verify this behavior in KMP client.
+  - severity: medium
+    description: |
+      The cursor encodes startTime which may have timezone issues. If stored as UTC
+      in MongoDB but decoded with local timezone, cursor seek queries may skip or
+      duplicate results.
+    mitigation: |
+      Always use ISO 8601 UTC format in cursor encoding/decoding. Verify that
+      Mongoose Date fields store UTC consistently.
+  - severity: low
+    description: |
+      SCAN-based cache invalidation from implement-caching needs to handle the
+      increased key cardinality from field selection parameters in cache keys.
+    mitigation: |
+      Consider field-selection-agnostic cache keys (cache full document, apply
+      field selection on cache hit). Trades memory for simplicity.
+
+references:
+  - src/modules/events/event.service.ts — getEvents(), searchEvents() to modify
+  - src/modules/events/event.schema.ts — Zod schemas to extend
+  - src/modules/events/events.routes.ts — Route definitions
+  - src/plugins/swagger.ts — OpenAPI docs to update
+  - state/epics/api-perf-optimization/artifacts/protocol-recommendation.md — Research output
+  - state/epics/api-perf-optimization/artifacts/baseline-report.md — Baseline measurements

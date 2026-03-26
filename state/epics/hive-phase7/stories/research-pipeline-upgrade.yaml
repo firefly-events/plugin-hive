@@ -1,0 +1,46 @@
+id: research-pipeline-upgrade
+epic: hive-phase7
+title: Integrate Firecrawl MCP for real web research in planning
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Upgrade the analyst/researcher agents to do real web research during
+  planning via Firecrawl MCP. Currently agents only explore the local
+  codebase. With Firecrawl, they can scrape docs, search the web, and
+  cross-reference external sources against project state.
+
+  The research-brief skill already demonstrates this workflow. Port the
+  methodology: directed sources + web search + cross-referencing + synthesis.
+
+acceptance_criteria:
+  - "Given Firecrawl is available, when the analyst runs during planning, then it performs real web research with cited sources"
+  - "Given research output, then it follows: Summary, Directed Findings, Web Findings, Cross-Reference, Recommendation, Sources"
+  - "Given the researcher persona, then it knows to check for Firecrawl in available MCP tools"
+
+steps:
+  - id: upgrade-personas
+    description: |
+      Update agents/researcher.md and agents/analyst.md to include:
+      - MCP tool discovery (check for Firecrawl)
+      - Research methodology from the research-brief skill
+      - Output format: structured brief with citations
+      Reference: /Users/don/Documents/project-hive/docs/plans/research-pipeline-upgrade.md
+    agent: developer
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/docs/plans/research-pipeline-upgrade.md
+    - skills/hive/agents/researcher.md
+    - skills/hive/agents/analyst.md
+
+files_to_modify:
+  - file: skills/hive/agents/researcher.md
+    change: Add MCP tool discovery and web research methodology
+  - file: skills/hive/agents/analyst.md
+    change: Add web research capability section
+
+references:
+  - /Users/don/Documents/project-hive/docs/plans/research-pipeline-upgrade.md
+  - /Users/don/Documents/project-hive/docs/plans/planned-improvements.md

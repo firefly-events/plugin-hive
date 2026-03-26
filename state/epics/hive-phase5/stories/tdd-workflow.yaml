@@ -1,0 +1,51 @@
+id: tdd-workflow
+epic: hive-phase5
+title: Create TDD development workflow definition
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Create skills/hive/workflows/development.tdd.workflow.yaml — the TDD
+  methodology workflow. The key difference from classic: tests are written
+  BEFORE implementation (red-green-refactor cycle). The tester agent receives
+  only the spec (no implementation) and writes failing tests first.
+
+acceptance_criteria:
+  - "Given the TDD workflow exists, when /hive:execute --methodology tdd loads it, then steps are ordered: research → test → implement → review → optimize → integrate"
+  - "Given the test step, then the tester agent receives spec-only input (TDD mode), not implementation"
+  - "Given the implement step, then the developer receives failing tests as input to make pass"
+
+steps:
+  - id: create-workflow
+    description: |
+      Read skills/hive/workflows/development.classic.workflow.yaml for format.
+      Read skills/hive/references/methodology-routing.md for TDD phase ordering.
+      Read skills/hive/agents/tester.md for TDD mode details.
+
+      Create development.tdd.workflow.yaml with phases:
+      1. research — same as classic
+      2. test — tester in TDD mode (spec-only input, writes failing tests)
+      3. implement — developer receives failing tests + research brief
+      4. review — same as classic
+      5. optimize — optional, same as classic
+      6. integrate — same as classic
+
+      Key difference: test comes BEFORE implement. Tester inputs are spec-only.
+      Developer inputs include test files to make pass.
+    agent: developer
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/workflows/development.classic.workflow.yaml — format reference
+    - skills/hive/references/methodology-routing.md — TDD phase ordering
+    - skills/hive/agents/tester.md — TDD mode documentation
+
+files_to_modify:
+  - file: skills/hive/workflows/development.tdd.workflow.yaml
+    change: NEW FILE — TDD development workflow
+
+references:
+  - skills/hive/workflows/development.classic.workflow.yaml
+  - skills/hive/references/methodology-routing.md

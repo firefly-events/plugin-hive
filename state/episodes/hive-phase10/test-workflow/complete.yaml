@@ -1,0 +1,5 @@
+step_id: complete
+status: completed
+timestamp: "2026-03-25T23:00:00Z"
+artifacts:
+  - skills/hive/workflows/test-swarm.workflow.yaml

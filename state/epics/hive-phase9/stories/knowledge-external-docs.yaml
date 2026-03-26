@@ -1,0 +1,32 @@
+id: knowledge-external-docs
+epic: hive-phase9
+title: Integrate external doc retrieval (context7/chub)
+status: pending
+complexity: medium
+depends_on: [knowledge-layer-design]
+
+description: |
+  Integrate external documentation retrieval into the knowledge layer.
+  Agents can query context7 or chub for up-to-date API docs, best practices,
+  and library documentation during execution.
+
+acceptance_criteria:
+  - "Given an agent needs library docs, then they can query via context7 MCP"
+  - "Given retrieved docs, then they're cached for the session to avoid redundant fetches"
+  - "Given the integration, then it's documented in the knowledge layer reference"
+
+steps:
+  - id: integrate-docs
+    description: |
+      Update knowledge-layer.md with external docs integration specifics.
+      Document how agents discover and use context7/chub during execution.
+      Update relevant agent personas to reference knowledge layer queries.
+    agent: developer
+
+context:
+  key_files:
+    - skills/hive/references/knowledge-layer.md
+
+files_to_modify:
+  - file: skills/hive/references/knowledge-layer.md
+    change: Add external docs integration section

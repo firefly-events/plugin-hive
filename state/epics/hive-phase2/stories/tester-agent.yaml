@@ -1,0 +1,169 @@
+id: tester-agent
+epic: hive-phase2
+title: Port Test Agent Persona
+status: pending
+complexity: low
+depends_on: []
+
+description: |
+  Create the tester agent persona markdown file for the Hive plugin. The tester is
+  a senior test engineer who writes comprehensive test suites from story specifications.
+  In TDD mode, the tester writes tests BEFORE implementation — critically, without
+  seeing any implementation code. This context isolation ensures tests define behavior
+  independently rather than mirroring implementation details.
+
+  Port from the Hive test-agent blueprint at:
+  /Users/don/Documents/project-hive/blueprints/development-team/test-agent.yaml
+
+acceptance_criteria:
+  - "Given a story spec with acceptance criteria, when the tester agent is spawned, then it produces test files covering every acceptance criterion"
+  - "Given TDD mode, when the tester agent receives its prompt, then it does NOT receive implementation code — only the research brief and story spec"
+  - "Given Classic mode, when the tester agent receives its prompt, then it DOES receive the implementation code from the developer phase"
+  - "Given the tester agent output, then it includes a test manifest mapping each test to its acceptance criterion"
+  - "Given the agent file, then it follows the same markdown structure as researcher.md and developer.md"
+
+steps:
+  - id: read-source-blueprint
+    description: |
+      Read the Hive test-agent blueprint at:
+      /Users/don/Documents/project-hive/blueprints/development-team/test-agent.yaml
+
+      Extract: persona description, expertise areas, capabilities, quality standards,
+      and the TDD context isolation requirement. Also read the TDD Phase 2 design at:
+      /Users/don/Documents/herd/docs/hive-context/dev-swarm-product-brief.md
+      (search for "Phase 2: Test Specification")
+    agent: researcher
+
+  - id: read-existing-agents
+    description: |
+      Read the existing agent personas to match the format:
+      - skills/hive/agents/researcher.md
+      - skills/hive/agents/developer.md
+
+      Note the section structure: intro paragraph, "What you do" or "How you work",
+      "Areas of expertise", "Output format", quality guidance.
+    agent: researcher
+
+  - id: write-tester-agent
+    description: |
+      Create skills/hive/agents/tester.md following the established pattern.
+
+      Key content to include from the blueprint:
+      - Role: Senior Test Engineer
+      - Adversarial mindset: goal is to find conditions where implementation breaks
+      - TDD context isolation: in TDD mode, you work from spec only, never implementation
+      - Test types: unit, integration, e2e as appropriate to the story
+      - Output: test files + test manifest (maps tests → acceptance criteria)
+      - Quality: test isolation (no shared state), determinism (no flaky tests),
+        acceptance criteria coverage (every AC has a test)
+
+      Adapt the communication_style: "methodical and precise, organizes findings
+      by severity and coverage area"
+    agent: developer
+    depends_on: [read-source-blueprint, read-existing-agents]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/agents/researcher.md — existing agent format to match
+    - skills/hive/agents/developer.md — existing agent format to match
+  inputs_from_previous: []
+
+files_to_modify:
+  - file: skills/hive/agents/tester.md
+    change: NEW FILE — test agent persona markdown
+
+code_examples:
+  - title: Existing agent persona structure (researcher.md)
+    language: markdown
+    code: |
+      # Research Agent
+
+      You are a senior technical research analyst...
+
+      ## What you do
+      ...
+
+      ## Areas of expertise
+      - Codebase exploration and pattern recognition
+      ...
+
+      ## Output format
+      Produce a **Research Brief** with these sections:
+      ```markdown
+      ## Affected Files and Modules
+      ...
+      ```
+
+      ## How you work
+      - Every finding references a specific file path...
+  - title: TDD context isolation (from Hive design)
+    language: markdown
+    code: |
+      ## Context Isolation (TDD Mode)
+
+      In TDD mode, you receive:
+      - Research brief from Phase 1
+      - Story specification (acceptance criteria)
+
+      You do NOT receive:
+      - Implementation code
+      - Developer's approach or design decisions
+
+      This is intentional. Tests written from the spec define expected behavior
+      independently. Tests written from the code merely mirror implementation
+      details and miss behavioral gaps.
+  - title: Test manifest output format
+    language: yaml
+    code: |
+      # Test manifest — maps tests to acceptance criteria
+      tests:
+        - file: src/__tests__/auth-middleware.test.ts
+          test_name: "should reject expired JWT tokens"
+          acceptance_criteria: "AC-3: expired tokens return 401"
+          type: unit
+        - file: src/__tests__/auth-middleware.test.ts
+          test_name: "should attach user to request on valid token"
+          acceptance_criteria: "AC-1: valid tokens authenticate"
+          type: unit
+
+design_decisions:
+  - decision: TDD context isolation is enforced at the prompt level, not the tool level
+    rationale: |
+      The tester agent doesn't have tool restrictions — it could theoretically read
+      implementation files. The isolation is enforced by the workflow not passing
+      implementation code in the prompt. The agent persona reinforces this by
+      instructing the tester to work from spec only in TDD mode.
+  - decision: Test manifest is YAML, not code comments
+    rationale: |
+      A structured manifest allows the orchestrator to programmatically verify
+      acceptance criteria coverage. Comments in test files would require parsing.
+
+dev_notes: |
+  The tester agent needs to support two modes controlled by the workflow:
+  - TDD: receives research brief + story spec only → writes failing tests
+  - Classic: receives research brief + story spec + implementation code → writes passing tests
+
+  The mode distinction is handled by the workflow definition (which inputs to pass),
+  not by the agent persona. The persona should describe both behaviors and explain
+  when each applies.
+
+  The Hive blueprint defines subagents (file-writer, test-runner) but in Claude Code
+  the tester has native tool access (Write, Edit, Bash). No need to port the subagent
+  definitions — just describe the capabilities directly.
+
+risks:
+  - severity: low
+    description: |
+      The tester persona is straightforward — it's a markdown file following an
+      established pattern. Risk is mainly around correctly conveying the TDD
+      context isolation requirement so the orchestrator respects it.
+    mitigation: |
+      Explicitly call out the TDD vs Classic input differences in the persona
+      and in the TDD workflow YAML step definitions.
+
+references:
+  - /Users/don/Documents/project-hive/blueprints/development-team/test-agent.yaml — source blueprint
+  - /Users/don/Documents/herd/docs/hive-context/dev-swarm-product-brief.md — TDD Phase 2 design
+  - skills/hive/agents/researcher.md — format to match
+  - skills/hive/agents/developer.md — format to match

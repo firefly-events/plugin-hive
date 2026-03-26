@@ -1,0 +1,37 @@
+id: validation-handshake
+epic: hive-phase8
+title: Add validation handshake protocol for peer review
+status: pending
+complexity: medium
+depends_on: [quality-gate-engine]
+
+description: |
+  Define the three-step validation handshake for peer review tier:
+  1. Submit — agent provides work with validation criteria
+  2. Validate — peer-validator agent reviews and returns findings with evidence
+  3. Verify — submitting agent verifies findings before they surface
+
+  This uses the peer-validator agent persona created in phase 5.
+
+acceptance_criteria:
+  - "Given output is routed to peer review, then the three-step handshake executes"
+  - "Given the handshake, then the peer-validator provides evidence-based findings"
+  - "Given findings, then the submitting agent can verify before escalation"
+
+steps:
+  - id: design-handshake
+    description: |
+      Add validation handshake protocol to quality-gates.md.
+      Define how peer-validator agent is invoked during the handshake.
+      Source: /Users/don/Documents/project-hive/docs/stories/3-2-validation-handshake-protocol.md
+    agent: developer
+
+context:
+  key_files:
+    - /Users/don/Documents/project-hive/docs/stories/3-2-validation-handshake-protocol.md
+    - skills/hive/agents/peer-validator.md
+    - skills/hive/references/quality-gates.md
+
+files_to_modify:
+  - file: skills/hive/references/quality-gates.md
+    change: Add validation handshake section

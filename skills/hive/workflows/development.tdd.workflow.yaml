@@ -1,0 +1,162 @@
+name: development-tdd
+description: TDD development workflow — tests first, then implement to make them pass.
+version: "1.0.0"
+methodology: tdd
+
+steps:
+  - id: research
+    agent: researcher
+    task: >
+      Read the story spec and explore the codebase. Identify affected files,
+      existing patterns, potential risks, and any context needed for implementation.
+      Produce a research brief covering: file locations, relevant patterns, integration
+      points, test infrastructure, and recommended approach.
+    depends_on: []
+    inputs:
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: research_brief
+        type: string
+    optional: false
+    timeout_ms: 300000
+
+  - id: test-spec
+    agent: tester
+    task: >
+      Write failing tests from the story specification ONLY. You do NOT see any
+      implementation code — this is TDD mode. Tests define the expected behavior
+      based on acceptance criteria. Use existing test patterns found during research.
+      Tests MUST fail when run (there is no implementation yet). Produce a test
+      manifest listing each test with its target acceptance criterion.
+    depends_on:
+      - research
+    inputs:
+      - name: research_brief
+        source: step_output
+        step_id: research
+        output_name: research_brief
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: test_files
+        type: string
+      - name: test_manifest
+        type: string
+    optional: false
+    timeout_ms: 600000
+
+  - id: implement
+    agent: developer
+    task: >
+      Implement the story to make all failing tests pass. You receive the test
+      files and the research brief — write the minimum code needed to satisfy
+      the tests. Follow existing patterns identified in the research phase.
+      Do not modify the tests. Verify all tests pass after implementation.
+    depends_on:
+      - test-spec
+    inputs:
+      - name: test_files
+        source: step_output
+        step_id: test-spec
+        output_name: test_files
+      - name: research_brief
+        source: step_output
+        step_id: research
+        output_name: research_brief
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: implementation
+        type: string
+    optional: false
+    timeout_ms: 600000
+
+  - id: review
+    agent: reviewer
+    task: >
+      Review the implementation and tests for correctness, security, performance,
+      and convention compliance. Check that all acceptance criteria are satisfied.
+      Verify tests are meaningful (not trivially passing). Produce a verdict:
+      passed, needs_optimization, or needs_revision.
+    depends_on:
+      - implement
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: test_files
+        source: step_output
+        step_id: test-spec
+        output_name: test_files
+      - name: research_brief
+        source: step_output
+        step_id: research
+        output_name: research_brief
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: review_verdict
+        type: string
+      - name: review_findings
+        type: string
+    optional: false
+    timeout_ms: 300000
+
+  - id: optimize
+    agent: developer
+    task: >
+      Apply the improvements listed in the review findings. Address each
+      needs_optimization item. Do not change behavior — only improve quality,
+      performance, or clarity as directed. Re-verify all tests still pass.
+    depends_on:
+      - review
+    inputs:
+      - name: review_findings
+        source: step_output
+        step_id: review
+        output_name: review_findings
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: optimized_implementation
+        type: string
+    optional: true
+    timeout_ms: 600000
+
+  - id: integrate
+    agent: developer
+    task: >
+      Commit and integrate the implementation. Stage all changed files, write a
+      clear commit message following the repository convention, and push to the
+      feature branch. Verify CI passes if available. Report the commit hash and
+      files changed.
+    depends_on:
+      - review
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: review_verdict
+        source: step_output
+        step_id: review
+        output_name: review_verdict
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: commit_ref
+        type: string
+    optional: false
+    timeout_ms: 600000

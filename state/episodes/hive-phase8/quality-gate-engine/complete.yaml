@@ -1,0 +1,5 @@
+step_id: complete
+status: completed
+timestamp: "2026-03-25T22:30:00Z"
+artifacts:
+  - skills/hive/references/quality-gates.md

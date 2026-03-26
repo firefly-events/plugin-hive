@@ -1,0 +1,158 @@
+id: ui-touchpoints
+epic: hive-phase4
+title: Add human approval flow for wireframes
+status: pending
+complexity: medium
+depends_on: [ui-agent]
+
+description: |
+  Add human approval touchpoints to the wireframe generation workflow. When the
+  UI agent produces wireframes, the user must review and approve before the design
+  feeds into downstream implementation steps.
+
+  This story defines:
+  1. Rendition support — generating N wireframe variants per story
+  2. Touchpoint 1 — wireframe approval (user picks one, requests changes, or asks for more)
+  3. Touchpoint 2 — story brief sign-off (user confirms wireframe brief before developers see it)
+  4. Story YAML append — adding wireframe references to the story file
+
+  This is a workflow/protocol design story, not a code implementation story. The
+  output is updated documentation in ORCHESTRATOR.md and a wireframe workflow
+  step definition.
+
+acceptance_criteria:
+  - "Given a UI step in a workflow, when the agent produces renditions, then N variants are generated (default 1, configurable)"
+  - "Given renditions are produced, when Touchpoint 1 fires, then the user sees all variants and can: pick one, request changes, or ask for more"
+  - "Given a wireframe is approved, when Touchpoint 2 fires, then the user sees the design brief and CLI references that will be embedded in the story"
+  - "Given the user approves at Touchpoint 2, then the story YAML file is updated with a wireframes section containing: approved path, brief, export command, rendition paths, and selected index"
+  - "Given the wireframes section is in the story YAML, when the developer agent reads the story, then it has the wireframe context for implementation"
+
+steps:
+  - id: research-touchpoints
+    description: |
+      Study how the execute flow currently handles interactive steps:
+
+      1. Read ORCHESTRATOR.md Execute Command — how are steps with human
+         interaction currently handled? (They aren't — this is new.)
+      2. Read the brief's wireframe workflow (section 3 of hive-phase4-brief.md)
+         for the expected touchpoint behavior.
+      3. Read the story YAML format (ORCHESTRATOR.md Plan Command section) to
+         understand where the wireframes section would be appended.
+      4. Check how Claude Code handles user interaction during agent execution —
+         can a subagent present images and wait for user input?
+         (AskUserQuestion tool, Read tool for images)
+
+      Key constraint: the approval flow must work within Claude Code's
+      interaction model. The agent can present PNG paths (user opens them)
+      and use AskUserQuestion to get approval/feedback.
+    agent: researcher
+
+  - id: design-protocol
+    description: |
+      Design the wireframe approval protocol and write it as a new section in
+      ORCHESTRATOR.md (or as a separate reference doc if it's too long).
+
+      **Rendition support:**
+      - Default: 1 rendition
+      - Configurable via story YAML field: `renditions: 3`
+      - Or via execute command flag: `--renditions 3`
+      - Each rendition is a variation (different layout, component arrangement)
+
+      **Touchpoint 1 — Wireframe Approval:**
+      After the UI agent produces renditions:
+      1. Present all PNG paths to the user (or .f0 file paths if no export)
+      2. Ask: "Which rendition? (1-N, 'changes' for feedback, 'more' for additional options)"
+      3. If 'changes': collect feedback, re-run UI agent with feedback context
+      4. If 'more': re-run UI agent for additional renditions
+      5. If selection: lock the chosen wireframe, proceed to Touchpoint 2
+
+      **Touchpoint 2 — Brief Sign-off:**
+      After wireframe selection:
+      1. Present the design brief text and export commands
+      2. Ask: "Approve this brief for the story? (yes/no/edit)"
+      3. If 'no' or 'edit': collect changes, update brief
+      4. If 'yes': append to story YAML
+
+      **Story YAML wireframes section:**
+      ```yaml
+      wireframes:
+        approved: /path/to/wireframe-approved.png
+        brief: |
+          Design brief text...
+        export_command: |
+          cli-anything-frame-zero --live export page --page-id "ID" --format png --output /path.png
+        renditions:
+          - /path/to/wireframe-v1.png
+          - /path/to/wireframe-v2.png
+        selected: 1
+      ```
+
+      Write the protocol documentation and create a `ui-design` workflow step
+      definition that can be inserted into development workflows.
+    agent: developer
+    depends_on: [research-touchpoints]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/ORCHESTRATOR.md — execute flow to extend
+    - skills/hive/agents/ui-designer.md — agent that produces wireframes (created by ui-agent story)
+    - state/epics/hive-phase4-brief.md — section 3 defines the expected touchpoint behavior
+  inputs_from_previous:
+    - ui-agent: UI designer persona definition (needed to understand agent's output format)
+
+files_to_modify:
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Add wireframe approval touchpoint protocol section
+  - file: skills/hive/references/wireframe-protocol.md
+    change: NEW FILE — detailed wireframe approval protocol (if too long for ORCHESTRATOR.md)
+
+design_decisions:
+  - decision: Use AskUserQuestion for touchpoint interaction
+    rationale: |
+      Claude Code's AskUserQuestion tool is the standard way to get user input
+      during execution. The agent presents options and the user picks one.
+      This works within the existing execution model.
+  - decision: Touchpoints are blocking — execution waits for user approval
+    rationale: |
+      Design approval is a gate. Downstream implementation should not start
+      with an unapproved wireframe. The touchpoint halts the workflow until
+      the user responds.
+  - decision: Renditions default to 1 to avoid unnecessary token burn
+    rationale: |
+      Each rendition costs a UI agent invocation. Default to 1 and let the
+      user request more via Touchpoint 1 ("more" option) or pre-configure
+      via the renditions field.
+
+dev_notes: |
+  The biggest challenge is image presentation. Claude Code can read image files
+  (Read tool on PNG paths shows the image), but the user experience of reviewing
+  wireframes by reading file paths is not ideal. The agent should:
+  1. Export PNGs to a known location (e.g., state/wireframes/{epic}/{story}/)
+  2. Present the paths and suggest the user open them
+  3. For live Frame0, the user can also open the .f0 file directly
+
+  The touchpoint protocol should be agnostic to whether images are PNG exports
+  or .f0 files — it works with paths either way.
+
+risks:
+  - severity: medium
+    description: |
+      Touchpoints interrupt automated execution. If running via agent teams,
+      a touchpoint in one story blocks that teammate while others continue.
+    mitigation: |
+      Document that UI stories with touchpoints should run in the main session
+      (team lead), not as a teammate, since touchpoints need direct user access.
+  - severity: low
+    description: |
+      The AskUserQuestion tool has limited options (2-4 choices). Complex
+      feedback may not fit.
+    mitigation: |
+      Use the "Other" option (always available in AskUserQuestion) for
+      free-form feedback. Or use a simple yes/no and collect detailed
+      feedback as a follow-up prompt.
+
+references:
+  - state/epics/hive-phase4-brief.md — touchpoint spec (section 3)
+  - skills/hive/ORCHESTRATOR.md — execute flow to extend
+  - skills/hive/agents/ui-designer.md — agent output format

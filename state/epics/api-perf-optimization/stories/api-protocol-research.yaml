@@ -1,0 +1,180 @@
+id: api-protocol-research
+epic: api-perf-optimization
+title: Evaluate GraphQL, tRPC, and REST Optimization Approaches
+status: pending
+complexity: medium
+depends_on:
+  - baseline-perf-audit
+
+description: |
+  Research API protocol alternatives for the Shindig event-api. The current architecture
+  is pure REST via Fastify with Zod schema validation. The KMP frontend uses Ktor HTTP
+  client. The baseline audit will quantify over-fetching — this story evaluates whether
+  to fix it via field selection (REST), GraphQL (Mercurius), tRPC, or a hybrid approach.
+
+  Key constraint: the frontend is Kotlin Multiplatform, not TypeScript. This eliminates
+  tRPC's main advantage (shared types) and means any GraphQL adoption requires a Kotlin
+  GraphQL client (Apollo Kotlin or graphql-kotlin).
+
+acceptance_criteria:
+  - Comparison matrix covering GraphQL (Mercurius), tRPC, and optimized REST
+  - KMP/Ktor client impact assessment for each approach
+  - Migration effort estimate given 27 Fastify modules with Zod schemas
+  - Analysis tied to specific over-fetching patterns from the baseline
+  - Recommendation with rationale, trade-offs, and incremental adoption path
+
+steps:
+  - id: quantify-overfetch
+    description: |
+      Using the baseline payload analysis, calculate exact over-fetching for the top
+      5 endpoints. For each, document:
+      - Fields returned by the API
+      - Fields used by the KMP client's data classes and composables
+      - Wasted bytes per response
+      - Estimated bandwidth savings from field selection
+      Check the KMP data models at:
+      composeApp/src/commonMain/kotlin/com/shindig/ for Event data classes.
+    agent: researcher
+
+  - id: evaluate-graphql
+    description: |
+      Research GraphQL adoption via Mercurius (Fastify's first-class GraphQL plugin):
+      - Can Zod schemas auto-generate GraphQL types? (check zod-to-graphql, pothos)
+      - What's the Mercurius integration pattern with existing Fastify routes?
+      - How would the KMP client consume GraphQL? (Apollo Kotlin, graphql-kotlin)
+      - Can GraphQL coexist with existing REST endpoints for incremental adoption?
+      - What's the N+1 solution in GraphQL? (DataLoader pattern)
+
+      Check Mercurius docs and look for Fastify + Mercurius + Mongoose examples.
+    agent: researcher
+
+  - id: evaluate-trpc
+    description: |
+      Assess tRPC feasibility:
+      - tRPC requires a TypeScript client for type sharing — KMP is Kotlin
+      - Could tRPC be used server-side only (between Fastify services)?
+      - Is there a Kotlin tRPC client or code generator?
+      - Likely conclusion: tRPC doesn't fit the KMP frontend architecture
+      Document why and move on quickly if confirmed.
+    agent: researcher
+
+  - id: evaluate-optimized-rest
+    description: |
+      Research REST optimization techniques that don't require protocol changes:
+      - Sparse fieldsets: ?fields=title,startTime,venue.name (JSON:API style)
+      - Cursor-based pagination replacing skip/limit (better for large collections)
+      - Compound document includes: ?include=venue,organizer (reduce N+1)
+      - ETag/conditional requests for cache validation
+      - Response compression (check if Fastify compression plugin is already active)
+
+      For each, estimate implementation effort in the existing Fastify codebase.
+    agent: researcher
+
+  - id: compile-recommendation
+    description: |
+      Synthesize findings into a recommendation. Consider:
+      - Migration effort (27 modules × schema conversion)
+      - KMP client impact (new dependencies, API client rewrite)
+      - Incremental adoption (can it be done endpoint-by-endpoint?)
+      - Performance gain vs effort ratio
+      - Team familiarity (existing team knows REST + Fastify)
+
+      Write the recommendation to:
+      state/epics/api-perf-optimization/artifacts/protocol-recommendation.md
+    agent: researcher
+    depends_on: [quantify-overfetch, evaluate-graphql, evaluate-trpc, evaluate-optimized-rest]
+
+context:
+  codebase: ~/Documents/KMP/Shindig/event-api
+  frontend_codebase: ~/Documents/KMP/Shindig/composeApp
+  tech_stack:
+    backend: Fastify 5.x + TypeScript + Mongoose/MongoDB + Zod schemas
+    frontend: Kotlin Multiplatform (Compose) with Ktor HTTP client
+  key_files:
+    - src/modules/events/event.schema.ts — Zod schemas (potential GraphQL type source)
+    - src/modules/events/events.routes.ts — current REST route definitions
+    - src/modules/events/event.controller.ts — controller pattern to evaluate
+    - src/plugins/swagger.ts — existing OpenAPI/Swagger (REST documentation)
+  inputs_from_previous:
+    - baseline-perf-audit: over-fetching analysis, payload sizes, endpoint traffic patterns
+
+code_examples:
+  - title: Current Zod schema pattern (could generate GraphQL types)
+    language: typescript
+    code: |
+      // event.schema.ts — Zod schemas with buildJsonSchemas
+      import { z } from 'zod';
+      import { buildJsonSchemas } from 'fastify-zod';
+
+      const eventResponseSchema = z.object({
+        id: z.string(),
+        title: z.string(),
+        description: z.string().optional(),
+        startTime: z.string(),
+        endTime: z.string().optional(),
+        venue: z.object({ name: z.string(), address: z.string() }).optional(),
+        // ... ~40 more fields
+      });
+  - title: Current REST list endpoint (returns all fields)
+    language: typescript
+    code: |
+      // events.routes.ts — no field selection, full payload
+      fastify.get('/api/events', { schema: { ... } }, async (request, reply) => {
+        const result = await eventService.getEvents(request.query);
+        return reply.send(result);
+      });
+  - title: Mercurius GraphQL integration pattern (Fastify-native)
+    language: typescript
+    code: |
+      // What GraphQL adoption would look like
+      import mercurius from 'mercurius';
+
+      const schema = `
+        type Event {
+          id: ID!
+          title: String!
+          startTime: String!
+          venue: Venue
+        }
+        type Query {
+          events(city: String, limit: Int): [Event!]!
+        }
+      `;
+      app.register(mercurius, { schema, resolvers });
+  - title: Sparse fieldsets pattern (optimized REST)
+    language: typescript
+    code: |
+      // What field selection would look like in the existing REST API
+      fastify.get('/api/events', async (request, reply) => {
+        const { fields } = request.query; // ?fields=title,startTime,venue
+        const projection = fields ? parseFieldSelection(fields) : {};
+        const events = await EventModel.find(query).select(projection).lean();
+        return reply.send(events);
+      });
+
+risks:
+  - severity: high
+    description: |
+      GraphQL adoption requires the KMP team to adopt Apollo Kotlin or similar,
+      which is a significant frontend dependency change. If the KMP app has
+      tight release cycles, this could block adoption.
+    mitigation: |
+      Evaluate incremental adoption — GraphQL for new endpoints only, REST
+      remains for existing. Or use optimized REST which requires zero KMP changes.
+  - severity: medium
+    description: |
+      Mercurius + Mongoose can introduce N+1 problems at the resolver level if
+      DataLoader isn't implemented from the start. GraphQL makes it easy to
+      request nested data, and without batching, each nested field triggers
+      a separate MongoDB query.
+    mitigation: |
+      If GraphQL is recommended, DataLoader must be part of the initial
+      implementation, not a follow-up optimization.
+  - severity: low
+    description: |
+      The 27 Fastify modules all use Zod + fastify-zod for validation. Any
+      protocol change needs to either reuse these schemas or maintain parallel
+      schema definitions, which is a maintenance burden.
+    mitigation: |
+      Prefer approaches that can derive from Zod schemas (e.g., zod-to-graphql,
+      or sparse fieldsets which don't need new schemas at all).

@@ -1,0 +1,74 @@
+id: daily-ceremony-workflow
+epic: hive-phase7
+title: Create daily ceremony workflow (standup, planning, execution)
+status: pending
+complexity: high
+depends_on: [cycle-state-document, task-tracking-integration]
+
+description: |
+  Create the daily ceremony workflow that the 1M Opus orchestrator runs each
+  day. The orchestrator restarts fresh daily with the full context window.
+
+  Ceremony flow:
+  1. Standup — present previous day's work (from status markers + cycle state),
+     blockers (from task tracker), human dependencies, items to continue,
+     overnight swarm improvements
+  2. Compressed story planning — user short-lists items, orchestrator spins up
+     a planning swarm (analyst, architect, ui-designer if needed) that analyzes
+     all listed work and reports back with a plan
+  3. Plan approval — user reviews and approves
+  4. Execution — orchestrator kicks off dev team(s). Currently one at a time,
+     sequentially across epics. Future: parallel dev teams.
+
+acceptance_criteria:
+  - "Given a new day session starts, when the orchestrator loads, then it can reconstruct previous state from status markers + cycle state + task tracker"
+  - "Given the standup, then it presents: completed work, in-progress items, blockers (from tracker), human dependencies, and continuation items"
+  - "Given the planning phase, then the user can short-list items and the orchestrator produces a plan via planning swarm"
+  - "Given plan approval, then the orchestrator kicks off execution with a dev team"
+  - "Given the ceremony workflow, then it's defined in skills/hive/workflows/daily-ceremony.workflow.yaml"
+
+steps:
+  - id: design-ceremony
+    description: |
+      Create the daily ceremony workflow:
+      1. skills/hive/workflows/daily-ceremony.workflow.yaml — ceremony phases
+      2. Update ORCHESTRATOR.md with a new "Daily Ceremony" command section
+      3. Create a /hive:standup skill entry point (or fold into existing commands)
+
+      The standup phase reads:
+      - state/episodes/ — status markers for recent epics
+      - state/cycle-state/ — accumulated decisions
+      - Task tracker — pending human items (via adapter)
+      - Agent memories — any overnight improvements or patterns
+
+      The planning phase uses the existing /hive:plan flow but compressed —
+      user provides a short list, not a full brief.
+
+      The execution phase uses the existing /hive:execute flow.
+    agent: developer
+
+  - id: create-skill-entry
+    description: |
+      Create skills/standup/SKILL.md as a new entry point for daily ceremonies.
+      This triggers the standup → planning → execution flow.
+      Follow the pattern of existing skill entry points (skills/plan/SKILL.md).
+    agent: developer
+    depends_on: [design-ceremony]
+
+context:
+  key_files:
+    - skills/hive/ORCHESTRATOR.md
+    - skills/hive/references/cycle-state-schema.md — from cycle-state-document story
+    - skills/hive/references/task-tracking-adapter.md — from task-tracking story
+    - skills/plan/SKILL.md — skill entry point pattern
+
+files_to_modify:
+  - file: skills/hive/workflows/daily-ceremony.workflow.yaml
+    change: NEW FILE — daily ceremony workflow definition
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Add Daily Ceremony command section
+  - file: skills/standup/SKILL.md
+    change: NEW FILE — standup skill entry point
+
+references:
+  - /Users/don/.claude/projects/-Users-don-Documents-herd/memory/project_daily_operations_model.md

@@ -1,0 +1,33 @@
+name: hive-phase2
+title: "Hive Plugin Phase 2: Quality Gates + Full Agent Roster"
+description: |
+  Add quality gate hooks, tester and reviewer agent personas, episode schema
+  for inter-phase communication, TDD workflow definition, and /hive:status
+  command support to the Hive Claude Code plugin.
+target_codebase: /Users/don/Documents/herd
+
+stories:
+  - id: tester-agent
+    title: Port Test Agent Persona
+    complexity: low
+    depends_on: []
+  - id: reviewer-agent
+    title: Port Review Agent Persona
+    complexity: low
+    depends_on: []
+  - id: episode-schema
+    title: Create Episode Schema Reference
+    complexity: low
+    depends_on: []
+  - id: tdd-workflow
+    title: Create TDD Workflow Definition
+    complexity: medium
+    depends_on: [tester-agent, reviewer-agent, episode-schema]
+  - id: quality-gate-hook
+    title: PostToolUse Quality Gate Hook
+    complexity: medium
+    depends_on: []
+  - id: status-command
+    title: Implement /hive:status Command
+    complexity: low
+    depends_on: [episode-schema]

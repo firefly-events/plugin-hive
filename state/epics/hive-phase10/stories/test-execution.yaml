@@ -1,0 +1,36 @@
+id: test-execution
+epic: hive-phase10
+title: Implement parallel test execution with platform dispatch
+status: pending
+complexity: high
+depends_on: [test-authoring]
+
+description: |
+  Define how test-workers execute tests in parallel across platforms.
+  Mobile: iOS simulator + Android device via Maestro. Web: headless browsers
+  via Playwright. Backend: CLI test runner (pytest, jest). Workers report
+  results with pass/fail per test, screenshots on failure, timing data.
+
+acceptance_criteria:
+  - "Given multiple platforms configured, then tests execute in parallel"
+  - "Given test failures, then screenshots/logs are captured"
+  - "Given execution completes, then structured results are reported per platform"
+
+steps:
+  - id: design-execution
+    description: |
+      Add test execution protocol to test-swarm-architecture.md:
+      - Platform dispatch model (parallel workers per platform)
+      - Per-framework execution commands
+      - Result capture: pass/fail, screenshots, logs, timing
+      - Failure artifact collection
+      Source: ~/Documents/WorkFlow/src/modules/mts/commands/mts-execute-tests.md
+    agent: developer
+
+context:
+  key_files:
+    - ~/Documents/WorkFlow/src/modules/mts/commands/mts-execute-tests.md
+
+files_to_modify:
+  - file: skills/hive/references/test-swarm-architecture.md
+    change: Add test execution section

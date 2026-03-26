@@ -1,0 +1,149 @@
+id: status-command
+epic: hive-phase2
+title: Implement /hive:status Command
+status: pending
+complexity: low
+depends_on: [episode-schema]
+
+description: |
+  Add /hive:status command support to SKILL.md. The status command reads the
+  state/ directory and reports active epics, per-story progress, and the most
+  recent episode for each in-progress story. This gives the user visibility
+  into workflow execution without interrupting the running agents.
+
+acceptance_criteria:
+  - "Given active epics in state/epics/, when /hive:status is invoked, then it lists all epics with story progress (completed/total)"
+  - "Given per-story episode files in state/episodes/, when /hive:status runs, then each story shows its current phase and status"
+  - "Given a story with completed episodes, when /hive:status runs, then the most recent episode summary is shown"
+  - "Given no active epics (empty state/), when /hive:status runs, then it reports 'No active workflows'"
+  - "Given the status output, then it shows a dependency graph visualization (text-based)"
+
+steps:
+  - id: design-status-output
+    description: |
+      Design the status output format. It should be scannable — a user glances at
+      it and knows where things stand. Include:
+
+      ```
+      ## Epic: hive-phase2 — Hive Plugin Phase 2
+      Progress: 3/6 stories completed
+
+      Stories:
+        ✓ tester-agent — Port Test Agent Persona
+        ✓ reviewer-agent — Port Review Agent Persona
+        ✓ episode-schema — Create Episode Schema Reference
+        ⧖ tdd-workflow — Create TDD Workflow Definition [research → in-progress]
+        · quality-gate-hook — PostToolUse Quality Gate Hook [pending]
+        · status-command — Implement /hive:status Command [pending]
+
+      Dependency Graph:
+        tester-agent ──┐
+        reviewer-agent ─┼──→ tdd-workflow
+        episode-schema ─┘        │
+        quality-gate-hook        └──→ (blocked until deps complete)
+        status-command
+      ```
+    agent: researcher
+
+  - id: update-skill-status
+    description: |
+      Update the Status Command section in skills/hive/SKILL.md with:
+      1. Read state/epics/ to find active epics
+      2. For each epic, load the epic.yaml to get story list and dependencies
+      3. For each story, check state/episodes/{epic-id}/{story-id}/ for episodes
+      4. Determine story status:
+         - No episodes → pending
+         - Has episodes but last one isn't for the final workflow step → in-progress
+         - Last episode is for the final step with status: completed → completed
+         - Any episode with status: failed → failed
+      5. Format and display the output per the designed format
+      6. Include the text-based dependency graph
+    agent: developer
+    depends_on: [design-status-output]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/SKILL.md — Status Command section to update
+    - skills/hive/references/episode-schema.md — how to parse episode files
+    - state/epics/ — where epic and story files live
+    - state/episodes/ — where episode records live
+  inputs_from_previous:
+    - episode-schema: skills/hive/references/episode-schema.md defines the episode format
+
+files_to_modify:
+  - file: skills/hive/SKILL.md
+    change: Update Status Command section with detailed parsing and display logic
+
+code_examples:
+  - title: Status output format (target)
+    language: markdown
+    code: |
+      ## Epic: api-perf-optimization — Shindig Event API Performance
+      Progress: 1/6 stories completed
+
+      Stories:
+        ✓ baseline-perf-audit — Establish Performance Baseline [completed]
+        ⧖ mongodb-query-optimization — Optimize Queries [implement → in-progress]
+        ⧖ cache-strategy — Design Redis Caching [research → in-progress]
+        ⧖ api-protocol-research — Evaluate Protocols [research → in-progress]
+        · implement-caching — Redis Cache Layer [blocked: cache-strategy, mongodb-query-optimization]
+        · protocol-implementation — API Protocol Changes [blocked: api-protocol-research, implement-caching]
+  - title: Episode directory structure to parse
+    language: text
+    code: |
+      state/
+        epics/
+          api-perf-optimization/
+            epic.yaml
+            stories/
+              baseline-perf-audit.yaml
+              ...
+        episodes/
+          api-perf-optimization/
+            baseline-perf-audit/
+              research.yaml        ← completed
+              implement.yaml       ← completed
+              test.yaml            ← completed
+              review.yaml          ← completed
+              integrate.yaml       ← completed (final step → story complete)
+            mongodb-query-optimization/
+              research.yaml        ← completed
+              implement.yaml       ← in-progress (last episode)
+
+design_decisions:
+  - decision: Status reads files, doesn't maintain a separate state database
+    rationale: |
+      The epic YAML and episode files ARE the state. Reading them directly means
+      no synchronization issues between a database and the filesystem. At the
+      scale of a single developer's workflow, file I/O is fast enough.
+  - decision: Use Unicode symbols for status (✓ ⧖ · ✗) not emoji
+    rationale: |
+      Terminal-safe symbols work in all environments. Emoji rendering varies
+      across terminals and may not align in monospace columns.
+
+dev_notes: |
+  The status command is read-only — it never modifies state files. It should work
+  even if invoked in a separate terminal while a workflow is running.
+
+  The dependency graph visualization is text-based ASCII art. For small epics
+  (3-6 stories) this is readable. For large epics (10+), consider showing just
+  the blocked/unblocked status rather than a full graph.
+
+  The status command needs to handle the case where state/episodes/ exists but
+  state/epics/ doesn't (orphaned episodes from a deleted epic). Just skip those.
+
+risks:
+  - severity: low
+    description: |
+      The status command adds more content to an already long SKILL.md. Claude
+      needs to parse the whole file to find the status logic.
+    mitigation: |
+      Keep the status section concise — it's mostly "read files, format output."
+      The complex logic is in determining story status from episodes, which is
+      a simple last-episode check.
+
+references:
+  - skills/hive/SKILL.md — Status Command section
+  - skills/hive/references/episode-schema.md — episode format
+  - state/epics/ — epic and story files

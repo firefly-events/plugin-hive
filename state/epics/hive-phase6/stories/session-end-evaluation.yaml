@@ -1,0 +1,79 @@
+id: session-end-evaluation
+epic: hive-phase6
+title: Evaluate and promote/discard insights at session end
+status: pending
+complexity: high
+depends_on: [insight-capture]
+
+description: |
+  At session end, staged insights are evaluated and either promoted to
+  permanent agent memory or discarded. The orchestrator (main session)
+  reviews all staged insights, deduplicates, checks against existing
+  memories, and decides what persists.
+
+  This is the most important story in the epic — it's the quality gate
+  that prevents memory bloat while ensuring valuable learnings survive.
+
+acceptance_criteria:
+  - "Given a session ends with staged insights, then the orchestrator reviews each one"
+  - "Given an insight matches keep criteria (pattern, pitfall, override, codebase), then it's promoted to agents/memories/{agent}/"
+  - "Given an insight that overrides an existing memory, then the existing memory is updated, not duplicated"
+  - "Given an insight that's one-off or derivable, then it's discarded"
+  - "Given the evaluation flow, then it's documented in ORCHESTRATOR.md or a reference doc"
+
+steps:
+  - id: design-evaluation-flow
+    description: |
+      Design the session-end evaluation protocol. Create or update reference docs:
+
+      **Evaluation flow:**
+      1. At session end (or after epic execution), scan state/insights/ for
+         staged insight files
+      2. For each insight:
+         a. Check type against keep criteria (pattern, pitfall, override, codebase)
+         b. Check against existing memories in agents/memories/{agent}/ for duplicates
+         c. If override type: find and update the existing memory it supersedes
+         d. If new and meets criteria: promote to agents/memories/{agent}/{slug}.md
+         e. If doesn't meet criteria: discard (delete from staging)
+      3. Clean up: remove state/insights/{epic-id}/ staging directory
+
+      **Promotion format:** Convert insight YAML to memory markdown:
+      ```markdown
+      ---
+      name: Short title
+      description: One-line for relevance matching
+      type: pattern|pitfall|override|codebase
+      agent: developer
+      timestamp: 2026-03-25
+      source_epic: hive-phase5
+      ---
+
+      Detail of the insight and how to apply it in future work.
+      ```
+
+      **User involvement:** The orchestrator may present borderline insights
+      to the user for a keep/discard decision, but most should be auto-evaluated
+      based on the criteria.
+
+      Document this in ORCHESTRATOR.md as a new "Session End" section and/or
+      in the agent-memory-schema reference.
+    agent: developer
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/references/agent-memory-schema.md — memory format and criteria
+    - skills/hive/ORCHESTRATOR.md — add session-end section
+    - skills/hive/agents/orchestrator.md — orchestrator responsibilities
+
+files_to_modify:
+  - file: skills/hive/references/agent-memory-schema.md
+    change: Add session-end evaluation protocol
+  - file: skills/hive/ORCHESTRATOR.md
+    change: Add Session End section for insight evaluation
+  - file: skills/hive/agents/orchestrator.md
+    change: Add session-end evaluation to orchestrator responsibilities
+
+references:
+  - /Users/don/.claude/projects/-Users-don-Documents-herd/memory/project_episode_redesign.md — design notes
+  - skills/hive/references/agent-memory-schema.md

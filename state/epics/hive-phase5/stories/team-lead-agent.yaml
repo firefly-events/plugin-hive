@@ -1,0 +1,83 @@
+id: team-lead-agent
+epic: hive-phase5
+title: Port team-lead blueprint to Hive agent persona
+status: pending
+complexity: medium
+depends_on: []
+
+description: |
+  Port the team-lead blueprint from Project Hive to a Hive agent persona at
+  skills/hive/agents/team-lead.md. This is distinct from the orchestrator —
+  the orchestrator is the main session; the team lead is the per-team leader
+  who receives a story, decides staffing, coordinates their team, and reports
+  back to the orchestrator.
+
+  The team lead is the first decision point for any story: "Can I do this
+  myself, or do I need to pull agents from the bench?" They manage the
+  developer(s), tester, and optional pair-programmer within their team.
+
+acceptance_criteria:
+  - "Given skills/hive/agents/team-lead.md exists, when read, then it follows the Hive persona format"
+  - "Given a team lead receives a story, then they evaluate complexity and decide whether to solo it or staff a team"
+  - "Given a team is staffed, then the lead coordinates work, resolves conflicts, and reports to the orchestrator"
+  - "Given a phase completes, then the lead reviews output for quality before advancing"
+  - "Given the lead cannot resolve an issue, then they escalate to the orchestrator with clear context"
+
+steps:
+  - id: research-blueprint
+    description: |
+      Read the source blueprint at:
+      /Users/don/Documents/project-hive/blueprints/planning-team/team-lead.yaml
+
+      Also read skills/hive/agents/orchestrator.md to understand the boundary:
+      - Orchestrator = main session, coordinates across teams
+      - Team Lead = per-team, coordinates within a team
+
+      Read skills/hive/agents/researcher.md for format reference.
+    agent: researcher
+
+  - id: write-persona
+    description: |
+      Create skills/hive/agents/team-lead.md. Key sections:
+
+      - Opening: per-team coordinator. Receives story, decides staffing, manages
+        team execution, reports to orchestrator. Pragmatic and results-oriented.
+      - What you do: evaluate story complexity, decide solo vs team, pull agents
+        from bench, assign work, review phase output, resolve conflicts, escalate
+        when needed, report back to orchestrator.
+      - Staffing evaluation: criteria for when to go solo vs staff up. Reference
+        the evaluation criteria in orchestrator.md but apply at the story level.
+      - Team shape: frontend dev, backend dev, tester, pair-programmer (optional).
+      - Quality standards: decision traceability, phase completeness checks,
+        minimal escalation (only when autonomous resolution fails).
+      - Output format: story execution report to orchestrator.
+
+      Distinguish clearly from orchestrator (epic-level) vs team-lead (story-level).
+    agent: developer
+    depends_on: [research-blueprint]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/agents/orchestrator.md — boundary definition
+    - skills/hive/agents/researcher.md — format reference
+    - /Users/don/Documents/project-hive/blueprints/planning-team/team-lead.yaml — source
+
+files_to_modify:
+  - file: skills/hive/agents/team-lead.md
+    change: NEW FILE — team lead agent persona
+
+design_decisions:
+  - decision: Team lead is distinct from orchestrator
+    rationale: |
+      Orchestrator coordinates across epics/teams. Team lead coordinates within
+      a single story's team. This mirrors the hierarchy: orchestrator → team lead
+      → individual agents.
+  - decision: Team lead decides their own staffing
+    rationale: |
+      The orchestrator assigns stories to team leads. The team lead evaluates
+      complexity and pulls from the bench. This decentralizes decision-making.
+
+references:
+  - /Users/don/Documents/project-hive/blueprints/planning-team/team-lead.yaml
+  - skills/hive/agents/orchestrator.md

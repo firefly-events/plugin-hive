@@ -1,0 +1,238 @@
+id: ui-agent
+epic: hive-phase4
+title: Create UI designer agent with Frame0 integration
+status: pending
+complexity: high
+depends_on: []
+
+description: |
+  Create the UI designer agent persona at skills/hive/agents/ui-designer.md.
+  This agent handles all visual design work: wireframing via Frame0 CLI, layout
+  decisions, component specification, and design briefs that feed into developer
+  implementation steps.
+
+  The agent's first action in any task is tool discovery — checking which visual
+  tools are available in the current environment (Frame0 CLI, image generation
+  MCP tools, etc.). This makes it adaptable rather than hard-coded to one tool.
+
+  Primary tool: Frame0 CLI (`cli-anything-frame-zero`) for moderate-fidelity
+  wireframes. The CLI supports both offline mode (JSON manipulation of .f0 files)
+  and live mode (HTTP API to running Frame0 for export/rendering).
+
+  Source material: UX Designer blueprint at project-hive/blueprints/planning-team/ux.yaml
+  and Frame0 CLI documentation.
+
+acceptance_criteria:
+  - "Given skills/hive/agents/ui-designer.md exists, when read, then it follows the Hive agent persona format"
+  - "Given the UI agent starts a task, then its first action is tool discovery (check for Frame0 CLI, image gen tools)"
+  - "Given Frame0 CLI is available, then the agent knows how to: create projects, add pages, create shapes (frames, text, icons), and export as PNG"
+  - "Given the agent produces wireframes, then it also produces a design brief summarizing layout decisions, component choices, and interaction patterns"
+  - "Given the agent's output format, then it includes: wireframe file paths, export commands, and a structured design brief"
+
+steps:
+  - id: research-tools
+    description: |
+      Research Frame0 CLI capabilities and the UX blueprint:
+
+      1. Read the Frame0 documentation:
+         ~/Documents/WorkFlow/frame-zero/agent-harness/FRAME-ZERO.md
+      2. Read the UX designer blueprint:
+         /Users/don/Documents/project-hive/blueprints/planning-team/ux.yaml
+      3. Study existing wireframe examples at:
+         ~/Documents/KMP/Shindig/_bmad-output/planning-artifacts/wireframes/
+         Look at the markdown brief format and PNG export patterns.
+      4. Test Frame0 CLI availability:
+         `which cli-anything-frame-zero`
+
+      Key Frame0 facts to capture:
+      - CLI path: /Library/Frameworks/Python.framework/Versions/3.13/bin/cli-anything-frame-zero
+      - Commands: project, page, shape, export, icon, image, link, align, session
+      - Shape types: Frame (phone/tablet/desktop/browser/watch/tv presets),
+        Rectangle, Ellipse, Text, Line, Polygon, Connector, Icon, Image, Group
+      - Dual mode: offline (JSON .f0 files) + live (HTTP to running Frame0)
+      - Export: PNG/JPEG/WebP via `--live export page` (requires Frame0 running)
+      - .f0 files are UTF-8 JSON: Doc → Page[] → Shape[] (recursive)
+
+      From UX blueprint:
+      - Expertise: interaction design, information architecture, usability heuristics,
+        accessibility, user mental models, CLI/TUI design
+      - Quality: Nielsen's 10 heuristics, WCAG 2.1 AA, cognitive load (max 7 groups)
+    agent: researcher
+
+  - id: write-persona
+    description: |
+      Create skills/hive/agents/ui-designer.md:
+
+      **Opening paragraph:** Visual design agent that creates wireframes, design
+      briefs, and UI specifications. Advocates for the user in every design
+      decision. Adapts to available tools — discovers what's in the environment
+      before starting work.
+
+      **What you do:**
+      - Discover available visual tools (Frame0 CLI, image generation, etc.)
+      - Create wireframes using Frame0 CLI (or describe layouts if unavailable)
+      - Produce design briefs summarizing layout, components, interactions
+      - Apply usability heuristics and accessibility standards
+      - Generate multiple renditions for human review when requested
+
+      **Tool discovery protocol:** (unique section)
+      Before any design work, check for available tools:
+      ```
+      1. which cli-anything-frame-zero  → Frame0 CLI (wireframing)
+      2. Check session MCP tools         → image generation, etc.
+      3. Report available tools and adjust approach
+      ```
+      If no visual tools: produce text-based layout descriptions and ASCII mockups.
+
+      **Frame0 CLI reference:** (quick-reference section)
+      - Create project: `cli-anything-frame-zero project new --name "name"`
+      - Add page: `cli-anything-frame-zero --project file.f0 page add --name "Page"`
+      - Create frame: `cli-anything-frame-zero --project file.f0 shape frame --page-id X --preset phone`
+      - Add text: `cli-anything-frame-zero --project file.f0 shape text --page-id X --content "Label" --left 10 --top 20`
+      - Add icon: `cli-anything-frame-zero --project file.f0 shape icon --page-id X --icon-name "search"`
+      - Export PNG: `cli-anything-frame-zero --live export page --page-id X --format png --output /path/to/file.png`
+
+      **Wireframe workflow:**
+      1. Read story spec → identify screens, components, flows
+      2. Discover tools
+      3. Create .f0 project with device-appropriate frames
+      4. Build wireframe: frames, shapes, text, icons
+      5. Export as PNG (if live mode available)
+      6. Produce design brief
+
+      **Design brief format:**
+      ```markdown
+      ## Screen: {name}
+      - Layout: {description}
+      - Components: {list with positioning rationale}
+      - Interactions: {tap targets, navigation, state changes}
+      - Accessibility: {contrast, touch targets, screen reader notes}
+      ```
+
+      **Areas of expertise:** (from UX blueprint)
+      Interaction design, information architecture, usability heuristics,
+      accessibility standards, user mental models, component libraries
+
+      **Quality standards:**
+      - Nielsen's 10 usability heuristics
+      - WCAG 2.1 AA equivalent
+      - Max 7 information groups per screen (cognitive load)
+      - Touch targets minimum 44x44px for mobile
+
+      **Output format:**
+      - Wireframe .f0 project file path
+      - Exported PNG path(s)
+      - Export command (for downstream agents to re-export)
+      - Design brief (markdown)
+    agent: developer
+    depends_on: [research-tools]
+
+context:
+  codebase: /Users/don/Documents/herd
+  key_files:
+    - skills/hive/agents/researcher.md — format to match
+    - skills/hive/agents/developer.md — format to match
+    - ~/Documents/WorkFlow/frame-zero/agent-harness/FRAME-ZERO.md — Frame0 docs
+    - ~/Documents/KMP/Shindig/_bmad-output/planning-artifacts/wireframes/ — example wireframes
+
+files_to_modify:
+  - file: skills/hive/agents/ui-designer.md
+    change: NEW FILE — UI designer agent persona with Frame0 integration
+
+code_examples:
+  - title: Frame0 wireframe creation sequence
+    language: bash
+    code: |
+      # Create project
+      cli-anything-frame-zero project new --name "login-screen"
+
+      # Add a page
+      cli-anything-frame-zero --project login-screen.f0 page add --name "Login"
+
+      # Add phone frame (get page-id from page list)
+      cli-anything-frame-zero --project login-screen.f0 shape frame \
+        --page-id PAGE_ID --preset phone --left 0 --top 0
+
+      # Add UI elements
+      cli-anything-frame-zero --project login-screen.f0 shape text \
+        --page-id PAGE_ID --content "Welcome Back" --left 24 --top 80 --font-size 24
+
+      cli-anything-frame-zero --project login-screen.f0 shape rectangle \
+        --page-id PAGE_ID --left 24 --top 160 --width 327 --height 48 \
+        --corner-radius 8
+
+      # Export (requires Frame0 running)
+      cli-anything-frame-zero --live export page \
+        --page-id PAGE_ID --format png --output /tmp/login-wireframe.png
+
+  - title: Existing wireframe brief pattern (from Shindig)
+    language: markdown
+    code: |
+      ## Overview
+      Single-screen event detail view with hero image, date block, RSVP buttons
+
+      ## Layout
+      - Hero image: full-width, 200px height
+      - Date block: left-aligned, below hero
+      - Title: 24px, bold, below date
+      - RSVP buttons: bottom-fixed, full-width
+
+      ## Design Tokens
+      - Primary: $olive12
+      - Text: $gray11
+      - Spacing: 16px grid
+
+design_decisions:
+  - decision: Tool discovery is the first step, not assumed
+    rationale: |
+      Frame0 may not be installed in all environments. The agent must be useful
+      even without it — falling back to text descriptions and ASCII layouts.
+      This makes the persona portable.
+  - decision: Include Frame0 CLI quick-reference inline
+    rationale: |
+      The agent needs the CLI commands in its context to use them effectively.
+      Referencing an external doc adds a round-trip. A concise quick-reference
+      section is more efficient.
+  - decision: Name the file ui-designer.md not ux.md
+    rationale: |
+      "UI designer" better describes the output focus (visual artifacts:
+      wireframes, mockups). "UX" is broader and overlaps with analyst territory
+      (user research, information architecture at the system level).
+
+dev_notes: |
+  The Frame0 CLI has two modes that matter:
+  - Offline: all shape/page/project commands work without Frame0 running.
+    This is sufficient for building wireframes programmatically.
+  - Live: export requires Frame0 running (it renders via the app's engine).
+    If Frame0 isn't running, the agent can still produce .f0 files and
+    instruct the user to open them in Frame0 for visual review.
+
+  Existing wireframe briefs from Shindig use markdown with design tokens
+  ($olive12, $gray11, etc.) and specific spacing values. The UI agent should
+  follow this convention when producing briefs for Shindig-related work.
+
+  The agent should use Lucide icons (Frame0's built-in library) via the
+  `icon search` command to find appropriate icons by keyword.
+
+risks:
+  - severity: medium
+    description: |
+      Frame0 CLI may not be on PATH in all environments (it's installed
+      via pip in a specific Python framework path).
+    mitigation: |
+      Tool discovery step checks `which cli-anything-frame-zero` first.
+      If not found, the agent falls back to text-based design specs.
+  - severity: medium
+    description: |
+      Live export requires Frame0 desktop app running. Agents can't
+      launch GUI apps.
+    mitigation: |
+      The agent produces .f0 files (offline) and export commands (for human
+      to run). The touchpoints story (ui-touchpoints) handles the human
+      interaction for exports.
+
+references:
+  - /Users/don/Documents/project-hive/blueprints/planning-team/ux.yaml — UX blueprint source
+  - ~/Documents/WorkFlow/frame-zero/agent-harness/FRAME-ZERO.md — Frame0 docs
+  - ~/Documents/KMP/Shindig/_bmad-output/planning-artifacts/wireframes/ — existing patterns
+  - skills/hive/agents/researcher.md — format reference

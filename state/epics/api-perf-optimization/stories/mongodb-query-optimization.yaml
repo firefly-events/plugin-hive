@@ -1,0 +1,229 @@
+id: mongodb-query-optimization
+epic: api-perf-optimization
+title: Optimize MongoDB Queries and Indexes
+status: pending
+complexity: high
+depends_on:
+  - baseline-perf-audit
+
+description: |
+  Optimize the MongoDB query layer based on baseline profiling. The event-api uses
+  Mongoose with MongoDB. Key issues identified in codebase analysis:
+  - getEvents() returns full documents (~60 fields) when list views need ~15
+  - searchEvents() uses regex for keyword search instead of text index
+  - computeTrendingForCity() does N+1 findById() calls inside a loop
+  - getEventById() chains 3-4 sequential queries for enrichment
+  - No use of Mongoose .select() for field projection on list endpoints
+  - Potential index field name mismatch (startDate in indexes vs startTime in queries)
+
+acceptance_criteria:
+  - All slow queries identified in baseline have covering or compound indexes
+  - N+1 patterns in trending and event detail replaced with batch queries
+  - Mongoose lean() + select() applied to all read-only list/search endpoints
+  - Field projections reduce list endpoint response sizes by measured amount
+  - Before/after query execution time comparison for each optimization
+
+steps:
+  - id: fix-index-alignment
+    description: |
+      Verify that index field names match Mongoose schema field names. The
+      create-indexes.ts script defines indexes on `startDate` but the
+      event.service.ts queries on `startTime`. If mismatched:
+      1. Check the actual Mongoose schema field name in event.model.ts
+      2. Update either the index script or queries to align
+      3. Create the corrected indexes
+      4. Verify with explain() that queries now hit indexes
+
+      Also add missing compound indexes for common query patterns:
+      - { city: 1, startTime: 1, category: 1 } for filtered list queries
+      - { tags: 1, startTime: 1 } for tag-filtered queries
+    agent: developer
+
+  - id: add-projections
+    description: |
+      Add .select() to all list/search query paths to return only the fields
+      needed for list views. The KMP client's event list items likely need:
+      title, startTime, endTime, venue.name, venue.address, location,
+      images[0], category, tags, provider, rsvpCount, isPrivate, organizer.name.
+
+      Apply to:
+      - getEvents() in event.service.ts
+      - searchEvents() in event.service.ts
+      - getPromotedEvents() in event.service.ts
+      - trending list endpoints
+
+      Ensure .lean() is used on ALL read-only queries (some paths may be missing it).
+    agent: developer
+    depends_on: [fix-index-alignment]
+
+  - id: fix-trending-n-plus-one
+    description: |
+      Replace the N+1 pattern in computeTrendingForCity(). Currently:
+      ```typescript
+      for (const [eventId, counts] of signals) {
+        const event = await EventModel.findById(eventId)
+          .select('createdAt startTime').lean();
+        // ...
+      }
+      ```
+      Replace with a batch query:
+      ```typescript
+      const eventIds = Array.from(signals.keys());
+      const events = await EventModel.find({ _id: { $in: eventIds } })
+        .select('createdAt startTime').lean();
+      const eventMap = new Map(events.map(e => [e._id.toString(), e]));
+      ```
+      This reduces N queries to 1 query regardless of trending event count.
+    agent: developer
+
+  - id: fix-event-detail-enrichment
+    description: |
+      Optimize getEventById() which currently does 3-4 sequential queries:
+      1. EventModel.findById(id).lean()
+      2. getInvitedEventIds(userId) — queries InvitationModel
+      3. UserModel.findById(organizerId).lean() — organizer enrichment
+      4. Optional Firebase lookup for organizer photo
+
+      Options:
+      A. Use Promise.all() to parallelize queries 1-3 (they're independent)
+      B. Embed organizer name/photo in the event document on write (denormalize)
+      C. Use MongoDB $lookup in an aggregation pipeline
+
+      Option A is the quickest win. Option B is better long-term but requires
+      a migration. Implement A first, document B as a future optimization.
+    agent: developer
+
+  - id: optimize-search-keyword
+    description: |
+      The searchEvents() method uses regex for keyword search:
+      ```typescript
+      const rx = new RegExp(keyword.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      match.$or = [{ title: rx }, { description: rx }];
+      ```
+      The create-indexes.ts already defines a text index with weights:
+      { title: 'text', description: 'text', tags: 'text' } with title weight 10.
+
+      Replace regex search with $text search on the text index:
+      ```typescript
+      match.$text = { $search: keyword };
+      ```
+      This uses MongoDB's inverted index instead of scanning documents.
+      Note: $text search may already be used in one code path but not another —
+      verify both getEvents() and searchEvents() use it consistently.
+    agent: developer
+
+  - id: verify-improvements
+    description: |
+      Re-run the baseline explain() queries and compare:
+      - executionTimeMillis before vs after
+      - totalDocsExamined before vs after
+      - Response payload size before vs after (with projections)
+      - Trending computation time (N+1 fix impact)
+      - Event detail response time (parallel enrichment impact)
+
+      Document results in:
+      state/epics/api-perf-optimization/artifacts/query-optimization-results.md
+    agent: developer
+    depends_on: [add-projections, fix-trending-n-plus-one, fix-event-detail-enrichment, optimize-search-keyword]
+
+context:
+  codebase: ~/Documents/KMP/Shindig/event-api
+  key_files:
+    - src/modules/events/event.service.ts — all query methods to optimize
+    - src/modules/events/event.model.ts — Mongoose schema, field definitions
+    - src/services/trending-events.service.ts — N+1 trending computation
+    - src/services/popularity.service.ts — signal aggregation queries
+    - scripts/mongodb/create-indexes.ts — index definitions to update
+  inputs_from_previous:
+    - baseline-perf-audit: explain() results, slow queries, N+1 patterns, index gaps
+
+code_examples:
+  - title: "Before: getEvents with no projection"
+    language: typescript
+    code: |
+      // Returns ALL ~60 fields per document
+      const [rawEvents, total] = await Promise.all([
+        EventModel.find(query).limit(limitVal).sort({ startTime: 1 }).lean(),
+        EventModel.countDocuments(query)
+      ]);
+  - title: "After: getEvents with projection"
+    language: typescript
+    code: |
+      const LIST_PROJECTION = {
+        title: 1, startTime: 1, endTime: 1, location: 1,
+        'venue.name': 1, 'venue.address': 1, category: 1,
+        tags: 1, images: { $slice: 1 }, provider: 1,
+        isPrivate: 1, 'organizer.name': 1, rsvpCount: 1,
+      };
+      const [rawEvents, total] = await Promise.all([
+        EventModel.find(query).select(LIST_PROJECTION)
+          .limit(limitVal).sort({ startTime: 1 }).lean(),
+        EventModel.countDocuments(query)
+      ]);
+  - title: "Before: trending N+1"
+    language: typescript
+    code: |
+      for (const [eventId, counts] of signals) {
+        const event = await EventModel.findById(eventId)
+          .select('createdAt startTime').lean(); // 1 query per event
+      }
+  - title: "After: trending batch query"
+    language: typescript
+    code: |
+      const eventIds = [...signals.keys()].map(id => new mongoose.Types.ObjectId(id));
+      const events = await EventModel.find({ _id: { $in: eventIds } })
+        .select('createdAt startTime').lean();
+      const eventMap = new Map(events.map(e => [e._id.toString(), e]));
+      // Now O(1) lookup per event instead of O(1) query per event
+  - title: "Before: event detail sequential"
+    language: typescript
+    code: |
+      const event = await EventModel.findById(id).lean();       // 150ms
+      const invitedIds = await this.getInvitedEventIds(userId);  // 50ms (sequential)
+      const organizer = await UserModel.findById(orgId).lean();  // 30ms (sequential)
+      // Total: ~230ms sequential
+  - title: "After: event detail parallel"
+    language: typescript
+    code: |
+      const [event, invitedIds, organizer] = await Promise.all([
+        EventModel.findById(id).lean(),
+        userId ? this.getInvitedEventIds(userId) : Promise.resolve(new Set()),
+        UserModel.findById(orgId).select('displayName photoUrl').lean(),
+      ]);
+      // Total: ~150ms parallel (bounded by slowest query)
+
+risks:
+  - severity: high
+    description: |
+      Adding .select() projections to list endpoints may break KMP client
+      data classes if they expect fields that are now excluded. The client
+      may crash on null/missing fields.
+    mitigation: |
+      Cross-reference projection fields with KMP data classes before deploying.
+      Add the projection behind a feature flag initially, or return a superset
+      that covers all known client field usage.
+  - severity: medium
+    description: |
+      Switching from regex to $text search changes search behavior. $text search
+      uses stemming and stop words, so "running" matches "run" but "the" is
+      ignored. This may change search results users are accustomed to.
+    mitigation: |
+      Run both search methods side by side in testing and compare result quality.
+      If $text results are significantly different, consider keeping regex as a
+      fallback for exact-match searches.
+  - severity: medium
+    description: |
+      The batch query fix for trending changes the order of operations.
+      If any events are deleted between signal aggregation and the batch lookup,
+      the eventMap won't have entries for those IDs. Current N+1 code handles
+      this implicitly (findById returns null, skipped).
+    mitigation: |
+      Filter out eventIds that don't exist in the eventMap result, same as
+      the current null check but applied to the batch result.
+  - severity: low
+    description: |
+      Creating new compound indexes on a large events collection may temporarily
+      impact write performance during index build.
+    mitigation: |
+      Build indexes in the background (MongoDB default for 4.2+) or during
+      low-traffic hours. Use the --dry-run flag on create-indexes.ts first.
