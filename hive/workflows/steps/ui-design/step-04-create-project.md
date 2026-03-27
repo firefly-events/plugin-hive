@@ -2,7 +2,9 @@
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
-- ONLY use CLI commands from the Command Templates section below — do NOT construct commands from memory
+- NEVER use the Write tool to create .f0 files. NEVER hand-craft JSON. The .f0 format is managed exclusively by the Frame0 CLI. Hand-written JSON will not be registered by Frame0 desktop app and will be invisible to it.
+- ONLY use `cli-anything-frame-zero` CLI commands from the Command Templates section below — do NOT construct commands from memory
+- ALWAYS use `--live` flag when Frame0 desktop app is running (prefer live mode for immediate visual feedback)
 - Do NOT use shell variable assignments (e.g., `PG1="abc"`) — they trigger permission prompts. Use literal values in every command.
 - Do NOT proceed to building wireframes (step 5) until ALL pages are created and their IDs captured
 - Create one page per planned screen from the manifest — no more, no less
@@ -97,6 +99,9 @@ cli-anything-frame-zero --project {file.f0} page list
 
 **NEVER** use these patterns:
 ```bash
+# BAD — Writing JSON directly bypasses CLI and Frame0 won't register the file
+Write tool → file.f0 with JSON content   # ABSOLUTELY FORBIDDEN
+
 # BAD — variable assignment triggers permission prompt
 F0="path/to/file.f0"
 cli-anything-frame-zero --project "$F0" page add --name "Foo"
@@ -124,6 +129,7 @@ cli-anything-frame-zero --project path/to/file.f0 page add --name "Foo"
 
 ## FAILURE MODES
 
+- **CRITICAL — Writing .f0 JSON directly with Write tool:** Frame0 desktop app will not see the file. The CLI registers projects in Frame0's internal index. Hand-written JSON bypasses this entirely. ALWAYS use `cli-anything-frame-zero project new`.
 - **Using shell variable assignments:** Triggers "command contains newlines" permission prompt for every subsequent command. Use literal values.
 - **Not capturing page IDs:** Step 5 cannot add shapes without page IDs. Always run `page list` after creating pages.
 - **Creating extra or missing pages:** Page count must match manifest exactly. Verify before proceeding.

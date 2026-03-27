@@ -75,7 +75,10 @@ cli-anything-frame-zero --live export shape \
 
 **File format:** `.f0` is UTF-8 JSON. Hierarchy: `Doc → Page[] → Shape[]` (recursive). Shape IDs are nanoid strings (21 chars). Coordinates are absolute (left, top, width, height).
 
-**IMPORTANT:** Use literal values in all commands. Do NOT use shell variable assignments (e.g., `PG1="abc"`) — they trigger permission prompts. Pass page IDs and file paths directly in each command.
+**IMPORTANT:**
+- NEVER use the Write tool to create or modify .f0 files. Frame0 CLI is the ONLY way to create wireframes. Hand-written JSON will not be registered by Frame0 desktop app.
+- Prefer `--live` mode when Frame0 desktop app is running — the user wants real-time visual feedback.
+- Use literal values in all commands. Do NOT use shell variable assignments (e.g., `PG1="abc"`) — they trigger permission prompts.
 
 ## Areas of expertise
 

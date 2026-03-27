@@ -2,6 +2,8 @@
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
+- NEVER use the Write tool to modify .f0 files. NEVER edit JSON directly. ALL wireframe changes go through `cli-anything-frame-zero` commands.
+- ALWAYS use `--live` flag when Frame0 desktop app is running — the user wants to see wireframes build in real time
 - Build shapes in strict order per screen: device frame → section containers → content elements → labels → icons
 - NEVER skip the device frame — it is always the first shape on every page
 - NEVER add content shapes before their container is created
