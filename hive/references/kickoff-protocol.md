@@ -187,8 +187,11 @@ Create `hive.config.yaml` in the project root. This is Hive-specific config — 
 ### Phase 5: Initialize Hive State
 
 - Create `state/cycle-state/` directory
-- Create `state/test-baseline/{project}/` if test swarm will be used
 - Create `state/epics/` directory
+- Create `state/insights/` directory (staging area for agent insights)
+- Create `state/test-baseline/{project}/` if test swarm will be used
+- Create `state/test-artifacts/` directory (screenshots, logs, results from test swarm)
+- Create `skills/hive/agents/memories/` with subdirectories for each agent in the roster: developer, researcher, tester, reviewer, architect, analyst, ui-designer, team-lead, pair-programmer, peer-validator, test-architect, test-scout, test-worker, test-inspector, test-sentinel, orchestrator
 
 ### Phase 6: Present Onboarding Report
 
@@ -219,6 +222,8 @@ Create `hive.config.yaml` in the project root. This is Hive-specific config — 
 ### Files Created
 - state/project-profile.yaml — comprehensive project profile
 - hive.config.yaml — Hive workflow configuration
+- state/insights/ — insight staging area
+- skills/hive/agents/memories/ — agent memory storage (16 agent subdirectories)
 
 ### Recommended Next Steps
 - Review the project profile for accuracy
