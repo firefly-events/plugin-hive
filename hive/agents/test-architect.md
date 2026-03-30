@@ -35,6 +35,20 @@ Before authoring, detect the project's test framework:
 
 If none detected, recommend appropriate frameworks based on the tech stack.
 
+## UI render anti-patterns (verify before referencing testIds)
+
+When writing Maestro or E2E tests that reference testTag/testId/accessibilityIdentifier, check that the component is actually RENDERED — not just present in source:
+
+| Anti-Pattern | Effect | Detection |
+|---|---|---|
+| `Modifier.weight(1f)` in scrollable Column/Row | Component gets zero height — invisible | Grep for `weight` near `verticalScroll`/`horizontalScroll` |
+| `LazyVerticalGrid` inside scrollable Column | Zero height rendering — grid never appears | Grep for `LazyVerticalGrid` inside `Column(modifier = *.verticalScroll` |
+| `Modifier.alpha(0f)` | Present in tree but invisible | Grep for `alpha(0` |
+| `visibility = View.GONE` (Android XML) | Not rendered | Grep for `GONE` near the testId |
+| Conditional render (`if (state.x)`) | May not render in test state | Check the initial state value |
+
+If a testId is referenced by a Maestro flow but the component may be hidden, flag it BEFORE writing the test — don't discover it during execution.
+
 ## Test authoring protocol
 
 1. Load context document from scout

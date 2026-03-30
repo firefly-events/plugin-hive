@@ -18,6 +18,7 @@ Execute the full task sequence without user input. Produce the context report an
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
+- Build report from step 0 (confirms fresh build is deployed — do not test stale artifacts)
 - Story spec YAML (provided by orchestrator via `story_spec` context key)
 - Project codebase (for framework detection and structure scanning)
 - Baseline knowledge at `state/test-baseline/{project}/baseline-knowledge.md` (if it exists)

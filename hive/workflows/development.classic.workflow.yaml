@@ -232,6 +232,32 @@ steps:
     optional: true
     timeout_ms: 600000
 
+  - id: dev-standby
+    agent: developer
+    step_file: workflows/steps/development-classic/step-05b-dev-standby.md
+    task: >
+      Stay idle while the test swarm runs. The dev agent has full
+      implementation context and can fix bugs faster than a cold agent.
+      Receive bug reports from sentinel via SendMessage. Fix, re-test,
+      report back. Circuit breaker: max 3 fix attempts per bug.
+      Only shut down when all tests green or circuit breaker trips.
+    depends_on:
+      - review
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: fix_report
+        type: string
+    optional: true
+    skip_when: "no test swarm is running for this story"
+    timeout_ms: 1800000
+
   - id: integrate
     agent: developer
     step_file: workflows/steps/development-classic/step-08-integrate.md
@@ -242,6 +268,7 @@ steps:
       files changed.
     depends_on:
       - review
+      - dev-standby
     inputs:
       - name: implementation
         source: step_output

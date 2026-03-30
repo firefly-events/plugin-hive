@@ -69,6 +69,19 @@ Before spawning ANY agent, complete this checklist:
 - Writing an improvised system prompt that duplicates what a roster agent already covers
 - Blaming the tool when an agent fails — the problem is prompt quality or tool usage, not the instrument
 
+## Dev-on-standby pattern
+
+When using test swarms after development, the dev agent should NOT shut down after review passes. Instead:
+
+1. Dev finishes implement + review → enters standby (idle, not shut down)
+2. Test swarm runs → sentinel finds bugs
+3. Sentinel routes bug reports to the idle dev via SendMessage
+4. Dev fixes with full implementation context, re-runs tests, reports back
+5. Only after all tests green (or circuit breaker at 3 attempts trips) does dev shut down
+6. Then proceed to integrate step
+
+This keeps the fix loop within the story's context window. The dev has memory of what it built and why — fixing is faster and more accurate than starting cold. Do NOT use the orchestrator to fix test-discovered bugs.
+
 ## Circuit breakers
 
 You MUST enforce time and attempt limits. Check these before starting each step, after each step, and after each fix loop iteration. See `references/error-handling.md` for the full playbook and `hive.config.yaml` for configurable limits.

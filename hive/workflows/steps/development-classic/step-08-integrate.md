@@ -4,7 +4,9 @@
 
 - Only run after review verdict is "passed" or "needs_optimization" (and optimization is done)
 - NEVER integrate after "needs_revision" — that goes to fix loop
-- Commit message must follow repository conventions
+- Commit PER STORY immediately after review passes — do NOT batch commits at epic end
+- Each story commits on its OWN feature branch: `hive-{story-id}`
+- Commit message MUST include story ID: `[{story-id}] {description}`
 - Do NOT force-push or amend commits without user approval
 - Verify all tests pass one final time before committing
 
@@ -36,26 +38,36 @@ Commit the implementation to the feature branch and verify CI.
 ```
 If tests fail: STOP. Do not commit broken code. Report regression.
 
-### 2. Stage changed files
-Stage ONLY the files that were modified during implementation.
-Do NOT use `git add -A` — stage specific files to avoid committing unrelated changes.
-
-### 3. Write commit message
-Follow the repository's commit convention (check CLAUDE.md or recent git log).
-Common formats:
-- Conventional Commits: `feat(scope): description`
-- Story reference: `[STORY-ID] description`
-
-### 4. Commit
+### 2. Ensure feature branch exists
+Each story gets its own branch. If not already on one:
 ```bash
-git commit -m "{commit message}"
+git checkout -b hive-{story-id}
+```
+If parallel stories are running, each teammate should already be on its own branch.
+
+### 3. Stage changed files
+Stage ONLY the files that were modified during THIS story's implementation.
+Do NOT use `git add -A` — stage specific files to avoid committing other stories' changes.
+
+If shared files (e.g., ViewModel, data models) were also modified by another story:
+- Check `git diff` to confirm your changes are the ones staged
+- If conflict: rebase onto the other story's commit first
+
+### 4. Write commit message
+Include the story ID so changes are traceable. Follow the repository's convention:
+```
+[{story-id}] feat(scope): {description}
 ```
 
-### 5. Push to feature branch
+### 5. Commit
 ```bash
-git push origin {branch-name}
+git commit -m "[{story-id}] {commit message}"
 ```
-If branch doesn't exist remotely, use `git push -u origin {branch-name}`.
+
+### 6. Push to feature branch
+```bash
+git push -u origin hive-{story-id}
+```
 
 ### 6. Verify CI (if available)
 If the project has CI: check that the push triggers a build and it passes.

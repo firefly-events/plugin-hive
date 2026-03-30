@@ -62,6 +62,7 @@ concerns:
       - "All new interactive components have testTag (Android) and accessibilityIdentifier (iOS)"
       - "Tag names follow project naming convention"
       - "Tags verified: MTS discovery pass can locate all new components"
+      - "Render verified: tagged components are actually VISIBLE (not hidden by weight(1f) in scrollable Column, LazyVerticalGrid in scrollable Column, or conditional rendering)"
 
   - id: accessibility
     name: Accessibility Standards (WCAG 2.1 AA)

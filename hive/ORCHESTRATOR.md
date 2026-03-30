@@ -48,17 +48,32 @@ Parse `$ARGUMENTS` to determine which command to run. If ambiguous, ask.
 
 3. **Decompose into stories.** Break the requirement into an **epic** containing multiple **stories**. Each story should be independently implementable and testable.
 
-4. **Write detailed story files.** For each story, produce an individual YAML file in `state/epics/{epic-id}/stories/{story-id}.yaml`. Stories are the primary artifact — they're what agents read when executing. They must contain enough context for an agent to work autonomously without reading the full epic or other stories.
+4. **Requirements traceability check.** Before finalizing stories, verify every aspect of the original requirement is covered by at least one story:
+   - Re-read the original requirement/PRD
+   - List every distinct capability, feature, or behavior mentioned
+   - Map each to at least one story
+   - Flag any unmapped capabilities as **GAPS**
+   - Present gaps to the user before proceeding — missing stories are cheaper to add now than discover during testing
 
-5. **Evaluate cross-cutting concerns per story.** For each story, evaluate each concern's `applies_when` condition. For applicable concerns, determine the specific action needed and add a `cross_cutting` section to the story YAML. See `references/cross-cutting-concerns.md` for format and examples.
+   ```
+   TRACEABILITY:
+     Mapped: 8 of 10 capabilities covered
+     GAPS:
+     - SMS/email invites to non-users — not covered by any story
+     - Contact permission flow — not covered by any story
+   ```
 
-6. **Write the epic index.** Produce `state/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories.
+5. **Write detailed story files.** For each story, produce an individual YAML file in `state/epics/{epic-id}/stories/{story-id}.yaml`. Stories are the primary artifact — they're what agents read when executing. They must contain enough context for an agent to work autonomously without reading the full epic or other stories.
 
-7. **Detect UI stories.** After generating stories and before presenting for confirmation, scan each story for UI work indicators. See the UI Step Detection section below.
+6. **Evaluate cross-cutting concerns per story.** For each story, evaluate each concern's `applies_when` condition. For applicable concerns, determine the specific action needed and add a `cross_cutting` section to the story YAML. See `references/cross-cutting-concerns.md` for format and examples.
 
-8. **Run agent-ready checklist.** Validate each story against the 9-point checklist in `references/agent-ready-checklist.md` (including check #9: cross-cutting concerns). Flag stories that fail checks in the confirmation output.
+7. **Write the epic index.** Produce `state/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories.
 
-9. **Present for confirmation.** Show the dependency graph, story summaries, cross-cutting concerns applied, UI detection results, and checklist results. Ask for confirmation before saving.
+8. **Detect UI stories.** After generating stories and before presenting for confirmation, scan each story for UI work indicators. See the UI Step Detection section below.
+
+9. **Run agent-ready checklist.** Validate each story against the 9-point checklist in `references/agent-ready-checklist.md` (including check #9: cross-cutting concerns). Flag stories that fail checks in the confirmation output.
+
+10. **Present for confirmation.** Show the dependency graph, story summaries, traceability results, cross-cutting concerns applied, UI detection results, and checklist results. Ask for confirmation before saving.
 
 ### UI Step Detection
 
@@ -305,6 +320,8 @@ After generating, present a summary to the user showing the dependency graph and
    - For large epics (10+ stories), keep task descriptions minimal (ID + title + deps only) to avoid exceeding prompt limits.
 
    After generating the prompt, pass it to the `TeamCreate` tool. Each story-level teammate gets its own tmux pane. Within their pane, teammates use the `Agent` tool for individual workflow steps (research, implement, test, review). The team lead manages dependencies and monitors completion. When all tasks finish, proceed to the epic summary (step 7).
+
+   **Per-story commits:** Stories commit independently on their own feature branches (`hive-{story-id}`) as soon as review passes. Do NOT batch commits at epic end — this creates messy grouping when shared files are involved.
 
 6. **Sequential execution.** For each story (in dependency order):
 

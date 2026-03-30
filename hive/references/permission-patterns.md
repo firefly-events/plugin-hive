@@ -91,14 +91,39 @@ Read-only git and state queries.
 
 ## Command Pattern Rules for Step Files
 
-Step files should follow these patterns to minimize prompts even without allowlists:
+Step files MUST follow these patterns. They are mandatory for all command templates.
 
 | Do | Don't | Why |
 |---|---|---|
 | Single-line commands with literal values | Shell variable assignments (`F0="path"`) | Variables trigger "contains newlines" prompt |
+| `&&` chaining for sequential commands | Multi-line with `\` continuation | `&&` is one logical command; `\` triggers approval |
 | Use CLI tools (Frame0, git, build commands) | Use Write tool for managed files | Managed files need their CLI to register properly |
 | Copy-paste from command templates | Construct commands from memory | Wrong flags cause silent failures + fallback to Write |
-| Use `--` flag syntax | Use multi-line with `\` continuation | Multi-line triggers approval prompt |
+| Use `--` flag syntax | Positional args where flags exist | Flags are self-documenting and less error-prone |
+
+### && chaining pattern (standard for Hive agents)
+
+When multiple sequential commands are needed, chain them with `&&`:
+
+```bash
+# GOOD — one logical command, one permission prompt
+./gradlew assembleDebug && adb install -r app/build/outputs/apk/debug/app-debug.apk && adb shell am start -n com.app/.MainActivity
+
+# BAD — three separate commands, three permission prompts
+./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n com.app/.MainActivity
+
+# BAD — shell variable, triggers "contains newlines"
+APK="app/build/outputs/apk/debug/app-debug.apk"
+adb install -r "$APK"
+```
+
+This pattern works because `&&` chains are treated as a single command by Claude Code's permission system. Each command in the chain only runs if the previous one succeeded.
+
+### bypassPermissions limitation
+
+`bypassPermissions` on teammates does NOT suppress all prompt types. Specifically, "command contains newlines" prompts still fire for shell variable assignments. The `&&` chaining + literal values pattern avoids this entirely.
 
 ## Combining Allowlists
 

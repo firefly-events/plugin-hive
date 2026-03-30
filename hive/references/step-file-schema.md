@@ -153,6 +153,17 @@ Every metric must be binary (pass/fail). The agent checks these before proceedin
 
 Failure modes are the inverse of success metrics — they describe specific ways this step can go wrong, learned from actual failures. The gating section prevents advancement until conditions are met.
 
+## Mandatory Command Pattern Rules
+
+All command templates in step files MUST follow these rules:
+
+1. **Single-line commands with literal values** — no shell variable assignments
+2. **`&&` chaining for sequential commands** — treated as one command by Claude Code
+3. **No `\` line continuation** — triggers "contains newlines" prompt
+4. **No Write tool for managed files** — use the appropriate CLI (Frame0, git, etc.)
+
+See `references/permission-patterns.md` for full details and examples.
+
 ## Optional Sections
 
 These sections are used when relevant:

@@ -229,3 +229,13 @@ The test swarm is triggered via:
 - Cross-swarm handoff from dev swarm (automated pipeline)
 - Manual: `/hive:test {story-id}` (future command)
 - Daily ceremony: orchestrator decides to run test swarm after dev execution
+
+## Known Limitations
+
+### Maestro single-driver (port 7001)
+Maestro binds to port 7001 as a single driver instance. iOS and Android cannot run Maestro flows in parallel — the second platform will fail to bind the port. The worker step serializes Maestro execution across platforms (Android first, then iOS, or vice versa). Unit and integration tests can still run in parallel.
+
+**Workaround investigated:** Running separate Maestro instances on different ports is not officially supported. Accept serial execution for now.
+
+### testId render visibility
+A testId/testTag in source code does not guarantee the component is visible. Layout anti-patterns (e.g., `weight(1f)` in scrollable Column, `LazyVerticalGrid` in scrollable Column) can give components zero height, making them invisible to Maestro while still present in the layout tree. The architect step now includes a render verification check to catch this during test authoring.

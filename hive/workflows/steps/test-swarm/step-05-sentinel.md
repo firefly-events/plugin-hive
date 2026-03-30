@@ -8,6 +8,8 @@
 - Do NOT guess at severity — classify based on the defined criteria below
 - Do NOT skip the AI hypothesis — analyze the code to explain WHY the failure occurred, not just THAT it occurred
 - Every bug report must be structured — no freeform text dumps
+- If the dev agent is on standby (idle after review): route fix requests to the dev agent via SendMessage. The dev has full implementation context and can fix faster than a cold agent.
+- If no dev agent is available: file the bug as a ticket for manual triage
 
 ## EXECUTION PROTOCOLS
 

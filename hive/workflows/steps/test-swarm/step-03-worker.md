@@ -140,6 +140,16 @@ ls -la state/test-artifacts/{epic-id}/{story-id}/results.yaml
 
 If any artifacts ended up elsewhere (project root, `test-results/`, `~/.maestro/`), move them to the correct artifact directory.
 
+## BEHAVIOR MATRIX
+
+| Condition | Behavior |
+|-----------|----------|
+| Test type is unit/integration | Run platforms in parallel if possible |
+| Test type is Maestro (mobile E2E) | **SERIALIZE iOS and Android.** Maestro uses port 7001 as a single driver — only one platform can run at a time. Run Android first, then iOS (or vice versa). |
+| Test fails | Capture error, screenshot, log. Continue to next test. Do NOT stop. |
+| Framework not installed | Report missing framework. Skip those tests with `status: skipped, reason: framework_not_found`. |
+| Device not connected | Report missing device. Skip those tests with `status: skipped, reason: device_not_connected`. |
+
 ## SUCCESS METRICS
 
 - [ ] All tests from manifest executed (none skipped without reason)

@@ -84,6 +84,7 @@ COVERAGE MAP:
 For each gap, classify severity:
 
 - **Critical:** Core flow acceptance criterion with no tests at all
+- **Critical:** testId exists in source but component is not rendered (layout anti-pattern hiding it) — Maestro timeout
 - **Moderate:** Criterion has happy path but missing edge cases or error states
 - **Low:** Cosmetic or UX criterion with partial coverage
 

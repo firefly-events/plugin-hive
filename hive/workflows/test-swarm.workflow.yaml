@@ -3,6 +3,19 @@ description: Generalized test swarm — 8-task pipeline from context through bug
 version: "1.0.0"
 
 steps:
+  - id: rebuild
+    agent: test-scout
+    step_file: workflows/steps/test-swarm/step-00-rebuild.md
+    task: >
+      Rebuild the project from latest commit and deploy to test targets.
+      Verify build artifacts are fresh before any tests run.
+    depends_on: []
+    outputs:
+      - name: build_report
+        type: string
+    optional: false
+    timeout_ms: 300000
+
   - id: gather-context
     agent: test-scout
     step_file: workflows/steps/test-swarm/step-01-scout.md

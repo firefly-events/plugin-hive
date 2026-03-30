@@ -8,6 +8,7 @@
 - Do NOT skip requirement traceability — every test MUST map to an acceptance criterion
 - Do NOT invent acceptance criteria — test only what the story spec defines
 - Follow existing test patterns from baseline knowledge (naming, directory structure, helpers)
+- When referencing testIds/testTags in Maestro scripts, VERIFY the component is actually RENDERED — not just present in source. Check for layout anti-patterns that hide components.
 
 ## EXECUTION PROTOCOLS
 
@@ -98,7 +99,27 @@ Each test file header should include:
 # Platform: {target platform}
 ```
 
-### 5. Produce test manifest
+### 5. Verify testId render visibility (Maestro/E2E tests only)
+
+For any test that references a testTag, testId, or accessibilityIdentifier:
+
+a. **Find the component in source:** Grep for the testId in the codebase
+b. **Check the layout context:** Read the surrounding layout code
+c. **Scan for render-hiding anti-patterns:**
+   - `Modifier.weight(1f)` inside a scrollable Column/Row → component gets zero height
+   - `LazyVerticalGrid` or `LazyColumn` inside a scrollable Column → zero height rendering
+   - `Modifier.alpha(0f)` or `visibility = GONE/INVISIBLE` → present but not visible
+   - Conditional rendering (`if (condition)`) where condition may be false in test state
+d. **Flag issues:** If a testId exists but the component may be invisible, flag it:
+   ```
+   WARNING: testId "{id}" in {file}:{line} may not render.
+   Reason: {anti-pattern detected}
+   Impact: Maestro flow will timeout waiting for element.
+   ```
+
+This check prevents the Shindig failure where weight(1f) in a scrollable Column hid ALL new components — testIds existed but Maestro couldn't find them.
+
+### 6. Produce test manifest
 
 Output a structured YAML manifest:
 
