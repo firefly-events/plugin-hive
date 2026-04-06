@@ -74,6 +74,16 @@ Execute stories through development workflow phases.
 
    **Per-story commits:** Stories commit independently on their own feature branches (`hive-{story-id}`) as soon as review passes. Do NOT batch commits at epic end.
 
+   **Respawn monitoring (team execution):** The orchestrator monitors active teammates for context degradation signals during execution. If a teammate shows signs of context pressure (see `skills/hive/skills/respawn/SKILL.md` for detection heuristics), the orchestrator triggers the respawn protocol:
+
+   1. `SendMessage` the respawn signal to the teammate
+   2. Wait for the teammate to write its respawn summary to `state/respawn-summaries/`
+   3. Check the respawn iteration count — if >= 3, escalate to user instead
+   4. Spawn a fresh teammate via agent-spawn skill with `respawn_summary_path` pointing to the summary
+   5. The fresh teammate picks up where the previous one left off
+
+   Ensure `state/respawn-summaries/` exists before epic execution begins (create if needed).
+
 7. **Sequential execution.** For each story (in dependency order):
 
    **a. Read the workflow steps.** Each step has an `agent` field referencing a persona in `hive/agents/`. Read that agent's markdown file to understand their role and output format.
@@ -102,6 +112,16 @@ Execute stories through development workflow phases.
 
    **f. Check other gate criteria** before advancing. For test steps, verify tests pass. For failed gates, write a `failed` episode and halt the story.
 
+   **g. Respawn monitoring (sequential execution).** During long-running steps (implement, test, optimize), the orchestrator should watch for context degradation in the spawned sub-worker. If the sub-worker's responses show quality decline, repetitive behavior, or task drift (see `skills/hive/skills/respawn/SKILL.md` for the full signal list):
+
+   1. Signal the sub-worker to write a respawn summary
+   2. After the sub-worker writes the summary and terminates, check respawn count (max 3 per step)
+   3. Spawn a fresh sub-worker via agent-spawn skill with `respawn_summary_path`
+   4. The fresh sub-worker continues the step from where the previous one left off
+   5. If respawn count reaches 3, escalate to the user with the summary chain
+
+   Ensure `state/respawn-summaries/` exists at the start of execution.
+
 8. After all stories complete, produce a summary of the epic execution.
 
 ## Key References
@@ -112,3 +132,5 @@ Execute stories through development workflow phases.
 - `hive/references/cycle-state-schema.md` — persistent decision tracking
 - `hive/references/step-file-schema.md` — step file format
 - `hive/agents/orchestrator.md` — orchestrator coordination guidance
+- `skills/hive/skills/respawn/SKILL.md` — agent respawn protocol and detection heuristics
+- `skills/hive/skills/agent-spawn/SKILL.md` — agent spawning with respawn continuation support

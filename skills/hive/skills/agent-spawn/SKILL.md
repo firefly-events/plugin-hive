@@ -102,15 +102,39 @@ Agent(
 2. **Domain note** — "You may modify files matching: {allow patterns}. Do not modify files outside this domain."
 3. **Prior knowledge** — relevant memories from the agent's memory directory
 4. **Applicable skills** — skill content if any matched
-5. **Task** — the story spec, step instructions, and any inputs from prior steps
+5. **Continuation Context** (respawn only) — if `respawn_summary_path` is provided, read the summary file and include it here. See step 7b below.
+6. **Task** — the story spec, step instructions, and any inputs from prior steps
+
+### 7b. Handle respawn continuation (optional)
+
+If a `respawn_summary_path` is provided (indicating this is a respawn, not a fresh spawn):
+
+1. **Read the respawn summary** from the provided file path
+2. **Parse the frontmatter** to extract `respawn_iteration`, `story_id`, `step_id`
+3. **Inject the summary** into the prompt as a "Continuation Context" section (position 5 in the prompt structure above), wrapped with:
+
+```
+## Continuation Context
+
+You are continuing work from a previous instance of yourself (respawn iteration {N}).
+Review the context below carefully before proceeding. Do not repeat completed work.
+Verify the current state of files and tests before assuming the summary is accurate —
+things may have changed since the previous instance wrote this.
+
+{full respawn summary content}
+```
+
+If `respawn_summary_path` is NOT provided, skip this step entirely — behavior is unchanged from a normal fresh spawn.
 
 ### 8. Report spawn result
 
 After spawning, report:
 - Agent name and model tier used
+- Respawn: yes (iteration {N} of 3) | no (fresh spawn)
 - Required tools: available / missing (with fallback)
 - Memories loaded: count and names
 - Skills injected: count and names
+- Continuation context: loaded from {path} | none
 - Domain restrictions communicated
 
 ## Key Rules
