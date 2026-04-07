@@ -129,7 +129,7 @@ All agents have YAML frontmatter with both official Claude Code fields (`name`, 
 |------|-------|--------|------|
 | **Opus** | claude-opus-4-6 | orchestrator, team-lead, architect, analyst, tpm | Highest — complex reasoning |
 | **Sonnet** | claude-sonnet-4-6 | researcher, technical-writer, frontend-developer, backend-developer, developer, tester, reviewer, pair-programmer, peer-validator, ui-designer, test-scout, test-architect, test-inspector, test-sentinel | Medium — analytical/implementation |
-| **Haiku** | claude-haiku-4-5 | test-worker | Lowest — fast mechanical execution |
+| **Haiku** | claude-haiku-4-5 | test-worker | Lowest — fast mechanical execution (consider bumping to Sonnet if context issues arise) |
 
 Configure in `hive.config.yaml`. Override per-agent with `model_overrides`.
 
@@ -219,7 +219,16 @@ When enabled (`hive.config.yaml` → `external_models.codex.enabled: true`), a C
 
 ---
 
-## Memory System (Two-Tier)
+## Memory System (Layered Architecture)
+
+Four-layer architecture with graceful degradation:
+
+| Layer | What | Status |
+|-------|------|--------|
+| **L0: Raw memories** | `.md` files at `~/.claude/hive/memories/{agent}/` | Baseline fallback |
+| **L1: Compiled wiki** | LLM-synthesized topic articles at `~/.claude/hive/memory-wiki/` | Primary retrieval |
+| **L2: Obsidian UI** | Open `~/.claude/hive/` as an Obsidian vault | Opt-in, zero config |
+| **L3: Vector backend** | Qdrant semantic search | Future (corpus > ~400k words) |
 
 ### System-Level: Agent Memories (cross-project)
 
@@ -227,9 +236,19 @@ When enabled (`hive.config.yaml` → `external_models.codex.enabled: true`), a C
 ~/.claude/hive/memories/{agent-name}/{slug}.md
 ```
 
-Agent memories span projects. A backend developer working on Go Project A and Python Project B accumulates cross-project expertise. Memory types: `pattern`, `pitfall`, `override`, `codebase`, `reference`.
+Agent memories span projects. Memory types: `pattern` (90d TTL), `pitfall` (180d), `override` (no expiry), `codebase` (60d), `reference` (no expiry, append semantics). Frontmatter includes staleness fields (`last_verified`, `ttl_days`) and provenance tracking (`source`, `imported_from`).
 
-**Reference memories** are a special type — curated knowledge lists that accumulate entries over time (e.g., "Go Concurrency Patterns" with entries from multiple projects and links to external docs).
+### Compiled Wiki (L1)
+
+```
+~/.claude/hive/memory-wiki/
+├── index.md              ← master topic index
+├── topics/{slug}.md      ← synthesized articles with [[wikilinks]]
+├── agents/{name}.md      ← per-agent digests with backlinks
+└── meta/compiled-at.md   ← compilation timestamp
+```
+
+Replaces keyword matching with topic-based navigation. Cross-agent sharing is organic — memories from different agents converge by topic. All files use `[[wikilinks]]` for Obsidian compatibility. Compiled incrementally at session-end.
 
 ### Project-Level: Team Memories (project-scoped)
 
@@ -237,28 +256,19 @@ Agent memories span projects. A backend developer working on Go Project A and Py
 state/team-memories/{team-name}/{slug}.md
 ```
 
-Team memories capture collective patterns specific to THIS codebase. They don't travel to other projects. Memory types: `convention`, `handoff-pattern`, `tooling`, `process`.
+Team memories capture collective patterns specific to THIS codebase. Types: `convention`, `handoff-pattern`, `tooling`, `process`.
 
-### Memory Lifecycle
+### Memory Loading (Wiki-First Retrieval)
 
-```
-Agent executes step
-  → encounters something non-obvious
-  → writes insight to state/insights/ staging
-  → session ends
-  → orchestrator evaluates: promote or discard?
-  → agent insights → ~/.claude/hive/memories/{agent}/
-  → team insights → state/team-memories/{team}/
-  → reference insights → append to existing reference memory
-  → next session: memories loaded at spawn time
-```
+At every spawn, agent-spawn step 5 checks the compiled wiki first:
+1. If wiki fresh → navigate topic index → load relevant articles
+2. If wiki stale/absent → fall back to L0 keyword scan
+3. Flag memories past TTL with staleness warnings
+4. Surface override count at session-start
 
-### Memory Loading
+### Onboarding & Federation
 
-Mandatory at every spawn point:
-1. Orchestrator loads own memories at session start
-2. Agent-spawn skill loads target agent's memories before spawning
-3. Team lead loads team memories + agent memories before staffing
+Starter memories ship with the plugin and migrate on first kickoff. Export/import via MemoryBundle format for cross-user sharing with provenance tracking. See `references/onboarding-guide.md`.
 
 ---
 
@@ -321,7 +331,7 @@ All settings in `hive/hive.config.yaml`:
 | Doc | File | What it covers |
 |-----|------|---------------|
 | Agent Config Schema | `references/agent-config-schema.md` | Frontmatter format (official + Hive fields) |
-| Agent Memory Schema | `references/agent-memory-schema.md` | Two-tier storage, memory types, loading, migration |
+| Agent Memory Schema | `references/agent-memory-schema.md` | Layered storage, memory types, TTL/staleness, loading, migration |
 | Team Config Schema | `references/team-config-schema.md` | Loadable team compositions and lifecycle |
 | Domain Access Control | `references/domain-access-control.md` | Per-agent write restrictions and enforcement |
 | Workflow Schema | `references/workflow-schema.md` | YAML workflow format, step fields |
@@ -334,3 +344,7 @@ All settings in `hive/hive.config.yaml`:
 | Insight Capture | `references/insight-capture.md` | When and how agents capture insights |
 | Cross-Cutting Concerns | `references/cross-cutting-concerns.md` | Per-project concern evaluation |
 | Vertical Planning | `references/vertical-planning.md` | H/V planning methodology |
+| MemoryStore Interface | `references/memory-store-interface.md` | Memory retrieval/persistence contract (6 methods) |
+| MemoryBundle Format | `references/memory-bundle-format.md` | Export/import federation format |
+| Wiki Compilation | `references/wiki-compilation-guide.md` | Compiled wiki structure, templates, procedure |
+| Onboarding Guide | `references/onboarding-guide.md` | Starter memories, kickoff migration, federation |

@@ -119,7 +119,7 @@ Match the model to the job — not every agent needs Opus.
 |------|-------|--------|------|
 | **Opus** | claude-opus-4-6 | orchestrator, team-lead, architect, analyst, tpm | Highest — complex reasoning |
 | **Sonnet** | claude-sonnet-4-6 | researcher, technical-writer, frontend-developer, backend-developer, developer, tester, reviewer, pair-programmer, peer-validator, ui-designer, test-scout, test-architect, test-inspector, test-sentinel | Medium — analytical/implementation |
-| **Haiku** | claude-haiku-4-5 | test-worker | Lowest — fast mechanical execution |
+| **Haiku** | claude-haiku-4-5 | test-worker | Lowest — fast mechanical execution (consider bumping to Sonnet if context issues arise) |
 
 Configure in `hive.config.yaml`. Override per-agent with `model_overrides` for complex projects.
 
@@ -301,22 +301,31 @@ YAML-defined quality rules per workflow at `gate-policies/{workflow}.yaml`. Type
 
 ---
 
-## Agent Memory System
+## Agent Memory System (Layered Architecture)
 
-Agents accumulate memories across sessions — patterns, pitfalls, codebase understanding.
+Agents accumulate memories across sessions. The memory system uses a four-layer architecture with graceful degradation:
 
-### Two-Tier Storage
+| Layer | What | Status |
+|-------|------|--------|
+| **L0: Raw memories** | `.md` files at `~/.claude/hive/memories/{agent}/` | Baseline fallback |
+| **L1: Compiled wiki** | LLM-synthesized topic articles at `~/.claude/hive/memory-wiki/` | Primary retrieval |
+| **L2: Obsidian UI** | Open `~/.claude/hive/` as an Obsidian vault | Opt-in, zero config |
+| **L3: Vector backend** | Qdrant semantic search | Future (corpus > ~400k words) |
 
-**System-level** (`~/.claude/hive/memories/{agent}/`): Agent memories span projects — cross-project expertise that builds over time.
+### Storage
+
+**System-level** (`~/.claude/hive/memories/{agent}/`): Agent memories span projects — cross-project expertise that builds over time. Frontmatter includes TTL fields (`last_verified`, `ttl_days`) and provenance tracking (`source`, `imported_from`).
+
+**Compiled wiki** (`~/.claude/hive/memory-wiki/`): LLM-authored topic articles with `[[wikilinks]]`. Replaces keyword matching with topic-based navigation. Cross-agent sharing is organic — memories from different agents converge by topic.
 
 **Project-level** (`state/team-memories/{team}/`): Team memories are scoped to the current project — collective patterns that don't travel.
 
 ### Memory Types
-- `pattern` — repeatable approach that worked
-- `pitfall` — lesson learned, avoid this
-- `override` — supersedes an existing memory
-- `codebase` — project-specific understanding
-- `reference` — curated knowledge list with appendable entries and external docs
+- `pattern` — repeatable approach that worked (TTL: 90 days)
+- `pitfall` — lesson learned, avoid this (TTL: 180 days)
+- `override` — supersedes an existing memory (no expiry)
+- `codebase` — project-specific understanding (TTL: 60 days)
+- `reference` — curated knowledge list with append semantics (no expiry)
 
 ### Flow
 ```
@@ -328,14 +337,28 @@ Agent executes step
   → agent insights → ~/.claude/hive/memories/{agent}/
   → team insights → state/team-memories/{team}/
   → reference insights → append to existing reference memory
-  → next session: memories loaded at spawn time
+  → wiki compilation (incremental, affected topics only)
+  → next session: wiki-first retrieval at spawn time
 ```
+
+### Memory Loading (Wiki-First Retrieval)
+
+At every spawn, agent-spawn step 5 checks the compiled wiki first:
+1. If wiki fresh → navigate topic index → load relevant articles as "Prior Knowledge"
+2. If wiki stale/absent → fall back to L0 keyword scan
+3. Flag memories past TTL with `⚠ last verified: N days ago`
+4. Surface override count at session-start
+
+### Onboarding & Federation
+
+Starter memories ship with the plugin and migrate to the live path on first kickoff. Export/import via MemoryBundle format enables cross-user memory sharing with provenance tracking. See `references/onboarding-guide.md`.
 
 ### What Gets Discarded
 - One-off execution details
 - Ephemeral context
 - Already captured in existing memories
 - Derivable from reading current code
+- Secrets, credentials, or PII
 
 ---
 
@@ -394,7 +417,7 @@ All settings in `skills/hive/hive.config.yaml`:
 | Cycle State | `references/cycle-state-schema.md` | Decision accumulation across phases |
 | Quality Gates | `references/quality-gates.md` | Three-tier gates, trust scoring, validation handshake, control plane |
 | Knowledge Layer | `references/knowledge-layer.md` | External docs, project knowledge, capability catalog |
-| Agent-Ready Checklist | `references/agent-ready-checklist.md` | 8-point story validation before execution |
+| Agent-Ready Checklist | `references/agent-ready-checklist.md` | 9-point story validation before execution |
 | Wireframe Protocol | `references/wireframe-protocol.md` | UI touchpoints during planning |
 | Task Tracking | `references/task-tracking-adapter.md` | Full lifecycle adapter — Linear, GitHub, or local-only |
 | Error Handling | `references/error-handling.md` | Failure categories, per-phase recovery, back-to-planning protocol |
@@ -406,6 +429,11 @@ All settings in `skills/hive/hive.config.yaml`:
 | Configuration | `references/configuration.md` | All config settings and defaults |
 | Agent Teams | `references/agent-teams-guide.md` | Claude Code agent teams mechanics |
 | Cross-Swarm Handoff | `references/cross-swarm-handoff.md` | Artifact transfer between swarms |
+| MemoryStore Interface | `references/memory-store-interface.md` | Memory retrieval/persistence contract (6 methods) |
+| MemoryBundle Format | `references/memory-bundle-format.md` | Export/import federation format |
+| Wiki Compilation | `references/wiki-compilation-guide.md` | Compiled wiki structure, templates, procedure |
+| Onboarding Guide | `references/onboarding-guide.md` | Starter memories, kickoff migration, federation |
+| Cross-Cutting Concerns | `references/cross-cutting-concerns.md` | Per-project concern evaluation (documentation default) |
 
 ---
 
