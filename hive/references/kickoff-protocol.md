@@ -685,12 +685,17 @@ For a new project starting from scratch.
 
 **Process:**
 
-1. **Brainstorming / Ideation**
-   - Ask the user: "What are you building and why?"
-   - Use the analyst agent mindset: target users, core problem, key differentiators
-   - If `$ARGUMENTS` has a description, use as starting point
-   - Facilitate: what's in scope, what's explicitly out
-   - Output: captured product concept with user validation
+1. **Product Discovery (via greenfield-discovery skill)**
+
+   Delegate to the **greenfield-discovery** skill for deep product exploration. This replaces inline brainstorming with a structured, Socratic facilitation conversation.
+
+   - Read and invoke: `skills/hive/skills/greenfield-discovery/SKILL.md`
+   - Use the analyst agent in **creative/exploratory mode** (not requirements-analysis mode)
+   - If `$ARGUMENTS` has a description, pass it as input context to the skill
+   - The skill facilitates a 7-area discovery conversation: problem space, target users, competitive landscape, differentiators, success metrics, MVP boundaries, and technical constraints
+   - Output: structured **Product Discovery Brief** written to `state/planning/product-discovery-brief.md`
+   - The user validates the brief before proceeding to Step 2
+   - The discovery brief feeds directly into Step 2 (Product Brief) as structured input
 
    **1a. Integration Preflight**
 
@@ -766,10 +771,28 @@ For a new project starting from scratch.
    ## Project Kickoff: {project_name}
 
    **Type:** Greenfield
+   **Discovery:** state/planning/product-discovery-brief.md
    **Brief:** state/planning/product-brief.md
    **PRD:** state/planning/prd.md
    **Architecture:** state/planning/architecture.md
    **Epics:** {N} epics with {M} total stories
+
+   ### Discovery Session Summary
+
+   **Problem:** {1-sentence problem statement from discovery brief}
+   **Primary User:** {primary persona from discovery brief}
+   **Platform:** {project-type signal: web/mobile/API/CLI/desktop/hybrid}
+   **Core Differentiator:** {key differentiator from discovery brief}
+
+   **MVP Scope:** {count} features in v1, {count} deferred to v2+
+   - {top 3 v1 features, abbreviated}
+
+   **Key Decisions:**
+   - {decisions reached during discovery conversation}
+
+   **Open Questions:** {count} unresolved — see discovery brief for details
+
+   Source: `state/planning/product-discovery-brief.md`
 
    ### Integration Status
 
