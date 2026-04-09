@@ -9,6 +9,20 @@ Run a structured code review workflow.
 
 **Input:** `$ARGUMENTS` optionally contains a PR number, branch name, or file paths.
 
+## Kickoff Gate
+
+**Before doing anything else**, check whether Hive has been initialized for this project:
+
+1. Check if `state/project-profile.yaml` exists in the project root
+2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
+3. As a secondary check, verify `hive.config.yaml` exists in the project root
+
+If **any** of these checks fail, display this message and **stop** — do not proceed with the review:
+
+> Hive hasn't been set up for this project yet. Run `/hive:kickoff` first — it takes a few minutes and ensures every agent has full context about your codebase, preferences, and available tools.
+
+If all checks pass, proceed normally.
+
 ## Argument Parsing
 
 | Argument | Interpretation | Diff command |

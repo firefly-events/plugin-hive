@@ -9,6 +9,20 @@ Run the test swarm pipeline on a story, PR, or the current codebase.
 
 **Input:** `$ARGUMENTS` optionally contains a story ID, PR number, or "all" for full suite.
 
+## Kickoff Gate
+
+**Before doing anything else**, check whether Hive has been initialized for this project:
+
+1. Check if `state/project-profile.yaml` exists in the project root
+2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
+3. As a secondary check, verify `hive.config.yaml` exists in the project root
+
+If **any** of these checks fail, display this message and **stop** — do not proceed with testing:
+
+> Hive hasn't been set up for this project yet. Run `/hive:kickoff` first — it takes a few minutes and ensures every agent has full context about your codebase, preferences, and available tools.
+
+If all checks pass, proceed normally.
+
 ## Process
 
 Load `hive/workflows/test-swarm.workflow.yaml` and execute the pipeline. Each step has a step file at `hive/workflows/steps/test-swarm/`.

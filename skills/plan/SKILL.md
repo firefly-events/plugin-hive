@@ -9,6 +9,20 @@ Decompose a requirement into an epic with dependency-tracked stories.
 
 **Input:** `$ARGUMENTS` contains the requirement or feature description. Optionally a target codebase path.
 
+## Kickoff Gate
+
+**Before doing anything else**, check whether Hive has been initialized for this project:
+
+1. Check if `state/project-profile.yaml` exists in the project root
+2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
+3. As a secondary check, verify `hive.config.yaml` exists in the project root
+
+If **any** of these checks fail, display this message and **stop** — do not proceed with planning:
+
+> Hive hasn't been set up for this project yet. Run `/hive:kickoff` first — it takes a few minutes and ensures every agent has full context about your codebase, preferences, and available tools.
+
+If all checks pass, proceed normally.
+
 ## Process
 
 ### Phase 0: Assemble Planning Team
