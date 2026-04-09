@@ -1,0 +1,22 @@
+# Meta Team Optimization Ledger
+# Records every optimization attempt and its outcome.
+# Cleanup: entries older than 30 cycles archived to state/meta-team/archive/
+
+entries: []
+  # Each entry records one optimization attempt and its outcome.
+  #
+  # Schema:
+  # - id: string             # format: opt-{date}-{seq} (e.g., opt-2026-04-08-001)
+  #   date: string           # ISO date of the cycle (e.g., 2026-04-08)
+  #   cycle: string          # cycle identifier (e.g., nightly-2026-04-08)
+  #   target: string         # file path being optimized (e.g., hive/agents/researcher.md)
+  #   type: enum             # one of: persona-edit, skill-edit, workflow-edit,
+  #                          #         gate-policy-edit, reference-edit, new-artifact
+  #   description: string    # human-readable summary of the change
+  #   rationale: string      # linked to evidence (why this optimization was attempted)
+  #   metrics_before: object # key-value metric snapshot pre-change (e.g., { sprawl_incidents: 3 })
+  #   metrics_after: object  # key-value metric snapshot post-change (e.g., { sprawl_incidents: 0 })
+  #   verdict: enum          # one of: keep, discard, defer
+  #   promoted: boolean      # true if the change reached the main branch
+  #   commit: string|null    # git SHA if promoted, null otherwise
+  #   reason: string|null    # explanation if discarded or deferred, null if kept

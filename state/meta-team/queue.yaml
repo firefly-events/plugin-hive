@@ -1,0 +1,21 @@
+# Meta Team Optimization Queue
+# Prioritized optimization targets identified by analysis.
+# Cleanup: entries matching recent discarded ledger entries (within 5 cycles) are auto-rejected.
+# Priority scoring: internal-recurring (1) > internal-one-off (2) > memory-pattern (3) > external (4)
+
+targets: []
+  # Each entry is a prioritized optimization target.
+  #
+  # Schema:
+  # - id: string                 # format: target-{date}-{seq} (e.g., target-2026-04-08-001)
+  #   target: string             # file path or Hive concept to optimize
+  #   type: enum                 # one of: persona-edit, skill-edit, workflow-edit,
+  #                              #         gate-policy-edit, reference-edit, new-artifact
+  #   priority: integer          # 1=highest. Scoring: internal-recurring > internal-one-off > external
+  #   description: string        # human-readable summary of the optimization
+  #   source: enum               # one of: internal-analysis, external-research, memory-pattern
+  #   source_attribution: string|list  # file path(s) or URL(s) that sourced this target
+  #   source_evidence: string    # description of the evidence supporting this target
+  #   status: enum               # one of: queued, in-progress, completed, discarded, needs-user-review
+  #   created: string            # ISO datetime (e.g., 2026-04-08T01:15:00Z)
+  #   attempted_count: integer   # incremented on each attempt, starts at 0
