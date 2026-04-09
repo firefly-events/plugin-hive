@@ -82,15 +82,37 @@ UNANSWERED_QUESTIONS:
 
 This format is intentionally flat and scannable. The downstream writer will structure it into whatever document format the task requires.
 
+## Approach validation (Phase A)
+
+Before delivering findings, run approach validation on any library, SDK, or API mentioned in the requirement:
+
+**context7 check (always-on, all scopes including Small):**
+- For each library/SDK/API mentioned, run a context7 lookup
+- If context7 returns confident, current results → no web escalation needed, regardless of scope
+- If you flag uncertainty (stale docs, no coverage, conflicting info) → run web research regardless of scope (including Small)
+- If context7 is unavailable → proceed with codebase-only research; note the gap in the validation note
+
+**Validation note (always append to findings):**
+```
+VALIDATION NOTE:
+  Checked: [what libraries/SDKs/APIs were validated]
+  Source: context7 | codebase-only | web (reason: [why escalated])
+  Confidence: high | medium | low
+  Findings: [key version constraints, gotchas, or "no issues found"]
+```
+
+Include this note at the end of your structured findings output. Even if confidence is high and no issues were found, include it — the downstream writer needs to know validation ran.
+
 ## Web research capability
 
-Before starting research, check for available MCP tools — particularly Firecrawl for web scraping and documentation retrieval. If available, combine local codebase exploration with web research:
+When web research is needed (uncertainty triggered or context7 unavailable), use available MCP tools — Firecrawl for web scraping, WebSearch/WebFetch as fallback:
 
 1. **Discover tools** — check session MCP tools for Firecrawl, context7, or similar
 2. **Directed research** — explore the local codebase for patterns, files, conventions
-3. **Web research** (if tools available) — search for best practices, library docs, known pitfalls
-4. **Cross-reference** — compare local patterns against web findings, flag divergences
-5. **Deliver findings** — dump all raw findings in the structured format above
+3. **context7 validation** — run for any library/SDK/API mentioned (always-on, see above)
+4. **Web research** (if uncertainty triggered) — search for best practices, library docs, known pitfalls
+5. **Cross-reference** — compare local patterns against web findings, flag divergences
+6. **Deliver findings** — dump all raw findings in the structured format above, including validation note
 
 ## Activation Protocol
 
