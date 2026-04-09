@@ -83,3 +83,16 @@ When a new developer joins the team:
 4. **First session-end** compiles the wiki from imported + any new memories
 
 The new member starts with the team's accumulated knowledge instead of a cold start.
+
+## Extended Discovery Schemas
+
+Kickoff Phase 2b adds three sub-phases that populate extended schema sections. These are defined as data contracts in `kickoff-protocol.md` and are optional with sensible defaults until detection logic is implemented.
+
+| Schema Section | File | Populated By | Default |
+|---------------|------|-------------|---------|
+| `code_quality` | project-profile.yaml | Phase 2b-iii | `{linters: [], formatters: [], pre_commit: {framework: null, hooks: []}, code_snippets: []}` |
+| `integrations` | project-profile.yaml | Phase 2b-i | `{cli_tools: {}, mcp_servers: {}, vaults: {}}` |
+| `project_maturity` | project-profile.yaml | Phase 2b-iii | `"not_detected"` |
+| `developer` | hive.config.yaml | Phase 2b-ii | `{pr_style: null, commit_granularity: null, review_depth: null, notes: null}` |
+
+These sections do not affect existing kickoff behavior. They are placeholder contracts consumed by downstream stories (integration-preflight, developer-discovery, cross-cutting-concerns).

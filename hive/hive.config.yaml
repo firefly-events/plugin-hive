@@ -102,7 +102,17 @@ external_models:
       - adversarial-review      # run after Claude review, before optimize/integrate
     # companion_path is auto-detected from the codex plugin if installed
 
+# Developer preferences (populated by Phase 2b-ii: Developer Discovery)
+# These configure how Hive adapts to the developer's working style.
+# All fields are optional — null means "not yet discovered".
+developer:
+  pr_style: null               # single-commit | squash-merge | atomic-prs | bundled
+  commit_granularity: null     # fine (per-change) | medium (per-task) | coarse (per-story)
+  review_depth: null           # thorough | standard | light
+  notes: null                  # free-text developer preferences or workflow notes
+
 # Execution defaults
+# Note: default_methodology can be populated by developer elicitation (Phase 2b-ii)
 execution:
   default_methodology: classic
   parallel_teams: true

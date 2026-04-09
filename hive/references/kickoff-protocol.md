@@ -76,6 +76,49 @@ Now scan the code to fill gaps not covered by documentation:
    - Linear/Jira/YouTrack integration in `.claude/settings`
    - Branch naming conventions (check recent git branches)
 
+### Phase 2b: Extended Discovery (Placeholders)
+
+These sub-phases extend brownfield discovery with deeper project analysis. Each writes to a specific section of the project profile. All new fields are optional with sensible defaults — existing kickoff output is unchanged until detection logic is implemented.
+
+#### Phase 2b-i: Integration Preflight
+
+<!-- TODO: Implement integration detection logic (story: integration-preflight) -->
+<!-- DATA CONTRACT: Writes to project-profile.yaml → integrations: {} -->
+<!-- Detects: CLI tools (linearis, frame0, codex, maestro), MCP servers (firecrawl, context7, posthog, firebase, mobile-mcp), vaults (obsidian) -->
+<!-- Default: integrations: {cli_tools: {}, mcp_servers: {}, vaults: {}} -->
+<!-- Note: This populates integrations.mcp_servers (detected), NOT existing_knowledge.mcp_servers (manually declared) -->
+
+Scan the development environment for available integrations. Check for CLI tools, MCP server configurations, and knowledge vaults. Results inform which Hive capabilities are available during execution.
+
+#### Phase 2b-ii: Developer Discovery
+
+<!-- TODO: Implement developer preference elicitation (story: developer-discovery) -->
+<!-- DATA CONTRACT: Writes to hive.config.yaml → developer: {} -->
+<!-- Discovers: pr_style, commit_granularity, review_depth, notes -->
+<!-- Default: developer: {pr_style: null, commit_granularity: null, review_depth: null, notes: null} -->
+<!-- Also populates: execution.default_methodology via elicitation (currently hardcoded to "classic") -->
+
+Elicit developer preferences for PR workflow, commit style, and review expectations. These preferences configure Hive's execution behavior to match the developer's working style.
+
+#### Phase 2b-iii: Cross-Cutting Concern Generation
+
+<!-- TODO: Implement cross-cutting concern auto-generation (story: cross-cutting-concerns) -->
+<!-- DATA CONTRACT: Writes to project-profile.yaml → code_quality: {} and project_maturity: "" -->
+<!-- Detects: linters, formatters, pre-commit hooks, code patterns; assesses project maturity -->
+<!-- Default: code_quality: {linters: [], formatters: [], pre_commit: {framework: null, hooks: []}, code_snippets: []}; project_maturity: "not_detected" -->
+
+Analyze the codebase for code quality tooling (linters, formatters, pre-commit hooks) and assess project maturity (greenfield, active, maintenance, legacy). Generate cross-cutting concern templates based on discovered patterns.
+
+#### Phase 2b Data Flow Summary
+
+| Sub-phase | Target File | Target Section |
+|-----------|------------|----------------|
+| 2b-i Integration Preflight | project-profile.yaml | `integrations` |
+| 2b-ii Developer Discovery | hive.config.yaml | `developer` |
+| 2b-iii Cross-Cutting Concerns | project-profile.yaml | `code_quality`, `project_maturity` |
+
+---
+
 ### Phase 3: Synthesize Project Profile
 
 Write a structured project profile to `state/project-profile.yaml`. This is what all Hive agents read before starting work.
