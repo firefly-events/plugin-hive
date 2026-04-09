@@ -176,8 +176,20 @@ mkdir -p state/respawn-summaries/
 
 Respawn summaries accumulate during an epic's execution. They are not cleaned up automatically — they serve as an audit trail. Clean up manually or per-epic if disk space is a concern.
 
+## Pre-Shutdown Protocol Safety
+
+**Audit result (hive-workflow-foundation/respawn-audit):** Respawn does NOT bypass the orchestrator's pre-shutdown insight protocol.
+
+Evidence:
+- **Step 1** sends a RESPAWN SIGNAL asking the agent to run the insight capture pass before anything else — this is functionally equivalent to the pre-shutdown message in `hive/references/pre-shutdown-protocol.md`.
+- **Step 2** explicitly requires the agent to write insights before writing the respawn summary.
+- **Step 6** terminates the old agent by withholding further messages (natural termination), NOT via `shutdown_request`. There is no direct `shutdown_request` call in this skill that could bypass the orchestrator.
+
+No protocol change required. The insight-before-shutdown guarantee holds for respawned agents.
+
 ## References
 
 - `hive/references/agent-memory-schema.md` — insight capture protocol
+- `hive/references/pre-shutdown-protocol.md` — pre-shutdown insight protocol (respawn is safe, see above)
 - `skills/hive/skills/agent-spawn/SKILL.md` — agent spawning with persona injection
 - `hive/references/episode-schema.md` — status markers for tracking step completion
