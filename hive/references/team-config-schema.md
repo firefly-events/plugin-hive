@@ -24,11 +24,12 @@ Team configs are project-scoped — they live in `state/` alongside other projec
 name: fullstack-team
 description: Full-stack development team for the project
 lead: team-lead
-methodology: classic
+methodology: classic  # from hive.config.yaml → execution.default_methodology
 
 members:
   - agent: frontend-developer
     role: UI implementation
+    tool_access: [frame0]  # only if Frame0 detected
     domain:
       - path: src/components/**
         read: true
@@ -53,6 +54,7 @@ members:
 
   - agent: tester
     role: Test authoring and execution
+    tool_access: [maestro]  # only if Maestro detected
     domain:
       - path: tests/**
         read: true
@@ -65,6 +67,7 @@ members:
 
   - agent: reviewer
     role: Code review
+    tool_access: [codex]  # only if Codex detected
     # reviewer has no domain override — uses agent default (read-only everywhere)
 
 context:
@@ -72,6 +75,11 @@ context:
     frontend: react-native
     backend: go
     database: postgresql
+  lint_commands:
+    - "npx eslint ."
+  commit_granularity: medium
+  pr_style: squash-merge
+  review_depth: thorough
   notes: |
     Generated from project discovery.
     Add project-specific notes here (frameworks, conventions, etc.).
@@ -99,11 +107,16 @@ List of agents on the team. Each member has:
 - `agent` (required): roster agent name (must exist in `hive/agents/`)
 - `role` (required): one-line description of this agent's role on the team
 - `domain` (optional): project-specific domain overrides. If present, these override the agent's default domain from its frontmatter. If absent, the agent uses its own default domain.
+- `tool_access` (optional): list of integration tools this agent can use (e.g., `[maestro]`, `[frame0]`). Only populated for integrations detected during kickoff. Agents should not reference tools not in this list.
 
 ### context (optional)
 Project-specific context that helps agents understand the codebase:
 
 - `tech_stack`: key technology choices (frontend framework, backend language, database, etc.)
+- `lint_commands`: list of lint commands from discovered linters (e.g., `["npx eslint .", "ruff check ."]`). Populated from `project-profile.yaml → code_quality.linters[].lint_command`. Code agents use these to validate changes before submitting.
+- `commit_granularity`: developer preference for commit size (`fine`, `medium`, `coarse`). From `hive.config.yaml → developer.commit_granularity`.
+- `pr_style`: developer preference for PR structure (`single-commit`, `squash-merge`, `atomic-prs`, `bundled`). From `hive.config.yaml → developer.pr_style`. Relevant for reviewer agents.
+- `review_depth`: developer preference for review thoroughness (`thorough`, `standard`, `light`). From `hive.config.yaml → developer.review_depth`. Relevant for reviewer agents.
 - `notes`: free-form text with project-specific information
 
 ### team_memory_path (required)

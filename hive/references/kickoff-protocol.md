@@ -586,9 +586,23 @@ Based on the project discovery from phases 1-4, generate team config files:
 2. Match domains to roster agents (frontend dir → frontend-developer, backend dir → backend-developer, etc.)
 3. Generate domain restrictions based on actual directory paths discovered
 4. Set tech_stack from discovered technologies
-5. Write team config(s) to `state/teams/{team-name}.yaml`
-6. For large projects, generate multiple specialized teams (e.g., `api-team`, `mobile-team`)
-7. Present configs in the onboarding report for user review
+5. **Integration-driven tool access** — read `project-profile.yaml → integrations` and configure agent tool access:
+   - If **Maestro** detected → add `tool_access: [maestro]` to test agents (tester, test-worker, test-architect)
+   - If **Frame0** detected → add `tool_access: [frame0]` to UI agents (ui-designer, frontend-developer)
+   - If **mobile-mcp** detected → add `tool_access: [mobile-mcp]` to mobile agents
+   - If **codex** detected → add `tool_access: [codex]` to reviewer agent
+   - Only grant tool access for integrations that are actually detected — agents should not reference unavailable tools
+6. **Linter domain restrictions** — read `project-profile.yaml → code_quality.linters[]` and configure code agents:
+   - For each detected linter, add `lint_command` to code agent context (frontend-developer, backend-developer, pair-programmer)
+   - Example: if `eslint` detected with command `npx eslint .`, add to the agent's `context.lint_commands[]`
+   - This enables code agents to run linters before submitting PRs
+7. **Developer methodology** — read `hive.config.yaml → developer` and `execution.default_methodology`:
+   - Set team `methodology` field from `execution.default_methodology` (e.g., `tdd`, `classic`)
+   - Propagate `developer.pr_style` and `developer.review_depth` into reviewer agent context
+   - Propagate `developer.commit_granularity` into all code agent contexts
+8. Write team config(s) to `state/teams/{team-name}.yaml`
+9. For large projects, generate multiple specialized teams (e.g., `api-team`, `mobile-team`)
+10. Present configs in the onboarding report for user review
 
 See `references/team-config-schema.md` for the full format.
 
@@ -617,6 +631,37 @@ See `references/team-config-schema.md` for the full format.
 - E2E: {framework} at {location} — {count} flows
 - Coverage: {tool or "not configured"}
 - Gaps: {specific gaps identified}
+
+### Integration Status
+
+| Integration | Type | Status | Impact |
+|-------------|------|--------|--------|
+| linearis | CLI | {detected/missing} | Task tracking automation |
+| frame0 | CLI | {detected/missing} | UI wireframe generation |
+| codex | CLI | {detected/missing} | Adversarial code review |
+| maestro | CLI | {detected/missing} | Mobile E2E test execution |
+| firecrawl | MCP | {detected/missing} | Web research & scraping |
+| context7 | MCP | {detected/missing} | Library documentation lookup |
+| posthog | MCP | {detected/missing} | Product analytics queries |
+| firebase | MCP | {detected/missing} | Firebase project management |
+| mobile-mcp | MCP | {detected/missing} | Mobile simulator interaction |
+| obsidian | Vault | {detected/missing} | Knowledge base access |
+
+Source: `state/project-profile.yaml → integrations`
+
+### Developer Preferences
+
+- **Methodology:** {methodology or "not yet set"}
+- **PR Style:** {pr_style or "not yet set"}
+- **Commit Granularity:** {commit_granularity or "not yet set"}
+- **Review Depth:** {review_depth or "not yet set"}
+- **Notes:** {notes or "none"}
+
+Source: `hive.config.yaml → developer`
+
+### Cross-Cutting Concerns
+
+Auto-generated {N} concerns. Edit at `state/cross-cutting-concerns.yaml`.
 
 ### Files Created
 - state/project-profile.yaml — comprehensive project profile
