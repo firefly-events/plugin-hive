@@ -692,6 +692,25 @@ For a new project starting from scratch.
    - Facilitate: what's in scope, what's explicitly out
    - Output: captured product concept with user validation
 
+   **1a. Integration Preflight**
+
+   Run the same integration detection as brownfield Phase 2b-i. CLI tools (`linearis`, `frame0`, `codex`, `maestro`) and MCP servers (`firecrawl`, `context7`, `posthog`, `firebase`, `mobile-mcp`) are system-level — they exist regardless of whether a codebase exists. Vaults (`obsidian`) are also system-level.
+
+   - Detect available integrations using the same logic as brownfield (check `which` for CLIs, check MCP server configs for servers, check vault paths)
+   - Write results to `state/project-profile.yaml → integrations`
+   - Results inform which Hive capabilities are available during execution (e.g., Frame0 for wireframes, Maestro for E2E tests)
+
+   **1b. Developer Discovery (Static Defaults)**
+
+   Elicit developer preferences for PR workflow, commit style, and review expectations — identical to brownfield Phase 2b-ii elicitation. However, greenfield discovery uses **static defaults only**:
+
+   - **No test-first heuristic signals** — there is no codebase to analyze
+   - **No linter detection** — there are no config files to scan
+   - **No code snippet extraction** — there is no existing code
+   - All smart-default fields (`test_first_signals`, `code_quality`) are skipped entirely
+   - Elicitation still asks the developer about: `pr_style`, `commit_granularity`, `review_depth`, `methodology`, and `notes`
+   - Write results to `hive.config.yaml → developer` and `execution.default_methodology`
+
 2. **Product Brief**
    - Synthesize into structured brief
    - Sections: Problem, Target Users, Core Features (P0/P1/P2), Success Metrics, Scope Boundaries
@@ -710,6 +729,30 @@ For a new project starting from scratch.
    - Write to `state/planning/architecture.md`
    - Present for user approval
 
+   **4a. Cross-Cutting Concern Auto-Generation (from Architecture Choices)**
+
+   After the user approves the architecture, silently auto-generate cross-cutting concerns. This follows the same generation logic as brownfield Phase 2b-iv, but the input is the **chosen architecture stack** (from `state/planning/architecture.md`), not a discovered codebase.
+
+   - Read the chosen tech stack from the architecture document (frameworks, languages, patterns)
+   - Map to a concern template in `hive/references/examples/` using the same mapping table as brownfield Phase 2b-iv Step 1
+   - If a template matches: idempotent merge into `state/cross-cutting-concerns.yaml` (same algorithm as brownfield — match by `id`, preserve existing, append new)
+   - If no template matches: ensure `documentation` default concern exists
+   - Print summary: `"Auto-generated N concerns for {stack}. Edit at state/cross-cutting-concerns.yaml."`
+
+   **4b. Linter & Formatter Setup Recommendation**
+
+   Since no codebase exists, there are no linter/formatter configs to detect. Instead, **recommend** setup based on the chosen tech stack:
+
+   - Map the chosen language/framework to recommended linters and formatters:
+     - JavaScript/TypeScript → ESLint + Prettier
+     - Python → Ruff (linter + formatter)
+     - Kotlin → detekt + ktlint
+     - Swift → SwiftLint + SwiftFormat
+     - Go → golangci-lint + gofmt (built-in)
+     - Rust → clippy + rustfmt (built-in)
+   - Present as a recommendation (not a detection result): `"Recommended for {stack}: {linter} + {formatter}. Configure these early to establish code quality standards."`
+   - Do **not** write to `project-profile.yaml → code_quality` — there are no detected configs to record. The developer will configure these tools when they scaffold the project.
+
 5. **Epics & Stories**
    - Decompose PRD into epics and stories via `/plugin-hive:plan`
    - Apply agent-ready checklist to every story
@@ -727,6 +770,41 @@ For a new project starting from scratch.
    **PRD:** state/planning/prd.md
    **Architecture:** state/planning/architecture.md
    **Epics:** {N} epics with {M} total stories
+
+   ### Integration Status
+
+   | Integration | Type | Status | Impact |
+   |-------------|------|--------|--------|
+   | linearis | CLI | {detected/missing} | Task tracking automation |
+   | frame0 | CLI | {detected/missing} | UI wireframe generation |
+   | codex | CLI | {detected/missing} | Adversarial code review |
+   | maestro | CLI | {detected/missing} | Mobile E2E test execution |
+   | firecrawl | MCP | {detected/missing} | Web research & scraping |
+   | context7 | MCP | {detected/missing} | Library documentation lookup |
+   | posthog | MCP | {detected/missing} | Product analytics queries |
+   | firebase | MCP | {detected/missing} | Firebase project management |
+   | mobile-mcp | MCP | {detected/missing} | Mobile simulator interaction |
+   | obsidian | Vault | {detected/missing} | Knowledge base access |
+
+   Source: `state/project-profile.yaml → integrations`
+
+   ### Developer Preferences
+
+   - **Methodology:** {methodology or "not yet set"}
+   - **PR Style:** {pr_style or "not yet set"}
+   - **Commit Granularity:** {commit_granularity or "not yet set"}
+   - **Review Depth:** {review_depth or "not yet set"}
+   - **Notes:** {notes or "none"}
+
+   Source: `hive.config.yaml → developer`
+
+   ### Cross-Cutting Concerns
+
+   Auto-generated {N} concerns for {stack}. Edit at `state/cross-cutting-concerns.yaml`.
+
+   ### Recommended Linter Setup
+
+   {linter + formatter recommendation for chosen stack, from Step 4b}
 
    ### Ready for Execution
    Run /plugin-hive:execute {epic-id} to begin development.
