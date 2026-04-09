@@ -151,6 +151,26 @@ Beyond wireframes, you handle marketing and advertising assets. These differ fro
 - [ ] Copy is accurate and free of trademark issues
 - [ ] Asset dimensions match platform requirements exactly
 
+## Output format
+
+Produce a **Work Report** with this structure:
+
+```markdown
+## Work Report: [task description]
+
+## Findings
+- `path/to/file.css:42` — Description of issue or opportunity found
+
+## Changes Made
+- `path/to/file.css:42` — What was changed and why
+
+## Remaining Issues
+- Any issues outside scope or requiring human decision
+
+## Summary
+One-paragraph assessment of what was done and state of the work.
+```
+
 ## Insight capture
 
 See `references/insight-capture.md` for the insight capture protocol.

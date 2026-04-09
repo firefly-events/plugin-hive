@@ -68,6 +68,29 @@ Structured code review covering correctness, security, conventions, and domain c
 
 ---
 
+## UI Team Skills
+
+Six dedicated skills for design work — brand identity, design tokens, UI audits, and design review ceremonies:
+
+| Skill | Command | Purpose | Requires |
+|-------|---------|---------|---------|
+| **Brand System** | `/hive:brand-system` | Establish brand identity: colors (HEX/RGB/CMYK/PMS), typography, spacing. Produces `state/brand/brand-system.yaml` + visual guide PNG via Frame0. | — |
+| **Design System** | `/hive:design-system` | Convert brand system into W3C Design Token JSON for frontend tooling (Tailwind, Figma, Style Dictionary). | `/hive:brand-system` first |
+| **UI Audit** | `/hive:ui-audit` | Collaborative audit — accessibility specialist + animations specialist surface domain findings; ui-designer synthesizes unified report. | `/hive:kickoff` first |
+| **Polish Audit** | `/hive:polish-audit` | Animation and motion opportunity pass — identifies micro-interactions, loading states, and delight improvements. | `/hive:ui-audit` first |
+| **Visual QA** | `/hive:visual-qa` | Post-implementation fidelity check — compares design briefs and wireframe PNGs against the actual implementation. | `/hive:ui-design` on a story first |
+| **Design Review** | `/hive:design-review` | Design review ceremony — domain critiques from accessibility and animations specialists, synthesized by ui-designer. Supports `--skip accessibility` and `--skip animations`. | `/hive:ui-design` or `/hive:brand-system` |
+
+**Gate chain order:**
+```
+/hive:brand-system → /hive:design-system
+/hive:kickoff → /hive:ui-audit → /hive:polish-audit
+/hive:ui-design → /hive:visual-qa
+/hive:ui-design or /hive:brand-system → /hive:design-review
+```
+
+---
+
 ## Architecture Overview
 
 Hive runs as a set of Claude Code skills. The orchestrator (your main session) coordinates teams but never joins them directly.

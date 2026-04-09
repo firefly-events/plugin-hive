@@ -18,6 +18,12 @@ Hive runs as a set of Claude Code skills. The orchestrator is always the main se
 | `/hive:execute` | "execute the epic", "run the workflow" | Execute stories through development phases |
 | `/hive:status` | "what's the status" | Check active workflow state |
 | `/hive:review` | "review this code", "review my changes" | Run structured code review |
+| `/hive:brand-system` | "create brand system", "establish brand identity" | Brand identity: colors (HEX/RGB/CMYK/PMS), typography, spacing. Produces YAML + visual guide PNG. No prerequisites. |
+| `/hive:design-system` | "generate design tokens", "create token file" | Convert brand YAML to W3C Design Token JSON. Requires `/hive:brand-system` first. |
+| `/hive:ui-audit` | "run ui audit", "audit accessibility" | Collaborative audit: accessibility-specialist + animations-specialist + ui-designer synthesis. Requires `/hive:kickoff` first. |
+| `/hive:polish-audit` | "run polish audit", "find animation opportunities" | Animation/motion opportunity pass. Requires `/hive:ui-audit` first. |
+| `/hive:visual-qa` | "run visual qa", "check design fidelity" | Compare design briefs and wireframe PNGs against implementation. Requires `/hive:ui-design` on a story first. |
+| `/hive:design-review` | "run design review", "review the design" | Design review ceremony with domain specialist critiques. Requires `/hive:ui-design` or `/hive:brand-system`. Supports `--skip accessibility` and `--skip animations`. |
 
 ---
 
@@ -201,6 +207,7 @@ Orchestrator (main session — you)
 | **Code Review** | `workflows/code-review.workflow.yaml` | analyze → review → summarize |
 | **Test Swarm** | `workflows/test-swarm.workflow.yaml` | 8-task pipeline: context → baseline → author → validate → execute → bugs → report |
 | **Daily Ceremony** | `workflows/daily-ceremony.workflow.yaml` | standup → planning → execution |
+| **Design Review** | `workflows/design-review.workflow.yaml` | accessibility-critique (optional) → animations-critique (optional) → design-critique → synthesis |
 
 Select development methodology: `/hive:execute {epic} --methodology tdd`
 
@@ -297,6 +304,12 @@ YAML-defined quality rules per workflow at `gate-policies/{workflow}.yaml`. Type
 | Team memories | `state/team-memories/{team}/` | Project-level team knowledge |
 | Team configs | `state/teams/{team-name}.yaml` | Loadable team compositions |
 | Test baselines | `state/test-baseline/{project}/` | Project test knowledge |
+| Audit reports | `state/audits/{audit-type}/{timestamp}/report.md` | Ad-hoc audit output (ui-audit, polish-audit, visual-qa, design-review) |
+| Latest audit pointer | `state/audits/{audit-type}/latest.yaml` | Pointer to most recent completed audit of each type |
+| Design briefs | `state/design/briefs/{story-id}.md` | Stable canonical design briefs (written by ui-design workflow) |
+| Design brief manifest | `state/design/index.yaml` | Lists all brief paths and wireframe export paths (gate file for visual-qa, design-review) |
+| Brand system | `state/brand/brand-system.yaml` | Brand identity data (gate file for design-system, design-review) |
+| Design tokens | `state/brand/tokens.json` | W3C Design Token JSON (produced by design-system skill) |
 | Handoffs | `state/handoffs/{handoff-id}.yaml` | Cross-swarm artifact transfers |
 
 ---

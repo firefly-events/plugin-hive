@@ -41,8 +41,9 @@ Your job is to receive epics, evaluate what's needed, assign work to team leads,
 4. **Assign stories to team leads.** Pass the team config alongside the story. The team lead uses the config for staffing instead of evaluating from scratch.
 5. **Load agent memories.** When assigning agents, read `~/.claude/hive/memories/{agent}/` and filter for memories relevant to the current story. Pass relevant memories to agents alongside their persona and task. See `references/agent-memory-schema.md`.
 6. **Monitor progress** via status markers and team lead reports.
-7. **Evaluate insights at session end.** After execution, review staged insights at `state/insights/` and promote or discard per the criteria in `references/agent-memory-schema.md`.
-8. **Synthesize results** when all stories complete — produce the epic execution report.
+7. **Capture own insights at phase boundaries.** The orchestrator never receives a shutdown signal — it IS the main session. Capture your own insights at natural phase completion points (planning done, execution done, review done). See "Orchestrator Self-Insight Protocol" below.
+8. **Evaluate agent insights at session end.** After execution, review staged insights at `state/insights/` and promote or discard per the criteria in `references/agent-memory-schema.md`.
+9. **Synthesize results** when all stories complete — produce the epic execution report.
 
 ## Team evaluation criteria
 
@@ -130,6 +131,28 @@ Before sending a `shutdown_request` to any agent, follow this protocol to captur
 **Respawn note:** The respawn skill does not bypass this protocol. Respawn's Step 1 already requests insight capture before agent termination, and Step 6 terminates agents via natural message withholding (not `shutdown_request`). The protocol is safe for respawned agents. See `skills/hive/skills/respawn/SKILL.md#pre-shutdown-protocol-safety`.
 
 Full spec: `hive/references/pre-shutdown-protocol.md`.
+
+## Orchestrator Self-Insight Protocol
+
+The orchestrator is the main session — it never receives a shutdown signal and never gets a pre-shutdown prompt. But it accumulates non-obvious insights throughout planning, execution, and review that are valuable for future sessions.
+
+**When to capture:** At every phase boundary — when a major phase completes and before moving to the next. These are the natural break points where context is freshest:
+
+| Phase boundary | Trigger |
+|---------------|---------|
+| Planning complete | Epic confirmed, stories written, planning team shut down |
+| Execution complete | All stories implemented, before review begins |
+| Review complete | Review verdicts in, fixes applied, before commit |
+| Session end | All work done, before final report to user |
+
+**What to capture:** Write non-obvious patterns, pitfalls, and reusable coordination strategies to `~/.claude/hive/memories/orchestrator/`. Use the same insight format as agent insights (see `references/insight-capture.md`). Only capture what is:
+- Not derivable from reading the code or git history
+- Likely to be useful in a future session with different stories
+- Surprising or counterintuitive (not "read files before editing")
+
+**How to capture:** Write directly to `~/.claude/hive/memories/orchestrator/{epic-id}-{phase}-insights.md`. No staging — the orchestrator evaluates its own insights immediately rather than staging them for later review.
+
+**Do not skip this.** The orchestrator's coordination insights (team composition decisions, agent communication patterns, protocol gaps discovered) are the highest-value memories in the system. Agents capture implementation details; only the orchestrator captures orchestration patterns.
 
 ## Circuit breakers
 
@@ -267,6 +290,10 @@ All paths relative to repo root:
 | Team configs | `state/teams/{team-name}.yaml` |
 | Team memories | `state/team-memories/{team-name}/` |
 | Orchestrator skill | `skills/hive/MAIN.md` |
+| Ad-hoc audit output | `state/audits/{audit-type}/{timestamp}/` |
+| Latest audit pointer | `state/audits/{audit-type}/latest.yaml` |
+| Design brief per story | `state/design/briefs/{story-id}.md` |
+| Design brief manifest | `state/design/index.yaml` |
 
 Reference docs (read when needed, don't inline):
 - `skills/hive/references/episode-schema.md` — status marker format
