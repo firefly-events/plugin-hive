@@ -80,6 +80,8 @@ Now scan the code to fill gaps not covered by documentation:
 
 These sub-phases extend brownfield discovery with deeper project analysis. Each writes to a specific section of the project profile. All new fields are optional with sensible defaults — existing kickoff output is unchanged until detection logic is implemented.
 
+**Execution order:** 2b-i (Integration Preflight) and 2b-iii (Code Quality) run first (parallel — no dependency on each other). Then 2b-ii (Developer Discovery) runs using test-first signals from 2b-iii for smart defaults. Finally 2b-iv (Cross-Cutting Concerns) runs using outputs from all prior phases.
+
 #### Phase 2b-i: Integration Preflight
 
 <!-- TODO: Implement integration detection logic (story: integration-preflight) -->
@@ -105,13 +107,13 @@ Before eliciting, check `hive.config.yaml` for existing developer preferences:
 1. Read the `developer:` section from `hive.config.yaml`
 2. If **any** of `pr_style`, `commit_granularity`, or `review_depth` are non-null → **skip elicitation entirely**
 3. Print: `Developer preferences already configured — skipping discovery.`
-4. Continue to Phase 2b-iii
+4. Continue to Phase 2b-iv
 
 This ensures `kickoff` can be re-run without re-asking questions the developer already answered.
 
 ##### Step 1: Infer Smart Defaults from Test-First Signals
 
-Read `code_quality.test_first_signals` from `project-profile.yaml` (populated by Phase 2b-iii if it ran first, or empty if not yet available). Apply this decision table to determine the methodology default:
+Read `code_quality.test_first_signals` from `project-profile.yaml` (populated by Phase 2b-iii which runs before this phase). Apply this decision table to determine the methodology default:
 
 | Priority | Condition | Default Methodology |
 |----------|-----------|-------------------|
@@ -124,7 +126,7 @@ Read `code_quality.test_first_signals` from `project-profile.yaml` (populated by
 Rules:
 - BDD wins over TDD when both signals are present (BDD is a superset of TDD practices)
 - When signals conflict, prefer the higher-priority row
-- If `test_first_signals` is missing entirely (Phase 2b-iii hasn't run), default to **Classic**
+- If `test_first_signals` is missing entirely (unexpected — Phase 2b-iii should have run first), default to **Classic**
 
 Also infer a PR style default from recent git history:
 - Run `git log --oneline -20` and check merge patterns
@@ -203,7 +205,7 @@ Got it! Your preferences are saved to hive.config.yaml.
 You can update them anytime by editing the file directly.
 ```
 
-Continue to Phase 2b-iii.
+Continue to Phase 2b-iv.
 
 #### Phase 2b-iii: Code Quality & Linter Detection
 

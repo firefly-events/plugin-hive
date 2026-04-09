@@ -15,7 +15,7 @@ Decompose a requirement into an epic with dependency-tracked stories.
 
 1. Check if `state/project-profile.yaml` exists in the project root
 2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
-3. As a secondary check, verify `hive.config.yaml` exists in the project root
+3. As a secondary check, verify `hive.config.yaml` exists (check both `hive/hive.config.yaml` and `hive.config.yaml` in the project root — either location is valid)
 
 If **any** of these checks fail, display this message and **stop** — do not proceed with planning:
 

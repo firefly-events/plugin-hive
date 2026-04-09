@@ -39,7 +39,9 @@ For each worktree (proposal):
    - For each modified file:
      - `original_lines` = line count on main branch
      - `modified_lines` = line count in worktree
-     - If `modified_lines < (original_lines * 0.5)`: FAIL — destructive
+     - `removed_lines` = count of lines present in original but absent in modified (use `git diff --stat` or line-by-line comparison)
+     - If `removed_lines > (original_lines * 0.5)`: FAIL — destructive (even if new lines were added to replace them)
+     - If `modified_lines < (original_lines * 0.5)`: FAIL — destructive (catches pure deletions)
    - For each deleted file: FAIL — destructive
 
 2. **Structural validation**
