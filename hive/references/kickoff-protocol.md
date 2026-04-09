@@ -100,14 +100,157 @@ Scan the development environment for available integrations. Check for CLI tools
 
 Elicit developer preferences for PR workflow, commit style, and review expectations. These preferences configure Hive's execution behavior to match the developer's working style.
 
-#### Phase 2b-iii: Cross-Cutting Concern Generation
+#### Phase 2b-iii: Code Quality & Linter Detection
 
-<!-- TODO: Implement cross-cutting concern auto-generation (story: cross-cutting-concerns) -->
+Detect code quality tooling, extract representative code snippets, and collect test-first heuristic signals. All results write to `project-profile.yaml → code_quality`. Idempotent on re-run: merge new discoveries, preserve existing entries (including manual edits).
+
 <!-- DATA CONTRACT: Writes to project-profile.yaml → code_quality: {} and project_maturity: "" -->
-<!-- Detects: linters, formatters, pre-commit hooks, code patterns; assesses project maturity -->
 <!-- Default: code_quality: {linters: [], formatters: [], pre_commit: {framework: null, hooks: []}, code_snippets: []}; project_maturity: "not_detected" -->
 
-Analyze the codebase for code quality tooling (linters, formatters, pre-commit hooks) and assess project maturity (greenfield, active, maintenance, legacy). Generate cross-cutting concern templates based on discovered patterns.
+##### Step 1: Linter & Formatter Detection (8 patterns)
+
+Scan for config files across 4 ecosystems. V1 ceiling: 2 patterns per ecosystem = 8 total.
+
+| Ecosystem | Pattern 1 | Pattern 2 |
+|-----------|-----------|-----------|
+| **JavaScript** | `.eslintrc.*` (any extension: `.js`, `.cjs`, `.json`, `.yml`) | `eslint.config.js` or `eslint.config.mjs` (flat config) |
+| **Python** | `pyproject.toml` containing `[tool.ruff]` | `.flake8` |
+| **Kotlin** | `detekt.yml` or `.detekt.yml` | `build.gradle.kts` containing `ktlint` or `spotless` plugin |
+| **Swift** | `.swiftlint.yml` | `.swiftformat` |
+
+For each match found:
+
+1. **Extract tool name** — the linter/formatter name (e.g., `eslint`, `ruff`, `detekt`, `swiftlint`)
+2. **Record config path** — relative path to the config file
+3. **Infer lint command** — best-guess run command (e.g., `npx eslint .`, `ruff check .`, `./gradlew detekt`, `swiftlint`)
+4. **Write to** `code_quality.linters[]`:
+
+```yaml
+code_quality:
+  linters:
+    - name: eslint
+      config_path: .eslintrc.js
+      lint_command: "npx eslint ."
+      ecosystem: javascript
+    - name: ruff
+      config_path: pyproject.toml
+      lint_command: "ruff check ."
+      ecosystem: python
+```
+
+Also detect formatters alongside linters — common pairs:
+
+| Ecosystem | Formatter pattern |
+|-----------|-------------------|
+| **JavaScript** | `.prettierrc`, `.prettierrc.*`, `prettier.config.js` |
+| **Python** | `pyproject.toml` containing `[tool.black]` or `[tool.ruff.format]` |
+| **Kotlin** | `spotless` plugin in `build.gradle.kts` |
+| **Swift** | `.swiftformat` (also a formatter) |
+
+Write formatter entries to `code_quality.formatters[]` with the same shape as linters.
+
+**If no linters or formatters are found**, write empty arrays — do not omit the keys:
+```yaml
+code_quality:
+  linters: []
+  formatters: []
+```
+
+##### Step 2: Pre-Commit Hook Detection
+
+Check for pre-commit hook frameworks in priority order:
+
+1. **Husky** — `package.json` containing `"husky"` in `devDependencies`, OR `.husky/` directory exists
+2. **pre-commit** — `.pre-commit-config.yaml` exists
+3. **Lefthook** — `lefthook.yml` or `.lefthook.yml` exists
+
+For the first framework found:
+
+1. **Record framework name** — `husky`, `pre-commit`, or `lefthook`
+2. **List hook names** — parse the config to extract registered hooks (e.g., `lint-staged`, `commitlint`, `prettier --check`)
+3. **Write to** `code_quality.pre_commit`:
+
+```yaml
+code_quality:
+  pre_commit:
+    framework: husky
+    hooks:
+      - lint-staged
+      - commitlint
+```
+
+**If no pre-commit framework is found**, write null/empty defaults:
+```yaml
+code_quality:
+  pre_commit:
+    framework: null
+    hooks: []
+```
+
+##### Step 3: Code Snippet Extraction
+
+Select 2–3 representative source files that demonstrate the project's coding patterns. Prefer:
+- An entry point (e.g., `main.kt`, `index.ts`, `app.py`, `App.swift`)
+- A service or repository file (business logic)
+- A component or view file (if UI exists)
+
+For each selected file, extract an **annotated pattern** — NOT verbatim file content:
+
+```yaml
+code_quality:
+  code_snippets:
+    - path: src/services/UserService.kt
+      pattern: repository-pattern
+      annotation: "Uses constructor-injected repository with suspend functions; returns Result<T> wrapper"
+      lines: "12-45"
+    - path: src/components/Dashboard.tsx
+      pattern: react-component
+      annotation: "Functional component with useQuery hook; follows container/presenter split"
+      lines: "1-38"
+```
+
+Each snippet entry must have:
+- `path` — relative file path
+- `pattern` — short pattern name (e.g., `repository-pattern`, `react-component`, `fastapi-router`)
+- `annotation` — 1–2 sentence description of what the pattern demonstrates
+- `lines` — line range showing the representative section (keep under 40 lines)
+
+##### Step 4: Test-First Heuristic Signals
+
+Collect 5 signal types that indicate whether the project follows test-first practices. These are **data only** — collected here, consumed by the developer-discovery story (Phase 2b-ii) for smart defaults.
+
+| Signal | How to detect | Value |
+|--------|---------------|-------|
+| **co_located_tests** | Test files adjacent to source (e.g., `UserService.test.ts` next to `UserService.ts`) | `true` / `false` |
+| **test_before_source** | Compare git timestamps: do test files predate or match source file creation? Sample 3–5 pairs via `git log --diff-filter=A --format=%aI -- <file>` | `true` / `false` / `inconclusive` |
+| **test_runner_in_precommit** | Pre-commit hooks include a test runner (e.g., `jest`, `pytest`, `gradle test`) | `true` / `false` |
+| **bdd_keywords** | Source or test files contain BDD keywords: `describe`, `it`, `given`, `when`, `then`, `Feature:`, `Scenario:` | `true` / `false` |
+| **test_absence** | No test files found at all (from Phase 2 test infrastructure scan) | `true` / `false` |
+
+Write to `code_quality.test_first_signals`:
+
+```yaml
+code_quality:
+  test_first_signals:
+    co_located_tests: false
+    test_before_source: inconclusive
+    test_runner_in_precommit: true
+    bdd_keywords: true
+    test_absence: false
+```
+
+##### Step 5: Idempotent Merge Logic
+
+When Phase 2b-iii runs on a project that already has `code_quality` data:
+
+1. **Read existing** `code_quality` section from `project-profile.yaml`
+2. **Match linters by name** — if a linter entry with the same `name` exists, preserve the existing entry (it may have been manually edited)
+3. **Append new** — any newly detected linter not already present gets appended
+4. **Never remove** — entries in the existing file that are NOT re-detected are kept (user may have added them manually)
+5. **Same logic** applies to `formatters[]`, `pre_commit.hooks[]`, and `code_snippets[]` (match snippets by `path`)
+6. **Scalar fields** (`pre_commit.framework`, `test_first_signals.*`) — overwrite with latest detection, unless existing value was manually changed (check for a `# manual` comment annotation)
+
+This ensures `kickoff` can be re-run safely without losing manual curation.
 
 #### Phase 2b Data Flow Summary
 
@@ -115,7 +258,7 @@ Analyze the codebase for code quality tooling (linters, formatters, pre-commit h
 |-----------|------------|----------------|
 | 2b-i Integration Preflight | project-profile.yaml | `integrations` |
 | 2b-ii Developer Discovery | hive.config.yaml | `developer` |
-| 2b-iii Cross-Cutting Concerns | project-profile.yaml | `code_quality`, `project_maturity` |
+| 2b-iii Code Quality & Linter Detection | project-profile.yaml | `code_quality` (linters, formatters, pre_commit, code_snippets, test_first_signals), `project_maturity` |
 
 ---
 
