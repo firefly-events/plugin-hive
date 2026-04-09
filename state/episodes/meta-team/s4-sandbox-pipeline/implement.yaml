@@ -1,0 +1,10 @@
+story: s4-sandbox-pipeline
+phase: implement
+status: complete
+date: "2026-04-08"
+summary: |
+  Created hive/references/meta-team-sandbox.md — comprehensive sandbox pipeline reference.
+  Covers worktree isolation, destructiveness enforcement (>50% threshold), structural
+  validation, heuristic analysis (advisory flags), promotion (cherry-pick), rollback
+  (per-commit revert), deferred patch preservation, and ledger integration.
+  Updated step files 04-implementation, 05-testing, 07-promotion with sandbox details.
