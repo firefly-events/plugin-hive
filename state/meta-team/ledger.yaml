@@ -15,7 +15,7 @@
     - skills/hive/agents/memories/team-lead/: 2 starter memories (pitfall + pattern)
     - skills/hive/agents/memories/architect/: 2 starter memories (pitfall + pattern)
     - skills/hive/agents/memories/tpm/: 2 starter memories (pattern × 2)
-  commit: pending
+  commit: 6a23b42067591ddfba941869a020e8ec6b1bc4b6
   notes: >
     First cycle. Full bootstrap of the meta-team infrastructure from scratch. All 7 findings
     addressed. 13 roster agents still have zero starter memories — analyst, tester,
