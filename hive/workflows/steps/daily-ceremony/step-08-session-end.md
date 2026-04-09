@@ -33,6 +33,30 @@ Evaluate staged insights for promotion to agent memories, clean up staging, and 
 
 ## TASK SEQUENCE
 
+### 0. Check for forced-stop interrupts
+
+Before evaluating insights, check whether any previous session was interrupted by a forced stop (Ctrl+C):
+
+1. Check whether `state/interrupts/` exists. If it does not exist, skip this section silently.
+2. If it exists, list all `.yaml` files in `state/interrupts/`.
+3. If any sentinel files exist, surface a report to the user:
+
+```
+⚠️  INTERRUPTED SESSIONS DETECTED
+
+The following sessions were interrupted before completing cleanly:
+
+{for each sentinel file:}
+  [{timestamp}] — Epic: {active_epic | none}, Story: {active_story | none}, Step: {active_step | none}
+  File: state/interrupts/{filename}
+
+These files have NOT been deleted. To clear them, delete the files manually after reviewing.
+```
+
+4. Ask the user: "Do you want to trigger recovery for any of these, or acknowledge and continue?"
+5. **Do NOT auto-delete sentinel files** — the user must acknowledge them explicitly.
+6. After the user responds, continue to step 1 regardless of their answer (recovery is out of scope for this step — just surface the information).
+
 ### 1. Scan for staged insights
 List all files under `state/insights/`. Insights are organized by `{epic-id}/{story-id}/` and follow the staged insight format:
 - `type` — pattern, pitfall, override, codebase, process

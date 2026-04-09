@@ -2,5 +2,19 @@
   "name": "plugin-hive",
   "description": "Hive — workflow orchestration for Claude Code. Multi-agent swarms for planning, development, testing, and code review with quality gates, agent memories, and daily ceremony workflow.",
   "version": "1.3.0",
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p state/interrupts && ts=$(date -u +%Y-%m-%dT%H:%M:%SZ) && printf 'interrupted_at: \"%s\"\\ninterruption_type: forced_stop\\nactive_epic: null\\nactive_story: null\\nactive_step: null\\n' \"$ts\" > \"state/interrupts/$ts.yaml\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }
