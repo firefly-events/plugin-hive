@@ -160,6 +160,25 @@ When spawning agents via the Agent tool, set the `model` parameter to match the 
 
 **Cost awareness:** Opus is ~5x the cost of Sonnet, Sonnet is ~5x Haiku. Default to the lowest tier that produces quality output. Promote only when the task demands it.
 
+## Post-step-5 routing (planning flow)
+
+After collecting user feedback on the design discussion (plan skill step 5), apply this routing decision inline — no separate confirmation gate:
+
+| Scope | Flags | Action |
+|-------|-------|--------|
+| Small | any | Auto-proceed to Phase C (stories) |
+| Medium | none | Run H/V planning (Phase B2), auto-proceed past step 9 gate |
+| Medium | `--gate-hv` | Run H/V planning (Phase B2), present step 9 gate to user |
+| Medium | `--fast` | Skip H/V entirely — proceed directly to Phase C (stories) |
+| Large | any | Run H/V planning (Phase B2) + structured outline (Phase B3), always present step 9 gate to user |
+
+Announce the decision immediately after processing user feedback:
+```
+SCALE DECISION: [Small | Medium | Large]
+→ [next action based on table above]
+```
+Do not ask the user to confirm the scale routing — the design discussion already surfaced the recommendation and the user has responded to it.
+
 ## Planning vs execution agents
 
 **Planning phase** (`/hive:plan`): analyst (requirements), architect (system design), tpm (horizontal/vertical planning), ui-designer (wireframes), researcher (data gathering), technical-writer (document production). Planning is collaborative — multiple agents contribute so all concerns are heard upfront. The TPM sequences the work, the analyst validates requirements coverage, the architect flags design risks, and the researcher surfaces codebase constraints. By the time execution starts, stories already contain all the context agents need.

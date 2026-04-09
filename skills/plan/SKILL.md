@@ -104,21 +104,20 @@ If all checks pass, proceed normally.
    - Flag any risks or approaches they disagree with
    - Confirm or override the scale assessment recommendation
 
-6. **Evaluate scale.** Based on the design discussion's scale assessment AND user feedback, determine the planning depth:
+   After collecting user feedback, evaluate the scale and **announce the routing decision inline** — no separate confirmation step:
 
    ```
-   SCALE ASSESSMENT: [Small | Medium | Large]
-   
-   Small  → Proceed directly to stories (Phase C)
-   Medium → Horizontal scan + Vertical slice plan, then stories (Phase B2 → C)
-   Large  → H scan + V slice plan + Structured outline, then stories (Phase B2 → B3 → C)
-   ```
+   SCALE DECISION: [Small | Medium | Large]
 
-   Present the recommendation and let the user confirm or override.
+   Small  → Proceeding directly to stories (Phase C)
+   Medium → Running H/V planning, then stories (Phase B2 → C)
+   Medium + --fast → Skipping H/V entirely, proceeding to stories (Phase C)
+   Large  → Running H/V planning + structured outline, then stories (Phase B2 → B3 → C)
+   ```
 
    **Routing rules:**
    - **Small** (~5-15 min, 1-3 files, single layer): design discussion is sufficient context → Phase C
-   - **Medium** (multi-file, multiple layers, cross-stack): needs H/V planning to slice correctly → Phase B2
+   - **Medium** (multi-file, multiple layers, cross-stack): needs H/V planning to slice correctly → Phase B2 (unless `--fast`, which skips H/V entirely)
    - **Large** (multi-system, migration, long-horizon): needs full H/V + structured outline with elicitation → Phase B2 + B3
 
 ### Phase B2: Horizontal + Vertical Planning (medium and large scope)
@@ -132,14 +131,19 @@ If all checks pass, proceed normally.
 
 8. **Collaborative review gate.** Run the collaborative review gate on the H/V outputs. `SendMessage` both documents to all active team agents. The researcher verifies findings are accurately reflected, the architect (if present) validates technical soundness, and the UI designer (if present) flags any UI layer gaps. Collect feedback, have the writer revise if needed.
 
-9. **Present H/V plans to user.** Show both documents, including a summary of team review findings. The user reviews:
+9. **H/V gate (conditional).** Behavior depends on scope and flags:
+
+   - **Large scope:** Always present both documents to the user for review. Collect feedback, incorporate, then proceed to Phase B3.
+   - **Medium scope + `--gate-hv`:** Present both documents to the user for review. Collect feedback, incorporate, then proceed to Phase C.
+   - **Medium scope (default, no `--gate-hv`):** Auto-proceed to Phase C without presenting a gate — the collaborative review in step 8 is sufficient.
+   - **Medium scope + `--fast`:** H/V planning was skipped entirely at step 5 — this step is never reached.
+
+   **When the gate runs (large or medium + `--gate-hv`), the user reviews:**
    - Are the layers correctly identified? (horizontal)
    - Are the slice boundaries logical? (vertical)
    - Is the first slice thin enough to be a real proof of concept?
    - Does each slice produce a genuinely working state?
    - Are deferred items acceptable?
-
-   Incorporate feedback. If scale is medium → proceed to Phase C. If large → continue to B3.
 
 ### Phase B3: Structured Outline (large scope only)
 
