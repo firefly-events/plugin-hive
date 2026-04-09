@@ -158,6 +158,7 @@ The vertical plan is moldable — unlike a rigid horizontal rollout, individual 
 
 ## Output Guidelines
 
+- Write the finished document to `state/epics/{epic-id}/docs/vertical-plan.md`
 - Every slice MUST have a "WHAT WORKS AFTER THIS STEP" statement — this is the invariant
 - Every slice MUST have a "VERIFIED BY" statement — how we confirm this slice works (tools, test types, platforms)
 - Every slice MUST have a "COMMIT REPRESENTS" statement — what the commit message would describe

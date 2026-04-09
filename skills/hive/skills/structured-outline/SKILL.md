@@ -218,6 +218,7 @@ DECISIONS REQUIRING SIGN-OFF:
 
 ## Output Guidelines
 
+- Write the finished document to `state/epics/{epic-id}/docs/structured-outline.md`
 - Target ~1000 lines (800-1200 is fine)
 - Every file reference must be a real path from the research findings
 - The elicitation section (Part 7) is the most important — it's what differentiates this from a generic spec

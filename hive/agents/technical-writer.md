@@ -102,6 +102,12 @@ This agent is short-lived. After delivering the document:
 
 For full receiver protocol details, see `hive/references/pre-shutdown-protocol.md`.
 
+## Output paths
+
+All planning documents are written to `state/epics/{epic-id}/docs/{document-type}.md`. Use the epic ID from the task context to construct the path before writing.
+
+**Research brief** has no sub-skill file. When tasked with producing a research brief, use the research-brief pattern from memory and write to `state/epics/{epic-id}/docs/research-brief.md`. The format: synthesize the researcher's raw findings into a structured brief with key files, patterns, constraints, risks, and open questions.
+
 ## Document formats
 
 The specific format is determined by the injected skill. Without a skill, default to:

@@ -480,6 +480,22 @@ All diagrams in Hive output (dependency graphs, flow diagrams) use **Mermaid** s
 - Arrow syntax: `story-a --> story-b` means story-b depends on story-a
 - Keep node IDs matching story IDs for consistency
 
+## Planning Document Paths
+
+All planning documents are written to `state/epics/{epic-id}/docs/{document-type}.md`.
+
+| Document type | Sub-skill | Output path |
+|---------------|-----------|-------------|
+| research-brief | None (no sub-skill — see note) | `state/epics/{epic-id}/docs/research-brief.md` |
+| design-discussion | `skills/hive/skills/design-discussion/SKILL.md` | `state/epics/{epic-id}/docs/design-discussion.md` |
+| horizontal-plan | `skills/hive/skills/horizontal-plan/SKILL.md` | `state/epics/{epic-id}/docs/horizontal-plan.md` |
+| vertical-plan | `skills/hive/skills/vertical-plan/SKILL.md` | `state/epics/{epic-id}/docs/vertical-plan.md` |
+| structured-outline | `skills/hive/skills/structured-outline/SKILL.md` | `state/epics/{epic-id}/docs/structured-outline.md` |
+
+**Note on research-brief:** No sub-skill file exists for the research brief format. The technical writer produces it using the research-brief pattern from memory, based on raw findings from the researcher. Output path: `state/epics/{epic-id}/docs/research-brief.md`. See `hive/agents/technical-writer.md`.
+
+Existing planning documents at the `state/` root are not moved — this convention applies to new planning sessions going forward.
+
 ## Key References
 
 - `hive/references/agent-ready-checklist.md` — 9-point story validation
