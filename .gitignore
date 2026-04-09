@@ -9,3 +9,4 @@ agents/memories/
 .history/
 .DS_Store
 *.log
+.claude/*.lock
