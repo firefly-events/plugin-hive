@@ -1,0 +1,167 @@
+name: meta-team-cycle
+description: >
+  Autonomous nightly self-improvement cycle for the Hive plugin codebase.
+  Runs unattended at 3 AM CDT. Analyzes, proposes, implements, and promotes
+  targeted improvements within the constraints defined in the meta-team charter.
+version: "1.0.0"
+
+steps:
+  - id: boot
+    agent: orchestrator
+    task: >
+      Initialize the meta-team cycle. Load the charter, previous ledger state,
+      and any staged work from a prior incomplete cycle.
+    step_file: hive/workflows/steps/meta-team-cycle/step-01-boot.md
+    outputs:
+      - name: cycle_id
+        type: string
+      - name: prior_ledger
+        type: json
+      - name: boot_report
+        type: string
+
+  - id: analysis
+    agent: researcher
+    task: >
+      Analyze the Hive codebase for improvement opportunities: missing files,
+      broken cross-references, incomplete schemas, gaps in agent memories, and
+      clarity issues in step files.
+    step_file: hive/workflows/steps/meta-team-cycle/step-02-analysis.md
+    depends_on:
+      - boot
+    inputs:
+      - name: cycle_id
+        source: step_output
+        step_id: boot
+        output_name: cycle_id
+    outputs:
+      - name: findings
+        type: json
+      - name: analysis_report
+        type: string
+
+  - id: proposal
+    agent: architect
+    task: >
+      Review analysis findings and produce a ranked proposal list. Each proposal
+      includes rationale, risk level, and an implementation plan within charter
+      constraints.
+    step_file: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
+    depends_on:
+      - analysis
+    inputs:
+      - name: findings
+        source: step_output
+        step_id: analysis
+        output_name: findings
+    outputs:
+      - name: approved_proposals
+        type: json
+      - name: skipped_proposals
+        type: json
+
+  - id: implementation
+    agent: developer
+    task: >
+      Implement each approved proposal in sequence. Write files, add sections,
+      create memories. Record each change with before/after notes.
+    step_file: hive/workflows/steps/meta-team-cycle/step-04-implementation.md
+    depends_on:
+      - proposal
+    inputs:
+      - name: approved_proposals
+        source: step_output
+        step_id: proposal
+        output_name: approved_proposals
+    outputs:
+      - name: changes_made
+        type: json
+      - name: implementation_report
+        type: string
+
+  - id: testing
+    agent: tester
+    task: >
+      Validate all changes: verify cross-references resolve, schemas are valid,
+      step files follow the required structure, and no existing content was
+      broken.
+    step_file: hive/workflows/steps/meta-team-cycle/step-05-testing.md
+    depends_on:
+      - implementation
+    inputs:
+      - name: changes_made
+        source: step_output
+        step_id: implementation
+        output_name: changes_made
+    outputs:
+      - name: test_results
+        type: json
+      - name: validation_report
+        type: string
+
+  - id: evaluation
+    agent: reviewer
+    task: >
+      Evaluate results against charter objectives. Score each change.
+      Determine which changes pass quality bar and which need revision.
+    step_file: hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
+    depends_on:
+      - testing
+    inputs:
+      - name: changes_made
+        source: step_output
+        step_id: implementation
+        output_name: changes_made
+      - name: test_results
+        source: step_output
+        step_id: testing
+        output_name: test_results
+    outputs:
+      - name: evaluation_results
+        type: json
+      - name: verdict
+        type: string
+
+  - id: promotion
+    agent: orchestrator
+    task: >
+      Promote approved changes. Write insights to starter memory staging.
+      Revert any changes that didn't meet quality bar.
+    step_file: hive/workflows/steps/meta-team-cycle/step-07-promotion.md
+    depends_on:
+      - evaluation
+    inputs:
+      - name: evaluation_results
+        source: step_output
+        step_id: evaluation
+        output_name: evaluation_results
+    outputs:
+      - name: promoted_changes
+        type: json
+      - name: reverted_changes
+        type: json
+
+  - id: close
+    agent: orchestrator
+    task: >
+      Close the cycle. Update cycle-state.yaml and ledger.yaml. Prepare morning
+      summary. Commit all changes.
+    step_file: hive/workflows/steps/meta-team-cycle/step-08-close.md
+    depends_on:
+      - promotion
+    inputs:
+      - name: cycle_id
+        source: step_output
+        step_id: boot
+        output_name: cycle_id
+      - name: promoted_changes
+        source: step_output
+        step_id: promotion
+        output_name: promoted_changes
+      - name: reverted_changes
+        source: step_output
+        step_id: promotion
+        output_name: reverted_changes
+    outputs:
+      - name: morning_summary
+        type: string

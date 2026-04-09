@@ -1,0 +1,105 @@
+name: meta-team
+description: >
+  Autonomous nightly self-improvement team for the Hive plugin codebase.
+  Executes the meta-team-cycle workflow. Each agent has a specific role in
+  the analysis → proposal → implementation → test → review pipeline.
+lead: orchestrator
+methodology: classic
+
+members:
+  - agent: researcher
+    role: Codebase analysis — find missing files, broken references, schema gaps
+    domain:
+      - path: hive/**
+        read: true
+        write: false
+        delete: false
+      - path: skills/**
+        read: true
+        write: false
+        delete: false
+      - path: state/**
+        read: true
+        write: false
+        delete: false
+
+  - agent: architect
+    role: Proposal design — rank findings, design solutions within charter constraints
+    domain:
+      - path: hive/**
+        read: true
+        write: false
+        delete: false
+      - path: state/meta-team/**
+        read: true
+        write: true
+        delete: false
+
+  - agent: developer
+    role: Implementation — create new files, add sections, write memories
+    domain:
+      - path: hive/references/**
+        read: true
+        write: true
+        delete: false
+      - path: hive/agents/**
+        read: true
+        write: true
+        delete: false
+      - path: hive/workflows/**
+        read: true
+        write: true
+        delete: false
+      - path: skills/hive/agents/memories/**
+        read: true
+        write: true
+        delete: false
+      - path: skills/**
+        read: true
+        write: true
+        delete: false
+      - path: state/teams/**
+        read: true
+        write: true
+        delete: false
+
+  - agent: tester
+    role: Validation — verify cross-references, schema compliance, structural correctness
+    domain:
+      - path: hive/**
+        read: true
+        write: false
+        delete: false
+      - path: skills/**
+        read: true
+        write: false
+        delete: false
+      - path: state/**
+        read: true
+        write: false
+        delete: false
+
+  - agent: reviewer
+    role: Quality gate — evaluate changes against charter objectives
+    domain:
+      - path: hive/**
+        read: true
+        write: false
+        delete: false
+      - path: skills/**
+        read: true
+        write: false
+        delete: false
+
+context:
+  tech_stack:
+    format: markdown + yaml
+    language: documentation and configuration
+  notes: |
+    The meta-team operates on the Hive plugin's own source files.
+    Target repo root: /home/user/plugin-hive (or wherever plugin-hive is checked out).
+    Charter constraints are defined in state/meta-team/charter.md — read before any action.
+    All changes must be committed with [meta-team] prefix.
+    No destructive operations. No >50% content removal per file.
+
+team_memory_path: state/team-memories/meta-team/

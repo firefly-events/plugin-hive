@@ -83,3 +83,24 @@ For each in-progress story, show a one-line summary from the most recent episode
 ### 7. Multi-Epic Display
 
 If multiple epics are active, display each as a separate block. Order by most recently modified (check episode timestamps).
+
+### 8. Meta-Team Morning Summary
+
+After all epic status blocks, check for `state/meta-team/morning-summary.md`.
+
+If the file exists, render it as a separate section at the END of the status output:
+
+```
+---
+
+## Hive Meta-Team — Last Nightly Cycle
+
+{Full content of state/meta-team/morning-summary.md}
+```
+
+If the file does not exist, check `state/meta-team/ledger.yaml`:
+- If the ledger exists and has at least one entry: show a one-line summary of the last cycle
+  ```
+  Meta-Team: Last cycle {cycle_id} on {date} — {verdict} ({N} changes promoted)
+  ```
+- If neither file exists: omit the meta-team section entirely (meta-team has not been configured or run yet)
