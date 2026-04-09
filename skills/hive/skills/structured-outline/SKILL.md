@@ -18,6 +18,15 @@ Synthesize the design discussion and user feedback into a clear statement of:
 - Key decisions that are now locked (cite which feedback confirmed them)
 - The overall implementation strategy in 3-5 sentences
 
+**Product Goals (optional sub-section)** — include when the plan has explicit success metrics, stakeholders, or scope boundaries worth documenting. Omit for internal tooling or single-developer stories where this produces empty boilerplate.
+
+```
+PRODUCT GOALS (optional):
+  Success metrics: [measurable outcomes — e.g., "P95 search latency < 200ms", "zero auth regressions"]
+  Non-goals: [explicit out-of-scope — e.g., "venue search is not in this epic"]
+  Stakeholders: [who is affected or needs to sign off — e.g., "mobile team, API consumers"]
+```
+
 ### Part 2: Detailed Approach (~300 lines)
 
 Break the implementation into phases or stages. For each phase:
@@ -214,6 +223,31 @@ DECISIONS REQUIRING SIGN-OFF:
 
 4. [TRADE-OFF] {what we're trading for what} — {rationale}
    → Affirm / Reconsider
+```
+
+### Part 9: Multi-Epic Coordination (optional — only when plan spans multiple epics)
+
+Omit this section entirely for single-epic plans. Only produce Part 9 when the structured outline describes work that crosses epic boundaries or depends on outputs from other epics.
+
+```
+## Part 9: Multi-Epic Coordination
+
+### Cross-Epic Dependency Table
+
+| This Epic | Depends On | Dependency Type | Blocking? |
+|-----------|-----------|-----------------|-----------|
+| {epic-id} | {other-epic-id} | {shared data / API contract / file / infra} | yes / no |
+
+### Shared State Conventions
+
+Files, paths, or data formats shared across epics — each consumer needs to coordinate on these:
+- {path or resource}: {what it is, who writes, who reads}
+
+### Handoff Points
+
+What must Epic A deliver before Epic B can start:
+- {Epic A deliverable} → unblocks → {Epic B work item}
+- {e.g., "auth-service API contract finalized"} → unblocks → {e.g., "mobile-client auth integration"}
 ```
 
 ## Output Guidelines
