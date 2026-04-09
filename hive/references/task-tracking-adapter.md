@@ -2,7 +2,7 @@
 
 Linear is the project board for Hive workflows. Every ceremony phase interacts with Linear: planning creates tickets, execution claims them, testing transitions them, and push auto-closes them.
 
-**Tool:** `linearis` CLI | **Team:** HOM | **Project:** plugin-hive
+**Tool:** `linearis` CLI | **Team:** ACME | **Project:** my-project
 
 ## Board Design
 
@@ -34,7 +34,7 @@ Backlog → Todo → In Progress → In Review → Done
 ### Hierarchy
 
 ```
-plugin-hive (Linear Project)
+my-project (Linear Project)
   └── Epic Parent Issue (label: epic-parent)
         ├── Story Sub-Issue (label: story)
         │     └── Bug Sub-Issue (label: bug)
@@ -43,11 +43,11 @@ plugin-hive (Linear Project)
 
 ### Branch Naming Convention
 
-Pattern: `hom-{N}-{slug}`
+Pattern: `acme-{N}-{slug}`
 
-Example: `hom-42-fix-payment-flow`
+Example: `acme-3-fix-payment-flow`
 
-Linear's native GitHub integration detects `HOM-42` in the branch name and auto-links PRs. The orchestrator **must** create branches matching this pattern.
+Linear's native GitHub integration detects `ACME-3` in the branch name and auto-links PRs. The orchestrator **must** create branches matching this pattern.
 
 ## Adapter Operations
 
@@ -57,13 +57,13 @@ Create the parent issue for a Hive epic.
 
 ```bash
 linearis issues create "Epic: {epic-id} — {title}" \
-  --team HOM \
-  --project "plugin-hive" \
+  --team ACME \
+  --project "my-project" \
   --labels "epic-parent" \
   -d "{description}"
 ```
 
-Returns: issue ID (e.g., `HOM-40`). Store in cycle state as `linear.epic_issue_id`.
+Returns: issue ID (e.g., `ACME-1`). Store in cycle state as `linear.epic_issue_id`.
 
 ### createStoryIssue(title, description, parentId)
 
@@ -71,8 +71,8 @@ Create a story as a sub-issue under the epic parent.
 
 ```bash
 linearis issues create "{story title}" \
-  --team HOM \
-  --project "plugin-hive" \
+  --team ACME \
+  --project "my-project" \
   --labels "story" \
   --parent-ticket {parentId} \
   --status "Todo" \
@@ -87,8 +87,8 @@ Create a bug as a sub-issue under the story where the test failed.
 
 ```bash
 linearis issues create "Bug: {title}" \
-  --team HOM \
-  --project "plugin-hive" \
+  --team ACME \
+  --project "my-project" \
   --labels "bug" \
   --parent-ticket {parentStoryId} \
   --priority {1-4} \
@@ -146,10 +146,10 @@ Get all issues grouped by status for the standup board view.
 
 ```bash
 # All issues in the project
-linearis issues search "" --project "plugin-hive" --team HOM --limit 50
+linearis issues search "" --project "my-project" --team ACME --limit 50
 
 # Blockers only
-linearis issues search "" --project "plugin-hive" --team HOM --status "Todo,In Progress" --limit 50
+linearis issues search "" --project "my-project" --team ACME --status "Todo,In Progress" --limit 50
 # Filter results for label: human-intervention
 ```
 
@@ -206,9 +206,9 @@ task_tracking:
   adapter: linear
   queue_name: "Hive — Human Intervention"
   auto_expire_days: 7
-  linear_team: HOM
+  linear_team: ACME
   linear_prefix: "[Hive]"
-  linear_project: "plugin-hive"
-  linear_user_id: "eb8b9543-48b6-4570-bc53-50c6b22b201a"
-  branch_prefix: "hom"
+  linear_project: "my-project"
+  linear_user_id: "your-user-uuid-here"
+  branch_prefix: "acme"
 ```

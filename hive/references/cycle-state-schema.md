@@ -109,20 +109,20 @@ The `linear` section maps Hive artifacts to Linear issue IDs. This is the source
 
 ```yaml
 linear:
-  epic_issue_id: "HOM-40"           # Linear parent issue for this epic
-  user_id: "eb8b9543-..."           # Cached user ID for assignment locking
+  epic_issue_id: "ACME-1"           # Linear parent issue for this epic
+  user_id: "your-user-uuid-here"    # Cached user ID for assignment locking
   stories:
     task-tracking-integration:
-      issue_id: "HOM-41"
+      issue_id: "ACME-2"
       status: "In Progress"
-      assignee: "eb8b9543-..."       # null when unlocked
-      branch: "hom-41-task-tracking-integration"
+      assignee: "your-user-uuid-here"  # null when unlocked
+      branch: "acme-2-task-tracking-integration"
     daily-ceremony-workflow:
-      issue_id: "HOM-42"
+      issue_id: "ACME-3"
       status: "Todo"
       assignee: null
   bugs:
-    - issue_id: "HOM-55"
+    - issue_id: "ACME-4"
       parent_story: "task-tracking-integration"
       status: "Done"
       title: "null check missing in payment validator"

@@ -119,7 +119,7 @@ phases:
 
       EXTERNAL TRACKER (when adapter configured):
       - Include ticket ID in commit message (enables auto-link)
-      - Linear: "Refs: HOM-{N}" in commit message
+      - Linear: "Refs: {TEAM}-{N}" in commit message
     agent: orchestrator
     depends_on: [execution]
 

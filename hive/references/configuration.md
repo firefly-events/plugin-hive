@@ -54,7 +54,7 @@ See `skills/hive/hive.config.yaml` for the full default template with comments.
 | `task_tracking.adapter` | null | `linear`, `github`, or `jira` |
 | `task_tracking.queue_name` | "Hive — Human Intervention" | Queue/label name |
 | `task_tracking.auto_expire_days` | 7 | Days before unresolved items expire |
-| `task_tracking.linear_team` | null | Linear team key (e.g., "HOM") |
+| `task_tracking.linear_team` | null | Linear team key (e.g., "ACME") |
 | `task_tracking.linear_project` | null | Linear project name (e.g., "plugin-hive") |
 | `task_tracking.linear_user_id` | null | User UUID for assignment locking (run `linearis users list --active` to find) |
 | `task_tracking.linear_prefix` | "[Hive]" | Prefix for Hive-created issues |

@@ -1,7 +1,7 @@
 # Linear Commands Quick Reference
 
 Copy-paste commands for each ceremony phase. Values come from `hive.config.yaml` → `task_tracking`:
-- `{TEAM}` = `linear_team` (e.g., "HOM")
+- `{TEAM}` = `linear_team` (e.g., "ACME")
 - `{PROJECT}` = `linear_project` (e.g., "my-project")
 - `{PREFIX}` = `branch_prefix` (e.g., "hom")
 - `{USER_ID}` = `linear_user_id`

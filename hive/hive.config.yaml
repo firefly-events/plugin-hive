@@ -33,11 +33,11 @@ task_tracking:
   queue_name: "Hive — Human Intervention"
   auto_expire_days: 7
   # Linear-specific
-  linear_team: null          # team key (e.g., "HOM")
-  linear_project: null       # project name (e.g., "plugin-hive")
+  linear_team: null          # team key (e.g., "ACME")
+  linear_project: null       # project name (e.g., "my-project")
   linear_user_id: null       # user UUID for assignment locking (from linearis users list)
   linear_prefix: "[Hive]"   # prefix for Hive-created issues
-  branch_prefix: "hom"      # branch naming: {prefix}-{N}-{slug} (enables GitHub auto-link)
+  branch_prefix: "acme"     # branch naming: {prefix}-{N}-{slug} (enables GitHub auto-link)
 
 # Model tier routing
 # Assigns the right model to the right job. Orchestrator and complex reasoning
