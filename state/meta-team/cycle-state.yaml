@@ -2,22 +2,30 @@
 # Tracks the current cycle's progress. Updated at every phase boundary.
 # Only one cycle runs at a time — enforced by cycle_lock.
 
-cycle_id: null                      # format: nightly-{date}, null when idle
-phase: "idle"                       # enum: idle, boot, analysis, proposal, implementation,
-                                    #       testing, evaluation, promotion, close
-started_at: null                    # ISO datetime when cycle began
-budget_total_min: 300               # 5-hour window (300 minutes)
-budget_remaining_min: 300           # decremented at phase boundaries
-in_flight_target_id: null           # target currently being processed, null when idle
-interrupted: false                  # true if previous cycle didn't complete cleanly
-resume_from: null                   # phase to resume from if interrupted, null otherwise
-baseline_tag: null                  # git tag name for this cycle's baseline (e.g., meta-team/baseline-2026-04-08)
-proposals_this_cycle: 0             # count of proposals attempted this cycle
-charter_path: "state/meta-team/charter.md"  # path to the optimization charter (created in S2)
+cycle_id: null
+phase: "idle"
+started_at: null
+budget_total_min: 300
+budget_remaining_min: 300
+in_flight_target_id: null
+interrupted: false
+resume_from: null
+baseline_tag: null
+proposals_this_cycle: 0
+charter_path: "state/meta-team/charter.md"
+last_cycle:
+  id: "nightly-2026-04-08"
+  completed_at: "2026-04-08T03:23:00Z"
+  targets_found: 3
+  proposals: 0
+  kept: 0
+  discarded: 0
+  deferred: 0
+  type: "baseline"
 
 cycle_lock:
-  locked_by: null                   # cycle_id that holds the lock, null when unlocked
-  locked_at: null                   # ISO datetime when lock was acquired, null when unlocked
+  locked_by: null
+  locked_at: null
   # Stale lock threshold: 6 hours. If locked_at > 6 hours ago, the lock is
   # considered stale and can be overridden. This prevents two cycles from
   # running simultaneously while allowing recovery from crashed cycles.

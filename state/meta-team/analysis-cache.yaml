@@ -8,7 +8,50 @@ ttl_defaults:
   external_days: 7                  # external findings expire after 7 days
   memory_days: 5                    # memory-sourced findings expire after 5 days
 
-findings: []
+findings:
+  - id: "finding-2026-04-08-001"
+    source: internal
+    finding: >
+      Gate policy directory (hive/gate-policies/) contains no policy files.
+      The quality-gates.md reference defines a YAML policy schema
+      (skills/hive/gate-policies/{workflow-name}.yaml) but no actual policy
+      files have been created. Gate evaluation in execute flow has no policies
+      to evaluate against.
+    applicability_score: 0.9
+    source_url: null
+    source_date: null
+    created: "2026-04-08T03:08:00Z"
+    ttl_expires: "2026-04-11T03:08:00Z"
+    converted_to_target: true
+
+  - id: "finding-2026-04-08-002"
+    source: internal
+    finding: >
+      Test agent persona (hive/agents/tester.md) lacks explicit time budget
+      constraints. The researcher persona includes strict "5/10/15 min by
+      complexity" limits and 6 scope discipline rules, but the tester has
+      only a general "scope discipline" quality standard with no time cap.
+      This asymmetry risks unbounded test generation.
+    applicability_score: 0.8
+    source_url: null
+    source_date: null
+    created: "2026-04-08T03:08:00Z"
+    ttl_expires: "2026-04-11T03:08:00Z"
+    converted_to_target: true
+
+  - id: "finding-2026-04-08-003"
+    source: internal
+    finding: >
+      Technical writer persona (hive/agents/technical-writer.md) is minimal
+      compared to other personas. It lacks an Activation Protocol section,
+      scope discipline rules, and explicit time budgets. Other mature
+      personas (researcher, developer, reviewer) all include these sections.
+    applicability_score: 0.7
+    source_url: null
+    source_date: null
+    created: "2026-04-08T03:08:00Z"
+    ttl_expires: "2026-04-11T03:08:00Z"
+    converted_to_target: true
   # Each entry is an analysis finding cached to prevent redundant scanning.
   #
   # Schema:
