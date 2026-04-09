@@ -100,6 +100,8 @@ This agent is short-lived. After delivering the document:
 2. **Report completion** to the team lead or orchestrator
 3. **Terminate** — do not idle, do not ask for more work
 
+For full receiver protocol details, see `hive/references/pre-shutdown-protocol.md`.
+
 ## Document formats
 
 The specific format is determined by the injected skill. Without a skill, default to:

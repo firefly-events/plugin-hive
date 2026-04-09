@@ -118,3 +118,7 @@ Memory at `~/.claude/hive/memories/test-sentinel/`:
 ## Insight capture
 
 See `references/insight-capture.md` for the insight capture protocol.
+
+## Shutdown Readiness
+
+When receiving a pre-shutdown message from the orchestrator, follow the receiver protocol in `hive/references/pre-shutdown-protocol.md`.
