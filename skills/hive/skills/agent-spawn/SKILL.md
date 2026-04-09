@@ -28,7 +28,7 @@ hive/agents/{agent-name}.md
 If the file does not exist: **STOP. Do not improvise a replacement.** Report the error and suggest the closest roster match.
 
 Available roster (check `hive/agents/` for the current list):
-`researcher`, `technical-writer`, `developer`, `frontend-developer`, `backend-developer`, `tester`, `reviewer`, `architect`, `analyst`, `tpm`, `ui-designer`, `pair-programmer`, `peer-validator`, `team-lead`, `test-scout`, `test-worker`, `test-inspector`, `test-sentinel`, `test-architect`
+`researcher`, `technical-writer`, `developer`, `frontend-developer`, `backend-developer`, `tester`, `reviewer`, `architect`, `analyst`, `tpm`, `ui-designer`, `pair-programmer`, `peer-validator`, `team-lead`, `test-scout`, `test-worker`, `test-inspector`, `test-sentinel`, `test-architect`, `animations-specialist`, `accessibility-specialist`, `idiomatic-reviewer`, `performance-reviewer`, `security-reviewer`
 
 ### 2. Read the agent's persona and config
 

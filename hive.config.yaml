@@ -1,0 +1,115 @@
+# Hive Configuration
+# All settings have sensible defaults. Override only what you need.
+
+# Quality gate thresholds
+quality_gates:
+  auto_pass_threshold: 0.9
+  human_escalation_threshold: 0.3
+
+# Per-agent-pair trust scoring
+trust:
+  initial_score: 0.5
+  high_threshold: 0.8
+  low_threshold: 0.5
+  decay_rate: 0.05
+  decay_interval_days: 7
+
+# Token budget limits
+tokens:
+  per_task_limit: 100000
+  per_story_limit: 500000
+  per_epic_limit: 2000000
+  warning_threshold: 0.8
+
+# Context window management
+context_window:
+  budget_fraction: 0.7
+  degradation_threshold: 0.85
+
+# External task tracking
+# Set adapter to enable. All linear_* fields required when adapter: linear.
+task_tracking:
+  adapter: null              # linear, github, jira — null = disabled
+  queue_name: "Hive — Human Intervention"
+  auto_expire_days: 7
+  # Linear-specific
+  linear_team: null          # team key (e.g., "HOM")
+  linear_project: null       # project name (e.g., "plugin-hive")
+  linear_user_id: null       # user UUID for assignment locking (from linearis users list)
+  linear_prefix: "[Hive]"   # prefix for Hive-created issues
+  branch_prefix: "hom"      # branch naming: {prefix}-{N}-{slug} (enables GitHub auto-link)
+
+# Model tier routing
+# Assigns the right model to the right job. Orchestrator and complex reasoning
+# get Opus. Analytical/implementation work gets Sonnet. Fast execution gets Haiku.
+model_tiers:
+  opus:                          # heavy reasoning, coordination, complex decisions
+    - orchestrator
+    - team-lead
+    - architect
+    - analyst
+    - tpm
+  sonnet:                        # analytical, implementation, review
+    - researcher
+    - developer                    # still referenced by workflows; use frontend/backend-developer for new work
+    - frontend-developer
+    - backend-developer
+    - tester
+    - reviewer
+    - pair-programmer
+    - peer-validator
+    - ui-designer
+    - technical-writer
+    - test-scout
+    - test-architect
+    - test-inspector
+    - test-sentinel
+    # Specialist teams
+    - animations-specialist
+    - accessibility-specialist
+    - idiomatic-reviewer
+    - performance-reviewer
+    - security-reviewer
+  haiku:                         # fast execution, mechanical tasks
+    - test-worker
+
+# Override a specific agent's model (takes precedence over tier)
+model_overrides: {}
+  # example: researcher: opus    # promote researcher to opus for complex projects
+
+# Circuit breakers — prevent wasted time and tokens
+circuit_breakers:
+  step_timeout_minutes: 10       # max time for a single workflow step
+  fix_loop_timeout_minutes: 20   # max time for all fix loop iterations combined
+  story_timeout_minutes: 45      # max time for a single story (all steps)
+  ceremony_timeout_hours: 4      # max time for the full daily ceremony
+  max_step_retries: 2            # retry a failed step this many times
+  max_fix_iterations: 3          # fix loop iterations before back-to-planning
+  max_same_error_repeats: 3      # same error N times = stop, change strategy
+
+# Example codebases — directories agents can reference to learn your coding
+# style, structure patterns, naming conventions, etc. Add paths to your own
+# projects so agents understand how YOU write code.
+example_codebases: []
+  # - path: /path/to/your/go-project
+  #   label: "Go API project"
+  #   notes: "Clean architecture, Chi router, PostgreSQL"
+  # - path: /path/to/your/react-app
+  #   label: "React Native app"
+  #   notes: "Expo managed, TypeScript, MobX state"
+
+# External model integrations
+# Codex (OpenAI) can be used as a second-model reviewer for adversarial review.
+# Requires: npm install -g @openai/codex && codex login
+external_models:
+  codex:
+    enabled: false              # set to true after installing and authenticating Codex CLI
+    use_for:
+      - adversarial-review      # run after Claude review, before optimize/integrate
+    # companion_path is auto-detected from the codex plugin if installed
+
+# Execution defaults
+execution:
+  default_methodology: classic
+  parallel_teams: true
+  max_retry_attempts: 2
