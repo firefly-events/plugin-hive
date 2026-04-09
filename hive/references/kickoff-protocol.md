@@ -92,13 +92,118 @@ Scan the development environment for available integrations. Check for CLI tools
 
 #### Phase 2b-ii: Developer Discovery
 
-<!-- TODO: Implement developer preference elicitation (story: developer-discovery) -->
 <!-- DATA CONTRACT: Writes to hive.config.yaml → developer: {} -->
 <!-- Discovers: pr_style, commit_granularity, review_depth, notes -->
-<!-- Default: developer: {pr_style: null, commit_granularity: null, review_depth: null, notes: null} -->
-<!-- Also populates: execution.default_methodology via elicitation (currently hardcoded to "classic") -->
+<!-- Also populates: execution.default_methodology via elicitation -->
 
 Elicit developer preferences for PR workflow, commit style, and review expectations. These preferences configure Hive's execution behavior to match the developer's working style.
+
+##### Idempotent Guard
+
+Before eliciting, check `hive.config.yaml` for existing developer preferences:
+
+1. Read the `developer:` section from `hive.config.yaml`
+2. If **any** of `pr_style`, `commit_granularity`, or `review_depth` are non-null → **skip elicitation entirely**
+3. Print: `Developer preferences already configured — skipping discovery.`
+4. Continue to Phase 2b-iii
+
+This ensures `kickoff` can be re-run without re-asking questions the developer already answered.
+
+##### Step 1: Infer Smart Defaults from Test-First Signals
+
+Read `code_quality.test_first_signals` from `project-profile.yaml` (populated by Phase 2b-iii if it ran first, or empty if not yet available). Apply this decision table to determine the methodology default:
+
+| Priority | Condition | Default Methodology |
+|----------|-----------|-------------------|
+| 1 | `bdd_keywords: true` | **BDD** |
+| 2 | `co_located_tests: true` AND (`test_before_source: true` OR `test_runner_in_precommit: true`) | **TDD** |
+| 3 | `co_located_tests: true` (alone) | **TDD** |
+| 4 | `test_absence: true` | **Classic** |
+| 5 | No signals available or all inconclusive | **Classic** |
+
+Rules:
+- BDD wins over TDD when both signals are present (BDD is a superset of TDD practices)
+- When signals conflict, prefer the higher-priority row
+- If `test_first_signals` is missing entirely (Phase 2b-iii hasn't run), default to **Classic**
+
+Also infer a PR style default from recent git history:
+- Run `git log --oneline -20` and check merge patterns
+- Mostly merge commits with single parents → `single-commit`
+- Squash merge messages (e.g., "Squashed commit of…") → `squash-merge`
+- No clear pattern or fresh repo → `single-commit` (safe default)
+
+##### Step 2: Present Elicitation (5 Questions)
+
+Present the questions as a single conversational block. The tone should feel like a colleague asking preferences, not a form to fill out.
+
+**Prompt template:**
+
+```
+I've detected some patterns in your codebase. Here are my suggested defaults
+for how Hive should work with you — press Enter to accept all, or type the
+number(s) you'd like to change (e.g., "1,3"):
+
+  1. Methodology:       {inferred_methodology} {reason_hint}
+  2. PR style:          {inferred_pr_style}
+  3. Commit granularity: feature-scoped
+  4. Review depth:      standard
+  5. Additional notes:  (none)
+
+Options for each:
+  1 → Classic / TDD / BDD
+  2 → single-commit / squash-merge / atomic-prs / bundled
+  3 → fine (per-change) / medium (per-task) / coarse (per-story)
+  4 → thorough / standard / light
+  5 → free text (workflow preferences, pet peeves, anything Hive should know)
+```
+
+The `{reason_hint}` after methodology briefly explains why that default was chosen:
+- `(co-located tests suggest test-first)` → TDD
+- `(BDD keywords found in test files)` → BDD
+- `(no strong test-first signals)` → Classic
+
+**Interaction flow:**
+
+1. If the developer presses **Enter** (empty input) → accept all defaults as-is
+2. If the developer types numbers (e.g., `1,3`) → prompt for each selected question individually:
+   - `Methodology (Classic/TDD/BDD):` and wait for input
+   - `Commit granularity (fine/medium/coarse):` and wait for input
+3. For Q5 (notes), if selected: `Any notes for Hive? (workflow preferences, things to avoid, etc.):` and capture free text
+4. Validate inputs — if an answer doesn't match known options, show the options again (once). On second invalid input, keep the default.
+
+##### Step 3: Write Preferences to Config
+
+Write the final values (defaults + any overrides) to `hive.config.yaml`:
+
+1. **Methodology** → `execution.default_methodology` (update the EXISTING field — do NOT create a new `developer.methodology` field)
+2. **PR style** → `developer.pr_style`
+3. **Commit granularity** → `developer.commit_granularity`
+4. **Review depth** → `developer.review_depth`
+5. **Notes** → `developer.notes` (null if no notes provided)
+
+Example result in `hive.config.yaml`:
+
+```yaml
+execution:
+  default_methodology: tdd    # ← updated by developer discovery
+
+developer:
+  pr_style: single-commit
+  commit_granularity: medium
+  review_depth: standard
+  notes: "I prefer small PRs. Always run tests before pushing."
+```
+
+##### Step 4: Confirm and Continue
+
+After writing, print a brief confirmation:
+
+```
+Got it! Your preferences are saved to hive.config.yaml.
+You can update them anytime by editing the file directly.
+```
+
+Continue to Phase 2b-iii.
 
 #### Phase 2b-iii: Code Quality & Linter Detection
 
@@ -252,6 +357,91 @@ When Phase 2b-iii runs on a project that already has `code_quality` data:
 
 This ensures `kickoff` can be re-run safely without losing manual curation.
 
+#### Phase 2b-iv: Cross-Cutting Concern Auto-Generation
+
+Silently auto-generate project-specific cross-cutting concerns from the discovered tech stack. No interactive review gate — write the file and show a summary.
+
+<!-- DATA CONTRACT: Writes to state/cross-cutting-concerns.yaml → concerns: [] -->
+<!-- Default: concerns contain at minimum the 'documentation' concern -->
+
+##### Step 1: Map Tech Stack to Template
+
+Read `tech_stack` from `state/project-profile.yaml` (populated in Phase 2). Map the discovered stack to a concern template file in `hive/references/examples/`:
+
+| Tech Stack Signal | Template File |
+|-------------------|---------------|
+| KMP, Kotlin Multiplatform, Compose Multiplatform, Android + iOS | `cross-cutting-concerns.mobile-app.yaml` |
+| React, Next.js, Vue, Angular, Svelte | *(no template — web)* |
+| Express, FastAPI, Django, Rails, Spring | *(no template — API)* |
+| CLI, argparse, cobra, clap | *(no template — CLI)* |
+
+Detection logic:
+1. Read `tech_stack.frameworks[]` and `tech_stack.languages[]` from project profile
+2. If any framework or language matches mobile indicators (KMP, `kotlin-multiplatform`, `compose-multiplatform`, Android, iOS, Swift + Kotlin together, React Native, Flutter) → use `cross-cutting-concerns.mobile-app.yaml`
+3. If no template file matches → fall through to Step 3 (graceful fallback)
+
+##### Step 2: Generate Concerns from Template
+
+If a matching template was found:
+
+1. **Read the template** YAML from `hive/references/examples/{template-file}`
+2. **Read existing** `state/cross-cutting-concerns.yaml` (may already have concerns from prior runs or manual edits)
+3. **Idempotent merge** using the following algorithm:
+   - Parse both files into concern lists, keyed by `id`
+   - For each concern in the **template**:
+     - If a concern with the same `id` exists in the **state file** → **keep the state file version** (it may have manual edits)
+     - If the concern `id` is new (not in state file) → **append** it to the state file
+   - For each concern in the **state file** that is NOT in the template → **preserve** it (user added it manually)
+   - The `documentation` concern (default) is always preserved — never removed
+4. **Write** the merged result to `state/cross-cutting-concerns.yaml`
+5. **Count** how many new concerns were added (template entries not previously in state file)
+
+##### Step 3: Graceful Fallback (No Template)
+
+If no template matches the detected tech stack:
+
+1. Ensure `state/cross-cutting-concerns.yaml` exists with at least the `documentation` concern:
+   ```yaml
+   concerns:
+     - id: documentation
+       name: Documentation Updates
+       description: >
+         When a story changes user-facing behavior, workflow steps, or configuration,
+         corresponding documentation must be updated.
+       applies_when: >
+         Story modifies workflows, schemas, directory structure, configuration files,
+         or adds/removes/renames reference documents
+       planning_prompt: >
+         Which documentation files reference the behavior this story changes?
+         List each doc and what section needs updating.
+       implementation_checklist:
+         - "All docs referencing changed behavior identified"
+         - "Affected sections updated to reflect new behavior"
+         - "No stale references to old behavior remain"
+   ```
+2. If the file already exists with concerns, do not modify it — just proceed to summary
+
+##### Step 4: Output Summary
+
+Print a single summary line (no interactive prompt, no review gate):
+
+- **Template matched:** `"Auto-generated N concerns for {stack}. Edit at state/cross-cutting-concerns.yaml."`
+  - Where `N` is the count of newly added concerns (0 if all already existed from a prior run)
+  - Where `{stack}` is the matched template name (e.g., "mobile-app")
+- **No template:** `"No concern templates found for {stack}. Using 'documentation' default. Edit at state/cross-cutting-concerns.yaml."`
+  - Where `{stack}` is the detected primary framework/language (e.g., "react", "fastapi")
+
+This summary is informational only — kickoff continues to the next phase regardless.
+
+##### Step 5: Idempotent Re-Run Safety
+
+When Phase 2b-iv runs on a project that already has `state/cross-cutting-concerns.yaml`:
+
+1. **Never remove** existing concerns — they may have been manually curated
+2. **Never overwrite** an existing concern's fields — the user may have customized `applies_when`, `planning_prompt`, or checklist items
+3. **Only append** template concerns whose `id` is not already present
+4. **Re-running produces identical output** if no new concerns need adding (N=0 in summary)
+
 #### Phase 2b Data Flow Summary
 
 | Sub-phase | Target File | Target Section |
@@ -259,6 +449,7 @@ This ensures `kickoff` can be re-run safely without losing manual curation.
 | 2b-i Integration Preflight | project-profile.yaml | `integrations` |
 | 2b-ii Developer Discovery | hive.config.yaml | `developer` |
 | 2b-iii Code Quality & Linter Detection | project-profile.yaml | `code_quality` (linters, formatters, pre_commit, code_snippets, test_first_signals), `project_maturity` |
+| 2b-iv Cross-Cutting Concern Auto-Generation | state/cross-cutting-concerns.yaml | `concerns` |
 
 ---
 
