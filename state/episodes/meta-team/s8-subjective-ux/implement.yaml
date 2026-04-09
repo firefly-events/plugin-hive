@@ -1,0 +1,10 @@
+story: s8-subjective-ux
+phase: implement
+status: complete
+date: "2026-04-08"
+summary: |
+  Created hive/references/meta-team-ux.md — comprehensive UX reference covering:
+  1. Morning summary generator (format, edge cases, state/meta-team/summary-{date}.md)
+  2. /meta-team review command (approve/reject/skip flows, stale patch handling)
+  3. /status integration (Meta Team section with health indicators)
+  Includes skill registration notes and patch file management details.
