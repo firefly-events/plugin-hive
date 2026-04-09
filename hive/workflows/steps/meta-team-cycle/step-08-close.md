@@ -1,80 +1,136 @@
-# Phase 8: Close
+# Step 8: Close
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
-- Do NOT skip ledger writes — every proposal must have a ledger entry
-- Do NOT leave the cycle lock held — always release on exit
-- Do NOT leave cycle-state in a non-idle phase
-- This phase always runs, even on early budget exit
+- Read this entire step file before taking any action
+- Close the cycle even if most changes were reverted — partial cycles are valid outcomes
+- The morning summary must be useful to a user who has not read the full cycle log
+- Commit BEFORE writing the ledger entry — the ledger records what was actually committed
+- If commit fails, record `status: uncommitted` in ledger with error — do NOT mark as closed
 
 ## EXECUTION PROTOCOLS
 
 **Mode:** autonomous
 
-Finalize the cycle: write all state, generate the morning summary, release
-the lock, and exit cleanly.
+Finalize the cycle: write the closed cycle-state, update the ledger, commit all changes, and produce the morning summary.
 
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
-- All state/meta-team/ files
-- Verdicts and metrics from Phases 5-7 (if they ran)
-- Cycle timing data
+- `cycle_id` from step 1
+- `promoted_changes` and `reverted_changes` from step 7
+- `state/meta-team/cycle-state.yaml` — full cycle history
+- `state/meta-team/ledger.yaml` — prior cycle records
+- Git (for committing changes)
 
 **NOT available:**
-- External state beyond this cycle's scope
+- User input
+- Any ability to change evaluation verdicts
 
 ## YOUR TASK
 
-Persist all cycle results, generate the morning summary, and cleanly shut down.
+Close the cycle cleanly: update state, commit everything, update the ledger, produce the morning summary.
 
 ## TASK SEQUENCE
 
-1. **Write ledger entries**
-   - For each proposal processed this cycle:
-     - Write a complete ledger entry with all schema fields
-     - Include metrics_before and metrics_after where available
-     - Record verdict, promoted status, commit SHA (if promoted), reason (if discarded/deferred)
-   - In baseline cycle (S3): no proposals → no ledger entries to write
+### 1. Finalize cycle-state.yaml
+Update `state/meta-team/cycle-state.yaml` with final summary:
+```yaml
+status: closed
+closed: {ISO 8601 timestamp}
+phase: close
+summary:
+  total_findings: {N}
+  proposals_generated: {N}
+  changes_attempted: {N}
+  changes_promoted: {N}
+  changes_reverted: {N}
+  flagged_for_human: {N}
+  cycle_verdict: {passed | partial | poor}
+```
 
-2. **Update queue**
-   - Mark completed targets as `status: completed`
-   - Mark discarded targets as `status: discarded`
-   - Mark deferred targets as `status: needs-user-review`
-   - Remove stale entries (completed/discarded older than 10 cycles)
+### 2. Commit all changes
+Commit all modified and created files under:
+- `hive/`
+- `skills/hive/agents/memories/`
+- `state/meta-team/` (charter, cycle-state)
+- `state/teams/`
+- Any other files touched during the cycle
 
-3. **Ledger pruning** (S5 extension)
-   - If ledger entries span >30 cycles:
-     - Archive old entries to `state/meta-team/archive/ledger-archive-{year-month}.yaml`
-     - Keep only last 30 cycles in active ledger
+Use commit message:
+```
+[meta-team] Cycle {cycle_id} — {N changes}: {one-line summary of what changed}
+```
 
-4. **Generate morning summary** (S8 extension)
-   - Write `state/meta-team/summary-{date}.md`
-   - Sections: cycle summary, kept, discarded, deferred
-   - In baseline cycle (S3): minimal summary (targets identified, zero modifications)
+Examples:
+- `[meta-team] Cycle meta-2026-04-09 — 3 changes: vertical-planning.md, status skill meta section, orchestrator memory`
+- `[meta-team] Cycle meta-2026-04-09 — 0 changes: analysis found 5 issues, all blocked by charter scope`
 
-5. **Update cycle-state**
-   - `phase: idle`
-   - `interrupted: false`
-   - `in_flight_target_id: null`
-   - Update `budget_remaining_min` with final value
+### 3. Update ledger.yaml
+After the commit succeeds, append to `state/meta-team/ledger.yaml`:
+```yaml
+- cycle_id: {cycle_id}
+  date: {YYYY-MM-DD}
+  started: {ISO 8601}
+  closed: {ISO 8601}
+  verdict: {passed | partial | poor}
+  changes_promoted: {N}
+  changes_reverted: {N}
+  findings_identified: {N}
+  top_changes:
+    - {file}: {one-line description}
+  commit: {git commit hash}
+  notes: |
+    {Any notable context: first run, all blocked, large improvement, etc.}
+```
 
-6. **Release cycle lock**
-   - `cycle_lock.locked_by: null`
-   - `cycle_lock.locked_at: null`
+If ledger.yaml does not exist, create it with a YAML list header.
 
-7. **Log completion**
-   - "Cycle {cycle_id} complete. {N} targets identified. {K} kept, {D} discarded, {F} deferred."
-   - In baseline cycle: "Baseline cycle complete. {N} targets identified. Zero modifications."
+### 4. Produce morning summary
+Write the morning summary to `state/meta-team/morning-summary.md`.
 
-## PHASE TRANSITION
+Follow the format in `hive/references/meta-team-ux.md`.
 
-This is the final phase. Cycle is complete. Exit cleanly.
+Minimal format if that reference doesn't exist:
+```markdown
+# Hive Meta-Team — Nightly Cycle Report
+**Cycle:** {cycle_id} | **Date:** {date} | **Verdict:** {verdict}
 
-## ERROR HANDLING
+## What Changed
+{Bulleted list of promoted changes with one-line descriptions}
 
-If any close step fails:
-- Continue with remaining steps (don't abort close on partial failure)
-- Always release the lock (even if other steps fail)
-- Set `interrupted: false` (close phase ran, even if imperfectly)
-- Log the error for next cycle's boot to detect
+## What Was Found (Not Fixed This Cycle)
+{Bulleted list of findings that were skipped, deferred, or flagged for human}
+
+## Metrics
+- Findings: {N} | Proposals: {N} | Promoted: {N} | Reverted: {N}
+- Next cycle priority: {top deferred finding}
+```
+
+### 5. Final confirmation
+Verify:
+- `state/meta-team/cycle-state.yaml` has `status: closed`
+- `state/meta-team/ledger.yaml` has the new entry
+- `state/meta-team/morning-summary.md` exists
+- Git commit succeeded
+
+## SUCCESS METRICS
+
+- [ ] `cycle-state.yaml` status updated to `closed`
+- [ ] All changed files committed with `[meta-team]` prefix
+- [ ] `ledger.yaml` updated with cycle entry including commit hash
+- [ ] `morning-summary.md` written per format in `meta-team-ux.md`
+- [ ] No files left in uncommitted state from this cycle
+
+## FAILURE MODES
+
+- Git commit fails: record `status: uncommitted` in cycle-state.yaml, record error in ledger, still write morning summary
+- Ledger YAML parse error: create a fresh ledger with only this cycle entry
+- Morning summary not possible (no format reference): use minimal format from this step file
+
+## CYCLE COMPLETE
+
+This is the final step of the meta-team cycle. No next step.
+
+**If all gating conditions met:** Cycle is fully closed. Morning summary available at `state/meta-team/morning-summary.md`.
+**If commit failed:** Cycle is closed with uncommitted changes. User should review and commit manually.

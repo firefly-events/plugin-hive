@@ -1,213 +1,149 @@
-# Meta Team Full Nightly Cycle Reference
+# Meta-Team Nightly Cycle — Integration Guide
 
-> Reference document for the complete 8-phase nightly cycle. Extends the baseline
-> cycle (S3) with all 5 agents, CronCreate scheduling, budget enforcement, interrupted
-> cycle recovery, and state cleanup.
+The meta-team is the Hive plugin's autonomous self-improvement system. This guide explains how the nightly cycle integrates with the rest of the Hive framework, how to bootstrap it on a new installation, and how to monitor and tune it over time.
 
-## Scheduling
+---
 
-### CronCreate Configuration
+## What the Nightly Cycle Does
 
+Each cycle runs eight sequential phases:
+
+| Phase | Step | Agent | Output |
+|-------|------|-------|--------|
+| 1. Boot | step-01 | orchestrator | Cycle ID, prior state loaded |
+| 2. Analysis | step-02 | researcher | Findings list (missing files, broken refs, schema gaps) |
+| 3. Proposal | step-03 | architect | Ranked, scoped implementation proposals |
+| 4. Implementation | step-04 | developer | New files, added sections, updated memories |
+| 5. Testing | step-05 | tester | Cross-reference, schema, and content-safety validation |
+| 6. Evaluation | step-06 | reviewer | Pass / needs-optimization / needs-revision per change |
+| 7. Promotion | step-07 | orchestrator | Approved changes kept; rejected changes reverted |
+| 8. Close | step-08 | orchestrator | Ledger updated, commit made, morning summary written |
+
+---
+
+## Bootstrapping the Meta-Team
+
+### First run
+On the first cycle, these files must exist:
+
+1. **`state/meta-team/charter.md`** — defines objectives, scope, and hard constraints. Already committed to the repo.
+2. **`hive/workflows/meta-team-cycle.workflow.yaml`** — the workflow definition.
+3. **`state/teams/meta-team.yaml`** — the 5-agent team config.
+4. **All 8 step files** in `hive/workflows/steps/meta-team-cycle/`.
+
+The ledger (`state/meta-team/ledger.yaml`) and cycle state (`state/meta-team/cycle-state.yaml`) are created by the cycle itself — no manual creation needed.
+
+### Running the cycle
+Trigger via the orchestrator:
 ```
-Expression: "3 3 * * *"     # 3:03 AM CST nightly
-Mode: durable                # persists to .claude/scheduled_tasks.json
-Re-registration: on each interactive session start (mitigates 7-day expiry)
+Run the meta-team nightly cycle.
+Read: hive/workflows/meta-team-cycle.workflow.yaml
+Team: state/teams/meta-team.yaml
+Charter: state/meta-team/charter.md
 ```
 
-### Re-Registration Protocol
+Or schedule via a cron-style trigger (see external trigger config if available).
 
-CronCreate registrations may expire after 7 days without session activity. To
-mitigate, re-register on every interactive Hive session start:
+---
 
-1. Check `.claude/scheduled_tasks.json` for meta-team entry
-2. If missing or expired: re-register with same expression and durable mode
-3. Log: "Meta Team cron re-registered: 3 3 * * *"
+## Cycle State Files
 
-### Manual Trigger
+### `state/meta-team/cycle-state.yaml`
 
-The cycle can be triggered manually for testing:
-- Invoke the meta-team-cycle workflow directly
-- Same 8-phase sequence, same budget enforcement
-- Useful for debugging after changes to the pipeline
+Created fresh each cycle. Contains the full running log of a single cycle:
+- Phase-by-phase outputs
+- All findings, proposals, changes, test results, evaluations
+- Final summary after close
 
-## Complete Phase Sequence
+Use it to debug a failed cycle or review what was changed.
 
-### Phase 1: Boot (orchestrator)
+### `state/meta-team/ledger.yaml`
 
-Extends S3 baseline boot with:
-
-- **Post-promotion monitoring:** compare current metrics against last cycle's baselines.
-  If any metric drops >10% from baseline → auto-rollback most recent promotion:
-  1. `git revert {promotion-commit-sha}`
-  2. Write ledger entry with rollback evidence
-  3. Re-queue target with `attempted_count` incremented
-  4. Log: "Auto-rollback: {target} — {metric} degraded {percentage}%"
-
-- **Stale worktree cleanup:** remove any `.claude/worktrees/meta-team-*` from crashed cycles
-  ```
-  git worktree list | grep meta-team | while read wt; do
-    git worktree remove "$wt" --force 2>/dev/null
-  done
-  git branch --list 'meta-team/sandbox-*' | xargs -r git branch -D
-  ```
-
-- **Interrupted cycle detection:** if cycle-state shows non-idle phase:
-  - Log: "Interrupted cycle: {cycle_id} at {phase}"
-  - Clean up stale worktrees
-  - Start fresh (full resumption deferred to post-v1)
-
-### Phase 2: Analysis (researcher)
-
-Three analysis passes merged into a single prioritized queue:
-
-1. **Internal analysis** (S3): scan Hive file structure for improvement opportunities
-2. **Memory targeting** (S7): scan memory ecosystem for patterns and trends
-3. **External research** (S6): scan web sources for applicable methodologies
-
-All findings written to queue.yaml with source attribution and priority scoring:
-- Internal-recurring: priority 1
-- Internal-one-off: priority 2
-- Memory-pattern: priority 3
-- External-research: priority 4
-
-### Phase 3: Proposal (architect)
-
-The architect reads the top N targets from the queue:
-- Budget > 240 min remaining: N = 3
-- Budget > 180 min remaining: N = 2
-- Otherwise: N = 1
-
-Each proposal includes:
+Append-only record of all completed cycles. One entry per cycle:
 ```yaml
-- id: "opt-{date}-{seq}"
-  target_id: "target-{date}-{seq}"
-  target: "hive/agents/researcher.md"
-  type: "persona-edit"
-  description: "Add explicit 15-min time budget for research phases"
-  rationale: "Internal analysis + memory pattern: scope section lacks time constraint"
-  expected_impact: "Reduce average research time from 48 min to ~15 min"
-  rollback_plan: "Revert commit — original persona in baseline tag"
-  change_spec: |
-    Specific edit instructions for the developer...
+- cycle_id: meta-2026-04-09
+  date: 2026-04-09
+  verdict: passed
+  changes_promoted: 3
+  changes_reverted: 0
+  findings_identified: 7
+  top_changes:
+    - hive/references/vertical-planning.md: created missing H/V planning reference
+    - skills/status/SKILL.md: added meta-team morning summary section
+  commit: abc1234
+  notes: First cycle. Bootstrapped meta-team infrastructure.
 ```
 
-### Phase 4: Implementation (developer)
+Use it to track Hive improvement over time.
 
-For each proposal:
-1. Create worktree: `git worktree add .claude/worktrees/meta-team-{id} -b meta-team/sandbox-{id}`
-2. Implement changes per the architect's change_spec
-3. Commit in worktree: `meta-team: {description} [opt-{id}]`
-4. Do NOT expand scope beyond the proposal
+---
 
-### Phase 5: Testing (tester)
+## Tuning the Cycle
 
-Per-worktree validation suite (details in meta-team-sandbox.md):
-1. Destructiveness check (>50% content removal → fail)
-2. Structural validation (YAML/markdown parsing)
-3. Heuristic analysis (advisory flags for safety keywords, charter contradictions)
-4. Metrics collection (lines added/removed, files modified)
+### Adjusting what gets analyzed
+The analysis step (step-02) performs six audit checks. To focus the cycle on specific areas:
+- Edit the step file to skip checks that are not relevant
+- Add custom check sections for new domains (e.g., check a new sub-directory added to the plugin)
 
-### Phase 6: Evaluation (reviewer)
+### Adjusting proposal limits
+The proposal step (step-03) caps approved proposals at 5 per cycle. To change this:
+- Edit `step-03-proposal.md` and update the cap in the MANDATORY EXECUTION RULES section
 
-Independent evaluation — reviewer sees:
-- Tester's metrics and notes
-- The actual diff (`git diff main..worktree-branch`)
-- Charter constraints
+### Adjusting charter scope
+To allow the meta-team to modify additional domains:
+- Edit `state/meta-team/charter.md` → scope table
+- Edit `state/teams/meta-team.yaml` → member domain sections
 
-Reviewer does NOT see:
-- Architect's rationale (prevents anchoring bias)
+---
 
-Three verdicts:
-- **keep:** safe, well-scoped, measurably beneficial → Phase 7 promotes
-- **discard:** fails tests, poorly scoped, or removes safety constraints → clean up
-- **defer:** subjective/design change → save patch, tag needs-user-review
+## Monitoring and Alerts
 
-### Phase 7: Promotion (orchestrator)
+### Morning review
+Run `/hive:status` to see the morning summary rendered inline.
 
-Process verdicts:
-- **Keep:** cherry-pick to main → `meta-team: {description} [opt-{id}]`
-- **Defer:** save patch to `state/meta-team/deferred/{id}.patch` → update queue status
-- **Discard:** log in ledger → clean up worktree
+### Ledger review
+Read `state/meta-team/ledger.yaml` to see the history of all cycles.
 
-All worktrees cleaned up after processing (kept, discarded, and deferred).
+### Aborted cycles
+If `state/meta-team/cycle-state.yaml` has `status: running` at the start of the next cycle, the prior cycle crashed. The next cycle will log it as aborted and start fresh.
 
-### Phase 8: Close (orchestrator)
+---
 
-1. Write complete ledger entries for all proposals
-2. Update queue (mark completed, discarded, deferred)
-3. Ledger pruning: archive entries >30 cycles old to `state/meta-team/archive/`
-4. Generate morning summary: `state/meta-team/summary-{date}.md`
-5. Release cycle lock
-6. Log completion stats
+## Bootstrapping Charter Template
 
-## Budget Enforcement
+If `state/meta-team/charter.md` is missing, create it with these minimum fields:
 
-At every phase boundary:
-```
-elapsed = now - started_at (in minutes)
-budget_remaining_min = budget_total_min - elapsed
+```markdown
+# Meta-Team Charter
 
-if budget_remaining_min < 90:
-  log "Budget low ({budget_remaining_min} min). Skipping to Phase 8."
-  → Phase 8 (close)
-```
+## Mission
+Self-optimize the Hive plugin.
 
-Budget enforcement is checked BEFORE each phase begins. If the cycle enters
-Phase 3 with 89 minutes remaining, it skips directly to Phase 8.
+## Objectives
+1. Completeness — all referenced files exist
+2. Consistency — schemas and terminology are uniform
+3. Clarity — step files have unambiguous procedures
+4. Coverage — agent memory starter set grows with each cycle
+5. Tooling — skill files route correctly
 
-## State Cleanup
+## Scope
+{domains the meta-team may change}
 
-### Ledger Pruning (Phase 8)
+## Hard Constraints
+- No destructive operations
+- No >50% content removal per file
+- 5-hour budget maximum
+- Commit all changes with [meta-team] prefix
 
-If ledger entries span >30 cycles:
-1. Identify entries older than 30 cycles
-2. Move to `state/meta-team/archive/ledger-archive-{year-month}.yaml`
-3. Active ledger retains only last 30 cycles
-
-### Queue Cleanup (Phase 8)
-
-- Completed targets: removed after 5 cycles
-- Discarded targets: removed after 10 cycles (allows 5-cycle dedup window)
-- `needs-user-review` targets: retained until user acts
-
-### Worktree Cleanup (Phase 1 + Phase 7)
-
-- Phase 1 boot: remove stale worktrees from crashed cycles
-- Phase 7 end: remove all cycle worktrees (even on budget exit)
-
-### Analysis-Cache Pruning (Phase 1)
-
-- Remove findings where `ttl_expires < now`
-- Internal: 3-day TTL, External: 7-day TTL, Memory: 5-day TTL
-
-## Cycle Lifecycle
-
-```
-                    ┌─────────────────────────────────────────────┐
-                    │           Budget Check at Each Phase        │
-                    │         <90 min remaining → Phase 8         │
-                    └─────────────────────────────────────────────┘
-
-    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────────┐
-    │ Phase 1  │───→│ Phase 2  │───→│ Phase 3  │───→│   Phase 4    │
-    │  Boot    │    │ Analysis │    │ Proposal │    │Implementation│
-    │(orchestr)│    │(research)│    │(architect)│    │ (developer)  │
-    └──────────┘    └──────────┘    └──────────┘    └──────────────┘
-                                                           │
-    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────┴───────┐
-    │ Phase 8  │←───│ Phase 7  │←───│ Phase 6  │←───│   Phase 5    │
-    │  Close   │    │Promotion │    │Evaluation│    │   Testing    │
-    │(orchestr)│    │(orchestr)│    │(reviewer)│    │  (tester)    │
-    └──────────┘    └──────────┘    └──────────┘    └──────────────┘
-         │
-         └──→ cycle_state.phase = "idle", lock released
+## Quality Bar
+{pass/fail criteria per the charter template}
 ```
 
-## Error Handling
+---
 
-- **Lock conflict:** abort cycle, log, exit
-- **State file corruption:** log error, attempt continue with defaults
-- **Agent spawn failure:** skip phase, log, advance (don't hang)
-- **Budget exceeded:** skip to Phase 8 immediately
-- **Cherry-pick conflict:** discard proposal, log, continue with others
-- **Network timeout (external research):** skip source, continue cycle
+## Integration with the Daily Ceremony
+
+The meta-team is independent from the daily standup ceremony. However:
+- The morning summary surfaces in `/hive:status` alongside daily epic status
+- Flagged-for-human items from the meta-team should be reviewed during standup
+- Meta-team insights staged in `state/insights/meta-team/` are evaluated by the orchestrator at session end alongside regular epic insights

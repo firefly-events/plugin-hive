@@ -1,262 +1,98 @@
-# Meta Team Sandbox Pipeline Reference
+# Meta-Team Sandbox Pipeline
 
-> Reference document for the Meta Team's sandbox pipeline. Defines worktree isolation,
-> destructiveness enforcement, structural validation, heuristic analysis, promotion,
-> rollback, and cleanup procedures.
+The sandbox pipeline lets the meta-team experiment with risky changes — ones that could break cross-references or alter existing behavior — without touching the live codebase until the change is validated.
 
-## Overview
+---
 
-Every proposed change passes through the sandbox pipeline before reaching main.
-The pipeline provides safety guarantees through multiple validation layers:
+## When to Use the Sandbox
 
-1. **Worktree isolation** — one worktree per proposal, no interaction between proposals
-2. **Destructiveness enforcement** — programmatic check against charter threshold
-3. **Structural validation** — parse all modified files to verify format integrity
-4. **Heuristic analysis** — advisory flags for safety-sensitive changes
-5. **Promotion** — cherry-pick from worktree to main with structured commit message
-6. **Rollback** — per-commit revert capability with baseline tags
+Use sandbox mode when a proposal:
+- Creates a new workflow step file that will be referenced by an existing workflow YAML
+- Modifies an existing reference doc that other files link to by path
+- Changes a schema field that affects multiple agent persona files
+- Introduces a new agent persona that will be cross-referenced from `MAIN.md` or `GUIDE.md`
 
-## Worktree Management
+Skip sandbox mode for:
+- New standalone files with no cross-references (e.g., a new starter memory, a new reference doc not yet linked anywhere)
+- Additive changes to existing files where the added section has no dependents
 
-### Creation
+---
 
-Each proposal gets its own isolated worktree. Worktrees are created outside the
-main repo tree to avoid polluting git status.
+## Sandbox Procedure
 
+### 1. Create a sandbox copy
+Before modifying the target file, create a copy at:
 ```
-Path:    .claude/worktrees/meta-team-{proposal-id}
-Branch:  meta-team/sandbox-{proposal-id}
-Command: git worktree add .claude/worktrees/meta-team-{proposal-id} -b meta-team/sandbox-{proposal-id}
+state/meta-team/sandbox/{proposal_id}/{target_filename}
 ```
 
-### Cleanup
-
-After promotion, discard, or deferral, the worktree and branch are removed:
-
+Example:
 ```
-git worktree remove .claude/worktrees/meta-team-{proposal-id}
-git branch -D meta-team/sandbox-{proposal-id}
+state/meta-team/sandbox/proposal-3/vertical-planning.md
 ```
 
-### Boot Cleanup (Stale Worktree Detection)
+### 2. Write to the sandbox copy
+All writes and edits go to the sandbox copy — not the live path.
 
-On cycle boot, any existing `.claude/worktrees/meta-team-*` directories indicate
-a crashed previous cycle. These are forcefully removed:
+### 3. Validate the sandbox copy
+Run the same test checks that step-05 (testing) would run, but against the sandbox copy:
+- Cross-reference integrity: does anything link TO this file? If so, verify the path is correct.
+- Schema compliance: does the content follow the appropriate schema?
+- Content safety: if modifying an existing file, is the line count > 50% of original?
 
-```
-for wt in .claude/worktrees/meta-team-*; do
-  git worktree remove "$wt" --force 2>/dev/null
-done
-# Also clean orphaned branches:
-git branch --list 'meta-team/sandbox-*' | xargs -r git branch -D
-```
+### 4. Promote or discard
+If validation passes:
+- Copy the sandbox file to the live target path
+- Delete the sandbox copy
+- Record the change as promoted
 
-## Destructiveness Enforcement
+If validation fails:
+- Leave the sandbox copy in place (it serves as evidence for the failure report)
+- Record the change as `blocked: sandbox_validation_failed` with details
+- Do NOT copy to live path
 
-### Threshold (from charter)
+---
 
-A change is **destructive** if:
-- It removes **>50% of content** (by line count) from a single file
-- It **deletes a file** entirely
-
-### Algorithm
-
-```
-For each modified file in the worktree diff:
-  original_lines = wc -l <file on main branch>
-  modified_lines = wc -l <file in worktree>
-
-  if original_lines > 0 and modified_lines < (original_lines * 0.5):
-    REJECT: "Destructive change — {file} lost >50% of content"
-    REJECT: "  Original: {original_lines} lines, Modified: {modified_lines} lines"
-    REJECT: "  Removal: {100 - (modified_lines/original_lines * 100)}%"
-
-For each deleted file in the worktree diff:
-  REJECT: "Destructive change — {file} deleted entirely"
-```
-
-### Edge Cases
-
-- New files (additions only): always pass — no original content to compare
-- Empty files (0 lines): skip comparison — division by zero guard
-- Binary files: skip line counting — structural validation handles format
-
-## Structural Validation
-
-### YAML Files
-
-- Parse with `safe_load` (or equivalent safe parser)
-- Must succeed without errors
-- Frontmatter in markdown files: parse YAML between `---` delimiters
-
-### Markdown Files
-
-- Check for expected structure based on file location:
-  - Agent personas: must have `##` headers for key sections
-  - Reference docs: must have `#` title
-  - Step files: must have `# Phase/Step` title
-- Check for broken internal links (best-effort)
-
-### Validation Output
-
-```yaml
-structural_validation:
-  - file: "hive/agents/researcher.md"
-    format: markdown
-    result: pass
-    notes: null
-  - file: "hive/workflows/meta-team-cycle.workflow.yaml"
-    format: yaml
-    result: pass
-    notes: null
-```
-
-## Heuristic Analysis (Advisory)
-
-Heuristic checks raise flags but do NOT block promotion. The reviewer uses
-these flags when making the keep/discard/defer decision.
-
-### Safety Keyword Scan
-
-Scan the diff for removal of safety-related keywords:
-- "constraint", "must not", "never", "required", "safety", "do not"
-- "mandatory", "prohibited", "forbidden", "always"
-
-If any safety keyword is in a removed line: flag as `safety-keyword-removal`.
-
-### Charter Contradiction Check
-
-Compare proposed changes against charter constraints:
-- Does the change expand scope beyond charter-defined artifact types?
-- Does the change weaken any of the 5 constraints?
-- Does the change modify the charter itself? (always flag)
-
-### Cross-File Consistency
-
-Best-effort check for inconsistencies:
-- If a persona references a skill, does the skill exist?
-- If a workflow references an agent, does the persona exist?
-- If a gate policy references an evaluator, does the evaluator pattern exist?
-
-### Heuristic Output
-
-```yaml
-heuristic_analysis:
-  flags:
-    - type: "safety-keyword-removal"
-      file: "hive/agents/researcher.md"
-      line: 45
-      keyword: "must not"
-      context: "Removed line: '- Must not exceed the time budget for research phases'"
-      severity: "warning"
-  advisory_notes:
-    - "Change removes a time constraint — verify this is intentional"
-  overall: "1 flag raised — reviewer should verify safety keyword removal"
-```
-
-## Promotion Protocol
-
-### Pre-Promotion
-
-1. Verify baseline tag exists: `git tag -l 'meta-team/baseline-{date}'`
-2. If not: `git tag meta-team/baseline-{date}`
-
-### Cherry-Pick
+## Sandbox Directory Structure
 
 ```
-git cherry-pick {commit-sha-from-worktree-branch}
+state/meta-team/sandbox/
+├── proposal-1/
+│   └── {filename}
+├── proposal-2/
+│   └── {filename}
+└── proposal-3/
+    └── {filename}
 ```
 
-Commit message format: `meta-team: {description} [opt-{id}]`
+The sandbox directory is cleaned up during the close step (step-08). All sandbox files are deleted after the cycle closes, whether the proposal was promoted or not.
 
-For user-approved deferred changes: `meta-team: {description} [opt-{id}] (user-approved)`
+---
 
-### Post-Promotion Verification
+## Fast Path (No Sandbox)
 
-After cherry-pick succeeds:
-- Parse all promoted files on main (structural validation)
-- If parse fails: `git revert HEAD` immediately, log as discard
-
-### Conflict Handling
-
-If cherry-pick conflicts:
-- `git cherry-pick --abort`
-- Log: verdict: discard, reason: "merge conflict during promotion"
-- Clean up worktree
-- Do NOT attempt manual conflict resolution
-
-## Rollback Protocol
-
-### Trigger
-
-Auto-rollback is triggered when the next cycle's boot phase detects
->10% degradation in any objective metric compared to the baseline.
-
-### Procedure
-
-1. Identify the most recent promotion commit(s) since baseline tag
-2. `git revert {specific-commit-sha}` (per-commit granularity)
-3. Write ledger entry: verdict update with rollback evidence
-4. Re-queue the target with `attempted_count` incremented
-5. Log: "Auto-rollback: {file} — {metric} degraded from {baseline} to {current}"
-
-### Manual Rollback
-
-To rollback to a specific baseline:
+For low-risk changes — new files with no cross-references — write directly to the live path:
 ```
-git log meta-team/baseline-{date}..HEAD --oneline
-# Identify commits to revert
-git revert {commit-sha}
+hive/references/new-topic.md       ← write here directly
+skills/hive/agents/memories/...    ← write here directly
 ```
 
-## Deferred Change Preservation
+The implementation step (step-04) determines which path to use based on the proposal's `risk_score`:
+- `risk_score ≤ 2`: write directly to live path
+- `risk_score ≥ 3`: use sandbox
 
-When a change receives a `defer` verdict:
+---
 
-1. Generate patch file:
-   ```
-   git diff main..meta-team/sandbox-{id} > state/meta-team/deferred/{id}.patch
-   ```
-2. Include full context in patch (for clean later application)
-3. Update queue entry: `status: needs-user-review`
-4. Clean up worktree (patch preserves the change)
+## Sandbox Validation Checks
 
-### Patch Application (via /meta-team review)
+These are the same checks as step-05 but run on the sandbox copy:
 
-When a user approves a deferred change:
-1. Create fresh worktree
-2. Apply patch: `git apply state/meta-team/deferred/{id}.patch`
-3. Run promotion protocol (same as nightly cycle)
-4. On conflict: flag to user (don't force-apply stale patches)
+| Check | Pass Condition |
+|-------|---------------|
+| Cross-reference integrity | All paths referenced in the new content exist in the live codebase |
+| Schema compliance | Content follows the required schema for its file type |
+| Content safety | Line count ≥ 50% of original (for modifications only) |
+| Path validity | The file will be written to the correct domain per charter scope |
 
-## Ledger Integration
-
-### On Keep (Promoted)
-
-```yaml
-- id: "opt-{date}-{seq}"
-  verdict: "keep"
-  promoted: true
-  commit: "{git-sha}"
-  reason: null
-```
-
-### On Discard
-
-```yaml
-- id: "opt-{date}-{seq}"
-  verdict: "discard"
-  promoted: false
-  commit: null
-  reason: "destructive|conflict|validation|test-failure"
-```
-
-### On Defer
-
-```yaml
-- id: "opt-{date}-{seq}"
-  verdict: "defer"
-  promoted: false
-  commit: null
-  reason: "subjective — needs user review"
-```
+If all checks pass: promote.
+If any check fails: discard sandbox, record failure.

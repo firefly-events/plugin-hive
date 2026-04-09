@@ -1,76 +1,129 @@
-# Phase 7: Promotion
+# Step 7: Promotion
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
-- Do NOT promote changes that were discarded or deferred
-- Do NOT leave orphaned worktrees — clean up ALL worktrees in every code path
-- Create baseline tag before first promotion if not already created
-- One commit per promoted change on main
-- Check budget at phase start — skip to Phase 8 if <90 min remaining
-- STUBBED in baseline cycle (S3) — log "Phase 7 skipped — baseline cycle" and advance
+- Read this entire step file before taking any action
+- Changes with `needs_revision` verdict MUST be reverted — do not leave broken content in place
+- `needs_optimization` changes are kept as-is with a follow-up note for the next cycle
+- `pass` changes are kept and may generate memory insights
+- Do NOT revert changes that passed — even if you think they could be better
+- Reverting means restoring the prior file content, not deleting the file
 
 ## EXECUTION PROTOCOLS
 
 **Mode:** autonomous
 
-The orchestrator cherry-picks kept changes to main, preserves deferred changes
-as patch files, and cleans up all worktrees.
+Promote approved changes. Revert rejected changes. Write insights for the next cycle.
 
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
-- Verdicts from Phase 6 (keep/discard/defer per proposal)
-- Worktrees from Phase 4 (with implemented changes)
-- state/meta-team/cycle-state.yaml — baseline tag reference
+- `evaluation_results` from step 6 — verdicts per change
+- Full codebase read/write access within charter domain
+- `state/meta-team/cycle-state.yaml`
 
 **NOT available:**
-- External state beyond the cycle's scope
+- User input
+- The ability to change a `needs_revision` verdict — that's set
 
 ## YOUR TASK
 
-Promote kept changes, preserve deferred changes, discard rejected changes,
-and clean up all worktrees.
+Apply the evaluation verdicts: keep passing changes, revert rejected ones, and capture any insights worth preserving for the meta-team's own memory.
 
 ## TASK SEQUENCE
 
-1. **Ensure baseline tag exists**
-   - If `baseline_tag` is null: `git tag meta-team/baseline-{today}`
-   - Record in cycle-state.yaml
+### 1. Process `needs_revision` changes
+For each change with `needs_revision` verdict:
+- If the change created a new file: write a note in `cycle-state.yaml` under `reverted`. The file will remain but should be treated as incomplete. Flag it for the next cycle's analysis.
+- If the change modified an existing file: check if the modification can be isolated. If so, restore the original content of the affected section. If not (the change is entangled), flag for human review.
+- Record: `status: reverted` or `status: flagged_for_human`
 
-2. **Process kept changes (verdict: keep)**
-   - For each kept proposal:
-     a. Cherry-pick from worktree branch to main:
-        `git cherry-pick {commit-sha}`
-     b. Commit message format: `meta-team: {description} [opt-{id}]`
-     c. Post-promotion verify: parse promoted files on main (structural check)
-     d. On cherry-pick conflict: reject, log "merge conflict" in ledger, treat as discard
+### 2. Process `pass` and `needs_optimization` changes
+For each change with `pass` or `needs_optimization` verdict:
+- Leave the file as-is
+- Record: `status: promoted`
+- For `needs_optimization`: add a note in `cycle-state.yaml` with the optimization suggestion for the next cycle
 
-3. **Process deferred changes (verdict: defer)**
-   - For each deferred proposal:
-     a. Generate patch: `git diff main..meta-team/sandbox-{id} > state/meta-team/deferred/{id}.patch`
-     b. Update queue entry: status → `needs-user-review`
-     c. Clean up worktree
+### 3. Generate meta-team insights
+Look for patterns across the cycle's work that would help future cycles run better:
 
-4. **Process discarded changes (verdict: discard)**
-   - For each discarded proposal:
-     a. Log discard reason in ledger
-     b. Clean up worktree
+Examples of promotable insights:
+- A finding category that appears frequently → pattern insight for analysis step
+- An implementation approach that worked well → pattern for implementation step
+- A type of change that often gets `needs_revision` → pitfall for proposal step
 
-5. **Clean up ALL worktrees**
-   - For each worktree at `.claude/worktrees/meta-team-*`:
-     a. `git worktree remove {path}`
-     b. `git branch -D meta-team/sandbox-{id}`
-   - Verify: no meta-team worktrees remain
+For each insight worth capturing, write to `state/insights/meta-team/cycle-{cycle-id}/`:
+```yaml
+agent: researcher  # or architect, developer, etc. — whoever benefits
+type: pattern | pitfall | override
+summary: "{one-line description}"
+detail: |
+  {Full explanation. Be specific.}
+scope: universal
+```
 
-## ROLLBACK PROTOCOL
+### 4. Compile promoted and reverted lists
+```
+promoted:
+  - proposal_id: {id}
+    file: {path}
+    verdict: pass | needs_optimization
+    optimization_note: {if applicable}
 
-If a promoted change needs rollback (detected in next cycle's boot):
-- `git revert {specific-commit-sha}`
-- Log revert in ledger with degradation evidence
-- Re-queue target with `attempted_count` incremented
-- Rollback is per-commit granularity (individual promotions revertible)
+reverted:
+  - proposal_id: {id}
+    file: {path}
+    reason: {revision notes from evaluation}
+    action_taken: reverted | flagged_for_human
+```
 
-## PHASE TRANSITION
+### 5. Update cycle-state.yaml
+Append to `state/meta-team/cycle-state.yaml`:
+```yaml
+phase: promotion
+promoted_changes: {N}
+reverted_changes: {N}
+flagged_for_human: {N}
+insights_staged: {N}
+promoted:
+  - {promoted objects}
+reverted:
+  - {reverted objects}
+```
 
-On success: advance to Phase 8 (Close).
-On cleanup failure: log warning, advance to Phase 8 anyway (boot will retry cleanup).
+### 6. Produce promotion report
+```
+## Promotion Report — Cycle {cycle_id}
+
+Promoted: {N}
+Reverted: {N}
+Flagged for human: {N}
+Insights staged: {N}
+
+Promoted changes:
+  {proposal_id} — {file} [{verdict}]
+    {optimization_note if applicable}
+
+Reverted changes:
+  {proposal_id} — {file}: {reason}
+```
+
+## SUCCESS METRICS
+
+- [ ] All `needs_revision` changes have a revert or flag action taken
+- [ ] All `pass` and `needs_optimization` changes recorded as promoted
+- [ ] Any insights staged to `state/insights/meta-team/`
+- [ ] `cycle-state.yaml` updated with promotion results
+- [ ] Promotion report produced
+
+## FAILURE MODES
+
+- File can't be restored (no original content available): flag for human with full context
+- Insight staging fails: log warning, continue — insights are best-effort
+- No changes promoted (all reverted): valid outcome — record as `partial` cycle
+
+## NEXT STEP
+
+**Gating:** Promotion report produced. All `needs_revision` changes actioned.
+**Next:** Load `hive/workflows/steps/meta-team-cycle/step-08-close.md`
+**If gating fails:** Report which changes could not be processed.

@@ -1,102 +1,167 @@
 name: meta-team-cycle
 description: >
-  Meta Team nightly optimization cycle — autonomous self-improvement pipeline.
-  8-phase cycle: boot, analysis, proposal, implementation, testing, evaluation,
-  promotion, close. 5-agent pipeline within a 5-hour budget window.
+  Autonomous nightly self-improvement cycle for the Hive plugin codebase.
+  Runs unattended at 3 AM CDT. Analyzes, proposes, implements, and promotes
+  targeted improvements within the constraints defined in the meta-team charter.
 version: "1.0.0"
-methodology: meta-team
-
-# ENFORCEMENT RULES:
-# 1. Boot MUST acquire cycle lock before any other phase runs
-# 2. Budget enforcement at every phase boundary: <90 min remaining → skip to close
-# 3. Analysis is the only phase in the baseline cycle (S3) — phases 3-7 are stubbed
-# 4. Independent evaluation: architect (proposer) != reviewer (evaluator)
-# 5. All changes validated in sandbox worktree before promotion
-# 6. Subjective changes deferred with needs-user-review tag, never auto-promoted
-# 7. One worktree per proposal — never shared between concurrent proposals
-#
-# SCHEDULING:
-# - CronCreate: "3 3 * * *" (3:03 AM CST nightly), durable mode
-# - Re-register on interactive session start (mitigate 7-day expiry)
-# - Manual trigger supported for testing (S3 baseline cycle)
-#
-# STATE FILES (all at state/meta-team/):
-# - cycle-state.yaml — cycle progress + concurrent lock
-# - ledger.yaml — optimization outcomes log
-# - queue.yaml — prioritized optimization targets
-# - analysis-cache.yaml — cached findings with TTL
-# - charter.md — read-only operating constraints
-#
-# BUDGET:
-# - Total: 300 minutes (5 hours)
-# - Phase-skip threshold: 90 minutes
-# - Proposals per cycle: 1-3
 
 steps:
   - id: boot
-    phase: 1
     agent: orchestrator
-    step_file: workflows/steps/meta-team-cycle/step-01-boot.md
     task: >
-      Acquire cycle lock, load all state files, prune expired analysis-cache
-      entries, detect interrupted cycles, create baseline git tag.
+      Initialize the meta-team cycle. Load the charter, previous ledger state,
+      and any staged work from a prior incomplete cycle.
+    step_file: hive/workflows/steps/meta-team-cycle/step-01-boot.md
+    outputs:
+      - name: cycle_id
+        type: string
+      - name: prior_ledger
+        type: json
+      - name: boot_report
+        type: string
 
   - id: analysis
-    phase: 2
     agent: researcher
-    step_file: workflows/steps/meta-team-cycle/step-02-analysis.md
     task: >
-      Scan Hive internals for optimization targets. Check personas, skills,
-      workflows, gate policies. Deduplicate against ledger. Output prioritized
-      targets to queue. Extensions: external research (S6), memory targeting (S7).
+      Analyze the Hive codebase for improvement opportunities: missing files,
+      broken cross-references, incomplete schemas, gaps in agent memories, and
+      clarity issues in step files.
+    step_file: hive/workflows/steps/meta-team-cycle/step-02-analysis.md
+    depends_on:
+      - boot
+    inputs:
+      - name: cycle_id
+        source: step_output
+        step_id: boot
+        output_name: cycle_id
+    outputs:
+      - name: findings
+        type: json
+      - name: analysis_report
+        type: string
 
   - id: proposal
-    phase: 3
     agent: architect
-    step_file: workflows/steps/meta-team-cycle/step-03-proposal.md
     task: >
-      Read top N targets from queue (N=1-3 based on budget). Produce structured
-      proposals with target file, change type, description, rationale, expected
-      impact, and rollback plan. (Stubbed in baseline cycle.)
+      Review analysis findings and produce a ranked proposal list. Each proposal
+      includes rationale, risk level, and an implementation plan within charter
+      constraints.
+    step_file: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
+    depends_on:
+      - analysis
+    inputs:
+      - name: findings
+        source: step_output
+        step_id: analysis
+        output_name: findings
+    outputs:
+      - name: approved_proposals
+        type: json
+      - name: skipped_proposals
+        type: json
 
   - id: implementation
-    phase: 4
     agent: developer
-    step_file: workflows/steps/meta-team-cycle/step-04-implementation.md
     task: >
-      Create worktree per proposal. Implement actual file edits from architect's
-      proposal. Do not redesign or expand scope. (Stubbed in baseline cycle.)
+      Implement each approved proposal in sequence. Write files, add sections,
+      create memories. Record each change with before/after notes.
+    step_file: hive/workflows/steps/meta-team-cycle/step-04-implementation.md
+    depends_on:
+      - proposal
+    inputs:
+      - name: approved_proposals
+        source: step_output
+        step_id: proposal
+        output_name: approved_proposals
+    outputs:
+      - name: changes_made
+        type: json
+      - name: implementation_report
+        type: string
 
   - id: testing
-    phase: 5
     agent: tester
-    step_file: workflows/steps/meta-team-cycle/step-05-testing.md
     task: >
-      Run sandbox validation suite per worktree: destructiveness check, structural
-      validation, heuristic analysis. Output pass/fail with metrics.
-      (Stubbed in baseline cycle.)
+      Validate all changes: verify cross-references resolve, schemas are valid,
+      step files follow the required structure, and no existing content was
+      broken.
+    step_file: hive/workflows/steps/meta-team-cycle/step-05-testing.md
+    depends_on:
+      - implementation
+    inputs:
+      - name: changes_made
+        source: step_output
+        step_id: implementation
+        output_name: changes_made
+    outputs:
+      - name: test_results
+        type: json
+      - name: validation_report
+        type: string
 
   - id: evaluation
-    phase: 6
     agent: reviewer
-    step_file: workflows/steps/meta-team-cycle/step-06-evaluation.md
     task: >
-      Independently evaluate each proposal. See tester metrics and diff only (not
-      architect's rationale). Verdict: keep, discard, or defer.
-      (Stubbed in baseline cycle.)
+      Evaluate results against charter objectives. Score each change.
+      Determine which changes pass quality bar and which need revision.
+    step_file: hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
+    depends_on:
+      - testing
+    inputs:
+      - name: changes_made
+        source: step_output
+        step_id: implementation
+        output_name: changes_made
+      - name: test_results
+        source: step_output
+        step_id: testing
+        output_name: test_results
+    outputs:
+      - name: evaluation_results
+        type: json
+      - name: verdict
+        type: string
 
   - id: promotion
-    phase: 7
     agent: orchestrator
-    step_file: workflows/steps/meta-team-cycle/step-07-promotion.md
     task: >
-      Cherry-pick kept changes to main. Save deferred changes as patch files.
-      Clean up all worktrees. (Stubbed in baseline cycle.)
+      Promote approved changes. Write insights to starter memory staging.
+      Revert any changes that didn't meet quality bar.
+    step_file: hive/workflows/steps/meta-team-cycle/step-07-promotion.md
+    depends_on:
+      - evaluation
+    inputs:
+      - name: evaluation_results
+        source: step_output
+        step_id: evaluation
+        output_name: evaluation_results
+    outputs:
+      - name: promoted_changes
+        type: json
+      - name: reverted_changes
+        type: json
 
   - id: close
-    phase: 8
     agent: orchestrator
-    step_file: workflows/steps/meta-team-cycle/step-08-close.md
     task: >
-      Write ledger entries, update queue, prune old ledger entries, generate
-      morning summary, release cycle lock, clean exit.
+      Close the cycle. Update cycle-state.yaml and ledger.yaml. Prepare morning
+      summary. Commit all changes.
+    step_file: hive/workflows/steps/meta-team-cycle/step-08-close.md
+    depends_on:
+      - promotion
+    inputs:
+      - name: cycle_id
+        source: step_output
+        step_id: boot
+        output_name: cycle_id
+      - name: promoted_changes
+        source: step_output
+        step_id: promotion
+        output_name: promoted_changes
+      - name: reverted_changes
+        source: step_output
+        step_id: promotion
+        output_name: reverted_changes
+    outputs:
+      - name: morning_summary
+        type: string

@@ -1,4 +1,9 @@
-state/
+state/*
+# meta-team state and team configs are plugin-level and should be tracked
+!state/meta-team/
+!state/meta-team/**
+!state/teams/
+!state/teams/**
 agents/memories/
 .claude/settings.local.json
 .history/

@@ -1,51 +1,111 @@
-# Phase 4: Implementation
+# Step 4: Implementation
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
-- Do NOT modify files on the main branch — all edits happen in worktrees
-- Do NOT expand scope beyond the architect's proposal
-- Do NOT redesign — implement exactly what was proposed
-- One worktree per proposal — never share worktrees between proposals
-- Check budget at phase start — skip to Phase 8 if <90 min remaining
-- STUBBED in baseline cycle (S3) — log "Phase 4 skipped — baseline cycle" and advance
+- Read this entire step file before taking any action
+- Implement ONLY the approved proposals from step 3 — no scope creep
+- Read each target file before writing to it — even for new files, check if it already exists
+- NEVER remove more than 50% of a file's existing content in a single operation
+- NEVER delete any file
+- For additive changes: append or insert; do not replace existing content unless fixing a specific named error
+- Record each change with file path, action type, and a brief description
 
 ## EXECUTION PROTOCOLS
 
 **Mode:** autonomous
 
-The developer creates an isolated worktree for each proposal and implements
-the specified changes. Scope is strictly bounded by the architect's proposal.
+Implement each approved proposal in priority order. Record changes in `cycle-state.yaml` as you go.
 
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
-- Architect's proposals (from Phase 3 output)
-- The target files in the worktree (read-write)
-- state/meta-team/charter.md — scope boundaries
+- `approved_proposals` JSON from step 3 (each with implementation_plan)
+- Full codebase read/write access within charter domain
+- `state/meta-team/cycle-state.yaml` for recording changes
 
 **NOT available:**
-- Original analysis rationale (developer works from proposal spec only)
+- User input
+- Changes to files outside the charter domain
+- Config file modifications
 
 ## YOUR TASK
 
-Implement each proposal in its own worktree.
+Execute each approved proposal's implementation plan. Write new files, add sections, create memory entries. Track every change made.
 
 ## TASK SEQUENCE
 
-1. **For each proposal:**
-   a. Create worktree:
-      `git worktree add .claude/worktrees/meta-team-{proposal-id} -b meta-team/sandbox-{proposal-id}`
-   b. In the worktree, implement the change described in `change_spec`
-   c. Commit the change in the worktree branch:
-      `meta-team: {description} [opt-{proposal-id}]`
-   d. Update cycle-state: `in_flight_target_id: {target_id}`
+### 1. Process proposals in priority order
+For each approved proposal (highest priority first):
 
-2. **Scope enforcement:**
-   - Only modify files listed in the proposal's `target` field
-   - Do not refactor adjacent code
-   - Do not add features beyond the proposal
+#### 1a. Re-read the target file(s)
+Before making any change, read the current content of every file in the implementation plan. Confirm:
+- The issue the proposal addresses is still present (it might have been fixed by a prior proposal in the same cycle)
+- The proposed action won't conflict with existing content
 
-## PHASE TRANSITION
+#### 1b. Execute each implementation plan step
+For `action: create`:
+- Check the file doesn't already exist
+- Write the new file following the appropriate schema (step-file-schema, agent-memory-schema, workflow-schema, etc.)
 
-On success: advance to Phase 5 (Testing).
-On worktree creation failure: log error, skip proposal, continue with remaining.
+For `action: add_section`:
+- Read current file content
+- Identify the insertion point (end of file, after a specific section, etc.)
+- Add the section without altering surrounding content
+
+For `action: update_field`:
+- Read current file content
+- Update the specific named field only
+- Leave all other content unchanged
+
+For `action: add_entry`:
+- Read current file content
+- Append the new entry to the appropriate list or section
+
+#### 1c. Record the change
+Immediately after each file write, append to `state/meta-team/cycle-state.yaml`:
+```yaml
+# Under changes:
+- proposal_id: proposal-{N}
+  action: {action type}
+  file: {file path}
+  description: {what was written / added / changed}
+  status: done
+```
+
+### 2. Handle blocked proposals
+If a proposal cannot be implemented as planned (target file has changed, dependency missing, content conflict):
+- Record it as `status: blocked` with a reason
+- Do NOT attempt a workaround — skip it cleanly
+- Continue with remaining proposals
+
+### 3. Produce implementation report
+```
+## Implementation Report — Cycle {cycle_id}
+
+Changes made: {N}
+Blocked proposals: {N}
+
+Changes:
+  [done] {proposal_id} — {file}: {description}
+  [blocked] {proposal_id} — {reason}
+```
+
+## SUCCESS METRICS
+
+- [ ] Each approved proposal attempted in priority order
+- [ ] Each target file read before writing
+- [ ] No existing file content removed beyond the minimum needed to fix the named issue
+- [ ] Each completed change recorded in `cycle-state.yaml`
+- [ ] Implementation report produced
+
+## FAILURE MODES
+
+- File write fails: log as blocked, continue with remaining proposals
+- Content conflict (target section already exists or was added by a prior proposal): log as blocked with reason `already_exists`, skip
+- Accidental scope creep: revert the change, record as blocked with reason `scope_creep`
+
+## NEXT STEP
+
+**Gating:** At least one change recorded in `cycle-state.yaml`, OR all proposals blocked with reasons.
+**Next:** Load `hive/workflows/steps/meta-team-cycle/step-05-testing.md`
+**If gating fails:** Report which proposals failed and why. Do not advance without at least one completed change.

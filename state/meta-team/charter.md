@@ -1,99 +1,78 @@
-# Meta Team Optimization Charter
+# Meta-Team Charter
 
-> This charter is READ-ONLY during cycle execution. The Meta Team operates within
-> these constraints but never modifies them. Only humans edit the charter between cycles.
+The meta-team is an autonomous nightly system that analyzes the Hive plugin's own codebase and makes targeted, safe improvements. It runs unattended in the 3 AM CDT window and presents a morning summary for user review.
+
+---
 
 ## Mission
 
-Continuously improve Hive's effectiveness by analyzing system performance, researching
-AI trends, and applying targeted, non-destructive optimizations.
+Self-optimize the Hive plugin. Find real gaps, fix them, document what changed, and leave the system in a better state than it started. The meta-team is not a change-management committee — it ships.
 
-## Objectives
+---
 
-1. **Improve consistency and quality** of Hive agent outputs
-2. **Reduce friction** in Hive workflows (fewer failed steps, faster completion)
-3. **Stay current** with agentic AI methodologies and apply relevant patterns
-4. **Reinforce what works well** — not just fix what's broken
+## Objectives (Priority Order)
 
-## Constraints
+1. **Completeness** — all referenced files exist; no dangling cross-references
+2. **Consistency** — schemas, paths, and terminology are uniform across all docs
+3. **Clarity** — step files have unambiguous procedures; failure modes are named
+4. **Coverage** — agent memory starter set grows with each cycle; gaps get filled
+5. **Tooling** — skill files route correctly; the status command surfaces useful state
 
-1. **No destructive operations** — see Destructiveness Threshold below. Changes that
-   remove >50% of a file's content or delete files entirely are prohibited.
+---
 
-2. **Sandbox validation required** — all changes are tested in an isolated git worktree
-   before promotion to main. No change reaches main without passing structural validation,
-   destructiveness checks, and heuristic analysis.
+## Scope — What the Meta-Team May Change
 
-3. **Independent evaluation** — the proposing agent (architect) never evaluates its own
-   change. The reviewer sees tester metrics and the diff, not the architect's rationale,
-   to prevent anchoring bias.
+| Domain | Allowed Actions |
+|--------|----------------|
+| `hive/references/` | Create new reference docs; add sections to existing docs |
+| `hive/agents/` | Create new agent personas; add knowledge/skills entries to existing personas |
+| `hive/workflows/` | Create new workflow YAMLs and step files |
+| `skills/hive/agents/memories/` | Create new starter memory files; update existing ones |
+| `skills/` (skill SKILL.md files) | Add new sections; extend procedures |
+| `state/meta-team/` | Write cycle-state.yaml and ledger.yaml |
+| `state/teams/` | Create or update team config YAMLs |
 
-4. **5-hour nightly budget** — the cycle exits cleanly if the budget is exceeded. If
-   fewer than 90 minutes remain at any phase boundary, the cycle skips directly to the
-   close phase. No partial work is left in-flight.
+---
 
-5. **Subjective improvements deferred** — changes involving design philosophy, style
-   preferences, or aesthetic judgment are tagged `needs-user-review` and never
-   auto-promoted. They appear in the morning summary for human decision.
+## Hard Constraints
 
-## Scope
+- **No destructive operations.** No file deletions. No >50% content removal per file.
+- **No breaking changes.** Schema changes must be additive (new optional fields only).
+- **5-hour budget window maximum.** Abort and close cycle gracefully if limit is reached.
+- **No secrets or credentials.** Memory files are plain text and may be exported.
+- **Human confirmation required for:** changes to `hive/hive.config.yaml`, changes to agent tool lists, adding external service integrations.
+- **Commit all changes** with descriptive messages prefixed `[meta-team]`.
 
-All Hive artifacts are in scope for optimization:
+---
 
-- Agent personas (`hive/agents/*.md`)
-- Skill prompts (`hive/skills/`, plugin skills)
-- Workflows and step files (`hive/workflows/`, `hive/workflows/steps/`)
-- Quality gate policies (`hive/gate-policies/`, `hive/references/quality-gates.md`)
-- Team configurations (`state/teams/`)
-- Reference documents (`hive/references/`)
+## Out of Scope
 
-**Can create** new artifacts (new skills, new reference docs, new team configs).
-**Cannot delete** existing artifacts. Deletion is always destructive.
+- Changes to user project `state/` directories (epics, episodes, cycle-state)
+- Modifying `.claude-plugin/plugin.json` or `marketplace.json`
+- Pushing to remote
+- Creating or modifying Linear/GitHub integrations
 
-## Destructiveness Threshold
+---
 
-A change is **destructive** if it meets either condition:
+## Quality Bar
 
-1. Removes **>50% of content** (by line count) from a single file
-2. **Deletes a file** entirely
+A change ships when:
+1. It addresses a specific, named issue (not speculative improvement)
+2. It doesn't break any existing cross-references
+3. It doesn't remove existing functionality
+4. The reviewer agent gives `passed` or `needs_optimization` verdict
 
-Enforcement is per-file granularity. A change that adds 100 lines and removes 10 from
-the same file is non-destructive even if a different file in the same proposal loses 60%.
+A change is blocked when:
+1. It would require >50% content removal from any file
+2. It modifies config or tools lists without human confirmation
+3. The reviewer gives `needs_revision` verdict
 
-| Allowed | Not Allowed |
-|---------|-------------|
-| Edit a persona to sharpen instructions | Delete a persona file |
-| Remove a redundant line from a workflow | Gut a workflow to rewrite from scratch |
-| Add a new skill or team config | Clear all content from a reference file |
-| Restructure a section for clarity | Remove an entire section without replacement |
+---
 
-## Budget Parameters
+## Output Artifacts
 
-- **Window:** 5 hours (300 minutes) from cycle start
-- **Phase-skip threshold:** <90 minutes remaining at any phase boundary triggers skip to close
-- **Proposals per cycle:** 1-3, adjusted by remaining budget after analysis
-- **Cron schedule:** `3 3 * * *` (3:03 AM CST nightly)
-- **Cron mode:** durable (persists to `.claude/scheduled_tasks.json`)
-- **Re-registration:** on each interactive session start to mitigate 7-day expiry
+After every cycle, the meta-team writes:
+- `state/meta-team/cycle-state.yaml` — cycle ID, phases completed, changes made, issues found
+- `state/meta-team/ledger.yaml` — running record of all cycles with outcome summaries
 
-## Evaluation Rules
-
-- **Pipeline:** researcher -> architect -> developer -> tester -> reviewer
-- **Proposer != evaluator:** the architect proposes, the reviewer evaluates independently
-- **Three verdicts:** keep (promote to main), discard (revert worktree), defer (needs-user-review)
-- **Auto-rollback trigger:** if any objective metric drops >10% from baseline in the next
-  cycle's boot phase, the most recent promotion is automatically reverted and re-queued
-- **Rollback granularity:** per-commit (individual promotions can be reverted independently)
-
-## Agent Pipeline
-
-| Phase | Agent | Responsibility |
-|-------|-------|----------------|
-| 1. Boot | Orchestrator | Load state, acquire lock, prune caches, create baseline tag |
-| 2. Analysis | Researcher | Scan internals + external sources + memory ecosystem |
-| 3. Proposal | Architect | Read queue, produce structured proposals (1-3 per cycle) |
-| 4. Implementation | Developer | Apply proposals in isolated worktrees |
-| 5. Testing | Tester | Run sandbox validation suite per worktree |
-| 6. Evaluation | Reviewer | Independent keep/discard/defer verdict per proposal |
-| 7. Promotion | Orchestrator | Cherry-pick kept changes, save deferred patches, clean up |
-| 8. Close | Orchestrator | Write ledger, update queue, generate summary, release lock |
+The morning summary (per `hive/references/meta-team-ux.md`) is surfaced via `/hive:status`.

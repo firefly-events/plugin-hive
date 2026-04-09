@@ -1,110 +1,140 @@
-# Phase 2: Analysis
+# Step 2: Analysis
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
-- Do NOT modify any Hive files — analysis is read-only
-- Do NOT re-queue targets that match recently discarded ledger entries (within 5 cycles)
-- Do NOT exceed per-source time budgets (when external research is enabled)
-- Check budget at phase start — skip to Phase 8 if <90 min remaining
+- Read this entire step file before taking any action
+- ONLY read — no writing to the Hive codebase in this step
+- Run all checks in the prescribed order — skipping checks leads to missed findings
+- Do NOT propose solutions in this step — only identify and document problems
+- Respect charter scope: only flag issues in domains the meta-team is allowed to change
 
 ## EXECUTION PROTOCOLS
 
 **Mode:** autonomous
 
-Scan Hive internals for optimization targets. The researcher identifies patterns,
-inefficiencies, and improvement opportunities across the codebase.
+Systematic scan of the Hive codebase. Produce a findings report. Do not fix anything.
 
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
-- state/meta-team/charter.md — objectives and scope definition
-- state/meta-team/ledger.yaml — avoid re-attempting discarded targets
-- state/meta-team/queue.yaml — avoid duplicating existing targets
-- state/meta-team/analysis-cache.yaml — skip already-cached findings
-- hive/agents/*.md — agent persona files
-- hive/workflows/ — workflow and step files
-- hive/references/ — reference documents
-- hive/gate-policies/ — quality gate configurations
+- `cycle_id` from step 1
+- The full Hive codebase under `hive/` and `skills/`
+- `state/meta-team/charter.md` — scope boundaries
+- `state/meta-team/cycle-state.yaml` — for writing findings to disk
 
-**Extension points (not in baseline cycle):**
-- External research: Reddit, HN, AI blogs (S6)
-- Memory targeting: feedback memories, trust scores, episodes (S7)
+**NOT available:**
+- User input
+- Prior cycle findings (for independence — re-analyze fresh each cycle)
 
 ## YOUR TASK
 
-Scan Hive's internal structure and identify optimization targets. Output prioritized
-targets in queue schema format.
+Systematically audit the Hive plugin codebase and produce a ranked findings list with severity and category for each issue.
 
 ## TASK SEQUENCE
 
-### Internal Analysis (baseline cycle)
+### 1. Cross-reference audit — dangling references
+For each reference doc listed in `hive/GUIDE.md` and `hive/MAIN.md`:
+- Check that the referenced file actually exists at the stated path
+- Record any files listed but missing as `MISSING_FILE` findings
 
-1. **Scan agent personas** (`hive/agents/*.md`)
-   - Look for: unclear instructions, missing scope boundaries, redundant sections,
-     outdated patterns, missing time budgets
-   - Cross-reference with charter objectives
+Also check: all `step_file` paths in workflow YAML files actually exist.
 
-2. **Scan skills and workflows** (`hive/workflows/`, step files)
-   - Look for: friction points, missing steps, unclear agent handoffs,
-     inconsistent patterns across workflows
-   - Check step files for completeness and clarity
+### 2. Schema consistency audit
+Compare field usage across instances of the same schema type:
+- Read 3+ agent persona files and check frontmatter field consistency
+- Read 2+ team config files (if they exist) and check schema compliance
+- Read workflow YAML files and confirm steps follow `workflow-schema.md`
 
-3. **Scan reference documents** (`hive/references/`)
-   - Look for: outdated guidance, missing topics, inconsistencies with actual patterns
+Record any missing required fields or undocumented fields as `SCHEMA_INCONSISTENCY` findings.
 
-4. **Scan gate policies** (`hive/gate-policies/`, `hive/references/quality-gates.md`)
-   - Look for: overly strict or lenient gates, missing evaluation criteria,
-     gates that don't match current workflow needs
+### 3. Step file completeness audit
+For each step file under `hive/workflows/steps/`:
+- Verify it contains all 7 required sections per `step-file-schema.md`:
+  1. Title (`# Step N: Name`)
+  2. MANDATORY EXECUTION RULES
+  3. EXECUTION PROTOCOLS
+  4. CONTEXT BOUNDARIES
+  5. YOUR TASK / TASK SEQUENCE
+  6. SUCCESS METRICS
+  7. FAILURE MODES and NEXT STEP
+- Record incomplete step files as `INCOMPLETE_STEP_FILE` findings
 
-5. **Deduplicate against ledger**
-   - For each potential target: check ledger for discarded entries on the same target
-     within the last 5 cycles
-   - If match found: skip (don't re-queue recently failed targets)
-   - Also check queue.yaml: skip targets already queued
+### 4. Agent memory starter set audit
+For each agent in the roster (listed in `hive/GUIDE.md`):
+- Check if `skills/hive/agents/memories/{agent}/` contains any `.md` files beyond `.gitkeep`
+- Agents with zero memories: record as `MEMORY_GAP` finding (low severity — expected for new agents)
+- Agents with memories: check frontmatter completeness (required: name, description, type)
 
-6. **Prioritize and output targets**
-   - Priority scoring:
-     - Internal-recurring (pattern across multiple files/agents): priority 1
-     - Internal-one-off (single file improvement): priority 2
-     - External-sourced (from S6): priority 3-4
-   - Each target must include all queue schema fields:
-     - id, target, type, priority, description, source, source_attribution,
-       source_evidence, status: "queued", created, attempted_count: 0
+### 5. Reference documentation audit
+For each doc in `hive/references/`:
+- Read the first 20 lines to confirm it has a title, clear purpose statement, and usable content
+- Flag docs that are stubs (< 30 lines of content) as `STUB_DOC` findings
 
-7. **Cache findings**
-   - Write all findings to analysis-cache.yaml with 3-day TTL (internal)
-   - Set `converted_to_target: true` for findings that became queue entries
+### 6. Workflow completeness audit
+Read each workflow YAML in `hive/workflows/`:
+- Confirm `name`, `version`, `steps` fields present
+- Confirm each step has either `task` or `step_file`
+- Flag missing step files as `MISSING_STEP_FILE` findings
 
-### External Research Extension (S6 — not in baseline)
-
-- Multi-pass web scanning with per-source time budgets
-- Applicability scoring (>= 0.5 threshold)
-- Source attribution (URLs, dates)
-
-### Memory Targeting Extension (S7 — not in baseline)
-
-- Feedback memory pattern detection (2+ occurrences)
-- Trust score trend analysis
-- Episode performance analysis
-
-## PHASE TRANSITION
-
-On success: write targets to queue.yaml, update analysis-cache.yaml, advance to Phase 3.
-In baseline cycle: Phases 3-7 are stubbed, advance directly to Phase 8 (close).
-
-## OUTPUT FORMAT
-
+### 7. Compile findings
+For each finding, record:
 ```yaml
-# Each target the researcher identifies:
-- id: "target-{date}-{seq}"
-  target: "hive/agents/researcher.md"
-  type: "persona-edit"
-  priority: 2
-  description: "Tighten scope discipline — 3 feedback memories mention sprawl"
-  source: "internal-analysis"
-  source_attribution: "hive/agents/researcher.md — scope section lacks time budget"
-  source_evidence: "Persona has no explicit time constraint for research phases"
-  status: "queued"
-  created: "{now}"
-  attempted_count: 0
+id: finding-{N}
+category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | OTHER
+severity: critical | high | medium | low
+location: {file path}
+description: {one-line description}
+evidence: {specific field, line, or pattern that demonstrates the issue}
 ```
+
+Sort findings by severity descending, then by category.
+
+### 8. Update cycle-state.yaml
+Append all findings to `state/meta-team/cycle-state.yaml`:
+```yaml
+phase: analysis
+findings:
+  - {finding objects}
+```
+
+### 9. Produce analysis report
+```
+## Analysis Report — Cycle {cycle_id}
+
+Total findings: {N}
+  Critical: {N}
+  High: {N}
+  Medium: {N}
+  Low: {N}
+
+By category:
+  MISSING_FILE: {N}
+  SCHEMA_INCONSISTENCY: {N}
+  INCOMPLETE_STEP_FILE: {N}
+  MEMORY_GAP: {N}
+  STUB_DOC: {N}
+  OTHER: {N}
+
+Top findings:
+  [{severity}] {category} — {location}: {description}
+  ...
+```
+
+## SUCCESS METRICS
+
+- [ ] All 6 audit checks executed (cross-ref, schema, step files, memories, reference docs, workflows)
+- [ ] Each finding has category, severity, location, description, evidence
+- [ ] Findings appended to `cycle-state.yaml`
+- [ ] Analysis report produced with counts by severity and category
+
+## FAILURE MODES
+
+- File not found during audit: log as finding, continue (don't stop the audit)
+- YAML parse error on a workflow/config file: log as `critical` finding, continue
+- Large codebase slows scan: prioritize critical and high checks; skip low checks if time is short
+
+## NEXT STEP
+
+**Gating:** Analysis report complete with at least one finding (or explicit "no findings" if clean)
+**Next:** Load `hive/workflows/steps/meta-team-cycle/step-03-proposal.md`
+**If gating fails:** Report which audit checks could not run and why.
