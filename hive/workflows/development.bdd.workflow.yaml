@@ -1,0 +1,221 @@
+name: development-bdd
+description: BDD development workflow — behavior specs first, then implement and test.
+version: "1.0.0"
+methodology: bdd
+
+# AGENT ROUTING:
+# Steps reference generic agent roles (e.g., "developer"). The team lead resolves
+# these to specific roster agents at runtime based on the story's scope:
+#   developer → frontend-developer (UI/component work) or backend-developer (API/server work)
+
+steps:
+  - id: research
+    agent: researcher
+    task: >
+      Read the story spec and explore the codebase. Gather raw findings:
+      affected files, existing patterns, architectural constraints, risks,
+      reusable utilities, and external references. Deliver structured raw
+      findings — do NOT write a formatted brief.
+    depends_on: []
+    inputs:
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: research_findings
+        type: string
+    optional: false
+    timeout_ms: 300000
+
+  - id: write-brief
+    agent: technical-writer
+    task: >
+      Receive raw research findings and produce a formatted research brief.
+      Use the research-brief skill if available. The brief should be
+      actionable for the analyst and developer: where to start, what to reuse,
+      what to watch out for.
+    depends_on:
+      - research
+    inputs:
+      - name: research_findings
+        source: step_output
+        step_id: research
+        output_name: research_findings
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: research_brief
+        type: string
+    optional: false
+    timeout_ms: 180000
+
+  - id: behavior-spec
+    agent: analyst
+    task: >
+      Write formal behavior specifications in Given/When/Then format from the
+      story spec and research brief. Each acceptance criterion becomes one or
+      more scenarios. Cover the happy path, error cases, and edge cases. These
+      specs drive both implementation and testing — they are the contract.
+    depends_on:
+      - write-brief
+    inputs:
+      - name: research_brief
+        source: step_output
+        step_id: write-brief
+        output_name: research_brief
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: behavior_specs
+        type: string
+    optional: false
+    timeout_ms: 300000
+
+  - id: implement
+    agent: developer
+    task: >
+      Implement the story to satisfy the behavior specifications. Each Given/When/Then
+      scenario must be satisfied by the implementation. Follow existing patterns
+      identified in the research phase. Write clean, minimal code.
+    depends_on:
+      - behavior-spec
+    inputs:
+      - name: behavior_specs
+        source: step_output
+        step_id: behavior-spec
+        output_name: behavior_specs
+      - name: research_brief
+        source: step_output
+        step_id: write-brief
+        output_name: research_brief
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: implementation
+        type: string
+    optional: false
+    timeout_ms: 600000
+
+  - id: test
+    agent: tester
+    task: >
+      Derive tests from the behavior specifications. Each Given/When/Then scenario
+      becomes one or more test cases. Tests verify the implementation satisfies
+      the behavior contract. Use existing test patterns from the research brief.
+      Verify all tests pass.
+    depends_on:
+      - implement
+    inputs:
+      - name: behavior_specs
+        source: step_output
+        step_id: behavior-spec
+        output_name: behavior_specs
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: research_brief
+        source: step_output
+        step_id: write-brief
+        output_name: research_brief
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: test_results
+        type: string
+    optional: false
+    timeout_ms: 600000
+
+  - id: review
+    agent: reviewer
+    task: >
+      Review the implementation, tests, and behavior specs for correctness,
+      security, performance, and convention compliance. Check that all behavior
+      scenarios are covered by tests and satisfied by implementation. Produce
+      a verdict: passed, needs_optimization, or needs_revision.
+    depends_on:
+      - test
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: test_results
+        source: step_output
+        step_id: test
+        output_name: test_results
+      - name: behavior_specs
+        source: step_output
+        step_id: behavior-spec
+        output_name: behavior_specs
+      - name: research_brief
+        source: step_output
+        step_id: write-brief
+        output_name: research_brief
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: review_verdict
+        type: string
+      - name: review_findings
+        type: string
+    optional: false
+    timeout_ms: 300000
+
+  - id: optimize
+    agent: developer
+    task: >
+      Apply the improvements listed in the review findings. Address each
+      needs_optimization item. Do not change behavior — only improve quality,
+      performance, or clarity as directed. Re-verify all tests still pass.
+    depends_on:
+      - review
+    inputs:
+      - name: review_findings
+        source: step_output
+        step_id: review
+        output_name: review_findings
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: optimized_implementation
+        type: string
+    optional: true
+    timeout_ms: 600000
+
+  - id: integrate
+    agent: developer
+    task: >
+      Commit and integrate the implementation. Stage all changed files, write a
+      clear commit message following the repository convention, and push to the
+      feature branch. Verify CI passes if available. Report the commit hash and
+      files changed.
+    depends_on:
+      - review
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: review_verdict
+        source: step_output
+        step_id: review
+        output_name: review_verdict
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: commit_ref
+        type: string
+    optional: false
+    timeout_ms: 600000

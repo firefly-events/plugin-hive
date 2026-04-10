@@ -1,0 +1,191 @@
+name: ui-design
+description: UI wireframing workflow using Frame0 CLI with step files. Produces .f0 wireframes, PNG exports, and design briefs.
+version: "1.0.0"
+methodology: ui-design
+
+# ENFORCEMENT RULES:
+# 1. All steps use the ui-designer agent persona
+# 2. Each step has a step_file — the step file is the authoritative procedure
+# 3. Steps are strictly sequential — each depends on the previous
+# 4. Design context discovery (step 1) is MANDATORY — no wireframes without it
+# 5. No shell variable assignments in Frame0 CLI commands (causes permission prompts)
+# 6. All cli-anything-frame-zero commands should be pre-approved (non-destructive, sandboxed)
+
+steps:
+  - id: read-story
+    agent: ui-designer
+    step_file: workflows/steps/ui-design/step-01-read-story.md
+    task: >
+      Read the story spec and discover existing design context (wireframes,
+      design tokens, component patterns). Produce a screen list and design
+      context report.
+    depends_on: []
+    inputs:
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: screen_list
+        type: string
+      - name: design_context
+        type: string
+    optional: false
+    timeout_ms: 120000
+
+  - id: discover-tools
+    agent: ui-designer
+    step_file: workflows/steps/ui-design/step-02-discover-tools.md
+    task: >
+      Check for Frame0 CLI, live export capability, and image generation
+      MCP tools. Produce a tool report.
+    depends_on:
+      - read-story
+    inputs:
+      - name: screen_list
+        source: step_output
+        step_id: read-story
+        output_name: screen_list
+    outputs:
+      - name: tool_report
+        type: string
+    optional: false
+    timeout_ms: 60000
+
+  - id: plan-screens
+    agent: ui-designer
+    step_file: workflows/steps/ui-design/step-03-plan-screens.md
+    task: >
+      Plan layout, component hierarchy, and build order for every screen.
+      Reference existing design patterns. Produce screen manifest.
+    depends_on:
+      - read-story
+      - discover-tools
+    inputs:
+      - name: screen_list
+        source: step_output
+        step_id: read-story
+        output_name: screen_list
+      - name: design_context
+        source: step_output
+        step_id: read-story
+        output_name: design_context
+      - name: tool_report
+        source: step_output
+        step_id: discover-tools
+        output_name: tool_report
+    outputs:
+      - name: screen_manifest
+        type: string
+    optional: false
+    timeout_ms: 180000
+
+  - id: create-project
+    agent: ui-designer
+    step_file: workflows/steps/ui-design/step-04-create-project.md
+    task: >
+      Create .f0 project file and add one page per planned screen.
+      Capture all page IDs.
+    depends_on:
+      - plan-screens
+    inputs:
+      - name: screen_manifest
+        source: step_output
+        step_id: plan-screens
+        output_name: screen_manifest
+    outputs:
+      - name: f0_project
+        type: string
+      - name: page_id_mapping
+        type: string
+    optional: false
+    timeout_ms: 120000
+
+  - id: build-wireframe
+    agent: ui-designer
+    step_file: workflows/steps/ui-design/step-05-build-wireframe.md
+    task: >
+      Build wireframe shapes on each page following the manifest build order.
+      Device frame first, then containers, then content, then labels and icons.
+    depends_on:
+      - create-project
+    inputs:
+      - name: screen_manifest
+        source: step_output
+        step_id: plan-screens
+        output_name: screen_manifest
+      - name: f0_project
+        source: step_output
+        step_id: create-project
+        output_name: f0_project
+      - name: page_id_mapping
+        source: step_output
+        step_id: create-project
+        output_name: page_id_mapping
+      - name: design_context
+        source: step_output
+        step_id: read-story
+        output_name: design_context
+    outputs:
+      - name: wireframes
+        type: string
+    optional: false
+    timeout_ms: 600000
+
+  - id: export
+    agent: ui-designer
+    step_file: workflows/steps/ui-design/step-06-export.md
+    task: >
+      Export each page as PNG if live mode available, or produce export
+      commands for manual execution.
+    depends_on:
+      - build-wireframe
+    inputs:
+      - name: f0_project
+        source: step_output
+        step_id: create-project
+        output_name: f0_project
+      - name: page_id_mapping
+        source: step_output
+        step_id: create-project
+        output_name: page_id_mapping
+      - name: tool_report
+        source: step_output
+        step_id: discover-tools
+        output_name: tool_report
+    outputs:
+      - name: export_summary
+        type: string
+    optional: false
+    timeout_ms: 120000
+
+  - id: design-brief
+    agent: ui-designer
+    step_file: workflows/steps/ui-design/step-07-design-brief.md
+    task: >
+      Produce one design brief per screen with layout, components,
+      interactions, states, and accessibility notes.
+    depends_on:
+      - build-wireframe
+      - export
+    inputs:
+      - name: screen_manifest
+        source: step_output
+        step_id: plan-screens
+        output_name: screen_manifest
+      - name: wireframes
+        source: step_output
+        step_id: build-wireframe
+        output_name: wireframes
+      - name: export_summary
+        source: step_output
+        step_id: export
+        output_name: export_summary
+      - name: design_context
+        source: step_output
+        step_id: read-story
+        output_name: design_context
+    outputs:
+      - name: design_briefs
+        type: string
+    optional: false
+    timeout_ms: 180000

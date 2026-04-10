@@ -1,0 +1,427 @@
+name: development-classic
+description: Classic development workflow — implement first, then test and review.
+version: "2.0.0"
+methodology: classic
+
+# ENFORCEMENT RULES:
+# 1. Preflight MUST pass before any other step runs
+# 2. Research is skippable for low-complexity stories (orchestrator decides)
+# 3. Test step MUST produce test artifacts — review is BLOCKED without them
+# 4. Platform verification required for cross-platform stories
+# 5. Each step MUST run as a SEPARATE agent instance — no self-review, no shared context
+#    between researcher and developer (developer should not "remember" research shortcuts)
+#
+# AGENT ROUTING:
+# Steps reference generic agent roles (e.g., "developer"). The team lead resolves
+# these to specific roster agents at runtime based on the story's scope:
+#   developer → frontend-developer (UI/component work) or backend-developer (API/server work)
+# The generic "developer" agent is kept for backward compatibility.
+#
+# MULTI-DOMAIN STORIES:
+# When a story spans both frontend and backend, the team lead executes the
+# implement step as two sequential sub-steps (backend first, then frontend).
+# Both agents' changes are merged into a single "implementation" output that
+# downstream steps (test, review) consume. The team lead tracks which agent
+# modified which files for domain validation.
+
+steps:
+  - id: preflight
+    agent: researcher
+    step_file: workflows/steps/development-classic/step-01-preflight.md
+    task: >
+      Before any implementation, verify the project is in a buildable state:
+      1. Run the project's build command (from CLAUDE.md or project config)
+      2. Verify critical config files exist (check story context for platform-specific files)
+      3. If cross-platform: verify each platform builds independently
+      4. Report: build status per platform, missing configs, blocking issues
+
+      If preflight FAILS: halt execution. Mark story as blocked. The issue
+      must be resolved before any code changes. This prevents wasting time
+      implementing on a broken foundation.
+    depends_on: []
+    inputs:
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: preflight_status
+        type: string
+    optional: false
+    timeout_ms: 300000
+
+  - id: research
+    agent: researcher
+    step_file: workflows/steps/development-classic/step-02-research.md
+    task: >
+      Read the story spec and explore the codebase. Gather raw findings:
+      affected files, existing patterns, architectural constraints, risks,
+      reusable utilities, and external references. Deliver structured raw
+      findings — do NOT write a formatted brief.
+
+      SKIP THIS STEP for low-complexity stories. The orchestrator decides based on
+      the story's complexity field. Low = skip research, read files directly.
+    depends_on:
+      - preflight
+    inputs:
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: research_findings
+        type: string
+    optional: true
+    skip_when: "story.complexity == 'low'"
+    timeout_ms: 300000
+
+  - id: write-brief
+    agent: technical-writer
+    task: >
+      Receive raw research findings and produce a formatted research brief.
+      Use the research-brief skill if available. The brief should be
+      actionable for the developer: where to start, what to reuse, what
+      to watch out for.
+
+      This agent is short-lived: write the document, record any insights,
+      then shut down.
+    depends_on:
+      - research
+    inputs:
+      - name: research_findings
+        source: step_output
+        step_id: research
+        output_name: research_findings
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: research_brief
+        type: string
+    optional: true
+    skip_when: "story.complexity == 'low'"
+    timeout_ms: 180000
+
+  - id: implement
+    agent: developer
+    step_file: workflows/steps/development-classic/step-03-implement.md
+    task: >
+      Implement the story according to the spec and research brief. Follow existing
+      patterns identified in the research phase. Write clean, minimal code — only
+      what is needed. Do not add extra features, error handling, or abstractions
+      beyond the story scope.
+
+      IMPORTANT: You are a SEPARATE agent from the researcher and writer. Do not
+      rely on context you "remember" from prior phases — work from the research
+      brief and story spec only. This ensures you follow the spec, not shortcuts.
+    depends_on:
+      - preflight
+      - write-brief
+    inputs:
+      - name: research_brief
+        source: step_output
+        step_id: write-brief
+        output_name: research_brief
+        optional: true
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: implementation
+        type: string
+    optional: false
+    timeout_ms: 600000
+
+  - id: test
+    agent: tester
+    step_file: workflows/steps/development-classic/step-05-test.md
+    task: >
+      Write tests for the implementation. Tests should cover the acceptance criteria
+      in the story spec. Use the existing test patterns found during research. Include
+      unit tests for core logic and integration tests for system boundaries. Verify
+      tests pass against the implementation.
+
+      You MUST produce test artifacts (test files). This step cannot complete
+      with only a "tests look good" assessment — actual test code is required.
+      The review step is BLOCKED until test artifacts exist.
+    depends_on:
+      - implement
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: research_brief
+        source: step_output
+        step_id: write-brief
+        output_name: research_brief
+        optional: true
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: test_results
+        type: string
+      - name: test_artifacts
+        type: artifact_ref
+    optional: false
+    gate: "test_artifacts must not be empty"
+    timeout_ms: 600000
+
+  - id: platform-verify
+    agent: tester
+    step_file: workflows/steps/development-classic/step-04-platform-verify.md
+    task: >
+      For cross-platform stories: build and run on EACH target platform to verify
+      the implementation works everywhere, not just where it was developed.
+
+      1. Identify target platforms from story spec and project profile
+      2. Build on each platform (e.g., ./gradlew assembleDebug, xcodebuild)
+      3. Run platform-specific tests if they exist
+      4. Report: pass/fail per platform with any platform-specific issues
+
+      SKIP THIS STEP if the story is single-platform or backend-only.
+    depends_on:
+      - test
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: platform_results
+        type: string
+    optional: true
+    skip_when: "story is single-platform or backend-only"
+    timeout_ms: 600000
+
+  - id: review
+    agent: reviewer
+    step_file: workflows/steps/development-classic/step-06-review.md
+    task: >
+      Review the implementation AND tests for correctness, security, performance,
+      and convention compliance. Check that all acceptance criteria are satisfied.
+
+      GATE: This step MUST NOT run unless the test step produced actual test
+      artifacts. If test_artifacts is empty, reject and send back to test step.
+
+      If platform-verify ran, review those results too — flag any platform
+      where builds failed or tests didn't pass.
+
+      The reviewer MUST be a different agent instance than the developer.
+
+      Produce a verdict: passed, needs_optimization, or needs_revision.
+    depends_on:
+      - test
+      - platform-verify
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: test_results
+        source: step_output
+        step_id: test
+        output_name: test_results
+      - name: test_artifacts
+        source: step_output
+        step_id: test
+        output_name: test_artifacts
+      - name: platform_results
+        source: step_output
+        step_id: platform-verify
+        output_name: platform_results
+      - name: research_brief
+        source: step_output
+        step_id: write-brief
+        output_name: research_brief
+        optional: true
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: review_verdict
+        type: string
+      - name: review_findings
+        type: string
+    optional: false
+    timeout_ms: 300000
+
+  - id: codex-review
+    agent: reviewer
+    task: >
+      Run a Codex adversarial review on the implementation using the codex
+      companion script. This provides a second-model perspective after the
+      Claude review — different training, different blind spots.
+
+      Execute:
+      ```
+      node "{codex-companion-path}" adversarial-review "--scope auto"
+      ```
+
+      Parse the Codex output. If it finds P1 or P2 issues:
+      - Add them to codex_findings
+      - Set codex_verdict to "needs_attention"
+      If no significant issues: set codex_verdict to "passed"
+
+      This step is OPTIONAL — controlled by hive.config.yaml external_models.codex.enabled.
+      Skip silently if Codex is not enabled, not installed, or not authenticated.
+    depends_on:
+      - review
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: review_verdict
+        source: step_output
+        step_id: review
+        output_name: review_verdict
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: codex_verdict
+        type: string
+      - name: codex_findings
+        type: string
+    optional: true
+    skip_when: "external_models.codex.enabled is false or Codex CLI is not installed"
+    timeout_ms: 300000
+
+  - id: optimize
+    agent: developer
+    step_file: workflows/steps/development-classic/step-07-optimize.md
+    task: >
+      Apply the improvements listed in the review findings. Address each
+      needs_optimization item. Do not change behavior — only improve quality,
+      performance, or clarity as directed. Re-verify that acceptance criteria
+      are still satisfied after changes. If Codex review found additional issues,
+      address those as well.
+    depends_on:
+      - review
+      - codex-review
+    inputs:
+      - name: review_findings
+        source: step_output
+        step_id: review
+        output_name: review_findings
+      - name: codex_findings
+        source: step_output
+        step_id: codex-review
+        output_name: codex_findings
+        optional: true
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: optimized_implementation
+        type: string
+    optional: true
+    timeout_ms: 600000
+
+  - id: dev-standby
+    agent: developer
+    step_file: workflows/steps/development-classic/step-05b-dev-standby.md
+    task: >
+      Stay idle while the test swarm runs. The dev agent has full
+      implementation context and can fix bugs faster than a cold agent.
+      Receive bug reports from sentinel via SendMessage. Fix, re-test,
+      report back. Circuit breaker: max 3 fix attempts per bug.
+      Only shut down when all tests green or circuit breaker trips.
+    depends_on:
+      - review
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: fix_report
+        type: string
+    optional: true
+    skip_when: "no test swarm is running for this story"
+    timeout_ms: 1800000
+
+  - id: integrate
+    agent: developer
+    step_file: workflows/steps/development-classic/step-08-integrate.md
+    task: >
+      Commit and integrate the implementation. Stage all changed files, write a
+      clear commit message following the repository convention, and push to the
+      feature branch. Verify CI passes if available. Report the commit hash and
+      files changed.
+    depends_on:
+      - review
+      - codex-review
+      - dev-standby
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: review_verdict
+        source: step_output
+        step_id: review
+        output_name: review_verdict
+      - name: codex_verdict
+        source: step_output
+        step_id: codex-review
+        output_name: codex_verdict
+        optional: true
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: commit_ref
+        type: string
+    optional: false
+    timeout_ms: 600000
+
+  - id: doc-check
+    agent: technical-writer
+    task: >
+      After integration, check whether the changes require documentation updates.
+      Scan the implementation diff and story spec. Ask:
+
+      1. Did we add, rename, or remove a public-facing feature, command, or config option?
+      2. Did we change agent behavior, workflow phases, or planning process?
+      3. Did we add new reference docs, skills, or agents?
+      4. Did we change file paths, storage locations, or directory structure?
+
+      If YES to any: identify which docs need updating (README, GUIDE, reference docs,
+      config comments) and produce a brief update plan. If the structured outline
+      flagged documentation impact, start from that list.
+
+      If NO to all: report "no doc updates needed" and shut down.
+
+      This is a lightweight check — not a full rewrite. Flag what needs changing
+      so it can be addressed before the story is considered complete.
+    depends_on:
+      - integrate
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: commit_ref
+        source: step_output
+        step_id: integrate
+        output_name: commit_ref
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: doc_update_plan
+        type: string
+    optional: true
+    skip_when: "story.complexity == 'low'"
+    timeout_ms: 180000

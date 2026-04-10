@@ -1,0 +1,50 @@
+- cycle_id: meta-2026-04-09
+  date: "2026-04-09"
+  started: "2026-04-09T03:00:00Z"
+  closed: "2026-04-09T04:45:00Z"
+  verdict: passed
+  changes_promoted: 21
+  changes_reverted: 0
+  findings_identified: 7
+  top_changes:
+    - hive/workflows/meta-team-cycle.workflow.yaml: bootstrapped the 8-phase nightly cycle workflow
+    - hive/workflows/steps/meta-team-cycle/: created all 8 step files with full schema compliance
+    - hive/references/meta-team-{ux,nightly-cycle,sandbox,external-research,memory-targeting}.md: created 5 meta-team reference docs
+    - hive/references/vertical-planning.md: created missing H/V planning methodology reference (was cited in README.md but absent)
+    - skills/status/SKILL.md: added section 8 — meta-team morning summary integration
+    - skills/hive/agents/memories/team-lead/: 2 starter memories (pitfall + pattern)
+    - skills/hive/agents/memories/architect/: 2 starter memories (pitfall + pattern)
+    - skills/hive/agents/memories/tpm/: 2 starter memories (pattern × 2)
+  commit: 6a23b42067591ddfba941869a020e8ec6b1bc4b6
+  notes: >
+    First cycle. Full bootstrap of the meta-team infrastructure from scratch. All 7 findings
+    addressed. 13 roster agents still have zero starter memories — analyst, tester,
+    frontend-developer, backend-developer, and peer-validator are top priority for next cycle.
+
+- cycle_id: meta-2026-04-10
+  date: "2026-04-10"
+  started: "2026-04-10T03:00:00Z"
+  closed: "2026-04-10T04:30:00Z"
+  verdict: passed
+  changes_promoted: 15
+  changes_reverted: 0
+  findings_identified: 9
+  top_changes:
+    - skills/hive/agents/memories/analyst/: 2 starter memories (traceability pitfall + measurable-criteria pattern)
+    - skills/hive/agents/memories/peer-validator/: 2 starter memories (scope-lane pitfall + check-order pattern)
+    - hive/references/insight-capture.md: expanded stub 13→119 lines with full format, criteria, and example
+    - skills/hive/agents/memories/technical-writer/: 2 starter memories (prose-drift pitfall + skill-routing pattern)
+    - skills/hive/agents/memories/ui-designer/: 2 starter memories (Frame0-check pitfall + naming pattern)
+    - skills/hive/agents/memories/test-scout/: 2 starter memories (framework-detect pattern + never-assume pitfall)
+    - skills/hive/agents/memories/test-architect/: 2 starter memories (strategy-first pattern + overlap pitfall)
+    - skills/hive/agents/memories/test-inspector/: 1 starter memory (delta report format)
+    - skills/hive/agents/memories/test-sentinel/: 1 starter memory (three-gate pass criteria)
+  commit: 1ed945ef90c4defa5b6ea5bd0d224940cad31f60
+  notes: >
+    Second cycle. Continued memory coverage expansion: added starter memories for 8 previously-empty
+    agents (analyst, peer-validator, technical-writer, ui-designer, test-scout, test-architect,
+    test-inspector, test-sentinel) and expanded insight-capture.md from a 13-line stub to a full
+    reference doc. 4 roster agents still have zero starter memories: accessibility-specialist,
+    animations-specialist, idiomatic-reviewer, and performance-reviewer. Next cycle priority:
+    these 4 remaining agents. Also: test-inspector and test-sentinel each have only 1 memory
+    and could benefit from a second in the next cycle.

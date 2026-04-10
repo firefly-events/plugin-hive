@@ -1,0 +1,142 @@
+name: design-review
+description: Design review ceremony — accessibility and animations specialists contribute domain critiques; ui-designer synthesizes findings into a verdict. Mirrors code-review.workflow.yaml shape.
+version: "1.0.0"
+timeout_ms: 2700000
+
+steps:
+  - id: accessibility-critique
+    agent: accessibility-specialist
+    task: >
+      Review the design artifacts for accessibility issues and WCAG 2.1 AA compliance.
+      Evaluate: ARIA patterns in any implementation referenced by the briefs, keyboard
+      navigation implications of the proposed layouts, touch target sizing in wireframes,
+      color contrast of the brand palette, semantic structure of the proposed UI.
+      Flag any design-level decisions (not just code issues) that would create
+      accessibility barriers. Produce a domain critique using your Work Report format.
+    depends_on: []
+    inputs:
+      - name: design_artifacts
+        source: context
+        context_key: design_artifacts
+    outputs:
+      - name: accessibility_critique
+        type: string
+    optional: true
+    timeout_ms: 600000
+
+  - id: animations-critique
+    agent: animations-specialist
+    task: >
+      Review the design artifacts for animation and motion design quality.
+      Evaluate: whether proposed interactions have appropriate motion feedback,
+      loading state treatments, transition quality between screens, missing
+      microinteractions that would improve UX, prefers-reduced-motion considerations.
+      Reference the accessibility critique (if provided) — flag any animations
+      that compound accessibility issues identified there.
+      Produce a domain critique using your Work Report format.
+    depends_on:
+      - accessibility-critique
+    inputs:
+      - name: design_artifacts
+        source: context
+        context_key: design_artifacts
+      - name: accessibility_critique
+        source: step_output
+        step_id: accessibility-critique
+        output_name: accessibility_critique
+        optional: true
+    outputs:
+      - name: animations_critique
+        type: string
+    optional: true
+    timeout_ms: 600000
+
+  - id: design-critique
+    agent: ui-designer
+    task: >
+      Review the design artifacts from a UI/UX design perspective.
+      Evaluate: visual hierarchy and information architecture, consistency with
+      established design patterns and brand system, usability heuristics (Nielsen's 10),
+      cognitive load and progressive disclosure, interaction design quality.
+      Reference state/brand/brand-system.yaml if available — flag any brand deviations.
+      Reference prior critiques (if provided) to avoid duplicating findings.
+      Produce a domain critique using your Work Report format.
+    depends_on:
+      - animations-critique
+    inputs:
+      - name: design_artifacts
+        source: context
+        context_key: design_artifacts
+      - name: accessibility_critique
+        source: step_output
+        step_id: accessibility-critique
+        output_name: accessibility_critique
+        optional: true
+      - name: animations_critique
+        source: step_output
+        step_id: animations-critique
+        output_name: animations_critique
+        optional: true
+    outputs:
+      - name: design_critique
+        type: string
+    optional: false
+    timeout_ms: 600000
+
+  - id: synthesis
+    agent: ui-designer
+    task: >
+      Synthesize all domain critiques into a unified design review verdict.
+      Collect findings from: accessibility critique (if run), animations critique
+      (if run), and your own design critique. Merge and deduplicate findings.
+      Rank by severity: blocking (design intent broken, accessibility violation) →
+      significant (UX degraded, brand inconsistency) → cosmetic (minor polish).
+      Produce a structured verdict:
+
+      ## Design Review: {artifacts reviewed}
+
+      ## Findings
+      - `{file-or-brief}:{section}` — {finding} [severity: blocking | significant | cosmetic] [domain: accessibility | motion | design]
+
+      ## Recommended Changes
+      - {specific actionable change with rationale}
+
+      ## Remaining Questions
+      - Design decisions requiring human input before proceeding
+
+      ## Summary
+      One-paragraph assessment of overall design quality and readiness to proceed.
+
+      ## Verdict
+      approved | needs_revision | needs_redesign
+
+      Verdict criteria:
+      - approved: no blocking findings; significant findings are documented for follow-up
+      - needs_revision: one or more blocking findings that must be addressed before implementation
+      - needs_redesign: fundamental design approach is flawed; requires re-scoping
+    depends_on:
+      - accessibility-critique
+      - animations-critique
+      - design-critique
+    inputs:
+      - name: accessibility_critique
+        source: step_output
+        step_id: accessibility-critique
+        output_name: accessibility_critique
+        optional: true
+      - name: animations_critique
+        source: step_output
+        step_id: animations-critique
+        output_name: animations_critique
+        optional: true
+      - name: design_critique
+        source: step_output
+        step_id: design-critique
+        output_name: design_critique
+    outputs:
+      - name: review_verdict
+        type: string
+      - name: review_summary
+        type: string
+    optional: false
+    timeout_ms: 600000

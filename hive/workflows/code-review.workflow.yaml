@@ -1,0 +1,80 @@
+name: code-review
+description: Structured code review workflow for /hive:review command.
+version: "1.0.0"
+
+steps:
+  - id: analyze
+    agent: researcher
+    task: >
+      Analyze the scope and complexity of the code changes. Identify: number of
+      files changed, modules affected, types of changes (new feature, refactor,
+      bug fix, config change). Flag any high-risk areas (security-sensitive code,
+      shared utilities, public APIs). Produce a scope analysis that helps the
+      reviewer focus attention.
+    depends_on: []
+    inputs:
+      - name: diff
+        source: context
+        context_key: diff_content
+    outputs:
+      - name: scope_analysis
+        type: string
+    optional: false
+    timeout_ms: 300000
+
+  - id: review
+    agent: reviewer
+    task: >
+      Review the code changes for correctness, security, performance, and
+      convention compliance. Use the scope analysis to prioritize attention
+      on high-risk areas. Categorize each finding as: critical (must fix),
+      improvement (should fix), or nit (optional). Produce a verdict:
+      passed (no critical findings), needs_optimization (improvements
+      recommended), or needs_revision (critical issues must be addressed).
+    depends_on:
+      - analyze
+    inputs:
+      - name: scope_analysis
+        source: step_output
+        step_id: analyze
+        output_name: scope_analysis
+      - name: diff
+        source: context
+        context_key: diff_content
+    outputs:
+      - name: review_verdict
+        type: string
+      - name: review_findings
+        type: string
+    optional: false
+    timeout_ms: 300000
+
+  - id: summarize
+    agent: researcher
+    task: >
+      Synthesize the scope analysis and review findings into a structured
+      summary. Group findings by category (security, correctness, performance,
+      convention, clarity, testing). Lead with the verdict and critical issues.
+      Produce the final review output in the format specified by the review
+      command in MAIN.md.
+    depends_on:
+      - analyze
+      - review
+    inputs:
+      - name: scope_analysis
+        source: step_output
+        step_id: analyze
+        output_name: scope_analysis
+      - name: review_verdict
+        source: step_output
+        step_id: review
+        output_name: review_verdict
+      - name: review_findings
+        source: step_output
+        step_id: review
+        output_name: review_findings
+    outputs:
+      - name: review_summary
+        type: string
+    optional: false
+    timeout_ms: 300000

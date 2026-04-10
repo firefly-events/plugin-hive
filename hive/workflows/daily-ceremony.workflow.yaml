@@ -1,0 +1,225 @@
+name: daily-ceremony
+description: Daily orchestrator ceremony — standup, planning, execution, testing, push.
+version: "2.1.0"
+
+# This workflow runs at session start with a fresh 1M Opus orchestrator.
+# It is NOT a development workflow — it coordinates the day's work.
+#
+# TASK TRACKING MODES:
+# The ceremony works in two modes based on hive.config.yaml task_tracking.adapter:
+#
+#   adapter: null (default) — LOCAL MODE
+#     All tracking via status markers (state/episodes/) and cycle state (state/cycle-state/).
+#     Blockers surfaced via cycle state "blocked" status. No external tool required.
+#
+#   adapter: linear — LINEAR MODE
+#     Local tracking PLUS Linear board integration. Tickets created, claimed, transitioned.
+#     See references/linear-integration.md and linear-commands.md.
+#
+# Every phase below has two sections:
+#   - Core operations (always run)
+#   - External tracker operations (only when adapter is configured)
+
+phases:
+  - id: standup
+    description: >
+      Present the current state to the user. Reconstruct context from previous sessions.
+
+      CORE (always):
+      1. Read status markers (state/episodes/) — completed, in-progress, failed stories
+      2. Read cycle state (state/cycle-state/) — accumulated decisions, blocked items
+      3. Read agent memories — any promoted insights from previous sessions
+      4. Present: completed work, in-progress items, blockers, continuation items
+
+      EXTERNAL TRACKER (when adapter configured):
+      - Query board for full status view grouped by columns
+      - Surface human-intervention items as blockers
+      - Detect newly resolved items since last standup
+      - Linear: see references/linear-integration.md (Standup section)
+
+      Output: structured standup report for user review.
+    agent: orchestrator
+    steps:
+      - id: load-state
+        step_file: workflows/steps/daily-ceremony/step-01-load-state.md
+        agent: orchestrator
+      - id: load-memories
+        step_file: workflows/steps/daily-ceremony/step-02-load-memories.md
+        agent: orchestrator
+      - id: present-standup
+        step_file: workflows/steps/daily-ceremony/step-03-present-standup.md
+        agent: orchestrator
+
+  - id: planning
+    description: >
+      After standup, the user short-lists items for today's work.
+
+      CORE (always):
+      1. User provides short list (story IDs, feature descriptions, or bug reports)
+      2. Orchestrator evaluates: already planned as stories? Need new planning?
+      3. If new work: run analyst + architect (+ ui-designer if UI) as planning swarm
+      4. Planning swarm reports back with proposed stories
+      5. Run agent-ready checklist on proposed stories
+      6. Present plan for user approval
+      7. Write story YAML files and epic index
+
+      EXTERNAL TRACKER (when adapter configured):
+      - Create epic parent ticket (if new epic)
+      - Create story sub-tickets linked to epic parent
+      - Record ticket IDs in cycle state
+      - Linear: see references/linear-integration.md (Planning section)
+    agent: orchestrator
+    depends_on: [standup]
+    steps:
+      - id: select-work
+        step_file: workflows/steps/daily-ceremony/step-04-select-work.md
+        agent: orchestrator
+      - id: validate-stories
+        step_file: workflows/steps/daily-ceremony/step-05-validate-stories.md
+        agent: analyst
+      - id: approve-plan
+        step_file: workflows/steps/daily-ceremony/step-06-approve-plan.md
+        agent: orchestrator
+
+  - id: execution
+    description: >
+      After plan approval, kick off dev team(s) to execute the approved work.
+
+      Current mode: one dev team at a time, epics in sequence.
+      Future mode: parallel dev teams across independent epics.
+
+      CORE (always):
+      1. Load story spec and cycle state
+      2. Evaluate: does this need a team or can the lead handle it solo?
+      3. If team needed: spawn team lead → team lead staffs and executes
+      4. If solo: execute directly
+      5. Write status markers after each step
+      6. Capture insights for session-end evaluation
+      7. Update cycle state with decisions made
+
+      EXTERNAL TRACKER (when adapter configured):
+      - Claim ticket (assignment lock) before starting work
+      - Create branch matching ticket convention (enables auto-link)
+      - Update ticket status to In Progress
+      - Linear: see references/linear-integration.md (Execution section)
+    agent: orchestrator
+    depends_on: [planning]
+    steps:
+      - id: kick-off
+        step_file: workflows/steps/daily-ceremony/step-07-kick-off.md
+        agent: orchestrator
+
+  - id: commit
+    description: >
+      After dev execution completes, commit all changes before testing.
+      Clean checkpoint — fixes are separate commits for traceability.
+
+      CORE (always):
+      - Commit with descriptive message referencing epic and stories
+
+      EXTERNAL TRACKER (when adapter configured):
+      - Include ticket ID in commit message (enables auto-link)
+      - Linear: "Refs: {TEAM}-{N}" in commit message
+    agent: orchestrator
+    depends_on: [execution]
+
+  - id: test-handoff
+    description: >
+      Hand off to the test swarm. Package story specs, implementation artifacts,
+      cycle state, and acceptance criteria.
+
+      CORE (always):
+      - Create cross-swarm handoff (see references/cross-swarm-handoff.md)
+      - Run test swarm pipeline (test-swarm.workflow.yaml):
+        context → baseline → author tests → validate coverage
+        → execute (parallel platforms) → file bugs → report
+      - High-severity bugs escalate to human
+      - Low-severity bugs auto-route to dev queue
+
+      EXTERNAL TRACKER (when adapter configured):
+      - Move ticket to In Review status
+      - Linear: see references/linear-integration.md (Test Handoff section)
+    agent: orchestrator
+    depends_on: [commit]
+
+  - id: fix-loop
+    description: >
+      If the test swarm filed bugs that were auto-routed to the dev queue:
+
+      CORE (always):
+      1. Dev team picks up each bug
+      2. Implements fix
+      3. Commits the fix (separate commit per fix)
+      4. Re-runs affected tests to verify
+      5. If all resolved → proceed to final review
+      6. If unresolved → surface for tomorrow's standup
+
+      EXTERNAL TRACKER (when adapter configured):
+      - Create bug sub-tickets for test failures
+      - Close bug tickets when fixed
+      - Linear: see references/linear-integration.md (Fix Loop section)
+
+      TERMINAL ISSUES (both modes):
+      If a bug cannot be resolved by a development fix:
+      1. STOP the fix loop for that story
+      2. Mark the story as BLOCKED in cycle state
+      3. If adapter configured: escalate ticket with full context
+         If no adapter: write blocked status to cycle state with context
+      4. Notify the user directly (don't bury it in a report)
+      5. Continue with any remaining non-blocked work
+      6. Blocked items surface in tomorrow's standup
+    agent: orchestrator
+    depends_on: [test-handoff]
+
+  - id: final-review
+    description: >
+      After all tests pass and fixes are committed, run a final code review.
+      Last quality gate before code leaves the machine.
+
+      CORE (always):
+      - Use code-review.workflow.yaml (analyze → review → summarize)
+      - Review the full session diff (all dev work + fixes)
+      - If needs_revision → back to fix-loop
+      - If passed → proceed to push
+
+      No external tracker operations — this is a code review gate only.
+    agent: orchestrator
+    depends_on: [fix-loop]
+
+  - id: push
+    description: >
+      Push all committed work to the remote branch.
+
+      CORE (always):
+      - Only push after: tests pass + review passes + no blocked stories
+      - If feature branch: create PR via gh CLI
+      - If main: push with user confirmation
+
+      EXTERNAL TRACKER (when adapter configured):
+      - Branch naming triggers auto-link (PR linked to ticket)
+      - On merge: ticket auto-closes (native integration handles this)
+      - No manual ticket update needed
+    agent: orchestrator
+    depends_on: [final-review]
+
+  - id: session-end
+    description: >
+      After all work is pushed.
+
+      CORE (always):
+      1. Evaluate staged insights — promote or discard per agent-memory-schema
+      2. Update cycle state with the day's decisions and final statuses
+      3. Surface unresolved items for tomorrow's standup
+      4. Clean up insight staging area
+
+      EXTERNAL TRACKER (when adapter configured):
+      - Release assignments on completed tickets
+      - Leave blocked tickets assigned (surfaces in next standup)
+      - Check for anomalies (tickets stuck in wrong status)
+      - Linear: see references/linear-integration.md (Session End section)
+    agent: orchestrator
+    depends_on: [push]
+    steps:
+      - id: session-end
+        step_file: workflows/steps/daily-ceremony/step-08-session-end.md
+        agent: orchestrator

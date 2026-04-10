@@ -1,0 +1,97 @@
+# Cross-Cutting Concerns — Mobile App Example
+# Customize this for your project. Copy to state/cross-cutting-concerns.yaml
+# Place this file at state/cross-cutting-concerns.yaml
+
+concerns:
+
+  - id: caching
+    name: Cache Strategy
+    description: >
+      Evaluate whether this story's data should be cached locally.
+      Consider both iOS and Android cache layers if using KMP or cross-platform.
+    applies_when: "Story involves API calls, data fetching, or repeated reads"
+    planning_prompt: >
+      Does this story fetch data that could benefit from caching? If yes:
+      cache layer (in-memory/disk), TTL, invalidation on mutation, and
+      whether stale-while-revalidate is appropriate.
+    implementation_checklist:
+      - "Cache decision documented (cache or no-cache with rationale)"
+      - "If cached: TTL defined, invalidation implemented on mutations"
+      - "Cache works on both iOS and Android"
+
+  - id: data-migration
+    name: Data Schema Migration
+    description: >
+      Backend uses MongoDB. If the story changes data models, a migration
+      may be needed. Also consider Firestore document structure changes.
+    applies_when: "Story adds, removes, or modifies fields on a data model"
+    planning_prompt: >
+      Does this story change any data model (MongoDB or Firestore)?
+      Specify: which models, what changes, additive vs destructive,
+      rollback strategy. Clarify if using Firebase UID or MongoDB ObjectId.
+    implementation_checklist:
+      - "Migration created (if schema changed)"
+      - "Rollback strategy documented"
+      - "Existing data handled (backfill or defaults)"
+      - "Clarified: Firebase UID vs MongoDB ObjectId for all user references"
+
+  - id: analytics
+    name: Analytics Instrumentation
+    description: >
+      New user-facing features need analytics events so product can
+      measure adoption, engagement, and conversion.
+    applies_when: "Story adds user-facing UI, interactions, or flows"
+    planning_prompt: >
+      What user actions should be tracked? Define: event names,
+      properties (event_id, category, action type), and destination
+      (PostHog, Firebase Analytics, or both).
+    implementation_checklist:
+      - "Analytics events defined with names and properties"
+      - "Events instrumented in shared KMP code (not platform-specific)"
+      - "Events fire correctly on both iOS and Android"
+
+  - id: test-tags
+    name: Maestro/MTS Test Tags
+    description: >
+      All interactive UI components need testTag (Compose) or
+      accessibilityIdentifier (iOS) so Maestro and MTS can find them.
+    applies_when: "Story creates or modifies UI components"
+    planning_prompt: >
+      Which new or modified UI components need test tags? List each
+      component and its tag name following project convention.
+    implementation_checklist:
+      - "All new interactive components have testTag (Android) and accessibilityIdentifier (iOS)"
+      - "Tag names follow project naming convention"
+      - "Tags verified: MTS discovery pass can locate all new components"
+      - "Render verified: tagged components are actually VISIBLE (not hidden by weight(1f) in scrollable Column, LazyVerticalGrid in scrollable Column, or conditional rendering)"
+
+  - id: accessibility
+    name: Accessibility Standards (WCAG 2.1 AA)
+    description: >
+      All UI must meet WCAG 2.1 AA. Accessibility identifiers also
+      help Maestro locate components for testing.
+    applies_when: "Story creates or modifies UI components"
+    planning_prompt: >
+      Check: contrast ratios (4.5:1 text, 3:1 large), touch targets
+      (min 44×44), screen reader labels, semantic structure, focus order.
+    implementation_checklist:
+      - "Contrast ratios meet WCAG AA"
+      - "Touch targets minimum 44×44dp"
+      - "contentDescription (Android) / accessibilityLabel (iOS) on all non-text elements"
+      - "Logical focus order for keyboard/switch navigation"
+
+  - id: maestro-test
+    name: Maestro Test Flow
+    description: >
+      Every ticket MUST have a Maestro test flow. Run on the connected
+      iPhone (UDID: 00008120-001C1CD90C50C01E). This is mandatory per
+      project CLAUDE.md — no exceptions.
+    applies_when: "Story adds or changes user-facing behavior"
+    planning_prompt: >
+      What Maestro flow is needed? Define the user journey, assertions,
+      and device target. Flow goes in .maestro/ directory.
+    implementation_checklist:
+      - "Maestro flow file created in .maestro/"
+      - "Flow exercises the primary user journey for this story"
+      - "Assertions verify expected outcomes"
+      - "Flow runs on connected device without errors"

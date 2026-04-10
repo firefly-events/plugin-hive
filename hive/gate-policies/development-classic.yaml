@@ -1,0 +1,37 @@
+name: development-classic-gates
+workflow: development.classic
+version: "1.0.0"
+
+policies:
+  - name: implementation-completeness
+    evaluator: structural
+    applies_to: [implement]
+    severity: major
+    checks:
+      - "All files listed in story files_to_modify are created or modified"
+      - "No TODO/FIXME/HACK left in new code"
+
+  - name: test-coverage
+    evaluator: coverage
+    applies_to: [test]
+    severity: major
+    checks:
+      - "Every acceptance criterion has at least one corresponding test"
+      - "Tests actually execute (not just defined)"
+
+  - name: convention-compliance
+    evaluator: consistency
+    applies_to: [implement, test]
+    severity: minor
+    source: cycle-state
+    checks:
+      - "Naming follows cycle-state naming conventions"
+      - "Technology matches cycle-state technology decisions"
+
+  - name: review-thoroughness
+    evaluator: structural
+    applies_to: [review]
+    severity: minor
+    checks:
+      - "Review covers: correctness, security, performance, conventions"
+      - "Verdict is one of: passed, needs_optimization, needs_revision"

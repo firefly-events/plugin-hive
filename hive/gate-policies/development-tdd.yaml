@@ -1,0 +1,57 @@
+name: development-tdd-gates
+workflow: development.tdd
+version: "1.0.0"
+
+policies:
+  - name: test-spec-validity
+    evaluator: structural
+    applies_to: [test-spec]
+    severity: critical
+    checks:
+      - "Every acceptance criterion in the story has at least one corresponding test"
+      - "Tests actually execute and ALL fail (no implementation exists yet)"
+      - "Tests use existing test framework and patterns from research brief"
+      - "Test manifest maps each test to its target acceptance criterion"
+
+  - name: test-isolation
+    evaluator: structural
+    applies_to: [test-spec]
+    severity: major
+    checks:
+      - "Tests do not depend on implementation details — only on public interfaces"
+      - "No mocks or stubs that assume internal structure not yet written"
+
+  - name: implementation-makes-tests-pass
+    evaluator: coverage
+    applies_to: [implement]
+    severity: critical
+    checks:
+      - "ALL tests from test-spec phase now pass"
+      - "No test files were modified during implementation"
+      - "Implementation is the minimum code needed to satisfy the tests"
+
+  - name: implementation-completeness
+    evaluator: structural
+    applies_to: [implement]
+    severity: major
+    checks:
+      - "All files listed in story files_to_modify are created or modified"
+      - "No TODO/FIXME/HACK left in new code"
+
+  - name: convention-compliance
+    evaluator: consistency
+    applies_to: [test-spec, implement]
+    severity: minor
+    source: cycle-state
+    checks:
+      - "Naming follows cycle-state naming conventions"
+      - "Technology matches cycle-state technology decisions"
+
+  - name: review-thoroughness
+    evaluator: structural
+    applies_to: [review]
+    severity: minor
+    checks:
+      - "Review covers: correctness, security, performance, conventions"
+      - "Review verifies tests are meaningful (not trivially passing)"
+      - "Verdict is one of: passed, needs_optimization, needs_revision"
