@@ -37,6 +37,38 @@ Include date, active epic count, and overall health indicator:
 - YELLOW: some blocked stories but unblocked work is available
 - RED: all remaining stories are blocked or failed
 
+### 1b. Format overnight remote work section
+
+If the step 1 report includes `overnight_pulls` with any commits, add this section at the very top of the standup output (above "Completed"):
+
+```
+### 🌙 Overnight
+- Commits pulled: {N}
+- [if meta_team_commits present]
+  **Meta-team cycle `{cycle_id}` ran** — verdict: {passed|partial|poor}
+  Read `state/meta-team/morning-summary.md` for the full report.
+  Top highlights:
+    - {summary bullet 1}
+    - {summary bullet 2}
+    - {summary bullet 3}
+  Deferred to next cycle: {count} findings
+- [if non-meta-team commits present]
+  Other remote commits: {subject list}
+```
+
+If a meta-team cycle ran, read `state/meta-team/morning-summary.md` and pull out:
+- The verdict line
+- The "What Changed Tonight" top 3 items (condensed to one line each)
+- The count of items under "What Was Found (Not Fixed This Cycle)"
+
+If no overnight pulls occurred, skip this section entirely — do NOT add an empty "Overnight: nothing" placeholder.
+
+If the pull was skipped (uncommitted local changes, merge conflict), surface this as a YELLOW warning at the top of the standup:
+```
+⚠ Overnight remote work NOT pulled: {skip reason}
+  You have {N} commits waiting on origin/main. Handle local changes, then `git pull` before proceeding.
+```
+
 ### 2. Format completed work section
 List stories completed in previous sessions, grouped by epic:
 ```
@@ -94,6 +126,9 @@ Output the complete report to the user. End with:
 
 ## SUCCESS METRICS
 
+- [ ] Overnight section surfaced at the top of the standup when commits were pulled
+- [ ] Meta-team cycle results highlighted when a meta-team cycle ran overnight
+- [ ] Skipped-pull warning shown when local changes blocked the pull
 - [ ] Standup report includes all five sections: completed, in-progress, blocked, failed, dependency graph
 - [ ] Health indicator (GREEN/YELLOW/RED) is accurate based on story statuses
 - [ ] Blocked and failed stories have clear action items

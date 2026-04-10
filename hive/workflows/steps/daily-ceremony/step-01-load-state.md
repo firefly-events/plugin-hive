@@ -33,6 +33,27 @@ Reconstruct the orchestrator's working context from all persistent state sources
 
 ## TASK SEQUENCE
 
+### 0. Pull overnight meta-team work
+
+Before reading local state, check for remote commits from scheduled overnight runs (e.g., the meta-team nightly cycle). These run in the cloud, commit directly to the remote branch, and will not be reflected in local state until pulled.
+
+```bash
+git fetch
+BEHIND=$(git rev-list --count HEAD..@{upstream} 2>/dev/null || echo 0)
+```
+
+- If `BEHIND` is `0`: nothing to pull, proceed to task 1
+- If `BEHIND` is `> 0`:
+  1. Check for uncommitted local changes (`git status --porcelain`)
+  2. If working tree is clean: `git pull --ff-only` and record the pulled commits in the standup report
+  3. If working tree has uncommitted changes: report the `BEHIND` count and note that a manual pull is needed after handling local work — do NOT force-pull over uncommitted changes
+  4. List any commits with `[meta-team]` prefix — these are overnight autonomous cycle results that should be surfaced prominently in the standup report
+
+Record the pull result for the state reconstruction report:
+- `overnight_pulls`: list of commit hashes + subjects pulled
+- `meta_team_commits`: subset of overnight_pulls with `[meta-team]` prefix
+- `pull_skipped_reason`: populated only if pull was skipped (uncommitted changes, merge conflict, not a git repo)
+
 ### 1. Identify active epics
 List directories under `state/epics/`. For each epic directory, read `epic.yaml` to get the epic ID, title, and story list. Record which epics have active (non-completed) stories.
 
@@ -67,6 +88,11 @@ Produce a structured report with the following sections:
 ```
 ## State Reconstruction Report
 
+### Overnight Remote Work
+- Commits pulled: {N}
+- Meta-team cycle: {cycle_id if meta-team commits present, else "no run"}
+- [if pull skipped] Skip reason: {reason}
+
 ### Active Epics
 - {epic-id}: {title} — {N} stories ({M} completed, {K} remaining)
 
@@ -94,6 +120,9 @@ Produce a structured report with the following sections:
 
 ## SUCCESS METRICS
 
+- [ ] Remote fetched and `BEHIND` count computed
+- [ ] Overnight commits pulled (or pull skip reason recorded)
+- [ ] Meta-team commits identified and surfaced in report
 - [ ] All directories under `state/epics/` scanned for active epics
 - [ ] All episode markers under `state/episodes/` read for active epics
 - [ ] All cycle state files under `state/cycle-state/` read for active epics
