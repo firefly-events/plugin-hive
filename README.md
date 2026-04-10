@@ -29,7 +29,7 @@
 ## Installation
 
 ```bash
-claude plugin add fireflyevents/plugin-hive
+claude plugin add firefly-events/plugin-hive
 ```
 
 ---

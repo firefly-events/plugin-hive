@@ -20,7 +20,7 @@ We expect all participants to:
 ## Enforcement
 
 Instances of unacceptable behavior may be reported to the project maintainers
-at **conduct@fireflyevents.com**. All complaints will be reviewed and
+at **conduct@ff.events**. All complaints will be reviewed and
 investigated promptly and fairly.
 
 Project maintainers are responsible for clarifying and enforcing standards of
