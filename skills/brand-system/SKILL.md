@@ -1,6 +1,6 @@
 ---
 name: brand-system
-description: Establish brand identity — colors, typography, spacing, and visual style guide. Produces state/brand/brand-system.yaml and a visual brand guide PNG via Frame0.
+description: Establish brand identity — colors, typography, spacing, logos, and a visual HTML brand guide. Produces state/brand/brand-system.yaml and state/brand/brand-guide.html for immediate visual review.
 ---
 
 # Hive Brand System
@@ -107,42 +107,32 @@ personality:
 
 Derive colors from the project context (existing code, product name, industry, user-provided hints). If no hints are given, establish a professional, accessible palette with all four WCAG-compliant roles (primary, secondary, neutral, surface).
 
-**Part 2: Visual brand style guide**
+**Part 2: Visual HTML brand guide (PRIMARY OUTPUT)**
 
-Run three-tier tool discovery before proceeding:
+Produce a self-contained HTML brand guide at `state/brand/brand-guide.html`. **Read `hive/references/html-preview-format.md` in full before generating the HTML** — it specifies the structure, sections, styling conventions, and logo SVG requirements.
+
+The HTML brand guide must include all six sections:
+
+1. **Brand header** — name + personality statement + tone
+2. **Color palette** — one card per color with swatch (≥200×120px), HEX/RGB/CMYK/PMS values, usage note, and WCAG contrast indicators against white and black
+3. **Typography** — two columns (heading_font + body_font) with "Aa" samples at each weight, sample sentences, and the full type scale rendered at actual sizes. Pull fonts from Google Fonts via `<link>` tag. If a font is unavailable, fall back to a close system stack and note it
+4. **Logo concepts** — inline SVG renderings of 3-5 distinct logo concepts (pure wordmark, wordmark + symbol, monogram, abstract mark, badge). Also show the selected concept on each brand color background to validate contrast
+5. **Spacing & radius scales** — visual demonstration with sized boxes
+6. **Brand in context** — 2-3 mini UI mockups (buttons, card, hero section) showing the brand working together
+
+The HTML file must be self-contained — no external stylesheets, no JavaScript dependencies. Fonts load from Google Fonts CDN. All logos are inline SVG.
+
+**Part 3: Frame0 visual guide (OPTIONAL higher-fidelity alternative)**
+
+Frame0 output is now optional and only produced if explicitly requested via `$ARGUMENTS` containing `--with-frame0`. The HTML preview in Part 2 is the primary visual output. If `--with-frame0` is present, run the three-tier tool discovery below; otherwise skip Frame0 entirely.
 
 1. Check Frame0 CLI: `which cli-anything-frame-zero`
-2. Check live mode: attempt `cli-anything-frame-zero --live status` (succeeds if Frame0 desktop app is running)
+2. Check live mode: attempt `cli-anything-frame-zero --live status`
+3. **Tier 1 — CLI + live:** create `.f0` and export PNG
+4. **Tier 2 — CLI only:** create `.f0` and produce the export command for manual run
+5. **Tier 3 — No CLI:** skip; note in output that Frame0 was unavailable
 
-**Tier 1 — CLI available AND live mode active:**
-- Create `state/brand/brand-guide.f0` using the Frame0 CLI
-- Export PNG directly: `cli-anything-frame-zero --live export page --page PAGE_ID --format png --output state/brand/brand-guide.png`
-- Both `.f0` and `.png` artifacts are produced
-
-**Tier 2 — CLI available, NO live mode:**
-- Create `state/brand/brand-guide.f0` using the Frame0 CLI
-- Produce the export command for the user to run manually:
-  ```
-  cli-anything-frame-zero --live export page --page PAGE_ID --format png --output state/brand/brand-guide.png
-  ```
-- Note in output: "brand-guide.f0 created. Open Frame0 desktop app and run the export command above to generate brand-guide.png."
-
-**Tier 3 — No Frame0 CLI:**
-- Produce `state/brand/brand-system.yaml` only
-- Note: "Visual brand guide skipped — Frame0 CLI not found. Install Frame0 or run `/hive:brand-system` in an environment where `cli-anything-frame-zero` is available."
-
-**Brand guide layout specification (for Tiers 1 and 2):**
-
-Use a single-page layout on a 1440×900 desktop frame. Section placement:
-
-| Section | Position | Content |
-|---------|----------|---------|
-| **Logo variations** | top-left quadrant | Primary logo, secondary logo, submark, favicon. If no logo assets exist, use text placeholders in heading font: "{Brand Name} — Primary", "{Brand Name} — Mark", etc. |
-| **Color palette** | top-right quadrant | One swatch per brand color (100×100px filled rect). Below each swatch: color name, HEX, RGB, CMYK, PMS values in small text |
-| **Typography weight matrix** | middle band | Two columns (heading_font, body_font). Each weight shown as: weight name + "Aa" sample at 32px + sample sentence ("The quick brown fox...") + usage note |
-| **Logo on backgrounds** | bottom-left quadrant | Primary logo text placed on a filled rect of each brand color. Confirms contrast and legibility |
-| **Design elements** | bottom-right quadrant | Spacing scale: row of filled rects sized to scale values (4, 8, 12, 16, 24, 32, 48, 64px). Border radius samples: four rects with small/medium/large/full radius |
-| **Brand personality** | bottom strip | Personality statement in display text (32px bold), tone adjectives below (16px medium) |
+Do not produce `brand-guide.f0` or `brand-guide.png` unless `--with-frame0` is in `$ARGUMENTS`.
 
 ---
 
@@ -154,9 +144,11 @@ After the subagent completes, report:
 Brand System Complete
 
 Artifacts:
-  Data:   state/brand/brand-system.yaml
-  Guide:  state/brand/brand-guide.f0   [or: "not generated — Frame0 CLI unavailable"]
-          state/brand/brand-guide.png  [or: "pending — run export command" | "not generated"]
+  Data:         state/brand/brand-system.yaml
+  Visual guide: state/brand/brand-guide.html  ← OPEN THIS TO SEE YOUR BRAND
+  [if --with-frame0]
+  Frame0 file:  state/brand/brand-guide.f0
+  PNG export:   state/brand/brand-guide.png  [or: pending manual export]
 
 Colors defined: {count}
   Primary:   {hex} — {name}
@@ -167,11 +159,19 @@ Colors defined: {count}
 Typography: {heading_font} / {body_font}
 Personality: {statement}
 
-Next: Run /hive:design-system to generate implementation tokens from this brand system.
+Logo concepts: {N} SVG concepts generated and rendered in brand-guide.html
+
+To view:
+  open state/brand/brand-guide.html
+or
+  code state/brand/brand-guide.html
+
+Next: Review the HTML guide and confirm direction. Run /hive:design-system to generate implementation tokens from this brand system.
 ```
 
 ## Key References
 
+- `hive/references/html-preview-format.md` — HTML preview structure, sections, SVG logo format, styling conventions
 - `hive/agents/ui-designer.md` — ui-designer persona (Frame0 CLI reference, tool discovery)
 - `hive/references/ui-skill-gates.md` — gate spec (brand-system: no gate)
 - `state/architecture/ui-team-skills-arch.md` — brand output format specification

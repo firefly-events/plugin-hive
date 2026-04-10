@@ -1,6 +1,6 @@
 ---
 name: design-system
-description: Convert brand-system YAML into W3C Design Token JSON. Gates on state/brand/brand-system.yaml. Produces state/brand/tokens.json for frontend tooling.
+description: Convert brand-system YAML into W3C Design Token JSON plus a visual HTML preview of the tokens in use. Gates on state/brand/brand-system.yaml.
 ---
 
 # Hive Design System
@@ -90,6 +90,16 @@ Rules:
 - Use W3C Design Token spec: each token has "value" and "type" fields
 - All dimension values must include "px" unit
 - Include every entry from the brand system — do not omit any color or spacing step
+
+After writing tokens.json, produce a visual HTML preview at state/brand/tokens-preview.html showing the tokens IN USE (not as raw JSON):
+
+- Color tokens: swatches with token name + hex value + usage context
+- Typography tokens: type scale demonstration rendering each scale-* token at its size
+- Spacing tokens: visual row of boxes sized to each spacing value
+- Border radius tokens: rounded corner demonstration
+- Raw tokens.json embedded at the bottom in a collapsible <details> block for developers to copy
+
+Read hive/references/html-preview-format.md for the HTML structure requirements, styling guidelines, and self-contained file rules (Google Fonts CDN, no external stylesheets, no JavaScript dependencies).
 ```
 
 ### 4. Report output
@@ -98,22 +108,27 @@ Rules:
 Design System Complete
 
 Artifacts:
-  Source:  state/brand/brand-system.yaml
-  Tokens:  state/brand/tokens.json
+  Source:   state/brand/brand-system.yaml
+  Tokens:   state/brand/tokens.json
+  Preview:  state/brand/tokens-preview.html  ← OPEN THIS TO SEE TOKENS IN USE
 
 Token categories generated:
-  color     — {count} tokens
-  typography — {count} tokens
-  spacing   — {count} tokens
+  color         — {count} tokens
+  typography    — {count} tokens
+  spacing       — {count} tokens
   border-radius — {count} tokens
 
 Compatible with: Tailwind CSS, Style Dictionary, Figma Token plugin, W3C Design Token importers.
+
+To view:
+  open state/brand/tokens-preview.html
 
 Next: Tokens are ready for frontend-developer to apply via Tailwind config or CSS custom properties.
 ```
 
 ## Key References
 
+- `hive/references/html-preview-format.md` — HTML preview format for tokens-preview.html
 - `hive/agents/ui-designer.md` — agent persona for token generation
 - `hive/references/ui-skill-gates.md` — gate specification for design-system
 - `state/architecture/ui-team-skills-arch.md` — W3C token format specification
