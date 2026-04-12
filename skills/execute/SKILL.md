@@ -45,6 +45,8 @@ If all checks pass, proceed normally.
 
    **If `escalations:` is present and non-empty:**
 
+   First, load the specialist-triggers catalog by reading `hive/references/specialist-triggers.md`. This catalog is needed for trigger lookups (responds_with, workflow fields) in the steps below.
+
    - For each record, validate the `placement` field against the enum `{pre-exec, post-exec, append}`.
      - If `placement` has an unknown value: log a warning `[warn] step 2b: unknown placement value "{value}" — skipping record` and skip that record. Do not crash.
      - If any other required field (`trigger`, `severity`, `stories`, `reason`, `raised_by`, `raised_at`) is missing or null: log a warning `[warn] step 2b: escalation record missing required field "{field}" — skipping record` and skip that record.
@@ -52,7 +54,7 @@ If all checks pass, proceed normally.
      - `pre_exec[]` — records with `placement: pre-exec`
      - `post_exec[]` — records with `placement: post-exec`
      - `appends[]` — records with `placement: append`
-   - For `appends[]`: build a story→sidecar_agents map: `{story_id: [agent_name, ...]}` from each record's `stories` list and the target agent(s) implied by the trigger's catalog entry.
+   - For `appends[]`: build a story→sidecar_agents map: `{story_id: [agent_name, ...]}` from each record's `stories` list and the target agent(s) from the trigger's catalog `responds_with.id`. Only use `stories` entries that match a canonical story ID in the current epic (i.e., a corresponding story YAML exists at `state/epics/{epic-id}/stories/{id}.yaml`). Log a warning for any non-canonical entry: `[warn] step 2b: stories[] entry "{entry}" is not a canonical story ID — skipping for sidecar map`.
    - For any trigger whose catalog entry has both `workflow:` empty and `skill:` empty: emit a trace `[debug] step 2b: trigger {trigger_id} — specialist phase not yet implemented, skipping`. This is a graceful no-op — do not halt execution.
    - Emit a single summary trace:
      ```
@@ -74,12 +76,12 @@ If all checks pass, proceed normally.
 
 4a. **Pre-exec phase loop.** If `pre_exec[]` is empty, skip this step entirely — zero behavior change for escalation-free epics.
 
-   For each trigger in `pre_exec[]`, ordered by `raised_at` ASC (severity DESC as tiebreak), apply the three-condition branch:
+   For each trigger in `pre_exec[]`, ordered by `raised_at` ASC (severity DESC as tiebreak), look up the trigger's catalog entry in `hive/references/specialist-triggers.md` (loaded in step 2b) to resolve `responds_with.id` and `workflow` fields. Then apply the three-condition branch:
 
    **Prerequisite — team_memory_path validation:** Before spawning, verify the team config's `team_memory_path` directory exists on disk. If it does not, emit an actionable error — e.g., `[error] pre-exec: team_memory_path "state/team-memories/security-team/" does not exist — create it before running specialist phases` — skip the trigger, and continue. Do not crash execute.
 
    **(i) workflow field set AND workflow file exists on disk:**
-   Invoke `TeamCreate(team_config=team_yaml, workflow=entry.workflow)`. Write phase output to `state/specialist-phases/{trigger}/{epic-id}/`. If `TeamCreate` errors: log the failure (e.g., `[error] pre-exec: TeamCreate failed for {trigger-id} — {error}`), write a failure marker to `state/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
+   Invoke `TeamCreate(team_config=team_yaml, workflow=entry.workflow)`. Write phase output to `state/specialist-phases/{trigger}/{epic-id}/` (where `{trigger}` is the trigger ID string, e.g., `security:plan-audit`). If `TeamCreate` errors: log the failure (e.g., `[error] pre-exec: TeamCreate failed for {trigger-id} — {error}`), write a failure marker to `state/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
 
    **(ii) workflow field set AND workflow file MISSING from disk:**
    Log `[info] pre-exec: specialist workflow not yet built — skipping {trigger-id}` → no-op. Continue to next trigger.
@@ -184,7 +186,7 @@ If all checks pass, proceed normally.
      - **If a "review" step is found:** when step execution reaches that step, inject each sidecar agent as a participating agent in the subagent spawn. Include each agent's persona (`hive/agents/{agent-name}.md`) alongside the primary reviewer persona and instruct each sidecar to participate in code review. This is injection INTO the step — not a new step.
      - **If no "review" step exists in the workflow:** after the final workflow step completes, inject sidecar agents as an additional post-step execution. Before injecting, emit:
        ```
-       [warn] sidecar inject-after fallback: review step not found in {workflow-file}; scanned steps: {step-name-list}; sidecar agent appended after final step
+       [warn] sidecar inject-after fallback: review step not found in {workflow-file}; scanned steps: {step-name-list}; sidecar agent(s) appended after final step
        ```
        The warning must include the workflow filename and the full list of scanned step IDs. This fallback path is the primary mitigation for deep-coupling risk — implement it with the same care as the happy path.
    - For all steps other than the injection target: proceed with step execution unchanged.

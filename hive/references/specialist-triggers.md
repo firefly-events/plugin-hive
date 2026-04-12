@@ -125,4 +125,4 @@ type: reference
 
 **Catalog review cadence:** Review on each specialist epic (when a new specialist agent or team is added). Every specialist-addition epic includes a full cross-reference check of this catalog.
 
-**v1 note:** Execute routing handles workflow-based triggers only; skill-based catalog entries are an extension point for future implementation.
+**v1 note:** Execute routing handles workflow-based triggers for pre-exec/post-exec phases. Append-placement triggers route directly to single agents (no workflow needed). Skill-based catalog entries are an extension point for future implementation.

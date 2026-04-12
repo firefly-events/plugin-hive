@@ -134,7 +134,7 @@ SCALE_CALL: in-planning | pre-exec
 ESCALATION:                              # only present when SCALE_CALL: pre-exec
   trigger: ui:major
   placement: pre-exec
-  severity: major | moderate | minor
+  severity: major
   stories: [topic-area-1, topic-area-2]
   reason: "explanation"
   raised_by: ui-designer
@@ -145,7 +145,7 @@ COMMENTS: ...
 
 **SCALE_CALL: in-planning** — Use when design work is small: 1–2 new screens, minor changes, no brand-system chain needed. Wireframes proceed during planning as today. No escalation is written to cycle state.
 
-**SCALE_CALL: pre-exec** — Use when design work is substantial: 3+ new screens, brand-system chain needed, or estimated 2+ days of design work. An escalation is written to cycle state; a full UI team phase runs before dev stories execute. Use trigger `ui:major` for large-scope UI work. Use `ui:brand-redo` when brand identity is changing or a `brand-system.yaml` is absent and the epic ships user-facing UI.
+**SCALE_CALL: pre-exec** — Use when design work is substantial: 3+ new screens, brand-system chain needed, or design work exceeds one day. An escalation is written to cycle state; a full UI team phase runs before dev stories execute. Use trigger `ui:major` for large-scope UI work. Use `ui:brand-redo` when brand identity is changing or a `brand-system.yaml` is absent and the epic ships user-facing UI.
 
 ### Two-gate precedence
 

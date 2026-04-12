@@ -4,4 +4,4 @@ rules:
   truthy:
     allowed-values: ["true", "false"]
     check-keys: false
-  key-duplicates: disable
+  key-duplicates: disable  # cycle-state files use intentional duplicate keys (status/phase) to track progression

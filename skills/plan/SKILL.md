@@ -165,8 +165,8 @@ If all checks pass, proceed normally.
 9b. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the structured outline. This is the most critical review — all active team agents review the full outline. The TPM validates sequencing, the researcher confirms technical accuracy, the architect (if present) stress-tests feasibility, and the UI designer (if present) validates UI approach. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
 
    **UI Designer SCALE_CALL revision (step 9b only) — two-gate precedence rule:** If ui-designer emits a `SCALE_CALL` field in their step 9b review response, apply **last gate wins**:
-   - **Revised to `pre-exec`:** delete any existing ui-designer escalation entry in cycle state, then write the step 9b `ESCALATION:` block as a fresh entry. Log: `"ui-designer scale call revised at step 9b — using latest value"`
-   - **Revised to `in-planning`:** delete any existing ui-designer escalation entry in cycle state (step 4b pre-exec call is superseded). Log: `"ui-designer scale call revised at step 9b — using latest value"`
+   - **Revised to `pre-exec`:** delete any existing ui-designer escalation entry in cycle state, then write the step 9b `ESCALATION:` block as a fresh entry. Log: `"ui-designer scale call revised at step 9b to pre-exec — writing fresh escalation"`
+   - **Revised to `in-planning`:** delete any existing ui-designer escalation entry in cycle state (step 4b pre-exec call is superseded). Log: `"ui-designer scale call revised at step 9b to in-planning — escalation removed"`
    - **No step 9b revision:** step 4b value stands unchanged; no action needed
 
 10. **Present structured outline to user.** Show the full document, including a summary of team review findings. The elicitation section (Part 7) contains the agent team's own stress-test of the plan — the user reads the team's answers to evaluate whether the thinking is sound. The user then:
@@ -202,7 +202,8 @@ If all checks pass, proceed normally.
     - For each entry, inspect its `stories` list — entries may contain topic area strings from raise time
     - For each topic area string, attempt a match against decomposed story IDs:
       - **Exact match:** topic area string equals a story ID → replace in place
-      - **Fuzzy match:** topic area string overlaps with a story's `title` or `description` keywords → replace with the matched canonical ID
+      - **Fuzzy match:** topic area string overlaps with a story's `title` or `description` keywords (case-insensitive substring match) → replace with the matched canonical ID
+    - **Already canonical:** if an entry already matches a story YAML ID exactly, leave it unchanged (no re-matching needed)
     - After replacement, write the updated `stories` list back to the escalation entry in cycle state
     - For any topic area with **no match found:** preserve the original string as-is and log:
       ```
@@ -384,9 +385,9 @@ A collaborative review gate runs before every user-facing document presentation.
 
    **Architect** — look for an `## Escalation Flags` section with line entries in the format:
    ```
-   - [severity] trigger-id — reason — raised_by: architect
+   - [severity] trigger-id — reason
    ```
-   For each line: parse `trigger`, `severity`, `reason`. Look up `placement` from the specialist-triggers catalog. Set `raised_by: architect`.
+   For each line: parse `trigger`, `severity`, `reason`. Look up `placement` from the specialist-triggers catalog. Set `raised_by: architect` (orchestrator adds this — architect does not emit it).
 
    **TPM** — look for an `ESCALATION_FLAGS:` block with YAML list entries in the format:
    ```
@@ -408,11 +409,11 @@ A collaborative review gate runs before every user-facing document presentation.
    **For all emitters:**
    - Set `raised_at` to the current ISO 8601 timestamp (orchestrator sets this at extraction time)
    - Set `stories` to topic areas from the agent's response context if not provided (canonical IDs backfilled at step 11)
-   - Look up `placement` from the specialist-triggers catalog if not provided by the agent
+   - `placement` source precedence: if the agent provides `placement` in their response (TPM, ui-designer), use the agent-provided value. If not (architect), look up `placement` from the specialist-triggers catalog
 
    **Dedup-on-write:** Before writing any extracted flag to `state/cycle-state/{epic-id}.yaml`, check whether an entry with the same `trigger` ID already exists:
    - **If exists:** merge into the existing entry — do NOT append a second entry:
-     - `stories`: union of existing and new stories[] lists (deduplicated, order preserved)
+     - `stories`: union of existing and new stories[] lists (deduplicated, existing entries first, then new entries)
      - `reason`: concatenate existing and new reason with `" | "` separator
      - `raised_at`: keep the **earliest** timestamp (preserves when the concern was first raised)
      - `raised_by`: if different agents, concatenate with `", "` separator (e.g. `"architect, tpm"`)
@@ -424,7 +425,7 @@ A collaborative review gate runs before every user-facing document presentation.
      - trigger: security:plan-audit
        placement: pre-exec
        severity: major
-       stories: []          # topic areas now; backfilled to real IDs at step 11
+       stories: [auth-flow]  # topic areas at raise time; backfilled to canonical story IDs at step 11
        reason: "human-readable explanation from architect flag"
        raised_by: architect
        raised_at: "2026-04-12T09:15:00Z"

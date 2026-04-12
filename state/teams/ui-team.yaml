@@ -7,25 +7,45 @@ members:
   - agent: ui-designer
     role: Primary UI lead — synthesizes design direction, owns wireframes and design briefs
     domain:
-      - path: "**"
+      - path: "state/design/**"
         read: true
         write: true
+        delete: false
+      - path: "state/brand/**"
+        read: true
+        write: true
+        delete: false
+      - path: "**"
+        read: true
+        write: false
         delete: false
 
   - agent: animations-specialist
     role: Motion and interaction design — defines animation patterns and transition specs
     domain:
-      - path: "**"
+      - path: "state/design/**"
         read: true
         write: true
+        delete: false
+      - path: "state/audits/**"
+        read: true
+        write: true
+        delete: false
+      - path: "**"
+        read: true
+        write: false
         delete: false
 
   - agent: accessibility-specialist
     role: Accessibility audit — enforces WCAG compliance and inclusive design standards
     domain:
-      - path: "**"
+      - path: "state/audits/**"
         read: true
         write: true
+        delete: false
+      - path: "**"
+        read: true
+        write: false
         delete: false
 
 context:
