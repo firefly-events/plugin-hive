@@ -202,7 +202,7 @@ approved_proposals:
       - step: Create pattern memory for test-inspector — produce a coverage delta report, not just a pass/fail verdict
         file: skills/hive/agents/memories/test-inspector/coverage-delta-report-format.md
         action: create
-      - step: Create pattern memory for test-sentinel — gate on all three: tests pass + coverage threshold + no regressions
+      - step: "Create pattern memory for test-sentinel — gate on all three: tests pass + coverage threshold + no regressions"
         file: skills/hive/agents/memories/test-sentinel/three-gate-pass-criteria.md
         action: create
     rationale: |
@@ -304,7 +304,7 @@ changes:
   - proposal_id: proposal-5
     action: create
     file: skills/hive/agents/memories/test-sentinel/three-gate-pass-criteria.md
-    description: Pattern memory — pass requires all three gates: tests pass + coverage threshold + no regressions
+    description: "Pattern memory — pass requires all three gates: tests pass + coverage threshold + no regressions"
     status: done
 
 # Phase 5 — Testing
