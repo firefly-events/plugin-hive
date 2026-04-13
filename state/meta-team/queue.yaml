@@ -18,9 +18,13 @@ targets:
       Gate policy directory is empty. quality-gates.md defines schema at
       skills/hive/gate-policies/{workflow-name}.yaml but no files exist.
       Gate Control Plane section references policy files that don't exist yet.
-    status: "queued"
+    status: "completed"
     created: "2026-04-08T03:08:00Z"
-    attempted_count: 0
+    completed: "2026-04-13T03:00:00Z"
+    attempted_count: 1
+    completion_note: >
+      Verified complete during meta-2026-04-13 boot: hive/gate-policies/development-classic.yaml
+      and hive/gate-policies/development-tdd.yaml both exist with full policy schemas.
 
   - id: "target-2026-04-08-002"
     target: "hive/agents/tester.md"
@@ -35,9 +39,13 @@ targets:
       Researcher persona has 6 scope discipline rules and explicit time
       budgets (5/10/15 min). Tester persona has only a single "scope
       discipline" bullet in Quality Standards with no enforcement mechanism.
-    status: "queued"
+    status: "completed"
     created: "2026-04-08T03:08:00Z"
-    attempted_count: 0
+    completed: "2026-04-13T03:00:00Z"
+    attempted_count: 1
+    completion_note: >
+      Added 6-rule Scope Discipline section with time budgets (10/20/30 min) to
+      hive/agents/tester.md during meta-2026-04-13. Mirrors researcher.md pattern.
 
   - id: "target-2026-04-08-003"
     target: "hive/agents/technical-writer.md"
@@ -52,9 +60,13 @@ targets:
       Technical writer lacks Activation Protocol (present in researcher,
       developer, reviewer, tester, analyst, architect). Missing scope
       discipline and time budgets found in all other production personas.
-    status: "queued"
+    status: "completed"
     created: "2026-04-08T03:08:00Z"
-    attempted_count: 0
+    completed: "2026-04-13T03:00:00Z"
+    attempted_count: 1
+    completion_note: >
+      Activation Protocol already present in technical-writer.md. Added 5-rule Scope
+      Discipline section with time budgets (5/15/25 min) during meta-2026-04-13.
   # Each entry is a prioritized optimization target.
   #
   # Schema:
