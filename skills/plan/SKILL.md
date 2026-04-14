@@ -164,6 +164,11 @@ If all checks pass, proceed normally.
 
 9b. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the structured outline. This is the most critical review — all active team agents review the full outline. The TPM validates sequencing, the researcher confirms technical accuracy, the architect (if present) stress-tests feasibility, and the UI designer (if present) validates UI approach. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
 
+   **UI Designer SCALE_CALL revision (step 9b only) — two-gate precedence rule:** If ui-designer emits a `SCALE_CALL` field in their step 9b review response, apply **last gate wins**:
+   - **Revised to `pre-exec`:** delete any existing ui-designer escalation entry in cycle state, then write the step 9b `ESCALATION:` block as a fresh entry. Log: `"ui-designer scale call revised at step 9b to pre-exec — writing fresh escalation"`
+   - **Revised to `in-planning`:** delete any existing ui-designer escalation entry in cycle state (step 4b pre-exec call is superseded). Log: `"ui-designer scale call revised at step 9b to in-planning — escalation removed"`
+   - **No step 9b revision:** step 4b value stands unchanged; no action needed
+
 10. **Present structured outline to user.** Show the full document, including a summary of team review findings. The elicitation section (Part 7) contains the agent team's own stress-test of the plan — the user reads the team's answers to evaluate whether the thinking is sound. The user then:
     - Flags any elicitation answers that seem weak or wrong
     - Responds to the decision points (Part 8) — numbered affirm/change items
@@ -191,6 +196,22 @@ If all checks pass, proceed normally.
     **If vertical slice plan exists:** Stories map to vertical slices. Each slice becomes one or more stories. Stories within a slice can run in parallel, but slices execute sequentially (each depends_on the prior slice's stories). Every story's completion leaves the product in a working state — this is the vertical planning invariant.
 
     **If no vertical slice plan:** Decompose as before — independently implementable stories with dependency tracking.
+
+    **Escalation stories[] backfill (always runs after story IDs are determined):**
+    Once canonical story YAML IDs are finalized, iterate every entry in `escalations:` in `state/cycle-state/{epic-id}.yaml`:
+    - For each entry, inspect its `stories` list — entries may contain topic area strings from raise time
+    - For each topic area string, attempt a match against decomposed story IDs:
+      - **Exact match:** topic area string equals a story ID → replace in place
+      - **Fuzzy match:** topic area string overlaps with a story's `title` or `description` keywords (case-insensitive substring match) → replace with the matched canonical ID
+    - **Already canonical:** if an entry already matches a story YAML ID exactly, leave it unchanged (no re-matching needed)
+    - After replacement, write the updated `stories` list back to the escalation entry in cycle state
+    - For any topic area with **no match found:** preserve the original string as-is and log:
+      ```
+      WARNING: escalation "{trigger}" stories[] entry "{topic-area}" could not be matched to a canonical story ID — leaving as topic area string
+      ```
+    - Entries whose `stories` list is already canonical IDs (from a prior run or manual edit) require no change
+
+    > **Two-phase population pattern:** `escalations[].stories[]` is populated in two phases: (1) topic areas at raise time by the raising agent, (2) canonical IDs at plan step 11 by orchestrator backfill. Execute reads the backfilled canonical IDs.
 
 12. **Requirements traceability check.** Before finalizing stories, verify every aspect of the original requirement is covered by at least one story:
     - Re-read the original requirement/PRD
@@ -352,9 +373,77 @@ A collaborative review gate runs before every user-facing document presentation.
 3. **Respond.** Each agent returns structured feedback via `SendMessage`:
    ```
    REVIEW: {agent-name}
-   VERDICT: approve | flag
+   VERDICT: approve | flag | approve-with-escalation
    COMMENTS: {specific issues or confirmation}
    ```
+
+3b. **Extract escalations from agent review responses (orchestrator only).** After collecting all agent review responses for a gate, check each response for escalation signals. Only the orchestrator writes to cycle state — planning agents signal via their review gate responses.
+
+   **Generic extraction pattern:** For each agent response in the review gate, check for an `ESCALATION_FLAGS` signal. Apply dedup-on-write for every flag found. This pattern is intentionally extensible — future emitters add their signal format here; the dedup-on-write rule handles all collisions automatically.
+
+   **Active emitters:**
+
+   **Architect** — look for an `## Escalation Flags` section with line entries in the format:
+   ```
+   - [severity] trigger-id — reason
+   ```
+   For each line: parse `trigger`, `severity`, `reason`. Look up `placement` from the specialist-triggers catalog. Set `raised_by: architect` (orchestrator adds this — architect does not emit it).
+
+   **TPM** — look for an `ESCALATION_FLAGS:` block with YAML list entries in the format:
+   ```
+   ESCALATION_FLAGS:
+     - trigger: performance:audit
+       placement: post-exec
+       severity: major
+       stories: [topic-area-1, ...]
+       reason: "explanation"
+       raised_by: tpm
+   ```
+   For each entry: read all fields directly. `placement` is provided by the TPM (taken from catalog). Set `raised_by: tpm`.
+
+   **UI Designer** — look for a `SCALE_CALL:` field in the review response:
+   - **`SCALE_CALL: in-planning`** → no write to cycle state; wireframes proceed during planning as normal
+   - **`SCALE_CALL: pre-exec`** → extract the `ESCALATION:` block that follows the field; write to cycle state using the same dedup-on-write logic as architect/TPM extraction. Set `raised_by: ui-designer`
+   - **No `SCALE_CALL` field** → ui-designer not on planning team or didn't emit; skip — no write to cycle state
+
+   **For all emitters:**
+   - Set `raised_at` to the current ISO 8601 timestamp (orchestrator sets this at extraction time)
+   - Set `stories` to topic areas from the agent's response context if not provided (canonical IDs backfilled at step 11)
+   - `placement` source precedence: if the agent provides `placement` in their response (TPM, ui-designer), use the agent-provided value. If not (architect), look up `placement` from the specialist-triggers catalog
+
+   **Dedup-on-write:** Before writing any extracted flag to `state/cycle-state/{epic-id}.yaml`, check whether an entry with the same `trigger` ID already exists:
+   - **If exists:** merge into the existing entry — do NOT append a second entry:
+     - `stories`: union of existing and new stories[] lists (deduplicated, existing entries first, then new entries)
+     - `reason`: concatenate existing and new reason with `" | "` separator
+     - `raised_at`: keep the **earliest** timestamp (preserves when the concern was first raised)
+     - `raised_by`: if different agents, concatenate with `", "` separator (e.g. `"architect, tpm"`)
+     - `severity`: keep the **maximum** severity using ordering `major > moderate > minor`. Example: existing `moderate` + incoming `major` → merged value is `major`. Ties keep the existing value.
+   - **If not exists:** write the new 7-field entry as normal
+
+   ```yaml
+   # Example entry written to cycle state (architect raises first)
+   escalations:
+     - trigger: security:plan-audit
+       placement: pre-exec
+       severity: major
+       stories: [auth-flow]  # topic areas at raise time; backfilled to canonical story IDs at step 11
+       reason: "human-readable explanation from architect flag"
+       raised_by: architect
+       raised_at: "2026-04-12T09:15:00Z"
+
+   # Example after dedup merge (TPM also raised security:plan-audit later in same gate)
+   escalations:
+     - trigger: security:plan-audit
+       placement: pre-exec
+       severity: major
+       stories: [auth-flow, data-layer]   # unioned topic areas
+       reason: "architect: token storage risk | tpm: compliance deadline requires audit"
+       raised_by: "architect, tpm"
+       raised_at: "2026-04-12T09:15:00Z"  # earliest timestamp kept (architect raised first)
+   ```
+
+   **If no escalation signal is found in a response:** skip — do not write an empty `escalations:` block or modify cycle state.
+
 4. **Revise if needed.** If any agent flags issues, the orchestrator `SendMessage`s the feedback to the technical writer for revision. Max 1 revision cycle to avoid loops.
 5. **Proceed.** Once all agents approve (or after 1 revision cycle), present the document to the user. Include a brief summary of what the team flagged and resolved:
    ```

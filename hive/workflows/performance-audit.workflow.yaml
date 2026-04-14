@@ -1,0 +1,77 @@
+name: performance-audit
+description: Performance specialist team audit — post-exec review of implementation artifacts for complexity, allocation, I/O, caching, bundle size, and lazy-loading issues. Mirrors design-review.workflow.yaml shape.
+version: "1.0.0"
+timeout_ms: 1800000
+
+steps:
+  - id: performance-critique
+    agent: performance-reviewer
+    task: >
+      Review the implementation artifacts for performance issues.
+      Evaluate: algorithmic complexity of hot paths, memory allocation patterns
+      in tight loops, I/O access patterns (N+1 queries, sequential fetches that
+      could parallelize), caching opportunities, bundle size impact of new
+      dependencies, lazy-loading opportunities for large modules.
+      Stay strictly in the performance lane — do NOT surface correctness,
+      security, or idiomatic findings; those belong to other specialized reviewers.
+      Every finding must quantify impact (measured latency delta, allocation count,
+      bundle kilobytes, query count) — unquantified findings are unactionable and
+      should be dropped.
+      Produce a structured findings report.
+    depends_on: []
+    inputs:
+      - name: implementation_artifacts
+        source: context
+        context_key: implementation_artifacts
+    outputs:
+      - name: performance_critique
+        type: string
+    optional: false
+    timeout_ms: 900000
+
+  - id: synthesis
+    agent: performance-reviewer
+    task: >
+      Synthesize the performance critique into a unified audit verdict.
+      Rank findings by severity per the catalog's severity_guidance:
+      major → findings block release; must be addressed before ship
+      moderate → findings logged; addressable in follow-on epic
+      minor → informational; benchmarks captured for baseline
+
+      Produce a structured verdict:
+
+      ## Performance Audit: {artifacts reviewed}
+
+      ## Findings
+      - `{file}:{line}` — {finding} [severity: major | moderate | minor] [impact: {quantified delta}]
+
+      ## Recommended Changes
+      - {specific actionable change with measured justification}
+
+      ## Baseline Metrics
+      - {benchmarks captured for future comparison}
+
+      ## Summary
+      One-paragraph assessment of overall performance posture and readiness to ship.
+
+      ## Verdict
+      approved | needs_revision | needs_redesign
+
+      Verdict criteria:
+      - approved: no major findings; moderate findings documented for follow-up
+      - needs_revision: one or more major findings that must be addressed before ship
+      - needs_redesign: performance approach is fundamentally flawed; requires re-scoping
+    depends_on:
+      - performance-critique
+    inputs:
+      - name: performance_critique
+        source: step_output
+        step_id: performance-critique
+        output_name: performance_critique
+    outputs:
+      - name: audit_verdict
+        type: string
+      - name: audit_summary
+        type: string
+    optional: false
+    timeout_ms: 600000

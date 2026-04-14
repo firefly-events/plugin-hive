@@ -92,7 +92,43 @@ described in prose or ASCII if a visual tool is unavailable.
 
 ## Risk Assessment
 - [severity: high/medium/low] Risk description — mitigation strategy
+
+## Escalation Flags
+- [severity] trigger-id — reason — raised_by: architect
 ```
+
+Field reference (from cycle-state-schema):
+- **trigger** — catalog entry ID (e.g. `security:plan-audit`)
+- **placement** — taken from catalog; architect does not invent (pre-exec | post-exec | append)
+- **severity** — minor | moderate | major
+- **stories** — topic areas affected; canonical IDs backfilled by orchestrator at plan step 11
+- **reason** — human-readable explanation of why the flag was raised
+- **raised_by** — always `architect` for flags raised here
+- **raised_at** — populated by orchestrator at extraction time; architect does NOT set this
+
+## When to raise escalation flags
+
+Architect is authorized to raise the following triggers from the specialist-triggers catalog:
+
+### `security:plan-audit` (placement: pre-exec)
+Raise when: auth model changes, new external API surfaces, privilege escalation risks, data schema changes touching PII, or any multi-system integration.
+- **major** → blocks execution until security team resolves
+- **moderate** → execution proceeds but results are flagged
+- **minor** → informational only
+
+### `security:impl-audit` (placement: append)
+Raise when: implementation touches auth flows, secrets handling, input validation, or any surface flagged during `security:plan-audit`.
+- **major** → blocks story merge until security-reviewer signs off
+- **moderate** → reviewer flags must be addressed before PR
+- **minor** → informational; reviewer comments appended to story output
+
+### `performance:audit` (placement: post-exec)
+Raise when: new data-intensive endpoints, client-side rendering of large datasets, database query patterns changed, or any feature with latency SLA implications.
+- **major** → findings block release; must be addressed before ship
+- **moderate** → findings logged; addressable in follow-on epic
+- **minor** → informational; benchmarks captured for baseline
+
+> **DOGFOOD NOTE:** During B2c review of the specialist-triggers epic, architect raised a real `security:plan-audit` flag — this is the canonical test fixture for L7.1 end-to-end chain validation.
 
 ## How you work
 

@@ -36,6 +36,15 @@ constraints:
   - "Minimum iOS 16, Android API 28"
   - "No new backend dependencies without architect review"
 
+escalations:
+  - trigger: security:plan-audit     # catalog entry ID — namespace:action
+    placement: pre-exec              # pre-exec | post-exec | append
+    severity: major                  # minor | moderate | major
+    stories: [story-id-1, ...]       # topic areas at raise; backfilled to real IDs at plan step 11
+    reason: "human-readable explanation"
+    raised_by: architect             # agent persona name
+    raised_at: "2026-04-11T09:15:00Z"  # ISO 8601; populated by orchestrator at extraction
+
 naming:
   product: my-app
   package: com.example.myapp
@@ -55,6 +64,8 @@ technology:
   database: "MongoDB"
   testing: "Maestro (E2E), JUnit (unit)"
 ```
+
+`stories` field — required for `append` placement (empty list is invalid); informational for `pre-exec`/`post-exec` (empty list is valid — phase spawns regardless of story scope).
 
 ## How It Works
 
@@ -90,7 +101,7 @@ When a planning swarm hands off to a dev swarm, the cycle state transfers as par
 | `epic_id` | string | Epic this state belongs to |
 | `created` | string | ISO 8601 creation timestamp |
 | `updated` | string | ISO 8601 last update timestamp |
-| `decisions` | list | Accumulated decisions with phase, key, value, rationale, timestamp |
+| `decisions` | list | Accumulated decisions — canonical format: `{phase, key, value, rationale, timestamp}`. Legacy files using `{decision, rationale}` shorthand update to canonical format on next orchestrator write — no bulk migration required. |
 
 ## Optional Fields
 
@@ -102,6 +113,7 @@ When a planning swarm hands off to a dev swarm, the cycle state transfers as par
 | `scope_boundaries` | object | Explicit in-scope and out-of-scope items |
 | `technology` | object | Technology stack decisions |
 | `linear` | object | Linear ticket ID mapping (see below) |
+| `escalations` | list | Specialist team escalation flags raised during planning. See specialist-triggers.md catalog for valid trigger IDs. |
 
 ## Linear Ticket Tracking
 
