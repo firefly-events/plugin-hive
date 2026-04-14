@@ -68,7 +68,12 @@ Validation: after expansion, check that the resolved path exists. If it doesn't 
 
 Read the agent's memory directory (from the resolved `knowledge` paths).
 
-**5a. Check wiki freshness:**
+**5a. L3 availability check (ChromaDB):**
+- Call `isAvailable()` from `hive/lib/chromadb-wrapper.js`
+- If available (L3 active): **skip steps 5b and 5c entirely** — proceed directly to **5c-L3** (see below). The compiled-at.md freshness gate does not apply when ChromaDB is active; semantic search operates independently of wiki compilation state.
+- If unavailable: proceed to the existing freshness gate below.
+
+**5a (L0/L1 path). Check wiki freshness:**
 - Read `~/.claude/hive/memory-wiki/meta/compiled-at.md`
 - If file absent or timestamp > 24 hours old: go to step 5c (L0 fallback)
 - If file present and recent: proceed to step 5b
@@ -81,7 +86,18 @@ Read the agent's memory directory (from the resolved `knowledge` paths).
 - Format loaded content as the "Prior Knowledge" block (same injection format as below)
 - Proceed to step 5d for staleness surfacing
 
-**5c. L0 fallback (keyword scan — current behavior):**
+**5c-L3 (ChromaDB active path):**
+- Query ChromaDB: `query(collectionName, agentContext, 20)` to fetch top-20 candidate memories
+- **Step A — Always include** all `override` and `pitfall` type memories unconditionally. These are immune to the 5-memory cap.
+- From remaining candidates, rank by: `score = relevance_score × (1 / (1 + days_since_created))`
+  where `relevance_score` is ChromaDB distance (lower = more relevant, normalize to 0–1),
+  and `days_since_created` is derived from the memory's `timestamp` field
+  where `relevance_score = 1 - distance` for cosine distance (ChromaDB default) — higher score = more relevant.
+- **Step C — Cap** the remaining (non-override/pitfall) memories at `max(0, 5 - override_pitfall_count)`. Total Prior Knowledge set size is `override_pitfall_count + remaining_cap`, which may exceed 5 when many overrides/pitfalls exist — this is intentional.
+- Format as the "Prior Knowledge" block (same format as L0/L1 path)
+- Proceed to step 5d for staleness surfacing
+
+**5c (L0/L1 fallback path — unchanged):**
 - Scan the memory directory for all `.md` files
 - Read each memory's frontmatter `description` field
 - Check relevance to the current task (keyword match: memory descriptions vs story description/context)
