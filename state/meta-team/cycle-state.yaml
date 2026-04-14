@@ -1,7 +1,8 @@
-cycle_id: meta-2026-04-10
-started: "2026-04-10T03:00:00Z"
-status: running
-phase: analysis
+cycle_id: meta-2026-04-13
+started: "2026-04-13T03:00:00Z"
+status: closed
+phase: close
+closed: "2026-04-13T04:15:00Z"
 charter_constraints:
   - No destructive operations (no file deletions, no >50% content removal per file)
   - No breaking changes (schema changes must be additive)
@@ -10,453 +11,446 @@ charter_constraints:
   - Human confirmation required for config changes, tool list changes, external service integrations
   - Commit all changes with [meta-team] prefix
 prior_cycle:
-  id: meta-2026-04-09
+  id: meta-2026-04-10
   outcome: passed
 
 # Phase 2 — Analysis
 findings:
   - id: finding-1
-    category: STUB_DOC
+    category: MEMORY_GAP
     severity: high
-    location: hive/references/insight-capture.md
-    description: insight-capture.md is only 13 lines — far below the 30-line threshold; missing format examples, evaluation criteria, and staging path details
-    evidence: "File has 13 lines total: a 5-line intro list of capture triggers and a single format pointer. No examples of what a complete insight looks like, no staging path conventions, no keep/discard guidance at capture time."
+    location: skills/hive/agents/memories/accessibility-specialist/
+    description: >
+      accessibility-specialist has zero starter memories. Agent audits and fixes WCAG 2.1 AA
+      violations across all code in scope. Two critical failure modes without memories: skipping
+      automated audit before writing fixes, and writing fixes without citing the specific
+      WCAG success criterion.
+    evidence: >
+      No *.md files in skills/hive/agents/memories/accessibility-specialist/ (no .gitkeep observed,
+      directory created fresh by this cycle). Prior cycle ledger (meta-2026-04-10) notes
+      accessibility-specialist as one of 4 remaining zero-memory agents.
 
   - id: finding-2
     category: MEMORY_GAP
-    severity: medium
-    location: skills/hive/agents/memories/analyst/
-    description: analyst agent has zero starter memories (only .gitkeep); analyst is Opus-tier and used in every planning phase for requirements decomposition
-    evidence: "Directory contains only .gitkeep. Prior cycle ledger (meta-2026-04-09) identified analyst as top priority for next cycle."
+    severity: high
+    location: skills/hive/agents/memories/animations-specialist/
+    description: >
+      animations-specialist has zero starter memories. Agent implements and optimizes animations
+      across CSS, native, and web. Two critical failure modes: shipping animations without
+      prefers-reduced-motion alternatives (a11y/WCAG violation), and animating non-compositor
+      properties (causes layout thrashing and jank).
+    evidence: >
+      No *.md files in skills/hive/agents/memories/animations-specialist/. Prior cycle ledger
+      notes animations-specialist as one of 4 remaining zero-memory agents.
 
   - id: finding-3
     category: MEMORY_GAP
-    severity: medium
-    location: skills/hive/agents/memories/peer-validator/
-    description: peer-validator agent has zero starter memories (only .gitkeep); peer-validator is the cross-story consistency gate
-    evidence: "Directory contains only .gitkeep. Prior cycle ledger identified peer-validator as top priority."
+    severity: high
+    location: skills/hive/agents/memories/idiomatic-reviewer/
+    description: >
+      idiomatic-reviewer has zero starter memories. Agent reviews code exclusively for language
+      idioms. Primary failure mode: straying into correctness/security/performance findings that
+      belong to other specialized reviewers, creating conflicting verdicts and diluting findings.
+    evidence: >
+      No *.md files in skills/hive/agents/memories/idiomatic-reviewer/. Prior cycle ledger
+      notes idiomatic-reviewer as one of 4 remaining zero-memory agents.
 
   - id: finding-4
     category: MEMORY_GAP
-    severity: medium
-    location: skills/hive/agents/memories/technical-writer/
-    description: technical-writer agent has zero starter memories; technical-writer produces research briefs, design discussions, outlines, and H/V plans in planning and dev phases
-    evidence: "Directory contains only .gitkeep. technical-writer.md references 4 planning skills but has no memory guidance for them."
+    severity: high
+    location: skills/hive/agents/memories/performance-reviewer/
+    description: >
+      performance-reviewer has zero starter memories. Agent reviews code for complexity,
+      allocation, I/O, caching, bundle, and lazy-loading issues. Primary failure modes:
+      straying into other lanes, and filing performance findings without quantifying impact
+      (making findings unactionable).
+    evidence: >
+      No *.md files in skills/hive/agents/memories/performance-reviewer/. Prior cycle ledger
+      notes performance-reviewer as one of 4 remaining zero-memory agents.
 
   - id: finding-5
     category: MEMORY_GAP
-    severity: medium
-    location: skills/hive/agents/memories/ui-designer/
-    description: ui-designer agent has zero starter memories; ui-designer drives UI wireframing with Frame0 CLI and has required_tools, making startup pitfalls likely
-    evidence: "Directory contains only .gitkeep. ui-designer.md has a required_tools entry and a graceful degradation fallback that agents often miss."
+    severity: low
+    location: skills/hive/agents/memories/test-inspector/
+    description: >
+      test-inspector has only 1 memory (coverage-delta-report-format). Prior cycle evaluation
+      explicitly flagged the need for a second memory: how to handle missing coverage tooling.
+      Without it, agents report "tooling unavailable" and stop rather than producing a manual
+      AC coverage table.
+    evidence: >
+      Only 1 file in test-inspector/ memory directory. meta-2026-04-10 evaluation notes:
+      "inspector → how to handle missing coverage tooling" as next-cycle priority.
 
   - id: finding-6
     category: MEMORY_GAP
     severity: low
-    location: skills/hive/agents/memories/test-architect/
-    description: test-architect agent has zero starter memories; drives test strategy in the test swarm
-    evidence: "Directory contains only .gitkeep."
+    location: skills/hive/agents/memories/test-sentinel/
+    description: >
+      test-sentinel has only 1 memory (three-gate-pass-criteria). Prior cycle evaluation
+      explicitly flagged the need for a second memory: how to report a regression block with
+      actionable detail.
+    evidence: >
+      Only 1 file in test-sentinel/ memory directory. meta-2026-04-10 evaluation notes:
+      "sentinel → how to report a regression block with actionable detail" as next-cycle priority.
 
   - id: finding-7
-    category: MEMORY_GAP
-    severity: low
-    location: skills/hive/agents/memories/test-inspector/
-    description: test-inspector agent has zero starter memories; validates coverage in the test swarm
-    evidence: "Directory contains only .gitkeep."
+    category: PERSONA_GAP
+    severity: medium
+    location: hive/agents/tester.md
+    description: >
+      tester.md has only a single "scope discipline" bullet in Quality Standards. Researcher.md
+      has a dedicated 6-rule Scope Discipline section with enforced time budgets. Without an
+      equivalent section, tester agents have no scope enforcement mechanism and routinely write
+      speculative tests outside the story spec.
+    evidence: >
+      Quality Standards section has one bullet: "Scope discipline: Tests cover story requirements
+      only — no speculative tests for unrelated functionality." researcher.md has a dedicated
+      Scope Discipline section with 6 specific rules and explicit time budgets (5/10/15 min).
+      Queue target target-2026-04-08-002 identified this gap on 2026-04-08.
 
   - id: finding-8
-    category: MEMORY_GAP
-    severity: low
-    location: skills/hive/agents/memories/test-scout/
-    description: test-scout agent has zero starter memories; scouts test infrastructure in the test swarm
-    evidence: "Directory contains only .gitkeep."
+    category: PERSONA_GAP
+    severity: medium
+    location: hive/agents/technical-writer.md
+    description: >
+      technical-writer.md has an Activation Protocol but lacks a Scope Discipline section with
+      explicit rules and time budgets. Primary failure mode is document sprawl: adding uninstructed
+      sections, analyzing raw data instead of structuring it, and not matching injected skill
+      structure exactly.
+    evidence: >
+      No Scope Discipline section found in technical-writer.md. Queue target target-2026-04-08-003
+      identified this gap on 2026-04-08.
 
   - id: finding-9
-    category: MEMORY_GAP
+    category: QUEUE_STALE
     severity: low
-    location: skills/hive/agents/memories/test-sentinel/
-    description: test-sentinel agent has zero starter memories; runs final coverage gate in the test swarm
-    evidence: "Directory contains only .gitkeep."
+    location: state/meta-team/queue.yaml
+    description: >
+      Queue target target-2026-04-08-001 (gate-policy files) remains in "queued" status but
+      hive/gate-policies/development-classic.yaml and hive/gate-policies/development-tdd.yaml
+      both exist with full policy schemas. Target is already complete.
+    evidence: >
+      Both gate-policy files found during boot scan. target-2026-04-08-001 status was "queued"
+      with attempted_count: 0.
 
 # Phase 3 — Proposals
 approved_proposals:
   - id: proposal-1
-    title: Add analyst starter memories (2 memories)
-    addresses_findings: [finding-2]
-    impact_score: 4
-    risk_score: 1
-    effort_score: 1
-    priority_score: 20.0
-    charter_objective: coverage
-    implementation_plan:
-      - step: Create pitfall memory — requirements traceability gaps go undetected when analyst doesn't map all capabilities
-        file: skills/hive/agents/memories/analyst/trace-every-capability-to-a-story.md
-        action: create
-      - step: Create pattern memory — decompose ambiguous requirements into measurable acceptance criteria before passing to architect
-        file: skills/hive/agents/memories/analyst/measurable-acceptance-criteria-first.md
-        action: create
-    rationale: |
-      analyst is Opus-tier and participates in every planning phase. It is the first agent
-      to process raw user requirements into traceable stories. Without starter memories,
-      the analyst starts blind: it will miss the traceability protocol, invent ambiguous
-      criteria, and skip gap reporting. These two memories address the two most common
-      analyst failure modes: unmapped capabilities and untestable acceptance criteria.
-    risk_notes: |
-      New files only — no existing content touched. Risk is near-zero.
-
-  - id: proposal-2
-    title: Add peer-validator starter memories (2 memories)
-    addresses_findings: [finding-3]
-    impact_score: 3
-    risk_score: 1
-    effort_score: 1
-    priority_score: 15.0
-    charter_objective: coverage
-    implementation_plan:
-      - step: Create pitfall memory — do not evaluate within-story correctness; that is the reviewer's job
-        file: skills/hive/agents/memories/peer-validator/stay-in-cross-story-lane.md
-        action: create
-      - step: Create pattern memory — always check naming consistency and shared-interface usage before checking logic
-        file: skills/hive/agents/memories/peer-validator/convention-consistency-before-logic.md
-        action: create
-    rationale: |
-      peer-validator is the cross-story consistency gate. Without starter memories, it
-      tends to overlap with the reviewer's within-story evaluation rather than focusing
-      on cross-story convention compliance and interface consistency. These two memories
-      establish the scope boundary and the check order.
-    risk_notes: |
-      New files only — no existing content touched.
-
-  - id: proposal-3
-    title: Expand insight-capture.md from stub to full reference doc
-    addresses_findings: [finding-1]
+    title: Add starter memories for accessibility-specialist (2) + animations-specialist (2)
+    addresses_findings: [finding-1, finding-2]
     impact_score: 4
     risk_score: 1
     effort_score: 2
+    priority_score: 18.0
+    charter_objective: coverage
+    implementation_plan:
+      - file: skills/hive/agents/memories/accessibility-specialist/run-automated-audit-before-manual-fixes.md
+        action: create
+      - file: skills/hive/agents/memories/accessibility-specialist/cite-wcag-criterion-for-every-fix.md
+        action: create
+      - file: skills/hive/agents/memories/animations-specialist/every-animation-needs-reduced-motion-alternative.md
+        action: create
+      - file: skills/hive/agents/memories/animations-specialist/compositor-only-properties-for-animation.md
+        action: create
+    rationale: >
+      Both agents have zero starter memories and were identified in the prior cycle ledger as
+      top-priority gaps. accessibility-specialist's two failure modes (skipping automated audit,
+      not citing WCAG criteria) and animations-specialist's two failure modes (missing
+      reduced-motion alternatives, animating non-compositor properties) are the most impactful
+      behavioral gaps for these agents.
+    risk_notes: New files only — no existing content touched.
+
+  - id: proposal-2
+    title: Add starter memories for idiomatic-reviewer (2) + performance-reviewer (2)
+    addresses_findings: [finding-3, finding-4]
+    impact_score: 4
+    risk_score: 1
+    effort_score: 2
+    priority_score: 18.0
+    charter_objective: coverage
+    implementation_plan:
+      - file: skills/hive/agents/memories/idiomatic-reviewer/stay-in-idiomatic-lane-only.md
+        action: create
+      - file: skills/hive/agents/memories/idiomatic-reviewer/acknowledge-wins-before-issues.md
+        action: create
+      - file: skills/hive/agents/memories/performance-reviewer/stay-in-performance-lane-only.md
+        action: create
+      - file: skills/hive/agents/memories/performance-reviewer/quantify-impact-dont-just-label-it.md
+        action: create
+    rationale: >
+      Both specialized reviewer agents have zero starter memories. Both are narrow-lane
+      reviewers and their #1 failure mode is straying into adjacent lanes. The lane-discipline
+      pitfall memory is the most critical first memory for any specialized reviewer.
+      The second memory addresses each agent's output quality: idiomatic-reviewer must
+      acknowledge wins (required by its output format), performance-reviewer must quantify
+      impact (otherwise findings are unactionable).
+    risk_notes: New files only — no existing content touched.
+
+  - id: proposal-3
+    title: Add second memories for test-inspector + test-sentinel
+    addresses_findings: [finding-5, finding-6]
+    impact_score: 3
+    risk_score: 1
+    effort_score: 1
+    priority_score: 10.0
+    charter_objective: coverage
+    implementation_plan:
+      - file: skills/hive/agents/memories/test-inspector/manual-ac-table-when-coverage-tooling-unavailable.md
+        action: create
+      - file: skills/hive/agents/memories/test-sentinel/regression-block-report-format.md
+        action: create
+    rationale: >
+      Both memories were explicitly called out in the prior cycle evaluation as next-cycle
+      priorities. test-inspector's most common real-world gap is coverage tooling absence;
+      the memory gives a fallback protocol (manual AC table) that is always producible.
+      test-sentinel's regression block report format ensures the orchestrator gets actionable
+      detail rather than a one-line block signal.
+    risk_notes: New files only — no existing content touched.
+
+  - id: proposal-4
+    title: Add Scope Discipline section to tester.md
+    addresses_findings: [finding-7]
+    impact_score: 3
+    risk_score: 1
+    effort_score: 1
     priority_score: 10.0
     charter_objective: clarity
     implementation_plan:
-      - step: Expand hive/references/insight-capture.md with full format, staging path, keep/discard criteria, and one complete example
-        file: hive/references/insight-capture.md
+      - file: hive/agents/tester.md
         action: add_section
-    rationale: |
-      insight-capture.md is referenced from MAIN.md and is the primary guidance agents use
-      to decide whether to stage an insight. At 13 lines it provides only the trigger list
-      and a format pointer. Missing: the complete frontmatter format (agents must look it up
-      in agent-memory-schema.md), the staging path conventions, how to name the file, and
-      what constitutes a promotable insight. The result is agents either skip insight capture
-      entirely or stage low-quality entries that get discarded at session-end.
-    risk_notes: |
-      Content-additive only — existing 13 lines are kept verbatim. New sections appended.
-
-  - id: proposal-4
-    title: Add technical-writer and ui-designer starter memories
-    addresses_findings: [finding-4, finding-5]
-    impact_score: 3
-    risk_score: 1
-    effort_score: 2
-    priority_score: 7.5
-    charter_objective: coverage
-    implementation_plan:
-      - step: Create pitfall memory for technical-writer — never produce prose analysis; write structured documents only
-        file: skills/hive/agents/memories/technical-writer/structured-docs-not-prose-analysis.md
-        action: create
-      - step: Create pattern memory for technical-writer — confirm which skill applies before writing any document
-        file: skills/hive/agents/memories/technical-writer/match-skill-to-document-type.md
-        action: create
-      - step: Create pitfall memory for ui-designer — always check Frame0 CLI availability before starting; fall back to text specs if unavailable
-        file: skills/hive/agents/memories/ui-designer/check-frame0-cli-availability-first.md
-        action: create
-      - step: Create pattern memory for ui-designer — one screen per frame0 page, named exactly as in the screen list
-        file: skills/hive/agents/memories/ui-designer/one-screen-per-page-canonical-naming.md
-        action: create
-    rationale: |
-      technical-writer produces the research brief that every subsequent agent depends on.
-      Its most common failure is producing flowing prose rather than structured sections,
-      making the brief hard to use. ui-designer has a tool dependency (Frame0 CLI) that
-      is easy to miss; agents that skip the availability check fail mid-workflow.
-    risk_notes: |
-      New files only — no existing content touched.
+        description: 6-rule Scope Discipline section with time budgets (10/20/30 min), placed before "How you think"
+    rationale: >
+      Addresses queue target target-2026-04-08-002. The tester.md Scope Discipline section
+      mirrors researcher.md's proven pattern: explicit numbered rules with time budgets.
+      Without it, tester agents rely on a single Quality Standards bullet that provides
+      no enforcement mechanism.
+    risk_notes: Additive edit only — no existing content changed.
 
   - id: proposal-5
-    title: Add test swarm agent starter memories (test-architect, test-inspector, test-scout, test-sentinel)
-    addresses_findings: [finding-6, finding-7, finding-8, finding-9]
+    title: Add Scope Discipline section to technical-writer.md
+    addresses_findings: [finding-8]
     impact_score: 3
     risk_score: 1
-    effort_score: 3
-    priority_score: 5.0
-    charter_objective: coverage
+    effort_score: 1
+    priority_score: 8.0
+    charter_objective: clarity
     implementation_plan:
-      - step: Create pattern memory for test-scout — detect test framework from config files before reading any test files
-        file: skills/hive/agents/memories/test-scout/detect-framework-from-config.md
-        action: create
-      - step: Create pitfall memory for test-scout — never assume test runner; always verify with package.json or equivalent
-        file: skills/hive/agents/memories/test-scout/never-assume-test-runner.md
-        action: create
-      - step: Create pattern memory for test-architect — write test strategy before generating any test files
-        file: skills/hive/agents/memories/test-architect/strategy-before-test-generation.md
-        action: create
-      - step: Create pitfall memory for test-architect — do not duplicate unit test coverage from story implementation
-        file: skills/hive/agents/memories/test-architect/avoid-coverage-overlap-with-story-tests.md
-        action: create
-      - step: Create pattern memory for test-inspector — produce a coverage delta report, not just a pass/fail verdict
-        file: skills/hive/agents/memories/test-inspector/coverage-delta-report-format.md
-        action: create
-      - step: "Create pattern memory for test-sentinel — gate on all three: tests pass + coverage threshold + no regressions"
-        file: skills/hive/agents/memories/test-sentinel/three-gate-pass-criteria.md
-        action: create
-    rationale: |
-      The test swarm's 4 specialized agents (scout, architect, inspector, sentinel) each have
-      a distinct role but zero starter memories. These memories establish the key behavioral
-      pattern for each role: scout detects framework, architect plans before generating,
-      inspector reports delta not verdict, sentinel gates on all three pass conditions.
-    risk_notes: |
-      New files only — no existing content touched.
+      - file: hive/agents/technical-writer.md
+        action: add_section
+        description: 5-rule Scope Discipline section with time budgets (5/15/25 min), placed after Quality Standards
+    rationale: >
+      Addresses queue target target-2026-04-08-003. The Scope Discipline section addresses
+      technical-writer's specific failure modes: document sprawl, editorializing raw data,
+      not matching injected skill structure. Rules are tailored to the writer's context
+      (not a researcher, not a coder — a formatter of provided input).
+    risk_notes: Additive edit only — no existing content changed.
 
-skipped_findings: []
+skipped_findings:
+  - id: finding-9
+    reason: queue_maintenance
+    description: Marked target-2026-04-08-001 as completed in queue.yaml during implementation (not a proposal — maintenance action)
 
 # Phase 4 — Implementation
 changes:
   - proposal_id: proposal-1
     action: create
-    file: skills/hive/agents/memories/analyst/trace-every-capability-to-a-story.md
-    description: Pitfall memory — every capability in the requirement must map to a story; unmapped = CAPABILITY_GAP
+    file: skills/hive/agents/memories/accessibility-specialist/run-automated-audit-before-manual-fixes.md
+    description: Pattern memory — run axe/pa11y automated audit before writing manual ARIA fixes; includes tool priority order and fallback
     status: done
 
   - proposal_id: proposal-1
     action: create
-    file: skills/hive/agents/memories/analyst/measurable-acceptance-criteria-first.md
-    description: Pattern memory — acceptance criteria must be binary-testable before leaving analysis
+    file: skills/hive/agents/memories/accessibility-specialist/cite-wcag-criterion-for-every-fix.md
+    description: Pitfall memory — every fix must cite its WCAG 2.1 success criterion; includes top-10 criteria reference table
+    status: done
+
+  - proposal_id: proposal-1
+    action: create
+    file: skills/hive/agents/memories/animations-specialist/every-animation-needs-reduced-motion-alternative.md
+    description: Pitfall memory — every animated element MUST have prefers-reduced-motion alternative before implementation is done
+    status: done
+
+  - proposal_id: proposal-1
+    action: create
+    file: skills/hive/agents/memories/animations-specialist/compositor-only-properties-for-animation.md
+    description: Pattern memory — animate only transform/opacity; all other properties flag as PERFORMANCE_RISK; will-change guidance
     status: done
 
   - proposal_id: proposal-2
     action: create
-    file: skills/hive/agents/memories/peer-validator/stay-in-cross-story-lane.md
-    description: Pitfall memory — peer-validator evaluates cross-story consistency, not within-story correctness
+    file: skills/hive/agents/memories/idiomatic-reviewer/stay-in-idiomatic-lane-only.md
+    description: Pitfall memory — 5 valid categories only (naming/stdlib/anti-pattern/style/idiom); suppress correctness/security/perf findings
     status: done
 
   - proposal_id: proposal-2
     action: create
-    file: skills/hive/agents/memories/peer-validator/convention-consistency-before-logic.md
-    description: Pattern memory — run naming/convention checks before logic/integration checks
+    file: skills/hive/agents/memories/idiomatic-reviewer/acknowledge-wins-before-issues.md
+    description: Pattern memory — Idiomatic Summary must acknowledge wins before issues; required by output format; template provided
+    status: done
+
+  - proposal_id: proposal-2
+    action: create
+    file: skills/hive/agents/memories/performance-reviewer/stay-in-performance-lane-only.md
+    description: Pitfall memory — 6 valid categories only; suppress correctness/security/idiom findings; in-lane vs. out-of-lane examples
+    status: done
+
+  - proposal_id: proposal-2
+    action: create
+    file: skills/hive/agents/memories/performance-reviewer/quantify-impact-dont-just-label-it.md
+    description: Pattern memory — quantification templates by category (complexity/allocation/io/caching/bundle/lazy-loading)
     status: done
 
   - proposal_id: proposal-3
+    action: create
+    file: skills/hive/agents/memories/test-inspector/manual-ac-table-when-coverage-tooling-unavailable.md
+    description: Pattern memory — when tooling unavailable, produce manual AC coverage table; format and rules provided
+    status: done
+
+  - proposal_id: proposal-3
+    action: create
+    file: skills/hive/agents/memories/test-sentinel/regression-block-report-format.md
+    description: Pattern memory — regression block report format (failing tests table, baseline/current metrics, delta, recommended action)
+    status: done
+
+  - proposal_id: proposal-4
     action: add_section
-    file: hive/references/insight-capture.md
-    description: Expanded stub (13 lines) to full reference doc (100+ lines) with format, staging path, keep/discard criteria, and complete example
-    status: done
-
-  - proposal_id: proposal-4
-    action: create
-    file: skills/hive/agents/memories/technical-writer/structured-docs-not-prose-analysis.md
-    description: Pitfall memory — produce structured documents with sections, not flowing prose analysis
-    status: done
-
-  - proposal_id: proposal-4
-    action: create
-    file: skills/hive/agents/memories/technical-writer/match-skill-to-document-type.md
-    description: Pattern memory — load the correct skill for each document type before writing
-    status: done
-
-  - proposal_id: proposal-4
-    action: create
-    file: skills/hive/agents/memories/ui-designer/check-frame0-cli-availability-first.md
-    description: Pitfall memory — verify Frame0 CLI availability before starting; declare fallback explicitly
-    status: done
-
-  - proposal_id: proposal-4
-    action: create
-    file: skills/hive/agents/memories/ui-designer/one-screen-per-page-canonical-naming.md
-    description: Pattern memory — one screen per Frame0 page, page name must match screen list exactly
+    file: hive/agents/tester.md
+    description: Added 6-rule Scope Discipline section with time budgets (10/20/30 min), placed before "How you think" section
     status: done
 
   - proposal_id: proposal-5
-    action: create
-    file: skills/hive/agents/memories/test-scout/detect-framework-from-config.md
-    description: Pattern memory — detect test framework from config files before reading test files
+    action: add_section
+    file: hive/agents/technical-writer.md
+    description: Added 5-rule Scope Discipline section with time budgets (5/15/25 min), placed after Quality Standards section
     status: done
 
-  - proposal_id: proposal-5
-    action: create
-    file: skills/hive/agents/memories/test-scout/never-assume-test-runner.md
-    description: Pitfall memory — never assume test runner from language/extension; always verify from config
-    status: done
-
-  - proposal_id: proposal-5
-    action: create
-    file: skills/hive/agents/memories/test-architect/strategy-before-test-generation.md
-    description: Pattern memory — write test strategy document before generating any test files
-    status: done
-
-  - proposal_id: proposal-5
-    action: create
-    file: skills/hive/agents/memories/test-architect/avoid-coverage-overlap-with-story-tests.md
-    description: Pitfall memory — swarm tests integration paths, not unit functions already covered by story
-    status: done
-
-  - proposal_id: proposal-5
-    action: create
-    file: skills/hive/agents/memories/test-inspector/coverage-delta-report-format.md
-    description: Pattern memory — produce before/after coverage delta report, not just pass/fail verdict
-    status: done
-
-  - proposal_id: proposal-5
-    action: create
-    file: skills/hive/agents/memories/test-sentinel/three-gate-pass-criteria.md
-    description: "Pattern memory — pass requires all three gates: tests pass + coverage threshold + no regressions"
+  - proposal_id: maintenance
+    action: update
+    file: state/meta-team/queue.yaml
+    description: Marked targets 001/002/003 as completed with completion notes and timestamps
     status: done
 
 # Phase 5 — Testing
 test_results:
-  - change_id: proposal-1_analyst-memories
-    file: skills/hive/agents/memories/analyst/
+  - change_id: proposal-1_a11y-animations-memories
+    file: skills/hive/agents/memories/accessibility-specialist/ + animations-specialist/
     tests:
       cross_reference_integrity: skip
       schema_compliance: pass
-      content_safety: skip
+      content_safety: pass
     overall: pass
     failure_notes: null
 
-  - change_id: proposal-2_peer-validator-memories
-    file: skills/hive/agents/memories/peer-validator/
+  - change_id: proposal-2_idiomatic-perf-memories
+    file: skills/hive/agents/memories/idiomatic-reviewer/ + performance-reviewer/
     tests:
       cross_reference_integrity: skip
       schema_compliance: pass
-      content_safety: skip
+      content_safety: pass
     overall: pass
     failure_notes: null
 
-  - change_id: proposal-3_insight-capture
-    file: hive/references/insight-capture.md
+  - change_id: proposal-3_test-inspector-sentinel-second-memories
+    file: skills/hive/agents/memories/test-inspector/ + test-sentinel/
+    tests:
+      cross_reference_integrity: skip
+      schema_compliance: pass
+      content_safety: pass
+    overall: pass
+    failure_notes: null
+
+  - change_id: proposal-4_tester-scope-discipline
+    file: hive/agents/tester.md
     tests:
       cross_reference_integrity: pass
       schema_compliance: pass
       content_safety: pass
     overall: pass
     failure_notes: null
+    content_delta_note: added ~250 words to 127-line file (19% expansion — within safety limit)
 
-  - change_id: proposal-4_technical-writer-memories
-    file: skills/hive/agents/memories/technical-writer/
+  - change_id: proposal-5_technical-writer-scope-discipline
+    file: hive/agents/technical-writer.md
     tests:
-      cross_reference_integrity: skip
+      cross_reference_integrity: pass
       schema_compliance: pass
-      content_safety: skip
+      content_safety: pass
     overall: pass
     failure_notes: null
+    content_delta_note: added ~180 words to 128-line file (14% expansion — within safety limit)
 
-  - change_id: proposal-4_ui-designer-memories
-    file: skills/hive/agents/memories/ui-designer/
-    tests:
-      cross_reference_integrity: skip
-      schema_compliance: pass
-      content_safety: skip
-    overall: pass
-    failure_notes: null
-
-  - change_id: proposal-5_test-scout-memories
-    file: skills/hive/agents/memories/test-scout/
-    tests:
-      cross_reference_integrity: skip
-      schema_compliance: pass
-      content_safety: skip
-    overall: pass
-    failure_notes: null
-
-  - change_id: proposal-5_test-architect-memories
-    file: skills/hive/agents/memories/test-architect/
-    tests:
-      cross_reference_integrity: skip
-      schema_compliance: pass
-      content_safety: skip
-    overall: pass
-    failure_notes: null
-
-  - change_id: proposal-5_test-inspector-memories
-    file: skills/hive/agents/memories/test-inspector/
-    tests:
-      cross_reference_integrity: skip
-      schema_compliance: pass
-      content_safety: skip
-    overall: pass
-    failure_notes: null
-
-  - change_id: proposal-5_test-sentinel-memories
-    file: skills/hive/agents/memories/test-sentinel/
-    tests:
-      cross_reference_integrity: skip
-      schema_compliance: pass
-      content_safety: skip
-    overall: pass
-    failure_notes: null
-
-overall_pass_rate: "9/9"
+overall_pass_rate: "5/5"
 
 # Phase 6 — Evaluation
 evaluations:
-  - change_id: proposal-1_analyst-memories
+  - change_id: proposal-1_a11y-animations-memories
     verdict: pass
     charter_objective: coverage
-    quality_score: 0.95
-    rationale: |
-      Both memories address specific, named analyst failure modes. trace-every-capability
-      directly addresses the traceability gap protocol described in analyst.md (Activation
-      Protocol step 7: "Flag unmapped capabilities as GAPS"). measurable-acceptance-criteria
-      provides the binary-testable rewrite procedure. Both have correct frontmatter (name,
-      description, type=pitfall/pattern, ttl_days per type default). Content is actionable.
+    quality_score: 0.94
+    rationale: >
+      accessibility-specialist memories address two specific, citable failure modes: missing
+      automated audit step (citable to Activation Protocol step 2 in accessibility-specialist.md)
+      and missing WCAG criterion citation (required for verifiable remediation). The WCAG top-10
+      table makes the pitfall immediately actionable. animations-specialist memories address the
+      two most common animation failures: reduced-motion (WCAG SC 2.3.3, user safety) and
+      compositor-only (the "60fps target" quality standard in animations-specialist.md). All four
+      memories are schema-compliant and specific.
     revision_notes: null
 
-  - change_id: proposal-2_peer-validator-memories
+  - change_id: proposal-2_idiomatic-perf-memories
     verdict: pass
     charter_objective: coverage
-    quality_score: 0.95
-    rationale: |
-      stay-in-cross-story-lane directly addresses the scope-confusion failure mode unique
-      to peer-validator (distinct from reviewer role as defined in peer-validator.md).
-      convention-consistency-before-logic provides a concrete check ordering that reduces
-      missed cross-story issues. Both memories are specific and citable. Schema compliant.
+    quality_score: 0.96
+    rationale: >
+      Both lane-discipline pitfalls are the highest-value first memories for specialized
+      reviewers. stay-in-idiomatic-lane-only cites the exact five categories from the
+      idiomatic-reviewer.md persona and provides concrete in-lane/out-of-lane examples.
+      stay-in-performance-lane-only cites the six categories from performance-reviewer.md
+      with equivalent concrete examples. acknowledge-wins-before-issues cites the required
+      Idiomatic Summary format from the persona. quantify-impact provides per-category
+      quantification templates that make findings actionable. All schema-compliant.
     revision_notes: null
 
-  - change_id: proposal-3_insight-capture
+  - change_id: proposal-3_test-inspector-sentinel-second-memories
+    verdict: pass
+    charter_objective: coverage
+    quality_score: 0.96
+    rationale: >
+      Both memories were explicitly cited in the prior cycle evaluation as next-cycle
+      priorities. manual-ac-table-when-coverage-tooling-unavailable directly solves the
+      most common real-world gap: coverage tooling is absent in many projects. The
+      fallback protocol (manual AC table) is always producible and more useful than a
+      percentage. regression-block-report-format gives test-sentinel a concrete output
+      structure with all information the orchestrator needs to route a fix. Both are
+      specific, citable, and self-contained.
+    revision_notes: null
+
+  - change_id: proposal-4_tester-scope-discipline
     verdict: pass
     charter_objective: clarity
-    quality_score: 0.98
-    rationale: |
-      insight-capture.md expanded from 13 lines to 119 lines. Original 13 lines preserved
-      verbatim at top. Added: complete frontmatter format example (consistent with
-      agent-memory-schema.md), TTL table (matches schema TTL defaults), staging path
-      convention (matches MAIN.md `state/insights/{epic-id}/{story-id}/` pattern), keep/
-      discard criteria (5 specific tests), complete working example, and session-end note.
-      Cross-reference to agent-memory-schema.md resolves. Content safety: no removals.
-    revision_notes: null
-
-  - change_id: proposal-4_technical-writer-ui-designer-memories
-    verdict: pass
-    charter_objective: coverage
-    quality_score: 0.95
-    rationale: |
-      Four memories across two agents. technical-writer memories address the two known
-      failure modes: prose drift (structured-docs-not-prose-analysis) and skill mismatch
-      (match-skill-to-document-type with a concrete mapping table). ui-designer memories
-      address the required_tools dependency check (check-frame0-cli-availability-first, with
-      the exact fallback wording from ui-designer.md) and canonical naming for visual-qa
-      compatibility. All schema-compliant. Content is specific and actionable.
-    revision_notes: null
-
-  - change_id: proposal-5_test-swarm-memories
-    verdict: pass
-    charter_objective: coverage
     quality_score: 0.92
-    rationale: |
-      Six memories across four test swarm agents. test-scout gets 2 (framework detection
-      priority order + don't-assume pitfall). test-architect gets 2 (strategy-first pattern
-      + coverage-overlap pitfall). test-inspector gets 1 (delta report format). test-sentinel
-      gets 1 (three-gate criteria table). All schema compliant. Content is role-specific
-      and behavioral.
-    optimization_note: |
-      test-inspector and test-sentinel each have only 1 memory. Both could benefit from a
-      second memory in a future cycle: inspector → how to handle missing coverage tooling;
-      sentinel → how to report a regression block with actionable detail.
+    rationale: >
+      Section directly mirrors researcher.md's proven Scope Discipline pattern: numbered
+      rules + time budgets. All 6 rules are tester-specific (not generic): rule 2 addresses
+      the "out-of-scope bug discovery" scenario unique to implementation-phase testing;
+      rule 4 prohibits testing private internals, which is a common tester failure mode.
+      Time budgets (10/20/30 min) are calibrated to test-writing complexity (longer than
+      research but shorter than implementation). Additive edit only — no content removed.
+    revision_notes: null
+
+  - change_id: proposal-5_technical-writer-scope-discipline
+    verdict: pass
+    charter_objective: clarity
+    quality_score: 0.92
+    rationale: >
+      Section addresses the specific failure modes of the technical-writer role: document
+      sprawl, editorializing, and deviating from injected skill structure. Rule 3
+      ("Structure, don't analyze") directly addresses the most common output quality issue:
+      technical-writer agents that critique or editorialize the researcher's findings instead
+      of structuring them. Rule 4 (match injected skill verbatim) prevents the second most
+      common issue: writers adding uninstructed sections. Time budgets (5/15/25 min)
+      are calibrated to document size, shorter than research/testing. Additive edit only.
+    revision_notes: null
 
 cycle_verdict: passed
 pass_count: 5
@@ -464,10 +458,10 @@ needs_optimization_count: 0
 needs_revision_count: 0
 
 # Phase 7 — Promotion
-promoted_changes: 15
+promoted_changes: 13
 reverted_changes: 0
 flagged_for_human: 0
-insights_staged: 1
+insights_staged: 0
 promoted:
   - proposal_id: proposal-1
     verdict: pass
@@ -479,20 +473,14 @@ promoted:
     verdict: pass
   - proposal_id: proposal-5
     verdict: pass
-    optimization_note: |
-      test-inspector and test-sentinel each have 1 memory. Next cycle: add inspector →
-      how to handle missing coverage tooling; sentinel → actionable regression block reporting.
 reverted: []
 
 # Phase 8 — Close
-status: closed
-closed: "2026-04-10T04:30:00Z"
-phase: close
 summary:
   total_findings: 9
   proposals_generated: 5
-  changes_attempted: 15
-  changes_promoted: 15
+  changes_attempted: 13
+  changes_promoted: 13
   changes_reverted: 0
   flagged_for_human: 0
   cycle_verdict: passed
