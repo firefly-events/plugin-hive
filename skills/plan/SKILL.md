@@ -417,6 +417,7 @@ A collaborative review gate runs before every user-facing document presentation.
      - `reason`: concatenate existing and new reason with `" | "` separator
      - `raised_at`: keep the **earliest** timestamp (preserves when the concern was first raised)
      - `raised_by`: if different agents, concatenate with `", "` separator (e.g. `"architect, tpm"`)
+     - `severity`: keep the **maximum** severity using ordering `major > moderate > minor`. Example: existing `moderate` + incoming `major` → merged value is `major`. Ties keep the existing value.
    - **If not exists:** write the new 7-field entry as normal
 
    ```yaml

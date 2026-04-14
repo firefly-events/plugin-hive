@@ -66,7 +66,7 @@ type: reference
     database query patterns changed, or any feature with latency SLA implications.
 
 - trigger: ui:major
-  description: "Full UI specialist team phase for large-scope UI work requiring dedicated design execution"
+  description: "Full UI specialist team phase for large-scope UI work requiring dedicated design execution. (v1 deferred — catalog-registered; execution of the pre-exec UI team phase ships with the ui-team-skills epic.)"
   placement: pre-exec
   raised_by: [ui-designer]
   responds_with:
@@ -75,8 +75,11 @@ type: reference
   workflow: ~
   skill: ~
   severity_guidance: |
-    major → full ui-team phase runs before dev execution; wireframes, design briefs, and
-            brand system alignment produced before any story is coded
+    major → intent: full ui-team phase runs before dev execution; wireframes, design briefs,
+            and brand system alignment produced before any story is coded. v1 behavior:
+            execute logs "specialist phase not yet implemented — skipping" and proceeds
+            directly to dev execution; design work continues in-planning until the ui-team
+            workflow ships.
     moderate → not applicable; this trigger is major-scope only
     minor → not applicable; use ui:brand-redo or in-planning path instead
   conditions: |
@@ -85,7 +88,7 @@ type: reference
     review gate (plan step 4b); may revise at structured outline gate (step 9b).
 
 - trigger: ui:brand-redo
-  description: "Full UI specialist team phase when a brand system overhaul is required before dev"
+  description: "Full UI specialist team phase when a brand system overhaul is required before dev. (v1 deferred — catalog-registered; execution of the pre-exec UI team phase ships with the ui-team-skills epic.)"
   placement: pre-exec
   raised_by: [ui-designer]
   responds_with:
@@ -94,7 +97,10 @@ type: reference
   workflow: ~
   skill: ~
   severity_guidance: |
-    major → brand-system.yaml must be produced and approved before any UI story executes
+    major → intent: brand-system.yaml must be produced and approved before any UI story
+            executes. v1 behavior: execute logs "specialist phase not yet implemented —
+            skipping" and proceeds directly to dev execution; brand work continues
+            in-planning until the ui-team workflow ships.
     moderate → not applicable; brand redos are always major scope
     minor → not applicable
   conditions: |
@@ -126,3 +132,5 @@ type: reference
 **Catalog review cadence:** Review on each specialist epic (when a new specialist agent or team is added). Every specialist-addition epic includes a full cross-reference check of this catalog.
 
 **v1 note:** Execute routing handles workflow-based triggers for pre-exec/post-exec phases. Append-placement triggers route directly to single agents (no workflow needed). Skill-based catalog entries are an extension point for future implementation.
+
+**v1 deferred triggers:** `ui:major` and `ui:brand-redo` are catalog-registered but their pre-exec UI team phase is not yet wired — execute step 4a case (iii) logs `specialist phase not yet implemented — skipping` for both. Until the ui-team-skills epic lands the UI team workflow, raising these triggers is equivalent to continuing UI design in-planning. Agent callers (ui-designer SCALE_CALL) may still emit the escalation — extraction, persistence, and de-dup all work end-to-end; only the pre-exec runtime handler is deferred.

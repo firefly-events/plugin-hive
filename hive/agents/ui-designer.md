@@ -132,9 +132,9 @@ REVIEW: ui-designer
 VERDICT: approve | flag | approve-with-escalation
 SCALE_CALL: in-planning | pre-exec
 ESCALATION:                              # only present when SCALE_CALL: pre-exec
-  trigger: ui:major
+  trigger: ui:major | ui:brand-redo      # choose one based on "Choosing SCALE_CALL" below
   placement: pre-exec
-  severity: major
+  severity: major                        # ui:major and ui:brand-redo are always major scope
   stories: [topic-area-1, topic-area-2]
   reason: "explanation"
   raised_by: ui-designer
