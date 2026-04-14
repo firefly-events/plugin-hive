@@ -1,0 +1,22 @@
+name: security-team
+description: Specialist security audit team — reviews code for vulnerabilities, auth flaws, and security anti-patterns
+lead: team-lead
+methodology: classic
+
+members:
+  - agent: security-reviewer
+    role: Security audit — identify vulnerabilities, review auth, flag risky patterns
+    domain:
+      - path: "**"
+        read: true
+        write: false
+        delete: false
+
+context:
+  notes: |
+    Specialist team invoked by the orchestrator when security concerns are detected.
+    Read-only access — findings are reported, not auto-remediated.
+    Workflow: hive/workflows/security-audit.workflow.yaml
+
+workflow: hive/workflows/security-audit.workflow.yaml
+team_memory_path: state/team-memories/security-team/

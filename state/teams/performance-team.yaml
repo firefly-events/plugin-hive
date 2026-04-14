@@ -1,0 +1,22 @@
+name: performance-team
+description: Specialist performance audit team — reviews code for bottlenecks, inefficient queries, and optimization opportunities
+lead: team-lead
+methodology: classic
+
+members:
+  - agent: performance-reviewer
+    role: Performance audit — identify bottlenecks, flag slow queries, surface optimization opportunities
+    domain:
+      - path: "**"
+        read: true
+        write: false
+        delete: false
+
+context:
+  notes: |
+    Specialist team invoked by the orchestrator when performance concerns are detected.
+    Read-only access — findings are reported, not auto-remediated.
+    Workflow: hive/workflows/performance-audit.workflow.yaml
+
+workflow: hive/workflows/performance-audit.workflow.yaml
+team_memory_path: state/team-memories/performance-team/

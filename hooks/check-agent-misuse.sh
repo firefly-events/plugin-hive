@@ -45,9 +45,13 @@ if echo "$prompt" | grep -qiE '(execute.*epic|epic.*execution|execute all storie
   exit 2
 fi
 
-# Pattern 3: Description contains story-execution signals
-if echo "$description" | grep -qiE '(execute story|story execution|implement story|run story)'; then
-  echo "BLOCKED: Agent description indicates story-level execution. Use TeamCreate." >&2
+# Pattern 3: Description indicates whole-story delegation.
+# Narrow to explicit whole-story phrasing so legitimate sub-step Agent calls
+# (e.g. "implement story checkout-123 test step") are not blocked. The allowed
+# `Agent` path documented in SKILL.md is "Sequential workflow steps within a
+# single story" — those descriptions name the step, not the whole story.
+if echo "$description" | grep -qiE '(story execution|execute (the )?(entire|full|whole) story|run (the )?(entire|full|whole) story|implement (the )?(entire|full|whole) story|execute all steps)'; then
+  echo "BLOCKED: Agent description indicates whole-story delegation. Use TeamCreate." >&2
   exit 2
 fi
 

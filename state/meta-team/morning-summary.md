@@ -1,34 +1,43 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-04-10 | **Date:** 2026-04-10 | **Verdict:** PASSED
+**Cycle:** meta-2026-04-13 | **Date:** 2026-04-13 | **Verdict:** PASSED
 
 ---
 
 ## What Changed Tonight
 
-- **`skills/hive/agents/memories/analyst/trace-every-capability-to-a-story.md`** — New pitfall memory: every capability in the original requirement must map to a story; unmapped = CAPABILITY_GAP, flag it before plan sign-off
-- **`skills/hive/agents/memories/analyst/measurable-acceptance-criteria-first.md`** — New pattern memory: acceptance criteria must be binary-testable before leaving analysis (includes the rewrite procedure)
-- **`skills/hive/agents/memories/peer-validator/stay-in-cross-story-lane.md`** — New pitfall memory: peer-validator owns cross-story consistency, not within-story correctness — clear scope boundary defined
-- **`skills/hive/agents/memories/peer-validator/convention-consistency-before-logic.md`** — New pattern memory: 5-step cross-story check order (naming → imports → conventions → dependencies → unmapped risk)
-- **`hive/references/insight-capture.md`** — Expanded from 13-line stub to 119-line full reference: insight file format with frontmatter template, TTL table, staging path convention, keep/discard criteria (5 binary tests), and a complete working example
-- **`skills/hive/agents/memories/technical-writer/structured-docs-not-prose-analysis.md`** — New pitfall memory: produce structured sections, not flowing prose; includes the diagnostic signal and fix procedure
-- **`skills/hive/agents/memories/technical-writer/match-skill-to-document-type.md`** — New pattern memory: skill routing table (design discussion / structured outline / horizontal plan / vertical plan) before writing any document
-- **`skills/hive/agents/memories/ui-designer/check-frame0-cli-availability-first.md`** — New pitfall memory: always verify `cli-anything-frame-zero` availability before starting; explicit fallback declaration required
-- **`skills/hive/agents/memories/ui-designer/one-screen-per-page-canonical-naming.md`** — New pattern memory: one screen = one Frame0 page with exact name match; verification command included
-- **`skills/hive/agents/memories/test-scout/detect-framework-from-config.md`** — New pattern memory: framework detection priority order from config files (package.json → config files → language-specific)
-- **`skills/hive/agents/memories/test-scout/never-assume-test-runner.md`** — New pitfall memory: wrong-framework assumption is the #1 test swarm failure; always verify from config, never from file extension
-- **`skills/hive/agents/memories/test-architect/strategy-before-test-generation.md`** — New pattern memory: write test strategy doc (6 sections) before generating any test files; prevents duplication and scope drift
-- **`skills/hive/agents/memories/test-architect/avoid-coverage-overlap-with-story-tests.md`** — New pitfall memory: swarm tests integration paths and E2E flows, NOT unit functions already covered by story tests
-- **`skills/hive/agents/memories/test-inspector/coverage-delta-report-format.md`** — New pattern memory: before/after delta report format with acceptance-criteria coverage table; never just "all tests pass"
-- **`skills/hive/agents/memories/test-sentinel/three-gate-pass-criteria.md`** — New pattern memory: pass requires all three gates (tests pass + coverage threshold + no regressions); verdict table included
+- **`skills/hive/agents/memories/accessibility-specialist/run-automated-audit-before-manual-fixes.md`** — New pattern memory: run axe/pa11y automated audit before writing any manual ARIA fixes; tool priority order, fallback for missing tooling, and before/after audit verification step
+- **`skills/hive/agents/memories/accessibility-specialist/cite-wcag-criterion-for-every-fix.md`** — New pitfall memory: every fix must cite the specific WCAG 2.1 success criterion it addresses; includes the required citation format and a top-10 criteria reference table
+- **`skills/hive/agents/memories/animations-specialist/every-animation-needs-reduced-motion-alternative.md`** — New pitfall memory: every animated element MUST have a `prefers-reduced-motion` alternative before the implementation is considered done; CSS and JS examples, audit step
+- **`skills/hive/agents/memories/animations-specialist/compositor-only-properties-for-animation.md`** — New pattern memory: animate only `transform` and `opacity`; all other CSS properties flag as PERFORMANCE_RISK; `will-change` usage guidance included
+- **`skills/hive/agents/memories/idiomatic-reviewer/stay-in-idiomatic-lane-only.md`** — New pitfall memory: only 5 valid categories (naming/stdlib/anti-pattern/style/idiom); suppress correctness/security/performance findings; in-lane vs. out-of-lane examples
+- **`skills/hive/agents/memories/idiomatic-reviewer/acknowledge-wins-before-issues.md`** — New pattern memory: Idiomatic Summary MUST acknowledge wins before issues (required by output format); Idiomatic Summary template with wins section provided
+- **`skills/hive/agents/memories/performance-reviewer/stay-in-performance-lane-only.md`** — New pitfall memory: only 6 valid categories (complexity/allocation/io/caching/bundle/lazy-loading); suppress correctness/security/idiom findings; in-lane vs. out-of-lane examples
+- **`skills/hive/agents/memories/performance-reviewer/quantify-impact-dont-just-label-it.md`** — New pattern memory: every finding must quantify or bound its impact; per-category quantification templates (complexity, allocation, io, caching, bundle, lazy-loading)
+- **`skills/hive/agents/memories/test-inspector/manual-ac-table-when-coverage-tooling-unavailable.md`** — New pattern memory: when coverage tooling is absent, produce a manual AC coverage table rather than reporting "tooling unavailable"; format, covered/partial/not-covered rules, and manual analysis notes section
+- **`skills/hive/agents/memories/test-sentinel/regression-block-report-format.md`** — New pattern memory: regression block reports must include failing tests table, baseline/current metrics, delta, and recommended action; PASS report format also provided
+- **`hive/agents/tester.md`** — Added 6-rule Scope Discipline section with time budgets (10 min small / 20 min medium / 30 min large): stay on story spec, note adjacent issues without fixing them, one assertion per test, no implementation detail testing, use existing utilities, time budget enforcement
+- **`hive/agents/technical-writer.md`** — Added 5-rule Scope Discipline section with time budgets (5 / 15 / 25 min): work only from provided input, one document per task, structure don't analyze, match injected skill verbatim, time budget enforcement
+- **`state/meta-team/queue.yaml`** — All 3 queued targets marked completed: 001 (gate-policy, already done), 002 (tester.md), 003 (technical-writer.md)
+
+---
+
+## Memory Coverage — All Roster Agents Now Have ≥1 Starter Memory
+
+This cycle completes the memory coverage initiative started in cycle 1:
+
+| Agent | Memories | Status |
+|---|---|---|
+| `security-reviewer` | 0 | **NEXT PRIORITY** |
+| `orchestrator` | 1 | Could use pre-shutdown coordination memory |
+| `pair-programmer` | 1 | Could use don't-rewrite-refactor discipline |
+| `tester` | 1 | Could use TDD/Classic mode selection memory |
+| All other agents | 1–3 | Covered |
 
 ---
 
 ## What Was Found (Not Fixed This Cycle)
 
-- **MEMORY_GAP** `skills/hive/agents/memories/accessibility-specialist/` — 0 starter memories _(reason: deferred_to_next_cycle — over proposal cap of 5)_
-- **MEMORY_GAP** `skills/hive/agents/memories/animations-specialist/` — 0 starter memories _(reason: deferred_to_next_cycle)_
-- **MEMORY_GAP** `skills/hive/agents/memories/idiomatic-reviewer/` — 0 starter memories _(reason: deferred_to_next_cycle)_
-- **MEMORY_GAP** `skills/hive/agents/memories/performance-reviewer/` — 0 starter memories _(reason: deferred_to_next_cycle)_
+Nothing deferred. All 9 findings were either addressed by proposals or resolved as maintenance (queue stale entry corrected). The 4 previously-zero-memory agents were the last unaddressed items from the prior cycle.
 
 ---
 
@@ -44,8 +53,8 @@
 |--------|-------|
 | Findings identified | 9 |
 | Proposals generated | 5 |
-| Changes promoted | 15 |
+| Changes promoted | 13 |
 | Changes reverted | 0 |
 | Flagged for human | 0 |
 
-**Next cycle priority:** accessibility-specialist, animations-specialist, idiomatic-reviewer, performance-reviewer (all at 0 starter memories); also add 2nd memories for test-inspector and test-sentinel
+**Next cycle priority:** security-reviewer (0 memories); orchestrator second memory (pre-shutdown coordination); pair-programmer second memory (targeted-edit discipline); tester second memory (TDD/Classic mode selection)

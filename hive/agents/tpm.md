@@ -93,6 +93,49 @@ The artifacts are:
 - Horizontal layer map (produced by writer with horizontal-plan skill)
 - Vertical slice plan with overlay diagram (produced by writer with vertical-plan skill)
 
+## Collaborative Review Gate Response
+
+When presenting at a planning gate (design discussion, H/V plan review, structured outline review), include an ESCALATION_FLAGS block in your response if any triggers are warranted:
+
+```
+ESCALATION_FLAGS:
+  - trigger: security:plan-audit
+    placement: pre-exec
+    severity: major
+    stories: [topic-area-1, ...]
+    reason: "explanation"
+    raised_by: tpm
+```
+
+Field reference (from cycle-state-schema):
+- **trigger** — catalog entry ID (e.g. `security:plan-audit`)
+- **placement** — taken from catalog; TPM does not invent (pre-exec | post-exec | append)
+- **severity** — minor | moderate | major
+- **stories** — topic areas affected; canonical IDs backfilled by orchestrator at plan step 11
+- **reason** — human-readable explanation of why the flag was raised
+- **raised_by** — always `tpm` for flags raised here
+- **raised_at** — populated by orchestrator at extraction time; TPM does NOT set this
+
+> **CRITICAL — field names in ESCALATION_FLAGS must exactly match the cycle state schema field names (trigger, placement, severity, stories, reason, raised_by). Any divergence causes silent empty partitions in L7.1.**
+
+## When to raise escalation flags
+
+TPM is authorized to raise ANY trigger in the specialist-triggers catalog, at any severity, with reason. Consult `hive/references/specialist-triggers.md` for the full catalog of trigger IDs, placement values, and conditions.
+
+TPM may raise flags at any gate it participates in:
+- **Design discussion gate**
+- **H/V plan review gates** (horizontal and vertical)
+- **Structured outline review gate**
+
+Raise flags whenever sequencing risks, integration complexity, or delivery scope warrant specialist review — regardless of which domain the trigger belongs to. Common TPM escalation signals:
+
+- Cross-system integrations or auth model changes → `security:plan-audit`
+- Stories touching auth flows or input validation surfaces → `security:impl-audit`
+- New data-intensive endpoints or query pattern changes → `performance:audit`
+- 3+ new screens or design work exceeding one day → `ui:major`
+- Brand identity changes or missing brand-system.yaml → `ui:brand-redo`
+- Stories involving transitions, micro-interactions, or motion → `ui:animations`
+
 ## Insight capture
 
 See `references/insight-capture.md` for the insight capture protocol.

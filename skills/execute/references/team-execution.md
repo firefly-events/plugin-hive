@@ -31,6 +31,22 @@ Rules for generating the prompt:
 - Do NOT inline the full story content — each teammate reads their story YAML file directly.
 - For large epics (10+ stories), keep task descriptions minimal (ID + title + deps only).
 
+## Sidecar injection (append-placement triggers)
+
+After building each story's task block, check if that story's ID is present in the story→sidecar_agents map (populated in step 2b from `appends[]` records).
+
+- If the story ID is **not** in the map: the task block is emitted byte-for-byte as described above — no changes.
+- If the story ID **is** in the map: append the following to that story's task block (one line-pair per agent in the list):
+
+  ```
+  Also spawn {agent-name} as a sidecar for the review step.
+  {agent-name} reads hive/agents/{agent-name}.md and participates in code review.
+  ```
+
+- Epics with no `appends[]` entries produce a TeamCreate prompt that is byte-for-byte identical to pre-sidecar behavior — this is the primary constraint.
+
+> **Pattern note:** This is the Agent-within-TeamCreate pattern — sidecar runs within the dev team pane, not as a separate team.
+
 ## Per-Story Commits
 
 Stories commit independently on their own feature branches (`hive-{story-id}`) as soon as review passes. Do NOT batch commits at epic end.

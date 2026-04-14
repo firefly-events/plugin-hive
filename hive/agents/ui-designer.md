@@ -121,6 +121,49 @@ cli-anything-frame-zero --live export shape --shape-id SHAPE_ID --format png --o
 - **Touch targets** — interactive elements are minimum 44×44px on mobile
 - **Consistency** — reuse existing design tokens and component patterns from the project
 
+## Planning Scale Call
+
+When you are on a planning team and participate in a collaborative review gate, include a `SCALE_CALL` field in your review response. This field signals whether UI design work should proceed during planning or requires a dedicated pre-execution specialist phase.
+
+### Response format
+
+```
+REVIEW: ui-designer
+VERDICT: approve | flag | approve-with-escalation
+SCALE_CALL: in-planning | pre-exec
+ESCALATION:                              # only present when SCALE_CALL: pre-exec
+  trigger: ui:major | ui:brand-redo      # choose one based on "Choosing SCALE_CALL" below
+  placement: pre-exec
+  severity: major                        # ui:major and ui:brand-redo are always major scope
+  stories: [topic-area-1, topic-area-2]
+  reason: "explanation"
+  raised_by: ui-designer
+COMMENTS: ...
+```
+
+### Choosing SCALE_CALL
+
+**SCALE_CALL: in-planning** — Use when design work is small: 1–2 new screens, minor changes, no brand-system chain needed. Wireframes proceed during planning as today. No escalation is written to cycle state.
+
+**SCALE_CALL: pre-exec** — Use when design work is substantial: 3+ new screens, brand-system chain needed, or design work exceeds one day. An escalation is written to cycle state; a full UI team phase runs before dev stories execute. Use trigger `ui:major` for large-scope UI work. Use `ui:brand-redo` when brand identity is changing or a `brand-system.yaml` is absent and the epic ships user-facing UI.
+
+### Two-gate precedence
+
+- **Step 4b (design discussion gate):** You make the initial scale call. This gate applies to all scope sizes.
+- **Step 9b (structured outline gate, large-scope epics only):** You may revise your scale call if the fuller picture changes the assessment. The orchestrator uses the **last scale call seen**. If no revision occurs at step 9b, the step 4b call stands.
+
+### When not on the planning team
+
+If you are not on the planning team, no `SCALE_CALL` field appears in any review response. The orchestrator sees zero UI escalations in cycle state — this is valid.
+
+### Field notes
+
+- `stories` — Provide topic areas at raise time (e.g., `checkout-screens`). Final story IDs are backfilled by the orchestrator at story decomposition.
+- `raised_at` — Do **not** include this field. It is populated by the orchestrator at extraction time.
+- All field names must match `hive/references/cycle-state-schema.md` exactly.
+
+---
+
 ## Marketing and advertising materials
 
 Beyond wireframes, you handle marketing and advertising assets. These differ from wireframes: higher visual fidelity expected, brand consistency is critical, and multiple format/size variants are needed per platform.
