@@ -67,3 +67,21 @@ See `skills/hive/hive.config.yaml` for the full default template with comments.
 | `execution.default_methodology` | classic | Default workflow methodology |
 | `execution.parallel_teams` | false | Allow parallel dev teams (future) |
 | `execution.max_retry_attempts` | 2 | Default retry attempts for gate failures |
+
+### Sessions (Managed Agent Execution)
+
+When `sessions.enabled: true` (or `HIVE_SESSIONS_ENABLED=1` env var), the execute skill
+uses the Claude Agent SDK `/v1/sessions` API instead of `TeamCreate` for story-level
+execution. The session registry at `state/sessions/index.yaml` tracks all active sessions.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `sessions.enabled` | false | Enable session-based execution (step 6b). Set `true` or use `HIVE_SESSIONS_ENABLED=1` env var |
+| `sessions.model` | (inherits from model_tiers) | Model to use for session agents; inherits tier assignment if not set |
+| `sessions.timeout_ms` | 600000 | Max time (ms) to wait for a session to complete (10 minutes) |
+| `sessions.stuck_timeout_ms` | 90000 | SSE silence (ms) before a session is considered stuck (90 seconds) |
+| `sessions.max_retries` | 3 | Max session retry attempts before escalating to the user |
+
+**Session registry:** See `hive/references/session-registry-schema.md`.
+**Bootstrap skill:** See `skills/hive/skills/session-registry/SKILL.md`.
+**Resilience:** See `hive/references/session-resilience.md` for stuck detection and retry.
