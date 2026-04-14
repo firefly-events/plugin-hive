@@ -1,0 +1,5 @@
+step_id: preflight
+status: completed
+timestamp: "2026-04-13T01:00:00Z"
+artifacts:
+  - state/episodes/memory-autonomy-foundation/kg-write-path/preflight.yaml

@@ -26,7 +26,12 @@ Before sending a `shutdown_request` to any agent, the orchestrator must first se
 
 When you receive a pre-shutdown message from the orchestrator:
 
-1. **Record insights first.** Write any non-obvious, reusable patterns or findings to your memory path (defined in your persona frontmatter `knowledge` field). Use the insight format from `hive/references/insight-capture.md`. If nothing reusable emerged, skip this step.
+1. **Record insights and write KG triples.** Execute in order:
+   1a. **Write insight files.** Record any non-obvious, reusable patterns or findings to your memory path (defined in your persona frontmatter `knowledge` field). Use the insight format from `hive/references/insight-capture.md`. If nothing reusable emerged, skip this sub-step.
+   1b. **Call kg_write().** After insight files are written (not before), persist decision and lifecycle triples to `~/.claude/hive/kg.sqlite`. Triples reference promoted insight slugs — ordering matters. See `hive/references/knowledge-graph-schema.md` for the kg_write() contract. If kg.sqlite is unavailable, skip silently.
+   1c. **Compile memory wiki.** Call compile() to refresh the memory wiki with the newly written insights.
+   
+   **Step 1 ordering is mandatory:** insight files → kg_write() → compile()
 2. **Reply "ready to shut down"** via `SendMessage` back to the orchestrator.
 3. **Do NOT send `shutdown_response`** before receiving the formal `shutdown_request`. The pre-shutdown message and the shutdown request are two separate turns.
 4. When the `shutdown_request` arrives, respond with `shutdown_response` as normal.
@@ -60,3 +65,15 @@ shut down" when done.
 ```
 
 Use this template verbatim. Agents recognize this message and follow the Receiver Protocol above.
+
+---
+
+## Session-End Path (Natural Completion)
+
+When a session ends naturally (not via shutdown_request), the session-end hook fires automatically. The same three sub-steps from Receiver Protocol step 1 apply:
+
+1. Write insight files to `~/.claude/hive/memories/{agent}/`
+2. Call `kg_write()` to persist triples to `~/.claude/hive/kg.sqlite`
+3. Call `compile()` to refresh the memory wiki
+
+The pre-shutdown receiver protocol handles orchestrator-initiated termination; the session-end hook handles natural completion. Both paths write KG triples — these are complementary, not redundant. Circuit-breaker kills skip both paths (no insight capture, no KG writes).
