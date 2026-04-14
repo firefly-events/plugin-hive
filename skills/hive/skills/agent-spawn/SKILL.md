@@ -98,6 +98,18 @@ Read the agent's memory directory (from the resolved `knowledge` paths).
   `{N} override memories loaded — oldest: {X} days since last_verified`
 - These are informational signals, not blocking errors
 
+**5e. KG Decision Context (L2 — when kg.sqlite active):**
+- Run `query_decisions({subject: current_agent})` to fetch currently-valid triples where the agent (or its current epic) appears as subject or object
+- See `hive/references/knowledge-graph-schema.md` → "query_decisions() Query Logic" for the SQL
+- If results exist: append a **"Decision Context (from knowledge graph)"** block to Prior Knowledge AFTER the memory entries. Format as:
+  ```
+  ### Decision Context (from knowledge graph)
+  - {subject} {predicate} {object} (since {valid_from}, via {source_epic})
+  - ...
+  ```
+- **This block does NOT count against the 5-memory cap.** Memory cap applies only to the L0/L1 entries from steps 5b/5c.
+- If kg.sqlite is not found, empty, or the query returns no results: **omit the block silently — do not raise an error.**
+
 Include relevant memories in the agent's prompt as a "Prior Knowledge" section, after the persona and before the task instructions.
 
 ### 6. Check for applicable skills

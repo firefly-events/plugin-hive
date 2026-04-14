@@ -131,6 +131,40 @@ If any insert fails, the transaction is rolled back (no partial writes).
 
 **Performance:** WAL mode enables concurrent reads during writes. Writing 20 triples completes in <100ms on standard hardware — well within the pre-shutdown 2-turn timeout window.
 
+## query_decisions() Query Logic
+
+The `query_decisions()` method from the MemoryStore interface runs against the triples table:
+
+### Point-in-time query (as_of provided)
+```sql
+SELECT subject, predicate, object, valid_from, valid_until, source_epic, source_agent
+FROM triples
+WHERE
+  (subject = :entity OR object = :entity)
+  AND valid_from <= :as_of
+  AND (valid_until IS NULL OR valid_until > :as_of)
+ORDER BY valid_from DESC
+```
+
+### Current-state query (as_of omitted — default)
+```sql
+SELECT subject, predicate, object, valid_from, valid_until, source_epic, source_agent
+FROM triples
+WHERE
+  (subject = :entity OR object = :entity)
+  AND valid_until IS NULL
+ORDER BY valid_from DESC
+```
+
+### Optional filters
+- `:predicate` filter: add `AND predicate = :predicate` to either query
+- `include_superseded: true`: remove the `valid_until IS NULL` clause entirely (returns all matching triples regardless of validity period)
+
+### Index usage
+- Subject/object filters use `idx_subject` and `idx_object` indexes
+- The composite `idx_valid` index optimizes valid_from <= :as_of range scans
+- Current-state queries benefit most from the `WHERE valid_until IS NULL` clause
+
 ## SQLite Bootstrap
 
 Run this DDL to initialize the schema. All statements are idempotent (`IF NOT EXISTS`, `INSERT OR IGNORE`).
