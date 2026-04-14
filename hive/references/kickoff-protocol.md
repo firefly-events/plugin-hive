@@ -680,6 +680,7 @@ Create `hive.config.yaml` in the project root. This is Hive-specific config — 
 - Create `~/.claude/hive/memories/` with subdirectories for each agent in the roster: frontend-developer, backend-developer, researcher, technical-writer, tester, reviewer, architect, analyst, tpm, ui-designer, team-lead, pair-programmer, peer-validator, test-architect, test-scout, test-worker, test-inspector, test-sentinel, orchestrator
 - Create `.pHive/team-memories/` directory (project-scoped team collective memories)
 - Create `.pHive/teams/` directory (loadable team configs)
+- Bootstrap `~/.claude/hive/kg.sqlite` if not exists: run the SQLite DDL from `hive/references/knowledge-graph-schema.md#sqlite-bootstrap`. This is idempotent — safe to run on every kickoff.
 - Run per-agent memory migration (idempotent — safe to run every kickoff):
   - For each agent, check `skills/hive/agents/memories/{agent}/` for `.md` files
   - Copy files that don't already exist at `~/.claude/hive/memories/{agent}/`
