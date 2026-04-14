@@ -681,6 +681,7 @@ Create `hive.config.yaml` in the project root. This is Hive-specific config — 
 - Create `.pHive/team-memories/` directory (project-scoped team collective memories)
 - Create `.pHive/teams/` directory (loadable team configs)
 - Ensure `~/.claude/hive/kg.sqlite` schema is initialized by running the SQLite DDL from `hive/references/knowledge-graph-schema.md#sqlite-bootstrap` on every kickoff. The DDL is idempotent, so re-running is safe.
+- Start ChromaDB sidecar if not already running: `hive/lib/chromadb-wrapper.js` is the JS-side wrapper, but the ChromaDB Python process must be started separately (e.g., `chroma run --path ~/.claude/hive/chromadb/`). Check with `isAvailable()`. **ChromaDB is optional** — if not installed or not started, all memory reads fall back to L1+L0 silently. Agents are not blocked by ChromaDB absence.
 - Run per-agent memory migration (idempotent — safe to run every kickoff):
   - For each agent, check `skills/hive/agents/memories/{agent}/` for `.md` files
   - Copy files that don't already exist at `~/.claude/hive/memories/{agent}/`
