@@ -1,51 +1,85 @@
-# Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-04-10 | **Date:** 2026-04-10 | **Verdict:** PASSED
+# Hive Overnight Run — Morning Summary
+**Epic:** memory-autonomy-foundation | **Phase:** 2 | **Date:** 2026-04-14 | **Verdict:** PASSED
 
 ---
 
-## What Changed Tonight
+## What Executed
 
-- **`skills/hive/agents/memories/analyst/trace-every-capability-to-a-story.md`** — New pitfall memory: every capability in the original requirement must map to a story; unmapped = CAPABILITY_GAP, flag it before plan sign-off
-- **`skills/hive/agents/memories/analyst/measurable-acceptance-criteria-first.md`** — New pattern memory: acceptance criteria must be binary-testable before leaving analysis (includes the rewrite procedure)
-- **`skills/hive/agents/memories/peer-validator/stay-in-cross-story-lane.md`** — New pitfall memory: peer-validator owns cross-story consistency, not within-story correctness — clear scope boundary defined
-- **`skills/hive/agents/memories/peer-validator/convention-consistency-before-logic.md`** — New pattern memory: 5-step cross-story check order (naming → imports → conventions → dependencies → unmapped risk)
-- **`hive/references/insight-capture.md`** — Expanded from 13-line stub to 119-line full reference: insight file format with frontmatter template, TTL table, staging path convention, keep/discard criteria (5 binary tests), and a complete working example
-- **`skills/hive/agents/memories/technical-writer/structured-docs-not-prose-analysis.md`** — New pitfall memory: produce structured sections, not flowing prose; includes the diagnostic signal and fix procedure
-- **`skills/hive/agents/memories/technical-writer/match-skill-to-document-type.md`** — New pattern memory: skill routing table (design discussion / structured outline / horizontal plan / vertical plan) before writing any document
-- **`skills/hive/agents/memories/ui-designer/check-frame0-cli-availability-first.md`** — New pitfall memory: always verify `cli-anything-frame-zero` availability before starting; explicit fallback declaration required
-- **`skills/hive/agents/memories/ui-designer/one-screen-per-page-canonical-naming.md`** — New pattern memory: one screen = one Frame0 page with exact name match; verification command included
-- **`skills/hive/agents/memories/test-scout/detect-framework-from-config.md`** — New pattern memory: framework detection priority order from config files (package.json → config files → language-specific)
-- **`skills/hive/agents/memories/test-scout/never-assume-test-runner.md`** — New pitfall memory: wrong-framework assumption is the #1 test swarm failure; always verify from config, never from file extension
-- **`skills/hive/agents/memories/test-architect/strategy-before-test-generation.md`** — New pattern memory: write test strategy doc (6 sections) before generating any test files; prevents duplication and scope drift
-- **`skills/hive/agents/memories/test-architect/avoid-coverage-overlap-with-story-tests.md`** — New pitfall memory: swarm tests integration paths and E2E flows, NOT unit functions already covered by story tests
-- **`skills/hive/agents/memories/test-inspector/coverage-delta-report-format.md`** — New pattern memory: before/after delta report format with acceptance-criteria coverage table; never just "all tests pass"
-- **`skills/hive/agents/memories/test-sentinel/three-gate-pass-criteria.md`** — New pattern memory: pass requires all three gates (tests pass + coverage threshold + no regressions); verdict table included
+All 4 Phase 2 stories completed. No blockers, no circuit breakers tripped.
 
----
+| Story | Branch | Commit | Review Verdict | Artifacts |
+|-------|--------|--------|----------------|-----------|
+| `session-registry` | `hive-session-registry` | `cb9359f` | passed | `hive/references/session-registry-schema.md`, `skills/hive/skills/session-registry/SKILL.md` |
+| `story-execution-migration` | `hive-story-execution-migration` | `ecf3cbc` | passed | `skills/execute/SKILL.md`, `hive/references/configuration.md` |
+| `specialist-trigger-migration` | `hive-specialist-trigger-migration` | `305c300` | passed | `hive/references/specialist-trigger-rules.md`, `skills/execute/SKILL.md`, `hive/agents/orchestrator.md` |
+| `session-resilience` | `hive-session-resilience` | `f0e4813` | passed | `hive/references/session-resilience.md`, `skills/execute/SKILL.md`, `hive/references/configuration.md`, `skills/hive/skills/respawn/SKILL.md` |
 
-## What Was Found (Not Fixed This Cycle)
-
-- **MEMORY_GAP** `skills/hive/agents/memories/accessibility-specialist/` — 0 starter memories _(reason: deferred_to_next_cycle — over proposal cap of 5)_
-- **MEMORY_GAP** `skills/hive/agents/memories/animations-specialist/` — 0 starter memories _(reason: deferred_to_next_cycle)_
-- **MEMORY_GAP** `skills/hive/agents/memories/idiomatic-reviewer/` — 0 starter memories _(reason: deferred_to_next_cycle)_
-- **MEMORY_GAP** `skills/hive/agents/memories/performance-reviewer/` — 0 starter memories _(reason: deferred_to_next_cycle)_
+All story branches merged into `feat/memory-autonomy-foundation`. Merge commits:
+- `8c9ecff` — Merge hive-session-registry
+- `967a1d4` — Merge hive-story-execution-migration
+- `bbe2343` — Merge hive-specialist-trigger-migration
+- `9d7ece3` — Merge hive-session-resilience
 
 ---
 
-## Flagged for Human Review
+## What Did Not Execute and Why
 
-- Nothing requires your attention.
+Nothing was blocked. All 4 Phase 2 stories ran to completion in dependency order.
+
+One design note (not a blocker): `story-execution-migration` references
+`hive/references/session-prompt-spec.md` (Phase 1 S5 deliverable). That file is asserted
+as complete per Phase 1 hard gates but does not exist in the current repo state. The
+forward-reference in step 6b is correct and will resolve when Phase 1 work is rebased
+onto the feature branch.
 
 ---
 
-## Cycle Metrics
+## What Changed (Files)
 
-| Metric | Count |
-|--------|-------|
-| Findings identified | 9 |
-| Proposals generated | 5 |
-| Changes promoted | 15 |
-| Changes reverted | 0 |
-| Flagged for human | 0 |
+### New files
+- `hive/references/session-registry-schema.md` — session record schema, status lifecycle, index format
+- `hive/references/specialist-trigger-rules.md` — 5 specialist trigger conditions, evaluation procedure, pattern matching
+- `hive/references/session-resilience.md` — SSE stuck detection, recovery procedure, comparison table vs respawn
+- `skills/hive/skills/session-registry/SKILL.md` — bootstrap command for state/sessions/index.yaml
 
-**Next cycle priority:** accessibility-specialist, animations-specialist, idiomatic-reviewer, performance-reviewer (all at 0 starter memories); also add 2nd memories for test-inspector and test-sentinel
+### Modified files
+- `skills/execute/SKILL.md` — step 5 session check (highest priority), step 6a with backward-compat note, full step 6b, resilience monitoring
+- `hive/references/configuration.md` — new `sessions.*` config block (5 fields)
+- `hive/agents/orchestrator.md` — specialist reviewer auto-trigger note
+- `skills/hive/skills/respawn/SKILL.md` — TeamCreate-only guard at top of "When to Use"
+
+---
+
+## Phase 3 Gate Status
+
+**Required for Phase 3 entry:** ≥ 3 successful session executions observed in Phase 2.
+
+**Observed successful session executions:** 0
+
+Phase 2 was entirely protocol/schema/doc work. No `/v1/sessions` API calls were made —
+this phase defined the session execution protocol, not the runtime. The infrastructure
+will be exercised when the first real epic runs with `HIVE_SESSIONS_ENABLED=1`.
+
+**Phase 3 gate: NOT MET** — 0/3 session executions observed.
+
+High-severity bugs surfaced: 0
+
+---
+
+## Explicit Next-Action Recommendation
+
+**Before Phase 3 — 3 steps required:**
+
+1. **Ensure session-prompt-spec exists.** The execute skill step 6b references
+   `hive/references/session-prompt-spec.md` (Phase 1 S5). Verify or create that file.
+
+2. **Run a smoke test with `HIVE_SESSIONS_ENABLED=1`** on a low-complexity story to
+   exercise the session registry bootstrap, session creation, specialist trigger check,
+   and SSE monitoring path. Repeat until ≥ 3 successful session executions are confirmed.
+
+3. **Delete local story branches** (`hive-session-registry`, `hive-story-execution-migration`,
+   `hive-specialist-trigger-migration`, `hive-session-resilience`) after confirming the
+   feature branch is stable.
+
+**Do NOT start Phase 3** (`kg-phase-scheduling`, `autonomous-loop-validation`) until the
+≥ 3 session execution gate is met.

@@ -43,25 +43,33 @@ If all checks pass, proceed normally.
 
 4. **Topologically sort stories** by their `depends_on` fields.
 
-5. **Choose execution mode.** Determine whether to use agent teams or sequential execution:
+5. **Choose execution mode.** Determine whether to use sessions, agent teams, or sequential execution:
 
+   **Session check (highest priority):**
+   Is `HIVE_SESSIONS_ENABLED` set (value `1`, `true`, or `"true"`) OR does `hive.config.yaml`
+   have `sessions.enabled: true`? If yes → use **session-based execution** (step 6b below).
+   Skip the remaining checks.
+
+   **Team check (when sessions not available):**
    1. Check: Is `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` set (value `1`, `true`, or `"true"`)?
    2. Check: Does `hive.config.yaml` have `parallel_teams: true`?
    3. Check: Does the topological sort reveal multiple stories at the same depth (independent stories that can run concurrently)?
    4. Check: Is `--sequential` flag NOT present in arguments?
 
-   If all four: use **agent team execution** (step 6 below).
+   If all four team checks pass: use **agent team execution** (step 6a below).
    Otherwise: use **sequential execution** (step 7 below).
 
    **IMPORTANT — tool hierarchy:**
-   - **Orchestrator → stories:** Use `TeamCreate` to spawn story-level teammates into separate tmux panes. This is how the user monitors parallel work.
+   - **Orchestrator → stories (session path):** Use the `/v1/sessions` Claude Agent SDK API to create one session per story. See step 6b.
+   - **Orchestrator → stories (TeamCreate path):** Use `TeamCreate` to spawn story-level teammates into separate tmux panes. This is how the user monitors parallel work.
    - **Teammates → workflow steps:** Teammates use the `Agent` tool to spawn sub-workers for individual workflow steps (researcher, developer, tester, etc). Sub-workers run inline within the teammate's pane — this is correct and expected.
 
-   The rule: `TeamCreate` for parallelizing stories across tmux panes. `Agent` for sequential workflow steps within a single story.
+   The rule: sessions when `HIVE_SESSIONS_ENABLED`. `TeamCreate` for parallelizing stories across tmux panes. `Agent` for sequential workflow steps within a single story.
 
    See `hive/references/agent-teams-guide.md` for agent teams detection and mechanics.
+   See `hive/references/configuration.md` for `sessions.*` config options.
 
-6. **Agent team execution.** Use the `TeamCreate` tool to spawn an agent team. Generate a natural-language team creation prompt that describes the epic and its tasks:
+6a. **Agent team execution** (TeamCreate path — used when sessions are not available). Use the `TeamCreate` tool to spawn an agent team. Generate a natural-language team creation prompt that describes the epic and its tasks:
 
    ```
    Create a team to execute the "{epic-id}" epic.
@@ -94,6 +102,10 @@ If all checks pass, proceed normally.
 
    **Per-story commits:** Stories commit independently on their own feature branches (`hive-{story-id}`) as soon as review passes. Do NOT batch commits at epic end.
 
+   **Specialist triggers (TeamCreate path):** When using step 6a, specialist agents may
+   be spawned as additional teammates for the review step. For session execution, specialist
+   triggers are handled via step 6b-4 specialist check — see `hive/references/specialist-trigger-rules.md`.
+
    **Respawn monitoring (team execution):** The orchestrator monitors active teammates for context degradation signals during execution. If a teammate shows signs of context pressure (see `skills/hive/skills/respawn/SKILL.md` for detection heuristics), the orchestrator triggers the respawn protocol:
 
    1. `SendMessage` the respawn signal to the teammate
@@ -103,6 +115,56 @@ If all checks pass, proceed normally.
    5. The fresh teammate picks up where the previous one left off
 
    Ensure `state/respawn-summaries/` exists before epic execution begins (create if needed).
+
+6b. **Session-based execution** (used when `HIVE_SESSIONS_ENABLED` or `sessions.enabled: true`).
+
+   **6b-1. Bootstrap session registry.** Run the session-registry bootstrap skill
+   (`skills/hive/skills/session-registry/SKILL.md`) to ensure `state/sessions/index.yaml`
+   exists. This is idempotent — safe to call even if already initialized.
+
+   **6b-2. Create session entries.** For each story in dependency order:
+   - Append a session record to `state/sessions/index.yaml` with `status: pending`,
+     `story_id: {story-id}`, `epic_id: {epic-id}`, and `created_at: {NOW}`.
+   - Use the model from `hive.config.yaml sessions.model` (or inherit from `model_tiers`
+     for the story's primary agent).
+
+   **6b-3. Invoke each session.** When a story's dependencies are complete, open its
+   session using the Claude Agent SDK `/v1/sessions` API. Format the initial session
+   prompt using the session prompt spec from `hive/references/session-prompt-spec.md`.
+   The prompt must include: story spec, workflow step sequence, episode write path, and
+   specialist trigger check (see step 6b specialist check below).
+   - Update the registry record: set `status: active` and `last_active_at: {NOW}`.
+
+   **6b-4. Specialist check.** Before invoking the review phase session, evaluate
+   specialist trigger rules from `hive/references/specialist-trigger-rules.md` against
+   the story's `key_files`, `tags`, and `description`. Follow the evaluation procedure
+   in that doc to build a list of matched specialists. Append matched specialists to the
+   review session's context as:
+   ```
+   Additional reviewers: {specialist-1}, {specialist-2}
+   Each additional reviewer should run their activation protocol after the primary review.
+   Load their persona from hive/agents/{agent-name}.md.
+   ```
+   Log the trigger decision per the format in `specialist-trigger-rules.md`. If no
+   specialists match, proceed with the standard reviewer only.
+
+   **6b-5. Monitor and update.** As sessions run, update `sse_last_event_at` in the
+   registry on each received SSE event. Watch for stuck sessions per the resilience
+   procedure in `hive/references/session-resilience.md`.
+
+   **6b-6. Close sessions.** On session completion, set `status: completed` (or `failed`)
+   and update `last_active_at`. Sessions are never reopened — each story run gets a
+   new session record.
+
+   **Per-story commits (session path):** Stories commit independently on their own feature
+   branches (`hive-{story-id}`) as soon as review passes, same as the TeamCreate path.
+
+   **Resilience monitoring:** While sessions are active, poll `sse_last_event_at` in the
+   session registry (`state/sessions/index.yaml`). If any active session has not updated
+   `sse_last_event_at` within `stuck_timeout_ms` (default 90s), trigger the session retry
+   procedure from `hive/references/session-resilience.md`. Max 3 retries per story before
+   escalating to the user. This replaces the respawn skill for session-based execution —
+   do NOT use the respawn protocol for step 6b stories.
 
 7. **Sequential execution.** For each story (in dependency order):
 

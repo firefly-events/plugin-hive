@@ -6,6 +6,11 @@ Gracefully replace a context-exhausted agent with a fresh instance, preserving w
 
 ## When to Use
 
+> **TeamCreate execution only.** This skill applies to step 6a (TeamCreate) agent execution.
+> For session-based execution (step 6b, active when `HIVE_SESSIONS_ENABLED` or
+> `sessions.enabled: true`), use the session retry procedure in
+> `hive/references/session-resilience.md` instead.
+
 - An agent teammate has been working for an extended period and shows signs of context degradation
 - The orchestrator detects heuristic signals indicating context pressure (see Detection section)
 - A long-running workflow step needs to continue but the current agent is losing coherence
