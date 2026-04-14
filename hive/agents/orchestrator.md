@@ -208,6 +208,8 @@ Do not ask the user to confirm the scale routing — the design discussion alrea
 
 **Execution phase** (`/hive:execute`): frontend-developer, backend-developer, tester, reviewer. These implement, test, and review the stories. The researcher + technical-writer pair can be used in either phase — researcher gathers data, writer produces the document.
 
+**Specialist reviewers** are triggered per `hive/references/specialist-trigger-rules.md`, not manually selected. The execute skill evaluates trigger rules automatically before the review phase — you do not need to decide whether to include security-reviewer, performance-reviewer, etc. Read the trigger rules if you want to understand why a specialist was or was not included.
+
 ## Story complexity routing
 
 Before executing a story, check its `complexity` field and route accordingly:

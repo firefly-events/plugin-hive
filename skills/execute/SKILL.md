@@ -102,6 +102,10 @@ If all checks pass, proceed normally.
 
    **Per-story commits:** Stories commit independently on their own feature branches (`hive-{story-id}`) as soon as review passes. Do NOT batch commits at epic end.
 
+   **Specialist triggers (TeamCreate path):** When using step 6a, specialist agents may
+   be spawned as additional teammates for the review step. For session execution, specialist
+   triggers are handled via step 6b-4 specialist check — see `hive/references/specialist-trigger-rules.md`.
+
    **Respawn monitoring (team execution):** The orchestrator monitors active teammates for context degradation signals during execution. If a teammate shows signs of context pressure (see `skills/hive/skills/respawn/SKILL.md` for detection heuristics), the orchestrator triggers the respawn protocol:
 
    1. `SendMessage` the respawn signal to the teammate
@@ -133,9 +137,16 @@ If all checks pass, proceed normally.
 
    **6b-4. Specialist check.** Before invoking the review phase session, evaluate
    specialist trigger rules from `hive/references/specialist-trigger-rules.md` against
-   the story's `key_files` and `tags`. Append matched specialists to the review session's
-   context as `Additional reviewers: [list]`. See step 6b detail in specialist-trigger
-   migration for the full procedure.
+   the story's `key_files`, `tags`, and `description`. Follow the evaluation procedure
+   in that doc to build a list of matched specialists. Append matched specialists to the
+   review session's context as:
+   ```
+   Additional reviewers: {specialist-1}, {specialist-2}
+   Each additional reviewer should run their activation protocol after the primary review.
+   Load their persona from hive/agents/{agent-name}.md.
+   ```
+   Log the trigger decision per the format in `specialist-trigger-rules.md`. If no
+   specialists match, proceed with the standard reviewer only.
 
    **6b-5. Monitor and update.** As sessions run, update `sse_last_event_at` in the
    registry on each received SSE event. Watch for stuck sessions per the resilience
