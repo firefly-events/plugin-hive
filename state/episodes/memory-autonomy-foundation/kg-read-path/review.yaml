@@ -1,0 +1,5 @@
+step_id: review
+status: completed
+timestamp: "2026-04-13T02:20:00Z"
+artifacts:
+  - state/episodes/memory-autonomy-foundation/kg-read-path/review-findings.md

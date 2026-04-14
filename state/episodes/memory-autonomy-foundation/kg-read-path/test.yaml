@@ -1,0 +1,5 @@
+step_id: test
+status: completed
+timestamp: "2026-04-13T02:10:00Z"
+artifacts:
+  - state/episodes/memory-autonomy-foundation/kg-read-path/test-results.md
