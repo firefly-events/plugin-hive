@@ -268,7 +268,7 @@ files_to_modify:
     change: MODIFY — add pane_mode (one-shot | persistent) to codex dispatch;
       persistent mode skips auto-close
   - file: hive/hive.config.yaml
-    change: MODIFY �� add idle_timeout_seconds under execution (default: 300)
+    change: MODIFY — add idle_timeout_seconds under execution (default: 300)
 
 design_decisions:
   - decision: Keep the Codex pane alive across implement + fix loop steps;
