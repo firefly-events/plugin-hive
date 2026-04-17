@@ -24,8 +24,10 @@ optional `pane_mode` (`one-shot` | `persistent`, default: `one-shot`).
 - Any task where Claude is the resolved backend (default path — use TeamCreate)
 - Non-macOS machines (cmux is macOS-only — hard-fail at pre-flight)
 
-**Supported personas (PoC):** `backend-developer`, `reviewer`. Other roster
-personas may work but are untested — broaden as validated.
+**Supported personas:** `backend-developer`, `reviewer`, `technical-writer`,
+`architect`, `tpm`. The orchestrator and team-lead must stay on Claude (they
+invoke tools and manage the workflow). Other roster personas may work but are
+untested — broaden as validated.
 
 ## Procedure
 
