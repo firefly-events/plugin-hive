@@ -109,10 +109,9 @@ external_models:
 # - `codex` requires: external_models.codex.enabled: true, codex + cmux CLIs,
 #   codex login. macOS-only during PoC (cmux constraint). See
 #   skills/hive/skills/codex-invoke/SKILL.md for pre-flight details.
-agent_backends:
-  reviewer: codex                # run reviewer in a cmux pane via OpenAI Codex
-  # backend-developer: codex     # run backend-developer work in a cmux pane
-  #                              # via OpenAI Codex instead of Claude
+agent_backends: {}
+  # reviewer: codex              # run reviewer in a cmux pane via OpenAI Codex
+  # backend-developer: codex     # run backend-developer in a cmux pane via OpenAI Codex
 
 # Developer preferences (populated by Phase 2b-ii: Developer Discovery)
 # These configure how Hive adapts to the developer's working style.
@@ -145,4 +144,4 @@ execution:
   # tmux: use TeamCreate's built-in tmux pane spawning (default)
   # cmux: spawn agents in cmux split panes via cmux CLI (requires cmux installed)
   # auto: detect cmux first, fall back to tmux
-  terminal_mux: cmux
+  terminal_mux: tmux

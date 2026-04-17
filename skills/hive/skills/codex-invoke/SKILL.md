@@ -105,21 +105,17 @@ Codex CLI reference (v0.118+):
 - `deny` (no worktree / default): `--sandbox read-only`
 - Caller override is passed through directly
 
-**Command pattern — always chain the cmux signal at the end:**
+**Command pattern — send the codex command directly:**
 
 ```
-cmux send --surface <id> "codex exec <approval_flags> -o <output_path> -C <workdir> - < <tempfile> ; cmux wait-for -S codex-<surface_id>-done"
+cmux send --surface <id> "codex exec <approval_flags> -o <output_path> -C <workdir> - < <tempfile>"
 cmux send-key --surface <id> enter
 ```
-
-The `; cmux wait-for -S codex-<surface_id>-done` fires a named signal when
-codex exits (success or failure). The orchestrator blocks on this signal
-(see step 7a).
 
 Write long prompts to a temp file first and pass `-` as the prompt to read
 from stdin:
 ```
-cmux send --surface <id> "codex exec <approval_flags> -o <output_path> - < <tempfile> ; cmux wait-for -S codex-<surface_id>-done"
+cmux send --surface <id> "codex exec <approval_flags> -o <output_path> - < <tempfile>"
 cmux send-key --surface <id> enter
 ```
 
@@ -147,18 +143,22 @@ If any failure is detected:
 If the pane shows codex actively running (progress lines, no shell prompt),
 proceed to step 7.
 
-### 7a. Wait for codex to finish (callback signal)
+### 7a. Wait for codex to finish (polling)
 
-The orchestrator blocks until codex completes:
+Poll until codex completes:
 
 ```
-cmux wait-for codex-<surface_id>-done --timeout <step_timeout_seconds>
+while elapsed < step_timeout_seconds:
+  cmux read-screen --surface <id>
+  if the last line ends with a shell prompt (`$` or `%`):
+    break
+  sleep 10
 ```
 
 `step_timeout_seconds` comes from `hive.config.yaml` →
 `circuit_breakers.step_timeout_minutes` × 60 (default: 600s).
 
-When the signal fires:
+When the shell prompt reappears:
 - Read the output file (`-o` path) — this is the codex response
 - Proceed to step 7b for transcript capture
 
@@ -209,12 +209,23 @@ Thread id capture: scan the transcript for a codex thread/session identifier
 with a loose regex (the exact format varies between codex versions). If not
 found, set `thread_id: null` and log a warning — DO NOT fail the spawn.
 
+### 7c. Close the pane
+
+After transcript and meta are captured, close the codex pane:
+
+```
+cmux close-surface --surface <id>
+```
+
+This keeps the workspace clean. The transcript file preserves all output.
+If capture failed or was partial, skip the close so the user can inspect
+the pane manually.
+
 ### 8. Report
 
 Return to the caller (agent-spawn):
 
 - Backend: `codex`
-- Surface id and where to view it (`cmux focus-surface --surface <id>`)
 - Transcript path and meta path
 - Approval policy used + source
 - Pre-flight results (codex: ok, cmux: ok, auth: ok, platform: ok)

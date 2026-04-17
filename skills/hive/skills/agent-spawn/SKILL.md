@@ -177,7 +177,7 @@ split pane instead of using TeamCreate:
 
 5. **Launch claude in the pane:**
    ```
-   cmux send --surface <id> "claude -p \"$(cat <tempfile>)\" --model <model>"
+   cmux send --surface <id> "claude -p - --model <model> < <tempfile>"
    cmux send-key --surface <id> enter
    ```
    For interactive sessions (long tasks, multi-step workflows), use:
@@ -185,17 +185,26 @@ split pane instead of using TeamCreate:
    cmux send --surface <id> "claude --model <model>"
    cmux send-key --surface <id> enter
    ```
-   Then after the session starts, deliver the prompt:
-   ```
-   cmux send --surface <id> "<prompt content>"
-   cmux send-key --surface <id> enter
-   ```
+   Then after the session starts, deliver the prompt from the temp file using
+   a file-backed input path supported by the environment. Do not embed raw
+   prompt content in `cmux send`, because quotes, backticks, and `$` content
+   can be mangled in transit.
 
 6. **Clean up temp file** after delivery.
 
 7. **Record in episode:** surface_id, terminal_mux: cmux, pane direction.
    The user can focus this pane anytime via `cmux focus-pane --pane <id>`.
    Capture output later via `cmux read-screen --surface <id> --scrollback`.
+
+8. **Block before proceeding to steps 7b/8:** poll `cmux read-screen --surface <id>`
+   every 10 seconds until the shell prompt (`$` or `%`) reappears on the last
+   line, which indicates `claude` exited. Use the step timeout from
+   `circuit_breakers` as the max polling duration; on timeout, capture
+   scrollback and hard-fail instead of continuing to cleanup/reporting early.
+
+9. **Close the pane** after capturing output via `cmux read-screen --scrollback`:
+   `cmux close-surface --surface <id>`. Skip if capture failed so the user
+   can inspect manually.
 
 The cmux path produces the same prompt content as the tmux path — only the
 dispatch mechanism differs. Memory loading, skill injection, domain notes,

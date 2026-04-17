@@ -13,8 +13,8 @@ description: |
   different model while keeping a single persona source of truth.
 
   VISIBILITY MODEL: Codex runs in a side-by-side cmux surface (pane) in the
-  active workspace. The orchestrator drives it via `cmux send-surface` /
-  `cmux send-key-surface` and captures its transcript. This matches the
+  active workspace. The orchestrator drives it via `cmux send --surface` /
+  `cmux send-key --surface` and captures its transcript. This matches the
   "visibility is trust proxy" stance during PoC — we can watch and intervene
   before committing to a headless path.
 
@@ -45,7 +45,7 @@ acceptance_criteria:
      test story, then a new cmux surface is opened running codex with the
      backend-developer persona injected as system context."
   - "Given the codex pane is running, when the orchestrator sends the story
-     prompt via cmux send-surface, then codex produces an implementation and
+     prompt via cmux send --surface, then codex produces an implementation and
      the transcript is captured to a known file path in state/."
   - "Given `codex` CLI is missing, when the codex-invoke skill is called,
      then it hard-fails with a clear message naming the missing prerequisite
@@ -56,7 +56,7 @@ acceptance_criteria:
      then its approval policy is set to `auto`. Otherwise `deny` is set."
   - "Given the codex spawn completes, when the episode record is read, then
      it contains the codex thread id and transcript path for resume."
-  - "Given hive.config.yaml has `backend: codex` configured for an agent,
+  - "Given hive.config.yaml has `agent_backends.{agent}: codex` configured,
      when agent-spawn runs for that agent, then it routes to codex-invoke
      instead of TeamCreate. Default (unset) remains `claude` (TeamCreate)."
   - "Given the persona is injected, when codex receives its system context,
@@ -83,7 +83,7 @@ steps:
       review` does NOT support `-o`; use `codex exec` with `-o` for output
       capture. Confirm cmux CLI commands: new-split, tree, send --surface,
       send-key --surface, focus-pane, read-screen --surface, close-surface,
-      wait-for -S (signal), notify.
+      notify.
       Identify where transcripts should land: propose
       state/episodes/{story_id}/codex/{agent}-{timestamp}.transcript.md
       and state/episodes/{story_id}/codex/{agent}-{timestamp}.meta.json
@@ -120,13 +120,14 @@ steps:
          e. Spawn pane — `cmux new-split right` in the current workspace;
             capture the new surface id by diffing `cmux tree` before/after.
          f. Start codex in the pane — write prompt to temp file, then:
-            `cmux send --surface <id> "codex exec <flags> -o <output> - < <tempfile> ; cmux wait-for -S codex-<surface_id>-done"`
+            `cmux send --surface <id> "codex exec <flags> -o <output> - < <tempfile>"`
             then `cmux send-key --surface <id> enter`.
          g. Verify launch — `sleep 3 && cmux read-screen --surface <id>`;
             check for `error:` or shell prompt reappearance; hard-fail if
             detected.
-         h. Wait for completion — `cmux wait-for codex-<surface_id>-done
-            --timeout <step_timeout>`. Read the `-o` output file.
+         h. Wait for completion — poll `cmux read-screen --surface <id>`
+            every 10 seconds until the last line shows the shell prompt or
+            `<step_timeout>` expires. Read the `-o` output file.
          i. Capture transcript — `cmux read-screen --surface <id> --scrollback`
             to state/episodes/{story_id}/codex/{agent}-{ts}.transcript.md.
             Write meta.json with: thread_id, surface_id, approval_policy,
@@ -205,7 +206,7 @@ steps:
     depends_on: [review]
 
 context:
-  codebase: /Users/don/Documents/plugin-hive
+  codebase: .
   tech_stack:
     runtime: Node.js (existing hive libs), shell (cmux + codex CLIs)
     external_cli:
