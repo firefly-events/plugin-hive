@@ -1,0 +1,355 @@
+name: development-tdd-codex
+description: >
+  Cross-model TDD workflow — Claude writes tests and reviews, Codex implements.
+  Each model plays to its strengths: Claude for spec interpretation and quality
+  judgment, Codex for raw implementation at lower cost. Different models reduce
+  confirmation bias. Requires agent_backends configured for codex + cmux installed.
+version: "1.0.0"
+methodology: tdd
+
+# AGENT ROUTING:
+# Steps with `backend: codex` route through codex-invoke (cmux pane).
+# Steps with `backend: claude` (or unset) use standard Agent/TeamCreate.
+# The persistent Codex pane opens once and stays alive across implement + fix-loop.
+
+# PARALLELISM:
+# Within a story: steps are sequential (test → implement → review → fix loop).
+# Between stories: each story gets its own Claude+Codex pair. Independent stories
+# spin up concurrent pairs — same as existing TeamCreate agent-teams pattern.
+
+steps:
+  - id: research
+    agent: researcher
+    backend: claude
+    step_file: workflows/steps/development-classic/step-02-research.md
+    task: >
+      Read the story spec and explore the codebase. Gather raw findings:
+      affected files, existing patterns, architectural constraints, risks,
+      reusable utilities, test infrastructure, and external references.
+      Deliver structured raw findings — do NOT write a formatted brief.
+    depends_on: []
+    inputs:
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: research_findings
+        type: string
+    optional: false
+    timeout_ms: 300000
+
+  - id: write-brief
+    agent: technical-writer
+    backend: claude
+    task: >
+      Receive raw research findings and produce a formatted research brief.
+      Use the research-brief skill if available. The brief should be
+      actionable for the developer and tester: where to start, what to reuse,
+      what test infrastructure exists, and what to watch out for.
+    depends_on:
+      - research
+    inputs:
+      - name: research_findings
+        source: step_output
+        step_id: research
+        output_name: research_findings
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: research_brief
+        type: string
+    optional: false
+    timeout_ms: 180000
+
+  - id: test-spec
+    agent: tester
+    backend: claude
+    step_file: workflows/steps/development-tdd/step-02-test-spec.md
+    task: >
+      Write failing tests from the story specification ONLY. You do NOT see any
+      implementation code — this is TDD mode. Tests define the expected behavior
+      based on acceptance criteria. Use existing test patterns found during research.
+      Tests MUST fail when run (there is no implementation yet).
+
+      Record in the episode:
+      - test_file_paths: list of created test files (absolute or repo-relative)
+      - test_manifest: map of test name → acceptance criterion it covers
+      - test_command: the shell command to run the tests (e.g., npm test, pytest)
+
+      These records are the contract that the Codex implementation step reads.
+    depends_on:
+      - write-brief
+    inputs:
+      - name: research_brief
+        source: step_output
+        step_id: write-brief
+        output_name: research_brief
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: test_files
+        type: string
+      - name: test_manifest
+        type: string
+      - name: test_command
+        type: string
+    optional: false
+    timeout_ms: 600000
+
+  - id: open-codex-pane
+    agent: orchestrator
+    backend: claude
+    task: >
+      Open a persistent Codex pane for the implementation and fix loop steps.
+      Use codex-invoke in open-only mode (pane_mode: persistent):
+        1. Run pre-flight checks (codex, cmux, auth, platform).
+        2. Resolve approval policy (worktree → full-auto, else read-only).
+        3. Open pane: cmux new-split right, capture surface_id.
+        4. Start codex in interactive mode:
+           cmux send --surface <id> "codex"
+           cmux send-key --surface <id> enter
+        5. Verify launch via cmux read-screen (check for errors).
+        6. Record in episode: surface_id, approval_policy, pane_opened_at.
+      Do NOT send any implementation prompt — that happens in the next step.
+      Do NOT close this pane — it stays open until the shutdown step.
+    depends_on:
+      - test-spec
+    inputs:
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: codex_surface_id
+        type: string
+      - name: approval_policy
+        type: string
+    optional: false
+    timeout_ms: 60000
+
+  - id: implement
+    agent: developer
+    backend: codex
+    pane_mode: persistent
+    task: >
+      Send the implementation prompt to the persistent Codex pane opened in
+      the previous step. Do NOT open a new pane — reuse codex_surface_id.
+
+      Prompt structure (write to temp file, deliver via stdin):
+        1. Adapter prefix (from codex-invoke/adapter-prefix.md)
+        2. Developer persona (backend-developer or frontend-developer)
+        3. Research brief
+        4. "The following tests define the expected behavior. Implement the
+           minimum code to make ALL tests pass. Do not modify the tests."
+        5. Test file paths and test_command from the episode record
+        6. Story spec (for context — the tests are the primary contract)
+
+      Deliver: cmux send --surface <id> "cat <tempfile>"
+               cmux send-key --surface <id> enter
+
+      Poll cmux read-screen for Codex completion (shell prompt reappearance).
+
+      After Codex reports done, INDEPENDENTLY verify tests pass from the host:
+        <test_command> 2>&1
+      Do NOT trust Codex's self-reported test status — run them yourself.
+
+      Record in episode: implementation_output, test_results, tests_passing.
+    depends_on:
+      - open-codex-pane
+    inputs:
+      - name: codex_surface_id
+        source: step_output
+        step_id: open-codex-pane
+        output_name: codex_surface_id
+      - name: test_files
+        source: step_output
+        step_id: test-spec
+        output_name: test_files
+      - name: test_command
+        source: step_output
+        step_id: test-spec
+        output_name: test_command
+      - name: research_brief
+        source: step_output
+        step_id: write-brief
+        output_name: research_brief
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: implementation
+        type: string
+      - name: test_results
+        type: string
+    optional: false
+    timeout_ms: 600000
+
+  - id: review
+    agent: reviewer
+    backend: claude
+    step_file: workflows/steps/development-classic/step-06-review.md
+    task: >
+      Review the Codex-written implementation against the story spec, test
+      coverage, and conventions. This is Claude reviewing Codex's work —
+      different model reduces confirmation bias.
+
+      Check:
+      - Spec fidelity: every acceptance criterion has an implementation
+      - Tests are meaningful (not trivially passing)
+      - Convention adherence, security, performance
+      - No test modifications (Codex was told not to touch tests)
+
+      Verdict: passed | needs_optimization
+      If passed → proceed to integrate.
+      If needs_optimization → proceed to fix-loop.
+    depends_on:
+      - implement
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: test_files
+        source: step_output
+        step_id: test-spec
+        output_name: test_files
+      - name: test_results
+        source: step_output
+        step_id: implement
+        output_name: test_results
+      - name: research_brief
+        source: step_output
+        step_id: write-brief
+        output_name: research_brief
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: review_verdict
+        type: string
+      - name: review_findings
+        type: string
+    optional: false
+    timeout_ms: 300000
+
+  - id: fix-loop
+    agent: developer
+    backend: codex
+    pane_mode: persistent
+    task: >
+      If review returned needs_optimization, send review findings to the SAME
+      Codex pane as a follow-up prompt. Do NOT open a new pane.
+
+      Prompt: "The reviewer found these issues with your implementation. Fix
+      each one. Re-run the tests after fixing. Do not modify the tests."
+      Followed by: full review findings with file paths and line numbers.
+
+      After Codex reports done, INDEPENDENTLY verify tests still pass.
+      Then trigger another Claude review (re-invoke review step).
+
+      Loop control:
+      - Max iterations: circuit_breakers.max_fix_iterations (default: 3)
+      - Same error repeated max_same_error_repeats times → halt, escalate
+      - Max iterations reached → halt, escalate to orchestrator
+
+      Each iteration records: iteration_number, findings_sent, test_results,
+      review_verdict in the episode.
+    depends_on:
+      - review
+    inputs:
+      - name: review_findings
+        source: step_output
+        step_id: review
+        output_name: review_findings
+      - name: review_verdict
+        source: step_output
+        step_id: review
+        output_name: review_verdict
+      - name: codex_surface_id
+        source: step_output
+        step_id: open-codex-pane
+        output_name: codex_surface_id
+      - name: test_command
+        source: step_output
+        step_id: test-spec
+        output_name: test_command
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: fix_result
+        type: string
+    optional: true
+    timeout_ms: 600000
+    # fix-loop runs only when review_verdict is needs_optimization.
+    # Skipped entirely when review passes on first try.
+    condition: review_verdict == "needs_optimization"
+
+  - id: integrate
+    agent: developer
+    backend: claude
+    step_file: workflows/steps/development-classic/step-08-integrate.md
+    task: >
+      Commit and integrate the implementation. Stage all changed files, write a
+      clear commit message following the repository convention, and push to the
+      feature branch. Run the test command one final time to confirm. Report
+      the commit hash and files changed.
+    depends_on:
+      - review
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: review_verdict
+        source: step_output
+        step_id: review
+        output_name: review_verdict
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: commit_ref
+        type: string
+    optional: false
+    timeout_ms: 600000
+    # integrate runs only when review passed (directly or after fix-loop)
+    condition: review_verdict == "passed"
+
+  - id: shutdown
+    agent: orchestrator
+    backend: claude
+    task: >
+      Pre-shutdown sequence for the Codex pane. This is the ONLY step that
+      closes the pane.
+
+      1. Send pre-shutdown capture prompt to the Codex pane:
+         "Summarize what you implemented, decisions you made, difficulties
+         encountered, and patterns you'd reuse. Output as markdown."
+      2. Poll cmux read-screen for Codex response.
+      3. Capture Codex insights to episode:
+         state/episodes/{story_id}/codex/{agent}-insights.md
+      4. Capture full scrollback:
+         cmux read-screen --surface <id> --scrollback → transcript file
+      5. Close the pane: cmux close-surface --surface <id>
+      6. Write final meta.json: total_fix_iterations, final_verdict,
+         pane_lifetime_seconds, backend: codex.
+
+      If this step doesn't run (orchestrator crash), the idle timeout
+      (execution.idle_timeout_seconds, default 300s) is the safety net.
+    depends_on:
+      - integrate
+    inputs:
+      - name: codex_surface_id
+        source: step_output
+        step_id: open-codex-pane
+        output_name: codex_surface_id
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: shutdown_report
+        type: string
+    optional: false
+    timeout_ms: 120000

@@ -10,7 +10,8 @@ the Hive persona verbatim (via the adapter prefix) — no forked personas.
 
 **Input:** `$ARGUMENTS` carries the already-constructed prompt (persona +
 domain + prior knowledge + skills + task) from agent-spawn, plus:
-`agent_name`, `story_id`, `step_id`, and optional `approval_override`.
+`agent_name`, `story_id`, `step_id`, optional `approval_override`, and
+optional `pane_mode` (`one-shot` | `persistent`, default: `one-shot`).
 
 ## When to Use
 
@@ -254,3 +255,91 @@ Return to the caller (agent-spawn):
 - Thread id parsing is loose regex — follow-up story migrates to codex
   JSON-RPC for reliable structured events
 - No multi-turn resume yet — thread id is captured for future use
+
+---
+
+## Persistent Pane Mode
+
+When `pane_mode: persistent` is passed, the skill operates differently to
+support multi-turn workflows (e.g., TDD cross-model: implement → fix loop).
+
+### Differences from one-shot mode
+
+| Aspect | one-shot (default) | persistent |
+|--------|-------------------|------------|
+| Pane lifecycle | Open → prompt → capture → close | Open → return surface_id. Caller sends prompts later. |
+| Close trigger | Step 7c (auto-close after capture) | Explicit `shutdown` step only |
+| Prompt delivery | Single prompt at open time | Multiple prompts over pane lifetime |
+| Safety net | None needed (pane closes immediately) | Idle timeout (execution.idle_timeout_seconds) |
+
+### Open-only mode (persistent, initial call)
+
+When `pane_mode: persistent` and no `existing_surface_id` is provided:
+
+1. Run steps 1–4 as normal (pre-flight, approval, build prompt, open pane).
+2. Start codex in **interactive mode** (not `exec`):
+   ```
+   cmux send --surface <id> "codex"
+   cmux send-key --surface <id> enter
+   ```
+3. Verify launch (step 6).
+4. **Skip steps 5 (build command), 7a (poll), 7b (capture), 7c (close).**
+5. Return the report with `surface_id` and `pane_mode: persistent`.
+   The caller is responsible for sending prompts and closing the pane.
+
+### Send-followup mode (persistent, subsequent calls)
+
+When `pane_mode: persistent` and `existing_surface_id` is provided:
+
+1. **Skip steps 1–4** (pre-flight already passed, pane already open).
+2. Write the new prompt to a temp file.
+3. Deliver to the existing pane:
+   ```
+   cmux send --surface <existing_surface_id> - < <tempfile>
+   cmux send-key --surface <existing_surface_id> enter
+   ```
+4. Clean up temp file.
+5. Poll `cmux read-screen --surface <id>` for completion (step 7a logic).
+6. Capture output to transcript (append, not overwrite — accumulate across
+   iterations).
+7. **Do NOT close the pane.**
+8. Return report with updated transcript path and iteration count.
+
+### Idle timeout (orphan prevention)
+
+Persistent panes must not linger forever if the orchestrator dies.
+
+Timeout value: `hive.config.yaml` → `execution.idle_timeout_seconds`
+(default: 300 = 5 minutes).
+
+**How it works:**
+- The timeout clock starts when the pane finishes processing a prompt
+  (shell prompt reappears after codex completes).
+- The clock resets every time a new prompt is delivered to the pane.
+- If the timeout expires (no new prompt for idle_timeout_seconds):
+  1. Capture scrollback to transcript: `cmux read-screen --surface <id> --scrollback`
+  2. Write a warning to the episode record: "Codex pane closed by idle timeout"
+  3. Close the pane: `cmux close-surface --surface <id>`
+
+**Implementation note:** the idle timeout is enforced by the orchestrator
+or team lead polling the pane's last-activity time — not by a background
+process inside the pane. The orchestrator checks the timeout at step
+boundaries. If the orchestrator itself dies, the pane will linger until
+cmux is restarted or the user closes it manually — this is an acceptable
+PoC tradeoff.
+
+### Shutdown sequence (persistent pane close)
+
+The shutdown step is the authoritative close path for persistent panes:
+
+1. Send pre-shutdown capture prompt to the pane:
+   ```
+   cmux send --surface <id> "Summarize what you implemented, decisions you made, difficulties encountered, and patterns you would reuse. Output as markdown."
+   cmux send-key --surface <id> enter
+   ```
+2. Poll for response.
+3. Capture insights to: `state/episodes/{story_id}/codex/{agent}-insights.md`
+4. Capture full scrollback to transcript.
+5. Close the pane: `cmux close-surface --surface <id>`
+6. Write final meta.json with pane_lifetime_seconds, total_fix_iterations,
+   final_verdict.
