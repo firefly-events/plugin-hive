@@ -1,0 +1,349 @@
+id: tdd-cross-model-workflow
+epic: external-model-integration
+title: TDD workflow with Claude test-writing + Codex implementation + Claude review loop
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [codex-developer-poc]
+
+description: |
+  Add a cross-model TDD workflow where Claude and Codex each play to their
+  strengths: Claude (sonnet) writes spec-driven tests and performs reviews,
+  Codex handles implementation. This reduces cost on the implementation step
+  (Codex is cheaper) and reduces model bias (different model = independent
+  second opinion on how to satisfy the same tests).
+
+  WORKFLOW SHAPE (within a single story):
+    1. Research       — Claude researcher (unchanged from existing TDD workflow)
+    2. Write brief    — Claude technical-writer (unchanged)
+    3. Test spec      — Claude tester writes failing tests from story spec
+    4. Implement      — Codex receives failing tests + brief → implements until
+                        tests pass. Runs in a persistent cmux pane.
+    5. Review         — Claude reviewer evaluates implementation against spec
+    6. Fix loop       — If review returns needs_optimization, send findings back
+                        to the SAME Codex pane. Codex fixes, Claude re-reviews.
+                        Max iterations: circuit_breakers.max_fix_iterations (3).
+    7. Integrate      — Claude developer commits (unchanged)
+    8. Shutdown       — Pre-shutdown sequence for both Claude agents and Codex
+                        pane. Codex pane closes ONLY here — not before.
+
+  PARALLELISM: Each story in an epic gets its own Claude+Codex pair (own pane,
+  own test files, own episode dir). Stories without `depends_on` spin up
+  concurrent pairs — the sequential part is WITHIN a story (test → implement
+  → review → fix loop). Between stories, parallelism works exactly like the
+  existing TeamCreate agent-teams pattern.
+
+  PERSISTENT CODEX PANE: Unlike the PoC codex-invoke which opens/closes per
+  invocation, this workflow keeps the Codex pane alive across the implement
+  and fix loop steps. The pane receives multiple prompts over its lifetime:
+    - Initial: "here are the failing tests and brief, implement to make them pass"
+    - Fix 1: "review found these issues, fix them, re-run tests"
+    - Fix 2: (same pattern)
+    - ...until review passes or max iterations hit
+  The pane has an idle safety timeout (5 min with no new prompt) to prevent
+  orphaned panes if the orchestrator dies. The pre-shutdown sequence is the
+  authoritative close signal.
+
+  TEST HANDOFF: Claude writes tests and records the test file paths + test
+  manifest in the episode. Codex reads the episode to locate the tests. The
+  test files ARE the contract between the two models.
+
+  OUT OF SCOPE: Gemini/Ollama as the implementation backend (future story),
+  auto-routing policy that selects cross-model vs single-model per story,
+  cost telemetry dashboard.
+
+acceptance_criteria:
+  - "Given a story with methodology: tdd and agent_backends configured for
+     codex, when the workflow runs, then steps 1-3 (research, brief, test-spec)
+     execute via Claude and step 4 (implement) executes via Codex in a cmux pane."
+  - "Given Claude writes failing tests in step 3, when Codex receives them in
+     step 4, then Codex can locate the test files via the episode record and
+     run them."
+  - "Given Codex implementation completes, when Claude reviewer runs in step 5,
+     then the review evaluates the Codex-written code against the story spec
+     and test coverage."
+  - "Given the reviewer returns needs_optimization with findings, when the fix
+     loop runs, then the findings are sent as a follow-up prompt to the SAME
+     Codex pane (not a new pane), and Codex addresses them."
+  - "Given the fix loop exceeds max_fix_iterations (3), when the next iteration
+     would start, then the workflow halts and escalates to the orchestrator."
+  - "Given the reviewer returns passed, when the shutdown sequence begins, then
+     the Codex pane receives its pre-shutdown capture prompt BEFORE being closed,
+     and insights are written to the episode."
+  - "Given the Codex pane has received no prompt for 5 minutes, when the idle
+     timeout fires, then the pane captures its scrollback to the transcript and
+     closes itself with a warning in the episode record."
+  - "Given an epic with 3 independent stories using this workflow, when
+     execution starts, then 3 concurrent Claude+Codex pairs spin up in
+     separate cmux panes — parallelism is between stories, not within them."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read the story spec and explore the codebase. Standard TDD research step —
+      unchanged from development.tdd.workflow.yaml. Identify test infrastructure,
+      existing patterns, affected files.
+    depends_on: []
+
+  - id: write-brief
+    agent: technical-writer
+    description: |
+      Produce a formatted research brief from the raw findings. Standard step —
+      unchanged from existing workflow.
+    depends_on: [research]
+
+  - id: test-spec
+    agent: tester
+    backend: claude
+    description: |
+      Write failing tests from the story spec ONLY. This is Claude's job — it
+      understands the spec and Hive conventions best. Tests define the contract
+      that Codex must satisfy.
+
+      Record in the episode:
+      - test_file_paths: list of created test files
+      - test_manifest: map of test name → acceptance criterion
+      - test_command: the command to run the tests (e.g., `npm test`, `pytest`)
+
+      Tests MUST fail when run (no implementation exists yet).
+    depends_on: [write-brief]
+
+  - id: open-codex-pane
+    agent: orchestrator
+    backend: claude
+    description: |
+      Open a persistent Codex pane for the implementation + fix loop.
+
+      1. Run codex-invoke pre-flight (check codex, cmux, auth, platform).
+      2. Open pane: `cmux new-split right`, capture surface_id.
+      3. Start codex in interactive mode (NOT exec — we need multi-turn):
+         `cmux send --surface <id> "codex --model <model>"`
+         `cmux send-key --surface <id> enter`
+      4. Verify launch (read-screen, check for errors).
+      5. Record surface_id, pane_opened_at in the episode.
+
+      This pane stays open until the shutdown step closes it. The idle safety
+      timeout (5 min) is a fallback — not the normal close path.
+
+      Do NOT send the implementation prompt yet — that happens in the next step.
+    depends_on: [test-spec]
+
+  - id: implement
+    agent: developer
+    backend: codex
+    description: |
+      Send the implementation prompt to the persistent Codex pane opened in
+      the previous step. Do NOT open a new pane.
+
+      Prompt content:
+      - Adapter prefix (from codex-invoke/adapter-prefix.md)
+      - Developer persona (backend-developer.md or frontend-developer.md)
+      - Research brief
+      - "The following tests define the expected behavior. Implement the minimum
+        code to make ALL tests pass. Do not modify the tests."
+      - Test file paths and test command from the episode record
+      - Story spec (for context, not as the primary contract — the tests are)
+
+      Deliver via: write prompt to temp file, then
+      `cmux send --surface <id> "cat <tempfile>"`
+      `cmux send-key --surface <id> enter`
+      Clean up temp file after delivery.
+
+      Poll `cmux read-screen --surface <id>` for completion (shell prompt or
+      codex idle indicator). Capture output.
+
+      After Codex reports done, run the test command from the host to verify
+      tests actually pass (do not trust Codex's claim — verify independently):
+      `<test_command> 2>&1`
+
+      Record in episode: implementation_output, test_results, tests_passing (bool).
+    depends_on: [open-codex-pane]
+
+  - id: review
+    agent: reviewer
+    backend: claude
+    description: |
+      Standard Claude review — same as existing TDD workflow. Evaluate the
+      Codex-written implementation against:
+      - Story spec and acceptance criteria
+      - Test coverage (are tests meaningful, not trivially passing?)
+      - Convention adherence
+      - Security, performance, architecture
+
+      Verdict: passed | needs_optimization
+
+      If passed → proceed to integrate.
+      If needs_optimization → proceed to fix-loop.
+    depends_on: [implement]
+
+  - id: fix-loop
+    agent: developer
+    backend: codex
+    description: |
+      If review returned needs_optimization, send the review findings to the
+      SAME Codex pane as a follow-up prompt.
+
+      Prompt content:
+      - "The reviewer found the following issues with your implementation.
+        Fix each one. Re-run the tests after fixing. Do not modify the tests."
+      - Full review findings (from reviewer output)
+      - Specific file paths and line numbers from findings
+
+      After Codex reports done, independently verify tests still pass.
+
+      Then trigger another Claude review (re-invoke the review step with the
+      updated implementation).
+
+      Loop control:
+      - Max iterations: circuit_breakers.max_fix_iterations (default: 3)
+      - Same error repeated max_same_error_repeats times → halt, escalate
+      - On max iterations reached → halt, escalate to orchestrator with the
+        last review findings and a note that the fix loop is exhausted
+
+      Each iteration records: iteration_number, findings_sent, test_results,
+      review_verdict in the episode.
+    depends_on: [review]
+
+  - id: integrate
+    agent: developer
+    backend: claude
+    description: |
+      Standard integration step — Claude commits the implementation. Stage
+      changed files, write commit message, push to feature branch. Verify
+      tests pass one final time. Report commit hash and files changed.
+    depends_on: [review]
+
+  - id: shutdown
+    agent: orchestrator
+    backend: claude
+    description: |
+      Pre-shutdown sequence — runs after integrate (or after fix-loop exhaustion).
+
+      1. Send pre-shutdown capture prompt to the Codex pane:
+         "Summarize: what you implemented, decisions you made, difficulties
+         encountered, and patterns you'd reuse. Output as markdown."
+      2. Wait for Codex response (poll read-screen).
+      3. Capture Codex insights to episode:
+         state/episodes/{story_id}/codex/{agent}-insights.md
+      4. Capture full scrollback:
+         `cmux read-screen --surface <id> --scrollback` → transcript file
+      5. Close the pane: `cmux close-surface --surface <id>`
+      6. Write final meta.json with: total_fix_iterations, final_verdict,
+         pane_lifetime_seconds, codex_token_estimate (from scrollback length).
+
+      This is the ONLY step that closes the Codex pane. If this step doesn't
+      run (orchestrator crash), the idle timeout (5 min) is the safety net.
+    depends_on: [integrate]
+
+context:
+  codebase: .
+  tech_stack:
+    runtime: Node.js (existing hive libs), shell (cmux + codex CLIs)
+    external_cli:
+      - codex (npm i -g @openai/codex)
+      - cmux (brew install --cask cmux)
+  key_files:
+    - path: hive/workflows/development.tdd.workflow.yaml
+      purpose: Existing TDD workflow — this story creates a cross-model variant
+        alongside it, not a replacement.
+    - path: skills/hive/skills/codex-invoke/SKILL.md
+      purpose: Reuses pre-flight, adapter prefix, and approval policy logic.
+        Extended with persistent pane mode.
+    - path: skills/hive/skills/agent-spawn/SKILL.md
+      purpose: Backend routing (step 7.0) already supports codex dispatch.
+        This story adds awareness of persistent vs one-shot pane mode.
+    - path: hive/agents/backend-developer.md
+      purpose: READ-ONLY. Persona injected into Codex via adapter prefix.
+    - path: hive/agents/reviewer.md
+      purpose: READ-ONLY. Claude reviewer persona for steps 5/6.
+
+files_to_modify:
+  - file: hive/workflows/development.tdd-codex.workflow.yaml
+    change: CREATE — new workflow definition for TDD cross-model execution
+  - file: skills/hive/skills/codex-invoke/SKILL.md
+    change: MODIFY — add persistent pane mode (open without sending prompt,
+      send follow-up prompts to existing pane, idle timeout, deferred close)
+  - file: skills/hive/skills/agent-spawn/SKILL.md
+    change: MODIFY — add pane_mode (one-shot | persistent) to codex dispatch;
+      persistent mode skips auto-close
+  - file: hive/hive.config.yaml
+    change: MODIFY �� add idle_timeout_seconds under execution (default: 300)
+
+design_decisions:
+  - decision: Keep the Codex pane alive across implement + fix loop steps;
+      close only at the shutdown step.
+    rationale: Killing and respawning codex per iteration wastes cold-start
+      time and loses thread context. The persistent pane lets Codex build on
+      its own prior work during fix iterations. Idle timeout (5 min) prevents
+      orphaned panes if the orchestrator crashes.
+
+  - decision: Claude writes tests, Codex implements, Claude reviews. Models
+      do not cross roles within a story.
+    rationale: Each model plays to its strengths — Claude for spec interpretation
+      and quality judgment, Codex for raw implementation. Different models
+      reviewing each other's work also reduces confirmation bias.
+
+  - decision: Independently verify test results from the host after Codex
+      claims completion — do not trust Codex's self-reported test status.
+    rationale: Cross-model verification is the entire point. If we trust
+      Codex's claim that tests pass, we lose the bias-reduction benefit.
+
+  - decision: Parallel story execution with concurrent Claude+Codex pairs.
+    rationale: The sequential constraint is within a story (test → implement
+      → review). Between independent stories, each pair operates in its own
+      pane and episode directory with no shared state.
+
+  - decision: New workflow file (development.tdd-codex.workflow.yaml) alongside
+      existing TDD workflow, not a replacement.
+    rationale: The existing TDD workflow works for single-model execution.
+      Cross-model is an opt-in variant selected by methodology + agent_backends
+      config, not a forced migration.
+
+cross_cutting:
+  - concern: cost tracking
+    action: "Record backend used (claude vs codex) and pane lifetime in the
+      episode for each step. Do not build a dashboard — just ensure the raw
+      data lands for future telemetry stories."
+  - concern: security
+    action: "Codex approval policy follows the existing codex-invoke rules:
+      --full-auto in worktrees, --sandbox read-only outside. The fix loop
+      does not escalate permissions between iterations."
+
+risks:
+  - severity: medium
+    description: "Codex may not understand Hive's test conventions well enough
+      to implement correctly, leading to excessive fix loop iterations."
+    mitigation: "The research brief explicitly documents test infrastructure
+      and patterns. The adapter prefix + full persona provide context. Max
+      fix iterations (3) caps wasted effort. If Codex consistently struggles
+      with a project's conventions, the team can fall back to the standard
+      TDD workflow."
+
+  - severity: medium
+    description: "Persistent pane idle timeout (5 min) may fire during a slow
+      Claude review step, killing the Codex pane before the fix loop starts."
+    mitigation: "The idle timeout should only start AFTER the implement step
+      completes. During the review step, the pane is expected to be idle —
+      reset the timeout clock when a new prompt is sent. Document this in
+      the idle timeout logic."
+
+  - severity: low
+    description: "Concurrent Claude+Codex pairs for parallel stories may
+      exhaust cmux split pane space in the workspace."
+    mitigation: "cmux supports tabs (surfaces) within panes. Each pair gets
+      one split. For epics with >4 parallel stories, consider stacking tabs
+      instead of splits. This is a UX concern, not a correctness concern."
+
+references:
+  - path: hive/workflows/development.tdd.workflow.yaml
+    relevant_excerpt: "Existing TDD workflow: research → brief → test-spec →
+      implement → review → optimize → integrate. Cross-model variant replaces
+      implement/optimize with codex-backed steps and adds fix loop + shutdown."
+  - path: skills/hive/skills/codex-invoke/SKILL.md
+    relevant_excerpt: "Pre-flight, adapter prefix, approval policy mapping,
+      transcript capture. Extended with persistent pane mode for multi-turn."
+  - path: state/epics/external-model-integration/stories/codex-developer-poc.yaml
+    relevant_excerpt: "PoC story that established the codex-invoke skill,
+      adapter prefix, backend routing, and cmux pane spawn. This story builds
+      on that foundation."
