@@ -9,11 +9,22 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-04-17
+
+External model integration: cross-model execution with OpenAI Codex.
+
 ### Added
-- Per-agent spawn backend axis (`agent_backends` in `hive.config.yaml`) — PoC
-  routing of roster personas through OpenAI Codex in a side-by-side cmux pane
-  via the new `codex-invoke` skill. Default (unset) remains `claude` and uses
-  TeamCreate unchanged.
+- Per-agent spawn backend axis (`agent_backends` in `hive.config.yaml`) —
+  route roster personas through OpenAI Codex in side-by-side cmux panes
+  via the new `codex-invoke` skill. Default (unset) remains `claude`.
+- TDD cross-model workflow (`development.tdd-codex.workflow.yaml`) — Claude
+  writes tests, Codex implements in a persistent cmux pane, Claude reviews
+  with a fix loop on the same pane before shutdown.
+- Terminal multiplexer config (`execution.terminal_mux`) — tmux, cmux, or auto
+- Persistent pane mode for multi-turn Codex workflows with idle timeout safety net
+- Adapter prefix for persona reuse across models without forking
+- Supported Codex personas: backend-developer, reviewer, technical-writer,
+  architect, tpm
 
 ## [1.0.0] - 2026-04-09
 
@@ -157,7 +168,8 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/firefly-events/plugin-hive/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/firefly-events/plugin-hive/releases/tag/v1.0.0
 [0.9.0]: https://github.com/firefly-events/plugin-hive/releases/tag/v0.9.0
 [0.8.0]: https://github.com/firefly-events/plugin-hive/releases/tag/v0.8.0
