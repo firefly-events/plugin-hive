@@ -279,6 +279,10 @@ external_models:
 
 agent_backends:
   backend-developer: codex
+  # Planning agents — Codex produces artifacts, Claude agents gate them:
+  # technical-writer: codex    # skill-driven structured output; review gate catches issues
+  # architect: codex           # design artifacts gated by Claude TPM before stories
+  # tpm: codex                 # story YAMLs, sequencing; gated by collaborative review
 
 execution:
   terminal_mux: auto
@@ -304,6 +308,20 @@ Persistent pane lifecycle for TDD-Codex:
 - The Codex pane opens once before implementation
 - The same pane stays alive across implement and fix-loop prompts
 - The pane closes during workflow shutdown or after the idle timeout safety net triggers
+
+#### Cross-Model Planning
+
+Planning agents can also route through Codex. The key principle: **Codex produces artifacts, Claude agents gate them.** This reduces cost on artifact-heavy planning phases while maintaining quality through cross-model review.
+
+| Codex agent | Claude gate | What's checked |
+|-------------|-------------|----------------|
+| technical-writer | collaborative review | Formatting, completeness, Hive conventions |
+| architect | TPM | Feasibility, sequencing, risk, constraint adherence |
+| tpm | collaborative review / analyst | Story dependencies, acceptance criteria quality |
+
+Agents that **must stay on Claude**: orchestrator and team-lead (they invoke tools and manage the workflow). The analyst is recommended to stay on Claude for horizontal/vertical planning that feeds the architect.
+
+No new workflow is needed — the existing planning flow already has review gates between these agents. Just set `agent_backends` in config.
 
 ---
 

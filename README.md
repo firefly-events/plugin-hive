@@ -26,7 +26,7 @@ Everything else — research, implementation, test authoring, fix loops, code re
 ## Features
 
 - **Multi-agent teams** — 20 specialized personas (analyst, architect, developer, tester, reviewer, and more) coordinate through structured workflows
-- **Cross-model execution** — route selected agent personas to OpenAI Codex as an implementation backend while Claude continues orchestration and review
+- **Cross-model execution** — route implementation and planning agents to OpenAI Codex while Claude handles orchestration, review, and gating — reduces cost and model bias
 - **Structured planning** — decompose requirements into dependency-tracked stories with horizontal/vertical planning for medium and large features
 - **Test swarm** — 5-agent pipeline runs tests across platforms, files bugs, and routes fixes automatically
 - **Layered memory system** — agents accumulate cross-project knowledge in a compiled wiki with TTL-aware staleness tracking
