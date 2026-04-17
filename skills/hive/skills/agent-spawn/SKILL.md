@@ -125,13 +125,23 @@ Supported backends: `claude` | `codex`.
 If the resolved backend is `codex`:
 
 - Record the backend in the episode record (for future cost/bias telemetry).
+- Resolve `pane_mode` from the caller: `one-shot` (default) or `persistent`.
+  - `one-shot`: open pane, send prompt, capture output, close pane (standard).
+  - `persistent`: two sub-modes depending on whether `existing_surface_id` is
+    provided:
+    - **No surface_id (initial):** open pane, start codex interactive, return
+      `surface_id` to caller. Do NOT send the task prompt or close the pane.
+    - **Surface_id provided (follow-up):** send the prompt to the existing
+      pane, poll for completion, capture output. Do NOT close the pane.
 - Build the full prompt structure (steps 7.1 persona, 7.2 domain, 7.3 prior
-  knowledge, 7.4 skills, 7.5 task) exactly as described below — codex reuses
-  the same prompt content so the persona stays a single source of truth.
+  knowledge, 7.4 skills, 7.5 task) exactly as described below for one-shot
+  mode and persistent follow-up mode. Skip prompt building for persistent
+  initial mode because that call only opens the pane and returns `surface_id`.
 - Do NOT call Agent/TeamCreate. Delegate to the `codex-invoke` skill with
-  the built prompt and return its report. All subsequent steps in this
-  skill (7b respawn, 8 report) still apply — codex-invoke is the dispatch,
-  not a replacement for the surrounding procedure.
+  the built prompt, `pane_mode`, and optional `existing_surface_id`. Return
+  its report. All subsequent steps in this skill (7b respawn, 8 report)
+  still apply — codex-invoke is the dispatch, not a replacement for the
+  surrounding procedure.
 
 If the resolved backend is `claude`, proceed with the Agent/TeamCreate call
 below unchanged.
@@ -253,6 +263,8 @@ After spawning, report:
 - Domain restrictions communicated
 - Backend-specific info (codex only): surface id, transcript path, meta path,
   approval policy + source, thread id (or null)
+- Pane mode (codex only): one-shot | persistent. If persistent, surface_id is
+  returned for reuse by subsequent steps (implement, fix-loop, shutdown).
 
 ## Key Rules
 

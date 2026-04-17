@@ -145,3 +145,7 @@ execution:
   # cmux: spawn agents in cmux split panes via cmux CLI (requires cmux installed)
   # auto: detect cmux first, fall back to tmux
   terminal_mux: tmux
+  # Idle timeout for persistent codex panes (seconds). Safety net to prevent
+  # orphaned panes if the orchestrator dies. Clock resets on each new prompt.
+  # Only applies to pane_mode: persistent (TDD cross-model workflow).
+  idle_timeout_seconds: 300

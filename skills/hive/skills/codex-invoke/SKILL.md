@@ -10,7 +10,8 @@ the Hive persona verbatim (via the adapter prefix) — no forked personas.
 
 **Input:** `$ARGUMENTS` carries the already-constructed prompt (persona +
 domain + prior knowledge + skills + task) from agent-spawn, plus:
-`agent_name`, `story_id`, `step_id`, and optional `approval_override`.
+`agent_name`, `story_id`, `step_id`, optional `approval_override`, and
+optional `pane_mode` (`one-shot` | `persistent`, default: `one-shot`).
 
 ## When to Use
 
@@ -254,3 +255,113 @@ Return to the caller (agent-spawn):
 - Thread id parsing is loose regex — follow-up story migrates to codex
   JSON-RPC for reliable structured events
 - No multi-turn resume yet — thread id is captured for future use
+
+---
+
+## Persistent Pane Mode
+
+When `pane_mode: persistent` is passed, the skill operates differently to
+support multi-turn workflows (e.g., TDD cross-model: implement → fix loop).
+
+### Differences from one-shot mode
+
+| Aspect | one-shot (default) | persistent |
+|--------|-------------------|------------|
+| Pane lifecycle | Open → prompt → capture → close | Open → return surface_id. Caller sends prompts later. |
+| Close trigger | Step 7c (auto-close after capture) | Explicit `shutdown` step only |
+| Prompt delivery | Single prompt at open time | Multiple prompts over pane lifetime |
+| Safety net | None needed (pane closes immediately) | Idle timeout (execution.idle_timeout_seconds) |
+
+### Open-only mode (persistent, initial call)
+
+When `pane_mode: persistent` and no `existing_surface_id` is provided:
+
+1. Run pre-flight, approval, and open-pane steps as normal.
+2. Start codex in **interactive mode** (not `exec`):
+   ```
+   cmux send --surface <id> "codex"
+   cmux send-key --surface <id> enter
+   ```
+3. Verify launch (step 6).
+4. **Skip prompt building and skip steps 5 (build command), 7a (poll), 7b (capture), 7c (close).**
+5. Return the report with `surface_id` and `pane_mode: persistent`.
+   The caller is responsible for sending prompts and closing the pane.
+
+### Send-followup mode (persistent, subsequent calls)
+
+When `pane_mode: persistent` and `existing_surface_id` is provided:
+
+1. **Skip steps 1–4** (pre-flight already passed, pane already open).
+2. Write the new prompt to a temp file.
+3. Deliver to the existing pane:
+   ```
+   cmux send --surface <existing_surface_id> "cat <tempfile>"
+   cmux send-key --surface <existing_surface_id> enter
+   ```
+4. Clean up temp file.
+5. Poll `cmux read-screen --surface <id>` for completion (step 7a logic).
+6. Capture output to transcript (append, not overwrite — accumulate across
+   iterations).
+7. **Do NOT close the pane.**
+8. Return report with updated transcript path and iteration count.
+
+### Idle timeout (orphan prevention)
+
+Persistent panes must not linger forever if the orchestrator dies.
+
+Timeout value: `hive.config.yaml` → `execution.idle_timeout_seconds`
+(default: 300 = 5 minutes).
+
+**Episode record fields for idle timeout:**
+
+The meta.json for persistent panes includes:
+```json
+{
+  "pane_last_prompt_at": "2026-04-17T03:42:00Z",
+  "pane_last_completion_at": "2026-04-17T03:45:12Z",
+  "pane_idle_since": "2026-04-17T03:45:12Z",
+  "pane_idle_timeout_seconds": 300
+}
+```
+
+- `pane_last_prompt_at` — updated each time a prompt is sent to the pane
+- `pane_last_completion_at` — updated each time codex finishes (shell prompt
+  reappears after polling)
+- `pane_idle_since` — set to `pane_last_completion_at` after each completion;
+  cleared (set to null) when a new prompt is sent
+- `pane_idle_timeout_seconds` — copied from `hive.config.yaml` →
+  `execution.idle_timeout_seconds` at pane open time
+
+**How it works:**
+- The timeout clock starts when `pane_idle_since` is set (codex finishes a
+  prompt and the pane is waiting for the next one).
+- The clock resets when a new prompt is delivered (`pane_idle_since` → null,
+  `pane_last_prompt_at` updated).
+- The orchestrator checks the timeout at step boundaries by reading meta.json:
+  `now - pane_idle_since > pane_idle_timeout_seconds`
+- If the timeout has expired:
+  1. Capture scrollback to transcript: `cmux read-screen --surface <id> --scrollback`
+  2. Write a warning to the episode record: `"pane_closed_reason": "idle_timeout"`
+  3. Close the pane: `cmux close-surface --surface <id>`
+
+**Implementation note:** the idle timeout is enforced by the orchestrator
+or team lead checking meta.json at step boundaries — not by a background
+process inside the pane. If the orchestrator itself dies, the pane will
+linger until cmux is restarted or the user closes it manually — this is
+an acceptable PoC tradeoff.
+
+### Shutdown sequence (persistent pane close)
+
+The shutdown step is the authoritative close path for persistent panes:
+
+1. Send pre-shutdown capture prompt to the pane:
+   ```
+   cmux send --surface <id> "Summarize what you implemented, decisions you made, difficulties encountered, and patterns you would reuse. Output as markdown."
+   cmux send-key --surface <id> enter
+   ```
+2. Poll for response.
+3. Capture insights to: `state/episodes/{story_id}/codex/{agent}-insights.md`
+4. Capture full scrollback to transcript.
+5. Close the pane: `cmux close-surface --surface <id>`
+6. Write final meta.json with pane_lifetime_seconds, total_fix_iterations,
+   final_verdict.
