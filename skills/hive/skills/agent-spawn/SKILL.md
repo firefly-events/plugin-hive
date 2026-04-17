@@ -134,8 +134,9 @@ If the resolved backend is `codex`:
     - **Surface_id provided (follow-up):** send the prompt to the existing
       pane, poll for completion, capture output. Do NOT close the pane.
 - Build the full prompt structure (steps 7.1 persona, 7.2 domain, 7.3 prior
-  knowledge, 7.4 skills, 7.5 task) exactly as described below — codex reuses
-  the same prompt content so the persona stays a single source of truth.
+  knowledge, 7.4 skills, 7.5 task) exactly as described below for one-shot
+  mode and persistent follow-up mode. Skip prompt building for persistent
+  initial mode because that call only opens the pane and returns `surface_id`.
 - Do NOT call Agent/TeamCreate. Delegate to the `codex-invoke` skill with
   the built prompt, `pane_mode`, and optional `existing_surface_id`. Return
   its report. All subsequent steps in this skill (7b respawn, 8 report)

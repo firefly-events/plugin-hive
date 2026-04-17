@@ -103,15 +103,9 @@ steps:
     backend: claude
     task: >
       Open a persistent Codex pane for the implementation and fix loop steps.
-      Use codex-invoke in open-only mode (pane_mode: persistent):
-        1. Run pre-flight checks (codex, cmux, auth, platform).
-        2. Resolve approval policy (worktree → full-auto, else read-only).
-        3. Open pane: cmux new-split right, capture surface_id.
-        4. Start codex in interactive mode:
-           cmux send --surface <id> "codex"
-           cmux send-key --surface <id> enter
-        5. Verify launch via cmux read-screen (check for errors).
-        6. Record in episode: surface_id, approval_policy, pane_opened_at.
+      Use codex-invoke open-only mode with pane_mode: persistent, then record
+      the returned surface_id, approval_policy, and pane_opened_at in the
+      episode.
       Do NOT send any implementation prompt — that happens in the next step.
       Do NOT close this pane — it stays open until the shutdown step.
     depends_on:
@@ -129,7 +123,7 @@ steps:
     timeout_ms: 60000
 
   - id: implement
-    agent: developer
+    agent: backend-developer
     backend: codex
     pane_mode: persistent
     task: >
@@ -234,7 +228,7 @@ steps:
     timeout_ms: 300000
 
   - id: fix-loop
-    agent: developer
+    agent: backend-developer
     backend: codex
     pane_mode: persistent
     task: >
@@ -254,7 +248,7 @@ steps:
       - Max iterations reached → halt, escalate to orchestrator
 
       Each iteration records: iteration_number, findings_sent, test_results,
-      review_verdict in the episode.
+      and updated_review_verdict in the episode.
     depends_on:
       - review
     inputs:
@@ -280,6 +274,8 @@ steps:
     outputs:
       - name: fix_result
         type: string
+      - name: updated_review_verdict
+        type: string
     optional: true
     timeout_ms: 600000
     # fix-loop runs only when review_verdict is needs_optimization.
@@ -297,6 +293,7 @@ steps:
       the commit hash and files changed.
     depends_on:
       - review
+      - fix-loop
     inputs:
       - name: implementation
         source: step_output
@@ -306,6 +303,10 @@ steps:
         source: step_output
         step_id: review
         output_name: review_verdict
+      - name: updated_review_verdict
+        source: step_output
+        step_id: fix-loop
+        output_name: updated_review_verdict
       - name: story_spec
         source: context
         context_key: story_spec
@@ -314,8 +315,8 @@ steps:
         type: string
     optional: false
     timeout_ms: 600000
-    # integrate runs only when review passed (directly or after fix-loop)
-    condition: review_verdict == "passed"
+    # integrate runs when review passed directly or when fix-loop re-review passed
+    condition: review_verdict == "passed" || updated_review_verdict == "passed"
 
   - id: shutdown
     agent: orchestrator
@@ -336,10 +337,14 @@ steps:
       6. Write final meta.json: total_fix_iterations, final_verdict,
          pane_lifetime_seconds, backend: codex.
 
+      Shutdown runs on ALL terminal paths: direct pass, pass after fix-loop,
+      or fix-loop halt/exhaustion.
+
       If this step doesn't run (orchestrator crash), the idle timeout
       (execution.idle_timeout_seconds, default 300s) is the safety net.
     depends_on:
       - integrate
+      - fix-loop
     inputs:
       - name: codex_surface_id
         source: step_output

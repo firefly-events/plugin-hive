@@ -276,14 +276,14 @@ support multi-turn workflows (e.g., TDD cross-model: implement → fix loop).
 
 When `pane_mode: persistent` and no `existing_surface_id` is provided:
 
-1. Run steps 1–4 as normal (pre-flight, approval, build prompt, open pane).
+1. Run pre-flight, approval, and open-pane steps as normal.
 2. Start codex in **interactive mode** (not `exec`):
    ```
    cmux send --surface <id> "codex"
    cmux send-key --surface <id> enter
    ```
 3. Verify launch (step 6).
-4. **Skip steps 5 (build command), 7a (poll), 7b (capture), 7c (close).**
+4. **Skip prompt building and skip steps 5 (build command), 7a (poll), 7b (capture), 7c (close).**
 5. Return the report with `surface_id` and `pane_mode: persistent`.
    The caller is responsible for sending prompts and closing the pane.
 
@@ -295,7 +295,7 @@ When `pane_mode: persistent` and `existing_surface_id` is provided:
 2. Write the new prompt to a temp file.
 3. Deliver to the existing pane:
    ```
-   cmux send --surface <existing_surface_id> - < <tempfile>
+   cmux send --surface <existing_surface_id> "cat <tempfile>"
    cmux send-key --surface <existing_surface_id> enter
    ```
 4. Clean up temp file.
