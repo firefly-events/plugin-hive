@@ -26,6 +26,7 @@ Everything else — research, implementation, test authoring, fix loops, code re
 ## Features
 
 - **Multi-agent teams** — 20 specialized personas (analyst, architect, developer, tester, reviewer, and more) coordinate through structured workflows
+- **Cross-model execution** — route selected agent personas to OpenAI Codex as an implementation backend while Claude continues orchestration and review
 - **Structured planning** — decompose requirements into dependency-tracked stories with horizontal/vertical planning for medium and large features
 - **Test swarm** — 5-agent pipeline runs tests across platforms, files bugs, and routes fixes automatically
 - **Layered memory system** — agents accumulate cross-project knowledge in a compiled wiki with TTL-aware staleness tracking
@@ -163,7 +164,8 @@ For full operational detail, see [docs/operations-guide.md](docs/operations-guid
 | Integration | Purpose | Setup |
 |-------------|---------|-------|
 | **Frame0** | UI wireframe generation by the ui-designer agent | `frame0` CLI in PATH |
-| **Codex** | Adversarial second-model code review after Claude review | `npm install -g @openai/codex && codex login` |
+| **Codex** | Optional second-model review or full per-agent implementation backend via `agent_backends` | `npm install -g @openai/codex && codex login` |
+| **cmux** | Visible multi-agent split panes for Codex-backed execution paths | `brew install --cask cmux` |
 | **Linear** | Task tracking adapter — stories sync to Linear issues | Set `task_tracker: linear` in `hive/hive.config.yaml` |
 | **GitHub Issues** | Task tracking adapter | Set `task_tracker: github` in `hive/hive.config.yaml` |
 | **Jira** | Task tracking adapter | Set `task_tracker: jira` in `hive/hive.config.yaml` |

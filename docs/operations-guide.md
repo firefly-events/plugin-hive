@@ -250,6 +250,7 @@ Orchestrator (main session — you)
 |----------|------|-------------|
 | **Classic** | `workflows/development.classic.workflow.yaml` | preflight → research → write-brief → implement → test → review → (codex-review) → optimize → integrate |
 | **TDD** | `workflows/development.tdd.workflow.yaml` | research → write-brief → test-spec → implement → review → optimize → integrate |
+| **TDD-Codex** | `workflows/development.tdd-codex.workflow.yaml` | research → write-brief → test-spec → open-codex-pane → implement → review → fix-loop → integrate → shutdown |
 | **BDD** | `workflows/development.bdd.workflow.yaml` | research → write-brief → behavior-spec → implement → test → review → optimize → integrate |
 
 Select methodology at execution time:
@@ -268,16 +269,41 @@ Select methodology at execution time:
 
 ### Codex Integration (Optional)
 
-When enabled, a Codex adversarial review runs after the Claude review step — providing a second-model perspective.
+Codex can be used in two ways: as an adversarial review pass after Claude review, or as the execution backend for specific agent personas.
 
 Enable in `hive.config.yaml`:
 ```yaml
 external_models:
   codex:
     enabled: true
+
+agent_backends:
+  backend-developer: codex
+
+execution:
+  terminal_mux: auto
+  idle_timeout_seconds: 300
 ```
 
-Requires: `npm install -g @openai/codex && codex login`
+`agent_backends` controls per-agent backend selection. Unset agents stay on the default Claude path; configured agents can route through Codex instead of `TeamCreate`.
+
+`execution.terminal_mux` controls how visible panes are opened for agent execution:
+- `tmux` uses the standard tmux path
+- `cmux` requires cmux and opens Codex-backed agents in cmux panes
+- `auto` prefers cmux when available, otherwise falls back to tmux
+
+`execution.idle_timeout_seconds` sets the idle safety timeout for persistent Codex panes used by cross-model workflows.
+
+The cross-model TDD workflow is `workflows/development.tdd-codex.workflow.yaml`: Claude writes the failing tests, Codex implements in a persistent pane, Claude reviews, and if review fails the findings go back to the same Codex pane for the fix loop.
+
+For the Codex-backed path, install prerequisites:
+- `npm install -g @openai/codex && codex login`
+- `brew install --cask cmux`
+
+Persistent pane lifecycle for TDD-Codex:
+- The Codex pane opens once before implementation
+- The same pane stays alive across implement and fix-loop prompts
+- The pane closes during workflow shutdown or after the idle timeout safety net triggers
 
 ---
 
@@ -358,8 +384,9 @@ All settings live in `hive/hive.config.yaml`.
 | `model_overrides` | Per-agent model overrides for complex projects |
 | Circuit breakers | Timeouts, max retry limits |
 | External models | Codex adversarial review toggle |
+| `agent_backends` | Per-agent backend routing (`claude` or `codex`) |
 | Example codebases | User's own projects for agents to learn from |
-| Execution defaults | `parallel_teams`, methodology |
+| Execution defaults | `parallel_teams`, methodology, `terminal_mux`, `idle_timeout_seconds` |
 
 ### Task Tracking Modes
 

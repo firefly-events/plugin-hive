@@ -67,3 +67,11 @@ See `skills/hive/hive.config.yaml` for the full default template with comments.
 | `execution.default_methodology` | classic | Default workflow methodology |
 | `execution.parallel_teams` | false | Allow parallel dev teams (future) |
 | `execution.max_retry_attempts` | 2 | Default retry attempts for gate failures |
+| `execution.terminal_mux` | tmux | Terminal multiplexer for visible agent panes: `tmux`, `cmux`, or `auto` |
+| `execution.idle_timeout_seconds` | 300 | Idle timeout for persistent Codex panes used by cross-model workflows |
+
+### External Model Routing
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `agent_backends` | {} | Per-agent backend routing map; unset agents default to `claude`, supported backends are `claude` and `codex` |

@@ -22,6 +22,15 @@ Phase ordering:
 5. Optimize (developer) — apply review findings
 6. Integrate (developer) — commit
 
+### TDD-Codex (Cross-Model Test-Driven Development)
+Research → Test Spec → Open Codex Pane → Implement → Review → Fix Loop → Integrate → Shutdown
+
+Variant of TDD using a split-model path. Claude writes the failing tests and performs review; Codex handles implementation and follow-up fixes in a persistent cmux pane.
+
+Requirements:
+- `agent_backends` configured to route the implementation persona to `codex`
+- `cmux` installed for the visible persistent pane path
+
 ### BDD (Behavior-Driven Development)
 Research → Behavior Spec → Implement → Test → Review → Integrate
 
@@ -37,6 +46,7 @@ Adds an explicit design phase between research and implementation. The architect
 When the user specifies `--methodology tdd` (or similar), load the corresponding workflow YAML:
 - `workflows/development.classic.workflow.yaml`
 - `workflows/development.tdd.workflow.yaml`
+- `workflows/development.tdd-codex.workflow.yaml`
 - `workflows/development.bdd.workflow.yaml`
 
 If no methodology is specified, default to **classic**.
