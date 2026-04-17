@@ -111,7 +111,42 @@ For each skill in the agent's `skills` list:
 
 ### 7. Construct the spawn call
 
-Build the Agent or TeamCreate call with:
+#### 7.0 Resolve backend (model provider)
+
+Decide whether this spawn runs through Claude (default) or an external model.
+Resolution order, first match wins:
+
+1. Explicit `backend_override` passed in by the caller
+2. `agent_backends.{agent-name}` in `hive/hive.config.yaml`
+3. Default: `claude`
+
+Supported backends: `claude` | `codex`.
+
+If the resolved backend is `codex`:
+
+- Record the backend in the episode record (for future cost/bias telemetry).
+- Build the full prompt structure (steps 7.1 persona, 7.2 domain, 7.3 prior
+  knowledge, 7.4 skills, 7.5 task) exactly as described below — codex reuses
+  the same prompt content so the persona stays a single source of truth.
+- Do NOT call Agent/TeamCreate. Delegate to the `codex-invoke` skill with
+  the built prompt and return its report. All subsequent steps in this
+  skill (7b respawn, 8 report) still apply — codex-invoke is the dispatch,
+  not a replacement for the surrounding procedure.
+
+If the resolved backend is `claude`, proceed with the Agent/TeamCreate call
+below unchanged.
+
+#### 7.1 Resolve terminal multiplexer
+
+Read `hive.config.yaml` → `execution.terminal_mux`. Values:
+
+- `tmux` (default): use TeamCreate/Agent which spawns tmux panes natively
+- `cmux`: spawn the agent in a cmux split pane via the cmux CLI
+- `auto`: check `which cmux` first; if available, use cmux; otherwise tmux
+
+#### 7.2 Agent/TeamCreate call (claude backend, tmux path)
+
+When `terminal_mux` resolves to `tmux`, use the standard Agent/TeamCreate call:
 
 ```
 Agent(
@@ -122,7 +157,51 @@ Agent(
 )
 ```
 
-**Prompt structure:**
+#### 7.3 cmux pane spawn (claude backend, cmux path)
+
+When `terminal_mux` resolves to `cmux`, spawn the agent in a visible cmux
+split pane instead of using TeamCreate:
+
+1. **Pre-flight:** `which cmux` — if missing, fall back to tmux path with a
+   warning (not a hard-fail; cmux is a visibility preference, not a backend).
+
+2. **Open pane:** `cmux new-split right` in the current workspace.
+
+3. **Capture surface:** `cmux tree` before and after the split — diff to
+   identify the new surface ref (e.g., `surface:13`). Record `surface_id`.
+
+4. **Write prompt to temp file:** write the full prompt structure (persona +
+   domain + prior knowledge + skills + continuation context + task) to a
+   temp file via `mktemp`. This avoids shell-escaping issues with large
+   prompts sent via `cmux send`.
+
+5. **Launch claude in the pane:**
+   ```
+   cmux send --surface <id> "claude -p \"$(cat <tempfile>)\" --model <model>"
+   cmux send-key --surface <id> enter
+   ```
+   For interactive sessions (long tasks, multi-step workflows), use:
+   ```
+   cmux send --surface <id> "claude --model <model>"
+   cmux send-key --surface <id> enter
+   ```
+   Then after the session starts, deliver the prompt:
+   ```
+   cmux send --surface <id> "<prompt content>"
+   cmux send-key --surface <id> enter
+   ```
+
+6. **Clean up temp file** after delivery.
+
+7. **Record in episode:** surface_id, terminal_mux: cmux, pane direction.
+   The user can focus this pane anytime via `cmux focus-pane --pane <id>`.
+   Capture output later via `cmux read-screen --surface <id> --scrollback`.
+
+The cmux path produces the same prompt content as the tmux path — only the
+dispatch mechanism differs. Memory loading, skill injection, domain notes,
+and respawn continuation are all identical.
+
+**Prompt structure (shared by both paths):**
 1. **Persona** — the full agent markdown file (this is the system prompt)
 2. **Domain note** — "You may modify files matching: {allow patterns}. Do not modify files outside this domain."
 3. **Prior knowledge** — relevant memories from the agent's memory directory
@@ -155,12 +234,16 @@ If `respawn_summary_path` is NOT provided, skip this step entirely — behavior 
 
 After spawning, report:
 - Agent name and model tier used
+- Backend: claude (Agent/TeamCreate) | codex (cmux pane via codex-invoke)
+- Terminal mux: tmux (TeamCreate) | cmux (surface id: X)
 - Respawn: yes (iteration {N} of 3) | no (fresh spawn)
 - Required tools: available / missing (with fallback)
 - Memories loaded: count and names
 - Skills injected: count and names
 - Continuation context: loaded from {path} | none
 - Domain restrictions communicated
+- Backend-specific info (codex only): surface id, transcript path, meta path,
+  approval policy + source, thread id (or null)
 
 ## Key Rules
 

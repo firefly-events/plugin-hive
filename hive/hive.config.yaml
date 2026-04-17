@@ -102,6 +102,18 @@ external_models:
       - adversarial-review      # run after Claude review, before optimize/integrate
     # companion_path is auto-detected from the codex plugin if installed
 
+# Per-agent spawn backend (PoC — external-model-integration epic)
+# Lets the orchestrator route specific agent personas through an external
+# model instead of Claude. Unset agents default to `claude` (TeamCreate path).
+# Supported backends: claude | codex
+# - `codex` requires: external_models.codex.enabled: true, codex + cmux CLIs,
+#   codex login. macOS-only during PoC (cmux constraint). See
+#   skills/hive/skills/codex-invoke/SKILL.md for pre-flight details.
+agent_backends:
+  reviewer: codex                # run reviewer in a cmux pane via OpenAI Codex
+  # backend-developer: codex     # run backend-developer work in a cmux pane
+  #                              # via OpenAI Codex instead of Claude
+
 # Developer preferences (populated by Phase 2b-ii: Developer Discovery)
 # These configure how Hive adapts to the developer's working style.
 # All fields are optional — null means "not yet discovered".
@@ -119,7 +131,7 @@ meta_team:
 
 # Planning settings
 planning:
-  collaborative_review: true  # set to false to skip collaborative review gates
+  collaborative_review: true   # set to false to skip collaborative review gates
                               # gates run after design discussion, H/V plans, and structured outline
                               # disabling skips the team review cycle and presents docs directly
 
@@ -129,3 +141,8 @@ execution:
   default_methodology: classic
   parallel_teams: true
   max_retry_attempts: 2
+  # Terminal multiplexer for agent pane visibility
+  # tmux: use TeamCreate's built-in tmux pane spawning (default)
+  # cmux: spawn agents in cmux split panes via cmux CLI (requires cmux installed)
+  # auto: detect cmux first, fall back to tmux
+  terminal_mux: cmux

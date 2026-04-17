@@ -40,7 +40,7 @@ Rules:
 Agent teams are created via the `TeamCreate` tool with natural language prompts, not by writing JSON config files.
 
 **Tool hierarchy:**
-- **Orchestrator → stories:** `TeamCreate` spawns each story-level teammate in a separate tmux pane.
+- **Orchestrator → stories:** `TeamCreate` spawns each story-level teammate in a separate tmux pane. When `execution.terminal_mux` is set to `cmux` in `hive.config.yaml`, agent-spawn opens cmux split panes instead (via the cmux CLI) and launches `claude` directly — this gives the same agent visibility in a cmux workspace.
 - **Teammates → workflow steps:** Each teammate uses the `Agent` tool internally to spawn sub-workers (researcher, developer, tester) for individual workflow steps. These run inline within the teammate's pane — this is correct.
 
 The execute command describes the team structure and dependencies in prose:

@@ -9,6 +9,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+- Per-agent spawn backend axis (`agent_backends` in `hive.config.yaml`) — PoC
+  routing of roster personas through OpenAI Codex in a side-by-side cmux pane
+  via the new `codex-invoke` skill. Default (unset) remains `claude` and uses
+  TeamCreate unchanged.
+
 ## [1.0.0] - 2026-04-09
 
 First public OSS release under Apache 2.0.

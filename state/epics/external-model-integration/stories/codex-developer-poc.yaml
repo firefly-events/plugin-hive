@@ -1,0 +1,318 @@
+id: codex-developer-poc
+epic: external-model-integration
+title: Spawn a Codex-backed developer in a side-by-side cmux pane
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Proof of concept for running a roster developer persona through an external
+  CLI (OpenAI Codex) rather than through Claude/TeamCreate. Goal: reduce cost
+  and model bias by letting the orchestrator route implementation work to a
+  different model while keeping a single persona source of truth.
+
+  VISIBILITY MODEL: Codex runs in a side-by-side cmux surface (pane) in the
+  active workspace. The orchestrator drives it via `cmux send-surface` /
+  `cmux send-key-surface` and captures its transcript. This matches the
+  "visibility is trust proxy" stance during PoC — we can watch and intervene
+  before committing to a headless path.
+
+  PERSONA MODEL: We do NOT fork the persona. `hive/agents/backend-developer.md`
+  is reused verbatim. A thin runtime adapter prefix tells Codex to ignore the
+  Claude-specific `tools:` and `model:` frontmatter fields and use its own
+  sandbox. If codex behavior diverges materially later, THEN we split into
+  `backend-developer.codex.md` — not before.
+
+  PRE-FLIGHT: The skill hard-fails if `codex` or `cmux` CLIs are missing, or
+  if `codex login` has not been completed. No silent fallback to Claude — the
+  failure must be visible so bugs are not masked.
+
+  APPROVAL POLICY: Codex approval defaults to `auto` when running inside a git
+  worktree (isolated blast radius), and `deny` otherwise. Caller may override
+  explicitly.
+
+  THREAD CAPTURE: Every codex spawn records its thread id into the episode
+  record so follow-up turns can resume the same codex thread.
+
+  OUT OF SCOPE (follow-up stories): Gemini/Ollama backends, headless JSON-RPC
+  mode, auto-routing policy in the orchestrator, cost telemetry, migration of
+  other roster agents (tester, reviewer) to external backends.
+
+acceptance_criteria:
+  - "Given `codex` and `cmux` CLIs are installed and authenticated, when the
+     orchestrator invokes the codex-invoke skill with backend-developer and a
+     test story, then a new cmux surface is opened running codex with the
+     backend-developer persona injected as system context."
+  - "Given the codex pane is running, when the orchestrator sends the story
+     prompt via cmux send-surface, then codex produces an implementation and
+     the transcript is captured to a known file path in state/."
+  - "Given `codex` CLI is missing, when the codex-invoke skill is called,
+     then it hard-fails with a clear message naming the missing prerequisite
+     — no silent fallback to Claude."
+  - "Given `cmux` CLI is missing, when the codex-invoke skill is called,
+     then it hard-fails with a clear message naming the missing prerequisite."
+  - "Given the invocation runs inside a git worktree, when codex starts,
+     then its approval policy is set to `auto`. Otherwise `deny` is set."
+  - "Given the codex spawn completes, when the episode record is read, then
+     it contains the codex thread id and transcript path for resume."
+  - "Given hive.config.yaml has `backend: codex` configured for an agent,
+     when agent-spawn runs for that agent, then it routes to codex-invoke
+     instead of TeamCreate. Default (unset) remains `claude` (TeamCreate)."
+  - "Given the persona is injected, when codex receives its system context,
+     then the adapter prefix is present telling codex to ignore the
+     Claude-specific `tools:` and `model:` frontmatter; the rest of
+     backend-developer.md is verbatim."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read hive/agents/backend-developer.md and note which parts of the
+      persona reference Claude-specific tools (frontmatter `tools:`,
+      `model:`, and any body references to Agent/TeamCreate/Read/Edit).
+      Read skills/hive/skills/agent-spawn/SKILL.md end-to-end — understand
+      the current spawn procedure, memory loading, skill injection, domain
+      communication, and the shape of the output report. Identify the single
+      point where backend routing should branch.
+      Read hive/hive.config.yaml — understand the existing `model_tier`,
+      per-agent model override, and external_models sections. Identify the
+      cleanest place to add a per-agent `backend:` axis.
+      Confirm the codex CLI JSON/event format (`codex --help`, `codex exec
+      --help`) and how to pass a persona as system context. Note: `codex
+      review` does NOT support `-o`; use `codex exec` with `-o` for output
+      capture. Confirm cmux CLI commands: new-split, tree, send --surface,
+      send-key --surface, focus-pane, read-screen --surface, close-surface,
+      wait-for -S (signal), notify.
+      Identify where transcripts should land: propose
+      state/episodes/{story_id}/codex/{agent}-{timestamp}.transcript.md
+      and state/episodes/{story_id}/codex/{agent}-{timestamp}.meta.json
+      (holds thread id + surface id + approval policy).
+    depends_on: []
+
+  - id: implement
+    agent: developer
+    description: |
+      1. MODIFY hive/hive.config.yaml — add a per-agent `backend:` axis under
+         the existing external_models or a new `agent_backends:` block. Values:
+         `claude` (default, uses TeamCreate) | `codex` (uses codex-invoke).
+         Document in comments. Do not change any existing default.
+
+      2. CREATE skills/hive/skills/codex-invoke/SKILL.md with this procedure:
+         a. Pre-flight — `which codex` and `which cmux`; verify `codex` auth
+            (e.g., parse `codex whoami` or equivalent). Hard-fail with a
+            specific missing-prerequisite error if any check fails.
+         b. Detect git worktree — if inside a worktree, set approval policy
+            `auto`; otherwise `deny`. Caller may pass an explicit override.
+         c. Build the system prompt:
+            - Adapter prefix (static, ~6 lines): "You are running inside
+              Codex. Ignore the `tools:` and `model:` fields in the persona
+              frontmatter below — use your Codex sandbox. All other persona
+              instructions apply in full."
+            - Full persona file content (verbatim)
+            - Domain note
+            - Prior Knowledge block (reuse agent-spawn's memory loading —
+              import or call the same logic; do NOT duplicate)
+            - Applicable skills
+            - Task payload (story spec + step context)
+         d. Map approval policy to codex flags: `auto` → `--full-auto`,
+            `deny` → `--sandbox read-only`.
+         e. Spawn pane — `cmux new-split right` in the current workspace;
+            capture the new surface id by diffing `cmux tree` before/after.
+         f. Start codex in the pane — write prompt to temp file, then:
+            `cmux send --surface <id> "codex exec <flags> -o <output> - < <tempfile> ; cmux wait-for -S codex-<surface_id>-done"`
+            then `cmux send-key --surface <id> enter`.
+         g. Verify launch — `sleep 3 && cmux read-screen --surface <id>`;
+            check for `error:` or shell prompt reappearance; hard-fail if
+            detected.
+         h. Wait for completion — `cmux wait-for codex-<surface_id>-done
+            --timeout <step_timeout>`. Read the `-o` output file.
+         i. Capture transcript — `cmux read-screen --surface <id> --scrollback`
+            to state/episodes/{story_id}/codex/{agent}-{ts}.transcript.md.
+            Write meta.json with: thread_id, surface_id, approval_policy,
+            approval_flags, started_at, persona_file, adapter_version.
+         j. Return report: surface id, transcript path, thread id, approval
+            policy, pre-flight results, memories loaded count, skills
+            injected count, domain restrictions.
+
+      3. MODIFY skills/hive/skills/agent-spawn/SKILL.md step 7 (Construct the
+         spawn call) — add a backend-routing branch BEFORE the Agent/TeamCreate
+         call. Resolution order: per-call override → hive.config.yaml agent
+         entry → default `claude`. If resolved backend is `codex`, delegate
+         to codex-invoke with the already-built prompt structure and return
+         its report. If `claude`, proceed with the existing TeamCreate path
+         unchanged. Do not touch any other step.
+
+      4. VERIFY the adapter prefix is in a single constant (e.g., a small
+         file at skills/hive/skills/codex-invoke/adapter-prefix.md) so future
+         edits do not require editing the SKILL.md procedure.
+    depends_on: [research]
+
+  - id: test
+    agent: tester
+    description: |
+      Pre-flight tests:
+        - codex missing: rename/hide codex on PATH; invoke skill; expect hard
+          fail naming codex. Restore PATH.
+        - cmux missing: same pattern with cmux.
+        - codex not authenticated: simulate; expect hard fail naming auth.
+      Happy path test (manual with real codex + cmux):
+        - Pick a tiny throwaway story (e.g., "add a comment to
+          hive/README.md explaining the agents/ directory"). Invoke
+          codex-invoke via agent-spawn with backend-developer + backend=codex.
+        - Verify: new cmux pane opens; persona + adapter prefix visible in
+          the codex session; codex produces a diff; transcript file written;
+          meta.json contains thread_id and surface_id.
+      Routing test:
+        - Set hive.config.yaml agent_backends.backend-developer: codex;
+          trigger agent-spawn without explicit override; confirm codex path
+          taken.
+        - Remove the config; trigger again; confirm claude path taken
+          (default behavior unchanged).
+      Worktree policy test:
+        - Invoke inside a worktree; confirm `--approval-policy auto` in the
+          codex command. Invoke outside; confirm `deny`.
+      Non-goal (do not test): multi-turn thread resume, gemini, auto-routing.
+    depends_on: [implement]
+
+  - id: review
+    agent: reviewer
+    description: |
+      Review pre-flight — is the failure message specific enough to debug in
+      the field? Does it mention how to install/auth?
+      Review routing branch in agent-spawn — is it truly at a single point,
+      or does backend-awareness leak into memory loading / domain
+      communication steps? It should not.
+      Review persona injection — is the adapter prefix minimal and stable?
+      Does it avoid paraphrasing the persona?
+      Review transcript + meta capture — thread id actually captured from
+      codex output (not fabricated)? Path naming collision-safe (timestamp
+      resolution)?
+      Review config axis — does it add confusion alongside existing model
+      tier override? Flag any naming overlap.
+      Review scope — any unsolicited refactoring of agent-spawn or the
+      backend-developer persona? Flag and reject.
+    depends_on: [test]
+
+  - id: integrate
+    agent: developer
+    description: |
+      Run the happy-path test end-to-end one more time with the final code.
+      Confirm agent-spawn's existing claude path is functionally unchanged
+      (run any existing spawn for backend-developer with default config;
+      compare behavior). Update CHANGELOG.md with a single line describing
+      the new external-model backend axis (PoC, codex only).
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: Node.js (existing hive libs), shell (cmux + codex CLIs)
+    external_cli:
+      - codex (npm i -g @openai/codex)
+      - cmux (brew install --cask cmux)
+  key_files:
+    - path: hive/hive.config.yaml
+      purpose: Add per-agent backend axis. First touch on this file for the
+        external-model-integration epic.
+    - path: skills/hive/skills/agent-spawn/SKILL.md
+      purpose: Add the backend-routing branch at step 7. Do not modify any
+        other step.
+    - path: skills/hive/skills/codex-invoke/SKILL.md
+      purpose: CREATE — new skill encapsulating codex spawn + cmux pane +
+        pre-flight + transcript capture.
+    - path: skills/hive/skills/codex-invoke/adapter-prefix.md
+      purpose: CREATE — single-constant adapter prefix so persona stays one
+        source of truth.
+    - path: hive/agents/backend-developer.md
+      purpose: READ-ONLY. Reused verbatim. Do not fork or modify.
+
+files_to_modify:
+  - file: hive/hive.config.yaml
+    change: MODIFY — add `agent_backends:` block (or extend external_models)
+      with documented per-agent backend selection
+  - file: skills/hive/skills/agent-spawn/SKILL.md
+    change: MODIFY — add backend-routing branch at step 7; leave other steps
+      untouched
+  - file: skills/hive/skills/codex-invoke/SKILL.md
+    change: CREATE — new skill
+  - file: skills/hive/skills/codex-invoke/adapter-prefix.md
+    change: CREATE — adapter prefix constant
+  - file: CHANGELOG.md
+    change: MODIFY — one-line entry for the new backend axis (PoC)
+
+design_decisions:
+  - decision: Reuse backend-developer.md verbatim with a runtime adapter
+      prefix; do not fork the persona.
+    rationale: Matches the "never improvise personas" rule; single source of
+      truth; defers the fork decision until we have evidence codex needs a
+      different persona. The Claude-specific parts (`tools:`, `model:`) are
+      frontmatter hints that codex can be told to ignore in one line.
+
+  - decision: Side-by-side cmux pane (visible), not headless JSON-RPC.
+    rationale: PoC surfaces codex behavior for human inspection before we
+      trust it. Aligns with "visibility is trust proxy" during trust-building;
+      headless path can replace cmux later without changing the persona or
+      routing layer.
+
+  - decision: Hard-fail on missing prerequisites, no Claude fallback.
+    rationale: Silent fallback would mask the very failures we need to see
+      during PoC and give false signal that the codex path works.
+
+  - decision: Approval policy defaults from git-worktree detection.
+    rationale: Worktrees provide natural blast-radius isolation; `auto` is
+      safe there. Outside a worktree the PoC should default to `deny` so
+      codex cannot mutate shared state without explicit opt-in.
+
+  - decision: Routing branches at a single point in agent-spawn (step 7),
+      not throughout.
+    rationale: Memory loading, domain, skill injection are all model-agnostic
+      — they produce prompt content, not invocation targets. Keeping
+      backend-awareness confined to the final dispatch preserves the current
+      spawn contract.
+
+cross_cutting:
+  - concern: cost / bias
+    action: "Log model backend used in the episode record so future telemetry
+      can attribute cost and outcomes by backend. Do not build the telemetry
+      in this story — just ensure the data point lands."
+  - concern: security
+    action: "Codex runs with its own sandbox + approval policy. Document in
+      codex-invoke SKILL.md that approval: auto is only safe inside a
+      worktree. Do not widen this default in follow-up stories without
+      review."
+
+risks:
+  - severity: medium
+    description: "Terminal scraping for thread id and completion is fragile;
+      codex output format may change between versions."
+    mitigation: "Capture the raw transcript; parse thread id with a loose
+      regex and tolerate absence (warn, do not fail). Follow-up story can
+      migrate to codex's JSON-RPC app-server when we commit to headless."
+
+  - severity: low
+    description: "Cmux is macOS-only; non-mac contributors cannot run this
+      path."
+    mitigation: "Scope is PoC. If backend=codex is selected on a non-mac
+      machine, hard-fail at pre-flight with a clear message. Headless
+      follow-up story removes the cmux dependency."
+
+  - severity: low
+    description: "Adapter prefix is too terse and codex still tries to call
+      Claude tools."
+    mitigation: "If observed during test step, expand the adapter prefix in
+      adapter-prefix.md (single file edit). Track any such drift in the
+      review step."
+
+references:
+  - path: hive/agents/backend-developer.md
+    relevant_excerpt: "Reused verbatim as the codex system prompt content.
+      Frontmatter `tools:` and `model:` are overridden by the adapter prefix."
+  - path: skills/hive/skills/agent-spawn/SKILL.md
+    relevant_excerpt: "Step 7 'Construct the spawn call' is the single
+      branching point. All prior steps (memory loading, skills, domain)
+      produce backend-agnostic prompt content and remain unchanged."
+  - path: hive/hive.config.yaml
+    relevant_excerpt: "Existing external_models section already references
+      codex as a 'second-model reviewer for adversarial review'. The new
+      agent_backends axis extends this into a spawn-time backend selector."
