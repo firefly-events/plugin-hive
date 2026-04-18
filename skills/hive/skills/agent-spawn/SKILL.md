@@ -205,9 +205,9 @@ split pane instead of using TeamCreate:
    - Continuation context (respawn only)
    - Task — the story spec, step instructions, and inputs from prior steps
 
-   This split matters: with `--append-system-prompt`, the persona is injected
-   as a system instruction with full authority. With TeamCreate/Agent, the
-   `prompt` parameter handled this implicitly. In cmux panes, we must be
+   This split matters: with `--append-system-prompt-file`, the persona is
+   injected as a system instruction with full authority. With TeamCreate/Agent,
+   the `prompt` parameter handled this implicitly. In cmux panes, we must be
    explicit — persona-as-user-message loses authority and agents drift.
 
 5. **Build the allowed tools list:** read the agent's `tools` field from the
@@ -244,15 +244,17 @@ split pane instead of using TeamCreate:
    cmux send-key --surface <id> enter
    ```
    Wait for the session to initialize (poll `surface.read_text` for the claude
-   prompt indicator), then deliver the task:
+   prompt indicator), then deliver the task via a file-backed send to avoid
+   shell-escaping issues with quotes, backticks, and `$` content regardless
+   of prompt size:
    ```
-   cmux send --surface <id> "$(cat <task-tempfile>)"
+   cmux send --surface <id> --from-file <task-tempfile>
    cmux send-key --surface <id> enter
    ```
 
-   If the task prompt is large (>4KB), use a file-backed delivery instead of
-   inline `cmux send` to avoid shell-escaping issues with quotes, backticks,
-   and `$` content.
+   If the cmux version in use does not support `--from-file`, fall back to
+   `cmux send --surface <id> "$(cat <task-tempfile>)"` — but this is best-effort
+   and may mangle special characters.
 
    **Note:** cmux team execution (execute step 6b) requires `interactive_panes: true`.
    If the orchestrator detects `interactive_panes: false` with `terminal_mux: cmux`
@@ -295,7 +297,7 @@ split pane instead of using TeamCreate:
     marker, `surface.health` is the fallback detection.
 
 The cmux path splits the prompt differently from the tmux path: persona,
-domain, and memories go into `--append-system-prompt` (system-level authority),
+domain, and memories go into `--append-system-prompt-file` (system-level authority),
 while skills, continuation context, and the task go as the first user message.
 Memory loading, skill injection, and respawn continuation are identical in
 content — only the injection point differs.
