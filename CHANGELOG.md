@@ -9,6 +9,22 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-04-18
+
+cmux v2 API as native team execution backend.
+
+### Added
+- cmux team execution path (execute step 6b) — orchestrator manages parallel
+  stories in cmux panes via v2 JSON-RPC API instead of TeamCreate
+- `execution.interactive_panes` config toggle — controls whether cmux-spawned
+  agents (Claude and Codex) launch in interactive or one-shot mode
+- v2 API annotations in agent-spawn skill (surface.split, surface.send_text,
+  surface.read_text, surface.health, surface.close)
+- Completion marker convention (`[STORY-COMPLETE:{story-id}]`) for poll-based
+  story completion detection
+- Failure propagation for blocked dependents in cmux execution path
+- Mode-dependent steps 8/9 in agent-spawn (team vs standalone pane lifecycle)
+
 ## [1.1.0] - 2026-04-17
 
 External model integration: cross-model execution with OpenAI Codex.
