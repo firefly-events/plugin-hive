@@ -191,42 +191,85 @@ split pane instead of using TeamCreate:
    identify the new surface ref (e.g., `surface:13`). Record `surface_id`.
    (v2: `system.tree`)
 
-4. **Write prompt to temp file:** write the full prompt structure (persona +
-   domain + prior knowledge + skills + continuation context + task) to a
-   temp file via `mktemp`. This avoids shell-escaping issues with large
-   prompts sent via `cmux send`.
+4. **Prepare prompt files:** split the prompt into two temp files via `mktemp`:
 
-5. **Launch claude in the pane:** choose mode based on `execution.interactive_panes`:
+   **System prompt file** (`<persona-tempfile>`): contains the agent's identity
+   and constraints — everything that should be a system-level instruction:
+   - Persona — the full agent markdown file
+   - Domain note — "You may modify files matching: {allow patterns}."
+   - Prior knowledge — relevant memories
+
+   **Task prompt file** (`<task-tempfile>`): contains the work assignment —
+   everything that should be a user-level message:
+   - Applicable skills
+   - Continuation context (respawn only)
+   - Task — the story spec, step instructions, and inputs from prior steps
+
+   This split matters: with `--append-system-prompt-file`, the persona is
+   injected as a system instruction with full authority. With TeamCreate/Agent,
+   the `prompt` parameter handled this implicitly. In cmux panes, we must be
+   explicit — persona-as-user-message loses authority and agents drift.
+
+5. **Build the allowed tools list:** read the agent's `tools` field from the
+   persona frontmatter. Map each tool name to the `--allowedTools` format:
+   - Standard tools: `Bash`, `Edit`, `Read`, `Write`, `Grep`, `Glob`
+   - Tool patterns: `Bash(git *)`, `Bash(npm *)`, etc.
+   - If the persona has `domain.allow` patterns, include `Edit` and `Write`
+     scoped to those patterns where possible
+
+   Also resolve `--permission-mode`:
+   - If running in a worktree: `auto` (pre-approve safe operations)
+   - If running in the main tree: `default` (prompt for destructive ops)
+   - Caller can override via `permission_mode_override`
+
+6. **Launch claude in the pane:** choose mode based on `execution.interactive_panes`:
 
    **One-shot mode** (`interactive_panes: false`):
    ```
-   cmux send --surface <id> "claude -p - --model <model> < <tempfile>"
+   cmux send --surface <id> "claude -p --model <model> \
+     --append-system-prompt-file <persona-tempfile> \
+     --allowedTools '<tool-list>' \
+     --permission-mode <mode> \
+     - < <task-tempfile>"
    cmux send-key --surface <id> enter
    ```
    (`cmux send` v2: `surface.send_text`; `cmux send-key` v2: `surface.send_key`)
 
    **Interactive mode** (`interactive_panes: true`, default):
    ```
-   cmux send --surface <id> "claude --model <model>"
+   cmux send --surface <id> "claude --model <model> \
+     --append-system-prompt-file <persona-tempfile> \
+     --allowedTools '<tool-list>' \
+     --permission-mode <mode>"
    cmux send-key --surface <id> enter
    ```
-   Then after the session starts, deliver the prompt from the temp file using
-   a file-backed input path supported by the environment. Do not embed raw
-   prompt content in `cmux send`, because quotes, backticks, and `$` content
-   can be mangled in transit.
+   Wait for the session to initialize (poll `surface.read_text` for the claude
+   prompt indicator), then deliver the task via a file-backed send to avoid
+   shell-escaping issues with quotes, backticks, and `$` content regardless
+   of prompt size:
+   ```
+   cmux send --surface <id> --from-file <task-tempfile>
+   cmux send-key --surface <id> enter
+   ```
+
+   If the cmux version in use does not support `--from-file`, fall back to
+   `cmux send --surface <id> "$(cat <task-tempfile>)"` — but this is best-effort
+   and may mangle special characters.
 
    **Note:** cmux team execution (execute step 6b) requires `interactive_panes: true`.
    If the orchestrator detects `interactive_panes: false` with `terminal_mux: cmux`
    and parallel stories, it should warn and fall back to TeamCreate (tmux path).
 
-6. **Clean up temp file** after delivery.
+7. **Clean up temp files** after delivery. Remove both `<persona-tempfile>` and
+   `<task-tempfile>`.
 
-7. **Record in episode:** surface_id, terminal_mux: cmux, pane direction.
+8. **Record in episode:** surface_id, terminal_mux: cmux, pane direction,
+   permission_mode, allowed_tools list.
    The user can focus this pane anytime via `cmux focus-pane --pane <id>`
    (v2: `pane.focus`). Capture output later via
    `cmux read-screen --surface <id> --scrollback` (v2: `surface.read_text`).
 
-8. **Completion handling depends on caller mode:**
+9. **Completion handling depends on caller mode:**
    - **Team execution mode (execute step 6b):** return immediately after spawn
      with `surface_id`. Do not poll for completion and do not close the pane
      here — the orchestrator's poll loop owns completion detection and cleanup.
@@ -239,31 +282,52 @@ split pane instead of using TeamCreate:
      surface is no longer healthy, claude has exited unexpectedly. Capture
      scrollback and report failure.
 
-9. **Close policy depends on caller mode:**
-   - **Team execution mode:** orchestrator closes surfaces during global cleanup
-     (execute step 6b). Do not close here.
-   - **Standalone spawn mode:** close the pane after capturing output via
-     `cmux read-screen --scrollback`: `cmux close-surface --surface <id>`
-     (v2: `surface.close`). Skip if capture failed so the user can inspect
-     manually.
+10. **Close policy depends on caller mode:**
+    - **Team execution mode:** orchestrator closes surfaces during global cleanup
+      (execute step 6b). Do not close here.
+    - **Standalone spawn mode:** close the pane after capturing output via
+      `cmux read-screen --scrollback`: `cmux close-surface --surface <id>`
+      (v2: `surface.close`). Skip if capture failed so the user can inspect
+      manually.
 
-10. **Completion marker (team execution only):** when the agent's workflow
+11. **Completion marker (team execution only):** when the agent's workflow
     completes successfully, emit `[STORY-COMPLETE:{story-id}]` as the final
     output line. The orchestrator's poll loop watches for this marker via
     `surface.read_text`. If the agent crashes or times out without emitting the
     marker, `surface.health` is the fallback detection.
 
-The cmux path produces the same prompt content as the tmux path — only the
-dispatch mechanism differs. Memory loading, skill injection, domain notes,
-and respawn continuation are all identical.
+The cmux path splits the prompt differently from the tmux path: persona,
+domain, and memories go into `--append-system-prompt-file` (system-level authority),
+while skills, continuation context, and the task go as the first user message.
+Memory loading, skill injection, and respawn continuation are identical in
+content — only the injection point differs.
 
 **Prompt structure (shared by both paths):**
-1. **Persona** — the full agent markdown file (this is the system prompt)
-2. **Domain note** — "You may modify files matching: {allow patterns}. Do not modify files outside this domain."
+
+For the **tmux path** (TeamCreate/Agent), all six parts are concatenated into
+the single `prompt` parameter — the framework handles system-level injection:
+1. **Persona** — the full agent markdown file
+2. **Domain note** — "You may modify files matching: {allow patterns}."
 3. **Prior knowledge** — relevant memories from the agent's memory directory
 4. **Applicable skills** — skill content if any matched
-5. **Continuation Context** (respawn only) — if `respawn_summary_path` is provided, read the summary file and include it here. See step 7b below.
+5. **Continuation Context** (respawn only) — see step 7b below
 6. **Task** — the story spec, step instructions, and any inputs from prior steps
+
+For the **cmux path**, the same content is split across two injection points:
+
+*System prompt file* (via `--append-system-prompt-file`):
+1. **Persona** — the full agent markdown file
+2. **Domain note**
+3. **Prior knowledge**
+
+*Task prompt* (first user message):
+4. **Applicable skills**
+5. **Continuation Context** (respawn only)
+6. **Task**
+
+This split ensures the persona has system-level authority. Skills and task
+content work correctly as user messages since they're instructions to execute,
+not identity to embody.
 
 ### 7b. Handle respawn continuation (optional)
 
