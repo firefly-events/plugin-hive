@@ -145,7 +145,14 @@ execution:
   # cmux: spawn agents in cmux split panes via cmux CLI (requires cmux installed)
   # auto: detect cmux first, fall back to tmux
   terminal_mux: tmux
-  # Idle timeout for persistent codex panes (seconds). Safety net to prevent
+  # Interactive pane mode for cmux-spawned agents (both Claude and Codex).
+  # true: launch agents in interactive mode — visible conversation in the pane,
+  #   orchestrator can send follow-up messages, user can inspect/interact live.
+  #   Required for cmux team execution (step 6b). Recommended for development.
+  # false: launch agents in one-shot mode — agent receives prompt, runs, exits.
+  #   Lower visibility, no follow-up messaging. Suitable for CI or headless runs.
+  interactive_panes: true
+  # Idle timeout for persistent panes (seconds). Safety net to prevent
   # orphaned panes if the orchestrator dies. Clock resets on each new prompt.
-  # Only applies to pane_mode: persistent (TDD cross-model workflow).
+  # Applies to interactive_panes: true (both Claude and Codex backends).
   idle_timeout_seconds: 300
