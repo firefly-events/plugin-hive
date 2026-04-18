@@ -111,7 +111,52 @@ For each skill in the agent's `skills` list:
 
 ### 7. Construct the spawn call
 
-Build the Agent or TeamCreate call with:
+#### 7.0 Resolve backend (model provider)
+
+Decide whether this spawn runs through Claude (default) or an external model.
+Resolution order, first match wins:
+
+1. Explicit `backend_override` passed in by the caller
+2. `agent_backends.{agent-name}` in `hive/hive.config.yaml`
+3. Default: `claude`
+
+Supported backends: `claude` | `codex`.
+
+If the resolved backend is `codex`:
+
+- Record the backend in the episode record (for future cost/bias telemetry).
+- Resolve `pane_mode` from the caller: `one-shot` (default) or `persistent`.
+  - `one-shot`: open pane, send prompt, capture output, close pane (standard).
+  - `persistent`: two sub-modes depending on whether `existing_surface_id` is
+    provided:
+    - **No surface_id (initial):** open pane, start codex interactive, return
+      `surface_id` to caller. Do NOT send the task prompt or close the pane.
+    - **Surface_id provided (follow-up):** send the prompt to the existing
+      pane, poll for completion, capture output. Do NOT close the pane.
+- Build the full prompt structure (steps 7.1 persona, 7.2 domain, 7.3 prior
+  knowledge, 7.4 skills, 7.5 task) exactly as described below for one-shot
+  mode and persistent follow-up mode. Skip prompt building for persistent
+  initial mode because that call only opens the pane and returns `surface_id`.
+- Do NOT call Agent/TeamCreate. Delegate to the `codex-invoke` skill with
+  the built prompt, `pane_mode`, and optional `existing_surface_id`. Return
+  its report. All subsequent steps in this skill (7b respawn, 8 report)
+  still apply — codex-invoke is the dispatch, not a replacement for the
+  surrounding procedure.
+
+If the resolved backend is `claude`, proceed with the Agent/TeamCreate call
+below unchanged.
+
+#### 7.1 Resolve terminal multiplexer
+
+Read `hive.config.yaml` → `execution.terminal_mux`. Values:
+
+- `tmux` (default): use TeamCreate/Agent which spawns tmux panes natively
+- `cmux`: spawn the agent in a cmux split pane via the cmux CLI
+- `auto`: check `which cmux` first; if available, use cmux; otherwise tmux
+
+#### 7.2 Agent/TeamCreate call (claude backend, tmux path)
+
+When `terminal_mux` resolves to `tmux`, use the standard Agent/TeamCreate call:
 
 ```
 Agent(
@@ -122,7 +167,60 @@ Agent(
 )
 ```
 
-**Prompt structure:**
+#### 7.3 cmux pane spawn (claude backend, cmux path)
+
+When `terminal_mux` resolves to `cmux`, spawn the agent in a visible cmux
+split pane instead of using TeamCreate:
+
+1. **Pre-flight:** `which cmux` — if missing, fall back to tmux path with a
+   warning (not a hard-fail; cmux is a visibility preference, not a backend).
+
+2. **Open pane:** `cmux new-split right` in the current workspace.
+
+3. **Capture surface:** `cmux tree` before and after the split — diff to
+   identify the new surface ref (e.g., `surface:13`). Record `surface_id`.
+
+4. **Write prompt to temp file:** write the full prompt structure (persona +
+   domain + prior knowledge + skills + continuation context + task) to a
+   temp file via `mktemp`. This avoids shell-escaping issues with large
+   prompts sent via `cmux send`.
+
+5. **Launch claude in the pane:**
+   ```
+   cmux send --surface <id> "claude -p - --model <model> < <tempfile>"
+   cmux send-key --surface <id> enter
+   ```
+   For interactive sessions (long tasks, multi-step workflows), use:
+   ```
+   cmux send --surface <id> "claude --model <model>"
+   cmux send-key --surface <id> enter
+   ```
+   Then after the session starts, deliver the prompt from the temp file using
+   a file-backed input path supported by the environment. Do not embed raw
+   prompt content in `cmux send`, because quotes, backticks, and `$` content
+   can be mangled in transit.
+
+6. **Clean up temp file** after delivery.
+
+7. **Record in episode:** surface_id, terminal_mux: cmux, pane direction.
+   The user can focus this pane anytime via `cmux focus-pane --pane <id>`.
+   Capture output later via `cmux read-screen --surface <id> --scrollback`.
+
+8. **Block before proceeding to steps 7b/8:** poll `cmux read-screen --surface <id>`
+   every 10 seconds until the shell prompt (`$` or `%`) reappears on the last
+   line, which indicates `claude` exited. Use the step timeout from
+   `circuit_breakers` as the max polling duration; on timeout, capture
+   scrollback and hard-fail instead of continuing to cleanup/reporting early.
+
+9. **Close the pane** after capturing output via `cmux read-screen --scrollback`:
+   `cmux close-surface --surface <id>`. Skip if capture failed so the user
+   can inspect manually.
+
+The cmux path produces the same prompt content as the tmux path — only the
+dispatch mechanism differs. Memory loading, skill injection, domain notes,
+and respawn continuation are all identical.
+
+**Prompt structure (shared by both paths):**
 1. **Persona** — the full agent markdown file (this is the system prompt)
 2. **Domain note** — "You may modify files matching: {allow patterns}. Do not modify files outside this domain."
 3. **Prior knowledge** — relevant memories from the agent's memory directory
@@ -155,12 +253,18 @@ If `respawn_summary_path` is NOT provided, skip this step entirely — behavior 
 
 After spawning, report:
 - Agent name and model tier used
+- Backend: claude (Agent/TeamCreate) | codex (cmux pane via codex-invoke)
+- Terminal mux: tmux (TeamCreate) | cmux (surface id: X)
 - Respawn: yes (iteration {N} of 3) | no (fresh spawn)
 - Required tools: available / missing (with fallback)
 - Memories loaded: count and names
 - Skills injected: count and names
 - Continuation context: loaded from {path} | none
 - Domain restrictions communicated
+- Backend-specific info (codex only): surface id, transcript path, meta path,
+  approval policy + source, thread id (or null)
+- Pane mode (codex only): one-shot | persistent. If persistent, surface_id is
+  returned for reuse by subsequent steps (implement, fix-loop, shutdown).
 
 ## Key Rules
 
