@@ -215,18 +215,26 @@ split pane instead of using TeamCreate:
    (v2: `pane.focus`). Capture output later via
    `cmux read-screen --surface <id> --scrollback` (v2: `surface.read_text`).
 
-8. **Block before proceeding to steps 7b/8:** poll `cmux read-screen --surface <id>`
-   every 10 seconds until the shell prompt (`$` or `%`) reappears on the last
-   line, which indicates `claude` exited. Use the step timeout from
-   `circuit_breakers` as the max polling duration; on timeout, capture
-   scrollback and hard-fail instead of continuing to cleanup/reporting early.
-   Also check `surface.health` (v2: `surface.health`) periodically — if the
-   surface is no longer healthy, claude has exited unexpectedly. Capture
-   scrollback and report failure.
+8. **Completion handling depends on caller mode:**
+   - **Team execution mode (execute step 6b):** return immediately after spawn
+     with `surface_id`. Do not poll for completion and do not close the pane
+     here — the orchestrator's poll loop owns completion detection and cleanup.
+   - **Standalone spawn mode:** poll `cmux read-screen --surface <id>`
+     (v2: `surface.read_text`) every 10 seconds until the shell prompt (`$` or
+     `%`) reappears on the last line, which indicates `claude` exited. Use the
+     step timeout from `circuit_breakers` as the max polling duration; on
+     timeout, capture scrollback and hard-fail instead of continuing to
+     cleanup/reporting early. Also check `surface.health` periodically — if the
+     surface is no longer healthy, claude has exited unexpectedly. Capture
+     scrollback and report failure.
 
-9. **Close the pane** after capturing output via `cmux read-screen --scrollback`:
-   `cmux close-surface --surface <id>` (v2: `surface.close`). Skip if capture
-   failed so the user can inspect manually.
+9. **Close policy depends on caller mode:**
+   - **Team execution mode:** orchestrator closes surfaces during global cleanup
+     (execute step 6b). Do not close here.
+   - **Standalone spawn mode:** close the pane after capturing output via
+     `cmux read-screen --scrollback`: `cmux close-surface --surface <id>`
+     (v2: `surface.close`). Skip if capture failed so the user can inspect
+     manually.
 
 10. **Completion marker (team execution only):** when the agent's workflow
     completes successfully, emit `[STORY-COMPLETE:{story-id}]` as the final

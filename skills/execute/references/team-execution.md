@@ -84,8 +84,10 @@ Poll loop (replaces TeamCreate's internal monitoring):
 ```
 Every 10 seconds:
   for each active surface:
-    cmux read-screen --surface <id> --lines 20
-    - If output contains [STORY-COMPLETE:{id}]: mark complete, check dependents
+    cmux read-screen --surface <id> --scrollback
+    - Search output for [STORY-COMPLETE:{story-id}]
+    - Persist last-read line count per surface to avoid reprocessing
+    - If marker found: mark complete, check dependents
     - If surface.health fails: mark failed, capture scrollback, log error
 ```
 

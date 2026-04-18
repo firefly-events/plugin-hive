@@ -136,6 +136,7 @@ If all checks pass, proceed normally.
      - Call `cmux read-screen --surface <id>` and look for `[STORY-COMPLETE:{story-id}]`
      - Call `surface.health` to confirm the pane is still live
    - When a story completes: mark it done, then scan blocked stories and spawn any whose `depends_on` set is now fully satisfied.
+   - When a story fails: mark `failed`, propagate failure to all transitive dependents (they cannot run), and continue executing remaining independent stories. Terminate the epic with a failure summary once no runnable stories remain.
    - Use `cmux send --surface <id>` to deliver respawn prompts or sidecar injection messages to active panes.
    - When all stories complete: close every tracked surface via `cmux close-surface`, then produce the epic summary.
    - Follow **`references/team-execution.md`** for the cmux variant details.

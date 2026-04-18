@@ -96,7 +96,7 @@ Differences from TeamCreate:
 | Dispatch | Single TeamCreate call | Orchestrator loops, spawns per story |
 | Dependency mgmt | Framework-managed | Orchestrator-managed (poll + spawn) |
 | Messaging | SendMessage(to: name) | surface.send_text to surface_id |
-| Completion | Task result returned | [STORY-COMPLETE] marker + surface.health |
+| Completion | Task result returned | [STORY-COMPLETE:{story-id}] marker + surface.health |
 | Pane type | tmux | cmux |
 
 When to prefer cmux: the user is already working in cmux, wants direct pane interaction, or wants to inspect and message agents mid-execution.
