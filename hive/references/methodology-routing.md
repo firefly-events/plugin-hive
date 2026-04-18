@@ -37,7 +37,6 @@ Adds an explicit design phase between research and implementation. The architect
 When the user specifies `--methodology tdd` (or similar), load the corresponding workflow YAML:
 - `workflows/development.classic.workflow.yaml`
 - `workflows/development.tdd.workflow.yaml`
-- `workflows/development.tdd-codex.workflow.yaml` — TDD cross-model variant (Claude tests + Codex implements)
 - `workflows/development.bdd.workflow.yaml`
 
 If no methodology is specified, default to **classic**.
