@@ -176,9 +176,11 @@ split pane instead of using TeamCreate:
    warning (not a hard-fail; cmux is a visibility preference, not a backend).
 
 2. **Open pane:** `cmux new-split right` in the current workspace.
+   (v2: `surface.split`)
 
 3. **Capture surface:** `cmux tree` before and after the split — diff to
    identify the new surface ref (e.g., `surface:13`). Record `surface_id`.
+   (v2: `system.tree`)
 
 4. **Write prompt to temp file:** write the full prompt structure (persona +
    domain + prior knowledge + skills + continuation context + task) to a
@@ -190,6 +192,7 @@ split pane instead of using TeamCreate:
    cmux send --surface <id> "claude -p - --model <model> < <tempfile>"
    cmux send-key --surface <id> enter
    ```
+   (`cmux send` v2: `surface.send_text`; `cmux send-key` v2: `surface.send_key`)
    For interactive sessions (long tasks, multi-step workflows), use:
    ```
    cmux send --surface <id> "claude --model <model>"
@@ -200,21 +203,36 @@ split pane instead of using TeamCreate:
    prompt content in `cmux send`, because quotes, backticks, and `$` content
    can be mangled in transit.
 
+   **Team execution note:** When spawned as part of cmux team execution
+   (execute skill step 6b), Claude MUST be launched in interactive mode so the
+   orchestrator can send follow-up messages via `surface.send_text`. One-shot
+   mode (`-p`) exits after the first prompt.
+
 6. **Clean up temp file** after delivery.
 
 7. **Record in episode:** surface_id, terminal_mux: cmux, pane direction.
-   The user can focus this pane anytime via `cmux focus-pane --pane <id>`.
-   Capture output later via `cmux read-screen --surface <id> --scrollback`.
+   The user can focus this pane anytime via `cmux focus-pane --pane <id>`
+   (v2: `pane.focus`). Capture output later via
+   `cmux read-screen --surface <id> --scrollback` (v2: `surface.read_text`).
 
 8. **Block before proceeding to steps 7b/8:** poll `cmux read-screen --surface <id>`
    every 10 seconds until the shell prompt (`$` or `%`) reappears on the last
    line, which indicates `claude` exited. Use the step timeout from
    `circuit_breakers` as the max polling duration; on timeout, capture
    scrollback and hard-fail instead of continuing to cleanup/reporting early.
+   Also check `surface.health` (v2: `surface.health`) periodically — if the
+   surface is no longer healthy, claude has exited unexpectedly. Capture
+   scrollback and report failure.
 
 9. **Close the pane** after capturing output via `cmux read-screen --scrollback`:
-   `cmux close-surface --surface <id>`. Skip if capture failed so the user
-   can inspect manually.
+   `cmux close-surface --surface <id>` (v2: `surface.close`). Skip if capture
+   failed so the user can inspect manually.
+
+10. **Completion marker (team execution only):** when the agent's workflow
+    completes successfully, emit `[STORY-COMPLETE:{story-id}]` as the final
+    output line. The orchestrator's poll loop watches for this marker via
+    `surface.read_text`. If the agent crashes or times out without emitting the
+    marker, `surface.health` is the fallback detection.
 
 The cmux path produces the same prompt content as the tmux path — only the
 dispatch mechanism differs. Memory loading, skill injection, domain notes,

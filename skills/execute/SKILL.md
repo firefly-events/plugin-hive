@@ -41,7 +41,7 @@ If all checks pass, proceed normally.
 
 | Scope | Tool | Why |
 |---|---|---|
-| **Parallelizing stories across the epic** | `TeamCreate` | Stories run in separate tmux panes for visibility and independence |
+| **Parallelizing stories across the epic** | `TeamCreate` or cmux panes | Stories run in separate tmux panes via `TeamCreate`, or separate cmux panes when `execution.terminal_mux: cmux` |
 | **Sequential workflow steps within a single story** | `Agent` | Steps within a teammate's pane run inline — this is correct |
 | **Specialist phase teams (pre-exec, post-exec)** | `TeamCreate` | Specialist teams are independent coordination units |
 
@@ -120,10 +120,25 @@ If all checks pass, proceed normally.
    3. Check: Does the topological sort reveal multiple stories at the same depth (independent stories that can run concurrently)?
    4. Check: Is `--sequential` flag NOT present in arguments?
 
-   If all four: use **agent team execution** (step 6).
+   If all four: use **agent team execution**. If `execution.terminal_mux` resolves to `cmux`, use step 6b. Otherwise use step 6.
    Otherwise: use **sequential execution** (step 7).
 
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
+
+6b. **Agent team execution (cmux path).** Use this path when all four step-5 conditions are true and `execution.terminal_mux` resolves to `cmux`.
+
+   - Spawn each unblocked story via the agent-spawn skill. Section 7.3 of that skill handles the cmux pane lifecycle and prompt delivery.
+   - Track active work in a map:
+     ```
+     {story_id -> surface_id, status, depends_on}
+     ```
+   - Run a poll loop every 10 seconds. For each active surface:
+     - Call `cmux read-screen --surface <id>` and look for `[STORY-COMPLETE:{story-id}]`
+     - Call `surface.health` to confirm the pane is still live
+   - When a story completes: mark it done, then scan blocked stories and spawn any whose `depends_on` set is now fully satisfied.
+   - Use `cmux send --surface <id>` to deliver respawn prompts or sidecar injection messages to active panes.
+   - When all stories complete: close every tracked surface via `cmux close-surface`, then produce the epic summary.
+   - Follow **`references/team-execution.md`** for the cmux variant details.
 
 7. **Sequential execution.** Follow **`references/sequential-execution.md`** for the step-by-step workflow within each story, sidecar injection at the review step, episode records, gate checks, and respawn monitoring.
 
