@@ -146,13 +146,22 @@ If the resolved backend is `codex`:
 If the resolved backend is `claude`, proceed with the Agent/TeamCreate call
 below unchanged.
 
-#### 7.1 Resolve terminal multiplexer
+#### 7.1 Resolve terminal multiplexer and pane mode
 
 Read `hive.config.yaml` → `execution.terminal_mux`. Values:
 
 - `tmux` (default): use TeamCreate/Agent which spawns tmux panes natively
 - `cmux`: spawn the agent in a cmux split pane via the cmux CLI
 - `auto`: check `which cmux` first; if available, use cmux; otherwise tmux
+
+Also read `execution.interactive_panes` (default: `true`). This controls
+whether cmux-spawned agents (both Claude and Codex backends) launch in
+interactive mode or one-shot mode:
+
+- `true`: launch in interactive mode. The agent stays alive for follow-up
+  messages from the orchestrator. Required for cmux team execution (step 6b).
+- `false`: launch in one-shot mode (`claude -p` / `codex exec`). Agent
+  receives one prompt, runs, exits. No follow-up messaging possible.
 
 #### 7.2 Agent/TeamCreate call (claude backend, tmux path)
 
@@ -187,13 +196,16 @@ split pane instead of using TeamCreate:
    temp file via `mktemp`. This avoids shell-escaping issues with large
    prompts sent via `cmux send`.
 
-5. **Launch claude in the pane:**
+5. **Launch claude in the pane:** choose mode based on `execution.interactive_panes`:
+
+   **One-shot mode** (`interactive_panes: false`):
    ```
    cmux send --surface <id> "claude -p - --model <model> < <tempfile>"
    cmux send-key --surface <id> enter
    ```
    (`cmux send` v2: `surface.send_text`; `cmux send-key` v2: `surface.send_key`)
-   For interactive sessions (long tasks, multi-step workflows), use:
+
+   **Interactive mode** (`interactive_panes: true`, default):
    ```
    cmux send --surface <id> "claude --model <model>"
    cmux send-key --surface <id> enter
@@ -203,10 +215,9 @@ split pane instead of using TeamCreate:
    prompt content in `cmux send`, because quotes, backticks, and `$` content
    can be mangled in transit.
 
-   **Team execution note:** When spawned as part of cmux team execution
-   (execute skill step 6b), Claude MUST be launched in interactive mode so the
-   orchestrator can send follow-up messages via `surface.send_text`. One-shot
-   mode (`-p`) exits after the first prompt.
+   **Note:** cmux team execution (execute step 6b) requires `interactive_panes: true`.
+   If the orchestrator detects `interactive_panes: false` with `terminal_mux: cmux`
+   and parallel stories, it should warn and fall back to TeamCreate (tmux path).
 
 6. **Clean up temp file** after delivery.
 

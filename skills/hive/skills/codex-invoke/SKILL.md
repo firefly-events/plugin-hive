@@ -106,8 +106,9 @@ Codex CLI reference (v0.118+):
 - `deny` (no worktree / default): `--sandbox read-only`
 - Caller override is passed through directly
 
-**Command pattern — send the codex command directly:**
+**Command pattern — choose mode based on `execution.interactive_panes`:**
 
+**One-shot mode** (`interactive_panes: false`, or `pane_mode: one-shot`):
 ```
 cmux send --surface <id> "codex exec <approval_flags> -o <output_path> -C <workdir> - < <tempfile>"
 cmux send-key --surface <id> enter
@@ -119,6 +120,16 @@ from stdin:
 cmux send --surface <id> "codex exec <approval_flags> -o <output_path> - < <tempfile>"
 cmux send-key --surface <id> enter
 ```
+
+**Interactive mode** (`interactive_panes: true`, or `pane_mode: persistent`):
+```
+cmux send --surface <id> "codex"
+cmux send-key --surface <id> enter
+```
+Then deliver prompts via temp file after the session starts. The pane stays
+alive for follow-up prompts (fix loops, review feedback). This is the same
+behavior as the existing persistent pane mode — `interactive_panes: true`
+makes it the default for all Codex spawns, not just TDD cross-model workflows.
 
 ### 6. Verify launch (failure detection)
 
