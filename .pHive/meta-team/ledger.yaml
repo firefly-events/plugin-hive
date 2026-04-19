@@ -66,7 +66,7 @@
     - skills/hive/agents/memories/test-sentinel/: 1 second memory (regression block report format)
     - hive/agents/tester.md: added 6-rule Scope Discipline section with time budgets
     - hive/agents/technical-writer.md: added 5-rule Scope Discipline section with time budgets
-    - state/meta-team/queue.yaml: marked all 3 queued targets (001/002/003) as completed
+    - .pHive/meta-team/queue.yaml: marked all 3 queued targets (001/002/003) as completed
   commit: TBD
   notes: >
     Third cycle. Completed memory coverage for all previously-zero-memory agents in the roster:

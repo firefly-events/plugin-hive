@@ -25,17 +25,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   and offers in-place migration (or opt-in to keep using `state/`).
 
 ### Migration
-Existing projects with a `state/` directory have three options:
+Existing projects with a `state/` directory should migrate. Two supported paths:
 
 1. **Auto-migrate** (recommended): re-run `/hive:kickoff`, choose `yes` at
    the migration prompt.
 2. **Manual migrate**: `bash scripts/migrate-state-to-pHive.sh` from your
    project root.
-3. **Keep state/**: add to your `hive.config.yaml`:
-   ```yaml
-   paths:
-     state_dir: state
-   ```
+
+> **Note:** `paths.state_dir` is documented in the config schema but not yet
+> wired into runtime path resolution in every skill. If you cannot migrate
+> immediately, a symlink (`ln -s state .pHive`) is a safe stopgap. Full
+> config-driven path resolution is tracked as follow-up work.
 
 ## [1.1.1] - 2026-04-18
 

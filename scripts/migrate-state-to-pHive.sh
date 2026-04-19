@@ -51,15 +51,17 @@ else
   run "mv state .pHive"
 fi
 
-# Update .gitignore if present
-if [[ -f .gitignore ]] && grep -q 'state/' .gitignore; then
-  echo "Updating .gitignore patterns (state/ -> .pHive/)"
+# Update .gitignore if present.
+# IMPORTANT: only rewrite anchored Hive-state patterns (^state/, ^!state/) so
+# we don't mangle unrelated entries like `test/state/**` or example-project paths.
+# We deliberately do NOT touch any line that contains state/ in the middle.
+if [[ -f .gitignore ]] && grep -qE '^!?state/' .gitignore; then
+  echo "Updating .gitignore patterns (anchored ^state/ and ^!state/ only)"
   if [[ "$DRY" == "1" ]]; then
-    echo "[dry-run] sed -i.bak 's|state/|.pHive/|g' .gitignore"
+    echo "[dry-run] sed -E 's|^(!?)state/|\\1.pHive/|' .gitignore"
   else
-    # macOS / BSD sed needs -i ''; GNU sed accepts -i. Use a portable temp file.
     cp .gitignore .gitignore.bak
-    sed 's|state/|.pHive/|g' .gitignore.bak > .gitignore
+    sed -E 's|^(!?)state/|\1.pHive/|' .gitignore.bak > .gitignore
     rm .gitignore.bak
   fi
 fi

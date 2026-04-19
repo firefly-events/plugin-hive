@@ -29,8 +29,8 @@ Self-optimize the Hive plugin. Find real gaps, fix them, document what changed, 
 | `hive/workflows/` | Create new workflow YAMLs and step files |
 | `skills/hive/agents/memories/` | Create new starter memory files; update existing ones |
 | `skills/` (skill SKILL.md files) | Add new sections; extend procedures |
-| `state/meta-team/` | Write cycle-state.yaml and ledger.yaml |
-| `state/teams/` | Create or update team config YAMLs |
+| `.pHive/meta-team/` | Write cycle-state.yaml and ledger.yaml |
+| `.pHive/teams/` | Create or update team config YAMLs |
 
 ---
 
@@ -47,14 +47,14 @@ Self-optimize the Hive plugin. Find real gaps, fix them, document what changed, 
 
 ## Out of Scope
 
-- Changes to user project `state/` directories (epics, episodes, cycle-state)
+- Changes to user project `.pHive/` directories (epics, episodes, cycle-state)
 - Modifying `.claude-plugin/plugin.json` or `marketplace.json`
 - Pushing to remote
 - Creating or modifying Linear/GitHub integrations (unless `github_forwarding` is enabled — see below)
 
 ## GitHub Issue Forwarding (Opt-In)
 
-By default, the meta-team only optimizes locally — findings stay in `state/meta-team/` and the morning summary. Plugin-level issues that fall outside the meta-team's charter scope are logged as skipped findings.
+By default, the meta-team only optimizes locally — findings stay in `.pHive/meta-team/` and the morning summary. Plugin-level issues that fall outside the meta-team's charter scope are logged as skipped findings.
 
 When `hive.config.yaml → meta_team.github_forwarding: true`, the meta-team may file GitHub issues for findings that:
 1. Are **out of charter scope** but represent genuine plugin-level bugs or gaps
@@ -85,7 +85,7 @@ A change is blocked when:
 ## Output Artifacts
 
 After every cycle, the meta-team writes:
-- `state/meta-team/cycle-state.yaml` — cycle ID, phases completed, changes made, issues found
-- `state/meta-team/ledger.yaml` — running record of all cycles with outcome summaries
+- `.pHive/meta-team/cycle-state.yaml` — cycle ID, phases completed, changes made, issues found
+- `.pHive/meta-team/ledger.yaml` — running record of all cycles with outcome summaries
 
 The morning summary (per `hive/references/meta-team-ux.md`) is surfaced via `/hive:status`.

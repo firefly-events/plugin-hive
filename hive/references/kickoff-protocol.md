@@ -11,13 +11,17 @@ from Hive v1.1.x or earlier:
 
 1. If both `state/` and `.pHive/` exist → warn the user, do not auto-migrate.
    They likely have a half-finished migration. Tell them to resolve manually.
-2. If only `state/` exists (no `.pHive/`) → offer to migrate:
-   - Show: "Found legacy state/ directory. Hive v1.2+ uses .pHive/ by default.
-     Migrate now? (yes/no/keep-state)"
+2. If only `state/` exists (no `.pHive/`) → strongly recommend migration:
+   - Show: "Found legacy state/ directory. Hive v1.2+ uses .pHive/ by default,
+     and all shipped skills/workflows now reference `.pHive/` directly.
+     Migrate now? (yes/no)"
    - **yes**: run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/migrate-state-to-pHive.sh`
-   - **no**: skip and continue (next kickoff run will ask again)
-   - **keep-state**: write `paths.state_dir: state` to `hive.config.yaml`,
-     so the user keeps their existing directory permanently
+   - **no**: skip and continue. **Important caveat:** `paths.state_dir` in
+     `hive.config.yaml` is not yet honored by all skills, so keeping `state/`
+     without migrating will cause skills that hardcode `.pHive/` paths to
+     write to a new empty directory. Tell the user this explicitly, and
+     suggest a symlink (`ln -s state .pHive`) as a stopgap if they cannot
+     migrate right now. Next kickoff run will ask again.
 3. If only `.pHive/` exists or neither → no action needed.
 
 This step is idempotent — safe to re-run on any project.

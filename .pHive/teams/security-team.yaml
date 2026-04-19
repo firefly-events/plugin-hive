@@ -19,4 +19,4 @@ context:
     Workflow: hive/workflows/security-audit.workflow.yaml
 
 workflow: hive/workflows/security-audit.workflow.yaml
-team_memory_path: state/team-memories/security-team/
+team_memory_path: .pHive/team-memories/security-team/

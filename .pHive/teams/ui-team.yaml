@@ -7,11 +7,11 @@ members:
   - agent: ui-designer
     role: Primary UI lead — synthesizes design direction, owns wireframes and design briefs
     domain:
-      - path: "state/design/**"
+      - path: ".pHive/design/**"
         read: true
         write: true
         delete: false
-      - path: "state/brand/**"
+      - path: ".pHive/brand/**"
         read: true
         write: true
         delete: false
@@ -23,11 +23,11 @@ members:
   - agent: animations-specialist
     role: Motion and interaction design — defines animation patterns and transition specs
     domain:
-      - path: "state/design/**"
+      - path: ".pHive/design/**"
         read: true
         write: true
         delete: false
-      - path: "state/audits/**"
+      - path: ".pHive/audits/**"
         read: true
         write: true
         delete: false
@@ -39,7 +39,7 @@ members:
   - agent: accessibility-specialist
     role: Accessibility audit — enforces WCAG compliance and inclusive design standards
     domain:
-      - path: "state/audits/**"
+      - path: ".pHive/audits/**"
         read: true
         write: true
         delete: false
@@ -54,4 +54,4 @@ context:
     Triggered on ui:major escalations (significant UI changes) and ui:brand-redo escalations.
     Workflow deferred to L8 — no workflow field in v1.
 
-team_memory_path: state/team-memories/ui-team/
+team_memory_path: .pHive/team-memories/ui-team/
