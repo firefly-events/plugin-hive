@@ -15,7 +15,7 @@ This command is **read-only** — it never modifies state files. It is safe to r
 
 **Before doing anything else**, check whether Hive has been initialized for this project:
 
-1. Check if `state/project-profile.yaml` exists in the project root
+1. Check if `.pHive/project-profile.yaml` exists in the project root
 2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
 3. As a secondary check, verify `hive.config.yaml` exists (check both `hive/hive.config.yaml` and `hive.config.yaml` in the project root — either location is valid)
 
@@ -35,7 +35,7 @@ If all checks pass, proceed normally.
 
 ### 1. Find Active Epics
 
-Scan `state/epics/` for subdirectories. Each subdirectory containing an `epic.yaml` is an active epic. If `state/epics/` does not exist or is empty, output:
+Scan `.pHive/epics/` for subdirectories. Each subdirectory containing an `epic.yaml` is an active epic. If `.pHive/epics/` does not exist or is empty, output:
 
 ```
 No active workflows. Run /hive:plan to create an epic.
@@ -43,13 +43,13 @@ No active workflows. Run /hive:plan to create an epic.
 
 ### 2. Load Epic Metadata
 
-For each epic, read `state/epics/{epic-id}/epic.yaml` to get:
+For each epic, read `.pHive/epics/{epic-id}/epic.yaml` to get:
 - `title` — epic display name
 - `stories` — list of story entries with `id`, `title`, `depends_on`
 
 ### 3. Determine Story Status
 
-For each story in the epic, check `state/episodes/{epic-id}/{story-id}/` for episode YAML files. Load the workflow definition (`hive/workflows/development.{methodology}.workflow.yaml`, default `classic`) to know the ordered list of steps.
+For each story in the epic, check `.pHive/episodes/{epic-id}/{story-id}/` for episode YAML files. Load the workflow definition (`hive/workflows/development.{methodology}.workflow.yaml`, default `classic`) to know the ordered list of steps.
 
 | Condition | Status | Symbol |
 |-----------|--------|--------|
@@ -106,7 +106,7 @@ If multiple epics are active, display each as a separate block. Order by most re
 
 ### 8. Meta-Team Morning Summary
 
-After all epic status blocks, check for `state/meta-team/morning-summary.md`.
+After all epic status blocks, check for `.pHive/meta-team/morning-summary.md`.
 
 If the file exists, render it as a separate section at the END of the status output:
 
@@ -115,10 +115,10 @@ If the file exists, render it as a separate section at the END of the status out
 
 ## Hive Meta-Team — Last Nightly Cycle
 
-{Full content of state/meta-team/morning-summary.md}
+{Full content of .pHive/meta-team/morning-summary.md}
 ```
 
-If the file does not exist, check `state/meta-team/ledger.yaml`:
+If the file does not exist, check `.pHive/meta-team/ledger.yaml`:
 - If the ledger exists and has at least one entry: show a one-line summary of the last cycle
   ```
   Meta-Team: Last cycle {cycle_id} on {date} — {verdict} ({N} changes promoted)

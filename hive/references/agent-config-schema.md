@@ -191,7 +191,7 @@ Agent frontmatter `model_tier` must match `hive.config.yaml` tiers. If `model_ov
 
 ## Interaction with Team Config
 
-Team configs (at `state/teams/{team-name}.yaml`) can override agent-level domains for project-specific scoping:
+Team configs (at `.pHive/teams/{team-name}.yaml`) can override agent-level domains for project-specific scoping:
 
 ```yaml
 # In team config

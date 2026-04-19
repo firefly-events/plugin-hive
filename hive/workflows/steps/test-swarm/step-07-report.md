@@ -4,9 +4,9 @@
 
 - Read this entire step file before taking any action
 - Do NOT produce the report without reading all upstream artifacts — results, coverage, bug reports, and routing decisions
-- Do NOT fabricate pass/fail counts — calculate from `state/test-artifacts/{epic-id}/{story-id}/results.yaml`
+- Do NOT fabricate pass/fail counts — calculate from `.pHive/test-artifacts/{epic-id}/{story-id}/results.yaml`
 - Do NOT omit the executive summary — it is the primary output consumed by the orchestrator and humans
-- All artifact references MUST point to `state/test-artifacts/` paths — no relative or invented paths
+- All artifact references MUST point to `.pHive/test-artifacts/` paths — no relative or invented paths
 - Include both the executive summary (for quick decisions) and the detailed breakdown (for debugging)
 
 ## EXECUTION PROTOCOLS
@@ -18,7 +18,7 @@ Synthesize all upstream outputs into a consolidated test session report. The rep
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
-- Execution results from step 3 (`state/test-artifacts/{epic-id}/{story-id}/results.yaml`)
+- Execution results from step 3 (`.pHive/test-artifacts/{epic-id}/{story-id}/results.yaml`)
 - Coverage report from step 4 (coverage_report)
 - Bug reports from step 5 (bug_reports)
 - Routing decisions from step 6 (routing_decisions)
@@ -38,7 +38,7 @@ Produce a consolidated test session report with pass/fail counts, coverage analy
 ### 1. Gather all upstream data
 
 Read these artifacts:
-- `state/test-artifacts/{epic-id}/{story-id}/results.yaml` — execution results
+- `.pHive/test-artifacts/{epic-id}/{story-id}/results.yaml` — execution results
 - Coverage report from step 4
 - Bug reports and triage summary from step 5
 - Routing decisions from step 6
@@ -126,9 +126,9 @@ A concise summary for quick decision-making:
 - Human blockers (escalate): {count} — {list}
 
 ### Artifacts
-- Results: `state/test-artifacts/{epic-id}/{story-id}/results.yaml`
-- Screenshots: `state/test-artifacts/{epic-id}/{story-id}/screenshots/`
-- Logs: `state/test-artifacts/{epic-id}/{story-id}/logs/`
+- Results: `.pHive/test-artifacts/{epic-id}/{story-id}/results.yaml`
+- Screenshots: `.pHive/test-artifacts/{epic-id}/{story-id}/screenshots/`
+- Logs: `.pHive/test-artifacts/{epic-id}/{story-id}/logs/`
 ```
 
 ### 5. Validate report completeness
@@ -137,7 +137,7 @@ Verify:
 - Pass/fail counts match results.yaml totals
 - Every bug from step 5 appears in the report
 - Every gap from step 4 appears in the report
-- All artifact paths are valid `state/test-artifacts/` paths
+- All artifact paths are valid `.pHive/test-artifacts/` paths
 - Executive summary verdict matches the data
 
 ## SUCCESS METRICS
@@ -146,7 +146,7 @@ Verify:
 - [ ] Pass/fail counts match actual execution results (no fabrication)
 - [ ] Coverage percentage matches inspector's analysis
 - [ ] All bug tickets included with severity and routing
-- [ ] All artifact references point to `state/test-artifacts/` paths
+- [ ] All artifact references point to `.pHive/test-artifacts/` paths
 - [ ] Detailed breakdown includes per-platform results
 - [ ] Verdict logic is correctly applied (PASS / PASS WITH ISSUES / FAIL)
 
@@ -154,7 +154,7 @@ Verify:
 
 - **Fabricating metrics:** Reporting counts that do not match results.yaml. Always calculate from the source artifact.
 - **Missing executive summary:** The detailed report exists but the orchestrator needs a quick verdict. Always include both.
-- **Broken artifact references:** Pointing to paths outside `state/test-artifacts/` or paths that do not exist.
+- **Broken artifact references:** Pointing to paths outside `.pHive/test-artifacts/` or paths that do not exist.
 - **Optimistic verdict:** Reporting PASS when high-severity bugs exist or coverage is below threshold.
 - **Missing recommendations:** The report describes problems but does not suggest next actions.
 

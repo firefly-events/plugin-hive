@@ -1,6 +1,14 @@
 # Hive Configuration
 # All settings have sensible defaults. Override only what you need.
 
+# File system paths
+# Where Hive stores all per-project state (epics, episodes, cycle state,
+# memories, sessions). Skills resolve all "state" paths relative to this.
+# Default: .pHive/ (hidden directory, like .git/ or .claude/)
+# Common overrides: state/ (legacy v1.1.x and earlier), .hive/, hive-state/
+paths:
+  state_dir: .pHive
+
 # Quality gate thresholds
 quality_gates:
   auto_pass_threshold: 0.9

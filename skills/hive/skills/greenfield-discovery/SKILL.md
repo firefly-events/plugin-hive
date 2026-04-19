@@ -180,7 +180,7 @@ After the conversation, synthesize everything into a **Product Discovery Brief**
 {Brief narrative summary of the conversation flow — what topics generated the most discussion, where the developer had strong convictions vs. uncertainty, any pivots in thinking}
 ```
 
-Write the discovery brief to `state/planning/product-discovery-brief.md`.
+Write the discovery brief to `.pHive/planning/product-discovery-brief.md`.
 
 ## Conversation Flow Guidelines
 

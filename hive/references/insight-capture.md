@@ -1,6 +1,6 @@
 # Insight Capture Protocol
 
-During execution, if you encounter something non-obvious and reusable, write an insight to the staging area at `state/insights/{epic-id}/{story-id}/`.
+During execution, if you encounter something non-obvious and reusable, write an insight to the staging area at `.pHive/insights/{epic-id}/{story-id}/`.
 
 Most steps produce zero insights. Only capture when you find:
 
@@ -51,7 +51,7 @@ both what to do and why it matters without needing to re-investigate.}
 ## Staging Path Convention
 
 ```
-state/insights/{epic-id}/{story-id}/{slug}.md
+.pHive/insights/{epic-id}/{story-id}/{slug}.md
 ```
 
 - `epic-id`: the current epic's identifier (e.g., `epic-hive-phase5`)
@@ -59,7 +59,7 @@ state/insights/{epic-id}/{story-id}/{slug}.md
 - `slug`: a short kebab-case name for the insight (e.g., `avoid-parallel-schema-migrations.md`)
 
 If you're capturing an insight that applies to the whole epic rather than a specific story,
-use `_epic` as the story-id: `state/insights/{epic-id}/_epic/{slug}.md`
+use `_epic` as the story-id: `.pHive/insights/{epic-id}/_epic/{slug}.md`
 
 ---
 

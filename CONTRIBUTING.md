@@ -119,7 +119,7 @@ See `hive/references/workflow-schema.md` for the full field reference.
 
 ### Teams (Team Configs)
 
-Team configs define reusable agent compositions. They live in `state/teams/{team-name}.yaml` in the consuming project (not the plugin itself), but you can contribute example team configs to `hive/examples/teams/`.
+Team configs define reusable agent compositions. They live in `.pHive/teams/{team-name}.yaml` in the consuming project (not the plugin itself), but you can contribute example team configs to `hive/examples/teams/`.
 
 **Minimum structure:**
 
@@ -138,7 +138,7 @@ members:
         write: true
         delete: false
 
-team_memory_path: state/team-memories/team-name/
+team_memory_path: .pHive/team-memories/team-name/
 ```
 
 See `hive/references/team-config-schema.md` for the full field reference.

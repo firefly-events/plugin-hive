@@ -17,7 +17,7 @@ Evaluate staged insights, promote or discard, clean up staging, produce session 
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
-- `state/insights/` — staged insight files from execution phase
+- `.pHive/insights/` — staged insight files from execution phase
 - `~/.claude/hive/memories/` — existing agent memories (to check for duplicates)
 - `references/agent-memory-schema.md` — keep/discard criteria, memory file format
 - Episode markers from step 7 (stories completed, failed, blocked)
@@ -37,8 +37,8 @@ Evaluate staged insights for promotion to agent memories, clean up staging, and 
 
 Before evaluating insights, check whether any previous session was interrupted by a forced stop (Ctrl+C):
 
-1. Check whether `state/interrupts/` exists. If it does not exist, skip this section silently.
-2. If it exists, list all `.yaml` files in `state/interrupts/`.
+1. Check whether `.pHive/interrupts/` exists. If it does not exist, skip this section silently.
+2. If it exists, list all `.yaml` files in `.pHive/interrupts/`.
 3. If any sentinel files exist, surface a report to the user:
 
 ```
@@ -48,7 +48,7 @@ The following sessions were interrupted before completing cleanly:
 
 {for each sentinel file:}
   [{timestamp}] — Epic: {active_epic | none}, Story: {active_story | none}, Step: {active_step | none}
-  File: state/interrupts/{filename}
+  File: .pHive/interrupts/{filename}
 
 These files have NOT been deleted. To clear them, delete the files manually after reviewing.
 ```
@@ -58,7 +58,7 @@ These files have NOT been deleted. To clear them, delete the files manually afte
 6. After the user responds, continue to step 1 regardless of their answer (recovery is out of scope for this step — just surface the information).
 
 ### 1. Scan for staged insights
-List all files under `state/insights/`. Insights are organized by `{epic-id}/{story-id}/` and follow the staged insight format:
+List all files under `.pHive/insights/`. Insights are organized by `{epic-id}/{story-id}/` and follow the staged insight format:
 - `type` — pattern, pitfall, override, codebase, process
 - `agent` — which agent produced this
 - `summary` — one-line description
@@ -108,7 +108,7 @@ The slug should be a kebab-case version of the summary (e.g., `api-rate-limit-re
 
 For insights that capture collective team patterns (handoff conventions, tooling quirks, process adjustments), promote to the team memory directory instead of the agent memory:
 
-Write to `state/team-memories/{team-name}/{slug}.md`:
+Write to `.pHive/team-memories/{team-name}/{slug}.md`:
 
 ```yaml
 ---
@@ -123,7 +123,7 @@ source_epic: {epic-id}
 {Detail of the team-level pattern.}
 ```
 
-**Decision rule:** If one agent could have learned this alone → agent memory at `~/.claude/hive/memories/`. If it required multiple agents coordinating → team memory at `state/team-memories/`.
+**Decision rule:** If one agent could have learned this alone → agent memory at `~/.claude/hive/memories/`. If it required multiple agents coordinating → team memory at `.pHive/team-memories/`.
 
 ### 4c. Append to reference memories
 
@@ -171,9 +171,9 @@ For insights that do not clearly match keep or discard criteria:
 
 ### 6. Clean up staging
 After all insights have been promoted or discarded:
-- Delete the processed insight files from `state/insights/{epic-id}/{story-id}/`
+- Delete the processed insight files from `.pHive/insights/{epic-id}/{story-id}/`
 - Remove empty staging directories
-- Do NOT delete `state/insights/` itself — other epics may have staged insights
+- Do NOT delete `.pHive/insights/` itself — other epics may have staged insights
 
 ### 7. Produce session summary
 Compile a final summary for the user:
@@ -210,7 +210,7 @@ Compile a final summary for the user:
 
 ## SUCCESS METRICS
 
-- [ ] All staged insights under `state/insights/` scanned
+- [ ] All staged insights under `.pHive/insights/` scanned
 - [ ] Each insight evaluated against keep/discard criteria from agent-memory-schema
 - [ ] Duplicate check performed against existing memories
 - [ ] Promoted insights written to `~/.claude/hive/memories/{agent}/` with correct format
@@ -224,7 +224,7 @@ Compile a final summary for the user:
 - Discarding all insights without evaluation — valuable learnings lost, agents repeat mistakes
 - Not checking for duplicate memories — redundant memories waste context window in future sessions
 - Skipping the session summary — user does not know what to expect tomorrow
-- Deleting `state/insights/` root directory — other epics lose their staged insights
+- Deleting `.pHive/insights/` root directory — other epics lose their staged insights
 
 ## NEXT STEP
 

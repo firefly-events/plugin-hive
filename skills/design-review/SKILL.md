@@ -21,8 +21,8 @@ Run a structured design review ceremony on design artifacts (wireframes, design 
 ## Gate Check (OR condition)
 
 Check at least one of:
-1. `state/design/index.yaml` — exists
-2. `state/brand/brand-system.yaml` — exists
+1. `.pHive/design/index.yaml` — exists
+2. `.pHive/brand/brand-system.yaml` — exists
 
 If **both** are missing, display this message and **stop**:
 
@@ -54,8 +54,8 @@ Read `hive/workflows/design-review.workflow.yaml` in full.
 
 Build the artifact list for review:
 - If `$ARGUMENTS` contains explicit paths: use those
-- If `state/design/index.yaml` exists: read it, collect all `brief_path` and `export_paths`
-- If `state/brand/brand-system.yaml` exists: include it
+- If `.pHive/design/index.yaml` exists: read it, collect all `brief_path` and `export_paths`
+- If `.pHive/brand/brand-system.yaml` exists: include it
 - If both: include all
 
 ### 3. Load specialist personas (for steps that will run)
@@ -96,7 +96,7 @@ Generate a timestamp: `{YYYY-MM-DD}T{HHMM}`.
 
 Write the synthesis output (from step 4) to:
 ```
-state/audits/design-review/{timestamp}/report.md
+.pHive/audits/design-review/{timestamp}/report.md
 ```
 
 ### 6. Display structured verdict
@@ -125,7 +125,7 @@ state/audits/design-review/{timestamp}/report.md
 {1-3 concrete next actions based on verdict}
 
 ---
-Full report: state/audits/design-review/{timestamp}/report.md
+Full report: .pHive/audits/design-review/{timestamp}/report.md
 ```
 
 ## Key References

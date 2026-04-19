@@ -39,7 +39,7 @@ The orchestrator sends a `SendMessage` to the agent:
 ```
 RESPAWN SIGNAL: Context pressure detected. Begin respawn protocol:
 1. Run your insight capture pass (per agent-memory-schema.md)
-2. Write your respawn summary to: state/respawn-summaries/{agent}-{story-id}-{N}.md
+2. Write your respawn summary to: .pHive/respawn-summaries/{agent}-{story-id}-{N}.md
    where {N} is the respawn iteration (1, 2, or 3)
 3. Reply with the file path when complete
 ```
@@ -57,9 +57,9 @@ This ensures knowledge gained during the session is not lost when the agent term
 
 ### Step 3: Agent Writes Respawn Summary
 
-The agent writes a structured MD file to `state/respawn-summaries/`. This file is the bridge between the old and new agent instances.
+The agent writes a structured MD file to `.pHive/respawn-summaries/`. This file is the bridge between the old and new agent instances.
 
-**File path:** `state/respawn-summaries/{agent-name}-{story-id}-{N}.md`
+**File path:** `.pHive/respawn-summaries/{agent-name}-{story-id}-{N}.md`
 - `{agent-name}` — the roster agent name (e.g., `developer`, `researcher`)
 - `{story-id}` — the story being worked on
 - `{N}` — respawn iteration number (1, 2, or 3)
@@ -112,7 +112,7 @@ timestamp: {ISO-8601}
 The agent sends a `SendMessage` back to the orchestrator:
 
 ```
-RESPAWN READY: Summary written to state/respawn-summaries/{agent}-{story-id}-{N}.md
+RESPAWN READY: Summary written to .pHive/respawn-summaries/{agent}-{story-id}-{N}.md
 ```
 
 ### Step 5: Orchestrator Checks Respawn Count
@@ -131,9 +131,9 @@ This agent has been respawned 3 times on the same step. Continuing may indicate:
 - The task requires human judgment
 
 Respawn summaries:
-1. state/respawn-summaries/{agent}-{story-id}-1.md
-2. state/respawn-summaries/{agent}-{story-id}-2.md
-3. state/respawn-summaries/{agent}-{story-id}-3.md
+1. .pHive/respawn-summaries/{agent}-{story-id}-1.md
+2. .pHive/respawn-summaries/{agent}-{story-id}-2.md
+3. .pHive/respawn-summaries/{agent}-{story-id}-3.md
 
 Options:
 a) Decompose this step into smaller sub-steps
@@ -168,10 +168,10 @@ The new agent should verify file state before acting on the summary — files ma
 
 ## Directory Setup
 
-The orchestrator should ensure `state/respawn-summaries/` exists before triggering a respawn. Create it if needed:
+The orchestrator should ensure `.pHive/respawn-summaries/` exists before triggering a respawn. Create it if needed:
 
 ```
-mkdir -p state/respawn-summaries/
+mkdir -p .pHive/respawn-summaries/
 ```
 
 Respawn summaries accumulate during an epic's execution. They are not cleaned up automatically — they serve as an audit trail. Clean up manually or per-epic if disk space is a concern.

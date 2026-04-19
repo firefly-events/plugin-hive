@@ -9,6 +9,34 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+- **Default state directory renamed `state/` → `.pHive/`.** Hidden by default
+  (like `.git/` or `.claude/`). Configurable via `paths.state_dir` in
+  `hive.config.yaml` if you prefer a different name.
+- All skills and references updated to use `.pHive/` as the default storage
+  location for epics, episodes, cycle state, sessions, memories, etc.
+
+### Added
+- `paths.state_dir` config setting (default: `.pHive`) — override to keep
+  legacy `state/` or pick any directory name.
+- Migration script: `scripts/migrate-state-to-pHive.sh` — renames `state/`
+  to `.pHive/` while preserving git history and updating `.gitignore`.
+- Kickoff Step 0: detects legacy `state/` directories on existing projects
+  and offers in-place migration (or opt-in to keep using `state/`).
+
+### Migration
+Existing projects with a `state/` directory have three options:
+
+1. **Auto-migrate** (recommended): re-run `/hive:kickoff`, choose `yes` at
+   the migration prompt.
+2. **Manual migrate**: `bash scripts/migrate-state-to-pHive.sh` from your
+   project root.
+3. **Keep state/**: add to your `hive.config.yaml`:
+   ```yaml
+   paths:
+     state_dir: state
+   ```
+
 ## [1.1.1] - 2026-04-18
 
 cmux v2 API as native team execution backend.
@@ -139,7 +167,7 @@ Step file architecture: BMAD-style step files across all workflows.
 - BMAD-style step files for all core Hive workflows
 - Step files for UI designer workflow
 - `step-file-schema.md` reference document
-- Per-project cross-cutting concerns system (`state/cross-cutting-concerns.yaml`)
+- Per-project cross-cutting concerns system (`.pHive/cross-cutting-concerns.yaml`)
 - Retro findings from first and second Shindig runs addressed (circuit breakers, tool hierarchy fixes)
 - `TeamCreate` enforced over `Agent` tool for parallel team execution
 

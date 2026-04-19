@@ -44,7 +44,7 @@ After epic execution completes (or at the end of a session with staged insights)
 
 **Process:**
 
-1. **Scan for staged insights.** Check `state/insights/` for any staged files.
+1. **Scan for staged insights.** Check `.pHive/insights/` for any staged files.
 2. **For each insight:**
    - Read the insight's `type`, `summary`, and `detail`
    - Check against keep criteria: is it a repeatable pattern, a pitfall warning, an override, or codebase-specific understanding?
@@ -52,7 +52,7 @@ After epic execution completes (or at the end of a session with staged insights)
    - **Promote:** write to `~/.claude/hive/memories/{agent}/{slug}.md` with frontmatter (name, description, type, agent, timestamp, source_epic, last_verified, ttl_days)
    - **Discard:** delete from staging
 3. **Compile the memory wiki.** If any insights were promoted, run incremental wiki compilation (step 4d in `step-08-session-end.md`). This updates topic articles in `~/.claude/hive/memory-wiki/` so the next session's agent-spawn uses fresh wiki navigation.
-4. **Clean up.** Remove `state/insights/{epic-id}/` staging directories.
+4. **Clean up.** Remove `.pHive/insights/{epic-id}/` staging directories.
 
 For borderline cases, present to the user for a keep/discard decision. Most insights should be auto-evaluated.
 

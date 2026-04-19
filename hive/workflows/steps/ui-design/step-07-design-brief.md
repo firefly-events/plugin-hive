@@ -107,13 +107,13 @@ In addition to the wireframe directory write above, write to these stable paths 
 
 **Per-brief write:**
 ```
-state/design/briefs/{story-id}.md
+.pHive/design/briefs/{story-id}.md
 ```
 Write the full design brief content for this story (same content as above).
 
 **Manifest write (create or update):**
 ```
-state/design/index.yaml
+.pHive/design/index.yaml
 ```
 
 If the file exists, load it and append the new entry. If it doesn't exist, create it. Format:
@@ -122,7 +122,7 @@ If the file exists, load it and append the new entry. If it doesn't exist, creat
 updated_at: "{ISO 8601 timestamp}"
 briefs:
   - story_id: "{story-id}"
-    brief_path: "state/design/briefs/{story-id}.md"
+    brief_path: ".pHive/design/briefs/{story-id}.md"
     wireframe_path: "{path-to-.f0-file}"
     export_paths:
       - "{path-to-png-1}"
@@ -164,7 +164,7 @@ Ready for developer handoff.
 - [ ] Coordinates in briefs match actual wireframe shapes from step 5
 - [ ] Design tokens from step 1 referenced in briefs
 - [ ] All briefs written to single markdown file
-- [ ] Stable canonical paths written: `state/design/briefs/{story-id}.md` and `state/design/index.yaml` updated
+- [ ] Stable canonical paths written: `.pHive/design/briefs/{story-id}.md` and `.pHive/design/index.yaml` updated
 - [ ] Final summary produced listing all artifacts
 
 ## FAILURE MODES
@@ -183,7 +183,7 @@ This is the final step in the UI design workflow. No next step.
 1. `.f0` wireframe file (from step 4-5)
 2. PNG exports (from step 6)
 3. Design briefs markdown (from this step — wireframe dir)
-4. `state/design/briefs/{story-id}.md` — stable canonical design brief
-5. `state/design/index.yaml` — manifest of all briefs and wireframe exports
+4. `.pHive/design/briefs/{story-id}.md` — stable canonical design brief
+5. `.pHive/design/index.yaml` — manifest of all briefs and wireframe exports
 
 These artifacts feed into the developer agent during the implementation phase.

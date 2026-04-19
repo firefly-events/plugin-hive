@@ -20,7 +20,7 @@ Present the validated plan to the user. Wait for explicit approval. Handle modif
 - Today's work list from step 4 (execution order)
 - Validation report from step 5 (checklist results per story)
 - Cross-cutting concern evaluations from step 5
-- Story specs from `state/epics/{epic-id}/stories/{story-id}.yaml`
+- Story specs from `.pHive/epics/{epic-id}/stories/{story-id}.yaml`
 
 **NOT available:**
 - Execution infrastructure (teams, agents — set up in step 7)
@@ -77,7 +77,7 @@ After the plan summary, present clear options:
 
 **If approved with fixes:** For each failed story:
 - Apply the remediation from the validation report
-- Update the story spec file at `state/epics/{epic-id}/stories/{story-id}.yaml`
+- Update the story spec file at `.pHive/epics/{epic-id}/stories/{story-id}.yaml`
 - Re-run the failed checks to confirm they now pass
 - Then proceed to step 7
 

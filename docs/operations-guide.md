@@ -20,7 +20,7 @@ Run `/hive:kickoff` to initialize Hive for your project.
 - **Brownfield project** (existing codebase): Hive discovers your structure, team configs, and existing state
 - **Greenfield project**: Hive sets up fresh state directories and starter agent memories
 
-Kickoff generates team configs in `state/teams/` and migrates starter memories to `~/.claude/hive/memories/`.
+Kickoff generates team configs in `.pHive/teams/` and migrates starter memories to `~/.claude/hive/memories/`.
 
 After kickoff, you're ready for the daily flow.
 
@@ -344,7 +344,7 @@ Agents accumulate knowledge across sessions. The memory system uses a four-layer
 
 **Compiled wiki** (`~/.claude/hive/memory-wiki/`): LLM-authored topic articles with `[[wikilinks]]`. Replaces keyword matching with topic-based navigation. Cross-agent sharing is organic — memories from different agents converge by topic.
 
-**Team memories** (`state/team-memories/{team}/`): Scoped to the current project — collective patterns that don't travel.
+**Team memories** (`.pHive/team-memories/{team}/`): Scoped to the current project — collective patterns that don't travel.
 
 ### Memory Types
 
@@ -361,11 +361,11 @@ Agents accumulate knowledge across sessions. The memory system uses a four-layer
 ```
 Agent executes step
   → encounters something non-obvious
-  → writes insight to state/insights/ (staging)
+  → writes insight to .pHive/insights/ (staging)
   → session ends
   → orchestrator evaluates: promote or discard?
   → promoted insights → ~/.claude/hive/memories/{agent}/
-  → team insights → state/team-memories/{team}/
+  → team insights → .pHive/team-memories/{team}/
   → reference insights → append to existing reference memory
   → wiki compilation (incremental, affected topics only)
   → next session: wiki-first retrieval at spawn time
@@ -409,7 +409,7 @@ All settings live in `hive/hive.config.yaml`.
 ### Task Tracking Modes
 
 **Local mode** (`adapter: null`, default):
-- All tracking via status markers (`state/episodes/`) and cycle state (`state/cycle-state/`)
+- All tracking via status markers (`.pHive/episodes/`) and cycle state (`.pHive/cycle-state/`)
 - Works out of the box — no external tool required
 
 **External tracker mode** (`adapter: linear`):
@@ -477,16 +477,16 @@ See `references/error-handling.md` for the full per-phase failure playbook.
 
 | What | Where | Purpose |
 |------|-------|---------|
-| Epic definitions | `state/epics/{epic-id}/epic.yaml` | Epic index with story list |
-| Story specs | `state/epics/{epic-id}/stories/{story-id}.yaml` | Self-contained story definitions |
-| Episode records | `state/episodes/{epic-id}/{story-id}/{step-id}.yaml` | Progress tracking per step |
-| Cycle state | `state/cycle-state/{epic-id}.yaml` | Accumulated decisions across phases |
-| Staged insights | `state/insights/{epic-id}/{story-id}/` | Insights pending session-end evaluation |
+| Epic definitions | `.pHive/epics/{epic-id}/epic.yaml` | Epic index with story list |
+| Story specs | `.pHive/epics/{epic-id}/stories/{story-id}.yaml` | Self-contained story definitions |
+| Episode records | `.pHive/episodes/{epic-id}/{story-id}/{step-id}.yaml` | Progress tracking per step |
+| Cycle state | `.pHive/cycle-state/{epic-id}.yaml` | Accumulated decisions across phases |
+| Staged insights | `.pHive/insights/{epic-id}/{story-id}/` | Insights pending session-end evaluation |
 | Agent memories | `~/.claude/hive/memories/{agent}/` | System-level, cross-project |
-| Team memories | `state/team-memories/{team}/` | Project-level team knowledge |
-| Team configs | `state/teams/{team-name}.yaml` | Loadable team compositions |
-| Test baselines | `state/test-baseline/{project}/` | Project test knowledge |
-| Handoffs | `state/handoffs/{handoff-id}.yaml` | Cross-swarm artifact transfers |
+| Team memories | `.pHive/team-memories/{team}/` | Project-level team knowledge |
+| Team configs | `.pHive/teams/{team-name}.yaml` | Loadable team compositions |
+| Test baselines | `.pHive/test-baseline/{project}/` | Project test knowledge |
+| Handoffs | `.pHive/handoffs/{handoff-id}.yaml` | Cross-swarm artifact transfers |
 
 ---
 

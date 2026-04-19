@@ -1,13 +1,13 @@
 ---
 name: polish-audit
-description: Fun-factor polish pass — animations specialist identifies motion and delight opportunities; ui-designer synthesizes a polish report. Gates on state/audits/ui-audit/latest.yaml.
+description: Fun-factor polish pass — animations specialist identifies motion and delight opportunities; ui-designer synthesizes a polish report. Gates on .pHive/audits/ui-audit/latest.yaml.
 ---
 
 # Hive Polish Audit
 
 Run a focused polish pass to identify animation, motion, and delight opportunities that elevate UI quality beyond baseline compliance.
 
-**Input:** `$ARGUMENTS` optionally contains artifact paths to target. If none provided, reads scope from `state/audits/ui-audit/latest.yaml`.
+**Input:** `$ARGUMENTS` optionally contains artifact paths to target. If none provided, reads scope from `.pHive/audits/ui-audit/latest.yaml`.
 
 ## Before Executing Any Skill
 
@@ -17,7 +17,7 @@ Run a focused polish pass to identify animation, motion, and delight opportuniti
 
 ## Gate Check
 
-Check `state/audits/ui-audit/latest.yaml`:
+Check `.pHive/audits/ui-audit/latest.yaml`:
 
 1. Verify the file exists (existence check only — the `verdict` field is NOT checked)
 
@@ -33,7 +33,7 @@ Note: Even a clean ui-audit (verdict: passed) justifies a polish pass. The gate 
 
 ### 1. Load prior audit context
 
-Read `state/audits/ui-audit/latest.yaml` to get:
+Read `.pHive/audits/ui-audit/latest.yaml` to get:
 - `report_path` — read the prior audit report for context
 - `verdict` — include in polish report header for reference
 
@@ -124,16 +124,16 @@ Generate a timestamp: `{YYYY-MM-DD}T{HHMM}`.
 
 Write the synthesis output to:
 ```
-state/audits/polish-audit/{timestamp}/report.md
+.pHive/audits/polish-audit/{timestamp}/report.md
 ```
 
 ### 7. Write latest.yaml pointer (on success only)
 
 Only after the report is successfully written, write:
 ```yaml
-# state/audits/polish-audit/latest.yaml
+# .pHive/audits/polish-audit/latest.yaml
 completed_at: "{ISO 8601 timestamp}"
-report_path: "state/audits/polish-audit/{timestamp}/report.md"
+report_path: ".pHive/audits/polish-audit/{timestamp}/report.md"
 findings_count: {total opportunity count}
 verdict: "opportunities_identified"
 ```
@@ -145,7 +145,7 @@ verdict: "opportunities_identified"
 ```
 Polish Audit Complete
 
-Report: state/audits/polish-audit/{timestamp}/report.md
+Report: .pHive/audits/polish-audit/{timestamp}/report.md
 Opportunities: {count} total ({low} low-effort, {medium} medium, {high} high-effort)
 
 Top high-impact / low-effort picks:
@@ -161,4 +161,4 @@ Built on: {prior_audit_report_path} (verdict: {prior_verdict})
 - `hive/agents/animations-specialist.md` — Step 1 persona (motion opportunities)
 - `hive/agents/ui-designer.md` — Step 2 synthesis persona
 - `hive/references/ui-skill-gates.md` — gate specification for polish-audit
-- `state/architecture/ui-team-skills-arch.md` — latest.yaml pointer pattern
+- `.pHive/architecture/ui-team-skills-arch.md` — latest.yaml pointer pattern

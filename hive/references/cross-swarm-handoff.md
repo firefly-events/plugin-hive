@@ -16,16 +16,16 @@ expires_at: "2026-04-01T14:00:00Z"   # 7 days default
 
 artifacts:
   - type: epic
-    path: state/epics/hive-phase7/epic.yaml
+    path: .pHive/epics/hive-phase7/epic.yaml
   - type: stories
     paths:
-      - state/epics/hive-phase7/stories/story-1.yaml
-      - state/epics/hive-phase7/stories/story-2.yaml
+      - .pHive/epics/hive-phase7/stories/story-1.yaml
+      - .pHive/epics/hive-phase7/stories/story-2.yaml
   - type: cycle_state
-    path: state/cycle-state/hive-phase7.yaml
+    path: .pHive/cycle-state/hive-phase7.yaml
   - type: wireframes
     paths:
-      - state/wireframes/hive-phase7/event-detail/approved.png
+      - .pHive/wireframes/hive-phase7/event-detail/approved.png
 
 decisions:
   - key: api_protocol
@@ -60,7 +60,7 @@ pending → expired  → (cleanup)
 ## Storage
 
 ```
-state/handoffs/{handoff-id}.yaml
+.pHive/handoffs/{handoff-id}.yaml
 ```
 
 ## How It Works
@@ -71,14 +71,14 @@ After a swarm completes (e.g., planning finishes all stories):
 
 1. Orchestrator packages: epic, stories, cycle state, wireframes, and any other artifacts
 2. Extracts key decisions and constraints from cycle state
-3. Writes handoff YAML to `state/handoffs/`
+3. Writes handoff YAML to `.pHive/handoffs/`
 4. Status: `pending`
 
 ### Consuming a Handoff (target swarm)
 
 When the next swarm starts (e.g., dev swarm kicks off):
 
-1. Orchestrator checks `state/handoffs/` for pending handoffs targeting this swarm
+1. Orchestrator checks `.pHive/handoffs/` for pending handoffs targeting this swarm
 2. Loads all artifacts and injects cycle state as constraints
 3. Updates handoff status to `consumed` with timestamp
 4. Proceeds with execution using the handed-off context

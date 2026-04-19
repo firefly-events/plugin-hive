@@ -20,7 +20,7 @@ Promote approved changes. Revert rejected changes. Write insights for the next c
 **Inputs available:**
 - `evaluation_results` from step 6 — verdicts per change
 - Full codebase read/write access within charter domain
-- `state/meta-team/cycle-state.yaml`
+- `.pHive/meta-team/cycle-state.yaml`
 
 **NOT available:**
 - User input
@@ -52,7 +52,7 @@ Examples of promotable insights:
 - An implementation approach that worked well → pattern for implementation step
 - A type of change that often gets `needs_revision` → pitfall for proposal step
 
-For each insight worth capturing, write to `state/insights/meta-team/cycle-{cycle-id}/`:
+For each insight worth capturing, write to `.pHive/insights/meta-team/cycle-{cycle-id}/`:
 ```yaml
 agent: researcher  # or architect, developer, etc. — whoever benefits
 type: pattern | pitfall | override
@@ -78,7 +78,7 @@ reverted:
 ```
 
 ### 5. Update cycle-state.yaml
-Append to `state/meta-team/cycle-state.yaml`:
+Append to `.pHive/meta-team/cycle-state.yaml`:
 ```yaml
 phase: promotion
 promoted_changes: {N}
@@ -112,7 +112,7 @@ Reverted changes:
 
 - [ ] All `needs_revision` changes have a revert or flag action taken
 - [ ] All `pass` and `needs_optimization` changes recorded as promoted
-- [ ] Any insights staged to `state/insights/meta-team/`
+- [ ] Any insights staged to `.pHive/insights/meta-team/`
 - [ ] `cycle-state.yaml` updated with promotion results
 - [ ] Promotion report produced
 

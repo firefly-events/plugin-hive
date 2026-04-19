@@ -22,7 +22,7 @@ Up-to-date library documentation, API references, and best practices retrieved o
 Accumulated knowledge from past cycles in this project: decisions, quality feedback, patterns.
 
 **Sources:**
-- **Cycle state history** — `state/cycle-state/*.yaml` files from past epics. Decisions, constraints, naming conventions, technology choices.
+- **Cycle state history** — `.pHive/cycle-state/*.yaml` files from past epics. Decisions, constraints, naming conventions, technology choices.
 - **Agent memories** — `~/.claude/hive/memories/{agent}/` files. Patterns, pitfalls, codebase understanding accumulated across sessions.
 - **Gate feedback** — past quality gate rejections and the reasons why (from status markers with `failed` status + associated insights).
 
@@ -70,7 +70,7 @@ This saves agents from redundant queries and keeps their context focused.
 
 When agents discover something useful, they annotate it back for future sessions:
 
-- **Insight capture** → `state/insights/` staging area → promoted to agent memories at session end
+- **Insight capture** → `.pHive/insights/` staging area → promoted to agent memories at session end
 - This is the existing insight system from `references/agent-memory-schema.md`
 - Annotations are the write-back path that makes the knowledge layer self-improving
 
@@ -81,8 +81,8 @@ When agents discover something useful, they annotate it back for future sessions
 | Knowledge Layer — External Docs | Context7, Firecrawl, WebSearch MCP tools | Session cache only (not persisted) |
 | Knowledge Layer — Project Knowledge | cycle state, agent memories, status markers | — (read-only) |
 | Knowledge Layer — Capability Catalog | agent personas, workflows, MCP tools | — (read-only) |
-| Insight Capture | — | state/insights/ staging |
-| Session-End Evaluation | state/insights/ staging | agent memories (promoted) |
+| Insight Capture | — | .pHive/insights/ staging |
+| Session-End Evaluation | .pHive/insights/ staging | agent memories (promoted) |
 
 ## Query Protocol
 
@@ -124,7 +124,7 @@ External doc results are session-scoped — they're not persisted between sessio
 
 To find past decisions about a technology or pattern:
 ```
-1. List past cycle states: ls state/cycle-state/*.yaml
+1. List past cycle states: ls .pHive/cycle-state/*.yaml
 2. Search for relevant decisions: grep for technology/pattern keywords
 3. Load the relevant cycle state and extract decisions
 ```
@@ -142,8 +142,8 @@ To find relevant patterns or pitfalls:
 
 To find what types of issues caused past failures:
 ```
-1. Find failed status markers: grep "status: failed" state/episodes/
-2. Check associated insights in state/insights/ (if not yet cleaned up)
+1. Find failed status markers: grep "status: failed" .pHive/episodes/
+2. Check associated insights in .pHive/insights/ (if not yet cleaned up)
 3. Check agent memories for promoted pitfall insights
 ```
 

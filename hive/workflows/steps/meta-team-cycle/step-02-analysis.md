@@ -19,8 +19,8 @@ Systematic scan of the Hive codebase. Produce a findings report. Do not fix anyt
 **Inputs available:**
 - `cycle_id` from step 1
 - The full Hive codebase under `hive/` and `skills/`
-- `state/meta-team/charter.md` — scope boundaries
-- `state/meta-team/cycle-state.yaml` — for writing findings to disk
+- `.pHive/meta-team/charter.md` — scope boundaries
+- `.pHive/meta-team/cycle-state.yaml` — for writing findings to disk
 
 **NOT available:**
 - User input
@@ -90,7 +90,7 @@ evidence: {specific field, line, or pattern that demonstrates the issue}
 Sort findings by severity descending, then by category.
 
 ### 8. Update cycle-state.yaml
-Append all findings to `state/meta-team/cycle-state.yaml`:
+Append all findings to `.pHive/meta-team/cycle-state.yaml`:
 ```yaml
 phase: analysis
 findings:

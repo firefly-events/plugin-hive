@@ -21,16 +21,16 @@ Agent memories live at the system level — outside any project directory. A bac
 ### Project-level: Team memories (project-scoped)
 
 ```
-state/team-memories/{team-name}/{slug}.md
+.pHive/team-memories/{team-name}/{slug}.md
 ```
 
 Team memories are scoped to the current project. They capture collective patterns specific to THIS codebase and THIS team composition. They do not travel to other projects.
 
-- **Location:** `state/team-memories/{team-name}/`
+- **Location:** `.pHive/team-memories/{team-name}/`
 - **Scope:** current project only
 - **Written by:** team leads during execution
 - **Read by:** team leads when assembling the same team
-- **Bootstrapped by:** kickoff protocol creates `state/team-memories/`
+- **Bootstrapped by:** kickoff protocol creates `.pHive/team-memories/`
 
 ### Migration from old path
 
@@ -174,7 +174,7 @@ Discard when the insight is:
 During execution, agents write insights to a staging area before promotion:
 
 ```
-state/insights/{epic-id}/{story-id}/{agent}-{slug}.yaml
+.pHive/insights/{epic-id}/{story-id}/{agent}-{slug}.yaml
 ```
 
 ### Staged Insight Format
@@ -222,14 +222,14 @@ Agents should NOT capture:
 
 After epic execution (or at session end), the orchestrator evaluates staged insights:
 
-1. Scan `state/insights/` for staged files
+1. Scan `.pHive/insights/` for staged files
 2. For each insight:
    - Check type against keep criteria
    - Check against existing memories in `~/.claude/hive/memories/{agent}/` for duplicates
    - If `override` type: find and update the existing memory it supersedes
    - If new and meets criteria: promote to `~/.claude/hive/memories/{agent}/{slug}.md`
    - If doesn't meet criteria: discard (delete from staging)
-3. Clean up: remove the `state/insights/{epic-id}/` staging directory
+3. Clean up: remove the `.pHive/insights/{epic-id}/` staging directory
 
 ### Promotion
 
@@ -326,7 +326,7 @@ Team memories capture collective patterns specific to a project and team composi
 ### Storage
 
 ```
-state/team-memories/{team-name}/{slug}.md
+.pHive/team-memories/{team-name}/{slug}.md
 ```
 
 ### When it's a team memory vs agent memory
@@ -371,7 +371,7 @@ had expired mid-session but GET requests were cached and appeared to work.
 
 Team leads load team memories during activation, alongside agent memories:
 
-1. Check for `state/team-memories/{team-name}/` matching the team's config
+1. Check for `.pHive/team-memories/{team-name}/` matching the team's config
 2. Scan for `.md` files
 3. Load all team memories (no relevance filtering — they're already project-scoped)
 4. Include in the team lead's context as "Team Knowledge" section

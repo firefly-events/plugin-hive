@@ -4,6 +4,24 @@ Initialize Hive for a project. Detects brownfield vs greenfield automatically.
 
 **Input:** `$ARGUMENTS` optionally describes the project or intent.
 
+## Step 0: Legacy state/ Migration Check
+
+Before any other work, check if this project has a legacy `state/` directory
+from Hive v1.1.x or earlier:
+
+1. If both `state/` and `.pHive/` exist → warn the user, do not auto-migrate.
+   They likely have a half-finished migration. Tell them to resolve manually.
+2. If only `state/` exists (no `.pHive/`) → offer to migrate:
+   - Show: "Found legacy state/ directory. Hive v1.2+ uses .pHive/ by default.
+     Migrate now? (yes/no/keep-state)"
+   - **yes**: run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/migrate-state-to-pHive.sh`
+   - **no**: skip and continue (next kickoff run will ask again)
+   - **keep-state**: write `paths.state_dir: state` to `hive.config.yaml`,
+     so the user keeps their existing directory permanently
+3. If only `.pHive/` exists or neither → no action needed.
+
+This step is idempotent — safe to re-run on any project.
+
 ## Step 1: Detect Scenario
 
 Check the current working directory:
@@ -371,12 +389,12 @@ This ensures `kickoff` can be re-run safely without losing manual curation.
 
 Silently auto-generate project-specific cross-cutting concerns from the discovered tech stack. No interactive review gate — write the file and show a summary.
 
-<!-- DATA CONTRACT: Writes to state/cross-cutting-concerns.yaml → concerns: [] -->
+<!-- DATA CONTRACT: Writes to .pHive/cross-cutting-concerns.yaml → concerns: [] -->
 <!-- Default: concerns contain at minimum the 'documentation' concern -->
 
 ##### Step 1: Map Tech Stack to Template
 
-Read `tech_stack` from `state/project-profile.yaml` (populated in Phase 2). Map the discovered stack to a concern template file in `hive/references/examples/`:
+Read `tech_stack` from `.pHive/project-profile.yaml` (populated in Phase 2). Map the discovered stack to a concern template file in `hive/references/examples/`:
 
 | Tech Stack Signal | Template File |
 |-------------------|---------------|
@@ -395,7 +413,7 @@ Detection logic:
 If a matching template was found:
 
 1. **Read the template** YAML from `hive/references/examples/{template-file}`
-2. **Read existing** `state/cross-cutting-concerns.yaml` (may already have concerns from prior runs or manual edits)
+2. **Read existing** `.pHive/cross-cutting-concerns.yaml` (may already have concerns from prior runs or manual edits)
 3. **Idempotent merge** using the following algorithm:
    - Parse both files into concern lists, keyed by `id`
    - For each concern in the **template**:
@@ -403,14 +421,14 @@ If a matching template was found:
      - If the concern `id` is new (not in state file) → **append** it to the state file
    - For each concern in the **state file** that is NOT in the template → **preserve** it (user added it manually)
    - The `documentation` concern (default) is always preserved — never removed
-4. **Write** the merged result to `state/cross-cutting-concerns.yaml`
+4. **Write** the merged result to `.pHive/cross-cutting-concerns.yaml`
 5. **Count** how many new concerns were added (template entries not previously in state file)
 
 ##### Step 3: Graceful Fallback (No Template)
 
 If no template matches the detected tech stack:
 
-1. Ensure `state/cross-cutting-concerns.yaml` exists with at least the `documentation` concern:
+1. Ensure `.pHive/cross-cutting-concerns.yaml` exists with at least the `documentation` concern:
    ```yaml
    concerns:
      - id: documentation
@@ -435,17 +453,17 @@ If no template matches the detected tech stack:
 
 Print a single summary line (no interactive prompt, no review gate):
 
-- **Template matched:** `"Auto-generated N concerns for {stack}. Edit at state/cross-cutting-concerns.yaml."`
+- **Template matched:** `"Auto-generated N concerns for {stack}. Edit at .pHive/cross-cutting-concerns.yaml."`
   - Where `N` is the count of newly added concerns (0 if all already existed from a prior run)
   - Where `{stack}` is the matched template name (e.g., "mobile-app")
-- **No template:** `"No concern templates found for {stack}. Using 'documentation' default. Edit at state/cross-cutting-concerns.yaml."`
+- **No template:** `"No concern templates found for {stack}. Using 'documentation' default. Edit at .pHive/cross-cutting-concerns.yaml."`
   - Where `{stack}` is the detected primary framework/language (e.g., "react", "fastapi")
 
 This summary is informational only — kickoff continues to the next phase regardless.
 
 ##### Step 5: Idempotent Re-Run Safety
 
-When Phase 2b-iv runs on a project that already has `state/cross-cutting-concerns.yaml`:
+When Phase 2b-iv runs on a project that already has `.pHive/cross-cutting-concerns.yaml`:
 
 1. **Never remove** existing concerns — they may have been manually curated
 2. **Never overwrite** an existing concern's fields — the user may have customized `applies_when`, `planning_prompt`, or checklist items
@@ -459,13 +477,13 @@ When Phase 2b-iv runs on a project that already has `state/cross-cutting-concern
 | 2b-i Integration Preflight | project-profile.yaml | `integrations` |
 | 2b-ii Developer Discovery | hive.config.yaml | `developer` |
 | 2b-iii Code Quality & Linter Detection | project-profile.yaml | `code_quality` (linters, formatters, pre_commit, code_snippets, test_first_signals), `project_maturity` |
-| 2b-iv Cross-Cutting Concern Auto-Generation | state/cross-cutting-concerns.yaml | `concerns` |
+| 2b-iv Cross-Cutting Concern Auto-Generation | .pHive/cross-cutting-concerns.yaml | `concerns` |
 
 ---
 
 ### Phase 3: Synthesize Project Profile
 
-Write a structured project profile to `state/project-profile.yaml`. This is what all Hive agents read before starting work.
+Write a structured project profile to `.pHive/project-profile.yaml`. This is what all Hive agents read before starting work.
 
 ```yaml
 project_name: "{name}"
@@ -573,14 +591,14 @@ Create `hive.config.yaml` in the project root. This is Hive-specific config — 
 
 ### Phase 5: Initialize Hive State
 
-- Create `state/cycle-state/` directory
-- Create `state/epics/` directory
-- Create `state/insights/` directory (staging area for agent insights)
-- Create `state/test-baseline/{project}/` if test swarm will be used
-- Create `state/test-artifacts/` directory (screenshots, logs, results from test swarm)
+- Create `.pHive/cycle-state/` directory
+- Create `.pHive/epics/` directory
+- Create `.pHive/insights/` directory (staging area for agent insights)
+- Create `.pHive/test-baseline/{project}/` if test swarm will be used
+- Create `.pHive/test-artifacts/` directory (screenshots, logs, results from test swarm)
 - Create `~/.claude/hive/memories/` with subdirectories for each agent in the roster: frontend-developer, backend-developer, researcher, technical-writer, tester, reviewer, architect, analyst, tpm, ui-designer, team-lead, pair-programmer, peer-validator, test-architect, test-scout, test-worker, test-inspector, test-sentinel, orchestrator
-- Create `state/team-memories/` directory (project-scoped team collective memories)
-- Create `state/teams/` directory (loadable team configs)
+- Create `.pHive/team-memories/` directory (project-scoped team collective memories)
+- Create `.pHive/teams/` directory (loadable team configs)
 - Run per-agent memory migration (idempotent — safe to run every kickoff):
   - For each agent, check `skills/hive/agents/memories/{agent}/` for `.md` files
   - Copy files that don't already exist at `~/.claude/hive/memories/{agent}/`
@@ -610,7 +628,7 @@ Based on the project discovery from phases 1-4, generate team config files:
    - Set team `methodology` field from `execution.default_methodology` (e.g., `tdd`, `classic`)
    - Propagate `developer.pr_style` and `developer.review_depth` into reviewer agent context
    - Propagate `developer.commit_granularity` into all code agent contexts
-8. Write team config(s) to `state/teams/{team-name}.yaml`
+8. Write team config(s) to `.pHive/teams/{team-name}.yaml`
 9. For large projects, generate multiple specialized teams (e.g., `api-team`, `mobile-team`)
 10. Present configs in the onboarding report for user review
 
@@ -657,7 +675,7 @@ See `references/team-config-schema.md` for the full format.
 | mobile-mcp | MCP | {detected/missing} | Mobile simulator interaction |
 | obsidian | Vault | {detected/missing} | Knowledge base access |
 
-Source: `state/project-profile.yaml → integrations`
+Source: `.pHive/project-profile.yaml → integrations`
 
 ### Developer Preferences
 
@@ -671,12 +689,12 @@ Source: `hive.config.yaml → developer`
 
 ### Cross-Cutting Concerns
 
-Auto-generated {N} concerns. Edit at `state/cross-cutting-concerns.yaml`.
+Auto-generated {N} concerns. Edit at `.pHive/cross-cutting-concerns.yaml`.
 
 ### Files Created
-- state/project-profile.yaml — comprehensive project profile
+- .pHive/project-profile.yaml — comprehensive project profile
 - hive.config.yaml — Hive workflow configuration
-- state/insights/ — insight staging area
+- .pHive/insights/ — insight staging area
 - ~/.claude/hive/memories/ — agent memory storage (16 agent subdirectories)
 
 ### Recommended Next Steps
@@ -703,7 +721,7 @@ For a new project starting from scratch.
    - Use the analyst agent in **creative/exploratory mode** (not requirements-analysis mode)
    - If `$ARGUMENTS` has a description, pass it as input context to the skill
    - The skill facilitates a 7-area discovery conversation: problem space, target users, competitive landscape, differentiators, success metrics, MVP boundaries, and technical constraints
-   - Output: structured **Product Discovery Brief** written to `state/planning/product-discovery-brief.md`
+   - Output: structured **Product Discovery Brief** written to `.pHive/planning/product-discovery-brief.md`
    - The user validates the brief before proceeding to Step 2
    - The discovery brief feeds directly into Step 2 (Product Brief) as structured input
 
@@ -712,7 +730,7 @@ For a new project starting from scratch.
    Run the same integration detection as brownfield Phase 2b-i. CLI tools (`linearis`, `frame0`, `codex`, `maestro`) and MCP servers (`firecrawl`, `context7`, `posthog`, `firebase`, `mobile-mcp`) are system-level — they exist regardless of whether a codebase exists. Vaults (`obsidian`) are also system-level.
 
    - Detect available integrations using the same logic as brownfield (check `which` for CLIs, check MCP server configs for servers, check vault paths)
-   - Write results to `state/project-profile.yaml → integrations`
+   - Write results to `.pHive/project-profile.yaml → integrations`
    - Results inform which Hive capabilities are available during execution (e.g., Frame0 for wireframes, Maestro for E2E tests)
 
    **1b. Developer Discovery (Static Defaults)**
@@ -729,30 +747,30 @@ For a new project starting from scratch.
 2. **Product Brief**
    - Synthesize into structured brief
    - Sections: Problem, Target Users, Core Features (P0/P1/P2), Success Metrics, Scope Boundaries
-   - Write to `state/planning/product-brief.md`
+   - Write to `.pHive/planning/product-brief.md`
    - Present for user approval before proceeding
 
 3. **PRD (Product Requirements Document)**
    - Expand brief into detailed requirements
    - Each requirement: description, user value, acceptance criteria (Given/When/Then)
-   - Write to `state/planning/prd.md`
+   - Write to `.pHive/planning/prd.md`
    - Present for user approval
 
 4. **Architecture**
    - Architect agent: tech stack, components, API contracts, data model
    - Decisions with alternatives considered and rationale
-   - Write to `state/planning/architecture.md`
+   - Write to `.pHive/planning/architecture.md`
    - Present for user approval
 
    **4a. Cross-Cutting Concern Auto-Generation (from Architecture Choices)**
 
-   After the user approves the architecture, silently auto-generate cross-cutting concerns. This follows the same generation logic as brownfield Phase 2b-iv, but the input is the **chosen architecture stack** (from `state/planning/architecture.md`), not a discovered codebase.
+   After the user approves the architecture, silently auto-generate cross-cutting concerns. This follows the same generation logic as brownfield Phase 2b-iv, but the input is the **chosen architecture stack** (from `.pHive/planning/architecture.md`), not a discovered codebase.
 
    - Read the chosen tech stack from the architecture document (frameworks, languages, patterns)
    - Map to a concern template in `hive/references/examples/` using the same mapping table as brownfield Phase 2b-iv Step 1
-   - If a template matches: idempotent merge into `state/cross-cutting-concerns.yaml` (same algorithm as brownfield — match by `id`, preserve existing, append new)
+   - If a template matches: idempotent merge into `.pHive/cross-cutting-concerns.yaml` (same algorithm as brownfield — match by `id`, preserve existing, append new)
    - If no template matches: ensure `documentation` default concern exists
-   - Print summary: `"Auto-generated N concerns for {stack}. Edit at state/cross-cutting-concerns.yaml."`
+   - Print summary: `"Auto-generated N concerns for {stack}. Edit at .pHive/cross-cutting-concerns.yaml."`
 
    **4b. Linter & Formatter Setup Recommendation**
 
@@ -771,20 +789,20 @@ For a new project starting from scratch.
 5. **Epics & Stories**
    - Decompose PRD into epics and stories via `/plugin-hive:plan`
    - Apply agent-ready checklist to every story
-   - Write to `state/epics/`
+   - Write to `.pHive/epics/`
 
 6. **Initialize Cycle State**
-   - Create `state/cycle-state/{epic-id}.yaml` with all decisions from steps 2-4
+   - Create `.pHive/cycle-state/{epic-id}.yaml` with all decisions from steps 2-4
 
 7. **Present Kickoff Summary**
    ```
    ## Project Kickoff: {project_name}
 
    **Type:** Greenfield
-   **Discovery:** state/planning/product-discovery-brief.md
-   **Brief:** state/planning/product-brief.md
-   **PRD:** state/planning/prd.md
-   **Architecture:** state/planning/architecture.md
+   **Discovery:** .pHive/planning/product-discovery-brief.md
+   **Brief:** .pHive/planning/product-brief.md
+   **PRD:** .pHive/planning/prd.md
+   **Architecture:** .pHive/planning/architecture.md
    **Epics:** {N} epics with {M} total stories
 
    ### Discovery Session Summary
@@ -802,7 +820,7 @@ For a new project starting from scratch.
 
    **Open Questions:** {count} unresolved — see discovery brief for details
 
-   Source: `state/planning/product-discovery-brief.md`
+   Source: `.pHive/planning/product-discovery-brief.md`
 
    ### Integration Status
 
@@ -819,7 +837,7 @@ For a new project starting from scratch.
    | mobile-mcp | MCP | {detected/missing} | Mobile simulator interaction |
    | obsidian | Vault | {detected/missing} | Knowledge base access |
 
-   Source: `state/project-profile.yaml → integrations`
+   Source: `.pHive/project-profile.yaml → integrations`
 
    ### Developer Preferences
 
@@ -833,7 +851,7 @@ For a new project starting from scratch.
 
    ### Cross-Cutting Concerns
 
-   Auto-generated {N} concerns for {stack}. Edit at `state/cross-cutting-concerns.yaml`.
+   Auto-generated {N} concerns for {stack}. Edit at `.pHive/cross-cutting-concerns.yaml`.
 
    ### Recommended Linter Setup
 

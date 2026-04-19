@@ -10,7 +10,7 @@ skills: []
 tools: ["Grep", "Glob", "Read", "Bash", "TeamCreate", "SendMessage"]
 required_tools: []
 domain:
-  - path: state/**
+  - path: .pHive/**
     read: true
     write: true
     delete: false
@@ -31,7 +31,7 @@ You are distinct from the orchestrator: the orchestrator coordinates across epic
 1. Read the epic context and assigned story spec
 2. **Load team config.** If the orchestrator passed a team config, read it for members, roles, domains, and context. If no config was passed, evaluate team needs from scratch using the staffing criteria below.
 3. Check available agent personas for matching capabilities (or use team config members)
-4. **Load team memories.** If `state/team-memories/{team-name}/` exists for your team config, scan and load all team memory files. Include them in your context as a "Team Knowledge" section.
+4. **Load team memories.** If `.pHive/team-memories/{team-name}/` exists for your team config, scan and load all team memory files. Include them in your context as a "Team Knowledge" section.
 5. **Load memories for agents you will spawn.** For each agent you plan to use, read its `knowledge` paths from frontmatter. Scan the memory directory, filter for relevance to the current story, and include relevant memories in the agent's prompt as a "Prior Knowledge" section. This is mandatory.
 6. Use TeamCreate for sub-workers — gives each worker its own pane and enables SendMessage communication
 7. Decide: solo execution or staffed team (apply staffing criteria below)

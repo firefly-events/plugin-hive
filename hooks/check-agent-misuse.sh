@@ -24,9 +24,9 @@ prompt=$(echo "$input" | jq -r '.tool_input.prompt // ""')
 description=$(echo "$input" | jq -r '.tool_input.description // ""')
 
 # Pattern 1: Agent prompt references story YAML paths (story-level work)
-if echo "$prompt" | grep -qiE 'state/epics/[^/]+/stories/[^/]+\.yaml'; then
+if echo "$prompt" | grep -qiE '.pHive/epics/[^/]+/stories/[^/]+\.yaml'; then
   # Check if it's a single story being fully delegated
-  story_count=$(echo "$prompt" | grep -oiE 'state/epics/[^/]+/stories/[^/]+\.yaml' | sort -u | wc -l | tr -d ' ')
+  story_count=$(echo "$prompt" | grep -oiE '.pHive/epics/[^/]+/stories/[^/]+\.yaml' | sort -u | wc -l | tr -d ' ')
   if [ "$story_count" -ge 1 ]; then
     # Check for workflow execution signals (not just reading a story for context)
     if echo "$prompt" | grep -qiE '(execute.*stor|implement.*stor|workflow.*phase|development.*workflow|research.*implement.*test|review.*integrate)'; then

@@ -35,7 +35,7 @@ Create the .f0 project file and add one page per planned screen. Capture all pag
 
 ### 1. Determine project file path
 
-Use the project name from the screen manifest. Place the .f0 file in the wireframes directory specified by the story spec (typically `state/wireframes/{epic-id}/{feature-name}/`):
+Use the project name from the screen manifest. Place the .f0 file in the wireframes directory specified by the story spec (typically `.pHive/wireframes/{epic-id}/{feature-name}/`):
 
 ```
 {wireframe_dir}/{feature-name}.f0

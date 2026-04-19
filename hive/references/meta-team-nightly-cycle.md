@@ -26,20 +26,20 @@ Each cycle runs eight sequential phases:
 ### First run
 On the first cycle, these files must exist:
 
-1. **`state/meta-team/charter.md`** — defines objectives, scope, and hard constraints. Already committed to the repo.
+1. **`.pHive/meta-team/charter.md`** — defines objectives, scope, and hard constraints. Already committed to the repo.
 2. **`hive/workflows/meta-team-cycle.workflow.yaml`** — the workflow definition.
-3. **`state/teams/meta-team.yaml`** — the 5-agent team config.
+3. **`.pHive/teams/meta-team.yaml`** — the 5-agent team config.
 4. **All 8 step files** in `hive/workflows/steps/meta-team-cycle/`.
 
-The ledger (`state/meta-team/ledger.yaml`) and cycle state (`state/meta-team/cycle-state.yaml`) are created by the cycle itself — no manual creation needed.
+The ledger (`.pHive/meta-team/ledger.yaml`) and cycle state (`.pHive/meta-team/cycle-state.yaml`) are created by the cycle itself — no manual creation needed.
 
 ### Running the cycle
 Trigger via the orchestrator:
 ```
 Run the meta-team nightly cycle.
 Read: hive/workflows/meta-team-cycle.workflow.yaml
-Team: state/teams/meta-team.yaml
-Charter: state/meta-team/charter.md
+Team: .pHive/teams/meta-team.yaml
+Charter: .pHive/meta-team/charter.md
 ```
 
 Or schedule via a cron-style trigger (see external trigger config if available).
@@ -48,7 +48,7 @@ Or schedule via a cron-style trigger (see external trigger config if available).
 
 ## Cycle State Files
 
-### `state/meta-team/cycle-state.yaml`
+### `.pHive/meta-team/cycle-state.yaml`
 
 Created fresh each cycle. Contains the full running log of a single cycle:
 - Phase-by-phase outputs
@@ -57,7 +57,7 @@ Created fresh each cycle. Contains the full running log of a single cycle:
 
 Use it to debug a failed cycle or review what was changed.
 
-### `state/meta-team/ledger.yaml`
+### `.pHive/meta-team/ledger.yaml`
 
 Append-only record of all completed cycles. One entry per cycle:
 ```yaml
@@ -91,8 +91,8 @@ The proposal step (step-03) caps approved proposals at 5 per cycle. To change th
 
 ### Adjusting charter scope
 To allow the meta-team to modify additional domains:
-- Edit `state/meta-team/charter.md` → scope table
-- Edit `state/teams/meta-team.yaml` → member domain sections
+- Edit `.pHive/meta-team/charter.md` → scope table
+- Edit `.pHive/teams/meta-team.yaml` → member domain sections
 
 ---
 
@@ -102,16 +102,16 @@ To allow the meta-team to modify additional domains:
 Run `/hive:status` to see the morning summary rendered inline.
 
 ### Ledger review
-Read `state/meta-team/ledger.yaml` to see the history of all cycles.
+Read `.pHive/meta-team/ledger.yaml` to see the history of all cycles.
 
 ### Aborted cycles
-If `state/meta-team/cycle-state.yaml` has `status: running` at the start of the next cycle, the prior cycle crashed. The next cycle will log it as aborted and start fresh.
+If `.pHive/meta-team/cycle-state.yaml` has `status: running` at the start of the next cycle, the prior cycle crashed. The next cycle will log it as aborted and start fresh.
 
 ---
 
 ## Bootstrapping Charter Template
 
-If `state/meta-team/charter.md` is missing, create it with these minimum fields:
+If `.pHive/meta-team/charter.md` is missing, create it with these minimum fields:
 
 ```markdown
 # Meta-Team Charter
@@ -146,4 +146,4 @@ Self-optimize the Hive plugin.
 The meta-team is independent from the daily standup ceremony. However:
 - The morning summary surfaces in `/hive:status` alongside daily epic status
 - Flagged-for-human items from the meta-team should be reviewed during standup
-- Meta-team insights staged in `state/insights/meta-team/` are evaluated by the orchestrator at session end alongside regular epic insights
+- Meta-team insights staged in `.pHive/insights/meta-team/` are evaluated by the orchestrator at session end alongside regular epic insights
