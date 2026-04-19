@@ -22,10 +22,14 @@ DRY=${DRY_RUN:-0}
 
 run() {
   if [[ "$DRY" == "1" ]]; then
-    echo "[dry-run] $*"
+    printf '[dry-run]'
+    printf ' %q' "$@"
+    printf '\n'
   else
-    echo "+ $*"
-    eval "$@"
+    printf '+'
+    printf ' %q' "$@"
+    printf '\n'
+    "$@"
   fi
 }
 
@@ -46,9 +50,9 @@ echo "Migrating state/ -> .pHive/ in $(pwd)"
 
 # Use git mv if tracked, regular mv otherwise
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git ls-files state/ | head -1 | grep -q .; then
-  run "git mv state .pHive"
+  run git mv state .pHive
 else
-  run "mv state .pHive"
+  run mv state .pHive
 fi
 
 # Update .gitignore if present.

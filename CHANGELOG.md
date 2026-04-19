@@ -37,6 +37,16 @@ Existing projects with a `state/` directory should migrate. Two supported paths:
 > immediately, a symlink (`ln -s state .pHive`) is a safe stopgap. Full
 > config-driven path resolution is tracked as follow-up work.
 
+### Known follow-up
+Wiring `paths.state_dir` end-to-end requires a single path resolver that
+every skill, workflow step, agent domain spec, and hook reads from. Right
+now those references hardcode `.pHive/` directly. This is deliberate scope
+for this PR (rename + migration tooling + config surface); resolver wiring
+will be a dedicated follow-up so the path changes stay reviewable. Until
+that lands, any override of `paths.state_dir` other than the default
+`.pHive` is best-effort — use the symlink stopgap if you need a different
+layout today.
+
 ## [1.1.1] - 2026-04-18
 
 cmux v2 API as native team execution backend.
@@ -167,7 +177,7 @@ Step file architecture: BMAD-style step files across all workflows.
 - BMAD-style step files for all core Hive workflows
 - Step files for UI designer workflow
 - `step-file-schema.md` reference document
-- Per-project cross-cutting concerns system (`.pHive/cross-cutting-concerns.yaml`)
+- Per-project cross-cutting concerns system (`state/cross-cutting-concerns.yaml`)
 - Retro findings from first and second Shindig runs addressed (circuit breakers, tool hierarchy fixes)
 - `TeamCreate` enforced over `Agent` tool for parallel team execution
 
