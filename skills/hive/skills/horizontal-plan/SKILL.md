@@ -123,7 +123,7 @@ HORIZONTAL SCOPE:
 
 ## Output Guidelines
 
-- Write the finished document to `state/epics/{epic-id}/docs/horizontal-plan.md`
+- Write the finished document to `.pHive/epics/{epic-id}/docs/horizontal-plan.md`
 - Be exhaustive in per-layer requirements — this is the breadth pass, not the execution plan
 - Every item should be concrete (name the endpoint, name the component, name the table)
 - The layer map diagram is mandatory — it's the visual anchor for vertical planning

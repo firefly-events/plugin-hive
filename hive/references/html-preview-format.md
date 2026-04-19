@@ -22,10 +22,10 @@ HTML previews are **primary output** for visual artifacts. Frame0 wireframes are
 
 | Artifact | HTML preview path |
 |----------|-------------------|
-| Brand system | `state/brand/brand-guide.html` |
-| Design tokens | `state/brand/tokens-preview.html` |
-| Logo concepts | `state/brand/logo-concepts.html` |
-| UI audit report | `state/audits/ui-audit/{ts}/report.html` (optional) |
+| Brand system | `.pHive/brand/brand-guide.html` |
+| Design tokens | `.pHive/brand/tokens-preview.html` |
+| Logo concepts | `.pHive/brand/logo-concepts.html` |
+| UI audit report | `.pHive/audits/ui-audit/{ts}/report.html` (optional) |
 
 All HTML files must be **self-contained** — no external stylesheets, no JavaScript dependencies. Fonts load from Google Fonts CDN via `<link>` tags.
 
@@ -304,12 +304,12 @@ When a skill generates an HTML preview, the report output must include:
 
 ```
 Visual Preview:
-  state/brand/brand-guide.html
+  .pHive/brand/brand-guide.html
 
   Open in your browser:
-    open state/brand/brand-guide.html
+    open .pHive/brand/brand-guide.html
   Or preview in VSCode:
-    code state/brand/brand-guide.html
+    code .pHive/brand/brand-guide.html
 ```
 
 Do not ask the user to open the file — show them the command they can run.

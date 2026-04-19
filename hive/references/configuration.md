@@ -14,6 +14,12 @@ See `skills/hive/hive.config.yaml` for the full default template with comments.
 
 ## Settings Reference
 
+### Paths
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `paths.state_dir` | `.pHive` | Directory where Hive stores per-project state (epics, episodes, cycle state, sessions, memories). The default is honored end-to-end — skills/hooks/workflows all reference `.pHive/` directly. Other values are documented but not yet wired into runtime path resolution; tracked as follow-up. |
+
 ### Quality Gates
 
 | Setting | Default | Description |

@@ -4,7 +4,7 @@
 
 - Read this entire step file before taking any action
 - Evaluate each change independently — don't let a strong change inflate a weak one
-- Use the quality bar in `state/meta-team/charter.md` — don't invent your own criteria
+- Use the quality bar in `.pHive/meta-team/charter.md` — don't invent your own criteria
 - Self-review bias check: you did not implement any of these changes (you are the reviewer agent) — evaluate honestly
 
 ## EXECUTION PROTOCOLS
@@ -18,7 +18,7 @@ Read all changes and test results. Apply the charter's quality bar. Produce a fi
 **Inputs available:**
 - `changes_made` from step 4 — what was written
 - `test_results` from step 5 — pass/fail per check
-- `state/meta-team/charter.md` — quality bar criteria
+- `.pHive/meta-team/charter.md` — quality bar criteria
 - Full codebase read access
 
 **NOT available:**
@@ -33,8 +33,8 @@ Evaluate each implemented change against the charter quality bar. Assign `pass`,
 
 ### 1. Load evaluation inputs
 Read:
-- `state/meta-team/cycle-state.yaml` for changes and test results
-- `state/meta-team/charter.md` for the quality bar section
+- `.pHive/meta-team/cycle-state.yaml` for changes and test results
+- `.pHive/meta-team/charter.md` for the quality bar section
 
 ### 2. Evaluate each change
 
@@ -76,7 +76,7 @@ revision_notes: |
 - Overall cycle verdict: `passed` if ≥ 70% of changes pass or needs_optimization; `partial` if 40–70%; `poor` if < 40%
 
 ### 4. Update cycle-state.yaml
-Append to `state/meta-team/cycle-state.yaml`:
+Append to `.pHive/meta-team/cycle-state.yaml`:
 ```yaml
 phase: evaluation
 evaluations:

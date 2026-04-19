@@ -48,7 +48,7 @@ BUG REPORT:
   file: {path}:{line}
   expected: {what should happen}
   actual: {what happened}
-  screenshot: state/test-artifacts/{epic-id}/{story-id}/screenshots/{filename}
+  screenshot: .pHive/test-artifacts/{epic-id}/{story-id}/screenshots/{filename}
   hypothesis: {sentinel's AI guess at root cause}
 ```
 

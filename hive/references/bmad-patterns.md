@@ -64,8 +64,8 @@ Role-specific steps after step 5 (developer gets test gates, researcher gets sco
 
 **Fix:** Hive already has `hive.config.yaml` and cycle state. The activation protocol should explicitly load:
 1. `hive.config.yaml` — global Hive settings
-2. `state/cycle-state/{epic-id}.yaml` — accumulated decisions for this epic
-3. Cross-cutting concerns (if present at `state/cross-cutting-concerns.yaml`)
+2. `.pHive/cycle-state/{epic-id}.yaml` — accumulated decisions for this epic
+3. Cross-cutting concerns (if present at `.pHive/cross-cutting-concerns.yaml`)
 4. Agent memories from `~/.claude/hive/memories/{agent}/`
 
 This isn't a new config file — it's making existing files part of the mandatory activation sequence.
@@ -81,14 +81,14 @@ This isn't a new config file — it's making existing files part of the mandator
 
 This means interrupted workflows resume from where they left off rather than restarting.
 
-**Hive gap:** Hive has episode records (`state/episodes/`) that track completion, but step files don't check them. If a workflow is re-run, it starts from scratch rather than resuming.
+**Hive gap:** Hive has episode records (`.pHive/episodes/`) that track completion, but step files don't check them. If a workflow is re-run, it starts from scratch rather than resuming.
 
 **Fix:** Add a continuation check to the first step of every workflow:
 ```
 ## TASK SEQUENCE
 
 ### 0. Check for existing progress (before anything else)
-Check state/episodes/{epic-id}/{story-id}/ for existing episode files.
+Check .pHive/episodes/{epic-id}/{story-id}/ for existing episode files.
 If the previous step has a completed episode, skip to the next incomplete step.
 If no episodes exist, start from step 1.
 ```

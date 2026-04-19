@@ -1,6 +1,6 @@
 ---
 name: brand-system
-description: Establish brand identity — colors, typography, spacing, logos, and a visual HTML brand guide. Produces state/brand/brand-system.yaml and state/brand/brand-guide.html for immediate visual review.
+description: Establish brand identity — colors, typography, spacing, logos, and a visual HTML brand guide. Produces .pHive/brand/brand-system.yaml and .pHive/brand/brand-guide.html for immediate visual review.
 ---
 
 # Hive Brand System
@@ -37,10 +37,10 @@ You are creating a complete brand system for this project. Your output has two p
 
 **Part 1: brand-system.yaml (required)**
 
-Produce a structured brand system and write it to `state/brand/brand-system.yaml`. Use this exact schema:
+Produce a structured brand system and write it to `.pHive/brand/brand-system.yaml`. Use this exact schema:
 
 ```yaml
-# state/brand/brand-system.yaml
+# .pHive/brand/brand-system.yaml
 colors:
   primary:
     name: "Color Name"
@@ -109,7 +109,7 @@ Derive colors from the project context (existing code, product name, industry, u
 
 **Part 2: Visual HTML brand guide (PRIMARY OUTPUT)**
 
-Produce a self-contained HTML brand guide at `state/brand/brand-guide.html`. **Read `hive/references/html-preview-format.md` in full before generating the HTML** — it specifies the structure, sections, styling conventions, and logo SVG requirements.
+Produce a self-contained HTML brand guide at `.pHive/brand/brand-guide.html`. **Read `hive/references/html-preview-format.md` in full before generating the HTML** — it specifies the structure, sections, styling conventions, and logo SVG requirements.
 
 The HTML brand guide must include all six sections:
 
@@ -144,11 +144,11 @@ After the subagent completes, report:
 Brand System Complete
 
 Artifacts:
-  Data:         state/brand/brand-system.yaml
-  Visual guide: state/brand/brand-guide.html  ← OPEN THIS TO SEE YOUR BRAND
+  Data:         .pHive/brand/brand-system.yaml
+  Visual guide: .pHive/brand/brand-guide.html  ← OPEN THIS TO SEE YOUR BRAND
   [if --with-frame0]
-  Frame0 file:  state/brand/brand-guide.f0
-  PNG export:   state/brand/brand-guide.png  [or: pending manual export]
+  Frame0 file:  .pHive/brand/brand-guide.f0
+  PNG export:   .pHive/brand/brand-guide.png  [or: pending manual export]
 
 Colors defined: {count}
   Primary:   {hex} — {name}
@@ -162,9 +162,9 @@ Personality: {statement}
 Logo concepts: {N} SVG concepts generated and rendered in brand-guide.html
 
 To view:
-  open state/brand/brand-guide.html
+  open .pHive/brand/brand-guide.html
 or
-  code state/brand/brand-guide.html
+  code .pHive/brand/brand-guide.html
 
 Next: Review the HTML guide and confirm direction. Run /hive:design-system to generate implementation tokens from this brand system.
 ```
@@ -174,4 +174,4 @@ Next: Review the HTML guide and confirm direction. Run /hive:design-system to ge
 - `hive/references/html-preview-format.md` — HTML preview structure, sections, SVG logo format, styling conventions
 - `hive/agents/ui-designer.md` — ui-designer persona (Frame0 CLI reference, tool discovery)
 - `hive/references/ui-skill-gates.md` — gate spec (brand-system: no gate)
-- `state/architecture/ui-team-skills-arch.md` — brand output format specification
+- `.pHive/architecture/ui-team-skills-arch.md` — brand output format specification

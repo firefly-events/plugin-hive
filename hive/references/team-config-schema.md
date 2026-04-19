@@ -5,10 +5,10 @@ Team configs give teams permanence. Instead of the orchestrator deciding team co
 ## Storage
 
 ```
-state/teams/{team-name}.yaml
+.pHive/teams/{team-name}.yaml
 ```
 
-Team configs are project-scoped — they live in `state/` alongside other project-specific data. Different projects get different team compositions based on their structure and needs.
+Team configs are project-scoped — they live in `.pHive/` alongside other project-specific data. Different projects get different team compositions based on their structure and needs.
 
 ## Lifecycle
 
@@ -84,7 +84,7 @@ context:
     Generated from project discovery.
     Add project-specific notes here (frameworks, conventions, etc.).
 
-team_memory_path: state/team-memories/fullstack-team/
+team_memory_path: .pHive/team-memories/fullstack-team/
 ```
 
 ## Fields
@@ -120,7 +120,7 @@ Project-specific context that helps agents understand the codebase:
 - `notes`: free-form text with project-specific information
 
 ### team_memory_path (required)
-Path to the team's memory directory: `state/team-memories/{team-name}/`
+Path to the team's memory directory: `.pHive/team-memories/{team-name}/`
 
 ## Domain Precedence
 
@@ -136,7 +136,7 @@ This lets the same agent have different domains in different teams or projects. 
 
 When the orchestrator receives an epic for execution:
 
-1. Check `state/teams/` for team configs
+1. Check `.pHive/teams/` for team configs
 2. If configs exist: evaluate which team matches the epic's scope
 3. Load the team config and pass it to the team lead alongside the story
 4. The team lead uses the config for staffing instead of evaluating from scratch
@@ -161,7 +161,7 @@ During kickoff or planning, the orchestrator generates team configs based on pro
 2. Match domains to roster agents (frontend dir → frontend-developer, etc.)
 3. Generate domain restrictions based on the actual directory structure
 4. Set tech_stack from discovered technologies
-5. Write the config to `state/teams/{team-name}.yaml`
+5. Write the config to `.pHive/teams/{team-name}.yaml`
 6. Present to the user for review before execution
 
 Multiple teams can be generated for large projects (e.g., `api-team`, `mobile-team`, `infra-team`).
@@ -190,7 +190,7 @@ context:
   tech_stack:
     backend: go
     database: postgresql
-team_memory_path: state/team-memories/api-team/
+team_memory_path: .pHive/team-memories/api-team/
 ```
 
 ### Documentation team
@@ -207,5 +207,5 @@ members:
     role: Review for accuracy and completeness
 context:
   notes: No code changes — documentation only
-team_memory_path: state/team-memories/docs-team/
+team_memory_path: .pHive/team-memories/docs-team/
 ```

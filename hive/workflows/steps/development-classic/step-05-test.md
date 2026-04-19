@@ -32,7 +32,7 @@ Write comprehensive tests that verify every acceptance criterion, then run them 
 ## TASK SEQUENCE
 
 ### 0. Check for existing progress
-Check `state/episodes/{epic-id}/{story-id}/` for test episode.
+Check `.pHive/episodes/{epic-id}/{story-id}/` for test episode.
 If completed, skip to next step.
 
 ### 1. Map acceptance criteria to tests

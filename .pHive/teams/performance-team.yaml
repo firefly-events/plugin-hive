@@ -19,4 +19,4 @@ context:
     Workflow: hive/workflows/performance-audit.workflow.yaml
 
 workflow: hive/workflows/performance-audit.workflow.yaml
-team_memory_path: state/team-memories/performance-team/
+team_memory_path: .pHive/team-memories/performance-team/

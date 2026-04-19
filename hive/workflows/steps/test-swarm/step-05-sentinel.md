@@ -4,7 +4,7 @@
 
 - Read this entire step file before taking any action
 - Do NOT file a bug without: expected behavior, actual behavior, screenshot path (if UI), repro steps, and AI hypothesis
-- Do NOT reference screenshots or logs outside `state/test-artifacts/` — all paths must point there
+- Do NOT reference screenshots or logs outside `.pHive/test-artifacts/` — all paths must point there
 - Do NOT guess at severity — classify based on the defined criteria below
 - Do NOT skip the AI hypothesis — analyze the code to explain WHY the failure occurred, not just THAT it occurred
 - Every bug report must be structured — no freeform text dumps
@@ -22,7 +22,7 @@ Process all test failures from execution results. For each failure, gather evide
 **Inputs available:**
 - Execution results from step 3 (platform_a_results, platform_b_results)
 - Context report from step 1 (context_doc — for code-level analysis)
-- Test artifacts at `state/test-artifacts/{epic-id}/{story-id}/` (screenshots, logs)
+- Test artifacts at `.pHive/test-artifacts/{epic-id}/{story-id}/` (screenshots, logs)
 - Project codebase (for root cause analysis)
 
 **NOT available (do not read or assume):**
@@ -38,7 +38,7 @@ Process every test failure into a structured bug ticket with evidence, root caus
 
 ### 1. Load failure results
 
-Read `state/test-artifacts/{epic-id}/{story-id}/results.yaml`. Filter to tests with `status: fail`. For each failure, collect:
+Read `.pHive/test-artifacts/{epic-id}/{story-id}/results.yaml`. Filter to tests with `status: fail`. For each failure, collect:
 - test_id and requirement_ref
 - error message
 - screenshot path (if captured)
@@ -52,7 +52,7 @@ For each failing test:
 
 **b. Actual behavior:** From the error message and logs, describe what happened instead.
 
-**c. Screenshots:** Reference the screenshot path from `state/test-artifacts/{epic-id}/{story-id}/screenshots/{test_id}-fail.png`. If no screenshot was captured, note it explicitly.
+**c. Screenshots:** Reference the screenshot path from `.pHive/test-artifacts/{epic-id}/{story-id}/screenshots/{test_id}-fail.png`. If no screenshot was captured, note it explicitly.
 
 **d. Reproduction steps:** Extract from the test script — the test steps ARE the repro steps:
 1. {Precondition/setup}
@@ -102,7 +102,7 @@ For each failure, produce a structured report:
 {What happened instead — from error and logs}
 
 ### Screenshots
-{Path: state/test-artifacts/{epic-id}/{story-id}/screenshots/{test_id}-fail.png}
+{Path: .pHive/test-artifacts/{epic-id}/{story-id}/screenshots/{test_id}-fail.png}
 
 ### Reproduction Steps
 1. {Step from test script}
@@ -116,7 +116,7 @@ For each failure, produce a structured report:
 - {file paths and line numbers if identifiable}
 
 ### Log Reference
-{Path: state/test-artifacts/{epic-id}/{story-id}/logs/{framework}-{test_id}.log}
+{Path: .pHive/test-artifacts/{epic-id}/{story-id}/logs/{framework}-{test_id}.log}
 ```
 
 ### 6. Route by severity
@@ -152,7 +152,7 @@ triage_summary:
 
 - [ ] Every failing test has a structured bug report
 - [ ] All bug reports include: expected, actual, screenshot path, repro steps, AI hypothesis
-- [ ] All screenshot and log references point to `state/test-artifacts/` paths
+- [ ] All screenshot and log references point to `.pHive/test-artifacts/` paths
 - [ ] Severity classified for each bug using the defined criteria
 - [ ] High severity bugs marked for escalation
 - [ ] Low severity bugs auto-routed
@@ -161,7 +161,7 @@ triage_summary:
 ## FAILURE MODES
 
 - **Missing AI hypothesis:** "The test failed" is not a bug report. The hypothesis is what separates useful triage from noise.
-- **Screenshot references outside state/test-artifacts/:** Downstream consumers (report, humans) cannot find the evidence. All paths must be canonical.
+- **Screenshot references outside .pHive/test-artifacts/:** Downstream consumers (report, humans) cannot find the evidence. All paths must be canonical.
 - **Wrong severity classification:** Over-classifying cosmetic issues as high wastes human attention. Under-classifying crashes as low misses critical bugs.
 - **Freeform bug reports:** Without structure, bugs are hard to triage, track, and fix. Use the template.
 - **Not reading log files:** The error message alone is often insufficient. The full log contains stack traces and context.

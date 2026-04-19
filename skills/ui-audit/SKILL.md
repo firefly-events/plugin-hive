@@ -1,6 +1,6 @@
 ---
 name: ui-audit
-description: Collaborative UI audit — accessibility specialist and animations specialist surface findings; ui-designer synthesizes a unified audit report. Gates on state/project-profile.yaml.
+description: Collaborative UI audit — accessibility specialist and animations specialist surface findings; ui-designer synthesizes a unified audit report. Gates on .pHive/project-profile.yaml.
 ---
 
 # Hive UI Audit
@@ -17,7 +17,7 @@ Run a collaborative UI audit — accessibility and animation specialists surface
 
 ## Gate Check
 
-Check `state/project-profile.yaml`:
+Check `.pHive/project-profile.yaml`:
 
 1. Verify the file exists
 2. Verify it has a `tech_stack` key that is non-empty
@@ -40,9 +40,9 @@ Read all three agent personas in full before spawning any subagents:
 ### 2. Determine artifact scope
 
 Parse `$ARGUMENTS` for artifact paths. If none provided, use:
-- All files under `state/wireframes/`
-- All files under `state/design/`
-- Any frontend source files identified in `state/project-profile.yaml` tech stack
+- All files under `.pHive/wireframes/`
+- All files under `.pHive/design/`
+- Any frontend source files identified in `.pHive/project-profile.yaml` tech stack
 
 ### 3. Step 1 — Accessibility specialist audit
 
@@ -52,7 +52,7 @@ Spawn a subagent with the full accessibility-specialist persona and this task:
 Audit the following artifacts for WCAG 2.1 AA accessibility issues:
 {artifact_paths}
 
-Tech stack context from state/project-profile.yaml: {tech_stack}
+Tech stack context from .pHive/project-profile.yaml: {tech_stack}
 
 Produce a Work Report covering:
 - ARIA attribute issues
@@ -145,16 +145,16 @@ Generate a timestamp: `{YYYY-MM-DD}T{HHMM}` (e.g., `2026-04-09T1430`).
 
 Write the synthesis output to:
 ```
-state/audits/ui-audit/{timestamp}/report.md
+.pHive/audits/ui-audit/{timestamp}/report.md
 ```
 
 ### 7. Write latest.yaml pointer (on success only)
 
 Only after the report is successfully written, write:
 ```yaml
-# state/audits/ui-audit/latest.yaml
+# .pHive/audits/ui-audit/latest.yaml
 completed_at: "{ISO 8601 timestamp}"
-report_path: "state/audits/ui-audit/{timestamp}/report.md"
+report_path: ".pHive/audits/ui-audit/{timestamp}/report.md"
 findings_count: {total finding count from report}
 verdict: "{passed | needs_optimization | needs_revision}"
 ```
@@ -166,7 +166,7 @@ verdict: "{passed | needs_optimization | needs_revision}"
 ```
 UI Audit Complete
 
-Report: state/audits/ui-audit/{timestamp}/report.md
+Report: .pHive/audits/ui-audit/{timestamp}/report.md
 Verdict: {verdict}
 Findings: {count} total ({blocking} blocking, {significant} significant, {cosmetic} cosmetic)
 
@@ -184,4 +184,4 @@ Next: Run /hive:polish-audit to identify refinement opportunities based on these
 - `hive/agents/animations-specialist.md` — Step 2 persona
 - `hive/agents/ui-designer.md` — Step 3 synthesis persona
 - `hive/references/ui-skill-gates.md` — gate specification for ui-audit
-- `state/architecture/ui-team-skills-arch.md` — collaborative skill pattern, latest.yaml spec
+- `.pHive/architecture/ui-team-skills-arch.md` — collaborative skill pattern, latest.yaml spec

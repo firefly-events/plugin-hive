@@ -23,12 +23,12 @@ Skip sandbox mode for:
 ### 1. Create a sandbox copy
 Before modifying the target file, create a copy at:
 ```
-state/meta-team/sandbox/{proposal_id}/{target_filename}
+.pHive/meta-team/sandbox/{proposal_id}/{target_filename}
 ```
 
 Example:
 ```
-state/meta-team/sandbox/proposal-3/vertical-planning.md
+.pHive/meta-team/sandbox/proposal-3/vertical-planning.md
 ```
 
 ### 2. Write to the sandbox copy
@@ -56,7 +56,7 @@ If validation fails:
 ## Sandbox Directory Structure
 
 ```
-state/meta-team/sandbox/
+.pHive/meta-team/sandbox/
 ├── proposal-1/
 │   └── {filename}
 ├── proposal-2/

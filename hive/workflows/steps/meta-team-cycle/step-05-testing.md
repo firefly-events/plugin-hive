@@ -19,7 +19,7 @@ Validate each change from step 4 using the prescribed check set. Produce a test 
 **Inputs available:**
 - `changes_made` from step 4 — list of files modified and actions taken
 - Full codebase read access
-- `state/meta-team/cycle-state.yaml`
+- `.pHive/meta-team/cycle-state.yaml`
 
 **NOT available:**
 - Write access to any files
@@ -58,7 +58,7 @@ For each new or modified file, apply the appropriate schema:
 - Frontmatter present with: `name`, `description`, `type`
 - `type` is one of: `pattern`, `pitfall`, `override`, `codebase`, `reference`
 
-**Team config files** (`state/teams/**/*.yaml`):
+**Team config files** (`.pHive/teams/**/*.yaml`):
 - Required fields present: `name`, `description`, `lead`, `members`, `team_memory_path`
 - Each member has: `agent`, `role`
 
@@ -93,7 +93,7 @@ failure_notes: {details if any test failed}
 ```
 
 ### 5. Update cycle-state.yaml
-Append to `state/meta-team/cycle-state.yaml`:
+Append to `.pHive/meta-team/cycle-state.yaml`:
 ```yaml
 phase: testing
 test_results:

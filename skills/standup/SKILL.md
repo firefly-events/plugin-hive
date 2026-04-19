@@ -13,7 +13,7 @@ Run the daily ceremony workflow: standup → planning → execution.
 
 **Before doing anything else**, check whether Hive has been initialized for this project:
 
-1. Check if `state/project-profile.yaml` exists in the project root
+1. Check if `.pHive/project-profile.yaml` exists in the project root
 2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
 3. As a secondary check, verify `hive.config.yaml` exists (check both `hive/hive.config.yaml` and `hive.config.yaml` in the project root — either location is valid)
 
@@ -33,7 +33,7 @@ If all checks pass, proceed normally.
 
 Load `hive/workflows/daily-ceremony.workflow.yaml` and execute its three phases. Each phase has step files at `hive/workflows/steps/daily-ceremony/`.
 
-**Phase 1 — Standup:** Reconstruct state from previous sessions. Read status markers (`state/episodes/`), cycle state (`state/cycle-state/`), task tracker (pending human items), and agent memories. Present structured report to user.
+**Phase 1 — Standup:** Reconstruct state from previous sessions. Read status markers (`.pHive/episodes/`), cycle state (`.pHive/cycle-state/`), task tracker (pending human items), and agent memories. Present structured report to user.
 
 **Phase 2 — Planning:** User short-lists today's work. Evaluate whether items need new planning or are already storied. If new work, run a compressed planning swarm. Present plan with agent-ready checklist results. User approves.
 

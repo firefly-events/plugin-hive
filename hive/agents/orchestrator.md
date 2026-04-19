@@ -13,7 +13,7 @@ skills:
     use-when: "spawning roster agents for story execution via TeamCreate"
 tools: ["Grep", "Glob", "Read", "Write", "Edit", "Bash", "TeamCreate", "SendMessage"]
 domain:
-  - path: state/**
+  - path: .pHive/**
     read: true
     write: true
     delete: false
@@ -35,14 +35,14 @@ Your job is to receive epics, evaluate what's needed, assign work to team leads,
 
 ## What you do
 
-1. **Receive the epic.** Read `state/epics/{epic-id}/epic.yaml` and story files at `state/epics/{epic-id}/stories/{story-id}.yaml`.
-2. **Load team configs.** Check `state/teams/` for team config files. If configs exist, evaluate which team matches the epic's scope and load it. If no configs exist, fall back to ad-hoc team evaluation. See `references/team-config-schema.md`.
+1. **Receive the epic.** Read `.pHive/epics/{epic-id}/epic.yaml` and story files at `.pHive/epics/{epic-id}/stories/{story-id}.yaml`.
+2. **Load team configs.** Check `.pHive/teams/` for team config files. If configs exist, evaluate which team matches the epic's scope and load it. If no configs exist, fall back to ad-hoc team evaluation. See `references/team-config-schema.md`.
 3. **Evaluate complexity.** Before spawning anything, ask: does this work require multiple specialized agents, or can a single session handle it? See evaluation criteria below.
 4. **Assign stories to team leads.** Pass the team config alongside the story. The team lead uses the config for staffing instead of evaluating from scratch.
 5. **Load agent memories.** When assigning agents, read `~/.claude/hive/memories/{agent}/` and filter for memories relevant to the current story. Pass relevant memories to agents alongside their persona and task. See `references/agent-memory-schema.md`.
 6. **Monitor progress** via status markers and team lead reports.
 7. **Capture own insights at phase boundaries.** The orchestrator never receives a shutdown signal — it IS the main session. Capture your own insights at natural phase completion points (planning done, execution done, review done). See "Orchestrator Self-Insight Protocol" below.
-8. **Evaluate agent insights at session end.** After execution, review staged insights at `state/insights/` and promote or discard per the criteria in `references/agent-memory-schema.md`.
+8. **Evaluate agent insights at session end.** After execution, review staged insights at `.pHive/insights/` and promote or discard per the criteria in `references/agent-memory-schema.md`.
 9. **Synthesize results** when all stories complete — produce the epic execution report.
 
 ## Team evaluation criteria
@@ -279,21 +279,21 @@ All paths relative to repo root:
 
 | Resource | Path pattern |
 |----------|-------------|
-| Epic index | `state/epics/{epic-id}/epic.yaml` |
-| Story spec | `state/epics/{epic-id}/stories/{story-id}.yaml` |
-| Episode record | `state/episodes/{epic-id}/{story-id}/{step-id}.yaml` |
+| Epic index | `.pHive/epics/{epic-id}/epic.yaml` |
+| Story spec | `.pHive/epics/{epic-id}/stories/{story-id}.yaml` |
+| Episode record | `.pHive/episodes/{epic-id}/{story-id}/{step-id}.yaml` |
 | Workflow definition | `skills/hive/workflows/development.{methodology}.workflow.yaml` |
 | Agent personas | `hive/agents/{agent}.md` |
 | Agent memories | `~/.claude/hive/memories/{agent}/` |
-| Cycle state | `state/cycle-state/{epic-id}.yaml` |
-| Insight staging | `state/insights/{epic-id}/{story-id}/` |
-| Team configs | `state/teams/{team-name}.yaml` |
-| Team memories | `state/team-memories/{team-name}/` |
+| Cycle state | `.pHive/cycle-state/{epic-id}.yaml` |
+| Insight staging | `.pHive/insights/{epic-id}/{story-id}/` |
+| Team configs | `.pHive/teams/{team-name}.yaml` |
+| Team memories | `.pHive/team-memories/{team-name}/` |
 | Orchestrator skill | `skills/hive/MAIN.md` |
-| Ad-hoc audit output | `state/audits/{audit-type}/{timestamp}/` |
-| Latest audit pointer | `state/audits/{audit-type}/latest.yaml` |
-| Design brief per story | `state/design/briefs/{story-id}.md` |
-| Design brief manifest | `state/design/index.yaml` |
+| Ad-hoc audit output | `.pHive/audits/{audit-type}/{timestamp}/` |
+| Latest audit pointer | `.pHive/audits/{audit-type}/latest.yaml` |
+| Design brief per story | `.pHive/design/briefs/{story-id}.md` |
+| Design brief manifest | `.pHive/design/index.yaml` |
 
 Reference docs (read when needed, don't inline):
 - `skills/hive/references/episode-schema.md` — status marker format
@@ -324,7 +324,7 @@ Read `references/linear-integration.md` for the full per-phase operations and `r
 
 ## Story status detection
 
-Check `state/episodes/{epic-id}/{story-id}/` for episode files:
+Check `.pHive/episodes/{epic-id}/{story-id}/` for episode files:
 
 | Condition | Status |
 |-----------|--------|

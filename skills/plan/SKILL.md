@@ -26,7 +26,7 @@ Retains the H/V user-facing review gate at medium scope (opt-in conservative pat
 
 **Before doing anything else**, check whether Hive has been initialized for this project:
 
-1. Check if `state/project-profile.yaml` exists in the project root
+1. Check if `.pHive/project-profile.yaml` exists in the project root
 2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
 3. As a secondary check, verify `hive.config.yaml` exists (check both `hive/hive.config.yaml` and `hive.config.yaml` in the project root — either location is valid)
 
@@ -101,9 +101,9 @@ If all checks pass, proceed normally.
 
    The researcher runs **context7 validation always-on** for any library/SDK/API in the requirement. Web research escalation is uncertainty-triggered (stale docs, missing coverage, conflicting info) — not scope-gated. Findings include a validation note with confidence level. If context7 is unavailable, the researcher proceeds codebase-only and notes the gap.
 
-2. **Produce research brief.** `SendMessage` to the technical writer with the research-brief skill to transform raw findings into a formatted brief. This brief feeds into the design discussion. Write to `state/epics/{epic-id}/docs/research-brief.md`.
+2. **Produce research brief.** `SendMessage` to the technical writer with the research-brief skill to transform raw findings into a formatted brief. This brief feeds into the design discussion. Write to `.pHive/epics/{epic-id}/docs/research-brief.md`.
 
-3. **Load cross-cutting concerns.** Check for `state/cross-cutting-concerns.yaml`. If found, load the concerns — they will be evaluated per-story later. See `hive/references/cross-cutting-concerns.md`.
+3. **Load cross-cutting concerns.** Check for `.pHive/cross-cutting-concerns.yaml`. If found, load the concerns — they will be evaluated per-story later. See `hive/references/cross-cutting-concerns.md`.
 
 ### Phase B: Design Discussion (always runs)
 
@@ -198,7 +198,7 @@ If all checks pass, proceed normally.
     **If no vertical slice plan:** Decompose as before — independently implementable stories with dependency tracking.
 
     **Escalation stories[] backfill (always runs after story IDs are determined):**
-    Once canonical story YAML IDs are finalized, iterate every entry in `escalations:` in `state/cycle-state/{epic-id}.yaml`:
+    Once canonical story YAML IDs are finalized, iterate every entry in `escalations:` in `.pHive/cycle-state/{epic-id}.yaml`:
     - For each entry, inspect its `stories` list — entries may contain topic area strings from raise time
     - For each topic area string, attempt a match against decomposed story IDs:
       - **Exact match:** topic area string equals a story ID → replace in place
@@ -228,7 +228,7 @@ If all checks pass, proceed normally.
       - Contact permission flow — not covered by any story
     ```
 
-13. **Write detailed story files.** For each story, produce an individual YAML file in `state/epics/{epic-id}/stories/{story-id}.yaml`. Stories are the primary artifact — they're what agents read when executing. They must contain enough context for an agent to work autonomously without reading the full epic or other stories.
+13. **Write detailed story files.** For each story, produce an individual YAML file in `.pHive/epics/{epic-id}/stories/{story-id}.yaml`. Stories are the primary artifact — they're what agents read when executing. They must contain enough context for an agent to work autonomously without reading the full epic or other stories.
 
     **Self-containment rule:** Stories must work identically whether read from local disk or pulled from an external tracker (e.g., Linear). To achieve this, **inline relevant context snippets** alongside file references:
 
@@ -327,7 +327,7 @@ If all checks pass, proceed normally.
 
 14. **Evaluate cross-cutting concerns per story.** For each story, evaluate each concern's `applies_when` condition. For applicable concerns, determine the specific action needed and add a `cross_cutting` section to the story YAML. See `hive/references/cross-cutting-concerns.md` for format and examples.
 
-15. **Write the epic index.** Produce `state/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories.
+15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories.
 
 16. **Detect UI stories.** After generating stories and before presenting for confirmation, scan each story for UI work indicators. See the UI Step Detection section below.
 
@@ -411,7 +411,7 @@ A collaborative review gate runs before every user-facing document presentation.
    - Set `stories` to topic areas from the agent's response context if not provided (canonical IDs backfilled at step 11)
    - `placement` source precedence: if the agent provides `placement` in their response (TPM, ui-designer), use the agent-provided value. If not (architect), look up `placement` from the specialist-triggers catalog
 
-   **Dedup-on-write:** Before writing any extracted flag to `state/cycle-state/{epic-id}.yaml`, check whether an entry with the same `trigger` ID already exists:
+   **Dedup-on-write:** Before writing any extracted flag to `.pHive/cycle-state/{epic-id}.yaml`, check whether an entry with the same `trigger` ID already exists:
    - **If exists:** merge into the existing entry — do NOT append a second entry:
      - `stories`: union of existing and new stories[] lists (deduplicated, existing entries first, then new entries)
      - `reason`: concatenate existing and new reason with `" | "` separator
@@ -592,19 +592,19 @@ All diagrams in Hive output (dependency graphs, flow diagrams) use **Mermaid** s
 
 ## Planning Document Paths
 
-All planning documents are written to `state/epics/{epic-id}/docs/{document-type}.md`.
+All planning documents are written to `.pHive/epics/{epic-id}/docs/{document-type}.md`.
 
 | Document type | Sub-skill | Output path |
 |---------------|-----------|-------------|
-| research-brief | None (no sub-skill — see note) | `state/epics/{epic-id}/docs/research-brief.md` |
-| design-discussion | `skills/hive/skills/design-discussion/SKILL.md` | `state/epics/{epic-id}/docs/design-discussion.md` |
-| horizontal-plan | `skills/hive/skills/horizontal-plan/SKILL.md` | `state/epics/{epic-id}/docs/horizontal-plan.md` |
-| vertical-plan | `skills/hive/skills/vertical-plan/SKILL.md` | `state/epics/{epic-id}/docs/vertical-plan.md` |
-| structured-outline | `skills/hive/skills/structured-outline/SKILL.md` | `state/epics/{epic-id}/docs/structured-outline.md` |
+| research-brief | None (no sub-skill — see note) | `.pHive/epics/{epic-id}/docs/research-brief.md` |
+| design-discussion | `skills/hive/skills/design-discussion/SKILL.md` | `.pHive/epics/{epic-id}/docs/design-discussion.md` |
+| horizontal-plan | `skills/hive/skills/horizontal-plan/SKILL.md` | `.pHive/epics/{epic-id}/docs/horizontal-plan.md` |
+| vertical-plan | `skills/hive/skills/vertical-plan/SKILL.md` | `.pHive/epics/{epic-id}/docs/vertical-plan.md` |
+| structured-outline | `skills/hive/skills/structured-outline/SKILL.md` | `.pHive/epics/{epic-id}/docs/structured-outline.md` |
 
-**Note on research-brief:** No sub-skill file exists for the research brief format. The technical writer produces it using the research-brief pattern from memory, based on raw findings from the researcher. Output path: `state/epics/{epic-id}/docs/research-brief.md`. See `hive/agents/technical-writer.md`.
+**Note on research-brief:** No sub-skill file exists for the research brief format. The technical writer produces it using the research-brief pattern from memory, based on raw findings from the researcher. Output path: `.pHive/epics/{epic-id}/docs/research-brief.md`. See `hive/agents/technical-writer.md`.
 
-Existing planning documents at the `state/` root are not moved — this convention applies to new planning sessions going forward.
+Existing planning documents at the `.pHive/` root are not moved — this convention applies to new planning sessions going forward.
 
 ## Key References
 

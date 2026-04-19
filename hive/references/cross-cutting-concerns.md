@@ -4,7 +4,7 @@ Cross-cutting concerns are project-specific requirements that apply to every (or
 
 ## How It Works
 
-1. **Project configuration:** Each project defines its concerns in `cross-cutting-concerns.yaml` at `state/cross-cutting-concerns.yaml`. This file is loaded during `/hive:plan` and `/hive:execute`.
+1. **Project configuration:** Each project defines its concerns in `cross-cutting-concerns.yaml` at `.pHive/cross-cutting-concerns.yaml`. This file is loaded during `/hive:plan` and `/hive:execute`.
 
 2. **During planning (`/hive:plan`):** The analyst and architect agents receive the concerns as context. For each story, they evaluate which concerns apply and add a `cross_cutting` section to the story YAML listing the relevant concerns and what actions they require.
 
@@ -14,7 +14,7 @@ Cross-cutting concerns are project-specific requirements that apply to every (or
 
 ## Configuration File
 
-Place `cross-cutting-concerns.yaml` at `state/cross-cutting-concerns.yaml`. Hive loads it during plan and execute commands.
+Place `cross-cutting-concerns.yaml` at `.pHive/cross-cutting-concerns.yaml`. Hive loads it during plan and execute commands.
 
 ```yaml
 # cross-cutting-concerns.yaml

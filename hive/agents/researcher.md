@@ -20,7 +20,7 @@ required_tools:
     type: mcp
     fallback: "Use WebSearch for library documentation"
 domain:
-  - path: state/insights/**
+  - path: .pHive/insights/**
     read: true
     write: true
     delete: false

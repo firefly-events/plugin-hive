@@ -18,7 +18,7 @@ members:
         read: true
         write: false
         delete: false
-      - path: state/**
+      - path: .pHive/**
         read: true
         write: false
         delete: false
@@ -30,7 +30,7 @@ members:
         read: true
         write: false
         delete: false
-      - path: state/meta-team/**
+      - path: .pHive/meta-team/**
         read: true
         write: true
         delete: false
@@ -58,7 +58,7 @@ members:
         read: true
         write: true
         delete: false
-      - path: state/teams/**
+      - path: .pHive/teams/**
         read: true
         write: true
         delete: false
@@ -74,7 +74,7 @@ members:
         read: true
         write: false
         delete: false
-      - path: state/**
+      - path: .pHive/**
         read: true
         write: false
         delete: false
@@ -98,8 +98,8 @@ context:
   notes: |
     The meta-team operates on the Hive plugin's own source files.
     Target repo root: /home/user/plugin-hive (or wherever plugin-hive is checked out).
-    Charter constraints are defined in state/meta-team/charter.md — read before any action.
+    Charter constraints are defined in .pHive/meta-team/charter.md — read before any action.
     All changes must be committed with [meta-team] prefix.
     No destructive operations. No >50% content removal per file.
 
-team_memory_path: state/team-memories/meta-team/
+team_memory_path: .pHive/team-memories/meta-team/

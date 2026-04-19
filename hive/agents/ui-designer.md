@@ -17,7 +17,7 @@ domain:
     read: true
     write: true
     delete: true
-  - path: state/wireframes/**
+  - path: .pHive/wireframes/**
     read: true
     write: true
     delete: false

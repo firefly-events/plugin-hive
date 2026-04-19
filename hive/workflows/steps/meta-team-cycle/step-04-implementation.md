@@ -21,7 +21,7 @@ Implement each approved proposal in priority order. Record changes in `cycle-sta
 **Inputs available:**
 - `approved_proposals` JSON from step 3 (each with implementation_plan)
 - Full codebase read/write access within charter domain
-- `state/meta-team/cycle-state.yaml` for recording changes
+- `.pHive/meta-team/cycle-state.yaml` for recording changes
 
 **NOT available:**
 - User input
@@ -62,7 +62,7 @@ For `action: add_entry`:
 - Append the new entry to the appropriate list or section
 
 #### 1c. Record the change
-Immediately after each file write, append to `state/meta-team/cycle-state.yaml`:
+Immediately after each file write, append to `.pHive/meta-team/cycle-state.yaml`:
 ```yaml
 # Under changes:
 - proposal_id: proposal-{N}

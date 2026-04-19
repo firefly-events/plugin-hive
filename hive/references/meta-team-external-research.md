@@ -47,7 +47,7 @@ If internal sources don't answer the question:
 - Prefer official documentation (Claude Code docs, Anthropic API docs) over blog posts or forums
 
 ### 4. Record the finding
-Write the finding to `state/meta-team/research-notes/{cycle-id}/{slug}.md`:
+Write the finding to `.pHive/meta-team/research-notes/{cycle-id}/{slug}.md`:
 ```markdown
 # Research Note: {slug}
 

@@ -184,13 +184,13 @@ If the timeout expires:
 Create the episode codex dir if needed:
 
 ```
-mkdir -p state/episodes/{story_id}/codex
+mkdir -p .pHive/episodes/{story_id}/codex
 ```
 
 Paths (use ISO-8601 timestamp for collision safety, e.g. `20260414T143012Z`):
 
-- Transcript: `state/episodes/{story_id}/codex/{agent_name}-{ts}.transcript.md`
-- Meta:       `state/episodes/{story_id}/codex/{agent_name}-{ts}.meta.json`
+- Transcript: `.pHive/episodes/{story_id}/codex/{agent_name}-{ts}.transcript.md`
+- Meta:       `.pHive/episodes/{story_id}/codex/{agent_name}-{ts}.meta.json`
 
 Transcript capture strategy (PoC):
 - Prefer reading codex's own session log if it writes one (check `~/.codex/` or
@@ -213,7 +213,7 @@ Meta JSON shape:
   "persona_file": "hive/agents/backend-developer.md",
   "adapter_prefix_version": 1,
   "started_at": "2026-04-14T14:30:12Z",
-  "transcript_path": "state/episodes/.../backend-developer-20260414T143012Z.transcript.md"
+  "transcript_path": ".pHive/episodes/.../backend-developer-20260414T143012Z.transcript.md"
 }
 ```
 
@@ -371,7 +371,7 @@ The shutdown step is the authoritative close path for persistent panes:
    cmux send-key --surface <id> enter
    ```
 2. Poll for response.
-3. Capture insights to: `state/episodes/{story_id}/codex/{agent}-insights.md`
+3. Capture insights to: `.pHive/episodes/{story_id}/codex/{agent}-insights.md`
 4. Capture full scrollback to transcript.
 5. Close the pane: `cmux close-surface --surface <id>`
 6. Write final meta.json with pane_lifetime_seconds, total_fix_iterations,

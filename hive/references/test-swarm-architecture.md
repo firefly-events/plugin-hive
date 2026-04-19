@@ -67,8 +67,8 @@ test_swarm:
     - name: android
       type: physical
       serial: "DEVICE_SERIAL"
-  artifacts_dir: state/test-artifacts/{epic-id}/{story-id}/
-  baseline_path: state/test-baseline/{project}/baseline-knowledge.md
+  artifacts_dir: .pHive/test-artifacts/{epic-id}/{story-id}/
+  baseline_path: .pHive/test-baseline/{project}/baseline-knowledge.md
   bug_routing:
     auto_route_threshold: low   # auto-route bugs at or below this severity
     escalation_target: human    # where to escalate high-severity bugs
@@ -102,7 +102,7 @@ A living document that captures project-level test context. Created on first dis
 - Known test patterns and conventions
 - Platform-specific considerations
 
-**Storage:** `state/test-baseline/{project}/baseline-knowledge.md`
+**Storage:** `.pHive/test-baseline/{project}/baseline-knowledge.md`
 
 **Discovery pass:** When no baseline exists, the scout runs a full discovery — inspecting the codebase for structure, patterns, and conventions. This creates the initial baseline.
 
@@ -131,7 +131,7 @@ tests:
     type: happy_path           # happy_path, edge_case, error_state
     platforms: [ios, android]
     regression_candidate: true
-    script_path: state/test-artifacts/.../test-001.yaml
+    script_path: .pHive/test-artifacts/.../test-001.yaml
 ```
 
 ## Test Execution

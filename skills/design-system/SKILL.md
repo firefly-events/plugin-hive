@@ -1,6 +1,6 @@
 ---
 name: design-system
-description: Convert brand-system YAML into W3C Design Token JSON plus a visual HTML preview of the tokens in use. Gates on state/brand/brand-system.yaml.
+description: Convert brand-system YAML into W3C Design Token JSON plus a visual HTML preview of the tokens in use. Gates on .pHive/brand/brand-system.yaml.
 ---
 
 # Hive Design System
@@ -17,7 +17,7 @@ Convert a brand system into implementation-ready W3C Design Token JSON.
 
 ## Gate Check
 
-Check `state/brand/brand-system.yaml`:
+Check `.pHive/brand/brand-system.yaml`:
 
 1. Verify the file exists
 
@@ -31,7 +31,7 @@ See `hive/references/ui-skill-gates.md` for the full gate specification.
 
 ### 1. Read brand system
 
-Read `state/brand/brand-system.yaml` in full.
+Read `.pHive/brand/brand-system.yaml` in full.
 
 ### 2. Load ui-designer persona
 
@@ -42,9 +42,9 @@ Read `hive/agents/ui-designer.md` in full.
 Spawn a subagent with the full ui-designer persona and this task:
 
 ```
-Read state/brand/brand-system.yaml.
+Read .pHive/brand/brand-system.yaml.
 
-Convert it to W3C Design Token format JSON and write to state/brand/tokens.json.
+Convert it to W3C Design Token format JSON and write to .pHive/brand/tokens.json.
 
 Use this structure (extend with all colors, all spacing values, all type scale entries):
 
@@ -91,7 +91,7 @@ Rules:
 - All dimension values must include "px" unit
 - Include every entry from the brand system — do not omit any color or spacing step
 
-After writing tokens.json, produce a visual HTML preview at state/brand/tokens-preview.html showing the tokens IN USE (not as raw JSON):
+After writing tokens.json, produce a visual HTML preview at .pHive/brand/tokens-preview.html showing the tokens IN USE (not as raw JSON):
 
 - Color tokens: swatches with token name + hex value + usage context
 - Typography tokens: type scale demonstration rendering each scale-* token at its size
@@ -108,9 +108,9 @@ Read hive/references/html-preview-format.md for the HTML structure requirements,
 Design System Complete
 
 Artifacts:
-  Source:   state/brand/brand-system.yaml
-  Tokens:   state/brand/tokens.json
-  Preview:  state/brand/tokens-preview.html  ← OPEN THIS TO SEE TOKENS IN USE
+  Source:   .pHive/brand/brand-system.yaml
+  Tokens:   .pHive/brand/tokens.json
+  Preview:  .pHive/brand/tokens-preview.html  ← OPEN THIS TO SEE TOKENS IN USE
 
 Token categories generated:
   color         — {count} tokens
@@ -121,7 +121,7 @@ Token categories generated:
 Compatible with: Tailwind CSS, Style Dictionary, Figma Token plugin, W3C Design Token importers.
 
 To view:
-  open state/brand/tokens-preview.html
+  open .pHive/brand/tokens-preview.html
 
 Next: Tokens are ready for frontend-developer to apply via Tailwind config or CSS custom properties.
 ```
@@ -131,4 +131,4 @@ Next: Tokens are ready for frontend-developer to apply via Tailwind config or CS
 - `hive/references/html-preview-format.md` — HTML preview format for tokens-preview.html
 - `hive/agents/ui-designer.md` — agent persona for token generation
 - `hive/references/ui-skill-gates.md` — gate specification for design-system
-- `state/architecture/ui-team-skills-arch.md` — W3C token format specification
+- `.pHive/architecture/ui-team-skills-arch.md` — W3C token format specification

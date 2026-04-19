@@ -19,8 +19,8 @@ Finalize the cycle: write the closed cycle-state, update the ledger, commit all 
 **Inputs available:**
 - `cycle_id` from step 1
 - `promoted_changes` and `reverted_changes` from step 7
-- `state/meta-team/cycle-state.yaml` — full cycle history
-- `state/meta-team/ledger.yaml` — prior cycle records
+- `.pHive/meta-team/cycle-state.yaml` — full cycle history
+- `.pHive/meta-team/ledger.yaml` — prior cycle records
 - Git (for committing changes)
 
 **NOT available:**
@@ -34,7 +34,7 @@ Close the cycle cleanly: update state, commit everything, update the ledger, pro
 ## TASK SEQUENCE
 
 ### 1. Finalize cycle-state.yaml
-Update `state/meta-team/cycle-state.yaml` with final summary:
+Update `.pHive/meta-team/cycle-state.yaml` with final summary:
 ```yaml
 status: closed
 closed: {ISO 8601 timestamp}
@@ -53,8 +53,8 @@ summary:
 Commit all modified and created files under:
 - `hive/`
 - `skills/hive/agents/memories/`
-- `state/meta-team/` (charter, cycle-state)
-- `state/teams/`
+- `.pHive/meta-team/` (charter, cycle-state)
+- `.pHive/teams/`
 - Any other files touched during the cycle
 
 Use commit message:
@@ -79,7 +79,7 @@ gh issue create --title "[meta-team] {finding title}" --body "{description with 
 Record the issue URL in cycle-state.yaml under `forwarded_issues`. If `github_forwarding` is false (default), skip this step entirely.
 
 ### 4. Update ledger.yaml
-After the commit succeeds, append to `state/meta-team/ledger.yaml`:
+After the commit succeeds, append to `.pHive/meta-team/ledger.yaml`:
 ```yaml
 - cycle_id: {cycle_id}
   date: {YYYY-MM-DD}
@@ -99,7 +99,7 @@ After the commit succeeds, append to `state/meta-team/ledger.yaml`:
 If ledger.yaml does not exist, create it with a YAML list header.
 
 ### 5. Produce morning summary
-Write the morning summary to `state/meta-team/morning-summary.md`.
+Write the morning summary to `.pHive/meta-team/morning-summary.md`.
 
 Follow the format in `hive/references/meta-team-ux.md`.
 
@@ -121,9 +121,9 @@ Minimal format if that reference doesn't exist:
 
 ### 6. Final confirmation
 Verify:
-- `state/meta-team/cycle-state.yaml` has `status: closed`
-- `state/meta-team/ledger.yaml` has the new entry
-- `state/meta-team/morning-summary.md` exists
+- `.pHive/meta-team/cycle-state.yaml` has `status: closed`
+- `.pHive/meta-team/ledger.yaml` has the new entry
+- `.pHive/meta-team/morning-summary.md` exists
 - Git commit succeeded
 
 ## SUCCESS METRICS
@@ -144,5 +144,5 @@ Verify:
 
 This is the final step of the meta-team cycle. No next step.
 
-**If all gating conditions met:** Cycle is fully closed. Morning summary available at `state/meta-team/morning-summary.md`.
+**If all gating conditions met:** Cycle is fully closed. Morning summary available at `.pHive/meta-team/morning-summary.md`.
 **If commit failed:** Cycle is closed with uncommitted changes. User should review and commit manually.

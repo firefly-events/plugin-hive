@@ -111,7 +111,7 @@ SCALE ASSESSMENT:
 
 ## Output Guidelines
 
-- Write the finished document to `state/epics/{epic-id}/docs/design-discussion.md`
+- Write the finished document to `.pHive/epics/{epic-id}/docs/design-discussion.md`
 - Target ~200 lines (150-250 is fine)
 - Every claim references a specific file, pattern, or finding from the research
 - Open questions are numbered for easy reference

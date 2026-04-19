@@ -25,7 +25,7 @@ skills:
 tools: ["Read", "Edit", "Write"]
 required_tools: []
 domain:
-  - path: state/**
+  - path: .pHive/**
     read: true
     write: true
     delete: false
@@ -116,9 +116,9 @@ This agent is short-lived. After delivering the document:
 
 ## Output paths
 
-All planning documents are written to `state/epics/{epic-id}/docs/{document-type}.md`. Use the epic ID from the task context to construct the path before writing.
+All planning documents are written to `.pHive/epics/{epic-id}/docs/{document-type}.md`. Use the epic ID from the task context to construct the path before writing.
 
-**Research brief** has no sub-skill file. When tasked with producing a research brief, use the research-brief pattern from memory and write to `state/epics/{epic-id}/docs/research-brief.md`. The format: synthesize the researcher's raw findings into a structured brief with key files, patterns, constraints, risks, and open questions.
+**Research brief** has no sub-skill file. When tasked with producing a research brief, use the research-brief pattern from memory and write to `.pHive/epics/{epic-id}/docs/research-brief.md`. The format: synthesize the researcher's raw findings into a structured brief with key files, patterns, constraints, risks, and open questions.
 
 ## Document formats
 

@@ -13,7 +13,7 @@ Run the test swarm pipeline on a story, PR, or the current codebase.
 
 **Before doing anything else**, check whether Hive has been initialized for this project:
 
-1. Check if `state/project-profile.yaml` exists in the project root
+1. Check if `.pHive/project-profile.yaml` exists in the project root
 2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
 3. As a secondary check, verify `hive.config.yaml` exists (check both `hive/hive.config.yaml` and `hive.config.yaml` in the project root — either location is valid)
 
@@ -40,7 +40,7 @@ Load `hive/workflows/test-swarm.workflow.yaml` and execute the pipeline. Each st
 | 0. Rebuild | test-scout | `step-00-rebuild.md` | Rebuild from latest commit, deploy to devices |
 | 1. Scout | test-scout | `step-01-scout.md` | Detect frameworks, scan tests, read baseline |
 | 2. Architect | test-architect | `step-02-architect.md` | Map ACs to tests, author scripts, verify testId render |
-| 3. Worker | test-worker | `step-03-worker.md` | Execute tests, capture artifacts to `state/test-artifacts/` |
+| 3. Worker | test-worker | `step-03-worker.md` | Execute tests, capture artifacts to `.pHive/test-artifacts/` |
 | 4. Inspector | test-inspector | `step-04-inspector.md` | Coverage analysis, gap detection |
 | 5. Sentinel | test-sentinel | `step-05-sentinel.md` | Bug filing with AI hypothesis |
 | 6. Triage | test-sentinel | `step-06-triage.md` | Categorize: transient, story issue, or human blocker |
@@ -49,7 +49,7 @@ Load `hive/workflows/test-swarm.workflow.yaml` and execute the pipeline. Each st
 
 ## Artifact Paths
 
-ALL test artifacts go to `state/test-artifacts/{epic-id}/{story-id}/`:
+ALL test artifacts go to `.pHive/test-artifacts/{epic-id}/{story-id}/`:
 - Screenshots → `screenshots/`
 - Logs → `logs/`
 - Results → `results.yaml`

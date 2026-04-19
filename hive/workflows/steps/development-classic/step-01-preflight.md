@@ -30,7 +30,7 @@ Verify the project builds cleanly before any code changes begin.
 ## TASK SEQUENCE
 
 ### 0. Check for existing progress
-Check `state/episodes/{epic-id}/{story-id}/` for existing episode files.
+Check `.pHive/episodes/{epic-id}/{story-id}/` for existing episode files.
 If `preflight` episode exists with `status: completed`, skip to next step.
 
 ### 1. Identify build commands

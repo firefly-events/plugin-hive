@@ -14,7 +14,7 @@ skills:
 tools: ["Grep", "Glob", "Read"]
 required_tools: []
 domain:
-  - path: state/**
+  - path: .pHive/**
     read: true
     write: true
     delete: false

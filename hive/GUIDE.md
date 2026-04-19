@@ -295,22 +295,22 @@ YAML-defined quality rules per workflow at `gate-policies/{workflow}.yaml`. Type
 
 | What | Where | Purpose |
 |------|-------|---------|
-| Epic definitions | `state/epics/{epic-id}/epic.yaml` | Epic index with story list |
-| Story specs | `state/epics/{epic-id}/stories/{story-id}.yaml` | Self-contained story definitions |
-| Episode records | `state/episodes/{epic-id}/{story-id}/{step-id}.yaml` | Progress tracking |
-| Cycle state | `state/cycle-state/{epic-id}.yaml` | Accumulated decisions across phases |
-| Staged insights | `state/insights/{epic-id}/{story-id}/` | Insights pending session-end evaluation |
+| Epic definitions | `.pHive/epics/{epic-id}/epic.yaml` | Epic index with story list |
+| Story specs | `.pHive/epics/{epic-id}/stories/{story-id}.yaml` | Self-contained story definitions |
+| Episode records | `.pHive/episodes/{epic-id}/{story-id}/{step-id}.yaml` | Progress tracking |
+| Cycle state | `.pHive/cycle-state/{epic-id}.yaml` | Accumulated decisions across phases |
+| Staged insights | `.pHive/insights/{epic-id}/{story-id}/` | Insights pending session-end evaluation |
 | Agent memories | `~/.claude/hive/memories/{agent}/` | System-level, cross-project |
-| Team memories | `state/team-memories/{team}/` | Project-level team knowledge |
-| Team configs | `state/teams/{team-name}.yaml` | Loadable team compositions |
-| Test baselines | `state/test-baseline/{project}/` | Project test knowledge |
-| Audit reports | `state/audits/{audit-type}/{timestamp}/report.md` | Ad-hoc audit output (ui-audit, polish-audit, visual-qa, design-review) |
-| Latest audit pointer | `state/audits/{audit-type}/latest.yaml` | Pointer to most recent completed audit of each type |
-| Design briefs | `state/design/briefs/{story-id}.md` | Stable canonical design briefs (written by ui-design workflow) |
-| Design brief manifest | `state/design/index.yaml` | Lists all brief paths and wireframe export paths (gate file for visual-qa, design-review) |
-| Brand system | `state/brand/brand-system.yaml` | Brand identity data (gate file for design-system, design-review) |
-| Design tokens | `state/brand/tokens.json` | W3C Design Token JSON (produced by design-system skill) |
-| Handoffs | `state/handoffs/{handoff-id}.yaml` | Cross-swarm artifact transfers |
+| Team memories | `.pHive/team-memories/{team}/` | Project-level team knowledge |
+| Team configs | `.pHive/teams/{team-name}.yaml` | Loadable team compositions |
+| Test baselines | `.pHive/test-baseline/{project}/` | Project test knowledge |
+| Audit reports | `.pHive/audits/{audit-type}/{timestamp}/report.md` | Ad-hoc audit output (ui-audit, polish-audit, visual-qa, design-review) |
+| Latest audit pointer | `.pHive/audits/{audit-type}/latest.yaml` | Pointer to most recent completed audit of each type |
+| Design briefs | `.pHive/design/briefs/{story-id}.md` | Stable canonical design briefs (written by ui-design workflow) |
+| Design brief manifest | `.pHive/design/index.yaml` | Lists all brief paths and wireframe export paths (gate file for visual-qa, design-review) |
+| Brand system | `.pHive/brand/brand-system.yaml` | Brand identity data (gate file for design-system, design-review) |
+| Design tokens | `.pHive/brand/tokens.json` | W3C Design Token JSON (produced by design-system skill) |
+| Handoffs | `.pHive/handoffs/{handoff-id}.yaml` | Cross-swarm artifact transfers |
 
 ---
 
@@ -331,7 +331,7 @@ Agents accumulate memories across sessions. The memory system uses a four-layer 
 
 **Compiled wiki** (`~/.claude/hive/memory-wiki/`): LLM-authored topic articles with `[[wikilinks]]`. Replaces keyword matching with topic-based navigation. Cross-agent sharing is organic — memories from different agents converge by topic.
 
-**Project-level** (`state/team-memories/{team}/`): Team memories are scoped to the current project — collective patterns that don't travel.
+**Project-level** (`.pHive/team-memories/{team}/`): Team memories are scoped to the current project — collective patterns that don't travel.
 
 ### Memory Types
 - `pattern` — repeatable approach that worked (TTL: 90 days)
@@ -344,11 +344,11 @@ Agents accumulate memories across sessions. The memory system uses a four-layer 
 ```
 Agent executes step
   → encounters something non-obvious
-  → writes insight to state/insights/ staging
+  → writes insight to .pHive/insights/ staging
   → session ends
   → orchestrator evaluates: promote or discard?
   → agent insights → ~/.claude/hive/memories/{agent}/
-  → team insights → state/team-memories/{team}/
+  → team insights → .pHive/team-memories/{team}/
   → reference insights → append to existing reference memory
   → wiki compilation (incremental, affected topics only)
   → next session: wiki-first retrieval at spawn time
@@ -392,7 +392,7 @@ Handoff includes: story specs, implementation artifacts, cycle state, constraint
 Hive works in two modes based on `hive.config.yaml` → `task_tracking.adapter`:
 
 **Local mode** (`adapter: null`, default):
-- All tracking via status markers (`state/episodes/`) and cycle state (`state/cycle-state/`)
+- All tracking via status markers (`.pHive/episodes/`) and cycle state (`.pHive/cycle-state/`)
 - Blockers surfaced via cycle state "blocked" status
 - No external tool required — works out of the box
 

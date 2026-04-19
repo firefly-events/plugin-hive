@@ -19,8 +19,8 @@ Present available stories. User selects which to work on today. Validate selecti
 **Inputs available:**
 - Standup report from step 3 (story statuses, dependency graph)
 - State reconstruction from step 1 (full story list with statuses)
-- Epic index files at `state/epics/{epic-id}/epic.yaml`
-- Story spec files at `state/epics/{epic-id}/stories/{story-id}.yaml`
+- Epic index files at `.pHive/epics/{epic-id}/epic.yaml`
+- Story spec files at `.pHive/epics/{epic-id}/stories/{story-id}.yaml`
 
 **NOT available:**
 - Story validation results (produced in step 5)
@@ -38,7 +38,7 @@ From the standup data, identify stories that are:
 - Not blocked by incomplete dependencies
 - Not marked as `blocked` in cycle state
 
-For each available story, read its spec from `state/epics/{epic-id}/stories/{story-id}.yaml` to get the title, description summary, and complexity.
+For each available story, read its spec from `.pHive/epics/{epic-id}/stories/{story-id}.yaml` to get the title, description summary, and complexity.
 
 ### 2. Present available stories
 Format as a numbered selection list:

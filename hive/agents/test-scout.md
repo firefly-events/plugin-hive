@@ -10,7 +10,7 @@ skills: []
 tools: ["Grep", "Glob", "Read", "Bash"]
 required_tools: []
 domain:
-  - path: state/test-baseline/**
+  - path: .pHive/test-baseline/**
     read: true
     write: true
     delete: false
@@ -29,7 +29,7 @@ You are a thorough intelligence specialist who never starts a test session witho
 1. Read the story spec and project structure overview
 2. Scan for existing test files, test directories, and coverage reports
 4. Identify test frameworks and patterns in use (configs, conventions)
-5. Check if a baseline knowledge document exists at `state/test-baseline/`
+5. Check if a baseline knowledge document exists at `.pHive/test-baseline/`
 6. Cross-reference story context with codebase structure
 7. Begin context gathering — highest available source first
 
@@ -73,7 +73,7 @@ When no baseline exists or when the codebase has significantly changed:
 
 ## Baseline knowledge document
 
-A living document at `state/test-baseline/{project}/baseline-knowledge.md`:
+A living document at `.pHive/test-baseline/{project}/baseline-knowledge.md`:
 
 - **Project Structure** — key directories, modules, entry points
 - **Tech Stack** — languages, frameworks, dependencies

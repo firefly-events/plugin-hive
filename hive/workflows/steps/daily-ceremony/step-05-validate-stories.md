@@ -22,9 +22,9 @@ This step is executed by the analyst agent persona. Load `agents/analyst.md` for
 
 **Inputs available:**
 - Today's work list from step 4 (story IDs and execution order)
-- Story spec files at `state/epics/{epic-id}/stories/{story-id}.yaml`
+- Story spec files at `.pHive/epics/{epic-id}/stories/{story-id}.yaml`
 - Agent-ready checklist at `references/agent-ready-checklist.md`
-- Cross-cutting concerns from step 2 (loaded from `state/cross-cutting-concerns.yaml`)
+- Cross-cutting concerns from step 2 (loaded from `.pHive/cross-cutting-concerns.yaml`)
 - Cycle state from step 1 (decisions and constraints)
 
 **NOT available:**
@@ -50,7 +50,7 @@ Read `references/agent-ready-checklist.md` to get the full 9-point checklist. Th
 9. Cross-cutting concerns evaluated
 
 ### 2. Validate each story
-For each story in today's work list, read the full story spec from `state/epics/{epic-id}/stories/{story-id}.yaml` and evaluate all 9 checks:
+For each story in today's work list, read the full story spec from `.pHive/epics/{epic-id}/stories/{story-id}.yaml` and evaluate all 9 checks:
 
 For each check, record:
 - **Pass/Fail** — does the story satisfy this check?
@@ -58,7 +58,7 @@ For each check, record:
 - **Remediation** — if failed, what needs to change?
 
 ### 3. Evaluate cross-cutting concerns per story
-For each story, evaluate each cross-cutting concern from `state/cross-cutting-concerns.yaml`:
+For each story, evaluate each cross-cutting concern from `.pHive/cross-cutting-concerns.yaml`:
 - Does the concern's `applies_when` condition match this story?
 - If yes, does the story's spec already address the concern's required `action`?
 - If the concern applies but is not addressed, flag it as a validation failure

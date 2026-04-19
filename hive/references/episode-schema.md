@@ -5,7 +5,7 @@ Status markers are lightweight files that track workflow step completion. They r
 ## Storage Path
 
 ```
-state/episodes/{epic-id}/{story-id}/{step-id}.yaml
+.pHive/episodes/{epic-id}/{story-id}/{step-id}.yaml
 ```
 
 ## Format
@@ -45,7 +45,7 @@ That's it. Four fields. Target: under 200 bytes per marker.
 
 ## Reading markers for status
 
-Check `state/episodes/{epic-id}/{story-id}/` for marker files. Cross-reference the workflow step order:
+Check `.pHive/episodes/{epic-id}/{story-id}/` for marker files. Cross-reference the workflow step order:
 
 | Condition | Story Status |
 |-----------|-------------|

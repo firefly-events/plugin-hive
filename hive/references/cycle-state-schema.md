@@ -5,7 +5,7 @@ The cycle state document is a structured, machine-readable file that accumulates
 ## Storage Path
 
 ```
-state/cycle-state/{epic-id}.yaml
+.pHive/cycle-state/{epic-id}.yaml
 ```
 
 Created at epic start, updated after each phase completes.

@@ -1,13 +1,13 @@
 ---
 name: visual-qa
-description: Post-implementation design fidelity check — compares design briefs and wireframe PNGs against the actual implementation. Gates on state/design/index.yaml.
+description: Post-implementation design fidelity check — compares design briefs and wireframe PNGs against the actual implementation. Gates on .pHive/design/index.yaml.
 ---
 
 # Hive Visual QA
 
 Run a visual QA pass to verify the implementation matches the design briefs and wireframe exports.
 
-**Input:** `$ARGUMENTS` optionally contains specific story IDs or implementation file paths to compare. If none provided, checks all entries in `state/design/index.yaml`.
+**Input:** `$ARGUMENTS` optionally contains specific story IDs or implementation file paths to compare. If none provided, checks all entries in `.pHive/design/index.yaml`.
 
 ## Before Executing Any Skill
 
@@ -19,10 +19,10 @@ Run a visual QA pass to verify the implementation matches the design briefs and 
 
 Check both files in order:
 
-1. Verify `state/design/index.yaml` exists. If missing, display this message and **stop**:
+1. Verify `.pHive/design/index.yaml` exists. If missing, display this message and **stop**:
    > No design briefs found. Run `/hive:ui-design` on a story first — visual-qa needs design briefs and wireframe exports to compare against the implementation.
 
-2. Verify `state/project-profile.yaml` exists. If missing, display this message and **stop**:
+2. Verify `.pHive/project-profile.yaml` exists. If missing, display this message and **stop**:
    > Hive hasn't been set up for this project yet. Run `/hive:kickoff` first — visual-qa needs the tech stack profile to locate implementation files.
 
 Both checks must pass before proceeding.
@@ -33,7 +33,7 @@ See `hive/references/ui-skill-gates.md` for the full gate specification.
 
 ### 1. Load design manifest
 
-Read `state/design/index.yaml`. Extract:
+Read `.pHive/design/index.yaml`. Extract:
 - All `brief_path` entries
 - All `export_paths` entries (wireframe PNGs)
 - All `story_id` values (to locate implementation files)
@@ -67,7 +67,7 @@ For each screen/story in scope:
    - Accessibility requirements
 
 2. Read the implementation files for {story_id} — locate the frontend components
-   that implement the designed screens. Use the tech stack from state/project-profile.yaml
+   that implement the designed screens. Use the tech stack from .pHive/project-profile.yaml
    to find the right file locations.
 
 3. If wireframe PNG is available at {export_path}: use it as the visual reference.
@@ -106,7 +106,7 @@ Generate a timestamp: `{YYYY-MM-DD}T{HHMM}`.
 
 Write the report to:
 ```
-state/audits/visual-qa/{timestamp}/report.md
+.pHive/audits/visual-qa/{timestamp}/report.md
 ```
 
 ### 5. Report output
@@ -114,7 +114,7 @@ state/audits/visual-qa/{timestamp}/report.md
 ```
 Visual QA Complete
 
-Report: state/audits/visual-qa/{timestamp}/report.md
+Report: .pHive/audits/visual-qa/{timestamp}/report.md
 Verdict: {fidelity-passed | fidelity-acceptable | fidelity-needs-revision}
 Discrepancies: {count} total ({blocking} blocking, {significant} significant, {cosmetic} cosmetic)
 
@@ -127,4 +127,4 @@ Wireframe PNGs: {count available} / {count total}
 
 - `hive/agents/ui-designer.md` — agent persona for fidelity comparison
 - `hive/references/ui-skill-gates.md` — gate specification for visual-qa
-- `state/design/index.yaml` — design brief manifest (gate file)
+- `.pHive/design/index.yaml` — design brief manifest (gate file)

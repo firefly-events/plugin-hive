@@ -23,10 +23,15 @@ fi
 prompt=$(echo "$input" | jq -r '.tool_input.prompt // ""')
 description=$(echo "$input" | jq -r '.tool_input.description // ""')
 
-# Pattern 1: Agent prompt references story YAML paths (story-level work)
-if echo "$prompt" | grep -qiE 'state/epics/[^/]+/stories/[^/]+\.yaml'; then
+# Pattern 1: Agent prompt references story YAML paths (story-level work).
+# Matches both the v1.2+ default (.pHive/) and the legacy state/ layout so
+# projects that haven't migrated yet are still covered by this hook.
+# The `.` and `/` in `.pHive` are escaped to avoid false positives on strings
+# like `xpHive-epics`.
+story_regex='(\.pHive|state)/epics/[^/]+/stories/[^/]+\.yaml'
+if echo "$prompt" | grep -qiE "$story_regex"; then
   # Check if it's a single story being fully delegated
-  story_count=$(echo "$prompt" | grep -oiE 'state/epics/[^/]+/stories/[^/]+\.yaml' | sort -u | wc -l | tr -d ' ')
+  story_count=$(echo "$prompt" | grep -oiE "$story_regex" | sort -u | wc -l | tr -d ' ')
   if [ "$story_count" -ge 1 ]; then
     # Check for workflow execution signals (not just reading a story for context)
     if echo "$prompt" | grep -qiE '(execute.*stor|implement.*stor|workflow.*phase|development.*workflow|research.*implement.*test|review.*integrate)'; then

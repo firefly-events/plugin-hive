@@ -44,7 +44,7 @@ Capture the output of each step. Pass outputs to downstream steps as configured 
 After each step completes, per the schema in `hive/references/episode-schema.md`, write to:
 
 ```
-state/episodes/{epic-id}/{story-id}/{step-id}.yaml
+.pHive/episodes/{epic-id}/{story-id}/{step-id}.yaml
 ```
 
 Episode markers are **limited to status and artifact paths** (per the episode schema). They are the audit trail — discovery of what ran, succeeded/failed, and which artifacts it produced. They are **not** a data-flow mechanism. Substantive step output is carried forward in the subagent prompt for the next step, never reconstructed by reading episode YAMLs.
@@ -71,4 +71,4 @@ During long-running steps (implement, test, optimize), the orchestrator should w
 4. The fresh sub-worker continues the step from where the previous one left off
 5. If respawn count reaches 3, escalate to the user with the summary chain
 
-Ensure `state/respawn-summaries/` exists at the start of execution.
+Ensure `.pHive/respawn-summaries/` exists at the start of execution.
