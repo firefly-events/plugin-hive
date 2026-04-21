@@ -8,20 +8,21 @@
 - NEVER remove more than 50% of a file's existing content in a single operation
 - NEVER delete any file
 - For additive changes: append or insert; do not replace existing content unless fixing a specific named error
-- Record each change with file path, action type, and a brief description
+- Track each change with file path, action type, and a brief description in the step's `changes_made` output
 
 ## EXECUTION PROTOCOLS
 
 **Mode:** autonomous
 
-Implement each approved proposal in priority order. Record changes in `cycle-state.yaml` as you go.
+**Authority model:** this step's only persistent output is the structured `changes_made` result returned to the workflow. Do NOT write cycle-state, ledger, envelope, or metrics-carrier files inline from this step. Downstream steps (evaluation, promotion, close) own any persistent control-plane writes and the orchestrator coordinates them via the workflow output graph, the B0 envelope contract (`.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md`), and the C1 runtime primitives (`hive/lib/metrics/`) per the meta-improvement-system epic.
+
+Implement each approved proposal in priority order. Track changes in the implementation outputs as you go.
 
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
 - `approved_proposals` JSON from step 3 (each with implementation_plan)
 - Full codebase read/write access within charter domain
-- `.pHive/meta-team/cycle-state.yaml` for recording changes
 
 **NOT available:**
 - User input
@@ -30,7 +31,7 @@ Implement each approved proposal in priority order. Record changes in `cycle-sta
 
 ## YOUR TASK
 
-Execute each approved proposal's implementation plan. Write new files, add sections, create memory entries. Track every change made.
+Execute each approved proposal's implementation plan. Write new files, add sections, create memory entries. Track every change made in the implementation outputs.
 
 ## TASK SEQUENCE
 
@@ -61,10 +62,9 @@ For `action: add_entry`:
 - Read current file content
 - Append the new entry to the appropriate list or section
 
-#### 1c. Record the change
-Immediately after each file write, append to `.pHive/meta-team/cycle-state.yaml`:
+#### 1c. Track the change in the implementation report output
+Immediately after each successful file write, add a structured entry to the `changes_made` output:
 ```yaml
-# Under changes:
 - proposal_id: proposal-{N}
   action: {action type}
   file: {file path}
@@ -79,6 +79,7 @@ If a proposal cannot be implemented as planned (target file has changed, depende
 - Continue with remaining proposals
 
 ### 3. Produce implementation report
+This report is the human-readable companion to the structured `changes_made` output.
 ```
 ## Implementation Report — Cycle {cycle_id}
 
@@ -95,7 +96,7 @@ Changes:
 - [ ] Each approved proposal attempted in priority order
 - [ ] Each target file read before writing
 - [ ] No existing file content removed beyond the minimum needed to fix the named issue
-- [ ] Each completed change recorded in `cycle-state.yaml`
+- [ ] Each completed change appears in the `changes_made` output
 - [ ] Implementation report produced
 
 ## FAILURE MODES
@@ -104,8 +105,18 @@ Changes:
 - Content conflict (target section already exists or was added by a prior proposal): log as blocked with reason `already_exists`, skip
 - Accidental scope creep: revert the change, record as blocked with reason `scope_creep`
 
+## WHAT THIS STEP DOES NOT OWN
+
+- Persistent cycle-state or ledger writes (close step / orchestrator own those per the rebuilt authority model)
+- Envelope creation or updates (lifecycle library and promotion step own these — B0 §1 contract)
+- Metrics-carrier emission (opt-in via kickoff; C2 emitters own this; Step 4 does not emit events)
+- Test execution or validation (Step 5)
+- Evaluation verdict (Step 6)
+- Promotion or revert decisions (Step 7)
+- Closure invariant checks (Step 8 close validator)
+
 ## NEXT STEP
 
-**Gating:** At least one change recorded in `cycle-state.yaml`, OR all proposals blocked with reasons.
+**Gating:** At least one change in the `changes_made` output, OR all proposals blocked with structured reasons in the same output.
 **Next:** Load `hive/workflows/steps/meta-team-cycle/step-05-testing.md`
 **If gating fails:** Report which proposals failed and why. Do not advance without at least one completed change.

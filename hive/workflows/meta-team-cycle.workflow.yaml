@@ -64,7 +64,9 @@ steps:
     agent: developer
     task: >
       Implement each approved proposal in sequence. Write files, add sections,
-      create memories. Record each change with before/after notes.
+      create memories. Return structured per-change entries in the
+      `changes_made` output; persistent control-plane writes happen in later
+      steps and are coordinated by the workflow output graph, not this step.
     step_file: hive/workflows/steps/meta-team-cycle/step-04-implementation.md
     depends_on:
       - proposal
