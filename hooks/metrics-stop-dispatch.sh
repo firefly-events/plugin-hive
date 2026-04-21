@@ -8,7 +8,8 @@
 # Always exits 0 on internal failure (handler isolation — sentinel must not be
 # suppressed by any failure in this script).
 
-set -euo pipefail
+# No set -e: use per-line guards (|| exit 0) to avoid partial-write risk (I-4)
+set -uo pipefail
 
 # Resolve project root (always the git repo root regardless of cwd at hook time)
 # HIVE_REPO_ROOT_OVERRIDE allows tests to inject a fixture root
@@ -22,17 +23,37 @@ CONFIG="$REPO_ROOT/hive/hive.config.yaml"
 # Always exit 0 on any unhandled error — metrics failure must not suppress sentinel
 trap 'exit 0' ERR
 
-_read_config_value() {
+# Three-tier YAML-scoped config reader (I-1): yq → python3 yaml.safe_load → awk-scoped grep
+# Returns value of metrics.<key>, never matches keys outside the metrics: block
+_read_metrics_config() {
   local key="$1"
   local default="$2"
   if [ ! -f "$CONFIG" ]; then
     echo "$default"
     return
   fi
-  # Simple yaml reader — handles "key: value" on its own line
-  local val
-  val=$(grep -E "^[[:space:]]*${key}:" "$CONFIG" 2>/dev/null | head -1 | sed 's/^[^:]*:[[:space:]]*//' | tr -d '"' | tr -d "'")
-  if [ -z "$val" ]; then
+  local val=""
+  if command -v yq &>/dev/null; then
+    val=$(yq ".metrics.${key}" "$CONFIG" 2>/dev/null | tr -d ' "' || true)
+  elif command -v python3 &>/dev/null; then
+    val=$(python3 - "$CONFIG" "$key" <<'PYEOF'
+import sys
+try:
+    import yaml
+    with open(sys.argv[1]) as f:
+        c = yaml.safe_load(f)
+    v = c.get('metrics', {}).get(sys.argv[2], '')
+    if v is not None and str(v) != '':
+        print(str(v).lower() if isinstance(v, bool) else str(v))
+except Exception:
+    pass
+PYEOF
+    )
+  else
+    val=$(awk '/^metrics:/{flag=1; next} /^[a-zA-Z]/{flag=0} flag && /^[[:space:]]+'"$key"':/' "$CONFIG" \
+      | head -1 | sed 's/[^:]*:[[:space:]]*//' | tr -d ' "')
+  fi
+  if [ -z "${val:-}" ] || [ "$val" = "null" ]; then
     echo "$default"
   else
     echo "$val"
@@ -40,8 +61,8 @@ _read_config_value() {
 }
 
 # Read configuration
-METRICS_ENABLED=$(_read_config_value "enabled" "false")
-METRICS_DIR=$(_read_config_value "dir" ".pHive/metrics")
+METRICS_ENABLED=$(_read_metrics_config "enabled" "false")
+METRICS_DIR=$(_read_metrics_config "dir" ".pHive/metrics")
 
 # Strip leading/trailing whitespace and comment suffixes from yaml values
 METRICS_ENABLED=$(echo "$METRICS_ENABLED" | awk '{print $1}')
@@ -98,7 +119,7 @@ _extract_tokens() {
     return
   fi
 
-  # Stream line-by-line; never slurp full file (C2.0 edge case #4)
+  # Slurp mode for aggregation across all assistant rows (C2.0 edge case #4)
   jq -c -s '
     [.[] | select(.type == "assistant" and .message.usage != null)]
     | {
@@ -125,9 +146,10 @@ TOTAL_TOKENS=$((INPUT_TOKENS + OUTPUT_TOKENS))
 # Wall-clock end time
 END_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 # Use unix timestamp in ms — macOS date lacks %3N; fall back to seconds * 1000
+# If both fail, WALL_CLOCK_MS remains empty (I-3: omit row rather than emit misleading 0)
 WALL_CLOCK_MS=$(python3 -c "import time; print(int(time.time()*1000))" 2>/dev/null \
-  || awk 'BEGIN{srand(); print int(systime()*1000)}' \
-  || echo "0")
+  || awk 'BEGIN{print int(systime()*1000)}' 2>/dev/null \
+  || true)
 
 # Build event_id and run_id
 EVENT_TS=$(date -u +%Y-%m-%dT%H%M%SZ)
@@ -177,32 +199,33 @@ TOKEN_ROW=$(jq -nc \
 
 echo "$TOKEN_ROW" >> "$EVENTS_FILE" || exit 0
 
-# Emit wall_clock_ms row
-WALL_EVENT_ID="evt_${EVENT_TS}_stop_wall"
-WALL_ROW=$(jq -nc \
-  --arg event_id "$WALL_EVENT_ID" \
-  --arg ts "$END_TS" \
-  --arg run_id "$RUN_ID" \
-  --arg swarm_id "meta-improvement-system" \
-  --arg session_id "$SESSION_ID" \
-  --argjson value "$WALL_CLOCK_MS" \
-  '{
-    event_id: $event_id,
-    timestamp: $ts,
-    run_id: $run_id,
-    swarm_id: $swarm_id,
-    story_id: "session-end",
-    phase: "stop-hook",
-    agent: "stop-hook-dispatcher",
-    metric_type: "wall_clock_ms",
-    value: $value,
-    unit: "ms",
-    dimensions: {
-      session_id: $session_id
-    },
-    source: "stop-hook-wall-clock"
-  }')
-
-echo "$WALL_ROW" >> "$EVENTS_FILE" || exit 0
+# Emit wall_clock_ms row only when value is available (I-3: skip rather than emit 0)
+if [ -n "${WALL_CLOCK_MS:-}" ]; then
+  WALL_EVENT_ID="evt_${EVENT_TS}_stop_wall"
+  WALL_ROW=$(jq -nc \
+    --arg event_id "$WALL_EVENT_ID" \
+    --arg ts "$END_TS" \
+    --arg run_id "$RUN_ID" \
+    --arg swarm_id "meta-improvement-system" \
+    --arg session_id "$SESSION_ID" \
+    --argjson value "$WALL_CLOCK_MS" \
+    '{
+      event_id: $event_id,
+      timestamp: $ts,
+      run_id: $run_id,
+      swarm_id: $swarm_id,
+      story_id: "session-end",
+      phase: "stop-hook",
+      agent: "stop-hook-dispatcher",
+      metric_type: "wall_clock_ms",
+      value: $value,
+      unit: "ms",
+      dimensions: {
+        session_id: $session_id
+      },
+      source: "stop-hook-wall-clock"
+    }')
+  echo "$WALL_ROW" >> "$EVENTS_FILE" || exit 0
+fi
 
 exit 0

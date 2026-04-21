@@ -47,6 +47,27 @@ YAML
   echo "$dir/repo"
 }
 
+_make_fixture_with_collision() {
+  local name="$1"
+  local dir="$TMPDIR_BASE/$name"
+  mkdir -p "$dir/repo/hive" "$dir/repo/.pHive/interrupts" "$dir/repo/hooks"
+
+  # Config: metrics.enabled false, followed later by a block with enabled: true
+  # Simulates external_models.codex.enabled: true appearing after metrics: block (I-2)
+  cat > "$dir/repo/hive/hive.config.yaml" <<YAML
+metrics:
+  enabled: false
+  dir: .pHive/metrics
+external_models:
+  codex:
+    enabled: true
+YAML
+
+  cp "$DISPATCHER" "$dir/repo/hooks/metrics-stop-dispatch.sh"
+  mkdir -p "$dir/repo/.git"
+  echo "$dir/repo"
+}
+
 _make_jsonl() {
   local path="$1"
   mkdir -p "$(dirname "$path")"
@@ -301,6 +322,68 @@ if [ -n "$EVENT_FILE_D" ]; then
   fi
 else
   _fail "idempotency: no event file found"
+fi
+
+# ── Test (e): config key collision — metrics.enabled false wins over later enabled: true ─
+# (I-2) Locks in the YAML-scoped config parser fix (I-1)
+
+echo ""
+echo "=== (e) config-collision: metrics.enabled=false wins despite later enabled:true ==="
+
+REPO_E=$(_make_fixture_with_collision "key_collision")
+_run_dispatcher "$REPO_E" "test-session-e" 2>/dev/null
+
+if [ -d "$REPO_E/.pHive/metrics/events" ]; then
+  event_files_e=$(ls "$REPO_E/.pHive/metrics/events/" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$event_files_e" -eq "0" ]; then
+    _pass "collision: no events written (metrics.enabled=false wins)"
+  else
+    _fail "collision: events were written despite metrics.enabled=false ($event_files_e files)"
+  fi
+else
+  _pass "collision: events dir not created (metrics.enabled=false wins)"
+fi
+
+# ── Test (c'): real dispatcher with corrupted JSONL — exits 0, trap guards work ─
+# (I-5) Proves the script's own trap/|| exit 0 guards, not just plugin.json || true
+
+echo ""
+echo "=== (c') real dispatcher with corrupted JSONL: exits 0, sentinel preserved ==="
+
+REPO_CP=$(_make_fixture "corrupted_jsonl" "true")
+SESSION_CP="test-session-cp"
+
+# Create a corrupted JSONL: truncated mid-line + malformed JSON
+CORRUPT_JSONL="$TMPDIR_BASE/corrupt_${SESSION_CP}.jsonl"
+printf '{"type":"assistant","message":{"usage":{"input_tokens":50,"output_' > "$CORRUPT_JSONL"
+printf '\n{"INVALID JSON :::' >> "$CORRUPT_JSONL"
+
+# Write sentinel first
+_run_sentinel_command "$REPO_CP"
+sentinel_count_cp=$(ls "$REPO_CP/.pHive/interrupts/" | wc -l | tr -d ' ')
+
+# Run real dispatcher with corrupted transcript — must exit 0
+exit_code=0
+(
+  cd "$REPO_CP"
+  export HIVE_REPO_ROOT_OVERRIDE="$REPO_CP"
+  input_json=$(jq -nc --arg sid "$SESSION_CP" --arg cwd "$REPO_CP" --arg tp "$CORRUPT_JSONL" \
+    '{session_id: $sid, cwd: $cwd, transcript_path: $tp, hook_event_name: "Stop"}')
+  echo "$input_json" | bash "$REPO_CP/hooks/metrics-stop-dispatch.sh"
+) 2>/dev/null || exit_code=$?
+
+if [ "$exit_code" -eq "0" ]; then
+  _pass "corrupted-jsonl: dispatcher exits 0 on corrupted transcript"
+else
+  _fail "corrupted-jsonl: dispatcher exited non-zero ($exit_code) — trap guards failed"
+fi
+
+# Sentinel must still be intact
+sentinel_count_cp_after=$(ls "$REPO_CP/.pHive/interrupts/" | wc -l | tr -d ' ')
+if [ "$sentinel_count_cp_after" -eq "$sentinel_count_cp" ]; then
+  _pass "corrupted-jsonl: sentinel count unchanged"
+else
+  _fail "corrupted-jsonl: sentinel count changed ($sentinel_count_cp -> $sentinel_count_cp_after)"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
