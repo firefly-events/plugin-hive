@@ -1,0 +1,27 @@
+# CodeRabbit configuration
+# Docs: https://docs.coderabbit.ai/guides/configure-coderabbit
+
+language: en
+early_access: false
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  # Exclude planning + audit artifacts from review. These are authored pre-execution
+  # under bounded prompts, sign-off protocols, or ceremony outputs — they are not
+  # engineering code and should be reviewed by humans, not CodeRabbit.
+  path_filters:
+    - "!.pHive/epics/**/docs/**"
+    - "!.pHive/epics/**/research-drafts/**"
+    - "!.pHive/epics/**/stories/*.yaml"
+    - "!.pHive/epics/**/epic.yaml"
+    - "!.pHive/episodes/**"
+    - "!.pHive/cycle-state/**"
+  auto_review:
+    enabled: true
+    drafts: false
+chat:
+  auto_reply: true
