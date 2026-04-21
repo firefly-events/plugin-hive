@@ -204,7 +204,7 @@ if [ -n "$EVENT_FILE_B" ]; then
   fi
 
   # orchestrator row must have value > 0 (100+80+200+150 = 530)
-  ORC_ROW=$(jq -c 'select(.dimensions.agent == "orchestrator")' "$EVENT_FILE_B" 2>/dev/null | head -1)
+  ORC_ROW=$(jq -c 'select(.agent == "orchestrator")' "$EVENT_FILE_B" 2>/dev/null | head -1)
   if [ -n "$ORC_ROW" ]; then
     ORC_VAL=$(echo "$ORC_ROW" | jq -r '.value // 0')
     if [ "$ORC_VAL" -gt "0" ]; then
@@ -212,17 +212,19 @@ if [ -n "$EVENT_FILE_B" ]; then
     else
       _fail "flag-on: orchestrator value is 0"
     fi
+    [ "$ORC_VAL" = "530" ] || _fail "flag-on: orchestrator value: expected 530, got $ORC_VAL"
     if echo "$ORC_ROW" | jq -e '.dimensions.input_tokens != null and .dimensions.output_tokens != null' > /dev/null 2>&1; then
       _pass "flag-on: orchestrator dimensions carry token breakdown"
     else
       _fail "flag-on: orchestrator dimensions missing token breakdown"
     fi
+    [ "$(echo "$ORC_ROW" | jq -r .dimensions.codex_gap)" = "false" ] || _fail "codex_gap should be false on populated row"
   else
     _fail "flag-on: orchestrator row not found"
   fi
 
   # developer agent row
-  DEV_ROW=$(jq -c 'select(.dimensions.agent == "hive:developer")' "$EVENT_FILE_B" 2>/dev/null | head -1)
+  DEV_ROW=$(jq -c 'select(.agent == "hive:developer")' "$EVENT_FILE_B" 2>/dev/null | head -1)
   if [ -n "$DEV_ROW" ]; then
     DEV_VAL=$(echo "$DEV_ROW" | jq -r '.value // 0')
     if [ "$DEV_VAL" -gt "0" ]; then
@@ -230,6 +232,7 @@ if [ -n "$EVENT_FILE_B" ]; then
     else
       _fail "flag-on: hive:developer value is 0"
     fi
+    [ "$DEV_VAL" = "175" ] || _fail "flag-on: hive:developer value: expected 175, got $DEV_VAL"
   else
     _fail "flag-on: hive:developer row not found"
   fi
@@ -357,7 +360,7 @@ if [ -n "$EVENT_FILE_E" ]; then
   fi
 
   # Each agent must be distinct
-  DISTINCT_AGENTS=$(jq -r '.dimensions.agent' "$EVENT_FILE_E" | sort -u | wc -l | tr -d ' ')
+  DISTINCT_AGENTS=$(jq -r '.agent' "$EVENT_FILE_E" | sort -u | wc -l | tr -d ' ')
   if [ "$DISTINCT_AGENTS" -ge "3" ]; then
     _pass "per-agent: $DISTINCT_AGENTS distinct agent labels"
   else
@@ -365,12 +368,12 @@ if [ -n "$EVENT_FILE_E" ]; then
   fi
 
   # developer and reviewer must both appear
-  if jq -e 'select(.dimensions.agent == "hive:developer")' "$EVENT_FILE_E" > /dev/null 2>&1; then
+  if jq -e 'select(.agent == "hive:developer")' "$EVENT_FILE_E" > /dev/null 2>&1; then
     _pass "per-agent: hive:developer row present"
   else
     _fail "per-agent: hive:developer row missing"
   fi
-  if jq -e 'select(.dimensions.agent == "hive:reviewer")' "$EVENT_FILE_E" > /dev/null 2>&1; then
+  if jq -e 'select(.agent == "hive:reviewer")' "$EVENT_FILE_E" > /dev/null 2>&1; then
     _pass "per-agent: hive:reviewer row present"
   else
     _fail "per-agent: hive:reviewer row missing"
@@ -414,7 +417,7 @@ EVENTS_F="$REPO_F/.pHive/metrics/events"
 EVENT_FILE_F=$(ls "$EVENTS_F"/*.jsonl 2>/dev/null | head -1 || echo "")
 
 if [ -n "$EVENT_FILE_F" ]; then
-  CODEX_ROW=$(jq -c 'select(.dimensions.agent == "codex-agent")' "$EVENT_FILE_F" 2>/dev/null | head -1)
+  CODEX_ROW=$(jq -c 'select(.agent == "codex-agent")' "$EVENT_FILE_F" 2>/dev/null | head -1)
   if [ -n "$CODEX_ROW" ]; then
     CG=$(echo "$CODEX_ROW" | jq -r '.dimensions.codex_gap // false')
     CV=$(echo "$CODEX_ROW" | jq -r '.value // -1')

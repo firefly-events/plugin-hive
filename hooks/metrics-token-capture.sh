@@ -218,10 +218,10 @@ _emit_agent_row() {
         timestamp:   $ts,
         run_id:      $run_id,
         metric_type: "tokens",
+        agent:       $agent,
         value:       $value,
         unit:        "tokens",
         dimensions: {
-          agent:                      $agent,
           model:                      $model,
           input_tokens:               $input_t,
           output_tokens:              $output_t,
@@ -296,7 +296,7 @@ if [ -n "$MAIN_JSONL" ] && [ -f "$MAIN_JSONL" ]; then
   CC=$(echo "$MAIN_STATS" | jq -r '.cache_creation_input_tokens // 0')
   CR=$(echo "$MAIN_STATS" | jq -r '.cache_read_input_tokens // 0')
   MDL=$(echo "$MAIN_STATS" | jq -r '.model // "unknown"')
-  GAP=$(echo "$MAIN_STATS" | jq -r '.codex_gap // true')
+  GAP=$(echo "$MAIN_STATS" | jq -r 'if has("codex_gap") then .codex_gap else true end')
   TOTAL=$((IN + OUT))
 
   ROW=$(_emit_agent_row "orchestrator" "$TOTAL" "$IN" "$OUT" "$CC" "$CR" "$MDL" "$GAP")
@@ -322,7 +322,7 @@ if [ -d "$SUBAGENTS_DIR" ]; then
     CC=$(echo "$STATS" | jq -r '.cache_creation_input_tokens // 0')
     CR=$(echo "$STATS" | jq -r '.cache_read_input_tokens // 0')
     MDL=$(echo "$STATS" | jq -r '.model // "unknown"')
-    GAP=$(echo "$STATS" | jq -r '.codex_gap // true')
+    GAP=$(echo "$STATS" | jq -r 'if has("codex_gap") then .codex_gap else true end')
     TOTAL=$((IN + OUT))
 
     ROW=$(_emit_agent_row "$agent_label" "$TOTAL" "$IN" "$OUT" "$CC" "$CR" "$MDL" "$GAP")
