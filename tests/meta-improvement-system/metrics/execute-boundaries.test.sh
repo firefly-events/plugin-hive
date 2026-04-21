@@ -5,6 +5,7 @@
 #   (a) first-pass case: emits first_attempt_pass=true, fix_loop_iterations=0
 #   (b) fix-loop case: emits first_attempt_pass=false, fix_loop_iterations>0
 #   (c) flag-off silence: no events written when metrics.enabled: false
+#   (d) event_id uniqueness: two rapid same-second emissions produce distinct event_ids
 
 set -euo pipefail
 
@@ -280,6 +281,57 @@ if [[ $exit_code -eq 0 ]]; then
   pass "flag-off: exit code 0 (silent no-op)"
 else
   fail "flag-off: non-zero exit code $exit_code when metrics disabled"
+fi
+
+# ---------------------------------------------------------------------------
+# (d) event_id uniqueness: two rapid same-second emissions produce distinct event_ids
+# ---------------------------------------------------------------------------
+echo ""
+echo "=== (d) event_id uniqueness: two rapid same-second emissions ==="
+
+WDIR_D="$TMPDIR_BASE/d"
+mkdir -p "$WDIR_D"
+make_config "$WDIR_D" "true" "$WDIR_D/metrics"
+
+(
+  cd "$WDIR_D"
+  HIVE_CONFIG="hive/hive.config.yaml" \
+  HIVE_RUN_ID="run_test_2026-04-21_uniq" \
+  HIVE_STORY_ID="C2.5" \
+  HIVE_FIX_ITERATIONS="0" \
+  HIVE_FIRST_PASS="true" \
+  bash "$HELPER"
+  HIVE_CONFIG="hive/hive.config.yaml" \
+  HIVE_RUN_ID="run_test_2026-04-21_uniq" \
+  HIVE_STORY_ID="C2.5" \
+  HIVE_FIX_ITERATIONS="0" \
+  HIVE_FIRST_PASS="true" \
+  bash "$HELPER"
+)
+
+out_d="$WDIR_D/metrics/events/run_test_2026-04-21_uniq-execute-boundaries.jsonl"
+if [[ -f "$out_d" ]]; then
+  all_ids=()
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    id=$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['event_id'])" "$line" 2>/dev/null || echo "")
+    all_ids+=("$id")
+  done < "$out_d"
+
+  if [[ ${#all_ids[@]} -eq 4 ]]; then
+    pass "event_id uniqueness: 4 events written across 2 rapid emissions"
+  else
+    fail "event_id uniqueness: expected 4 events, got ${#all_ids[@]}"
+  fi
+
+  unique_count=$(printf "%s\n" "${all_ids[@]}" | sort -u | wc -l | tr -d ' ')
+  if [[ "$unique_count" -eq 4 ]]; then
+    pass "event_id uniqueness: all 4 event_ids are distinct"
+  else
+    fail "event_id uniqueness: only $unique_count distinct IDs out of 4 (collision detected)"
+  fi
+else
+  fail "event_id uniqueness: execute-boundaries file not created"
 fi
 
 # ---------------------------------------------------------------------------

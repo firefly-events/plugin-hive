@@ -107,8 +107,6 @@ phase="${HIVE_PHASE:-}"
 
 # Shared timestamp for both events in this boundary emission
 timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-# Use nanoseconds for uniqueness when available
-ns=$(date -u +"%N" 2>/dev/null || echo "0000")
 
 # Build identity block (story_id XOR proposal_id)
 if [[ -n "$story_id" ]]; then
@@ -147,7 +145,7 @@ out_file="${events_dir}/${run_id}-execute-boundaries.jsonl"
 
 # --- Event 1: fix_loop_iterations ---
 # Emit the count of corrective fix-loop passes for this story/proposal attempt.
-event_id_1="evt_${timestamp}_fix-loop_${ns}"
+event_id_1="evt_${timestamp}_$$_${RANDOM}_fix_loop"
 fix_dims="\"stage\":\"execute-boundary\""
 if [[ -n "$phase" ]]; then
   fix_dims="${fix_dims},\"phase\":\"${phase}\""
@@ -157,10 +155,7 @@ echo "$event_fix" >> "$out_file"
 
 # --- Event 2: first_attempt_pass ---
 # Emit an explicit binary signal: true = passed on first attempt, false = fix-loop was needed.
-# Nanosecond suffix is incremented by 1 to guarantee uniqueness within the same second.
-ns2=$((10#${ns} + 1))
-ns2_padded=$(printf "%09d" "$ns2")
-event_id_2="evt_${timestamp}_first-pass_${ns2_padded}"
+event_id_2="evt_${timestamp}_$$_${RANDOM}_first_pass"
 pass_dims="\"stage\":\"execute-boundary\""
 if [[ -n "$phase" ]]; then
   pass_dims="${pass_dims},\"phase\":\"${phase}\""
