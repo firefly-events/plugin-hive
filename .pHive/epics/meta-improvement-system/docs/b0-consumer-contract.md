@@ -104,9 +104,56 @@ For the avoidance of doubt (and to preserve the anti-over-engineering invariant)
 
 ---
 
-## 2. Consumer query shapes (B0.2 — pending)
+## 2. Consumer query shapes (B0.2)
 
-_To be authored by B0.2. Will define `baseline-vs-candidate`, `run-over-run`, and `delayed-regression-watch` with inputs, outputs, and cost classification._
+This section names the three consumer queries the B-layer will ask of Epic C's data, and states — for each one — the inputs it reads, the answer it returns, the lifecycle decision it supports, and the cost expectation it places on the future metrics substrate. S2's schema freeze must make every query shape here answerable; S2 may choose storage-layout, indexes, and denormalization, but it may not add a new query without re-opening this contract.
+
+The three queries are:
+
+1. `baseline-vs-candidate` — the primary decision query for a single experiment.
+2. `run-over-run` — the trend query across sequential experiments.
+3. `delayed-regression-watch` — the post-close monitor that arms auto-revert.
+
+These are the only three named consumer queries in the lean MVP contract. Q3's anti-over-engineering signal explicitly forbids adding analytics queries beyond what lifecycle decisions require; requests for richer analytics belong in a follow-on RFC, not in B0.
+
+### 2.1 `baseline-vs-candidate`
+
+- **Purpose:** answer "did this experiment's change measurably help or hurt relative to its baseline?" for one specific experiment.
+- **Required inputs (from the envelope, per §1):** `baseline_ref`, `candidate_ref`, `metrics_snapshot`, `policy_ref`. Also reads `decision` to filter out experiments still in `pending` and `commit_ref` for attribution in the returned record.
+- **Intended output:** a delta record with one entry per metric plus a verdict derived from the policy's threshold. Shape at the contract level: a small structure with one entry per metric containing baseline value, candidate value, delta, and an over/under-threshold flag, plus an overall `accept`/`reject` derived from `policy_ref`. S2 picks whether this is a single record, a row-per-entry table, or a nested struct.
+- **Lifecycle decision supported:** the Step-06 evaluation write (accept vs reject) on the envelope's `decision` field. Also feeds the accept-path hand-off into Step-07 promotion.
+- **Cost expectation: cheap.** One experiment = one baseline snapshot + one candidate snapshot + one policy lookup. S2 must make this a fixed small number of reads per experiment. Scan-over-history shapes are not acceptable for this query; they belong in `run-over-run` instead.
+
+### 2.2 `run-over-run`
+
+- **Purpose:** answer "across the last N experiments, is the system getting better, worse, or flat on each metric?" — the trend view a maintainer reads during standup or a meta-meta-optimize review.
+- **Required inputs (from the envelope, per §1):** `baseline_ref`, `candidate_ref`, `metrics_snapshot`, and `decision` across a time-ordered or cycle-ordered sequence of envelopes. Does NOT read `policy_ref` — this is a trend query, not a decision query, and must not silently re-evaluate closed decisions.
+- **Intended output:** one time-series (or delta-series) per metric over the requested window, plus count-by-decision (how many accepted vs rejected in the window). S2 picks whether this is aggregated server-side, returned as a raw series for client-side aggregation, or both.
+- **Lifecycle decision supported:** the maintainer-facing review surface that feeds human judgement about meta-team health. Does not directly drive any automated write — the output is read by operators and by meta-meta-optimize's analysis step, not by the lifecycle library.
+- **Cost expectation: moderate.** Bounded by the window size, not by total history. Agents must be able to cap the window (by count or by time range) and get a bounded-cost response. Full-history scans are not an intended shape; S2 should make them explicit if they are supported at all.
+
+### 2.3 `delayed-regression-watch`
+
+- **Purpose:** answer, continuously during each experiment's observation window, "is this experiment's post-close measurement drifting past its policy threshold, such that the auto-revert path must fire?"
+- **Required inputs (from the envelope, per §1):** `metrics_snapshot` (the post-close snapshot being evaluated against the candidate baseline), `policy_ref` (the regression condition), `observation_window` (to determine whether the snapshot is still in-window), `regression_watch` (the arming-and-trip state), and `rollback_ref` (to hand to the auto-revert path on trip). Does NOT read `baseline_ref` or `candidate_ref` directly; the regression check is against the candidate's own post-close drift, not against the pre-candidate baseline.
+- **Intended output:** a small status record per armed experiment: still-armed vs tripped. On trip, the record carries the snapshot reference that tripped the watch and the `rollback_ref` to pass to the auto-revert caller. S2 picks whether this is a synchronous query return or an event emission that the lifecycle library consumes.
+- **Lifecycle decision supported:** the unconditional auto-revert behavior fixed by Q3. There is no human-confirm branch, no narrow-revert branch, no recommendation-only branch. Trip → lifecycle library reads `rollback_ref` → auto-revert executes → envelope's `decision` transitions to `reverted`. This query is the sole trigger of that transition.
+- **Cost expectation: cheap per-arm, moderate in aggregate.** Each armed experiment contributes a bounded-cost check per observation-interval tick. Across all concurrently-armed experiments the cost grows linearly in the number of open windows, which the concurrency discipline (Q2: serial by default) already bounds. S2 must avoid shapes where a single trip check scans unrelated experiments' data; the query must be indexable on `regression_watch`-armed envelopes only.
+
+### 2.4 Query-to-field consumer-map reconciliation
+
+The per-query input lists in §2.1–§2.3 are the normative edition of the consumer-map table at §1.10. If a future diff introduces a mismatch between §1.10 and §2.1–§2.3, treat §2.1–§2.3 as the source of truth and correct §1.10 accordingly — the per-query sections name the fields explicitly in-context, while the table is a summary.
+
+No field in the envelope is without a reader: `baseline_ref`, `candidate_ref`, `metrics_snapshot`, `policy_ref`, `decision`, `commit_ref` are consumed by the compare or trend queries (or by the closure validator); `observation_window`, `regression_watch`, `rollback_ref` are consumed by the watch query. Every field listed in §1 has either a query reader or a closure-validator precondition (or both). If S2 discovers it cannot answer one of the three queries from the fields enumerated here, escalate to re-open Q3 — do not silently add a field.
+
+### 2.5 What B0.2 does NOT commit to
+
+- **No fourth query.** The lean MVP contract has exactly three consumer queries. No aggregation-over-agents, no per-skill rollup, no cost-attribution query, no similarity-between-experiments query — each of those is follow-on work that must re-open scope.
+- **No indexing or storage-layout guidance.** How S2 makes each query cheap is S2's choice. This contract only states the cost expectation, not the mechanism.
+- **No concrete API surface.** Whether the query is exposed as a function call, a CLI command, a read from a materialized view, or a fold over a JSONL stream is a C1/B-L1 decision.
+- **No windowing parameterization.** The trend-query window bound is stated qualitatively ("by count or by time range"). S2 picks the parameter shape and defaults.
+- **No output serialization format.** Whether results are YAML, JSON, in-memory structs, or printed tables is S2's choice.
+- **No concurrency-safety commitment.** The `delayed-regression-watch` query's aggregate cost assumes Q2's serial-by-default concurrency discipline; if future work enables parallel experiment execution (currently punted), that work owns re-validating this query's cost expectation.
 
 ## 3. Threshold and rollback policy-ref contract (B0.3 — pending)
 
