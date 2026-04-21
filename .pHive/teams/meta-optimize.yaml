@@ -70,7 +70,7 @@ context:
     repositories.
     Scope boundary: this swarm does NOT write to plugin-hive's own files; that
     is the local-only `meta-meta-optimize` swarm's job.
-    Charter path: `.pHive/teams/meta-optimize-charter.md` (A2.7 authors it).
+    Charter path: `.pHive/meta-team/charter-meta-optimize.md` (authored by A2.7).
     Shared safety constraints: `hive/references/meta-safety-constraints.md`.
     `{project_root}` is resolved per consumer project at runtime; this template
     intentionally does not hardcode consumer-repo paths.

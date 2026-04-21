@@ -41,7 +41,7 @@ Map every verdict in `evaluation_results` to exactly one action, compile the str
 |---------|--------|
 | `pass` | **Promote.** Apply the worktree's approved content to the live repo via the active swarm's promotion adapter. Record `status: promoted`. |
 | `needs_optimization` | **Promote with note.** Same promotion action as `pass`. Record `status: promoted` plus an `optimization_note` from the evaluation for the next cycle's analysis phase. |
-| `needs_revision` | **Discard.** The experiment's worktree is removed (`git worktree remove` or equivalent discard). No live-repo writes happen. Record `status: discarded` with the evaluation's `revision_notes` as the reason. The underlying finding returns to the next cycle's analysis phase; it is NOT flagged to a human and is NOT left partially-applied in the live repo. |
+| `needs_revision` | **Discard.** The experiment's worktree is removed (`git worktree remove`; use `git worktree remove --force` when the worktree has modified or untracked files, which is expected for a rejected experiment). No live-repo writes happen. Record `status: discarded` with the evaluation's `revision_notes` as the reason. The underlying finding returns to the next cycle's analysis phase; it is NOT flagged to a human and is NOT left partially-applied in the live repo. |
 
 There is no human-escalation verdict path in this step. Human escalation only appears in FAILURE MODES when infrastructure problems prevent the verdict-to-action mapping from executing at all.
 
@@ -134,7 +134,7 @@ Discarded changes:
 
 ## FAILURE MODES
 
-- Worktree discard fails (`git worktree remove` or equivalent cannot complete): flag for human with full context because the discard action could not execute
+- Worktree discard fails (`git worktree remove [--force]` cannot complete): flag for human with full context because the discard action could not execute
 - Promotion adapter fails to apply approved content to the live repo: flag for human with the adapter error and affected proposal IDs
 - Insight staging fails: log warning, continue — insights are best-effort
 - No changes promoted (all discarded): valid outcome — record as `partial` cycle

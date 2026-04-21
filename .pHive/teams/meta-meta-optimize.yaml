@@ -122,7 +122,7 @@ context:
     Per A2.5, the swarm-configured lifecycle writer targets are
     `.pHive/meta-meta-optimize/cycle-state.yaml` and
     `.pHive/meta-meta-optimize/ledger.yaml`.
-    Charter path: `.pHive/teams/meta-meta-optimize-charter.md` (A2.7 authors it).
+    Charter path: `.pHive/meta-team/charter-meta-meta-optimize.md` (authored by A2.7).
     Shared safety constraints: `hive/references/meta-safety-constraints.md`.
     Promotion adapter: direct-commit, per the signed cycle-state decision and
     the worktree isolation model in `hive/references/meta-experiment-isolation.md`.

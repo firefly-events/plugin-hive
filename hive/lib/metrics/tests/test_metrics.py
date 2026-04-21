@@ -25,8 +25,16 @@ class MetricsRuntimeTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.metrics_root = Path(self.temp_dir.name) / ".pHive" / "metrics"
+        prior_metrics_root = os.environ.get("METRICS_ROOT")
         os.environ["METRICS_ROOT"] = str(self.metrics_root)
-        self.addCleanup(os.environ.pop, "METRICS_ROOT", None)
+
+        def _restore_metrics_root() -> None:
+            if prior_metrics_root is None:
+                os.environ.pop("METRICS_ROOT", None)
+            else:
+                os.environ["METRICS_ROOT"] = prior_metrics_root
+
+        self.addCleanup(_restore_metrics_root)
 
     def test_append_event_round_trip(self) -> None:
         event = {

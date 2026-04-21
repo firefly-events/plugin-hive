@@ -18,8 +18,9 @@ cycle-state, ledger, envelope, or metrics-carrier files from within this step.
 Persistent control-plane writes are owned by downstream steps (evaluation,
 promotion, close) coordinated via the workflow output graph and the B0 envelope
 contract (`.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md`).
-The team-grant for this role is read-only by design; see
-`.pHive/teams/meta-team.yaml` and post-A2.6 swarm-specific team configs.
+The team-grant for this role is read-only by design; see the swarm-specific
+team configs `.pHive/teams/meta-optimize.yaml` and
+`.pHive/teams/meta-meta-optimize.yaml` (introduced in A2.6).
 
 Validate each change from step 4 using the prescribed check set. Produce the
 structured `test_results` workflow output and companion `validation_report`.
@@ -134,7 +135,7 @@ Results by change:
 
 ## WHAT THIS STEP DOES NOT OWN
 
-- Persistent cycle-state / ledger / envelope writes (evaluation → close own these)
+- Persistent cycle-state / ledger / envelope writes — Step 8 (close) is the single lifecycle writer per A2.1–A2.5; Steps 4–7 (including evaluation) are output-graph-only and do not perform inline persistent writes
 - Metrics-carrier emission (C2 emitters, opt-in; Step 5 does not emit events)
 - Quality-bar verdicts (Step 6 evaluation)
 - Promotion or revert decisions (Step 7)

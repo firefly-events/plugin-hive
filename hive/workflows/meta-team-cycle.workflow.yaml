@@ -180,3 +180,6 @@ steps:
     outputs:
       - name: morning_summary
         type: string
+      - name: close_rejected
+        type: string
+        optional: true

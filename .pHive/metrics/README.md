@@ -32,8 +32,8 @@ At the contract level, event records are append-only within a run. Retention, ro
 
 ## Directory layout
 
-- See [events/README.md](/Users/don/Documents/plugin-hive/.pHive/metrics/events/README.md) for the event-record carrier.
-- See [experiments/README.md](/Users/don/Documents/plugin-hive/.pHive/metrics/experiments/README.md) for the experiment-envelope carrier.
+- See [events/README.md](./events/README.md) for the event-record carrier.
+- See [experiments/README.md](./experiments/README.md) for the experiment-envelope carrier.
 
 ## What this README does NOT commit to
 

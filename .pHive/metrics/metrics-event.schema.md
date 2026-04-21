@@ -181,7 +181,7 @@ Valid JSONL examples follow. Each line is a complete JSON object and is intended
 Later emitters that write `.pHive/metrics/events/*.jsonl` must satisfy these invariants:
 
 - every row is parseable JSON
-- every row contains `event_id`, `timestamp`, `run_id`, `metric_type`, `value`, and `unit`
+- every row contains `event_id`, `timestamp`, `run_id`, `metric_type`, `value`, `unit`, `dimensions`, and `source`
 - every row contains exactly one of `story_id` or `proposal_id`
 - `event_id` is unique within a file
 - no row references another row by `event_id`

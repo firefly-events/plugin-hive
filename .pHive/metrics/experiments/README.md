@@ -14,11 +14,11 @@ The closure invariant is non-bypassable. Per `b0-consumer-contract.md` §1.11 an
 
 ## Schema authority
 
-No envelope syntax is approved yet. The authoritative schema for records in this directory is planned for `.pHive/metrics/experiment-envelope.schema.md`, to be authored by `C1.3`. Mutation rules, including which fields are mutable after creation, are also in `C1.3` scope.
+The authoritative schema for records in this directory is [`.pHive/metrics/experiment-envelope.schema.md`](../experiment-envelope.schema.md), authored by `C1.3`. Mutation rules — including which fields are immutable, update-in-place, or narrow-mutable after creation — are defined there.
 
 ## Default OFF
 
-Metrics writes are opt-in at kickoff and default OFF per `user-decisions-dd.md` Q-new-B. Until opt-in exists and the envelope schema is defined, this directory is expected to remain empty.
+Metrics writes are opt-in at kickoff and default OFF per `user-decisions-dd.md` Q-new-B. Until opt-in exists, this directory is expected to remain empty even though the envelope schema is active.
 
 ## Write boundary
 

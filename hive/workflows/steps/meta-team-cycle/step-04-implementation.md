@@ -117,6 +117,6 @@ Changes:
 
 ## NEXT STEP
 
-**Gating:** At least one change in the `changes_made` output, OR all proposals blocked with structured reasons in the same output.
+**Gating:** Every proposal has a structured entry in the `changes_made` output — either a completed change OR a block record with a structured reason. An all-blocked cycle is a valid advance.
 **Next:** Load `hive/workflows/steps/meta-team-cycle/step-05-testing.md`
-**If gating fails:** Report which proposals failed and why. Do not advance without at least one completed change.
+**If gating fails:** Report which proposals have no entry in `changes_made` and why.

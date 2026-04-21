@@ -17,6 +17,8 @@ REQUIRED_EVENT_FIELDS = {
     "metric_type",
     "value",
     "unit",
+    "dimensions",
+    "source",
 }
 EVENT_METRIC_TYPES = {
     "tokens": ("number", "tokens"),
@@ -167,6 +169,12 @@ def delta_compare(
         baseline = baseline_values.get(metric_name)
         candidate = candidate_values.get(metric_name)
         if isinstance(baseline, bool) or isinstance(candidate, bool):
+            if not (isinstance(baseline, bool) and isinstance(candidate, bool)) and not (
+                baseline is None or candidate is None
+            ):
+                raise MetricsValidationError(
+                    f"metric '{metric_name}' mixes boolean and numeric values across snapshots"
+                )
             deltas[metric_name] = {
                 "baseline": baseline,
                 "candidate": candidate,

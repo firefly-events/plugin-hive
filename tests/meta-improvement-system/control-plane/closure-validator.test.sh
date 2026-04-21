@@ -8,8 +8,8 @@ set -euo pipefail
 FAILED=0
 PASSED=0
 
-pass() { PASSED=$((PASSED+1)); echo "[PASS] $1"; }
-fail() { FAILED=$((FAILED+1)); echo "[FAIL] $1"; }
+pass() { PASSED=$((PASSED+1)); echo "[PASS] $1"; return 0; }
+fail() { FAILED=$((FAILED+1)); echo "[FAIL] $1"; return 0; }
 
 # Helper: validates a candidate close record. Returns 0 on valid, 1 on invalid.
 # Reads commit_ref, metrics_snapshot, rollback_ref from env vars.

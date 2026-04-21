@@ -30,6 +30,7 @@ def resolve_metrics_path(*parts: str, for_write: bool = False) -> Path:
     if for_write:
         parent = candidate.parent
         parent.mkdir(parents=True, exist_ok=True)
+        candidate = candidate.resolve()
         try:
             candidate.relative_to(root)
         except ValueError as exc:

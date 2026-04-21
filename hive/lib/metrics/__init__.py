@@ -16,6 +16,11 @@ from .errors import (
 )
 
 __all__ = [
+    "MetricsConflictError",
+    "MetricsError",
+    "MetricsNotFoundError",
+    "MetricsPathBoundaryError",
+    "MetricsValidationError",
     "append_event",
     "create_envelope",
     "delta_compare",
@@ -23,9 +28,4 @@ __all__ = [
     "read_envelope",
     "read_run_events",
     "update_envelope",
-    "MetricsConflictError",
-    "MetricsError",
-    "MetricsNotFoundError",
-    "MetricsPathBoundaryError",
-    "MetricsValidationError",
 ]

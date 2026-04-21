@@ -154,6 +154,6 @@ Self-optimize the Hive plugin.
 ## Integration with the Daily Ceremony
 
 In the legacy workflow, the meta-team was independent from the daily standup ceremony. However:
-- The morning summary surfaces in `/hive:status` alongside daily epic status
-- Flagged-for-human items from the meta-team should be reviewed during standup
-- Meta-team insights staged in `.pHive/insights/meta-team/` are evaluated by the orchestrator at session end alongside regular epic insights
+- The morning summary surfaced in `/hive:status` alongside daily epic status
+- Flagged-for-human items from the meta-team were reviewed during standup
+- Meta-team insights staged in `.pHive/insights/meta-team/` were evaluated by the orchestrator at session end alongside regular epic insights

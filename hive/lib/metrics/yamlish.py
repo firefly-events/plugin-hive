@@ -56,6 +56,16 @@ def load_yaml(text: str) -> dict[str, Any]:
         while len(stack) > 1 and indent <= stack[-1][0]:
             stack.pop()
 
+        parent_indent = stack[-1][0]
+        if indent != parent_indent + 2 and parent_indent != -1:
+            raise MetricsValidationError(
+                f"invalid YAML indentation at line {lineno}: {raw_line}"
+            )
+        if parent_indent == -1 and indent != 0:
+            raise MetricsValidationError(
+                f"invalid YAML indentation at line {lineno}: {raw_line}"
+            )
+
         if ":" not in stripped:
             raise MetricsValidationError(f"invalid YAML line {lineno}: {raw_line}")
 

@@ -50,9 +50,9 @@ Read:
 - `hive/references/meta-safety-constraints.md` plus the active swarm's charter
   for the quality bar criteria
 
-If the active swarm charter is not yet present because A2.7 has not landed,
-fall back to `hive/references/meta-safety-constraints.md` alone rather than
-using the archived legacy meta-team charter.
+If the active swarm charter is not present (historical cycle-state or pre-A2.7
+state), fall back to `hive/references/meta-safety-constraints.md` alone rather
+than using the archived legacy meta-team charter.
 
 ### 2. Evaluate each change
 
@@ -137,7 +137,7 @@ Results:
 
 ## WHAT THIS STEP DOES NOT OWN
 
-- Persistent cycle-state / ledger / envelope writes (promotion + close own these per rebuilt authority)
+- Persistent cycle-state / ledger / envelope writes — Step 8 (close) is the single lifecycle writer per A2.1–A2.5; Step 7 (promotion) is output-graph-only and does not perform inline persistent writes
 - Metrics-carrier emission (C2 emitters, opt-in)
 - Promotion or revert decisions (Step 7)
 - Closure invariant checks (Step 8 close validator per B0 §1.11)

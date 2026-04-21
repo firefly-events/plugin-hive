@@ -10,13 +10,17 @@ PASSED=0
 pass() { PASSED=$((PASSED + 1)); echo "[PASS] $1"; }
 fail() { FAILED=$((FAILED + 1)); echo "[FAIL] $1"; }
 
-REPO_ROOT="/Users/don/Documents/plugin-hive"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [[ -z "$REPO_ROOT" ]]; then
+  REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+fi
 TEAMS_DIR="$REPO_ROOT/.pHive/teams"
 STEPS_DIR="$REPO_ROOT/hive/workflows/steps/meta-team-cycle"
 META_OPTIMIZE_TEAM="$TEAMS_DIR/meta-optimize.yaml"
 META_META_TEAM="$TEAMS_DIR/meta-meta-optimize.yaml"
 LEGACY_TEAM="$TEAMS_DIR/meta-team.yaml"
 WORKFLOW_FILE="$REPO_ROOT/hive/workflows/meta-team-cycle.workflow.yaml"
+# shellcheck disable=SC2034  # WORKFLOW_FILE reserved for future workflow-level assertions
 
 # Usage: parse_team_members <team-yaml-path>
 # Emits: agent|role|path|read|write|delete|agent_line|path_line

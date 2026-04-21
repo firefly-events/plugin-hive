@@ -21,7 +21,7 @@ Finalize the cycle only after the closure invariant passes: validate closure evi
 **Inputs available:**
 - `cycle_id` from step 1
 - `promoted_changes` and `reverted_changes` from step 7 — primary close inputs
-- `.pHive/meta-team/ledger.yaml` — prior cycle records
+- Swarm-configured `ledger.yaml` — prior cycle records (legacy `.pHive/meta-team/ledger.yaml` only during the A2.6/A2.7 migration window)
 - Active swarm config / team config that determines the cycle-state target path (during the A2.6 migration window this may still resolve to a legacy-compatible path)
 - Git (for validating refs and committing changes)
 
@@ -94,16 +94,24 @@ Commit all modified and created files under:
 
 Use commit message:
 ```
-[meta-team] Cycle {cycle_id} — {N changes}: {one-line summary of what changed}
+{swarm_prefix} Cycle {cycle_id} — {N changes}: {one-line summary of what changed}
 ```
 
+`{swarm_prefix}` is resolved from the active swarm config at close time. For
+`/meta-meta-optimize` the prefix is `[meta-meta-optimize]` (see
+`.pHive/meta-team/charter-meta-meta-optimize.md`); for `/meta-optimize` the
+prefix is `[meta-optimize]` (see `.pHive/meta-team/charter-meta-optimize.md`).
+A legacy `[meta-team]` prefix is acceptable only during the documented A2.6/A2.7
+migration window when the active swarm config is not yet resolvable.
+
 Examples:
-- `[meta-team] Cycle meta-2026-04-09 — 3 changes: vertical-planning.md, status skill meta section, orchestrator memory`
-- `[meta-team] Cycle meta-2026-04-09 — 0 changes: analysis found 5 issues, all blocked by charter scope`
+- `[meta-meta-optimize] Cycle meta-2026-04-09 — 3 changes: vertical-planning.md, status skill meta section, orchestrator memory`
+- `[meta-meta-optimize] Cycle meta-2026-04-09 — 0 changes: analysis found 5 issues, all blocked by charter scope`
 
 Rules:
 - The commit MUST succeed before any ledger append
 - `commit_ref` used for closure evidence must resolve to the actual recorded commit, not a placeholder
+- `{swarm_prefix}` MUST resolve to a concrete prefix from the active swarm config; unresolved `{swarm_prefix}` placeholders MUST fail the close
 - Fabricated values such as `commit: TBD` are explicit rejection cases and MUST fail the close
 
 ### 4. Forward plugin-level issues (opt-in)
@@ -123,7 +131,13 @@ Record any created issue URL in the cycle-state summary under `forwarded_issues`
 
 ### 5. Update ledger.yaml
 
-Only after the closure invariant passes AND the commit succeeds, append to `.pHive/meta-team/ledger.yaml`:
+Only after the closure invariant passes AND the commit succeeds, append to the
+swarm-configured ledger path. The active swarm config determines the target —
+typically `.pHive/meta-meta-optimize/ledger.yaml` for `/meta-meta-optimize` and
+the consumer-project-scoped ledger for `/meta-optimize`. The legacy
+`.pHive/meta-team/ledger.yaml` is acceptable only as an explicit migration
+fallback during the A2.6/A2.7 window when the active swarm config is not yet
+resolvable. Append format:
 ```yaml
 - cycle_id: {cycle_id}
   date: {YYYY-MM-DD}
@@ -147,7 +161,7 @@ Prerequisite check before append:
 - Re-confirm that the commit hash being written is the real resolved commit, not `TBD`, `pending`, empty, or other placeholder text
 - If any prerequisite fails at this point, HALT without appending the ledger entry and record `close_rejected`
 
-If `ledger.yaml` does not exist, create it with a YAML list header.
+If the resolved `ledger.yaml` does not exist at the swarm-configured path, create it with a YAML list header.
 
 ### 6. Produce morning summary
 
@@ -179,15 +193,15 @@ Verify:
 - The closure invariant passed before any persistent close write
 - The swarm-configured cycle-state target reflects the final close summary
 - The git commit succeeded
-- `.pHive/meta-team/ledger.yaml` has the new entry
+- The swarm-configured `ledger.yaml` has the new entry
 - The morning summary or rejection stub exists at the configured target
 
 ## SUCCESS METRICS
 
 - [ ] Closure invariant passed before any state write or ledger append
 - [ ] Final cycle-state summary written to the swarm-configured target path
-- [ ] All changed files committed with `[meta-team]` prefix
-- [ ] `ledger.yaml` updated with cycle entry including real commit hash, metrics snapshot, and rollback ref
+- [ ] All changed files committed with the swarm-resolved `{swarm_prefix}` prefix
+- [ ] Swarm-configured `ledger.yaml` updated with cycle entry including real commit hash, metrics snapshot, and rollback ref
 - [ ] Morning summary written per format in `meta-team-ux.md`
 - [ ] No files left in uncommitted state from this cycle
 
