@@ -132,8 +132,12 @@ steps:
   - id: promotion
     agent: orchestrator
     task: >
-      Promote approved changes. Write insights to starter memory staging.
-      Revert any changes that didn't meet quality bar.
+      Apply evaluation verdicts unambiguously under the worktree-default
+      isolation model (Q4 / hive/references/meta-experiment-isolation.md):
+      pass and needs_optimization promote via the active swarm's adapter;
+      needs_revision discards the experiment worktree. Return promoted_changes
+      and reverted_changes via the workflow output graph; no inline cycle-state
+      writes. Stage any reusable insights under .pHive/insights/{swarm}/.
     step_file: hive/workflows/steps/meta-team-cycle/step-07-promotion.md
     depends_on:
       - evaluation
