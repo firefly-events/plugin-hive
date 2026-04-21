@@ -22,7 +22,7 @@ Metrics writes are opt-in at kickoff and default OFF per `user-decisions-dd.md` 
 Only approved schema files define record shape. For this carrier, that authority is expected to land in:
 
 - [`.pHive/metrics/metrics-event.schema.md`](./metrics-event.schema.md) in `C1.2`
-- `.pHive/metrics/experiment-envelope.schema.md` in `C1.3`
+- [`.pHive/metrics/experiment-envelope.schema.md`](./experiment-envelope.schema.md) in `C1.3`
 
 Ad hoc record formats are not permitted. If a shape is not described by an approved schema file, it is out of contract for this directory.
 

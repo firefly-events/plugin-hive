@@ -1,0 +1,28 @@
+story: C1.3
+step: test
+status: completed
+methodology: classic
+backend: orchestrator
+timestamp: "2026-04-21T04:16:30Z"
+checks:
+  - name: "envelope schema file exists"
+    command: "test -f .pHive/metrics/experiment-envelope.schema.md"
+    result: pass
+  - name: "all 9 B0 fields present"
+    command: "grep -n 'baseline_ref|candidate_ref|commit_ref|metrics_snapshot|policy_ref|rollback_ref|regression_watch|observation_window|decision'"
+    result: pass
+  - name: "mutation vocabulary present"
+    command: "grep -n 'update-in-place|immutable|narrow-mutable'"
+    result: pass
+  - name: "closure invariant explicit"
+    command: "grep -n 'closure invariant|closure requires'"
+    result: pass
+  - name: "no anti-over-engineering terms in positive context"
+    command: "grep -n 'per-metric|human-confirmed|recommendation-only'"
+    result: "pass (negation-only)"
+  - name: "HP pre-B0 field names absent"
+    command: "grep -n 'baseline_metrics_ref|candidate_metrics_ref'"
+    result: "pass (zero matches)"
+  - name: "README cross-link added"
+    command: "grep -n 'experiment-envelope.schema.md' .pHive/metrics/README.md"
+    result: "pass (line 25)"

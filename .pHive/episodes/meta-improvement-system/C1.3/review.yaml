@@ -1,0 +1,22 @@
+story: C1.3
+step: review
+status: completed
+methodology: classic
+backend: claude
+model: opus (model_overrides.reviewer: opus)
+verdict: passed (first submission, no revisions)
+timestamp: "2026-04-21T04:17:00Z"
+ac_check:
+  - ac: "all B0 fields present, no extras"
+    result: pass (§3.1-§3.9 enumerates exactly the 9 fields)
+  - ac: "update-in-place limited"
+    result: pass (§4.1 immutables 7, §4.2 narrow-mutable 5, §4.3 forbids ad-hoc)
+  - ac: "closure invariant explicit"
+    result: pass (§5 L296-299 lists decision + commit_ref + metrics_snapshot + rollback_ref)
+  - ac: "example envelope shows compare + rollback-watch entry points"
+    result: pass (§6.1 accept + §6.2 reverted, both with explicit entry-point callouts)
+drift_risks: none (for C1.3; notes for C1.4 below)
+c1_4_notes:
+  - "inactive token from §4.2.2 needs consistency in writer state-name set"
+  - "metrics_snapshot freeze trigger is structural (closure); writer must check all 4 closure fields before re-accept"
+  - "§4.3 L288 forbids using envelope as append-log; C1.4 must route run-over-run data to event rows"
