@@ -16,9 +16,14 @@ These files are the legacy meta-team control-plane records preserved as evidence
 
 `ledger.yaml` contains a preserved cycle entry at `cycle_id: meta-2026-04-13` with `commit: TBD`. Per user decision Q-new-D, this historical integrity break is preserved as-is rather than rewritten out of history. Downstream consumers reading the archived ledger must treat that entry's `commit` field as unreliable.
 
-## What this archive does NOT change
+## Live-state reset
 
-This story does not modify the live `.pHive/meta-team/cycle-state.yaml`, `.pHive/meta-team/ledger.yaml`, or `.pHive/meta-team/queue.yaml` files. A1.5 handles the live-state reset separately.
+As of A1.5 (2026-04-21), the live `.pHive/meta-team/cycle-state.yaml`,
+`.pHive/meta-team/ledger.yaml`, and `.pHive/meta-team/queue.yaml` files
+have been deleted. The authoritative record of those files is this
+archive. Subsequent slices (S4+) introduce the new control-plane
+artifacts; see `.pHive/epics/meta-improvement-system/docs/` for the
+current plan.
 
 ## Source of authority
 

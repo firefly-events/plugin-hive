@@ -1,0 +1,30 @@
+story: A1.5
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-A1.5
+parent_branch: hive-A1.4 (85520de)
+timestamp: "2026-04-21T04:43:00Z"
+changes:
+  - deleted: .pHive/meta-team/cycle-state.yaml (21803 B, archived in A1.1)
+  - deleted: .pHive/meta-team/ledger.yaml (5321 B, archived in A1.1)
+  - deleted: .pHive/meta-team/queue.yaml (4270 B, archived in A1.1)
+  - modified: .pHive/meta-team/archive/2026-04-19/MANIFEST.md (renamed "What this archive does NOT change" section to "Live-state reset" with 2026-04-21 deletion date)
+backend_split:
+  implement: codex (file ops only)
+  review: claude (opus)
+ac_check: 3/3 pass
+review_verdict: passed (first submission)
+archive_integrity: "byte-identical (21803/5321/4270)"
+untouched:
+  - charter.md
+  - analysis-cache.yaml
+  - morning-summary.md
+  - summary-2026-04-08.md
+  - baselines/
+  - deferred/
+notes: |
+  Codex hit sandbox limitation on git rm; resolved by filesystem delete,
+  orchestrator stages via git add -A at commit time. Review verified
+  only 3 deletions + 1 manifest modification in scope.
