@@ -183,6 +183,53 @@ else
   fail "proposal_id path: correlation fields wrong"
 fi
 
+# ─── (d) event_id uniqueness on same-second emissions ────────────────────────
+echo ""
+echo "=== (d) event_id uniqueness ==="
+
+# Emit twice without sleeping — both calls use the same second timestamp.
+HIVE_ROOT="$FAKE_HIVE" bash "$FAKE_HIVE/hooks/metrics-human-escalation.sh" \
+  --run-id "run_uniq_001" \
+  --story-id "C2.6" \
+  --reason "first"
+
+HIVE_ROOT="$FAKE_HIVE" bash "$FAKE_HIVE/hooks/metrics-human-escalation.sh" \
+  --run-id "run_uniq_001" \
+  --story-id "C2.6" \
+  --reason "second"
+
+ID1=$(tail -2 "$ON_EVENTS/human-escalation.jsonl" | head -1 | python3 -c "import sys,json; print(json.load(sys.stdin)['event_id'])")
+ID2=$(tail -1 "$ON_EVENTS/human-escalation.jsonl" | python3 -c "import sys,json; print(json.load(sys.stdin)['event_id'])")
+
+if [[ "$ID1" != "$ID2" ]]; then
+  pass "same-second emissions produce distinct event_id values"
+else
+  fail "same-second emissions produced identical event_id: $ID1"
+fi
+
+# ─── (e) embedded-quote reason roundtrip ─────────────────────────────────────
+echo ""
+echo "=== (e) embedded-quote reason roundtrip ==="
+
+HIVE_ROOT="$FAKE_HIVE" bash "$FAKE_HIVE/hooks/metrics-human-escalation.sh" \
+  --run-id "run_quote_001" \
+  --story-id "C2.6" \
+  --reason 'a"b\c'
+
+QLINE=$(tail -1 "$ON_EVENTS/human-escalation.jsonl")
+
+if echo "$QLINE" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
+  pass "embedded-quote reason: JSON parses cleanly"
+else
+  fail "embedded-quote reason: JSON parse failed"
+fi
+
+if echo "$QLINE" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['dimensions']['reason'] == 'a\"b\\\\c', repr(d['dimensions']['reason'])" 2>/dev/null; then
+  pass "embedded-quote reason: exact roundtrip a\"b\\c"
+else
+  fail "embedded-quote reason: roundtrip value wrong"
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 echo ""
 echo "=== Result: $PASSED passed, $FAILED failed ==="
