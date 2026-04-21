@@ -84,9 +84,11 @@ steps:
   - id: testing
     agent: tester
     task: >
-      Validate all changes: verify cross-references resolve, schemas are valid,
-      step files follow the required structure, and no existing content was
-      broken.
+      Validate every change from Step 4 using the prescribed check set
+      (cross-reference integrity, schema compliance, content safety).
+      Read-only — return structured test_results and a validation_report
+      via the workflow output graph. Persistent control-plane writes
+      happen in later steps; this step does not write files.
     step_file: hive/workflows/steps/meta-team-cycle/step-05-testing.md
     depends_on:
       - implementation
