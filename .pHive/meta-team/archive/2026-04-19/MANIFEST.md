@@ -15,6 +15,7 @@ These files are the legacy meta-team control-plane records preserved as evidence
 ## Integrity caveat: `commit: TBD`
 
 `ledger.yaml` contains a preserved cycle entry at `cycle_id: meta-2026-04-13` with `commit: TBD`. Per user decision Q-new-D, this historical integrity break is preserved as-is rather than rewritten out of history. Downstream consumers reading the archived ledger must treat that entry's `commit` field as unreliable.
+See [AUDIT-NOTE.md](./AUDIT-NOTE.md) for the full audit context, defect description, and rules for future readers.
 
 ## Live-state reset
 

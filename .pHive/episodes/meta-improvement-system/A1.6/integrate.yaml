@@ -1,0 +1,18 @@
+story: A1.6
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-A1.6
+parent_branch: hive-A1.5 (6b1be23)
+timestamp: "2026-04-21T04:46:00Z"
+artifacts:
+  - .pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md (43 lines, NEW)
+  - .pHive/meta-team/archive/2026-04-19/MANIFEST.md (+1 line cross-link)
+backend_split:
+  implement: codex
+  review: claude (opus)
+ac_check: 3/3 pass
+review_verdict: passed (first submission)
+archive_immutability: "ledger.yaml UNCHANGED (git diff confirms)"
+notes: "audit note gives commit: TBD defect its own durable surface with rules forbidding retroactive edits"
