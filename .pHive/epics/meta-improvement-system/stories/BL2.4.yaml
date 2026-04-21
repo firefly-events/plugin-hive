@@ -1,0 +1,109 @@
+id: BL2.4
+epic: meta-improvement-system
+slice: S9
+title: Activate rollback watch on a real committed experiment
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["BL2.1", "BL2.3", "L1.6"]
+
+description: |
+  Bind the shared rollback-watch primitive to the concrete maintainer promotion
+  path so a real committed experiment can enter the observation window and
+  become eligible for automatic revert.
+  This story is the activation step between pure composition and milestone proof:
+  the committed experiment path, regression-watch evaluation, and concrete
+  auto-revert callback must all be wired together so later proof work exercises
+  the genuine path rather than a mock or bypass.
+  The implementation should record trigger-relevant evidence in the live
+  envelope or adjacent artifacts so the later MVL proof story can point at real
+  trigger data.
+  Do activate the real rollback-watch path on committed experiments. Do not yet
+  claim the proof artifact or deliberate-regression demonstration.
+
+acceptance_criteria:
+  - "Given a real committed maintainer experiment, when the observation window opens, then `regression_watch` is active on that run."
+  - "Given the activated path, when tests inspect the live wiring, then rollback watch invokes the concrete auto-revert callback rather than a stub or no-op."
+  - "Given later proof needs, when the experiment envelope or adjacent artifacts are inspected, then trigger-relevant rollback-watch evidence is recorded for that live run."
+  - "Given S9 sequencing, when this story completes, then the real path is armed but the deliberate-regression proof remains for BL2.6."
+
+steps:
+  - id: research
+    description: "Confirm how the shared rollback-watch primitive, direct-commit adapter, and close/evaluation surfaces should connect so later proof work hits the real path."
+    agent: researcher
+  - id: implement
+    description: "Wire the live maintainer experiment path so committed runs enter `regression_watch`, bind to the concrete auto-revert callback, and record trigger-relevant evidence for later proof inspection."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run activation tests. Suggested checks: `pytest tests/meta_meta/test_rollback_watch_activation.py` and `rg -n \"regression_watch|auto_revert|observation_window\" /Users/don/Documents/plugin-hive`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the live path is genuinely armed and that later proof work will exercise the real callback path rather than a test-only shortcut."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the rollback-watch activation once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, python, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/rollback_watch.py
+      purpose: "Shared trigger logic that must now bind to the concrete maintainer path."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
+      purpose: "Evaluation surface where regression evidence may be surfaced."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-08-close.md
+      purpose: "Close surface where rollback-trigger evidence must remain visible."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md
+    change: "Wire the committed experiment path to activate `regression_watch` on real runs."
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
+    change: "Update evaluation guidance only as needed to surface rollback-watch trigger evidence."
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-08-close.md
+    change: "Update close guidance only as needed to preserve rollback-watch evidence in the live run."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_meta/test_rollback_watch_activation.py
+    change: "Create tests proving the live maintainer path arms the real rollback-watch callback."
+
+code_examples:
+  - title: "Rollback-watch realism requirement precursor"
+    file: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    snippet: |
+      - trigger: rollback-realism-proof-ambiguity
+        stories: [S9, BL2.4, BL2.6]
+        reason: "The outline proves a real revert, but does not explicitly require regression-watch to trigger the auto-revert path end-to-end."
+
+design_decisions:
+  - decision: "Arm rollback watch before the deliberate-regression proof story."
+    rationale: "BL2.6 must demonstrate the real activated path, not introduce it while trying to prove it."
+    source: "cycle-state escalation rollback-realism-proof-ambiguity"
+  - decision: "Record trigger-relevant evidence in the live run."
+    rationale: "Later MVL proof should cite durable artifacts instead of relying on narrative recollection."
+    source: "structured-outline S9 proof-artifact requirement"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update the touched maintainer and workflow docs so operators can see where `regression_watch` becomes active in the live maintainer path."
+
+risks:
+  - severity: high
+    description: "The path could look armed in code review but still use a test-only callback or bypass in real runs."
+    mitigation: "Require activation tests against the concrete callback path and review the evidence fields they produce."
+  - severity: medium
+    description: "Trigger evidence could be too implicit for later proof auditing."
+    mitigation: "Write trigger-relevant fields into the envelope or adjacent artifacts during activation."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `BL2.4` Activate rollback watch on a real committed experiment.
+  - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    relevant_excerpt: |
+      - trigger: rollback-realism-proof-ambiguity
+        stories: [S9, BL2.4, BL2.6]

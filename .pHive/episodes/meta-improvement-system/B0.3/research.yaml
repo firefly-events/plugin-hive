@@ -1,0 +1,14 @@
+step_id: research
+status: completed
+timestamp: "2026-04-21T04:38:00Z"
+artifacts:
+  - .pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+  - .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+methodology: solo
+collapsed_steps: [research, implement, test]
+notes: |
+  Note: the B0.3 story YAML does not list a research step (steps start at
+  implement). Authored this marker for audit-trail parity with B0.1/B0.2.
+  Sources: Q3 verbatim (threshold policy + delayed-regression-handling), §1.5
+  policy_ref, §1.6 decision, §1.7 rollback_ref, §1.9 regression_watch, §2.1
+  compare query, §2.3 rollback-watch query, §1.11 and §2.5 anti-drift fences.

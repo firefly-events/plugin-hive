@@ -1,0 +1,105 @@
+id: BL2.1
+epic: meta-improvement-system
+slice: S9
+title: Direct-commit promotion adapter
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["L1.5", "A2.4", "BL2i.3"]
+
+description: |
+  Implement the first concrete promotion adapter for the local maintainer loop:
+  a direct-commit path that operates inside a worktree and returns explicit
+  promotion evidence to the shared lifecycle library.
+  This story owns concrete promotion mechanics only for `/meta-meta-optimize`.
+  It must take the shared promotion-adapter contract from S7 and bind it to a
+  local direct-commit workflow that can report commit hashes, rollback targets,
+  and discard-on-failure behavior without affecting the public PR-only path.
+  The adapter must be worktree-native by default and produce evidence in a shape
+  the closure validator can consume later in the slice.
+  Do implement concrete maintainer promotion behavior and failure cleanup. Do
+  not wire the full skill orchestration or proof artifact yet.
+
+acceptance_criteria:
+  - "Given the direct-commit adapter story, when the repo is inspected, then a concrete maintainer adapter exists under `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/`."
+  - "Given a worktree-scoped experiment candidate, when the adapter promotes it, then it returns a real commit hash plus rollback target information."
+  - "Given a failed promotion, when tests run, then the adapter discards worktree residue and reports failure without leaving partial promotion state in the main tree."
+  - "Given shared-library boundaries, when this story completes, then the implementation is maintainer-specific but still conforms to the shared adapter interface."
+
+steps:
+  - id: research
+    description: "Confirm the direct-commit maintainer semantics, worktree default, and shared adapter contract from the signed decisions, S7, and the rewritten promotion step."
+    agent: researcher
+  - id: implement
+    description: "Create a concrete maintainer direct-commit adapter under `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/` that promotes from a worktree, returns commit and rollback evidence, and cleans up on failure."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run direct-commit adapter tests. Suggested checks: `pytest tests/meta_meta/test_direct_commit_adapter.py` and `rg -n \"worktree|rollback|commit\" /Users/don/Documents/plugin-hive/hive/lib/meta-experiment`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the adapter is truly maintainer-local, worktree-safe, and still aligned with the shared promotion interface."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the direct-commit adapter once tests and review pass."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [python, markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/promotion_adapter.py
+      purpose: "Shared adapter contract the direct-commit implementation must satisfy."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-07-promotion.md
+      purpose: "Promotion semantics and failure cleanup expectations."
+    - path: /Users/don/Documents/plugin-hive/hive/references/meta-experiment-isolation.md
+      purpose: "Worktree isolation requirements for self-modifying experiments."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/direct_commit_adapter.py
+    change: "Create the concrete direct-commit promotion adapter for the maintainer loop."
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/__init__.py
+    change: "Export the direct-commit adapter."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_meta/test_direct_commit_adapter.py
+    change: "Create adapter tests for success, failure cleanup, and evidence return shape."
+
+code_examples:
+  - title: "Maintainer path uses direct commit, public path ships later"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - `BL2.1` Direct-commit promotion adapter.
+      - Create concrete direct-commit adapter implementation under `hive/lib/meta-experiment/` or a sibling adapter path — internal-repo promotion path for the maintainer swarm.
+
+design_decisions:
+  - decision: "Implement direct-commit promotion only for the maintainer loop."
+    rationale: "The local proving path lands before the public PR-only path and must not redefine the shared lifecycle seam."
+    source: "structured-outline Part 4 S9 | S10"
+  - decision: "Make worktree cleanup part of the adapter contract."
+    rationale: "The maintainer path is not valid if failed promotion dirties the main tree."
+    source: "user-decisions Q4 | structured-outline S9 acceptance criteria"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md` or `/Users/don/Documents/plugin-hive/hive/references/meta-experiment-isolation.md` with the concrete maintainer adapter’s worktree and rollback-evidence expectations."
+
+risks:
+  - severity: high
+    description: "A failed direct-commit adapter could leave partial state in the main tree and invalidate the entire proving run."
+    mitigation: "Test discard-on-failure explicitly and keep all promotion work inside a worktree."
+  - severity: medium
+    description: "The concrete adapter could drift away from the shared result shape."
+    mitigation: "Use contract tests against the abstract interface before review."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      ## Q4. `meta-meta-optimize` isolation — `Worktree default`
+      Git-worktree isolation required. File-copy sandbox is NOT acceptable.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - BL2.1: Direct-commit promotion adapter.

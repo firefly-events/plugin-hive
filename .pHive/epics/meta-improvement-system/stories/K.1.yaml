@@ -1,0 +1,105 @@
+id: K.1
+epic: meta-improvement-system
+slice: S6
+title: Fresh-workspace metrics opt-in question
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["C2.1", "C2.2", "C2.3", "C2.4", "C2.5", "C2.6"]
+
+description: |
+  Add the fresh-workspace kickoff question that exposes the signed metrics opt-in
+  choice before any user-facing meta skill exists.
+  This story explicitly names the kickoff owner files: `skills/kickoff/SKILL.md`
+  and `hive/references/kickoff-protocol.md`.
+  The question must make the trade-off clear, default to no, and route the
+  chosen value to `metrics.enabled` in `hive/hive.config.yaml`.
+  Do present this as a meaningful choice with clear consequences. Do not reset
+  existing values here; brownfield preservation belongs to `K.2`.
+
+acceptance_criteria:
+  - "Given a fresh kickoff, when the user reaches the metrics decision, then the flow asks \"Enable metrics tracking?\" or equivalent with clear trade-off explanation and default-off semantics."
+  - "Given the user’s answer, when kickoff persists config, then `hive/hive.config.yaml` records the value under `metrics.enabled`."
+  - "Given the owner-file constraint, when this story is reviewed, then the question and copy are anchored in `skills/kickoff/SKILL.md` and `hive/references/kickoff-protocol.md`."
+  - "Given S6 scope, when this story completes, then brownfield re-kickoff preservation is still left to `K.2`."
+
+steps:
+  - id: research
+    description: "Read the current kickoff delegation pattern and confirm where the fresh-workspace elicitation copy and config-persistence steps belong in the two kickoff owner files."
+    agent: researcher
+  - id: implement
+    description: "Modify `/Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md` and `/Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md` so fresh kickoff asks the metrics opt-in question and writes the answer to `metrics.enabled`."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run fresh-kickoff checks proving the question appears and the selected value is written to `hive/hive.config.yaml`. Suggested checks should include the repo’s chosen test command plus `rg -n \"Enable metrics tracking|metrics.enabled\" /Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md /Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the wording for policy accuracy, default-off semantics, and correct ownership between the kickoff skill and protocol."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the fresh-kickoff opt-in question once copy and config persistence are correct."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md
+      purpose: "Primary kickoff skill owner for user-facing elicitation entrypoints."
+    - path: /Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md
+      purpose: "Primary kickoff protocol owner for the actual flow and config-persistence behavior."
+    - path: /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+      purpose: "Config file receiving the persisted `metrics.enabled` value."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md
+    change: "Update the kickoff skill entrypoint so the metrics opt-in question is part of fresh-workspace kickoff."
+  - file: /Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md
+    change: "Add the fresh-workspace metrics opt-in question, explanatory copy, and write path to `metrics.enabled`."
+  - file: /Users/don/Documents/plugin-hive/tests/meta-improvement-system/kickoff/metrics-opt-in.test.sh
+    change: "Create fresh-kickoff tests proving the metrics question appears and the selected value persists to `metrics.enabled`."
+
+code_examples:
+  - title: "Current kickoff delegation pattern"
+    file: /Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md
+    snippet: |
+      # Hive Kickoff
+      Initialize Hive for a project. Detects brownfield vs greenfield automatically.
+      **Instructions:** Read `hive/references/kickoff-protocol.md` for the full protocol.
+
+design_decisions:
+  - decision: "Expose metrics opt-in during kickoff, default off."
+    rationale: "The user signed off on kickoff-time opt-in with clear explanation before metrics become active."
+    source: "user-decisions Q-new-B | structured-outline Part 4 S6"
+  - decision: "Keep `SKILL.md` and `kickoff-protocol.md` as the owner files."
+    rationale: "Architect review called out owner-file precision, and S6 explicitly names these two surfaces."
+    source: "structured-outline Part 4 S6 | cycle-state manifest-ownership escalation"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md` and `/Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md` so fresh kickoff clearly documents the metrics opt-in question and default-off behavior."
+
+risks:
+  - severity: medium
+    description: "If the question copy is vague, users may not understand that metrics stay off unless they opt in."
+    mitigation: "Review the wording specifically for default-off clarity and persisted-config consequences."
+  - severity: low
+    description: "The story could start handling brownfield reset behavior prematurely."
+    mitigation: "Keep brownfield preservation out of scope until `K.2`."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `K.1` Fresh-workspace metrics opt-in question.
+      - Modify `skills/kickoff/SKILL.md` — primary kickoff skill owner.
+      - Modify `hive/references/kickoff-protocol.md` — primary kickoff protocol owner.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      Kickoff UI should present this as a clear choice, not a quiet default.
+      Without metrics, the meta swarm has nothing objective to optimize against.

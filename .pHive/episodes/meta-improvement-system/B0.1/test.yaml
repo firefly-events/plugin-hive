@@ -1,0 +1,26 @@
+step_id: test
+status: completed
+timestamp: "2026-04-21T03:52:00Z"
+artifacts:
+  - .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+methodology: solo
+collapsed_steps: [research, implement, test]
+notes: |
+  Ran the B0.1 story YAML's specified rg checks against the drafted doc:
+
+  Test 1 — required field tokens present:
+    cmd: rg -n "baseline_ref|candidate_ref|policy_ref|rollback_ref|regression_watch" .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+    result: PASS — all 5 tokens matched (16 total hits across field definitions and consumer map)
+
+  Test 2 — forbidden anti-patterns negated, not defined:
+    cmd: rg -n "per-metric|human-confirmed|recommendation-only" .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+    result: PASS — 3 hits, all in negation contexts:
+      - line 14: anti-over-engineering invariant statement
+      - line 99: "No per-metric threshold classes." disclaimer
+      - line 100: "No alternate rollback modes. ... No human-confirm, no narrow-revert, no recommendation-only."
+
+  AC self-check vs story YAML:
+    AC1 (every field with purpose + shape): PASS — §1.1–1.9 enumerate all 9
+    AC2 (Q3 field coverage): PASS — commit_ref renders "commit/ref"; metrics_snapshot renders "metrics snapshot"
+    AC3 (no per-metric / alternate rollback / extra fields): PASS — only negation-context mentions
+    AC4 (no runtime code/hooks/config): PASS — docs-only diff

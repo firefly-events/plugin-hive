@@ -1,0 +1,105 @@
+id: A2.5
+epic: meta-improvement-system
+slice: S4
+title: Rewrite close step and add closure validator
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["B0.1", "B0.3", "A1.2", "A1.5", "A2.4"]
+
+description: |
+  Rewrite the close phase and add the non-bypassable closure validator that the
+  user signed off on in Q3.
+  This story owns the close-step contract, the workflow wording tied to close,
+  and the first explicit validator surface that rejects incomplete closes before
+  any ledger append can happen.
+  The validator must require real commit/ref evidence, a persisted metrics
+  snapshot reference, and a rollback target. A fabricated `commit: TBD` style
+  close must fail.
+  Do keep the morning-summary and ledger responsibilities. Do not water down the
+  invariant into a warning, reviewer suggestion, or manual checklist.
+
+acceptance_criteria:
+  - "Given the rewritten Step 8, when the close contract is read, then commit/ref, metrics snapshot, and rollback target are mandatory preconditions for successful close."
+  - "Given an incomplete close attempt, when the closure validator is exercised or described in the step, then the close is rejected before ledger append."
+  - "Given the workflow file, when the close step block is reviewed, then its task/output wording matches the rewritten Step 8 and validator semantics."
+  - "Given the historical `commit: TBD` integrity break, when this story is reviewed, then the new close contract clearly rejects fabricated commit evidence."
+
+steps:
+  - id: research
+    description: "Confirm the exact Q3 closure invariant, the current Step 8 sequencing, and the audit finding on fabricated commit evidence before rewriting the close step."
+    agent: researcher
+  - id: implement
+    description: "Rewrite `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-08-close.md`, align the close block in `/Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml`, and add the closure-validator contract surface the later runtime can enforce."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the close step now names the non-bypassable invariant and rejects incomplete closes. Suggested checks: `rg -n \"metrics snapshot|rollback target|commit hash|closure validator|ledger append|commit: TBD\" /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-08-close.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for strict Q3 closure enforcement and confirm the story did not weaken failure handling into advisory prose."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the Step 8 rewrite once the closure invariant is explicit and the workflow wording matches."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-08-close.md
+      purpose: "Primary close-step contract that must embed the non-bypassable closure validator."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+      purpose: "Workflow owner file whose close step wording must stay aligned with the validator contract."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/ledger.yaml
+      purpose: "Historical ledger example showing why fabricated commit evidence must be rejected."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-08-close.md
+    change: "Rewrite the close-step contract to require commit/ref, metrics snapshot, rollback target, and non-bypassable closure validation."
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+    change: "Adjust the close-step task/output wording only as needed to match the rewritten Step 8 contract."
+  - file: /Users/don/Documents/plugin-hive/tests/meta-improvement-system/control-plane/closure-validator.test.sh
+    change: "Create validator-focused tests that reject incomplete closes missing commit/ref, metrics snapshot, or rollback target."
+
+code_examples:
+  - title: "User-approved closure invariant"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    snippet: |
+      - **Closure invariant:** agreed. Cycle cannot close unless commit/ref + metrics snapshot + rollback target are present.
+      Non-bypassable gate blocks ledger append.
+
+design_decisions:
+  - decision: "Treat the close invariant as a hard gate."
+    rationale: "The user explicitly approved a non-bypassable close gate and rejected over-engineered alternatives, not strictness."
+    source: "user-decisions Q3"
+  - decision: "Use real commit evidence and reject fabricated closure records."
+    rationale: "The audit showed the prior system claimed success with `commit: TBD`, which cannot survive the rewrite."
+    source: "codex-audit-memo §3.6 | vertical-plan Slice 4"
+
+cross_cutting:
+  - concern: documentation
+    action: "Rewrite `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-08-close.md` and keep the close block in `/Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml` aligned with the new closure-validator contract."
+
+risks:
+  - severity: high
+    description: "A soft or bypassable validator would let the rebuilt control plane repeat the historical false-close failure."
+    mitigation: "Encode rejection behavior explicitly in the step and verify the story includes negative validation checks."
+  - severity: medium
+    description: "The story could overreach into later runtime implementation details."
+    mitigation: "Keep the slice at contract-plus-test level; leave full shared-library code to S7."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A2.5` Rewrite close step and add closure validator.
+      - Step-08 rejects closes missing commit/ref, metrics snapshot, or rollback target, and that rejection is non-bypassable.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/codex-audit-memo.md
+    relevant_excerpt: |
+      The recorded cycle claims closure without a real commit hash.
+      The ledger entry must include `commit: {git commit hash}`.

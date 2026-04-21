@@ -1,0 +1,13 @@
+step_id: integrate
+status: completed
+timestamp: "2026-04-21T04:05:00Z"
+artifacts:
+  - .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+methodology: solo
+notes: |
+  Two commits landed for B0.1:
+    - 557ef78 on refactor/configurable-state-dir — chore: whitelist epic artifacts in .gitignore (slice-kickoff housekeeping)
+    - 09e5daf on hive-B0.1 — docs: B0.1 experiment envelope outline (contract doc + 4 episode markers)
+  Branch hive-B0.1 cut from refactor/configurable-state-dir tip after the .gitignore commit.
+  No push. PRs deferred per orchestrator brief (user batch-reviews at slice end).
+  Returned to refactor/configurable-state-dir for B0.2 base.

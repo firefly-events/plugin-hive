@@ -1,0 +1,105 @@
+id: BL2i.4
+epic: meta-improvement-system
+slice: S8
+title: Step-03b backlog-fallback logic
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["BL2i.1", "BL2i.2", "BL2i.3", "A2.1"]
+
+description: |
+  Add the explicit backlog-fallback step surface that lets the local maintainer
+  scaffold say "no metric signal; would use backlog" without running an
+  experiment yet.
+  This story creates or updates
+  `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` as the
+  reusable owner of backlog-mode behavior, and it wires the local scaffold to
+  read from that step contract during dry-run execution.
+  The branch must be structurally real but still non-destructive: it can load
+  backlog entries and explain which candidate would be chosen, but it must not
+  mutate the control plane, promote changes, or close a cycle.
+  Do make the fallback step explicit and reusable. Do not turn it into a live
+  experiment or metrics-comparison path in this slice.
+
+acceptance_criteria:
+  - "Given the fallback story, when the repo is inspected, then `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` exists."
+  - "Given a dry-run maintainer invocation, when no metric signal is available, then the skill can load backlog state and report backlog-fallback intent without mutating files."
+  - "Given S8 intro scope, when the fallback branch is reviewed, then it is explicitly non-destructive and does not invoke promotion, close, or direct experiment execution."
+  - "Given backlog auto-surfacing is deferred, when the step is read, then it assumes human-edited queues only."
+
+steps:
+  - id: research
+    description: "Confirm that backlog fallback is the explicit step-owned surface for S8 and inspect nearby meta-team cycle steps so the new `step-03b` file fits the existing workflow style."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` and update `/Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md` as needed so dry-run invocation can load backlog entries and report fallback intent without side effects."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run a dry-run fallback check. Suggested checks: `test -f /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md`, `rg -n \"backlog|dry-run|no metric signal\" /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md`, and a repo test command such as `pytest tests/meta_meta/test_backlog_fallback.py`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the backlog branch is explicit, reusable, non-destructive, and still clearly separate from future live maintainer execution."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the fallback step surface once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+      purpose: "New reusable backlog-fallback step surface."
+    - path: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md
+      purpose: "Maintainer scaffold that should consume the fallback branch in dry-run mode."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-meta-optimize.yaml
+      purpose: "Backlog source the fallback branch should read."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+    change: "Create the explicit backlog-fallback step file for dry-run maintainer usage."
+  - file: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md
+    change: "Update the scaffold to reference or consume the new backlog-fallback step surface."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_meta/test_backlog_fallback.py
+    change: "Create a dry-run fallback test proving the branch reports intent without side effects."
+
+code_examples:
+  - title: "Explicit fallback owner surface"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - Modify `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` if backlog-fallback logic remains step-owned rather than fully skill-owned — this is the explicit reusable step surface for the fallback branch.
+
+design_decisions:
+  - decision: "Make backlog fallback an explicit step surface."
+    rationale: "The plan calls out `step-03b-backlog-fallback.md` as the reusable owner of fallback behavior."
+    source: "structured-outline Part 4 S8"
+  - decision: "Keep the branch dry-run only in S8."
+    rationale: "The intro slice proves structural reality without granting destructive capability."
+    source: "vertical-plan Slice 8"
+
+cross_cutting:
+  - concern: documentation
+    action: "Author `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` with complete step guidance and update the maintainer skill scaffold to point at this fallback owner surface."
+
+risks:
+  - severity: medium
+    description: "A vague fallback step would leave S9 to rediscover behavior during the first live run."
+    mitigation: "Make the branch explicit now, with dry-run tests and clear no-side-effects wording."
+  - severity: medium
+    description: "The fallback logic could accidentally promise auto-surfaced candidates."
+    mitigation: "State directly that the queue is human-edited in MVP."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - BL2i.4: Step-03b backlog-fallback logic.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - Meta-team reads from backlog when metric-driven mode can't propose anything
+      - NEW Q4 (backlog auto-surfacing): `(A)` — human-edit-only MVP

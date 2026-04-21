@@ -1,0 +1,343 @@
+name: meta-improvement-system
+title: Meta-Improvement System — Karpathy-style auto-improvement loop for plugin-hive
+description: |
+  Rebuild the meta-team control plane into a measurable, Karpathy-style auto-improvement
+  loop with two sibling swarms: /meta-optimize (shipped, public, user projects) and
+  /meta-meta-optimize (local-only, plugin-hive internals). Epic delivers metrics
+  instrumentation, control-plane rewrite, shared lifecycle library, meta-backlog,
+  and both swarm skills across 10 slices.
+
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+milestones:
+  mvl: BL2.6
+  mvs: BL3.7
+
+slices:
+  - id: S1
+    name: B0 — Consumer Contract Sliver
+    stories: [B0.1, B0.2, B0.3]
+  - id: S2
+    name: C1 — Metrics Substrate
+    stories: [C1.1, C1.2, C1.3, C1.4]
+  - id: S3
+    name: A1 — Historical Archive + Authority Reset
+    stories: [A1.1, A1.2, A1.3, A1.4, A1.5, A1.6]
+  - id: S4
+    name: A2 — Control-Plane Rewrite
+    stories: [A2.1, A2.2, A2.3, A2.4, A2.5, A2.6, A2.7, A2.8]
+  - id: S5
+    name: C2 — Event Emission Hooks (5 MVP Metrics, Opt-In)
+    stories: [C2.0, C2.1, C2.2, C2.3, C2.4, C2.5, C2.6]
+  - id: S6
+    name: Kickoff Opt-In Integration
+    stories: [K.1, K.2, K.3]
+  - id: S7
+    name: B-L1 Shared Lifecycle Library
+    stories: [L1.1, L1.2, L1.3, L1.4, L1.5, L1.6, L1.7]
+  - id: S8
+    name: B-L2 Intro — Meta-Backlog + /meta-meta-optimize Scaffold
+    stories: [BL2i.1, BL2i.2, BL2i.3, BL2i.4, BL2i.5]
+  - id: S9
+    name: B-L2 Cycle — First End-to-End /meta-meta-optimize Run (MVL)
+    stories: [BL2.1, BL2.2, BL2.3, BL2.4, BL2.5, BL2.6]
+  - id: S10
+    name: B-L3 — /meta-optimize Ships (MVS)
+    stories: [BL3.1, BL3.2, BL3.3, BL3.4, BL3.5, BL3.6, BL3.7]
+
+stories:
+  - id: B0.1
+    title: Experiment envelope outline
+    complexity: medium
+    slice: S1
+    depends_on: []
+  - id: B0.2
+    title: Query shape doc for baseline vs candidate, run-over-run, and delayed-regression watch
+    complexity: medium
+    slice: S1
+    depends_on: [B0.1]
+  - id: B0.3
+    title: Lean threshold plus rollback policy-ref contract
+    complexity: low
+    slice: S1
+    depends_on: [B0.1, B0.2]
+  - id: C1.1
+    title: Metrics directory and carrier README
+    complexity: medium
+    slice: S2
+    depends_on: [B0.1, B0.2, B0.3]
+  - id: C1.2
+    title: Event JSONL schema
+    complexity: medium
+    slice: S2
+    depends_on: [B0.1, B0.2, B0.3, C1.1]
+  - id: C1.3
+    title: Experiment envelope schema
+    complexity: medium
+    slice: S2
+    depends_on: [B0.1, B0.2, B0.3, C1.1]
+  - id: C1.4
+    title: Writer and reader primitives
+    complexity: high
+    slice: S2
+    depends_on: [B0.1, B0.2, B0.3, C1.2, C1.3]
+  - id: A1.1
+    title: Archive cycle-state, ledger, and queue under dated archive path with manifest
+    complexity: medium
+    slice: S3
+    depends_on: [B0.1, B0.2, B0.3]
+  - id: A1.2
+    title: Extract shared safety constraints
+    complexity: low
+    slice: S3
+    depends_on: [B0.1, B0.2, B0.3]
+  - id: A1.3
+    title: Demote nightly-cycle reference to historical/operator narrative
+    complexity: low
+    slice: S3
+    depends_on: [B0.1, B0.2, B0.3, A1.2]
+  - id: A1.4
+    title: Replace sandbox reference with worktree-centric isolation reference
+    complexity: medium
+    slice: S3
+    depends_on: [B0.1, B0.2, B0.3, A1.2]
+  - id: A1.5
+    title: Zero or remove active state files
+    complexity: medium
+    slice: S3
+    depends_on: [B0.1, B0.2, B0.3, A1.1]
+  - id: A1.6
+    title: "Optional audit note for historical `commit: TBD` integrity break"
+    complexity: low
+    slice: S3
+    depends_on: [B0.1, B0.2, B0.3, A1.1]
+  - id: A2.1
+    title: Rewrite implementation step
+    complexity: medium
+    slice: S4
+    depends_on: [A1.2, A1.5]
+  - id: A2.2
+    title: Rewrite testing step around orchestrator-mediated writes
+    complexity: high
+    slice: S4
+    depends_on: [A1.2, A1.5, A2.1]
+  - id: A2.3
+    title: Rewrite evaluation step
+    complexity: medium
+    slice: S4
+    depends_on: [A1.2, A1.5, A2.1]
+  - id: A2.4
+    title: Rewrite promotion step with unambiguous revert semantics
+    complexity: high
+    slice: S4
+    depends_on: [A1.2, A1.4, A1.5, A2.1, A2.3]
+  - id: A2.5
+    title: Rewrite close step and add closure validator
+    complexity: high
+    slice: S4
+    depends_on: [B0.1, B0.3, A1.2, A1.5, A2.4]
+  - id: A2.6
+    title: Split meta-team team file into two swarm-specific team files
+    complexity: high
+    slice: S4
+    depends_on: [A2.2, A2.3, A2.4, A2.5]
+  - id: A2.7
+    title: Write two new charters
+    complexity: medium
+    slice: S4
+    depends_on: [A1.2, A1.4, A2.6]
+  - id: A2.8
+    title: Audit step-write obligations against team grants
+    complexity: high
+    slice: S4
+    depends_on: [A2.2, A2.3, A2.4, A2.5, A2.6, A2.7]
+  - id: C2.0
+    title: Token capture feasibility spike
+    complexity: high
+    slice: S5
+    depends_on: [C1.4]
+  - id: C2.1
+    title: Add metrics config keys
+    complexity: medium
+    slice: S5
+    depends_on: [C1.1, C1.2, C1.3, C1.4]
+  - id: C2.2
+    title: Stop-hook session-end metric emission for story totals
+    complexity: high
+    slice: S5
+    depends_on: [C2.0, C2.1]
+  - id: C2.3
+    title: Per-agent token capture path
+    complexity: high
+    slice: S5
+    depends_on: [C2.0, C2.1, C2.2]
+  - id: C2.4
+    title: Agent-spawn reporting emission
+    complexity: medium
+    slice: S5
+    depends_on: [C2.0, C2.1]
+  - id: C2.5
+    title: Fix-loop iteration and first-attempt pass emission at execute boundaries
+    complexity: medium
+    slice: S5
+    depends_on: [C2.0, C2.1]
+  - id: C2.6
+    title: Human escalation emission
+    complexity: medium
+    slice: S5
+    depends_on: [C2.0, C2.1]
+  - id: K.1
+    title: Fresh-workspace metrics opt-in question
+    complexity: medium
+    slice: S6
+    depends_on: [C2.1, C2.2, C2.3, C2.4, C2.5, C2.6]
+  - id: K.2
+    title: Brownfield preservation and change prompt
+    complexity: medium
+    slice: S6
+    depends_on: [K.1]
+  - id: K.3
+    title: Kickoff docs update for backlog-fallback mode
+    complexity: low
+    slice: S6
+    depends_on: [K.1, K.2]
+  - id: L1.1
+    title: Scaffold `hive/lib/meta-experiment/`
+    complexity: medium
+    slice: S7
+    depends_on: [C1.3, C1.4]
+  - id: L1.2
+    title: Envelope loader and writer
+    complexity: medium
+    slice: S7
+    depends_on: [L1.1, C1.3, C1.4]
+  - id: L1.3
+    title: Baseline-capture primitive
+    complexity: medium
+    slice: S7
+    depends_on: [L1.2, C1.4, C2.1]
+  - id: L1.4
+    title: Delta-compare primitive
+    complexity: medium
+    slice: S7
+    depends_on: [L1.3, B0.2, B0.3]
+  - id: L1.5
+    title: Promotion adapter interface
+    complexity: medium
+    slice: S7
+    depends_on: [L1.4, A2.4]
+  - id: L1.6
+    title: Rollback watch and auto-revert trigger
+    complexity: high
+    slice: S7
+    depends_on: [L1.4, L1.5, B0.3]
+  - id: L1.7
+    title: Closure validator and library test suite
+    complexity: high
+    slice: S7
+    depends_on: [L1.2, L1.3, L1.4, L1.5, L1.6, A2.5]
+  - id: BL2i.1
+    title: Meta-meta backlog schema and seeded trivial candidates
+    complexity: medium
+    slice: S8
+    depends_on: [A1.5, L1.3]
+  - id: BL2i.2
+    title: Meta-optimize backlog template
+    complexity: low
+    slice: S8
+    depends_on: [BL2i.1]
+  - id: BL2i.3
+    title: Local-only maintainer skill scaffold under `maintainer-skills/`
+    complexity: medium
+    slice: S8
+    depends_on: [BL2i.1, L1.1, A2.7]
+  - id: BL2i.4
+    title: Step-03b backlog-fallback logic
+    complexity: medium
+    slice: S8
+    depends_on: [BL2i.1, BL2i.2, BL2i.3, A2.1]
+  - id: BL2i.5
+    title: Regression test proving `plugin.json` excludes `maintainer-skills/`
+    complexity: medium
+    slice: S8
+    depends_on: [BL2i.3]
+  - id: BL2.1
+    title: Direct-commit promotion adapter
+    complexity: high
+    slice: S9
+    depends_on: [L1.5, A2.4, BL2i.3]
+  - id: BL2.2
+    title: Orchestrate the rewritten control plane from the maintainer skill
+    complexity: high
+    slice: S9
+    depends_on: [BL2.1, BL2i.3, BL2i.4, A2.8]
+  - id: BL2.3
+    title: Integrate baseline capture, metric emission, compare, and close validation
+    complexity: high
+    slice: S9
+    depends_on: [BL2.2, L1.3, L1.4, L1.7, C2.6]
+  - id: BL2.4
+    title: Activate rollback watch on a real committed experiment
+    complexity: high
+    slice: S9
+    depends_on: [BL2.1, BL2.3, L1.6]
+  - id: BL2.5
+    title: Execute first live no-op cycle and write verification doc
+    complexity: medium
+    slice: S9
+    depends_on: [BL2.2, BL2.3, BL2.4]
+  - id: BL2.6
+    title: Real commit-then-revert proof during observation window
+    complexity: high
+    slice: S9
+    depends_on: [BL2.4, BL2.5, L1.6, L1.7]
+  - id: BL3.1
+    title: Public skill scaffold and plugin registration
+    complexity: medium
+    slice: S10
+    depends_on: [K.3, BL2.6, BL2i.5, A2.7]
+  - id: BL3.2
+    title: PR-artifact promotion adapter
+    complexity: high
+    slice: S10
+    depends_on: [K.3, BL2.6, BL3.1, L1.5, L1.7, A2.4]
+  - id: BL3.3
+    title: Public-skill orchestration against user-project targets
+    complexity: high
+    slice: S10
+    depends_on: [K.3, BL2.6, BL3.1, BL3.2, A2.8, L1.3, L1.4, L1.7, BL2i.2]
+  - id: BL3.4
+    title: Unknown-dimension tolerance in metric registry
+    complexity: medium
+    slice: S10
+    depends_on: [K.3, BL2.6, BL3.3, C1.4]
+  - id: BL3.5
+    title: Backlog-fallback mode for consumer backlog template
+    complexity: medium
+    slice: S10
+    depends_on: [K.3, BL2.6, BL3.3, BL2i.2, BL2i.4]
+  - id: BL3.6
+    title: First end-to-end public fixture run
+    complexity: high
+    slice: S10
+    depends_on: [K.3, BL2.6, BL3.2, BL3.3, BL3.4, BL3.5, L1.7]
+  - id: BL3.7
+    title: User-facing docs
+    complexity: medium
+    slice: S10
+    depends_on: [K.3, BL2.6, BL3.1, BL3.2, BL3.3, BL3.4, BL3.5, BL3.6]
+
+docs:
+  - path: docs/design-discussion.md
+  - path: docs/horizontal-plan.md
+  - path: docs/vertical-plan.md
+  - path: docs/structured-outline.md
+  - path: docs/user-decisions-dd.md
+  - path: docs/architect-memo.md
+  - path: docs/architect-hv-review.md
+  - path: docs/architect-outline-review.md
+  - path: docs/research-brief.md
+  - path: docs/codex-audit-memo.md
+  - path: docs/tpm-sequencing-memo.md
+
+cycle_state: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml

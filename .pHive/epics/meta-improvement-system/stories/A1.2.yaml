@@ -1,0 +1,88 @@
+id: A1.2
+epic: meta-improvement-system
+slice: S3
+title: Extract shared safety constraints
+status: pending
+complexity: low
+methodology: classic
+depends_on: ["B0.1", "B0.2", "B0.3"]
+
+description: |
+  Extract the reusable safety constraints from the old meta-team charter into a
+  standalone reference that future swarm-specific charters can import.
+  This story is a controlled salvage step: preserve the useful hard constraints
+  without carrying forward the old single-swarm authority model.
+  The new reference should capture the non-destructive, no-secrets, budget, and
+  human-confirmation guardrails in neutral language suitable for both future
+  swarms. Do not pull in obsolete scope tables or legacy operator workflow text.
+
+acceptance_criteria:
+  - "Given the extraction story, when `/Users/don/Documents/plugin-hive/hive/references/meta-safety-constraints.md` is opened, then the reusable safety constraints are present in standalone form."
+  - "Given the new reference, when a future charter author reads it, then the constraints are clearly reusable without inheriting the old single-swarm mission/scope text."
+  - "Given A1 scope, when the story completes, then the new reference exists even though the new charters themselves are deferred to S4."
+
+steps:
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/hive/references/meta-safety-constraints.md` by extracting the reusable hard-constraint language from the old charter and rewriting only enough to make it swarm-neutral."
+    agent: developer
+  - id: test
+    description: "Verify the new reference covers the preserved constraints. Suggested checks: `rg -n \"No destructive operations|No secrets|budget|Human confirmation required\" /Users/don/Documents/plugin-hive/hive/references/meta-safety-constraints.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the extracted reference preserves the real guardrails without copying over obsolete authority or mission text."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the new shared safety reference."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/charter.md
+      purpose: "Current source of the legacy hard constraints to salvage."
+    - path: /Users/don/Documents/plugin-hive/hive/references/meta-safety-constraints.md
+      purpose: "New reusable reference created by this story."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/references/meta-safety-constraints.md
+    change: "Create a reusable safety-constraints reference extracted from the old charter."
+
+code_examples:
+  - title: "Legacy hard constraints to salvage"
+    file: /Users/don/Documents/plugin-hive/.pHive/meta-team/charter.md
+    snippet: |
+      ## Hard Constraints
+      - **No destructive operations.** No file deletions. No >50% content removal per file.
+      - **No breaking changes.** Schema changes must be additive (new optional fields only).
+      - **5-hour budget window maximum.**
+      - **No secrets or credentials.**
+      - **Human confirmation required for:** changes to `hive/hive.config.yaml`
+
+design_decisions:
+  - decision: "Salvage only the reusable safety constraints from the old charter."
+    rationale: "The old authority model is being retired, but its guardrails remain useful."
+    source: "tpm-sequencing-memo §3 | structured-outline Part 4 S3"
+
+cross_cutting:
+  - concern: documentation
+    action: "Create `/Users/don/Documents/plugin-hive/hive/references/meta-safety-constraints.md` as the shared safety reference that later S4 charters can import instead of copying legacy charter prose."
+
+risks:
+  - severity: low
+    description: "Extraction could copy obsolete single-swarm scope text into the new reference."
+    mitigation: "Limit the new document to constraints and omit mission, scope table, and old operator instructions."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/tpm-sequencing-memo.md
+    relevant_excerpt: |
+      - Charter hard constraints (§37-45, §70-82) → extracted into a shared `meta-safety-constraints.md` ref, reused by both new charters.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A1.2` Extract shared safety constraints.
+      - Create `hive/references/meta-safety-constraints.md` — extracted safety constraints reused by both future charters.

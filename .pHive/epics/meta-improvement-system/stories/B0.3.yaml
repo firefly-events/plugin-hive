@@ -1,0 +1,94 @@
+id: B0.3
+epic: meta-improvement-system
+slice: S1
+title: Lean threshold plus rollback policy-ref contract
+status: pending
+complexity: low
+methodology: classic
+depends_on: ["B0.1", "B0.2"]
+
+description: |
+  Finish the B0 contract by documenting the lean threshold and rollback policy
+  reference shape that later lifecycle code will consume.
+  The output is still documentation-only, but it locks the user’s Q3 policy
+  decisions into the contract: one simple threshold knob, one unconditional
+  delayed-regression behavior, and a policy reference that fits the envelope.
+  Do explain how the policy reference participates in compare and rollback-watch
+  flows. Do not introduce per-metric tolerance classes, branchy mode trees, or
+  recommendation-only rollback semantics.
+
+acceptance_criteria:
+  - "Given the completed B0 contract, when the policy section is read, then threshold semantics are documented as one lean knob rather than per-metric classes."
+  - "Given the delayed-regression sign-off, when the rollback section is reviewed, then auto-revert is the only documented behavior."
+  - "Given the later lifecycle dependency, when the policy-ref shape is inspected, then the contract explains how compare and rollback-watch consumers use it."
+  - "Given this is still S1 documentation work, when the story finishes, then no code, config, or schema files were added."
+
+steps:
+  - id: implement
+    description: "Add the policy-ref and rollback semantics section to `/Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md`, keeping the shape lean and Q3-compliant."
+    agent: developer
+  - id: test
+    description: "Check that the contract says single threshold knob and auto-revert only. Suggested checks: `rg -n \"auto-revert|threshold|policy_ref\" /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md` and verify no per-metric class language remains."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for policy drift and confirm the doc preserves the signed rollback semantics without expanding scope."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push once the lean policy contract is accepted."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+      purpose: "Contract doc where the lean policy-ref and rollback semantics are documented."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+      purpose: "Binding source for Q3 threshold, rollback, and closure decisions."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+    change: "Add the lean threshold and rollback policy-ref contract section."
+
+code_examples:
+  - title: "Q3 policy guardrails"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    snippet: |
+      - **Threshold policy:** lean — no per-metric asymmetric-tolerance class system unless a concrete use case forces it. Start simple; add complexity only on demand.
+      - **Delayed-regression handling:** `auto-revert`.
+      - **Do-not-over-engineer signal applies across Q3:** keep the envelope field set minimal, keep the threshold simple, keep rollback behavior unconditional.
+
+design_decisions:
+  - decision: "Represent policy as a simple reference shape consumed by compare and rollback-watch."
+    rationale: "The B0 contract exists to define consumer expectations without overcommitting to implementation format."
+    source: "structured-outline Part 4 S1"
+  - decision: "Rollback behavior is unconditional auto-revert."
+    rationale: "The user explicitly narrowed delayed regression handling to one behavior."
+    source: "user-decisions Q3"
+
+cross_cutting:
+  - concern: documentation
+    action: "Complete the policy section in `/Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md` and keep its terminology aligned with the future envelope doc `/Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md`."
+
+risks:
+  - severity: medium
+    description: "The policy contract might reintroduce deferred complexity from the punt list."
+    mitigation: "Reject any threshold-class, parallel-mode, or rollback-mode expansion not named in Q3."
+  - severity: low
+    description: "Later slices may not understand how policy_ref is used."
+    mitigation: "State the compare and rollback-watch consumption points directly in the doc."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `B0.3` Lean threshold plus rollback policy-ref contract.
+      - Threshold semantics remain one lean knob and rollback semantics remain unconditional auto-revert; no per-metric classes or mode trees appear.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - **Threshold policy:** lean — no per-metric asymmetric-tolerance class system unless a concrete use case forces it.
+      - **Delayed-regression handling:** `auto-revert`.

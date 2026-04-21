@@ -1,0 +1,106 @@
+id: A1.4
+epic: meta-improvement-system
+slice: S3
+title: Replace sandbox reference with worktree-centric isolation reference
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["B0.1", "B0.2", "B0.3", "A1.2"]
+
+description: |
+  Replace the legacy file-copy sandbox guidance with the authoritative
+  worktree-centric isolation reference required by the signed Q4 decision.
+  This story creates `meta-experiment-isolation.md`, redirects surviving
+  references, and retires `meta-team-sandbox.md` from active authority.
+  The new reference should explain why copy-file sandboxing is insufficient for
+  experiment proof, how worktree isolation supports clean discard/revert flows,
+  and what expectations later slices inherit.
+  Do preserve any useful risk-routing ideas if they still fit. Do not keep the
+  old file-copy procedure as if it were still the active contract.
+
+acceptance_criteria:
+  - "Given the replacement story, when `/Users/don/Documents/plugin-hive/hive/references/meta-experiment-isolation.md` is opened, then worktree isolation is documented as the authoritative model."
+  - "Given the old sandbox ref, when repo references are checked, then live cross-links to `meta-team-sandbox.md` have been removed or redirected."
+  - "Given the signed isolation decision, when the new doc is reviewed, then it does not present file-copy sandboxing as an acceptable default."
+
+steps:
+  - id: research
+    description: "Find all live references to `meta-team-sandbox.md` and confirm the Q4 worktree requirement and the audit reasons the old file-copy model is insufficient."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/hive/references/meta-experiment-isolation.md`, demote or replace `/Users/don/Documents/plugin-hive/hive/references/meta-team-sandbox.md`, and update surviving cross-links to the new reference."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the new reference exists and old live links are gone. Suggested checks: `rg -n \"meta-team-sandbox\\.md\" /Users/don/Documents/plugin-hive/hive /Users/don/Documents/plugin-hive/.pHive` and `test -f /Users/don/Documents/plugin-hive/hive/references/meta-experiment-isolation.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the new isolation doc reflects worktree-first semantics and that old file-copy sandboxing is no longer treated as authoritative."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the isolation reference replacement."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/references/meta-team-sandbox.md
+      purpose: "Legacy file-copy sandbox reference being replaced."
+    - path: /Users/don/Documents/plugin-hive/hive/references/meta-experiment-isolation.md
+      purpose: "New authoritative isolation reference created by this story."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+      purpose: "Binding source for the worktree-default isolation decision."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/references/meta-experiment-isolation.md
+    change: "Create the authoritative worktree-centric isolation reference."
+  - file: /Users/don/Documents/plugin-hive/hive/references/meta-team-sandbox.md
+    change: "Demote, replace, or redirect the old file-copy sandbox doc so it is no longer authoritative."
+  - file: /Users/don/Documents/plugin-hive/hive
+    change: "Update any surviving cross-links from the old sandbox reference to the new isolation reference."
+
+code_examples:
+  - title: "Legacy sandbox model being retired"
+    file: /Users/don/Documents/plugin-hive/hive/references/meta-team-sandbox.md
+    snippet: |
+      ### 1. Create a sandbox copy
+      Before modifying the target file, create a copy at:
+      `.pHive/meta-team/sandbox/{proposal_id}/{target_filename}`
+      If validation passes:
+      - Copy the sandbox file to the live target path
+
+design_decisions:
+  - decision: "Make worktree isolation the authoritative experiment model."
+    rationale: "The user rejected file-copy sandboxing for self-modifying experiment classes."
+    source: "user-decisions Q4"
+  - decision: "Retire the old sandbox doc from active authority while preserving migration context."
+    rationale: "The audit found the old reference fundamentally incompatible with the approved safety model."
+    source: "codex-audit-memo §4.5 | structured-outline Part 4 S3"
+
+cross_cutting:
+  - concern: documentation
+    action: "Create `/Users/don/Documents/plugin-hive/hive/references/meta-experiment-isolation.md` and update or retire `/Users/don/Documents/plugin-hive/hive/references/meta-team-sandbox.md` so all live references point to the worktree-centric isolation contract."
+
+risks:
+  - severity: medium
+    description: "Stale links to the old sandbox doc could leave two conflicting isolation contracts live."
+    mitigation: "Search and patch cross-links during the story, then verify with `rg` that live references are redirected."
+  - severity: medium
+    description: "The new doc could preserve too much of the file-copy procedure and blur the signed Q4 decision."
+    mitigation: "State explicitly that worktrees are required and file-copy sandboxing is historical context only."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A1.4` Replace sandbox reference with worktree-centric isolation reference.
+      - `meta-experiment-isolation.md` is the authoritative isolation reference and cross-links to the old sandbox doc no longer remain live.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      ## Q4. `meta-meta-optimize` isolation — `Worktree default`
+      Git-worktree isolation required. File-copy sandbox is NOT acceptable for any self-modifying experiment class.

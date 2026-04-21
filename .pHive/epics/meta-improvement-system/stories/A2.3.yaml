@@ -1,0 +1,108 @@
+id: A2.3
+epic: meta-improvement-system
+slice: S4
+title: Rewrite evaluation step
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["A1.2", "A1.5", "A2.1"]
+
+description: |
+  Rewrite the evaluation phase so reviewer obligations, quality-bar inputs, and
+  any persisted evaluation results line up with the rebuilt two-swarm control
+  plane instead of the archived single-team contract.
+  The current Step 6 reads from `.pHive/meta-team/charter.md` and writes
+  evaluations back into `.pHive/meta-team/cycle-state.yaml`, even though the
+  future control plane replaces the one-charter model and must not assume the
+  archived active-state files remain the live authority surface.
+  Do preserve the pass / needs_optimization / needs_revision decision logic and
+  evidence-oriented review bar. Do not redesign promotion or closure behavior.
+
+acceptance_criteria:
+  - "Given the rewritten Step 6, when a reviewer reads the file, then its charter references and persistence targets match the new swarm-specific control plane rather than the archived single charter."
+  - "Given the evaluation verdict model, when the step is reviewed, then `pass`, `needs_optimization`, and `needs_revision` remain explicit and evidence-driven."
+  - "Given the workflow file, when the evaluation step block is inspected, then its task/output wording matches the Step 6 rewrite."
+  - "Given S4 scope, when this story completes, then promotion and close semantics are not redefined here."
+
+steps:
+  - id: research
+    description: "Read the current Step 6 contract, the one-charter assumptions it makes, and the S4 outline language for reviewer-aligned writes before rewriting the step."
+    agent: researcher
+  - id: implement
+    description: "Rewrite `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-06-evaluation.md` and align the evaluation block in `/Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml` to the rebuilt control plane."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the rewritten Step 6 no longer depends on the archived single-charter model and still preserves the verdict taxonomy. Suggested checks: `rg -n \"pass \\| needs_optimization \\| needs_revision|charter|cycle-state.yaml\" /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-06-evaluation.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for reviewer-role coherence, preserved quality-bar rigor, and correct separation from promotion and close concerns."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the Step 6 rewrite once the evaluation contract matches the new control plane."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
+      purpose: "Primary reviewer-contract file that must be rewritten for the two-swarm control plane."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+      purpose: "Workflow owner that must keep the evaluation step block consistent with Step 6."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/charter.md
+      purpose: "Legacy single-swarm charter whose assumptions must not remain active after the rewrite."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
+    change: "Rewrite the evaluation-step contract so reviewer obligations and references align with the rebuilt control plane."
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+    change: "Update the evaluation-step task/output wording only as needed to stay consistent with the rewritten Step 6 file."
+
+code_examples:
+  - title: "Legacy one-charter evaluation coupling"
+    file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
+    snippet: |
+      **Inputs available:**
+      - `changes_made` from step 4 — what was written
+      - `test_results` from step 5 — pass/fail per check
+      - `.pHive/meta-team/charter.md` — quality bar criteria
+      ...
+      ### 4. Update cycle-state.yaml
+      Append to `.pHive/meta-team/cycle-state.yaml`:
+
+design_decisions:
+  - decision: "Separate evaluator logic from the archived single-charter authority model."
+    rationale: "The public and maintainer swarms need swarm-specific charters; Step 6 cannot stay tied to one retired charter."
+    source: "structured-outline Part 4 S4 | codex-audit-memo §4.1"
+  - decision: "Preserve the explicit verdict taxonomy."
+    rationale: "The current evaluation categories are still useful; the rewrite is about authority coherence, not replacing the review bar."
+    source: "vertical-plan Slice 4 | current Step 6"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-06-evaluation.md` and keep the matching evaluation block in `/Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml` synchronized with the new swarm-specific charter references."
+
+risks:
+  - severity: medium
+    description: "The rewritten step could accidentally preserve references to the retired single charter."
+    mitigation: "Review all charter mentions explicitly and align them later with A2.7 outputs."
+  - severity: medium
+    description: "Changing persistence wording could blur where promotion starts."
+    mitigation: "Hold the story to evaluation-only scope and leave revert semantics to A2.4."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A2.3` Rewrite evaluation step.
+      - Modify `hive/workflows/steps/meta-team-cycle/step-06-evaluation.md` — align reviewer write behavior with actual grants.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/codex-audit-memo.md
+    relevant_excerpt: |
+      The write-actor model is wrong in three phases, which means the pipeline contract
+      itself was never reconciled with the team boundary model.
+

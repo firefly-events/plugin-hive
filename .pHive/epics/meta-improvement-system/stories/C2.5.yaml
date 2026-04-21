@@ -1,0 +1,103 @@
+id: C2.5
+epic: meta-improvement-system
+slice: S5
+title: Fix-loop iteration and first-attempt pass emission at execute boundaries
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["C2.0", "C2.1"]
+
+description: |
+  Emit the quality-oriented S5 metrics at execute boundaries: fix-loop iteration
+  count and first-attempt review-pass status.
+  This story owns the execute-boundary surface where those two metrics are most
+  naturally known, and it must write schema-valid JSONL events only when the
+  metrics gate is enabled.
+  The resulting events should be specific enough that later consumers can tell
+  whether a story passed review on the first try and how many fix iterations it
+  required.
+  Do keep the implementation focused on execute-boundary emission. Do not fold
+  in human escalation or token-specific logic here.
+
+acceptance_criteria:
+  - "Given `metrics.enabled: true`, when execute-boundary events occur, then fix-loop iteration counts and first-attempt pass status are emitted as schema-valid metrics events."
+  - "Given `metrics.enabled: false`, when the same boundaries occur, then no metrics events are written."
+  - "Given downstream consumers need binary quality signals, when the first-attempt pass event is reviewed, then it clearly distinguishes first-pass from fix-loop cases."
+  - "Given S5 scope, when this story completes, then escalation and token-specific emission remain owned by their separate stories."
+
+steps:
+  - id: research
+    description: "Identify the concrete execute-boundary owner surface where fix-loop count and first-attempt review-pass state are available without inference."
+    agent: researcher
+  - id: implement
+    description: "Modify the execute-boundary owner file so fix-loop iteration count and first-attempt pass state emit schema-valid JSONL events behind the `metrics.enabled` gate."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run checks for first-pass versus fix-loop cases, schema validity, and flag-off silence using the repo’s chosen test approach."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the event shape for binary clarity and confirm the implementation did not pull in unrelated emission responsibilities."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the execute-boundary metrics emission once the two quality metrics are proven."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [yaml, json, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+      purpose: "Metrics gate consumed by the execute-boundary emitter."
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md
+      purpose: "Schema for the emitted fix-loop and first-pass events."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/tpm-sequencing-memo.md
+      purpose: "Source of the MVP metric set defining these quality metrics."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hooks/metrics-execute-boundaries.sh
+    change: "Create the execute-boundary metrics helper so fix-loop iteration and first-attempt pass events emit when `metrics.enabled` is true."
+  - file: /Users/don/Documents/plugin-hive/tests/meta-improvement-system/metrics/execute-boundaries.test.sh
+    change: "Create execute-boundary metrics tests for first-pass, fix-loop, and flag-off cases."
+
+code_examples:
+  - title: "MVP quality metrics"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/tpm-sequencing-memo.md
+    snippet: |
+      MVP metric set: tokens-per-story, wall-clock-per-phase,
+      fix-loop-iterations, human-escalations, first-attempt-pass-rate.
+
+design_decisions:
+  - decision: "Emit fix-loop and first-pass metrics where execution boundaries already know the state."
+    rationale: "These metrics are boundary facts, not values that should be inferred later from other event families."
+    source: "structured-outline Part 4 S5 | tpm-sequencing-memo §2"
+  - decision: "Represent first-attempt pass as an explicit signal."
+    rationale: "The MVP metric set includes first-attempt pass rate, so later consumers need a clear binary event shape."
+    source: "user-decisions Q8 provisional metric set | S5 acceptance criteria"
+
+cross_cutting:
+  - concern: documentation
+    action: "Document the execute-boundary emission owner file and keep its quality-metric event notes aligned with `/Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md`."
+
+risks:
+  - severity: medium
+    description: "If first-pass state is inferred indirectly, later analysis may misclassify fix-loop cases."
+    mitigation: "Implement on the boundary where review outcome is known and test explicit first-pass versus fix-loop scenarios."
+  - severity: low
+    description: "The story could accumulate escalation logic too."
+    mitigation: "Hold escalation emission for C2.6 and review for scope discipline."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `C2.5` Fix-loop iteration and first-attempt pass emission at execute boundaries.
+      - With the flag on, the run emits ... fix-loop iterations, first-attempt pass flag ...
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/tpm-sequencing-memo.md
+    relevant_excerpt: |
+      MVP metric set: tokens-per-story, wall-clock-per-phase, fix-loop-iterations,
+      human-escalations, first-attempt-pass-rate.

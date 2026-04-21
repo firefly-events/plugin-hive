@@ -1,0 +1,105 @@
+id: BL3.2
+epic: meta-improvement-system
+slice: S10
+title: PR-artifact promotion adapter
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["K.3", "BL2.6", "BL3.1", "L1.5", "L1.7", "A2.4"]
+
+description: |
+  Implement the public swarm’s concrete promotion adapter that produces PR-style
+  artifacts instead of directly mutating the target repository.
+  This story is where the public path becomes materially different from the
+  maintainer path: the shared lifecycle still promotes through one adapter seam,
+  but the returned evidence shape is `pr_ref` plus `pr_state`, not `commit_ref`.
+  The adapter must preserve rollback targeting and closure integrity while
+  keeping direct-commit semantics out of the public promotion path.
+  Do implement the concrete PR adapter, result shape, and contract tests. Do not
+  silently coerce PR outcomes into commit-shaped closure evidence.
+
+acceptance_criteria:
+  - "Given Q5, when the public promotion adapter is exercised, then retained changes are emitted as a PR-style artifact and not as a direct repo mutation."
+  - "Given the closure-evidence-shape escalation, when the adapter result is inspected, then it carries `pr_ref` and `pr_state` for closure evidence rather than overloading `commit_ref`."
+  - "Given shared rollback semantics, when the adapter output is reviewed, then rollback targeting remains explicit even on the PR-only path."
+  - "Given the library seam from L1.5, when tests run, then the concrete PR adapter satisfies the shared promotion-adapter interface without changing the interface contract."
+
+steps:
+  - id: research
+    description: "Confirm the public promotion semantics, PR evidence shape, and rollback-target expectations from Q5, the S10 outline, and the closure-evidence-shape escalation."
+    agent: researcher
+  - id: implement
+    description: "Create a concrete PR-only promotion adapter such as `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/pr_promotion_adapter.py` and bind its result shape to explicit `pr_ref`, `pr_state`, and rollback-target fields without introducing direct-commit fallback."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run adapter contract tests. Suggested checks: `pytest tests/meta_optimize/test_pr_promotion_adapter.py tests/meta_experiment/test_promotion_adapter.py tests/meta_experiment/test_closure_validator.py` and `rg -n \"pr_ref|pr_state|rollback|commit_ref\" /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/pr_promotion_adapter.py`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the concrete adapter preserves the shared lifecycle seam, emits PR-shaped closure evidence, and leaves no direct-mutation path available to the public skill."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the PR-artifact adapter and its tests once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [python, markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/promotion_adapter.py
+      purpose: "Shared abstract interface that the public PR adapter must satisfy."
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/closure_validator.py
+      purpose: "Shared closure gate that must accept PR-shaped evidence without weakening incomplete-record rejection."
+    - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+      purpose: "Escalation source for the PR evidence-shape requirement."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/pr_promotion_adapter.py
+    change: "Create the concrete PR-only promotion adapter with explicit `pr_ref`, `pr_state`, and rollback-target output fields."
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/__init__.py
+    change: "Export the PR promotion adapter from the shared lifecycle module."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_optimize/test_pr_promotion_adapter.py
+    change: "Create adapter tests proving PR-only promotion, evidence-shape correctness, and rollback-target preservation."
+
+code_examples:
+  - title: "Closure-evidence-shape risk to resolve in public path"
+    file: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    snippet: |
+      - trigger: closure-evidence-shape-mismatch
+        stories: [S9, S10]
+        reason: "The outline elicits but does not register the risk that a shared closure validator overfits direct-commit evidence and rejects valid PR-only close records."
+
+design_decisions:
+  - decision: "Use a concrete PR adapter rather than embedding PR logic into the skill."
+    rationale: "The public swarm must still consume the shared lifecycle library through the same promotion seam as the maintainer loop."
+    source: "vertical-plan Slice 10 | L1.5"
+  - decision: "Treat `pr_ref` plus `pr_state` as first-class closure evidence."
+    rationale: "S10 closure proof is PR-shaped, and the architect escalation explicitly warns against direct-commit overfitting."
+    source: "structured-outline R19 | cycle-state closure-evidence-shape-mismatch"
+
+cross_cutting:
+  - concern: documentation
+    action: "Document the PR-only promotion contract and evidence shape in the adapter module docs so later public-skill wiring and user docs reference one canonical behavior."
+
+risks:
+  - severity: high
+    description: "A convenience fallback to commit-shaped evidence would violate Q5 and mask a closure mismatch until late."
+    mitigation: "Keep PR evidence explicit in code and tests, and run the shared closure-validator suite against PR-shaped fixtures."
+  - severity: medium
+    description: "Rollback targeting could be dropped because the public path does not merge directly."
+    mitigation: "Carry rollback-target fields in the adapter result and assert them in contract tests."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `BL3.2` PR-artifact promotion adapter.
+      - The closure validator accepts PR-based close records and still rejects incomplete records.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      ## Q5. `meta-optimize` promotion — `PR-only`
+      All retained changes leave the system as PR-style artifacts. No direct repo mutation.

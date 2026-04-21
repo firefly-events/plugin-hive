@@ -1,0 +1,105 @@
+id: A2.4
+epic: meta-improvement-system
+slice: S4
+title: Rewrite promotion step with unambiguous revert semantics
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["A1.2", "A1.4", "A1.5", "A2.1", "A2.3"]
+
+description: |
+  Rewrite the promotion phase so failed changes have an explicit, reversible
+  disposition under the user-approved worktree isolation model.
+  The current Step 7 mixes "revert", "leave the file as-is", and
+  "flag for human" behaviors while still reflecting a pre-rewrite control plane.
+  S4 requires this step to make the revert path unambiguous: worktree-native
+  discard or equivalent delete-on-fail semantics must be stated clearly enough
+  that later maintainer runs can prove reversibility instead of improvising it.
+  Do preserve the distinction between promoted versus rejected work. Do not add
+  PR-only public-swarm behavior here; that belongs later.
+
+acceptance_criteria:
+  - "Given the rewritten Step 7, when a maintainer reads the promotion contract, then the revert path for failed changes is explicit and compatible with worktree-default isolation."
+  - "Given `pass`, `needs_optimization`, and `needs_revision` verdicts, when the step is read, then each verdict has one unambiguous action path."
+  - "Given the workflow file, when the promotion block is inspected, then its task/output wording matches the rewritten Step 7 semantics."
+  - "Given Q4 worktree default, when this story is reviewed, then Step 7 does not describe irreversible or ad hoc cleanup behavior as acceptable promotion logic."
+
+steps:
+  - id: research
+    description: "Read the current promotion step, the worktree-isolation reference, and the Q4 sign-off so the new revert semantics are explicit before editing."
+    agent: researcher
+  - id: implement
+    description: "Rewrite `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-07-promotion.md` and align the promotion block in `/Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml` to a clear worktree-compatible revert model."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the rewritten Step 7 names one explicit action for each verdict and states a clear revert path. Suggested checks: `rg -n \"needs_revision|needs_optimization|pass|worktree|revert|flagged_for_human\" /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-07-promotion.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for revert-path clarity, Q4 alignment, and separation from later PR-only public promotion semantics."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the Step 7 rewrite once the revert path is explicit and consistent with the workflow file."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-07-promotion.md
+      purpose: "Primary promotion contract that must define unambiguous revert semantics."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+      purpose: "Workflow owner whose promotion step wording must stay aligned."
+    - path: /Users/don/Documents/plugin-hive/hive/references/meta-experiment-isolation.md
+      purpose: "Isolation reference introduced in A1 that establishes worktree-first semantics."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-07-promotion.md
+    change: "Rewrite promotion behavior so failed changes have explicit worktree-compatible revert handling."
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+    change: "Adjust the promotion-step task/output wording only as needed to stay consistent with the rewritten Step 7 file."
+
+code_examples:
+  - title: "Current ambiguous promotion wording"
+    file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-07-promotion.md
+    snippet: |
+      For each change with `needs_revision` verdict:
+      - If the change created a new file: write a note in `cycle-state.yaml` under `reverted`. The file will remain but should be treated as incomplete.
+      - If the change modified an existing file: check if the modification can be isolated. If so, restore the original content.
+      - If not (the change is entangled), flag for human review.
+
+design_decisions:
+  - decision: "Promotion must prove reversibility under worktree-default isolation."
+    rationale: "The user rejected file-copy sandboxing for self-modifying experiments and the architect tied safe promotion to clean revertibility."
+    source: "user-decisions Q4 | architect-memo §5"
+  - decision: "Keep Step 7 scoped to internal control-plane semantics."
+    rationale: "PR-only public promotion is a later slice; S4 only needs an internally coherent revert model."
+    source: "vertical-plan Slice 4 | user-decisions Q5"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-07-promotion.md` and keep the promotion block in `/Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml` aligned with the new worktree-compatible revert semantics."
+
+risks:
+  - severity: high
+    description: "A partially clarified Step 7 could still allow irreversible or ad hoc revert behavior."
+    mitigation: "Require explicit verdict-to-action mapping and review it against the worktree isolation reference."
+  - severity: medium
+    description: "The story could accidentally import later public-swarm PR semantics."
+    mitigation: "Limit the rewrite to internal control-plane behavior and defer PR-only wording to S10."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A2.4` Rewrite promotion step with unambiguous revert semantics.
+      - The Step-07 revert semantics are explicit and reversible under the worktree model.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      ## Q4. `meta-meta-optimize` isolation — `Worktree default`
+      Git-worktree isolation required. File-copy sandbox is NOT acceptable for any self-modifying experiment class.
+

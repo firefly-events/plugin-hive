@@ -1,0 +1,108 @@
+id: A2.7
+epic: meta-improvement-system
+slice: S4
+title: Write two new charters
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["A1.2", "A1.4", "A2.6"]
+
+description: |
+  Write the two swarm-specific charters that replace the legacy single-swarm
+  charter without duplicating the shared safety-constraint prose extracted in A1.
+  One charter must govern the public `meta-optimize` swarm and one must govern
+  the local-only `meta-meta-optimize` maintainer swarm.
+  Both charters should import or reference the shared safety constraints, then
+  state swarm-specific mission, scope, promotion model, and boundary language.
+  Do preserve the reusable safety and quality-bar instincts. Do not copy the old
+  charter forward wholesale or keep its plugin-only scope language in the public
+  swarm charter.
+
+acceptance_criteria:
+  - "Given the charter story, when `/Users/don/Documents/plugin-hive/.pHive/meta-team/` is inspected, then `charter-meta-optimize.md` and `charter-meta-meta-optimize.md` exist."
+  - "Given the shared-constraints extraction from A1, when the new charters are read, then they import or reference shared safety constraints instead of duplicating the full prose."
+  - "Given the two-swarm split, when the public charter is read, then it does not inherit the old plugin-internal-only scope restriction."
+  - "Given the maintainer-only local tool decision, when the maintainer charter is read, then it clearly reflects local-only operation and worktree-default safety."
+
+steps:
+  - id: research
+    description: "Read the extracted safety-constraints reference, the legacy charter, and the two-swarm scope decisions so the new charters separate shared guardrails from swarm-specific mission text."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/.pHive/meta-team/charter-meta-optimize.md` and `/Users/don/Documents/plugin-hive/.pHive/meta-team/charter-meta-meta-optimize.md` using the shared safety-constraints reference instead of copying legacy single-swarm prose."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify both charters exist and reference the shared safety constraints. Suggested checks: `test -f` on both charter paths and `rg -n \"meta-safety-constraints|worktree|PR-only|local-only\" /Users/don/Documents/plugin-hive/.pHive/meta-team/charter-meta-*.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for swarm-specific scope clarity and confirm neither charter silently preserves the old single-swarm authority assumptions."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the new charters once shared constraints and swarm-specific scope are both clear."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/charter-meta-optimize.md
+      purpose: "New public-swarm charter authored by this story."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/charter-meta-meta-optimize.md
+      purpose: "New maintainer-swarm charter authored by this story."
+    - path: /Users/don/Documents/plugin-hive/hive/references/meta-safety-constraints.md
+      purpose: "Shared safety reference extracted in A1 and reused here."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/charter.md
+      purpose: "Legacy single-swarm charter whose assumptions must not be copied forward wholesale."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/charter-meta-optimize.md
+    change: "Create the public-swarm charter with shared-safety imports and PR-oriented scope."
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/charter-meta-meta-optimize.md
+    change: "Create the maintainer-swarm charter with shared-safety imports and local-only worktree-safe scope."
+
+code_examples:
+  - title: "Shared-constraints reuse expectation"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/tpm-sequencing-memo.md
+    snippet: |
+      Charter hard constraints (§37-45, §70-82) → extracted into a shared
+      `meta-safety-constraints.md` ref, reused by both new charters.
+      - New `meta-optimize` charter (user-project swarm).
+      - New `meta-meta-optimize` charter (plugin-hive swarm).
+
+design_decisions:
+  - decision: "Author two charters instead of mutating one legacy charter."
+    rationale: "The public and maintainer swarms have different scope boundaries and cannot share one undifferentiated authority document."
+    source: "structured-outline Part 4 S4 | codex-audit-memo §4.1"
+  - decision: "Reuse shared safety constraints rather than duplicating them."
+    rationale: "A1 extracted reusable guardrails precisely so the new charters stay consistent without copy drift."
+    source: "tpm-sequencing-memo §2 | A1.2 scope"
+
+cross_cutting:
+  - concern: documentation
+    action: "Create `/Users/don/Documents/plugin-hive/.pHive/meta-team/charter-meta-optimize.md` and `/Users/don/Documents/plugin-hive/.pHive/meta-team/charter-meta-meta-optimize.md`, each explicitly referencing `/Users/don/Documents/plugin-hive/hive/references/meta-safety-constraints.md`."
+
+risks:
+  - severity: medium
+    description: "The public charter could inherit plugin-internal-only restrictions from the legacy charter and cripple future `meta-optimize` work."
+    mitigation: "Review the public charter against the audit’s warning about copying old scope language."
+  - severity: medium
+    description: "Duplicated safety prose could drift between charters."
+    mitigation: "Reference the shared safety doc instead of copying constraint blocks."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A2.7` Write two new charters.
+      - Create `.pHive/meta-team/charter-meta-optimize.md`.
+      - Create `.pHive/meta-team/charter-meta-meta-optimize.md`.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/codex-audit-memo.md
+    relevant_excerpt: |
+      The public-vs-plugin split can be lost if people reuse the current charter language.
+      The current charter explicitly forbids changes to user project `.pHive/` directories.
+

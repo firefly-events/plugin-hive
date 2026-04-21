@@ -1,0 +1,110 @@
+id: C1.1
+epic: meta-improvement-system
+slice: S2
+title: Metrics directory and carrier README
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["B0.1", "B0.2", "B0.3"]
+
+description: |
+  Create the inert dual-schema carrier layout under `.pHive/metrics/` and
+  document how the directory is organized before any live emitters exist.
+  This story establishes the top-level README plus the `events/` and
+  `experiments/` subdirectories that later stories will populate.
+  The README content must explain the split between append-only JSONL events and
+  experiment envelope records, the default-off nature of metrics writes, and
+  the expectation that only approved schema files define record shape.
+  Do create discoverable docs and directories. Do not add emitters, hooks, or
+  ad hoc record formats outside the planned schema files.
+
+acceptance_criteria:
+  - "Given the carrier story, when the repo is inspected, then `/Users/don/Documents/plugin-hive/.pHive/metrics/`, `/Users/don/Documents/plugin-hive/.pHive/metrics/events/`, and `/Users/don/Documents/plugin-hive/.pHive/metrics/experiments/` exist."
+  - "Given the README set, when a reader opens the docs, then the dual-schema split, directory purpose, and retention/convention notes are clearly described."
+  - "Given metrics are opt-in later, when the carrier docs are reviewed, then they do not imply that emission is on by default."
+  - "Given this is substrate-only work, when the story completes, then no hook sites or workflow emitters have been added."
+
+steps:
+  - id: research
+    description: "Confirm the dual-schema directory structure, doc touchpoints, and default-off framing from the outline, horizontal plan, and signed kickoff decision."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/.pHive/metrics/README.md`, `/Users/don/Documents/plugin-hive/.pHive/metrics/events/README.md`, and `/Users/don/Documents/plugin-hive/.pHive/metrics/experiments/README.md` with conventions aligned to the B0 contract."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the directories and README files exist and mention the dual-schema carrier. Suggested checks: `test -f` for the three README paths and `rg -n \"dual-schema|events|experiments|default\" /Users/don/Documents/plugin-hive/.pHive/metrics/README.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for terminology drift against B0 and confirm the docs do not promise emitters or config semantics that belong to later slices."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the carrier layout once the documentation review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/README.md
+      purpose: "Top-level carrier reference explaining the directory split and conventions."
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/events/README.md
+      purpose: "Local contract for append-only event storage and examples."
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/experiments/README.md
+      purpose: "Local contract for experiment-envelope records and mutation rules."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/horizontal-plan.md
+      purpose: "Authoritative layer map for the dual-schema carrier structure."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/metrics/README.md
+    change: "Create and document carrier conventions, retention notes, and the top-level split between events and experiments."
+  - file: /Users/don/Documents/plugin-hive/.pHive/metrics/events/README.md
+    change: "Create and document append-only JSONL event storage expectations."
+  - file: /Users/don/Documents/plugin-hive/.pHive/metrics/experiments/README.md
+    change: "Create and document experiment envelope storage expectations and narrow mutation rules."
+
+code_examples:
+  - title: "Carrier structure from the horizontal plan"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/horizontal-plan.md
+    snippet: |
+      STRUCTURE: `.pHive/metrics/events/*.jsonl` (append-only, per run_id or rolling daily) + `.pHive/metrics/experiments/*.yaml` (one envelope per experiment_id) + README.md (conventions + retention).
+      SCHEMAS (new):
+        - `metrics-event.schema.md`
+        - `experiment-envelope.schema.md`
+
+design_decisions:
+  - decision: "Use a dual-schema carrier under `.pHive/metrics/`."
+    rationale: "The user approved append-only event JSONL plus experiment envelopes as the locked storage model."
+    source: "user-decisions Q1"
+  - decision: "Document the carrier before adding emitters."
+    rationale: "S2 is intentionally schema and substrate first; hook writes land later in S5."
+    source: "vertical-plan Slice 2 | structured-outline Part 4 S2"
+
+cross_cutting:
+  - concern: documentation
+    action: "Create `/Users/don/Documents/plugin-hive/.pHive/metrics/README.md`, `/Users/don/Documents/plugin-hive/.pHive/metrics/events/README.md`, and `/Users/don/Documents/plugin-hive/.pHive/metrics/experiments/README.md` so later schema and emitter stories have a discoverable doc entrypoint."
+
+risks:
+  - severity: medium
+    description: "The README set could accidentally imply metrics are enabled by default."
+    mitigation: "State explicitly that later writes are gated and that this slice adds inert structure only."
+  - severity: low
+    description: "Directory naming could drift from the approved plan."
+    mitigation: "Use the exact `.pHive/metrics/events/` and `.pHive/metrics/experiments/` paths from the outline."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `C1.1` Metrics directory and carrier README.
+      - Create `.pHive/metrics/README.md` — carrier conventions, retention notes, and directory purpose.
+      - Create `.pHive/metrics/events/README.md`.
+      - Create `.pHive/metrics/experiments/README.md`.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      ## Q1. Metrics storage — `Affirm`
+      Dual-schema carrier under `.pHive/metrics/` (append-only JSONL events + experiment envelopes).

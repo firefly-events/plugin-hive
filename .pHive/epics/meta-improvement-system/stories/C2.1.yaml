@@ -1,0 +1,99 @@
+id: C2.1
+epic: meta-improvement-system
+slice: S5
+title: Add metrics config keys
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["C1.1", "C1.2", "C1.3", "C1.4"]
+
+description: |
+  Add the S5 config surface that gates all metrics writes: `metrics.enabled`
+  defaulting to `false` and `metrics.dir` defaulting to `.pHive/metrics`.
+  This story owns the config schema and documentation comments in
+  `hive/hive.config.yaml`; it does not emit metrics by itself.
+  The resulting config must be explicit enough that every later hook story can
+  treat it as the one write-time gate and one carrier root.
+  Do preserve the existing backend-routing and planning settings. Do not add
+  kickoff prompting here or write any event records yet.
+
+acceptance_criteria:
+  - "Given the updated config, when `/Users/don/Documents/plugin-hive/hive/hive.config.yaml` is read, then it contains `metrics.enabled: false` and `metrics.dir: .pHive/metrics`."
+  - "Given the default-off policy, when the config comments are reviewed, then they describe metrics as opt-in and do not imply background emission by default."
+  - "Given S5 scope, when this story completes, then no hook or kickoff owner files have been modified."
+  - "Given later emitters depend on these keys, when review finishes, then the config surface is precise enough for hook stories to gate all writes on it."
+
+steps:
+  - id: research
+    description: "Confirm the exact config keys, defaults, and comment style already used in `hive/hive.config.yaml`, then map how later S5 stories will consume them."
+    agent: researcher
+  - id: implement
+    description: "Modify `/Users/don/Documents/plugin-hive/hive/hive.config.yaml` to add `metrics.enabled: false` and `metrics.dir: .pHive/metrics` with repo-consistent documentation comments."
+    agent: backend-developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the new keys and defaults exist. Suggested checks: `rg -n \"metrics:|enabled: false|dir: \\.pHive/metrics\" /Users/don/Documents/plugin-hive/hive/hive.config.yaml`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for policy accuracy, comment clarity, and isolation from later hook and kickoff work."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the metrics config-key addition once the defaults and comments are correct."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [yaml, markdown, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+      purpose: "Primary owner file for the `metrics.enabled` and `metrics.dir` config surface."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+      purpose: "Source for the S5 file manifest and default-off gating requirement."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+    change: "Add the `metrics.enabled` and `metrics.dir` keys with default-off semantics and doc comments."
+
+code_examples:
+  - title: "S5 config surface from the outline"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - Modify `hive/hive.config.yaml` — add `metrics.enabled: false`
+        and `metrics.dir: .pHive/metrics`
+      - With the flag off, no `.pHive/metrics/events/*.jsonl` writes occur during a run.
+
+design_decisions:
+  - decision: "Use a default-off metrics gate."
+    rationale: "The user signed off on kickoff-time opt-in with metrics disabled until explicitly enabled."
+    source: "user-decisions Q-new-B"
+  - decision: "Centralize metrics carrier path in config."
+    rationale: "All S5 emitters need one canonical carrier root instead of scattered hardcoded metrics paths."
+    source: "structured-outline Part 4 S5"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/hive/hive.config.yaml` comments so `metrics.enabled` and `metrics.dir` are discoverable and clearly documented as the S5 write gate."
+
+risks:
+  - severity: medium
+    description: "The keys could be added without enough explanation, leading later stories to interpret them inconsistently."
+    mitigation: "Use repo-consistent config comments that name both the opt-in default and the carrier directory."
+  - severity: low
+    description: "The story could drift into hook implementation."
+    mitigation: "Restrict edits to `hive/hive.config.yaml` only."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `C2.1` Add metrics config keys.
+      - `hive/hive.config.yaml` contains `metrics.enabled: false` and `metrics.dir: .pHive/metrics`.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      Metrics are kickoff-time opt-in.
+      All Epic C hook writes become conditional on `metrics.enabled: true`.
+

@@ -1,0 +1,111 @@
+id: A1.1
+epic: meta-improvement-system
+slice: S3
+title: Archive cycle-state, ledger, and queue under dated archive path with manifest
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["B0.1", "B0.2", "B0.3"]
+
+description: |
+  Preserve the legacy meta-team state files under a dated archive path so the
+  historical record survives while active authority is reset.
+  This story moves the current `cycle-state.yaml`, `ledger.yaml`, and `queue.yaml`
+  into `.pHive/meta-team/archive/2026-04-19/` and creates a `MANIFEST.md` that
+  explains what was archived, why it was archived, and what integrity caveats
+  remain in the preserved history.
+  The archive must preserve file contents as evidence rather than rewriting them.
+  Do create a clear manifest and include the known `commit: TBD` caveat. Do not
+  silently edit the archived historical payloads to make them look cleaner.
+
+acceptance_criteria:
+  - "Given the archive story, when the archive directory is inspected, then `cycle-state.yaml`, `ledger.yaml`, `queue.yaml`, and `MANIFEST.md` exist under `/Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/`."
+  - "Given the manifest, when an operator reads it, then it explains archive scope, rationale, and the historical integrity caveat."
+  - "Given the preservation requirement, when archived files are compared to their prior live versions, then they were copied for evidence rather than rewritten."
+  - "Given A1 scope, when the story completes, then the old authority surface is archived but no new control-plane files were introduced yet."
+
+steps:
+  - id: research
+    description: "Confirm the current live state files, archive destination, and the required `commit: TBD` caveat from the outline and signed decisions."
+    agent: researcher
+  - id: implement
+    description: "Archive `/Users/don/Documents/plugin-hive/.pHive/meta-team/{cycle-state.yaml,ledger.yaml,queue.yaml}` under `/Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/` and create `MANIFEST.md` describing the preserved files and integrity note."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the archive files and manifest exist. Suggested checks: `test -f` on the four archive paths and `rg -n \"commit: TBD|integrity\" /Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/MANIFEST.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that evidence was preserved, authority was severed, and the manifest does not rewrite the historical record."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the archive + manifest once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/cycle-state.yaml
+      purpose: "Current live cycle-state file that must be preserved as historical evidence."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/ledger.yaml
+      purpose: "Current live ledger containing the `commit: TBD` historical integrity break."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue.yaml
+      purpose: "Current live queue file whose pre-split state must be archived before authority reset."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/MANIFEST.md
+      purpose: "Archive manifest produced by this story."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/cycle-state.yaml
+    change: "Create archived copy of the prior live cycle-state file."
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/ledger.yaml
+    change: "Create archived copy of the prior live ledger with historical integrity caveat preserved."
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/queue.yaml
+    change: "Create archived copy of the prior live queue."
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/MANIFEST.md
+    change: "Create archive manifest documenting preserved files, rationale, and the `commit: TBD` note."
+
+code_examples:
+  - title: "Historical integrity caveat to preserve"
+    file: /Users/don/Documents/plugin-hive/.pHive/meta-team/ledger.yaml
+    snippet: |
+      - cycle_id: meta-2026-04-13
+        date: "2026-04-13"
+        verdict: passed
+        commit: TBD
+        notes: >
+          Third cycle. Completed memory coverage for all previously-zero-memory agents.
+
+design_decisions:
+  - decision: "Archive the legacy state instead of deleting it outright."
+    rationale: "The signed plan preserves useful history while severing live authority."
+    source: "vertical-plan Slice 3 | user-decisions Q9"
+  - decision: "Carry the `commit: TBD` integrity break into the manifest."
+    rationale: "The user explicitly chose preservation plus audit note rather than rewriting history."
+    source: "user-decisions Q-new-D"
+
+cross_cutting:
+  - concern: documentation
+    action: "Create `/Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/MANIFEST.md` documenting the archived `cycle-state.yaml`, `ledger.yaml`, and `queue.yaml`, including the `commit: TBD` integrity caveat."
+
+risks:
+  - severity: medium
+    description: "Archive work could accidentally mutate the historical payload instead of preserving it."
+    mitigation: "Treat the archive files as copies and keep commentary in `MANIFEST.md`, not inside the archived records."
+  - severity: medium
+    description: "The manifest could omit the integrity break and imply a cleaner history than exists."
+    mitigation: "Call out the `commit: TBD` issue explicitly in the manifest."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A1.1` Archive cycle-state, ledger, and queue under dated archive path with manifest.
+      - Create `.pHive/meta-team/archive/2026-04-19/MANIFEST.md` — explain preserved files, archive rationale, and integrity caveats.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - NEW Q5 (commit: TBD historical ledger entry): `(A)` — add optional A1.6 MANIFEST audit-note story during archive.

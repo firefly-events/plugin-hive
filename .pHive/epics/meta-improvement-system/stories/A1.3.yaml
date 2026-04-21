@@ -1,0 +1,87 @@
+id: A1.3
+epic: meta-improvement-system
+slice: S3
+title: Demote nightly-cycle reference to historical/operator narrative
+status: pending
+complexity: low
+methodology: classic
+depends_on: ["B0.1", "B0.2", "B0.3", "A1.2"]
+
+description: |
+  Demote `meta-team-nightly-cycle.md` so it is clearly historical and no longer
+  presents itself as the authoritative guide for the future two-swarm system.
+  The useful operator narrative can remain, but the document must state up front
+  that it describes a retired legacy control plane.
+  The story should add a clear header or status block, keep salvageable monitoring
+  ideas, and remove authoritative posture where practical. Do not delete the doc,
+  because later operators may still need the historical context during migration.
+
+acceptance_criteria:
+  - "Given the demotion story, when `/Users/don/Documents/plugin-hive/hive/references/meta-team-nightly-cycle.md` is opened, then it is explicitly marked historical/operator-narrative only."
+  - "Given the authority reset, when an operator scans the doc, then it no longer reads as the current source of truth for the live system."
+  - "Given useful salvage remains, when the story completes, then operator-history value is preserved rather than deleting the document."
+
+steps:
+  - id: implement
+    description: "Modify `/Users/don/Documents/plugin-hive/hive/references/meta-team-nightly-cycle.md` to add a historical/operator-narrative header and remove authoritative wording where it conflicts with the new plan."
+    agent: developer
+  - id: test
+    description: "Verify the historical header is present and authoritative language is demoted. Suggested checks: `rg -n \"historical|operator narrative|non-authoritative\" /Users/don/Documents/plugin-hive/hive/references/meta-team-nightly-cycle.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the doc remains useful as history while no longer acting as the active integration guide."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the demoted reference doc."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/references/meta-team-nightly-cycle.md
+      purpose: "Legacy reference doc being demoted from authority to historical narrative."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/codex-audit-memo.md
+      purpose: "Explains why the old nightly-cycle guide cannot remain the umbrella authority."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/references/meta-team-nightly-cycle.md
+    change: "Add a historical/operator-narrative header and demote authoritative posture."
+
+code_examples:
+  - title: "Legacy authoritative posture to demote"
+    file: /Users/don/Documents/plugin-hive/hive/references/meta-team-nightly-cycle.md
+    snippet: |
+      # Meta-Team Nightly Cycle — Integration Guide
+      The meta-team is the Hive plugin's autonomous self-improvement system.
+      This guide explains how the nightly cycle integrates with the rest of the Hive framework.
+
+design_decisions:
+  - decision: "Preserve the nightly-cycle doc as historical/operator narrative instead of deleting it."
+    rationale: "The planning docs call for selective salvage: preserve useful operator context while severing active authority."
+    source: "vertical-plan Slice 3 | tpm-sequencing-memo §3"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/hive/references/meta-team-nightly-cycle.md` so it becomes explicitly historical and no longer serves as the authoritative guide for the active control plane."
+
+risks:
+  - severity: medium
+    description: "The doc could remain ambiguous and still mislead operators into treating it as active authority."
+    mitigation: "Put the historical status at the top and remove or soften live-authority language."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/codex-audit-memo.md
+    relevant_excerpt: |
+      Verdict:
+      - Targeted patch if salvaged as the operator guide for `meta-meta-optimize` only.
+      - Full rewrite if intended as the umbrella guide for both new swarms.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A1.3` Demote nightly-cycle reference to historical/operator narrative.
+      - `meta-team-nightly-cycle.md` is explicitly historical and operator-narrative only.

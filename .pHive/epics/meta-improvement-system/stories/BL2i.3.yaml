@@ -1,0 +1,104 @@
+id: BL2i.3
+epic: meta-improvement-system
+slice: S8
+title: Local-only maintainer skill scaffold under `maintainer-skills/`
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["BL2i.1", "L1.1", "A2.7"]
+
+description: |
+  Create the local-only `/meta-meta-optimize` skill scaffold at
+  `maintainer-skills/meta-meta-optimize/SKILL.md`, outside the shipped skill
+  root and outside `.claude-plugin/plugin.json`.
+  This story makes the packaging boundary structural: the maintainer skill lives
+  in the repo, can document its shared-library dependency, and can describe the
+  dry-run/backlog-loading flow, but it must not yet perform real experiments.
+  The scaffold may include helper docs or prompt fragments under the same local
+  path if needed, but the new root path is the core deliverable.
+  Do create the skill scaffold and keep it local-only. Do not register it in the
+  plugin manifest or add destructive execution behavior yet.
+
+acceptance_criteria:
+  - "Given the local-only skill story, when the repo is inspected, then `/Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md` exists."
+  - "Given the packaging boundary, when the scaffold is reviewed, then it lives outside `/Users/don/Documents/plugin-hive/skills/` and outside `.claude-plugin/plugin.json`."
+  - "Given S8 intro scope, when the scaffold is invoked in dry-run form later, then it is positioned to load backlog state and shared-library imports without executing a real experiment."
+  - "Given Q-new-A, when this story completes, then the new skill remains local-only and undistributed."
+
+steps:
+  - id: research
+    description: "Confirm the exact `maintainer-skills/meta-meta-optimize/SKILL.md` path from the signed NEW Q2 resolution and inspect shipped-skill conventions so the local scaffold is readable without being bundle-visible."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md` and any same-directory helper docs needed to explain local-only invocation, backlog loading, and shared-library imports."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the scaffold path exists and remains outside the shipped root. Suggested checks: `test -f /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md` and `rg -n \"meta-meta-optimize|maintainer-skills\" /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the scaffold is structurally local-only, references the shared library correctly, and stays non-destructive."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the local-only maintainer skill scaffold once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md
+      purpose: "New local-only maintainer skill scaffold."
+    - path: /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json
+      purpose: "Manifest boundary that must continue to exclude the local-only skill."
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md
+      purpose: "Shared runtime reference the scaffold should cite."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md
+    change: "Create the local-only skill scaffold outside the shipped skill root."
+  - file: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/
+    change: "Optionally add same-directory helper docs or prompt fragments needed by the scaffold."
+
+code_examples:
+  - title: "Local-only placement decision"
+    file: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    snippet: |
+      - phase: hv-gate
+        key: L9-meta-meta-location
+        value: "maintainer-skills/meta-meta-optimize/SKILL.md"
+
+design_decisions:
+  - decision: "Place `/meta-meta-optimize` under `maintainer-skills/`."
+    rationale: "The signed path decision makes the local-only boundary structural rather than convention-based."
+    source: "cycle-state L9-meta-meta-location | structured-outline Part 4 S8"
+  - decision: "Keep the scaffold out of `plugin.json`."
+    rationale: "The maintainer skill is local to this repo and must not ship publicly."
+    source: "user-decisions Q-new-A | Q6"
+
+cross_cutting:
+  - concern: documentation
+    action: "Author `/Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md` so maintainers can discover the local-only invocation path, shared-library dependency, and backlog-fallback intent from the skill itself."
+
+risks:
+  - severity: high
+    description: "A misplaced scaffold under `skills/` would weaken the packaging boundary before any regression test catches it."
+    mitigation: "Use the exact `maintainer-skills/meta-meta-optimize/SKILL.md` path and keep the manifest untouched in this story."
+  - severity: low
+    description: "The scaffold could promise live execution before the control plane is wired."
+    mitigation: "Describe dry-run and backlog-loading behavior only; defer real execution to S9."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `BL2i.3` Local-only maintainer skill scaffold under `maintainer-skills/`.
+      - Create `maintainer-skills/meta-meta-optimize/SKILL.md` — local-only skill scaffold outside the shipped skill root.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      ## Q-new-A. `meta-meta-optimize` does NOT ship
+      - Epic B-L2 (meta-meta-optimize) builds in this repo but is not in plugin.json's public surface

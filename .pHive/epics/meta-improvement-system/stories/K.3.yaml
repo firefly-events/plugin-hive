@@ -1,0 +1,102 @@
+id: K.3
+epic: meta-improvement-system
+slice: S6
+title: Kickoff docs update for backlog-fallback mode
+status: pending
+complexity: low
+methodology: classic
+depends_on: ["K.1", "K.2"]
+
+description: |
+  Update the kickoff-facing documentation so users understand the consequence of
+  opting out of metrics: future meta runs remain in backlog-fallback-only mode
+  rather than metric-driven optimization.
+  This story explicitly names the kickoff owner docs: `skills/kickoff/SKILL.md`
+  and `hive/references/kickoff-protocol.md`.
+  The wording must be policy-accurate and should not oversell metric-driven
+  capabilities before later meta-optimize slices land.
+  Do make the trade-off discoverable in the kickoff docs. Do not add new config
+  logic or re-open the kickoff questions themselves.
+
+acceptance_criteria:
+  - "Given the kickoff docs, when a user reads the metrics opt-in section, then they are told that opting out leaves future meta runs in backlog-fallback-only mode."
+  - "Given the user’s signed decision, when the docs are reviewed, then they explain why metrics opt-in matters without implying metrics are enabled by default."
+  - "Given the owner-file requirement, when this story completes, then the relevant explanatory text exists in both `skills/kickoff/SKILL.md` and `hive/references/kickoff-protocol.md`."
+  - "Given S6 scope, when this story completes, then it changes documentation only and does not alter config-persistence logic."
+
+steps:
+  - id: research
+    description: "Read the final K.1/K.2 wording and the Q-new-B/Q7 decisions so the docs explain backlog fallback accurately and concisely."
+    agent: researcher
+  - id: implement
+    description: "Modify `/Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md` and `/Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md` to explain backlog-fallback-only mode when metrics are disabled."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the docs mention backlog-fallback-only mode and keep default-off semantics intact. Suggested checks: `rg -n \"backlog|fallback|metrics|default\" /Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md /Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the doc wording for policy accuracy and confirm it does not promise more capability than S6 actually delivers."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the kickoff doc update once backlog-fallback implications are explicit and accurate."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md
+      purpose: "Kickoff-facing skill doc that must mention the opt-out consequence."
+    - path: /Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md
+      purpose: "Detailed kickoff protocol doc that must explain backlog-fallback-only mode."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+      purpose: "Authoritative source for the opt-out consequence and backlog fallback."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md
+    change: "Add or refine user-facing copy explaining that disabling metrics forces backlog-fallback-only meta runs."
+  - file: /Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md
+    change: "Add or refine kickoff protocol text explaining the opt-out consequence and default-off policy."
+
+code_examples:
+  - title: "Opt-out consequence from signed decisions"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    snippet: |
+      Without metrics, the meta swarm has nothing objective to optimize against
+      Meta-team features will fall back to qualitative / backlog-driven mode
+
+design_decisions:
+  - decision: "Document the backlog-fallback consequence explicitly."
+    rationale: "The user required kickoff to explain what opting out means for future meta runs."
+    source: "user-decisions Q-new-B | Q7 extension"
+  - decision: "Keep the doc update in the kickoff owner files."
+    rationale: "S6 explicitly identifies the skill and protocol docs as the authoritative surfaces."
+    source: "structured-outline Part 4 S6"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md` and `/Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md` so both kickoff-facing docs explain backlog-fallback-only mode when metrics are disabled."
+
+risks:
+  - severity: low
+    description: "The docs could oversell metric-driven behavior before later slices land."
+    mitigation: "Review the wording specifically for present-tense scope accuracy."
+  - severity: low
+    description: "Only one kickoff doc could be updated, leaving drift."
+    mitigation: "Require both owner files in the same story and verify them together."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `K.3` Kickoff docs update.
+      - Kickoff docs explicitly say that opting out means future meta runs use backlog fallback only.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      Without metrics, the meta swarm has nothing objective to optimize against.
+      Meta-team features will fall back to qualitative / backlog-driven mode.

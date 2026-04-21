@@ -1,0 +1,8 @@
+step_id: implement
+status: completed
+timestamp: "2026-04-21T04:20:00Z"
+artifacts:
+  - .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+methodology: solo
+collapsed_steps: [research, implement, test]
+notes: "Appended §2 query-shape section (§2.1 baseline-vs-candidate, §2.2 run-over-run, §2.3 delayed-regression-watch, §2.4 query-to-field reconciliation, §2.5 does-NOT-commit-to fence). Each query states purpose, required inputs, intended output, lifecycle decision supported, and cost expectation (cheap / moderate / cheap-per-arm-moderate-in-aggregate). Doc grew 122 → 169 lines."

@@ -1,0 +1,104 @@
+id: L1.5
+epic: meta-improvement-system
+slice: S7
+title: Promotion adapter interface
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["L1.4", "A2.4"]
+
+description: |
+  Define the abstract promotion-adapter interface shared by the maintainer and
+  public swarms without committing either concrete promotion path yet.
+  This story gives the lifecycle library a stable seam: the maintainer loop will
+  later bind a direct-commit adapter, while the public loop will bind a PR-only
+  adapter, but both must satisfy one explicit contract.
+  The interface must carry enough information for promotion, rollback targeting,
+  and closure evidence without hard-coding direct-commit assumptions.
+  Do create the interface, adapter result shape, and contract tests. Do not
+  implement direct-commit or PR-only behavior in this story.
+
+acceptance_criteria:
+  - "Given the adapter-interface story, when the repo is inspected, then `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/promotion_adapter.py` exists and defines an abstract promotion contract."
+  - "Given later swarm asymmetry, when the interface is reviewed, then it supports both a maintainer direct-commit path and a public PR-only path without changing the shared lifecycle API."
+  - "Given closure-evidence needs, when the adapter result shape is examined, then it has an explicit place for promotion evidence and rollback targeting rather than burying those values in ad hoc fields."
+  - "Given S7 scope, when this story completes, then no concrete direct-commit or PR-only adapter implementation exists yet."
+
+steps:
+  - id: research
+    description: "Confirm the shared-versus-asymmetric boundary between lifecycle runtime and promotion policy from the outline, architect review, and the rewritten promotion step."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/promotion_adapter.py` with an abstract adapter interface, a shared result shape, and explicit evidence/rollback fields that later concrete adapters must fill."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run interface-contract tests. Suggested checks: `pytest tests/meta_experiment/test_promotion_adapter.py` and `rg -n \"abstract|rollback|evidence|pr\" /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/promotion_adapter.py`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the shared adapter seam preserves maintainer/public asymmetry without overfitting to direct-commit evidence shape."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the promotion-adapter interface once tests and review pass."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [python, markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/promotion_adapter.py
+      purpose: "New abstract promotion seam for both swarms."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-07-promotion.md
+      purpose: "Control-plane promotion semantics the shared interface must not contradict."
+    - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+      purpose: "Escalation source for the closure-evidence-shape concern that this interface must avoid worsening."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/promotion_adapter.py
+    change: "Create the abstract adapter interface and shared result/evidence shape for later concrete implementations."
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/__init__.py
+    change: "Export the adapter interface."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_experiment/test_promotion_adapter.py
+    change: "Create contract tests covering direct-commit and PR-only compatibility expectations."
+
+code_examples:
+  - title: "Shared runtime with separate policies"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/horizontal-plan.md
+    snippet: |
+      LOCATION — **`hive/lib/meta-experiment/`**. Shared runtime code, NOT a `SKILL.md`.
+      `/meta-optimize` and local `/meta-meta-optimize` both import; neither registers.
+
+design_decisions:
+  - decision: "Define one abstract promotion seam before concrete adapters."
+    rationale: "The maintainer and public swarms differ in policy, but both should consume the same lifecycle contract."
+    source: "vertical-plan Slice 7 | Slice 9 | Slice 10"
+  - decision: "Keep evidence shape explicit in the shared result."
+    rationale: "The architect flagged a risk that closure validation could overfit direct-commit evidence and later reject PR-only closes."
+    source: "cycle-state escalation closure-evidence-shape-mismatch"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md` with the abstract promotion-adapter contract and note that concrete direct-commit and PR-only implementations land in later slices."
+
+risks:
+  - severity: medium
+    description: "The shared interface could bake in direct-commit assumptions that later block PR-only closure."
+    mitigation: "Use an explicit evidence/result shape that leaves room for both commit and PR references."
+  - severity: low
+    description: "The story could creep into concrete adapter implementation."
+    mitigation: "Keep this file abstract only and reject repo-mutation logic in review."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    relevant_excerpt: |
+      - trigger: closure-evidence-shape-mismatch
+        stories: [S9, S10]
+        reason: "The outline elicits but does not register the risk that a shared closure validator overfits direct-commit evidence and rejects valid PR-only close records."
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - Create `hive/lib/meta-experiment/promotion-adapter.*` — abstract adapter interface, intentionally no concrete adapter yet.

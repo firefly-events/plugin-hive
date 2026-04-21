@@ -1,0 +1,11 @@
+step_id: research
+status: completed
+timestamp: "2026-04-21T04:15:00Z"
+artifacts:
+  - .pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+  - .pHive/epics/meta-improvement-system/docs/structured-outline.md
+  - .pHive/epics/meta-improvement-system/docs/vertical-plan.md
+  - .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+methodology: solo
+collapsed_steps: [research, implement, test]
+notes: "Sources: Q3 (lean signal, envelope field set), structured-outline Part 4 S1 AC2 (three queries with cost classification), vertical-plan Slice 1 (cheap/expensive framing), existing b0-consumer-contract §1.10 (pre-declared query names in consumer-map, binding §1 and §2 together)."

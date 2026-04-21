@@ -1,0 +1,8 @@
+step_id: implement
+status: completed
+timestamp: "2026-04-21T04:45:00Z"
+artifacts:
+  - .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+methodology: solo
+collapsed_steps: [research, implement, test]
+notes: "Appended §3 policy-ref contract (§3.1 single-knob threshold, §3.2 unconditional auto-revert, §3.3 policy-ref shape and consumer reads, §3.4 composition with §1/§2, §3.5 does-NOT-commit-to fence). Doc grew 169 → 230 lines."

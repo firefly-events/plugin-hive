@@ -1,0 +1,32 @@
+step_id: test
+status: completed
+timestamp: "2026-04-21T04:22:00Z"
+artifacts:
+  - .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+methodology: solo
+collapsed_steps: [research, implement, test]
+notes: |
+  Ran B0.2 story YAML's rg check against the drafted §2:
+
+  Test — query names + cost labels present:
+    cmd: rg -n "baseline-vs-candidate|run-over-run|delayed-regression-watch|cheap|expensive" .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+    result: PASS — 21 hits for query names across §1 consumer notes and §2 per-query sections; 3 "cheap"/"moderate" cost label hits in §2.1 / §2.2 / §2.3 (intentionally avoided "expensive" — contract rejects full-history-scan shapes, no query is labeled expensive).
+
+  Regression test — B0.1 field tokens still intact:
+    cmd: rg -c "baseline_ref|candidate_ref|policy_ref|rollback_ref|regression_watch" .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+    result: PASS — 23 hits (up from 16 after B0.1; new §2 references added the expected increase).
+
+  Anti-pattern check — "per-metric|human-confirmed|recommendation-only" should appear only in negation contexts:
+    first pass: 6 hits — 3 legit (lines 14, 99, 100 from §1), 3 false positives at lines 123, 131 describing per-metric query OUTPUTS (benign English, not the forbidden threshold class system).
+    action: reworded lines 123, 131 to "one entry per metric" / "one time-series per metric" to eliminate false positives for downstream rote rg validators. Kept line 140 ("no human-confirm branch, no narrow-revert branch, no recommendation-only branch") — that's a negation restating §1.11's mode-tree fence, appropriate in §2.3's decision-path section.
+    final: 4 hits total, all negation contexts:
+      - line 14: anti-over-engineering invariant
+      - line 99: "No per-metric threshold classes." disclaimer
+      - line 100: "No alternate rollback modes ... no human-confirm, no narrow-revert, no recommendation-only."
+      - line 140: §2.3 restating the fixed behavior ("no ... branch ... no recommendation-only branch")
+
+  AC self-check vs B0.2 story YAML:
+    AC1 (baseline-vs-candidate, run-over-run, delayed-regression-watch all named and described): PASS — §2.1, §2.2, §2.3 each have full structured descriptions
+    AC2 (each query: required inputs + intended output + cost expectation stated explicitly): PASS — every §2.x has bullets for all three
+    AC3 (architect can read §2 alone and tell what records S2 must support): PASS — inputs enumerate fields from §1 verbatim, reconciliation in §2.4 ties back
+    AC4 (no schema files, runtime code, or hook behavior changed): PASS — docs-only diff

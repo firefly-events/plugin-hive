@@ -1,0 +1,106 @@
+id: BL3.3
+epic: meta-improvement-system
+slice: S10
+title: Public-skill orchestration against user-project targets
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["K.3", "BL2.6", "BL3.1", "BL3.2", "A2.8", "L1.3", "L1.4", "L1.7", "BL2i.2"]
+
+description: |
+  Wire the shipped `/meta-optimize` skill to the rewritten control plane and the
+  shared lifecycle library so it can execute against a user-project target.
+  This is the public orchestration story: the skill must load target inputs,
+  honor metrics opt-in state from kickoff, consume the consumer backlog template
+  when needed, and run through baseline capture, candidate execution, compare,
+  promotion, and close using the public PR-only adapter.
+  The orchestration must preserve the control-plane grants and step obligations
+  established in S4 rather than embedding ad hoc behavior in the skill file.
+  Do bind the public skill to the A2 workflow and shared runtime. Do not bypass
+  the lifecycle library or restore legacy meta-team authority shortcuts.
+
+acceptance_criteria:
+  - "Given the public skill story, when `/meta-optimize` is invoked against a user-project target, then it routes through the rewritten A2 workflow and shared lifecycle helpers rather than bespoke inline logic."
+  - "Given the S6 dependency, when metrics were enabled at kickoff, then the public run reads that state and enables metrics-backed operation instead of ignoring kickoff configuration."
+  - "Given consumer backlog support, when metrics are insufficient, then the orchestration can load the consumer `queue-meta-optimize.yaml` template rather than failing before proposal selection."
+  - "Given the shared close gate, when the public orchestration completes a valid run, then it supplies PR-shaped closure evidence that the validator accepts."
+
+steps:
+  - id: research
+    description: "Confirm the public-skill orchestration boundary across S4, S6, S7, S8, and S10 so the skill delegates to the existing control plane and lifecycle library rather than reimplementing them."
+    agent: researcher
+  - id: implement
+    description: "Modify `/Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md` and any supporting helper files under `/Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/` to orchestrate the A2 workflow, read kickoff metrics state, consume the consumer backlog template, and call the public PR promotion adapter."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run orchestration coverage. Suggested checks: `pytest tests/meta_optimize/test_public_orchestration.py tests/meta_experiment/test_closure_validator.py`, `rg -n \"queue-meta-optimize|metrics.enabled|pr_ref|pr_state\" /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize`, and validate that the public skill references control-plane steps rather than duplicating them."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the public skill preserves the rewritten authority model, honors kickoff metrics state, and closes with PR-shaped evidence through the shared validator."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the public orchestration wiring once tests and review pass."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, python, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md
+      purpose: "Public command entrypoint that must orchestrate the shared runtime for user-project targets."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/
+      purpose: "Rewritten control-plane step set that the public skill must route through."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-optimize.yaml
+      purpose: "Consumer backlog template available when metrics-driven proposal selection is insufficient."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md
+    change: "Wire the public skill to the rewritten control plane, kickoff metrics state, consumer backlog template, and PR-only adapter."
+  - file: /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/run.py
+    change: "Create or update helper orchestration code that invokes the A2 workflow and shared lifecycle runtime for user-project targets."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_optimize/test_public_orchestration.py
+    change: "Create integration-oriented tests covering control-plane delegation, kickoff metrics state handling, and PR-shaped close records."
+
+code_examples:
+  - title: "Public orchestration goal from Slice 10"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    snippet: |
+      GOAL: `/meta-optimize` skill exists, is registered in `.claude-plugin/plugin.json`,
+      executes an end-to-end cycle against a user project target, promotes via PR-only adapter (Q5),
+      and produces an inspectable PR artifact.
+
+design_decisions:
+  - decision: "Keep public orchestration as a consumer of the rewritten workflow and shared lifecycle library."
+    rationale: "S10 is supposed to ship the same control plane and lifecycle semantics proven in S9, not fork them in public-skill code."
+    source: "vertical-plan Slice 10 | A2.8 | S7"
+  - decision: "Read kickoff metrics state as a real prerequisite rather than a doc-only note."
+    rationale: "The MVS acceptance path begins at kickoff opt-in, so the public skill has to consume that state explicitly."
+    source: "structured-outline S10 acceptance criteria | user-decisions Q-new-B"
+
+cross_cutting:
+  - concern: documentation
+    action: "Keep `/Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md` explicit about target-project inputs, metrics opt-in dependency, and backlog-template fallback so users can run the public skill without maintainer-only assumptions."
+
+risks:
+  - severity: high
+    description: "The public skill could reintroduce legacy authority shortcuts or inline orchestration logic that diverges from the A2 workflow."
+    mitigation: "Review the skill as a thin orchestrator and enforce tests that exercise shared workflow and validator code paths."
+  - severity: medium
+    description: "Kickoff metrics state or consumer backlog inputs could be treated as optional afterthoughts, breaking the intended operator flow."
+    mitigation: "Make both prerequisites explicit in the skill contract and cover them in orchestration tests."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - BL3.3: Wire skill to orchestrate A2 workflow against user-project target (target-repo worktree)
+      - End-to-end integration: kickoff → opt-in → metrics enabled → `/meta-optimize` run → PR
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      Metrics are kickoff-time opt-in.
+      If disabled at kickoff, meta-team features fall back to qualitative / backlog-driven mode.

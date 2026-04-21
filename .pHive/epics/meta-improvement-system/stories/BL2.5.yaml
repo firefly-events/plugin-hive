@@ -1,0 +1,104 @@
+id: BL2.5
+epic: meta-improvement-system
+slice: S9
+title: Execute first live no-op cycle and write verification doc
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["BL2.2", "BL2.3", "BL2.4"]
+
+description: |
+  Execute the first full live maintainer cycle against a trivial candidate and
+  record a verification document with durable artifact references.
+  This story proves that the local maintainer path can complete a clean,
+  worktree-isolated no-op or trivial cycle through the rewritten control plane
+  before the deliberate-regression rollback proof is attempted.
+  The verification document should cite the run artifacts directly: envelope
+  path, event references, commit SHA, rollback target, and any relevant worktree
+  cleanup evidence. Narrative summary alone is not sufficient.
+  Do execute the live proving run and write the verification doc. Do not use
+  this story to satisfy the rollback-realism proof requirement; that remains
+  explicitly reserved for BL2.6.
+
+acceptance_criteria:
+  - "Given the first live proving run, when `/meta-meta-optimize` executes against a trivial backlog target, then the cycle completes inside a worktree rather than the main tree."
+  - "Given the verification doc, when it is read, then it points to durable run artifacts including commit SHA, metrics snapshot reference, rollback target reference, and representative event or envelope paths."
+  - "Given the proving-run scope, when the story completes, then the run is evidence-backed but does not claim rollback-realism proof on its own."
+
+steps:
+  - id: research
+    description: "Select the safest trivial backlog candidate and confirm which artifacts the verification doc must reference so the first live run is auditable."
+    agent: researcher
+  - id: implement
+    description: "Execute the first trivial live maintainer run in a worktree and create a verification document under `/Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof/` or a nearby maintainer audit path that records durable artifact references from the run."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the run artifacts and verification doc exist. Suggested checks: `rg -n \"commit|rollback|metrics|worktree\" /Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof` and any repo integration command used to exercise the live run."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the live no-op cycle is real, worktree-isolated, and documented with artifact references rather than unsupported narrative claims."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the verification doc and any supporting test updates once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, python, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof/
+      purpose: "Audit path where the first live-run verification evidence should be stored."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-meta-optimize.yaml
+      purpose: "Source of trivial proving-run candidates."
+    - path: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md
+      purpose: "Maintainer entrypoint used to execute the first live run."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof/
+    change: "Create the first live-run verification doc with durable artifact references."
+  - file: /Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof/latest.yaml
+    change: "Update the latest-pointer file if this story establishes or refreshes the verification pointer."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_meta/test_first_live_cycle.py
+    change: "Add or update checks that verify the proving-run artifacts and audit doc shape."
+
+code_examples:
+  - title: "Verification doc must cite artifacts, not just narrative"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - `BL2.5` Execute first live no-op cycle and write verification doc.
+      - Create `.pHive/audits/mvl-proof/{iso-ts}/proof.yaml` — canonical MVL proof artifact for the first live cycle, with durable artifact references and closure evidence.
+
+design_decisions:
+  - decision: "Run a trivial live cycle before deliberate regression proof."
+    rationale: "The maintainer loop should demonstrate clean end-to-end orchestration before it intentionally triggers rollback."
+    source: "vertical-plan Slice 9"
+  - decision: "Require artifact-backed verification."
+    rationale: "The architect explicitly warned against milestone claims supported only by thin narrative."
+    source: "structured-outline Risk R17"
+
+cross_cutting:
+  - concern: documentation
+    action: "Create the verification doc under `/Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof/` with direct references to the run artifacts so operators can inspect the first live cycle."
+
+risks:
+  - severity: medium
+    description: "A narrative-only verification doc would overstate readiness without enough inspection detail."
+    mitigation: "Require direct artifact references and review them before sign-off."
+  - severity: low
+    description: "The chosen backlog candidate could still be too invasive for a first live cycle."
+    mitigation: "Use one of the seeded trivial candidates and record the selection rationale."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `BL2.5` Execute first live no-op cycle and write verification doc.
+      - `.pHive/audits/mvl-proof/{iso-ts}/proof.yaml` — canonical MVL proof artifact for the first live maintainer run.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - BL2.5: Execute first live no-op cycle and write verification doc.

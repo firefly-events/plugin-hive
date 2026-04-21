@@ -1,0 +1,101 @@
+id: C2.4
+epic: meta-improvement-system
+slice: S5
+title: Agent-spawn reporting emission
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["C2.0", "C2.1"]
+
+description: |
+  Emit agent-spawn reporting events so S5 captures spawn-scoped metric context
+  without requiring later slices to infer it indirectly from story totals.
+  This story owns the concrete agent-spawn reporting surface identified in the
+  outline and must write schema-valid JSONL events only when metrics are
+  enabled.
+  The emitted records should provide the dimensions needed to correlate spawn
+  activity with token, duration, and review outcomes in later analysis.
+  Do preserve no-op behavior when metrics are disabled. Do not duplicate the
+  Stop-hook totals or the fix-loop/review boundary events owned by other stories.
+
+acceptance_criteria:
+  - "Given the chosen spawn-reporting surface, when an agent spawn occurs and `metrics.enabled` is true, then a schema-valid metrics event is written."
+  - "Given `metrics.enabled: false`, when the same spawn path runs, then no metrics event is written."
+  - "Given later analysis needs, when the emitted event is reviewed, then it carries enough run/story/spawn context to correlate with the other MVP metrics."
+  - "Given S5 scope, when this story completes, then it does not duplicate story-total or fix-loop-specific emission behavior."
+
+steps:
+  - id: research
+    description: "Confirm the exact agent-spawn reporting owner surface and the minimum event dimensions needed to correlate spawn activity with the rest of S5 metrics."
+    agent: researcher
+  - id: implement
+    description: "Modify the concrete agent-spawn reporting surface so it emits schema-valid JSONL events behind the `metrics.enabled` gate."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run checks for spawn-event emission, schema validity, and flag-off silence using the repo’s chosen test approach."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the spawn-event payload for overlap minimization and correlation usefulness across the MVP metric set."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the spawn-reporting emission once schema validity and gating behavior are proven."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [yaml, json, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+      purpose: "Source of the metrics gate and carrier directory used by the spawn emitter."
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md
+      purpose: "Schema the spawn-reporting events must follow."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+      purpose: "Source for the spawn-reporting story and S5 acceptance criteria."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hooks/metrics-agent-spawn.sh
+    change: "Create the agent-spawn metrics helper so spawn-scoped events emit under the `metrics.enabled` gate."
+  - file: /Users/don/Documents/plugin-hive/tests/meta-improvement-system/metrics/agent-spawn-emission.test.sh
+    change: "Create spawn-event emission tests covering schema validity and flag-off silence."
+
+code_examples:
+  - title: "S5 remaining emission sites"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      `developer` on Codex wires the remaining emission sites:
+      Task/PostToolUse, agent-spawn reporting, execute boundaries, and escalation path.
+
+design_decisions:
+  - decision: "Emit spawn-scoped context as its own event family."
+    rationale: "The outline names agent-spawn reporting as a separate emission site, which avoids overloading Stop-hook totals."
+    source: "structured-outline Part 4 S5"
+  - decision: "Keep spawn emission behind the same config gate as all other metrics."
+    rationale: "The user approved one opt-in metrics surface, not per-emitter enablement."
+    source: "user-decisions Q-new-B | C2.1"
+
+cross_cutting:
+  - concern: documentation
+    action: "Document the chosen agent-spawn emission owner file and keep its event-shape notes aligned with `/Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md`."
+
+risks:
+  - severity: medium
+    description: "Spawn events could duplicate other emission paths and create ambiguous analysis later."
+    mitigation: "Constrain the payload to spawn-scoped context and review it specifically for overlap."
+  - severity: medium
+    description: "The story could attach to the wrong owner surface and miss real spawn events."
+    mitigation: "Research the concrete spawn-reporting entrypoint before implementation."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `C2.4` Agent-spawn reporting emission.
+      - `developer` on Codex wires the remaining emission sites: ... agent-spawn reporting ...
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      Event emission hooks — passive capture points (Stop hook, PostToolUse, agent-spawn report, step boundaries).

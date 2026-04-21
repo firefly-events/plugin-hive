@@ -1,0 +1,108 @@
+id: A2.8
+epic: meta-improvement-system
+slice: S4
+title: Audit step-write obligations against team grants
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["A2.2", "A2.3", "A2.4", "A2.5", "A2.6", "A2.7"]
+
+description: |
+  Add the closure-property audit that proves the rewritten control plane is
+  internally coherent: every path a step may write is covered by the responsible
+  swarm’s team grants, and no step requires an unauthorized mutation.
+  This story is the S4 proof point, not a narrative summary. It should produce
+  mechanical evidence in the repo’s normal test location or an equivalent audit
+  artifact that can fail when steps and grants drift apart.
+  Do inspect the workflow and rewritten step files against both new team YAMLs.
+  Do not accept prose-only confidence or reviewer intuition as the proof.
+
+acceptance_criteria:
+  - "Given the S4 rewrite set, when the closure-property audit runs, then every declared step-write path is a subset of the corresponding swarm’s team grants."
+  - "Given a missing or over-broad mapping, when the audit is exercised, then it fails with a specific path-to-grant mismatch."
+  - "Given the rewritten control plane, when this story completes, then the repo contains a durable audit artifact or test that future changes can rerun."
+  - "Given S4 verification requirements, when review finishes, then Step 5 contradiction removal and Step 8 incomplete-close rejection are both still covered by the final proof surface."
+
+steps:
+  - id: research
+    description: "Enumerate every declared write target in the rewritten workflow and Steps 4-8, then map each one to the responsible swarm file and grant before choosing the audit implementation shape."
+    agent: researcher
+  - id: implement
+    description: "Add the closure-property audit in the repo’s normal test location or equivalent audit artifact so rewritten steps, workflow files, and team YAMLs can be checked mechanically for grant coverage."
+    agent: tester
+    depends_on: [research]
+  - id: test
+    description: "Run the closure-property audit and record any intentional negative cases proving it fails on mismatched paths. Suggested checks should include the repo’s chosen test command plus `rg -n \"step-0[4-8]|meta-optimize|meta-meta-optimize\" /Users/don/Documents/plugin-hive/.pHive/teams /Users/don/Documents/plugin-hive/hive/workflows`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the audit for real proof value rather than documentation theater, and confirm the path coverage matches the final rewritten control plane."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the closure-property audit once it proves step writes are a subset of team grants."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+      purpose: "Workflow owner whose steps and outputs define the control-plane write surfaces to audit."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle
+      purpose: "Rewritten Step 4-8 files whose declared write paths are the audit input."
+    - path: /Users/don/Documents/plugin-hive/.pHive/teams/meta-optimize.yaml
+      purpose: "Public-swarm team grants audited by this story."
+    - path: /Users/don/Documents/plugin-hive/.pHive/teams/meta-meta-optimize.yaml
+      purpose: "Maintainer-swarm team grants audited by this story."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/tests/meta-improvement-system/control-plane/step-grant-audit.test.sh
+    change: "Create the closure-property audit test so step-write paths can be checked mechanically against team grants."
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+    change: "Adjust comments or explicit write-path annotations only if the audit needs them to make the step-to-grant mapping unambiguous."
+  - file: /Users/don/Documents/plugin-hive/.pHive/teams/meta-optimize.yaml
+    change: "Clarify grants only if the audit reveals ambiguity between declared write paths and authorized domains."
+  - file: /Users/don/Documents/plugin-hive/.pHive/teams/meta-meta-optimize.yaml
+    change: "Clarify grants only if the audit reveals ambiguity between declared write paths and authorized domains."
+
+code_examples:
+  - title: "S4 proof requirement from the vertical plan"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    snippet: |
+      VERIFIED BY: Closure property test (step writes ⊆ team grants);
+      step-05 contradiction gone; step-07 revert path unambiguous;
+      step-08 rejects incomplete closes.
+
+design_decisions:
+  - decision: "Use a mechanical audit rather than prose review as the proof surface."
+    rationale: "S4 verification requires a closure-property test, not just a reviewer statement."
+    source: "vertical-plan Slice 4"
+  - decision: "Audit the final rewritten steps against the final split team files."
+    rationale: "Checking either side in isolation would miss the exact drift S4 is meant to eliminate."
+    source: "structured-outline Part 4 S4 | architect escalation manifest-ownership-under-specification"
+
+cross_cutting:
+  - concern: documentation
+    action: "Document the closure-property audit location and usage in the audit file itself and keep any write-path annotations in `/Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml` synchronized with the test."
+
+risks:
+  - severity: high
+    description: "A manual or underspecified audit could let authority drift return without detection."
+    mitigation: "Require a rerunnable proof artifact with explicit mismatch failure output."
+  - severity: medium
+    description: "The audit might only cover one swarm and miss the other."
+    mitigation: "Map every rewritten step to either `meta-optimize.yaml` or `meta-meta-optimize.yaml` during research."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A2.8` Audit step-write obligations against team grants.
+      - Optionally add or create a closure-property audit test file in the repo’s test suite.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      Closure property test passes: every path a step writes is covered by the corresponding team's grant.
+      VERIFIED BY: Closure property test (step writes ⊆ team grants).
