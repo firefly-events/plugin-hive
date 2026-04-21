@@ -1,0 +1,18 @@
+story: C1.1
+step: research
+status: completed
+methodology: classic
+backend: orchestrator
+model: opus
+timestamp: "2026-04-21T04:05:00Z"
+artifacts:
+  - .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+  - .pHive/epics/meta-improvement-system/docs/horizontal-plan.md
+  - .pHive/epics/meta-improvement-system/docs/structured-outline.md
+  - .pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+notes: |
+  Research step collapsed into prompt construction — orchestrator assembled
+  the B0 contract, horizontal plan, structured outline, and user-decisions
+  references directly into the Codex dispatch prompt. No separate researcher
+  agent spawned for this story since all authoritative sources were already
+  committed in S1 (commit 21f806c) and Opus-reviewable from the workspace.

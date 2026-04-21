@@ -1,0 +1,26 @@
+story: C1.1
+step: test
+status: completed
+methodology: classic
+backend: orchestrator
+timestamp: "2026-04-21T04:06:00Z"
+artifacts:
+  - .pHive/metrics/README.md
+  - .pHive/metrics/events/README.md
+  - .pHive/metrics/experiments/README.md
+checks:
+  - name: "three directories exist"
+    command: "test -d .pHive/metrics/ && test -d .pHive/metrics/events/ && test -d .pHive/metrics/experiments/"
+    result: pass
+  - name: "three README files exist"
+    command: "test -f .pHive/metrics/README.md && test -f .pHive/metrics/events/README.md && test -f .pHive/metrics/experiments/README.md"
+    result: pass
+  - name: "dual-schema/events/experiments/default terminology present"
+    command: "rg -n 'dual-schema|events|experiments|default' .pHive/metrics/README.md"
+    result: "pass (9 matches)"
+  - name: "hook/emitter only in negation context"
+    command: "rg -n 'hook|emitter' .pHive/metrics/**/README.md"
+    result: "pass (4 matches, all in 'no live hook wiring' / 'no active hook' / 'does NOT commit to hook site list' contexts)"
+  - name: "schema paths at top-level (post-revision)"
+    command: "rg 'events/metrics-event|experiments/experiment-envelope' .pHive/metrics/"
+    result: "pass (zero matches after revision)"

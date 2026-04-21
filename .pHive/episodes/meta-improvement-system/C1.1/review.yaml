@@ -1,0 +1,34 @@
+story: C1.1
+step: review
+status: completed
+methodology: classic
+backend: claude
+model: opus (per model_overrides.reviewer: opus)
+verdict: passed (after 1 revision cycle)
+timestamp: "2026-04-21T04:06:30Z"
+review_verdict_initial: needs_revision
+review_verdict_final: passed
+artifacts:
+  - .pHive/metrics/README.md
+  - .pHive/metrics/events/README.md
+  - .pHive/metrics/experiments/README.md
+ac_check:
+  - ac: "three dirs exist"
+    result: pass
+  - ac: "dual-schema split, purpose, retention/convention notes"
+    result: pass
+  - ac: "does NOT imply default-on emission"
+    result: pass
+  - ac: "no hook sites or emitters introduced"
+    result: pass
+findings:
+  - severity: needs_revision
+    issue: "Schema file paths placed under subdirectories instead of top-level .pHive/metrics/"
+    status: fixed
+    evidence: "horizontal-plan.md:77-78, structured-outline.md:242-243"
+drift_risks: none
+codex_observations: |
+  Codex followed the spec tightly: crisp B0-contract language, explicit Q-new-B
+  citations, disciplined 'does NOT commit to' fences in all three files. One
+  concrete drift on schema paths, corrected in one revision cycle. No
+  over-engineering.

@@ -1,0 +1,18 @@
+story: C1.1
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-C1.1
+parent_branch: refactor/configurable-state-dir (tip 0101a75 at branch cut)
+timestamp: "2026-04-21T04:07:00Z"
+artifacts:
+  - .pHive/metrics/README.md
+  - .pHive/metrics/events/README.md
+  - .pHive/metrics/experiments/README.md
+  - .pHive/episodes/meta-improvement-system/C1.1/
+notes: |
+  Orchestrator-driven commit (team-lead layer removed per user directive).
+  Codex handled implement; Opus handled review; orchestrator handled commit.
+  Review required one revision cycle (schema path correction) which was
+  applied without a second full review per circuit-breaker logic.
