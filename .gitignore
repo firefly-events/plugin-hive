@@ -28,6 +28,11 @@ state/
 !.pHive/cycle-state/
 .pHive/cycle-state/*
 !.pHive/cycle-state/meta-improvement-system.yaml
+# Metrics carrier (.pHive/metrics/) — authored by S2 stories of the
+# meta-improvement-system epic; contains schema docs and, from C1.4 on,
+# fixtures consumed by hive/lib/metrics/ unit tests.
+!.pHive/metrics/
+!.pHive/metrics/**
 agents/memories/
 .claude/settings.local.json
 .history/
