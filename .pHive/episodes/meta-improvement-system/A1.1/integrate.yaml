@@ -1,0 +1,20 @@
+story: A1.1
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-A1.1
+parent_branch: refactor/configurable-state-dir (43c04bc)
+timestamp: "2026-04-21T04:30:00Z"
+artifacts:
+  - .pHive/meta-team/archive/2026-04-19/cycle-state.yaml (21803B, copy)
+  - .pHive/meta-team/archive/2026-04-19/ledger.yaml (5321B, copy)
+  - .pHive/meta-team/archive/2026-04-19/queue.yaml (4270B, copy)
+  - .pHive/meta-team/archive/2026-04-19/MANIFEST.md (27 lines, NEW)
+backend_split:
+  implement: codex
+  review: claude (opus)
+  integrate: orchestrator
+ac_check: 4/4 pass
+review_verdict: passed (first submission)
+diff_audit: "all three YAMLs byte-identical to live (diff returned zero output)"

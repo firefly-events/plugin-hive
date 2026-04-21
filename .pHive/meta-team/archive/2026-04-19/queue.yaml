@@ -1,0 +1,84 @@
+# Meta Team Optimization Queue
+# Prioritized optimization targets identified by analysis.
+# Cleanup: entries matching recent discarded ledger entries (within 5 cycles) are auto-rejected.
+# Priority scoring: internal-recurring (1) > internal-one-off (2) > memory-pattern (3) > external (4)
+
+targets:
+  - id: "target-2026-04-08-001"
+    target: "hive/gate-policies/"
+    type: "new-artifact"
+    priority: 1
+    description: >
+      Create initial gate policy file for the development-classic workflow
+      matching the schema defined in quality-gates.md. Without policy files,
+      the gate evaluation system has nothing to evaluate against.
+    source: "internal-analysis"
+    source_attribution: "hive/references/quality-gates.md"
+    source_evidence: >
+      Gate policy directory is empty. quality-gates.md defines schema at
+      skills/hive/gate-policies/{workflow-name}.yaml but no files exist.
+      Gate Control Plane section references policy files that don't exist yet.
+    status: "completed"
+    created: "2026-04-08T03:08:00Z"
+    completed: "2026-04-13T03:00:00Z"
+    attempted_count: 1
+    completion_note: >
+      Verified complete during meta-2026-04-13 boot: hive/gate-policies/development-classic.yaml
+      and hive/gate-policies/development-tdd.yaml both exist with full policy schemas.
+
+  - id: "target-2026-04-08-002"
+    target: "hive/agents/tester.md"
+    type: "persona-edit"
+    priority: 2
+    description: >
+      Add explicit time budget and scope discipline section to test agent
+      persona, mirroring the researcher's proven scope control pattern.
+    source: "internal-analysis"
+    source_attribution: "hive/agents/researcher.md"
+    source_evidence: >
+      Researcher persona has 6 scope discipline rules and explicit time
+      budgets (5/10/15 min). Tester persona has only a single "scope
+      discipline" bullet in Quality Standards with no enforcement mechanism.
+    status: "completed"
+    created: "2026-04-08T03:08:00Z"
+    completed: "2026-04-13T03:00:00Z"
+    attempted_count: 1
+    completion_note: >
+      Added 6-rule Scope Discipline section with time budgets (10/20/30 min) to
+      hive/agents/tester.md during meta-2026-04-13. Mirrors researcher.md pattern.
+
+  - id: "target-2026-04-08-003"
+    target: "hive/agents/technical-writer.md"
+    type: "persona-edit"
+    priority: 2
+    description: >
+      Add Activation Protocol and scope discipline sections to technical
+      writer persona for consistency with mature agent personas.
+    source: "internal-analysis"
+    source_attribution: "hive/agents/tester.md, hive/agents/researcher.md"
+    source_evidence: >
+      Technical writer lacks Activation Protocol (present in researcher,
+      developer, reviewer, tester, analyst, architect). Missing scope
+      discipline and time budgets found in all other production personas.
+    status: "completed"
+    created: "2026-04-08T03:08:00Z"
+    completed: "2026-04-13T03:00:00Z"
+    attempted_count: 1
+    completion_note: >
+      Activation Protocol already present in technical-writer.md. Added 5-rule Scope
+      Discipline section with time budgets (5/15/25 min) during meta-2026-04-13.
+  # Each entry is a prioritized optimization target.
+  #
+  # Schema:
+  # - id: string                 # format: target-{date}-{seq} (e.g., target-2026-04-08-001)
+  #   target: string             # file path or Hive concept to optimize
+  #   type: enum                 # one of: persona-edit, skill-edit, workflow-edit,
+  #                              #         gate-policy-edit, reference-edit, new-artifact
+  #   priority: integer          # 1=highest. Scoring: internal-recurring > internal-one-off > external
+  #   description: string        # human-readable summary of the optimization
+  #   source: enum               # one of: internal-analysis, external-research, memory-pattern
+  #   source_attribution: string|list  # file path(s) or URL(s) that sourced this target
+  #   source_evidence: string    # description of the evidence supporting this target
+  #   status: enum               # one of: queued, in-progress, completed, discarded, needs-user-review
+  #   created: string            # ISO datetime (e.g., 2026-04-08T01:15:00Z)
+  #   attempted_count: integer   # incremented on each attempt, starts at 0
