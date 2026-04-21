@@ -13,6 +13,17 @@
 paths:
   state_dir: .pHive
 
+# Metrics collection
+# Controls whether Hive emits per-run event records. Opt-in at kickoff time
+# (user decision Q-new-B) — disabled by default so no writes occur unless the
+# user explicitly enables this feature.
+# When enabled, all hook-emitted event files are written under `dir` (the
+# canonical S5 carrier root). Hook stories gate every write on `enabled: true`
+# and resolve paths relative to this directory.
+metrics:
+  enabled: false              # opt-in only; no .pHive/metrics/events/*.jsonl writes when false
+  dir: .pHive/metrics         # canonical carrier root for all S5 metric event files
+
 # Quality gate thresholds
 quality_gates:
   auto_pass_threshold: 0.9
