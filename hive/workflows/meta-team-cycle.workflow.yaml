@@ -106,8 +106,11 @@ steps:
   - id: evaluation
     agent: reviewer
     task: >
-      Evaluate results against charter objectives. Score each change.
-      Determine which changes pass quality bar and which need revision.
+      Evaluate each implemented change against the A1.2 shared safety-constraints
+      reference (hive/references/meta-safety-constraints.md) plus the active
+      swarm's charter. Assign pass / needs_optimization / needs_revision per
+      change with evidence-cited rationale. Read-only — return evaluation_results
+      and verdict via the workflow output graph; no file writes from this step.
     step_file: hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
     depends_on:
       - testing

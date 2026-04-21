@@ -4,21 +4,34 @@
 
 - Read this entire step file before taking any action
 - Evaluate each change independently — don't let a strong change inflate a weak one
-- Use the quality bar in `.pHive/meta-team/charter.md` — don't invent your own criteria
+- Use the quality bar in `hive/references/meta-safety-constraints.md` (A1.2 authoritative reference) plus the swarm-specific charter in effect (per A2.7 post-rewrite — the legacy meta-team charter is ARCHIVED and must not be treated as the active authority)
 - Self-review bias check: you did not implement any of these changes (you are the reviewer agent) — evaluate honestly
 
 ## EXECUTION PROTOCOLS
 
 **Mode:** autonomous
 
-Read all changes and test results. Apply the charter's quality bar. Produce a final verdict per change.
+**Authority model:** this step is read-only against the code under review and
+its sole persistent output is the `evaluation_results` JSON + `verdict` string
+returned via the workflow output graph. Do NOT write cycle-state, ledger,
+envelope, or metrics-carrier files inline from this step. Downstream steps
+(promotion, close) own persistent control-plane writes coordinated through
+the workflow output graph and the B0 envelope contract
+(`.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md`). The
+quality bar is the A1.2 shared safety-constraints reference
+(`hive/references/meta-safety-constraints.md`) plus the active swarm's charter.
+`.pHive/meta-team/charter.md` is ARCHIVED — do not use it as the quality bar.
+
+Read all changes and test results. Apply the safety-constraints quality bar +
+swarm-specific charter criteria. Produce a final verdict per change.
 
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
 - `changes_made` from step 4 — what was written
 - `test_results` from step 5 — pass/fail per check
-- `.pHive/meta-team/charter.md` — quality bar criteria
+- `hive/references/meta-safety-constraints.md` — authoritative quality bar
+- swarm-specific charter (post-A2.7)
 - Full codebase read access
 
 **NOT available:**
@@ -27,14 +40,19 @@ Read all changes and test results. Apply the charter's quality bar. Produce a fi
 
 ## YOUR TASK
 
-Evaluate each implemented change against the charter quality bar. Assign `pass`, `needs_optimization`, or `needs_revision` verdict per change, with rationale.
+Evaluate each implemented change against the safety-constraints quality bar plus swarm charter criteria. Assign `pass`, `needs_optimization`, or `needs_revision` verdict per change, with rationale.
 
 ## TASK SEQUENCE
 
 ### 1. Load evaluation inputs
 Read:
-- `.pHive/meta-team/cycle-state.yaml` for changes and test results
-- `.pHive/meta-team/charter.md` for the quality bar section
+- `changes_made` from step 4 and `test_results` from step 5
+- `hive/references/meta-safety-constraints.md` plus the active swarm's charter
+  for the quality bar criteria
+
+If the active swarm charter is not yet present because A2.7 has not landed,
+fall back to `hive/references/meta-safety-constraints.md` alone rather than
+using the archived legacy meta-team charter.
 
 ### 2. Evaluate each change
 
@@ -43,7 +61,7 @@ For each change with `status: done` from step 4:
 #### 2a. Read the actual change
 Open the file that was written or modified. Read the added content.
 
-#### 2b. Apply charter quality bar
+#### 2b. Apply safety-constraints quality bar plus swarm charter criteria
 A change passes when:
 - It addresses a specific, named finding (verify against the finding it claims to address)
 - It doesn't break any existing cross-references (check test results)
@@ -75,10 +93,10 @@ revision_notes: |
 - Count: pass, needs_optimization, needs_revision
 - Overall cycle verdict: `passed` if ≥ 70% of changes pass or needs_optimization; `partial` if 40–70%; `poor` if < 40%
 
-### 4. Update cycle-state.yaml
-Append to `.pHive/meta-team/cycle-state.yaml`:
+### 4. Compile workflow outputs
+This structured dictionary is the `evaluation_results` workflow output for this
+step, not a side-effect write:
 ```yaml
-phase: evaluation
 evaluations:
   - {evaluation objects}
 cycle_verdict: passed | partial | poor
@@ -108,7 +126,7 @@ Results:
 - [ ] Each change with `status: done` has an evaluation entry
 - [ ] Each evaluation cites specific evidence (not just "looks good")
 - [ ] Overall cycle verdict calculated
-- [ ] `cycle-state.yaml` updated with evaluations and cycle verdict
+- [ ] `evaluation_results` output emitted with per-change entries and cycle_verdict
 - [ ] Evaluation report produced
 
 ## FAILURE MODES
@@ -117,8 +135,17 @@ Results:
 - Test results for a change are absent: apply conservative evaluation (check the file manually)
 - All changes pass: valid outcome — don't invent problems to seem rigorous
 
+## WHAT THIS STEP DOES NOT OWN
+
+- Persistent cycle-state / ledger / envelope writes (promotion + close own these per rebuilt authority)
+- Metrics-carrier emission (C2 emitters, opt-in)
+- Promotion or revert decisions (Step 7)
+- Closure invariant checks (Step 8 close validator per B0 §1.11)
+- Fixing changes the evaluator flagged (re-planning or next-cycle handling)
+- Redefining the quality bar (anchored in hive/references/meta-safety-constraints.md + swarm charter)
+
 ## NEXT STEP
 
-**Gating:** All changes evaluated. `cycle_verdict` written to `cycle-state.yaml`.
+**Gating:** All changes evaluated. `cycle_verdict` surfaced in `evaluation_results` output and `verdict` returned via the workflow output graph.
 **Next:** Load `hive/workflows/steps/meta-team-cycle/step-07-promotion.md`
 **If gating fails:** Report which changes could not be evaluated.
