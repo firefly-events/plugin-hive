@@ -3,7 +3,7 @@ step: review
 status: completed
 methodology: classic
 backend: claude
-model: opus (per model_overrides.reviewer: opus)
+model: "opus (per model_overrides.reviewer: opus)"
 verdict: passed (after 1 revision cycle)
 timestamp: "2026-04-21T04:06:30Z"
 review_verdict_initial: needs_revision

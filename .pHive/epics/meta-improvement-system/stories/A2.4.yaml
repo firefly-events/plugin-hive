@@ -102,4 +102,3 @@ references:
     relevant_excerpt: |
       ## Q4. `meta-meta-optimize` isolation — `Worktree default`
       Git-worktree isolation required. File-copy sandbox is NOT acceptable for any self-modifying experiment class.
-

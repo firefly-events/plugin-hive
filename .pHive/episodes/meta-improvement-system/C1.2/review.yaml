@@ -3,7 +3,7 @@ step: review
 status: completed
 methodology: classic
 backend: claude
-model: opus (model_overrides.reviewer: opus)
+model: "opus (model_overrides.reviewer: opus)"
 verdict: passed
 timestamp: "2026-04-21T04:12:00Z"
 ac_check:
