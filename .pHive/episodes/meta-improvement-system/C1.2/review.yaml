@@ -1,0 +1,27 @@
+story: C1.2
+step: review
+status: completed
+methodology: classic
+backend: claude
+model: opus (model_overrides.reviewer: opus)
+verdict: passed
+timestamp: "2026-04-21T04:12:00Z"
+ac_check:
+  - ac: "field list + purpose (§3.1–§3.13)"
+    result: pass
+  - ac: "valid JSONL example (§6, 3 rows)"
+    result: pass
+  - ac: "represents 5 MVP metrics without invention (§4 registry)"
+    result: pass
+  - ac: "docs-only, no hooks wired"
+    result: pass
+drift_risks: none
+codex_observations: |
+  Clean, lean, scope-disciplined. Field list matches horizontal-plan exactly.
+  MVP coverage complete. Scope-fences against envelope concerns explicit
+  (policy_ref, rollback_ref, decision appear only inside §8 fence).
+  README diff is a single-line markdown-link upgrade on line 24 as specified.
+terminology_alignment: "Consistent with b0-consumer-contract.md §2 vocabulary (run_id, metric_type, dimensions, story_id|proposal_id, three-query names all verbatim)."
+followup_notes:
+  - "Reviewer flagged: reconcile source field-level cardinality (§3.13 required) with §7 invariant list at C1.4/C1.5 — non-blocking for C1.2"
+  - "Reviewer flagged: stage only C1.2 files (schema + README + episode markers); hive/hive.config.yaml M-status is unrelated user in-flight work"

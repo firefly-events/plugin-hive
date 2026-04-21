@@ -1,0 +1,13 @@
+story: C1.2
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-C1.2
+parent_branch: hive-C1.1 (94d8604)
+timestamp: "2026-04-21T04:12:30Z"
+notes: |
+  Orchestrator-driven commit. Codex authored the schema + README cross-link;
+  Opus approved on first submission (no revision cycles). Staged only
+  .pHive/metrics/ and .pHive/episodes/ paths — hive/hive.config.yaml remains
+  uncommitted per reviewer note.
