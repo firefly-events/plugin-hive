@@ -1,0 +1,132 @@
+name: meta-meta-optimize
+description: >
+  Plugin-hive maintainer swarm for meta-improvement work on the plugin-hive
+  repository itself. Executes the rewritten meta-team-cycle with local-only
+  promotion semantics and minimum-necessary grants.
+lead: orchestrator
+methodology: classic
+
+members:
+  - agent: orchestrator
+    role: Lifecycle coordination — owns close-time state, ledger, and summary writes
+    domain:
+      - path: "**"
+        read: true
+        write: false
+        delete: false
+      - path: .pHive/meta-meta-optimize/**
+        read: true
+        write: true
+        delete: false
+
+  - agent: researcher
+    role: Analysis — map findings and constraints without modifying repo state
+    domain:
+      - path: hive/**
+        read: true
+        write: false
+        delete: false
+      - path: skills/**
+        read: true
+        write: false
+        delete: false
+      - path: .pHive/**
+        read: true
+        write: false
+        delete: false
+
+  - agent: architect
+    role: Proposal design — produce plans only, no inline control-plane writes
+    domain:
+      - path: hive/**
+        read: true
+        write: false
+        delete: false
+      - path: skills/**
+        read: true
+        write: false
+        delete: false
+      - path: .pHive/**
+        read: true
+        write: false
+        delete: false
+
+  - agent: developer
+    role: Implementation — execute approved repo changes within Step 4 scope
+    domain:
+      - path: hive/**
+        read: true
+        write: false
+        delete: false
+      - path: skills/**
+        read: true
+        write: false
+        delete: false
+      - path: hive/references/**
+        read: true
+        write: true
+        delete: false
+      - path: hive/agents/**
+        read: true
+        write: true
+        delete: false
+      - path: hive/workflows/**
+        read: true
+        write: true
+        delete: false
+      - path: hive/lib/**
+        read: true
+        write: true
+        delete: false
+      - path: skills/hive/agents/memories/**
+        read: true
+        write: true
+        delete: false
+      - path: .pHive/teams/**
+        read: true
+        write: true
+        delete: false
+
+  - agent: tester
+    role: Validation — read-only verification of Step 4 changes
+    domain:
+      - path: hive/**
+        read: true
+        write: false
+        delete: false
+      - path: skills/**
+        read: true
+        write: false
+        delete: false
+      - path: .pHive/**
+        read: true
+        write: false
+        delete: false
+
+  - agent: reviewer
+    role: Quality gate — read-only evaluation against constraints and charter
+    domain:
+      - path: hive/**
+        read: true
+        write: false
+        delete: false
+      - path: skills/**
+        read: true
+        write: false
+        delete: false
+
+context:
+  notes: |
+    This swarm operates on the plugin-hive repository itself, not on a consumer
+    project.
+    Per A2.5, the swarm-configured lifecycle writer targets are
+    `.pHive/meta-meta-optimize/cycle-state.yaml` and
+    `.pHive/meta-meta-optimize/ledger.yaml`.
+    Charter path: `.pHive/teams/meta-meta-optimize-charter.md` (A2.7 authors it).
+    Shared safety constraints: `hive/references/meta-safety-constraints.md`.
+    Promotion adapter: direct-commit, per the signed cycle-state decision and
+    the worktree isolation model in `hive/references/meta-experiment-isolation.md`.
+    Execution backend routing is already materialized in `hive/hive.config.yaml`;
+    this team file does not redefine backends.
+
+team_memory_path: .pHive/team-memories/meta-meta-optimize/

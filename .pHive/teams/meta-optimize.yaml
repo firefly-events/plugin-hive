@@ -1,0 +1,78 @@
+name: meta-optimize
+description: >
+  Public swarm template for optimizing a user project via the /meta-optimize
+  skill. Grants are expressed relative to the consumer project's runtime root.
+lead: orchestrator
+methodology: classic
+
+members:
+  - agent: orchestrator
+    role: Lifecycle coordination — owns swarm-local control-plane writes in the user project
+    domain:
+      - path: "{project_root}/**"
+        read: true
+        write: false
+        delete: false
+      - path: "{project_root}/.pHive/meta-optimize/**"
+        read: true
+        write: true
+        delete: false
+
+  - agent: researcher
+    role: Analysis — inspect the consumer project without modifying it
+    domain:
+      - path: "{project_root}/**"
+        read: true
+        write: false
+        delete: false
+
+  - agent: architect
+    role: Proposal design — produce optimization plans only
+    domain:
+      - path: "{project_root}/**"
+        read: true
+        write: false
+        delete: false
+
+  - agent: developer
+    role: Implementation staging — writes only PR-artifact candidates inside the consumer project
+    domain:
+      - path: "{project_root}/**"
+        read: true
+        write: false
+        delete: false
+      - path: "{project_root}/.pHive/meta-optimize-candidates/**"
+        read: true
+        write: true
+        delete: false
+
+  - agent: tester
+    role: Validation — read-only checks over staged candidate changes
+    domain:
+      - path: "{project_root}/**"
+        read: true
+        write: false
+        delete: false
+
+  - agent: reviewer
+    role: Quality gate — read-only evaluation of proposed optimization artifacts
+    domain:
+      - path: "{project_root}/**"
+        read: true
+        write: false
+        delete: false
+
+context:
+  notes: |
+    This swarm lands in user projects via the `/meta-optimize` public skill;
+    S10 owns the PR-artifact adapter that consumes the staged outputs.
+    Promotion adapter: PR-artifact. This swarm never direct-commits to user
+    repositories.
+    Scope boundary: this swarm does NOT write to plugin-hive's own files; that
+    is the local-only `meta-meta-optimize` swarm's job.
+    Charter path: `.pHive/teams/meta-optimize-charter.md` (A2.7 authors it).
+    Shared safety constraints: `hive/references/meta-safety-constraints.md`.
+    `{project_root}` is resolved per consumer project at runtime; this template
+    intentionally does not hardcode consumer-repo paths.
+
+team_memory_path: .pHive/team-memories/meta-optimize/

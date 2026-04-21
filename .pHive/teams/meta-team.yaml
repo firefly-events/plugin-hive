@@ -1,3 +1,18 @@
+# RETIRED (Historical Reference) — 2026-04-21
+#
+# This team file is no longer the active authority. The meta-improvement-system
+# epic (Slice S4 / story A2.6) split its responsibilities into two swarm-specific
+# team files:
+#
+#   - .pHive/teams/meta-meta-optimize.yaml — plugin-hive maintainer swarm (local-only)
+#   - .pHive/teams/meta-optimize.yaml      — user-project optimization swarm (public)
+#
+# Body preserved below as operator history. DO NOT treat this file as the active
+# team definition. See also:
+#   - .pHive/meta-team/archive/2026-04-19/MANIFEST.md (A1.1 archive)
+#   - hive/references/meta-safety-constraints.md (A1.2 shared constraints)
+#   - hive/references/meta-experiment-isolation.md (A1.4 worktree isolation)
+#
 name: meta-team
 description: >
   Autonomous nightly self-improvement team for the Hive plugin codebase.
