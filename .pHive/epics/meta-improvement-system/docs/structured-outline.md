@@ -40,7 +40,7 @@ milestones: MVL=S9, MVS=S10
 
 ### 1.1 Goal
 
-This outline translates the approved horizontal and vertical plans into an implementation-ready blueprint for Phase C story authoring and execution. It does not redesign the system. It maps each approved vertical slice `S1-S10` to a delivery phase, expands the slice into file-level and review-level detail, and records the remaining decisions the user must explicitly affirm before story YAMLs are written (per `structured-outline-phase-invariants.md`; per `vertical-plan.md` §2). 
+This outline translates the approved horizontal and vertical plans into an implementation-ready blueprint for Phase C story authoring and execution. It does not redesign the system. It maps each approved vertical slice `S1-S10` to a delivery phase, expands the slice into file-level and review-level detail, and records the remaining decisions the user must explicitly affirm before story YAMLs are written (per `structured-outline-phase-invariants.md`; per `vertical-plan.md` §2).
 
 The build target is the signed two-swarm meta-improvement system:
 - one local-only maintainer tool, `/meta-meta-optimize`, outside the shipped skill root and absent from `plugin.json` (per `user-decisions-dd.md` Q-new-A; per `horizontal-plan.md` L9);
