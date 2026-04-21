@@ -58,7 +58,7 @@ steps:
       Evaluate: visual hierarchy and information architecture, consistency with
       established design patterns and brand system, usability heuristics (Nielsen's 10),
       cognitive load and progressive disclosure, interaction design quality.
-      Reference state/brand/brand-system.yaml if available — flag any brand deviations.
+      Reference .pHive/brand/brand-system.yaml if available — flag any brand deviations.
       Reference prior critiques (if provided) to avoid duplicating findings.
       Produce a domain critique using your Work Report format.
     depends_on:

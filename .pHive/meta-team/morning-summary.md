@@ -17,7 +17,7 @@
 - **`skills/hive/agents/memories/test-sentinel/regression-block-report-format.md`** — New pattern memory: regression block reports must include failing tests table, baseline/current metrics, delta, and recommended action; PASS report format also provided
 - **`hive/agents/tester.md`** — Added 6-rule Scope Discipline section with time budgets (10 min small / 20 min medium / 30 min large): stay on story spec, note adjacent issues without fixing them, one assertion per test, no implementation detail testing, use existing utilities, time budget enforcement
 - **`hive/agents/technical-writer.md`** — Added 5-rule Scope Discipline section with time budgets (5 / 15 / 25 min): work only from provided input, one document per task, structure don't analyze, match injected skill verbatim, time budget enforcement
-- **`state/meta-team/queue.yaml`** — All 3 queued targets marked completed: 001 (gate-policy, already done), 002 (tester.md), 003 (technical-writer.md)
+- **`.pHive/meta-team/queue.yaml`** — All 3 queued targets marked completed: 001 (gate-policy, already done), 002 (tester.md), 003 (technical-writer.md)
 
 ---
 

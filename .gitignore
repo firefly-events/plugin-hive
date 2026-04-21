@@ -1,11 +1,15 @@
-state/*
+.pHive/*
+# Legacy state/ — ignored completely. Harness sessions running the pre-rename
+# Stop hook may briefly recreate state/interrupts/ files until the session
+# restarts. Keeping state/ ignored prevents those files from polluting PRs.
+state/
 # meta-team state, team configs, and team-memories are plugin-level and should be tracked
-!state/meta-team/
-!state/meta-team/**
-!state/teams/
-!state/teams/**
-!state/team-memories/
-!state/team-memories/**
+!.pHive/meta-team/
+!.pHive/meta-team/**
+!.pHive/teams/
+!.pHive/teams/**
+!.pHive/team-memories/
+!.pHive/team-memories/**
 agents/memories/
 .claude/settings.local.json
 .history/

@@ -13,7 +13,7 @@ Run a structured code review workflow.
 
 **Before doing anything else**, check whether Hive has been initialized for this project:
 
-1. Check if `state/project-profile.yaml` exists in the project root
+1. Check if `.pHive/project-profile.yaml` exists in the project root
 2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
 3. As a secondary check, verify `hive.config.yaml` exists (check both `hive/hive.config.yaml` and `hive.config.yaml` in the project root — either location is valid)
 
@@ -62,7 +62,7 @@ If all checks pass, proceed normally.
 
 4. **Write episode records.** After each step, write an episode to:
    ```
-   state/episodes/review/{timestamp}/{step-id}.yaml
+   .pHive/episodes/review/{timestamp}/{step-id}.yaml
    ```
 
 5. **Display structured findings:**

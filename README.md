@@ -98,7 +98,7 @@ Six dedicated skills for design work — brand identity, design tokens, UI audit
 
 | Skill | Command | Purpose | Requires |
 |-------|---------|---------|---------|
-| **Brand System** | `/hive:brand-system` | Establish brand identity: colors (HEX/RGB/CMYK/PMS), typography, spacing. Produces `state/brand/brand-system.yaml` + visual guide PNG via Frame0. | — |
+| **Brand System** | `/hive:brand-system` | Establish brand identity: colors (HEX/RGB/CMYK/PMS), typography, spacing. Produces `.pHive/brand/brand-system.yaml` + visual guide PNG via Frame0. | — |
 | **Design System** | `/hive:design-system` | Convert brand system into W3C Design Token JSON for frontend tooling (Tailwind, Figma, Style Dictionary). | `/hive:brand-system` first |
 | **UI Audit** | `/hive:ui-audit` | Collaborative audit — accessibility specialist + animations specialist surface domain findings; ui-designer synthesizes unified report. | `/hive:kickoff` first |
 | **Polish Audit** | `/hive:polish-audit` | Animation and motion opportunity pass — identifies micro-interactions, loading states, and delight improvements. | `/hive:ui-audit` first |
@@ -184,7 +184,7 @@ Hive is built to grow. Each component is a discrete file you can add or replace:
 
 **Add a workflow** — create a YAML file in `hive/workflows/` following the workflow schema. Assign it to stories via `methodology` in `hive.config.yaml`. See `references/workflow-schema.md`.
 
-**Compose a team** — create or edit a file in `state/teams/`. Team configs define members, roles, domain restrictions, and methodology. The orchestrator loads them at execution time.
+**Compose a team** — create or edit a file in `.pHive/teams/`. Team configs define members, roles, domain restrictions, and methodology. The orchestrator loads them at execution time.
 
 **Hive-to-hive communication** *(forward-looking)* — a cross-system collaboration protocol is in design that will allow Hive instances to share stories, hand off work, and coordinate across repositories and organizations.
 

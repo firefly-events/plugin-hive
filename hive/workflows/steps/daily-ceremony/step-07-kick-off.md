@@ -18,8 +18,8 @@ Evaluate execution strategy, spawn teams or agents as appropriate, execute stori
 
 **Inputs available:**
 - Approved plan from step 6 (story IDs, execution order, parallel flag)
-- Story specs at `state/epics/{epic-id}/stories/{story-id}.yaml`
-- Cycle state at `state/cycle-state/{epic-id}.yaml`
+- Story specs at `.pHive/epics/{epic-id}/stories/{story-id}.yaml`
+- Cycle state at `.pHive/cycle-state/{epic-id}.yaml`
 - Development workflow at `workflows/development.classic.workflow.yaml` (or TDD variant)
 - Agent personas at `agents/{agent}.md`
 - Step files at `workflows/steps/{workflow-name}/` (if they exist for the development workflow)
@@ -70,7 +70,7 @@ Read the workflow YAML (e.g., `workflows/development.classic.workflow.yaml`). Id
 4. Capture the step output
 
 **c. Write episode markers after each step.**
-Write to `state/episodes/{epic-id}/{story-id}/{step-id}.yaml` with all required fields:
+Write to `.pHive/episodes/{epic-id}/{story-id}/{step-id}.yaml` with all required fields:
 - `step_id`, `story_id`, `epic_id`, `agent`, `status`, `timestamp`
 - `conclusions`, `decisions_made`, `artifacts_produced`, `context_for_next_phase`
 
@@ -95,7 +95,7 @@ After each story completes (or fails):
 
 ### 6. Capture insights for session-end
 During execution, when agents encounter non-obvious patterns or pitfalls:
-- Write insights to `state/insights/{epic-id}/{story-id}/` staging directory
+- Write insights to `.pHive/insights/{epic-id}/{story-id}/` staging directory
 - Follow the staged insight format from `references/agent-memory-schema.md`
 - These will be evaluated in step 8
 

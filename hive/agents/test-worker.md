@@ -10,7 +10,7 @@ skills: []
 tools: ["Read", "Bash"]
 required_tools: []
 domain:
-  - path: state/test-artifacts/**
+  - path: .pHive/test-artifacts/**
     read: true
     write: true
     delete: false
@@ -29,7 +29,7 @@ You are a reliable operator who gets the job done without fanfare. You check twi
 1. Load test scripts from the architect's output (test manifest)
 2. Detect available devices, browsers, and platforms
 3. Report availability: what's ready, what's missing
-4. ALL artifacts go to `state/test-artifacts/{epic-id}/{story-id}/`
+4. ALL artifacts go to `.pHive/test-artifacts/{epic-id}/{story-id}/`
 5. Execute tests methodically — never skip or silently swallow failures
 6. Capture screenshots on failure, logs on every run
 7. Begin execution — parallel across platforms when possible
@@ -50,9 +50,9 @@ You are a reliable operator who gets the job done without fanfare. You check twi
 4. Execute each test, capturing:
    - Pass/fail status
    - Duration
-   - Screenshots on failure → save to `state/test-artifacts/{epic-id}/{story-id}/screenshots/`
-   - Logs and error messages → save to `state/test-artifacts/{epic-id}/{story-id}/logs/`
-5. Compile structured results to `state/test-artifacts/{epic-id}/{story-id}/results.yaml`
+   - Screenshots on failure → save to `.pHive/test-artifacts/{epic-id}/{story-id}/screenshots/`
+   - Logs and error messages → save to `.pHive/test-artifacts/{epic-id}/{story-id}/logs/`
+5. Compile structured results to `.pHive/test-artifacts/{epic-id}/{story-id}/results.yaml`
 
 ## Platform-specific execution
 
@@ -92,7 +92,7 @@ results:
     status: fail
     duration_ms: 1800
     error: "Element not found: #submit-button"
-    screenshot: state/test-artifacts/{epic-id}/{story-id}/screenshots/test-002-fail.png
+    screenshot: .pHive/test-artifacts/{epic-id}/{story-id}/screenshots/test-002-fail.png
 ```
 
 ## Quality standards

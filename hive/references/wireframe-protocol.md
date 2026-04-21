@@ -11,7 +11,7 @@ During `/hive:plan`, when a story involves net-new UI work. The UI designer agen
 - **Default:** 1 rendition per screen/component
 - **Configurable:** via story config field `renditions: N` or plan command flag `--renditions N`
 - Each rendition is a layout/component variation of the same screen
-- All renditions are exported to: `state/wireframes/{epic-id}/{story-id}/`
+- All renditions are exported to: `.pHive/wireframes/{epic-id}/{story-id}/`
 
 ## Touchpoint 1 — Wireframe Approval
 
@@ -20,9 +20,9 @@ After the UI designer produces renditions:
 1. **Present renditions.** Show file paths and suggest the user open them:
    ```
    Wireframe renditions for "{story-title}":
-     1. state/wireframes/{epic}/{story}/v1.png
-     2. state/wireframes/{epic}/{story}/v2.png
-     3. state/wireframes/{epic}/{story}/v3.png
+     1. .pHive/wireframes/{epic}/{story}/v1.png
+     2. .pHive/wireframes/{epic}/{story}/v2.png
+     3. .pHive/wireframes/{epic}/{story}/v3.png
    ```
    If Claude Code can read images (Read tool on PNG), present them inline.
 
@@ -58,15 +58,15 @@ Appended to the story file after approval:
 
 ```yaml
 wireframes:
-  approved: state/wireframes/{epic-id}/{story-id}/v{N}.png
+  approved: .pHive/wireframes/{epic-id}/{story-id}/v{N}.png
   brief: |
     Structured design brief text describing layout decisions,
     component choices, and interaction patterns.
   export_command: |
-    cli-anything-frame-zero --live export page --page "{page-id}" --format png --output state/wireframes/{epic-id}/{story-id}/approved.png
+    cli-anything-frame-zero --live export page --page "{page-id}" --format png --output .pHive/wireframes/{epic-id}/{story-id}/approved.png
   renditions:
-    - state/wireframes/{epic-id}/{story-id}/v1.png
-    - state/wireframes/{epic-id}/{story-id}/v2.png
+    - .pHive/wireframes/{epic-id}/{story-id}/v1.png
+    - .pHive/wireframes/{epic-id}/{story-id}/v2.png
   selected: 1
 ```
 

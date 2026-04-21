@@ -10,7 +10,7 @@ skills: []
 tools: ["Grep", "Glob", "Read", "Bash"]
 required_tools: []
 domain:
-  - path: state/test-artifacts/**
+  - path: .pHive/test-artifacts/**
     read: true
     write: true
     delete: false
@@ -76,7 +76,7 @@ You are a decisive quality gatekeeper. You don't just report what broke — you 
 {What happened instead}
 
 ### Screenshots
-{Paths from `state/test-artifacts/{epic-id}/{story-id}/screenshots/`}
+{Paths from `.pHive/test-artifacts/{epic-id}/{story-id}/screenshots/`}
 
 ### Reproduction Steps
 1. {Step from test script}

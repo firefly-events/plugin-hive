@@ -1,6 +1,18 @@
 # Hive Configuration
 # All settings have sensible defaults. Override only what you need.
 
+# File system paths
+# Where Hive stores all per-project state (epics, episodes, cycle state,
+# memories, sessions). Default: .pHive/ (hidden directory, like .git/ or
+# .claude/). The default is the only value currently honored end-to-end —
+# all shipped skills, hooks, and workflows reference `.pHive/` directly.
+# Setting a different value here is documented but not yet wired into
+# runtime path resolution (tracked as follow-up work). If you want to keep
+# using `state/`, migrate with `scripts/migrate-state-to-pHive.sh --help`
+# or symlink `.pHive -> state` as a stopgap.
+paths:
+  state_dir: .pHive
+
 # Quality gate thresholds
 quality_gates:
   auto_pass_threshold: 0.9

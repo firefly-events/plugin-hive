@@ -9,6 +9,44 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+- **Default state directory renamed `state/` → `.pHive/`.** Hidden by default
+  (like `.git/` or `.claude/`). Configurable via `paths.state_dir` in
+  `hive.config.yaml` if you prefer a different name.
+- All skills and references updated to use `.pHive/` as the default storage
+  location for epics, episodes, cycle state, sessions, memories, etc.
+
+### Added
+- `paths.state_dir` config setting (default: `.pHive`) — override to keep
+  legacy `state/` or pick any directory name.
+- Migration script: `scripts/migrate-state-to-pHive.sh` — renames `state/`
+  to `.pHive/` while preserving git history and updating `.gitignore`.
+- Kickoff Step 0: detects legacy `state/` directories on existing projects
+  and offers in-place migration (or opt-in to keep using `state/`).
+
+### Migration
+Existing projects with a `state/` directory should migrate. Two supported paths:
+
+1. **Auto-migrate** (recommended): re-run `/hive:kickoff`, choose `yes` at
+   the migration prompt.
+2. **Manual migrate**: `bash scripts/migrate-state-to-pHive.sh` from your
+   project root.
+
+> **Note:** `paths.state_dir` is documented in the config schema but not yet
+> wired into runtime path resolution in every skill. If you cannot migrate
+> immediately, a symlink (`ln -s state .pHive`) is a safe stopgap. Full
+> config-driven path resolution is tracked as follow-up work.
+
+### Known follow-up
+Wiring `paths.state_dir` end-to-end requires a single path resolver that
+every skill, workflow step, agent domain spec, and hook reads from. Right
+now those references hardcode `.pHive/` directly. This is deliberate scope
+for this PR (rename + migration tooling + config surface); resolver wiring
+will be a dedicated follow-up so the path changes stay reviewable. Until
+that lands, any override of `paths.state_dir` other than the default
+`.pHive` is best-effort — use the symlink stopgap if you need a different
+layout today.
+
 ## [1.1.1] - 2026-04-18
 
 cmux v2 API as native team execution backend.

@@ -9,7 +9,7 @@ version: "2.1.0"
 # The ceremony works in two modes based on hive.config.yaml task_tracking.adapter:
 #
 #   adapter: null (default) — LOCAL MODE
-#     All tracking via status markers (state/episodes/) and cycle state (state/cycle-state/).
+#     All tracking via status markers (.pHive/episodes/) and cycle state (.pHive/cycle-state/).
 #     Blockers surfaced via cycle state "blocked" status. No external tool required.
 #
 #   adapter: linear — LINEAR MODE
@@ -26,8 +26,8 @@ phases:
       Present the current state to the user. Reconstruct context from previous sessions.
 
       CORE (always):
-      1. Read status markers (state/episodes/) — completed, in-progress, failed stories
-      2. Read cycle state (state/cycle-state/) — accumulated decisions, blocked items
+      1. Read status markers (.pHive/episodes/) — completed, in-progress, failed stories
+      2. Read cycle state (.pHive/cycle-state/) — accumulated decisions, blocked items
       3. Read agent memories — any promoted insights from previous sessions
       4. Present: completed work, in-progress items, blockers, continuation items
 

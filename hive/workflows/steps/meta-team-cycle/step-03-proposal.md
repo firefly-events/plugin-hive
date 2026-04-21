@@ -3,7 +3,7 @@
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
 - Read this entire step file before taking any action
-- Only propose changes within charter scope — re-read `state/meta-team/charter.md` scope table before ranking
+- Only propose changes within charter scope — re-read `.pHive/meta-team/charter.md` scope table before ranking
 - Do NOT propose changes that require human confirmation (config changes, tool list changes) — skip them
 - Each proposal must have an explicit implementation plan — "improve this doc" is not a plan
 - Cap approved proposals at 5 per cycle — prioritize depth over breadth
@@ -18,7 +18,7 @@ Review findings from step 2. Produce ranked, actionable proposals. No changes to
 
 **Inputs available:**
 - `findings` JSON from step 2
-- `state/meta-team/charter.md` — objectives, scope, hard constraints
+- `.pHive/meta-team/charter.md` — objectives, scope, hard constraints
 - Full codebase read access for context on each finding
 
 **NOT available:**
@@ -82,7 +82,7 @@ skipped:
 ```
 
 ### 6. Update cycle-state.yaml
-Append to `state/meta-team/cycle-state.yaml`:
+Append to `.pHive/meta-team/cycle-state.yaml`:
 ```yaml
 phase: proposal
 approved_proposals:

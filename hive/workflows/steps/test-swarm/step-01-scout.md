@@ -7,7 +7,7 @@
 - Do NOT skip baseline check even if the story seems straightforward
 - Do NOT read files outside story spec, codebase structure, and baseline knowledge
 - Do NOT proceed without producing the context report — it is the input for all downstream steps
-- Always check `state/test-baseline/` before running a full discovery pass
+- Always check `.pHive/test-baseline/` before running a full discovery pass
 
 ## EXECUTION PROTOCOLS
 
@@ -21,12 +21,12 @@ Execute the full task sequence without user input. Produce the context report an
 - Build report from step 0 (confirms fresh build is deployed — do not test stale artifacts)
 - Story spec YAML (provided by orchestrator via `story_spec` context key)
 - Project codebase (for framework detection and structure scanning)
-- Baseline knowledge at `state/test-baseline/{project}/baseline-knowledge.md` (if it exists)
+- Baseline knowledge at `.pHive/test-baseline/{project}/baseline-knowledge.md` (if it exists)
 
 **NOT available (do not read or assume):**
 - Other story specs in the epic
 - MAIN.md, GUIDE.md, or hive system files
-- Test results from previous runs (those live in `state/test-artifacts/`)
+- Test results from previous runs (those live in `.pHive/test-artifacts/`)
 
 ## YOUR TASK
 
@@ -47,10 +47,10 @@ Read the story YAML file provided by the orchestrator. Extract:
 ### 2. Check for existing baseline
 
 ```bash
-ls state/test-baseline/
+ls .pHive/test-baseline/
 ```
 
-- If baseline exists: read `state/test-baseline/{project}/baseline-knowledge.md`
+- If baseline exists: read `.pHive/test-baseline/{project}/baseline-knowledge.md`
 - If baseline is missing or stale: proceed to step 3 (discovery pass)
 - If baseline exists and is current: skip to step 4
 
@@ -97,7 +97,7 @@ find . -name "coverage" -type d -o -name "*.lcov" -o -name "coverage.xml" | head
 - Technology stack and dependencies
 
 **d. Write baseline knowledge:**
-Save findings to `state/test-baseline/{project}/baseline-knowledge.md` with:
+Save findings to `.pHive/test-baseline/{project}/baseline-knowledge.md` with:
 - Project structure summary
 - Detected test frameworks and their config locations
 - Existing test directories and file counts
@@ -140,7 +140,7 @@ Output a structured context document:
 
 ## Baseline Context
 - Baseline status: {created | updated | current}
-- Baseline path: state/test-baseline/{project}/baseline-knowledge.md
+- Baseline path: .pHive/test-baseline/{project}/baseline-knowledge.md
 - Key patterns: {relevant sections from baseline}
 ```
 

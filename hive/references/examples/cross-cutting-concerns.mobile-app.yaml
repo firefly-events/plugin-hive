@@ -1,6 +1,6 @@
 # Cross-Cutting Concerns — Mobile App Example
-# Customize this for your project. Copy to state/cross-cutting-concerns.yaml
-# Place this file at state/cross-cutting-concerns.yaml
+# Customize this for your project. Copy to .pHive/cross-cutting-concerns.yaml
+# Place this file at .pHive/cross-cutting-concerns.yaml
 
 concerns:
 

@@ -35,7 +35,7 @@ Implement the story by translating each acceptance criterion into code, followin
 ## TASK SEQUENCE
 
 ### 0. Check for existing progress
-Check `state/episodes/{epic-id}/{story-id}/` for implement episode.
+Check `.pHive/episodes/{epic-id}/{story-id}/` for implement episode.
 If completed, skip to next step.
 
 ### 1. Read story spec completely

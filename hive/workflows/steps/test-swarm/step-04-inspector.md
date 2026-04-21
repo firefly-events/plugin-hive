@@ -21,7 +21,7 @@ Compare the test manifest and execution results against the story's acceptance c
 - Test manifest from step 2 (test_manifest)
 - Context report from step 1 (context_doc)
 - Story spec YAML (for acceptance criteria — the authoritative source)
-- Execution results from step 3 (results.yaml in `state/test-artifacts/`)
+- Execution results from step 3 (results.yaml in `.pHive/test-artifacts/`)
 
 **NOT available (do not read or assume):**
 - Bug reports (not filed yet)
@@ -49,7 +49,7 @@ Flag any criteria that cannot be automated (e.g., "looks professional" without s
 
 ### 2. Inventory executed tests
 
-Read the test manifest and `state/test-artifacts/{epic-id}/{story-id}/results.yaml`. For each test, record:
+Read the test manifest and `.pHive/test-artifacts/{epic-id}/{story-id}/results.yaml`. For each test, record:
 - test_id
 - requirement_ref (which AC it covers)
 - type (happy_path, edge_case, error_state, regression)

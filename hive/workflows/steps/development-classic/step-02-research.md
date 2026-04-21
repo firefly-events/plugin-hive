@@ -33,7 +33,7 @@ Explore the codebase to produce a research brief that gives the developer everyt
 ## TASK SEQUENCE
 
 ### 0. Check for existing progress
-Check `state/episodes/{epic-id}/{story-id}/` for research episode.
+Check `.pHive/episodes/{epic-id}/{story-id}/` for research episode.
 If completed, skip to next step.
 
 ### 1. Extract research questions (max 3)
@@ -51,7 +51,7 @@ Use Grep to find similar implementations in the codebase.
 Keep searches scoped to the story's domain — don't explore unrelated modules.
 
 ### 4. Check cross-cutting concerns
-If `state/cross-cutting-concerns.yaml` exists, read it.
+If `.pHive/cross-cutting-concerns.yaml` exists, read it.
 Note which concerns apply to this story for inclusion in the brief.
 
 ### 5. Produce research brief

@@ -20,7 +20,7 @@ Read the context report from step 1. Detect the appropriate framework per test t
 
 **Inputs available:**
 - Context report from step 1 (context_doc)
-- Baseline knowledge at `state/test-baseline/{project}/baseline-knowledge.md`
+- Baseline knowledge at `.pHive/test-baseline/{project}/baseline-knowledge.md`
 - Story spec YAML (for acceptance criteria reference)
 - Project codebase (for existing test patterns)
 

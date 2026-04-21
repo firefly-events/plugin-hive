@@ -7,7 +7,7 @@ The meta-team runs unattended at 3 AM CDT and produces a morning summary for use
 ## Where the Summary Lives
 
 ```
-state/meta-team/morning-summary.md
+.pHive/meta-team/morning-summary.md
 ```
 
 Written at the end of every meta-team cycle (step 8 — close).
@@ -16,7 +16,7 @@ Written at the end of every meta-team cycle (step 8 — close).
 
 ## How the User Sees It
 
-When the user runs `/hive:status`, the status skill checks for `state/meta-team/morning-summary.md`. If it exists, it is rendered as a top-level section before the epic status output.
+When the user runs `/hive:status`, the status skill checks for `.pHive/meta-team/morning-summary.md`. If it exists, it is rendered as a top-level section before the epic status output.
 
 The summary is designed for a 30-second morning review:
 - Verdict at the top (passed / partial / poor)
@@ -100,7 +100,7 @@ The summary is designed for a 30-second morning review:
 
 **Explain why something was NOT fixed.** If a finding was deferred or blocked, say why. The user can't act on "found issues" — they need to know the reason.
 
-**Cap the "What Was Found" list at 10 items.** If there are more, summarize them: "... and N more low-severity findings — see `state/meta-team/cycle-state.yaml` for full list."
+**Cap the "What Was Found" list at 10 items.** If there are more, summarize them: "... and N more low-severity findings — see `.pHive/meta-team/cycle-state.yaml` for full list."
 
 **Don't pad.** If nothing was flagged for human, say "Nothing requires your attention." — not a paragraph explaining why nothing was flagged.
 

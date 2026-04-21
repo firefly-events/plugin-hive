@@ -124,7 +124,7 @@ findings:
   - id: finding-9
     category: QUEUE_STALE
     severity: low
-    location: state/meta-team/queue.yaml
+    location: .pHive/meta-team/queue.yaml
     description: >
       Queue target target-2026-04-08-001 (gate-policy files) remains in "queued" status but
       hive/gate-policies/development-classic.yaml and hive/gate-policies/development-tdd.yaml
@@ -326,7 +326,7 @@ changes:
 
   - proposal_id: maintenance
     action: update
-    file: state/meta-team/queue.yaml
+    file: .pHive/meta-team/queue.yaml
     description: Marked targets 001/002/003 as completed with completion notes and timestamps
     status: done
 

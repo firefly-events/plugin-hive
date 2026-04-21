@@ -46,7 +46,7 @@ If the step 1 report includes `overnight_pulls` with any commits, add this secti
 - Commits pulled: {N}
 - [if meta_team_commits present]
   **Meta-team cycle `{cycle_id}` ran** — verdict: {passed|partial|poor}
-  Read `state/meta-team/morning-summary.md` for the full report.
+  Read `.pHive/meta-team/morning-summary.md` for the full report.
   Top highlights:
     - {summary bullet 1}
     - {summary bullet 2}
@@ -56,7 +56,7 @@ If the step 1 report includes `overnight_pulls` with any commits, add this secti
   Other remote commits: {subject list}
 ```
 
-If a meta-team cycle ran, read `state/meta-team/morning-summary.md` and pull out:
+If a meta-team cycle ran, read `.pHive/meta-team/morning-summary.md` and pull out:
 - The verdict line
 - The "What Changed Tonight" top 3 items (condensed to one line each)
 - The count of items under "What Was Found (Not Fixed This Cycle)"
