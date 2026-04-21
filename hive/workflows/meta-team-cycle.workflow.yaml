@@ -155,8 +155,12 @@ steps:
   - id: close
     agent: orchestrator
     task: >
-      Close the cycle. Update cycle-state.yaml and ledger.yaml. Prepare morning
-      summary. Commit all changes.
+      Close the cycle. The closure invariant (commit_ref + metrics_snapshot +
+      rollback_ref all present and valid) is a non-bypassable gate per B0 §1.11
+      and user-decisions Q3 — incomplete closes are rejected before ledger
+      append. On pass, update cycle-state, commit changes, append ledger entry,
+      and produce morning summary. On fail, record close_rejected output with
+      missing-field details and halt without ledger append.
     step_file: hive/workflows/steps/meta-team-cycle/step-08-close.md
     depends_on:
       - promotion
