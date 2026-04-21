@@ -10,6 +10,18 @@ state/
 !.pHive/teams/**
 !.pHive/team-memories/
 !.pHive/team-memories/**
+# Meta-improvement-system epic artifacts (planning + audit trail for maintainer tooling).
+# The parent .pHive/epics/ and .pHive/episodes/ dirs must be un-ignored first —
+# git will not recurse into an ignored directory even if a deeper negation exists.
+!.pHive/epics/
+!.pHive/episodes/
+# Then re-ignore every child of those dirs except the meta-improvement-system subtree.
+.pHive/epics/*
+.pHive/episodes/*
+!.pHive/epics/meta-improvement-system/
+!.pHive/epics/meta-improvement-system/**
+!.pHive/episodes/meta-improvement-system/
+!.pHive/episodes/meta-improvement-system/**
 agents/memories/
 .claude/settings.local.json
 .history/
