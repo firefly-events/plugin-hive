@@ -33,18 +33,19 @@ EOF
 
 echo "=== (a) flag-off silence ==="
 
-CONFIG_OFF="$TMPDIR_BASE/config-off.yaml"
-make_config false > "$CONFIG_OFF"
+FAKE_HIVE_OFF="$TMPDIR_BASE/fake-hive-off"
+mkdir -p "$FAKE_HIVE_OFF/hive"
+make_config false > "$FAKE_HIVE_OFF/hive/hive.config.yaml"
 
-EVENTS_DIR="$TMPDIR_BASE/fake-pHive/metrics/events"
+EVENTS_DIR_OFF="$FAKE_HIVE_OFF/.pHive/metrics/events"
 
-# Run hook with disabled config; should produce no file
-HIVE_ROOT="$TMPDIR_BASE" bash "$HOOK" \
+# Run hook with disabled config at correct HIVE_ROOT path; should produce no file
+HIVE_ROOT="$FAKE_HIVE_OFF" bash "$HOOK" \
   --run-id run_test_001 \
   --story-id C2.6 \
   --reason scope-ambiguity 2>/dev/null || true
 
-if [[ ! -f "$EVENTS_DIR/human-escalation.jsonl" ]]; then
+if [[ ! -f "$EVENTS_DIR_OFF/human-escalation.jsonl" ]]; then
   pass "flag-off: no event file created"
 else
   fail "flag-off: event file was created when metrics disabled"

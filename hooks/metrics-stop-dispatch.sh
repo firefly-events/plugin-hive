@@ -153,8 +153,8 @@ WALL_CLOCK_MS=$(python3 -c "import time; print(int(time.time()*1000))" 2>/dev/nu
 
 # Build event_id and run_id
 EVENT_TS=$(date -u +%Y-%m-%dT%H%M%SZ)
-EVENT_ID="evt_${EVENT_TS}_stop"
-RUN_ID="run_stop_${SESSION_ID:-unknown}_${EVENT_TS}"
+EVENT_ID="evt_${EVENT_TS}_$$_${RANDOM}_stop"
+RUN_ID="run_stop_${SESSION_ID:-unknown}_${EVENT_TS}_$$_${RANDOM}"
 
 # Determine target events file (one file per session)
 SESSION_SLUG="${SESSION_ID:-unknown}"
@@ -201,7 +201,7 @@ echo "$TOKEN_ROW" >> "$EVENTS_FILE" || exit 0
 
 # Emit wall_clock_ms row only when value is available (I-3: skip rather than emit 0)
 if [ -n "${WALL_CLOCK_MS:-}" ]; then
-  WALL_EVENT_ID="evt_${EVENT_TS}_stop_wall"
+  WALL_EVENT_ID="evt_${EVENT_TS}_$$_${RANDOM}_stop_wall"
   WALL_ROW=$(jq -nc \
     --arg event_id "$WALL_EVENT_ID" \
     --arg ts "$END_TS" \

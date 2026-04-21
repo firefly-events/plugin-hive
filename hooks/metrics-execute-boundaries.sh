@@ -19,50 +19,54 @@
 
 set -euo pipefail
 
-HIVE_CONFIG="${HIVE_CONFIG:-hive/hive.config.yaml}"
+# Resolve config path anchored to HIVE_ROOT
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HIVE_ROOT="${HIVE_ROOT:-$(dirname "$SCRIPT_DIR")}"
+HIVE_CONFIG="${HIVE_CONFIG:-$HIVE_ROOT/hive/hive.config.yaml}"
 
-# Parse metrics.enabled and metrics.dir from hive.config.yaml
-if command -v yq >/dev/null 2>&1; then
-  metrics_enabled=$(yq '.metrics.enabled' "$HIVE_CONFIG" 2>/dev/null || echo "false")
-  metrics_dir=$(yq '.metrics.dir' "$HIVE_CONFIG" 2>/dev/null || echo ".pHive/metrics")
-elif command -v python3 >/dev/null 2>&1; then
-  metrics_enabled=$(python3 - "$HIVE_CONFIG" <<'EOF'
-import sys, re
-path = sys.argv[1]
+# Three-tier YAML-scoped config reader: yq → python3 yaml.safe_load → awk-scoped grep
+# Returns value of metrics.<key>, never matches keys outside the metrics: block
+_read_metrics_config() {
+  local key="$1"
+  local default="$2"
+  if [[ ! -f "$HIVE_CONFIG" ]]; then
+    echo "$default"
+    return
+  fi
+  local val=""
+  if command -v yq &>/dev/null; then
+    val=$(yq ".metrics.${key}" "$HIVE_CONFIG" 2>/dev/null | tr -d ' "' || true)
+  elif command -v python3 &>/dev/null; then
+    val=$(python3 - "$HIVE_CONFIG" "$key" <<'PYEOF'
+import sys
 try:
-    text = open(path).read()
-    m = re.search(r'^\s*enabled:\s*(true|false)', text, re.MULTILINE)
-    print(m.group(1) if m else "false")
+    import yaml
+    with open(sys.argv[1]) as f:
+        c = yaml.safe_load(f)
+    v = c.get('metrics', {}).get(sys.argv[2], '')
+    if v is not None and str(v) != '':
+        print(str(v).lower() if isinstance(v, bool) else str(v))
 except Exception:
-    print("false")
-EOF
-)
-  metrics_dir=$(python3 - "$HIVE_CONFIG" <<'EOF'
-import sys, re
-path = sys.argv[1]
-try:
-    text = open(path).read()
-    m = re.search(r'^\s*dir:\s*(\S+)', text, re.MULTILINE)
-    print(m.group(1) if m else ".pHive/metrics")
-except Exception:
-    print(".pHive/metrics")
-EOF
-)
-else
-  metrics_enabled=$(grep -E '^\s*enabled:' "$HIVE_CONFIG" | head -1 | awk '{print $2}' || echo "false")
-  metrics_dir=$(grep -E '^\s*dir:' "$HIVE_CONFIG" | head -1 | awk '{print $2}' || echo ".pHive/metrics")
-fi
+    pass
+PYEOF
+    )
+  else
+    val=$(awk '/^metrics:/{flag=1; next} /^[a-zA-Z]/{flag=0} flag && /^[[:space:]]+'"$key"':/' "$HIVE_CONFIG" \
+      | head -1 | sed 's/[^:]*:[[:space:]]*//' | tr -d ' "')
+  fi
+  if [[ -z "${val:-}" ]] || [[ "$val" == "null" ]]; then
+    echo "$default"
+  else
+    echo "$val"
+  fi
+}
 
-# Normalise: strip inline yaml comments and surrounding quotes
-metrics_enabled="${metrics_enabled%%#*}"
-metrics_enabled="${metrics_enabled//\"/}"
-metrics_enabled="${metrics_enabled//\'/}"
-metrics_enabled=$(echo "$metrics_enabled" | tr -d '[:space:]')
+metrics_enabled=$(_read_metrics_config "enabled" "false")
+metrics_dir=$(_read_metrics_config "dir" ".pHive/metrics")
 
-metrics_dir="${metrics_dir%%#*}"
-metrics_dir="${metrics_dir//\"/}"
-metrics_dir="${metrics_dir//\'/}"
-metrics_dir=$(echo "$metrics_dir" | tr -d '[:space:]')
+# Strip leading/trailing whitespace
+metrics_enabled=$(echo "$metrics_enabled" | awk '{print $1}')
+metrics_dir=$(echo "$metrics_dir" | awk '{print $1}')
 
 # Silent no-op when metrics are disabled
 if [[ "$metrics_enabled" != "true" ]]; then
@@ -88,6 +92,10 @@ if [[ -z "$fix_iterations" ]]; then
   echo "metrics-execute-boundaries: HIVE_FIX_ITERATIONS is required" >&2
   exit 1
 fi
+if ! [[ "$fix_iterations" =~ ^[0-9]+$ ]]; then
+  echo "metrics-execute-boundaries: HIVE_FIX_ITERATIONS must be a non-negative integer" >&2
+  exit 1
+fi
 if [[ -z "$first_pass" ]]; then
   echo "metrics-execute-boundaries: HIVE_FIRST_PASS is required (true or false)" >&2
   exit 1
@@ -108,35 +116,10 @@ phase="${HIVE_PHASE:-}"
 # Shared timestamp for both events in this boundary emission
 timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Build identity block (story_id XOR proposal_id)
-if [[ -n "$story_id" ]]; then
-  identity_field="\"story_id\":\"${story_id}\""
-else
-  identity_field="\"proposal_id\":\"${proposal_id}\""
+# Ensure events directory exists (anchor relative metrics_dir to HIVE_ROOT)
+if [[ "$metrics_dir" != /* ]]; then
+  metrics_dir="$HIVE_ROOT/$metrics_dir"
 fi
-
-# Build optional swarm field
-if [[ -n "$swarm_id" ]]; then
-  swarm_field="\"swarm_id\":\"${swarm_id}\","
-else
-  swarm_field=""
-fi
-
-# Build optional agent field
-if [[ -n "$agent_name" ]]; then
-  agent_field="\"agent\":\"${agent_name}\","
-else
-  agent_field=""
-fi
-
-# Build optional phase field
-if [[ -n "$phase" ]]; then
-  phase_field="\"phase\":\"${phase}\","
-else
-  phase_field=""
-fi
-
-# Ensure events directory exists
 events_dir="${metrics_dir}/events"
 mkdir -p "$events_dir"
 
@@ -146,19 +129,69 @@ out_file="${events_dir}/${run_id}-execute-boundaries.jsonl"
 # --- Event 1: fix_loop_iterations ---
 # Emit the count of corrective fix-loop passes for this story/proposal attempt.
 event_id_1="evt_${timestamp}_$$_${RANDOM}_fix_loop"
-fix_dims="\"stage\":\"execute-boundary\""
-if [[ -n "$phase" ]]; then
-  fix_dims="${fix_dims},\"phase\":\"${phase}\""
-fi
-event_fix="{\"event_id\":\"${event_id_1}\",\"timestamp\":\"${timestamp}\",\"run_id\":\"${run_id}\",${swarm_field}${identity_field},${phase_field}${agent_field}\"metric_type\":\"fix_loop_iterations\",\"value\":${fix_iterations},\"unit\":\"iterations\",\"dimensions\":{${fix_dims}},\"source\":\"execute-phase-boundary\"}"
+
+fix_jq_filter='
+  {
+    event_id:    $event_id,
+    timestamp:   $timestamp,
+    run_id:      $run_id,
+    metric_type: "fix_loop_iterations",
+    value:       ($fix_iterations | tonumber),
+    unit:        "iterations",
+    dimensions:  ({stage: "execute-boundary"} | if $phase != "" then . + {phase: $phase} else . end),
+    source:      "execute-phase-boundary"
+  }
+  | if $story_id    != "" then . + {story_id:    $story_id}    else . end
+  | if $proposal_id != "" then . + {proposal_id: $proposal_id} else . end
+  | if $swarm_id    != "" then . + {swarm_id:    $swarm_id}    else . end
+  | if $phase       != "" then . + {phase:       $phase}       else . end
+  | if $agent_name  != "" then . + {agent:       $agent_name}  else . end
+'
+
+event_fix=$(jq -cn \
+  --arg event_id      "$event_id_1" \
+  --arg timestamp     "$timestamp" \
+  --arg run_id        "$run_id" \
+  --arg story_id      "$story_id" \
+  --arg proposal_id   "$proposal_id" \
+  --arg swarm_id      "$swarm_id" \
+  --arg phase         "$phase" \
+  --arg agent_name    "$agent_name" \
+  --arg fix_iterations "$fix_iterations" \
+  "$fix_jq_filter")
 echo "$event_fix" >> "$out_file"
 
 # --- Event 2: first_attempt_pass ---
 # Emit an explicit binary signal: true = passed on first attempt, false = fix-loop was needed.
 event_id_2="evt_${timestamp}_$$_${RANDOM}_first_pass"
-pass_dims="\"stage\":\"execute-boundary\""
-if [[ -n "$phase" ]]; then
-  pass_dims="${pass_dims},\"phase\":\"${phase}\""
-fi
-event_pass="{\"event_id\":\"${event_id_2}\",\"timestamp\":\"${timestamp}\",\"run_id\":\"${run_id}\",${swarm_field}${identity_field},${phase_field}${agent_field}\"metric_type\":\"first_attempt_pass\",\"value\":${first_pass},\"unit\":\"bool\",\"dimensions\":{${pass_dims}},\"source\":\"execute-phase-boundary\"}"
+
+pass_jq_filter='
+  {
+    event_id:    $event_id,
+    timestamp:   $timestamp,
+    run_id:      $run_id,
+    metric_type: "first_attempt_pass",
+    value:       ($first_pass == "true"),
+    unit:        "bool",
+    dimensions:  ({stage: "execute-boundary"} | if $phase != "" then . + {phase: $phase} else . end),
+    source:      "execute-phase-boundary"
+  }
+  | if $story_id    != "" then . + {story_id:    $story_id}    else . end
+  | if $proposal_id != "" then . + {proposal_id: $proposal_id} else . end
+  | if $swarm_id    != "" then . + {swarm_id:    $swarm_id}    else . end
+  | if $phase       != "" then . + {phase:       $phase}       else . end
+  | if $agent_name  != "" then . + {agent:       $agent_name}  else . end
+'
+
+event_pass=$(jq -cn \
+  --arg event_id    "$event_id_2" \
+  --arg timestamp   "$timestamp" \
+  --arg run_id      "$run_id" \
+  --arg story_id    "$story_id" \
+  --arg proposal_id "$proposal_id" \
+  --arg swarm_id    "$swarm_id" \
+  --arg phase       "$phase" \
+  --arg agent_name  "$agent_name" \
+  --arg first_pass  "$first_pass" \
+  "$pass_jq_filter")
 echo "$event_pass" >> "$out_file"

@@ -138,7 +138,7 @@ _resolve_main_jsonl() {
   fi
   local base="${cwd_arg:-$HIVE_ROOT}"
   local encoded_cwd
-  encoded_cwd=$(echo "$base" | sed 's|^/||' | sed 's|/|-|g')
+  encoded_cwd=$(echo "$base" | sed 's|^/||' | sed 's|[^a-zA-Z0-9-]|-|g')
   local candidate="$HOME/.claude/projects/$encoded_cwd/$session_id.jsonl"
   if [ -f "$candidate" ]; then
     echo "$candidate"
@@ -158,7 +158,7 @@ _resolve_subagents_dir() {
   fi
   local base="${cwd_arg:-$HIVE_ROOT}"
   local encoded_cwd
-  encoded_cwd=$(echo "$base" | sed 's|^/||' | sed 's|/|-|g')
+  encoded_cwd=$(echo "$base" | sed 's|^/||' | sed 's|[^a-zA-Z0-9-]|-|g')
   echo "$HOME/.claude/projects/$encoded_cwd/$session_id/subagents"
 }
 

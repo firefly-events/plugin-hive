@@ -16,8 +16,10 @@
 
 set -euo pipefail
 
-# Resolve config path
-HIVE_CONFIG="${HIVE_CONFIG:-hive/hive.config.yaml}"
+# Resolve config path anchored to HIVE_ROOT
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HIVE_ROOT="${HIVE_ROOT:-$(dirname "$SCRIPT_DIR")}"
+HIVE_CONFIG="${HIVE_CONFIG:-$HIVE_ROOT/hive/hive.config.yaml}"
 
 # Three-tier YAML-scoped config reader (I-4): yq → python3 yaml.safe_load → awk-scoped grep
 # Returns value of metrics.<key>, never matches keys outside the metrics: block
@@ -96,36 +98,40 @@ phase="${HIVE_PHASE:-}"
 timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 event_id="evt_${timestamp}_$$_${RANDOM}_spawn_${agent_name}"
 
-# Build spawn-scoped dimensions: kind tag only (I-1, I-3)
-# Top-level phase and agent fields already carry persona/phase per schema §3.7/§3.8.
-# kind=spawn_marker differentiates this zero-value row from real wall_clock_ms timing rows.
-dimensions_pairs="\"kind\":\"spawn_marker\""
+# Build event JSON via jq for safe escaping of all user-supplied values
+jq_filter='
+  {
+    event_id:    $event_id,
+    timestamp:   $timestamp,
+    run_id:      $run_id,
+    metric_type: "wall_clock_ms",
+    value:       0,
+    unit:        "ms",
+    agent:       $agent_name,
+    dimensions:  {kind: "spawn_marker"},
+    source:      "agent-spawn-report"
+  }
+  | if $story_id    != "" then . + {story_id:    $story_id}    else . end
+  | if $proposal_id != "" then . + {proposal_id: $proposal_id} else . end
+  | if $swarm_id    != "" then . + {swarm_id:    $swarm_id}    else . end
+  | if $phase       != "" then . + {phase:       $phase}       else . end
+'
 
-# Build the identity block (story_id XOR proposal_id)
-if [[ -n "$story_id" ]]; then
-  identity_field="\"story_id\":\"${story_id}\""
-else
-  identity_field="\"proposal_id\":\"${proposal_id}\""
-fi
-
-# Build optional swarm field
-if [[ -n "$swarm_id" ]]; then
-  swarm_field="\"swarm_id\":\"${swarm_id}\","
-else
-  swarm_field=""
-fi
-
-# Build optional phase field
-if [[ -n "$phase" ]]; then
-  phase_field="\"phase\":\"${phase}\","
-else
-  phase_field=""
-fi
-
-# Assemble JSONL row
-event_row="{\"event_id\":\"${event_id}\",\"timestamp\":\"${timestamp}\",\"run_id\":\"${run_id}\",${swarm_field}${identity_field},${phase_field}\"agent\":\"${agent_name}\",\"metric_type\":\"wall_clock_ms\",\"value\":0,\"unit\":\"ms\",\"dimensions\":{${dimensions_pairs}},\"source\":\"agent-spawn-report\"}"
+event_row=$(jq -cn \
+  --arg event_id    "$event_id" \
+  --arg timestamp   "$timestamp" \
+  --arg run_id      "$run_id" \
+  --arg story_id    "$story_id" \
+  --arg proposal_id "$proposal_id" \
+  --arg swarm_id    "$swarm_id" \
+  --arg phase       "$phase" \
+  --arg agent_name  "$agent_name" \
+  "$jq_filter")
 
 # Ensure events directory exists and write
+if [[ "$metrics_dir" != /* ]]; then
+  metrics_dir="$HIVE_ROOT/$metrics_dir"
+fi
 events_dir="${metrics_dir}/events"
 mkdir -p "$events_dir"
 

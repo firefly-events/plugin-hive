@@ -274,8 +274,8 @@ fi
 
 EVENTS_C="$REPO_C/.pHive/metrics/events"
 EVENT_FILE_C=$(ls "$EVENTS_C"/*.jsonl 2>/dev/null | head -1 || echo "")
-if [ -n "$EVENT_FILE_C" ]; then
-  # At least one row with codex_gap: true
+if [ -n "$EVENT_FILE_C" ] && [ -s "$EVENT_FILE_C" ]; then
+  # Event file exists and is non-empty: REQUIRE a codex_gap: true row
   GAP_ROW=$(jq -c 'select(.dimensions.codex_gap == true)' "$EVENT_FILE_C" 2>/dev/null | head -1)
   if [ -n "$GAP_ROW" ]; then
     GAP_VAL=$(echo "$GAP_ROW" | jq -r '.value // -1')
@@ -286,9 +286,7 @@ if [ -n "$EVENT_FILE_C" ]; then
     fi
     _pass "degradation: codex_gap: true row emitted"
   else
-    # Acceptable: both orchestrator and tester had no data → both zero rows may or may not be written
-    # The requirement is: no crash. Empty output is also valid degradation.
-    _pass "degradation: no crash (zero rows written is acceptable when no data available)"
+    _fail "degradation: event file non-empty but no codex_gap: true row found"
   fi
 else
   _pass "degradation: no crash, no event file (acceptable when no token data)"

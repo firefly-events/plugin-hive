@@ -232,9 +232,14 @@ else
   fi
 
   # Binary distinguishability: the two cases must have opposite first_attempt_pass values
-  if [[ ${#events_a[@]} -gt 0 && -n "$pass_row_b" ]]; then
-    # pass_row from (a) has value=true; pass_row_b has value=false — already validated above
-    pass "fix-loop: first_attempt_pass clearly distinguishes first-pass (true) from fix-loop (false)"
+  if [[ -n "${pass_row:-}" && -n "$pass_row_b" ]]; then
+    val_a=$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['value'])" "$pass_row" 2>/dev/null || echo "")
+    val_b=$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['value'])" "$pass_row_b" 2>/dev/null || echo "")
+    if [[ "$val_a" == "True" && "$val_b" == "False" ]]; then
+      pass "fix-loop: first_attempt_pass distinguishes first-pass (true) from fix-loop (false)"
+    else
+      fail "fix-loop: first_attempt_pass values not opposite across (a)/(b): a=$val_a b=$val_b"
+    fi
   fi
 fi
 
@@ -249,8 +254,7 @@ mkdir -p "$WDIR_C"
 make_config "$WDIR_C" "false"
 
 (
-  cd "$WDIR_C"
-  HIVE_CONFIG="hive/hive.config.yaml" \
+  HIVE_ROOT="$WDIR_C" \
   HIVE_RUN_ID="run_test_2026-04-21_003" \
   HIVE_STORY_ID="C2.5" \
   HIVE_FIX_ITERATIONS="1" \
@@ -268,8 +272,7 @@ fi
 # Also verify exit code is 0 (silent no-op, not an error)
 exit_code=0
 (
-  cd "$WDIR_C"
-  HIVE_CONFIG="hive/hive.config.yaml" \
+  HIVE_ROOT="$WDIR_C" \
   HIVE_RUN_ID="run_test_2026-04-21_003" \
   HIVE_STORY_ID="C2.5" \
   HIVE_FIX_ITERATIONS="1" \

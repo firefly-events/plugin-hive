@@ -48,8 +48,7 @@ mkdir -p "$WDIR_A"
 make_config "$WDIR_A" "false"
 
 (
-  cd "$WDIR_A"
-  HIVE_CONFIG="hive/hive.config.yaml" \
+  HIVE_ROOT="$WDIR_A" \
   HIVE_RUN_ID="run_test_2026-04-21_001" \
   HIVE_STORY_ID="C2.4" \
   HIVE_AGENT="developer" \
