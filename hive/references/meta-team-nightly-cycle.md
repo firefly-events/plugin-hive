@@ -1,12 +1,22 @@
-# Meta-Team Nightly Cycle — Integration Guide
+# Meta-Team Nightly Cycle — Historical Operator Narrative
 
-The meta-team is the Hive plugin's autonomous self-improvement system. This guide explains how the nightly cycle integrates with the rest of the Hive framework, how to bootstrap it on a new installation, and how to monitor and tune it over time.
+## Status
+
+This document describes a retired legacy control plane: the single-swarm meta-team nightly cycle. It is preserved as operator history.
+
+This document is NOT the authoritative guide for the active meta-improvement system. The current two-swarm architecture (`meta-optimize` and `meta-meta-optimize`) is defined elsewhere in the planning artifacts under `.pHive/epics/meta-improvement-system/docs/`.
+
+The authoritative shared safety-constraint reference is now `hive/references/meta-safety-constraints.md`.
+
+Date of demotion: 2026-04-21.
+
+This guide describes how the legacy meta-team nightly cycle was integrated with the Hive framework prior to the 2026-04 authority reset, including how operators bootstrapped it on a new installation and how they monitored and tuned it over time.
 
 ---
 
-## What the Nightly Cycle Does
+## What the Nightly Cycle Did
 
-Each cycle runs eight sequential phases:
+In the legacy control plane, each cycle ran eight sequential phases:
 
 | Phase | Step | Agent | Output |
 |-------|------|-------|--------|
@@ -21,20 +31,20 @@ Each cycle runs eight sequential phases:
 
 ---
 
-## Bootstrapping the Meta-Team
+## Bootstrapping the Legacy Meta-Team
 
 ### First run
-On the first cycle, these files must exist:
+On the first cycle of the retired system, these files had to exist:
 
 1. **`.pHive/meta-team/charter.md`** — defines objectives, scope, and hard constraints. Already committed to the repo.
 2. **`hive/workflows/meta-team-cycle.workflow.yaml`** — the workflow definition.
 3. **`.pHive/teams/meta-team.yaml`** — the 5-agent team config.
 4. **All 8 step files** in `hive/workflows/steps/meta-team-cycle/`.
 
-The ledger (`.pHive/meta-team/ledger.yaml`) and cycle state (`.pHive/meta-team/cycle-state.yaml`) are created by the cycle itself — no manual creation needed.
+The ledger (`.pHive/meta-team/ledger.yaml`) and cycle state (`.pHive/meta-team/cycle-state.yaml`) were created by the cycle itself — no manual creation needed.
 
 ### Running the cycle
-Trigger via the orchestrator:
+In the legacy workflow, operators triggered the cycle via the orchestrator:
 ```
 Run the meta-team nightly cycle.
 Read: hive/workflows/meta-team-cycle.workflow.yaml
@@ -42,7 +52,7 @@ Team: .pHive/teams/meta-team.yaml
 Charter: .pHive/meta-team/charter.md
 ```
 
-Or schedule via a cron-style trigger (see external trigger config if available).
+Or they scheduled it via a cron-style trigger (see external trigger config if available).
 
 ---
 
@@ -50,12 +60,12 @@ Or schedule via a cron-style trigger (see external trigger config if available).
 
 ### `.pHive/meta-team/cycle-state.yaml`
 
-Created fresh each cycle. Contains the full running log of a single cycle:
+Created fresh each cycle. It contained the full running log of a single cycle:
 - Phase-by-phase outputs
 - All findings, proposals, changes, test results, evaluations
 - Final summary after close
 
-Use it to debug a failed cycle or review what was changed.
+Operators used it to debug a failed cycle or review what was changed.
 
 ### `.pHive/meta-team/ledger.yaml`
 
@@ -74,23 +84,23 @@ Append-only record of all completed cycles. One entry per cycle:
   notes: First cycle. Bootstrapped meta-team infrastructure.
 ```
 
-Use it to track Hive improvement over time.
+Operators used it to track Hive improvement over time.
 
 ---
 
-## Tuning the Cycle
+## Tuning the Legacy Cycle
 
 ### Adjusting what gets analyzed
-The analysis step (step-02) performs six audit checks. To focus the cycle on specific areas:
+The analysis step (step-02) performed six audit checks. To focus the cycle on specific areas, operators would:
 - Edit the step file to skip checks that are not relevant
 - Add custom check sections for new domains (e.g., check a new sub-directory added to the plugin)
 
 ### Adjusting proposal limits
-The proposal step (step-03) caps approved proposals at 5 per cycle. To change this:
+The proposal step (step-03) capped approved proposals at 5 per cycle. To change this, operators would:
 - Edit `step-03-proposal.md` and update the cap in the MANDATORY EXECUTION RULES section
 
 ### Adjusting charter scope
-To allow the meta-team to modify additional domains:
+To allow the meta-team to modify additional domains in that retired setup, operators would:
 - Edit `.pHive/meta-team/charter.md` → scope table
 - Edit `.pHive/teams/meta-team.yaml` → member domain sections
 
@@ -99,19 +109,19 @@ To allow the meta-team to modify additional domains:
 ## Monitoring and Alerts
 
 ### Morning review
-Run `/hive:status` to see the morning summary rendered inline.
+Operators ran `/hive:status` to see the morning summary rendered inline.
 
 ### Ledger review
-Read `.pHive/meta-team/ledger.yaml` to see the history of all cycles.
+Operators read `.pHive/meta-team/ledger.yaml` to see the history of all cycles.
 
 ### Aborted cycles
-If `.pHive/meta-team/cycle-state.yaml` has `status: running` at the start of the next cycle, the prior cycle crashed. The next cycle will log it as aborted and start fresh.
+If `.pHive/meta-team/cycle-state.yaml` had `status: running` at the start of the next cycle, the prior cycle had crashed. The next cycle would log it as aborted and start fresh.
 
 ---
 
 ## Bootstrapping Charter Template
 
-If `.pHive/meta-team/charter.md` is missing, create it with these minimum fields:
+If `.pHive/meta-team/charter.md` was missing in the legacy setup, operators created it with these minimum fields:
 
 ```markdown
 # Meta-Team Charter
@@ -143,7 +153,7 @@ Self-optimize the Hive plugin.
 
 ## Integration with the Daily Ceremony
 
-The meta-team is independent from the daily standup ceremony. However:
+In the legacy workflow, the meta-team was independent from the daily standup ceremony. However:
 - The morning summary surfaces in `/hive:status` alongside daily epic status
 - Flagged-for-human items from the meta-team should be reviewed during standup
 - Meta-team insights staged in `.pHive/insights/meta-team/` are evaluated by the orchestrator at session end alongside regular epic insights
