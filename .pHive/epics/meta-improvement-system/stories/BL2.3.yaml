@@ -1,0 +1,111 @@
+id: BL2.3
+epic: meta-improvement-system
+slice: S9
+title: Integrate baseline capture, metric emission, compare, and close validation
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["BL2.2", "L1.3", "L1.4", "L1.7", "C2.6"]
+
+description: |
+  Compose the shared lifecycle library and metrics substrate into the live
+  maintainer path so a real run captures baseline state, emits metrics, performs
+  comparison, and reaches close validation with evidence-bearing artifacts.
+  This story owns the first full library composition, but not yet the deliberate
+  rollback-realism proof. It should wire the maintainer orchestration to the
+  baseline primitive, live metrics emission, compare output, and closure gate so
+  the system can produce real envelopes and event records during a proving run.
+  Because the shared close validator will later serve both direct-commit and
+  PR-only paths, this integration should preserve explicit evidence shapes rather
+  than collapsing them into a direct-commit-only shortcut.
+  Do wire the live evidence path across the maintainer run. Do not yet claim the
+  rollback-realism milestone proof artifact.
+
+acceptance_criteria:
+  - "Given the composed maintainer path, when a live run executes, then baseline capture, metric emission, comparison, and close validation all occur in one flow."
+  - "Given the run artifacts, when the repo is inspected after execution, then representative envelope and event records exist under `/Users/don/Documents/plugin-hive/.pHive/metrics/`."
+  - "Given the close gate, when a fabricated `commit: TBD` close attempt is exercised in tests, then the shared validator rejects it."
+  - "Given the shared-validator concern, when integration code is reviewed, then evidence remains explicit enough for future PR-only close records and is not normalized to direct-commit-only assumptions."
+
+steps:
+  - id: research
+    description: "Trace the live maintainer path across the boot, analysis, evaluation, and close surfaces so baseline, metrics, compare, and close validation bind at the right points."
+    agent: researcher
+  - id: implement
+    description: "Update the maintainer orchestration and the relevant step files so live runs capture baselines, emit metrics, compare candidate versus baseline, and invoke closure validation with explicit evidence-bearing artifacts."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run integration tests for the composed evidence path. Suggested checks: `pytest tests/meta_meta/test_live_cycle_integration.py` and `rg -n \"commit: TBD|metrics_snapshot|baseline_ref|rollback_ref\" /Users/don/Documents/plugin-hive/tests/meta_meta`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the live maintainer path now composes the shared lifecycle library correctly and preserves explicit evidence shape for current and future close records."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the composed live evidence path once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, python, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-01-boot.md
+      purpose: "Boot surface where baseline or kickoff preconditions may bind."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
+      purpose: "Evaluation surface where comparison and regression evidence can surface."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-08-close.md
+      purpose: "Close surface that must enforce the shared closure validator."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md
+    change: "Bind live baseline capture, metrics emission, compare, and close validation into the maintainer run."
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-01-boot.md
+    change: "Update boot instructions only as needed to bind baseline-capture prerequisites for the live run."
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
+    change: "Update evaluation guidance only as needed to bind compare and regression evidence into the live path."
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-08-close.md
+    change: "Update close guidance only as needed to invoke the shared closure validator with explicit evidence fields."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_meta/test_live_cycle_integration.py
+    change: "Create live integration tests covering baseline, metrics, compare, and close validation composition."
+
+code_examples:
+  - title: "S9 evidence-bearing composition"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - `BL2.3` Integrate baseline capture, metric emission, compare, and close validation.
+      - Create real envelope and event artifacts in `.pHive/metrics/` during the proving run, then preserve representative examples or references for inspection.
+
+design_decisions:
+  - decision: "Compose shared lifecycle primitives through the live maintainer path before claiming MVL."
+    rationale: "S9 must prove the library is not just unit-tested but actually drives a real run."
+    source: "vertical-plan Slice 9"
+  - decision: "Preserve explicit closure evidence shape."
+    rationale: "The architect flagged a moderate risk that the shared close gate could overfit direct-commit evidence and later reject PR-only closes."
+    source: "cycle-state escalation closure-evidence-shape-mismatch"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update the maintainer skill docs and any touched step files to describe where baseline capture, metric emission, comparison, and close validation now occur in the live run."
+
+risks:
+  - severity: high
+    description: "The live composition could appear to work while still allowing fabricated close evidence through."
+    mitigation: "Add explicit `commit: TBD` rejection coverage in the integration tests."
+  - severity: medium
+    description: "The integration layer could collapse shared evidence into a direct-commit-only shortcut."
+    mitigation: "Keep explicit evidence fields in the envelope and review that shape against future PR-only needs."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    relevant_excerpt: |
+      - trigger: closure-evidence-shape-mismatch
+        severity: moderate
+        stories: [S9, S10]
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - BL2.3: Integrate baseline capture, metric emission, compare, and close validation.

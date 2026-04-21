@@ -1,0 +1,106 @@
+id: BL3.4
+epic: meta-improvement-system
+slice: S10
+title: Unknown-dimension tolerance in metric registry
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["K.3", "BL2.6", "BL3.3", "C1.4"]
+
+description: |
+  Harden the public metrics-consumption path so consumer-supplied metric
+  dimensions that were not pre-declared by plugin-hive do not crash the skill,
+  registry helpers, or comparison flow.
+  This is a public-ship robustness story rather than a schema expansion story:
+  the system should tolerate unknown dimensions, preserve known data, and keep
+  producing usable comparisons instead of failing on user-project variation.
+  The tolerance mechanism must remain compatible with the lean metrics carrier
+  and should not introduce a new class system, schema explosion, or bespoke
+  public-only metric format.
+  Do implement tolerant parsing and comparison behavior for unknown dimensions.
+  Do not redesign the carrier or widen MVP scope beyond graceful handling.
+
+acceptance_criteria:
+  - "Given a consumer project with metric dimensions not pre-declared in plugin-hive, when `/meta-optimize` reads them, then the registry path does not crash."
+  - "Given mixed known and unknown dimensions, when comparison output is generated, then known dimensions still compare correctly and unknown ones are surfaced or ignored deterministically."
+  - "Given Q3's anti-over-engineering constraint, when this story completes, then no new threshold-class system or public-only schema fork has been added."
+  - "Given S10 verification needs, when tests run, then unknown-dimension fixtures exercise the public metrics path end to end enough to prove tolerance."
+
+steps:
+  - id: research
+    description: "Confirm the intended unknown-dimension behavior from the S10 plan and identify where the public skill or metrics helpers currently assume fixed dimensions."
+    agent: researcher
+  - id: implement
+    description: "Modify the relevant metrics-registry and compare path used by `/Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/` so unknown consumer dimensions are handled gracefully without changing the lean carrier contract."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run tolerance coverage. Suggested checks: `pytest tests/meta_optimize/test_metric_registry_unknown_dimensions.py`, verify fixtures with extra dimensions do not fail the run, and grep for the handling path with `rg -n \"unknown|dimension|tolerate|ignore\" /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize /Users/don/Documents/plugin-hive/hive/lib`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the solution is robust but still lean: no schema sprawl, no public-only metric fork, and no crash on consumer variance."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the unknown-dimension tolerance changes once tests and review pass."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [python, markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/
+      purpose: "Public-skill path whose metric reads must tolerate consumer variance."
+    - path: /Users/don/Documents/plugin-hive/hive/lib/metrics/
+      purpose: "Shared metrics helpers likely involved in parsing and comparison."
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md
+      purpose: "Lean carrier contract that must remain stable while tolerance is added."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/metric_registry.py
+    change: "Create or update tolerant metric-registry handling for consumer-supplied unknown dimensions."
+  - file: /Users/don/Documents/plugin-hive/hive/lib/metrics/compare.py
+    change: "Adjust shared compare helpers only as needed so unknown dimensions do not crash public comparisons."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_optimize/test_metric_registry_unknown_dimensions.py
+    change: "Create tests proving unknown metric dimensions are tolerated without schema sprawl."
+
+code_examples:
+  - title: "S10 robustness requirement"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - `BL3.4` Unknown-dimension tolerance in metric registry.
+      - Unknown consumer-supplied metric dimensions do not crash the skill or the registry path.
+
+design_decisions:
+  - decision: "Handle unknown dimensions as a tolerance concern, not a schema-redesign project."
+    rationale: "S10 is about public robustness at ship time and the user explicitly rejected over-engineering the metrics model."
+    source: "structured-outline S10 | user-decisions Q3"
+  - decision: "Keep tolerance in the shared/public metrics path rather than inventing a separate public schema."
+    rationale: "The public skill should extend the proven shared carrier, not fork it."
+    source: "vertical-plan Slice 10 | C1 contract"
+
+cross_cutting:
+  - concern: documentation
+    action: "Document how `/meta-optimize` handles unknown consumer metric dimensions so fixture setup and user docs do not assume a hardcoded dimension registry."
+
+risks:
+  - severity: medium
+    description: "Unknown dimensions could still crash later in compare or rendering code even if parsing is tolerant."
+    mitigation: "Test mixed-dimension fixtures through the public compare path, not only the parser."
+  - severity: low
+    description: "Tolerance work could drift into schema expansion or configurable class systems."
+    mitigation: "Keep acceptance focused on graceful handling and explicitly reject broader carrier changes in review."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `BL3.4` Unknown-dimension tolerance in metric registry.
+      - Unknown consumer-supplied metric dimensions do not crash the skill or the registry path.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - **Do-not-over-engineer signal applies across Q3:** keep the envelope field set minimal,
+        keep the threshold simple, keep rollback behavior unconditional.

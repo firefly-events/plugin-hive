@@ -1,0 +1,110 @@
+id: BL3.5
+epic: meta-improvement-system
+slice: S10
+title: Backlog-fallback mode for consumer backlog template
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["K.3", "BL2.6", "BL3.3", "BL2i.2", "BL2i.4"]
+
+description: |
+  Integrate backlog-fallback behavior into the public `/meta-optimize` flow so
+  consumer projects can supply curated improvement candidates when metrics alone
+  are insufficient to propose a change.
+  This story adapts the backlog-mode concept proven for the maintainer side to
+  the public consumer template, but it must stay within the signed MVP scope:
+  the backlog is human-edit-only and no auto-surfacing pipeline is introduced.
+  The public skill should explain when backlog fallback is used, where consumers
+  populate `queue-meta-optimize.yaml`, and how the selected candidate still runs
+  through baseline capture, compare, PR promotion, and closure the same way as
+  a metrics-proposed experiment.
+  Do wire backlog fallback into the public path and template semantics. Do not
+  add auto-generated backlog items or new qualitative-ingestion machinery.
+
+acceptance_criteria:
+  - "Given insufficient metrics signal, when `/meta-optimize` runs with a populated consumer backlog template, then it can select a candidate from `queue-meta-optimize.yaml` instead of idling."
+  - "Given Q-new-D, when the backlog integration is reviewed, then it remains human-edit-only and includes no auto-surfacing logic."
+  - "Given public-user clarity needs, when the template and skill docs are read, then they explain what fields consumers populate and when backlog fallback applies."
+  - "Given shared lifecycle integrity, when a backlog-driven public run proceeds, then it still flows through baseline capture, compare, PR-only promotion, and close validation."
+
+steps:
+  - id: research
+    description: "Confirm the signed backlog scope for consumer projects, the human-edit-only limit, and how the public skill should distinguish metrics-driven versus backlog-driven proposal selection."
+    agent: researcher
+  - id: implement
+    description: "Modify `/Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md`, `/Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-optimize.yaml`, and any helper code so the public path can load consumer-curated backlog entries when metric-driven proposal selection is unavailable."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run backlog-fallback coverage. Suggested checks: `pytest tests/meta_optimize/test_backlog_fallback.py`, `rg -n \"queue-meta-optimize|backlog|human-edit|auto-surfacing\" /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-optimize.yaml`, and verify a backlog-driven run still reaches the shared lifecycle path."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the consumer backlog path is human-curated, understandable to users, and behaviorally aligned with the shared lifecycle rather than a sidecar shortcut."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the public backlog-fallback integration once tests and review pass."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [yaml, markdown, python, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-optimize.yaml
+      purpose: "Consumer backlog template that public projects populate."
+    - path: /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md
+      purpose: "Public skill that must describe and invoke backlog fallback clearly."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+      purpose: "Authority for the backlog fallback and human-edit-only MVP limit."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-optimize.yaml
+    change: "Clarify the consumer backlog template fields and comments needed for public backlog-driven runs."
+  - file: /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md
+    change: "Document and wire consumer backlog-fallback behavior for insufficient-metrics runs."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_optimize/test_backlog_fallback.py
+    change: "Create tests proving a populated consumer backlog can drive a public run without adding auto-surfacing behavior."
+
+code_examples:
+  - title: "Signed backlog scope"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    snippet: |
+      - A `meta-backlog.yaml` or equivalent ledger of known-useful optimization targets
+      - Meta-team reads from backlog when metric-driven mode can't propose anything
+      - Backlog entries may be human-curated or auto-surfaced from qualitative signals
+      ## Q-new-D
+      - backlog auto-surfacing: `(A)` — human-edit-only MVP.
+
+design_decisions:
+  - decision: "Expose backlog fallback to consumer projects through the existing template path."
+    rationale: "S8 already establishes `.pHive/meta-team/queue-meta-optimize.yaml` as the consumer-facing backlog surface."
+    source: "vertical-plan Slice 8 | Slice 10"
+  - decision: "Keep public backlog support human-curated only."
+    rationale: "The user explicitly deferred auto-surfacing from qualitative signals out of MVP."
+    source: "user-decisions Q7 extension | Q-new-D"
+
+cross_cutting:
+  - concern: documentation
+    action: "Document in the skill and queue template when backlog fallback applies, what consumers edit, and that backlog entries remain human-curated in MVP."
+
+risks:
+  - severity: medium
+    description: "The public backlog path could silently diverge from the shared lifecycle and behave as an ad hoc manual mode."
+    mitigation: "Require tests showing a backlog-driven run still traverses baseline, compare, PR promotion, and closure."
+  - severity: low
+    description: "Template wording could imply auto-generated backlog entries are already supported."
+    mitigation: "State human-edit-only MVP limits plainly in the queue comments and skill docs."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - BL3.5: Backlog-fallback mode integration (consumer-populated `queue-meta-optimize.yaml`)
+      - Consumer-facing backlog template lands in user project; consumers can populate `queue-meta-optimize.yaml`
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      If disabled at kickoff, meta-team features will fall back to qualitative / backlog-driven mode.
+      Q-new-D backlog auto-surfacing: human-edit-only MVP.

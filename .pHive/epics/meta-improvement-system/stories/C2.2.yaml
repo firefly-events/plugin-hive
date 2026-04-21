@@ -1,0 +1,116 @@
+id: C2.2
+epic: meta-improvement-system
+slice: S5
+title: Stop-hook session-end metric emission for story totals
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["C2.0", "C2.1"]
+
+description: |
+  Add the session-end metrics emission path at the Stop-hook owner surface in
+  `.claude-plugin/plugin.json` while preserving the existing interrupt sentinel.
+  This story owns story-end totals such as wall-clock and session-level token
+  totals using the D4-approved combined dispatcher shape in the existing Stop
+  hook or an equivalent adjacent entry inside the same owner file if needed for
+  clean isolation.
+  The implementation must remain silent when `metrics.enabled` is false and must
+  not let metrics failure suppress the sentinel write to `.pHive/interrupts/`.
+  Do follow the token-capture mechanism chosen in `C2.0`. Do not treat token
+  totals as optional or leave the hook composition under-specified.
+
+acceptance_criteria:
+  - "Given the D4 decision, when `.claude-plugin/plugin.json` is reviewed, then the Stop-hook owner surface preserves the interrupt sentinel and adds metrics dispatch with handler isolation."
+  - "Given `metrics.enabled: false`, when the Stop hook fires, then no `.pHive/metrics/events/*.jsonl` write occurs."
+  - "Given `metrics.enabled: true`, when the Stop hook fires, then a story-end event is emitted that includes wall-clock and token-total fields derived from the C2.0 mechanism."
+  - "Given hook failure handling, when the metrics branch fails, then the interrupt sentinel still writes `.pHive/interrupts/{ts}.yaml`."
+
+steps:
+  - id: research
+    description: "Read the current Stop hook, the D4 decision, and the `C2.0` mechanism choice so the combined dispatcher shape is explicit before editing `plugin.json`."
+    agent: researcher
+  - id: implement
+    description: "Modify `/Users/don/Documents/plugin-hive/.claude-plugin/plugin.json` and any adjacent helper files introduced by the chosen strategy so session-end metrics emission runs alongside the existing interrupt sentinel without breaking it."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run checks for flag-off silence, flag-on story-total emission, and sentinel preservation. Suggested checks should include inspection of `.claude-plugin/plugin.json`, the chosen helper path, and a no-write/write assertion against `/Users/don/Documents/plugin-hive/.pHive/metrics/events/`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the Stop-hook composition for blast radius, idempotency, and token-total correctness using the `C2.0` mechanism."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the Stop-hook metrics change once sentinel preservation and flag gating are proven."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [json, bash, yaml]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json
+      purpose: "Current Stop-hook owner file that must preserve the interrupt sentinel while adding metrics dispatch."
+    - path: /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+      purpose: "Source of the default-off `metrics.enabled` gate and metrics carrier path."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/token-capture-feasibility.md
+      purpose: "Chosen token-capture mechanism that this story must consume."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json
+    change: "Modify the Stop-hook owner surface to add metrics dispatch while preserving the interrupt sentinel."
+  - file: /Users/don/Documents/plugin-hive/hooks/metrics-stop-dispatch.sh
+    change: "Create the Stop-hook metrics dispatcher that runs alongside the interrupt sentinel and writes story-total metrics when enabled."
+  - file: /Users/don/Documents/plugin-hive/tests/meta-improvement-system/metrics/stop-hook-emission.test.sh
+    change: "Create Stop-hook integration tests for flag-off silence, flag-on event writes, and sentinel preservation."
+
+code_examples:
+  - title: "Current Stop-hook sentinel to preserve"
+    file: /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json
+    snippet: |
+      "Stop": [
+        {
+          "matcher": "",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "mkdir -p .pHive/interrupts && ts=$(date -u +%Y-%m-%dT%H%M%SZ) ...",
+              "timeout": 10
+            }
+          ]
+        }
+      ]
+
+design_decisions:
+  - decision: "Use the existing `plugin.json` Stop-hook owner surface."
+    rationale: "D4 locked the combined dispatcher approach in the existing Stop hook, with guardrails for isolation and ordering."
+    source: "cycle-state D4-stop-hook-resolution | user-decisions B3 gate"
+  - decision: "Make token totals mandatory in the story-end event."
+    rationale: "D7 removed the prior hedge that token capture could slip to follow-on work."
+    source: "cycle-state D7-token-capture-requirement"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/.claude-plugin/plugin.json` comments or adjacent hook notes so the combined sentinel-plus-metrics Stop-hook strategy is documented with the `metrics.enabled` gate."
+
+risks:
+  - severity: high
+    description: "A bad hook composition could break the interrupt sentinel or emit metrics when the flag is off."
+    mitigation: "Require explicit flag-off/no-write checks, handler isolation, and review focused on blast radius."
+  - severity: high
+    description: "Session-end totals could ignore the chosen token mechanism and emit incomplete counts."
+    mitigation: "Force dependence on `C2.0` and review the emitted event against the spike’s documented extraction path."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    relevant_excerpt: |
+      key: D4-stop-hook-resolution
+      value: "Option A — combined dispatcher in existing .claude-plugin/plugin.json Stop hook"
+      Guardrails required: handler isolation, ordering tests, idempotency tests, flag-off no-op verification.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `C2.2` Stop-hook or equivalent session-end metric emission for story-end totals.
+      - The pre-existing Stop-hook consumer behavior is preserved.

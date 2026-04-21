@@ -1,0 +1,106 @@
+id: B0.1
+epic: meta-improvement-system
+slice: S1
+title: Experiment envelope outline
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Define the approved experiment-envelope field set as a contract document before
+  Epic C freezes any storage schema. This story is documentation-only and should
+  not add runtime code, config keys, or writer behavior.
+  The deliverable is the first section of `b0-consumer-contract.md`: field names,
+  shapes, purpose, and who consumes each field.
+  The content must preserve the user’s Q3 “do not over-engineer” constraint:
+  use only the approved lean field set and avoid threshold subclasses, extra
+  closure evidence, or rollback branches.
+  Do include clear type/purpose notes and where the lifecycle library or query
+  surface will later read the field. Do not invent syntax-level schema details.
+
+acceptance_criteria:
+  - "Given the Q3 sign-off, when the contract doc is read in isolation, then it enumerates every approved envelope field with purpose and data shape."
+  - "Given the contract doc, when an architect checks it against Epic C planning, then baseline_ref, candidate_ref, commit/ref, metrics snapshot, policy_ref, decision, rollback_ref, observation window, and regression_watch are all present."
+  - "Given the user’s anti-over-engineering direction, when the field outline is reviewed, then no per-metric threshold classes, alternate rollback modes, or extra envelope fields appear."
+  - "Given this is B0 contract work, when the story completes, then no runtime code, hooks, or config changes were introduced."
+
+steps:
+  - id: research
+    description: "Confirm the exact Q3-approved envelope fields and the B0/S2 dependency wording from the outline, vertical plan, and signed decisions."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md` with the envelope field outline, purpose notes, and consumer mapping. Do not add syntax-level schema or implementation details."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the doc contains every approved field and no extras. Suggested checks: `rg -n \"baseline_ref|candidate_ref|policy_ref|rollback_ref|regression_watch\" /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md` and `rg -n \"per-metric|human-confirmed|recommendation-only\" /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for drift against Q3 and confirm the field outline is sufficient input for S2 schema authoring."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the contract-doc change once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+      purpose: "Definitive B3 source for the S1 story list, B0 acceptance criteria, and file manifest."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+      purpose: "Authoritative sign-off for the lean Q3 envelope contract and rollback policy."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+      purpose: "New contract document authored by this slice and later consumed by S2 schema work."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+    change: "Create the contract doc and add the approved experiment-envelope field outline with type/purpose/consumer notes."
+
+code_examples:
+  - title: "Approved envelope fields from user sign-off"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    snippet: |
+      - **Required fields:** approved as listed (baseline ref, candidate ref, commit/ref, metrics snapshot, policy ref, decision, `rollback_ref`, observation window, `regression_watch`).
+      - **Threshold policy:** lean — no per-metric asymmetric-tolerance class system unless a concrete use case forces it.
+      - **Delayed-regression handling:** `auto-revert`.
+      - **Closure invariant:** agreed. Cycle cannot close unless commit/ref + metrics snapshot + rollback target are present.
+
+design_decisions:
+  - decision: "Keep the B0 output as a contract doc rather than a concrete schema."
+    rationale: "The outline and vertical plan define S1 as documentation-only so Epic C can freeze schema against agreed consumer needs without premature implementation."
+    source: "structured-outline Part 4 S1 | vertical-plan Slice 1"
+  - decision: "Use only the lean Q3-approved envelope fields."
+    rationale: "The user explicitly rejected over-engineered threshold classes and multi-mode rollback behavior."
+    source: "user-decisions Q3"
+
+cross_cutting:
+  - concern: documentation
+    action: "Create `/Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md` and make its field names align with the later S2 docs `/Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md` and `/Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md`."
+
+risks:
+  - severity: medium
+    description: "The contract could add fields not actually approved by Q3, causing downstream schema drift."
+    mitigation: "Cross-check the doc line-by-line against `user-decisions-dd.md` before review."
+  - severity: low
+    description: "The story could slip from contract outline into syntax-spec work."
+    mitigation: "Keep the document at field/type/purpose level only; leave exact schema syntax to C1."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      **Story list**
+      - `B0.1` Experiment envelope outline.
+      **Acceptance criteria**
+      - The contract enumerates every Q3-required envelope field with purpose, data shape, and consumer query usage.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - **Required fields:** approved as listed (baseline ref, candidate ref, commit/ref, metrics snapshot, policy ref, decision, `rollback_ref`, observation window, `regression_watch`).
+      - **Threshold policy:** lean — no per-metric asymmetric-tolerance class system unless a concrete use case forces it.
+      - **Delayed-regression handling:** `auto-revert`.

@@ -1,0 +1,103 @@
+id: K.2
+epic: meta-improvement-system
+slice: S6
+title: Brownfield preservation and change prompt
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["K.1"]
+
+description: |
+  Preserve and expose existing `metrics.enabled` state during brownfield
+  re-kickoff instead of silently resetting it.
+  This story again names the kickoff owner files explicitly:
+  `skills/kickoff/SKILL.md` and `hive/references/kickoff-protocol.md`.
+  The flow must read the current config value, show it to the user, and offer a
+  change prompt only if they want to alter it.
+  Do maintain idempotent re-kickoff behavior. Do not overwrite a prior opt-in or
+  opt-out just because kickoff is run again.
+
+acceptance_criteria:
+  - "Given a brownfield re-kickoff with `metrics.enabled` already set, when the flow reaches the metrics decision, then it reads and shows the existing value instead of silently resetting it."
+  - "Given the user chooses to keep the existing value, when re-kickoff completes, then `hive/hive.config.yaml` remains unchanged for `metrics.enabled`."
+  - "Given the user chooses to change the value, when re-kickoff completes, then `hive/hive.config.yaml` updates `metrics.enabled` to the new choice."
+  - "Given the owner-file requirement, when this story is reviewed, then the brownfield logic lives in `skills/kickoff/SKILL.md` and `hive/references/kickoff-protocol.md` rather than an undocumented side path."
+
+steps:
+  - id: research
+    description: "Read the current re-kickoff idempotent guards and determine exactly where the existing `metrics.enabled` value should be read, shown, and optionally updated."
+    agent: researcher
+  - id: implement
+    description: "Modify `/Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md` and `/Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md` so brownfield re-kickoff preserves or updates `metrics.enabled` based on explicit user choice."
+    agent: backend-developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run brownfield re-kickoff checks proving keep-versus-change behavior for `metrics.enabled`. Suggested checks should include the repo’s chosen test command plus targeted inspection of the kickoff owner files for the preservation prompt."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the brownfield path for idempotency, explicit choice handling, and correct file ownership."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the brownfield preservation flow once re-kickoff no longer resets `metrics.enabled` silently."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md
+      purpose: "Kickoff entrypoint whose brownfield behavior must stay aligned with the protocol."
+    - path: /Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md
+      purpose: "Kickoff protocol owner for re-kickoff preservation and change-prompt logic."
+    - path: /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+      purpose: "Config file whose existing `metrics.enabled` value must be preserved or explicitly changed."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md
+    change: "Update kickoff entrypoint wording or delegation notes so brownfield preservation behavior is discoverable."
+  - file: /Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md
+    change: "Add the re-kickoff preservation and change-prompt logic for existing `metrics.enabled` values."
+  - file: /Users/don/Documents/plugin-hive/tests/meta-improvement-system/kickoff/metrics-rekickoff.test.sh
+    change: "Create brownfield re-kickoff tests for keep and change paths on `metrics.enabled`."
+
+code_examples:
+  - title: "Existing kickoff idempotent-guard pattern"
+    file: /Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md
+    snippet: |
+      Before eliciting, check `hive.config.yaml` for existing developer preferences:
+      If any ... are non-null → skip elicitation entirely
+      This ensures `kickoff` can be re-run without re-asking questions the developer already answered.
+
+design_decisions:
+  - decision: "Preserve existing metrics state on re-kickoff unless the user explicitly changes it."
+    rationale: "S6 requires brownfield preservation and the user explicitly rejected quiet resets."
+    source: "structured-outline Part 4 S6 | vertical-plan Slice 6"
+  - decision: "Use the kickoff owner files rather than hidden helper logic."
+    rationale: "The architect review called for explicit owner-file naming, especially in S6."
+    source: "structured-outline Part 4 S6"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md` and `/Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md` so brownfield preservation behavior for `metrics.enabled` is documented where kickoff users and maintainers already look."
+
+risks:
+  - severity: medium
+    description: "A faulty brownfield flow could silently flip existing repos back to default-off or default-on."
+    mitigation: "Test both keep and change paths and review specifically for silent-reset behavior."
+  - severity: low
+    description: "Fresh-workspace copy could drift from the brownfield wording."
+    mitigation: "Keep both owner files updated together and review for consistent policy language."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `K.2` Brownfield preservation and change prompt.
+      - Re-kickoff reads the existing value and offers a change without silently resetting it.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      Brownfield re-kickoff reads existing value and offers to change without resetting.

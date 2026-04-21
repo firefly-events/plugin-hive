@@ -1,0 +1,95 @@
+id: BL2i.2
+epic: meta-improvement-system
+slice: S8
+title: Meta-optimize backlog template
+status: pending
+complexity: low
+methodology: classic
+depends_on: ["BL2i.1"]
+
+description: |
+  Create the consumer backlog template that the future shipped `/meta-optimize`
+  path will use when metrics are unavailable or insufficient.
+  This story is intentionally light: the file should exist, explain its shape,
+  and remain empty so the public skill can start from a clean template rather
+  than inheriting maintainer-specific proving-run candidates.
+  The template should mirror the backlog vocabulary established for the local
+  maintainer queue where appropriate, but it must remain consumer-facing and
+  neutral about repo-internal proving steps.
+  Do create the template and explain how it is meant to be populated. Do not add
+  consumer execution logic or seed maintainer candidates into it.
+
+acceptance_criteria:
+  - "Given the template story, when the repo is inspected, then `/Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-optimize.yaml` exists."
+  - "Given the consumer template requirement, when the file is read, then it documents the expected entry shape but starts empty."
+  - "Given public and maintainer swarms differ, when the template is reviewed, then it contains no maintainer-only proving-run candidates or worktree-specific assumptions."
+
+steps:
+  - id: research
+    description: "Confirm the consumer backlog template requirement and compare it to the maintainer queue so shared fields are reused without leaking maintainer-only assumptions."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-optimize.yaml` as an empty consumer backlog template with header documentation for the expected entry shape."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the template exists and starts empty. Suggested checks: `test -f /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-optimize.yaml` and `rg -n \"template|entries|meta-optimize\" /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-optimize.yaml`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the template is consumer-facing, empty, and free of maintainer-only assumptions."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the consumer backlog template once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [yaml, markdown, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-optimize.yaml
+      purpose: "New consumer backlog template."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-meta-optimize.yaml
+      purpose: "Maintainer backlog reference for shared vocabulary only."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+      purpose: "Source for the consumer queue-template requirement."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-optimize.yaml
+    change: "Create the empty consumer backlog template with documented entry shape."
+
+code_examples:
+  - title: "S8 queue split"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - Create `.pHive/meta-team/queue-meta-meta-optimize.yaml` — maintainer backlog with seeded trivial proving-run candidates.
+      - Create `.pHive/meta-team/queue-meta-optimize.yaml` — consumer backlog template, initially empty.
+
+design_decisions:
+  - decision: "Keep the consumer backlog template empty."
+    rationale: "The public path should start from a clean template instead of inheriting maintainer proving candidates."
+    source: "structured-outline Part 4 S8"
+  - decision: "Reuse vocabulary, not maintainer execution assumptions."
+    rationale: "Both swarms need compatible backlog semantics, but only the local maintainer path uses worktree proving-run mechanics."
+    source: "vertical-plan Slice 8 | Slice 10"
+
+cross_cutting:
+  - concern: documentation
+    action: "Document the consumer queue template inline in `/Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-optimize.yaml` so S10 can consume it without reopening schema decisions."
+
+risks:
+  - severity: low
+    description: "The template could drift away from the maintainer backlog vocabulary and create unnecessary translation work later."
+    mitigation: "Mirror shared field names while keeping the file empty and consumer-facing."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - `.pHive/meta-team/queue-meta-optimize.yaml` — consumer backlog template, initially empty
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - Shipped plugin exposes `/meta-optimize` only. End users get one entrypoint.

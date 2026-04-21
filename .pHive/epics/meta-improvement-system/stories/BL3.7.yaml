@@ -1,0 +1,112 @@
+id: BL3.7
+epic: meta-improvement-system
+slice: S10
+title: User-facing docs
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["K.3", "BL2.6", "BL3.1", "BL3.2", "BL3.3", "BL3.4", "BL3.5", "BL3.6"]
+
+description: |
+  Finish the public ship by documenting `/meta-optimize` for end users and
+  maintainers who need to support the shipped flow.
+  The docs must explain the real operating model the implementation now enforces:
+  metrics are opted in at kickoff and default off, backlog fallback exists for
+  insufficient signal, the public swarm targets user projects, and retained
+  changes leave as PR-style artifacts rather than direct mutations.
+  This story is intentionally lightweight relative to the runtime work; it
+  should consolidate the shipped behavior into the repo’s user-facing surfaces
+  instead of restating design discussions or internal planning docs.
+  Do update public docs and configuration references for the shipped command. Do
+  not document maintainer-only `/meta-meta-optimize` behavior as part of the
+  public user surface.
+
+acceptance_criteria:
+  - "Given `/meta-optimize` is now shipped, when public docs are read, then users can find the command, its prerequisites, and its PR-only operating model."
+  - "Given S6, when kickoff-related docs are read, then they clearly explain metrics opt-in, default-off behavior, and backlog fallback when metrics are unavailable."
+  - "Given the public/local split, when ship docs are reviewed, then `/meta-meta-optimize` remains described as maintainer-local rather than a shipped user command."
+  - "Given the MVS fixture proof exists, when docs mention expected outputs, then they describe PR artifacts and baseline-vs-candidate metrics rather than commit-based promotion."
+
+steps:
+  - id: research
+    description: "Identify the minimal shipped doc surfaces to update and confirm the exact user-visible behavior from the completed S10 implementation and proof artifacts."
+    agent: researcher
+  - id: implement
+    description: "Update `/Users/don/Documents/plugin-hive/README.md`, `/Users/don/Documents/plugin-hive/hive/GUIDE.md`, `/Users/don/Documents/plugin-hive/hive/hive.config.yaml`, and `/Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md` so the shipped `/meta-optimize` flow is documented consistently."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the docs cover the shipped flow and do not leak maintainer-only packaging assumptions. Suggested checks: `rg -n \"meta-optimize|metrics|kickoff|PR|pull request|backlog\" /Users/don/Documents/plugin-hive/README.md /Users/don/Documents/plugin-hive/hive/GUIDE.md /Users/don/Documents/plugin-hive/hive/hive.config.yaml /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md` and confirm no user-facing doc presents `/meta-meta-optimize` as shipped."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the public docs match the actual shipped behavior, preserve the local-only boundary for `/meta-meta-optimize`, and explain the kickoff opt-in to PR-artifact lifecycle clearly."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the user-facing doc updates once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/README.md
+      purpose: "Primary repo entrypoint where the shipped public command should be discoverable."
+    - path: /Users/don/Documents/plugin-hive/hive/GUIDE.md
+      purpose: "Operational guide that should explain the user-visible `/meta-optimize` flow."
+    - path: /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+      purpose: "Configuration reference that should mention metrics opt-in and the `meta_optimize:` block including migrated github forwarding."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/README.md
+    change: "Add or update the public `/meta-optimize` section with prerequisites, PR-only behavior, and expected outputs."
+  - file: /Users/don/Documents/plugin-hive/hive/GUIDE.md
+    change: "Document the public kickoff-to-PR workflow and consumer backlog fallback behavior."
+  - file: /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+    change: "Document metrics opt-in and the `meta_optimize:` configuration block including migrated `meta_optimize.github_forwarding` references."
+  - file: /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md
+    change: "Align the shipped skill text with the final public docs and fixture-proofed behavior."
+
+code_examples:
+  - title: "S10 documentation touchpoints"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - Modify user-facing docs such as README, GUIDE, or skill references to explain kickoff opt-in,
+        required metrics/backlog inputs, and PR-only behavior.
+      - `hive/hive.config.yaml` docs for metrics opt-in and `meta_optimize:` block,
+        including migrated `meta_optimize.github_forwarding`.
+
+design_decisions:
+  - decision: "Keep epic.yaml lightweight and put user-operating detail in the shipped docs instead."
+    rationale: "Users need concise runnable guidance in normal repo surfaces, not another planning-document restatement."
+    source: "task instructions | structured-outline S10 cross-cutting"
+  - decision: "Document only the shipped public surface as user-facing behavior."
+    rationale: "Q6 and Q-new-A make `/meta-meta-optimize` maintainer-local even after S10 ships."
+    source: "user-decisions Q6 | Q-new-A"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update README, GUIDE, config references, and the public skill doc so all user-facing surfaces consistently describe kickoff opt-in, backlog fallback, and PR-only public promotion."
+
+risks:
+  - severity: medium
+    description: "Repo docs could drift from the actual shipped behavior and leave users with maintainer-only assumptions or outdated promotion semantics."
+    mitigation: "Write docs after the fixture proof lands and review them against BL3.6 evidence."
+  - severity: low
+    description: "The docs could over-explain planning history instead of the runnable public workflow."
+    mitigation: "Keep them focused on command visibility, prerequisites, inputs, outputs, and PR-only behavior."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `BL3.7` User-facing docs.
+      - README/GUIDE/skill references for the public command.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - Metrics are kickoff-time opt-in.
+      - Shipped plugin exposes `/meta-optimize` only.
+      - `meta_team.github_forwarding` migrates into `meta_optimize.github_forwarding`.

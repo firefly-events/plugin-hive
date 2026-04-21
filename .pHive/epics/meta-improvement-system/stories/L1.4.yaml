@@ -1,0 +1,103 @@
+id: L1.4
+epic: meta-improvement-system
+slice: S7
+title: Delta-compare primitive
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["L1.3", "B0.2", "B0.3"]
+
+description: |
+  Implement the lifecycle-library compare primitive that turns two baseline
+  snapshots into a structured decision object for later promotion logic.
+  This story owns comparison only: take baseline and candidate inputs, evaluate
+  them against the lean threshold policy, and emit a decision record the
+  promotion layer can consume later.
+  The compare output must stay simple and compatible with the B0 query contract:
+  one threshold policy shape, one decision object, no per-metric class system.
+  Do add fixture tests covering improvement, no-change, and regression paths.
+  Do not implement a concrete promotion adapter or rollback triggering here.
+
+acceptance_criteria:
+  - "Given the compare primitive, when the repo is inspected, then `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/compare.py` exists and produces a structured decision object from two snapshots."
+  - "Given fixture baseline and candidate snapshots, when tests run, then improvement, neutral, and regression scenarios are all classified deterministically."
+  - "Given the lean Q3 policy, when the compare output is reviewed, then it uses one threshold-policy shape and does not introduce per-metric asymmetric classes."
+  - "Given S7 scope, when this story completes, then the result is comparison output only and no promotion or close side effects occur."
+
+steps:
+  - id: research
+    description: "Confirm the B0 query and threshold-policy contract so the compare result shape is sufficient for later promotion logic without over-expanding policy complexity."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/compare.py` to compare two metric snapshots, apply the lean threshold policy, and return a structured decision object for later promotion handling."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run compare fixture tests. Suggested checks: `pytest tests/meta_experiment/test_compare.py` and `rg -n \"threshold|decision\" /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/compare.py`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the compare primitive matches the B0 contract, stays lean, and leaves promotion behavior to later stories."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the compare primitive once tests and review pass."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [python, markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/compare.py
+      purpose: "New delta-compare primitive."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+      purpose: "Defines the query surface and cost assumptions the compare output should satisfy."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+      purpose: "Locks the lean threshold and unconditional auto-revert policy."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/compare.py
+    change: "Create the snapshot comparison primitive and decision-object output."
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/__init__.py
+    change: "Export the compare helper for later library consumers."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_experiment/test_compare.py
+    change: "Create fixture tests for improved, neutral, and regressed comparisons."
+
+code_examples:
+  - title: "Lean threshold and rollback policy"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    snippet: |
+      - **Threshold policy:** lean — no per-metric asymmetric-tolerance class system unless a concrete use case forces it.
+      - **Delayed-regression handling:** `auto-revert`.
+
+design_decisions:
+  - decision: "Emit a structured decision object, not a promotion action."
+    rationale: "The compare primitive should inform later promotion logic without owning repo mutation behavior."
+    source: "structured-outline Part 4 S7"
+  - decision: "Keep threshold evaluation lean."
+    rationale: "The user explicitly rejected over-engineered threshold subclasses."
+    source: "user-decisions Q3"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md` with the compare input/output shape and link it back to the B0 query contract."
+
+risks:
+  - severity: medium
+    description: "Comparison output could drift from the B0 query contract and force later adapter stories to compensate."
+    mitigation: "Cross-check the decision shape against the B0 doc during research and review."
+  - severity: medium
+    description: "Threshold logic could accrete policy classes prematurely."
+    mitigation: "Keep the compare API centered on a single policy-ref shape and cover only simple fixture cases."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - L1.4: Delta-compare primitive (two snapshots → decision)
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - Create `hive/lib/meta-experiment/compare.*` — delta-compare primitive.
+      - Baseline-to-compare fixture flow yields a structured decision object suitable for later promotion logic.

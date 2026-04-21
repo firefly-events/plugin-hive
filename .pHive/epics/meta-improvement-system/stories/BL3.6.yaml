@@ -1,0 +1,108 @@
+id: BL3.6
+epic: meta-improvement-system
+slice: S10
+title: First end-to-end public fixture run
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["K.3", "BL2.6", "BL3.2", "BL3.3", "BL3.4", "BL3.5", "L1.7"]
+
+description: |
+  Execute the MVS acceptance run for the shipped public path: kickoff opt-in,
+  metrics enabled, `/meta-optimize` invoked against a user-project fixture, and
+  a PR artifact emitted with baseline-versus-candidate metrics attached.
+  This story is the explicit public milestone proof, analogous to BL2.6 for MVL
+  but with the public promotion and closure evidence shape.
+  The fixture run must validate the real end-to-end path, not a synthetic
+  shortcut: kickoff state must be read, metrics must flow, the public skill must
+  orchestrate a real candidate run against a test target, and close validation
+  must accept `pr_ref` plus `pr_state` rather than requiring `commit_ref`.
+  Do write durable fixture-run evidence. Do not substitute narrative-only proof,
+  direct mutation, or commit-shaped closure evidence for the public path.
+
+acceptance_criteria:
+  - "Kickoff opt-in is exercised and the fixture target ends the flow with metrics enabled."
+  - "A real `/meta-optimize` run executes against a test user-project fixture and produces a PR artifact rather than direct repo mutation."
+  - "The PR artifact or paired proof record includes baseline and candidate metrics for the run."
+  - "The close record is accepted using `pr_ref` plus `pr_state` evidence and still includes a metrics snapshot reference and rollback target."
+  - "Durable proof artifacts for the MVS run are written and inspectable after the run."
+
+steps:
+  - id: research
+    description: "Select the fixture target, define the exact kickoff-to-PR proof steps, and specify the durable evidence fields needed to prove metrics-enabled public closure on `pr_ref` plus `pr_state`."
+    agent: researcher
+  - id: implement
+    description: "Execute the full public acceptance path: perform kickoff opt-in with metrics enabled, run `/Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md` against a test user-project fixture, and write proof artifacts such as `/Users/don/Documents/plugin-hive/.pHive/audits/mvs-proof/{iso-ts}/proof.yaml` plus `/Users/don/Documents/plugin-hive/.pHive/audits/mvs-proof/latest.yaml` that capture the PR reference, PR state, metrics references, and fixture details."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Run end-to-end validation for the public fixture path. Suggested checks: execute the live proof workflow, verify `rg -n \"pr_ref|pr_state|baseline_metrics|candidate_metrics|metrics_enabled\" /Users/don/Documents/plugin-hive/.pHive/audits/mvs-proof`, and confirm the fixture run produced a PR artifact rather than a direct commit."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the MVS proof for milestone honesty: kickoff opt-in really happened, metrics flowed, the public skill ran end to end, the PR artifact is real, and closure succeeded with PR-shaped evidence."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the MVS proof artifacts and any supporting end-to-end test coverage once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [yaml, markdown, python, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/audits/mvs-proof/
+      purpose: "Canonical proof-artifact destination for the shipped public milestone run."
+    - path: /Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md
+      purpose: "Kickoff surface whose opt-in flow must be part of the real acceptance path."
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/closure_validator.py
+      purpose: "Shared close gate whose PR-shaped evidence support must be exercised for the public milestone."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/audits/mvs-proof/{iso-ts}/proof.yaml
+    change: "Create the canonical public MVS proof artifact recording kickoff opt-in, metrics-enabled state, PR reference/state, and baseline-versus-candidate metrics evidence."
+  - file: /Users/don/Documents/plugin-hive/.pHive/audits/mvs-proof/latest.yaml
+    change: "Update the latest-pointer file to the newest public MVS proof artifact."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_optimize/test_meta_optimize_e2e.py
+    change: "Create end-to-end acceptance coverage for the kickoff-opt-in to PR-artifact public path."
+
+code_examples:
+  - title: "S10 end-to-end ship proof"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - End-to-end integration works: kickoff opt-in -> metrics enabled -> public skill run -> PR description includes baseline vs candidate metrics.
+      - The closure validator accepts PR-based close records and still rejects incomplete records.
+
+design_decisions:
+  - decision: "Make BL3.6 the explicit MVS acceptance proof."
+    rationale: "The vertical plan distinguishes MVL and MVS, and S10 needs its own durable public milestone evidence rather than inheriting S9 proof."
+    source: "vertical-plan §4 | structured-outline S10"
+  - decision: "Require PR-shaped closure evidence in the proof artifacts."
+    rationale: "The public ship path is only honest if it demonstrates the `pr_ref` plus `pr_state` evidence family rather than a commit-shaped shortcut."
+    source: "structured-outline R19 | cycle-state closure-evidence-shape-mismatch"
+
+cross_cutting:
+  - concern: documentation
+    action: "Write public MVS proof artifacts under `/Users/don/Documents/plugin-hive/.pHive/audits/mvs-proof/` and document where maintainers can inspect the kickoff-to-PR acceptance evidence."
+
+risks:
+  - severity: high
+    description: "A fixture run could appear successful while bypassing kickoff state or using direct mutation under the hood."
+    mitigation: "Treat kickoff opt-in, metrics-enabled state, PR artifact creation, and PR-shaped closure evidence as separate required proof fields."
+  - severity: high
+    description: "The close path could still be using commit-shaped evidence implicitly, masking the architect’s R19 concern."
+    mitigation: "Require `pr_ref` and `pr_state` in the proof artifact and inspect the close record during review."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - BL3.6: First end-to-end cycle against a fixture user-project
+      - VERIFIED BY: full kickoff → opt-in → run → PR integration path works.
+  - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    relevant_excerpt: |
+      - trigger: closure-evidence-shape-mismatch
+        stories: [S9, S10]
+        reason: "Shared closure validator ... reject valid PR-only close records."

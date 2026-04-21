@@ -1,0 +1,107 @@
+id: L1.7
+epic: meta-improvement-system
+slice: S7
+title: Closure validator and library test suite
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["L1.2", "L1.3", "L1.4", "L1.5", "L1.6", "A2.5"]
+
+description: |
+  Implement the non-bypassable closure validator for the shared lifecycle
+  library and finish the first full unit-test sweep for the S7 module.
+  This story is where the library’s integrity contract becomes real: closure
+  must reject incomplete experiment records before ledger append, with distinct
+  failures for missing commit or ref evidence, missing metrics snapshot, and
+  missing rollback target.
+  Because S9 proves the direct-commit path first but S10 will later close with
+  PR-only evidence, the validator must be written carefully enough that it does
+  not overfit the shared contract to direct commits alone.
+  Do add tests for the three required failure modes and at least one forward-
+  looking PR-shaped close record. Do not bind the validator to a concrete skill
+  or promotion adapter in this story.
+
+acceptance_criteria:
+  - "Given the closure-validator story, when the repo is inspected, then `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/closure_validator.py` exists and enforces non-bypassable close validation."
+  - "Given incomplete envelopes, when tests run, then missing commit-or-ref evidence, missing metrics snapshot, and missing rollback target each fail with distinct validator errors."
+  - "Given the future public path, when a PR-shaped close fixture is evaluated, then the shared validator accepts the evidence shape when the corresponding ref fields are present."
+  - "Given S7 scope, when this story completes, then validation is library-local and no workflow step or skill wiring has been added."
+
+steps:
+  - id: research
+    description: "Confirm the closure invariant from Q3, the rewritten close-step contract, and the closure-evidence-shape escalation so the validator covers current and future close records correctly."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/closure_validator.py` and finish the shared library test suite covering failure modes, direct-commit close fixtures, and forward-looking PR-shaped close fixtures."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run validator tests. Suggested checks: `pytest tests/meta_experiment/test_closure_validator.py` and `rg -n \"rollback|metrics_snapshot|pr_ref|commit\" /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/closure_validator.py`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that closure validation is non-bypassable, distinguishes the three required failure modes, and does not overfit the shared contract to direct-commit evidence only."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the closure validator and S7 test sweep once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [python, markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/closure_validator.py
+      purpose: "New shared close-validation gate."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-08-close.md
+      purpose: "Control-plane close semantics that the validator must preserve."
+    - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+      purpose: "Escalation source for the closure-evidence-shape concern."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/closure_validator.py
+    change: "Create the shared close-validation gate with distinct failure modes and support for both direct-commit and PR-shaped evidence."
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/__init__.py
+    change: "Export the closure validator."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_experiment/test_closure_validator.py
+    change: "Create the validator test suite covering incomplete and valid close-record shapes."
+
+code_examples:
+  - title: "Closure invariant from signed Q3"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    snippet: |
+      - **Closure invariant:** agreed. Cycle cannot close unless commit/ref + metrics snapshot + rollback target are present.
+      - Non-bypassable gate blocks ledger append.
+
+design_decisions:
+  - decision: "Make close validation a shared lifecycle concern."
+    rationale: "The close gate must be reusable across maintainer and public swarms rather than reimplemented in step files."
+    source: "vertical-plan Slice 7 | A2.5"
+  - decision: "Avoid direct-commit overfitting in the shared validator."
+    rationale: "The architect explicitly flagged a risk that the shared close gate could reject valid PR-only closes later."
+    source: "cycle-state escalation closure-evidence-shape-mismatch"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md` with the closure-validator contract and note the two accepted evidence families: direct commit refs and future PR refs."
+
+risks:
+  - severity: high
+    description: "A direct-commit-only validator would make S9 look correct while planting a hidden S10 failure."
+    mitigation: "Include a forward-looking PR-shaped fixture in the S7 test suite and call out the evidence-shape rule in docs."
+  - severity: medium
+    description: "The validator could collapse distinct missing-field failures into one generic error."
+    mitigation: "Require separate tests and separate failure messages for commit/ref, metrics snapshot, and rollback target."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - Create `hive/lib/meta-experiment/closure-validator.*` — non-bypassable envelope validation helpers.
+      - Closure validator rejects missing commit, missing metrics snapshot, and missing rollback target as distinct failures.
+  - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    relevant_excerpt: |
+      - trigger: closure-evidence-shape-mismatch
+        stories: [S9, S10]

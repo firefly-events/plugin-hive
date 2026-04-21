@@ -1,0 +1,98 @@
+id: C1.2
+epic: meta-improvement-system
+slice: S2
+title: Event JSONL schema
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["B0.1", "B0.2", "B0.3", "C1.1"]
+
+description: |
+  Author the sparse append-only event schema document for `.pHive/metrics/events/`.
+  This story defines the event record fields, example records, and the validation
+  expectations future hook emitters must satisfy.
+  The schema should cover run identity, swarm/story context, phase/agent source,
+  metric name/value/unit, dimensions, and provenance while staying at the lean
+  MVP level from the planning docs.
+  Do include examples that later tests can validate against. Do not add runtime
+  writer code here, and do not fold envelope-only concerns into the event schema.
+
+acceptance_criteria:
+  - "Given the new schema doc, when the event schema is reviewed, then it lists the approved event fields and their purpose."
+  - "Given the example records, when a tester reads the schema doc, then at least one valid example shows the append-only JSONL shape expected by later emitters."
+  - "Given the S5 dependency, when the event schema is compared to the MVP metric list, then the schema can represent tokens, wall-clock, fix-loop iterations, first-attempt pass, and escalation events without extra schema invention."
+  - "Given S2 scope, when the story completes, then only documentation/files for the event schema changed and no hooks were wired."
+
+steps:
+  - id: research
+    description: "Confirm the event field list from the horizontal plan and note any B0 query expectations that constrain source or dimension fields."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md` with field definitions, append-only JSONL rules, and example records."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the schema doc contains the approved fields and examples. Suggested checks: `rg -n \"event_id|timestamp|run_id|metric_type|dimensions|source\" /Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for schema bloat, field drift, and ability to represent the approved MVP metrics without forcing envelope concerns into event rows."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the event schema once review approves the lean field set."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md
+      purpose: "Canonical schema reference for future JSONL metric emitters."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/horizontal-plan.md
+      purpose: "Source of the approved event field list."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+      purpose: "Defines S2 acceptance criteria and the example-validation requirement."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md
+    change: "Create the event schema doc with field definitions, append-only constraints, and example JSONL records."
+
+code_examples:
+  - title: "Planned event schema fields"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/horizontal-plan.md
+    snippet: |
+      - `metrics-event.schema.md` — fields: event_id, timestamp, run_id, swarm_id, story_id|proposal_id, phase, agent, metric_type, value, unit, dimensions, source
+
+design_decisions:
+  - decision: "Keep event storage append-only JSONL."
+    rationale: "The carrier is designed for low-friction event emission and later range reads keyed by run."
+    source: "horizontal-plan L3 | vertical-plan Slice 2"
+  - decision: "Separate event rows from experiment-envelope records."
+    rationale: "The approved dual-schema model explicitly splits sparse events from mutable experiment state."
+    source: "user-decisions Q1"
+
+cross_cutting:
+  - concern: documentation
+    action: "Create `/Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md` and cross-link it from the carrier README so hook and lifecycle stories have a single event-schema reference."
+
+risks:
+  - severity: medium
+    description: "The event schema could omit provenance or context fields needed by later emitters."
+    mitigation: "Use the horizontal-plan field list exactly and include example rows for each major context type."
+  - severity: low
+    description: "Event and envelope concerns could get mixed together."
+    mitigation: "Keep mutation rules and rollback semantics out of this doc; reserve them for C1.3."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `C1.2` Event JSONL schema.
+      - Create `.pHive/metrics/metrics-event.schema.md` — sparse append-only event schema.
+      - Example records validate against the event schema.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/horizontal-plan.md
+    relevant_excerpt: |
+      - `metrics-event.schema.md` — fields: event_id, timestamp, run_id, swarm_id, story_id|proposal_id, phase, agent, metric_type, value, unit, dimensions, source

@@ -1,0 +1,103 @@
+id: L1.2
+epic: meta-improvement-system
+slice: S7
+title: Envelope loader and writer
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["L1.1", "C1.3", "C1.4"]
+
+description: |
+  Implement the lifecycle-library envelope runtime that reads and writes the
+  approved experiment record shape from the C1 substrate.
+  This story owns the first `meta-experiment` data primitive: load an envelope,
+  create a new envelope, and perform only the narrow updates later slices need
+  for decision and rollback state.
+  The implementation must preserve the lean Q3 field set and stay aligned with
+  the C1 envelope schema rather than inventing a richer internal model.
+  Do add round-trip tests over example envelopes. Do not add baseline capture,
+  compare logic, or promotion behavior in this story.
+
+acceptance_criteria:
+  - "Given the new lifecycle primitive, when the repo is inspected, then `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/envelope.py` exists and reads/writes the approved envelope shape."
+  - "Given schema-aligned fixture data, when tests run, then envelope create and load round-trips preserve every Q3-approved field."
+  - "Given the narrow mutation rule, when update helpers are exercised, then only decision and rollback-related fields are mutable in place."
+  - "Given the anti-over-engineering constraint, when the module is reviewed, then it does not add extra envelope fields, threshold classes, or alternate rollback modes."
+
+steps:
+  - id: research
+    description: "Confirm the approved envelope fields, closure invariant, and C1 envelope-writer contract from `user-decisions-dd.md`, `structured-outline.md`, and `C1.4`."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/envelope.py` and any package exports needed to load, create, and narrowly update experiment envelopes against `/Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md`."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run round-trip envelope tests. Suggested checks: `pytest tests/meta_experiment/test_envelope.py` and `rg -n \"regression_watch|rollback_ref|policy_ref\" /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/envelope.py`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for schema fidelity, lean-field discipline, and narrow update semantics."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the envelope runtime once tests and review pass."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [python, markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/envelope.py
+      purpose: "New lifecycle-library envelope implementation."
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md
+      purpose: "Schema contract the runtime must honor."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+      purpose: "Authoritative source for the lean envelope field set and auto-revert semantics."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/envelope.py
+    change: "Create envelope load/create/update helpers aligned to the C1 schema."
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/__init__.py
+    change: "Export the envelope helper for later skill consumers."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_experiment/test_envelope.py
+    change: "Create round-trip tests for envelope create/load and constrained updates."
+
+code_examples:
+  - title: "Q3-required envelope fields"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    snippet: |
+      - **Required fields:** approved as listed (baseline ref, candidate ref, commit/ref, metrics snapshot, policy ref, decision, `rollback_ref`, observation window, `regression_watch`).
+      - **Delayed-regression handling:** `auto-revert`.
+      - **Closure invariant:** agreed. Cycle cannot close unless commit/ref + metrics snapshot + rollback target are present.
+
+design_decisions:
+  - decision: "Use the C1 envelope schema as the runtime contract."
+    rationale: "The lifecycle library is a consumer of the metrics substrate, not an alternate schema authority."
+    source: "structured-outline Part 4 S7 | C1.3"
+  - decision: "Keep updates narrow to decision and rollback state."
+    rationale: "The substrate contract already limits mutable fields; the lifecycle library must not widen it."
+    source: "C1.4 acceptance criteria | vertical-plan Slice 2"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md` with the envelope module contract and explicitly point readers back to `/Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md` as the source of record."
+
+risks:
+  - severity: medium
+    description: "The runtime could quietly fork the approved schema by normalizing extra internal fields."
+    mitigation: "Test the module against the exact Q3 field set and reject extra-field expansion during review."
+  - severity: medium
+    description: "Envelope update helpers could become a loophole for arbitrary mutation."
+    mitigation: "Constrain the public API and cover mutation boundaries in tests."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - L1.2: Envelope loader/writer (reads/writes C1.3 schema)
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - Create `hive/lib/meta-experiment/envelope.*` — envelope loader/writer implementation for the C1 schema.

@@ -22,6 +22,12 @@ state/
 !.pHive/epics/meta-improvement-system/**
 !.pHive/episodes/meta-improvement-system/
 !.pHive/episodes/meta-improvement-system/**
+# Per-epic cycle-state lives under .pHive/cycle-state/; only the
+# meta-improvement-system entry is tracked at this time (same maintainer-
+# infrastructure rationale as the epics/ and episodes/ subtrees above).
+!.pHive/cycle-state/
+.pHive/cycle-state/*
+!.pHive/cycle-state/meta-improvement-system.yaml
 agents/memories/
 .claude/settings.local.json
 .history/

@@ -1,0 +1,113 @@
+id: A2.6
+epic: meta-improvement-system
+slice: S4
+title: Split meta-team team file into two swarm-specific team files
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["A2.2", "A2.3", "A2.4", "A2.5"]
+
+description: |
+  Replace the single `.pHive/teams/meta-team.yaml` authority model with two
+  swarm-specific team files whose grants match the rewritten step obligations.
+  This story is not a net-new discovery of a missing file: `.pHive/teams/meta-team.yaml`
+  already exists and must be retired or archived in favor of
+  `meta-optimize.yaml` and `meta-meta-optimize.yaml`.
+  The resulting grants must be explicit enough for the later closure-property
+  audit to prove that every declared write path is authorized and that no
+  single-swarm assumptions remain live.
+  Do preserve the execution-split backends already materialized in
+  `hive/hive.config.yaml`. Do not re-open backend routing here.
+
+acceptance_criteria:
+  - "Given the rewritten control plane, when `/Users/don/Documents/plugin-hive/.pHive/teams/` is inspected, then `meta-optimize.yaml` and `meta-meta-optimize.yaml` exist and the old `meta-team.yaml` is retired or clearly non-authoritative."
+  - "Given the rewritten steps, when the new team files are read, then their grants cover the actual write obligations and do not include unrelated broad write access."
+  - "Given the two-swarm split, when the team files are reviewed, then one file is scoped to user-project optimization and the other to plugin-hive maintenance."
+  - "Given Q-new-C is already materialized, when this story completes, then it does not introduce new backend-mapping work in `hive/hive.config.yaml`."
+
+steps:
+  - id: research
+    description: "Map every step-write obligation from the rewritten Step 4-8 files to the minimum needed team grants, then separate plugin-hive versus user-project responsibilities before editing team YAML."
+    agent: researcher
+  - id: implement
+    description: "Retire `/Users/don/Documents/plugin-hive/.pHive/teams/meta-team.yaml` as the active team definition and create `/Users/don/Documents/plugin-hive/.pHive/teams/meta-optimize.yaml` plus `/Users/don/Documents/plugin-hive/.pHive/teams/meta-meta-optimize.yaml` with grants aligned to S4."
+    agent: backend-developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the new team files exist and that no single-swarm assumptions remain active. Suggested checks: `test -f /Users/don/Documents/plugin-hive/.pHive/teams/meta-optimize.yaml`, `test -f /Users/don/Documents/plugin-hive/.pHive/teams/meta-meta-optimize.yaml`, and `rg -n \"meta-team|team_memory_path|domain\" /Users/don/Documents/plugin-hive/.pHive/teams`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the grant model for minimum necessary scope and confirm it matches the rewritten step obligations without reopening backend-routing decisions."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the team-file split once the two swarm definitions and retirement handling for `meta-team.yaml` are coherent."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/teams/meta-team.yaml
+      purpose: "Existing single-swarm team file that must be retired or replaced."
+    - path: /Users/don/Documents/plugin-hive/.pHive/teams/meta-optimize.yaml
+      purpose: "New public-swarm team roster and grant file created by this story."
+    - path: /Users/don/Documents/plugin-hive/.pHive/teams/meta-meta-optimize.yaml
+      purpose: "New maintainer-swarm team roster and grant file created by this story."
+    - path: /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+      purpose: "Reference-only proof that execution backend routing is already materialized and not owned by this story."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/teams/meta-team.yaml
+    change: "Archive, replace, or mark non-authoritative so it no longer serves as the active meta-team definition."
+  - file: /Users/don/Documents/plugin-hive/.pHive/teams/meta-optimize.yaml
+    change: "Create the user-project swarm team file with grants aligned to the rewritten public-swarm obligations."
+  - file: /Users/don/Documents/plugin-hive/.pHive/teams/meta-meta-optimize.yaml
+    change: "Create the plugin-hive maintainer swarm team file with grants aligned to the rewritten maintainer obligations."
+
+code_examples:
+  - title: "Single-swarm team file to split"
+    file: /Users/don/Documents/plugin-hive/.pHive/teams/meta-team.yaml
+    snippet: |
+      name: meta-team
+      description: >
+        Autonomous nightly self-improvement team for the Hive plugin codebase.
+      lead: orchestrator
+      methodology: classic
+
+design_decisions:
+  - decision: "Split the team definition into one public swarm and one maintainer swarm."
+    rationale: "The rebuilt system has two distinct authority domains and cannot keep one shared active team file."
+    source: "structured-outline Part 4 S4 | vertical-plan Slice 4"
+  - decision: "Consume the existing Q-new-C backend materialization rather than remaking it."
+    rationale: "The cycle-state explicitly says `hive/hive.config.yaml` already carries the execution split and S4 should only consume it."
+    source: "cycle-state decision execution-backend-split | structured-outline Part 4 S4"
+
+cross_cutting:
+  - concern: documentation
+    action: "Document the active team split in `/Users/don/Documents/plugin-hive/.pHive/teams/meta-optimize.yaml` and `/Users/don/Documents/plugin-hive/.pHive/teams/meta-meta-optimize.yaml`, and ensure `/Users/don/Documents/plugin-hive/.pHive/teams/meta-team.yaml` is no longer documented as the live authority file."
+
+risks:
+  - severity: high
+    description: "If the grants are too broad or too narrow, the later closure-property audit will either fail or give false confidence."
+    mitigation: "Map grants directly from the rewritten step obligations and defer proof to A2.8."
+  - severity: medium
+    description: "The old `meta-team.yaml` could remain implicitly authoritative."
+    mitigation: "Retire or clearly mark it as non-authoritative in the same change set."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A2.6` Split `meta-team.yaml` into two swarm-specific team files.
+      - Archive or replace `.pHive/teams/meta-team.yaml` — retire single-swarm team file.
+      - Create `.pHive/teams/meta-optimize.yaml`.
+      - Create `.pHive/teams/meta-meta-optimize.yaml`.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/tpm-sequencing-memo.md
+    relevant_excerpt: |
+      `.pHive/teams/meta-team.yaml` → split into two team files with correct per-role `.pHive/**`
+      write grants matching new step obligations.
+

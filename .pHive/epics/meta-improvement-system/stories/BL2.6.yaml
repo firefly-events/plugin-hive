@@ -1,0 +1,123 @@
+id: BL2.6
+epic: meta-improvement-system
+slice: S9
+title: Real commit-then-revert proof during observation window
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["BL2.4", "BL2.5", "L1.6", "L1.7"]
+
+description: |
+  Execute the milestone rollback-realism proof for the local maintainer loop by
+  committing a real, deliberately regressive change inside the worktree-isolated
+  experiment path and letting the live rollback-watch stack revert it.
+  This story is the explicit MVL integrity gate. It must prove that the system
+  can observe a real committed regression, have `regression_watch` detect that
+  regression during the observation window, pass through the genuine
+  `regression_watch -> closure gate -> auto-revert` path, and emit a durable
+  proof artifact that shows what happened and when.
+  Manual revert, mock callbacks, synthetic closure events, and narrative-only
+  evidence are all out of bounds here. The proof is valid only if the real
+  committed delta triggers the real automatic path end to end.
+  Do execute an end-to-end validation with a deliberate threshold-exceeding
+  regression and capture the proof artifact. Do not substitute manual cleanup or
+  a synthetic trigger for the real revert path.
+
+acceptance_criteria:
+  - "Experiment commits a deliberate regression to a tracked metric (threshold-exceeding degradation)"
+  - "`regression_watch` MUST trigger the auto-revert path during the observation window"
+  - "Auto-revert MUST fire via the lifecycle library's `regression_watch` → closure gate → auto-revert code path — NOT via manual intervention, mock, or synthetic closure"
+  - "MVL proof artifact at `.pHive/audits/mvl-proof/{iso-ts}/proof.yaml` records: trigger event, auto-revert commit hash, wall-clock, confirmation that `regression_watch` fired the revert"
+  - "Test step must exercise the auto-revert mechanism with a real committed delta, not a mock"
+  - "Given the closure-integrity requirement, when the proof run is inspected, then the close record also carries a real metrics snapshot reference and rollback target reference."
+
+steps:
+  - id: research
+    description: "Select the deliberate regression mechanism, confirm the tracked metric and threshold that will exceed, and define the exact proof-artifact fields needed to demonstrate the real auto-revert path."
+    agent: researcher
+  - id: implement
+    description: "Execute the real committed experiment inside the maintainer worktree, introduce the deliberate threshold-exceeding regression, allow the live `regression_watch` path to trigger the automatic revert, and write `/Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof/{iso-ts}/proof.yaml` plus `/Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof/latest.yaml`."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Run end-to-end validation against the real committed delta. Suggested checks: execute the live proof workflow, verify the proof artifact with `rg -n \"trigger_event|auto_revert_commit|wall_clock|regression_watch_fired\" /Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof`, and confirm the regressive commit was reverted by the automatic path rather than by manual cleanup."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the proof for milestone honesty: verify that the regression was real, the revert was automatic, the path was `regression_watch -> closure gate -> auto-revert`, and the artifact evidence is durable and specific."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the rollback-realism proof artifacts and any supporting test updates once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [yaml, markdown, python, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof/
+      purpose: "Canonical MVL proof-artifact destination for the rollback-realism run."
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/rollback_watch.py
+      purpose: "Shared rollback-watch primitive that must trigger the real revert path."
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/closure_validator.py
+      purpose: "Shared close gate that must be exercised on the real rollback path."
+    - path: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md
+      purpose: "Live maintainer entrypoint used to execute the proof run."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof/{iso-ts}/proof.yaml
+    change: "Create the canonical rollback-realism proof artifact recording the trigger event, auto-revert commit hash, wall-clock, and confirmation that `regression_watch` fired the revert."
+  - file: /Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof/latest.yaml
+    change: "Update the latest-pointer file to the new rollback-realism proof artifact."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_meta/test_rollback_realism_e2e.py
+    change: "Create end-to-end validation that exercises the auto-revert mechanism with a real committed delta rather than a mock."
+  - file: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md
+    change: "Update the live maintainer run docs only as needed to document the proof-run procedure and artifact location."
+
+code_examples:
+  - title: "Rollback-realism escalation to satisfy verbatim"
+    file: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    snippet: |
+      - trigger: rollback-realism-proof-ambiguity
+        placement: pre-exec
+        severity: major
+        stories: [S9, BL2.4, BL2.6]
+        reason: "The outline proves a real revert, but does not explicitly require regression-watch to trigger the auto-revert path end-to-end; MVL could be overstated by a manual revert reading."
+
+design_decisions:
+  - decision: "Treat BL2.6 as the explicit MVL integrity gate."
+    rationale: "The architect escalation requires the milestone claim to rest on an unambiguous real auto-revert proof, not an inferred or manual revert."
+    source: "cycle-state escalation rollback-realism-proof-ambiguity"
+  - decision: "Require end-to-end proof artifacts, not narrative."
+    rationale: "The proof must be inspectable after the run and must show that `regression_watch` itself fired the revert."
+    source: "structured-outline Part 4 S9 | user task instructions"
+
+cross_cutting:
+  - concern: documentation
+    action: "Write the proof artifact under `/Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof/{iso-ts}/proof.yaml`, update `/Users/don/Documents/plugin-hive/.pHive/audits/mvl-proof/latest.yaml`, and document in the maintainer skill where operators can inspect rollback-realism evidence."
+
+risks:
+  - severity: high
+    description: "The proof could be invalidated by a manual revert, a mocked callback, or a synthetic close event that only looks like the real path."
+    mitigation: "Keep those paths explicitly out of scope, require end-to-end execution on a real committed delta, and review the artifact evidence against the acceptance criteria verbatim."
+  - severity: high
+    description: "The deliberate regression could fail to exceed threshold and produce an ambiguous non-trigger."
+    mitigation: "Define the tracked metric and threshold-exceeding degradation during research, then verify the trigger event in the proof artifact."
+  - severity: medium
+    description: "Closure evidence could be incomplete even if the revert fires."
+    mitigation: "Require the proof run’s close record to include a real metrics snapshot reference and rollback target reference alongside the revert evidence."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    relevant_excerpt: |
+      - trigger: rollback-realism-proof-ambiguity
+        placement: pre-exec
+        severity: major
+        stories: [S9, BL2.4, BL2.6]
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `BL2.6` Real commit-then-revert proof during observation window.
+      - Auto-revert fires via the `regression_watch` -> closure gate -> auto-revert path, not via manual intervention.

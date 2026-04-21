@@ -1,0 +1,102 @@
+id: A1.5
+epic: meta-improvement-system
+slice: S3
+title: Zero or remove active state files
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["B0.1", "B0.2", "B0.3", "A1.1"]
+
+description: |
+  Clear the active legacy state tree so no tooling or operator can mistake it
+  for a coherent live control plane after archival.
+  This story zeroes out or removes the active `cycle-state.yaml`, `ledger.yaml`,
+  and `queue.yaml` only after their historical copies are safely archived.
+  The outcome should be a clean transition state: archive preserved, active live
+  files clearly absent or empty, and no half-wired authority remaining.
+  Do not create the new split queue or new charters here; those belong to later
+  slices. The goal is removal of stale authority, not introduction of new state.
+
+acceptance_criteria:
+  - "Given the reset story, when `/Users/don/Documents/plugin-hive/.pHive/meta-team/` is inspected, then `cycle-state.yaml`, `ledger.yaml`, and `queue.yaml` are absent or clearly zeroed so they cannot be mistaken for active authoritative state."
+  - "Given the archive dependency, when this story runs, then archival copies already exist before any active-state clearing happens."
+  - "Given slice boundaries, when the story completes, then no replacement queue or control-plane files have been created yet."
+
+steps:
+  - id: research
+    description: "Confirm the archive outputs from A1.1 and determine whether empty-file or delete semantics is safer for the current repo conventions."
+    agent: researcher
+  - id: implement
+    description: "Clear or remove `/Users/don/Documents/plugin-hive/.pHive/meta-team/cycle-state.yaml`, `/Users/don/Documents/plugin-hive/.pHive/meta-team/ledger.yaml`, and `/Users/don/Documents/plugin-hive/.pHive/meta-team/queue.yaml` so no stale contradictory state remains active."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the three active files are absent or clearly empty and that the archive copies remain present. Suggested checks: `test ! -s` or file absence checks for active paths and `test -f` for archive copies."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that authority has been reset cleanly without damaging the preserved archive."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the active-state reset once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/cycle-state.yaml
+      purpose: "Legacy active cycle state to clear after archival."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/ledger.yaml
+      purpose: "Legacy active ledger to clear after archival."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue.yaml
+      purpose: "Legacy active queue to clear after archival."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/
+      purpose: "Archive location that must remain intact while active files are cleared."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/cycle-state.yaml
+    change: "Zero out or remove the active legacy file after archival."
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/ledger.yaml
+    change: "Zero out or remove the active legacy file after archival."
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue.yaml
+    change: "Zero out or remove the active legacy file after archival."
+
+code_examples:
+  - title: "Legacy active state surface to retire"
+    file: /Users/don/Documents/plugin-hive/hive/references/meta-team-nightly-cycle.md
+    snippet: |
+      ### `.pHive/meta-team/cycle-state.yaml`
+      Created fresh each cycle.
+      ### `.pHive/meta-team/ledger.yaml`
+      Append-only record of all completed cycles.
+
+design_decisions:
+  - decision: "Reset active state only after archival copies exist."
+    rationale: "The slice goal is archive plus authority reset, not destructive history loss."
+    source: "vertical-plan Slice 3 | structured-outline Part 4 S3"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update the archive manifest and any nearby reference text so operators looking at `/Users/don/Documents/plugin-hive/.pHive/meta-team/` understand that live legacy state was intentionally zeroed or removed after archival."
+
+risks:
+  - severity: medium
+    description: "Clearing live files before archival would destroy evidence."
+    mitigation: "Depend explicitly on A1.1 and verify archive presence before modification."
+  - severity: low
+    description: "Leaving partially populated files could still mislead tooling."
+    mitigation: "Use a clearly empty or absent state, not a partially edited legacy schema."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A1.5` Zero or remove active state files.
+      - Active state files are absent or empty enough that no tooling can mistake them for authoritative live meta-team state.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - Active `cycle-state.yaml` + `ledger.yaml` + `queue.yaml` are either empty or absent (no stale inconsistent state)

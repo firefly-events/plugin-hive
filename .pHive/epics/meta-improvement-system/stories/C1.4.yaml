@@ -1,0 +1,113 @@
+id: C1.4
+epic: meta-improvement-system
+slice: S2
+title: Writer and reader primitives
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["B0.1", "B0.2", "B0.3", "C1.2", "C1.3"]
+
+description: |
+  Implement the inert runtime primitives under `hive/lib/metrics/` that read and
+  write the dual-schema carrier without introducing live emitters.
+  This story owns the first real code in the metrics substrate: append-only event
+  writes, envelope creation plus constrained updates, baseline reads, and delta
+  comparison helpers over fixture data.
+  The runtime must stay side-effect-bounded to `.pHive/metrics/` and remain callable
+  without hook integration. Its job is to provide trusted I/O and comparison
+  behavior for later slices, not to choose metrics, own config prompts, or wire
+  workflow hooks.
+  Do include unit tests for round-trip reads/writes and side-effect boundaries.
+  Do not add actual event emission sites, kickoff UX changes, or lifecycle logic.
+
+acceptance_criteria:
+  - "Given the new runtime module, when the repo is inspected, then `/Users/don/Documents/plugin-hive/hive/lib/metrics/` exists with writer, reader, and compare helpers."
+  - "Given fixture data, when tests run, then an event can be appended, a run-scoped range can be read back, and a structured delta can be produced."
+  - "Given envelope writes, when the writer is exercised, then creation works and update-in-place is limited to decision and rollback fields."
+  - "Given the side-effect boundary, when tests or review inspect the implementation, then no writes occur outside `/Users/don/Documents/plugin-hive/.pHive/metrics/`."
+  - "Given later hook integration is out of scope, when this story completes, then no workflow hook or kickoff file has been modified."
+
+steps:
+  - id: research
+    description: "Inspect existing repo patterns for small runtime modules and confirm where tests should live. Reconcile the primitive contract against the C1 schema docs before coding."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/hive/lib/metrics/` with append-only event writer, envelope writer, baseline reader, run-range reader, and delta-compare helpers. Keep file I/O restricted to `.pHive/metrics/` and do not wire any callers yet."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run primitive tests for round-trip writes, constrained envelope updates, fixture diff output, and side-effect boundaries. Suggested commands should include the repo’s normal test runner plus `rg -n \".pHive/metrics\" /Users/don/Documents/plugin-hive/hive/lib/metrics` to confirm path scoping."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for schema fidelity, path-bound I/O, and accidental coupling to future hook or lifecycle concerns."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the inert runtime module once tests and review pass."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/lib/metrics
+      purpose: "New runtime module root for substrate I/O helpers."
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md
+      purpose: "Event schema the append-only writer and readers must honor."
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md
+      purpose: "Envelope schema the envelope writer must honor."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+      purpose: "Source for the inert-primitives scope, acceptance criteria, and side-effect boundary."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/lib/metrics/
+    change: "Create the runtime module and implement append-only event writes, envelope reads/writes, baseline lookup, and delta-compare helpers."
+  - file: /Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md
+    change: "Adjust examples or clarifications only if needed to match the implemented writer contract."
+  - file: /Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md
+    change: "Adjust examples or clarifications only if needed to match the implemented envelope writer contract."
+  - file: /Users/don/Documents/plugin-hive
+    change: "Add primitive unit tests in the repo’s normal test location for metrics runtime round-trip and side-effect checks."
+
+code_examples:
+  - title: "Primitive contract from the outline"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - Create `hive/lib/metrics/` — non-skill runtime module for append-only writer, envelope writer, baseline reader, and delta compare helper.
+      - Create primitive unit tests under the repo’s normal test location for `hive/lib/metrics/` — round-trip and side-effect boundary tests.
+      - The writer primitive can append an event and the reader primitive can retrieve a run-scoped range without any emitter integration.
+
+design_decisions:
+  - decision: "Place primitives in `hive/lib/metrics/` as a non-skill runtime module."
+    rationale: "The outline’s naming convention explicitly commits shared metrics I/O code to `hive/lib/`, not a skill surface."
+    source: "structured-outline Part 2.3 | Part 4 S2"
+  - decision: "Keep the module inert and side-effect-bounded."
+    rationale: "Later slices own emitters and kickoff integration; this slice must only provide substrate primitives."
+    source: "vertical-plan Slice 2 | structured-outline Part 4 S2"
+
+cross_cutting:
+  - concern: documentation
+    action: "Add usage notes to `/Users/don/Documents/plugin-hive/.pHive/metrics/README.md` or a module-adjacent README so later S5/S7 stories know the supported writer/reader primitives and their `.pHive/metrics/` path boundary."
+
+risks:
+  - severity: high
+    description: "The runtime could leak side effects outside `.pHive/metrics/` or quietly couple itself to later workflow hook assumptions."
+    mitigation: "Keep all path resolution explicit, add boundary tests, and reject any hook or kickoff edits in this story."
+  - severity: medium
+    description: "The writer/update behavior could drift from the C1 schema docs."
+    mitigation: "Use the schema docs as the implementation contract and update examples only when they clarify the agreed behavior."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `C1.4` Writer and reader primitives.
+      - Create `hive/lib/metrics/` — non-skill runtime module for append-only writer, envelope writer, baseline reader, and delta compare helper.
+      - Create primitive unit tests under the repo’s normal test location for `hive/lib/metrics/`.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - C1.4: Implement writer + reader primitives (append-only JSONL writer; envelope YAML writer; baseline-snapshot + delta-compare readers).
+      - Primitive contract test (no side effects outside `.pHive/metrics/`).

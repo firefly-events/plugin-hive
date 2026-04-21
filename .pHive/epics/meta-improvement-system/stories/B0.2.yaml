@@ -1,0 +1,100 @@
+id: B0.2
+epic: meta-improvement-system
+slice: S1
+title: Query shape doc for baseline vs candidate, run-over-run, and delayed-regression watch
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["B0.1"]
+
+description: |
+  Extend the B0 contract with the three consumer query shapes Epic B expects:
+  baseline-vs-candidate, run-over-run, and delayed-regression-watch.
+  This story explains what each query reads, what answer it returns, and whether
+  the query is expected to be cheap, moderate, or expensive on the future carrier.
+  The purpose is to keep C1 schema work grounded in actual reader needs instead
+  of guessed telemetry. Do not add implementations or APIs here.
+  Do include the minimum fields each query must join across and what lifecycle
+  decision each query supports. Do not redesign the slice order or add extra
+  analytics asks beyond the approved B0 contract.
+
+acceptance_criteria:
+  - "Given the B0 contract doc, when the query section is reviewed, then baseline-vs-candidate, run-over-run, and delayed-regression-watch are all named and described."
+  - "Given each named query, when a reader checks the contract, then required inputs, intended output, and cost expectation are stated explicitly."
+  - "Given the S2 dependency, when an architect reads the query section alone, then it is clear what records the metrics substrate must support."
+  - "Given the contract-first scope, when the story lands, then no schema files, runtime code, or hook behavior changed."
+
+steps:
+  - id: research
+    description: "Confirm the approved query names, the cost-classification requirement, and any wording tying B0 to S2 schema freeze."
+    agent: researcher
+  - id: implement
+    description: "Add the query-shape section to `/Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md`, defining inputs, outputs, and cost expectations for the three named queries."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the contract contains all three query names and a cost label for each. Suggested checks: `rg -n \"baseline-vs-candidate|run-over-run|delayed-regression-watch|cheap|expensive\" /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for completeness and confirm the query descriptions are enough to guide C1 without hard-coding implementation choices."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push after the query surface is approved."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+      purpose: "Canonical home for the B0 consumer queries that later slices must honor."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+      purpose: "Names the three B0 queries and frames them as the dependency for C1 schema freeze."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+      purpose: "Defines S1 acceptance criteria and the query cost-expectation requirement."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+    change: "Add a query-shape section covering baseline-vs-candidate, run-over-run, and delayed-regression-watch."
+
+code_examples:
+  - title: "B0 query shape requirements"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    snippet: |
+      - Query shape doc describes three named queries (baseline-vs-candidate, run-over-run, delayed-regression-watch) with cost classification
+      - Architect can read the doc in isolation and assess whether C1's schema will answer every B-layer question
+
+design_decisions:
+  - decision: "Document explicit cost expectations for each query."
+    rationale: "The B0 contract is supposed to guide schema freeze, and cost classification is part of the required query shape."
+    source: "vertical-plan Slice 1 | structured-outline Part 4 S1"
+  - decision: "Keep the query surface limited to the three approved reads."
+    rationale: "Adding extra consumer asks here would silently expand the metrics substrate beyond signed scope."
+    source: "structured-outline Part 4 S1 | user-decisions Q3"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md` so the query section becomes the documented dependency from B0 to C1 and later reference it from the S2 schema docs."
+
+risks:
+  - severity: medium
+    description: "Ambiguous query descriptions could leave C1 guessing which joins and indexes matter."
+    mitigation: "State the required inputs, compared records, and decision output for each query."
+  - severity: low
+    description: "Cost labels could be omitted and leave the contract incomplete."
+    mitigation: "Use a repeated per-query template that includes cost expectation explicitly."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `B0.2` Query shape doc for baseline vs candidate, run-over-run, and delayed-regression watch.
+      - Three named queries exist: baseline-vs-candidate, run-over-run, delayed-regression-watch, each with explicit cost expectations.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - B0.2: Draft query shape document (baseline/candidate/delta queries; what's cheap, what's expensive)
+      - Query shape doc describes three named queries with cost classification

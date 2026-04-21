@@ -1,0 +1,111 @@
+id: C2.0
+epic: meta-improvement-system
+slice: S5
+title: Token capture feasibility spike
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["C1.4"]
+
+description: |
+  Identify and prove the viable token-capture mechanism that S5 will use for MVP
+  metrics emission. This story is mandatory and blocking, not optional research.
+  The user’s D7 directive is explicit: token capture is required for S5 MVP and
+  "there has to be a way."
+  Investigate the concrete candidate surfaces named in the locked decision:
+  Claude Code JSONL transcripts under `~/.claude/projects/*/`, PostToolUse hook
+  environment variables, SessionEnd hook context, and background Agent task
+  output JSONL under `/private/tmp/claude-*/.../tasks/*.output` where `usage`
+  blocks may contain `input_tokens` and `output_tokens`.
+  The deliverable is a documented mechanism plus proof-of-concept extraction of
+  token counts for at least one real past session. If every candidate fails, the
+  story fails and S5 is blocked.
+
+acceptance_criteria:
+  - "Given the D7 requirement, when the spike completes, then it identifies one viable extraction path for token counts and documents why that path is the chosen mechanism."
+  - "Given the candidate surfaces, when the spike is reviewed, then Claude Code transcripts, PostToolUse env vars, SessionEnd context, and background Agent task output JSONL were all investigated or explicitly ruled out with evidence."
+  - "Given the proof-of-concept requirement, when the spike artifacts are inspected, then token counts were extracted from at least one real past session rather than a synthetic fixture."
+  - "Given follow-on S5 stories depend on this result, when the spike completes successfully, then the chosen mechanism is specific enough that later hook stories can write token counts to JSONL."
+  - "Given the user’s directive, when no viable mechanism is found, then this story is marked failed and the remaining metric-emission stories do not proceed."
+
+steps:
+  - id: research
+    description: "Investigate the four named candidate surfaces for token visibility, gather evidence from real local artifacts, and determine which one can support S5 MVP token capture."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/token-capture-feasibility.md` plus a proof artifact at `/Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/token-capture-proof.json` documenting the viable extraction mechanism and real-session proof-of-concept counts."
+    agent: researcher
+    depends_on: [research]
+  - id: test
+    description: "Verify the feasibility doc names all candidate surfaces and the proof artifact contains extracted token counts from real session data. Suggested checks: `rg -n \"~/.claude/projects|PostToolUse|SessionEnd|/private/tmp/claude-|usage|input_tokens|output_tokens\" /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/token-capture-feasibility.md` and inspect `/Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/token-capture-proof.json` for non-empty counts."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the spike for real evidence quality and confirm the chosen mechanism is concrete enough to unblock token-emission stories."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the spike artifacts only if a viable extraction path was identified and exercised against real session data."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, json, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/token-capture-feasibility.md
+      purpose: "New decision record describing the winning token-capture mechanism and the rejected candidates."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/token-capture-proof.json
+      purpose: "Proof-of-concept extraction output showing token counts from at least one real past session."
+    - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+      purpose: "Locked D7 decision naming the candidate mechanisms and making token capture required."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/token-capture-feasibility.md
+    change: "Create the feasibility document covering every named candidate mechanism, the winning path, and evidence for rejected paths."
+  - file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/token-capture-proof.json
+    change: "Create the proof-of-concept extraction artifact showing real-session token counts via the chosen mechanism."
+
+code_examples:
+  - title: "Locked D7 candidate mechanisms"
+    file: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    snippet: |
+      value: "required, not contingent — must find viable path"
+      rationale: "user pushed back on Option A contingency: 'there has to be a way.'
+      Candidates to investigate: Claude Code JSONL transcripts at ~/.claude/projects/*/,
+      PostToolUse hook env vars, SessionEnd hook context,
+      background Agent task output JSONL usage fields."
+
+design_decisions:
+  - decision: "Treat token capture as a blocking discovery item."
+    rationale: "The user rejected making token capture optional or follow-on work."
+    source: "cycle-state D7-token-capture-requirement | user-decisions B3 gate"
+  - decision: "Require real-session proof rather than speculative documentation."
+    rationale: "S5 needs an implementable mechanism, not a theory about where tokens might appear."
+    source: "task directive | D7 acceptance requirement"
+
+cross_cutting:
+  - concern: documentation
+    action: "Create `/Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/token-capture-feasibility.md` and `/Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/token-capture-proof.json` so later S5 hook stories can cite one authoritative token-capture mechanism."
+
+risks:
+  - severity: high
+    description: "If the spike settles for weak evidence, later S5 stories could implement token emission on a surface that does not actually expose counts."
+    mitigation: "Require proof against at least one real past session and fail the story outright if all candidate surfaces fail."
+  - severity: medium
+    description: "The doc could omit a candidate path and leave ambiguity."
+    mitigation: "List all four locked candidates explicitly and mark each accepted or rejected with evidence."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    relevant_excerpt: |
+      key: D7-token-capture-requirement
+      value: "required, not contingent — must find viable path"
+      rationale: "Token capture must discover a working mechanism before S5 ships."
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      D7 token capture: `Option A reframed` — user intent: "we need to figure out a viable path
+      for token spend.. there has to be a way." Token capture is REQUIRED, not contingent.
+

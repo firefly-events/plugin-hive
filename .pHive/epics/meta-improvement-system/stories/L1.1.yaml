@@ -1,0 +1,105 @@
+id: L1.1
+epic: meta-improvement-system
+slice: S7
+title: "Scaffold `hive/lib/meta-experiment/`"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["C1.3", "C1.4"]
+
+description: |
+  Create the shared lifecycle library root at `hive/lib/meta-experiment/` as a
+  real runtime module rather than a skill surface.
+  This story establishes the importable module layout, the module README, and a
+  thin public entrypoint that later stories can extend with envelope, baseline,
+  compare, promotion-adapter, rollback-watch, and closure-validator primitives.
+  The point is to make the `hive/lib/` convention concrete before any maintainer
+  or public skill binds to it.
+  Do create the library directory, package markers, and discovery docs. Do not
+  implement experiment policy, skill prompts, or a concrete promotion path here.
+
+acceptance_criteria:
+  - "Given the shared-library location decision, when the repo is inspected, then `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/` exists and is not modeled as a `SKILL.md`."
+  - "Given the scaffold story, when a maintainer reads the module root, then the README explains the library purpose, future submodules, and the `hive/lib/` convention."
+  - "Given later slices depend on a reusable runtime, when an import smoke test runs, then the module root is importable without pulling in skill-only paths."
+  - "Given S7 is shared-runtime work, when this story completes, then no `maintainer-skills/`, `skills/`, or workflow step files have been modified."
+
+steps:
+  - id: research
+    description: "Confirm the `hive/lib/meta-experiment/` location from the signed NEW Q1 resolution and inspect the `hive/lib/metrics/` story pattern so the library scaffold matches the new runtime-module convention."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/` with package markers, a thin module entrypoint, and `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md` describing the shared lifecycle role and planned submodules."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run a smoke check proving the module path exists and is importable. Suggested checks: `test -d /Users/don/Documents/plugin-hive/hive/lib/meta-experiment`, `test -f /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md`, and a repo test command such as `pytest tests/meta_experiment/test_module_scaffold.py`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the scaffold is shared runtime code only, follows the approved `hive/lib/` placement, and does not smuggle swarm-specific behavior into the module root."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the shared-library scaffold once the smoke test and review pass."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [python, markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+      purpose: "Definitive source for the S7 file manifest, acceptance criteria, and `hive/lib/meta-experiment/` placement."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+      purpose: "Authoritative slice list naming `L1.1` as the module scaffold story."
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md
+      purpose: "New module discovery doc created by this story."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/
+    change: "Create the shared lifecycle runtime module root with package markers and a thin public entrypoint."
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md
+    change: "Create a discovery doc describing the library purpose, submodules, and import boundary."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_experiment/test_module_scaffold.py
+    change: "Create an import smoke test covering the new module root."
+
+code_examples:
+  - title: "Approved shared-library location"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    snippet: |
+      - L1.1: Module scaffold at **`hive/lib/meta-experiment/`** (architect NEW Q1 → Option A: non-skill shared runtime library; NOT a `SKILL.md`)
+      - `hive/lib/meta-experiment/` module directory exists with envelope, baseline, compare, adapter-interface, rollback-watch, closure-validator modules
+
+design_decisions:
+  - decision: "Place the lifecycle library under `hive/lib/meta-experiment/`."
+    rationale: "The user-signed and architect-reviewed path decision makes the library a shared runtime module rather than a skill."
+    source: "cycle-state L8-library-location | structured-outline Part 4 S7"
+  - decision: "Keep the scaffold swarm-neutral."
+    rationale: "S7 must deliver reusable runtime structure before maintainer or public consumers bind to it."
+    source: "vertical-plan Slice 7"
+
+cross_cutting:
+  - concern: documentation
+    action: "Create `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md` and explain that the module is shared runtime code consumed later by `maintainer-skills/meta-meta-optimize/` and `skills/hive/skills/meta-optimize/`, not a shipped skill itself."
+
+risks:
+  - severity: medium
+    description: "The scaffold could accidentally be expressed as a skill-shaped surface, weakening the packaging and ownership model."
+    mitigation: "Keep all work under `hive/lib/meta-experiment/` and add no `SKILL.md` in this story."
+  - severity: low
+    description: "The README could omit the `hive/lib/` convention and make later imports harder to discover."
+    mitigation: "Document the module boundary and planned submodules in the root README."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `L1.1` Scaffold `hive/lib/meta-experiment/`.
+      - Create `hive/lib/meta-experiment/` — shared runtime module root.
+  - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    relevant_excerpt: |
+      - phase: hv-gate
+        key: L8-library-location
+        value: "hive/lib/meta-experiment/"

@@ -1,0 +1,105 @@
+id: BL2.2
+epic: meta-improvement-system
+slice: S9
+title: Orchestrate the rewritten control plane from the maintainer skill
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["BL2.1", "BL2i.3", "BL2i.4", "A2.8"]
+
+description: |
+  Turn the local maintainer scaffold into a real orchestrator for the rewritten
+  meta-team control plane.
+  This story binds `maintainer-skills/meta-meta-optimize/SKILL.md` to the
+  rewritten workflow surfaces so a maintainer run can enter through the local
+  skill, traverse the approved control plane, and stay inside the worktree-
+  isolated execution model by default.
+  The orchestration must respect the two-swarm split, use the shared lifecycle
+  library rather than embedding experiment logic in the skill, and preserve the
+  non-bypassable close gate added earlier.
+  Do wire the skill to the control plane and default worktree behavior. Do not
+  yet claim end-to-end proof or write the MVL artifact in this story.
+
+acceptance_criteria:
+  - "Given the orchestration story, when the maintainer skill is read, then it invokes the rewritten meta-team control plane rather than a dry-run scaffold."
+  - "Given the local maintainer path, when the control plane is traversed, then it uses worktree isolation by default and imports the shared lifecycle library instead of duplicating experiment logic."
+  - "Given the rewritten two-swarm model, when the skill and workflow surfaces are reviewed, then the maintainer path does not revive single-swarm or public-shipping assumptions."
+  - "Given S9 sequencing, when this story completes, then orchestration is live but proof-artifact capture remains for later stories."
+
+steps:
+  - id: research
+    description: "Inspect the rewritten workflow and step files so the maintainer skill can bind to the right control-plane surfaces without reintroducing archived assumptions."
+    agent: researcher
+  - id: implement
+    description: "Update `/Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md` and any same-directory helper files so the local skill invokes the rewritten control plane, defaults to worktree isolation, and consumes the shared lifecycle library."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run orchestration integration checks. Suggested checks: `pytest tests/meta_meta/test_skill_orchestration.py` and `rg -n \"meta-team-cycle|worktree|meta-experiment\" /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the skill is now a thin orchestrator over the rewritten control plane and shared library rather than a second policy engine."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the live maintainer orchestration once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, python, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md
+      purpose: "Maintainer skill entrypoint now becoming live orchestration."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+      purpose: "Workflow the local maintainer path must orchestrate."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-08-close.md
+      purpose: "Closure gate that must remain non-bypassable."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md
+    change: "Convert the scaffold into real maintainer orchestration over the rewritten control plane."
+  - file: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/
+    change: "Add or update helper files needed to drive the rewritten workflow."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_meta/test_skill_orchestration.py
+    change: "Create integration checks for the live maintainer orchestration path."
+
+code_examples:
+  - title: "S9 orchestration binding"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - `BL2.2` Orchestrate the rewritten control plane from the maintainer skill.
+      - Modify `maintainer-skills/meta-meta-optimize/SKILL.md` — wire actual execution rather than dry-run scaffold.
+
+design_decisions:
+  - decision: "Make the maintainer skill a thin orchestrator over shared runtime and workflow surfaces."
+    rationale: "Shared lifecycle logic belongs in `hive/lib/meta-experiment/`, not inside skill prompts."
+    source: "structured-outline Part 4 S7-S9"
+  - decision: "Default the maintainer path to worktree isolation."
+    rationale: "The user made worktree isolation mandatory for self-modifying experiments."
+    source: "user-decisions Q4"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md` so it documents the live control-plane path, shared-library dependency, and worktree-default behavior."
+
+risks:
+  - severity: high
+    description: "The skill could duplicate control-plane logic and drift away from the rewritten workflow."
+    mitigation: "Keep orchestration thin and point directly at the workflow and step surfaces."
+  - severity: medium
+    description: "Live orchestration could bypass the close gate or fallback surface."
+    mitigation: "Add integration checks that traverse the approved workflow sequence."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `BL2.2` Orchestrate the rewritten control plane from the maintainer skill.
+      - Modify `maintainer-skills/meta-meta-optimize/SKILL.md` — wire actual execution rather than dry-run scaffold.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - `/meta-meta-optimize` lives in this repo but is NOT in `.claude-plugin/plugin.json`'s public skill surface — maintainer-only local tool.

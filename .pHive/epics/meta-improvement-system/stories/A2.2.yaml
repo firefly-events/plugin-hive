@@ -1,0 +1,112 @@
+id: A2.2
+epic: meta-improvement-system
+slice: S4
+title: Rewrite testing step around orchestrator-mediated writes
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["A1.2", "A1.5", "A2.1"]
+
+description: |
+  Resolve the Step 5 authority contradiction by rewriting the testing phase so
+  the tester either stays genuinely read-only or uses an explicitly aligned
+  orchestrator-mediated write path for persisted results.
+  This story is the sharpest control-plane inconsistency in the current system:
+  Step 5 says "do NOT modify any files" and "NOT available: Write access to any
+  files" while also instructing the tester to append `test_results` to
+  `.pHive/meta-team/cycle-state.yaml`.
+  The rewrite must make the contract internally coherent and align the workflow
+  step wording to the chosen persistence model.
+  Do keep the structural/schema/content-safety checks. Do not defer the
+  contradiction to reviewer judgment or undocumented convention.
+
+acceptance_criteria:
+  - "Given the rewritten Step 5, when the file is read top to bottom, then its rules, context boundaries, and task sequence no longer contradict each other about write access."
+  - "Given the chosen persistence model, when test results are recorded, then the responsible writer is named explicitly and that writer is consistent with the control-plane grants."
+  - "Given the workflow file, when the testing step block is reviewed, then its task/output wording matches the rewritten Step 5 contract."
+  - "Given the original audit finding, when this story is compared against the prior Step 5 text, then the direct read-only versus append-to-cycle-state conflict is gone."
+
+steps:
+  - id: research
+    description: "Read the current Step 5 contradiction, the workflow testing block, and the audit notes to decide the exact orchestrator-mediated or narrowed-grant persistence shape before editing."
+    agent: researcher
+  - id: implement
+    description: "Rewrite `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-05-testing.md` and align the testing step block in `/Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml` so result persistence is explicit and internally coherent."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the Step 5 file no longer contains mutually exclusive write rules. Suggested checks: `rg -n \"Read-only access|Write access to any files|cycle-state.yaml|test_results\" /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-05-testing.md` and inspect that any remaining write reference is mediated by the named actor."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the rewritten test-step contract for authority coherence and confirm the persistence path matches the team-grant strategy planned for S4."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the Step 5 rewrite once the contradiction is removed and the workflow wording matches."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-05-testing.md
+      purpose: "Primary contradiction surface that must be rewritten."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+      purpose: "Workflow owner whose testing-step task and outputs must reflect the repaired contract."
+    - path: /Users/don/Documents/plugin-hive/.pHive/teams/meta-team.yaml
+      purpose: "Current team-grant reference showing the tester is read-only today."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/codex-audit-memo.md
+      purpose: "Source of the explicit Step 5 contradiction finding."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-05-testing.md
+    change: "Rewrite the testing-step contract so result persistence is coherent with the chosen write model."
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+    change: "Adjust the testing-step task/output wording only as needed to match the rewritten Step 5 contract."
+
+code_examples:
+  - title: "Direct contradiction called out by the audit"
+    file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-05-testing.md
+    snippet: |
+      - Read-only access in this step — do NOT modify any files
+      ...
+      **NOT available:**
+      - Write access to any files
+      ...
+      ### 5. Update cycle-state.yaml
+      Append to `.pHive/meta-team/cycle-state.yaml`:
+
+design_decisions:
+  - decision: "Repair Step 5 with an explicit persistence model rather than reviewer interpretation."
+    rationale: "The control-plane failure is a contract contradiction, not a stylistic inconsistency."
+    source: "codex-audit-memo §3.4 | architect-memo §1"
+  - decision: "Keep the validation check set but align writes to actual grants."
+    rationale: "S4 preserves the testing role while making team permissions and step obligations consistent."
+    source: "structured-outline Part 4 S4 | vertical-plan Slice 4"
+
+cross_cutting:
+  - concern: documentation
+    action: "Rewrite `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-05-testing.md` and keep the testing block in `/Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml` synchronized so operators are not left with contradictory execution guidance."
+
+risks:
+  - severity: high
+    description: "A vague rewrite could leave Step 5 formally contradictory even if the wording becomes less obvious."
+    mitigation: "Force the story to name the writer and verify the remaining write path is compatible with S4 team-grant changes."
+  - severity: medium
+    description: "The fix could silently spill tester write authority wider than needed."
+    mitigation: "Review against the narrowest viable persistence model and defer broader grant changes to A2.6."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A2.2` Rewrite testing step around orchestrator-mediated writes or equivalent aligned grants.
+      - The Step-05 self-contradiction is removed; read-only claims and actual writes are no longer in conflict.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/codex-audit-memo.md
+    relevant_excerpt: |
+      Step 5 explicitly says "Read-only access in this step — do NOT modify any files"
+      while also requiring a write to `.pHive/meta-team/cycle-state.yaml`.
+

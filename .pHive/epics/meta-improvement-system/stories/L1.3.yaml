@@ -1,0 +1,104 @@
+id: L1.3
+epic: meta-improvement-system
+slice: S7
+title: Baseline-capture primitive
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["L1.2", "C1.4", "C2.1"]
+
+description: |
+  Implement baseline capture in the shared lifecycle library so later swarms can
+  persist a baseline snapshot reference into the experiment envelope.
+  This story bridges the lifecycle module to the inert metrics substrate without
+  wiring any workflow or skill caller yet: it should resolve the correct metrics
+  directory, read baseline data, and write a stable snapshot reference into the
+  envelope record.
+  The primitive must tolerate metrics being disabled or sparse, because backlog
+  fallback remains a valid mode later in the epic.
+  Do cover the enabled and no-metrics paths in tests. Do not make promotion or
+  compare decisions in this story.
+
+acceptance_criteria:
+  - "Given the baseline primitive, when the repo is inspected, then `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/baseline.py` exists and can persist a baseline snapshot reference into an envelope."
+  - "Given fixture metrics data, when tests run, then the primitive reads the substrate and records a stable baseline reference."
+  - "Given metrics may be disabled or absent, when baseline capture is called without usable events, then the result is an explicit no-baseline outcome rather than a crash."
+  - "Given S7 is library work, when this story completes, then no workflow step file or skill prompt was changed."
+
+steps:
+  - id: research
+    description: "Confirm the baseline-capture responsibilities and the default-off metrics behavior from the outline, `user-decisions-dd.md`, and the C1 primitive contract."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/baseline.py` so the shared lifecycle library can read substrate data, derive a baseline snapshot reference, and persist that reference back through the envelope helper."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run baseline fixture tests for both metrics-present and no-metrics cases. Suggested checks: `pytest tests/meta_experiment/test_baseline.py` and `rg -n \"baseline\" /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/baseline.py`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that baseline capture remains a substrate-facing primitive, preserves backlog-mode tolerance, and does not embed skill or workflow assumptions."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the baseline primitive once tests and review pass."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [python, markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/baseline.py
+      purpose: "New baseline-capture primitive."
+    - path: /Users/don/Documents/plugin-hive/hive/lib/metrics
+      purpose: "Existing substrate runtime the baseline primitive must read from."
+    - path: /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+      purpose: "Metrics default-off config surface the primitive must tolerate."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/baseline.py
+    change: "Create baseline-capture helpers that read substrate data and persist a snapshot reference into the envelope."
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/__init__.py
+    change: "Export the baseline helper for later consumer imports."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_experiment/test_baseline.py
+    change: "Create fixture tests for baseline capture with and without metrics data."
+
+code_examples:
+  - title: "Baseline primitive requirement"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - Create `hive/lib/meta-experiment/baseline.*` — baseline capture primitive.
+      - Baseline-to-compare fixture flow yields a structured decision object suitable for later promotion logic.
+
+design_decisions:
+  - decision: "Make no-baseline an explicit outcome."
+    rationale: "Metrics are opt-in and backlog fallback remains valid, so missing baseline evidence must not crash the library."
+    source: "user-decisions Q-new-B | Q7 extension"
+  - decision: "Persist snapshot references through the shared envelope helper."
+    rationale: "The envelope remains the canonical record joining baseline state to later compare and close behavior."
+    source: "vertical-plan Slice 7"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md` with the baseline-capture contract, including the explicit no-baseline path used later by backlog fallback."
+
+risks:
+  - severity: medium
+    description: "The primitive could assume metrics are always present and make backlog-mode runs impossible."
+    mitigation: "Add no-metrics fixture coverage and require an explicit no-baseline return shape."
+  - severity: low
+    description: "Baseline capture could start deciding experiment outcomes instead of just collecting references."
+    mitigation: "Keep comparison logic in `compare.py` and review the module boundary."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/vertical-plan.md
+    relevant_excerpt: |
+      - L1.3: Baseline-capture primitive (calls C1 reader, persists snapshot ref into envelope)
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - Without metrics, the meta swarm has nothing objective to optimize against
+      - Meta-team features will fall back to qualitative / backlog-driven mode

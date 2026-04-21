@@ -1,0 +1,109 @@
+id: BL2i.5
+epic: meta-improvement-system
+slice: S8
+title: Regression test proving `plugin.json` excludes `maintainer-skills/`
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["BL2i.3"]
+
+description: |
+  Add the structural packaging-boundary regression test that proves the shipped
+  plugin manifest does not reference `maintainer-skills/`.
+  This story is intentionally narrow and defensive: it should inspect
+  `.claude-plugin/plugin.json`, assert the shipped `skills` root remains the
+  public `./skills/` tree, and fail if any maintainer-skill path or
+  `/meta-meta-optimize` registration leaks into the manifest.
+  The test should be future-proof enough that S10 can still register
+  `/meta-optimize` later without weakening the local-only boundary.
+  Do add the regression coverage and any small manifest comments needed for
+  clarity. Do not change the shipped skill surface in this slice.
+
+acceptance_criteria:
+  - "Given the packaging-boundary regression story, when tests run, then `.claude-plugin/plugin.json` is asserted to contain no `maintainer-skills/` reference."
+  - "Given the local-only invariant, when the manifest is reviewed, then it still points at the public `./skills/` root and does not register `/meta-meta-optimize`."
+  - "Given later public registration work, when the test is read, then it permits future `/meta-optimize` registration while continuing to ban maintainer-skill leakage."
+
+steps:
+  - id: research
+    description: "Read `.claude-plugin/plugin.json` and confirm the current shipped skill-root behavior so the regression test locks the right invariant instead of an incidental implementation detail."
+    agent: researcher
+  - id: implement
+    description: "Create a manifest-boundary regression test such as `/Users/don/Documents/plugin-hive/tests/meta_meta/test_plugin_manifest_boundary.py` that asserts `.claude-plugin/plugin.json` contains no `maintainer-skills/` or `/meta-meta-optimize` registration."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Run the new manifest-boundary test and grep the manifest directly. Suggested checks: `pytest tests/meta_meta/test_plugin_manifest_boundary.py` and `rg -n \"maintainer-skills|meta-meta-optimize\" /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the test proves the structural boundary without blocking the later public `/meta-optimize` registration story."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the packaging-boundary regression test once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [python, json, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json
+      purpose: "Manifest whose shipped skill surface must remain free of maintainer-skill references."
+    - path: /Users/don/Documents/plugin-hive/tests/meta_meta/test_plugin_manifest_boundary.py
+      purpose: "New regression test for the packaging boundary."
+    - path: /Users/don/Documents/plugin-hive/maintainer-skills/meta-meta-optimize/SKILL.md
+      purpose: "Local-only skill whose path must not leak into the manifest."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/tests/meta_meta/test_plugin_manifest_boundary.py
+    change: "Create the regression test that forbids `maintainer-skills/` and `/meta-meta-optimize` references in `.claude-plugin/plugin.json`."
+  - file: /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json
+    change: "Leave the shipped root unchanged; add only minimal clarifying comments if the manifest format allows them."
+
+code_examples:
+  - title: "Current shipped skill root"
+    file: /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json
+    snippet: |
+      {
+        "skills": "./skills/",
+        "hooks": {
+          "Stop": [
+            {
+              "matcher": "",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "mkdir -p .pHive/interrupts ...
+
+design_decisions:
+  - decision: "Lock the local-only boundary with regression coverage."
+    rationale: "The packaging boundary must be structural and testable, not dependent on maintainer memory."
+    source: "structured-outline Part 4 S8 | architect NEW QUESTION 2"
+  - decision: "Keep the manifest surface unchanged in S8."
+    rationale: "The public skill is registered later in S10; S8 only proves exclusion."
+    source: "vertical-plan Slice 8"
+
+cross_cutting:
+  - concern: documentation
+    action: "Document the manifest-boundary invariant in the test file and, if needed, in a nearby maintainer note so future plugin changes know `maintainer-skills/` must stay out of `.claude-plugin/plugin.json`."
+
+risks:
+  - severity: high
+    description: "Without an explicit regression test, a later manifest edit could accidentally ship the local maintainer tool."
+    mitigation: "Fail the test on any `maintainer-skills/` or `/meta-meta-optimize` manifest reference."
+  - severity: low
+    description: "The test could accidentally freeze the manifest too tightly and block the future public skill."
+    mitigation: "Scope assertions to maintainer-skill exclusion rather than forbidding all future skill registrations."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `BL2i.5` Regression test proving `plugin.json` excludes `maintainer-skills/`.
+      - Regression testing proves `plugin.json` does not register `maintainer-skills/`.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - `/meta-meta-optimize` lives in this repo but is NOT in `.claude-plugin/plugin.json`'s public skill surface — maintainer-only local tool.

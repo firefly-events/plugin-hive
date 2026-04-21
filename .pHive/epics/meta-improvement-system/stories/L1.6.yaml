@@ -1,0 +1,108 @@
+id: L1.6
+epic: meta-improvement-system
+slice: S7
+title: Rollback watch and auto-revert trigger
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["L1.4", "L1.5", "B0.3"]
+
+description: |
+  Implement the shared rollback-watch primitive that observes post-promotion
+  metrics and invokes one auto-revert callback path when a regression exceeds
+  threshold.
+  This story owns the lifecycle-library observation-window logic and callback
+  contract only. It should detect threshold-exceeding regression, produce a
+  trigger event for the envelope/proof path, and call a supplied auto-revert
+  function with the rollback target and supporting evidence.
+  The user’s Q3 direction is strict here: no alternate rollback modes, no
+  human-confirmed branch, and no recommendation-only result.
+  Do add tests covering watch-window timing, non-trigger cases, and callback
+  firing on real fixture regressions. Do not yet bind the callback to a concrete
+  direct-commit adapter; that lands in S9.
+
+acceptance_criteria:
+  - "Given the rollback-watch story, when the repo is inspected, then `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/rollback_watch.py` exists and models observation-window evaluation plus auto-revert callback firing."
+  - "Given a threshold-exceeding fixture regression during the observation window, when tests run, then the rollback watch emits a trigger record and invokes the provided auto-revert callback."
+  - "Given a non-regression or below-threshold change, when tests run, then the callback is not invoked."
+  - "Given the user’s Q3 decision, when the module is reviewed, then it contains one behavior only: auto-revert on triggered regression, with no manual or recommendation-only branch."
+
+steps:
+  - id: research
+    description: "Confirm the observation-window and unconditional auto-revert rules from Q3, B0, and the S7 acceptance criteria before coding the shared rollback-watch contract."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/rollback_watch.py` with observation-window evaluation, trigger-event creation, and a callback-based auto-revert interface that later concrete adapters can bind."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run rollback-watch tests covering trigger and non-trigger cases. Suggested checks: `pytest tests/meta_experiment/test_rollback_watch.py` and `rg -n \"auto-revert|callback|observation\" /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/rollback_watch.py`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that rollback handling stays single-path, evidence-bearing, and ready for real end-to-end activation in S9 without needing interface changes."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the rollback-watch primitive once tests and review pass."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [python, markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/rollback_watch.py
+      purpose: "New shared observation-window and auto-revert trigger logic."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+      purpose: "Authoritative source for the single auto-revert behavior."
+    - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+      purpose: "Escalation record requiring real end-to-end rollback realism later in S9."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/rollback_watch.py
+    change: "Create the shared rollback-watch and callback-trigger primitive."
+  - file: /Users/don/Documents/plugin-hive/hive/lib/meta-experiment/__init__.py
+    change: "Export the rollback-watch helper."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_experiment/test_rollback_watch.py
+    change: "Create tests for threshold-triggered and non-triggered observation-window behavior."
+
+code_examples:
+  - title: "Auto-revert is the only delayed-regression behavior"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    snippet: |
+      - **Delayed-regression handling:** `auto-revert`. If `regression_watch` flags a regression, the system reverts automatically.
+      - Do NOT build a three-class system (auto/human/narrow) — one behavior.
+
+design_decisions:
+  - decision: "Model rollback watch as a callback-triggering primitive."
+    rationale: "The shared lifecycle library should detect regressions and hand off the concrete revert action to the adapter layer."
+    source: "structured-outline Part 4 S7 | S9"
+  - decision: "Keep rollback semantics unconditional."
+    rationale: "The user explicitly rejected alternate delayed-regression modes."
+    source: "user-decisions Q3"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/README.md` with the rollback-watch contract, observation-window inputs, and the guarantee that the shared library exposes one auto-revert path only."
+
+risks:
+  - severity: high
+    description: "Rollback-watch logic could quietly introduce manual or soft-fail branches that undermine the approved safety model."
+    mitigation: "Keep the public API callback-based and cover only trigger/no-trigger behavior in tests."
+  - severity: medium
+    description: "Trigger evidence could be too weak for later proof artifacts."
+    mitigation: "Emit an explicit trigger record shape from the primitive and review it before S9 binding."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - Create `hive/lib/meta-experiment/rollback-watch.*` — watch-window and auto-revert trigger logic.
+      - Rollback watch triggers auto-revert callback on regression with no alternate mode branching.
+  - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    relevant_excerpt: |
+      - trigger: rollback-realism-proof-ambiguity
+        severity: major
+        reason: "The outline proves a real revert, but does not explicitly require regression-watch to trigger the auto-revert path end-to-end."

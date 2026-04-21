@@ -1,0 +1,108 @@
+id: BL3.1
+epic: meta-improvement-system
+slice: S10
+title: Public skill scaffold and plugin registration
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["K.3", "BL2.6", "BL2i.5", "A2.7"]
+
+description: |
+  Scaffold the shipped public `/meta-optimize` skill and register it in the
+  plugin manifest without weakening the local-only boundary established in S8.
+  This story creates the visible public entrypoint for end users, but it does
+  not yet implement PR promotion or full orchestration behavior.
+  The skill scaffold must explain the public prerequisites clearly: metrics are
+  kickoff-time opt-in, backlog fallback exists when metrics are insufficient,
+  and retained changes leave as PR-style artifacts rather than direct repo
+  mutation.
+  Do add `skills/hive/skills/meta-optimize/SKILL.md` and register the command in
+  `.claude-plugin/plugin.json`. Do not introduce any `maintainer-skills/`
+  reference or public registration of `/meta-meta-optimize`.
+
+acceptance_criteria:
+  - "Given S10 ship work, when `.claude-plugin/plugin.json` is inspected, then `/meta-optimize` is registered in the shipped skill surface."
+  - "Given the packaging-boundary invariant from S8, when the manifest is reviewed, then it still contains no `maintainer-skills/` references and does not expose `/meta-meta-optimize`."
+  - "Given the public-skill scaffold, when `skills/hive/skills/meta-optimize/SKILL.md` is read, then it names kickoff opt-in, metrics/backlog prerequisites, and PR-only promotion expectations."
+  - "Given this story is scaffold-level only, when it completes, then no concrete PR adapter or end-to-end user-project execution has been implemented yet."
+
+steps:
+  - id: research
+    description: "Confirm the shipped-versus-local packaging boundary, the public command naming, and the user-facing prerequisite language from S8-S10, Q5, Q6, and kickoff docs."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md` and modify `/Users/don/Documents/plugin-hive/.claude-plugin/plugin.json` to register `/meta-optimize` in the public shipped surface while preserving the `./skills/` root."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add or update registration coverage. Suggested checks: `rg -n \"meta-optimize|maintainer-skills|meta-meta-optimize\" /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json`, `test -f /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md`, and run a manifest test such as `pytest tests/meta_optimize/test_plugin_registration.py tests/meta_meta/test_plugin_manifest_boundary.py`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the public skill is shipped and discoverable, the manifest still excludes maintainer-only content, and the scaffold text does not promise direct-mutation behavior."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the public-skill scaffold and manifest registration once tests and review pass."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, json, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md
+      purpose: "New shipped public skill entrypoint for end users."
+    - path: /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json
+      purpose: "Plugin manifest that must expose `/meta-optimize` while still excluding `maintainer-skills/`."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/stories/BL2i.5.yaml
+      purpose: "Prior boundary-lock story whose invariant must remain true after registration."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md
+    change: "Create the public skill scaffold with user-facing prerequisites, inputs, and PR-only promotion expectations."
+  - file: /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json
+    change: "Register `/meta-optimize` in the shipped skill surface without adding any `maintainer-skills/` reference."
+  - file: /Users/don/Documents/plugin-hive/tests/meta_optimize/test_plugin_registration.py
+    change: "Create or update manifest coverage proving `/meta-optimize` is shipped and `/meta-meta-optimize` remains unshipped."
+
+code_examples:
+  - title: "S10 shipped-surface requirements"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    snippet: |
+      - `BL3.1` Public skill scaffold and plugin registration.
+      - `/meta-optimize` is registered in `.claude-plugin/plugin.json` and visible in the shipped command surface.
+      - `.claude-plugin/plugin.json` still contains no `maintainer-skills/` references.
+
+design_decisions:
+  - decision: "Register `/meta-optimize` in the shipped manifest before deeper S10 behavior lands."
+    rationale: "The public command surface is itself part of the MVS promise and needs a distinct regression boundary."
+    source: "structured-outline Part 4 S10 | vertical-plan Slice 10"
+  - decision: "Preserve the structural exclusion of `maintainer-skills/` even while adding the public command."
+    rationale: "Q6 and S8 make the local-only packaging boundary a hard invariant, not a convention."
+    source: "user-decisions Q6 | BL2i.5"
+
+cross_cutting:
+  - concern: documentation
+    action: "Document the new public command in `/Users/don/Documents/plugin-hive/skills/hive/skills/meta-optimize/SKILL.md` and keep manifest registration behavior aligned with the shipped-surface contract."
+
+risks:
+  - severity: high
+    description: "A manifest edit could accidentally weaken the local-only boundary and ship maintainer-only paths."
+    mitigation: "Run explicit registration and boundary tests that assert `/meta-optimize` is present while `maintainer-skills/` and `/meta-meta-optimize` remain absent."
+  - severity: medium
+    description: "The scaffold could imply direct mutation or omit the metrics opt-in prerequisite."
+    mitigation: "Keep the skill text narrowly aligned to Q5, Q6, and K.3 wording and review it as user-facing ship copy."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `BL3.1` Public skill scaffold and plugin registration.
+      - Create `skills/hive/skills/meta-optimize/SKILL.md` — shipped public skill.
+      - Modify `.claude-plugin/plugin.json` — register `/meta-optimize`.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - Shipped plugin exposes `/meta-optimize` only. End users get one entrypoint.
+      - `/meta-optimize` promotes via PR artifact only.

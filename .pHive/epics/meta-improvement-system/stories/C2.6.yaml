@@ -1,0 +1,101 @@
+id: C2.6
+epic: meta-improvement-system
+slice: S5
+title: Human escalation emission
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["C2.0", "C2.1"]
+
+description: |
+  Emit the human-escalation metric at the orchestrator escalation path so the
+  final MVP metric set includes the friction signal the user explicitly wanted.
+  This story owns only the escalation event path and should remain silent unless
+  metrics are enabled.
+  The emitted record should identify that a human escalation occurred and carry
+  enough context to correlate it with run and story outcomes later.
+  Do keep the implementation narrow and schema-valid. Do not mix in review-pass
+  or token logic from the other S5 stories.
+
+acceptance_criteria:
+  - "Given `metrics.enabled: true`, when a human-escalation path is triggered, then a schema-valid escalation event is written to `.pHive/metrics/events/`."
+  - "Given `metrics.enabled: false`, when the same escalation path runs, then no metrics event is written."
+  - "Given later analysis needs, when the event payload is reviewed, then it includes enough context to correlate the escalation with the affected run or story."
+  - "Given S5 scope, when this story completes, then it does not duplicate token, story-total, or fix-loop emission responsibilities."
+
+steps:
+  - id: research
+    description: "Find the concrete orchestrator escalation path and confirm the minimum context the emitted human-escalation event must carry."
+    agent: researcher
+  - id: implement
+    description: "Modify the orchestrator escalation owner file so human escalations emit schema-valid JSONL metrics events behind the `metrics.enabled` gate."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run checks for escalation-event emission, schema validity, and flag-off silence using the repo’s chosen test approach."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the escalation payload for correlation usefulness and confirm the story stayed narrow."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the human-escalation emitter once the event shape and gating behavior are proven."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [yaml, json, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+      purpose: "Metrics gate used by the escalation emitter."
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md
+      purpose: "Schema the escalation events must follow."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+      purpose: "Authoritative source for the human-escalation metric in the provisional MVP set."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hooks/metrics-human-escalation.sh
+    change: "Create the human-escalation metrics helper so orchestrator escalation emits schema-valid events when `metrics.enabled` is true."
+  - file: /Users/don/Documents/plugin-hive/tests/meta-improvement-system/metrics/human-escalation.test.sh
+    change: "Create human-escalation emission tests covering schema validity and flag-off silence."
+
+code_examples:
+  - title: "User-approved friction metric"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    snippet: |
+      Provisional MVP set:
+      5. Human escalation count per epic
+
+design_decisions:
+  - decision: "Emit escalation metrics at the orchestrator path where escalation is explicit."
+    rationale: "This friction metric should be recorded where escalation is actually decided, not inferred later."
+    source: "structured-outline Part 4 S5 | user-decisions Q8"
+  - decision: "Keep escalation emission behind the same default-off gate."
+    rationale: "All metrics writes are opt-in at kickoff; escalation is not a special exception."
+    source: "user-decisions Q-new-B | C2.1"
+
+cross_cutting:
+  - concern: documentation
+    action: "Document the orchestrator escalation emission owner file and keep its event notes aligned with `/Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md`."
+
+risks:
+  - severity: medium
+    description: "If the event is emitted too late or too early, later analysis may not be able to correlate it to the right run."
+    mitigation: "Research the concrete escalation owner surface before implementation and include run/story context in the event."
+  - severity: low
+    description: "The story could absorb unrelated quality metrics."
+    mitigation: "Keep the payload and tests focused only on human escalation."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `C2.6` Human escalation emission.
+      - `developer` on Codex wires the remaining emission sites: ... escalation path.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      Provisional MVP set:
+      5. Human escalation count per epic

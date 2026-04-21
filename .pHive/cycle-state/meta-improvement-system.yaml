@@ -1,0 +1,85 @@
+epic_id: meta-improvement-system
+created: "2026-04-19T19:49:15Z"
+updated: "2026-04-20T04:08:00Z"
+
+decisions:
+  - phase: design-discussion
+    key: salvage-vs-rebuild
+    value: "rebuild control plane with selective artifact salvage"
+    rationale: "researcher says cycle ran 5 times (operationally exercised); codex audit found structural contradictions in sandbox/permissions/promotion/closure. architect reconciled: salvage artifacts + loop-shape precedent, rebuild authority model."
+    timestamp: "2026-04-19T19:57:00Z"
+  - phase: design-discussion
+    key: meta-meta-optimize-ships
+    value: "no — local-only"
+    rationale: "user directive Q-new-A: maintainer-only tool, not in plugin.json public surface"
+    timestamp: "2026-04-19T20:08:00Z"
+  - phase: design-discussion
+    key: metrics-enablement-model
+    value: "opt-in at kickoff, default OFF"
+    rationale: "user directive Q-new-B: without metrics meta swarm is not fully functional; make this explicit at onboarding"
+    timestamp: "2026-04-19T20:08:00Z"
+  - phase: design-discussion
+    key: execution-backend-split
+    value: "Codex for dev/test/pair-programmer; Claude Opus 4.7 for reviewer/peer-validator"
+    rationale: "user directive Q-new-C: use Codex for work, Opus for review"
+    timestamp: "2026-04-20T03:55:00Z"
+  - phase: hv-gate
+    key: L8-library-location
+    value: "hive/lib/meta-experiment/"
+    rationale: "architect NEW_Q1_VERDICT Option A — shared runtime code belongs in library path, not SKILL.md"
+    timestamp: "2026-04-20T03:30:00Z"
+  - phase: hv-gate
+    key: L9-meta-meta-location
+    value: "maintainer-skills/meta-meta-optimize/SKILL.md"
+    rationale: "architect NEW_Q2_VERDICT Option B (outside shipped skills/ root); tpm refined exact path — plugin manifest scope structurally prevents accidental bundling"
+    timestamp: "2026-04-20T03:46:00Z"
+  - phase: outline-review
+    key: stop-hook-dispatch-file
+    value: ".claude-plugin/plugin.json"
+    rationale: "researcher GAP_FILLED — hook dispatch lives in plugin.json inline bash writing .pHive/interrupts/{ts}.yaml, NOT ~/.claude/settings.json"
+    timestamp: "2026-04-20T04:04:57Z"
+  - phase: b3-gate
+    key: D4-stop-hook-resolution
+    value: "Option A — combined dispatcher in existing .claude-plugin/plugin.json Stop hook"
+    rationale: "user sign-off 2026-04-20. Guardrails required: handler isolation (metrics failure must not suppress sentinel), explicit ordering tests, idempotency tests, flag-off no-op verification."
+    timestamp: "2026-04-20T04:12:00Z"
+  - phase: b3-gate
+    key: D7-token-capture-requirement
+    value: "required, not contingent — must find viable path"
+    rationale: "user pushed back on Option A contingency: 'there has to be a way.' Token capture must discover a working mechanism before S5 ships. Candidates to investigate: Claude Code JSONL transcripts at ~/.claude/projects/*/, PostToolUse hook env vars, SessionEnd hook context, background Agent task output JSONL usage fields. Phase C story authoring must include this as a blocking discovery item, not a follow-on."
+    timestamp: "2026-04-20T04:12:00Z"
+
+escalations:
+  - trigger: rollback-realism-proof-ambiguity
+    placement: pre-exec
+    severity: major
+    stories: [S9, BL2.4, BL2.6]
+    reason: "The outline proves a real revert, but does not explicitly require regression-watch to trigger the auto-revert path end-to-end; MVL could be overstated by a manual revert reading."
+    raised_by: architect
+    raised_at: "2026-04-20T04:08:00Z"
+  - trigger: manifest-ownership-under-specification
+    placement: in-planning
+    severity: moderate
+    stories: [S5, S6, S4, S8, S9]
+    reason: "Several file owners are still vague where the repo already identifies them, especially Stop-hook, kickoff, and step-01/02/03b surfaces."
+    raised_by: architect
+    raised_at: "2026-04-20T04:08:00Z"
+  - trigger: closure-evidence-shape-mismatch
+    placement: in-planning
+    severity: moderate
+    stories: [S9, S10]
+    reason: "The outline elicits but does not register the risk that a shared closure validator overfits direct-commit evidence and rejects valid PR-only close records."
+    raised_by: architect
+    raised_at: "2026-04-20T04:08:00Z"
+
+scope_boundaries:
+  out_of_scope:
+    - "paths.state_dir resolver (separate epic, 26 CodeRabbit sites from PR #8)"
+    - "Scheduler/cron trigger surface (external to repo)"
+    - "Long-tail metrics (cache hit, CodeRabbit fixes, memory wiki, trust score, skill coverage)"
+    - "Parallel experiment execution mode (follow-on, gated on isolation proof)"
+    - "Per-metric asymmetric threshold classes (Q3 anti-over-engineering)"
+    - "Three-class delayed-regression handling (Q3 — auto-revert only)"
+    - "Backlog auto-surfacing from qualitative signals (Q4 — human-edit-only MVP)"
+
+linear: {}

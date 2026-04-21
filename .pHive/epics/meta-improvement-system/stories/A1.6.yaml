@@ -1,0 +1,94 @@
+id: A1.6
+epic: meta-improvement-system
+slice: S3
+title: "Optional audit note for historical `commit: TBD` integrity break"
+status: pending
+complexity: low
+methodology: classic
+depends_on: ["B0.1", "B0.2", "B0.3", "A1.1"]
+
+description: |
+  Add the explicit audit note for the historical `commit: TBD` ledger defect that
+  the user asked to preserve rather than erase.
+  This story supplements the archive manifest with a short, direct explanation of
+  the integrity break, where it appears, and why the archive preserves it instead
+  of normalizing the record after the fact.
+  The note may live inside `MANIFEST.md` or as a tightly linked sibling document,
+  but it must be discoverable from the archive root.
+  Do preserve the historical defect as evidence. Do not retroactively fill in a
+  fake commit hash or otherwise rewrite the archived ledger entry.
+
+acceptance_criteria:
+  - "Given the audit-note story, when the archive is opened, then the `commit: TBD` integrity issue is documented in or next to `MANIFEST.md`."
+  - "Given the preservation rule, when the note is reviewed, then it flags the defect without rewriting the archived ledger entry."
+  - "Given user sign-off, when the story completes, then the archive clearly records that this is a preserved historical caveat rather than a newly introduced issue."
+
+steps:
+  - id: implement
+    description: "Add a discoverable audit note in `/Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/MANIFEST.md` or a linked sibling note explaining the preserved `commit: TBD` integrity break."
+    agent: developer
+  - id: test
+    description: "Verify the archive root surfaces the integrity note. Suggested checks: `rg -n \"commit: TBD|integrity break|preserved history\" /Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the note documents the defect clearly without backfilling or normalizing the archived history."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the archive audit note."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/MANIFEST.md
+      purpose: "Primary home for the historical integrity note."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/ledger.yaml
+      purpose: "Source record containing the preserved `commit: TBD` defect."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+      purpose: "Authoritative user sign-off directing preservation plus audit note."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/MANIFEST.md
+    change: "Add a dedicated audit note or link to a sibling note documenting the preserved `commit: TBD` integrity break."
+
+code_examples:
+  - title: "Defect to preserve, not rewrite"
+    file: /Users/don/Documents/plugin-hive/.pHive/meta-team/ledger.yaml
+    snippet: |
+      - cycle_id: meta-2026-04-13
+        commit: TBD
+        notes: >
+          Third cycle. Completed memory coverage for all previously-zero-memory agents.
+
+design_decisions:
+  - decision: "Preserve the bad historical entry and annotate it."
+    rationale: "The user explicitly chose archive audit note over rewriting history."
+    source: "user-decisions Q-new-D"
+
+cross_cutting:
+  - concern: documentation
+    action: "Add the `commit: TBD` integrity note to `/Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/MANIFEST.md` so operators can discover the caveat from the archive root."
+
+risks:
+  - severity: low
+    description: "The note could be too subtle and fail to warn later readers."
+    mitigation: "Place it in the manifest or a prominently linked sibling note at the archive root."
+  - severity: medium
+    description: "Someone could try to 'fix' history by editing the archived ledger."
+    mitigation: "Keep the explanation in the manifest and treat archived payloads as immutable evidence."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - NEW Q5 (commit: TBD historical ledger entry): `(A)` — add optional A1.6 MANIFEST audit-note story during archive.
+      - Preserves history + flags the integrity break.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A1.6` Optional audit note for historical `commit: TBD` integrity break.
+      - Optionally create an audit-note subsection in `MANIFEST.md` or a sibling note documenting the `commit: TBD` issue.

@@ -1,0 +1,106 @@
+id: C2.3
+epic: meta-improvement-system
+slice: S5
+title: Per-agent token capture path
+status: pending
+complexity: high
+methodology: classic
+depends_on: ["C2.0", "C2.1", "C2.2"]
+
+description: |
+  Implement the per-agent token capture path using the mechanism proven in
+  `C2.0`, and wire it into the relevant hook surface so token counts can be
+  written as schema-valid JSONL metrics events.
+  This story owns the agent-granular refinement of the token metric, not the
+  config gate or the top-level Stop-hook totals.
+  The implementation may touch PostToolUse, SessionEnd-adjacent logic, or task
+  output parsing helpers depending on what the spike proved viable, but it must
+  stay faithful to that decision record and degrade gracefully when a specific
+  event lacks token data.
+  Do write actual token counts when available. Do not re-open whether token
+  capture is required or swap in a placeholder metric.
+
+acceptance_criteria:
+  - "Given the `C2.0` mechanism choice, when the per-agent token path is reviewed, then it uses that mechanism rather than inventing a new unproven surface."
+  - "Given `metrics.enabled: true`, when an agent-scoped capture point fires, then the system emits token-count data that validates against the event schema."
+  - "Given incomplete token visibility for a single event, when the path degrades, then it does not crash the workflow and records the absence in the documented way."
+  - "Given `metrics.enabled: false`, when the same path fires, then no metrics event is written."
+
+steps:
+  - id: research
+    description: "Translate the `C2.0` spike result into concrete hook/helper ownership, then confirm which repo surface should own per-agent token extraction and how graceful degradation should be represented."
+    agent: researcher
+  - id: implement
+    description: "Modify the concrete hook/helper files selected by the `C2.0` spike so per-agent token counts can be extracted and written as schema-valid events under the `metrics.enabled` gate."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Add and run checks for agent-scoped token emission, graceful degradation, and flag-off silence. Suggested commands should include the repo’s chosen test runner plus schema-focused inspection of emitted token events."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the implementation for fidelity to the spike result and confirm it emits real token counts rather than placeholders."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the per-agent token-capture path once it is proven against the documented mechanism and event schema."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [json, bash, yaml, markdown]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/token-capture-feasibility.md
+      purpose: "Authoritative source for the winning token-capture mechanism."
+    - path: /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json
+      purpose: "Possible owner surface if the chosen mechanism is hook-driven."
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md
+      purpose: "Schema the emitted token events must validate against."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hooks/metrics-token-capture.sh
+    change: "Create the token-capture helper implementing the `C2.0` extraction mechanism for per-agent metrics emission."
+  - file: /Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md
+    change: "Adjust token-related examples or field notes only if the proven mechanism requires clarifying schema examples."
+  - file: /Users/don/Documents/plugin-hive/tests/meta-improvement-system/metrics/token-capture.test.sh
+    change: "Create per-agent token-emission tests covering the proven mechanism, graceful degradation, and flag-off silence."
+
+code_examples:
+  - title: "Token-risk framing from sequencing"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/tpm-sequencing-memo.md
+    snippet: |
+      If the Claude Code SDK doesn't surface per-Agent token usage via TeamCreate,
+      C3 needs an alternative capture path (PostToolUse on Task tool? transcript parsing? explicit self-report?).
+
+design_decisions:
+  - decision: "Implement the proven spike mechanism rather than an unverified alternative."
+    rationale: "D7 makes token capture mandatory, but only a real extraction path should become the S5 implementation basis."
+    source: "C2.0 output | cycle-state D7"
+  - decision: "Gracefully degrade on missing token visibility for a specific event."
+    rationale: "S5 requires robustness when a surface is temporarily incomplete, but not optional token capture at the slice level."
+    source: "structured-outline Part 4 S5 | task D7 note"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update the hook/helper owner file chosen by `C2.0` and clarify any token-event examples in `/Users/don/Documents/plugin-hive/.pHive/metrics/metrics-event.schema.md` so later stories use the same capture semantics."
+
+risks:
+  - severity: high
+    description: "The implementation could drift from the proven mechanism and recreate the original uncertainty."
+    mitigation: "Make the spike document the primary reference in review and reject any code path not justified by it."
+  - severity: medium
+    description: "Missing-token cases could be mishandled as hard failures."
+    mitigation: "Test graceful degradation explicitly while still preserving slice-level token-capture requirements."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `C2.3` Per-agent token capture path with fallback.
+      - With the flag on, the run emits the five approved MVP metrics: tokens, wall-clock, fix-loop iterations, first-attempt pass flag, and human escalation.
+  - path: /Users/don/Documents/plugin-hive/.pHive/cycle-state/meta-improvement-system.yaml
+    relevant_excerpt: |
+      Token capture must discover a working mechanism before S5 ships.
+      Phase C story authoring must include this as a blocking discovery item.

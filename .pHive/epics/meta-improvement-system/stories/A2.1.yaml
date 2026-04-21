@@ -1,0 +1,109 @@
+id: A2.1
+epic: meta-improvement-system
+slice: S4
+title: Rewrite implementation step
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["A1.2", "A1.5"]
+
+description: |
+  Rewrite the implementation phase of the meta-team control plane so its write
+  obligations, workflow wording, and active-state references match the rebuilt
+  authority model instead of the archived single-swarm system.
+  This story owns `step-04-implementation.md` and the matching implementation
+  step block in `meta-team-cycle.workflow.yaml`.
+  The rewritten step must stop telling the developer to mutate legacy
+  `.pHive/meta-team/cycle-state.yaml` as an inline scratchpad when that path is
+  no longer the live authority mechanism for both future swarms.
+  Do keep the approved-proposal sequencing, file reread discipline, and blocked
+  proposal handling. Do not rewrite testing, promotion, or close semantics here.
+
+acceptance_criteria:
+  - "Given the rewritten implementation step, when an operator reads `step-04-implementation.md`, then every named write target is consistent with the post-A1 control plane rather than archived meta-team state."
+  - "Given the workflow file, when the implementation step block is reviewed, then its task/output wording matches the rewritten step file and does not promise legacy `cycle-state.yaml` recording behavior."
+  - "Given the archived-single-swarm reset, when the step is checked against S4 scope, then it no longer depends on live writes to `/Users/don/Documents/plugin-hive/.pHive/meta-team/cycle-state.yaml` for routine per-change tracking."
+  - "Given A2 scope boundaries, when this story completes, then testing, evaluation, promotion, and close files remain untouched except for any workflow wording needed to keep Step 4 aligned."
+
+steps:
+  - id: research
+    description: "Read the current workflow and Step 4 text, then confirm which implementation-phase obligations survive the control-plane rewrite and which legacy state writes must be removed or redirected."
+    agent: researcher
+  - id: implement
+    description: "Rewrite `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-04-implementation.md` and align the implementation block in `/Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml` to the rebuilt authority model."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify Step 4 no longer names legacy per-change writes to `.pHive/meta-team/cycle-state.yaml` and that the workflow still points to the same step file. Suggested checks: `rg -n \"cycle-state.yaml|Record each change|approved proposals\" /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-04-implementation.md` and `rg -n \"step-04-implementation.md|changes_made|implementation_report\" /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the Step 4 rewrite for authority coherence and confirm it removes the archived-state coupling without deleting the proposal-processing guardrails."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the Step 4 rewrite once workflow and step-file wording are consistent."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-04-implementation.md
+      purpose: "Primary control-plane file that currently mixes implementation guidance with legacy state-write assumptions."
+    - path: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+      purpose: "Workflow owner file whose implementation step task and outputs must stay aligned with the rewritten step file."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/archive/2026-04-19/MANIFEST.md
+      purpose: "Archive evidence showing the prior meta-team state is historical, not the active runtime contract."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-04-implementation.md
+    change: "Rewrite the implementation protocol so it follows the rebuilt authority model and removes legacy active-state assumptions."
+  - file: /Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml
+    change: "Update the implementation step task/output wording only as needed to stay consistent with the rewritten Step 4 contract."
+
+code_examples:
+  - title: "Legacy Step 4 state-write coupling to remove"
+    file: /Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-04-implementation.md
+    snippet: |
+      Implement each approved proposal in priority order. Record changes in `cycle-state.yaml` as you go.
+      ...
+      Immediately after each file write, append to `.pHive/meta-team/cycle-state.yaml`:
+      - proposal_id: proposal-{N}
+        action: {action type}
+        file: {file path}
+
+design_decisions:
+  - decision: "Treat Step 4 as a control-plane rewrite, not a path-only patch."
+    rationale: "The architect and audit both say the live problem is contradictory authority, not missing strings."
+    source: "architect-memo §3 | codex-audit-memo TL;DR"
+  - decision: "Keep the implementation-phase sequencing but remove archived-state dependence."
+    rationale: "S4 preserves useful workflow discipline while retiring the legacy single-swarm authority surface."
+    source: "structured-outline Part 4 S4 | vertical-plan Slice 4"
+
+cross_cutting:
+  - concern: documentation
+    action: "Update `/Users/don/Documents/plugin-hive/hive/workflows/steps/meta-team-cycle/step-04-implementation.md` and keep `/Users/don/Documents/plugin-hive/hive/workflows/meta-team-cycle.workflow.yaml` wording aligned so workflow docs do not describe archived-state behavior."
+
+risks:
+  - severity: medium
+    description: "A shallow rewrite could remove the legacy path names but leave Step 4 semantically dependent on the archived meta-team state."
+    mitigation: "Review for authority semantics, not just string replacement, and compare against the A1 archive/reset output."
+  - severity: low
+    description: "Workflow and step-file wording could drift."
+    mitigation: "Edit both files in the same story and verify the step outputs still match."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `A2.1` Rewrite implementation step.
+      - Modify `hive/workflows/steps/meta-team-cycle/step-04-implementation.md` — remove cross-role write violations.
+      - Modify `hive/workflows/meta-team-cycle.workflow.yaml` — align workflow orchestration with rewritten step semantics.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/codex-audit-memo.md
+    relevant_excerpt: |
+      The current meta-team is not a broken version of the desired two-swarm Karpathy loop.
+      Rebuild the control plane; do not paper over it with find/replace patches.
+

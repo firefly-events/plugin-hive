@@ -1,0 +1,100 @@
+id: C1.3
+epic: meta-improvement-system
+slice: S2
+title: Experiment envelope schema
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["B0.1", "B0.2", "B0.3", "C1.1"]
+
+description: |
+  Author the lean experiment-envelope schema document that turns the B0 contract
+  into a concrete storage-facing reference for `.pHive/metrics/experiments/`.
+  This story captures the approved fields, how they are stored, and which
+  fields are allowed to change in place after experiment creation.
+  The schema must preserve the user’s Q3 guardrails: minimal field set, simple
+  threshold policy reference, unconditional auto-revert semantics, and a strict
+  closure invariant.
+  Do include example envelopes and mutation notes. Do not add any threshold
+  class system, alternative delayed-regression modes, or extra closure evidence.
+
+acceptance_criteria:
+  - "Given the envelope schema doc, when it is compared to B0 and Q3, then all approved fields are present and no extra fields were introduced."
+  - "Given the mutation rules, when the schema is reviewed, then update-in-place is limited to decision and rollback-related fields rather than arbitrary envelope edits."
+  - "Given the closure invariant, when the doc is read in isolation, then commit/ref, metrics snapshot, and rollback target requirements are explicit."
+  - "Given the example envelope, when later slices use it as a model, then compare and rollback-watch flows can identify where policy_ref, observation_window, and regression_watch live."
+
+steps:
+  - id: research
+    description: "Reconcile the B0 envelope contract with Q3 and the horizontal-plan field list before writing the storage-facing schema."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md` with field definitions, example envelopes, and narrow mutation rules."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the schema doc includes the approved fields and update-in-place rules. Suggested checks: `rg -n \"baseline_ref|candidate_ref|policy_ref|rollback_ref|regression_watch|update-in-place\" /Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for Q3 drift and confirm the doc stays lean enough for the user’s anti-over-engineering requirement."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the envelope schema after review approval."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md
+      purpose: "Canonical schema reference for lifecycle envelopes and closure semantics."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+      purpose: "B0 contract this schema concretizes."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+      purpose: "Binding source for the field set, threshold policy, and auto-revert behavior."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md
+    change: "Create the lean envelope schema doc with examples and tightly scoped mutation rules."
+
+code_examples:
+  - title: "Approved envelope schema shape"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/horizontal-plan.md
+    snippet: |
+      - `experiment-envelope.schema.md` — fields: experiment_id, swarm_id, target_ref, baseline_ref, baseline_metrics_ref, candidate_ref, candidate_metrics_ref, policy_ref, decision, observation_window, rollback_ref, regression_watch (Q3 lean; no per-metric class system)
+
+design_decisions:
+  - decision: "Translate B0 into a concrete envelope schema without broadening the field set."
+    rationale: "C1 is allowed to freeze storage, not redesign the approved contract."
+    source: "structured-outline Part 4 S2 | user-decisions Q3"
+  - decision: "Allow only narrow update-in-place semantics."
+    rationale: "The outline explicitly limits mutable envelope fields and later tests depend on that boundary."
+    source: "structured-outline Part 4 S2 | vertical-plan Slice 2"
+
+cross_cutting:
+  - concern: documentation
+    action: "Create `/Users/don/Documents/plugin-hive/.pHive/metrics/experiment-envelope.schema.md` and reference it from the carrier README and B0 contract doc as the storage-facing realization of the signed envelope contract."
+
+risks:
+  - severity: medium
+    description: "The schema could exceed the user-approved envelope scope."
+    mitigation: "Validate every field against B0 and Q3 before review."
+  - severity: medium
+    description: "Mutation rules could be underspecified and let later code rewrite arbitrary envelope state."
+    mitigation: "Document create-vs-update fields explicitly and keep update-in-place limited to decision and rollback surfaces."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `C1.3` Experiment envelope schema.
+      - Create `.pHive/metrics/experiment-envelope.schema.md` — lean envelope schema with approved fields only.
+      - The envelope writer only supports update-in-place for decision and rollback fields, not arbitrary mutation.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      - **Required fields:** approved as listed (baseline ref, candidate ref, commit/ref, metrics snapshot, policy ref, decision, `rollback_ref`, observation window, `regression_watch`).
+      - **Delayed-regression handling:** `auto-revert`.

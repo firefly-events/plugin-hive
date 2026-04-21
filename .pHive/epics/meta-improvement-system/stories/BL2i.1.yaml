@@ -1,0 +1,103 @@
+id: BL2i.1
+epic: meta-improvement-system
+slice: S8
+title: Meta-meta backlog schema and seeded trivial candidates
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["A1.5", "L1.3"]
+
+description: |
+  Create the maintainer backlog file that gives `/meta-meta-optimize` a safe,
+  human-curated proving-run input when metrics are absent or insufficient.
+  This story owns the maintainer queue shape at
+  `.pHive/meta-team/queue-meta-meta-optimize.yaml` and seeds it with 2-3 trivial
+  candidates suitable for the first non-destructive proving cycle.
+  The backlog should preserve attribution, status, and experiment-safety notes
+  so later stories can select a candidate without reinterpreting free-form text.
+  Do create a clear YAML schema-by-example and seed only trivial candidates. Do
+  not add auto-surfacing or live execution logic here.
+
+acceptance_criteria:
+  - "Given the backlog story, when the repo is inspected, then `/Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-meta-optimize.yaml` exists."
+  - "Given the seeded proving-run requirement, when the backlog file is read, then it contains 2-3 trivial maintainer candidates that are safe for a first live cycle."
+  - "Given backlog mode is a fallback, when the file is reviewed, then each entry carries enough structure for later selection without implying auto-surfacing."
+  - "Given S8 intro scope, when this story completes, then no workflow execution or repo-mutation behavior has been added."
+
+steps:
+  - id: research
+    description: "Inspect the legacy queue shape and the signed backlog-fallback decision so the new maintainer queue carries useful structure without reviving single-swarm assumptions."
+    agent: researcher
+  - id: implement
+    description: "Create `/Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-meta-optimize.yaml` with a documented schema-by-example and 2-3 trivial proving-run candidates scoped for maintainer-only backlog fallback."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Verify the queue file exists and contains seeded candidates. Suggested checks: `test -f /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-meta-optimize.yaml` and `rg -n \"candidate_id|status|safety_notes\" /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-meta-optimize.yaml`."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review that the seeded candidates are trivial, safe, and clearly distinct from any future auto-surfaced backlog mode."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit and push the maintainer backlog file once review passes."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [yaml, markdown, bash]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-meta-optimize.yaml
+      purpose: "New maintainer backlog and proving-run candidate source."
+    - path: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue.yaml
+      purpose: "Legacy queue reference for useful structural cues only."
+    - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+      purpose: "Authoritative source for backlog fallback and human-edit-only MVP scope."
+
+files_to_modify:
+  - file: /Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-meta-optimize.yaml
+    change: "Create the maintainer backlog with structured trivial proving-run candidates."
+
+code_examples:
+  - title: "Backlog fallback is in scope, auto-surfacing is deferred"
+    file: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    snippet: |
+      - A `meta-backlog.yaml` or equivalent ledger of known-useful optimization targets
+      - Meta-team reads from backlog when metric-driven mode can't propose anything
+      - Backlog entries may be human-curated or auto-surfaced from qualitative signals
+      - NEW Q4 (backlog auto-surfacing): `(A)` — human-edit-only MVP
+
+design_decisions:
+  - decision: "Seed the maintainer queue with trivial candidates."
+    rationale: "S9 needs a safe first proving-run target rather than an empty or ambiguous backlog."
+    source: "structured-outline Part 4 S8"
+  - decision: "Keep backlog entries human-curated only."
+    rationale: "Auto-surfacing is explicitly deferred out of MVP."
+    source: "user-decisions Q-new-D"
+
+cross_cutting:
+  - concern: documentation
+    action: "Document the queue shape inline in `/Users/don/Documents/plugin-hive/.pHive/meta-team/queue-meta-meta-optimize.yaml` so maintainers can discover required fields without separate hidden knowledge."
+
+risks:
+  - severity: medium
+    description: "Seeded backlog items could be too invasive for a first maintainer proving run."
+    mitigation: "Restrict entries to trivial, reversible candidates and review the safety notes explicitly."
+  - severity: low
+    description: "The file could blur human-curated backlog mode with deferred auto-surfacing."
+    mitigation: "State directly in comments or header fields that the MVP backlog is human-edited only."
+
+references:
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/structured-outline.md
+    relevant_excerpt: |
+      - `BL2i.1` Meta-meta backlog schema and seeded trivial candidates.
+      - Create `.pHive/meta-team/queue-meta-meta-optimize.yaml` — maintainer backlog with seeded trivial proving-run candidates.
+  - path: /Users/don/Documents/plugin-hive/.pHive/epics/meta-improvement-system/docs/user-decisions-dd.md
+    relevant_excerpt: |
+      ## Q7. First `meta-meta-optimize` cycle gating — `Affirm + extend`
+      This adds a design surface not previously captured:
+      - A `meta-backlog.yaml` or equivalent ledger of known-useful optimization targets
