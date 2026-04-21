@@ -80,7 +80,9 @@ model_tiers:
     - test-worker
 
 # Override a specific agent's model (takes precedence over tier)
-model_overrides: {}
+model_overrides:
+  reviewer: opus               # Claude Opus 4.7 reviews Codex-produced work (user directive)
+  peer-validator: opus         # peer-validator runs alongside reviewer — same tier
   # example: researcher: opus    # promote researcher to opus for complex projects
 
 # Circuit breakers — prevent wasted time and tokens
@@ -109,7 +111,7 @@ example_codebases: []
 # Requires: npm install -g @openai/codex && codex login
 external_models:
   codex:
-    enabled: false              # set to true after installing and authenticating Codex CLI
+    enabled: true               # codex CLI 0.118+ installed, ChatGPT auth active
     use_for:
       - adversarial-review      # run after Claude review, before optimize/integrate
     # companion_path is auto-detected from the codex plugin if installed
@@ -121,9 +123,19 @@ external_models:
 # - `codex` requires: external_models.codex.enabled: true, codex + cmux CLIs,
 #   codex login. macOS-only during PoC (cmux constraint). See
 #   skills/hive/skills/codex-invoke/SKILL.md for pre-flight details.
-agent_backends: {}
-  # reviewer: codex              # run reviewer in a cmux pane via OpenAI Codex
-  # backend-developer: codex     # run backend-developer in a cmux pane via OpenAI Codex
+agent_backends:
+  # Planning split (per user split-system directive)
+  architect: codex             # route architect persona to Codex (planning work)
+  technical-writer: codex      # route technical-writer persona to Codex (planning work)
+  # Execution split (per user directive: "codex does the work, opus 4.7 reviews")
+  developer: codex
+  frontend-developer: codex
+  backend-developer: codex
+  tester: codex
+  # reviewer stays on Claude backend; model overridden to opus below
+  # reviewer: codex            # intentionally disabled — user wants Opus review
+  pair-programmer: codex
+  # Haiku test-worker stays Claude — cheapest path for mechanical execution
 
 # Developer preferences (populated by Phase 2b-ii: Developer Discovery)
 # These configure how Hive adapts to the developer's working style.
@@ -156,7 +168,7 @@ execution:
   # tmux: use TeamCreate's built-in tmux pane spawning (default)
   # cmux: spawn agents in cmux split panes via cmux CLI (requires cmux installed)
   # auto: detect cmux first, fall back to tmux
-  terminal_mux: tmux
+  terminal_mux: cmux
   # Interactive pane mode for cmux-spawned agents (both Claude and Codex).
   # true: launch agents in interactive mode — visible conversation in the pane,
   #   orchestrator can send follow-up messages, user can inspect/interact live.
