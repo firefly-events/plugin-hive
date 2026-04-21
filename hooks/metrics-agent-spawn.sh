@@ -19,50 +19,49 @@ set -euo pipefail
 # Resolve config path
 HIVE_CONFIG="${HIVE_CONFIG:-hive/hive.config.yaml}"
 
-# Parse metrics.enabled and metrics.dir from hive.config.yaml
-# yq is not guaranteed; use pure bash/python fallback
-if command -v yq >/dev/null 2>&1; then
-  metrics_enabled=$(yq '.metrics.enabled' "$HIVE_CONFIG" 2>/dev/null || echo "false")
-  metrics_dir=$(yq '.metrics.dir' "$HIVE_CONFIG" 2>/dev/null || echo ".pHive/metrics")
-elif command -v python3 >/dev/null 2>&1; then
-  metrics_enabled=$(python3 - "$HIVE_CONFIG" <<'EOF'
-import sys, re
-path = sys.argv[1]
+# Three-tier YAML-scoped config reader (I-4): yq → python3 yaml.safe_load → awk-scoped grep
+# Returns value of metrics.<key>, never matches keys outside the metrics: block
+_read_metrics_config() {
+  local key="$1"
+  local default="$2"
+  if [[ ! -f "$HIVE_CONFIG" ]]; then
+    echo "$default"
+    return
+  fi
+  local val=""
+  if command -v yq &>/dev/null; then
+    val=$(yq ".metrics.${key}" "$HIVE_CONFIG" 2>/dev/null | tr -d ' "' || true)
+  elif command -v python3 &>/dev/null; then
+    val=$(python3 - "$HIVE_CONFIG" "$key" <<'PYEOF'
+import sys
 try:
-    text = open(path).read()
-    m = re.search(r'^\s*enabled:\s*(true|false)', text, re.MULTILINE)
-    print(m.group(1) if m else "false")
+    import yaml
+    with open(sys.argv[1]) as f:
+        c = yaml.safe_load(f)
+    v = c.get('metrics', {}).get(sys.argv[2], '')
+    if v is not None and str(v) != '':
+        print(str(v).lower() if isinstance(v, bool) else str(v))
 except Exception:
-    print("false")
-EOF
-)
-  metrics_dir=$(python3 - "$HIVE_CONFIG" <<'EOF'
-import sys, re
-path = sys.argv[1]
-try:
-    text = open(path).read()
-    m = re.search(r'^\s*dir:\s*(\S+)', text, re.MULTILINE)
-    print(m.group(1) if m else ".pHive/metrics")
-except Exception:
-    print(".pHive/metrics")
-EOF
-)
-else
-  # grep fallback: very basic
-  metrics_enabled=$(grep -E '^\s*enabled:' "$HIVE_CONFIG" | head -1 | awk '{print $2}' || echo "false")
-  metrics_dir=$(grep -E '^\s*dir:' "$HIVE_CONFIG" | head -1 | awk '{print $2}' || echo ".pHive/metrics")
-fi
+    pass
+PYEOF
+    )
+  else
+    val=$(awk '/^metrics:/{flag=1; next} /^[a-zA-Z]/{flag=0} flag && /^[[:space:]]+'"$key"':/' "$HIVE_CONFIG" \
+      | head -1 | sed 's/[^:]*:[[:space:]]*//' | tr -d ' "')
+  fi
+  if [[ -z "${val:-}" ]] || [[ "$val" == "null" ]]; then
+    echo "$default"
+  else
+    echo "$val"
+  fi
+}
 
-# Normalise: strip inline yaml comments and surrounding quotes
-metrics_enabled="${metrics_enabled%%#*}"
-metrics_enabled="${metrics_enabled//\"/}"
-metrics_enabled="${metrics_enabled//\'/}"
-metrics_enabled=$(echo "$metrics_enabled" | tr -d '[:space:]')
+metrics_enabled=$(_read_metrics_config "enabled" "false")
+metrics_dir=$(_read_metrics_config "dir" ".pHive/metrics")
 
-metrics_dir="${metrics_dir%%#*}"
-metrics_dir="${metrics_dir//\"/}"
-metrics_dir="${metrics_dir//\'/}"
-metrics_dir=$(echo "$metrics_dir" | tr -d '[:space:]')
+# Strip leading/trailing whitespace
+metrics_enabled=$(echo "$metrics_enabled" | awk '{print $1}')
+metrics_dir=$(echo "$metrics_dir" | awk '{print $1}')
 
 # Silent no-op when metrics are disabled
 if [[ "$metrics_enabled" != "true" ]]; then
@@ -92,21 +91,15 @@ fi
 swarm_id="${HIVE_SWARM_ID:-}"
 phase="${HIVE_PHASE:-}"
 
-# Build event_id: evt_<timestamp>_spawn_<agent>
+# Build event_id using PID + RANDOM for same-second uniqueness (I-2)
+# macOS date does not support %N; PID+RANDOM gives sufficient uniqueness
 timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-# Use nanoseconds for uniqueness when available; fall back to seconds
-if date -u +"%N" >/dev/null 2>&1; then
-  ns=$(date -u +"%N" 2>/dev/null || echo "0000")
-else
-  ns="0000"
-fi
-event_id="evt_${timestamp}_spawn_${agent_name}_${ns}"
+event_id="evt_${timestamp}_$$_${RANDOM}_spawn_${agent_name}"
 
-# Build spawn-scoped dimensions: agent persona + phase if present
-dimensions_pairs="\"agent_persona\":\"${agent_name}\""
-if [[ -n "$phase" ]]; then
-  dimensions_pairs="${dimensions_pairs},\"phase\":\"${phase}\""
-fi
+# Build spawn-scoped dimensions: kind tag only (I-1, I-3)
+# Top-level phase and agent fields already carry persona/phase per schema §3.7/§3.8.
+# kind=spawn_marker differentiates this zero-value row from real wall_clock_ms timing rows.
+dimensions_pairs="\"kind\":\"spawn_marker\""
 
 # Build the identity block (story_id XOR proposal_id)
 if [[ -n "$story_id" ]]; then

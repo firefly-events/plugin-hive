@@ -5,6 +5,10 @@
 #   (a) metrics.enabled: false  → no event file written
 #   (b) metrics.enabled: true   → schema-valid JSONL event written
 #   (c) emitted event carries run/story/spawn correlation fields
+#   (d) proposal_id path: story_id absent when proposal_id supplied
+#   (e) YAML-scope: metrics.enabled: false + later enabled: true → no emission
+#   (f) dimensions.kind = spawn_marker; no dimensions.phase or dimensions.agent_persona
+#   (g) event_id uniqueness: two rapid emissions produce distinct event_ids
 
 set -euo pipefail
 
@@ -170,17 +174,6 @@ if [[ ${#jsonl_files[@]} -gt 0 ]]; then
   check_field_value "swarm_id" "meta-meta-optimize"
   check_field_value "phase"    "implement"
 
-  # dimensions must carry agent_persona for spawn-scoped context
-  if python3 -c "
-import json,sys
-d=json.loads(sys.argv[1])
-dims=d.get('dimensions',{})
-assert dims.get('agent_persona')=='developer'
-" "$first_line" 2>/dev/null; then
-    pass "correlation: dimensions.agent_persona = 'developer'"
-  else
-    fail "correlation: dimensions.agent_persona missing or wrong"
-  fi
 else
   fail "correlation tests skipped: no event file from (b)"
 fi
@@ -223,6 +216,113 @@ assert 'story_id' not in d
   fi
 else
   fail "proposal_id path: no event file written"
+fi
+
+# ---------------------------------------------------------------------------
+# (e) YAML-scope: metrics.enabled: false + later block with enabled: true → no emission
+# ---------------------------------------------------------------------------
+echo ""
+echo "=== (e) YAML-scope collision: metrics.enabled: false + later enabled: true → no write ==="
+
+WDIR_E="$TMPDIR_BASE/e"
+mkdir -p "$WDIR_E/hive"
+# metrics block has enabled: false; a later unrelated block has enabled: true
+cat > "$WDIR_E/hive/hive.config.yaml" <<'EOF'
+metrics:
+  enabled: false
+  dir: .pHive/metrics
+other_feature:
+  enabled: true
+EOF
+
+(
+  cd "$WDIR_E"
+  HIVE_CONFIG="hive/hive.config.yaml" \
+  HIVE_RUN_ID="run_test_2026-04-21_scope" \
+  HIVE_STORY_ID="C2.4" \
+  HIVE_AGENT="developer" \
+  bash "$HELPER"
+)
+
+events_e="$WDIR_E/.pHive/metrics/events"
+if [[ -d "$events_e" ]] && compgen -G "$events_e/*.jsonl" >/dev/null 2>&1; then
+  fail "yaml-scope: event written when metrics.enabled is false (other block's true matched)"
+else
+  pass "yaml-scope: no event written; metrics block correctly scoped"
+fi
+
+# ---------------------------------------------------------------------------
+# (f) dimensions.kind = spawn_marker; dimensions.phase and dimensions.agent_persona absent
+# ---------------------------------------------------------------------------
+echo ""
+echo "=== (f) dimensions: kind=spawn_marker; no phase/agent_persona in dimensions ==="
+
+if [[ ${#jsonl_files[@]} -gt 0 ]]; then
+  first_line=$(head -1 "${jsonl_files[0]}")
+
+  if python3 -c "
+import json,sys
+d=json.loads(sys.argv[1])
+dims=d.get('dimensions',{})
+assert dims.get('kind')=='spawn_marker', f'kind={dims.get(\"kind\")}'
+assert 'phase' not in dims, 'dimensions.phase must not be present'
+assert 'agent_persona' not in dims, 'dimensions.agent_persona must not be present'
+" "$first_line" 2>/dev/null; then
+    pass "dimensions: kind=spawn_marker, no phase/agent_persona in dimensions"
+  else
+    fail "dimensions: invariant violated — check kind, phase, agent_persona"
+  fi
+
+  # Top-level phase and agent must still be present
+  if python3 -c "
+import json,sys
+d=json.loads(sys.argv[1])
+assert 'agent' in d, 'top-level agent missing'
+assert 'phase' in d, 'top-level phase missing'
+" "$first_line" 2>/dev/null; then
+    pass "dimensions: top-level agent and phase present"
+  else
+    fail "dimensions: top-level agent or phase missing"
+  fi
+else
+  fail "(f) skipped: no event file from (b)"
+fi
+
+# ---------------------------------------------------------------------------
+# (g) event_id uniqueness: two rapid emissions produce distinct event_ids
+# ---------------------------------------------------------------------------
+echo ""
+echo "=== (g) event_id uniqueness: two rapid same-second emissions ==="
+
+WDIR_G="$TMPDIR_BASE/g"
+mkdir -p "$WDIR_G"
+make_config "$WDIR_G" "true" "$WDIR_G/metrics"
+
+(
+  cd "$WDIR_G"
+  HIVE_CONFIG="hive/hive.config.yaml" \
+  HIVE_RUN_ID="run_test_2026-04-21_uniq" \
+  HIVE_STORY_ID="C2.4" \
+  HIVE_AGENT="developer" \
+  bash "$HELPER"
+  HIVE_CONFIG="hive/hive.config.yaml" \
+  HIVE_RUN_ID="run_test_2026-04-21_uniq" \
+  HIVE_STORY_ID="C2.4" \
+  HIVE_AGENT="developer" \
+  bash "$HELPER"
+)
+
+out_g="$WDIR_G/metrics/events/run_test_2026-04-21_uniq-spawn.jsonl"
+if [[ -f "$out_g" ]]; then
+  id1=$(python3 -c "import json; lines=open('$out_g').readlines(); print(json.loads(lines[0])['event_id'])" 2>/dev/null || echo "")
+  id2=$(python3 -c "import json; lines=open('$out_g').readlines(); print(json.loads(lines[1])['event_id'])" 2>/dev/null || echo "")
+  if [[ -n "$id1" && -n "$id2" && "$id1" != "$id2" ]]; then
+    pass "event_id uniqueness: two rapid emissions produced distinct IDs"
+  else
+    fail "event_id uniqueness: IDs were identical or missing ($id1 / $id2)"
+  fi
+else
+  fail "event_id uniqueness: spawn file not created"
 fi
 
 # ---------------------------------------------------------------------------
