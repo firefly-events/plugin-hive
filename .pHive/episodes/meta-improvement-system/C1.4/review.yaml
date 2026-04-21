@@ -1,0 +1,54 @@
+story: C1.4
+step: review
+status: completed
+methodology: classic
+backend: claude
+model: opus (model_overrides.reviewer: opus)
+verdict: passed
+timestamp: "2026-04-21T04:24:00Z"
+ac_check:
+  - ac: "hive/lib/metrics/ exists with writer/reader/compare"
+    result: pass
+    evidence: "core.py:64-193"
+  - ac: "fixture tests: append + range + delta"
+    result: pass
+    evidence: "test_metrics.py:31-98"
+  - ac: "envelope create works; update-in-place limited to decision/rollback"
+    result: pass
+    evidence: "core.py:75-84 (create), core.py:87-113 (update), negative case tested"
+  - ac: "no writes outside .pHive/metrics/ — path safety"
+    result: pass
+    evidence: "paths.py:20-38 resolve+relative_to defense; _validate_relative_identifier at core.py:267-273; traversal/absolute/symlink all blocked empirically"
+  - ac: "no hook/kickoff modified"
+    result: pass
+    evidence: "git diff hive-C1.3..HEAD touches only .gitignore (prior commit) + new hive/lib/metrics/"
+path_safety_audit:
+  traversal_via_identifier: blocked_at_core.py:272
+  absolute_path_injection: blocked_at_core.py:270
+  symlink_escape: blocked_at_paths.py:22 (.resolve() canonicalizes)
+  write_site_check: "paths.py:30-38 re-validates; for_write flag load-bearing; no bypass path"
+schema_fidelity_audit:
+  event_required_fields: enforced (core.py:197-199)
+  event_story_proposal_xor: enforced (core.py:201-204)
+  event_type_invariants: enforced (core.py:213-222)
+  event_id_uniqueness: "NOT enforced — deferred to S5"
+  envelope_immutable_set: enforced_exactly (core.py:40-48)
+  envelope_narrow_mutable_set: enforced_exactly (core.py:49-55)
+  envelope_set_once: "commit_ref + rollback_ref (core.py:56-61)"
+  envelope_decision_transitions: "pending→accept, pending→reject, accept→reverted only (core.py:289-298)"
+  envelope_closure: _is_closed_at_core.py:317-319
+  auto_revert_B0_3_2_compliance: accept→reverted_allowed
+yaml_subset_risk:
+  status: acceptable
+  latent_issue: "future list-valued field would break _scalar_to_yaml at yamlish.py:38"
+  mitigation: "documented in README; schema §7 fence limits exposure"
+drift_risks_for_S5_S7:
+  - "event_id uniqueness — S5 emitters must dedupe or accept duplicates"
+  - "baseline_ref — S7 will need snapshot-ref flavor support"
+  - "metrics_snapshot open-update — S7 owns closure orchestration"
+reviewer_summary: |
+  Strong inert-primitive implementation. Path-safety enforcement is
+  defense-in-depth (validation + boundary check + resolve-then-verify).
+  Schema §4.1/§4.2 mutation rules modeled precisely. YAML subset round-trips
+  schema examples. Test suite light but exercises each AC — 4 defense-in-depth
+  tests added post-review per non-blocking reviewer recommendation.

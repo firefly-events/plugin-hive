@@ -1,0 +1,18 @@
+story: C1.4
+step: research
+status: completed
+methodology: classic
+backend: orchestrator
+timestamp: "2026-04-21T04:20:00Z"
+artifacts:
+  - hive/ (tree inspection — confirmed no existing hive/lib/, no package manifest)
+  - scripts/migrate-state-to-pHive.sh (only existing runtime script, bash)
+  - .pHive/metrics/metrics-event.schema.md (C1.2 contract)
+  - .pHive/metrics/experiment-envelope.schema.md (C1.3 contract)
+notes: |
+  Key repo-shape findings:
+  - Greenfield hive/lib/ (no prior runtime module)
+  - No package.json, pyproject, Cargo.toml — no build system
+  - Only existing scripts are bash under scripts/
+  - Decision surfaced to Codex as explicit judgment call (language + test runner)
+  Codex chose Python 3 + stdlib unittest with stdlib-only dependencies.

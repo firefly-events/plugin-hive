@@ -1,0 +1,35 @@
+story: C1.4
+step: implement
+status: completed
+methodology: classic
+backend: codex
+model: codex-cli-0.118.0 (--full-auto)
+timestamp: "2026-04-21T04:22:00Z"
+language: python3
+test_runner: unittest (stdlib)
+artifacts:
+  - hive/lib/metrics/__init__.py (31 lines)
+  - hive/lib/metrics/core.py (349 lines — writer/reader/compare primitives)
+  - hive/lib/metrics/errors.py (19 lines — exception classes)
+  - hive/lib/metrics/paths.py (40 lines — boundary enforcement)
+  - hive/lib/metrics/yamlish.py (95 lines — stdlib-only YAML subset)
+  - hive/lib/metrics/tests/test_metrics.py (initial 9 tests, +4 defense-in-depth = 13 total)
+  - hive/lib/metrics/README.md (38 lines — usage, METRICS_ROOT override, limitations)
+judgment_calls:
+  - id: 1
+    description: "Language + test runner choice (greenfield runtime module)"
+    resolution: "Python 3 + stdlib unittest — no new deps, callable from Bash"
+  - id: 2
+    description: "Event partitioning — one file per run_id"
+    resolution: "accepted — matches schema §6 examples; schema §8 defers partitioning"
+  - id: 3
+    description: "baseline_ref resolution scope"
+    resolution: "envelope-backed refs only (experiment:/envelope: prefixes); S7 will extend for snapshot-ref flavors"
+  - id: 4
+    description: "YAML library choice — stdlib-only subset vs pyyaml"
+    resolution: "stdlib-only yamlish module; supports mappings + scalars, no sequences; round-trips schema §6.1 envelope example"
+known_limitations:
+  - "event_id uniqueness within file NOT enforced (deferred to S5 emitters)"
+  - "read_baseline_metrics only resolves envelope-backed refs"
+  - "yamlish has no sequence support (latent bug if future schema adds list-valued fields)"
+  - "metrics_snapshot updates allowed while envelope is open; full closure-policy orchestration is S7's concern"
