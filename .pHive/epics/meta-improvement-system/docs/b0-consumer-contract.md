@@ -155,9 +155,70 @@ No field in the envelope is without a reader: `baseline_ref`, `candidate_ref`, `
 - **No output serialization format.** Whether results are YAML, JSON, in-memory structs, or printed tables is S2's choice.
 - **No concurrency-safety commitment.** The `delayed-regression-watch` query's aggregate cost assumes Q2's serial-by-default concurrency discipline; if future work enables parallel experiment execution (currently punted), that work owns re-validating this query's cost expectation.
 
-## 3. Threshold and rollback policy-ref contract (B0.3 — pending)
+## 3. Threshold and rollback policy-ref contract (B0.3)
 
-_To be authored by B0.3. Will pin the single-knob threshold shape and unconditional auto-revert semantics, with consumption points in compare and rollback-watch._
+This section pins the shape of the policy record that every `policy_ref` in §1.5 points at. It is still contract-level — no YAML keys, no validation rules. It defines (a) what the threshold knob is and is not, (b) the unconditional auto-revert behavior, and (c) how the compare and rollback-watch consumers read the policy to make their decisions. S2 freezes the syntax for this policy record; this section freezes the semantics S2's syntax must preserve.
+
+### 3.1 Threshold: one lean knob
+
+The threshold in the policy record is a **single knob**. Q3's sign-off language is verbatim: "no per-metric asymmetric-tolerance class system unless a concrete use case forces it." The lean MVP contract interprets this as the minimum shape that still answers the compare query's decision: a single scalar (or single-structure-equivalent) interpreted uniformly across all metrics.
+
+What the knob IS at the contract level:
+
+- **One value, applied across the MVP metric set.** The MVP metric set from Q8 (tokens per story, wall-clock per story, fix-loop iteration count, first-attempt review-pass flag, human escalation count) is the population the knob covers. S2 picks the exact numeric type (percent, ratio, absolute-delta ceiling) and whether the knob is rendered as a single field or a structurally-simple equivalent (for example, a relative-tolerance number with a sign convention).
+- **Read by the compare query.** §2.1's `baseline-vs-candidate` computes a delta for each metric and applies the single-knob threshold to decide `accept`/`reject`. Uniform application is the point: one knob value governs all metrics in the snapshot.
+- **Read by the rollback-watch query.** §2.3's `delayed-regression-watch` uses the same knob to decide whether a post-close snapshot has drifted far enough past the candidate's baseline to trip the watch.
+
+What the knob is NOT:
+
+- Not a per-metric class system. The policy record carries one knob, not a map of per-metric knob values. If a future concrete use case forces asymmetric tolerances (Q3's explicit escape hatch), that case re-opens Q3 and amends this contract; it does not quietly extend the lean shape.
+- Not a branchy mode tree. The knob is a single comparable value, not a decision tree that routes different metrics to different comparators (ratio here, absolute there, percentile somewhere else). S2 picks one comparator semantics and uses it uniformly.
+- Not two-sided/asymmetric at the contract level. A single lean knob implies one comparator used symmetrically; if asymmetric tolerance (e.g., "accept 5% token regression but reject any wall-clock regression") is later justified, it's a re-open, not a default.
+
+### 3.2 Rollback: unconditional auto-revert
+
+The rollback behavior in the policy record is **unconditional auto-revert**. Q3's sign-off language is verbatim: "If `regression_watch` flags a regression, the system reverts automatically. Do NOT build a three-class system (auto/human/narrow) — one behavior."
+
+What the behavior IS at the contract level:
+
+- **Single trigger condition:** the `delayed-regression-watch` query (§2.3) trips. When it trips, auto-revert fires. Nothing else triggers rollback from within the lifecycle; explicit maintainer-initiated rollbacks are a different surface (not an experiment-policy path) and are out of scope for B0.
+- **Single revert target:** the envelope's `rollback_ref` (§1.7). No alternate target selection, no "revert to N-2" branch, no partial-revert.
+- **Single terminal state:** the envelope's `decision` (§1.6) transitions to `reverted`. That transition is the sole write the auto-revert path performs on the envelope (S2 and S4/A2's step-07 own any other side effects — metrics, ledger, worktree-state).
+
+What the behavior is NOT:
+
+- Not a three-class system. No auto-revert-if-A-else-human-confirm-if-B-else-narrow-revert-if-C triage. One condition, one action.
+- Not recommendation-only. When the watch trips, the revert is taken, not proposed.
+- Not human-confirm-gated. No human gate between watch trip and revert execution.
+- Not scope-selectable. The rollback always restores to `rollback_ref`'s target, not to a caller-chosen subset.
+
+### 3.3 Policy-ref shape: how compare and rollback-watch consume it
+
+The policy record pointed at by `policy_ref` is, at the contract level, a **two-field minimum**: the threshold knob (§3.1) and the rollback behavior identifier (§3.2). The rollback behavior field is singular because there is only one approved behavior; carrying it explicitly in the policy record is a forward-compatibility hook — if a future Q3 re-open adds a second rollback mode, the field already exists to carry the selector. S2 picks whether the rollback field is a string enum, a boolean, a nested struct, or omitted from the MVP record entirely (since the only legal value is auto-revert).
+
+How each consumer reads the policy record:
+
+- **`baseline-vs-candidate` (§2.1) reads the threshold field.** It does not read the rollback field — that field is not relevant to the accept/reject decision, only to the post-close behavior. This is load-bearing: a policy record change that affects only rollback semantics must not invalidate prior compare-query verdicts.
+- **`delayed-regression-watch` (§2.3) reads the threshold field and the rollback field.** The threshold field names the regression condition (same scalar as compare uses, applied to the post-close snapshot's drift from the candidate baseline). The rollback field names the action on trip (in the MVP, always auto-revert; in the record carried for forward-compat, always `auto-revert` or its lean-record equivalent).
+- **`run-over-run` (§2.2) does NOT read the policy record.** Confirmed at §2.2 and restated here for the policy-side view: the trend query must not silently re-evaluate closed decisions through a different policy. Historical envelopes carry the policy they were decided under; trend reads report those decisions as-written.
+- **The closure validator (S4/A2.5) does NOT read the policy record.** Closure is a structural check (`commit_ref` + `metrics_snapshot` + `rollback_ref` + `decision` all present). Policy correctness is checked at decision time by the compare query, not at close time.
+
+Policy-record versioning is S2's concern. If a policy record is edited in place between an experiment's decision and its observation-window close, the contract expectation is that each envelope carries a reference to the policy record *as it was at decision time* (typically via a version or hash). This contract does not pin the mechanism; it names the invariant: **the rollback-watch query evaluates against the same policy that drove the accept decision, not the current tip of the policy record.** S2 may satisfy this via immutable policy records, versioned records with immutable versions, content-addressed references, or equivalent.
+
+### 3.4 Composition with §1 and §2
+
+- `policy_ref` (§1.5) is the envelope field that binds an experiment to a policy record of the shape defined here. Every envelope field enumerated in §1.5 (including "lives external to the envelope to prevent per-experiment drift") is load-bearing for this section.
+- `decision` (§1.6) enumerates `accept`, `reject`, `pending`, `reverted`. The `reverted` terminal state is written only by the auto-revert path defined here, confirming §1.6's "no mode tree" claim.
+- `baseline-vs-candidate` (§2.1) and `delayed-regression-watch` (§2.3) are this section's only policy-consuming consumers. §2.4's reconciliation rule applies: if §3 and §2 diverge on what a consumer reads, §3 and §2 must be updated together — neither wins by default over the other, because the per-query field list in §2 and the per-policy consumption note in §3 are two views of the same contract.
+
+### 3.5 What B0.3 does NOT commit to
+
+- **No policy-record schema.** Field names, ordering, required-vs-optional, default values, validation rules are all S2.
+- **No comparator algebra.** Whether the threshold is applied as `abs(delta) <= knob`, `delta / baseline <= knob`, normalized scores, or any other math is S2's choice, as long as the single-knob-uniformly-applied shape is preserved.
+- **No auto-revert implementation details.** Whether the revert is `git revert`, `git reset --hard`, a worktree-discard, or a different mechanism is S4/A2 (step-07 promotion) and B-L1 (shared lifecycle library) territory, not B0.
+- **No policy authorship UX.** How operators write a policy record (hand-edit, CLI, template fill-in) is kickoff / operator-surface territory, not B0.
+- **No policy-change audit trail.** Whether policy-record edits emit events, are versioned, or carry a changelog is S2.
+- **No recommendation-only mode, no human-confirm mode, no narrow-revert mode.** Restating §3.2's fence in the scope list for symmetry with §1.11 and §2.5: these modes are punted until a concrete use case forces them, and "forced" means a Q3 re-open, not an interpretation.
 
 ---
 

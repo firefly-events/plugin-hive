@@ -1,0 +1,37 @@
+step_id: test
+status: completed
+timestamp: "2026-04-21T04:48:00Z"
+artifacts:
+  - .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+methodology: solo
+collapsed_steps: [research, implement, test]
+notes: |
+  Ran B0.3 story YAML's rg checks:
+
+  Test 1 — auto-revert / threshold / policy_ref present:
+    cmd: rg -c "auto-revert|threshold|policy_ref" .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+    result: PASS — 36 total hits across §1 (policy_ref field, auto-revert path, reverted decision state), §2 (policy reads in compare + watch queries), §3 (full policy-ref contract).
+
+  Test 2 — anti-pattern check, only negation-context mentions:
+    cmd: rg -n "per-metric|human-confirmed|recommendation-only" .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+    first pass after §3 authoring: 9 hits — 7 legit (negation or verbatim-quote contexts), 2 false positives at §3.1 ("a per-metric delta") and §3.5 ("per-metric normalized scores") describing benign comparator/output shapes, not the forbidden class system.
+    action: reworded §3.1 "a per-metric delta" → "a delta for each metric" and §3.5 "per-metric normalized scores" → "normalized scores". Meaning preserved; matches the same zero-false-positive discipline applied in §2.
+    final: 7 hits, all negation or verbatim-quote contexts:
+      - L14 anti-over-engineering invariant
+      - L99-100 §1.11 fence
+      - L140 §2.3 no-mode-tree statement
+      - L164 Q3 verbatim quote inside quote marks
+      - L174 §3.1 "Not a per-metric class system" (negation)
+      - L191 §3.2 "Not recommendation-only" (negation)
+      - L221 §3.5 "No recommendation-only mode, no human-confirm mode" (negation)
+
+  Regression test — B0.1 fields + B0.2 queries still intact:
+    rg -c "baseline_ref|candidate_ref|policy_ref|rollback_ref|regression_watch" → 30 hits
+    rg -c "baseline-vs-candidate|run-over-run|delayed-regression-watch" → 28 hits
+    Both up from pre-§3 counts (23 and 21 respectively); the increase comes from §3's explicit references to fields and queries. Baselines preserved.
+
+  AC self-check vs B0.3 story YAML:
+    AC1 (threshold semantics documented as one lean knob, not per-metric classes): PASS — §3.1 names "single knob", explicitly not-per-metric-class-system
+    AC2 (auto-revert is the ONLY documented behavior): PASS — §3.2 names "unconditional auto-revert" and §3.2-NOT list fences three-class, recommendation-only, human-confirm
+    AC3 (policy-ref shape explains compare and rollback-watch consumption): PASS — §3.3 has per-consumer read-notes, §3.4 composes with §1.5/§1.6/§2.1/§2.3
+    AC4 (no code / config / schema files added): PASS — docs-only diff (single-file modification)
