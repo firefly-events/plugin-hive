@@ -1,0 +1,53 @@
+{
+  "mechanism": "claude_code_jsonl_transcript",
+  "sample": {
+    "session_id": "babf5d22-59ae-45be-ac17-9d4db44c07b2",
+    "session_path": "/Users/don/.claude/projects/-Users-don-Documents-plugin-hive/babf5d22-59ae-45be-ac17-9d4db44c07b2.jsonl",
+    "cwd": "/Users/don/Documents/plugin-hive",
+    "git_branch": "refactor/configurable-state-dir",
+    "claude_code_version": "2.1.116",
+    "extracted_at": "2026-04-21T19:55:47Z",
+    "assistant_usage_rows": 543,
+    "total_input_tokens": 6886,
+    "total_output_tokens": 665932,
+    "total_cache_creation_input_tokens": 2586192,
+    "total_cache_read_input_tokens": 161621847,
+    "models_observed": [
+      "claude-opus-4-7"
+    ],
+    "sidechain_rows": 0,
+    "main_thread_rows": 543,
+    "first_usage_row": {
+      "uuid": "f2c906aa-95b3-4747-90f9-8b4e7fdd9a65",
+      "timestamp": "2026-04-21T03:20:03.146Z",
+      "isSidechain": false,
+      "model": "claude-opus-4-7",
+      "usage": {
+        "input_tokens": 5,
+        "output_tokens": 364,
+        "cache_creation_input_tokens": 24668,
+        "cache_read_input_tokens": 18177
+      }
+    },
+    "last_usage_row": {
+      "uuid": "b77968d0-1e07-4809-b9f7-88cb005d4545",
+      "timestamp": "2026-04-21T06:59:30.369Z",
+      "isSidechain": false,
+      "model": "claude-opus-4-7",
+      "usage": {
+        "input_tokens": 1,
+        "output_tokens": 887,
+        "cache_creation_input_tokens": 746,
+        "cache_read_input_tokens": 565695
+      }
+    }
+  },
+  "evidence": {
+    "jsonl_line_shape": "{\"type\":\"assistant\",\"sessionId\":\"<uuid>\",\"isSidechain\":<bool>,\"message\":{\"model\":\"claude-opus-4-7\",\"usage\":{\"input_tokens\":N,\"output_tokens\":M,\"cache_creation_input_tokens\":X,\"cache_read_input_tokens\":Y,...}}}",
+    "rejected_surfaces": {
+      "tmp_task_output_jsonl": "grep over /private/tmp/claude-501/<project>/<session>/tasks/*.output found 0 usage blocks; files contain agent prompt traces only",
+      "post_tool_use_hook": "PostToolUse hook stdin payload exposes {session_id, transcript_path, tool_name, tool_input, tool_response} — no usage field (per Claude Code hook spec and existing hooks/check-agent-misuse.sh sample)",
+      "session_end_hook": "SessionEnd hook stdin exposes {session_id, transcript_path, reason} — no usage field. However transcript_path points back to the JSONL, so SessionEnd can be a trigger for reading the JSONL."
+    }
+  }
+}
