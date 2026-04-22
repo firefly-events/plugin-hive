@@ -53,7 +53,13 @@ Check if `.pHive/meta-team/cycle-state.yaml` exists.
 
 Before declaring the boot report complete, verify baseline metrics are available for the cycle via `hive/lib/meta-experiment/baseline.py` and `hive/lib/metrics`.
 
-- Use `hive.lib.metrics.read_run_events({prior_run_id})` to inspect the prior run's recorded events.
+- Resolve `prior_run_id` before calling metrics helpers. `prior_run_id` means the
+  most recent completed run for the same swarm cycle from the prior cycle metadata:
+  read the previous cycle's recorded run metadata from
+  `.pHive/meta-team/cycle-state.yaml -> steps.step_01_boot.run_id` and confirm its
+  companion events file at `.pHive/metrics/events/{prior_run_id}.jsonl`.
+- Use `hive.lib.metrics.read_run_events({prior_run_id})` to inspect that prior
+  run's recorded events.
 - If events exist for at least one MVP metric type (`tokens`, `wall_clock_ms`, `fix_loop_iterations`, `first_attempt_pass`, `human_escalation`):
   - record `baseline_available: true` in the boot report
 - Otherwise:
@@ -61,7 +67,12 @@ Before declaring the boot report complete, verify baseline metrics are available
   - emit the actionable stop-message: `BL2.3: baseline capture prerequisites missing (no metric events for run_id=<id>). Stop cycle after boot. No implementation work may begin.`
   - return `boot_report` with `status: stop_no_baseline` and HALT
 
-This check aligns with the BL2.2/BL2.3 stop condition and ensures later baseline capture can call `hive.lib.meta_experiment.baseline.capture_from_run()` or `capture_and_persist()` against a run with usable `hive.lib.metrics.read_run_events(...)` data.
+This check aligns with the BL2.2/BL2.3 stop condition and is non-bypassable. Do
+not show any "ready for Step 2" wording when `baseline_available: false`, and do
+not allow manual continuation into analysis or implementation. Later baseline
+capture may call `hive.lib.meta_experiment.baseline.capture_from_run()` or
+`capture_and_persist()` only after this step has recorded
+`baseline_available: true`.
 
 ### 5. Assign cycle ID
 Generate a cycle ID in the format `meta-YYYY-MM-DD` using today's date. If today's date already exists in the ledger (cycle already ran today), append `-r2`, `-r3`, etc.
@@ -92,7 +103,7 @@ Charter loaded: yes
 Prior cycles: {count}
 Last cycle: {id} — {outcome}
 Baseline available: {true|false}
-Status: ready to analyze
+Status: {ready_to_analyze | stop_no_baseline}
 ```
 
 ## SUCCESS METRICS
@@ -114,6 +125,9 @@ Status: ready to analyze
 
 ## NEXT STEP
 
-**Gating:** Boot report is complete and `cycle-state.yaml` is written.
-**Next:** Load `hive/workflows/steps/meta-team-cycle/step-02-analysis.md`
-**If gating fails:** Report which initialization step failed and stop.
+**Gating:** Boot report is complete, `cycle-state.yaml` is written, and
+`baseline_available: true`.
+**Next:** Load `hive/workflows/steps/meta-team-cycle/step-02-analysis.md` only
+when the BL2.3 gate passed.
+**If gating fails:** Report which initialization step failed, emit
+`status: stop_no_baseline` when applicable, and stop. No manual continuation.

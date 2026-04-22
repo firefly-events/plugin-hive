@@ -78,7 +78,32 @@ decision: no-fallback-available   # enum: would-execute | no-fallback-available
 Rules:
 - `decision: would-execute` when a pending candidate was found
 - `decision: no-fallback-available` when no pending candidate exists
+- `decision` MUST match whether `selected.*` are populated or `null`
 - All fields other than `decision` mirror the selected backlog entry or become `null`
+
+Example A: no fallback candidate available
+
+```yaml
+selected:
+  candidate_id: null
+  target: null
+  type: null
+  description: null
+  safety_notes: null
+decision: no-fallback-available
+```
+
+Example B: candidate found, dry-run would execute
+
+```yaml
+selected:
+  candidate_id: mmo-2026-04-21-001
+  target: hive/workflows/steps/meta-team-cycle/step-04-execute.md
+  type: workflow-doc-fix
+  description: Clarify fallback execution handoff wording
+  safety_notes: Docs only; no runtime mutation
+decision: would-execute
+```
 
 ### 5. Stop after reporting
 After the report is emitted:

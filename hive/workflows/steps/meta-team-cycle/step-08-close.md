@@ -48,9 +48,10 @@ Before any state write or ledger append: verify the closure evidence required by
 
 If any field fails validation:
 - HALT before ledger append
-- HALT before morning-summary write
+- Do NOT write the normal morning summary
 - Do NOT mark `status: closed`
 - Record the failure in the step's output as `close_rejected: {reason}` with the specific field(s) and their invalid values
+- Write only a diagnostic morning-summary-stub that records the rejection
 - The cycle ends in an incomplete state — NO ledger entry, NO promotion of the close record. The next cycle will find this cycle's state and can retry close after fixing the missing evidence.
 
 This check is the FIRST action in Step 8. It is not advisory. It is not skippable by reviewer judgment. The `hive/lib/metrics/` C1.4 runtime provides the envelope-structure validation; the git-ref validation here uses `git rev-parse --verify`.
@@ -59,7 +60,7 @@ This check is the FIRST action in Step 8. It is not advisory. It is not skippabl
 
 Build the close-time envelope from the workflow output graph:
 
-- `metrics_snapshot` <- step-06 evaluation output (the compare-derived dict)
+- `metrics_snapshot` <- step-06 evaluation output's raw candidate metric dict
 - `commit_ref` <- step-07 `promoted_changes[...]` entry's `commit_ref` (the real SHA captured by the `DirectCommitAdapter`). If the cycle discarded (no promotion), `commit_ref` is absent from the assembled envelope; the close-gate will reject. This is the intended outcome for a cycle with no promotion.
 - `rollback_ref` <- step-07 `promoted_changes[...]` entry's `rollback_target`. Rename at assembly time; this is the single canonical translation point.
 - `decision` <- cycle's terminal decision (`accept` / `reject` / `reverted`)
@@ -95,7 +96,7 @@ armed = arm_watch(
     envelope,
     observation_window_hours=4,
     now="<ISO now>",
-    envelope_writer=envelope,
+    envelope_writer=None,
 )
 ```
 
@@ -180,10 +181,17 @@ Rules:
 For findings marked for forwarding by the active swarm:
 
 ```bash
-gh issue create --title "[meta-team] {finding title}" --body "{description with evidence}" --label "meta-team-auto"
+gh issue create --title "{swarm_prefix} {finding title}" --body "{description with evidence}" --label "{swarm_label}"
 ```
 
-Record any created issue URL in the cycle-state summary under `forwarded_issues`. If forwarding is disabled or the active swarm is `/meta-meta-optimize`, skip this step entirely.
+`{swarm_prefix}` must be the resolved swarm prefix used elsewhere in close. Use a
+matching swarm label variable such as `{swarm_label}`; if the active swarm config
+does not expose one directly, derive it from the prefix, for example
+`[meta-optimize]` -> `meta-optimize-auto`.
+
+Record any created issue URL in the cycle-state summary under `forwarded_issues`.
+If forwarding is disabled or the active swarm is `/meta-meta-optimize`, skip this
+step entirely.
 
 ### 5. Update ledger.yaml
 

@@ -141,7 +141,9 @@ Discarded changes:
 - Worktree discard fails (`git worktree remove [--force]` cannot complete): flag for human with full context because the discard action could not execute
 - Promotion adapter fails to apply approved content to the live repo: flag for human with the adapter error and affected proposal IDs
 - Insight staging fails: log warning, continue — insights are best-effort
-- No changes promoted (all discarded): valid outcome — record as `partial` cycle
+- No changes promoted (all discarded): valid outcome — emit an output-graph
+  entry marking the cycle as `partial` so step 8 can persist that lifecycle
+  state
 
 ## WHAT THIS STEP DOES NOT OWN
 

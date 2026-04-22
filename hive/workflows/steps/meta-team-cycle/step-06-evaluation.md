@@ -14,9 +14,11 @@
 **Authority model:** this step is read-only against the code under review and
 its sole persistent output is the `evaluation_results` JSON + `verdict` string
 returned via the workflow output graph. Do NOT write cycle-state, ledger,
-envelope, or metrics-carrier files inline from this step. Downstream steps
-(promotion, close) own persistent control-plane writes coordinated through
-the workflow output graph and the B0 envelope contract
+envelope, or metrics-carrier files inline from this step. Step 7 remains
+output-graph-only as well: it returns promotion results and evidence but does
+not perform persistent control-plane writes. Step 8 (promotion/close) is the
+single lifecycle writer responsible for persistent control-plane writes
+coordinated through the workflow output graph and the B0 envelope contract
 (`.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md`). The
 quality bar is the A1.2 shared safety-constraints reference
 (`hive/references/meta-safety-constraints.md`) plus the active swarm's charter.
@@ -97,22 +99,35 @@ revision_notes: |
 Use `hive.lib.meta_experiment.compare` with the captured baseline already present in the envelope context and the candidate metrics collected during the step-04/step-05 run.
 
 - Load the baseline from the current envelope context
-- Compare the baseline against the candidate metrics using `hive.lib.meta_experiment.compare`
-- Produce a comparison dict
-- Step-06 emits `metrics_snapshot` for the envelope as the raw candidate metric values that post-close rollback watching will compare against later, for example `{'tokens': 0, 'wall_clock_ms': 39, 'first_attempt_pass': true}`. This value is consumed by step-08 during envelope assembly. Step-06 does not write the envelope directly.
-- Include the compare-derived `metrics_snapshot` in `evaluation_results` or as a sibling workflow output field
-- Base the evaluation verdict on that comparison output rather than on prose-only reasoning
-- Evaluation must emit the `metrics_snapshot` and the decision verdict in a form that can later serve as the baseline for post-close `rollback_watch.evaluate_watch(...)` comparisons.
+- Emit `metrics_snapshot` as the raw candidate metric dict, for example
+  `{'tokens': 0, 'wall_clock_ms': 39, 'first_attempt_pass': true}`. This value
+  must stay non-empty and is what step 8 later places into the envelope for
+  post-close `rollback_watch.evaluate_watch(...)` comparisons.
+- Compare the baseline against those candidate metrics using
+  `hive.lib.meta_experiment.compare`
+- Produce a separate comparison dict such as `evaluation_results.compare` or
+  `evaluation_results.verdict`
+- Base the evaluation verdict on that compare output rather than on prose-only
+  reasoning
+- Do not write promotion evidence here; step 7 owns promotion evidence and step 8
+  later consumes the raw `metrics_snapshot`
 
 This makes the step-06 verdict explicitly depend on the shared lifecycle library output that step 8 later validates.
 
-The compare output itself is separate workflow output, such as `evaluation_results.compare` or `evaluation_results.verdict`. Do not substitute that verdict/regression-metrics structure for the envelope `metrics_snapshot`; the snapshot must remain the raw baseline values that `rollback_watch.evaluate_watch(...)` will later compare against post-close observations.
+The compare output itself is separate workflow output, such as
+`evaluation_results.compare` or `evaluation_results.verdict`. Do not substitute
+that verdict/regression-metrics structure for the envelope `metrics_snapshot`;
+the snapshot must remain the raw candidate values that
+`rollback_watch.evaluate_watch(...)` will later compare against post-close
+observations.
 
 #### 4a. Evidence shape preservation
 
 - `metrics_snapshot` must be a non-empty dict
+- `metrics_snapshot` must contain raw metric values only; do not embed compare output
 - Evaluation must NOT populate `commit_ref` or `pr_ref`
-- Step 7 remains the sole owner of promotion evidence fields; step 6 only produces the compare-backed `metrics_snapshot`
+- Step 7 remains the sole owner of promotion evidence fields; step 6 only
+  produces raw `metrics_snapshot` plus separate compare output
 
 ### 5. Compile workflow outputs
 This structured dictionary is the `evaluation_results` workflow output for this
@@ -124,7 +139,8 @@ cycle_verdict: passed | partial | poor
 pass_count: {N}
 needs_optimization_count: {N}
 needs_revision_count: {N}
-metrics_snapshot: {non-empty compare-derived dict}
+metrics_snapshot: {non-empty raw candidate metric dict}
+compare: {structured compare output}
 ```
 
 ### 6. Produce evaluation report
@@ -148,7 +164,8 @@ Results:
 - [ ] Each change with `status: done` has an evaluation entry
 - [ ] Each evaluation cites specific evidence (not just "looks good")
 - [ ] Overall cycle verdict calculated
-- [ ] `hive.lib.meta_experiment.compare` output is bound into a non-empty `metrics_snapshot`
+- [ ] `metrics_snapshot` is a non-empty raw candidate metric dict
+- [ ] `hive.lib.meta_experiment.compare` output is emitted separately and drives the verdict
 - [ ] `evaluation_results` output emitted with per-change entries and cycle_verdict
 - [ ] Evaluation report produced
 
