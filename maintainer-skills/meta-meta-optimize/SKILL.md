@@ -143,6 +143,15 @@ If the close gate fails:
 - do not append the ledger
 - do not remove the worktree yet
 
+### Post-close observation (BL2.4)
+
+- Observe the cycle only while `now` remains inside the envelope `observation_window`
+- A follow-up maintainer run invokes `hive.lib.meta_experiment.rollback_watch.evaluate_watch(...)` with a post-close snapshot
+- Bind `auto_revert_callback` to `DirectCommitAdapter.rollback` so a trip performs a real git revert in the main checkout
+- If the watch trips: set `regression_watch.state` to `tripped`, transition `decision` to `reverted`, and record the revert commit in the ledger trail
+- If the observation window elapses without a trip: treat the experiment as stable
+- `evaluate_watch(...)` is post-close and cadence-driven; do not inline it into steps 1-8
+
 ## Insights And Ledger
 
 - Step 7 stages per-cycle insights under `.pHive/insights/meta-meta-optimize/cycle-{cycle_id}/`

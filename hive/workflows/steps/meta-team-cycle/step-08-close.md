@@ -81,6 +81,27 @@ Before any persistent state write, call:
 
 This is the FIRST executable action in step 8. It is not advisory. It delegates structural validation to the shared library so direct-commit and PR-only paths share one gate.
 
+### 1c. Arm rollback watch for accepted experiments (BL2.4)
+
+If the validated envelope decision is `accept`, arm the post-close rollback watch before any persistent close write so `rollback_watch.evaluate_watch(...)` can later observe a real committed experiment inside a concrete observation window.
+
+```python
+from hive.lib.meta_experiment.rollback_watch import arm_watch
+
+armed = arm_watch(
+    envelope,
+    observation_window_hours=4,
+    now="<ISO now>",
+    envelope_writer=envelope,
+)
+```
+
+Rules:
+- Default observation window is 4 hours unless the active maintainer path config overrides it
+- The `armed` payload's `regression_watch` and `observation_window` fields MUST be present in the Section 2 persistent write so post-close `evaluate_watch(...)` finds an armed state
+- For `reject` or `reverted`, skip arming and record `regression_watch: {state: 'not_applicable'}` in the close payload
+- `evaluate_watch(...)` remains a post-close concern; step 8 only arms the watch
+
 ### 2. Write final cycle summary to cycle-state
 
 After Section 1 passes, write the final cycle summary to the swarm-configured cycle-state target path. Do NOT hardcode `.pHive/meta-team/cycle-state.yaml` as the universal destination; the active swarm config determines the path. During the A2.6 split window, the target may still be a legacy-compatible location, but this step owns the close-time write.

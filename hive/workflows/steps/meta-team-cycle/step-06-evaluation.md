@@ -102,6 +102,7 @@ Use `hive.lib.meta_experiment.compare` with the captured baseline already presen
 - Step-06 emits `metrics_snapshot` (a non-empty dict derived from compare) as a workflow output value. This value is consumed by step-08 during envelope assembly. Step-06 does not write the envelope directly.
 - Include the compare-derived `metrics_snapshot` in `evaluation_results` or as a sibling workflow output field
 - Base the evaluation verdict on that comparison output rather than on prose-only reasoning
+- Evaluation must emit the `metrics_snapshot` and the decision verdict in a form that can later serve as the baseline for post-close `rollback_watch.evaluate_watch(...)` comparisons.
 
 This makes the step-06 verdict explicitly depend on the shared lifecycle library output that step 8 later validates.
 
