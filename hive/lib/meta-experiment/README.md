@@ -167,3 +167,34 @@ Writer behavior:
 Delivery note:
 
 - The `rollback-realism-proof-ambiguity` escalation remains open for S9; BL2.4 and BL2.6 will bind a real adapter and prove the end-to-end rollback path against concrete promotion machinery
+
+## Closure validator module
+
+Purpose: non-bypassable close-invariant gate per Q3. This module is a pure shared-library predicate; callers pass an envelope dict and receive either a pass or a distinct validation failure before ledger append.
+
+API:
+
+- `validate_closable(envelope)` raises on invalid close records and returns `None` on pass
+- `is_closable(envelope)` returns a boolean and swallows validator exceptions
+
+Required envelope fields for close:
+
+- `decision`: one of `accept`, `reject`, or `reverted`; `pending` is not closable
+- exactly one evidence field: `commit_ref` XOR `pr_ref`
+- `metrics_snapshot`: non-empty dict
+- `rollback_ref`: populated reference string
+
+Distinct error classes:
+
+- `CloseValidationError`
+- `MissingEvidenceError`
+- `AmbiguousEvidenceError`
+- `MissingMetricsSnapshotError`
+- `MissingRollbackTargetError`
+- `InvalidDecisionError`
+
+Evidence-shape guard:
+
+- The architect raised `closure-evidence-shape-mismatch` in `.pHive/cycle-state/meta-improvement-system.yaml`: a shared closure validator could overfit direct-commit evidence and reject valid PR-only close records.
+- This validator intentionally accepts current C1 `commit_ref` envelope evidence and forward-looking `pr_ref` envelope evidence. The current schema documents `commit_ref`; `pr_ref` acceptance is architecturally load-bearing so S10 does not have to retrofit the validator when the public PR-only close path lands.
+- S9 ships the first direct-commit close evidence. S10 ships PR-only close evidence. Both satisfy this validator without changes.
