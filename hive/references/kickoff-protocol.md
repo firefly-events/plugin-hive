@@ -38,6 +38,31 @@ Check the current working directory:
 - **Empty or minimal** (just a README, no source) → **Greenfield**
 - **Ambiguous** → Ask the user
 
+## Step 1a: Fresh Kickoff Metrics Opt-In
+
+Before entering the brownfield or greenfield path on a fresh kickoff run, ask the user:
+
+`Enable metrics tracking?`
+
+Keep the explanation inline and short: opting in enables metric-driven meta-optimization later; opting out keeps metrics off and future meta runs fall back to qualitative/backlog-fallback mode.
+
+Default to `no`. The user must actively choose `yes` to enable metrics. Empty input, unclear input, or any non-yes answer leaves metrics disabled.
+
+Persist the answer to `hive.config.yaml` using the existing kickoff config write pattern:
+
+1. Write the final choice to `metrics.enabled`
+2. `yes` → `metrics.enabled: true`
+3. `no` or default-off path → `metrics.enabled: false`
+
+Example result in `hive.config.yaml`:
+
+```yaml
+metrics:
+  enabled: false
+```
+
+Do not add brownfield read-current-value or keep-existing logic here. That belongs to later work.
+
 ---
 
 ## Step 2A: Brownfield — Discovery & Onboarding
