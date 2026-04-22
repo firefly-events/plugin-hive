@@ -1,0 +1,25 @@
+story: A1.2
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-A1.2
+parent_branch: hive-A1.1 (102acc3)
+timestamp: "2026-04-21T04:33:00Z"
+artifacts:
+  - hive/references/meta-safety-constraints.md (42 lines, NEW)
+backend_split:
+  implement: codex
+  review: claude (opus)
+ac_check: 3/3 pass
+review_verdict: passed (first submission)
+judgment_calls:
+  - id: 1
+    description: "Commit-prefix rule neutralization"
+    resolution: "per-swarm prefix (accepted as correct neutralization)"
+  - id: 2
+    description: "Legacy cadence exclusion phrasing"
+    resolution: "'Any legacy nightly cadence' (broader, future-proof)"
+  - id: 3
+    description: "Footer date 2026-04-20"
+    resolution: "accepted (extraction day, provenance-correct)"

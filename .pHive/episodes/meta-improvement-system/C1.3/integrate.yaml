@@ -1,0 +1,12 @@
+story: C1.3
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-C1.3
+parent_branch: hive-C1.2 (3ad23cf)
+timestamp: "2026-04-21T04:17:30Z"
+notes: |
+  Orchestrator-driven commit. Codex authored, Opus reviewed first-submission-pass.
+  Staged only .pHive/metrics/ + .pHive/episodes/ paths; hive.config.yaml remains
+  user's unrelated M-status.

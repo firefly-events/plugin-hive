@@ -1,0 +1,18 @@
+story: A2.1
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-A2.1
+parent_branch: refactor/configurable-state-dir (9c8fd68)
+timestamp: "2026-04-21T04:50:00Z"
+artifacts:
+  - hive/workflows/steps/meta-team-cycle/step-04-implementation.md (substantive rewrite)
+  - hive/workflows/meta-team-cycle.workflow.yaml (implementation step block only)
+diff_stat: "2 files changed, 23 insertions(+), 10 deletions(-)"
+backend_split:
+  implement: codex
+  review: claude (opus)
+ac_check: 4/4 pass
+review_verdict: passed (first submission)
+authority_model: "real decoupling — changes_made output replaces inline cycle-state writes; B0 + C1 cited as owners of downstream authority"

@@ -96,4 +96,3 @@ references:
     relevant_excerpt: |
       Metrics are kickoff-time opt-in.
       All Epic C hook writes become conditional on `metrics.enabled: true`.
-

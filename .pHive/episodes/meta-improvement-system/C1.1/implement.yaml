@@ -1,0 +1,30 @@
+story: C1.1
+step: implement
+status: completed
+methodology: classic
+backend: codex
+model: codex-cli-0.118.0 (--full-auto, workspace-write sandbox)
+timestamp: "2026-04-21T04:05:30Z"
+artifacts:
+  - .pHive/metrics/README.md
+  - .pHive/metrics/events/README.md
+  - .pHive/metrics/experiments/README.md
+  - .pHive/metrics/ (directory)
+  - .pHive/metrics/events/ (directory)
+  - .pHive/metrics/experiments/ (directory)
+notes: |
+  First orchestrator-driven Codex dispatch in the epic. Codex authored three
+  READMEs and the directory structure per the C1.1 story spec. One revision
+  cycle required to fix schema-file path drift (Codex placed paths under
+  subdirectories, horizontal plan placed them at top-level) — fix applied
+  cleanly, no other content changes.
+judgment_calls:
+  - id: 1
+    description: "Schema file location — Codex initially placed under subdirs"
+    resolution: "adjusted to top-level per reviewer finding (hp.md:77-78, outline:242-243)"
+  - id: 2
+    description: "Event file partitioning (per-run vs rolling daily) deferred to C1.2"
+    resolution: "accepted — horizontal-plan itself ambiguous; C1.2 owns decision"
+  - id: 3
+    description: "Retention/rotation policy under-specified"
+    resolution: "accepted — C1.4 (writer primitive) owns rotation policy"

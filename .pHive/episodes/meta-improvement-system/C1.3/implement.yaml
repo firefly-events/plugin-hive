@@ -1,0 +1,29 @@
+story: C1.3
+step: implement
+status: completed
+methodology: classic
+backend: codex
+model: codex-cli-0.118.0 (--full-auto)
+timestamp: "2026-04-21T04:16:00Z"
+artifacts:
+  - .pHive/metrics/experiment-envelope.schema.md (395 lines, NEW)
+  - .pHive/metrics/README.md (1 line — cross-link at line 25)
+judgment_calls:
+  - id: 1
+    description: "metrics_snapshot mutation model"
+    resolution: "final-at-close (set once before closure, frozen); append-history belongs in event rows"
+  - id: 2
+    description: "rollback_ref timing"
+    resolution: "may be at-create or set-later before closure; then frozen (matches B0 §1.7)"
+  - id: 3
+    description: "regression_watch shape"
+    resolution: "small mapping (state, tripped_by, tripped_at); B0 §1.9 permits composite"
+  - id: 4
+    description: "Historical drift wording"
+    resolution: "described HP as 'pre-B0 evidence split' without carrying old field names"
+drift_resolution: |
+  Contract fields = B0 §1's nine fields (baseline_ref, candidate_ref,
+  commit_ref, metrics_snapshot, policy_ref, decision, rollback_ref,
+  observation_window, regression_watch). Record-identity = separate §2.1
+  (experiment_id, swarm_id, target_ref). No baseline_metrics_ref or
+  candidate_metrics_ref introduced (metrics_snapshot subsumes them).

@@ -1,0 +1,23 @@
+story: A2.5
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-A2.5
+parent_branch: hive-A2.4 (3923ca7)
+timestamp: "2026-04-21T05:14:00Z"
+artifacts:
+  - hive/workflows/steps/meta-team-cycle/step-08-close.md (substantive rewrite, +111/-35)
+  - hive/workflows/meta-team-cycle.workflow.yaml (close step block)
+  - tests/meta-improvement-system/control-plane/closure-validator.test.sh (NEW, 86 lines, executable)
+ac_check: 4/4 pass
+review_verdict: passed (first submission)
+closure_invariant: |
+  NON-BYPASSABLE per Q3 + B0 §1.11. First check in TASK SEQUENCE before any
+  state write or ledger append. Rejects commit_ref missing/TBD/placeholder/
+  bogus, metrics_snapshot empty, rollback_ref missing/bogus. Uses
+  git rev-parse --verify "${ref}^{commit}" to strictly require real commit
+  refs (stronger than plain --verify).
+test_result: "7/7 PASS on closure-validator.test.sh (1 positive + 6 negative cases)"
+tbd_rejection: "explicit at step lines 45, 107, 147 + test case 2"
+pattern_consistency: "matches A2.1-A2.4 Authority model + WHAT THIS STEP DOES NOT OWN fence"

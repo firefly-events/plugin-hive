@@ -109,4 +109,3 @@ references:
     relevant_excerpt: |
       Step 5 explicitly says "Read-only access in this step — do NOT modify any files"
       while also requiring a write to `.pHive/meta-team/cycle-state.yaml`.
-

@@ -1,0 +1,26 @@
+story: A2.8
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-A2.8
+parent_branch: hive-A2.7 (36e934b)
+timestamp: "2026-04-21T05:38:00Z"
+artifacts:
+  - tests/meta-improvement-system/control-plane/step-grant-audit.test.sh (399 lines, NEW, executable)
+ac_check: 4/4 pass (strict — this is the S4 proof surface)
+review_verdict: passed
+test_result: "22 passed, 0 failed (20 positive assertions + 2 negative drift injections)"
+coverage:
+  - "Property 1: team files exist + well-formed (including legacy RETIRED tombstone)"
+  - "Property 2: tester + reviewer read-only in both swarms (mechanical YAML parse)"
+  - "Property 3: meta-meta-optimize developer write grants cover Step 4 obligations (hive/references, hive/agents, hive/workflows, skills/hive/agents/memories, .pHive/teams)"
+  - "Property 4: meta-meta-optimize orchestrator write grant covers Step 8 lifecycle (.pHive/meta-meta-optimize/**)"
+  - "Property 5: meta-optimize grants all scoped under {project_root}/ (zero cross-swarm leakage)"
+  - "Property 6: Step 8 closure invariant non-bypassable + commit_ref/metrics_snapshot/rollback_ref + git rev-parse --verify"
+  - "Property 7: Steps 4-7 have no inline cycle-state writes"
+  - "Property 8: Step 5 declares tester read-only in its own contract"
+  - "Property 9: negative drift cases caught with specific path/agent/file messages"
+portability_fix: "one rg -q → grep -q swap at L263 (ripgrep not in repo's tool baseline)"
+mechanical_vs_theater: "real mechanical check — Python3 stdlib YAML parser extracts agent|path|write triples; negative cases verify specific stderr messages, not generic non-zero"
+drift_resistance: "broadening tester/reviewer grant → P2 fails; adding inline cycle-state write → P7 fails; weakening Step 8 invariant → P6 fails; removing developer grant → P3 fails"

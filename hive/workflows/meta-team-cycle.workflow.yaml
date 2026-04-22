@@ -64,7 +64,9 @@ steps:
     agent: developer
     task: >
       Implement each approved proposal in sequence. Write files, add sections,
-      create memories. Record each change with before/after notes.
+      create memories. Return structured per-change entries in the
+      `changes_made` output; persistent control-plane writes happen in later
+      steps and are coordinated by the workflow output graph, not this step.
     step_file: hive/workflows/steps/meta-team-cycle/step-04-implementation.md
     depends_on:
       - proposal
@@ -82,9 +84,11 @@ steps:
   - id: testing
     agent: tester
     task: >
-      Validate all changes: verify cross-references resolve, schemas are valid,
-      step files follow the required structure, and no existing content was
-      broken.
+      Validate every change from Step 4 using the prescribed check set
+      (cross-reference integrity, schema compliance, content safety).
+      Read-only — return structured test_results and a validation_report
+      via the workflow output graph. Persistent control-plane writes
+      happen in later steps; this step does not write files.
     step_file: hive/workflows/steps/meta-team-cycle/step-05-testing.md
     depends_on:
       - implementation
@@ -102,8 +106,11 @@ steps:
   - id: evaluation
     agent: reviewer
     task: >
-      Evaluate results against charter objectives. Score each change.
-      Determine which changes pass quality bar and which need revision.
+      Evaluate each implemented change against the A1.2 shared safety-constraints
+      reference (hive/references/meta-safety-constraints.md) plus the active
+      swarm's charter. Assign pass / needs_optimization / needs_revision per
+      change with evidence-cited rationale. Read-only — return evaluation_results
+      and verdict via the workflow output graph; no file writes from this step.
     step_file: hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
     depends_on:
       - testing
@@ -125,8 +132,12 @@ steps:
   - id: promotion
     agent: orchestrator
     task: >
-      Promote approved changes. Write insights to starter memory staging.
-      Revert any changes that didn't meet quality bar.
+      Apply evaluation verdicts unambiguously under the worktree-default
+      isolation model (Q4 / hive/references/meta-experiment-isolation.md):
+      pass and needs_optimization promote via the active swarm's adapter;
+      needs_revision discards the experiment worktree. Return promoted_changes
+      and reverted_changes via the workflow output graph; no inline cycle-state
+      writes. Stage any reusable insights under .pHive/insights/{swarm}/.
     step_file: hive/workflows/steps/meta-team-cycle/step-07-promotion.md
     depends_on:
       - evaluation
@@ -144,8 +155,12 @@ steps:
   - id: close
     agent: orchestrator
     task: >
-      Close the cycle. Update cycle-state.yaml and ledger.yaml. Prepare morning
-      summary. Commit all changes.
+      Close the cycle. The closure invariant (commit_ref + metrics_snapshot +
+      rollback_ref all present and valid) is a non-bypassable gate per B0 §1.11
+      and user-decisions Q3 — incomplete closes are rejected before ledger
+      append. On pass, update cycle-state, commit changes, append ledger entry,
+      and produce morning summary. On fail, record close_rejected output with
+      missing-field details and halt without ledger append.
     step_file: hive/workflows/steps/meta-team-cycle/step-08-close.md
     depends_on:
       - promotion
@@ -165,3 +180,6 @@ steps:
     outputs:
       - name: morning_summary
         type: string
+      - name: close_rejected
+        type: string
+        optional: true

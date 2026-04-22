@@ -1,0 +1,25 @@
+story: L1.3
+epic: meta-improvement-system
+slice: S7
+status: passed
+steps:
+  - id: implement
+    agent: codex:codex-rescue
+    status: success
+    artifacts:
+      - hive/lib/meta-experiment/baseline.py
+      - hive/lib/meta-experiment/__init__.py
+      - hive/lib/meta-experiment/README.md
+      - hive/lib/meta-experiment/tests/test_baseline.py
+  - id: test
+    status: success
+    artifacts:
+      - "python3 -m unittest discover hive/lib/meta-experiment/tests: 16 tests, OK"
+  - id: review
+    agent: reviewer (opus)
+    status: passed
+    notes: |
+      capture_from_run returns None on missing/empty events (explicit no-baseline);
+      NoBaselineError reserved for capture_and_persist where baseline is required.
+      All substrate access via hive.lib.metrics; no YAML/JSONL direct I/O.
+      Minor non-blocking: constants duplicated from core.py rather than imported.

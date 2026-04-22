@@ -1,0 +1,15 @@
+story: C1.4
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-C1.4
+parent_branch: hive-C1.3 (603518a)
+prior_commit_on_branch: "533ee93 chore: ignore Python bytecode/caches"
+timestamp: "2026-04-21T04:25:00Z"
+notes: |
+  Orchestrator-driven commit after two-phase Codex authoring (initial impl +
+  4 defense-in-depth tests) and Opus review pass. Batched feature commit
+  includes 8 module files + 13 tests + 5 episode markers.
+  Prior commit 533ee93 landed repo-wide Python bytecode ignores on the same
+  branch as a precondition for C1.4 commit cleanliness.

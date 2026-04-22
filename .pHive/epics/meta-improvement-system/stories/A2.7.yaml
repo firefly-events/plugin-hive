@@ -105,4 +105,3 @@ references:
     relevant_excerpt: |
       The public-vs-plugin split can be lost if people reuse the current charter language.
       The current charter explicitly forbids changes to user project `.pHive/` directories.
-

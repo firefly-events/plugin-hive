@@ -1,0 +1,25 @@
+story: L1.4
+epic: meta-improvement-system
+slice: S7
+status: passed
+steps:
+  - id: implement
+    agent: codex:codex-rescue
+    status: success
+    artifacts:
+      - hive/lib/meta-experiment/compare.py
+      - hive/lib/meta-experiment/__init__.py
+      - hive/lib/meta-experiment/README.md
+      - hive/lib/meta-experiment/tests/test_compare.py
+  - id: test
+    status: success
+    artifacts:
+      - "python3 -m unittest discover hive/lib/meta-experiment/tests: 24 tests, OK"
+  - id: review
+    agent: reviewer (opus)
+    status: passed
+    notes: |
+      Single-knob discipline intact: threshold_pct required positional, no per-metric map.
+      Positive delta_pct = regression, documented. Booleans observed-only.
+      evaluate_from_envelope minimal wrapper. Minor cleanup in README planned-submodules
+      list can be done later (non-blocking).

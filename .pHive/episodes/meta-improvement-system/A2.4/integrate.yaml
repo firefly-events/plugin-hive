@@ -1,0 +1,18 @@
+story: A2.4
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-A2.4
+parent_branch: hive-A2.3 (f47051f)
+timestamp: "2026-04-21T05:06:00Z"
+artifacts:
+  - hive/workflows/steps/meta-team-cycle/step-07-promotion.md (substantive rewrite)
+  - hive/workflows/meta-team-cycle.workflow.yaml (promotion step block only)
+diff_stat: "2 files changed, 84 insertions(+), 54 deletions(-)"
+ac_check: 4/4 pass
+review_verdict: passed (first submission)
+revert_semantics: "worktree-discard model (git worktree remove); no file-copy restore; atomic + reversible per Q4"
+verdict_mapping: "pass → promote; needs_optimization → promote-with-note; needs_revision → discard worktree. Single unambiguous action per verdict; flagged_for_human removed from verdict paths (only exists as infrastructure failure response)"
+vocabulary: "status field renamed reverted → discarded; workflow output field name reverted_changes kept for backwards compat (documented in step file at two places)"
+s10_deferral: "clean — PR-artifact promotion semantics deferred to S10 /meta-optimize; line 7 + WHAT THIS STEP DOES NOT OWN fence both cite the boundary"

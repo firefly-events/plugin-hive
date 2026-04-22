@@ -1,0 +1,36 @@
+schema_version: 1
+type: mvl-proof
+slice: S9
+story: BL2.5
+proven_at: '2026-04-22T10:29:48Z'
+cycle_id: meta-2026-04-22
+candidate:
+  id: mmo-2026-04-21-001
+  target: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
+  type: archive-provenance-note
+worktree:
+  path: .pHive/meta-team/worktrees/meta-2026-04-22/
+  cleanup_status: removed
+  branch: meta-meta-exp-meta-2026-04-22
+artifacts:
+  envelope_path: .pHive/metrics/experiments/meta-2026-04-22.yaml
+  events_path: .pHive/metrics/events/meta-2026-04-22.jsonl
+  cycle_state_path: .pHive/meta-team/cycle-state.yaml
+  ledger_path: .pHive/meta-team/ledger.yaml
+closure_evidence:
+  commit_ref: 96d410046ccac86c69806b6b0e5335522af93216
+  rollback_ref: ea5b73a8fa4a76f69ff4ca2024d7f1c37b3b688d
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 39
+    first_attempt_pass: true
+  decision: accept
+regression_watch:
+  state: armed
+  observation_window:
+    start: '2026-04-22T10:29:48Z'
+    end: '2026-04-22T14:29:48Z'
+scope_boundary: BL2.5 proves a clean no-op live cycle with worktree isolation + durable
+  artifact references. Deliberate-regression rollback proof is reserved for BL2.6
+  against this same armed path.
+notes: First live /meta-meta-optimize cycle against a dormant archive candidate.

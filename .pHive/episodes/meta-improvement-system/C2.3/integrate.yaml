@@ -1,0 +1,63 @@
+story_id: C2.3
+epic: meta-improvement-system
+step: integrate
+status: complete
+date: "2026-04-21"
+
+per_agent_boundary_choice:
+  decision: >
+    Per-agent boundary is the subagent JSONL file boundary.
+    Each agent-<id>.jsonl under <session-id>/subagents/ is one agent invocation.
+    Tokens are summed across all assistant rows in that file to produce one row
+    per agent per call to metrics-token-capture.sh.
+    Main-thread rows (isSidechain=false in the main JSONL) are attributed to
+    the "orchestrator" agent label.
+  rationale: >
+    C2.0 feasibility doc §"Subagent attribution procedure" documents this
+    boundary explicitly: "Sum usage across agent-<id>.jsonl; tag the aggregated
+    row with agent_type from the meta sidecar." The subagent JSONL file is
+    therefore the natural per-agent unit — it already carries exactly one
+    agent's turns and is named by agent ID.
+  feasibility_doc_section: "Subagent attribution procedure"
+
+graceful_degradation:
+  strategy: emit_zero_with_flag
+  description: >
+    When a subagent's JSONL is absent (Codex-backed agent) or contains no
+    assistant rows with non-null message.usage (interrupted/streaming-error
+    turns), the helper emits a row with value: 0 and
+    dimensions.codex_gap: true. This preserves the agent's presence in the
+    metrics timeline without crashing the workflow. The flag allows downstream
+    consumers to distinguish "zero tokens confirmed" from "zero tokens due to
+    missing visibility".
+  ac3_reference: "AC-3: must not crash workflow; records absence in documented way"
+
+files_created:
+  - path: hooks/metrics-token-capture.sh
+    description: Per-agent token capture helper implementing C2.0 JSONL mechanism
+  - path: tests/meta-improvement-system/metrics/token-capture.test.sh
+    description: Test suite covering all 4 ACs
+
+schema_modified: false
+schema_note: >
+  No schema changes required. Existing token metric_type, unit, and dimensions
+  fields in metrics-event.schema.md are sufficient. codex_gap is stored as a
+  dimension key consistent with C2.2's existing pattern.
+
+test_results:
+  total: 18
+  passed: 18
+  failed: 0
+  cases:
+    - "(a) flag-off silence"
+    - "(b) flag-on real token counts (orchestrator=530, hive:developer=175)"
+    - "(c) graceful degradation: null usage → codex_gap row"
+    - "(d) schema validity: all rows satisfy §7 invariants"
+    - "(e) per-agent scoping: 3 distinct rows for 3 agents"
+    - "(f) codex gap: absent JSONL → codex_gap: true row"
+
+relationship_to_c22: >
+  C2.2 emits one aggregated session-total row at Stop-hook time.
+  C2.3 emits per-agent rows when called by the orchestrator at natural
+  agent boundaries. The two are complementary: C2.2 gives rollup view,
+  C2.3 gives granular attribution. C2.3 does NOT duplicate C2.2's emission.

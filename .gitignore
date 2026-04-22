@@ -28,9 +28,25 @@ state/
 !.pHive/cycle-state/
 .pHive/cycle-state/*
 !.pHive/cycle-state/meta-improvement-system.yaml
+# Metrics carrier (.pHive/metrics/) — authored by S2 stories of the
+# meta-improvement-system epic; contains schema docs and, from C1.4 on,
+# fixtures consumed by hive/lib/metrics/ unit tests.
+!.pHive/metrics/
+!.pHive/metrics/**
+# MVL proof artifacts — only the canonical mvl-proof folder ships with the repo.
+!.pHive/audits/
+.pHive/audits/*
+!.pHive/audits/mvl-proof/
+!.pHive/audits/mvl-proof/**
 agents/memories/
 .claude/settings.local.json
 .history/
 .DS_Store
 *.log
 .claude/*.lock
+# Python bytecode/caches — C1.4 (hive/lib/metrics/) introduced Python 3 runtime
+# primitives with stdlib-only deps. Prevent __pycache__/ and *.pyc files from
+# polluting the tree as future maintainer tooling adds more Python.
+__pycache__/
+*.pyc
+*.pyo

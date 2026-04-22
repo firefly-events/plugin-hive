@@ -1,0 +1,71 @@
+# Maintainer backlog for /meta-meta-optimize (LOCAL-ONLY, not shipped).
+# Mode: human-edit only — do NOT auto-append from analysis (Q-new-D locked).
+# Purpose: proving-run input when metrics are absent or insufficient.
+# Editing guidance: maintainers EDIT this file manually. Only add candidates
+# that are trivial, reversible, and safe for a first live cycle. Destructive
+# or wide-scope changes belong in a planning epic, not this backlog.
+#
+# Proving-run discipline: prefer ADD-style edits (append a line, add a note)
+# to dormant / archived files. ADD-style edits on dormant targets produce a
+# deterministic diff regardless of current file state, so they cannot silently
+# become no-ops. Avoid "normalize" / "fix trailing whitespace" candidates
+# unless the issue has been manually verified at the file under the candidate's
+# exact target path — otherwise the proving cycle may produce an empty diff
+# and fail to exercise the control plane.
+#
+# Active-file caution: do NOT target files that are being edited in open
+# branches or recent commits. Check `git log --since="1 week" -- <path>` before
+# seeding a candidate. If the target is actively churning, either wait or
+# pick a dormant alternative.
+
+schema_version: 1
+
+candidates:
+  - candidate_id: "mmo-2026-04-21-001"
+    target: ".pHive/meta-team/archive/2026-04-19/MANIFEST.md"
+    type: "archive-provenance-note"
+    description: >
+      Append a short "reviewed-on" provenance line to the archived meta-team
+      MANIFEST under .pHive/meta-team/archive/2026-04-19/. This is a pure ADD
+      operation on a historical artifact that no live workflow consumes, so the
+      diff is deterministic regardless of current file state and cannot become
+      a no-op.
+    safety_notes: >
+      Append-only edit on a frozen archive file. No live workflow, skill, or
+      runtime code reads this path. Revert is a single-line delete with no
+      cross-file impact. Must re-check target freshness at selection time
+      (file should still live under .pHive/meta-team/archive/2026-04-19/).
+    status: "pending"
+    created: "2026-04-21T00:00:00Z"
+
+  - candidate_id: "mmo-2026-04-21-002"
+    target: ".pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md"
+    type: "archive-provenance-note"
+    description: >
+      Append a single "indexed-for-meta-meta-optimize proving run" footer line
+      to the archived AUDIT-NOTE so the first live cycle produces a verifiable
+      append-diff on a dormant target. The footer line is a pure addition and
+      does not edit or reinterpret any existing audit narrative.
+    safety_notes: >
+      Append-only edit to a historical audit artifact. Not read by any workflow
+      or skill. Revert is a one-hunk delete of the footer line. Choose this
+      target only if the archive directory still exists at selection time.
+    status: "pending"
+    created: "2026-04-21T00:01:00Z"
+
+  - candidate_id: "mmo-2026-04-21-003"
+    target: ".pHive/meta-team/archive/2026-04-19/ledger.yaml"
+    type: "archive-provenance-comment"
+    description: >
+      Add a single leading YAML comment line to the archived ledger.yaml noting
+      that the file is a frozen historical record and should not be reopened.
+      Comment-only, no schema change, no behavioral change. The diff is a
+      deterministic one-line insert regardless of current file contents.
+    safety_notes: >
+      Leading-comment insert into a frozen ledger file. YAML parsers ignore
+      comments, so no data or schema is affected. Revert is a single-line
+      delete. If the archive directory has been further restructured by a
+      later archive rotation, the candidate should be discarded at selection
+      time rather than retargeted.
+    status: "pending"
+    created: "2026-04-21T00:02:00Z"

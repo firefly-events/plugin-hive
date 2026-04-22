@@ -1,0 +1,29 @@
+story: BL2i.5
+epic: meta-improvement-system
+slice: S8
+status: passed
+steps:
+  - id: implement
+    agent: codex:codex-rescue
+    status: success
+    artifacts:
+      - tests/meta_meta/test_plugin_manifest_boundary.py
+      - tests/__init__.py (new — package marker for unittest discover)
+      - tests/meta_meta/__init__.py (new — package marker)
+  - id: test
+    status: success
+    artifacts:
+      - "python3 -m unittest discover tests.meta_meta: 9 tests, OK (4 manifest + 5 backlog)"
+      - "python3 -m unittest discover hive/lib/meta-experiment/tests: 64 tests, OK"
+  - id: review
+    agent: reviewer (opus)
+    status: passed
+    notes: |
+      4 test methods cover all 6 specified assertions. Substring check for
+      "maintainer-skills" + exact-match check for /meta-meta-optimize avoids
+      false positives on documentation prose. Positive guard proves S10
+      /meta-optimize registration would still pass. Negative guard proves
+      validation raises on a leaked manifest. plugin.json untouched.
+      Non-blocking observation: a hypothetical public ./skills/meta-meta-optimize/
+      registration would slip past the exact-match check; that's out of scope
+      per the story's "maintainer-skills/ + slash-command" wording.

@@ -1,0 +1,31 @@
+epic: meta-improvement-system
+story: BL2.4
+step: review
+agent: reviewer
+backend: opus-4-7
+status: passed
+verdict: needs_optimization
+started: "2026-04-22T06:58:00Z"
+completed: "2026-04-22T07:00:00Z"
+artifacts:
+  - path: .pHive/episodes/meta-improvement-system/BL2.4/review-memo.md
+    kind: review-memo
+scores:
+  armed_path_correctness: 5
+  concrete_callback_binding_realism: 5
+  observation_window_semantics: 5
+  envelope_writer_protocol_extension: 4
+  step_skill_integration_clarity: 4
+  trigger_evidence_durability: 3
+  test_realism: 5
+  scope_discipline: 5
+  all_export_decision: 3
+must_fix_before_integrate:
+  - "F1: persist rollback_result to envelope (BL2.6 must cite from disk, not TripEvent in-process)"
+optimize_followups:
+  - "F2: document recovery shape when callback fails (regression_watch=tripped + decision=accept)"
+  - "F3: tz-aware timestamp guard in arm_watch to prevent tz-naive vs tz-aware comparison trap"
+forward_risks:
+  - "BL2.6 snapshot must match compare's .metrics.{tokens,wall_clock_ms} shape — consider shared fixture helper"
+  - "BL2.6 git revert fixtures must use tmp_path to avoid live-repo pollution"
+agent_id: aa554db1feb38baaa

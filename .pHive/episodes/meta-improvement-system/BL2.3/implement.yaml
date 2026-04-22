@@ -1,0 +1,43 @@
+epic: meta-improvement-system
+story: BL2.3
+step: implement
+agent: developer
+backend: codex
+status: passed
+started: "2026-04-22T06:28:00Z"
+completed: "2026-04-22T06:34:00Z"
+artifacts:
+  - path: hive/lib/meta-experiment/closure_validator.py
+    kind: source
+    change: added _PLACEHOLDER_REFS rejection (TBD/pending/N/A)
+  - path: hive/workflows/steps/meta-team-cycle/step-01-boot.md
+    kind: step
+    change: added BL2.3 baseline-availability gate + stop_no_baseline halt
+  - path: hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
+    kind: step
+    change: bound compare output into envelope metrics_snapshot
+  - path: hive/workflows/steps/meta-team-cycle/step-08-close.md
+    kind: step
+    change: added explicit validate_closable() call as first step-08 action
+  - path: maintainer-skills/meta-meta-optimize/SKILL.md
+    kind: source
+    change: documented stop-after-boot note and rollback_target -> rollback_ref translation
+  - path: tests/meta_meta/test_live_cycle_integration.py
+    kind: tests
+    loc: 225
+suites:
+  - target: tests/meta_meta/test_live_cycle_integration.py
+    passed: 9
+  - target: tests/meta_meta/
+    passed: 40
+    subtests: 3
+  - target: hive/lib/meta-experiment/tests/
+    passed: 64
+    subtests: 8
+    note: "requires --import-mode=importlib to avoid pre-existing collection quirk"
+notes: |
+  All 3 target suites green. Closure validator now rejects TBD/pending/N/A
+  via _is_placeholder_ref helper; existing CloseValidationError subclass
+  surface preserved (MissingEvidenceError for commit/pr; MissingRollbackTargetError
+  for rollback). Diff kept minimal — no restructuring of evidence-shape enforcement.
+codex_agent_id: ad6498ee12986a67e

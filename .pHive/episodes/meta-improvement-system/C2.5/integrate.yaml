@@ -1,0 +1,34 @@
+story_id: C2.5
+episode: integrate
+status: complete
+branch: hive-C2.5
+date: 2026-04-21
+
+boundary_surface: execute-phase boundary — the point where a reviewer (or review step) delivers
+  an outcome, at which both fix-loop count and first-attempt pass status are already known
+  without inference.
+
+events_emitted:
+  - metric_type: fix_loop_iterations
+    value_type: number
+    unit: iterations
+    source: execute-phase-boundary
+    signal: count of corrective fix-loop passes completed before review acceptance
+  - metric_type: first_attempt_pass
+    value_type: boolean
+    unit: bool
+    source: execute-phase-boundary
+    signal: explicit binary — true=passed on first attempt, false=fix-loop was needed
+
+files_created:
+  - hooks/metrics-execute-boundaries.sh
+  - tests/meta-improvement-system/metrics/execute-boundaries.test.sh
+
+test_results:
+  passed: 37
+  failed: 0
+
+scope_notes:
+  - escalation emission not included (owned by C2.6)
+  - token-specific logic not included (owned by C2.2/C2.3)
+  - plugin.json not modified

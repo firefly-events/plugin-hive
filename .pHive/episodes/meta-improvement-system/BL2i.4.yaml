@@ -1,0 +1,29 @@
+story: BL2i.4
+epic: meta-improvement-system
+slice: S8
+status: passed
+steps:
+  - id: implement
+    agent: codex:codex-rescue
+    status: success
+    artifacts:
+      - hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+      - tests/meta_meta/test_backlog_fallback.py
+      - maintainer-skills/meta-meta-optimize/SKILL.md (updated)
+  - id: test
+    status: success
+    artifacts:
+      - "python3 -m unittest tests.meta_meta.test_backlog_fallback: 5 tests, OK"
+      - "python3 -m unittest discover hive/lib/meta-experiment/tests: 64 tests, OK (L1.x still green)"
+  - id: review
+    agent: reviewer (opus)
+    status: passed
+    notes: |
+      Format mirrors step-03-proposal.md (MANDATORY EXECUTION RULES,
+      EXECUTION PROTOCOLS, CONTEXT BOUNDARIES, etc.). Dry-run discipline
+      explicit at multiple sites. First-pending-wins selection rule, no
+      priority scoring (matches BL2i.1 backlog header). Output contract
+      enumerates all 6 fields with decision enum {would-execute,
+      no-fallback-available}. SKILL.md scaffold updated to consume the
+      step. Test suite verifies presence, content invariants, scaffold
+      reference, and mtime-stable dry-run simulation (no side effects).

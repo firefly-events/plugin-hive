@@ -1,0 +1,25 @@
+story: C1.2
+step: test
+status: completed
+methodology: classic
+backend: orchestrator
+timestamp: "2026-04-21T04:11:30Z"
+checks:
+  - name: "schema file exists"
+    command: "test -f .pHive/metrics/metrics-event.schema.md"
+    result: pass
+  - name: "required field names present"
+    command: "grep -n 'event_id|timestamp|run_id|metric_type|dimensions|source' .pHive/metrics/metrics-event.schema.md"
+    result: "pass — each field appears in §3.x definition, §7 invariants, and §6 examples"
+  - name: "MVP metric types present"
+    command: "grep -n 'tokens|wall_clock_ms|fix_loop_iterations|first_attempt_pass|human_escalation' .pHive/metrics/metrics-event.schema.md"
+    result: "pass — registry §4 + examples §6"
+  - name: "at least 3 JSONL example rows"
+    command: "grep -c '^{' .pHive/metrics/metrics-event.schema.md"
+    result: "pass (3 rows: tokens, fix_loop_iterations, human_escalation)"
+  - name: "no anti-over-engineering terms in positive context"
+    command: "grep -n 'per-metric|human-confirmed|recommendation-only' .pHive/metrics/metrics-event.schema.md"
+    result: "pass (zero matches)"
+  - name: "README cross-link added"
+    command: "grep -n 'metrics-event.schema.md' .pHive/metrics/README.md"
+    result: "pass (line 24)"

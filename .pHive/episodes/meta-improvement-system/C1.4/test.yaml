@@ -1,0 +1,29 @@
+story: C1.4
+step: test
+status: completed
+methodology: classic
+backend: codex
+timestamp: "2026-04-21T04:23:30Z"
+command: "python3 -m unittest discover hive/lib/metrics/tests -v"
+initial_test_count: 9
+defense_in_depth_added: 4
+final_test_count: 13
+result: "13/13 PASS (0.011s)"
+coverage:
+  - "round-trip append event + read_run_events"
+  - "create envelope + read_envelope"
+  - "update-in-place narrow-mutable fields"
+  - "update rejects immutable-field writes"
+  - "create rejects duplicate experiment_id"
+  - "delta-compare numeric + boolean metrics"
+  - "side-effect boundary error"
+  - "public-API tainted run_id rejected by append_event (defense-in-depth)"
+  - "public-API tainted experiment_id rejected by create_envelope (defense-in-depth)"
+  - "decision transition reject->accept blocked (defense-in-depth)"
+  - "decision transition reverted->accept blocked (defense-in-depth)"
+  - "commit_ref set-once enforcement (defense-in-depth)"
+  - "rollback_ref set-once enforcement (defense-in-depth)"
+coverage_gaps_noted:
+  - "closure-freezes-metrics_snapshot (reviewer bonus, skipped per prompt constraint)"
+exception_notes:
+  - "Tainted identifier failures raise MetricsValidationError (not MetricsPathBoundaryError) because validator runs before boundary check — matches layered defense design"

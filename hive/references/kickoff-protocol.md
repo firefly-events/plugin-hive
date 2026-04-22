@@ -38,6 +38,72 @@ Check the current working directory:
 - **Empty or minimal** (just a README, no source) → **Greenfield**
 - **Ambiguous** → Ask the user
 
+## Step 1a: Metrics Opt-In / Preservation
+
+Before entering the brownfield or greenfield path, inspect `hive.config.yaml` for an
+existing `metrics.enabled` value.
+
+- If `metrics.enabled` is absent, treat this as a fresh kickoff prompt.
+- If `metrics.enabled` is already present, treat this as a re-kickoff preservation
+  branch regardless of whether the project is brownfield or greenfield.
+
+### Fresh kickoff path
+
+Ask the user:
+
+`Enable metrics tracking?`
+
+Keep the explanation inline and short: opting in enables metric-driven
+meta-optimization later; opting out keeps metrics off and future meta runs fall back
+to qualitative/backlog-fallback mode.
+
+Add a clearly labeled consequence line immediately with the question:
+
+`Consequence of opting out: metrics stay off. Meta work will use qualitative/backlog mode, and future metric-driven optimization features won't be available.`
+
+Follow it with the matching future-facing clause:
+
+`Opting in is what would unlock metric-driven behavior for those future skills.`
+
+Default to `no`. The user must actively choose `yes` to enable metrics. Empty
+input, unclear input, or any non-yes answer leaves metrics disabled.
+
+Persist the answer to `hive.config.yaml` using the existing kickoff config write
+pattern:
+
+1. Write the final choice to `metrics.enabled`
+2. `yes` → `metrics.enabled: true`
+3. `no` or default-off path → `metrics.enabled: false`
+
+Example result in `hive.config.yaml`:
+
+```yaml
+metrics:
+  enabled: false
+```
+
+### Re-kickoff preservation path
+
+If `hive.config.yaml` already contains `metrics.enabled`:
+
+1. Read the current `metrics.enabled` value from `hive.config.yaml` before
+   prompting.
+2. Show the current value explicitly to the user, for example: `Metrics tracking is
+   currently enabled.` or `Metrics tracking is currently disabled.`
+3. Ask a change prompt, not the fresh opt-in question. Example: `Do you want to
+   change metrics tracking from its current setting?`
+4. If the user keeps the existing value, preserve it as-is and do not write
+   `hive.config.yaml`.
+5. If the user explicitly chooses to change it, collect the replacement setting
+   and write only the new boolean to `metrics.enabled` using the existing kickoff
+   config write pattern:
+   - replacement answer `yes` → `metrics.enabled: true`
+   - replacement answer `no`, empty, or any other response → `metrics.enabled: false`
+
+This preservation branch applies equally to brownfield re-kickoff and greenfield
+re-kickoff so an existing metrics setting is never reset just because kickoff ran
+again.
+
 ---
 
 ## Step 2A: Brownfield — Discovery & Onboarding

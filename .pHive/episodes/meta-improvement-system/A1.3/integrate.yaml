@@ -1,0 +1,25 @@
+story: A1.3
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-A1.3
+parent_branch: hive-A1.2 (6372566)
+timestamp: "2026-04-21T04:36:00Z"
+artifacts:
+  - hive/references/meta-team-nightly-cycle.md (modified: +31 -21, 149→159 lines)
+backend_split:
+  implement: codex
+  review: claude (opus)
+ac_check: 3/3 pass
+review_verdict: passed (first submission)
+change_summary:
+  - "Title suffix changed to 'Historical Operator Narrative'"
+  - "New status/tombstone block (L3-13): retired-legacy notice, successor pointers, demotion date 2026-04-21"
+  - "Opening paragraph rewritten in historical tense"
+  - "Heading 'What the Nightly Cycle Does' → 'Did'"
+  - "Live imperatives softened to past tense across monitoring/runbook sections"
+  - "Cross-link to hive/references/meta-safety-constraints.md (A1.2 artifact)"
+non_blocking_notes:
+  - "L157-159 (Integration with Daily Ceremony subsection bullets) retain present tense/imperative voice — scoped under demoted header, reviewer judged non-blocking; could be polished in a follow-up"
+  - "Phase table, charter template, runbook content preserved verbatim — operator-history value intact"

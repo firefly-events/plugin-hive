@@ -1,0 +1,27 @@
+epic: meta-improvement-system
+story: BL2.5
+step: review
+agent: reviewer
+backend: opus-4-7
+status: passed
+verdict: passed
+artifacts:
+  - path: .pHive/episodes/meta-improvement-system/BL2.5/review-memo.md
+    kind: review-memo
+scores:
+  ac1_worktree_isolation: 5
+  ac2_durable_artifact_refs: 5
+  ac3_scope_discipline: 5
+  no_stub_realism: 5
+  reproducibility: 4
+  safety_rails: 4
+  bl24_edge_workaround: 4
+  envelope_shape: 5
+  candidate_selection: 5
+must_fix_before_integrate: none
+bl2_6_prep:
+  - "Fix observation_window immutability contradiction (narrow-mutable OR drop setter) before next live arm"
+  - "Add dirty-tree guard to script"
+  - "Pick a candidate whose revert is metrically observable (MANIFEST revert is a no-op by design)"
+  - "Confirm BL2.6 re-arms fresh vs. reuses the currently armed watch ending 2026-04-22T14:29:48Z"
+agent_id: aa92d02af0e212fce

@@ -1,0 +1,36 @@
+episode: C2.5-macos-fix
+story: C2.5
+date: 2026-04-21
+branch: hive-C2.5-macos-n
+type: followup-fix
+
+finding: |
+  Opus reviewer flagged that `date -u +"%N"` emits the literal character "N" on macOS
+  (Darwin) rather than nanoseconds, causing event_id_2 to be constructed from the string
+  "N" and the arithmetic `10#N + 1` to fail or produce garbage. On macOS the two boundary
+  events could collide or the script could error.
+
+fix:
+  file: hooks/metrics-execute-boundaries.sh
+  before: |
+    ns=$(date -u +"%N" 2>/dev/null || echo "0000")
+    ...
+    event_id_1="evt_${timestamp}_fix-loop_${ns}"
+    ...
+    ns2=$((10#${ns} + 1))
+    ns2_padded=$(printf "%09d" "$ns2")
+    event_id_2="evt_${timestamp}_first-pass_${ns2_padded}"
+  after: |
+    event_id_1="evt_${timestamp}_$$_${RANDOM}_fix_loop"
+    ...
+    event_id_2="evt_${timestamp}_$$_${RANDOM}_first_pass"
+  pattern: PID + RANDOM disambiguator, consistent with C2.2 / C2.4 / C2.6
+
+tests:
+  before: 37 passing
+  after: 39 passing
+  added:
+    - "(d) event_id uniqueness: two rapid same-second emissions produce distinct event_ids"
+    - "asserts 4 distinct IDs across 2 back-to-back emissions on same run_id"
+
+verification: all 39 tests pass on macOS (Darwin 25.3.0) and compatible with Linux

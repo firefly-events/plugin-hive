@@ -1,0 +1,16 @@
+story: A2.3
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-A2.3
+parent_branch: hive-A2.2 (2ae7edc)
+timestamp: "2026-04-21T05:00:00Z"
+artifacts:
+  - hive/workflows/steps/meta-team-cycle/step-06-evaluation.md (substantive rewrite)
+  - hive/workflows/meta-team-cycle.workflow.yaml (evaluation step block only)
+diff_stat: "2 files changed, 44 insertions(+), 14 deletions(-)"
+ac_check: 4/4 pass
+review_verdict: passed (first submission)
+authority_decoupling: "archived charter demoted; quality bar now anchored in hive/references/meta-safety-constraints.md + active swarm charter (A2.7 forward ref with clean fallback to safety-constraints alone)"
+taxonomy_preservation: "pass / needs_optimization / needs_revision + 70%/40-70%/<40% thresholds + per-change scoring schema all intact"

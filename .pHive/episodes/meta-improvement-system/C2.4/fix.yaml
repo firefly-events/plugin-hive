@@ -1,0 +1,44 @@
+story: C2.4
+phase: fix-pass
+date: 2026-04-21
+reviewer_verdict: needs_optimization
+findings_addressed: 4
+test_count_before: 17
+test_count_after: 24
+
+fixes:
+  I-1:
+    title: Drop phase/agent_persona duplication in dimensions
+    change: |
+      Removed `agent_persona` and `phase` from dimensions_pairs entirely.
+      Top-level `agent` and `phase` fields own those values per schema §3.7/§3.8.
+      dimensions now contains only kind=spawn_marker (per I-3).
+
+  I-2:
+    title: macOS %N nanosecond fallback
+    change: |
+      Replaced exit-code guard `date -u +"%N" >/dev/null 2>&1` (which silently
+      sets ns="N" on macOS) with PID+RANDOM pattern matching C2.6's
+      metrics-human-escalation.sh: `evt_${timestamp}_$$_${RANDOM}_spawn_${agent}`.
+      Provides reliable uniqueness within the same second on all platforms.
+
+  I-3:
+    title: spawn_marker dimension tag to differentiate zero-value rows
+    change: |
+      Added `dimensions.kind: "spawn_marker"` so B0 queries filtering on
+      metric_type=wall_clock_ms can exclude spawn-marker zeros from real timing rows.
+      Fills dimensions with meaningful content after I-1 removed agent_persona.
+
+  I-4:
+    title: YAML-scope three-tier config reader
+    change: |
+      Replaced flat grep with _read_metrics_config() function matching the pattern
+      in hooks/metrics-stop-dispatch.sh and hooks/metrics-human-escalation.sh:
+      yq → python3 yaml.safe_load → awk-scoped grep
+      (/^metrics:/{flag=1} /^[a-zA-Z]/{flag=0}).
+      Prevents false-positive enabled:true match from non-metrics YAML blocks.
+
+new_tests:
+  - "(e) YAML-scope collision: metrics.enabled false + later block enabled true → no emit"
+  - "(f) dimensions.kind=spawn_marker; dimensions.phase and dimensions.agent_persona absent"
+  - "(g) event_id uniqueness: two rapid same-second emissions produce distinct IDs"

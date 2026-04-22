@@ -1,0 +1,55 @@
+epic: meta-improvement-system
+story: BL2.5
+step: implement
+agent: developer + orchestrator
+backend: codex + orchestrator
+status: passed
+started: "2026-04-22T07:05:00Z"
+completed: "2026-04-22T10:30:00Z"
+artifacts:
+  - path: scripts/run_first_live_cycle.py
+    kind: source
+    change: first-live-cycle orchestrator script
+  - path: tests/meta_meta/test_first_live_cycle.py
+    kind: tests
+    change: 7 structural tests over the live-run artifacts
+  - path: .pHive/audits/mvl-proof/2026-04-22T10-29-48Z/proof.yaml
+    kind: audit
+    change: verification doc citing real cycle_id, commit_ref, rollback_ref
+  - path: .pHive/audits/mvl-proof/latest.yaml
+    kind: pointer
+  - path: .pHive/metrics/experiments/meta-2026-04-22.yaml
+    kind: envelope
+  - path: .pHive/metrics/events/meta-2026-04-22.jsonl
+    kind: events
+  - path: .pHive/meta-team/cycle-state.yaml
+    kind: cycle-state
+  - path: .pHive/meta-team/ledger.yaml
+    kind: ledger
+  - path: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
+    kind: promoted-change
+    change: reviewed-on provenance note appended (candidate mmo-2026-04-21-001)
+live_run:
+  cycle_id: meta-2026-04-22
+  commit_ref: 96d410046ccac86c69806b6b0e5335522af93216
+  rollback_ref: ea5b73a8fa4a76f69ff4ca2024d7f1c37b3b688d
+  worktree_cleanup: removed
+  candidate: mmo-2026-04-21-001
+suites:
+  - target: tests/meta_meta/test_first_live_cycle.py
+    passed: 7
+  - target: tests/meta_meta/
+    passed: 59
+  - target: hive/lib/meta-experiment/tests/
+    passed: 64
+    subtests: 8
+notes: |
+  Codex developer sandbox refused git ref writes, so the live cycle was
+  executed from the orchestrator session where git access is unrestricted.
+  One latent BL2.4 bug surfaced during the run: `envelope.set_observation_window`
+  cannot update because observation_window is in IMMUTABLE_ENVELOPE_FIELDS.
+  Worked around at the script level: observation_window is pre-set at
+  envelope.create time using the same `now` passed into arm_watch; arm_watch
+  called with envelope_writer=None and regression_watch persisted manually.
+  Recommend BL2.6 or a follow-up cleans up this edge via either making
+  observation_window narrow-mutable or dropping set_observation_window.

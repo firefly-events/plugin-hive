@@ -1,0 +1,16 @@
+epic: meta-improvement-system
+story: BL2.1
+step: research
+agent: researcher
+status: passed
+started: "2026-04-22T05:40:00Z"
+completed: "2026-04-22T05:45:00Z"
+artifacts:
+  - path: .pHive/episodes/meta-improvement-system/BL2.1/research-brief.md
+    kind: research-brief
+notes: |
+  Brief confirms shared adapter contract, worktree semantics, decision-dict shape, and
+  6-case test plan. Orchestrator override on one point: AC#3 says adapter
+  discards worktree residue on failure (story description says "failure cleanup");
+  brief recommended preserving for inspection. Developer brief will enforce
+  remove-on-failure per AC.
