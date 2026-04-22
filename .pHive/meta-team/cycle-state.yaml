@@ -1,0 +1,35 @@
+schema_version: 1
+cycle_id: meta-2026-04-22
+story: BL2.5
+slice: S9
+status: closed
+branch: meta-improvement-system-s9
+candidate_id: mmo-2026-04-21-001
+candidate_target: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
+steps:
+  step_01_boot:
+    started_at: '2026-04-22T10:29:48Z'
+    baseline_available: true
+    run_id: meta-2026-04-22
+    events_path: .pHive/metrics/events/meta-2026-04-22.jsonl
+  step_02_analysis:
+    mode: no-op
+    reason: proving run uses preselected candidate
+  step_03b_backlog_fallback:
+    selected_candidate:
+      candidate_id: mmo-2026-04-21-001
+      target: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
+      type: archive-provenance-note
+commit_ref: 96d410046ccac86c69806b6b0e5335522af93216
+rollback_ref: ea5b73a8fa4a76f69ff4ca2024d7f1c37b3b688d
+audit_path: .pHive/audits/mvl-proof/2026-04-22T10-29-48Z/proof.yaml
+decision: accept
+metrics_snapshot:
+  tokens: 0
+  wall_clock_ms: 39
+  first_attempt_pass: true
+regression_watch:
+  state: armed
+  observation_window:
+    start: '2026-04-22T10:29:48Z'
+    end: '2026-04-22T14:29:48Z'

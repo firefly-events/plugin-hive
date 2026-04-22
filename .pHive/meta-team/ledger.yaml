@@ -1,0 +1,9 @@
+- cycle_id: meta-2026-04-22
+  date: '2026-04-22'
+  story: BL2.5
+  candidate_id: mmo-2026-04-21-001
+  target: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
+  decision: accept
+  commit_ref: 96d410046ccac86c69806b6b0e5335522af93216
+  rollback_ref: ea5b73a8fa4a76f69ff4ca2024d7f1c37b3b688d
+  audit_path: .pHive/audits/mvl-proof/2026-04-22T10-29-48Z/proof.yaml

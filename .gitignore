@@ -33,6 +33,11 @@ state/
 # fixtures consumed by hive/lib/metrics/ unit tests.
 !.pHive/metrics/
 !.pHive/metrics/**
+# MVL proof artifacts (.pHive/audits/mvl-proof/) — BL2.5+ maintainer-loop
+# verification docs citing durable run artifacts. Tracked so fresh clones
+# and CI see the canonical proof.
+!.pHive/audits/
+!.pHive/audits/**
 agents/memories/
 .claude/settings.local.json
 .history/
