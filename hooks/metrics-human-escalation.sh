@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# metrics-human-escalation.sh — emit a human_escalation event to .pHive/metrics/events/
+# metrics-human-escalation.sh — emit a human_escalation event to the metrics events directory
 #
 # Usage:
 #   metrics-human-escalation.sh \
@@ -20,58 +20,49 @@ set -euo pipefail
 # --- locate config -----------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HIVE_ROOT="${HIVE_ROOT:-$(dirname "$SCRIPT_DIR")}"
-CONFIG_FILE="$HIVE_ROOT/hive/hive.config.yaml"
+. "$HIVE_ROOT/hooks/common.sh"
+CONFIG_FILE="${CONFIG_FILE:-$HIVE_ROOT/hive.config.yaml}"
 
 # --- read gate ---------------------------------------------------------------
-metrics_enabled="false"
-metrics_dir=".pHive/metrics"
-
-if [[ -f "$CONFIG_FILE" ]]; then
-  # Scope the enabled grep to the metrics: block to avoid matching other enabled: keys.
-  # Prefer yq, then python3, then awk-scoped fallback.
+_read_metrics_config() {
+  local key="$1"
+  local default="$2"
+  if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "$default"
+    return
+  fi
+  local val=""
   if command -v yq &>/dev/null; then
-    val=$(yq '.metrics.enabled' "$CONFIG_FILE" 2>/dev/null | tr -d ' "' || true)
-    dir_val=$(yq '.metrics.dir' "$CONFIG_FILE" 2>/dev/null | tr -d ' "' || true)
+    val=$(yq ".metrics.${key}" "$CONFIG_FILE" 2>/dev/null | tr -d ' "' || true)
   elif command -v python3 &>/dev/null; then
-    val=$(python3 - "$CONFIG_FILE" <<'PYEOF'
+    val=$(python3 - "$CONFIG_FILE" "$key" <<'PYEOF'
 import sys
 try:
     import yaml
     with open(sys.argv[1]) as f:
         c = yaml.safe_load(f)
-    print(str(c.get('metrics', {}).get('enabled', '')).lower())
-except Exception:
-    pass
-PYEOF
-    )
-    dir_val=$(python3 - "$CONFIG_FILE" <<'PYEOF'
-import sys
-try:
-    import yaml
-    with open(sys.argv[1]) as f:
-        c = yaml.safe_load(f)
-    v = c.get('metrics', {}).get('dir', '')
-    if v:
-        print(v)
+    v = c.get('metrics', {}).get(sys.argv[2], '')
+    if v is not None and str(v) != '':
+        print(str(v).lower() if isinstance(v, bool) else str(v))
 except Exception:
     pass
 PYEOF
     )
   else
-    # awk-scoped fallback: only read keys inside the metrics: block
-    val=$(awk '/^metrics:/{flag=1; next} /^[a-zA-Z]/{flag=0} flag && /^[[:space:]]+enabled:/' "$CONFIG_FILE" \
-      | head -1 | sed 's/[^:]*:[[:space:]]*//' | tr -d ' "')
-    dir_val=$(awk '/^metrics:/{flag=1; next} /^[a-zA-Z]/{flag=0} flag && /^[[:space:]]+dir:/' "$CONFIG_FILE" \
+    val=$(awk '/^metrics:/{flag=1; next} /^[a-zA-Z]/{flag=0} flag && /^[[:space:]]+'"$key"':/' "$CONFIG_FILE" \
       | head -1 | sed 's/[^:]*:[[:space:]]*//' | tr -d ' "')
   fi
+  if [[ -z "${val:-}" ]] || [[ "$val" == "null" ]] || [[ "$val" == "None" ]]; then
+    echo "$default"
+  else
+    echo "$val"
+  fi
+}
 
-  if [[ -n "${val:-}" ]] && [[ "$val" != "null" ]] && [[ "$val" != "None" ]] && [[ "$val" == "true" ]]; then
-    metrics_enabled="true"
-  fi
-  if [[ -n "${dir_val:-}" ]] && [[ "$dir_val" != "null" ]] && [[ "$dir_val" != "None" ]]; then
-    metrics_dir="$dir_val"
-  fi
-fi
+metrics_enabled=$(_read_metrics_config "enabled" "false")
+state_dir=$(_resolve_state_dir)
+metrics_enabled=$(echo "$metrics_enabled" | awk '{print $1}')
+state_dir=$(echo "$state_dir" | awk '{print $1}')
 
 # silent no-op when disabled
 if [[ "$metrics_enabled" != "true" ]]; then
@@ -153,6 +144,10 @@ event=$(jq -cn \
   "$jq_filter")
 
 # --- write -------------------------------------------------------------------
-events_dir="$HIVE_ROOT/$metrics_dir/events"
+if [[ "$state_dir" != /* ]]; then
+  state_dir="$HIVE_ROOT/$state_dir"
+fi
+metrics_dir="$state_dir/metrics"
+events_dir="${metrics_dir}/events"
 mkdir -p "$events_dir"
 printf '%s\n' "$event" >> "$events_dir/human-escalation.jsonl"
