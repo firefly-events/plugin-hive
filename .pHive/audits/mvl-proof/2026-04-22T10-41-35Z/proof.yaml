@@ -1,0 +1,53 @@
+schema_version: 1
+type: mvl-proof-rollback-realism
+slice: S9
+story: BL2.6
+proven_at: '2026-04-22T10:41:35Z'
+cycle_id: meta-2026-04-22-r2
+candidate:
+  id: mmo-2026-04-21-002
+  target: .pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md
+  type: archive-provenance-note
+regression_watch_fired: true
+trigger_event:
+  tripped_at: '2026-04-22T10:41:34.943769Z'
+  regression_metrics:
+  - wall_clock_ms
+  threshold_pct: 0.1
+  baseline_snapshot: &id001
+    tokens: 0
+    wall_clock_ms: 39
+    first_attempt_pass: true
+  post_close_snapshot:
+    tokens: 0
+    wall_clock_ms: 78
+    first_attempt_pass: true
+auto_revert:
+  commit_hash_regressive: 548c2f67c12a84f42db0f3a9d2170629a4f4884f
+  auto_revert_commit_hash: c8694138cfc9ec2b034bfca69529ba99801f741f
+  wall_clock_from_arm_to_trip_ms: 78
+  path: regression_watch -> closure_gate -> auto_revert_callback
+  callback_binding: DirectCommitAdapter.rollback (bound method)
+closure_evidence:
+  commit_ref: 548c2f67c12a84f42db0f3a9d2170629a4f4884f
+  rollback_ref: c2407ca32e371cc3782ab242a93a9e6e793aa54f
+  metrics_snapshot: *id001
+  decision: reverted
+envelope_path: .pHive/metrics/experiments/meta-2026-04-22-r2.yaml
+proof_integrity:
+  manual_revert_used: false
+  mock_callback_used: false
+  synthetic_closure_used: false
+notes: 'BL2.6 milestone proof. Regression injected via a deliberately-worse
+
+  post_close_snapshot (wall_clock_ms +100% vs baseline, exceeding the
+
+  10% threshold). auto_revert fired via the live
+
+  rollback_watch.evaluate_watch -> DirectCommitAdapter.rollback path
+
+  with envelope_writer=envelope so the trip + rollback_result landed
+
+  on disk.
+
+  '

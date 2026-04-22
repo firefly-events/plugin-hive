@@ -30,6 +30,7 @@ class InvalidDecisionError(CloseValidationError):
 
 
 _CLOSABLE_DECISIONS = {"accept", "reject", "reverted"}
+_PLACEHOLDER_REFS = frozenset({"tbd", "pending", "n/a", "unknown"})
 def validate_closable(envelope: dict) -> None:
     """Raise a distinct validation error if the envelope cannot close."""
 
@@ -87,7 +88,11 @@ def _validate_rollback_ref(envelope: dict[str, _Any]) -> None:
 
 
 def _has_reference(value: _Any) -> bool:
-    return isinstance(value, str) and value != ""
+    return isinstance(value, str) and value.strip() != "" and not _is_placeholder_ref(value)
+
+
+def _is_placeholder_ref(value: str) -> bool:
+    return value.strip().casefold() in _PLACEHOLDER_REFS
 
 
 __all__ = [

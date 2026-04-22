@@ -1,0 +1,22 @@
+experiment_id: "meta-2026-04-22"
+swarm_id: "meta-meta-optimize"
+target_ref: "repo:plugin-hive@meta-improvement-system-s9"
+baseline_ref: "experiment:meta-2026-04-22"
+candidate_ref: "branch:meta-meta-exp-meta-2026-04-22"
+policy_ref: "policy:no-op-proof"
+decision: "accept"
+observation_window:
+  start: "2026-04-22T10:29:48Z"
+  end: "2026-04-22T14:29:48Z"
+
+regression_watch:
+  state: "armed"
+  armed_at: "2026-04-22T10:29:48Z"
+
+metrics_snapshot:
+  tokens: 0
+  wall_clock_ms: 39
+  first_attempt_pass: true
+
+commit_ref: "96d410046ccac86c69806b6b0e5335522af93216"
+rollback_ref: "ea5b73a8fa4a76f69ff4ca2024d7f1c37b3b688d"
