@@ -1,5 +1,5 @@
 """Shared runtime lifecycle library scaffold for meta-experiment flows."""
 
-from . import envelope
+from . import baseline, envelope
 
-__all__ = ["envelope"]
+__all__ = ["envelope", "baseline"]

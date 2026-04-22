@@ -47,3 +47,21 @@ Contract:
 - storage is delegated to `hive.lib.metrics`; this module does not read or write envelope YAML directly
 
 Source of record for field shapes: `.pHive/metrics/experiment-envelope.schema.md`
+
+## Baseline module
+
+Purpose: substrate-facing baseline capture that reads run events from `hive.lib.metrics`, derives a lean `metrics_snapshot`, and persists that snapshot through the envelope wrapper when requested.
+
+API:
+
+- `capture_from_run`
+- `persist_to_envelope`
+- `capture_and_persist`
+- `NoBaselineError`
+
+Contract:
+
+- metrics-absent is a normal no-baseline outcome, not a failure; `capture_from_run` returns `None` for missing or empty event files
+- malformed event rows raise `MetricsValidationError` rather than being silently ignored
+- backlog-fallback compatibility is preserved; this module never forces metrics to exist and does not turn missing metrics into a crash
+- persistence still routes through `hive.lib.meta_experiment.envelope`; this module does not read or write envelope YAML directly
