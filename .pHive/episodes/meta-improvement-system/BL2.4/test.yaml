@@ -1,0 +1,29 @@
+epic: meta-improvement-system
+story: BL2.4
+step: test
+agent: tester
+backend: opus-4-7
+status: passed
+started: "2026-04-22T06:56:00Z"
+completed: "2026-04-22T06:58:00Z"
+suites:
+  - target: tests/meta_meta/test_rollback_watch_activation.py
+    passed: 9
+  - target: tests/meta_meta/
+    passed: 51
+    subtests: 3
+  - target: hive/lib/meta-experiment/tests/
+    passed: 64
+    subtests: 8
+coverage:
+  ac1_armed_on_real_experiment: present
+  ac2_concrete_callback_no_stub: present
+  ac3_trigger_evidence_on_envelope: present
+  ac4_proof_deferred_to_bl2_6: intentionally_absent
+realism_probe:
+  mocks_found: 0
+  bound_method_proof: "callback.__self__ is adapter; callback.__func__ is DirectCommitAdapter.rollback"
+  real_git_revert_proof: "subprocess.run(git log --oneline -2); asserts 'Revert' in log and revert_ref prefix matches"
+  promoted_commit_is_real: "_promoted_envelope invokes real DirectCommitAdapter.promote on tmp git repo"
+verdict: PASS
+agent_id: affd4b513ecb4766b

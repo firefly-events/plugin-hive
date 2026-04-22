@@ -1,0 +1,41 @@
+epic: meta-improvement-system
+story: BL2.4
+step: implement
+agent: developer
+backend: codex
+status: passed
+started: "2026-04-22T06:50:00Z"
+completed: "2026-04-22T06:56:00Z"
+artifacts:
+  - path: hive/lib/meta-experiment/rollback_watch.py
+    change: added arm_watch + make_direct_commit_auto_revert + EnvelopeWriter protocol extension
+  - path: hive/lib/meta-experiment/envelope.py
+    change: added set_observation_window
+  - path: hive/lib/meta-experiment/__init__.py
+    change: exported arm_watch + make_direct_commit_auto_revert at package root
+  - path: hive/workflows/steps/meta-team-cycle/step-08-close.md
+    change: added §1c arm-watch after close-gate passes (decision=accept only)
+  - path: hive/workflows/steps/meta-team-cycle/step-06-evaluation.md
+    change: evaluation metrics_snapshot must be usable as rollback-watch baseline
+  - path: maintainer-skills/meta-meta-optimize/SKILL.md
+    change: added post-close observation subsection; evaluate_watch noted as external scheduled check
+    total_lines: 190
+  - path: tests/meta_meta/test_rollback_watch_activation.py
+    kind: tests
+    loc: 282
+suites:
+  - target: tests/meta_meta/test_rollback_watch_activation.py
+    passed: 9
+  - target: tests/meta_meta/
+    passed: 51
+    subtests: 3
+  - target: hive/lib/meta-experiment/tests/
+    passed: 64
+    subtests: 8
+ac2_callback_binding_test: test_arm_then_evaluate_tripped_invokes_direct_commit_adapter_rollback
+notes: |
+  Legit deviation: __all__ of rollback_watch.py NOT widened (existing lib suite pins
+  the legacy single-trip public surface). New helpers exported at package root
+  via hive/lib/meta-experiment/__init__.py — satisfies activation tests while
+  preserving the existing contract.
+codex_agent_id: a276261f289bbafa1

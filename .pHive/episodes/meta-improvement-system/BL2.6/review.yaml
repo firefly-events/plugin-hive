@@ -1,0 +1,35 @@
+epic: meta-improvement-system
+story: BL2.6
+step: review
+agent: reviewer
+backend: opus-4-7
+status: passed
+verdict: passed
+artifacts:
+  - path: .pHive/episodes/meta-improvement-system/BL2.6/review-memo.md
+    kind: review-memo
+integrity_checklist:
+  total: 10
+  passed: 10
+scores:
+  milestone_honesty: 5
+  path_signature_integrity: 5
+  artifact_durability: 5
+  closure_evidence_shape: 5
+  scope_discipline: 5
+  escalation_satisfaction: 5
+escalation_resolution:
+  trigger: rollback-realism-proof-ambiguity
+  severity: major
+  stories: [S9, BL2.4, BL2.6]
+  status: resolved
+  resolution_basis: |
+    Proven three ways: (1) live code path via
+    evaluate_watch(envelope_writer=envelope) with bound DirectCommitAdapter.rollback
+    callback; (2) real git artefacts where revert commit's parent IS the
+    regressive commit; (3) negative assertions where
+    proof_integrity.manual_revert_used/mock_callback_used/synthetic_closure_used
+    all false, and no mock imports in script. CI-replayable via
+    test_rollback_realism_e2e.py.
+must_fix_before_integrate: none
+agent_id: a07ddba7414f4a91d

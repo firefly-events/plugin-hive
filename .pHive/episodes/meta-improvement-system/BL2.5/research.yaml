@@ -1,0 +1,25 @@
+epic: meta-improvement-system
+story: BL2.5
+step: research
+agent: researcher
+status: passed
+started: "2026-04-22T07:05:00Z"
+completed: "2026-04-22T07:06:00Z"
+notes: |
+  Orchestrator-performed research (no separate subagent — the scope is tight
+  and all context is fresh from BL2.1-2.4):
+  - Backlog has 3 seeded candidates. Select mmo-2026-04-21-001 (MANIFEST.md append)
+    as the simplest append-only edit to a dormant archive file.
+  - Live run must: create worktree → apply append → run minimal test → compare
+    synthetic metrics → promote via DirectCommitAdapter → validate close → arm watch.
+  - Baseline: seed synthetic metrics events under .pHive/metrics/{run_id}/ before boot.
+  - Target branch for promotion: current branch (meta-improvement-system-s9) via
+    adapter envelope target_branch override.
+  - Verification doc path: .pHive/audits/mvl-proof/{iso-ts}/proof.yaml citing
+    cycle_id, commit SHA, rollback_target, envelope path, event path,
+    worktree path + cleanup status.
+  - Scope boundary: BL2.5 proves clean no-op run. Deliberate-regression proof
+    remains BL2.6.
+selected_candidate: mmo-2026-04-21-001
+promotion_target_branch: meta-improvement-system-s9
+audit_root: .pHive/audits/mvl-proof/

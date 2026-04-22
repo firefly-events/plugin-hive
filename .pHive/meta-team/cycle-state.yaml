@@ -1,0 +1,42 @@
+schema_version: 1
+cycle_id: meta-2026-04-22-r2
+story: BL2.6
+slice: S9
+status: closed
+branch: meta-improvement-system-s9
+candidate_id: mmo-2026-04-21-002
+candidate_target: .pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md
+steps:
+  step_01_boot:
+    started_at: '2026-04-22T10:41:34Z'
+    baseline_available: true
+    run_id: meta-2026-04-22-r2
+    events_path: .pHive/metrics/events/meta-2026-04-22-r2.jsonl
+  step_02_analysis:
+    mode: proof
+    reason: prove real post-close regression watch auto-revert
+  step_03b_backlog_fallback:
+    selected_candidate:
+      candidate_id: mmo-2026-04-21-002
+      target: .pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md
+      type: archive-provenance-note
+commit_ref: 548c2f67c12a84f42db0f3a9d2170629a4f4884f
+rollback_ref: c2407ca32e371cc3782ab242a93a9e6e793aa54f
+auto_revert_commit_ref: c8694138cfc9ec2b034bfca69529ba99801f741f
+audit_path: .pHive/audits/mvl-proof/2026-04-22T10-41-35Z/proof.yaml
+decision: reverted
+metrics_snapshot:
+  tokens: 0
+  wall_clock_ms: 39
+  first_attempt_pass: true
+regression_watch:
+  state: tripped
+  tripped_by:
+    tokens: 0
+    wall_clock_ms: 78
+    first_attempt_pass: true
+  tripped_at: '2026-04-22T10:41:34.943769Z'
+  rollback_result:
+    success: true
+    revert_ref: c8694138cfc9ec2b034bfca69529ba99801f741f
+    notes: reverted via git revert

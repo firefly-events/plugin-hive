@@ -1,0 +1,26 @@
+story: L1.7
+epic: meta-improvement-system
+slice: S7
+status: passed
+steps:
+  - id: implement
+    agent: codex:codex-rescue
+    status: success
+    artifacts:
+      - hive/lib/meta-experiment/closure_validator.py
+      - hive/lib/meta-experiment/__init__.py
+      - hive/lib/meta-experiment/README.md
+      - hive/lib/meta-experiment/tests/test_closure_validator.py
+  - id: test
+    status: success
+    artifacts:
+      - "python3 -m unittest discover hive/lib/meta-experiment/tests: 60 tests, OK"
+  - id: review
+    agent: reviewer (opus)
+    status: passed
+    notes: |
+      Non-bypassable validate_closable (raises) + is_closable (bool variant).
+      Six distinct error classes subclass CloseValidationError; PR-only close
+      records pass (forward-looking S10 path). Empty metrics_snapshot treated
+      as missing. TypeError reserved for non-dict inputs (programmer error).
+      README cites closure-evidence-shape-mismatch escalation.
