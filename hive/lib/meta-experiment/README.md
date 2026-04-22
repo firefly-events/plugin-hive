@@ -65,3 +65,37 @@ Contract:
 - malformed event rows raise `MetricsValidationError` rather than being silently ignored
 - backlog-fallback compatibility is preserved; this module never forces metrics to exist and does not turn missing metrics into a crash
 - persistence still routes through `hive.lib.meta_experiment.envelope`; this module does not read or write envelope YAML directly
+
+## Compare module
+
+Purpose: pure decision helper that compares baseline and candidate metric snapshots, applies one uniform threshold knob, and returns a structured `accept`/`reject` decision object for later lifecycle consumers.
+
+API:
+
+- `evaluate(baseline_metrics, candidate_metrics, threshold_pct)`
+- `evaluate_from_envelope(envelope_dict, candidate_metrics, threshold_pct)`
+
+Output shape:
+
+- top-level `verdict`: `accept` or `reject`
+- top-level `threshold_pct`: the single scalar knob used for the evaluation
+- `metrics`: one entry per metric containing baseline and candidate values plus comparison details
+- `regression_metrics`: names of numeric metrics whose `delta_pct` exceeded the threshold
+
+Comparator convention:
+
+- positive `delta_pct` means regression
+- negative `delta_pct` means improvement
+- the same `threshold_pct` scalar is applied uniformly across all numeric metrics
+- numeric metrics are over threshold only when `delta_pct > threshold_pct`
+- boolean metrics are included for visibility but do not contribute to the verdict
+
+Scope:
+
+- numeric metrics are the only metrics that can reject a decision
+- boolean metrics are observational only; they always report `over_threshold: false`
+
+Purity:
+
+- the compare module performs no writes
+- no envelope updates, promotion actions, rollback actions, or side effects occur here
