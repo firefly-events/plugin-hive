@@ -48,7 +48,7 @@ Keep the explanation inline and short: opting in enables metric-driven meta-opti
 
 Add a clearly labeled consequence line immediately with the question:
 
-`Consequence of opting out: meta work in this repo defaults to qualitative/backlog-driven mode, and if future meta-optimize-style skills ship, they will stay in backlog-fallback-only mode on workspaces where metrics remain disabled.`
+`Consequence of opting out: metrics stay off. Meta work will use qualitative/backlog mode, and future metric-driven optimization features won't be available.`
 
 Follow it with the matching future-facing clause:
 
