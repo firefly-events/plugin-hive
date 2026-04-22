@@ -1,0 +1,25 @@
+epic: meta-improvement-system
+story: BL2.6
+step: integrate
+agent: orchestrator
+status: passed
+branch: meta-improvement-system-s9
+commits:
+  - ref: c2407ca
+    kind: infrastructure
+    note: "chore(meta-improvement-system): BL2.6 rollback-realism proof infrastructure (script + tests + SKILL update)"
+  - ref: 548c2f6
+    kind: regressive-promotion
+    note: "meta-meta-exp(meta-2026-04-22-r2): archive audit note proof footer — real DirectCommitAdapter.promote output"
+  - ref: c869413
+    kind: auto-revert
+    note: 'Revert "meta-meta-exp(meta-2026-04-22-r2): archive audit note proof footer" — real DirectCommitAdapter.rollback output fired by rollback_watch.evaluate_watch'
+  - ref: bc4adaa
+    kind: proof-artifacts
+    note: "feat(meta-improvement-system): BL2.6 real commit-then-revert MVL proof — proof.yaml, envelope, events, ledger, test fix for BL2.5 idempotency"
+notes: |
+  BL2.6 produced four commits on s9: infrastructure, regressive promotion
+  (from adapter.promote), auto-revert (from adapter.rollback fired by the
+  watch), and the proof-artifact commit. The regressive commit and its
+  automatic revert both remain in git history as durable evidence of the
+  full path exercise.

@@ -27,6 +27,11 @@ def set_regression_watch(experiment_id: str, watch_state_dict: dict[str, Any]) -
     return update_envelope(experiment_id, {"regression_watch": watch_state_dict})
 
 
+def set_observation_window(experiment_id: str, window_dict: dict[str, Any]) -> dict[str, Any]:
+    """Update only the observation window field on an existing envelope."""
+    return update_envelope(experiment_id, {"observation_window": window_dict})
+
+
 def set_commit_ref(experiment_id: str, commit_ref: str) -> dict[str, Any]:
     """Update only the commit reference field on an existing envelope."""
     return update_envelope(experiment_id, {"commit_ref": commit_ref})

@@ -43,8 +43,20 @@ class PromotionAdapter(ABC):
 
     @abstractmethod
     def promote(self, envelope: dict[str, Any], decision: dict[str, Any]) -> PromotionResult:
-        """Promote a candidate using the adapter-specific policy."""
+        """Promote a candidate using the adapter-specific policy.
+
+        Concrete implementations MAY raise PromotionFailure to signal failure
+        paths that have no valid commit_ref (e.g., merge conflict,
+        verdict=needs_revision). Callers must catch it and treat as promotion
+        failure with main tree unchanged.
+        """
 
     @abstractmethod
     def rollback(self, envelope: dict[str, Any], rollback_ref: str) -> RollbackResult:
-        """Rollback a prior promotion using the adapter-specific policy."""
+        """Rollback a prior promotion using the adapter-specific policy.
+
+        Concrete implementations SHOULD return RollbackResult(success=False, ...)
+        on recoverable failure (e.g., revert conflict) rather than raising, so
+        the rollback watch loop can distinguish recoverable from catastrophic
+        failure.
+        """

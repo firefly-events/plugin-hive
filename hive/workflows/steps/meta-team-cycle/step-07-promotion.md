@@ -86,6 +86,8 @@ promoted_changes:
     file: {path}
     verdict: pass | needs_optimization
     status: promoted
+    commit_ref: {PromotionResult.evidence.commit_ref}
+    rollback_target: {PromotionResult.rollback_target}
     optimization_note: {if applicable}
 
 reverted_changes:
@@ -95,6 +97,8 @@ reverted_changes:
     status: discarded
     reason: {revision_notes from evaluation}
 ```
+
+`commit_ref` and `rollback_target` are output-graph values carried in each promoted entry. Step 7 does NOT write the envelope; step 8 is the single lifecycle-writer that assembles the envelope from these outputs.
 
 ### 5. Compile promotion results
 

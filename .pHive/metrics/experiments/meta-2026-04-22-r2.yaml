@@ -1,0 +1,32 @@
+experiment_id: "meta-2026-04-22-r2"
+swarm_id: "meta-meta-optimize"
+target_ref: "repo:plugin-hive@meta-improvement-system-s9"
+baseline_ref: "experiment:meta-2026-04-22-r2"
+candidate_ref: "branch:meta-meta-exp-meta-2026-04-22-r2"
+policy_ref: "policy:rollback-realism-proof"
+decision: "reverted"
+observation_window:
+  start: "2026-04-22T10:41:34Z"
+  end: "2026-04-22T14:41:34Z"
+
+regression_watch:
+  state: "tripped"
+  tripped_by:
+    tokens: 0
+    wall_clock_ms: 78
+    first_attempt_pass: true
+
+  tripped_at: "2026-04-22T10:41:34.943769Z"
+  rollback_result:
+    success: true
+    revert_ref: "c8694138cfc9ec2b034bfca69529ba99801f741f"
+    notes: "reverted via git revert"
+
+
+metrics_snapshot:
+  tokens: 0
+  wall_clock_ms: 39
+  first_attempt_pass: true
+
+commit_ref: "548c2f67c12a84f42db0f3a9d2170629a4f4884f"
+rollback_ref: "c2407ca32e371cc3782ab242a93a9e6e793aa54f"

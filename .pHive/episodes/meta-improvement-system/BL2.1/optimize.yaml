@@ -1,0 +1,30 @@
+epic: meta-improvement-system
+story: BL2.1
+step: optimize
+agent: developer
+backend: codex
+status: passed
+started: "2026-04-22T05:58:00Z"
+completed: "2026-04-22T06:02:00Z"
+artifacts:
+  - path: hive/lib/meta-experiment/promotion_adapter.py
+    kind: source
+    change: tightened ABC docstrings (PromotionFailure + RollbackResult semantics)
+  - path: hive/lib/meta-experiment/direct_commit_adapter.py
+    kind: source
+    change: added invariant comment before rev-parse HEAD capture; added rollback guard for missing commit_ref
+  - path: tests/meta_meta/test_direct_commit_adapter.py
+    kind: tests
+    change: added 3 rollback failure tests
+added_tests:
+  - test_rollback_aborts_on_revert_conflict
+  - test_rollback_raises_when_commit_ref_missing_from_envelope
+  - test_rollback_reports_failure_when_commit_is_not_reachable
+suites:
+  - target: tests/meta_meta/test_direct_commit_adapter.py
+    passed: 11
+  - target: tests/meta_meta/
+    passed: 22
+    subtests: 3
+verdict: optimizations_applied
+codex_agent_id: a98bce602c9bcc7c7

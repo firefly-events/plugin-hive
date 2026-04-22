@@ -1,0 +1,17 @@
+epic: meta-improvement-system
+story: BL2.2
+step: integrate
+agent: orchestrator
+status: passed
+started: "2026-04-22T06:19:00Z"
+completed: "2026-04-22T06:21:00Z"
+commit: 8a3e5dd
+branch: meta-improvement-system-s9
+files:
+  modified: 1
+  created: 8
+  total_insertions: 778
+  total_deletions: 69
+notes: |
+  BL2.2 shipped on s9 branch. Also rolled in BL2.1/integrate.yaml episode
+  record that was written after BL2.1's commit.

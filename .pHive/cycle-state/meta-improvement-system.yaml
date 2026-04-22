@@ -57,6 +57,17 @@ escalations:
     reason: "The outline proves a real revert, but does not explicitly require regression-watch to trigger the auto-revert path end-to-end; MVL could be overstated by a manual revert reading."
     raised_by: architect
     raised_at: "2026-04-20T04:08:00Z"
+    resolved: true
+    resolved_at: "2026-04-22T10:45:00Z"
+    resolved_by: BL2.6
+    resolution: |
+      BL2.6 proof ran a real deliberate regression through
+      rollback_watch.evaluate_watch -> DirectCommitAdapter.rollback and
+      produced two real git commits (regressive 548c2f6 + auto-revert
+      c869413) on meta-improvement-system-s9. Proof artifact at
+      .pHive/audits/mvl-proof/2026-04-22T10-41-35Z/proof.yaml. Review
+      integrity checklist: 10/10 PASS; no mocks, no manual revert, no
+      synthetic closure.
   - trigger: manifest-ownership-under-specification
     placement: in-planning
     severity: moderate

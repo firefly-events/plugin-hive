@@ -1,0 +1,28 @@
+epic: meta-improvement-system
+story: BL2.1
+step: implement
+agent: developer
+backend: codex
+status: passed
+started: "2026-04-22T05:45:00Z"
+completed: "2026-04-22T05:52:00Z"
+artifacts:
+  - path: hive/lib/meta-experiment/direct_commit_adapter.py
+    kind: source
+    loc: 212
+  - path: hive/lib/meta-experiment/__init__.py
+    kind: source
+    loc: 47
+  - path: hive/lib/meta-experiment/README.md
+    kind: docs
+    loc: 228
+  - path: tests/meta_meta/test_direct_commit_adapter.py
+    kind: tests
+    loc: 268
+notes: |
+  DirectCommitAdapter concrete adapter + PromotionFailure exception implemented.
+  Worktree-native default, ff-only merge with cherry-pick fallback, discard-on-failure,
+  needs_revision defensive path. Codex developer ran
+  `python3 -m pytest tests/meta_meta/test_direct_commit_adapter.py -xvs` — 6/6 green.
+  Wider `python3 -m pytest tests/meta_meta -xvs` — 17 tests green.
+codex_agent_id: a7ee3eabd94d7525d

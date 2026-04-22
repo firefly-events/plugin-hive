@@ -1,0 +1,51 @@
+epic: meta-improvement-system
+story: BL2.6
+step: research
+agent: orchestrator
+status: passed
+started: "2026-04-22T10:30:00Z"
+completed: "2026-04-22T10:31:00Z"
+notes: |
+  Orchestrator-consolidated research (context is fresh from BL2.1-2.5):
+
+  Regression mechanism:
+  - Run a NEW cycle against candidate mmo-2026-04-21-002 (AUDIT-NOTE.md append)
+    to keep the regression-proof cycle distinct from BL2.5's proving run.
+  - "Deliberate regression" is captured in a post_close_snapshot that exceeds
+    the 10% threshold vs envelope.metrics_snapshot. The snapshot models what
+    a regressive change would produce (wall_clock_ms +50%, etc.).
+  - The COMMIT is still real (DirectCommitAdapter.promote produces a real sha).
+    Only the "metrics observed post-close" are deliberately worse to trigger
+    the watch.
+
+  Path integrity:
+  - evaluate_watch runs the live regression_watch logic.
+  - auto_revert_callback = make_direct_commit_auto_revert(adapter) — bound to
+    DirectCommitAdapter.rollback.
+  - On trip: evaluate_watch calls adapter.rollback(envelope, rollback_ref)
+    which runs `git revert --no-edit <commit>` on the branch and persists
+    rollback_result to envelope via envelope_writer.set_regression_watch.
+  - Envelope transitions: decision=accept → reverted; regression_watch.state=
+    armed → tripped; rollback_result{success,revert_ref,notes} persisted.
+
+  Proof artifact fields (per AC4):
+  - trigger_event: post_close_snapshot + regression_metrics list
+  - auto_revert_commit_hash: rollback_result.revert_ref
+  - wall_clock: tripped_at ISO + elapsed ms between arm and trip
+  - regression_watch_fired: true (assertable by artifact presence)
+  - Plus the full closure evidence: commit_ref (regressive), rollback_ref,
+    metrics_snapshot, decision=reverted
+
+  BL2.6 prep items from BL2.5 review:
+  - F1 (dirty-tree guard): add to the proof script.
+  - F2 (observation_window immutability): carry forward the pre-set-at-create
+    workaround.
+  - F3 (different candidate): use mmo-2026-04-21-002.
+
+  Two-commit proof on the branch:
+  - Commit N: the regressive promotion commit
+  - Commit N+1: the real git revert commit from adapter.rollback()
+  Both are real, both appear in `git log`.
+selected_candidate: mmo-2026-04-21-002
+regression_mechanism: synthetic_post_close_snapshot_exceeding_threshold
+threshold_pct: 0.10

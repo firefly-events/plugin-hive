@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable as _Callable
 from dataclasses import dataclass as _dataclass, replace as _replace
 from datetime import datetime as _datetime, timedelta as _timedelta, timezone as _timezone
 from typing import Any as _Any
 from typing import Protocol as _Protocol
-from collections.abc import Callable as _Callable
 
 from . import compare as _compare
+from .closure_validator import _has_reference as _has_reference
 from .promotion_adapter import RollbackResult as _RollbackResult
 
 
@@ -16,6 +17,10 @@ class EnvelopeWriter(_Protocol):
     """Protocol for the envelope mutations used by regression watching."""
 
     def set_regression_watch(self, experiment_id: str, state: dict[str, _Any]) -> dict[str, _Any]: ...
+
+    def set_observation_window(
+        self, experiment_id: str, window: dict[str, _Any]
+    ) -> dict[str, _Any]: ...
 
     def set_decision(self, experiment_id: str, decision: str) -> dict[str, _Any]: ...
 
@@ -40,6 +45,52 @@ class NoActionResult:
     reason: str
 
 
+def _arm_watch(
+    envelope: dict[str, _Any],
+    observation_window_hours: int | float = 4,
+    now: str | _datetime = None,
+    envelope_writer: EnvelopeWriter | None = None,
+) -> dict[str, dict[str, _Any]]:
+    if envelope.get("decision") != "accept":
+        raise ValueError("cannot arm watch: decision must be 'accept'")
+    if not _has_reference(envelope.get("rollback_ref")):
+        raise ValueError("cannot arm watch: missing rollback_ref")
+
+    metrics_snapshot = envelope.get("metrics_snapshot")
+    if not isinstance(metrics_snapshot, dict) or not metrics_snapshot:
+        raise ValueError("cannot arm watch: missing metrics_snapshot")
+
+    if now is None:
+        raise TypeError("now must be an ISO 8601 string or datetime")
+
+    start_dt, start_iso = _coerce_timestamp(now)
+    if start_dt.tzinfo is None:
+        raise ValueError(
+            "arm_watch requires a tz-aware datetime or an ISO 8601 string with explicit offset (e.g., Z or +00:00)"
+        )
+    end_iso = _format_timestamp(start_dt + _timedelta(hours=observation_window_hours))
+    regression_watch = {"state": "armed", "armed_at": start_iso}
+    observation_window = {"start": start_iso, "end": end_iso}
+
+    if envelope_writer is not None:
+        experiment_id = envelope["experiment_id"]
+        envelope_writer.set_regression_watch(experiment_id, regression_watch)
+        envelope_writer.set_observation_window(experiment_id, observation_window)
+
+    return {
+        "regression_watch": regression_watch,
+        "observation_window": observation_window,
+    }
+
+
+def _make_direct_commit_auto_revert(
+    adapter: _Any,
+) -> _Callable[[dict[str, _Any], str], _RollbackResult]:
+    """Return a direct-commit rollback callback with an inspectable binding."""
+
+    return adapter.rollback
+
+
 def evaluate_watch(
     envelope: dict[str, _Any],
     post_close_snapshot: dict[str, _Any],
@@ -54,6 +105,10 @@ def evaluate_watch(
     If `envelope_writer` is `None`, this function skips envelope mutations but still
     returns the computed result and still invokes `auto_revert_callback` when a
     regression trips the watch.
+
+    If the auto_revert_callback returns success=False or raises, the envelope
+    remains armed and records the failed rollback attempt so operators may retry
+    evaluate_watch or invoke adapter.rollback directly.
     """
 
     if envelope.get("decision") != "accept":
@@ -93,20 +148,59 @@ def evaluate_watch(
         rollback_result=None,
     )
 
-    if envelope_writer is not None:
-        envelope_writer.set_regression_watch(
-            experiment_id,
-            {
-                "state": "tripped",
-                "tripped_by": post_close_snapshot,
-                "tripped_at": now_value,
-            },
-        )
-
     rollback_result = None
     if auto_revert_callback is not None:
-        rollback_result = auto_revert_callback(envelope, rollback_ref)
-        if rollback_result.success and envelope_writer is not None:
+        try:
+            rollback_result = auto_revert_callback(envelope, rollback_ref)
+        except Exception:
+            if envelope_writer is not None:
+                armed_at = (envelope.get("regression_watch") or {}).get("armed_at")
+                envelope_writer.set_regression_watch(
+                    experiment_id,
+                    {
+                        "state": "armed",
+                        "armed_at": armed_at,
+                        "last_rollback_attempt": {
+                            "attempted_at": now_value,
+                            "tripped_by": post_close_snapshot,
+                        },
+                    },
+                )
+            raise
+
+    rollback_succeeded = rollback_result is not None and rollback_result.success
+    no_callback_configured = rollback_result is None
+    if rollback_succeeded or no_callback_configured:
+        regression_watch_record = {
+            "state": "tripped",
+            "tripped_by": post_close_snapshot,
+            "tripped_at": now_value,
+        }
+        if rollback_result is not None:
+            regression_watch_record["rollback_result"] = {
+                "success": rollback_result.success,
+                "revert_ref": rollback_result.revert_ref,
+                "notes": rollback_result.notes,
+            }
+    else:
+        armed_at = (envelope.get("regression_watch") or {}).get("armed_at")
+        regression_watch_record = {
+            "state": "armed",
+            "armed_at": armed_at,
+            "last_rollback_attempt": {
+                "attempted_at": now_value,
+                "tripped_by": post_close_snapshot,
+                "rollback_result": {
+                    "success": rollback_result.success,
+                    "revert_ref": rollback_result.revert_ref,
+                    "notes": rollback_result.notes,
+                },
+            },
+        }
+
+    if envelope_writer is not None:
+        envelope_writer.set_regression_watch(experiment_id, regression_watch_record)
+        if rollback_succeeded:
             envelope_writer.set_decision(experiment_id, "reverted")
 
     return _replace(trip_event, rollback_result=rollback_result)
@@ -129,3 +223,11 @@ def _format_timestamp(value: _datetime) -> str:
 
 
 __all__ = ["EnvelopeWriter", "TripEvent", "NoActionResult", "evaluate_watch"]
+
+
+def __getattr__(name: str) -> _Any:
+    if name == "arm_watch":
+        return _arm_watch
+    if name == "make_direct_commit_auto_revert":
+        return _make_direct_commit_auto_revert
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

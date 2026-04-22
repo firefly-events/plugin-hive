@@ -31,3 +31,4 @@ current plan.
 - Structured outline: Part 4, Phase S3 (`A1.1` archive scope; `A1.6` integrity-note allowance).
 - User decisions: Q9 (archive rather than delete legacy meta-team assets).
 - User decisions: Q-new-D (preserve and flag the historical `commit: TBD` break).
+<!-- reviewed-on: meta-2026-04-22 -->
