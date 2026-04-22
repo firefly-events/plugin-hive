@@ -7,11 +7,11 @@ The module is consumed later by:
 - `maintainer-skills/meta-meta-optimize/` for local-only maintainer workflows
 - `skills/hive/skills/meta-optimize/` for the public skill surface
 
-Planned submodules for later stories:
+Submodules:
 
 - `envelope`
 - `baseline`
-- `compare`
+- `compare` (shipped in L1.4)
 - `promotion_adapter`
 - `rollback_watch`
 - `closure_validator`
@@ -99,3 +99,30 @@ Purity:
 
 - the compare module performs no writes
 - no envelope updates, promotion actions, rollback actions, or side effects occur here
+
+## Promotion adapter module
+
+Purpose: abstract seam for maintainer and public promotion paths. The maintainer swarm will later bind a direct-commit adapter in S9, while the public swarm will later bind a PR-only adapter in S10.
+
+API:
+
+- `PromotionAdapter`
+- `PromotionResult`
+- `PromotionEvidence`
+- `RollbackResult`
+
+Contract:
+
+- `PromotionAdapter` defines the shared `promote(envelope, decision)` and `rollback(envelope, rollback_ref)` interface only
+- `PromotionResult` carries success state, explicit promotion evidence, rollback targeting, and optional notes
+- `RollbackResult` carries success state, optional revert reference, and optional notes
+- `PromotionEvidence` is load-bearing and requires exactly one non-`None` reference: `commit_ref` or `pr_ref`
+
+Risk guard:
+
+- The architect raised `closure-evidence-shape-mismatch` in `.pHive/cycle-state/meta-improvement-system.yaml`: a shared closure validator could overfit direct-commit evidence and later reject valid PR-only close records
+- This module prevents that overfitting by making promotion evidence explicit and dual-shaped at the type boundary, so later shared validation can accept either a commit-backed close or a PR-backed close without guessing or fallback logic
+
+Delivery note:
+
+- concrete direct-commit and PR-only adapters are intentionally out of scope here and land in S9 and S10

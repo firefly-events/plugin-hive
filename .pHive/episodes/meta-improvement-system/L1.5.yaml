@@ -1,0 +1,25 @@
+story: L1.5
+epic: meta-improvement-system
+slice: S7
+status: passed
+steps:
+  - id: implement
+    agent: codex:codex-rescue
+    status: success
+    artifacts:
+      - hive/lib/meta-experiment/promotion_adapter.py
+      - hive/lib/meta-experiment/__init__.py
+      - hive/lib/meta-experiment/README.md
+      - hive/lib/meta-experiment/tests/test_promotion_adapter.py
+  - id: test
+    status: success
+    artifacts:
+      - "python3 -m unittest discover hive/lib/meta-experiment/tests: 33 tests, OK"
+  - id: review
+    agent: reviewer (opus)
+    status: passed
+    notes: |
+      Abstract-only interface (ABC, @abstractmethod). Mutual-exclusion invariant
+      on PromotionEvidence enforces exactly-one-of commit_ref/pr_ref. Frozen
+      dataclasses. README cites closure-evidence-shape-mismatch escalation.
+      Tidied README planned-submodules list (compare removed, already shipped).
