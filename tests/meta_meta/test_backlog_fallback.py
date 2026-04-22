@@ -21,9 +21,11 @@ class BacklogFallbackDryRunTests(unittest.TestCase):
         self.skill_text = self.skill_path.read_text(encoding="utf-8")
 
     def test_step_file_exists(self) -> None:
+        """Step 3b markdown exists on disk."""
         self.assertTrue(self.step_path.is_file())
 
     def test_mandatory_rules_lock_dry_run_behavior(self) -> None:
+        """Mandatory rules keep the fallback branch dry-run and ordered."""
         mandatory_section = self._section_body(
             self.step_text,
             "## MANDATORY EXECUTION RULES (READ FIRST)",
@@ -37,9 +39,11 @@ class BacklogFallbackDryRunTests(unittest.TestCase):
         self.assertIn("Do NOT mutate backlog files", mandatory_section)
 
     def test_skill_references_backlog_fallback_step(self) -> None:
+        """Maintainer skill documentation points to the fallback step file."""
         self.assertIn("step-03b-backlog-fallback.md", self.skill_text)
 
     def test_backlog_parses_and_has_pending_candidate(self) -> None:
+        """Backlog fixture parses and still exposes at least one pending entry."""
         backlog = self._load_yaml(self.backlog_path)
         candidates = backlog.get("candidates", [])
 
@@ -47,6 +51,7 @@ class BacklogFallbackDryRunTests(unittest.TestCase):
         self.assertTrue(any(entry.get("status") == "pending" for entry in candidates))
 
     def test_dry_run_harness_selects_first_pending_without_mutation(self) -> None:
+        """Dry-run report selects the first pending entry without mutating inputs."""
         before_mtimes = {
             path: path.stat().st_mtime_ns
             for path in (self.step_path, self.skill_path, self.backlog_path)

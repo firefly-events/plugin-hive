@@ -1,1 +1,1 @@
-"""Meta-meta regression tests."""
+"""Meta-meta unittest package."""

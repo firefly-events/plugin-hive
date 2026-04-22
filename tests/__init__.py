@@ -1,1 +1,1 @@
-"""Test package markers for unittest discovery."""
+"""Top-level unittest discovery package."""

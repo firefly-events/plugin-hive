@@ -65,12 +65,14 @@ Inspect `candidates` in listed order.
 Emit exactly one structured YAML report with this shape:
 
 ```yaml
-candidate_id: "{candidate_id or null}"
-target: "{target or null}"
-type: "{type or null}"
-description: "{description or null}"
-safety_notes: "{safety_notes or null}"
-decision: "would-execute | no-fallback-available"
+# (report shape emitted by this step)
+selected:
+  candidate_id: null              # or a string like "mmo-2026-04-21-001"
+  target: null                    # filled when candidate_id is non-null
+  type: null
+  description: null
+  safety_notes: null
+decision: no-fallback-available   # enum: would-execute | no-fallback-available
 ```
 
 Rules:
