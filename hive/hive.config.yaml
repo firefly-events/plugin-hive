@@ -118,12 +118,12 @@ external_models:
 # Lets the orchestrator route specific agent personas through an external
 # model instead of Claude. Unset agents default to `claude` (TeamCreate path).
 # Supported backends: claude | codex
-# - `codex` requires: external_models.codex.enabled: true, codex + cmux CLIs,
+# - `codex` requires Codex CLI authentication plus the external model flag,
 #   codex login. macOS-only during PoC (cmux constraint). See
 #   skills/hive/skills/codex-invoke/SKILL.md for pre-flight details.
-agent_backends: {}
-  # reviewer: codex              # run reviewer in a cmux pane via OpenAI Codex
-  # backend-developer: codex     # run backend-developer in a cmux pane via OpenAI Codex
+# Optional config example:
+# reviewer: codex                # run reviewer in a cmux pane via OpenAI Codex
+# backend-developer: codex       # run backend-developer in a cmux pane via OpenAI Codex
 
 # Developer preferences (populated by Phase 2b-ii: Developer Discovery)
 # These configure how Hive adapts to the developer's working style.
@@ -156,15 +156,12 @@ execution:
   # tmux: use TeamCreate's built-in tmux pane spawning (default)
   # cmux: spawn agents in cmux split panes via cmux CLI (requires cmux installed)
   # auto: detect cmux first, fall back to tmux
-  terminal_mux: tmux
   # Interactive pane mode for cmux-spawned agents (both Claude and Codex).
   # true: launch agents in interactive mode — visible conversation in the pane,
   #   orchestrator can send follow-up messages, user can inspect/interact live.
   #   Required for cmux team execution (step 6b). Recommended for development.
   # false: launch agents in one-shot mode — agent receives prompt, runs, exits.
   #   Lower visibility, no follow-up messaging. Suitable for CI or headless runs.
-  interactive_panes: true
   # Idle timeout for persistent panes (seconds). Safety net to prevent
   # orphaned panes if the orchestrator dies. Clock resets on each new prompt.
-  # Applies to interactive_panes: true (both Claude and Codex backends).
-  idle_timeout_seconds: 300
+  # Applies only when persistent panes are enabled (both Claude and Codex backends).
