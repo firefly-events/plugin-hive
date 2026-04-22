@@ -1,3 +1,5 @@
+> `$HIVE_STATE_DIR` resolves from `paths.state_dir` in `hive.config.yaml` (default `.pHive`).
+
 # Step 1: Load State
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
@@ -17,10 +19,10 @@ Execute all reads in order. Compile findings into a state reconstruction report.
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
-- `.pHive/episodes/` — status marker YAML files organized by epic/story/step
-- `.pHive/cycle-state/` — accumulated decisions, blocked items, Linear ticket mappings
+- `<HIVE_STATE_DIR>/episodes/` — status marker YAML files organized by epic/story/step
+- `<HIVE_STATE_DIR>/cycle-state/` — accumulated decisions, blocked items, Linear ticket mappings
 - `hive.config.yaml` — task_tracking.adapter field determines if external tracker is configured
-- Active epic IDs from `.pHive/epics/` directory listing
+- Active epic IDs from `<HIVE_STATE_DIR>/epics/` directory listing
 
 **NOT available:**
 - Agent memories (loaded in step 2)
@@ -55,17 +57,17 @@ Record the pull result for the state reconstruction report:
 - `pull_skipped_reason`: populated only if pull was skipped (uncommitted changes, merge conflict, not a git repo)
 
 ### 1. Identify active epics
-List directories under `.pHive/epics/`. For each epic directory, read `epic.yaml` to get the epic ID, title, and story list. Record which epics have active (non-completed) stories.
+List directories under `<HIVE_STATE_DIR>/epics/`. For each epic directory, read `epic.yaml` to get the epic ID, title, and story list. Record which epics have active (non-completed) stories.
 
 ### 2. Read episode status markers
-For each active epic, read all status marker files under `.pHive/episodes/{epic-id}/`. Follow the episode schema:
+For each active epic, read all status marker files under `<HIVE_STATE_DIR>/episodes/{epic-id}/`. Follow the episode schema:
 - Each marker has `step_id`, `story_id`, `epic_id`, `agent`, `status`, `timestamp`
 - Status values: `completed`, `in_progress`, `failed`, `skipped`
 - Group markers by story to determine each story's current phase and status
 - Pay special attention to `failed` and `in_progress` markers — these indicate work that needs continuation or retry
 
 ### 3. Read cycle state
-For each active epic, read `.pHive/cycle-state/{epic-id}.yaml`. Extract:
+For each active epic, read `<HIVE_STATE_DIR>/cycle-state/{epic-id}.yaml`. Extract:
 - `decisions` — accumulated decisions with phase, key, value, rationale
 - Story-level status overrides (blocked, failed)
 - `linear` ticket mappings (if present)
@@ -123,9 +125,9 @@ Produce a structured report with the following sections:
 - [ ] Remote fetched and `BEHIND` count computed
 - [ ] Overnight commits pulled (or pull skip reason recorded)
 - [ ] Meta-team commits identified and surfaced in report
-- [ ] All directories under `.pHive/epics/` scanned for active epics
-- [ ] All episode markers under `.pHive/episodes/` read for active epics
-- [ ] All cycle state files under `.pHive/cycle-state/` read for active epics
+- [ ] All directories under `<HIVE_STATE_DIR>/epics/` scanned for active epics
+- [ ] All episode markers under `<HIVE_STATE_DIR>/episodes/` read for active epics
+- [ ] All cycle state files under `<HIVE_STATE_DIR>/cycle-state/` read for active epics
 - [ ] Task tracker adapter checked in `hive.config.yaml`
 - [ ] Failed, blocked, and in-progress stories identified and listed
 - [ ] State reconstruction report produced with all sections populated
@@ -134,7 +136,7 @@ Produce a structured report with the following sections:
 
 - Skipping episode reads for an active epic — leads to incomplete standup, user misses failed/blocked work
 - Assuming state from a prior conversation instead of reading from disk — this is a fresh session, stale assumptions cause incorrect status reporting
-- Treating a missing `.pHive/episodes/` directory as a fatal error — new projects have no episodes yet, report empty state
+- Treating a missing `<HIVE_STATE_DIR>/episodes/` directory as a fatal error — new projects have no episodes yet, report empty state
 - Not cross-referencing cycle state with episodes — a story may show `completed` in episodes but `blocked` in cycle state due to a later regression
 
 ## NEXT STEP
