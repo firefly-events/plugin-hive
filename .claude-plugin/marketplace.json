@@ -12,6 +12,12 @@
     {
       "name": "plugin-hive",
       "source": "./",
+      "exclude": [
+        "maintainer-skills/**",
+        ".pHive/**",
+        "hive.config.yaml",
+        "*.local.*"
+      ],
       "description": "Hive — multi-agent workflow orchestration for Claude Code. Decomposes requirements into dependency-tracked stories, executes them through planning → development → testing → review pipelines with quality gates, agent memories, and extensible workflows.",
       "version": "1.1.1"
     }
