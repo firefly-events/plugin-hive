@@ -1,3 +1,5 @@
+"""Tests for the meta-experiment envelope wrapper module."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -12,6 +14,7 @@ from hive.lib.metrics import MetricsValidationError
 
 
 def _load_envelope_module():
+    """Load the envelope module from the dashed package directory."""
     module_dir = Path("hive/lib/meta-experiment")
     init_path = module_dir / "__init__.py"
     spec = importlib.util.spec_from_file_location(
@@ -28,6 +31,8 @@ def _load_envelope_module():
 
 
 class EnvelopeRuntimeTests(unittest.TestCase):
+    """Verify envelope wrapper reads and narrow field updates."""
+
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)

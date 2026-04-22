@@ -1,3 +1,5 @@
+"""Tests for baseline snapshot capture and persistence."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -10,6 +12,7 @@ from pathlib import Path
 
 
 def _load_meta_experiment_module():
+    """Load the meta-experiment package from the dashed directory name."""
     module_dir = Path("hive/lib/meta-experiment")
     init_path = module_dir / "__init__.py"
     spec = importlib.util.spec_from_file_location(
@@ -26,6 +29,8 @@ def _load_meta_experiment_module():
 
 
 class BaselineRuntimeTests(unittest.TestCase):
+    """Verify baseline capture behavior against runtime fixtures."""
+
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
@@ -85,6 +90,21 @@ class BaselineRuntimeTests(unittest.TestCase):
         (events_dir / "run_empty.jsonl").write_text("", encoding="utf-8")
 
         self.assertIsNone(self.baseline.capture_from_run("run_empty"))
+
+    def test_capture_from_run_skips_nan_and_infinity_numeric_rows(self) -> None:
+        run_id = "run_skips_non_finite_numbers"
+        self._write_events(
+            run_id,
+            [
+                self._event(run_id, event_id="evt_020", metric_type="tokens", value=float("nan")),
+                self._event(run_id, event_id="evt_021", metric_type="wall_clock_ms", value=float("inf")),
+                self._event(run_id, event_id="evt_022", metric_type="tokens", value=4200),
+            ],
+        )
+
+        snapshot = self.baseline.capture_from_run(run_id)
+
+        self.assertEqual({"tokens": 4200}, snapshot["metrics"])
 
     def test_persist_to_envelope_writes_snapshot_via_wrapper(self) -> None:
         experiment_id = "exp_persist_snapshot"

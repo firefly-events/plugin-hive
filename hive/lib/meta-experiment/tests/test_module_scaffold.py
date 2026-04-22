@@ -1,3 +1,5 @@
+"""Tests for the meta-experiment package scaffold and import surface."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -7,6 +9,8 @@ from pathlib import Path
 
 
 class MetaExperimentScaffoldTests(unittest.TestCase):
+    """Verify the package scaffold exists and imports from `__init__.py`."""
+
     def setUp(self) -> None:
         self.module_dir = Path("hive/lib/meta-experiment")
         self.readme_path = self.module_dir / "README.md"

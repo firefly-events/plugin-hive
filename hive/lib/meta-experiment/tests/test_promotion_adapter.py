@@ -1,3 +1,5 @@
+"""Tests for promotion adapter contracts and result dataclasses."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -8,6 +10,7 @@ from pathlib import Path
 
 
 def _load_meta_experiment_module():
+    """Load the meta-experiment package from the dashed directory name."""
     module_dir = Path("hive/lib/meta-experiment")
     init_path = module_dir / "__init__.py"
     spec = importlib.util.spec_from_file_location(
@@ -24,6 +27,8 @@ def _load_meta_experiment_module():
 
 
 class PromotionAdapterContractTests(unittest.TestCase):
+    """Verify adapter abstractions and evidence/result contracts."""
+
     def setUp(self) -> None:
         meta_experiment = _load_meta_experiment_module()
         self.PromotionAdapter = meta_experiment.PromotionAdapter

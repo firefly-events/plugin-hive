@@ -18,7 +18,7 @@ Submodules:
 
 `hive/lib/` is the import boundary for runtime library code. Code placed here is shared implementation that other components import. This is distinct from `skills/`, which contains user-invocable procedures and their instructional packaging.
 
-This scaffold is intentionally inert. It establishes the runtime module location and discovery contract only; no lifecycle logic is implemented here yet.
+The implemented lifecycle modules are documented below.
 
 Test command:
 
@@ -63,6 +63,7 @@ Contract:
 
 - metrics-absent is a normal no-baseline outcome, not a failure; `capture_from_run` returns `None` for missing or empty event files
 - malformed event rows raise `MetricsValidationError` rather than being silently ignored
+- numeric event rows with `NaN` or `Infinity` values are skipped rather than added to the aggregate snapshot
 - backlog-fallback compatibility is preserved; this module never forces metrics to exist and does not turn missing metrics into a crash
 - persistence still routes through `hive.lib.meta_experiment.envelope`; this module does not read or write envelope YAML directly
 
@@ -80,7 +81,7 @@ Output shape:
 - top-level `verdict`: `accept` or `reject`
 - top-level `threshold_pct`: the single scalar knob used for the evaluation
 - `metrics`: one entry per metric containing baseline and candidate values plus comparison details
-- `regression_metrics`: names of numeric metrics whose `delta_pct` exceeded the threshold
+- `regression_metrics`: names of metrics that tripped rejection, including numeric regressions over threshold and boolean regressions that flipped `True -> False`
 
 Comparator convention:
 
@@ -88,12 +89,12 @@ Comparator convention:
 - negative `delta_pct` means improvement
 - the same `threshold_pct` scalar is applied uniformly across all numeric metrics
 - numeric metrics are over threshold only when `delta_pct > threshold_pct`
-- boolean metrics are included for visibility but do not contribute to the verdict
+- boolean metrics contribute to the verdict only when they flip in the regression direction from `True` to `False`
 
 Scope:
 
-- numeric metrics are the only metrics that can reject a decision
-- boolean metrics are observational only; they always report `over_threshold: false`
+- numeric metrics reject when they exceed the shared threshold
+- boolean metrics reject immediately on a `True -> False` flip; there is no separate asymmetric threshold knob for booleans
 
 Purity:
 

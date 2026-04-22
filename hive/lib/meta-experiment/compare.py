@@ -1,3 +1,5 @@
+"""Compare baseline and candidate metric snapshots for regressions."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -8,6 +10,7 @@ from hive.lib.metrics import delta_compare, read_baseline_metrics
 def evaluate(
     baseline_metrics: dict[str, Any], candidate_metrics: dict[str, Any], threshold_pct: float
 ) -> dict[str, Any]:
+    """Return a structured accept or reject decision for two snapshots."""
     raw_metrics = delta_compare(baseline_metrics, candidate_metrics)
 
     metrics: dict[str, dict[str, Any]] = {}
@@ -31,13 +34,18 @@ def evaluate(
 def evaluate_from_envelope(
     envelope_dict: dict[str, Any], candidate_metrics: dict[str, Any], threshold_pct: float
 ) -> dict[str, Any]:
+    """Load baseline metrics from an envelope and evaluate a candidate snapshot."""
     baseline_metrics = read_baseline_metrics(envelope_dict)
     return evaluate(baseline_metrics, candidate_metrics, threshold_pct)
 
 
 def _is_over_threshold(metric_result: dict[str, Any], threshold_pct: float) -> bool:
     if "changed" in metric_result:
-        return False
+        return (
+            metric_result.get("changed")
+            and metric_result.get("baseline") is True
+            and metric_result.get("candidate") is False
+        )
 
     delta_pct = metric_result.get("delta_pct")
     return delta_pct is not None and delta_pct > threshold_pct

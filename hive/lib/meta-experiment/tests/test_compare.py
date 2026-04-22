@@ -1,3 +1,5 @@
+"""Tests for compare verdict calculation and threshold behavior."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -9,6 +11,7 @@ from pathlib import Path
 
 
 def _load_meta_experiment_module():
+    """Load the meta-experiment package from the dashed directory name."""
     module_dir = Path("hive/lib/meta-experiment")
     init_path = module_dir / "__init__.py"
     spec = importlib.util.spec_from_file_location(
@@ -25,6 +28,8 @@ def _load_meta_experiment_module():
 
 
 class CompareRuntimeTests(unittest.TestCase):
+    """Verify compare verdicts for numeric and boolean metrics."""
+
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
@@ -103,19 +108,56 @@ class CompareRuntimeTests(unittest.TestCase):
         self.assertTrue(decision["metrics"]["wall_clock_ms"]["over_threshold"])
         self.assertFalse(decision["metrics"]["fix_loop_iterations"]["over_threshold"])
 
-    def test_boolean_metrics_are_visible_but_do_not_affect_verdict(self) -> None:
+    def test_boolean_metrics_accept_when_they_do_not_change(self) -> None:
+        decision = self.compare.evaluate(
+            self._snapshot(first_attempt_pass=True, human_escalation=False),
+            self._snapshot(first_attempt_pass=True, human_escalation=False),
+            0.0,
+        )
+
+        self.assertEqual("accept", decision["verdict"])
+        self.assertEqual([], decision["regression_metrics"])
+        self.assertFalse(decision["metrics"]["first_attempt_pass"]["changed"])
+        self.assertFalse(decision["metrics"]["first_attempt_pass"]["over_threshold"])
+
+    def test_boolean_metrics_accept_when_they_improve(self) -> None:
+        decision = self.compare.evaluate(
+            self._snapshot(first_attempt_pass=False),
+            self._snapshot(first_attempt_pass=True),
+            0.0,
+        )
+
+        self.assertEqual("accept", decision["verdict"])
+        self.assertEqual([], decision["regression_metrics"])
+        self.assertTrue(decision["metrics"]["first_attempt_pass"]["changed"])
+        self.assertFalse(decision["metrics"]["first_attempt_pass"]["over_threshold"])
+
+    def test_boolean_metrics_reject_when_they_regress_true_to_false(self) -> None:
         decision = self.compare.evaluate(
             self._snapshot(first_attempt_pass=True, human_escalation=False),
             self._snapshot(first_attempt_pass=False, human_escalation=True),
             0.0,
         )
 
-        self.assertEqual("accept", decision["verdict"])
-        self.assertEqual([], decision["regression_metrics"])
+        self.assertEqual("reject", decision["verdict"])
+        self.assertEqual(["first_attempt_pass"], decision["regression_metrics"])
         self.assertIn("first_attempt_pass", decision["metrics"])
         self.assertIn("human_escalation", decision["metrics"])
         self.assertTrue(decision["metrics"]["first_attempt_pass"]["changed"])
-        self.assertFalse(decision["metrics"]["first_attempt_pass"]["over_threshold"])
+        self.assertTrue(decision["metrics"]["first_attempt_pass"]["over_threshold"])
+        self.assertFalse(decision["metrics"]["human_escalation"]["over_threshold"])
+
+    def test_numeric_only_happy_paths_remain_unchanged(self) -> None:
+        decision = self.compare.evaluate(
+            self._snapshot(tokens=100, wall_clock_ms=200),
+            self._snapshot(tokens=90, wall_clock_ms=180),
+            5.0,
+        )
+
+        self.assertEqual("accept", decision["verdict"])
+        self.assertEqual([], decision["regression_metrics"])
+        self.assertFalse(decision["metrics"]["tokens"]["over_threshold"])
+        self.assertFalse(decision["metrics"]["wall_clock_ms"]["over_threshold"])
 
     def test_evaluate_from_envelope_reads_baseline_snapshot_from_referenced_envelope(self) -> None:
         baseline_experiment_id = "exp_baseline_source"

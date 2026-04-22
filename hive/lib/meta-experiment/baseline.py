@@ -1,6 +1,9 @@
+"""Capture baseline metric snapshots from recorded run events."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import math
 from typing import Any
 
 from hive.lib.metrics import MetricsValidationError, read_run_events
@@ -31,12 +34,15 @@ class NoBaselineError(Exception):
 
 
 def capture_from_run(run_id: str) -> dict[str, Any] | None:
+    """Return the latest valid metrics snapshot for a run, if present."""
     events = read_run_events(run_id)
     if not events:
         return None
 
     metrics: dict[str, Any] = {}
     for event in events:
+        if _should_skip_event_row(event):
+            continue
         _validate_event_row(event, run_id)
         metrics[event["metric_type"]] = event["value"]
 
@@ -50,10 +56,12 @@ def capture_from_run(run_id: str) -> dict[str, Any] | None:
 
 
 def persist_to_envelope(experiment_id: str, snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Persist a captured metrics snapshot through the envelope wrapper."""
     return envelope.set_metrics_snapshot(experiment_id, snapshot)
 
 
 def capture_and_persist(experiment_id: str, run_id: str) -> dict[str, Any]:
+    """Capture a run baseline and persist it to the experiment envelope."""
     snapshot = capture_from_run(run_id)
     if snapshot is None:
         raise NoBaselineError(f"no baseline metrics available for run_id={run_id}")
@@ -106,7 +114,18 @@ def _validate_event_row(event: dict[str, Any], run_id: str) -> None:
 
 
 def _is_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _should_skip_event_row(event: dict[str, Any]) -> bool:
+    metric_type = event.get("metric_type")
+    if metric_type not in _EVENT_METRIC_TYPES:
+        return False
+
+    expected_value_kind, _ = _EVENT_METRIC_TYPES[metric_type]
+    return expected_value_kind == "number" and isinstance(event.get("value"), float) and not math.isfinite(
+        event["value"]
+    )
 
 
 def _utc_now_iso() -> str:

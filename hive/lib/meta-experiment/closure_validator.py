@@ -1,3 +1,5 @@
+"""Validate whether an experiment envelope is ready to close."""
+
 from __future__ import annotations
 
 from typing import Any as _Any
@@ -28,9 +30,6 @@ class InvalidDecisionError(CloseValidationError):
 
 
 _CLOSABLE_DECISIONS = {"accept", "reject", "reverted"}
-_KNOWN_DECISIONS = _CLOSABLE_DECISIONS | {"pending"}
-
-
 def validate_closable(envelope: dict) -> None:
     """Raise a distinct validation error if the envelope cannot close."""
 
@@ -54,18 +53,13 @@ def is_closable(envelope: dict) -> bool:
 
 
 def _validate_decision(envelope: dict[str, _Any]) -> None:
-    if "decision" not in envelope:
-        raise InvalidDecisionError("decision is missing")
-
     decision = envelope.get("decision")
-    if decision is None or decision == "":
+    if decision is None:
         raise InvalidDecisionError("decision is missing")
     if decision == "pending":
         raise InvalidDecisionError("decision is pending and not closable")
-    if decision not in _KNOWN_DECISIONS:
-        raise InvalidDecisionError(f"unrecognized decision value: {decision!r}")
     if decision not in _CLOSABLE_DECISIONS:
-        raise InvalidDecisionError(f"decision is not closable: {decision!r}")
+        raise InvalidDecisionError(f"unrecognized decision value: {decision!r}")
 
 
 def _validate_evidence(envelope: dict[str, _Any]) -> None:

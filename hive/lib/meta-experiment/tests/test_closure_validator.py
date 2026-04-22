@@ -1,3 +1,5 @@
+"""Tests for close-validation predicates and error contracts."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -7,6 +9,7 @@ from pathlib import Path
 
 
 def _load_meta_experiment_module():
+    """Load the meta-experiment package from the dashed directory name."""
     module_dir = Path("hive/lib/meta-experiment")
     init_path = module_dir / "__init__.py"
     spec = importlib.util.spec_from_file_location(
@@ -23,6 +26,8 @@ def _load_meta_experiment_module():
 
 
 class ClosureValidatorTests(unittest.TestCase):
+    """Verify closure validation rules and exported errors."""
+
     def setUp(self) -> None:
         meta_experiment = _load_meta_experiment_module()
         self.closure_validator = meta_experiment.closure_validator

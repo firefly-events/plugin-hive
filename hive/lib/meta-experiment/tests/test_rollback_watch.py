@@ -1,3 +1,5 @@
+"""Tests for regression-watch evaluation and rollback triggering."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -7,6 +9,7 @@ from pathlib import Path
 
 
 def _load_meta_experiment_module():
+    """Load the meta-experiment package from the dashed directory name."""
     module_dir = Path("hive/lib/meta-experiment")
     init_path = module_dir / "__init__.py"
     spec = importlib.util.spec_from_file_location(
@@ -23,6 +26,8 @@ def _load_meta_experiment_module():
 
 
 class RecordingEnvelopeWriter:
+    """Record watch and decision writes issued by the watch evaluator."""
+
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, object]] = []
 
@@ -36,6 +41,8 @@ class RecordingEnvelopeWriter:
 
 
 class CallbackStub:
+    """Capture rollback callback calls and return a configured outcome."""
+
     def __init__(self, *, result=None, error: Exception | None = None) -> None:
         self.result = result
         self.error = error
@@ -49,6 +56,8 @@ class CallbackStub:
 
 
 class RollbackWatchRuntimeTests(unittest.TestCase):
+    """Verify rollback-watch trip behavior and side effects."""
+
     def setUp(self) -> None:
         meta_experiment = _load_meta_experiment_module()
         self.rollback_watch = meta_experiment.rollback_watch

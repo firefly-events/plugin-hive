@@ -1,7 +1,9 @@
+"""Watch accepted experiments for post-close regressions and rollbacks."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass as _dataclass
-from datetime import datetime as _datetime, timezone as _timezone
+from dataclasses import dataclass as _dataclass, replace as _replace
+from datetime import datetime as _datetime, timedelta as _timedelta, timezone as _timezone
 from typing import Any as _Any
 from typing import Protocol as _Protocol
 from collections.abc import Callable as _Callable
@@ -11,6 +13,8 @@ from .promotion_adapter import RollbackResult as _RollbackResult
 
 
 class EnvelopeWriter(_Protocol):
+    """Protocol for the envelope mutations used by regression watching."""
+
     def set_regression_watch(self, experiment_id: str, state: dict[str, _Any]) -> dict[str, _Any]: ...
 
     def set_decision(self, experiment_id: str, decision: str) -> dict[str, _Any]: ...
@@ -18,6 +22,8 @@ class EnvelopeWriter(_Protocol):
 
 @_dataclass(frozen=True)
 class TripEvent:
+    """Captured details for a regression-watch trip."""
+
     experiment_id: str
     tripped_at: str
     tripped_by: dict[str, _Any]
@@ -29,6 +35,8 @@ class TripEvent:
 
 @_dataclass(frozen=True)
 class NoActionResult:
+    """Reason no rollback-watch action was taken."""
+
     reason: str
 
 
@@ -101,15 +109,7 @@ def evaluate_watch(
         if rollback_result.success and envelope_writer is not None:
             envelope_writer.set_decision(experiment_id, "reverted")
 
-    return TripEvent(
-        experiment_id=trip_event.experiment_id,
-        tripped_at=trip_event.tripped_at,
-        tripped_by=trip_event.tripped_by,
-        regression_metrics=trip_event.regression_metrics,
-        threshold_pct=trip_event.threshold_pct,
-        rollback_ref=trip_event.rollback_ref,
-        rollback_result=rollback_result,
-    )
+    return _replace(trip_event, rollback_result=rollback_result)
 
 
 def _coerce_timestamp(value: str | _datetime) -> tuple[_datetime, str]:
@@ -123,7 +123,7 @@ def _coerce_timestamp(value: str | _datetime) -> tuple[_datetime, str]:
 
 
 def _format_timestamp(value: _datetime) -> str:
-    if value.tzinfo is not None and value.utcoffset() == _timezone.utc.utcoffset(value):
+    if value.tzinfo is not None and value.utcoffset() == _timedelta(0):
         return value.astimezone(_timezone.utc).isoformat().replace("+00:00", "Z")
     return value.isoformat()
 

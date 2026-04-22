@@ -1,3 +1,5 @@
+"""Define shared promotion and rollback adapter contracts."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -7,6 +9,8 @@ from typing import Any
 
 @dataclass(frozen=True)
 class PromotionEvidence:
+    """Promotion evidence carrying exactly one close reference."""
+
     commit_ref: str | None = None
     pr_ref: str | None = None
 
@@ -17,6 +21,8 @@ class PromotionEvidence:
 
 @dataclass(frozen=True)
 class PromotionResult:
+    """Promotion outcome details returned by an adapter."""
+
     success: bool
     evidence: PromotionEvidence
     rollback_target: str
@@ -25,6 +31,8 @@ class PromotionResult:
 
 @dataclass(frozen=True)
 class RollbackResult:
+    """Rollback outcome details returned by an adapter."""
+
     success: bool
     revert_ref: str | None = None
     notes: str | None = None
