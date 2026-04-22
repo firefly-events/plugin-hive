@@ -10,12 +10,12 @@ from pathlib import Path
 from tests.meta_meta.test_direct_commit_adapter import (
     _git,
     _init_repo,
-    _load_meta_experiment_module,
+    load_meta_experiment_module,
     _make_worktree_candidate,
 )
 
 
-META_EXPERIMENT = _load_meta_experiment_module()
+META_EXPERIMENT = load_meta_experiment_module()
 DirectCommitAdapter = META_EXPERIMENT.DirectCommitAdapter
 NoActionResult = META_EXPERIMENT.NoActionResult
 RollbackResult = META_EXPERIMENT.RollbackResult
@@ -184,10 +184,7 @@ def test_arm_watch_rejects_naive_datetime() -> None:
     try:
         arm_watch(_base_envelope(), now=datetime.now())
     except ValueError as exc:
-        assert str(exc) == (
-            "arm_watch requires a tz-aware datetime or an ISO 8601 string with explicit offset "
-            "(e.g., Z or +00:00)"
-        )
+        assert str(exc) == "timestamp must be tz-aware and include an explicit UTC offset (e.g., Z or +00:00)"
     else:
         raise AssertionError("expected ValueError")
 

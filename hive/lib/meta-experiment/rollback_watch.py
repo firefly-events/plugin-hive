@@ -47,8 +47,8 @@ class NoActionResult:
 
 def _arm_watch(
     envelope: dict[str, _Any],
+    now: str | _datetime,
     observation_window_hours: int | float = 4,
-    now: str | _datetime = None,
     envelope_writer: EnvelopeWriter | None = None,
 ) -> dict[str, dict[str, _Any]]:
     if envelope.get("decision") != "accept":
@@ -60,14 +60,7 @@ def _arm_watch(
     if not isinstance(metrics_snapshot, dict) or not metrics_snapshot:
         raise ValueError("cannot arm watch: missing metrics_snapshot")
 
-    if now is None:
-        raise TypeError("now must be an ISO 8601 string or datetime")
-
     start_dt, start_iso = _coerce_timestamp(now)
-    if start_dt.tzinfo is None:
-        raise ValueError(
-            "arm_watch requires a tz-aware datetime or an ISO 8601 string with explicit offset (e.g., Z or +00:00)"
-        )
     end_iso = _format_timestamp(start_dt + _timedelta(hours=observation_window_hours))
     regression_watch = {"state": "armed", "armed_at": start_iso}
     observation_window = {"start": start_iso, "end": end_iso}
@@ -208,12 +201,22 @@ def evaluate_watch(
 
 def _coerce_timestamp(value: str | _datetime) -> tuple[_datetime, str]:
     if isinstance(value, _datetime):
-        return value, _format_timestamp(value)
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError(
+                "timestamp must be tz-aware and include an explicit UTC offset (e.g., Z or +00:00)"
+            )
+        normalized = value.astimezone(_timezone.utc)
+        return normalized, _format_timestamp(normalized)
     if not isinstance(value, str):
         raise TypeError("timestamp must be an ISO 8601 string or datetime")
 
     parsed = _datetime.fromisoformat(value.replace("Z", "+00:00"))
-    return parsed, _format_timestamp(parsed)
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(
+            "timestamp must be tz-aware and include an explicit UTC offset (e.g., Z or +00:00)"
+        )
+    normalized = parsed.astimezone(_timezone.utc)
+    return normalized, _format_timestamp(normalized)
 
 
 def _format_timestamp(value: _datetime) -> str:

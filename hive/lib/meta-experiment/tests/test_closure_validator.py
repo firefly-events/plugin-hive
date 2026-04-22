@@ -2,34 +2,16 @@
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 import unittest
-from pathlib import Path
 
-
-def _load_meta_experiment_module():
-    """Load the meta-experiment package from the dashed directory name."""
-    module_dir = Path("hive/lib/meta-experiment")
-    init_path = module_dir / "__init__.py"
-    spec = importlib.util.spec_from_file_location(
-        "hive.lib.meta_experiment",
-        init_path,
-        submodule_search_locations=[str(module_dir)],
-    )
-    if spec is None or spec.loader is None:
-        raise AssertionError("failed to build import spec for meta-experiment package")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+from ._loader import load_meta_experiment_module
 
 
 class ClosureValidatorTests(unittest.TestCase):
     """Verify closure validation rules and exported errors."""
 
     def setUp(self) -> None:
-        meta_experiment = _load_meta_experiment_module()
+        meta_experiment = load_meta_experiment_module()
         self.closure_validator = meta_experiment.closure_validator
         self.validate_closable = meta_experiment.validate_closable
         self.is_closable = meta_experiment.is_closable
@@ -124,9 +106,21 @@ class ClosureValidatorTests(unittest.TestCase):
         self.assertTrue(issubclass(self.MissingRollbackTargetError, self.CloseValidationError))
         self.assertTrue(issubclass(self.InvalidDecisionError, self.CloseValidationError))
 
-    def test_is_closable_swallows_exceptions_and_returns_false(self) -> None:
+    def test_is_closable_returns_false_for_validation_and_type_errors(self) -> None:
         self.assertFalse(self.is_closable({"decision": "pending"}))
         self.assertFalse(self.is_closable(None))
+
+    def test_is_closable_propagates_unexpected_exceptions(self) -> None:
+        original = self.closure_validator.validate_closable
+
+        def boom(envelope: dict) -> None:
+            raise RuntimeError("boom")
+
+        self.closure_validator.validate_closable = boom
+        self.addCleanup(setattr, self.closure_validator, "validate_closable", original)
+
+        with self.assertRaisesRegex(RuntimeError, "boom"):
+            self.closure_validator.is_closable({})
 
     def test_empty_metrics_snapshot_raises_missing_metrics_snapshot(self) -> None:
         envelope = self._close_envelope(metrics_snapshot={})

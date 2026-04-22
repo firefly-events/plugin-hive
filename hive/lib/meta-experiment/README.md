@@ -35,6 +35,7 @@ API:
 - `create`
 - `load`
 - `set_decision`
+- `set_observation_window`
 - `set_regression_watch`
 - `set_commit_ref`
 - `set_rollback_ref`
@@ -176,7 +177,7 @@ Purpose: non-bypassable close-invariant gate per Q3. This module is a pure share
 API:
 
 - `validate_closable(envelope)` raises on invalid close records and returns `None` on pass
-- `is_closable(envelope)` returns a boolean and swallows validator exceptions
+- `is_closable(envelope)` returns a boolean and converts `CloseValidationError`/`TypeError` into `False`
 
 Required envelope fields for close:
 
@@ -214,14 +215,16 @@ Promotion semantics:
 
 - `pass` and `needs_optimization` validate that the worktree exists and that its `HEAD` matches `candidate_ref`
 - the adapter always captures the target branch pre-promotion `HEAD` as `rollback_target`
-- it first attempts `git merge --ff-only <candidate_ref>` and falls back to `git cherry-pick <candidate_ref>` when fast-forward is unavailable
+- it attempts `git merge --ff-only <candidate_ref>` and treats a non-fast-forward result as a promotion failure
 - on success it returns commit-backed evidence and removes the worktree
-- on any promotion failure it aborts in-progress git operations, preserves the main tree at the pre-promotion `HEAD`, and force-removes the worktree
+- on a promotion failure no new `commit_ref` is produced and `rollback_target` remains the pre-promotion `HEAD`
+- failed promotions preserve the worktree for inspection and leave the main tree at the pre-promotion `HEAD`
 - on `needs_revision` it does not write to the main tree and only discards the worktree
 
 Rollback semantics:
 
 - rollback uses `git revert --no-edit <commit_ref>` on the target branch
+- rollback verifies that the branch `HEAD` still matches the expected `rollback_ref` before creating a revert commit
 - a successful rollback returns the new revert commit SHA in `revert_ref`
 - rollback failures abort the revert and return `success=False`
 

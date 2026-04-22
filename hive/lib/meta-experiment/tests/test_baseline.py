@@ -2,30 +2,13 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-
-def _load_meta_experiment_module():
-    """Load the meta-experiment package from the dashed directory name."""
-    module_dir = Path("hive/lib/meta-experiment")
-    init_path = module_dir / "__init__.py"
-    spec = importlib.util.spec_from_file_location(
-        "hive.lib.meta_experiment",
-        init_path,
-        submodule_search_locations=[str(module_dir)],
-    )
-    if spec is None or spec.loader is None:
-        raise AssertionError("failed to build import spec for meta-experiment package")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+from ._loader import load_meta_experiment_module
 
 
 class BaselineRuntimeTests(unittest.TestCase):
@@ -45,7 +28,7 @@ class BaselineRuntimeTests(unittest.TestCase):
                 os.environ["METRICS_ROOT"] = prior_metrics_root
 
         self.addCleanup(_restore_metrics_root)
-        meta_experiment = _load_meta_experiment_module()
+        meta_experiment = load_meta_experiment_module()
         self.baseline = meta_experiment.baseline
         self.envelope = meta_experiment.envelope
 

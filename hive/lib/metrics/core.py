@@ -46,10 +46,10 @@ IMMUTABLE_ENVELOPE_FIELDS = {
     "baseline_ref",
     "candidate_ref",
     "policy_ref",
-    "observation_window",
 }
 MUTABLE_ENVELOPE_FIELDS = {
     "decision",
+    "observation_window",
     "regression_watch",
     "metrics_snapshot",
     "commit_ref",
@@ -107,6 +107,8 @@ def update_envelope(experiment_id: str, updates_dict: dict[str, Any]) -> dict[st
         elif field == "metrics_snapshot":
             if _is_closed(current):
                 raise MetricsValidationError("metrics_snapshot is immutable after closure")
+            updated[field] = value
+        elif field == "observation_window":
             updated[field] = value
         elif field == "regression_watch":
             updated[field] = _update_regression_watch(current.get(field), value)
@@ -354,4 +356,3 @@ def _is_number(value: Any) -> bool:
 
 def _is_number_or_none(value: Any) -> bool:
     return value is None or _is_number(value)
-

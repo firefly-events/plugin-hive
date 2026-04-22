@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import sys
@@ -10,24 +9,14 @@ from pathlib import Path
 
 import pytest
 
+TEST_HELPERS_DIR = Path(__file__).resolve().parents[2] / "hive/lib/meta-experiment/tests"
+if str(TEST_HELPERS_DIR) not in sys.path:
+    sys.path.insert(0, str(TEST_HELPERS_DIR))
 
-def _load_meta_experiment_module():
-    module_dir = Path("hive/lib/meta-experiment")
-    init_path = module_dir / "__init__.py"
-    spec = importlib.util.spec_from_file_location(
-        "hive.lib.meta_experiment",
-        init_path,
-        submodule_search_locations=[str(module_dir)],
-    )
-    if spec is None or spec.loader is None:
-        raise AssertionError("failed to build import spec for meta-experiment package")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+from _loader import load_meta_experiment_module
 
 
-META_EXPERIMENT = _load_meta_experiment_module()
+META_EXPERIMENT = load_meta_experiment_module()
 baseline = META_EXPERIMENT.baseline
 compare = META_EXPERIMENT.compare
 envelope = META_EXPERIMENT.envelope

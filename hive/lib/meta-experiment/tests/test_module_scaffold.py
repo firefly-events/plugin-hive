@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 import unittest
 from pathlib import Path
+
+from ._loader import load_meta_experiment_module
 
 
 class MetaExperimentScaffoldTests(unittest.TestCase):
     """Verify the package scaffold exists and imports from `__init__.py`."""
 
     def setUp(self) -> None:
-        self.module_dir = Path("hive/lib/meta-experiment")
+        self.module_dir = Path(__file__).resolve().parent.parent
         self.readme_path = self.module_dir / "README.md"
         self.init_path = self.module_dir / "__init__.py"
 
@@ -23,20 +23,9 @@ class MetaExperimentScaffoldTests(unittest.TestCase):
         self.assertTrue(self.readme_path.is_file())
 
     def test_module_is_importable_from_init_path(self) -> None:
-        spec = importlib.util.spec_from_file_location(
-            "hive.lib.meta_experiment",
-            self.init_path,
-            submodule_search_locations=[str(self.module_dir)],
-        )
+        module = load_meta_experiment_module()
 
-        self.assertIsNotNone(spec)
-        self.assertIsNotNone(spec.loader)
-
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = module
-        spec.loader.exec_module(module)
-
-        self.assertEqual(str(self.init_path.resolve()), module.__file__)
+        self.assertEqual(self.init_path.resolve(), Path(module.__file__).resolve())
 
 
 if __name__ == "__main__":

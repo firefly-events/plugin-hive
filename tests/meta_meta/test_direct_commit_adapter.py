@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import inspect
 import subprocess
 import sys
@@ -10,24 +9,14 @@ from pathlib import Path
 
 import pytest
 
+TEST_HELPERS_DIR = Path(__file__).resolve().parents[2] / "hive/lib/meta-experiment/tests"
+if str(TEST_HELPERS_DIR) not in sys.path:
+    sys.path.insert(0, str(TEST_HELPERS_DIR))
 
-def _load_meta_experiment_module():
-    module_dir = Path("hive/lib/meta-experiment")
-    init_path = module_dir / "__init__.py"
-    spec = importlib.util.spec_from_file_location(
-        "hive.lib.meta_experiment",
-        init_path,
-        submodule_search_locations=[str(module_dir)],
-    )
-    if spec is None or spec.loader is None:
-        raise AssertionError("failed to build import spec for meta-experiment package")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+from _loader import load_meta_experiment_module
 
 
-META_EXPERIMENT = _load_meta_experiment_module()
+META_EXPERIMENT = load_meta_experiment_module()
 DIRECT_COMMIT_MODULE = sys.modules["hive.lib.meta_experiment.direct_commit_adapter"]
 DirectCommitAdapter = META_EXPERIMENT.DirectCommitAdapter
 PromotionAdapter = META_EXPERIMENT.PromotionAdapter
@@ -105,7 +94,7 @@ def test_promote_success_fast_forward(tmp_path: Path) -> None:
     assert not worktree.exists()
 
 
-def test_promote_success_cherry_pick_fallback(tmp_path: Path) -> None:
+def test_promote_ff_only_failure_preserves_worktree_and_main(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init_repo(repo)
     worktree = repo / ".pHive/meta-team/worktrees/exp-cherry-pick"
@@ -122,26 +111,27 @@ def test_promote_success_cherry_pick_fallback(tmp_path: Path) -> None:
     divergent_head = _git(repo, "rev-parse", "HEAD")
 
     adapter = DirectCommitAdapter(repo)
-    result = adapter.promote(
-        {
-            "experiment_id": "exp-cherry-pick",
-            "candidate_ref": candidate_ref,
-            "target_branch": "main",
-        },
-        {"verdict": "needs_optimization", "optimization_note": "clean up naming"},
+    with pytest.raises(PromotionFailure) as exc_info:
+        adapter.promote(
+            {
+                "experiment_id": "exp-cherry-pick",
+                "candidate_ref": candidate_ref,
+                "target_branch": "main",
+            },
+            {"verdict": "needs_optimization", "optimization_note": "clean up naming"},
     )
 
-    assert result.success is True
-    assert result.rollback_target == divergent_head
-    assert result.evidence.commit_ref == _git(repo, "rev-parse", "HEAD")
-    assert result.evidence.commit_ref != candidate_ref
-    assert "cherry-pick fallback" in (result.notes or "")
-    assert "optimization_note: clean up naming" in (result.notes or "")
-    assert (repo / "feature.txt").read_text() == "candidate content\n"
-    assert not worktree.exists()
+    failure = exc_info.value
+    assert failure.rollback_target == divergent_head
+    assert "optimization_note: clean up naming" in (failure.notes or "")
+    assert "ff-only merge failed" in (failure.notes or "")
+    assert "fast-forward" in failure.reason.lower()
+    assert _git(repo, "rev-parse", "HEAD") == divergent_head
+    assert not (repo / "feature.txt").exists()
+    assert worktree.exists()
 
 
-def test_promote_conflict_discards_worktree_and_preserves_main(tmp_path: Path) -> None:
+def test_promote_conflict_preserves_worktree_and_main(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init_repo(repo)
     base_file = repo / "conflict.txt"
@@ -176,7 +166,7 @@ def test_promote_conflict_discards_worktree_and_preserves_main(tmp_path: Path) -
     assert failure.rollback_target == main_head
     assert _git(repo, "rev-parse", "HEAD") == main_head
     assert (repo / "conflict.txt").read_text() == "main change\n"
-    assert not worktree.exists()
+    assert worktree.exists()
 
 
 def test_promote_needs_revision_rejects_and_removes_worktree(tmp_path: Path) -> None:
@@ -240,7 +230,7 @@ def test_rollback_success(tmp_path: Path) -> None:
     assert rollback.revert_ref != promotion.evidence.commit_ref
 
 
-def test_rollback_aborts_on_revert_conflict(tmp_path: Path) -> None:
+def test_rollback_refuses_after_follow_up_commit_and_keeps_repo_clean(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init_repo(repo)
     conflict_file = repo / "conflict.txt"
@@ -278,10 +268,51 @@ def test_rollback_aborts_on_revert_conflict(tmp_path: Path) -> None:
 
     assert rollback.success is False
     assert rollback.revert_ref is None
-    assert "conflict" in (rollback.notes or "").lower()
-    assert "abort" in (rollback.notes or "").lower()
+    assert rollback.notes == (
+        f"rollback target advanced: expected {promotion.evidence.commit_ref}, got {follow_up_head}"
+    )
     assert _git(repo, "rev-parse", "HEAD") == follow_up_head
     assert _git(repo, "status", "--porcelain") == ""
+
+
+def test_rollback_refuses_when_target_branch_advanced(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    worktree = repo / ".pHive/meta-team/worktrees/exp-rollback-advanced"
+    candidate_ref = _make_worktree_candidate(
+        repo,
+        worktree,
+        "exp-rollback-advanced",
+        "rollback.txt",
+        "ship me\n",
+    )
+
+    adapter = DirectCommitAdapter(repo)
+    promotion = adapter.promote(
+        {
+            "experiment_id": "exp-rollback-advanced",
+            "candidate_ref": candidate_ref,
+            "target_branch": "main",
+        },
+        {"verdict": "pass"},
+    )
+
+    (repo / "follow-up.txt").write_text("advanced branch\n")
+    _git(repo, "add", "follow-up.txt")
+    _git(repo, "commit", "-m", "advance main")
+    advanced_head = _git(repo, "rev-parse", "HEAD")
+
+    rollback = adapter.rollback(
+        {"commit_ref": promotion.evidence.commit_ref, "target_branch": "main"},
+        promotion.rollback_target,
+    )
+
+    assert rollback.success is False
+    assert rollback.revert_ref is None
+    assert rollback.notes == (
+        f"rollback target advanced: expected {promotion.evidence.commit_ref}, got {advanced_head}"
+    )
+    assert _git(repo, "rev-parse", "HEAD") == advanced_head
 
 
 def test_rollback_raises_when_commit_ref_missing_from_envelope(tmp_path: Path) -> None:

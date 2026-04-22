@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import importlib.util
 import os
-import sys
 import tempfile
 import unittest
 from copy import deepcopy
@@ -12,22 +10,12 @@ from pathlib import Path
 
 from hive.lib.metrics import MetricsValidationError
 
+from ._loader import load_meta_experiment_module
+
 
 def _load_envelope_module():
     """Load the envelope module from the dashed package directory."""
-    module_dir = Path("hive/lib/meta-experiment")
-    init_path = module_dir / "__init__.py"
-    spec = importlib.util.spec_from_file_location(
-        "hive.lib.meta_experiment",
-        init_path,
-        submodule_search_locations=[str(module_dir)],
-    )
-    if spec is None or spec.loader is None:
-        raise AssertionError("failed to build import spec for meta-experiment package")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module.envelope
+    return load_meta_experiment_module().envelope
 
 
 class EnvelopeRuntimeTests(unittest.TestCase):
@@ -113,9 +101,30 @@ class EnvelopeRuntimeTests(unittest.TestCase):
 
         self.assertEqual(tripped, updated["regression_watch"])
 
+    def test_set_observation_window_updates_window(self) -> None:
+        envelope = self._base_envelope(experiment_id="exp_observation_window")
+        window = {
+            "start": "2026-04-20T16:00:00Z",
+            "end": "2026-04-20T20:00:00Z",
+        }
+        self.envelope.create(envelope)
+
+        updated = self.envelope.set_observation_window(envelope["experiment_id"], window)
+
+        self.assertEqual(window, updated["observation_window"])
+        self.assertEqual(window, self.envelope.load(envelope["experiment_id"])["observation_window"])
+
     def test_set_helpers_only_mutate_declared_field(self) -> None:
         cases = [
             ("set_decision", "decision", "accept"),
+            (
+                "set_observation_window",
+                "observation_window",
+                {
+                    "start": "2026-04-20T16:00:00Z",
+                    "end": "2026-04-20T20:00:00Z",
+                },
+            ),
             (
                 "set_regression_watch",
                 "regression_watch",

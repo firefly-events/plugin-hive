@@ -31,6 +31,8 @@ class InvalidDecisionError(CloseValidationError):
 
 _CLOSABLE_DECISIONS = {"accept", "reject", "reverted"}
 _PLACEHOLDER_REFS = frozenset({"tbd", "pending", "n/a", "unknown"})
+
+
 def validate_closable(envelope: dict) -> None:
     """Raise a distinct validation error if the envelope cannot close."""
 
@@ -48,7 +50,7 @@ def is_closable(envelope: dict) -> bool:
 
     try:
         validate_closable(envelope)
-    except Exception:
+    except (CloseValidationError, TypeError):
         return False
     return True
 
@@ -96,12 +98,12 @@ def _is_placeholder_ref(value: str) -> bool:
 
 
 __all__ = [
-    "CloseValidationError",
-    "MissingEvidenceError",
     "AmbiguousEvidenceError",
+    "CloseValidationError",
+    "InvalidDecisionError",
+    "MissingEvidenceError",
     "MissingMetricsSnapshotError",
     "MissingRollbackTargetError",
-    "InvalidDecisionError",
-    "validate_closable",
     "is_closable",
+    "validate_closable",
 ]

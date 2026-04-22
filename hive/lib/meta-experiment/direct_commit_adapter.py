@@ -76,7 +76,7 @@ class DirectCommitAdapter(PromotionAdapter):
         candidate_ref = envelope["candidate_ref"]
         self._validate_worktree_candidate(worktree_path, candidate_ref)
         self._checkout_branch(target_branch)
-        # Capture rollback_target BEFORE mutating main; the outer except uses this to reset --hard if merge/cherry-pick corrupts the branch state.
+        # Capture rollback_target BEFORE mutating main so failure cleanup can restore main.
         rollback_target = _git(self.repo_path, "rev-parse", "HEAD")
 
         notes_parts: list[str] = []
@@ -89,19 +89,14 @@ class DirectCommitAdapter(PromotionAdapter):
                 _git(self.repo_path, "merge", "--ff-only", candidate_ref)
                 notes_parts.insert(0, "promoted via fast-forward merge")
             except subprocess.CalledProcessError as merge_error:
-                notes_parts.insert(0, "promoted via cherry-pick fallback")
                 notes_parts.append(self._stderr_note(merge_error, prefix="ff-only merge failed"))
-                try:
-                    _git(self.repo_path, "cherry-pick", candidate_ref)
-                except subprocess.CalledProcessError as cherry_pick_error:
-                    self._abort_git_op("cherry-pick")
-                    self._reset_head(rollback_target)
-                    self._remove_worktree(worktree_path, force=True)
-                    raise PromotionFailure(
-                        self._stderr_reason(cherry_pick_error, "cherry-pick failed"),
-                        rollback_target=rollback_target,
-                        notes="; ".join(notes_parts),
-                    ) from cherry_pick_error
+                self._abort_git_op("merge")
+                self._reset_head(rollback_target)
+                raise PromotionFailure(
+                    self._stderr_reason(merge_error, "ff-only merge failed"),
+                    rollback_target=rollback_target,
+                    notes="; ".join(notes_parts),
+                ) from merge_error
 
             commit_ref = _git(self.repo_path, "rev-parse", "HEAD")
             self._remove_worktree(worktree_path, force=False)
@@ -115,9 +110,7 @@ class DirectCommitAdapter(PromotionAdapter):
             raise
         except subprocess.CalledProcessError as error:
             self._abort_git_op("merge")
-            self._abort_git_op("cherry-pick")
             self._reset_head(rollback_target)
-            self._remove_worktree(worktree_path, force=True)
             raise PromotionFailure(
                 self._stderr_reason(error, "promotion failed"),
                 rollback_target=rollback_target,
@@ -149,6 +142,14 @@ class DirectCommitAdapter(PromotionAdapter):
                 success=False,
                 revert_ref=None,
                 notes=f"rollback_ref mismatch: expected {parent_ref}, got {rollback_ref}",
+            )
+
+        actual_head = _git(self.repo_path, "rev-parse", "HEAD")
+        if actual_head != commit_to_revert:
+            return RollbackResult(
+                success=False,
+                revert_ref=None,
+                notes=f"rollback target advanced: expected {commit_to_revert}, got {actual_head}",
             )
 
         try:
@@ -213,7 +214,9 @@ class DirectCommitAdapter(PromotionAdapter):
 
     def _stderr_note(self, error: subprocess.CalledProcessError, *, prefix: str) -> str:
         detail = self._stderr_reason(error, prefix)
-        return detail
+        if detail == prefix:
+            return detail
+        return f"{prefix}: {detail}"
 
     def _stderr_reason(self, error: subprocess.CalledProcessError, fallback: str) -> str:
         stderr = (error.stderr or "").strip()
