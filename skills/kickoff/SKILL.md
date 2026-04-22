@@ -15,4 +15,10 @@ For a fresh kickoff, include the metrics opt-in question before scenario-specifi
 - Default to off. The user must actively choose yes.
 - Persist the answer to `hive/hive.config.yaml` at `metrics.enabled` using the kickoff protocol's existing config write pattern.
 
+For a brownfield re-kickoff where `hive/hive.config.yaml` already has `metrics.enabled` set:
+- Read and show the existing `metrics.enabled` value before asking anything.
+- Ask whether the user wants to change that existing value, using change-prompt wording rather than the fresh opt-in question.
+- If the user keeps the existing value, preserve it exactly and do not write `hive/hive.config.yaml`.
+- If the user explicitly changes it, write only the new value to `metrics.enabled` using the kickoff protocol's existing config write pattern.
+
 **Instructions:** Read `hive/references/kickoff-protocol.md` for the full protocol. Shared resources are in `hive/`.

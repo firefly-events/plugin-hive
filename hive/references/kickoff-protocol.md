@@ -61,7 +61,13 @@ metrics:
   enabled: false
 ```
 
-Do not add brownfield read-current-value or keep-existing logic here. That belongs to later work.
+If this is a brownfield re-kickoff and `hive.config.yaml` already contains `metrics.enabled`, extend this same step with a preservation branch:
+
+1. Read the current `metrics.enabled` value from `hive.config.yaml` before prompting.
+2. Show the current value explicitly to the user, for example: `Metrics tracking is currently enabled.` or `Metrics tracking is currently disabled.`
+3. Ask a change prompt, not the fresh opt-in question. Example: `Do you want to change metrics tracking from its current setting?`
+4. If the user keeps the existing value, preserve it as-is and do not write `hive.config.yaml`.
+5. If the user explicitly chooses to change it, write only the new value to `metrics.enabled` using the existing kickoff config write pattern.
 
 ---
 
