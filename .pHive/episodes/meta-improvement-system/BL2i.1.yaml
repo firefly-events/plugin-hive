@@ -1,0 +1,31 @@
+story: BL2i.1
+epic: meta-improvement-system
+slice: S8
+status: passed
+steps:
+  - id: implement
+    agent: codex:codex-rescue
+    status: success
+    artifacts:
+      - .pHive/meta-team/queue-meta-meta-optimize.yaml
+  - id: test
+    status: success
+    artifacts:
+      - "test -f .pHive/meta-team/queue-meta-meta-optimize.yaml: OK"
+      - "YAML parse + 3 candidates present"
+  - id: review
+    agent: reviewer (opus)
+    status: needs_revision → passed after fixup
+    notes: |
+      Initial seeds targeted hive/lib/meta-experiment/__init__.py (actively
+      churning in S7+S8) and two "normalize trailing whitespace" candidates
+      where the target files had zero trailing whitespace (verified with
+      grep) — would have produced no-op diffs, failing to exercise the
+      control plane during S9.
+
+      Fixup: rewrote all 3 seeds to target dormant files under
+      .pHive/meta-team/archive/2026-04-19/ (MANIFEST.md, AUDIT-NOTE.md,
+      ledger.yaml) with ADD-style operations (append provenance line,
+      insert comment) — deterministic diffs regardless of current state.
+      Added header guidance: prefer ADD-style edits on dormant targets;
+      check active-file churn before seeding.

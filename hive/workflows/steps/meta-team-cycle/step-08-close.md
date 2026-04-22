@@ -55,6 +55,56 @@ If any field fails validation:
 
 This check is the FIRST action in Step 8. It is not advisory. It is not skippable by reviewer judgment. The `hive/lib/metrics/` C1.4 runtime provides the envelope-structure validation; the git-ref validation here uses `git rev-parse --verify`.
 
+### 1a. Assemble envelope from step 6 + step 7 outputs (BL2.3)
+
+Build the close-time envelope from the workflow output graph:
+
+- `metrics_snapshot` <- step-06 evaluation output (the compare-derived dict)
+- `commit_ref` <- step-07 `promoted_changes[...]` entry's `commit_ref` (the real SHA captured by the `DirectCommitAdapter`). If the cycle discarded (no promotion), `commit_ref` is absent from the assembled envelope; the close-gate will reject. This is the intended outcome for a cycle with no promotion.
+- `rollback_ref` <- step-07 `promoted_changes[...]` entry's `rollback_target`. Rename at assembly time; this is the single canonical translation point.
+- `decision` <- cycle's terminal decision (`accept` / `reject` / `reverted`)
+
+This assembly is pure in-memory dict construction. It is not a persistent write yet; the persistent write happens in Section 2 after validation passes.
+
+### 1b. Invoke the shared closure validator (BL2.3)
+
+Before any persistent state write, call:
+
+    from hive.lib.meta_experiment.closure_validator import validate_closable, CloseValidationError
+    try:
+        validate_closable(envelope)
+    except CloseValidationError as exc:
+        # HALT — do not append ledger, do not write cycle-state
+        close_rejected = {"reason": str(exc), "error_class": type(exc).__name__}
+        # emit close_rejected output and stop
+        return
+
+This is the FIRST executable action in step 8. It is not advisory. It delegates structural validation to the shared library so direct-commit and PR-only paths share one gate.
+
+### 1c. Arm rollback watch for accepted experiments (BL2.4)
+
+If the validated envelope decision is `accept`, arm the post-close rollback watch before any persistent close write so `rollback_watch.evaluate_watch(...)` can later observe a real committed experiment inside a concrete observation window.
+
+```python
+from hive.lib.meta_experiment.rollback_watch import arm_watch
+# pseudocode — envelope_writer must implement set_regression_watch,
+# set_observation_window, and set_decision. Pass envelope_writer=None if the
+# step is only illustrating the in-memory payload shape.
+
+armed = arm_watch(
+    envelope,
+    observation_window_hours=4,
+    now="<ISO now>",
+    envelope_writer=envelope,
+)
+```
+
+Rules:
+- Default observation window is 4 hours unless the active maintainer path config overrides it
+- The `armed` payload's `regression_watch` and `observation_window` fields MUST be present in the Section 2 persistent write so post-close `evaluate_watch(...)` finds an armed state
+- For `reject` or `reverted`, skip arming and record `regression_watch: {state: 'not_applicable'}` in the close payload
+- `evaluate_watch(...)` remains a post-close concern; step 8 only arms the watch
+
 ### 2. Write final cycle summary to cycle-state
 
 After Section 1 passes, write the final cycle summary to the swarm-configured cycle-state target path. Do NOT hardcode `.pHive/meta-team/cycle-state.yaml` as the universal destination; the active swarm config determines the path. During the A2.6 split window, the target may still be a legacy-compatible location, but this step owns the close-time write.
@@ -76,12 +126,18 @@ closure_evidence:
   commit_ref: {validated git ref}
   metrics_snapshot: {validated snapshot ref}
   rollback_ref: {validated git ref}
+regression_watch:
+  state: {armed | not_applicable}
+observation_window:
+  start: {ISO 8601 timestamp when armed}
+  end: {ISO 8601 timestamp when window closes}
 ```
 
 Notes:
 - `promoted_changes` and `reverted_changes` are the primary sources for promotion/discard counts and top-change summaries
 - Leave the cycle in a non-closed status until commit, ledger append, and morning summary all succeed
 - If the close is later rejected or commit fails, preserve the incomplete close state rather than fabricating closure
+- For `reject` or `reverted` cases, persist `regression_watch: {state: 'not_applicable'}` rather than an armed payload
 
 ### 3. Commit all changes
 

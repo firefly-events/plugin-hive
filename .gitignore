@@ -33,6 +33,11 @@ state/
 # fixtures consumed by hive/lib/metrics/ unit tests.
 !.pHive/metrics/
 !.pHive/metrics/**
+# MVL proof artifacts — only the canonical mvl-proof folder ships with the repo.
+!.pHive/audits/
+.pHive/audits/*
+!.pHive/audits/mvl-proof/
+!.pHive/audits/mvl-proof/**
 agents/memories/
 .claude/settings.local.json
 .history/

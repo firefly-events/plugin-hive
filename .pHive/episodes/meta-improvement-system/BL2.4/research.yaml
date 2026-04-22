@@ -1,0 +1,24 @@
+epic: meta-improvement-system
+story: BL2.4
+step: research
+agent: researcher
+status: passed
+started: "2026-04-22T06:47:00Z"
+completed: "2026-04-22T06:50:00Z"
+artifacts:
+  - path: .pHive/episodes/meta-improvement-system/BL2.4/research-brief.md
+    kind: research-brief
+    lines: 239
+findings:
+  observation_window_default: "4h"
+  envelope_api_gap: "set_observation_window missing"
+  rollback_watch_api_gap: "arm_watch helper missing"
+  auto_revert_callback_shape: "DirectCommitAdapter.rollback signature matches evaluate_watch callback"
+  evaluate_watch_invocation: "post-close external scheduled check (not inside step chain)"
+  trigger_evidence_keys:
+    - regression_watch.state
+    - regression_watch.tripped_by
+    - regression_watch.tripped_at
+    - decision
+    - rollback_ref
+    - rollback_result

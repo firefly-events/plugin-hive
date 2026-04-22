@@ -1,0 +1,44 @@
+# Consumer backlog template for /meta-optimize
+# Mode: human-edit only. Auto-surfacing is deferred out of MVP, so entries are
+# added manually when the consumer project's metrics are absent or insufficient.
+# Purpose: backlog-fallback input for /meta-optimize when objective signals do
+# not provide enough direction for a safe optimization pick.
+#
+# Consumer neutrality: this template is consumer-facing. It does not assume
+# worktree-based proving mechanics or any maintainer-only local cycle. The
+# public /meta-optimize adapter promotes selected work differently (PR-only),
+# so backlog entries should describe consumer-project edits rather than local
+# proving steps or repository-internal maintenance actions.
+#
+# Editing guidance: prefer ADD-style edits on stable consumer files so the
+# resulting change is easy to review and easy to revert. Before seeding new
+# entries, check whether the target file is actively churning in current work;
+# if the file is in motion, wait or choose a calmer consumer-owned target.
+#
+# Entries should stay small, reversible, and scoped to one consumer project.
+# Avoid broad cleanup campaigns, speculative refactors, or candidates that only
+# make sense for local maintainer archives or proving infrastructure.
+#
+# Entry shape for candidates entries:
+# - candidate_id: stable unique identifier for the backlog item
+# - target: consumer-project file or surface expected to be edited
+# - type: short consumer-facing category name (for example note-add, doc-fix,
+#   config-comment, or other neutral edit labels that do not imply maintainer
+#   proving behavior)
+# - description: brief explanation of the intended consumer-project change
+# - safety_notes: optional notes on reversibility, scope, or review cautions
+# - status: current state such as pending, accepted, or rejected
+# - created: creation timestamp in ISO 8601 form
+#
+# Example entry shape:
+# # - candidate_id: "mo-2026-04-21-001"
+# #   target: "docs/guide.md"
+# #   type: "doc-note"
+# #   description: "Add a short note clarifying the fallback optimization path."
+# #   safety_notes: "Append-only edit in a stable docs file; revert is one hunk."
+# #   status: "pending"
+# #   created: "2026-04-21T00:00:00Z"
+
+schema_version: 1
+
+candidates: []

@@ -1,0 +1,29 @@
+epic: meta-improvement-system
+story: BL2.3
+step: review
+agent: reviewer
+backend: opus-4-7
+status: passed
+verdict: needs_optimization
+started: "2026-04-22T06:37:00Z"
+completed: "2026-04-22T06:40:00Z"
+artifacts:
+  - path: .pHive/episodes/meta-improvement-system/BL2.3/review-memo.md
+    kind: review-memo
+scores:
+  placeholder_rejection_correctness: 4
+  xor_invariant_preservation: 5
+  step_file_binding_realism: 3
+  skill_narrative_cohesion: 4
+  test_rigor: 4
+  envelope_evolution_safety: 5
+  forward_compat_s10: 5
+  close_gate_ordering: 4
+  rollback_ref_translation: 3
+must_fix_before_integrate:
+  - "step-06 §4 authority contradiction: metrics_snapshot must land in evaluation_results output dict, not direct envelope write (step-06 is output-graph-only per A2.3)"
+  - "step-07/step-08 boundary: no step currently owns writing commit_ref/rollback_ref into envelope. Fix: step-08 assembles envelope from step-6/7 output graph before validate_closable"
+optimize_followups:
+  - "closure_validator: normalize value.strip().casefold() before placeholder membership check"
+  - "Consider on-disk envelope-artifact integration test for AC2"
+agent_id: a2d315f022c2a48bc

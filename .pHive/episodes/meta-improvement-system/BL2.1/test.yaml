@@ -1,0 +1,34 @@
+epic: meta-improvement-system
+story: BL2.1
+step: test
+agent: tester
+backend: codex
+status: passed
+started: "2026-04-22T05:52:00Z"
+completed: "2026-04-22T05:55:00Z"
+artifacts:
+  - path: tests/meta_meta/test_direct_commit_adapter.py
+    kind: tests
+added_tests:
+  - test_promotion_evidence_enforces_xor
+  - test_remove_worktree_is_idempotent_when_path_disappears
+suites:
+  - target: tests/meta_meta/test_direct_commit_adapter.py
+    count: 8
+    passed: 8
+    duration_s: 2.41
+  - target: tests/meta_meta/
+    count: 19
+    passed: 19
+    subtests: 3
+coverage:
+  ff_only_success: present
+  cherry_pick_fallback: present
+  conflict_failure_cleanup: present
+  needs_revision_defensive_path: present
+  rollback_revert: present
+  interface_conformance: present
+  evidence_xor_enforcement: present
+  idempotent_worktree_removal: present
+verdict: PASS
+codex_agent_id: ac98838457c6dc007
