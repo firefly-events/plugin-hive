@@ -1,0 +1,29 @@
+epic: meta-improvement-system
+story: BL2.2
+step: test
+agent: tester
+backend: opus-4-7
+status: passed
+started: "2026-04-22T06:15:00Z"
+completed: "2026-04-22T06:17:00Z"
+artifacts:
+  - path: tests/meta_meta/test_skill_orchestration.py
+    change: added 2 coverage tests (two-swarm boundary, proof-artifact deferral)
+added_tests:
+  - test_skill_preserves_two_swarm_boundary
+  - test_skill_defers_proof_artifact_capture_to_later_stories
+suites:
+  - target: tests/meta_meta/test_skill_orchestration.py
+    passed: 9
+  - target: tests/meta_meta/
+    passed: 31
+    subtests: 3
+coverage:
+  ac1_control_plane_invocation: present
+  ac2_worktree_plus_shared_lib: present
+  ac3_two_swarm_boundary: present
+  ac4_live_orchestration_proof_deferred: present
+bl23_hook_readiness: true
+scaffold_residue: clean
+verdict: PASS
+agent_id: a461ae02436a6c085
