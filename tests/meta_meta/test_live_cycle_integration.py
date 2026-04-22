@@ -64,6 +64,11 @@ def test_close_gate_rejects_whitespace_padded_tbd() -> None:
         validate_closable(_close_envelope(commit_ref=" TBD "))
 
 
+def test_close_gate_rejects_whitespace_only_commit_ref() -> None:
+    with pytest.raises(MissingEvidenceError):
+        validate_closable(_close_envelope(commit_ref="   "))
+
+
 def test_close_gate_rejects_placeholder_pending() -> None:
     with pytest.raises(CloseValidationError):
         validate_closable(_close_envelope(commit_ref="pending"))

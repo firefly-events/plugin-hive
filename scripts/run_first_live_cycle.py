@@ -71,6 +71,10 @@ def main() -> int:
     repo_root = REPO_ROOT
     backlog_path = repo_root / args.backlog_path
     audit_root = repo_root / args.audit_root
+    dirty = _git_output("status", "--porcelain").strip()
+    if dirty:
+        print("refusing to run: uncommitted changes — commit or stash first", file=sys.stderr)
+        return 1
     pre_run_head = _git_output("rev-parse", "HEAD")
 
     worktree_path: Path | None = None
@@ -87,9 +91,9 @@ def main() -> int:
         worktree_branch = f"meta-meta-exp-{cycle_id}"
         worktree_path = repo_root / WORKTREES_ROOT / cycle_id
 
-        _seed_baseline_events(run_id, args.candidate_id)
         events_path = Path(f".pHive/metrics/events/{run_id}.jsonl")
         _track_if_created(created_paths, repo_root / events_path)
+        _seed_baseline_events(run_id, args.candidate_id)
 
         cycle_now_dt = datetime.now(timezone.utc).replace(microsecond=0)
         cycle_now_iso = cycle_now_dt.isoformat().replace("+00:00", "Z")
@@ -100,6 +104,8 @@ def main() -> int:
         )
         observation_window_dict = {"start": cycle_now_iso, "end": observation_end_iso}
 
+        envelope_path = Path(f".pHive/metrics/experiments/{cycle_id}.yaml")
+        _track_if_created(created_paths, repo_root / envelope_path)
         initial_envelope = envelope.create(
             {
                 "experiment_id": cycle_id,
@@ -113,8 +119,6 @@ def main() -> int:
                 "regression_watch": {"state": "pending"},
             }
         )
-        envelope_path = Path(f".pHive/metrics/experiments/{cycle_id}.yaml")
-        _track_if_created(created_paths, repo_root / envelope_path)
 
         boot_started_at = _utc_now()
         baseline_snapshot = baseline.capture_from_run(run_id)
@@ -142,8 +146,8 @@ def main() -> int:
                 "step_02_analysis": {"mode": "no-op", "reason": "proving run uses preselected candidate"},
             },
         }
-        _write_yaml(repo_root / CYCLE_STATE_PATH, cycle_state)
         _track_if_created(created_paths, repo_root / CYCLE_STATE_PATH)
+        _write_yaml(repo_root / CYCLE_STATE_PATH, cycle_state)
 
         candidate = _load_candidate(backlog_path, args.candidate_id)
         if candidate.get("target") != str(TARGET_FILE):
@@ -288,8 +292,10 @@ def main() -> int:
             ),
             "notes": "First live /meta-meta-optimize cycle against a dormant archive candidate.",
         }
-        _write_yaml(proof_path, proof_doc)
+        _track_if_created(created_paths, proof_dir)
         _track_if_created(created_paths, proof_path)
+        _write_yaml(proof_path, proof_doc)
+        _track_if_created(created_paths, latest_path)
         _write_yaml(
             latest_path,
             {
@@ -298,7 +304,6 @@ def main() -> int:
                 "story": STORY_ID,
             },
         )
-        _track_if_created(created_paths, latest_path)
 
         cycle_state.update(
             {
@@ -325,8 +330,8 @@ def main() -> int:
             "audit_path": str(proof_path.relative_to(repo_root)),
         }
         ledger.append(ledger_entry)
-        _write_yaml(repo_root / LEDGER_PATH, ledger)
         _track_if_created(created_paths, repo_root / LEDGER_PATH)
+        _write_yaml(repo_root / LEDGER_PATH, ledger)
 
         _cleanup_worktree_and_branch(worktree_path, worktree_branch)
 
@@ -478,9 +483,10 @@ def _cleanup_created_paths(paths: list[Path]) -> None:
 
 
 def _track_if_created(paths: list[Path], path: Path) -> None:
-    candidate = path if path.exists() else path.parent
-    if candidate not in paths:
-        paths.append(candidate)
+    if path.exists():
+        return
+    if path not in paths:
+        paths.append(path)
 
 
 def _read_yaml_dict(path: Path) -> dict[str, Any]:

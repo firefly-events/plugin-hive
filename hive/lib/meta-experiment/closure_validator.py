@@ -88,7 +88,7 @@ def _validate_rollback_ref(envelope: dict[str, _Any]) -> None:
 
 
 def _has_reference(value: _Any) -> bool:
-    return isinstance(value, str) and value != "" and not _is_placeholder_ref(value)
+    return isinstance(value, str) and value.strip() != "" and not _is_placeholder_ref(value)
 
 
 def _is_placeholder_ref(value: str) -> bool:

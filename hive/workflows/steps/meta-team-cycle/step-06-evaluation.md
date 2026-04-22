@@ -99,12 +99,14 @@ Use `hive.lib.meta_experiment.compare` with the captured baseline already presen
 - Load the baseline from the current envelope context
 - Compare the baseline against the candidate metrics using `hive.lib.meta_experiment.compare`
 - Produce a comparison dict
-- Step-06 emits `metrics_snapshot` (a non-empty dict derived from compare) as a workflow output value. This value is consumed by step-08 during envelope assembly. Step-06 does not write the envelope directly.
+- Step-06 emits `metrics_snapshot` for the envelope as the raw candidate metric values that post-close rollback watching will compare against later, for example `{'tokens': 0, 'wall_clock_ms': 39, 'first_attempt_pass': true}`. This value is consumed by step-08 during envelope assembly. Step-06 does not write the envelope directly.
 - Include the compare-derived `metrics_snapshot` in `evaluation_results` or as a sibling workflow output field
 - Base the evaluation verdict on that comparison output rather than on prose-only reasoning
 - Evaluation must emit the `metrics_snapshot` and the decision verdict in a form that can later serve as the baseline for post-close `rollback_watch.evaluate_watch(...)` comparisons.
 
 This makes the step-06 verdict explicitly depend on the shared lifecycle library output that step 8 later validates.
+
+The compare output itself is separate workflow output, such as `evaluation_results.compare` or `evaluation_results.verdict`. Do not substitute that verdict/regression-metrics structure for the envelope `metrics_snapshot`; the snapshot must remain the raw baseline values that `rollback_watch.evaluate_watch(...)` will later compare against post-close observations.
 
 #### 4a. Evidence shape preservation
 

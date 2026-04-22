@@ -95,6 +95,7 @@ class DirectCommitAdapter(PromotionAdapter):
                     _git(self.repo_path, "cherry-pick", candidate_ref)
                 except subprocess.CalledProcessError as cherry_pick_error:
                     self._abort_git_op("cherry-pick")
+                    self._reset_head(rollback_target)
                     self._remove_worktree(worktree_path, force=True)
                     raise PromotionFailure(
                         self._stderr_reason(cherry_pick_error, "cherry-pick failed"),

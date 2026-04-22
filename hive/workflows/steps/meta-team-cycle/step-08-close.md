@@ -87,6 +87,9 @@ If the validated envelope decision is `accept`, arm the post-close rollback watc
 
 ```python
 from hive.lib.meta_experiment.rollback_watch import arm_watch
+# pseudocode — envelope_writer must implement set_regression_watch,
+# set_observation_window, and set_decision. Pass envelope_writer=None if the
+# step is only illustrating the in-memory payload shape.
 
 armed = arm_watch(
     envelope,
@@ -123,12 +126,18 @@ closure_evidence:
   commit_ref: {validated git ref}
   metrics_snapshot: {validated snapshot ref}
   rollback_ref: {validated git ref}
+regression_watch:
+  state: {armed | not_applicable}
+observation_window:
+  start: {ISO 8601 timestamp when armed}
+  end: {ISO 8601 timestamp when window closes}
 ```
 
 Notes:
 - `promoted_changes` and `reverted_changes` are the primary sources for promotion/discard counts and top-change summaries
 - Leave the cycle in a non-closed status until commit, ledger append, and morning summary all succeed
 - If the close is later rejected or commit fails, preserve the incomplete close state rather than fabricating closure
+- For `reject` or `reverted` cases, persist `regression_watch: {state: 'not_applicable'}` rather than an armed payload
 
 ### 3. Commit all changes
 

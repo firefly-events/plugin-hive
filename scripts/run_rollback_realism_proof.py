@@ -208,55 +208,71 @@ def main() -> int:
             }
         )
         adapter = DirectCommitAdapter(repo_path=repo_root)
+        auto_revert_callback = rollback_watch.make_direct_commit_auto_revert(adapter)
         promotion_result = adapter.promote(promotion_input, {"verdict": "pass"})
         commit_ref = promotion_result.evidence.commit_ref
         rollback_ref = promotion_result.rollback_target
+        trip_succeeded = False
 
-        metrics_snapshot_for_envelope = candidate_metrics_snapshot["metrics"]
-        final_envelope = {
-            "experiment_id": cycle_id,
-            "decision": "accept",
-            "metrics_snapshot": metrics_snapshot_for_envelope,
-            "commit_ref": commit_ref,
-            "rollback_ref": rollback_ref,
-            "observation_window": observation_window_dict,
-            "regression_watch": {"state": "pending"},
-            "target_branch": args.target_branch,
-        }
-        envelope.set_metrics_snapshot(cycle_id, metrics_snapshot_for_envelope)
-        envelope.set_commit_ref(cycle_id, commit_ref)
-        envelope.set_rollback_ref(cycle_id, rollback_ref)
-        envelope.set_decision(cycle_id, "accept")
-        closure_validator.validate_closable(final_envelope)
+        try:
+            metrics_snapshot_for_envelope = candidate_metrics_snapshot["metrics"]
+            final_envelope = {
+                "experiment_id": cycle_id,
+                "decision": "accept",
+                "metrics_snapshot": metrics_snapshot_for_envelope,
+                "commit_ref": commit_ref,
+                "rollback_ref": rollback_ref,
+                "observation_window": observation_window_dict,
+                "regression_watch": {"state": "pending"},
+                "target_branch": args.target_branch,
+            }
+            envelope.set_metrics_snapshot(cycle_id, metrics_snapshot_for_envelope)
+            envelope.set_commit_ref(cycle_id, commit_ref)
+            envelope.set_rollback_ref(cycle_id, rollback_ref)
+            envelope.set_decision(cycle_id, "accept")
+            closure_validator.validate_closable(final_envelope)
 
-        watch_fields = rollback_watch.arm_watch(
-            final_envelope,
-            observation_window_hours=4,
-            now=cycle_now_dt,
-            envelope_writer=None,
-        )
-        final_envelope.update(watch_fields)
-        envelope.set_regression_watch(cycle_id, watch_fields["regression_watch"])
-        armed_envelope = dict(final_envelope)
+            watch_fields = rollback_watch.arm_watch(
+                final_envelope,
+                observation_window_hours=4,
+                now=cycle_now_dt,
+                envelope_writer=None,
+            )
+            final_envelope.update(watch_fields)
+            envelope.set_regression_watch(cycle_id, watch_fields["regression_watch"])
+            armed_envelope = dict(final_envelope)
 
-        baseline_metrics = armed_envelope["metrics_snapshot"]
-        post_close_snapshot = {
-            "tokens": baseline_metrics.get("tokens", 0),
-            "wall_clock_ms": int(baseline_metrics.get("wall_clock_ms", 40)) * 2,
-            "first_attempt_pass": True,
-        }
-        expected_regression_metrics = ["wall_clock_ms"]
-        armed_monotonic = time.perf_counter()
-        auto_revert_callback = rollback_watch.make_direct_commit_auto_revert(adapter)
-        trip_event = rollback_watch.evaluate_watch(
-            envelope=armed_envelope,
-            post_close_snapshot=post_close_snapshot,
-            threshold_pct=0.10,
-            now=datetime.now(timezone.utc),
-            auto_revert_callback=auto_revert_callback,
-            envelope_writer=envelope,
-        )
-        arm_to_trip_ms = max(0, int((time.perf_counter() - armed_monotonic) * 1000))
+            baseline_metrics = armed_envelope["metrics_snapshot"]
+            post_close_snapshot = {
+                "tokens": baseline_metrics.get("tokens", 0),
+                "wall_clock_ms": int(baseline_metrics.get("wall_clock_ms", 40)) * 2,
+                "first_attempt_pass": True,
+            }
+            expected_regression_metrics = ["wall_clock_ms"]
+            armed_monotonic = time.perf_counter()
+            trip_event = rollback_watch.evaluate_watch(
+                envelope=armed_envelope,
+                post_close_snapshot=post_close_snapshot,
+                threshold_pct=0.10,
+                now=datetime.now(timezone.utc),
+                auto_revert_callback=auto_revert_callback,
+                envelope_writer=envelope,
+            )
+            arm_to_trip_ms = max(0, int((time.perf_counter() - armed_monotonic) * 1000))
+            trip_succeeded = (
+                isinstance(trip_event, rollback_watch.TripEvent)
+                and trip_event.rollback_result is not None
+                and trip_event.rollback_result.success
+            )
+        finally:
+            if not trip_succeeded:
+                try:
+                    auto_revert_callback(
+                        {"commit_ref": commit_ref, "target_branch": args.target_branch},
+                        rollback_ref,
+                    )
+                except Exception as cleanup_error:
+                    print(f"CRITICAL: auto-revert cleanup failed: {cleanup_error}", file=sys.stderr)
         if not isinstance(trip_event, rollback_watch.TripEvent):
             raise RuntimeError(f"regression watch did not trip: {trip_event}")
         if trip_event.rollback_result is None or not trip_event.rollback_result.success:

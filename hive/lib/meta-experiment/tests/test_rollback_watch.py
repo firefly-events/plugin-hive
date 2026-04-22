@@ -186,13 +186,16 @@ class RollbackWatchRuntimeTests(unittest.TestCase):
                 "set_regression_watch",
                 "exp_watch_001",
                 {
-                    "state": "tripped",
-                    "tripped_by": self._snapshot(tokens=111),
-                    "tripped_at": "2026-04-21T12:30:00Z",
-                    "rollback_result": {
-                        "success": False,
-                        "revert_ref": None,
-                        "notes": "rollback unavailable",
+                    "state": "armed",
+                    "armed_at": None,
+                    "last_rollback_attempt": {
+                        "attempted_at": "2026-04-21T12:30:00Z",
+                        "tripped_by": self._snapshot(tokens=111),
+                        "rollback_result": {
+                            "success": False,
+                            "revert_ref": None,
+                            "notes": "rollback unavailable",
+                        },
                     },
                 },
             ),
@@ -216,7 +219,21 @@ class RollbackWatchRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual(1, len(writer.calls))
-        self.assertEqual("set_regression_watch", writer.calls[0][0])
+        self.assertEqual(
+            (
+                "set_regression_watch",
+                "exp_watch_001",
+                {
+                    "state": "armed",
+                    "armed_at": None,
+                    "last_rollback_attempt": {
+                        "attempted_at": "2026-04-21T12:30:00Z",
+                        "tripped_by": self._snapshot(tokens=111),
+                    },
+                },
+            ),
+            writer.calls[0],
+        )
 
     def test_trip_without_writer_invokes_callback_and_skips_side_effects(self) -> None:
         envelope = self._base_envelope()

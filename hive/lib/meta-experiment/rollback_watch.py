@@ -106,9 +106,8 @@ def evaluate_watch(
     returns the computed result and still invokes `auto_revert_callback` when a
     regression trips the watch.
 
-    If the auto_revert_callback returns success=False, the envelope will show
-    regression_watch.state=tripped but decision remains at accept. The
-    rollback_result.notes field should be surfaced to operators; they may retry
+    If the auto_revert_callback returns success=False or raises, the envelope
+    remains armed and records the failed rollback attempt so operators may retry
     evaluate_watch or invoke adapter.rollback directly.
     """
 
@@ -155,31 +154,53 @@ def evaluate_watch(
             rollback_result = auto_revert_callback(envelope, rollback_ref)
         except Exception:
             if envelope_writer is not None:
+                armed_at = (envelope.get("regression_watch") or {}).get("armed_at")
                 envelope_writer.set_regression_watch(
                     experiment_id,
                     {
-                        "state": "tripped",
-                        "tripped_by": post_close_snapshot,
-                        "tripped_at": now_value,
+                        "state": "armed",
+                        "armed_at": armed_at,
+                        "last_rollback_attempt": {
+                            "attempted_at": now_value,
+                            "tripped_by": post_close_snapshot,
+                        },
                     },
                 )
             raise
 
-    regression_watch_record = {
-        "state": "tripped",
-        "tripped_by": post_close_snapshot,
-        "tripped_at": now_value,
-    }
-    if rollback_result is not None:
-        regression_watch_record["rollback_result"] = {
-            "success": rollback_result.success,
-            "revert_ref": rollback_result.revert_ref,
-            "notes": rollback_result.notes,
+    rollback_succeeded = rollback_result is not None and rollback_result.success
+    no_callback_configured = rollback_result is None
+    if rollback_succeeded or no_callback_configured:
+        regression_watch_record = {
+            "state": "tripped",
+            "tripped_by": post_close_snapshot,
+            "tripped_at": now_value,
+        }
+        if rollback_result is not None:
+            regression_watch_record["rollback_result"] = {
+                "success": rollback_result.success,
+                "revert_ref": rollback_result.revert_ref,
+                "notes": rollback_result.notes,
+            }
+    else:
+        armed_at = (envelope.get("regression_watch") or {}).get("armed_at")
+        regression_watch_record = {
+            "state": "armed",
+            "armed_at": armed_at,
+            "last_rollback_attempt": {
+                "attempted_at": now_value,
+                "tripped_by": post_close_snapshot,
+                "rollback_result": {
+                    "success": rollback_result.success,
+                    "revert_ref": rollback_result.revert_ref,
+                    "notes": rollback_result.notes,
+                },
+            },
         }
 
     if envelope_writer is not None:
         envelope_writer.set_regression_watch(experiment_id, regression_watch_record)
-        if rollback_result is not None and rollback_result.success:
+        if rollback_succeeded:
             envelope_writer.set_decision(experiment_id, "reverted")
 
     return _replace(trip_event, rollback_result=rollback_result)

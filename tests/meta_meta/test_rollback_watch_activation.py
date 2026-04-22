@@ -300,3 +300,76 @@ def test_armed_watch_evidence_is_grepable() -> None:
     assert armed["regression_watch"]["armed_at"] == "2026-04-21T12:00:00Z"
     assert armed["observation_window"]["start"] == "2026-04-21T12:00:00Z"
     assert armed["observation_window"]["end"] == "2026-04-21T16:00:00Z"
+
+
+def test_failed_rollback_keeps_watch_armed_for_retry() -> None:
+    writer = RecordingEnvelopeWriter()
+    envelope = _base_envelope()
+    envelope.update(arm_watch(envelope, now="2026-04-21T12:00:00Z"))
+
+    result = evaluate_watch(
+        envelope,
+        _snapshot(tokens=111),
+        threshold_pct=5.0,
+        now="2026-04-21T12:30:00Z",
+        auto_revert_callback=lambda _envelope, _rollback_ref: RollbackResult(
+            success=False,
+            revert_ref=None,
+            notes="simulated failure",
+        ),
+        envelope_writer=writer,
+    )
+
+    assert isinstance(result, TripEvent)
+    assert writer.calls == [
+        (
+            "set_regression_watch",
+            "exp_watch_activation",
+            {
+                "state": "armed",
+                "armed_at": "2026-04-21T12:00:00Z",
+                "last_rollback_attempt": {
+                    "attempted_at": "2026-04-21T12:30:00Z",
+                    "tripped_by": _snapshot(tokens=111),
+                    "rollback_result": {
+                        "success": False,
+                        "revert_ref": None,
+                        "notes": "simulated failure",
+                    },
+                },
+            },
+        )
+    ]
+
+    retry_envelope = dict(envelope)
+    retry_envelope["regression_watch"] = writer.calls[0][2]
+    retry_result = evaluate_watch(
+        retry_envelope,
+        _snapshot(tokens=111),
+        threshold_pct=5.0,
+        now="2026-04-21T12:31:00Z",
+    )
+
+    assert isinstance(retry_result, TripEvent)
+
+
+def test_failed_rollback_does_not_flip_decision() -> None:
+    writer = RecordingEnvelopeWriter()
+    envelope = _base_envelope()
+    envelope.update(arm_watch(envelope, now="2026-04-21T12:00:00Z"))
+
+    result = evaluate_watch(
+        envelope,
+        _snapshot(tokens=111),
+        threshold_pct=5.0,
+        now="2026-04-21T12:30:00Z",
+        auto_revert_callback=lambda _envelope, _rollback_ref: RollbackResult(
+            success=False,
+            revert_ref=None,
+            notes="simulated failure",
+        ),
+        envelope_writer=writer,
+    )
+
+    assert isinstance(result, TripEvent)
+    assert all(call[0] != "set_decision" for call in writer.calls)
