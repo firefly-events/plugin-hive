@@ -126,3 +126,44 @@ Risk guard:
 Delivery note:
 
 - concrete direct-commit and PR-only adapters are intentionally out of scope here and land in S9 and S10
+
+## Rollback watch module
+
+Purpose: post-close observation-window watch that evaluates an accepted experiment against its candidate-time `metrics_snapshot` and exposes one delayed-regression behavior only: auto-revert through a supplied callback.
+
+Q3 reminder:
+
+- one behavior only: auto-revert
+- no alternate modes
+- no recommendation-only branch
+- no human-gated branch
+
+API:
+
+- `evaluate_watch(envelope, post_close_snapshot, threshold_pct, now, auto_revert_callback, envelope_writer)`
+
+Window rule:
+
+- the observation window is start-inclusive and end-exclusive: `start <= now < end`
+
+Return shapes:
+
+- `TripEvent(experiment_id, tripped_at, tripped_by, regression_metrics, threshold_pct, rollback_ref, rollback_result)`
+- `NoActionResult(reason)` where `reason` is one of `no-regression`, `window-elapsed`, `not-yet-in-window`, `not-accepted`, `not-armed`, `already-tripped`
+
+Side-effect sequencing on trip:
+
+1. Build a `TripEvent` with `rollback_result=None`
+2. If `envelope_writer` is provided, call `set_regression_watch(experiment_id, {"state": "tripped", "tripped_by": post_close_snapshot, "tripped_at": now})`
+3. If `auto_revert_callback` is provided, call it with `(envelope, rollback_ref)`
+4. If the callback returns `success=True` and `envelope_writer` is provided, call `set_decision(experiment_id, "reverted")`
+5. Return the final `TripEvent`
+
+Writer behavior:
+
+- `envelope_writer` is optional
+- when omitted, the module still computes the trip result and still invokes the callback, but it performs no envelope writes
+
+Delivery note:
+
+- The `rollback-realism-proof-ambiguity` escalation remains open for S9; BL2.4 and BL2.6 will bind a real adapter and prove the end-to-end rollback path against concrete promotion machinery
