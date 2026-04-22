@@ -70,6 +70,15 @@ Target lifecycle once wired in `S9`:
 `S8` in-scope behavior stops after steps 1-2 as documented intent. Steps 3-8
 are placeholders only and must not be executed by this scaffold.
 
+### Backlog-fallback step
+
+The fallback branch is owned by
+`hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md`.
+When wired in `S9`, this skill invokes step-03b after step-02 if no metric
+signal is available. In `S8` the step runs in dry-run mode only — it loads the
+backlog, reports the selected candidate, and stops. No control-plane mutation,
+no promotion, no closure.
+
 ## What the skill MUST NOT do in S8
 
 - execute real experiments
