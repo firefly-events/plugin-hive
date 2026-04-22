@@ -12,6 +12,8 @@ Initialize Hive for a project. Detects brownfield vs greenfield automatically.
 For a fresh kickoff, include the metrics opt-in question before scenario-specific work:
 - Ask: `Enable metrics tracking?`
 - Keep the trade-off inline and short: opting in enables metric-driven meta-optimization later; opting out keeps metrics off and future meta runs fall back to qualitative/backlog-fallback mode.
+- Clearly label the opt-out consequence: `Consequence of opting out: meta work in this repo defaults to qualitative/backlog-driven mode, and if future meta-optimize-style skills ship, they will stay in backlog-fallback-only mode on workspaces where metrics remain disabled.`
+- State the companion future-facing clause: `Opting in is what would unlock metric-driven behavior for those future skills.`
 - Default to off. The user must actively choose yes.
 - Persist the answer to `hive/hive.config.yaml` at `metrics.enabled` using the kickoff protocol's existing config write pattern.
 

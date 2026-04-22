@@ -46,6 +46,14 @@ Before entering the brownfield or greenfield path on a fresh kickoff run, ask th
 
 Keep the explanation inline and short: opting in enables metric-driven meta-optimization later; opting out keeps metrics off and future meta runs fall back to qualitative/backlog-fallback mode.
 
+Add a clearly labeled consequence line immediately with the question:
+
+`Consequence of opting out: meta work in this repo defaults to qualitative/backlog-driven mode, and if future meta-optimize-style skills ship, they will stay in backlog-fallback-only mode on workspaces where metrics remain disabled.`
+
+Follow it with the matching future-facing clause:
+
+`Opting in is what would unlock metric-driven behavior for those future skills.`
+
 Default to `no`. The user must actively choose `yes` to enable metrics. Empty input, unclear input, or any non-yes answer leaves metrics disabled.
 
 Persist the answer to `hive.config.yaml` using the existing kickoff config write pattern:

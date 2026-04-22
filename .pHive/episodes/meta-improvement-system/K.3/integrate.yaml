@@ -1,0 +1,18 @@
+story_id: K.3
+branch: meta-improvement-system-s6
+parent_commit: 2563e17
+files_changed:
+  - /Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md
+  - /Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md
+  - /Users/don/Documents/plugin-hive/.pHive/episodes/meta-improvement-system/K.3/integrate.yaml
+ac_line_mapping:
+  AC1: /Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md:51
+  AC2: /Users/don/Documents/plugin-hive/skills/kickoff/SKILL.md:15
+  AC3: /Users/don/Documents/plugin-hive/hive/references/kickoff-protocol.md:49
+  AC4: /Users/don/Documents/plugin-hive/.pHive/episodes/meta-improvement-system/K.3/integrate.yaml:13
+notes_for_reviewer: |
+  K.3 is docs-only. The new consequence copy is present in both kickoff owner
+  files and keeps present-tense claims limited to today's default
+  qualitative/backlog-driven behavior. Any metric-driven meta behavior is
+  described only as future or conditional on later meta-optimize-style skills
+  shipping. No config-persistence logic or kickoff question flow was changed.
