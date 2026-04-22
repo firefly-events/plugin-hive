@@ -93,7 +93,25 @@ revision_notes: |
 - Count: pass, needs_optimization, needs_revision
 - Overall cycle verdict: `passed` if ≥ 70% of changes pass or needs_optimization; `partial` if 40–70%; `poor` if < 40%
 
-### 4. Compile workflow outputs
+### 4. Bind compare output to metrics_snapshot (BL2.3)
+Use `hive.lib.meta_experiment.compare` with the captured baseline already present in the envelope context and the candidate metrics collected during the step-04/step-05 run.
+
+- Load the baseline from the current envelope context
+- Compare the baseline against the candidate metrics using `hive.lib.meta_experiment.compare`
+- Produce a comparison dict
+- Step-06 emits `metrics_snapshot` (a non-empty dict derived from compare) as a workflow output value. This value is consumed by step-08 during envelope assembly. Step-06 does not write the envelope directly.
+- Include the compare-derived `metrics_snapshot` in `evaluation_results` or as a sibling workflow output field
+- Base the evaluation verdict on that comparison output rather than on prose-only reasoning
+
+This makes the step-06 verdict explicitly depend on the shared lifecycle library output that step 8 later validates.
+
+#### 4a. Evidence shape preservation
+
+- `metrics_snapshot` must be a non-empty dict
+- Evaluation must NOT populate `commit_ref` or `pr_ref`
+- Step 7 remains the sole owner of promotion evidence fields; step 6 only produces the compare-backed `metrics_snapshot`
+
+### 5. Compile workflow outputs
 This structured dictionary is the `evaluation_results` workflow output for this
 step, not a side-effect write:
 ```yaml
@@ -103,9 +121,10 @@ cycle_verdict: passed | partial | poor
 pass_count: {N}
 needs_optimization_count: {N}
 needs_revision_count: {N}
+metrics_snapshot: {non-empty compare-derived dict}
 ```
 
-### 5. Produce evaluation report
+### 6. Produce evaluation report
 ```
 ## Evaluation Report — Cycle {cycle_id}
 
@@ -126,6 +145,7 @@ Results:
 - [ ] Each change with `status: done` has an evaluation entry
 - [ ] Each evaluation cites specific evidence (not just "looks good")
 - [ ] Overall cycle verdict calculated
+- [ ] `hive.lib.meta_experiment.compare` output is bound into a non-empty `metrics_snapshot`
 - [ ] `evaluation_results` output emitted with per-change entries and cycle_verdict
 - [ ] Evaluation report produced
 

@@ -69,7 +69,7 @@ Load and follow `hive/workflows/steps/meta-team-cycle/step-01-boot.md`.
 
 Gate: step 1 is complete only when the boot report exists.
 
-Stop condition: if baseline-capture prerequisites are missing, stop after the boot report and record that baseline capture is reserved for BL2.3 before any implementation work begins.
+Stop condition: if baseline-capture prerequisites are missing, step 1 now performs the BL2.3 baseline availability check and may stop after boot before any implementation work begins.
 
 ### Step 2 Analysis
 
@@ -114,7 +114,7 @@ Pass `candidate_ref` plus the step-06 decision verdict into `adapter.promote(env
 On success:
 
 - capture `commit_ref` from the promotion evidence
-- capture `rollback_target` and store it in the envelope as the cycle rollback reference
+- record the adapter's `rollback_target` in the `promoted_changes` output
 - stage insights to `.pHive/insights/meta-meta-optimize/cycle-{cycle_id}/`
 
 On `PromotionFailure`:
@@ -128,7 +128,7 @@ On `PromotionFailure`:
 
 Load and follow `hive/workflows/steps/meta-team-cycle/step-08-close.md`.
 
-This gate is non-bypassable: invoke `closure_validator.validate_closable(envelope)` before the cycle closes.
+This gate is non-bypassable: assemble the envelope from the step-06 and step-07 output graph (`rollback_target` -> `rollback_ref` renaming happens here), then invoke `closure_validator.validate_closable(envelope)` before the cycle closes.
 
 The cycle may NOT close without `commit_ref`, `metrics_snapshot`, and `rollback_ref`.
 
