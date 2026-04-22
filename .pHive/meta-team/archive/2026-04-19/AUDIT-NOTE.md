@@ -41,3 +41,5 @@ All other ledger entries in `.pHive/meta-team/archive/2026-04-19/ledger.yaml` ha
 
 - [MANIFEST.md](./MANIFEST.md)
 - [ledger.yaml](./ledger.yaml)
+
+indexed-for-meta-meta-optimize proving run: meta-2026-04-22-r2
