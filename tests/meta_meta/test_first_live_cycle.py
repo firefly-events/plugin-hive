@@ -13,9 +13,19 @@ AUDIT_ROOT = REPO_ROOT / ".pHive/audits/mvl-proof"
 
 
 def _latest_proof_path() -> Path:
+    """Return the most recent BL2.5-shaped (no-op) proof artifact.
+
+    BL2.6 ships a sibling `mvl-proof-rollback-realism` schema in the same
+    audit root; filter to the BL2.5 `mvl-proof` type so these tests remain
+    idempotent when both artifact families coexist.
+    """
     proofs = sorted(AUDIT_ROOT.glob("*/proof.yaml"))
     assert proofs, "expected at least one proof.yaml under .pHive/audits/mvl-proof/"
-    return proofs[-1]
+    for candidate in reversed(proofs):
+        data = yaml.safe_load(candidate.read_text(encoding="utf-8"))
+        if isinstance(data, dict) and data.get("type") == "mvl-proof":
+            return candidate
+    raise AssertionError("no proof.yaml with type=='mvl-proof' (BL2.5) found under audit root")
 
 
 def _proof_doc() -> dict:
