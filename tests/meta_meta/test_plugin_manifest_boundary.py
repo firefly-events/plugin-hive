@@ -34,7 +34,8 @@ def _validate_manifest(manifest_dict):
         if "maintainer-skills" in value:
             raise AssertionError(f"maintainer-skills leaked in manifest: {value!r}")
 
-        if value in {"meta-meta-optimize", "/meta-meta-optimize"}:
+        command_word = value.split()[0] if value.split() else ""
+        if command_word == "meta-meta-optimize" or value.startswith("/meta-meta-optimize"):
             raise AssertionError(
                 f"public manifest contains meta-meta-optimize registration: {value!r}"
             )
@@ -104,6 +105,11 @@ class PluginManifestBoundaryTests(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             _validate_manifest(leaked_manifest)
+
+    def test_validation_fails_on_meta_meta_optimize_command_with_args(self) -> None:
+        """Slash-command variants with extra args still fail manifest validation."""
+        with self.assertRaises(AssertionError):
+            _validate_manifest({"public_commands": ["/meta-meta-optimize --dry-run"]})
 
     def test_validation_fails_on_path_like_meta_meta_optimize_registration(self) -> None:
         """Path-like meta-meta-optimize registrations are rejected."""

@@ -20,6 +20,36 @@ ERRORS=()
 _pass() { echo "  PASS: $1"; PASS=$((PASS+1)); }
 _fail() { echo "  FAIL: $1"; FAIL=$((FAIL+1)); ERRORS+=("$1"); }
 
+_stop_hook_command() {
+  local index="$1"
+  python3 - "$PLUGIN_JSON" "$index" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    plugin = json.load(handle)
+print(plugin["hooks"]["Stop"][0]["hooks"][int(sys.argv[2])]["command"])
+PY
+}
+
+STOP_SENTINEL_COMMAND=$(_stop_hook_command 0)
+STOP_DISPATCHER_COMMAND=$(_stop_hook_command 1)
+
+echo ""
+echo "=== (config) shipped Stop-hook ordering and failure-tolerance ==="
+
+if [[ "$STOP_SENTINEL_COMMAND" == *".pHive/interrupts/"* ]]; then
+  _pass "config: sentinel command is first in Stop hook"
+else
+  _fail "config: first Stop hook command is not the sentinel writer"
+fi
+
+if [[ "$STOP_DISPATCHER_COMMAND" == *"metrics-stop-dispatch.sh"* ]] && [[ "$STOP_DISPATCHER_COMMAND" == *"|| true"* ]]; then
+  _pass "config: dispatcher command tolerates failure"
+else
+  _fail "config: dispatcher command is not failure-tolerant"
+fi
+
 # ── Fixture setup ────────────────────────────────────────────────────────────
 
 TMPDIR_BASE=$(mktemp -d)

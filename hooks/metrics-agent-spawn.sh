@@ -70,6 +70,18 @@ if [[ "$metrics_enabled" != "true" ]]; then
   exit 0
 fi
 
+_validate_safe_run_id() {
+  local candidate="$1"
+  if [[ "$candidate" == *"/"* ]] || [[ "$candidate" == *"\\"* ]] || [[ "$candidate" == *".."* ]]; then
+    echo "metrics-agent-spawn: invalid run_id: path separators and traversal are not allowed" >&2
+    exit 1
+  fi
+  if [[ ! "$candidate" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "metrics-agent-spawn: invalid run_id: only [A-Za-z0-9._-] are allowed" >&2
+    exit 1
+  fi
+}
+
 # Validate required env vars
 run_id="${HIVE_RUN_ID:-}"
 story_id="${HIVE_STORY_ID:-}"
@@ -77,15 +89,20 @@ proposal_id="${HIVE_PROPOSAL_ID:-}"
 agent_name="${HIVE_AGENT:-}"
 
 if [[ -z "$run_id" ]]; then
-  echo "metrics-agent-spawn: HIVE_RUN_ID is required" >&2
+  echo "metrics-agent-spawn: invalid run_id: HIVE_RUN_ID is required" >&2
   exit 1
 fi
+_validate_safe_run_id "$run_id"
 if [[ -z "$story_id" && -z "$proposal_id" ]]; then
-  echo "metrics-agent-spawn: one of HIVE_STORY_ID or HIVE_PROPOSAL_ID is required" >&2
+  echo "metrics-agent-spawn: invalid story_id/proposal_id: exactly one of HIVE_STORY_ID or HIVE_PROPOSAL_ID is required" >&2
+  exit 1
+fi
+if [[ -n "$story_id" && -n "$proposal_id" ]]; then
+  echo "metrics-agent-spawn: invalid story_id/proposal_id: HIVE_STORY_ID and HIVE_PROPOSAL_ID are mutually exclusive" >&2
   exit 1
 fi
 if [[ -z "$agent_name" ]]; then
-  echo "metrics-agent-spawn: HIVE_AGENT is required" >&2
+  echo "metrics-agent-spawn: invalid agent_name: HIVE_AGENT is required" >&2
   exit 1
 fi
 

@@ -13,11 +13,11 @@ AUDIT_ROOT = REPO_ROOT / ".pHive/audits/mvl-proof"
 
 
 def _latest_proof_path() -> Path:
-    """Return the most recent BL2.5-shaped (no-op) proof artifact.
+    """Return the most recent BL2.5-shaped (`type: mvl-proof`) artifact.
 
     BL2.6 ships a sibling `mvl-proof-rollback-realism` schema in the same
-    audit root; filter to the BL2.5 `mvl-proof` type so these tests remain
-    idempotent when both artifact families coexist.
+    audit root; filter to the BL2.5 `mvl-proof` type so structural tests
+    remain stable when both artifact families coexist.
     """
     proofs = sorted(AUDIT_ROOT.glob("*/proof.yaml"))
     assert proofs, "expected at least one proof.yaml under .pHive/audits/mvl-proof/"
@@ -26,6 +26,22 @@ def _latest_proof_path() -> Path:
         if isinstance(data, dict) and data.get("type") == "mvl-proof":
             return candidate
     raise AssertionError("no proof.yaml with type=='mvl-proof' (BL2.5) found under audit root")
+
+
+def _latest_pointer_proof_path() -> Path:
+    """Resolve whichever proof `latest.yaml` currently points at, regardless of type.
+
+    Used by ref-resolution tests so they catch stale `latest.yaml` drift —
+    per CodeRabbit feedback that ref checks must be driven by the pointer,
+    not by an independent directory scan.
+    """
+    latest_path = AUDIT_ROOT / "latest.yaml"
+    assert latest_path.exists()
+    latest = yaml.safe_load(latest_path.read_text(encoding="utf-8"))
+    assert isinstance(latest, dict)
+    target = AUDIT_ROOT / latest["latest_proof"]
+    assert target.exists()
+    return target
 
 
 def _proof_doc() -> dict:
@@ -70,12 +86,12 @@ def test_latest_pointer_resolves() -> None:
 
 
 def test_commit_ref_resolves_in_git() -> None:
-    proof = _proof_doc()
+    proof = yaml.safe_load(_latest_pointer_proof_path().read_text(encoding="utf-8"))
     assert _git_ref_exists(proof["closure_evidence"]["commit_ref"])
 
 
 def test_rollback_ref_resolves_in_git() -> None:
-    proof = _proof_doc()
+    proof = yaml.safe_load(_latest_pointer_proof_path().read_text(encoding="utf-8"))
     assert _git_ref_exists(proof["closure_evidence"]["rollback_ref"])
 
 

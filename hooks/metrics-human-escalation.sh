@@ -65,8 +65,12 @@ PYEOF
       | head -1 | sed 's/[^:]*:[[:space:]]*//' | tr -d ' "')
   fi
 
-  [[ "${val:-}" == "true" ]] && metrics_enabled="true"
-  [[ -n "${dir_val:-}" ]] && metrics_dir="$dir_val"
+  if [[ -n "${val:-}" ]] && [[ "$val" != "null" ]] && [[ "$val" != "None" ]] && [[ "$val" == "true" ]]; then
+    metrics_enabled="true"
+  fi
+  if [[ -n "${dir_val:-}" ]] && [[ "$dir_val" != "null" ]] && [[ "$dir_val" != "None" ]]; then
+    metrics_dir="$dir_val"
+  fi
 fi
 
 # silent no-op when disabled

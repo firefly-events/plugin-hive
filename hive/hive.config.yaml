@@ -122,7 +122,7 @@ example_codebases: []
 # Requires: npm install -g @openai/codex && codex login
 external_models:
   codex:
-    enabled: true               # codex CLI 0.118+ installed, ChatGPT auth active
+    enabled: false              # opt-in; codex CLI 0.118+ installed, ChatGPT auth active
     use_for:
       - adversarial-review      # run after Claude review, before optimize/integrate
     # companion_path is auto-detected from the codex plugin if installed
@@ -135,17 +135,15 @@ external_models:
 #   codex login. macOS-only during PoC (cmux constraint). See
 #   skills/hive/skills/codex-invoke/SKILL.md for pre-flight details.
 agent_backends:
-  # Planning split (per user split-system directive)
-  architect: codex             # route architect persona to Codex (planning work)
-  technical-writer: codex      # route technical-writer persona to Codex (planning work)
-  # Execution split (per user directive: "codex does the work, opus 4.7 reviews")
-  developer: codex
-  frontend-developer: codex
-  backend-developer: codex
-  tester: codex
+  # Example opt-in routes:
+  # architect: codex
+  # technical-writer: codex
+  # developer: codex
+  # frontend-developer: codex
+  # backend-developer: codex
+  # tester: codex
+  # pair-programmer: codex
   # reviewer stays on Claude backend; model overridden to opus below
-  # reviewer: codex            # intentionally disabled — user wants Opus review
-  pair-programmer: codex
   # Haiku test-worker stays Claude — cheapest path for mechanical execution
 
 # Developer preferences (populated by Phase 2b-ii: Developer Discovery)
@@ -179,7 +177,8 @@ execution:
   # tmux: use TeamCreate's built-in tmux pane spawning (default)
   # cmux: spawn agents in cmux split panes via cmux CLI (requires cmux installed)
   # auto: detect cmux first, fall back to tmux
-  terminal_mux: cmux
+  terminal_mux: auto
+  # terminal_mux: cmux
   # Interactive pane mode for cmux-spawned agents (both Claude and Codex).
   # true: launch agents in interactive mode — visible conversation in the pane,
   #   orchestrator can send follow-up messages, user can inspect/interact live.

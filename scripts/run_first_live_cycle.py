@@ -218,7 +218,7 @@ def main() -> int:
         commit_ref = promotion_result.evidence.commit_ref
         rollback_ref = promotion_result.rollback_target
 
-        metrics_snapshot_for_envelope = candidate_metrics_snapshot["metrics"]
+        metrics_snapshot_for_envelope = decision
         final_envelope = {
             "experiment_id": cycle_id,
             "decision": "accept",
@@ -241,6 +241,15 @@ def main() -> int:
         final_envelope.update(watch_fields)
         envelope.set_regression_watch(cycle_id, watch_fields["regression_watch"])
 
+        cleanup_status = "failed"
+        try:
+            _cleanup_worktree_and_branch(worktree_path, worktree_branch)
+        except RuntimeError:
+            cleanup_status = "failed"
+            raise
+        else:
+            cleanup_status = "removed"
+
         proven_at = _utc_now()
         proof_dir = audit_root / _proof_dirname(proven_at)
         proof_path = proof_dir / "proof.yaml"
@@ -259,7 +268,7 @@ def main() -> int:
             },
             "worktree": {
                 "path": f"{WORKTREES_ROOT.as_posix()}/{cycle_id}/",
-                "cleanup_status": "removed",
+                "cleanup_status": cleanup_status,
                 "branch": worktree_branch,
             },
             "artifacts": {
@@ -271,11 +280,7 @@ def main() -> int:
             "closure_evidence": {
                 "commit_ref": commit_ref,
                 "rollback_ref": rollback_ref,
-                "metrics_snapshot": {
-                    "tokens": 0,
-                    "wall_clock_ms": measured_ms,
-                    "first_attempt_pass": True,
-                },
+                "metrics_snapshot": metrics_snapshot_for_envelope,
                 "decision": "accept",
             },
             "regression_watch": {
@@ -333,15 +338,16 @@ def main() -> int:
         _track_if_created(created_paths, repo_root / LEDGER_PATH)
         _write_yaml(repo_root / LEDGER_PATH, ledger)
 
-        _cleanup_worktree_and_branch(worktree_path, worktree_branch)
-
         print(f"cycle_id={cycle_id}")
         print(f"commit_ref={commit_ref}")
         print(f"rollback_ref={rollback_ref}")
         print(f"audit_path={proof_path.relative_to(repo_root)}")
         return 0
     except Exception as exc:
-        _cleanup_worktree_and_branch(worktree_path, worktree_branch)
+        try:
+            _cleanup_worktree_and_branch(worktree_path, worktree_branch)
+        except RuntimeError:
+            pass
         _rollback_repo(pre_run_head)
         _cleanup_created_paths(created_paths)
         import traceback
@@ -448,21 +454,27 @@ def _run_python_assert(cwd: Path, code: str) -> None:
 
 def _cleanup_worktree_and_branch(worktree_path: Path | None, worktree_branch: str | None) -> None:
     if worktree_path is not None and worktree_path.exists():
-        subprocess.run(
+        completed = subprocess.run(
             ["git", "worktree", "remove", "--force", str(worktree_path)],
             cwd=REPO_ROOT,
             check=False,
             capture_output=True,
             text=True,
         )
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout or "").strip()
+            raise RuntimeError(f"git worktree remove failed: {detail}")
     if worktree_branch:
-        subprocess.run(
+        completed = subprocess.run(
             ["git", "branch", "-D", worktree_branch],
             cwd=REPO_ROOT,
             check=False,
             capture_output=True,
             text=True,
         )
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout or "").strip()
+            raise RuntimeError(f"git branch -D failed: {detail}")
 
 
 def _rollback_repo(pre_run_head: str) -> None:

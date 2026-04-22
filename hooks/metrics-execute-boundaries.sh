@@ -37,10 +37,14 @@ _read_metrics_config() {
   if command -v yq &>/dev/null; then
     val=$(yq ".metrics.${key}" "$HIVE_CONFIG" 2>/dev/null | tr -d ' "' || true)
   elif command -v python3 &>/dev/null; then
-    val=$(python3 - "$HIVE_CONFIG" "$key" <<'PYEOF'
+    if ! val=$(python3 - "$HIVE_CONFIG" "$key" <<'PYEOF'
 import sys
 try:
     import yaml
+except ModuleNotFoundError:
+    sys.exit(1)
+
+try:
     with open(sys.argv[1]) as f:
         c = yaml.safe_load(f)
     v = c.get('metrics', {}).get(sys.argv[2], '')
@@ -49,7 +53,9 @@ try:
 except Exception:
     pass
 PYEOF
-    )
+    ); then
+      val=""
+    fi
   else
     val=$(awk '/^metrics:/{flag=1; next} /^[a-zA-Z]/{flag=0} flag && /^[[:space:]]+'"$key"':/' "$HIVE_CONFIG" \
       | head -1 | sed 's/[^:]*:[[:space:]]*//' | tr -d ' "')
@@ -73,6 +79,18 @@ if [[ "$metrics_enabled" != "true" ]]; then
   exit 0
 fi
 
+_validate_safe_run_id() {
+  local candidate="$1"
+  if [[ "$candidate" == *"/"* ]] || [[ "$candidate" == *"\\"* ]] || [[ "$candidate" == *".."* ]]; then
+    echo "metrics-execute-boundaries: invalid run_id: path separators and traversal are not allowed" >&2
+    exit 1
+  fi
+  if [[ ! "$candidate" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "metrics-execute-boundaries: invalid run_id: only [A-Za-z0-9._-] are allowed" >&2
+    exit 1
+  fi
+}
+
 # Validate required env vars
 run_id="${HIVE_RUN_ID:-}"
 story_id="${HIVE_STORY_ID:-}"
@@ -86,6 +104,10 @@ if [[ -z "$run_id" ]]; then
 fi
 if [[ -z "$story_id" && -z "$proposal_id" ]]; then
   echo "metrics-execute-boundaries: one of HIVE_STORY_ID or HIVE_PROPOSAL_ID is required" >&2
+  exit 1
+fi
+if [[ -n "$story_id" && -n "$proposal_id" ]]; then
+  echo "metrics-execute-boundaries: HIVE_STORY_ID and HIVE_PROPOSAL_ID are mutually exclusive" >&2
   exit 1
 fi
 if [[ -z "$fix_iterations" ]]; then
@@ -107,6 +129,7 @@ if [[ "$first_pass" != "true" && "$first_pass" != "false" ]]; then
   echo "metrics-execute-boundaries: HIVE_FIRST_PASS must be 'true' or 'false'" >&2
   exit 1
 fi
+_validate_safe_run_id "$run_id"
 
 # Optional fields
 swarm_id="${HIVE_SWARM_ID:-}"

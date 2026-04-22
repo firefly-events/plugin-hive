@@ -188,6 +188,7 @@ _emit_agent_row() {
   local event_id="evt_${ts}_$$_${RANDOM}_token_${agent_label//[^a-zA-Z0-9_-]/_}"
 
   local scope_field
+  local scope_val
   if [ -n "$story_id" ]; then
     scope_field="story_id"
     scope_val="$story_id"

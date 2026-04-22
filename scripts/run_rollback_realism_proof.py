@@ -267,12 +267,17 @@ def main() -> int:
         finally:
             if not trip_succeeded:
                 try:
-                    auto_revert_callback(
+                    cleanup_result = auto_revert_callback(
                         {"commit_ref": commit_ref, "target_branch": args.target_branch},
                         rollback_ref,
                     )
+                    if not cleanup_result.success:
+                        raise RuntimeError(
+                            "CRITICAL: auto-revert cleanup returned success=False"
+                        )
                 except Exception as cleanup_error:
                     print(f"CRITICAL: auto-revert cleanup failed: {cleanup_error}", file=sys.stderr)
+                    raise
         if not isinstance(trip_event, rollback_watch.TripEvent):
             raise RuntimeError(f"regression watch did not trip: {trip_event}")
         if trip_event.rollback_result is None or not trip_event.rollback_result.success:

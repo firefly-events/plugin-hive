@@ -289,7 +289,7 @@ if [ -n "$EVENT_FILE_C" ] && [ -s "$EVENT_FILE_C" ]; then
     _fail "degradation: event file non-empty but no codex_gap: true row found"
   fi
 else
-  _pass "degradation: no crash, no event file (acceptable when no token data)"
+  _fail "degradation: no event file emitted; codex_gap: true row required"
 fi
 
 # ── (d) schema validity ──────────────────────────────────────────────────────

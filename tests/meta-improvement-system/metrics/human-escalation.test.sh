@@ -22,11 +22,16 @@ trap 'rm -rf "$TMPDIR_BASE"' EXIT
 make_config() {
   local enabled="$1"
   local dir="$TMPDIR_BASE/fake-pHive/metrics"
+  local include_dir="${2:-true}"
   cat <<EOF
 metrics:
   enabled: $enabled
-  dir: $TMPDIR_BASE/fake-pHive/metrics
 EOF
+  if [[ "$include_dir" == "true" ]]; then
+    cat <<EOF
+  dir: $dir
+EOF
+  fi
 }
 
 # ─── (a) Flag-off silence ────────────────────────────────────────────────────
@@ -81,6 +86,25 @@ if [[ -f "$ON_EVENTS/human-escalation.jsonl" ]]; then
   pass "flag-on: event file created"
 else
   fail "flag-on: event file not created"
+fi
+
+echo ""
+echo "=== (b0) missing metrics.dir falls back to default path ==="
+
+FAKE_HIVE_DEFAULT_DIR="$TMPDIR_BASE/fake-hive-default-dir"
+mkdir -p "$FAKE_HIVE_DEFAULT_DIR/hive"
+make_config true false > "$FAKE_HIVE_DEFAULT_DIR/hive/hive.config.yaml"
+
+HIVE_ROOT="$FAKE_HIVE_DEFAULT_DIR" bash "$HOOK" \
+  --run-id "run_test_default_dir_001" \
+  --story-id "C2.6" \
+  --reason "default-dir"
+
+DEFAULT_EVENTS="$FAKE_HIVE_DEFAULT_DIR/.pHive/metrics/events/human-escalation.jsonl"
+if [[ -f "$DEFAULT_EVENTS" ]]; then
+  pass "missing metrics.dir: default .pHive/metrics path used"
+else
+  fail "missing metrics.dir: default .pHive/metrics path not used"
 fi
 
 LINE="$(tail -1 "$ON_EVENTS/human-escalation.jsonl" 2>/dev/null || true)"
