@@ -1,16 +1,28 @@
 # Hive Configuration
 
-All configurable settings live in `skills/hive/hive.config.yaml`. The orchestrator reads this at session start. Defaults are sensible — configuration is optional.
+Hive uses a two-file configuration contract. The shipped baseline lives in `hive/hive.config.yaml`, and consumers can optionally override it with a root-level `hive.config.yaml`.
 
-## Configuration File
+## Configuration Structure
 
-Location: `skills/hive/hive.config.yaml`
+Defaults are consumer-safe and configuration is optional.
 
-If the file doesn't exist, all defaults apply.
+| Layer | Location | Role | Precedence |
+|-------|----------|------|------------|
+| Shipped baseline | `hive/hive.config.yaml` | Plugin-owned baseline with neutral defaults that are safe for marketplace consumers | Lower |
+| Consumer override | `hive.config.yaml` | Repository-local override layer for consumer-specific settings | Higher |
+
+precedence: when both files exist, root `hive.config.yaml` wins for overlapping keys and missing keys fall through to `hive/hive.config.yaml`.
+
+## Configuration Files
+
+- Baseline: `hive/hive.config.yaml`
+- Optional override: `hive.config.yaml`
+
+If the root override file does not exist, the shipped baseline applies by itself.
 
 ## Schema
 
-See `skills/hive/hive.config.yaml` for the full default template with comments.
+See `hive/hive.config.yaml` for the shipped default template with comments.
 
 ## Settings Reference
 
@@ -18,7 +30,8 @@ See `skills/hive/hive.config.yaml` for the full default template with comments.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `paths.state_dir` | `.pHive` | Directory where Hive stores per-project state (epics, episodes, cycle state, sessions, memories). The default is honored end-to-end — skills/hooks/workflows all reference `.pHive/` directly. Other values are documented but not yet wired into runtime path resolution; tracked as follow-up. |
+| `paths.state_dir` | `.pHive` | Directory where Hive stores per-project state (epics, episodes, cycle state, sessions, memories). Slice 1 introduces the unified resolver; until then, shipped skills and workflows still reference `.pHive/` directly in some places, so alternate values are documented ahead of full end-to-end wiring. |
+| `paths.target_project` | `null` | Primary source for the "attached project" path used by meta-team targeting. When unset (`null`), the resolver falls back to the invoking cwd. Config-key first, cwd fallback, no CLI argument form. |
 
 ### Quality Gates
 
@@ -73,11 +86,11 @@ See `skills/hive/hive.config.yaml` for the full default template with comments.
 | `execution.default_methodology` | classic | Default workflow methodology |
 | `execution.parallel_teams` | false | Allow parallel dev teams (future) |
 | `execution.max_retry_attempts` | 2 | Default retry attempts for gate failures |
-| `execution.terminal_mux` | tmux | Terminal multiplexer for visible agent panes: `tmux`, `cmux`, or `auto` |
-| `execution.idle_timeout_seconds` | 300 | Idle timeout for persistent Codex panes used by cross-model workflows |
 
-### External Model Routing
+## Maintainer Boundary
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `agent_backends` | {} | Per-agent backend routing map; unset agents default to `claude`, supported backends are `claude` and `codex` |
+Some Hive assets are maintainer-only and are used to improve the plugin itself rather than support marketplace consumers. Those assets do not belong in marketplace consumer installs, and consumers receive only the neutral baseline configuration plus any repo-local override they choose to add.
+
+The `maintainer-skills/` directory is excluded from marketplace distribution via `marketplace.json` under the Slice 5 story `marketplace-exclude-maintainer-skills`.
+
+Maintainer defaults such as Codex backends, Opus routing, and `cmux` terminal mux preferences do not ship. For the same reason, maintainer-only keys are intentionally absent from the shipped settings reference, including `execution.terminal_mux`, `execution.idle_timeout_seconds`, and external model routing such as `agent_backends`.
