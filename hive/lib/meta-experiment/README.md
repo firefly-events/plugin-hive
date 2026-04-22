@@ -199,3 +199,30 @@ Evidence-shape guard:
 - The architect raised `closure-evidence-shape-mismatch` in `.pHive/cycle-state/meta-improvement-system.yaml`: a shared closure validator could overfit direct-commit evidence and reject valid PR-only close records.
 - This validator intentionally accepts current C1 `commit_ref` envelope evidence and forward-looking `pr_ref` envelope evidence. The current schema documents `commit_ref`; `pr_ref` acceptance is architecturally load-bearing so S10 does not have to retrofit the validator when the public PR-only close path lands.
 - S9 ships the first direct-commit close evidence. S10 ships PR-only close evidence. Both satisfy this validator without changes.
+
+## DirectCommitAdapter (BL2.1)
+
+Purpose: maintainer-local promotion adapter that lands a worktree tip into the live repository with direct git commits rather than a PR flow.
+
+Defaults:
+
+- `repo_path` is the live checkout that receives the promotion
+- `worktrees_root` defaults to `<repo_path>/.pHive/meta-team/worktrees`
+- when `envelope["worktree_path"]` is omitted, the adapter derives `<worktrees_root>/<experiment_id>/`
+
+Promotion semantics:
+
+- `pass` and `needs_optimization` validate that the worktree exists and that its `HEAD` matches `candidate_ref`
+- the adapter always captures the target branch pre-promotion `HEAD` as `rollback_target`
+- it first attempts `git merge --ff-only <candidate_ref>` and falls back to `git cherry-pick <candidate_ref>` when fast-forward is unavailable
+- on success it returns commit-backed evidence and removes the worktree
+- on any promotion failure it aborts in-progress git operations, preserves the main tree at the pre-promotion `HEAD`, and force-removes the worktree
+- on `needs_revision` it does not write to the main tree and only discards the worktree
+
+Rollback semantics:
+
+- rollback uses `git revert --no-edit <commit_ref>` on the target branch
+- a successful rollback returns the new revert commit SHA in `revert_ref`
+- rollback failures abort the revert and return `success=False`
+
+Always returns `rollback_target`; pair with `closure_validator`.

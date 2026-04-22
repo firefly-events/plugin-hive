@@ -11,6 +11,7 @@ from .closure_validator import (
     is_closable,
     validate_closable,
 )
+from .direct_commit_adapter import DirectCommitAdapter, PromotionFailure
 from .promotion_adapter import (
     PromotionAdapter,
     PromotionEvidence,
@@ -22,6 +23,7 @@ from .rollback_watch import NoActionResult, TripEvent, evaluate_watch
 __all__ = [
     "AmbiguousEvidenceError",
     "CloseValidationError",
+    "DirectCommitAdapter",
     "InvalidDecisionError",
     "MissingEvidenceError",
     "MissingMetricsSnapshotError",
@@ -29,6 +31,7 @@ __all__ = [
     "NoActionResult",
     "PromotionAdapter",
     "PromotionEvidence",
+    "PromotionFailure",
     "PromotionResult",
     "RollbackResult",
     "TripEvent",

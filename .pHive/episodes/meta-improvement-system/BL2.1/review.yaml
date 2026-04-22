@@ -1,0 +1,27 @@
+epic: meta-improvement-system
+story: BL2.1
+step: review
+agent: reviewer
+backend: opus-4-7
+status: passed
+verdict: needs_optimization
+started: "2026-04-22T05:55:00Z"
+completed: "2026-04-22T05:58:00Z"
+artifacts:
+  - path: .pHive/episodes/meta-improvement-system/BL2.1/review-memo.md
+    kind: review-memo
+scores:
+  contract_conformance: 4
+  maintainer_local_scope: 5
+  worktree_safety: 5
+  failure_cleanup: 5
+  evidence_shape_fidelity: 5
+  subprocess_hygiene: 4
+  test_rigor: 3
+  integration_readiness: 3
+optimization_notes:
+  - "Add rollback failure tests: ref-mismatch, rev-parse parent fail, git-revert abort"
+  - "Document PromotionFailure raise pattern in PromotionAdapter ABC docstring"
+  - "Comment the rev-parse-HEAD-before-merge invariant in direct_commit_adapter.py"
+must_fix_before_integrate: none
+codex_agent_id: ac514853751ce4698
