@@ -24,8 +24,26 @@ optional `pane_mode` (`one-shot` | `persistent`, default: `one-shot`).
 - Any task where Claude is the resolved backend (default path — use TeamCreate)
 - Non-macOS machines (cmux is macOS-only — hard-fail at pre-flight)
 
-**Supported personas (PoC):** `backend-developer`, `reviewer`. Other roster
-personas may work but are untested — broaden as validated.
+**Supported personas (PoC):** `backend-developer`, `reviewer`,
+`technical-writer`, `architect`, `tpm`, `researcher`. Other roster personas
+may work but are untested — broaden as validated.
+
+**Known-incompatible personas:** `ui-designer` — depends on Frame0 CLI and
+firecrawl MCP tooling that a Codex pane cannot reliably provide. Stay on
+the Claude backend for this persona.
+
+**Validation history:**
+- `backend-developer` — validated in external-model-integration PoC (Codex
+  PoC-test-1 story)
+- `reviewer` — validated as adversarial reviewer in meta-improvement-system
+  (S4+ review cycles, Opus-override)
+- `technical-writer`, `architect` — validated 2026-04-22 across
+  meta-improvement-system planning (56 stories, 10 slices; research briefs,
+  design discussions, H/V plans, structured outlines, architect memos and
+  review memos across S1-S9 execution)
+- `tpm`, `researcher` — validated 2026-04-22 across meta-improvement-system
+  and hive-release-readiness planning (TPM horizontal/vertical plan
+  sequencing, researcher raw findings + review-gate fact-checking)
 
 ## Procedure
 

@@ -9,11 +9,15 @@ Execute stories through development workflow phases.
 
 **Input:** `$ARGUMENTS` contains epic ID and optional flags (`--methodology tdd|classic|bdd`, `--sequential`).
 
+## State directory resolution
+
+All state paths in this skill are written as `${HIVE_STATE_DIR}/...`. Resolve `HIVE_STATE_DIR` from `paths.state_dir` in `hive/hive.config.yaml` (or the root `hive.config.yaml` if no `hive/` variant exists). The shipped default is `.pHive` — when the config sets a different value, substitute that value everywhere this skill writes `${HIVE_STATE_DIR}`.
+
 ## Kickoff Gate
 
 **Before doing anything else**, check whether Hive has been initialized for this project:
 
-1. Check if `.pHive/project-profile.yaml` exists in the project root
+1. Check if `${HIVE_STATE_DIR}/project-profile.yaml` exists in the project root
 2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
 3. As a secondary check, verify `hive.config.yaml` exists (check both `hive/hive.config.yaml` and `hive.config.yaml` in the project root — either location is valid)
 
@@ -49,9 +53,9 @@ If all checks pass, proceed normally.
 
 ## Process
 
-1. **Load the epic.** Read `.pHive/epics/{epic-id}/epic.yaml`.
+1. **Load the epic.** Read `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`.
 
-2. **Load or create cycle state.** Check `.pHive/cycle-state/{epic-id}.yaml`. If it doesn't exist, create a minimal one with `epic_id` and `created` timestamp. The cycle state accumulates decisions across phases — see `hive/references/cycle-state-schema.md`. Include the cycle state in all downstream agent prompts as system-level constraints.
+2. **Load or create cycle state.** Check `${HIVE_STATE_DIR}/cycle-state/{epic-id}.yaml`. If it doesn't exist, create a minimal one with `epic_id` and `created` timestamp. The cycle state accumulates decisions across phases — see `hive/references/cycle-state-schema.md`. Include the cycle state in all downstream agent prompts as system-level constraints.
 
 2b. **Read and partition escalations.** Inspect the `escalations:` field of the loaded cycle state.
 
@@ -74,7 +78,7 @@ If all checks pass, proceed normally.
      - `pre_exec[]` — records with `placement: pre-exec`
      - `post_exec[]` — records with `placement: post-exec`
      - `appends[]` — records with `placement: append`
-   - For `appends[]`: build a story→sidecar_agents map: `{story_id: [agent_name, ...]}` from each record's `stories` list and the target agent(s) from the trigger's catalog `responds_with.id`. Only use `stories` entries that match a canonical story ID in the current epic (i.e., a corresponding story YAML exists at `.pHive/epics/{epic-id}/stories/{id}.yaml`). Log a warning for any non-canonical entry: `[warn] step 2b: stories[] entry "{entry}" is not a canonical story ID — skipping for sidecar map`.
+   - For `appends[]`: build a story→sidecar_agents map: `{story_id: [agent_name, ...]}` from each record's `stories` list and the target agent(s) from the trigger's catalog `responds_with.id`. Only use `stories` entries that match a canonical story ID in the current epic (i.e., a corresponding story YAML exists at `${HIVE_STATE_DIR}/epics/{epic-id}/stories/{id}.yaml`). Log a warning for any non-canonical entry: `[warn] step 2b: stories[] entry "{entry}" is not a canonical story ID — skipping for sidecar map`.
    - For any trigger whose catalog entry has both `workflow:` empty and `skill:` empty: emit a trace `[debug] step 2b: trigger {trigger_id} — specialist phase not yet implemented, skipping`. This is a graceful no-op — do not halt execution.
    - Emit a single summary trace:
      ```
@@ -84,7 +88,7 @@ If all checks pass, proceed normally.
    **Critical constraints for this step:**
    - Pure read — must not modify cycle state, must not create directories, must not write files.
    - `pre_exec[]`, `post_exec[]`, and `appends[]` are built in memory but not yet consumed. Downstream stories add consumption logic.
-   - If a trigger's `responds_with.id` does not resolve to an existing agent file (`hive/agents/{id}.md`) or team config (`.pHive/teams/{id}.yaml`): log `[warn] step 2b: responds_with.id "{id}" — referenced agent/team file not found on disk — continuing` and continue.
+   - If a trigger's `responds_with.id` does not resolve to an existing agent file (`hive/agents/{id}.md`) or team config (`${HIVE_STATE_DIR}/teams/{id}.yaml`): log `[warn] step 2b: responds_with.id "{id}" — referenced agent/team file not found on disk — continuing` and continue.
 
 3. **Load the workflow definition.** Based on the `--methodology` parameter (default: `classic`), load:
    ```
@@ -98,10 +102,10 @@ If all checks pass, proceed normally.
 
    For each trigger in `pre_exec[]`, ordered by `raised_at` ASC (severity DESC as tiebreak), look up the trigger's catalog entry in `hive/references/specialist-triggers.md` (loaded in step 2b) to resolve `responds_with.id` and `workflow` fields. Then apply the three-condition branch:
 
-   **Prerequisite — team_memory_path validation:** Before spawning, verify the team config's `team_memory_path` directory exists on disk. If it does not, emit an actionable error — e.g., `[error] pre-exec: team_memory_path ".pHive/team-memories/security-team/" does not exist — create it before running specialist phases` — skip the trigger, and continue. Do not crash execute.
+   **Prerequisite — team_memory_path validation:** Before spawning, verify the team config's `team_memory_path` directory exists on disk. If it does not, emit an actionable error — e.g., `[error] pre-exec: team_memory_path "${HIVE_STATE_DIR}/team-memories/security-team/" does not exist — create it before running specialist phases` — skip the trigger, and continue. Do not crash execute.
 
    **(i) workflow field set AND workflow file exists on disk:**
-   Invoke `TeamCreate(team_config=team_yaml, workflow=entry.workflow)`. Write phase output to `.pHive/specialist-phases/{trigger}/{epic-id}/` (where `{trigger}` is the trigger ID string, e.g., `security:plan-audit`). If `TeamCreate` errors: log the failure (e.g., `[error] pre-exec: TeamCreate failed for {trigger-id} — {error}`), write a failure marker to `.pHive/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
+   Invoke `TeamCreate(team_config=team_yaml, workflow=entry.workflow)`. Write phase output to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/` (where `{trigger}` is the trigger ID string, e.g., `security:plan-audit`). If `TeamCreate` errors: log the failure (e.g., `[error] pre-exec: TeamCreate failed for {trigger-id} — {error}`), write a failure marker to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
 
    **(ii) workflow field set AND workflow file MISSING from disk:**
    Log `[info] pre-exec: specialist workflow not yet built — skipping {trigger-id}` → no-op. Continue to next trigger.
@@ -147,10 +151,10 @@ If all checks pass, proceed normally.
 
    For each trigger in `post_exec[]`, ordered by `raised_at` ASC (severity DESC as tiebreak), apply the three-condition branch:
 
-   **Prerequisite — team_memory_path validation:** Before spawning, verify the team config's `team_memory_path` directory exists on disk. If it does not, emit an actionable error — e.g., `[error] post-exec: team_memory_path ".pHive/team-memories/security-team/" does not exist — create it before running specialist phases` — skip the trigger, and continue. Do not crash execute.
+   **Prerequisite — team_memory_path validation:** Before spawning, verify the team config's `team_memory_path` directory exists on disk. If it does not, emit an actionable error — e.g., `[error] post-exec: team_memory_path "${HIVE_STATE_DIR}/team-memories/security-team/" does not exist — create it before running specialist phases` — skip the trigger, and continue. Do not crash execute.
 
    **(i) workflow field set AND workflow file exists on disk:**
-   Invoke `TeamCreate(team_config=team_yaml, workflow=entry.workflow)`. Write phase output to `.pHive/specialist-phases/{trigger}/{epic-id}/`. If `TeamCreate` errors: log the failure (e.g., `[error] post-exec: TeamCreate failed for {trigger-id} — {error}`), write a failure marker to `.pHive/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
+   Invoke `TeamCreate(team_config=team_yaml, workflow=entry.workflow)`. Write phase output to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/`. If `TeamCreate` errors: log the failure (e.g., `[error] post-exec: TeamCreate failed for {trigger-id} — {error}`), write a failure marker to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
 
    **(ii) workflow field set AND workflow file MISSING from disk:**
    Log `[info] post-exec: specialist workflow not yet built — skipping {trigger-id}` → no-op. Continue to next trigger.
