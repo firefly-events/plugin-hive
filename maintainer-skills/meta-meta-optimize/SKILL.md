@@ -151,6 +151,7 @@ If the close gate fails:
 - If the watch trips: set `regression_watch.state` to `tripped`, transition `decision` to `reverted`, and record the revert commit in the ledger trail
 - If the observation window elapses without a trip: treat the experiment as stable
 - `evaluate_watch(...)` is post-close and cadence-driven; do not inline it into steps 1-8
+- The rollback-realism milestone proof lives under `.pHive/audits/mvl-proof/`; documents with `type: mvl-proof-rollback-realism` identify BL2.6 runs, and `scripts/run_rollback_realism_proof.py` is the repeatable procedure
 
 ## Insights And Ledger
 

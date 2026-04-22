@@ -1,0 +1,21 @@
+epic: meta-improvement-system
+story: BL2.5
+step: integrate
+agent: orchestrator
+status: passed
+branch: meta-improvement-system-s9
+commits:
+  - ref: 96d4100
+    kind: promotion-commit
+    note: "meta-meta-exp(meta-2026-04-22): reviewed-on provenance note — the proving-run experiment commit from DirectCommitAdapter.promote()"
+  - ref: HEAD
+    kind: integrate-commit
+    note: "feat(meta-improvement-system): BL2.5 first live no-op cycle + verification doc — the BL2.5 story wrap"
+files:
+  created: 14
+  modified: 1
+  total_insertions: 960
+notes: |
+  BL2.5 produced two commits on s9: the real promotion commit (96d4100) from
+  the live run, and the integrate commit wrapping proof artifacts + script +
+  tests + episode records. .gitignore updated to track .pHive/audits/.
