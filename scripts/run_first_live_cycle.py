@@ -319,7 +319,7 @@ def main() -> int:
         _write_yaml(repo_root / CYCLE_STATE_PATH, cycle_state)
 
         ledger_entry = {
-            "cycle_id": cycle_id,
+            "experiment_id": cycle_id,
             "date": cycle_id.removeprefix("meta-").split("-r", 1)[0],
             "story": STORY_ID,
             "candidate_id": args.candidate_id,
@@ -413,9 +413,10 @@ def _load_candidate(backlog_path: Path, candidate_id: str) -> dict[str, Any]:
 def _next_cycle_id(ledger: list[dict[str, Any]]) -> str:
     base = f"meta-{date.today().isoformat()}"
     existing = {
-        entry.get("cycle_id")
+        entry.get("experiment_id") or entry.get("cycle_id")
         for entry in ledger
-        if isinstance(entry, dict) and isinstance(entry.get("cycle_id"), str)
+        if isinstance(entry, dict)
+        and isinstance(entry.get("experiment_id") or entry.get("cycle_id"), str)
     }
     if base not in existing:
         return base

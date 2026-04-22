@@ -19,12 +19,12 @@ The three other candidate surfaces were investigated and rejected with concrete 
 
 ### Location
 - Main session: `~/.claude/projects/<encoded-cwd>/<session-uuid>.jsonl`
-  - `<encoded-cwd>` is the repo path with `/` → `-`. For this repo: `-Users-don-Documents-plugin-hive`.
+  - `<encoded-cwd>` is the repo path with `/` → `-`. For this repo: `<ENCODED_CWD>`.
 - Subagent transcripts (Task tool calls): `~/.claude/projects/<encoded-cwd>/<session-uuid>/subagents/agent-<agent-id>.jsonl`
 - Subagent metadata: `~/.claude/projects/<encoded-cwd>/<session-uuid>/subagents/agent-<agent-id>.meta.json`
 
 ### Evidence (real)
-Sampled `babf5d22-59ae-45be-ac17-9d4db44c07b2.jsonl` (this repo, the C2.0 planning session that preceded this spike):
+Sampled `<SESSION_ID>.jsonl` (this repo, the C2.0 planning session that preceded this spike):
 
 - 543 assistant turns with `message.usage` populated
 - Totals: `input_tokens=6,886`, `output_tokens=665,932`, `cache_creation_input_tokens=2,586,192`, `cache_read_input_tokens=161,621,847`
@@ -33,7 +33,7 @@ Sampled `babf5d22-59ae-45be-ac17-9d4db44c07b2.jsonl` (this repo, the C2.0 planni
 
 First usage line (trimmed):
 ```
-{"type":"assistant","sessionId":"babf5d22-59ae-45be-ac17-9d4db44c07b2","isSidechain":false,
+{"type":"assistant","sessionId":"<SESSION_ID>","isSidechain":false,
  "timestamp":"2026-04-21T03:20:03.146Z",
  "message":{"model":"claude-opus-4-7",
   "usage":{"input_tokens":5,"output_tokens":364,
@@ -41,9 +41,9 @@ First usage line (trimmed):
            "service_tier":"standard"}}}
 ```
 
-Subagent JSONL sample (session `f2f9d4b7-…`, agent `a541810e2a7b51098`):
-- `agent-a541810e2a7b51098.meta.json` → `{"agentType":"claude-code-guide","description":"Research Claude Design API/MCP"}`
-- `agent-a541810e2a7b51098.jsonl` → usage rows on `claude-haiku-4-5-20251001`, `isSidechain=true`
+Subagent JSONL sample (session `<SESSION_ID>`, agent `<AGENT_ID>`):
+- `agent-<AGENT_ID>.meta.json` → `{"agentType":"claude-code-guide","description":"Research Claude Design API/MCP"}`
+- `agent-<AGENT_ID>.jsonl` → usage rows on `claude-haiku-4-5-20251001`, `isSidechain=true`
 
 ### Why it wins
 - **Actually has token counts** (decisive — the other three candidates do not).
@@ -160,4 +160,4 @@ If the JSONL format disappears in a future release, candidate #2's `/tmp` surfac
 
 ## Proof artifact
 
-See `token-capture-proof.json` in this directory. Real extraction from session `babf5d22-59ae-45be-ac17-9d4db44c07b2` on this machine. Non-synthetic; produced by the jq pipeline above.
+See `token-capture-proof.json` in this directory. Real extraction from session `<SESSION_ID>` on this machine. Non-synthetic; produced by the jq pipeline above.

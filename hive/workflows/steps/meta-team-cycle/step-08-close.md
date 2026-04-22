@@ -195,7 +195,7 @@ the consumer-project-scoped ledger for `/meta-optimize`. The legacy
 fallback during the A2.6/A2.7 window when the active swarm config is not yet
 resolvable. Append format:
 ```yaml
-- cycle_id: {cycle_id}
+- experiment_id: {cycle_id}
   date: {YYYY-MM-DD}
   started: {ISO 8601}
   closed: {ISO 8601}
