@@ -1,0 +1,33 @@
+story: C2.0
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: meta-improvement-system-s5
+parent_branch: meta-improvement-system (eefbff3)
+timestamp: "2026-04-21T20:10:00Z"
+artifacts:
+  - .pHive/epics/meta-improvement-system/docs/token-capture-feasibility.md
+  - .pHive/epics/meta-improvement-system/docs/token-capture-proof.json
+commit: 3d95119
+diff_stat: "2 files changed, 216 insertions(+)"
+backend_split:
+  research_and_implement: claude (general-purpose subagent)
+  test_review_integrate: claude (orchestrator inline)
+ac_check: 5/5 pass
+chosen_mechanism: claude_code_jsonl_transcript
+chosen_mechanism_path: "~/.claude/projects/<encoded-cwd>/<session-uuid>.jsonl"
+rejected_surfaces:
+  - "/private/tmp/claude-*/.../tasks/*.output — no usage blocks (grep 199 files → 0 matches)"
+  - "PostToolUse hook stdin — payload has no usage field"
+  - "SessionEnd hook stdin — payload has no usage field"
+proof_session: "babf5d22-59ae-45be-ac17-9d4db44c07b2"
+proof_totals:
+  input_tokens: 6886
+  output_tokens: 665932
+  cache_creation_input_tokens: 2586192
+  cache_read_input_tokens: 161621847
+  rows: 543
+  model: "claude-opus-4-7"
+known_gap: "Codex-executed turns (per Q-new-C dev/test routing) do not appear in Claude Code transcripts. Deferred out of S5 MVP per Q8 best-effort language; documented in feasibility §'Risks & fallback'."
+unblocks: ["C2.2", "C2.3"]

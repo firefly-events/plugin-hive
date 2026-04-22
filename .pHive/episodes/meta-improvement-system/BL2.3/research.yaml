@@ -1,0 +1,19 @@
+epic: meta-improvement-system
+story: BL2.3
+step: research
+agent: researcher
+status: passed
+started: "2026-04-22T06:21:00Z"
+completed: "2026-04-22T06:28:00Z"
+artifacts:
+  - path: .pHive/episodes/meta-improvement-system/BL2.3/research-brief.md
+    kind: research-brief
+notes: |
+  Brief traces live evidence path. Orchestrator spot-verified:
+  - hive/lib/metrics/ exists (researcher concern unfounded)
+  - closure_validator ALREADY enforces commit_ref XOR pr_ref (lines 65-75) — AC4 de-risked
+  - closure_validator does NOT currently reject literal "TBD" — BL2.3 must add placeholder rejection
+  - step-08 already has non-bypassable gate language but does not reference validate_closable() programmatically
+  - baseline.capture_from_run + persist_to_envelope exist and compose via capture_and_persist
+  - .claude-plugin/plugin.json Stop hook is present
+  Findings shape the developer brief.

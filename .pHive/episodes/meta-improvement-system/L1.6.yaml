@@ -1,0 +1,26 @@
+story: L1.6
+epic: meta-improvement-system
+slice: S7
+status: passed
+steps:
+  - id: implement
+    agent: codex:codex-rescue
+    status: success
+    artifacts:
+      - hive/lib/meta-experiment/rollback_watch.py
+      - hive/lib/meta-experiment/__init__.py
+      - hive/lib/meta-experiment/README.md
+      - hive/lib/meta-experiment/tests/test_rollback_watch.py
+  - id: test
+    status: success
+    artifacts:
+      - "python3 -m unittest discover hive/lib/meta-experiment/tests: 44 tests, OK"
+  - id: review
+    agent: reviewer (opus)
+    status: passed
+    notes: |
+      Single-path discipline locked via __all__ + structural test asserting
+      exact public surface. Trip ordering (event, watch-tripped, callback,
+      conditional revert) matches spec. Callback failure → skip decision
+      transition; raised callback propagates. Baseline for regression check
+      is candidate-time metrics_snapshot per B0 §2.3, not baseline_ref.

@@ -1,0 +1,34 @@
+story_id: K.2
+branch: meta-improvement-system-s6
+parent_commit: c064ca1
+commit: not-created-sandbox-blocked
+files_changed:
+  - skills/kickoff/SKILL.md
+  - hive/references/kickoff-protocol.md
+  - .pHive/episodes/meta-improvement-system/K.2/integrate.yaml
+ac_to_line_mapping:
+  AC1:
+    - skills/kickoff/SKILL.md:18
+    - skills/kickoff/SKILL.md:19
+    - hive/references/kickoff-protocol.md:64
+    - hive/references/kickoff-protocol.md:66
+    - hive/references/kickoff-protocol.md:67
+  AC2:
+    - skills/kickoff/SKILL.md:21
+    - hive/references/kickoff-protocol.md:69
+  AC3:
+    - skills/kickoff/SKILL.md:20
+    - skills/kickoff/SKILL.md:22
+    - hive/references/kickoff-protocol.md:68
+    - hive/references/kickoff-protocol.md:70
+  AC4:
+    - skills/kickoff/SKILL.md:18
+    - hive/references/kickoff-protocol.md:64
+decisions:
+  - Extended the K.1 metrics step in place instead of reshaping the fresh-kickoff copy, so the brownfield behavior is documented as an additive branch.
+  - Kept the owner-file split intact: `skills/kickoff/SKILL.md` frames the re-kickoff behavior and `hive/references/kickoff-protocol.md` carries the concrete read/show/optionally-write rules.
+  - Defined idempotency conservatively: if the user keeps the current value, kickoff performs no `metrics.enabled` write at all.
+notes_for_reviewer:
+  - The brownfield branch reads the existing `metrics.enabled` value, shows it explicitly, and asks a change prompt instead of re-asking the fresh opt-in question.
+  - The no-change path is documented as preserving the existing value with no write to `hive/hive.config.yaml`.
+  - `hive/hive.config.yaml` was not modified by this story.

@@ -1,0 +1,20 @@
+story: C2.2
+step: integrate
+status: completed
+completed_at: "2026-04-21T00:00:00Z"
+artifacts:
+  - /Users/don/Documents/plugin-hive/.claude-plugin/plugin.json
+  - /Users/don/Documents/plugin-hive/hooks/metrics-stop-dispatch.sh
+  - /Users/don/Documents/plugin-hive/tests/meta-improvement-system/metrics/stop-hook-emission.test.sh
+branch: hive-C2.2
+notes: |
+  Stop hook composition: sentinel handler runs first (index 0, timeout 10s),
+  metrics dispatcher runs second (index 1, timeout 15s, "|| true" guard).
+  Handler isolation: metrics failure can never suppress sentinel write.
+  Token capture: C2.0 JSONL mechanism via transcript_path (hook input) or
+  ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl fallback.
+  Wall-clock uses python3 for ms-precision (macOS date lacks %3N).
+  Test results: 21/21 passed covering flag-off, flag-on, failure isolation,
+  and idempotency (unique event_ids verified).
+  Known gap: Codex turns not in Claude Code JSONL (per C2.0 edge case #3);
+  emits codex_gap:true in dimensions when JSONL is missing/unresolvable.

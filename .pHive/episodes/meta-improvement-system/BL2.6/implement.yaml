@@ -1,0 +1,55 @@
+epic: meta-improvement-system
+story: BL2.6
+step: implement
+agent: developer + orchestrator
+backend: codex + orchestrator
+status: passed
+started: "2026-04-22T10:31:00Z"
+completed: "2026-04-22T10:45:00Z"
+artifacts:
+  - path: scripts/run_rollback_realism_proof.py
+    kind: source
+    change: MVL proof orchestrator; dirty-tree guard, real DirectCommitAdapter, injects threshold-exceeding post_close_snapshot, invokes evaluate_watch with envelope_writer=envelope
+  - path: tests/meta_meta/test_rollback_realism_e2e.py
+    kind: tests
+    change: 10 structural tests over the BL2.6 proof artifact
+  - path: maintainer-skills/meta-meta-optimize/SKILL.md
+    change: +1 line noting rollback-realism proof type
+  - path: tests/meta_meta/test_first_live_cycle.py
+    change: type-filter BL2.5 proof lookups to stay idempotent with BL2.6
+  - path: .pHive/audits/mvl-proof/2026-04-22T10-41-35Z/proof.yaml
+    kind: proof-artifact
+  - path: .pHive/audits/mvl-proof/latest.yaml
+    change: repointed to BL2.6 proof
+  - path: .pHive/metrics/experiments/meta-2026-04-22-r2.yaml
+    kind: envelope
+    decision: reverted
+    regression_watch_state: tripped
+  - path: .pHive/metrics/events/meta-2026-04-22-r2.jsonl
+    kind: events
+  - path: .pHive/meta-team/cycle-state.yaml
+  - path: .pHive/meta-team/ledger.yaml
+live_run:
+  cycle_id: meta-2026-04-22-r2
+  regressive_commit: 548c2f67c12a84f42db0f3a9d2170629a4f4884f
+  auto_revert_commit: c8694138cfc9ec2b034bfca69529ba99801f741f
+  rollback_ref: c2407ca32e371cc3782ab242a93a9e6e793aa54f
+  candidate: mmo-2026-04-21-002
+  regression_metric: wall_clock_ms (+100% vs baseline)
+  threshold_pct: 0.10
+  regression_watch_fired: true
+  path: "regression_watch -> closure_gate -> auto_revert_callback"
+  callback_binding: "DirectCommitAdapter.rollback (bound method)"
+proof_integrity:
+  manual_revert_used: false
+  mock_callback_used: false
+  synthetic_closure_used: false
+suites:
+  - target: tests/meta_meta/test_rollback_realism_e2e.py
+    passed: 10
+  - target: tests/meta_meta/
+    passed: 69
+  - target: hive/lib/meta-experiment/tests/
+    passed: 64
+    subtests: 8
+addresses_escalation: rollback-realism-proof-ambiguity

@@ -1,0 +1,36 @@
+story: C2.3
+phase: fix-pass
+date: 2026-04-21
+reviewer_verdict: needs_revision
+findings_addressed:
+  - id: C-1
+    severity: critical
+    description: "jq // true falsely flips codex_gap on populated rows"
+    files:
+      - hooks/metrics-token-capture.sh
+    sites:
+      - line: ~299  # MAIN_STATS GAP extraction
+      - line: ~325  # per-subagent STATS GAP extraction
+    fix: "Replaced `.codex_gap // true` with `if has(\"codex_gap\") then .codex_gap else true end` at both call sites"
+
+  - id: C-2
+    severity: critical
+    description: "agent emitted under dimensions instead of top-level"
+    files:
+      - hooks/metrics-token-capture.sh
+    fix: "Moved `agent: $agent` to top-level in _emit_agent_row jq template; removed from dimensions object"
+
+  - id: I-1
+    severity: improvement
+    description: "Pin exact token totals and assert codex_gap=false on populated rows"
+    files:
+      - tests/meta-improvement-system/metrics/token-capture.test.sh
+    fix: >
+      Added exact-value assertions for ORC_VAL=530 and DEV_VAL=175.
+      Added codex_gap=false assertion on ORC_ROW.
+      Updated all .dimensions.agent selectors to .agent (tests b, e, f).
+
+test_results:
+  before: 18 passed  # prior passing count (original commit)
+  after: 18 passed
+  new_assertions_added: 3  # exact totals x2 + codex_gap=false

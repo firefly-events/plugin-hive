@@ -1,0 +1,62 @@
+story_id: C2.4
+epic: meta-improvement-system
+slice: S5
+phase: integrate
+status: complete
+branch: hive-C2.4
+date: 2026-04-21
+
+files_produced:
+  - hooks/metrics-agent-spawn.sh
+  - tests/meta-improvement-system/metrics/agent-spawn-emission.test.sh
+
+spawn_owner_surface: hooks/metrics-agent-spawn.sh
+# Caller sources this helper at agent-spawn entrypoints and passes env vars.
+# No existing entrypoint was modified — the helper is a standalone call-site.
+
+event_fields_emitted:
+  required:
+    - event_id       # evt_<ts>_spawn_<agent>_<ns>
+    - timestamp      # ISO-8601 UTC
+    - run_id         # correlates with Stop-hook totals (C2.2) and fix-loop events (C2.5)
+    - metric_type    # wall_clock_ms (spawn event carries 0ms; actual timing tracked by C2.3)
+    - value          # 0 (placeholder at spawn time)
+    - unit           # ms
+    - dimensions     # {agent_persona, phase?}
+    - source         # "agent-spawn-report"
+  conditional:
+    - story_id       # present when spawning for a story
+    - proposal_id    # present when spawning for a proposal (XOR story_id)
+  optional:
+    - swarm_id
+    - phase
+    - agent
+
+correlation_design: |
+  run_id groups spawn events with Stop-hook session totals (C2.2) and fix-loop
+  events (C2.5). story_id/proposal_id lets baseline-vs-candidate and
+  run-over-run B0 queries slice spawn activity by story or proposal.
+  dimensions.agent_persona supports per-persona spawn analysis without adding
+  a top-level field outside the approved schema list.
+
+test_results:
+  total: 21
+  passed: 21
+  failed: 0
+  cases:
+    - flag-off no-write
+    - flag-on event file created
+    - event row valid JSON
+    - all 8 required schema fields present
+    - source = agent-spawn-report
+    - metric_type in MVP registry
+    - exactly one of story_id/proposal_id
+    - correlation fields run_id/story_id/agent/swarm_id/phase
+    - dimensions.agent_persona
+    - proposal_id path story_id absent
+
+ac_coverage:
+  ac1: "spawn path + enabled=true → schema-valid event written (test b)"
+  ac2: "enabled=false → no write (test a)"
+  ac3: "correlation fields run_id/story_id/agent/swarm_id carried (test c)"
+  ac4: "no story-total or fix-loop fields emitted (by design — value=0, source=agent-spawn-report only)"

@@ -49,10 +49,24 @@ Check if `.pHive/meta-team/cycle-state.yaml` exists.
 - If it exists AND `status: closed` or `status: aborted`: prior cycle completed normally. Note findings for reference.
 - If it does not exist: first run.
 
-### 4. Assign cycle ID
+### 4. Baseline availability check (BL2.3)
+
+Before declaring the boot report complete, verify baseline metrics are available for the cycle via `hive/lib/meta-experiment/baseline.py` and `hive/lib/metrics`.
+
+- Use `hive.lib.metrics.read_run_events({prior_run_id})` to inspect the prior run's recorded events.
+- If events exist for at least one MVP metric type (`tokens`, `wall_clock_ms`, `fix_loop_iterations`, `first_attempt_pass`, `human_escalation`):
+  - record `baseline_available: true` in the boot report
+- Otherwise:
+  - record `baseline_available: false` in the boot report
+  - emit the actionable stop-message: `BL2.3: baseline capture prerequisites missing (no metric events for run_id=<id>). Stop cycle after boot. No implementation work may begin.`
+  - return `boot_report` with `status: stop_no_baseline` and HALT
+
+This check aligns with the BL2.2/BL2.3 stop condition and ensures later baseline capture can call `hive.lib.meta_experiment.baseline.capture_from_run()` or `capture_and_persist()` against a run with usable `hive.lib.metrics.read_run_events(...)` data.
+
+### 5. Assign cycle ID
 Generate a cycle ID in the format `meta-YYYY-MM-DD` using today's date. If today's date already exists in the ledger (cycle already ran today), append `-r2`, `-r3`, etc.
 
-### 5. Initialize cycle-state.yaml
+### 6. Initialize cycle-state.yaml
 Write `.pHive/meta-team/cycle-state.yaml` with:
 ```yaml
 cycle_id: {cycle-id}
@@ -68,7 +82,7 @@ changes: []
 findings: []
 ```
 
-### 6. Produce boot report
+### 7. Produce boot report
 ```
 ## Boot Report
 
@@ -77,6 +91,7 @@ Started: {timestamp}
 Charter loaded: yes
 Prior cycles: {count}
 Last cycle: {id} — {outcome}
+Baseline available: {true|false}
 Status: ready to analyze
 ```
 
@@ -85,6 +100,7 @@ Status: ready to analyze
 - [ ] Charter read and constraints extracted
 - [ ] Ledger read (or noted as absent on first run)
 - [ ] Any crashed prior cycle marked as aborted
+- [ ] Baseline availability checked before the boot report is finalized
 - [ ] Cycle ID assigned following naming convention
 - [ ] `.pHive/meta-team/cycle-state.yaml` written with `status: running`
 - [ ] Boot report produced
@@ -94,6 +110,7 @@ Status: ready to analyze
 - Charter does not exist: STOP. Do not proceed without constraints. Create the charter from `hive/references/meta-team-nightly-cycle.md`.
 - Ledger is corrupt YAML: log the parse error, continue with empty history (don't halt cycle).
 - Cycle-state.yaml has unknown status: treat as aborted, log warning, continue.
+- Baseline prerequisites missing: emit `status: stop_no_baseline`, include the BL2.3 stop-message, and halt after boot.
 
 ## NEXT STEP
 

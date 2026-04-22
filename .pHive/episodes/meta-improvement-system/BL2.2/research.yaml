@@ -1,0 +1,17 @@
+epic: meta-improvement-system
+story: BL2.2
+step: research
+agent: researcher
+status: passed
+started: "2026-04-22T06:05:00Z"
+completed: "2026-04-22T06:10:00Z"
+artifacts:
+  - path: .pHive/episodes/meta-improvement-system/BL2.2/research-brief.md
+    kind: research-brief
+    lines: 483
+notes: |
+  Brief traces the 8-step control plane and the shared-library handoffs.
+  Orchestrator overrode two false gaps in the developer prompt:
+  (a) step-06-evaluation.md does exist; (b) backlog at
+  .pHive/meta-team/queue-meta-meta-optimize.yaml is seeded from BL2i.1.
+  Confirmed: invocation is narrative (skill-as-runner), not programmatic.

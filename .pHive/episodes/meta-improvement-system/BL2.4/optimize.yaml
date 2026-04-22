@@ -1,0 +1,32 @@
+epic: meta-improvement-system
+story: BL2.4
+step: optimize
+agent: developer
+backend: codex
+status: passed
+started: "2026-04-22T07:00:00Z"
+completed: "2026-04-22T07:04:00Z"
+artifacts:
+  - path: hive/lib/meta-experiment/rollback_watch.py
+    change: persist rollback_result to envelope via final set_regression_watch; docstring failure-path note; naive datetime guard in arm_watch
+  - path: hive/lib/meta-experiment/tests/test_rollback_watch.py
+    change: accept persisted rollback_result payload
+  - path: tests/meta_meta/test_rollback_watch_activation.py
+    change: strengthened AC2 test to assert rollback_result on disk; added naive-datetime test
+added_tests:
+  - test_arm_watch_rejects_naive_datetime
+suites:
+  - target: tests/meta_meta/test_rollback_watch_activation.py
+    passed: 10
+  - target: tests/meta_meta/
+    passed: 52
+    subtests: 3
+  - target: hive/lib/meta-experiment/tests/
+    passed: 64
+    subtests: 8
+fixes_applied:
+  F1_rollback_result_persisted: true
+  F2_docstring_failure_path: true
+  F3_naive_datetime_guard: true
+verdict: optimizations_applied
+codex_agent_id: a3adc53fd8d8db61e

@@ -1,0 +1,35 @@
+id: C2.6
+story: Human escalation emission
+phase: integrate
+status: complete
+branch: hive-C2.6
+
+files_produced:
+  - hooks/metrics-human-escalation.sh
+  - tests/meta-improvement-system/metrics/human-escalation.test.sh
+
+escalation_owner_surface: orchestrator-escalation-path
+# Emitter is a standalone bash helper called by the orchestrator at the
+# escalation decision point; source field is hardcoded to
+# "orchestrator-escalation-path" for B0 query filtering.
+
+event_fields:
+  required: [event_id, timestamp, run_id, metric_type, value, unit, dimensions, source]
+  correlation: story_id XOR proposal_id (plus swarm_id, phase, agent as optional)
+  metric_type: human_escalation
+  value: true (boolean)
+  unit: bool
+
+gate_behavior:
+  enabled_true: emits JSONL to $metrics_dir/events/human-escalation.jsonl
+  enabled_false: silent no-op (exit 0)
+
+test_results:
+  total: 21
+  passed: 21
+  failed: 0
+
+insights:
+  - The config parser uses grep/sed to avoid yq dependency, consistent with C2.1 pattern.
+  - Flag-off silence is unconditional: even required-arg validation is skipped when disabled.
+  - dimensions carries the reason field so the schema anti-bloat rule is respected.

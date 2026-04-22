@@ -1,0 +1,56 @@
+story_id: C2.2
+episode: fix
+date: "2026-04-21"
+reviewer_verdict: needs_optimization
+findings_addressed: 6
+tests_before: 21
+tests_after: 24
+
+fixes:
+  I-1:
+    title: YAML-scope the config parser
+    file: hooks/metrics-stop-dispatch.sh
+    summary: >
+      Replaced flat regex _read_config_value with _read_metrics_config using the
+      three-tier pattern from metrics-human-escalation.sh: yq → python3 yaml.safe_load
+      → awk-scoped grep (/^metrics:/{flag=1} /^[a-zA-Z]/{flag=0}). No flat grep remains.
+
+  I-2:
+    title: Fixture test for config key collision
+    file: tests/meta-improvement-system/metrics/stop-hook-emission.test.sh
+    summary: >
+      Added test (e) with _make_fixture_with_collision: fixture config has
+      metrics.enabled: false followed by external_models.codex.enabled: true.
+      Asserts dispatcher no-ops. Locks in I-1 as regression guarantee.
+
+  I-3:
+    title: Wall-clock null vs 0 handling
+    file: hooks/metrics-stop-dispatch.sh
+    summary: >
+      Changed fallback chain to emit empty string (|| true) instead of "0" when
+      both python3 and awk fail. Wall_clock_ms row is now skipped entirely when
+      WALL_CLOCK_MS is empty, avoiding misleading zero values.
+
+  I-4:
+    title: set -e partial-write risk
+    file: hooks/metrics-stop-dispatch.sh
+    summary: >
+      Dropped set -e (kept set -uo pipefail). Per-line guards (|| exit 0) handle
+      failures at each write point. The trap 'exit 0' ERR remains as belt-and-suspenders
+      for any remaining pipefail triggers. Idempotency tests still pass.
+
+  I-5:
+    title: Test (c') real dispatcher with corrupted JSONL
+    file: tests/meta-improvement-system/metrics/stop-hook-emission.test.sh
+    summary: >
+      Added test (c') that runs the real dispatcher with a truncated mid-line +
+      malformed JSON fixture. Asserts exit 0 and sentinel preservation. Proves the
+      script's own trap guards work, not just the plugin.json || true glue.
+
+  I-6:
+    title: jq slurp vs stream comment mismatch
+    file: hooks/metrics-stop-dispatch.sh
+    summary: >
+      Corrected comment at extraction site from "Stream line-by-line; never slurp
+      full file" to "Slurp mode for aggregation across all assistant rows". Code
+      continues using jq -c -s (slurp) which is acceptable for current fixture sizes.
