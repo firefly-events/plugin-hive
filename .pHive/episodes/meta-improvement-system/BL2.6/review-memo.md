@@ -10,7 +10,7 @@
 | # | Check | Result | Evidence |
 |---|-------|--------|----------|
 | 1 | `git rev-parse --verify 548c2f67…` exits 0 AND sha in regressive commit log | **PASS** | `git rev-parse` returns the full sha; `git log --oneline -6` line 3: `548c2f6 meta-meta-exp(meta-2026-04-22-r2): archive audit note proof footer` |
-| 2 | `git rev-parse --verify c8694138…` exits 0 AND subject begins with `Revert ` | **PASS** | `git log --format=%s -1 c869413` → `Revert "meta-meta-exp(meta-2026-04-22-r2): archive audit note proof footer"` |
+| 2 | `git rev-parse --verify c8694138…` exits 0 AND subject begins with "Revert " | **PASS** | `git log --format=%s -1 c869413` → `Revert "meta-meta-exp(meta-2026-04-22-r2): archive audit note proof footer"` |
 | 3 | Revert commit appears above regressive in `git log --oneline -6`; regressive is ancestor of revert | **PASS** | Order: `bc4adaa, c869413, 548c2f6, …`; `git merge-base --is-ancestor 548c2f6 c869413` → 0; `c869413^` resolves to `548c2f6` (revert’s direct parent IS the regressive commit) |
 | 4 | `proof_integrity.manual_revert_used / mock_callback_used / synthetic_closure_used == false` | **PASS** | proof.yaml:38–40 all three are `false` |
 | 5 | `auto_revert.callback_binding == "DirectCommitAdapter.rollback (bound method)"` AND `path == "regression_watch -> closure_gate -> auto_revert_callback"` | **PASS** | proof.yaml:29–30 |

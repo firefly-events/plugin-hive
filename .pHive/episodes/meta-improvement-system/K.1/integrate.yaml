@@ -24,5 +24,5 @@ decisions_made:
   - Kept the trade-off to a single inline sentence and did not add brownfield preservation or broader backlog-fallback documentation.
 notes_for_reviewer:
   - Both kickoff owner files now reference the question `Enable metrics tracking?` and the persisted key `metrics.enabled`.
-  - `hive/hive.config.yaml` was not modified; `metrics.enabled: false` remains unchanged as the default.
+  - "`hive/hive.config.yaml` was not modified; `metrics.enabled: false` remains unchanged as the default."
   - Git staging and commit were blocked by sandbox denial on `.git/index.lock`; final report includes the exact failure and current HEAD for context.

@@ -56,12 +56,12 @@
 
 **Test 1: Interface conformance**
 - Verify concrete DirectCommitAdapter inherits PromotionAdapter and implements both methods without abstract marker.
-- Verify PromotionResult and PromotionEvidence dataclasses match the contract exactly (frozen, exact field names, __post_init__ validation).
+- Verify PromotionResult and PromotionEvidence dataclasses match the contract exactly (frozen, exact field names, `__post_init__` validation).
 
 **Test 2: Success promote (accept verdict)**
 - Given: tmp worktree with committed change on a detached HEAD, main tree at known commit.
 - When: promote(envelope with accept decision and valid candidate_ref, decision dict) is called.
-- Then: returns PromotionResult(success=True, evidence=PromotionEvidence(commit_ref=<hash>), rollback_target=<target>).
+- Then: returns `PromotionResult(success=True, evidence=PromotionEvidence(commit_ref=<hash>), rollback_target=<target>)`.
 - And: main tree HEAD has advanced to the merged commit; worktree still exists (caller removes it).
 
 **Test 3: Needs-revision discard**
@@ -103,7 +103,7 @@
 
 1. **Create `/Users/don/Documents/plugin-hive/hive/lib/meta-experiment/direct_commit_adapter.py`**
    - Import PromotionAdapter, PromotionResult, PromotionEvidence, RollbackResult from promotion_adapter.
-   - Class DirectCommitAdapter(PromotionAdapter) with __init__ accepting worktree_path and main_tree_path.
+   - Class DirectCommitAdapter(PromotionAdapter) with `__init__` accepting worktree_path and main_tree_path.
    - Implement promote(envelope, decision) and rollback(envelope, rollback_ref).
 
 2. **Git operations:**

@@ -72,7 +72,7 @@
 
 ### F7 — Subprocess hygiene check
 
-- All git calls route through `_git()` (line 36–46) which uses `check=True, capture_output=True, text=True` consistently. 
+- All git calls route through `_git()` (line 36–46) which uses `check=True, capture_output=True, text=True` consistently.
 - No user-controlled paths are interpolated without validation: `repo_path` and `worktrees_root` come from constructor; `worktree_path` is either constructor-derived or from `envelope["worktree_path"]` (caller-controlled, but orchestrator is trusted in maintainer-loop scope).
 - `candidate_ref` and `commit_ref` flow directly into `git merge`, `git cherry-pick`, `git revert`. Git commit refs are hex SHAs in practice; subprocess `args` list form prevents shell injection; risk is low but *not zero* if an attacker can control envelope fields. **This is maintainer-local scope**, so trust boundary justifies it.
 - **Recommendation:** Document the trust boundary (maintainer-only envelope construction) in the class docstring.
