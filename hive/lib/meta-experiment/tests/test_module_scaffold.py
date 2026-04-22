@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 import unittest
 from pathlib import Path
 
@@ -28,6 +29,7 @@ class MetaExperimentScaffoldTests(unittest.TestCase):
         self.assertIsNotNone(spec.loader)
 
         module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
         spec.loader.exec_module(module)
 
         self.assertEqual(str(self.init_path.resolve()), module.__file__)

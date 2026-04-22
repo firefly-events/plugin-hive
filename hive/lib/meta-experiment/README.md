@@ -25,3 +25,25 @@ Test command:
 ```bash
 python3 -m unittest discover hive/lib/meta-experiment/tests
 ```
+
+## Envelope module
+
+Purpose: lifecycle-facing wrapper over the C1 substrate envelope primitives in `hive.lib.metrics`.
+
+API:
+
+- `create`
+- `load`
+- `set_decision`
+- `set_regression_watch`
+- `set_commit_ref`
+- `set_rollback_ref`
+- `set_metrics_snapshot`
+
+Contract:
+
+- no new fields are introduced at this layer
+- narrow-mutation-only helpers route updates through `hive.lib.metrics`
+- storage is delegated to `hive.lib.metrics`; this module does not read or write envelope YAML directly
+
+Source of record for field shapes: `.pHive/metrics/experiment-envelope.schema.md`

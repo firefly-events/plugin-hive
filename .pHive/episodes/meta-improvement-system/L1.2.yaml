@@ -1,0 +1,24 @@
+story: L1.2
+epic: meta-improvement-system
+slice: S7
+status: passed
+steps:
+  - id: implement
+    agent: codex:codex-rescue
+    status: success
+    artifacts:
+      - hive/lib/meta-experiment/envelope.py
+      - hive/lib/meta-experiment/__init__.py
+      - hive/lib/meta-experiment/README.md
+      - hive/lib/meta-experiment/tests/test_envelope.py
+      - hive/lib/meta-experiment/tests/test_module_scaffold.py
+  - id: test
+    status: success
+    artifacts:
+      - "python3 -m unittest discover hive/lib/meta-experiment/tests: 10 tests, OK"
+  - id: review
+    agent: reviewer (opus)
+    status: passed
+    notes: |
+      Thin pass-through wrapper: each set_* helper routes through update_envelope with
+      exactly one field; substrate owns validation. No scope leak, all 10 tests pass.
