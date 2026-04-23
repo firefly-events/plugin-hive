@@ -8,6 +8,7 @@ as PR-shaped artifacts rather than direct mutations of the target branch.
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import subprocess
 from typing import Any
 
@@ -178,14 +179,13 @@ class PrPromotionAdapter(PromotionAdapter):
 
         try:
             _git(self.repo_path, *args)
-        except subprocess.CalledProcessError as error:
+        except subprocess.CalledProcessError:
             if not worktree_path.exists():
                 return
             if not force:
                 self._remove_worktree(worktree_path, force=True)
                 return
-            stderr = (error.stderr or "").lower()
-            if "does not exist" in stderr or "not found" in stderr or "not a working tree" in stderr:
+            if not self._worktree_is_registered(worktree_path):
                 return
             raise
 
@@ -209,7 +209,7 @@ class PrPromotionAdapter(PromotionAdapter):
         return pr_ref.rsplit("#", 1)[1].strip() or None
 
     def _pr_branch_ref(self, experiment_id: str) -> str:
-        sanitized = experiment_id.replace(" ", "-")
+        sanitized = self._sanitize_experiment_id(experiment_id)
         return f"meta-improvement/pr/{sanitized}"
 
     def _pr_ref(self, pr_branch_ref: str) -> str:
@@ -220,3 +220,27 @@ class PrPromotionAdapter(PromotionAdapter):
     def _stderr_reason(self, error: subprocess.CalledProcessError, fallback: str) -> str:
         stderr = (error.stderr or "").strip()
         return stderr or fallback
+
+    def _sanitize_experiment_id(self, experiment_id: str) -> str:
+        sanitized = experiment_id.replace(" ", "-")
+        sanitized = "".join(ch for ch in sanitized if ch.isprintable() and ord(ch) >= 32)
+        for token in ("..", "~", "^", ":", "?", "*", "[", "\\"):
+            sanitized = sanitized.replace(token, "-")
+        while sanitized.endswith(".lock"):
+            sanitized = sanitized[: -len(".lock")]
+        sanitized = re.sub(r"/+", "/", sanitized)
+        sanitized = sanitized.strip("./")
+        if not sanitized:
+            raise ValueError("experiment_id is empty after sanitization")
+        return sanitized
+
+    def _worktree_is_registered(self, worktree_path: Path) -> bool:
+        registered_path = worktree_path.resolve()
+        porcelain = _git(self.repo_path, "worktree", "list", "--porcelain")
+        for line in porcelain.splitlines():
+            if not line.startswith("worktree "):
+                continue
+            listed_path = Path(line.removeprefix("worktree ").strip()).resolve()
+            if listed_path == registered_path:
+                return True
+        return False

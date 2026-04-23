@@ -6,14 +6,17 @@ import subprocess
 import sys
 from typing import Any
 
+import yaml
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+MODULE_REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = MODULE_REPO_ROOT
+
+_META_EXPERIMENT = None
 
 
 def _load_meta_experiment():
-    module_dir = REPO_ROOT / "hive/lib/meta-experiment"
+    original_sys_path = list(sys.path)
+    module_dir = MODULE_REPO_ROOT / "hive/lib/meta-experiment"
     init_path = module_dir / "__init__.py"
     spec = importlib.util.spec_from_file_location(
         "hive.lib.meta_experiment",
@@ -22,17 +25,39 @@ def _load_meta_experiment():
     )
     if spec is None or spec.loader is None:
         raise RuntimeError("failed to build import spec for meta-experiment package")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    try:
+        if str(MODULE_REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(MODULE_REPO_ROOT))
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        sys.path[:] = original_sys_path
 
 
-META_EXPERIMENT = _load_meta_experiment()
-PrPromotionAdapter = META_EXPERIMENT.PrPromotionAdapter
-baseline = META_EXPERIMENT.baseline
-closure_validator = META_EXPERIMENT.closure_validator
-compare = META_EXPERIMENT.compare
+def _get_meta_experiment():
+    global _META_EXPERIMENT
+    if _META_EXPERIMENT is None:
+        _META_EXPERIMENT = _load_meta_experiment()
+    return _META_EXPERIMENT
+
+
+def _get_export(name: str):
+    missing = object()
+    value = globals().get(name, missing)
+    if value is not missing:
+        return value
+    module = _get_meta_experiment()
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
+
+
+def __getattr__(name: str):
+    if name in {"PrPromotionAdapter", "PromotionFailure", "baseline", "closure_validator", "compare"}:
+        return _get_export(name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def resolve_target_project() -> Path:
@@ -48,16 +73,13 @@ def resolve_target_project() -> Path:
 
 
 def read_kickoff_metrics_state(target_project: Path) -> bool:
-    # Kickoff/runtime docs currently split between the root consumer override and
-    # the shipped fallback config, so read both and prefer the root override.
     target_root = Path(target_project).resolve()
-    for config_path in (target_root / "hive.config.yaml", target_root / "hive/hive.config.yaml"):
-        config = _load_yaml_file(config_path)
-        enabled = _nested_get(config, "metrics", "enabled")
-        if isinstance(enabled, bool):
-            return enabled
-        if isinstance(enabled, str) and enabled.strip():
-            return enabled.strip().lower() == "true"
+    config = _load_yaml_file(target_root / "hive.config.yaml")
+    enabled = _nested_get(config, "metrics", "enabled")
+    if isinstance(enabled, bool):
+        return enabled
+    if isinstance(enabled, str) and enabled.strip():
+        return enabled.strip().lower() == "true"
     return False
 
 
@@ -80,6 +102,11 @@ def select_backlog_candidate(candidates: list[dict[str, Any]]) -> dict[str, Any]
 def run_public_cycle(target_project: Path) -> dict[str, Any]:
     target_root = Path(target_project).resolve()
     _assert_clean_git_repo(target_root)
+    compare_module = _get_export("compare")
+    baseline_module = _get_export("baseline")
+    closure_validator_module = _get_export("closure_validator")
+    adapter_cls = _get_export("PrPromotionAdapter")
+    promotion_failure_cls = _get_export("PromotionFailure")
 
     metrics_enabled = read_kickoff_metrics_state(target_root)
     backlog_candidates = load_backlog_candidates(target_root)
@@ -112,8 +139,8 @@ def run_public_cycle(target_project: Path) -> dict[str, Any]:
     if not candidate_metrics:
         raise RuntimeError("candidate metrics are unavailable for the public cycle")
 
-    threshold_pct = _coerce_threshold(meta_config.get("threshold_pct"), default=0.10)
-    compare_result = compare.evaluate(baseline_metrics, candidate_metrics, threshold_pct)
+    threshold_pct = _coerce_threshold(meta_config.get("threshold_pct"), default=10.0)
+    compare_result = compare_module.evaluate(baseline_metrics, candidate_metrics, threshold_pct)
     promotion_verdict = "pass" if compare_result["verdict"] == "accept" else "needs_revision"
 
     experiment_id = _string_value(meta_config.get("experiment_id")) or f"meta-optimize-{target_root.name}"
@@ -126,8 +153,35 @@ def run_public_cycle(target_project: Path) -> dict[str, Any]:
         "promotion_mode": "pr",
     }
 
-    adapter = PrPromotionAdapter(repo_path=target_root)
-    promotion = adapter.promote(envelope, {"verdict": promotion_verdict})
+    adapter = adapter_cls(repo_path=target_root)
+    try:
+        promotion = adapter.promote(envelope, {"verdict": promotion_verdict})
+    except promotion_failure_cls as error:
+        rollback_ref = getattr(error, "rollback_ref", None)
+        rollback_target = getattr(error, "rollback_target", None)
+        close_record = {
+            "experiment_id": experiment_id,
+            "decision": "reject",
+            "pr_ref": None,
+            "pr_state": None,
+            "rollback_ref": rollback_ref or rollback_target,
+            "rollback_target": rollback_target,
+            "baseline_metrics": baseline_metrics,
+            "candidate_metrics": candidate_metrics,
+            "metrics_snapshot": candidate_metrics,
+        }
+        closure_validator_module.validate_closable(close_record)
+        return {
+            "target_project": str(target_root),
+            "kickoff_metrics_enabled": metrics_enabled,
+            "mode": "rejected",
+            "proposal_source": proposal_source,
+            "selected_candidate": selected_candidate,
+            "compare_result": compare_result,
+            "close_record": close_record,
+            "adapter": type(adapter).__name__,
+            "failure_reason": getattr(error, "reason", str(error)),
+        }
 
     close_record = {
         "experiment_id": experiment_id,
@@ -140,7 +194,7 @@ def run_public_cycle(target_project: Path) -> dict[str, Any]:
         "candidate_metrics": candidate_metrics,
         "metrics_snapshot": candidate_metrics,
     }
-    closure_validator.validate_closable(close_record)
+    closure_validator_module.validate_closable(close_record)
 
     return {
         "target_project": str(target_root),
@@ -157,7 +211,7 @@ def run_public_cycle(target_project: Path) -> dict[str, Any]:
 def _load_baseline_metrics(meta_config: dict[str, Any]) -> dict[str, Any]:
     prior_run_id = _string_value(meta_config.get("prior_run_id"))
     if prior_run_id:
-        snapshot = baseline.capture_from_run(prior_run_id)
+        snapshot = _get_export("baseline").capture_from_run(prior_run_id)
         if isinstance(snapshot, dict):
             snapshot_metrics = _coerce_metric_dict(snapshot.get("metrics"))
             if snapshot_metrics:
@@ -216,131 +270,8 @@ def _string_value(value: Any) -> str | None:
 def _load_yaml_file(path: Path) -> dict[str, Any]:
     if not path.is_file():
         return {}
-    parsed = _parse_simple_yaml(path.read_text(encoding="utf-8"))
+    parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
     return parsed if isinstance(parsed, dict) else {}
-
-
-def _parse_simple_yaml(text: str) -> Any:
-    lines = []
-    for raw_line in text.splitlines():
-        stripped = raw_line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        lines.append(raw_line.rstrip())
-    if not lines:
-        return {}
-    parsed, next_index = _parse_block(lines, 0, _line_indent(lines[0]))
-    if next_index != len(lines):
-        raise ValueError("unparsed yaml content remains")
-    return parsed
-
-
-def _parse_block(lines: list[str], index: int, indent: int) -> tuple[Any, int]:
-    if _content(lines[index]).startswith("- "):
-        return _parse_list(lines, index, indent)
-    return _parse_mapping(lines, index, indent)
-
-
-def _parse_mapping(lines: list[str], index: int, indent: int) -> tuple[dict[str, Any], int]:
-    result: dict[str, Any] = {}
-    cursor = index
-    while cursor < len(lines):
-        line = lines[cursor]
-        current_indent = _line_indent(line)
-        if current_indent < indent:
-            break
-        if current_indent > indent:
-            raise ValueError(f"unexpected indentation at line: {line}")
-        body = _content(line)
-        if body.startswith("- "):
-            break
-        key, _, remainder = body.partition(":")
-        key = key.strip()
-        remainder = remainder.strip()
-        cursor += 1
-        if remainder:
-            result[key] = _parse_scalar(remainder)
-            continue
-        if cursor >= len(lines):
-            result[key] = {}
-            continue
-        next_indent = _line_indent(lines[cursor])
-        if next_indent <= indent and not _content(lines[cursor]).startswith("- "):
-            result[key] = {}
-            continue
-        child_indent = next_indent if next_indent > indent else indent
-        child, cursor = _parse_block(lines, cursor, child_indent)
-        result[key] = child
-    return result, cursor
-
-
-def _parse_list(lines: list[str], index: int, indent: int) -> tuple[list[Any], int]:
-    items: list[Any] = []
-    cursor = index
-    while cursor < len(lines):
-        line = lines[cursor]
-        current_indent = _line_indent(line)
-        if current_indent < indent:
-            break
-        if current_indent != indent:
-            raise ValueError(f"unexpected indentation at line: {line}")
-        body = _content(line)
-        if not body.startswith("- "):
-            break
-        entry = body[2:].strip()
-        cursor += 1
-        if not entry:
-            child, cursor = _parse_block(lines, cursor, _line_indent(lines[cursor]))
-            items.append(child)
-            continue
-        if ":" in entry:
-            key, _, remainder = entry.partition(":")
-            item: dict[str, Any] = {key.strip(): _parse_scalar(remainder.strip()) if remainder.strip() else {}}
-            if cursor < len(lines) and _line_indent(lines[cursor]) > indent:
-                child, cursor = _parse_block(lines, cursor, _line_indent(lines[cursor]))
-                if isinstance(child, dict):
-                    existing = item.get(key.strip())
-                    if existing == {}:
-                        item[key.strip()] = child
-                    else:
-                        item.update(child)
-                else:
-                    raise ValueError("list item child must be a mapping")
-            items.append(item)
-            continue
-        items.append(_parse_scalar(entry))
-    return items, cursor
-
-
-def _parse_scalar(value: str) -> Any:
-    if value in {"[]", "{}"}:
-        return [] if value == "[]" else {}
-    lowered = value.lower()
-    if lowered == "true":
-        return True
-    if lowered == "false":
-        return False
-    if lowered in {"null", "none"}:
-        return None
-    if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
-        return value[1:-1]
-    try:
-        return int(value)
-    except ValueError:
-        pass
-    try:
-        return float(value)
-    except ValueError:
-        pass
-    return value
-
-
-def _line_indent(line: str) -> int:
-    return len(line) - len(line.lstrip(" "))
-
-
-def _content(line: str) -> str:
-    return line.lstrip(" ")
 
 
 __all__ = [

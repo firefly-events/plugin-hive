@@ -20,6 +20,11 @@ def _load_frontmatter(text: str) -> dict:
     return data
 
 
+def _skill_body(text: str) -> str:
+    _, body = re.split(r"^---\n.*?\n---\n", text, maxsplit=1, flags=re.DOTALL)
+    return body
+
+
 def test_meta_optimize_skill_exists_and_has_expected_name() -> None:
     assert SKILL_PATH.is_file()
 
@@ -39,7 +44,7 @@ def test_plugin_manifest_does_not_reference_maintainer_skills() -> None:
 
 def test_skill_body_excludes_maintainer_only_surface_and_adapter_terms() -> None:
     content = SKILL_PATH.read_text(encoding="utf-8")
-    _, body = re.split(r"^---\n.*?\n---\n", content, maxsplit=1, flags=re.DOTALL)
+    body = _skill_body(content)
 
     assert "/meta-meta-optimize" not in body
     assert "DirectCommitAdapter" not in body
@@ -47,7 +52,7 @@ def test_skill_body_excludes_maintainer_only_surface_and_adapter_terms() -> None
 
 def test_skill_body_includes_public_pr_and_prerequisite_language() -> None:
     content = SKILL_PATH.read_text(encoding="utf-8")
-    _, body = re.split(r"^---\n.*?\n---\n", content, maxsplit=1, flags=re.DOTALL)
+    body = _skill_body(content)
 
     assert ("PR" in body) or ("pull request" in body)
     assert "metrics" in body

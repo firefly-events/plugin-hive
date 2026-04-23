@@ -4,16 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from tests.meta_optimize.test_public_orchestration import (
-    _git,
-    _init_repo,
-    _load_meta_experiment,
-    _load_module,
-    _write_yaml,
-)
+from tests.meta_optimize._helpers import ROOT, _git, _init_repo, _load_meta_experiment, _load_module, _write_yaml
 
 
-ROOT = Path(__file__).resolve().parents[2]
 QUEUE_PATH = ROOT / ".pHive/meta-team/queue-meta-optimize.yaml"
 SKILL_PATH = ROOT / "skills/hive/skills/meta-optimize/SKILL.md"
 

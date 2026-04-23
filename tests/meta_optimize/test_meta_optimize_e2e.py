@@ -11,10 +11,9 @@ from pathlib import Path
 
 import yaml
 
-from tests.meta_optimize.test_public_orchestration import _git, _init_repo, _load_module, _write_yaml
+from tests.meta_optimize._helpers import ROOT, _git, _init_repo, _load_module, _write_yaml
 
 
-ROOT = Path(__file__).resolve().parents[2]
 AUDIT_ROOT = ROOT / ".pHive/audits/mvs-proof"
 RUN_PATH = ROOT / "skills/hive/skills/meta-optimize/run.py"
 

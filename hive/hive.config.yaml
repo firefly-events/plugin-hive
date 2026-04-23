@@ -164,16 +164,6 @@ meta_team:
                              # when false, meta-team only optimizes locally
                              # when true, out-of-scope plugin issues are filed as GitHub issues
 
-# Public `/meta-optimize` config
-# No extra consumer configuration is required today beyond `paths.target_project`
-# and the kickoff-managed `metrics.enabled` opt-in above. Keep this block
-# commented out until a public runtime key ships.
-# meta_optimize:
-#   # TODO: add public settings only when a shipped runtime option exists.
-#   # Maintainer-only forwarding defaults remain internal until explicitly
-#   # promoted to the consumer surface.
-#   github_forwarding: false
-
 # Planning settings
 planning:
   collaborative_review: true   # set to false to skip collaborative review gates

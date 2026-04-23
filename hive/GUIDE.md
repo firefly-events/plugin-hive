@@ -72,6 +72,12 @@ selects from eligible entries when fallback is needed.
 `/meta-meta-optimize` remains maintainer-local only. It is not a shipped public
 consumer command.
 
+No public `meta_optimize:` config block is shipped in `hive.config.yaml` yet.
+Reviewers looking for the future config shape should treat
+`skills/hive/skills/meta-optimize/SKILL.md` and
+`hive/references/meta-optimize-contract.md` as the current source of truth
+until a runtime key is promoted into the public config surface.
+
 ---
 
 ## Daily Operations

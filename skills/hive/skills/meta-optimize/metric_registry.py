@@ -9,12 +9,14 @@ from __future__ import annotations
 
 from typing import Any
 
-KNOWN_DIMENSIONS = (
+KNOWN_DIMENSIONS = frozenset(
+    {
     "tokens",
     "wall_clock_ms",
     "fix_loop_iterations",
     "first_attempt_pass",
     "human_escalation",
+    }
 )
 
 
@@ -38,6 +40,9 @@ def normalize_dimensions(raw_metrics: list[dict[str, Any]] | dict[str, Any]) -> 
     for name, value in items:
         if not isinstance(name, str) or not name:
             continue
+        # Reserve the synthetic output key so caller input cannot clobber it.
+        if name == "skipped_dimensions":
+            raise ValueError("skipped_dimensions is reserved for normalization output")
         if is_known_dimension(name):
             normalized[name] = value
             continue

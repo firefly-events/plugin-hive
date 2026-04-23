@@ -86,8 +86,20 @@ class ClosureValidatorTests(unittest.TestCase):
         self.assertIsNone(self.validate_closable(envelope))
         self.assertTrue(self.is_closable(envelope))
 
+    def test_pr_ref_without_pr_state_raises_missing_evidence(self) -> None:
+        envelope = self._close_envelope(commit_ref=None, pr_ref="pr:42", pr_state=None)
+
+        with self.assertRaises(self.MissingEvidenceError):
+            self.validate_closable(envelope)
+
     def test_direct_commit_reject_record_is_closable(self) -> None:
         envelope = self._close_envelope(decision="reject")
+
+        self.assertIsNone(self.validate_closable(envelope))
+        self.assertTrue(self.is_closable(envelope))
+
+    def test_reject_record_without_evidence_is_closable(self) -> None:
+        envelope = self._close_envelope(decision="reject", commit_ref=None, rollback_ref="rollback:reject")
 
         self.assertIsNone(self.validate_closable(envelope))
         self.assertTrue(self.is_closable(envelope))

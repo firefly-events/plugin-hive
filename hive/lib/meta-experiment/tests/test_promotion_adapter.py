@@ -24,7 +24,7 @@ class PromotionAdapterContractTests(unittest.TestCase):
                 if variant == "commit":
                     evidence = self._evidence_cls(commit_ref=decision["ref"])
                 else:
-                    evidence = self._evidence_cls(pr_ref=decision["ref"])
+                    evidence = self._evidence_cls(pr_ref=decision["ref"], pr_state="open")
                 return self._promotion_result_cls(
                     success=decision["success"],
                     evidence=evidence,
@@ -61,10 +61,11 @@ class PromotionAdapterContractTests(unittest.TestCase):
         self.assertIsNone(evidence.pr_ref)
 
     def test_promotion_evidence_accepts_pr_reference(self) -> None:
-        evidence = self.PromotionEvidence(pr_ref="pr:42")
+        evidence = self.PromotionEvidence(pr_ref="pr:42", pr_state="open")
 
         self.assertIsNone(evidence.commit_ref)
         self.assertEqual("pr:42", evidence.pr_ref)
+        self.assertEqual("open", evidence.pr_state)
 
     def test_promotion_evidence_rejects_both_references_missing(self) -> None:
         with self.assertRaises(ValueError):

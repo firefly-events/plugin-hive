@@ -35,6 +35,7 @@ def _git(cwd: Path, *args: str) -> str:
 
 
 def _init_repo(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     _git(path.parent, "init", str(path))
     _git(path, "config", "user.email", "tests@example.com")
     _git(path, "config", "user.name", "Plugin Hive Tests")
@@ -139,8 +140,40 @@ def test_pr_adapter_satisfies_shared_promotion_adapter_contract(tmp_path: Path) 
     adapter = PrPromotionAdapter(repo)
 
     assert isinstance(adapter, PromotionAdapter)
-    assert callable(getattr(adapter, "promote"))
-    assert callable(getattr(adapter, "rollback"))
+    assert callable(adapter.promote)
+    assert callable(adapter.rollback)
+
+
+@pytest.mark.parametrize(
+    ("experiment_id", "expected_branch"),
+    [
+        ("exp with space", "meta-improvement/pr/exp-with-space"),
+        ("exp..dots", "meta-improvement/pr/exp-dots"),
+        ("exp.lock", "meta-improvement/pr/exp"),
+        ("exp~tilde", "meta-improvement/pr/exp-tilde"),
+    ],
+)
+def test_pr_branch_ref_sanitizes_invalid_git_ref_sequences(
+    tmp_path: Path,
+    experiment_id: str,
+    expected_branch: str,
+) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+
+    adapter = PrPromotionAdapter(repo)
+
+    assert adapter._pr_branch_ref(experiment_id) == expected_branch
+
+
+def test_pr_branch_ref_rejects_empty_after_sanitization(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+
+    adapter = PrPromotionAdapter(repo)
+
+    with pytest.raises(ValueError, match="empty after sanitization"):
+        adapter._pr_branch_ref(".lock")
 
 
 def test_direct_mutation_request_raises_instead_of_falling_back(tmp_path: Path) -> None:

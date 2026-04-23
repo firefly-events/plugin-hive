@@ -218,8 +218,7 @@ Close records on the public path use PR-shaped evidence. Rely on `closure_valida
 - `hive/references/meta-optimize-contract.md`
 - `hive/references/state-boundary.md`
 - `hive/references/meta-experiment-isolation.md`
-
-Maintainer note: regenerate the canonical BL3.6 MVS proof with `HIVE_WRITE_MVS_PROOF=1 pytest tests/meta_optimize/test_meta_optimize_e2e.py`.
+- Maintainer-only procedures live in `hive/references/meta-optimize-maintainer.md`
 - `hive/workflows/meta-team-cycle.workflow.yaml`
 - `hive/workflows/steps/meta-team-cycle/step-01-boot.md`
 - `hive/workflows/steps/meta-team-cycle/step-02-analysis.md`

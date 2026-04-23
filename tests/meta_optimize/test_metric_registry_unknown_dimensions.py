@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -88,36 +86,39 @@ def test_is_known_dimension_matches_mvp_set_only() -> None:
     assert registry.is_known_dimension("custom_latency_p95") is False
 
 
-def test_capture_from_run_tolerates_unknown_metric_dimensions() -> None:
+def test_capture_from_run_tolerates_unknown_metric_dimensions(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     meta_experiment = _load_meta_experiment()
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        metrics_root = Path(temp_dir) / ".pHive" / "metrics"
-        events_dir = metrics_root / "events"
-        events_dir.mkdir(parents=True, exist_ok=True)
-        prior_metrics_root = os.environ.get("METRICS_ROOT")
-        os.environ["METRICS_ROOT"] = str(metrics_root)
-        try:
-            run_id = "run_unknown_metric"
-            rows = [
-                _event(run_id, "evt_001", "tokens", 100, "tokens"),
-                _event(run_id, "evt_002", "custom_latency_p95", 44, "ms"),
-                _event(run_id, "evt_003", "first_attempt_pass", True, "bool"),
-            ]
-            with (events_dir / f"{run_id}.jsonl").open("w", encoding="utf-8") as handle:
-                for row in rows:
-                    handle.write(json.dumps(row, sort_keys=True))
-                    handle.write("\n")
+    metrics_root = tmp_path / ".pHive" / "metrics"
+    events_dir = metrics_root / "events"
+    events_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("METRICS_ROOT", str(metrics_root))
 
-            snapshot = meta_experiment.baseline.capture_from_run(run_id)
-        finally:
-            if prior_metrics_root is None:
-                os.environ.pop("METRICS_ROOT", None)
-            else:
-                os.environ["METRICS_ROOT"] = prior_metrics_root
+    run_id = "run_unknown_metric"
+    rows = [
+        _event(run_id, "evt_001", "tokens", 100, "tokens"),
+        _event(run_id, "evt_002", "custom_latency_p95", 44, "ms"),
+        _event(run_id, "evt_003", "first_attempt_pass", True, "bool"),
+    ]
+    with (events_dir / f"{run_id}.jsonl").open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, sort_keys=True))
+            handle.write("\n")
+
+    snapshot = meta_experiment.baseline.capture_from_run(run_id)
 
     assert snapshot is not None
     assert snapshot["metrics"] == {"tokens": 100, "first_attempt_pass": True}
+
+
+def test_normalize_dimensions_rejects_reserved_skipped_dimensions_key() -> None:
+    registry = _load_registry_module()
+
+    with pytest.raises(ValueError, match="reserved"):
+        registry.normalize_dimensions({"skipped_dimensions": 3})
 
 
 def test_compare_evaluate_handles_mixed_known_and_unknown_metrics() -> None:

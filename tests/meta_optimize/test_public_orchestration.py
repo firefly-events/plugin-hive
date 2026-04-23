@@ -1,71 +1,21 @@
 from __future__ import annotations
 
-import importlib.util
 from pathlib import Path
-import subprocess
-import sys
 
 import pytest
-import yaml
+
+from tests.meta_optimize._helpers import (
+    ROOT,
+    RUN_PATH,
+    _git,
+    _init_repo,
+    _load_meta_experiment,
+    _load_module,
+    _write_yaml,
+)
 
 
-ROOT = Path(__file__).resolve().parents[2]
-RUN_PATH = ROOT / "skills/hive/skills/meta-optimize/run.py"
 SKILL_PATH = ROOT / "skills/hive/skills/meta-optimize/SKILL.md"
-
-
-def _load_module():
-    module_name = "tests.meta_optimize._meta_optimize_run"
-    spec = importlib.util.spec_from_file_location(module_name, RUN_PATH)
-    if spec is None or spec.loader is None:
-        raise RuntimeError("failed to load meta-optimize run.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-def _load_meta_experiment():
-    module_name = "tests.meta_optimize._meta_experiment"
-    module_dir = ROOT / "hive/lib/meta-experiment"
-    spec = importlib.util.spec_from_file_location(
-        module_name,
-        module_dir / "__init__.py",
-        submodule_search_locations=[str(module_dir)],
-    )
-    if spec is None or spec.loader is None:
-        raise RuntimeError("failed to load meta-experiment package")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-def _write_yaml(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
-
-
-def _git(cwd: Path, *args: str) -> str:
-    completed = subprocess.run(
-        ["git", *args],
-        cwd=cwd,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return completed.stdout.strip()
-
-
-def _init_repo(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-    _git(path.parent, "init", str(path))
-    _git(path, "config", "user.email", "tests@example.com")
-    _git(path, "config", "user.name", "Plugin Hive Tests")
-    _git(path, "checkout", "-b", "main")
-    (path / "README.md").write_text("initial\n", encoding="utf-8")
-    _git(path, "add", "README.md")
-    _git(path, "commit", "-m", "initial commit")
 
 
 def test_resolve_target_project_honors_root_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -123,7 +73,7 @@ def test_load_backlog_candidates_returns_empty_and_parses_entries(tmp_path: Path
             "schema_version": 1,
             "candidates": [
                 {
-                    "candidate_id": "mo-1",
+                    "id": "mo-1",
                     "target": "docs/guide.md",
                     "type": "doc-note",
                     "description": "Add a clarification",
@@ -137,7 +87,7 @@ def test_load_backlog_candidates_returns_empty_and_parses_entries(tmp_path: Path
     assert module.load_backlog_candidates(target_empty) == []
     assert module.load_backlog_candidates(target_with_backlog) == [
         {
-            "candidate_id": "mo-1",
+            "id": "mo-1",
             "target": "docs/guide.md",
             "type": "doc-note",
             "description": "Add a clarification",
@@ -180,7 +130,7 @@ def test_run_public_cycle_uses_pr_adapter_and_emits_closable_pr_record(
             "schema_version": 1,
             "candidates": [
                 {
-                    "candidate_id": "mo-backlog-1",
+                    "id": "mo-backlog-1",
                     "target": "README.md",
                     "type": "doc-fix",
                     "description": "Use backlog fallback when no ranked proposals exist",
@@ -226,7 +176,7 @@ def test_run_public_cycle_uses_pr_adapter_and_emits_closable_pr_record(
     close_record = result["close_record"]
 
     assert result["mode"] == "backlog_fallback"
-    assert result["selected_candidate"]["candidate_id"] == "mo-backlog-1"
+    assert result["selected_candidate"]["id"] == "mo-backlog-1"
     assert result["adapter"] == "PrPromotionAdapter"
     assert captured["prior_run_id"] == "run-001"
     assert captured["adapter_repo_path"] == target.resolve()
@@ -240,6 +190,84 @@ def test_run_public_cycle_uses_pr_adapter_and_emits_closable_pr_record(
         "wall_clock_ms": 40,
         "first_attempt_pass": True,
     }
+    assert module.closure_validator.validate_closable(close_record) is None
+
+
+def test_run_public_cycle_returns_rejected_close_record_when_promotion_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = _load_module()
+    meta_experiment = _load_meta_experiment()
+    target = tmp_path / "target"
+    _init_repo(target)
+    _write_yaml(target / "hive.config.yaml", {"metrics": {"enabled": True}})
+    _write_yaml(
+        target / ".pHive/project-profile.yaml",
+        {
+            "meta_optimize": {
+                "experiment_id": "exp-public-reject",
+                "prior_run_id": "run-002",
+                "candidate_ref": "HEAD",
+                "target_branch": "main",
+                "worktree_path": str(target / ".pHive/meta-team/worktrees/exp-public-reject"),
+                "candidate_metrics": {
+                    "tokens": 150,
+                    "wall_clock_ms": 70,
+                    "first_attempt_pass": False,
+                },
+                "ranked_proposals": [],
+            }
+        },
+    )
+    _write_yaml(
+        target / ".pHive/meta-team/queue-meta-optimize.yaml",
+        {
+            "schema_version": 1,
+            "candidates": [
+                {
+                    "id": "mo-backlog-reject-1",
+                    "target": "README.md",
+                    "type": "doc-fix",
+                    "description": "Reject this candidate",
+                    "safety_notes": "No promotion should happen",
+                    "status": "pending",
+                }
+            ],
+        },
+    )
+    _git(target, "add", "hive.config.yaml", ".pHive/project-profile.yaml", ".pHive/meta-team/queue-meta-optimize.yaml")
+    _git(target, "commit", "-m", "reject fixture setup")
+
+    def fake_capture_from_run(_run_id: str) -> dict[str, object]:
+        return {
+            "metrics": {
+                "tokens": 100,
+                "wall_clock_ms": 50,
+                "first_attempt_pass": True,
+            }
+        }
+
+    def fake_promote(self, envelope: dict, decision: dict):
+        raise module.PromotionFailure(
+            "needs_revision verdict — adapter does not promote",
+            rollback_target="meta-improvement/pr/exp-public-reject",
+            notes="worktree discarded without touching target branch",
+        )
+
+    monkeypatch.setattr(module.baseline, "capture_from_run", fake_capture_from_run)
+    monkeypatch.setattr(module.PrPromotionAdapter, "promote", fake_promote)
+
+    result = module.run_public_cycle(target)
+    close_record = result["close_record"]
+
+    assert result["mode"] == "rejected"
+    assert result["failure_reason"] == "needs_revision verdict — adapter does not promote"
+    assert close_record["decision"] == "reject"
+    assert close_record["pr_ref"] is None
+    assert close_record["pr_state"] is None
+    assert close_record["rollback_ref"] == "meta-improvement/pr/exp-public-reject"
+    assert close_record["rollback_target"] == "meta-improvement/pr/exp-public-reject"
     assert module.closure_validator.validate_closable(close_record) is None
 
 

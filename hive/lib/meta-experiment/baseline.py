@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 import math
 from typing import Any
 
@@ -27,6 +28,7 @@ _EVENT_METRIC_TYPES = {
     "first_attempt_pass": ("bool", "bool"),
     "human_escalation": ("bool", "bool"),
 }
+_LOGGER = logging.getLogger(__name__)
 
 
 class NoBaselineError(Exception):
@@ -120,6 +122,7 @@ def _is_number(value: Any) -> bool:
 def _should_skip_event_row(event: dict[str, Any]) -> bool:
     metric_type = event.get("metric_type")
     if metric_type not in _EVENT_METRIC_TYPES:
+        _LOGGER.warning("skipping event row with unknown metric_type: %r", metric_type)
         return True
 
     expected_value_kind, _ = _EVENT_METRIC_TYPES[metric_type]
