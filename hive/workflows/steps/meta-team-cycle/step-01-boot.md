@@ -7,7 +7,12 @@
 - Read this entire step file before taking any action
 - Read `<HIVE_STATE_DIR>/meta-team/charter.md` BEFORE doing anything else — the charter defines what you may change
 - Do NOT assume the ledger is up to date — read from disk
-- Do NOT proceed if the charter does not exist — create it from `hive/references/meta-team-nightly-cycle.md` bootstrap section
+- Do NOT proceed without charter constraints: if the charter does not exist at `$HIVE_STATE_DIR/meta-team/charter.md`, render it from the shipped template at `hive/references/meta-team-charter-template.md` using the unified resolver in `hooks/common.sh`. Substitute the four Mustache placeholders:
+  - `{{target_project}}` — derive from the target project's name (basename of `paths.target_project` if set, or the invoking cwd's basename otherwise)
+  - `{{target_project_path}}` — absolute path, from `_resolve_target_project` via `hooks/common.sh`
+  - `{{charter_version}}` — ISO date + sequence (e.g., `2026-04-22-1` — use the current date and a 1-based counter if a same-day render already occurred)
+  - `{{render_timestamp}}` — ISO-8601 via `date -u +%Y-%m-%dT%H:%M:%SZ`
+  Write the rendered file to `$HIVE_STATE_DIR/meta-team/charter.md` and, if `_resolve_state_dir` in `hooks/common.sh` resolves `HIVE_STATE_DIR` to a relative path, anchor it to `$HIVE_ROOT` per the helper contract.
 - If a prior cycle is marked `status: running`, that cycle crashed — log it as `status: aborted` before starting a new one
 
 ## EXECUTION PROTOCOLS
@@ -93,7 +98,7 @@ Status: ready to analyze
 
 ## FAILURE MODES
 
-- Charter does not exist: STOP. Do not proceed without constraints. Create the charter from `hive/references/meta-team-nightly-cycle.md`.
+- Charter does not exist: STOP only after rendering is blocked. Use `hooks/common.sh` as the canonical resolver for `state_dir` and `target_project`; if `$HIVE_STATE_DIR/meta-team/charter.md` is absent, render it from `hive/references/meta-team-charter-template.md`, substitute the Mustache placeholders, and write the result to `$HIVE_STATE_DIR/meta-team/charter.md` before continuing.
 - Ledger is corrupt YAML: log the parse error, continue with empty history (don't halt cycle).
 - Cycle-state.yaml has unknown status: treat as aborted, log warning, continue.
 
