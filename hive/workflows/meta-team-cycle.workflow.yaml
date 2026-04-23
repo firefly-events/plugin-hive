@@ -34,6 +34,9 @@ steps:
         source: step_output
         step_id: boot
         output_name: cycle_id
+      - name: target_project
+        source: context
+        context_key: target_project
     outputs:
       - name: findings
         type: json

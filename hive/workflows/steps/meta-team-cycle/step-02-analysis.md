@@ -5,7 +5,7 @@
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
 - Read this entire step file before taking any action
-- ONLY read — no writing to the Hive codebase in this step
+- ONLY read — no writing to the target-project codebase in this step
 - Run all checks in the prescribed order — skipping checks leads to missed findings
 - Do NOT propose solutions in this step — only identify and document problems
 - Respect charter scope: only flag issues in domains the meta-team is allowed to change
@@ -14,15 +14,17 @@
 
 **Mode:** autonomous
 
-Systematic scan of the Hive codebase. Produce a findings report. Do not fix anything.
+Systematic scan of the target-project codebase (`$HIVE_TARGET_PROJECT`). Produce a findings report. Do not fix anything.
 
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
 - `cycle_id` from step 1
-- The full Hive codebase under `hive/` and `skills/`
+- The full target-project codebase at `$HIVE_TARGET_PROJECT` (resolved from paths.target_project via `hooks/common.sh`, cwd fallback when unset). For plugin-hive maintainers, HIVE_TARGET_PROJECT resolves to the plugin-hive root — analysis then scans the same `hive/` and `skills/` trees as before.
 - `<HIVE_STATE_DIR>/meta-team/charter.md` — scope boundaries
 - `<HIVE_STATE_DIR>/meta-team/cycle-state.yaml` — for writing findings to disk
+
+**Target resolution fallback:** If `paths.target_project` is unset in `hive.config.yaml`, the analyzer falls back to the invoking cwd (the directory where the cycle was started). This preserves maintainer behavior for plugin-hive: running the cycle from the plugin-hive root with no config override resolves to the plugin-hive codebase, making the generalized step functionally identical to the prior hardcoded form.
 
 **NOT available:**
 - User input
@@ -30,16 +32,16 @@ Systematic scan of the Hive codebase. Produce a findings report. Do not fix anyt
 
 ## YOUR TASK
 
-Systematically audit the Hive plugin codebase and produce a ranked findings list with severity and category for each issue.
+Systematically audit the target-project codebase (`$HIVE_TARGET_PROJECT`, resolved per hooks/common.sh) and produce a ranked findings list with severity and category for each issue.
 
 ## TASK SEQUENCE
 
 ### 1. Cross-reference audit — dangling references
-For each reference doc listed in `hive/GUIDE.md` and `hive/MAIN.md`:
+For each reference doc listed in the target project's top-level documentation manifest (e.g., plugin-hive's `hive/GUIDE.md` and `hive/MAIN.md`; adapt to the target project's equivalent structure if different):
 - Check that the referenced file actually exists at the stated path
 - Record any files listed but missing as `MISSING_FILE` findings
 
-Also check: all `step_file` paths in workflow YAML files actually exist.
+Also check: if the target project has workflow YAML files (plugin-hive does under `hive/workflows/`; other projects may not), check that all `step_file` paths actually exist.
 
 ### 2. Schema consistency audit
 Compare field usage across instances of the same schema type:
@@ -50,8 +52,8 @@ Compare field usage across instances of the same schema type:
 Record any missing required fields or undocumented fields as `SCHEMA_INCONSISTENCY` findings.
 
 ### 3. Step file completeness audit
-For each step file under `hive/workflows/steps/`:
-- Verify it contains all 7 required sections per `step-file-schema.md`:
+If the target project has step files under a workflows/steps/ tree (plugin-hive uses `hive/workflows/steps/`), for each step file verify it contains all 7 required sections per `step-file-schema.md`:
+- Verify each step file contains all 7 required sections:
   1. Title (`# Step N: Name`)
   2. MANDATORY EXECUTION RULES
   3. EXECUTION PROTOCOLS
@@ -62,18 +64,18 @@ For each step file under `hive/workflows/steps/`:
 - Record incomplete step files as `INCOMPLETE_STEP_FILE` findings
 
 ### 4. Agent memory starter set audit
-For each agent in the roster (listed in `hive/GUIDE.md`):
-- Check if `skills/hive/agents/memories/{agent}/` contains any `.md` files beyond `.gitkeep`
+If the target project has an agent roster document (plugin-hive lists agents in `hive/GUIDE.md`), inspect each listed agent:
+- Check whether the target project's agent-memory location for that agent (plugin-hive uses `skills/hive/agents/memories/{agent}/`) contains any `.md` files beyond `.gitkeep`
 - Agents with zero memories: record as `MEMORY_GAP` finding (low severity — expected for new agents)
 - Agents with memories: check frontmatter completeness (required: name, description, type)
 
 ### 5. Reference documentation audit
-For each doc in `hive/references/`:
+If the target project has a shared references directory (plugin-hive uses `hive/references/`), for each doc in that directory:
 - Read the first 20 lines to confirm it has a title, clear purpose statement, and usable content
 - Flag docs that are stubs (< 30 lines of content) as `STUB_DOC` findings
 
 ### 6. Workflow completeness audit
-Read each workflow YAML in `hive/workflows/`:
+If the target project has workflow YAML files (plugin-hive uses `hive/workflows/`), read each workflow YAML:
 - Confirm `name`, `version`, `steps` fields present
 - Confirm each step has either `task` or `step_file`
 - Flag missing step files as `MISSING_STEP_FILE` findings
