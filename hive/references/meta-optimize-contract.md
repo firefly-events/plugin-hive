@@ -56,6 +56,26 @@ This boundary is intentional. The public contract is target-project-relative
 and template-driven; the maintainer path remains plugin-hive-local and does not
 define the marketplace surface.
 
+## Taxonomy (charter-defined)
+
+The public `/meta-optimize` surface honors the charter-defined taxonomy
+contract: the rendered charter's `taxonomy.finding_categories:` list is
+the AUTHORITATIVE category set for the cycle, not a hardcoded global.
+
+Consumers of /meta-optimize set their taxonomy in the rendered charter at
+`{resolved_state_dir}/meta-team/charter.md` (the default shipped template
+at `hive/references/meta-team-charter-template.md` provides 5 generic
+categories: code-quality, test-coverage, documentation, performance,
+security). Consumers may add, remove, or replace categories to fit their
+target project without editing step-02-analysis, step-03-proposal, or
+step-06-evaluation.
+
+The maintainer-only `/meta-meta-optimize` workflow continues to use its
+plugin-hive-specific taxonomy (MISSING_FILE, SCHEMA_INCONSISTENCY, etc.).
+That set is declared in the plugin-hive maintainer charter, not in step
+code. See `hive/references/meta-team-charter-template.md` for both example
+taxonomies.
+
 ## Out of scope
 
 Non-goals for this contract:

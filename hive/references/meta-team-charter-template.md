@@ -40,7 +40,10 @@ shape without hardcoding `hive/` or `skills/`.
 
 ## Taxonomy
 
+Public default example for `/meta-optimize`:
+
 ```yaml
+# Example public default taxonomy (for /meta-optimize)
 taxonomy:
   finding_categories:
     - code-quality
@@ -52,10 +55,36 @@ taxonomy:
     # - workflow-correctness
 ```
 
+Plugin-hive-specific maintainer example for `/meta-meta-optimize`:
+
+```yaml
+# Example plugin-hive maintainer taxonomy (for /meta-meta-optimize)
+taxonomy:
+  finding_categories:
+    - id: MISSING_FILE
+      label: "Reference doc names a file that does not exist at the stated path"
+    - id: SCHEMA_INCONSISTENCY
+      label: "YAML / persona / workflow schema field drift across instances"
+    - id: INCOMPLETE_STEP_FILE
+      label: "Step file missing required section per step-file-schema.md"
+    - id: MEMORY_GAP
+      label: "Memory write contract violated or expected memory absent"
+    - id: STUB_DOC
+      label: "Doc present but content is placeholder / TBD"
+    - id: MISSING_STEP_FILE
+      label: "Workflow references a step_file that doesn't exist"
+    - id: OTHER
+      label: "Findings that don't fit above categories"
+```
+
 Categories are charter-defined. The step files `step-02-analysis`,
 `step-03-proposal`, and `step-06-evaluation` read taxonomy from the rendered
 charter and do NOT hardcode category lists. To add or remove categories, edit
 the taxonomy block in the charter rather than changing step logic.
+
+**Contract:** Analysis, proposal, and evaluation steps treat the `taxonomy.finding_categories:` list from the rendered charter as the AUTHORITATIVE category set for the cycle. Steps MUST NOT fall back to any hardcoded category list. If the rendered charter's taxonomy block is empty or missing, treat it as a charter-quality finding (surface it, halt the cycle).
+
+**Pluggability:** A charter may declare any category set that fits its target project. Categories may be alphanumeric + underscore IDs with a human-readable label. There is no enforced minimum or maximum. The step logic iterates the list at run-time; adding or removing categories does NOT require step-file edits.
 
 The default set above is intentionally generic for the public
 `/meta-optimize` surface. Maintainers can render project-specific variants by
