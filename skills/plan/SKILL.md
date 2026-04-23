@@ -97,9 +97,10 @@ If all checks pass, proceed normally.
    Apply this per assembled persona, including optional members only when they were added in Step 0.1. `ui-designer` is always routed `direct` even when configured to `codex`, because codex-invoke marks that persona as known-incompatible.
 
    Use these INFO-log directives when the route is decided:
-   - `[info] planning routing: {persona} -> codex (validated, agent_backends configured) - supported + configured`
-   - `[info] planning routing: {persona} -> direct (known-incompatible with codex) - e.g., ui-designer`
-   - `[info] planning routing: {persona} -> direct (agent_backends not configured) - default fallback`
+   - `[info] planning routing: persona=technical-writer requested=codex path=codex-invoke reason=no-fallback-needed`
+   - `[info] planning routing: persona=ui-designer requested=codex path=TeamCreate reason=known-incompatible`
+   - `[info] planning routing: persona={X} requested=codex path=TeamCreate reason=unvalidated-persona`
+   - `[info] planning routing: persona={X} requested=unset path=TeamCreate reason=agent_backends-unset`
 
    If a persona is configured to `codex` but is neither supported nor known-incompatible in the codex-invoke contract, INFO-log that the persona is unvalidated for Codex and route `direct`.
 
@@ -153,6 +154,40 @@ If all checks pass, proceed normally.
    If at least one persona is routed through Codex and at least one persona is routed direct, the `TeamCreate` prompt still includes only the direct-routed personas. Codex-routed personas participate via separate panes; they read the team context from their own `agent-spawn` prompt, not the `TeamCreate` prompt.
 
    **Agent-spawn compliance:** Every codex-routed teammate must follow the agent-spawn skill (`skills/hive/skills/agent-spawn/SKILL.md`) patterns — full persona injection, path resolution (`~`, `${CLAUDE_PLUGIN_ROOT}`), memory loading, domain constraints, and required tool validation. The direct `TeamCreate` prompt must still instruct each direct teammate to read their persona file and load their knowledge paths on startup.
+
+   **Step 0.5: Runtime fallback**
+
+   If codex-invoke dispatch FAILS at runtime for any persona (e.g., Codex CLI
+   not installed, authentication expired, cmux pane creation error, pre-flight
+   check failure, timeout, or any other error returned from agent-spawn or
+   codex-invoke), handle it gracefully:
+
+   1. Do NOT hard-fail planning-team assembly. A single Codex failure must not
+      block the whole planning flow.
+   2. Re-route the failed persona to direct TeamCreate in a follow-up call.
+      (The original TeamCreate prompt was composed without this persona; re-
+      compose it to ADD the failed persona back into the direct team. Or use
+      SendMessage to instruct the existing TeamCreate-spawned teammates to
+      adopt the re-routed teammate via the same SendMessage coordination.)
+   3. Emit an INFO log with the runtime-failure reason included:
+      [info] planning routing: persona={X} requested=codex path=TeamCreate reason=codex-dispatch-failed: <error>
+      where <error> is a short excerpt of the failure (max 120 chars — truncate
+      long stderr dumps).
+   4. Continue with the rest of the planning flow. Planning-team quality may
+      degrade (persona now runs on Claude instead of Codex), but assembly
+      succeeds.
+
+   If the orchestrator observes repeated Codex failures (>=3 within one
+   planning invocation), it MAY choose to skip remaining Codex-routed personas
+   for the rest of the invocation (fail-fast behavior) — still via TeamCreate
+   fallback, still with per-persona INFO log. This is an operator-friendly
+   circuit breaker; the underlying fallback contract is unchanged.
+
+   **Observability contract:** Every planning-persona spawn — success or
+   fallback — must emit exactly one structured INFO log line per the template
+   above. Operators diagnosing backend-routing issues rely on these lines as
+   the authoritative trace. Do NOT skip the INFO log. Do NOT collapse multiple
+   persona routings into one log line.
 
 ### Phase A: Research
 
