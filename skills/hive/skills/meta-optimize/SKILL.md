@@ -46,6 +46,8 @@ Use the shared runtime under `hive/lib/meta-experiment/`. Do not reimplement the
 - `rollback_watch.evaluate_watch`: post-close observation hook for accepted experiments
 - `closure_validator.validate_closable`: non-bypassable step-08 close gate for PR-shaped close evidence
 
+Unknown consumer metric dimensions are tolerated on the public path. Known dimensions continue through the shared comparison flow, and unknown ones are skipped deterministically instead of crashing the cycle.
+
 ## Live Cycle
 
 Follow these sections in order. Each step section maps to the shared workflow and step files; this skill orchestrates the public target-project path rather than re-specifying the step internals.

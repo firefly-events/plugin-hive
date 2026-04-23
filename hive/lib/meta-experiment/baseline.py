@@ -120,7 +120,7 @@ def _is_number(value: Any) -> bool:
 def _should_skip_event_row(event: dict[str, Any]) -> bool:
     metric_type = event.get("metric_type")
     if metric_type not in _EVENT_METRIC_TYPES:
-        return False
+        return True
 
     expected_value_kind, _ = _EVENT_METRIC_TYPES[metric_type]
     return expected_value_kind == "number" and isinstance(event.get("value"), float) and not math.isfinite(
