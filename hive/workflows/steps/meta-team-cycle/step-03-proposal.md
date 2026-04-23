@@ -57,6 +57,7 @@ For each proposal (top 5 by priority):
 ```yaml
 id: proposal-{N}
 title: {one-line title}
+discovery_source: internal_audit  # or: external_research
 addresses_findings: [finding-{N}, ...]
 impact_score: {1-5}
 risk_score: {1-5}
@@ -72,6 +73,8 @@ rationale: |
 risk_notes: |
   {What could go wrong, what to check before shipping}
 ```
+
+> **Backward compatibility:** Proposals written before this field was added (i.e., proposals without a `discovery_source` entry) default to `internal_audit` for schema-handling purposes. Do NOT reject or fail a proposal for a missing `discovery_source` field — treat it as the default.
 
 ### 5. List skipped findings
 Document all findings that were skipped:
