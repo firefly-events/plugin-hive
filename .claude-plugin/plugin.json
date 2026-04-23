@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-agent-misuse.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/check-agent-misuse.sh\"",
             "timeout": 5
           }
         ]
@@ -22,12 +22,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mkdir -p .pHive/interrupts && ts=$(date -u +%Y-%m-%dT%H%M%SZ) && printf 'interrupted_at: \"%s\"\\ninterruption_type: forced_stop\\nactive_epic: null\\nactive_story: null\\nactive_step: null\\n' \"$ts\" > \".pHive/interrupts/$ts.yaml\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-interrupt-capture.sh\"",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/metrics-stop-dispatch.sh || true",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/metrics-stop-dispatch.sh\" || true",
             "timeout": 15
           }
         ]

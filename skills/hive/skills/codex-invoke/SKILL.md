@@ -24,8 +24,69 @@ optional `pane_mode` (`one-shot` | `persistent`, default: `one-shot`).
 - Any task where Claude is the resolved backend (default path — use TeamCreate)
 - Non-macOS machines (cmux is macOS-only — hard-fail at pre-flight)
 
-**Supported personas (PoC):** `backend-developer`, `reviewer`. Other roster
-personas may work but are untested — broaden as validated.
+**Supported personas (PoC):** `backend-developer`, `reviewer`,
+`technical-writer`, `architect`, `tpm`, `researcher`. Other roster personas
+may work but are untested — broaden as validated.
+
+**Known-incompatible personas:** `ui-designer` — depends on Frame0 CLI and
+firecrawl MCP tooling that a Codex pane cannot reliably provide. Stay on
+the Claude backend for this persona.
+
+**Validation history:**
+- `backend-developer` — validated 2026-04-14 in external-model-integration
+  PoC (Codex PoC-test-1 story)
+- `reviewer` — validated 2026-04-18 as adversarial reviewer in
+  meta-improvement-system (S4+ review cycles, Opus-override)
+- `technical-writer`, `architect` — validated 2026-04-22 across
+  meta-improvement-system planning (56 stories, 10 slices; research briefs,
+  design discussions, H/V plans, structured outlines, architect memos and
+  review memos across S1-S9 execution)
+- `tpm`, `researcher` — validated 2026-04-22 across meta-improvement-system
+  and hive-release-readiness planning (TPM horizontal/vertical plan
+  sequencing, researcher raw findings + review-gate fact-checking)
+
+## Contract consumed by plan-skill routing
+
+The `Supported personas (PoC)` and `Known-incompatible personas` lists above
+form the contract that the planning skill (`skills/plan/SKILL.md`) consults
+when deciding whether to route a planning teammate through Codex
+(`agent_backends: <persona>: codex`) or fall back to direct TeamCreate.
+
+Plan-skill routing behavior for each case:
+- Persona in `Supported personas` AND `agent_backends[persona] == codex`:
+  route through codex-invoke. INFO-log reason: `no-fallback-needed`.
+- Persona in `Known-incompatible personas` (e.g., `ui-designer`): fall back
+  to direct TeamCreate regardless of `agent_backends` value. INFO-log
+  reason: `known-incompatible`.
+- Persona with `agent_backends[persona] == codex` but persona NOT in
+  `Supported personas`: fall back to direct TeamCreate. INFO-log reason:
+  `unvalidated-persona`.
+- Persona with `agent_backends[persona]` unset or `agent_backends` absent
+  entirely: fall back to direct TeamCreate (default path, no routing
+  configured). INFO-log reason: `agent_backends-unset`.
+
+### Structured INFO-log template consumed by plan-skill
+
+The plan skill emits one structured INFO-log line per persona routed,
+using this exact 4-field template (see `skills/plan/SKILL.md` Step 0.2 for
+the emission point):
+
+```
+[info] planning routing: persona={X} requested={codex|direct|unset} path={codex-invoke|TeamCreate} reason={...}
+```
+
+Allowed `reason` values:
+- `no-fallback-needed` — successful routing through codex-invoke.
+- `known-incompatible` — persona is in the Known-incompatible list.
+- `unvalidated-persona` — persona not in the Supported list; conservative
+  fallback.
+- `agent_backends-unset` — no routing configured for this persona.
+- `codex-dispatch-failed: <truncated error>` — runtime failure, fallback
+  succeeded; see plan skill Step 0.5 for the runtime-failure contract.
+
+Future stories that tighten or expand this contract must update both the
+list(s) above AND any consumers (currently only the plan skill). Do NOT
+let the lists drift out of sync with actual validation state.
 
 ## Procedure
 
@@ -181,16 +242,17 @@ If the timeout expires:
 
 ### 7b. Capture transcript + meta
 
-Create the episode codex dir if needed:
+Create the episode codex dir if needed. Resolve `${HIVE_STATE_DIR}` from
+`hooks/common.sh` (`_resolve_state_dir`):
 
 ```
-mkdir -p .pHive/episodes/{story_id}/codex
+mkdir -p "${HIVE_STATE_DIR}/episodes/{story_id}/codex"
 ```
 
 Paths (use ISO-8601 timestamp for collision safety, e.g. `20260414T143012Z`):
 
-- Transcript: `.pHive/episodes/{story_id}/codex/{agent_name}-{ts}.transcript.md`
-- Meta:       `.pHive/episodes/{story_id}/codex/{agent_name}-{ts}.meta.json`
+- Transcript: `${HIVE_STATE_DIR}/episodes/{story_id}/codex/{agent_name}-{ts}.transcript.md`
+- Meta:       `${HIVE_STATE_DIR}/episodes/{story_id}/codex/{agent_name}-{ts}.meta.json`
 
 Transcript capture strategy (PoC):
 - Prefer reading codex's own session log if it writes one (check `~/.codex/` or
@@ -213,7 +275,7 @@ Meta JSON shape:
   "persona_file": "hive/agents/backend-developer.md",
   "adapter_prefix_version": 1,
   "started_at": "2026-04-14T14:30:12Z",
-  "transcript_path": ".pHive/episodes/.../backend-developer-20260414T143012Z.transcript.md"
+  "transcript_path": "${HIVE_STATE_DIR}/episodes/.../backend-developer-20260414T143012Z.transcript.md"
 }
 ```
 
@@ -371,7 +433,7 @@ The shutdown step is the authoritative close path for persistent panes:
    cmux send-key --surface <id> enter
    ```
 2. Poll for response.
-3. Capture insights to: `.pHive/episodes/{story_id}/codex/{agent}-insights.md`
+3. Capture insights to: `${HIVE_STATE_DIR}/episodes/{story_id}/codex/{agent}-codex-insights.md`
 4. Capture full scrollback to transcript.
 5. Close the pane: `cmux close-surface --surface <id>`
 6. Write final meta.json with pane_lifetime_seconds, total_fix_iterations,

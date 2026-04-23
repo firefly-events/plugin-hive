@@ -1,5 +1,11 @@
 # Cross-Swarm Handoff Protocol
 
+> **State Directory Note:** Paths shown as `.pHive/...` assume the default
+> state directory. If you have relocated state via `paths.state_dir`,
+> substitute your configured location. See
+> [state-relocation.md](state-relocation.md) (or
+> `hive/references/state-relocation.md` from repo root).
+
 Defines how artifacts transfer between swarms (planning → dev → testing → security). Each swarm produces outputs that the next swarm consumes. The handoff carries structured context, not just document blobs.
 
 ## Handoff Schema

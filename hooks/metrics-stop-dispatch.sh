@@ -1,24 +1,25 @@
 #!/bin/bash
 # metrics-stop-dispatch.sh — Stop-hook metrics dispatcher (C2.2)
 #
-# Reads hive.config.yaml for metrics.enabled and metrics.dir.
+# Reads `metrics.enabled` from the root `hive.config.yaml` and derives the
+# metrics events directory via `_resolve_state_dir` in `hooks/common.sh`
+# (`paths.state_dir` + `/metrics/events`, default `.pHive/metrics/events`).
 # If enabled, extracts token totals from the Claude Code JSONL transcript
 # (C2.0 chosen mechanism) and writes a story-end JSONL event to
-# $metrics_dir/events/. If disabled, exits 0 silently.
+# `${state_dir}/metrics/events/`. If disabled, exits 0 silently.
 # Always exits 0 on internal failure (handler isolation — sentinel must not be
 # suppressed by any failure in this script).
 
 # No set -e: use per-line guards (|| exit 0) to avoid partial-write risk (I-4)
 set -uo pipefail
 
-# Resolve project root (always the git repo root regardless of cwd at hook time)
-# HIVE_REPO_ROOT_OVERRIDE allows tests to inject a fixture root
-if [ -n "${HIVE_REPO_ROOT_OVERRIDE:-}" ]; then
-  REPO_ROOT="$HIVE_REPO_ROOT_OVERRIDE"
-else
-  REPO_ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel 2>/dev/null || echo ".")"
-fi
-CONFIG="$REPO_ROOT/hive/hive.config.yaml"
+# Resolve project root (consumer config/state can differ from plugin install dir)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HIVE_ROOT="${HIVE_ROOT:-${CLAUDE_PROJECT_DIR:-$PLUGIN_ROOT}}"
+. "$PLUGIN_ROOT/hooks/common.sh"
+REPO_ROOT="$HIVE_ROOT"
+CONFIG="${CONFIG:-$REPO_ROOT/hive.config.yaml}"
 
 # Always exit 0 on any unhandled error — metrics failure must not suppress sentinel
 trap 'exit 0' ERR
@@ -62,11 +63,10 @@ PYEOF
 
 # Read configuration
 METRICS_ENABLED=$(_read_metrics_config "enabled" "false")
-METRICS_DIR=$(_read_metrics_config "dir" ".pHive/metrics")
+STATE_DIR=$(_resolve_state_dir)
 
 # Strip leading/trailing whitespace and comment suffixes from yaml values
 METRICS_ENABLED=$(echo "$METRICS_ENABLED" | awk '{print $1}')
-METRICS_DIR=$(echo "$METRICS_DIR" | awk '{print $1}')
 
 # Gate: if not enabled, exit silently
 if [ "$METRICS_ENABLED" != "true" ]; then
@@ -79,11 +79,7 @@ SESSION_ID=$(echo "$HOOK_INPUT" | jq -r '.session_id // ""' 2>/dev/null || echo 
 TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | jq -r '.transcript_path // ""' 2>/dev/null || echo "")
 HOOK_CWD=$(echo "$HOOK_INPUT" | jq -r '.cwd // ""' 2>/dev/null || echo "$REPO_ROOT")
 
-# Resolve absolute metrics dir
-if [[ "$METRICS_DIR" != /* ]]; then
-  METRICS_DIR="$REPO_ROOT/$METRICS_DIR"
-fi
-
+METRICS_DIR="$STATE_DIR/metrics"
 EVENTS_DIR="$METRICS_DIR/events"
 mkdir -p "$EVENTS_DIR" || exit 0
 

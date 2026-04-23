@@ -4,25 +4,31 @@
 # File system paths
 # Where Hive stores all per-project state (epics, episodes, cycle state,
 # memories, sessions). Default: .pHive/ (hidden directory, like .git/ or
-# .claude/). The default is the only value currently honored end-to-end —
-# all shipped skills, hooks, and workflows reference `.pHive/` directly.
-# Setting a different value here is documented but not yet wired into
-# runtime path resolution (tracked as follow-up work). If you want to keep
-# using `state/`, migrate with `scripts/migrate-state-to-pHive.sh --help`
-# or symlink `.pHive -> state` as a stopgap.
+# .claude/). A custom value is honored at runtime by `hooks/common.sh`
+# (`_resolve_state_dir`), which metrics hooks, the Stop hook, and the
+# Tier-1 runtime step files read at invocation time. Broader runtime
+# adoption across every skill/workflow is tracked under the
+# `project_state_dir_resolver` follow-up — see
+# `hive/references/state-relocation.md` for the current honors-list.
+# Precedence: the root `hive.config.yaml` wins for `paths.*` keys; the
+# shipped baseline below is the fall-through default.
 paths:
   state_dir: .pHive
+  # `target_project` overrides the invoking cwd for meta-team targeting.
+  # When unset (null), the resolver falls back to $PWD at invocation.
+  # Config-key first, cwd fallback, no CLI argument form.
+  target_project: null
 
 # Metrics collection
 # Controls whether Hive emits per-run event records. Opt-in at kickoff time
 # (user decision Q-new-B) — disabled by default so no writes occur unless the
 # user explicitly enables this feature.
-# When enabled, all hook-emitted event files are written under `dir` (the
-# canonical S5 carrier root). Hook stories gate every write on `enabled: true`
-# and resolve paths relative to this directory.
+# Note: after Slice 1 of hive-release-readiness, the metrics hooks read this
+# block from the ROOT `hive.config.yaml` (consumer override layer). Keys here
+# document the schema but do not drive runtime behavior — consumers opt in by
+# adding `metrics: { enabled: true }` to their root `hive.config.yaml`.
 metrics:
-  enabled: false              # opt-in only; no .pHive/metrics/events/*.jsonl writes when false
-  dir: .pHive/metrics         # canonical carrier root for all S5 metric event files
+  enabled: false              # opt-in only; no <state_dir>/metrics/events/*.jsonl writes when false
 
 # Quality gate thresholds
 quality_gates:
@@ -91,9 +97,7 @@ model_tiers:
     - test-worker
 
 # Override a specific agent's model (takes precedence over tier)
-model_overrides:
-  reviewer: opus               # Claude Opus 4.7 reviews Codex-produced work (user directive)
-  peer-validator: opus         # peer-validator runs alongside reviewer — same tier
+model_overrides: {}
   # example: researcher: opus    # promote researcher to opus for complex projects
 
 # Circuit breakers — prevent wasted time and tokens
@@ -122,7 +126,7 @@ example_codebases: []
 # Requires: npm install -g @openai/codex && codex login
 external_models:
   codex:
-    enabled: false              # opt-in; codex CLI 0.118+ installed, ChatGPT auth active
+    enabled: false              # set to true after installing and authenticating Codex CLI
     use_for:
       - adversarial-review      # run after Claude review, before optimize/integrate
     # companion_path is auto-detected from the codex plugin if installed
@@ -131,20 +135,14 @@ external_models:
 # Lets the orchestrator route specific agent personas through an external
 # model instead of Claude. Unset agents default to `claude` (TeamCreate path).
 # Supported backends: claude | codex
-# - `codex` requires: external_models.codex.enabled: true, codex + cmux CLIs,
+# - `codex` requires Codex CLI authentication plus the external model flag,
 #   codex login. macOS-only during PoC (cmux constraint). See
 #   skills/hive/skills/codex-invoke/SKILL.md for pre-flight details.
-agent_backends:
-  # Example opt-in routes:
-  # architect: codex
-  # technical-writer: codex
-  # developer: codex
-  # frontend-developer: codex
-  # backend-developer: codex
-  # tester: codex
-  # pair-programmer: codex
-  # reviewer stays on Claude backend; model overridden to opus below
-  # Haiku test-worker stays Claude — cheapest path for mechanical execution
+# Optional config example — to enable, uncomment the agent_backends map and
+# the per-persona entries beneath it:
+# agent_backends:
+#   reviewer: codex                # run reviewer in a cmux pane via OpenAI Codex
+#   backend-developer: codex       # run backend-developer in a cmux pane via OpenAI Codex
 
 # Developer preferences (populated by Phase 2b-ii: Developer Discovery)
 # These configure how Hive adapts to the developer's working style.
@@ -173,20 +171,8 @@ execution:
   default_methodology: classic
   parallel_teams: true
   max_retry_attempts: 2
-  # Terminal multiplexer for agent pane visibility
-  # tmux: use TeamCreate's built-in tmux pane spawning (default)
-  # cmux: spawn agents in cmux split panes via cmux CLI (requires cmux installed)
-  # auto: detect cmux first, fall back to tmux
-  terminal_mux: auto
-  # terminal_mux: cmux
-  # Interactive pane mode for cmux-spawned agents (both Claude and Codex).
-  # true: launch agents in interactive mode — visible conversation in the pane,
-  #   orchestrator can send follow-up messages, user can inspect/interact live.
-  #   Required for cmux team execution (step 6b). Recommended for development.
-  # false: launch agents in one-shot mode — agent receives prompt, runs, exits.
-  #   Lower visibility, no follow-up messaging. Suitable for CI or headless runs.
-  interactive_panes: true
-  # Idle timeout for persistent panes (seconds). Safety net to prevent
-  # orphaned panes if the orchestrator dies. Clock resets on each new prompt.
-  # Applies to interactive_panes: true (both Claude and Codex backends).
-  idle_timeout_seconds: 300
+  # Optional maintainer-only execution tuning — consumers do NOT need these
+  # keys. Uncomment in your root `hive.config.yaml` to override:
+  #   terminal_mux: auto           # tmux | cmux | auto  (default: TeamCreate's built-in tmux)
+  #   interactive_panes: true      # visible agent conversation (cmux only)
+  #   idle_timeout_seconds: 300    # 5-min idle reaper for persistent Codex panes

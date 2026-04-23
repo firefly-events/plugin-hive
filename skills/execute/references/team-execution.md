@@ -1,5 +1,7 @@
 # Team Execution (Step 6)
 
+> `${HIVE_STATE_DIR}` resolves from `paths.state_dir` in the ROOT `hive.config.yaml` at runtime (not from the shipped baseline `hive/hive.config.yaml`). Default: `.pHive`.
+
 Use the `TeamCreate` tool to spawn an agent team. Generate a natural-language team creation prompt that describes the epic and its tasks:
 
 ```
@@ -8,13 +10,13 @@ Create a team to execute the "{epic-id}" epic.
 ## Tasks
 
 **Task: {story-id}** (no dependencies — can start immediately)
-Read the story at .pHive/epics/{epic-id}/stories/{story-id}.yaml
+Read the story at ${HIVE_STATE_DIR}/epics/{epic-id}/stories/{story-id}.yaml
 and execute the steps described. Write episode records to
-.pHive/episodes/{epic-id}/{story-id}/.
+${HIVE_STATE_DIR}/episodes/{epic-id}/{story-id}/.
 
 **Task: {dependent-story-id}** (depends on: {dep-1}, {dep-2})
 Wait until all dependencies complete, then read and execute the story.
-Write episodes to .pHive/episodes/{epic-id}/{dependent-story-id}/.
+Write episodes to ${HIVE_STATE_DIR}/episodes/{epic-id}/{dependent-story-id}/.
 
 ## Workflow per task
 Each task follows the development workflow phases from the loaded
@@ -56,12 +58,12 @@ Stories commit independently on their own feature branches (`hive-{story-id}`) a
 The orchestrator monitors active teammates for context degradation signals during execution. If a teammate shows signs of context pressure (see `skills/hive/skills/respawn/SKILL.md` for detection heuristics), the orchestrator triggers the respawn protocol:
 
 1. `SendMessage` the respawn signal to the teammate
-2. Wait for the teammate to write its respawn summary to `.pHive/respawn-summaries/`
+2. Wait for the teammate to write its respawn summary to `${HIVE_STATE_DIR}/respawn-summaries/`
 3. Check the respawn iteration count — if >= 3, escalate to user instead
 4. Spawn a fresh teammate via agent-spawn skill with `respawn_summary_path` pointing to the summary
 5. The fresh teammate picks up where the previous one left off
 
-Ensure `.pHive/respawn-summaries/` exists before epic execution begins (create if needed).
+Ensure `${HIVE_STATE_DIR}/respawn-summaries/` exists before epic execution begins (create if needed).
 
 ## cmux Team Execution Variant
 
@@ -95,7 +97,7 @@ Dependency unblocking: when `story-a` completes, scan the tracking map for stori
 
 Messaging: the orchestrator can send messages to any active pane.
 
-- Respawn signal: `cmux send --surface <id> "Your context is degrading. Write a respawn summary to .pHive/respawn-summaries/{story-id}.md and exit."`
+- Respawn signal: `cmux send --surface <id> "Your context is degrading. Write a respawn summary to ${HIVE_STATE_DIR}/respawn-summaries/{story-id}.md and exit."`
 - Sidecar injection: `cmux send --surface <id> "Also spawn {agent-name} as a sidecar for the review step. Read hive/agents/{agent-name}.md."`
 
 Completion marker convention: agents must emit `[STORY-COMPLETE:{story-id}]` as the last line of their workflow output. Add this to the per-story prompt template.

@@ -34,26 +34,66 @@ steps:
         source: step_output
         step_id: boot
         output_name: cycle_id
+      - name: target_project
+        source: context
+        context_key: target_project
     outputs:
       - name: findings
         type: json
       - name: analysis_report
         type: string
 
+  - id: external-research
+    agent: researcher
+    # ADDITIVE-ONLY CONTRACT: this step always emits an
+    # `external_research_candidates` list (empty list on provider/network
+    # failure, sanitizer refusal, or zero qualifying candidates). See
+    # `step-02b-external-research.md` FAILURE MODES for the guaranteed-output
+    # contract. Because of that guarantee, downstream steps that declare
+    # external-research as a predecessor never block on its failure — they
+    # just see an empty list and continue with internal-audit proposals only.
+    task: >
+      Query external sources for candidate improvement proposals that complement
+      the internal audit without replacing it. Feed externally sourced
+      candidates into the proposal ranking queue. Always emit
+      external_research_candidates, even if the list is empty.
+    step_file: hive/workflows/steps/meta-team-cycle/step-02b-external-research.md
+    depends_on:
+      - analysis
+    inputs:
+      - name: cycle_id
+        source: step_output
+        step_id: boot
+        output_name: cycle_id
+      - name: findings
+        source: step_output
+        step_id: analysis
+        output_name: findings
+    outputs:
+      - name: external_research_candidates
+        type: json
+      - name: research_summary
+        type: string
+
   - id: proposal
     agent: architect
     task: >
-      Review analysis findings and produce a ranked proposal list. Each proposal
-      includes rationale, risk level, and an implementation plan within charter
-      constraints.
+      Review analysis findings and external research candidates, then produce a
+      ranked proposal list. Each proposal includes rationale, risk level, and
+      an implementation plan within charter constraints.
     step_file: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
     depends_on:
       - analysis
+      - external-research
     inputs:
       - name: findings
         source: step_output
         step_id: analysis
         output_name: findings
+      - name: external_research_candidates
+        source: step_output
+        step_id: external-research
+        output_name: external_research_candidates
     outputs:
       - name: approved_proposals
         type: json

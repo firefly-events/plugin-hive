@@ -26,8 +26,8 @@ phases:
       Present the current state to the user. Reconstruct context from previous sessions.
 
       CORE (always):
-      1. Read status markers (.pHive/episodes/) — completed, in-progress, failed stories
-      2. Read cycle state (.pHive/cycle-state/) — accumulated decisions, blocked items
+      1. Read status markers under <HIVE_STATE_DIR>/episodes/ — completed, in-progress, failed stories. HIVE_STATE_DIR is the value of paths.state_dir in hive.config.yaml (default .pHive).
+      2. Read cycle state under <HIVE_STATE_DIR>/cycle-state/ — accumulated decisions, blocked items. HIVE_STATE_DIR is the value of paths.state_dir in hive.config.yaml (default .pHive).
       3. Read agent memories — any promoted insights from previous sessions
       4. Present: completed work, in-progress items, blockers, continuation items
 

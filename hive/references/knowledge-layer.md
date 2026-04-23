@@ -1,5 +1,11 @@
 # Knowledge Layer
 
+> **State Directory Note:** Paths shown as `.pHive/...` assume the default
+> state directory. If you have relocated state via `paths.state_dir`,
+> substitute your configured location. See
+> [state-relocation.md](state-relocation.md) (or
+> `hive/references/state-relocation.md` from repo root).
+
 The knowledge layer provides agents with queryable information during execution. Three source types, three access patterns. Builds on the agent memory system but broader — cross-agent, cross-session, with annotation capability.
 
 ## Three Sources

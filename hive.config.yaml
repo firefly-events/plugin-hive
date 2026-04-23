@@ -1,6 +1,14 @@
 # Hive Configuration
 # All settings have sensible defaults. Override only what you need.
 
+# File system paths
+paths:
+  state_dir: .pHive
+  # Primary source for the attached project path.
+  # When unset (null), the resolver falls back to the invoking cwd.
+  # No CLI argument form exists; config-first, cwd-fallback only.
+  target_project: null
+
 # Quality gate thresholds
 quality_gates:
   auto_pass_threshold: 0.9

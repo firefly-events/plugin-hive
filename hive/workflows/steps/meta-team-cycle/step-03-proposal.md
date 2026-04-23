@@ -42,6 +42,29 @@ Review each finding from step 2:
 ### 2. Group related findings
 Some findings address the same root cause. Group them into single proposals where the implementation naturally covers multiple findings (e.g., "create missing reference doc" may resolve both a MISSING_FILE finding and a dangling cross-reference).
 
+### 2b. Merge external-research candidates into the eligible pool
+
+Step `external-research` (step-02b) supplies an `external_research_candidates`
+list as a workflow input. That list is always present (possibly empty — see
+step-02b's guaranteed-output contract). Before ranking:
+
+- Treat each `external_research_candidates[*]` entry as an eligible proposal
+  alongside the internal-audit-derived proposals produced in Step 1.
+- Tag merged external entries with `discovery_source: external_research` if
+  that field isn't already set on them. Internal proposals default to
+  `discovery_source: internal_audit` (missing field handling below).
+- De-duplicate: if an external candidate proposes work that overlaps a
+  grouped internal finding (Step 2), prefer the internal-derived proposal
+  (it has concrete finding evidence) but keep the external entry's
+  `rationale` text as appended context on the merged proposal. Do not
+  silently drop the external evidence.
+- IDs: internal proposals use `proposal-{N}`; external candidates use
+  `external-proposal-{N}` (per step-02b's namespace). Consumers MUST accept
+  both prefixes. The `discovery_source` field is the authoritative feed
+  identifier, not the ID prefix.
+
+The merged pool is the input to Step 3 ranking.
+
 ### 3. Rank proposals
 Score each proposal on three dimensions (1–5 each):
 - **Impact:** How much does this improve Hive's quality/usability? (5 = blocks real usage, 1 = cosmetic)
@@ -57,6 +80,7 @@ For each proposal (top 5 by priority):
 ```yaml
 id: proposal-{N}
 title: {one-line title}
+discovery_source: internal_audit  # or: external_research
 addresses_findings: [finding-{N}, ...]
 impact_score: {1-5}
 risk_score: {1-5}
@@ -72,6 +96,8 @@ rationale: |
 risk_notes: |
   {What could go wrong, what to check before shipping}
 ```
+
+> **Backward compatibility:** Proposals written before this field was added (i.e., proposals without a `discovery_source` entry) default to `internal_audit` for schema-handling purposes. Do NOT reject or fail a proposal for a missing `discovery_source` field — treat it as the default.
 
 ### 5. List skipped findings
 Document all findings that were skipped:
