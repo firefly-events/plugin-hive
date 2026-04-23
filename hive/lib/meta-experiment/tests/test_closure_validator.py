@@ -44,7 +44,7 @@ class ClosureValidatorTests(unittest.TestCase):
             self.validate_closable(envelope)
 
     def test_both_commit_ref_and_pr_ref_raises_ambiguous_evidence(self) -> None:
-        envelope = self._close_envelope(pr_ref="pr:42")
+        envelope = self._close_envelope(pr_ref="pr:42", pr_state="open")
 
         with self.assertRaises(self.AmbiguousEvidenceError):
             self.validate_closable(envelope)
@@ -81,7 +81,7 @@ class ClosureValidatorTests(unittest.TestCase):
         self.assertTrue(self.is_closable(envelope))
 
     def test_pr_only_accept_record_is_closable(self) -> None:
-        envelope = self._close_envelope(commit_ref=None, pr_ref="pr:42")
+        envelope = self._close_envelope(commit_ref=None, pr_ref="pr:42", pr_state="open")
 
         self.assertIsNone(self.validate_closable(envelope))
         self.assertTrue(self.is_closable(envelope))
@@ -155,6 +155,7 @@ class ClosureValidatorTests(unittest.TestCase):
         decision: str = "accept",
         commit_ref: str | None = "git:abc123",
         pr_ref: str | None = None,
+        pr_state: str | None = None,
         metrics_snapshot: dict | None = None,
         rollback_ref: str | None = "rollback:git:abc123",
     ) -> dict:
@@ -168,6 +169,8 @@ class ClosureValidatorTests(unittest.TestCase):
             envelope["commit_ref"] = commit_ref
         if pr_ref is not None:
             envelope["pr_ref"] = pr_ref
+        if pr_state is not None:
+            envelope["pr_state"] = pr_state
         return envelope
 
 

@@ -13,6 +13,7 @@ class PromotionEvidence:
 
     commit_ref: str | None = None
     pr_ref: str | None = None
+    pr_state: str | None = None
 
     def __post_init__(self) -> None:
         if bool(self.commit_ref) == bool(self.pr_ref):
@@ -35,6 +36,7 @@ class RollbackResult:
 
     success: bool
     revert_ref: str | None = None
+    rollback_target: str | None = None
     notes: str | None = None
 
 

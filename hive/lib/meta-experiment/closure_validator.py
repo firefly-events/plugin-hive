@@ -71,11 +71,14 @@ def _validate_evidence(envelope: dict[str, _Any]) -> None:
     # commit_ref only, but the closure-evidence-shape-mismatch escalation
     # requires this shared validator to accept PR-only close evidence too.
     pr_ref_set = _has_reference(envelope.get("pr_ref"))
+    pr_state_set = _has_reference(envelope.get("pr_state"))
 
     if commit_ref_set and pr_ref_set:
         raise AmbiguousEvidenceError("exactly one of commit_ref or pr_ref must be present; both are set")
     if not commit_ref_set and not pr_ref_set:
         raise MissingEvidenceError("either commit_ref or pr_ref must be present")
+    if pr_ref_set and not pr_state_set:
+        raise MissingEvidenceError("pr_state must be present when pr_ref is used")
 
 
 def _validate_metrics_snapshot(envelope: dict[str, _Any]) -> None:
