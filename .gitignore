@@ -38,6 +38,8 @@ state/
 .pHive/audits/*
 !.pHive/audits/mvl-proof/
 !.pHive/audits/mvl-proof/**
+!.pHive/audits/mvs-proof/
+!.pHive/audits/mvs-proof/**
 agents/memories/
 .claude/settings.local.json
 .history/

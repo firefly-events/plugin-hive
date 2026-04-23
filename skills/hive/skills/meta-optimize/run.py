@@ -92,9 +92,11 @@ def run_public_cycle(target_project: Path) -> dict[str, Any]:
     if metrics_enabled and isinstance(ranked_proposals, list) and ranked_proposals:
         selected_candidate = ranked_proposals[0] if isinstance(ranked_proposals[0], dict) else None
         cycle_mode = "metrics"
+        proposal_source = "metrics"
     else:
         selected_candidate = select_backlog_candidate(backlog_candidates)
         cycle_mode = "backlog_fallback" if metrics_enabled else "backlog_only"
+        proposal_source = "backlog"
 
     if selected_candidate is None:
         if metrics_enabled:
@@ -134,13 +136,17 @@ def run_public_cycle(target_project: Path) -> dict[str, Any]:
         "pr_state": promotion.evidence.pr_state,
         "rollback_ref": promotion.rollback_target,
         "rollback_target": promotion.rollback_target,
+        "baseline_metrics": baseline_metrics,
+        "candidate_metrics": candidate_metrics,
         "metrics_snapshot": candidate_metrics,
     }
     closure_validator.validate_closable(close_record)
 
     return {
         "target_project": str(target_root),
+        "kickoff_metrics_enabled": metrics_enabled,
         "mode": cycle_mode,
+        "proposal_source": proposal_source,
         "selected_candidate": selected_candidate,
         "compare_result": compare_result,
         "close_record": close_record,
