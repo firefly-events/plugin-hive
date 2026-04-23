@@ -33,10 +33,10 @@ firecrawl MCP tooling that a Codex pane cannot reliably provide. Stay on
 the Claude backend for this persona.
 
 **Validation history:**
-- `backend-developer` — validated in external-model-integration PoC (Codex
-  PoC-test-1 story)
-- `reviewer` — validated as adversarial reviewer in meta-improvement-system
-  (S4+ review cycles, Opus-override)
+- `backend-developer` — validated 2026-04-14 in external-model-integration
+  PoC (Codex PoC-test-1 story)
+- `reviewer` — validated 2026-04-18 as adversarial reviewer in
+  meta-improvement-system (S4+ review cycles, Opus-override)
 - `technical-writer`, `architect` — validated 2026-04-22 across
   meta-improvement-system planning (56 stories, 10 slices; research briefs,
   design discussions, H/V plans, structured outlines, architect memos and
@@ -44,6 +44,24 @@ the Claude backend for this persona.
 - `tpm`, `researcher` — validated 2026-04-22 across meta-improvement-system
   and hive-release-readiness planning (TPM horizontal/vertical plan
   sequencing, researcher raw findings + review-gate fact-checking)
+
+## Contract consumed by plan-skill routing
+
+The `Supported personas (PoC)` and `Known-incompatible personas` lists above
+form the contract that the planning skill (`skills/plan/SKILL.md`) consults
+when deciding whether to route a planning teammate through Codex
+(`agent_backends: <persona>: codex`) or fall back to direct TeamCreate.
+
+Plan-skill routing behavior for each case:
+- Persona in `Supported personas`: route through codex-invoke.
+- Persona in `Known-incompatible personas`: fall back to direct TeamCreate,
+  INFO-log why (persona known-incompatible with Codex backend).
+- Persona in neither list: fall back to direct TeamCreate, INFO-log that
+  the persona is unvalidated for Codex and route conservatively.
+
+Future stories that tighten or expand this contract must update both the
+list(s) above AND any consumers (currently only the plan skill). Do NOT
+let the lists drift out of sync with actual validation state.
 
 ## Procedure
 
