@@ -33,6 +33,11 @@ See `hive/hive.config.yaml` for the shipped default template with comments.
 | `paths.state_dir` | `.pHive` | Directory where Hive stores per-project state (epics, episodes, cycle state, sessions, memories). Slice 1 introduces the unified resolver; until then, shipped skills and workflows still reference `.pHive/` directly in some places, so alternate values are documented ahead of full end-to-end wiring. |
 | `paths.target_project` | `null` | Primary source for the "attached project" path used by meta-team targeting. When unset (`null`), the resolver falls back to the invoking cwd. Config-key first, cwd fallback, no CLI argument form. |
 
+### Relocating the state directory
+
+For the consumer-facing relocation procedure, coverage notes, and migration
+steps, see `hive/references/state-relocation.md`.
+
 ### Quality Gates
 
 | Setting | Default | Description |
@@ -94,3 +99,7 @@ Some Hive assets are maintainer-only and are used to improve the plugin itself r
 The `maintainer-skills/` directory is excluded from marketplace distribution via `marketplace.json` under the Slice 5 story `marketplace-exclude-maintainer-skills`.
 
 Maintainer defaults such as Codex backends, Opus routing, and `cmux` terminal mux preferences do not ship. For the same reason, maintainer-only keys are intentionally absent from the shipped settings reference, including `execution.terminal_mux`, `execution.idle_timeout_seconds`, and external model routing such as `agent_backends`.
+
+See also:
+- `hive/references/state-boundary.md`
+- `hive/references/state-relocation.md`

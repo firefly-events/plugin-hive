@@ -5,6 +5,12 @@ description: Decompose a requirement into an epic with dependency-tracked storie
 
 # Hive Plan
 
+> **State Directory Note:** Paths shown as `.pHive/...` assume the default
+> state directory. If you have relocated state via `paths.state_dir`,
+> substitute your configured location. See
+> [state-relocation.md](../../hive/references/state-relocation.md) (or
+> `hive/references/state-relocation.md` from repo root).
+
 Decompose a requirement into an epic with dependency-tracked stories.
 
 **Input:** `$ARGUMENTS` contains the requirement or feature description. Optionally a target codebase path. Supports optional flags (see `$ARGUMENTS` section below).

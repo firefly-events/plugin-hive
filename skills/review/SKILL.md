@@ -5,6 +5,12 @@ description: Run a structured code review on changes, a PR, or a branch.
 
 # Hive Review
 
+> **State Directory Note:** Paths shown as `.pHive/...` assume the default
+> state directory. If you have relocated state via `paths.state_dir`,
+> substitute your configured location. See
+> [state-relocation.md](../../hive/references/state-relocation.md) (or
+> `hive/references/state-relocation.md` from repo root).
+
 Run a structured code review workflow.
 
 **Input:** `$ARGUMENTS` optionally contains a PR number, branch name, or file paths.

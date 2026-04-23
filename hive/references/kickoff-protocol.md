@@ -1,5 +1,11 @@
 # Hive Kickoff Protocol
 
+> **State Directory Note:** Paths shown as `.pHive/...` assume the default
+> state directory. If you have relocated state via `paths.state_dir`,
+> substitute your configured location. See
+> [state-relocation.md](state-relocation.md) (or
+> `hive/references/state-relocation.md` from repo root).
+
 Initialize Hive for a project. Detects brownfield vs greenfield automatically.
 
 **Input:** `$ARGUMENTS` optionally describes the project or intent.
