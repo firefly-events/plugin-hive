@@ -21,10 +21,50 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HIVE_ROOT="${HIVE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
+_canonicalize_path() {
+  local path="$1"
+  local resolved=""
+
+  if command -v realpath &>/dev/null; then
+    if resolved=$(realpath -m "$path" 2>/dev/null); then
+      echo "$resolved"
+      return
+    fi
+    if resolved=$(realpath "$path" 2>/dev/null); then
+      echo "$resolved"
+      return
+    fi
+  fi
+
+  if command -v readlink &>/dev/null; then
+    if resolved=$(readlink -f "$path" 2>/dev/null); then
+      echo "$resolved"
+      return
+    fi
+  fi
+
+  local abs_path="$path"
+  if [[ "$abs_path" != /* ]]; then
+    abs_path="$PWD/$abs_path"
+  fi
+
+  local dir_path="${abs_path%/*}"
+  local base_name="${abs_path##*/}"
+
+  if [[ -d "$dir_path" ]]; then
+    if resolved=$(cd "$dir_path" 2>/dev/null && pwd -P); then
+      echo "${resolved%/}/$base_name"
+      return
+    fi
+  fi
+
+  echo "$abs_path"
+}
+
 _read_paths_config() {
   local key="$1"
   local default="$2"
-  local config_path="$HIVE_ROOT/hive.config.yaml"
+  local config_path="${CONFIG_FILE:-$HIVE_ROOT/hive.config.yaml}"
   local val=""
 
   if [[ ! -f "$config_path" ]]; then
@@ -34,7 +74,9 @@ _read_paths_config() {
 
   if command -v yq &>/dev/null; then
     val=$(yq -r ".paths.${key}" "$config_path" 2>/dev/null || true)
-  elif command -v python3 &>/dev/null; then
+  fi
+
+  if [[ -z "${val:-}" ]] && command -v python3 &>/dev/null; then
     val=$(python3 - "$config_path" "$key" <<'PYEOF'
 import sys
 try:
@@ -47,8 +89,10 @@ try:
 except Exception:
     pass
 PYEOF
-    )
-  else
+    2>/dev/null || true)
+  fi
+
+  if [[ -z "${val:-}" ]]; then
     val=$(awk -v key="$key" '
       /^paths:[[:space:]]*$/ { in_paths=1; next }
       in_paths && /^[^[:space:]#][^:]*:/ { in_paths=0 }
@@ -79,7 +123,17 @@ PYEOF
 }
 
 _resolve_state_dir() {
-  _read_paths_config "state_dir" ".pHive"
+  local state_dir=""
+  local target_project=""
+
+  state_dir=$(_read_paths_config "state_dir" ".pHive")
+  if [[ "$state_dir" == /* ]]; then
+    _canonicalize_path "$state_dir"
+    return
+  fi
+
+  target_project=$(_resolve_target_project)
+  _canonicalize_path "$target_project/$state_dir"
 }
 
 _resolve_target_project() {
@@ -87,7 +141,9 @@ _resolve_target_project() {
   target_project=$(_read_paths_config "target_project" "")
   if [[ -z "$target_project" ]]; then
     echo "$PWD"
+  elif [[ "$target_project" == /* ]]; then
+    _canonicalize_path "$target_project"
   else
-    echo "$target_project"
+    _canonicalize_path "$PWD/$target_project"
   fi
 }

@@ -48,7 +48,7 @@ Implications:
 |---|---|---|
 | Surface | Ships to marketplace consumers | In maintainer-skills/ — excluded from marketplace |
 | Target | Resolved via HIVE_TARGET_PROJECT (config-first, cwd fallback) | Hardwired to the plugin-hive root |
-| Adapter | DirectCommitAdapter(repo_path=HIVE_TARGET_PROJECT) | DirectCommitAdapter(repo_path=<plugin-hive root>) |
+| Adapter | `DirectCommitAdapter(repo_path=HIVE_TARGET_PROJECT)` | `DirectCommitAdapter(repo_path=<plugin-hive root>)` |
 | Charter | Rendered from hive/references/meta-team-charter-template.md at cycle boot | Local-only maintainer charter under plugin-hive's own .pHive/meta-team/ |
 | Taxonomy | Charter-defined (pluggable per target project) | Plugin-hive-specific categories |
 

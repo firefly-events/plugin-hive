@@ -56,6 +56,34 @@ Before querying any provider:
 - Exclude ideas that would require changes outside the charter or human-only decisions
 
 ### 2. Query external providers
+
+**No-leak boundary (MANDATORY — read before every query):**
+
+Only sanitized, non-sensitive search terms may leave the target project. Before
+constructing any Firecrawl / Context7 / arXiv query, validate the query string
+against these rejection rules:
+
+- No PII — personal names, email addresses, phone numbers, usernames.
+- No secrets — API keys, tokens, passwords, credentials, environment values.
+- No internal identifiers — internal hostnames, private URLs, ticket IDs from
+  private trackers, internal project codenames not already public.
+- No repository-specific paths — absolute filesystem paths to the target
+  project, internal directory trees, repo-specific file names that expose
+  non-public structure.
+- No code excerpts containing any of the above.
+
+Apply `sanitizeExternalQuery(query)` (or the equivalent `requireSanitizedQuery`
+approval gate in the invoking session) BEFORE calling any provider. If a query
+cannot be sanitized without losing its research intent, redact it or refuse
+the call — do NOT send the query and record the refusal as a finding. If the
+orchestrator or user has not explicitly authorized a borderline query, default
+to refusal and escalate for approval.
+
+Only after the sanitizer approves (or an explicit human-authorized override is
+in place) is the query permitted to leave the project. Log the sanitized query
+text alongside each candidate produced in step 4 so the evidence trail captures
+what was actually sent outbound.
+
 Use Firecrawl, Context7, and arXiv as available to gather:
 - Comparable workflow patterns for autonomous review / proposal systems
 - Documentation or reference patterns that improve maintainability, clarity, or schema consistency
@@ -76,8 +104,15 @@ When an externally sourced idea overlaps with an internal finding, keep it as a 
 ### 4. Shape candidates for step 3
 Write each candidate in the same general proposal shape expected by step 3, using the usual proposal fields where they can already be determined. Include:
 
+Use the `external-proposal-` ID namespace so external candidates never collide
+with the `proposal-` namespace used by internal-audit conversions. Consumers
+and validators (step-03-proposal.md + step-06-evaluation.md) MUST accept both
+prefixes; the `discovery_source` field is the authoritative routing key, but
+the distinct ID prefix lets grep-based tools and humans separate feeds at a
+glance.
+
 ```yaml
-id: proposal-{N}
+id: external-proposal-{N}
 title: {one-line title}
 discovery_source: external_research
 addresses_findings: [finding-{N}, ...]  # optional if no direct internal finding maps cleanly
@@ -139,9 +174,22 @@ research_summary: {string summary of provider usage and notable candidate themes
 
 ## FAILURE MODES
 
-- No useful external ideas found: output an empty candidate list and proceed normally
-- Provider unavailable: continue with remaining providers and note the gap in the summary
-- Candidate too vague to implement: discard it rather than passing low-quality noise to step 3
+**Guaranteed output contract:** this step ALWAYS emits a
+`external_research_candidates` list as its output, including an explicit empty
+list `[]` when no candidates qualify. Step 03 declares `external-research` as
+a predecessor; the empty-list guarantee is how this step remains additive-only
+rather than a blocker on proposal. Downstream consumers treat an empty list
+identically to a missing one (additive = additive + ∅).
+
+- No useful external ideas found: emit an empty candidate list and proceed normally.
+- Provider unavailable (Firecrawl/Context7/arXiv network or auth error):
+  continue with remaining providers if any; if ALL providers fail, emit an
+  empty candidate list, note the full provider-outage in the summary, and
+  proceed normally. Do NOT fail the step.
+- Sanitizer refusal: log the refusal, skip that query, continue with remaining
+  queries. If every query is refused, emit an empty candidate list.
+- Candidate too vague to implement: discard it rather than passing low-quality
+  noise to step 3.
 
 ## NEXT STEP
 

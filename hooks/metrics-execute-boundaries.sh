@@ -21,8 +21,9 @@ set -euo pipefail
 
 # Resolve config path anchored to HIVE_ROOT
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HIVE_ROOT="${HIVE_ROOT:-$(dirname "$SCRIPT_DIR")}"
-. "$HIVE_ROOT/hooks/common.sh"
+PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HIVE_ROOT="${HIVE_ROOT:-${CLAUDE_PROJECT_DIR:-$PLUGIN_ROOT}}"
+. "$PLUGIN_ROOT/hooks/common.sh"
 HIVE_CONFIG="${HIVE_CONFIG:-$HIVE_ROOT/hive.config.yaml}"
 
 # Three-tier YAML-scoped config reader: yq → python3 yaml.safe_load → awk-scoped grep
@@ -73,7 +74,6 @@ state_dir=$(_resolve_state_dir)
 
 # Strip leading/trailing whitespace
 metrics_enabled=$(echo "$metrics_enabled" | awk '{print $1}')
-state_dir=$(echo "$state_dir" | awk '{print $1}')
 
 # Silent no-op when metrics are disabled
 if [[ "$metrics_enabled" != "true" ]]; then
@@ -140,10 +140,7 @@ phase="${HIVE_PHASE:-}"
 # Shared timestamp for both events in this boundary emission
 timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Ensure events directory exists (anchor relative state_dir to HIVE_ROOT)
-if [[ "$state_dir" != /* ]]; then
-  state_dir="$HIVE_ROOT/$state_dir"
-fi
+# Ensure events directory exists
 metrics_dir="$state_dir/metrics"
 events_dir="${metrics_dir}/events"
 mkdir -p "$events_dir"

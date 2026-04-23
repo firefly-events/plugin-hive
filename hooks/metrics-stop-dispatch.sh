@@ -1,21 +1,23 @@
 #!/bin/bash
 # metrics-stop-dispatch.sh — Stop-hook metrics dispatcher (C2.2)
 #
-# Reads hive.config.yaml for metrics.enabled and metrics.dir.
+# Reads `metrics.enabled` from the root `hive.config.yaml` and derives the
+# metrics events directory via `_resolve_state_dir` in `hooks/common.sh`
+# (`paths.state_dir` + `/metrics/events`, default `.pHive/metrics/events`).
 # If enabled, extracts token totals from the Claude Code JSONL transcript
 # (C2.0 chosen mechanism) and writes a story-end JSONL event to
-# $metrics_dir/events/. If disabled, exits 0 silently.
+# `${state_dir}/metrics/events/`. If disabled, exits 0 silently.
 # Always exits 0 on internal failure (handler isolation — sentinel must not be
 # suppressed by any failure in this script).
 
 # No set -e: use per-line guards (|| exit 0) to avoid partial-write risk (I-4)
 set -uo pipefail
 
-# Resolve project root (always the git repo root regardless of cwd at hook time)
-# HIVE_REPO_ROOT_OVERRIDE allows tests to inject a fixture root
+# Resolve project root (consumer config/state can differ from plugin install dir)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HIVE_ROOT="${HIVE_ROOT:-${HIVE_REPO_ROOT_OVERRIDE:-$(dirname "$SCRIPT_DIR")}}"
-. "$HIVE_ROOT/hooks/common.sh"
+PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HIVE_ROOT="${HIVE_ROOT:-${CLAUDE_PROJECT_DIR:-$PLUGIN_ROOT}}"
+. "$PLUGIN_ROOT/hooks/common.sh"
 REPO_ROOT="$HIVE_ROOT"
 CONFIG="${CONFIG:-$REPO_ROOT/hive.config.yaml}"
 
@@ -65,7 +67,6 @@ STATE_DIR=$(_resolve_state_dir)
 
 # Strip leading/trailing whitespace and comment suffixes from yaml values
 METRICS_ENABLED=$(echo "$METRICS_ENABLED" | awk '{print $1}')
-STATE_DIR=$(echo "$STATE_DIR" | awk '{print $1}')
 
 # Gate: if not enabled, exit silently
 if [ "$METRICS_ENABLED" != "true" ]; then
@@ -78,10 +79,6 @@ SESSION_ID=$(echo "$HOOK_INPUT" | jq -r '.session_id // ""' 2>/dev/null || echo 
 TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | jq -r '.transcript_path // ""' 2>/dev/null || echo "")
 HOOK_CWD=$(echo "$HOOK_INPUT" | jq -r '.cwd // ""' 2>/dev/null || echo "$REPO_ROOT")
 
-# Resolve absolute metrics dir
-if [[ "$STATE_DIR" != /* ]]; then
-  STATE_DIR="$REPO_ROOT/$STATE_DIR"
-fi
 METRICS_DIR="$STATE_DIR/metrics"
 EVENTS_DIR="$METRICS_DIR/events"
 mkdir -p "$EVENTS_DIR" || exit 0

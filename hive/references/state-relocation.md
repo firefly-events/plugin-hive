@@ -13,16 +13,19 @@ root. You can move it elsewhere via the `paths.state_dir` key in your root
 
 ## How to configure
 
-In `hive.config.yaml` at your project root, add (or edit) the `paths` block:
+In `hive.config.yaml` at your project root, add (or edit) the `paths` block.
+Pick an absolute or relative value for `state_dir` to suit your setup — relative
+paths resolve against the project root (the directory where `hive.config.yaml`
+lives); absolute paths are used as-is.
 
 ```yaml
 paths:
-  state_dir: /absolute/path/or/relative/path
+  # Absolute example — state lives outside the Git-tracked tree:
+  state_dir: /Users/alice/.hive-state/my-project
+  # Relative example (comment out the line above and uncomment this one):
+  # state_dir: ../.hive-state
   target_project: null  # leave null to use the invoking cwd
 ```
-
-Relative paths resolve against the project root (the directory where
-`hive.config.yaml` lives). Absolute paths are used as-is.
 
 ## What honors `paths.state_dir` today
 
@@ -50,12 +53,30 @@ it for the follow-up work rather than treating it as a bug.
 If you already have state at `.pHive/` and want to move it:
 
 1. Stop any running Hive session.
-2. `mv .pHive /new/state/dir`
-3. Update `hive.config.yaml` → `paths.state_dir: /new/state/dir`
-4. Resume work.
+2. Move the state. Pick ONE of these depending on what you want:
+
+   **Option A — `.pHive` contents become the new state root** (typical).
+   The new directory must NOT exist beforehand, or use `rsync` if it already does:
+   ```bash
+   # Fresh destination (must not exist):
+   mv .pHive /new/state/dir
+   # OR destination already exists (merge contents):
+   rsync -a .pHive/ /new/state/dir/ && rm -rf .pHive
+   ```
+   Then set `paths.state_dir: /new/state/dir` in root `hive.config.yaml`.
+
+   **Option B — keep `.pHive` as a sub-directory under a parent.**
+   Move the whole `.pHive/` directory under a parent you already use:
+   ```bash
+   mv .pHive /parent/of/state/
+   ```
+   Then set `paths.state_dir: /parent/of/state/.pHive` (include the `.pHive`
+   basename so the resolver points at the moved directory).
+
+3. Resume work.
 
 No data transformation is needed — the directory shape is identical in both
-locations.
+locations; only the resolver's base changes.
 
 ## See also
 

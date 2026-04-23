@@ -45,10 +45,18 @@ steps:
 
   - id: external-research
     agent: researcher
+    # ADDITIVE-ONLY CONTRACT: this step always emits an
+    # `external_research_candidates` list (empty list on provider/network
+    # failure, sanitizer refusal, or zero qualifying candidates). See
+    # `step-02b-external-research.md` FAILURE MODES for the guaranteed-output
+    # contract. Because of that guarantee, downstream steps that declare
+    # external-research as a predecessor never block on its failure — they
+    # just see an empty list and continue with internal-audit proposals only.
     task: >
       Query external sources for candidate improvement proposals that complement
       the internal audit without replacing it. Feed externally sourced
-      candidates into the proposal ranking queue.
+      candidates into the proposal ranking queue. Always emit
+      external_research_candidates, even if the list is empty.
     step_file: hive/workflows/steps/meta-team-cycle/step-02b-external-research.md
     depends_on:
       - analysis

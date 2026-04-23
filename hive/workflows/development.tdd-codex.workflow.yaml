@@ -330,7 +330,7 @@ steps:
          encountered, and patterns you'd reuse. Output as markdown."
       2. Poll cmux read-screen for Codex response.
       3. Capture Codex insights to episode:
-         <HIVE_STATE_DIR>/episodes/{story_id}/codex/{agent}-insights.md, where HIVE_STATE_DIR is the value of paths.state_dir in hive.config.yaml (default .pHive)
+         <HIVE_STATE_DIR>/episodes/{story_id}/codex/{agent}-codex-insights.md, where HIVE_STATE_DIR is the value of paths.state_dir in hive.config.yaml (default .pHive)
       4. Capture full scrollback:
          cmux read-screen --surface <id> --scrollback → transcript file
       5. Close the pane: cmux close-surface --surface <id>

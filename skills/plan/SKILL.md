@@ -87,22 +87,17 @@ If all checks pass, proceed normally.
 
    Before spawning anyone, consult `agent_backends` using the root-first precedence contract loaded in the pre-flight config step above. For each persona in the assembled list, compare the configured backend (if any) against the `skills/hive/skills/codex-invoke/SKILL.md` contract under `Supported personas (PoC)` and `Known-incompatible personas`.
 
-   Produce a `routing_decisions` map for the assembled personas with one value per persona: `codex` or `direct`.
+   Produce a `routing_decisions` map for the assembled personas with one value per persona: `codex` or `direct`. Also store a tentative `routing_reason` per persona so Step 0.3 can emit the final structured INFO log after the spawn path succeeds or falls back.
 
    - If `agent_backends[persona] == codex` and the persona is in codex-invoke `Supported personas (PoC)`, set that persona to `codex`.
-   - If `agent_backends[persona] == codex` and the persona is in codex-invoke `Known-incompatible personas`, set that persona to `direct` and INFO-log that the Codex backend is known-incompatible for that persona.
-   - If `agent_backends[persona] == codex` but the persona is in neither contract list, set that persona to `direct` and INFO-log that the persona is unvalidated for Codex, so routing stays conservative.
+   - If `agent_backends[persona] == codex` and the persona is in codex-invoke `Known-incompatible personas`, set that persona to `direct`.
+   - If `agent_backends[persona] == codex` but the persona is in neither contract list, set that persona to `direct` because the persona is unvalidated for Codex, so routing stays conservative.
+   - If `agent_backends[persona] == "claude"`, set that persona to `direct` via explicit direct TeamCreate routing.
    - If `agent_backends[persona]` is unset, or `agent_backends` is absent, set that persona to `direct` and keep current direct-TeamCreate behavior.
 
    Apply this per assembled persona, including optional members only when they were added in Step 0.1. `ui-designer` is always routed `direct` even when configured to `codex`, because codex-invoke marks that persona as known-incompatible.
 
-   Use these INFO-log directives when the route is decided:
-   - `[info] planning routing: persona=technical-writer requested=codex path=codex-invoke reason=no-fallback-needed`
-   - `[info] planning routing: persona=ui-designer requested=codex path=TeamCreate reason=known-incompatible`
-   - `[info] planning routing: persona={X} requested=codex path=TeamCreate reason=unvalidated-persona`
-   - `[info] planning routing: persona={X} requested=unset path=TeamCreate reason=agent_backends-unset`
-
-   If a persona is configured to `codex` but is neither supported nor known-incompatible in the codex-invoke contract, INFO-log that the persona is unvalidated for Codex and route `direct`.
+   Step 0.2 decides and stores tentative routing only. It does NOT emit the INFO log. The single source of truth is: exactly one INFO log line per persona, at the final spawn decision point in Step 0.3.
 
    **Step 0.3: Spawn the team across two paths.**
 
@@ -112,6 +107,26 @@ If all checks pass, proceed normally.
    - **Codex path (`agent-spawn` -> `codex-invoke`):** for each persona routed `codex`, create a separate teammate through the `agent-spawn` skill, which in turn invokes the Codex backend via `codex-invoke`. Use persistent pane mode and pass the full persona context, resolved paths, memory loading context, and the same planning-team coordination context that the direct teammates receive.
 
    Mixed teams are valid. Some planning personas may come from `TeamCreate` while others come from `agent-spawn` -> `codex-invoke`; they are still the same planning team. The orchestrator remains the single coordination point, uses `SendMessage` for all work assignment and review loops, and keeps collaborative review gates identical for both backend paths.
+
+   Emit the structured INFO log here, after each persona's final spawn path is known. This is the definitive observability point: exactly one INFO log line per persona, at the final spawn decision point. If Step 0.5 later handles a runtime Codex failure, it updates the Step 0.3 result for that persona by replacing the earlier would-be success log with the fallback outcome instead of adding a second line.
+
+   Preserve the 4-field template exactly:
+   - `[info] planning routing: persona={X} requested={requested_backend|unset} path={codex-invoke|TeamCreate} reason={reason}`
+
+   Valid `reason=` values at this emission point are:
+   - `no-fallback-needed`
+   - `known-incompatible`
+   - `unvalidated-persona`
+   - `claude-requested`
+   - `agent_backends-unset`
+   - `codex-dispatch-failed: {error}`
+
+   Examples:
+   - `[info] planning routing: persona=technical-writer requested=codex path=codex-invoke reason=no-fallback-needed`
+   - `[info] planning routing: persona=ui-designer requested=codex path=TeamCreate reason=known-incompatible`
+   - `[info] planning routing: persona={X} requested=codex path=TeamCreate reason=unvalidated-persona`
+   - `[info] planning routing: persona={X} requested=claude path=TeamCreate reason=claude-requested`
+   - `[info] planning routing: persona={X} requested=unset path=TeamCreate reason=agent_backends-unset`
 
    **Step 0.4: Mixed-team prompt template.**
 
@@ -169,9 +184,11 @@ If all checks pass, proceed normally.
       compose it to ADD the failed persona back into the direct team. Or use
       SendMessage to instruct the existing TeamCreate-spawned teammates to
       adopt the re-routed teammate via the same SendMessage coordination.)
-   3. Emit an INFO log with the runtime-failure reason included:
-      [info] planning routing: persona={X} requested=codex path=TeamCreate reason=codex-dispatch-failed: <error>
-      where <error> is a short excerpt of the failure (max 120 chars — truncate
+   3. Update the Step 0.3 INFO log outcome for that persona so the final emitted
+      line reflects the runtime-failure reason instead of the earlier would-be
+      success result:
+      [info] planning routing: persona={X} requested=codex path=TeamCreate reason=codex-dispatch-failed: {error}
+      where {error} is a short excerpt of the failure (max 120 chars — truncate
       long stderr dumps).
    4. Continue with the rest of the planning flow. Planning-team quality may
       degrade (persona now runs on Claude instead of Codex), but assembly
@@ -184,10 +201,10 @@ If all checks pass, proceed normally.
    circuit breaker; the underlying fallback contract is unchanged.
 
    **Observability contract:** Every planning-persona spawn — success or
-   fallback — must emit exactly one structured INFO log line per the template
-   above. Operators diagnosing backend-routing issues rely on these lines as
-   the authoritative trace. Do NOT skip the INFO log. Do NOT collapse multiple
-   persona routings into one log line.
+   fallback — must emit exactly one structured INFO log line per persona at the
+   final spawn decision point in Step 0.3. Operators diagnosing backend-routing
+   issues rely on these lines as the authoritative trace. Do NOT skip the INFO
+   log. Do NOT collapse multiple persona routings into one log line.
 
 ### Phase A: Research
 

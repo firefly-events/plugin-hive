@@ -1,6 +1,6 @@
 # Sequential Execution (Step 7)
 
-> `${HIVE_STATE_DIR}` resolves from `paths.state_dir` in `hive/hive.config.yaml` (or root `hive.config.yaml`). Default: `.pHive`.
+> `${HIVE_STATE_DIR}` resolves from `paths.state_dir` in the ROOT `hive.config.yaml` at runtime (not from the shipped baseline `hive/hive.config.yaml`). Default: `.pHive`. Relocation after marketplace install still works.
 
 For each story (in dependency order):
 

@@ -1,6 +1,6 @@
 # Team Execution (Step 6)
 
-> `${HIVE_STATE_DIR}` resolves from `paths.state_dir` in `hive/hive.config.yaml` (or root `hive.config.yaml`). Default: `.pHive`.
+> `${HIVE_STATE_DIR}` resolves from `paths.state_dir` in the ROOT `hive.config.yaml` at runtime (not from the shipped baseline `hive/hive.config.yaml`). Default: `.pHive`.
 
 Use the `TeamCreate` tool to spawn an agent team. Generate a natural-language team creation prompt that describes the epic and its tasks:
 

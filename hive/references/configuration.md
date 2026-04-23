@@ -30,7 +30,7 @@ See `hive/hive.config.yaml` for the shipped default template with comments.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `paths.state_dir` | `.pHive` | Directory where Hive stores per-project state (epics, episodes, cycle state, sessions, memories). Slice 1 introduces the unified resolver; until then, shipped skills and workflows still reference `.pHive/` directly in some places, so alternate values are documented ahead of full end-to-end wiring. |
+| `paths.state_dir` | `.pHive` | Directory where Hive stores per-project state (epics, episodes, cycle state, sessions, memories). Relocatable — set a different value to move state elsewhere. See `hive/references/state-relocation.md`. |
 | `paths.target_project` | `null` | Primary source for the "attached project" path used by meta-team targeting. When unset (`null`), the resolver falls back to the invoking cwd. Config-key first, cwd fallback, no CLI argument form. |
 
 ### Relocating the state directory

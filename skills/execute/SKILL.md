@@ -11,13 +11,13 @@ Execute stories through development workflow phases.
 
 ## State directory resolution
 
-All state paths in this skill are written as `${HIVE_STATE_DIR}/...`. Resolve `HIVE_STATE_DIR` from `paths.state_dir` in `hive/hive.config.yaml` (or the root `hive.config.yaml` if no `hive/` variant exists). The shipped default is `.pHive` — when the config sets a different value, substitute that value everywhere this skill writes `${HIVE_STATE_DIR}`.
+All state paths in this skill are written as `${HIVE_STATE_DIR}/...`. Resolve `HIVE_STATE_DIR` from `paths.state_dir` in the ROOT `hive.config.yaml` (the consumer override layer). The shipped baseline at `hive/hive.config.yaml` is a fall-through source — it does NOT drive runtime path decisions per the Slice 1 resolver contract. The default is `.pHive`. When the root config sets a different value, substitute that value everywhere this skill writes `${HIVE_STATE_DIR}`, so relocation after marketplace install still works.
 
 ## Kickoff Gate
 
 **Before doing anything else**, check whether Hive has been initialized for this project:
 
-1. Check if `${HIVE_STATE_DIR}/project-profile.yaml` exists in the project root
+1. Check if `${HIVE_STATE_DIR}/project-profile.yaml` exists (resolved from `paths.state_dir`; see the resolution note above)
 2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
 3. As a secondary check, verify `hive.config.yaml` exists (check both `hive/hive.config.yaml` and `hive.config.yaml` in the project root — either location is valid)
 

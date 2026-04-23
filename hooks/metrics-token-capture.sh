@@ -31,8 +31,9 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HIVE_ROOT="${HIVE_ROOT:-$(dirname "$SCRIPT_DIR")}"
-. "$HIVE_ROOT/hooks/common.sh"
+PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HIVE_ROOT="${HIVE_ROOT:-${CLAUDE_PROJECT_DIR:-$PLUGIN_ROOT}}"
+. "$PLUGIN_ROOT/hooks/common.sh"
 CONFIG_FILE="${CONFIG_FILE:-$HIVE_ROOT/hive.config.yaml}"
 
 trap 'exit 0' ERR
@@ -77,7 +78,6 @@ METRICS_ENABLED=$(_read_metrics_config "enabled" "false")
 STATE_DIR=$(_resolve_state_dir)
 
 METRICS_ENABLED=$(echo "$METRICS_ENABLED" | awk '{print $1}')
-STATE_DIR=$(echo "$STATE_DIR" | awk '{print $1}')
 
 if [ "$METRICS_ENABLED" != "true" ]; then
   exit 0
@@ -120,10 +120,6 @@ if [ -n "$story_id" ] && [ -n "$proposal_id" ]; then
   exit 1
 fi
 
-# Resolve absolute metrics dir
-if [[ "$STATE_DIR" != /* ]]; then
-  STATE_DIR="$HIVE_ROOT/$STATE_DIR"
-fi
 METRICS_DIR="$STATE_DIR/metrics"
 EVENTS_DIR="$METRICS_DIR/events"
 mkdir -p "$EVENTS_DIR" || exit 0

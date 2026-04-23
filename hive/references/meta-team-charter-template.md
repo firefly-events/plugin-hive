@@ -46,13 +46,19 @@ Public default example for `/meta-optimize`:
 # Example public default taxonomy (for /meta-optimize)
 taxonomy:
   finding_categories:
-    - code-quality
-    - test-coverage
-    - documentation
-    - performance
-    - security
+    - id: code_quality
+      label: "Code quality / readability / maintainability"
+    - id: test_coverage
+      label: "Test coverage gaps or test-quality issues"
+    - id: documentation
+      label: "Documentation accuracy or completeness"
+    - id: performance
+      label: "Runtime performance regressions or opportunities"
+    - id: security
+      label: "Security gaps or vulnerabilities"
     # Project-specific example:
-    # - workflow-correctness
+    # - id: workflow_correctness
+    #   label: "Multi-agent workflow correctness"
 ```
 
 Plugin-hive-specific maintainer example for `/meta-meta-optimize`:
@@ -78,13 +84,18 @@ taxonomy:
 ```
 
 Categories are charter-defined. The step files `step-02-analysis`,
-`step-03-proposal`, and `step-06-evaluation` read taxonomy from the rendered
-charter and do NOT hardcode category lists. To add or remove categories, edit
-the taxonomy block in the charter rather than changing step logic.
+`step-03-proposal`, and `step-06-evaluation` SHOULD read taxonomy from the
+rendered charter — not hardcode category lists. Today those steps still
+reference inline category names (the plugin-hive maintainer set). Wiring
+each step to iterate the charter's `taxonomy.finding_categories:` list at
+run-time is a deferred follow-up (tracked with the `project_state_dir_resolver`
+deferred work); until then, adding a new category for a non-plugin-hive target
+requires both updating the rendered charter AND updating the step files'
+inline category references.
 
-**Contract:** Analysis, proposal, and evaluation steps treat the `taxonomy.finding_categories:` list from the rendered charter as the AUTHORITATIVE category set for the cycle. Steps MUST NOT fall back to any hardcoded category list. If the rendered charter's taxonomy block is empty or missing, treat it as a charter-quality finding (surface it, halt the cycle).
+**Contract (target state):** Analysis, proposal, and evaluation steps treat the `taxonomy.finding_categories:` list from the rendered charter as the AUTHORITATIVE category set for the cycle. Steps MUST NOT fall back to any hardcoded category list. If the rendered charter's taxonomy block is empty or missing, treat it as a charter-quality finding (surface it, halt the cycle). _Enforced once the deferred step-wiring lands._
 
-**Pluggability:** A charter may declare any category set that fits its target project. Categories may be alphanumeric + underscore IDs with a human-readable label. There is no enforced minimum or maximum. The step logic iterates the list at run-time; adding or removing categories does NOT require step-file edits.
+**Pluggability:** A charter may declare any category set that fits its target project. Each category is an object with an `id` (alphanumeric + underscore) and a `label` (human-readable). There is no enforced minimum or maximum. Once the runtime-consumption wiring lands, the step logic iterates the list at run-time; adding or removing categories will not require step-file edits.
 
 The default set above is intentionally generic for the public
 `/meta-optimize` surface. Maintainers can render project-specific variants by
@@ -167,10 +178,15 @@ change-management committee — it ships.
 ```yaml
 taxonomy:
   finding_categories:
-    - code-quality
-    - test-coverage
-    - documentation
-    - performance
-    - security
+    - id: code_quality
+      label: "Code quality / readability / maintainability"
+    - id: test_coverage
+      label: "Test coverage gaps or test-quality issues"
+    - id: documentation
+      label: "Documentation accuracy or completeness"
+    - id: performance
+      label: "Runtime performance regressions or opportunities"
+    - id: security
+      label: "Security gaps or vulnerabilities"
 ```
 ```

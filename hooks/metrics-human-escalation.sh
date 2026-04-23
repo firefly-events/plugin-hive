@@ -11,16 +11,19 @@
 #     [--agent <agent>]          \
 #     [--reason <reason>]
 #
-# Reads metrics.enabled and metrics.dir from hive.config.yaml (resolved relative
-# to HIVE_ROOT, defaulting to the directory containing this script's parent).
-# Silent no-op when metrics.enabled is false or missing.
+# Reads `metrics.enabled` from the root `hive.config.yaml` (via HIVE_ROOT) and
+# derives the metrics events directory as `${state_dir}/metrics/events`, where
+# `state_dir` comes from `_resolve_state_dir` in `hooks/common.sh`
+# (which reads `paths.state_dir` from root config, default `.pHive`).
+# Silent no-op when `metrics.enabled` is false or missing.
 
 set -euo pipefail
 
 # --- locate config -----------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HIVE_ROOT="${HIVE_ROOT:-$(dirname "$SCRIPT_DIR")}"
-. "$HIVE_ROOT/hooks/common.sh"
+PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HIVE_ROOT="${HIVE_ROOT:-${CLAUDE_PROJECT_DIR:-$PLUGIN_ROOT}}"
+. "$PLUGIN_ROOT/hooks/common.sh"
 CONFIG_FILE="${CONFIG_FILE:-$HIVE_ROOT/hive.config.yaml}"
 
 # --- read gate ---------------------------------------------------------------
@@ -62,7 +65,6 @@ PYEOF
 metrics_enabled=$(_read_metrics_config "enabled" "false")
 state_dir=$(_resolve_state_dir)
 metrics_enabled=$(echo "$metrics_enabled" | awk '{print $1}')
-state_dir=$(echo "$state_dir" | awk '{print $1}')
 
 # silent no-op when disabled
 if [[ "$metrics_enabled" != "true" ]]; then
@@ -144,9 +146,6 @@ event=$(jq -cn \
   "$jq_filter")
 
 # --- write -------------------------------------------------------------------
-if [[ "$state_dir" != /* ]]; then
-  state_dir="$HIVE_ROOT/$state_dir"
-fi
 metrics_dir="$state_dir/metrics"
 events_dir="${metrics_dir}/events"
 mkdir -p "$events_dir"

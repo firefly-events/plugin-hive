@@ -115,6 +115,7 @@ By category:
   MISSING_FILE: {N}
   SCHEMA_INCONSISTENCY: {N}
   INCOMPLETE_STEP_FILE: {N}
+  MISSING_STEP_FILE: {N}
   MEMORY_GAP: {N}
   STUB_DOC: {N}
   OTHER: {N}
@@ -140,5 +141,5 @@ Top findings:
 ## NEXT STEP
 
 **Gating:** Analysis report complete with at least one finding (or explicit "no findings" if clean)
-**Next:** Load `hive/workflows/steps/meta-team-cycle/step-03-proposal.md`
+**Next:** Load `hive/workflows/steps/meta-team-cycle/step-02b-external-research.md`. That step runs in parallel with the findings from this step and produces additional proposal candidates with `discovery_source: external_research`. Step 03 (`step-03-proposal.md`) consumes both this step's findings and step-02b's external candidates to compose the ranked proposal list.
 **If gating fails:** Report which audit checks could not run and why.

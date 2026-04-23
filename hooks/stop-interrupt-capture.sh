@@ -8,15 +8,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HIVE_ROOT="${HIVE_ROOT:-$(dirname "$SCRIPT_DIR")}"
-. "$HIVE_ROOT/hooks/common.sh"
+PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HIVE_ROOT="${HIVE_ROOT:-${CLAUDE_PROJECT_DIR:-$PLUGIN_ROOT}}"
+. "$PLUGIN_ROOT/hooks/common.sh"
 
 state_dir=$(_resolve_state_dir)
-state_dir=$(echo "$state_dir" | awk '{print $1}')
-
-if [[ "$state_dir" != /* ]]; then
-  state_dir="$HIVE_ROOT/$state_dir"
-fi
 
 interrupt_dir="$state_dir/interrupts"
 mkdir -p "$interrupt_dir"

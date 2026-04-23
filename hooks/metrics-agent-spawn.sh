@@ -18,8 +18,9 @@ set -euo pipefail
 
 # Resolve config path anchored to HIVE_ROOT
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HIVE_ROOT="${HIVE_ROOT:-$(dirname "$SCRIPT_DIR")}"
-. "$HIVE_ROOT/hooks/common.sh"
+PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HIVE_ROOT="${HIVE_ROOT:-${CLAUDE_PROJECT_DIR:-$PLUGIN_ROOT}}"
+. "$PLUGIN_ROOT/hooks/common.sh"
 HIVE_CONFIG="${HIVE_CONFIG:-$HIVE_ROOT/hive.config.yaml}"
 
 # Three-tier YAML-scoped config reader (I-4): yq → python3 yaml.safe_load → awk-scoped grep
@@ -34,8 +35,9 @@ _read_metrics_config() {
   local val=""
   if command -v yq &>/dev/null; then
     val=$(yq ".metrics.${key}" "$HIVE_CONFIG" 2>/dev/null | tr -d ' "' || true)
-  elif command -v python3 &>/dev/null; then
-    val=$(python3 - "$HIVE_CONFIG" "$key" <<'PYEOF'
+  fi
+  if [[ -z "${val:-}" ]] && command -v python3 &>/dev/null; then
+    if ! val=$(python3 - "$HIVE_CONFIG" "$key" <<'PYEOF'
 import sys
 try:
     import yaml
@@ -47,8 +49,11 @@ try:
 except Exception:
     pass
 PYEOF
-    )
-  else
+    ); then
+      val=""
+    fi
+  fi
+  if [[ -z "${val:-}" ]]; then
     val=$(awk '/^metrics:/{flag=1; next} /^[a-zA-Z]/{flag=0} flag && /^[[:space:]]+'"$key"':/' "$HIVE_CONFIG" \
       | head -1 | sed 's/[^:]*:[[:space:]]*//' | tr -d ' "')
   fi
@@ -64,7 +69,6 @@ state_dir=$(_resolve_state_dir)
 
 # Strip leading/trailing whitespace
 metrics_enabled=$(echo "$metrics_enabled" | awk '{print $1}')
-state_dir=$(echo "$state_dir" | awk '{print $1}')
 
 # Silent no-op when metrics are disabled
 if [[ "$metrics_enabled" != "true" ]]; then
@@ -147,9 +151,6 @@ event_row=$(jq -cn \
   "$jq_filter")
 
 # Ensure events directory exists and write
-if [[ "$state_dir" != /* ]]; then
-  state_dir="$HIVE_ROOT/$state_dir"
-fi
 metrics_dir="$state_dir/metrics"
 events_dir="${metrics_dir}/events"
 mkdir -p "$events_dir"
