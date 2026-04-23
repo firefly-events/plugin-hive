@@ -70,6 +70,13 @@ def load_backlog_candidates(target_project: Path) -> list[dict[str, Any]]:
     return [entry for entry in candidates if isinstance(entry, dict)]
 
 
+def select_backlog_candidate(candidates: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for entry in candidates:
+        if entry.get("status") == "pending":
+            return entry
+    return None
+
+
 def run_public_cycle(target_project: Path) -> dict[str, Any]:
     target_root = Path(target_project).resolve()
     _assert_clean_git_repo(target_root)
@@ -86,7 +93,7 @@ def run_public_cycle(target_project: Path) -> dict[str, Any]:
         selected_candidate = ranked_proposals[0] if isinstance(ranked_proposals[0], dict) else None
         cycle_mode = "metrics"
     else:
-        selected_candidate = _first_pending_candidate(backlog_candidates)
+        selected_candidate = select_backlog_candidate(backlog_candidates)
         cycle_mode = "backlog_fallback" if metrics_enabled else "backlog_only"
 
     if selected_candidate is None:
@@ -169,13 +176,6 @@ def _git(cwd: Path, *args: str) -> str:
         text=True,
     )
     return completed.stdout.strip()
-
-
-def _first_pending_candidate(candidates: list[dict[str, Any]]) -> dict[str, Any] | None:
-    for entry in candidates:
-        if entry.get("status") == "pending":
-            return entry
-    return None
 
 
 def _coerce_threshold(value: Any, *, default: float) -> float:
@@ -342,4 +342,5 @@ __all__ = [
     "read_kickoff_metrics_state",
     "resolve_target_project",
     "run_public_cycle",
+    "select_backlog_candidate",
 ]

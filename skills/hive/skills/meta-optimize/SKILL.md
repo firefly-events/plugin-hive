@@ -74,7 +74,7 @@ Load and follow `hive/workflows/steps/meta-team-cycle/step-02-analysis.md`.
 
 Load and follow `hive/workflows/steps/meta-team-cycle/step-03-proposal.md` when metrics signal is present and yields ranked proposals.
 
-If kickoff metrics were enabled but the compare/proposal path produces no ranked proposals, load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` as the public backlog-selection branch.
+If kickoff metrics were enabled but the baseline-to-compare proposal path produces no ranked proposals above threshold, load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` as the public backlog-selection branch.
 
 Do not run both branches for the same cycle. The public fallback branch consumes the consumer-managed backlog file at `{HIVE_TARGET_PROJECT}/.pHive/meta-team/queue-meta-optimize.yaml`.
 
@@ -157,17 +157,41 @@ If the close gate fails:
 
 ## Backlog Fallback
 
-When kickoff metrics are enabled but the signal is insufficient and the L1 compare/proposal path yields no ranked proposals, consume `{HIVE_TARGET_PROJECT}/.pHive/meta-team/queue-meta-optimize.yaml` for human-edited candidate selection.
+Trigger this branch only when both conditions are true:
 
-The expected template location for consumers is:
+- kickoff metrics state is enabled
+- the baseline -> compare proposal path yields no ranked proposals above threshold
 
-`{TARGET}/.pHive/meta-team/queue-meta-optimize.yaml`
+Consumer backlog location:
 
-Rules:
+`{HIVE_TARGET_PROJECT}/.pHive/meta-team/queue-meta-optimize.yaml`
 
-- The backlog is consumer-managed and human-edited
-- No auto-surfacing, auto-population, or auto-reordering happens on the public path
-- Fallback selection stays a thin orchestration handoff into the shared cycle rather than a bespoke replacement workflow
+Consumers populate backlog entries manually. The public path reads:
+
+- `id`
+- `title`
+- `description` or `rationale`
+- `status`
+- optional `priority`
+
+Selection rule:
+
+- mirror `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md`
+- preserve the human-authored order
+- select the first entry whose `status` is `pending`
+- if no pending entry exists, stop with no backlog fallback candidate
+
+Lifecycle rule:
+
+- the cycle still runs baseline -> candidate -> compare -> PR promotion -> close
+- only the proposal source changes from metric-ranked proposal to human backlog entry
+
+Boundary:
+
+- this is human-edit-only
+- no auto-surfacing
+- no new qualitative-ingestion path
+- no auto-generated backlog items
 
 ## Closure
 
