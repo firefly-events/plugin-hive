@@ -9,20 +9,37 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-### Changed
-- **Default state directory renamed `state/` → `.pHive/`.** Hidden by default
-  (like `.git/` or `.claude/`). Configurable via `paths.state_dir` in
-  `hive.config.yaml` if you prefer a different name.
-- All skills and references updated to use `.pHive/` as the default storage
-  location for epics, episodes, cycle state, sessions, memories, etc.
+## [1.1.2] - 2026-04-23
 
 ### Added
+- **Public `/meta-optimize` skill ships (MVS milestone).** New consumer-facing
+  skill that proposes and runs improvement experiments against a user project,
+  with PR-only promotion (no direct main mutation), human-edit-only backlog
+  fallback at `.pHive/meta-team/queue-meta-optimize.yaml`, and unknown-metric-
+  dimension tolerance. See `skills/hive/skills/meta-optimize/SKILL.md` and
+  `hive/references/meta-optimize-contract.md`.
+- `PrPromotionAdapter` in `hive/lib/meta-experiment/` — concrete PR-artifact
+  adapter alongside the maintainer `DirectCommitAdapter`. Close records
+  carry explicit `pr_ref` + `pr_state` evidence.
+- MVS acceptance proof at `.pHive/audits/mvs-proof/` (canonical + `latest.yaml`
+  pointer), 10-item integrity checklist. Regeneration gated behind
+  `HIVE_WRITE_MVS_PROOF=1` (see `hive/references/meta-optimize-maintainer.md`).
 - `paths.state_dir` config setting (default: `.pHive`) — override to keep
   legacy `state/` or pick any directory name.
 - Migration script: `scripts/migrate-state-to-pHive.sh` — renames `state/`
   to `.pHive/` while preserving git history and updating `.gitignore`.
 - Kickoff Step 0: detects legacy `state/` directories on existing projects
   and offers in-place migration (or opt-in to keep using `state/`).
+
+### Changed
+- **Default state directory renamed `state/` → `.pHive/`.** Hidden by default
+  (like `.git/` or `.claude/`). Configurable via `paths.state_dir` in
+  `hive.config.yaml` if you prefer a different name.
+- All skills and references updated to use `.pHive/` as the default storage
+  location for epics, episodes, cycle state, sessions, memories, etc.
+- Kickoff gate in every skill now proceeds silently when checks pass — no
+  user-visible announcement. The gate still surfaces actionable guidance
+  when a check fails.
 
 ### Migration
 Existing projects with a `state/` directory should migrate. Two supported paths:

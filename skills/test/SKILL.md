@@ -21,7 +21,7 @@ If **any** of these checks fail, display this message and **stop** — do not pr
 
 > Hive hasn't been set up for this project yet. Run `/hive:kickoff` first — it takes a few minutes and ensures every agent has full context about your codebase, preferences, and available tools.
 
-If all checks pass, proceed normally.
+If all checks pass, proceed silently — do not announce that the kickoff gate passed. Only surface this section when a check fails.
 
 ## Before Executing Any Skill
 
