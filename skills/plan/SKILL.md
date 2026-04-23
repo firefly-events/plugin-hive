@@ -66,7 +66,9 @@ If all checks pass, proceed normally.
 
 ### Phase 0: Assemble Planning Team
 
-0. **Spawn the planning team.** Use `TeamCreate` to assemble the planning team before any work begins. The orchestrator (main agent) stays as coordinator, directing work via `SendMessage`.
+0. **Assemble the planning team.** The orchestrator (main agent) stays as coordinator, directing work via `SendMessage`.
+
+   **Step 0.1: Build team composition.**
 
    **Core team (always spawned):**
    - **Researcher** (`hive/agents/researcher.md`) — codebase/web exploration, raw findings
@@ -79,11 +81,46 @@ If all checks pass, proceed normally.
 
    **How to decide conditional members:** The orchestrator evaluates the requirement text at team assembly time. Use the same detection keywords from the UI Step Detection section below for the UI designer. For the architect, look for signals like: multiple systems, API design, data model changes, infrastructure, or the word "architecture" itself.
 
-   **TeamCreate prompt template:**
+   Routing happens only after this assembled persona list is finalized. Do not let backend routing change team composition.
+
+   **Step 0.2: Build routing decisions.**
+
+   Before spawning anyone, consult `agent_backends` using the root-first precedence contract loaded in the pre-flight config step above. For each persona in the assembled list, compare the configured backend (if any) against the `skills/hive/skills/codex-invoke/SKILL.md` contract under `Supported personas (PoC)` and `Known-incompatible personas`.
+
+   Produce a `routing_decisions` map for the assembled personas with one value per persona: `codex` or `direct`.
+
+   - If `agent_backends[persona] == codex` and the persona is in codex-invoke `Supported personas (PoC)`, set that persona to `codex`.
+   - If `agent_backends[persona] == codex` and the persona is in codex-invoke `Known-incompatible personas`, set that persona to `direct` and INFO-log that the Codex backend is known-incompatible for that persona.
+   - If `agent_backends[persona] == codex` but the persona is in neither contract list, set that persona to `direct` and INFO-log that the persona is unvalidated for Codex, so routing stays conservative.
+   - If `agent_backends[persona]` is unset, or `agent_backends` is absent, set that persona to `direct` and keep current direct-TeamCreate behavior.
+
+   Apply this per assembled persona, including optional members only when they were added in Step 0.1. `ui-designer` is always routed `direct` even when configured to `codex`, because codex-invoke marks that persona as known-incompatible.
+
+   Use these INFO-log directives when the route is decided:
+   - `[info] planning routing: {persona} -> codex (validated, agent_backends configured) - supported + configured`
+   - `[info] planning routing: {persona} -> direct (known-incompatible with codex) - e.g., ui-designer`
+   - `[info] planning routing: {persona} -> direct (agent_backends not configured) - default fallback`
+
+   If a persona is configured to `codex` but is neither supported nor known-incompatible in the codex-invoke contract, INFO-log that the persona is unvalidated for Codex and route `direct`.
+
+   **Step 0.3: Spawn the team across two paths.**
+
+   Use the `routing_decisions` map to assemble one conceptual planning team that may be created through two backend paths:
+
+   - **Direct path (`TeamCreate`):** collect every persona routed `direct` and create them in a single `TeamCreate` call. Use the existing planning-team prompt template, but include only the direct-routed personas in the `## Team Members` section.
+   - **Codex path (`agent-spawn` -> `codex-invoke`):** for each persona routed `codex`, create a separate teammate through the `agent-spawn` skill, which in turn invokes the Codex backend via `codex-invoke`. Use persistent pane mode and pass the full persona context, resolved paths, memory loading context, and the same planning-team coordination context that the direct teammates receive.
+
+   Mixed teams are valid. Some planning personas may come from `TeamCreate` while others come from `agent-spawn` -> `codex-invoke`; they are still the same planning team. The orchestrator remains the single coordination point, uses `SendMessage` for all work assignment and review loops, and keeps collaborative review gates identical for both backend paths.
+
+   **Step 0.4: Mixed-team prompt template.**
+
+   Use this `TeamCreate` prompt template for the direct path only:
    ```
    Create a planning team for requirement: "{requirement-summary}"
 
    ## Team Members
+
+   [include only personas whose routing_decisions entry is direct]
 
    **researcher** — Explore the target codebase. Read persona from hive/agents/researcher.md.
    Load memories from the agent's knowledge paths. Gather raw findings: file paths, patterns,
@@ -97,11 +134,11 @@ If all checks pass, proceed normally.
    Load memories from the agent's knowledge paths. Own horizontal/vertical thinking.
    Review all documents for delivery feasibility.
 
-   [if architect needed]
+   [if architect is in the assembled list and routed direct]
    **architect** — Evaluate technical feasibility. Read persona from hive/agents/architect.md.
    Load memories from the agent's knowledge paths. Review designs for architectural soundness.
 
-   [if UI designer needed]
+   [if ui-designer is in the assembled list and routed direct]
    **ui-designer** — Produce wireframes and review UI aspects. Read persona from
    hive/agents/ui-designer.md. Load memories from the agent's knowledge paths.
    Scan existing design language before proposing new UI.
@@ -113,7 +150,9 @@ If all checks pass, proceed normally.
    - Use agent-spawn skill patterns: load full persona, resolve paths, load memories
    ```
 
-   **Agent-spawn compliance:** Each teammate must follow the agent-spawn skill (`skills/hive/skills/agent-spawn/SKILL.md`) patterns — full persona injection, path resolution (`~`, `${CLAUDE_PLUGIN_ROOT}`), memory loading, domain constraints, and required tool validation. The TeamCreate prompt must instruct each teammate to read their persona file and load their knowledge paths on startup.
+   If at least one persona is routed through Codex and at least one persona is routed direct, the `TeamCreate` prompt still includes only the direct-routed personas. Codex-routed personas participate via separate panes; they read the team context from their own `agent-spawn` prompt, not the `TeamCreate` prompt.
+
+   **Agent-spawn compliance:** Every codex-routed teammate must follow the agent-spawn skill (`skills/hive/skills/agent-spawn/SKILL.md`) patterns — full persona injection, path resolution (`~`, `${CLAUDE_PLUGIN_ROOT}`), memory loading, domain constraints, and required tool validation. The direct `TeamCreate` prompt must still instruct each direct teammate to read their persona file and load their knowledge paths on startup.
 
 ### Phase A: Research
 
