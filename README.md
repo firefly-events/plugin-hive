@@ -115,6 +115,56 @@ Six dedicated skills for design work — brand identity, design tokens, UI audit
 
 ---
 
+## Meta Optimization
+
+### `/meta-optimize`
+
+Consumer-facing skill for proposing and running improvement experiments on
+your project. It targets the resolved project repo, gathers the available
+signal, executes one candidate experiment, and leaves retained work as a
+PR-style artifact instead of mutating `main` directly.
+
+**Prerequisites**
+
+- Metrics opt-in happens at `/hive:kickoff` and defaults OFF.
+- The target project resolves from `paths.target_project` in the root
+  `hive.config.yaml`, or falls back to the invoking cwd when unset.
+- The resolved target project must be a git repository with a clean working
+  tree before the cycle starts.
+
+**Operating model**
+
+- Public `/meta-optimize` is PR-only.
+- Retained changes land on a feature branch with a candidate commit.
+- The target repo's `main` branch is not mutated directly by the skill.
+- The cycle closes with PR-shaped evidence rather than commit-promotion
+  semantics.
+
+**Expected outputs**
+
+- A PR-style artifact in the target project: feature branch plus candidate
+  commit.
+- A close record containing `pr_ref`, `pr_state`, and rollback references.
+- Baseline and candidate metrics snapshots captured for comparison at close.
+
+**Backlog fallback**
+
+When the metrics signal is insufficient to rank a candidate, the skill falls
+back to the consumer-managed backlog at:
+
+`{target}/.pHive/meta-team/queue-meta-optimize.yaml`
+
+That file is human-edit-only. The skill reads it as a fallback proposal source;
+it does not auto-populate backlog items for you.
+
+`/meta-meta-optimize` is maintainer-local and is not part of the shipped
+consumer command surface.
+
+For the detailed operating contract, see
+[`skills/hive/skills/meta-optimize/SKILL.md`](skills/hive/skills/meta-optimize/SKILL.md).
+
+---
+
 ## Architecture Overview
 
 Hive runs as a set of Claude Code skills. The orchestrator (your main session) coordinates teams but never joins them directly. Solid arrows are the automated pipeline; dashed arrows are human touchpoints.

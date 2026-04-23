@@ -23,6 +23,11 @@ paths:
 # Controls whether Hive emits per-run event records. Opt-in at kickoff time
 # (user decision Q-new-B) — disabled by default so no writes occur unless the
 # user explicitly enables this feature.
+# Public `/meta-optimize` reads this kickoff-time opt-in. Consumers must choose
+# `metrics.enabled: true` during kickoff (or later in their root
+# `hive.config.yaml`) for the metrics-backed proposal path; otherwise the public
+# command can only continue through its backlog fallback path when the consumer
+# backlog file is populated.
 # Note: after Slice 1 of hive-release-readiness, the metrics hooks read this
 # block from the ROOT `hive.config.yaml` (consumer override layer). Keys here
 # document the schema but do not drive runtime behavior — consumers opt in by
@@ -158,6 +163,16 @@ meta_team:
   github_forwarding: false   # opt-in: forward plugin-level issues to GitHub repo
                              # when false, meta-team only optimizes locally
                              # when true, out-of-scope plugin issues are filed as GitHub issues
+
+# Public `/meta-optimize` config
+# No extra consumer configuration is required today beyond `paths.target_project`
+# and the kickoff-managed `metrics.enabled` opt-in above. Keep this block
+# commented out until a public runtime key ships.
+# meta_optimize:
+#   # TODO: add public settings only when a shipped runtime option exists.
+#   # Maintainer-only forwarding defaults remain internal until explicitly
+#   # promoted to the consumer surface.
+#   github_forwarding: false
 
 # Planning settings
 planning:

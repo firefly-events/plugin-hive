@@ -24,6 +24,53 @@ Hive runs as a set of Claude Code skills. The orchestrator is always the main se
 | `/hive:polish-audit` | "run polish audit", "find animation opportunities" | Animation/motion opportunity pass. Requires `/hive:ui-audit` first. |
 | `/hive:visual-qa` | "run visual qa", "check design fidelity" | Compare design briefs and wireframe PNGs against implementation. Requires `/hive:ui-design` on a story first. |
 | `/hive:design-review` | "run design review", "review the design" | Design review ceremony with domain specialist critiques. Requires `/hive:ui-design` or `/hive:brand-system`. Supports `--skip accessibility` and `--skip animations`. |
+| `/meta-optimize` | "optimize this project", "run meta improvements" | Public meta-improvement cycle for the resolved target project. Requires kickoff-time metrics opt-in for metrics-backed proposal ranking; otherwise uses backlog fallback when available. Produces PR-style artifacts rather than mutating `main`. |
+
+---
+
+## `/meta-optimize` Workflow
+
+`/meta-optimize` is the shipped public meta-improvement path for a consumer's
+resolved target project. Keep the public explanation lightweight here and defer
+the runner contract to
+[`skills/hive/skills/meta-optimize/SKILL.md`](../skills/hive/skills/meta-optimize/SKILL.md)
+and
+[`hive/references/meta-optimize-contract.md`](references/meta-optimize-contract.md).
+
+### Kickoff To PR
+
+The public flow is:
+
+1. `/hive:kickoff` asks whether to enable metrics tracking. The default is
+   `no`, so metrics stay off unless the user explicitly opts in.
+2. Normal Hive use accumulates metrics only when `metrics.enabled: true`.
+3. `/meta-optimize` resolves the target project from `paths.target_project`
+   first, then falls back to the invoking cwd, and requires a clean git tree on
+   that target.
+4. The skill reads the available signal, proposes a candidate when the metrics
+   path has enough ranked signal, or falls back to the consumer backlog when it
+   does not.
+5. It captures a baseline snapshot, executes the candidate on a feature branch
+   in the target-project worktree, compares baseline versus candidate metrics,
+   and closes with PR-shaped evidence.
+
+What users see is a PR branch plus a close record with `pr_ref`, `pr_state`,
+and baseline-versus-candidate metrics snapshots. The public path does not
+directly mutate the target repo's `main` branch.
+
+### Backlog Fallback
+
+Fallback triggers when the metrics-backed proposal path does not produce a
+ranked candidate above threshold. The consumer-managed backlog lives at:
+
+`{target}/.pHive/meta-team/queue-meta-optimize.yaml`
+
+This backlog is human-edit-only. In practice that means users maintain the file
+themselves with queued improvement ideas; the skill only reads the backlog and
+selects from eligible entries when fallback is needed.
+
+`/meta-meta-optimize` remains maintainer-local only. It is not a shipped public
+consumer command.
 
 ---
 
