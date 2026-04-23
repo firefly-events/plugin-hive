@@ -1,0 +1,75 @@
+schema_version: 1
+type: mvs-proof-public-milestone
+slice: S10
+epic: meta-improvement-system
+story: BL3.6
+timestamp: '2026-04-23T21:10:47Z'
+proven_at: '2026-04-23T21:10:47Z'
+summary: BL3.6 public MVS milestone proof. A real public /meta-optimize run resolved
+  a fixture target, read kickoff metrics opt-in from config, selected a backlog candidate,
+  emitted a PR-shaped branch artifact, and closed through pr_ref + pr_state evidence.
+target_fixture: /private/var/folders/2x/4d9d2kgn3rj4kn5gt6rmmgkm0000gn/T/pytest-of-don/pytest-53/test_run_public_cycle_end_to_e0/fixture-project
+target_resolution:
+  config_first: /private/var/folders/2x/4d9d2kgn3rj4kn5gt6rmmgkm0000gn/T/pytest-of-don/pytest-53/test_run_public_cycle_end_to_e0/fixture-project
+  cwd_fallback: /private/var/folders/2x/4d9d2kgn3rj4kn5gt6rmmgkm0000gn/T/pytest-of-don/pytest-53/test_run_public_cycle_end_to_e0/invocation
+kickoff_metrics_enabled: true
+proposal_source: backlog
+adapter: PrPromotionAdapter
+candidate_ref: c2947434b5600da560ee38613ae364c4d5e8b5c1
+target_branch: main
+main_head_before: 8fd5b58307902a3845a4d343ddc8091f2c9325c5
+main_head_after: 8fd5b58307902a3845a4d343ddc8091f2c9325c5
+pr_ref: pr://test_run_public_cycle_end_to_e0/fixture-project#meta-improvement/pr/exp-mvs-public-e2e
+pr_state: open
+rollback_target: meta-improvement/pr/exp-mvs-public-e2e
+rollback_ref: meta-improvement/pr/exp-mvs-public-e2e
+baseline_metrics:
+  tokens: 100
+  wall_clock_ms: 50
+  first_attempt_pass: true
+candidate_metrics:
+  tokens: 95
+  wall_clock_ms: 45
+  first_attempt_pass: true
+close_validation: PASS
+close_record:
+  experiment_id: exp-mvs-public-e2e
+  decision: accept
+  pr_ref: pr://test_run_public_cycle_end_to_e0/fixture-project#meta-improvement/pr/exp-mvs-public-e2e
+  pr_state: open
+  rollback_ref: meta-improvement/pr/exp-mvs-public-e2e
+  rollback_target: meta-improvement/pr/exp-mvs-public-e2e
+  baseline_metrics:
+    tokens: 100
+    wall_clock_ms: 50
+    first_attempt_pass: true
+  candidate_metrics: &id001
+    tokens: 95
+    wall_clock_ms: 45
+    first_attempt_pass: true
+  metrics_snapshot: *id001
+integrity_checklist:
+- check: Kickoff opt-in read from hive.config.yaml metrics.enabled
+  result: PASS
+- check: Target project resolved via config-first/cwd-fallback seam
+  result: PASS
+- check: Backlog candidate selected for the public cycle
+  result: PASS
+- check: PrPromotionAdapter invoked and DirectCommitAdapter was not used
+  result: PASS
+- check: PR-style artifact produced with a new branch and candidate commit
+  result: PASS
+- check: Close evidence uses pr_ref plus pr_state and omits commit_ref-only evidence
+  result: PASS
+- check: closure_validator.validate_closable accepted the close record
+  result: PASS
+- check: Target main branch was not mutated directly
+  result: PASS
+- check: Baseline and candidate metrics snapshots are structurally present
+  result: PASS
+- check: No mocks were used in the promotion path
+  result: PASS
+notes: The fixture run used the backlog-fallback public path because kickoff metrics
+  were enabled but no ranked proposals were present. Promotion was performed by the
+  real PrPromotionAdapter against a temporary git fixture repo, producing a local
+  PR branch artifact without mutating the target's main branch.

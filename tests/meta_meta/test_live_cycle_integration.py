@@ -69,12 +69,23 @@ def test_close_gate_rejects_placeholder_rollback_ref() -> None:
 
 
 def test_close_gate_accepts_pr_only_evidence_shape() -> None:
-    validate_closable(_close_envelope(commit_ref=None, pr_ref="https://github.com/foo/bar/pull/42"))
+    validate_closable(
+        _close_envelope(
+            commit_ref=None,
+            pr_ref="https://github.com/foo/bar/pull/42",
+            pr_state="open",
+        )
+    )
 
 
 def test_close_gate_rejects_both_commit_and_pr_refs() -> None:
     with pytest.raises(AmbiguousEvidenceError):
-        validate_closable(_close_envelope(pr_ref="https://github.com/foo/bar/pull/42"))
+        validate_closable(
+            _close_envelope(
+                pr_ref="https://github.com/foo/bar/pull/42",
+                pr_state="open",
+            )
+        )
 
 
 def test_baseline_capture_and_persist_writes_metrics_snapshot(metrics_root: Path) -> None:
@@ -257,6 +268,7 @@ def _close_envelope(
     decision: str = "accept",
     commit_ref: str | None = "0123456789abcdef0123456789abcdef01234567",
     pr_ref: str | None = None,
+    pr_state: str | None = None,
     metrics_snapshot: dict | None = None,
     rollback_ref: str | None = "89abcdef0123456789abcdef0123456789abcdef",
 ) -> dict[str, object]:
@@ -279,4 +291,6 @@ def _close_envelope(
         result["commit_ref"] = commit_ref
     if pr_ref is not None:
         result["pr_ref"] = pr_ref
+    if pr_state is not None:
+        result["pr_state"] = pr_state
     return result

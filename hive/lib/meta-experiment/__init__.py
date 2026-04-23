@@ -18,6 +18,7 @@ else:
         validate_closable,
     )
     from .direct_commit_adapter import DirectCommitAdapter, PromotionFailure
+    from .pr_promotion_adapter import PrPromotionAdapter
     from .promotion_adapter import (
         PromotionAdapter,
         PromotionEvidence,
@@ -45,6 +46,7 @@ else:
         "PromotionEvidence",
         "PromotionFailure",
         "PromotionResult",
+        "PrPromotionAdapter",
         "RollbackResult",
         "TripEvent",
         "arm_watch",

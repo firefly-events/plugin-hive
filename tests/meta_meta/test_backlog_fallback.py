@@ -62,7 +62,7 @@ class BacklogFallbackDryRunTests(unittest.TestCase):
 
         self.assertEqual(
             [
-                "candidate_id",
+                "id",
                 "target",
                 "type",
                 "description",
@@ -73,7 +73,7 @@ class BacklogFallbackDryRunTests(unittest.TestCase):
         )
 
         for field in (
-            "candidate_id",
+            "id",
             "target",
             "type",
             "description",
@@ -89,7 +89,7 @@ class BacklogFallbackDryRunTests(unittest.TestCase):
         )
 
         self.assertIsNotNone(first_pending)
-        self.assertEqual(first_pending.get("candidate_id"), report["candidate_id"])
+        self.assertEqual(first_pending.get("id"), report["id"])
         self.assertEqual(first_pending.get("target"), report["target"])
         self.assertEqual(first_pending.get("type"), report["type"])
         self.assertEqual(first_pending.get("description"), report["description"])
@@ -115,7 +115,7 @@ class BacklogFallbackDryRunTests(unittest.TestCase):
 
         if first_pending is None:
             return {
-                "candidate_id": None,
+                "id": None,
                 "target": None,
                 "type": None,
                 "description": None,
@@ -124,7 +124,7 @@ class BacklogFallbackDryRunTests(unittest.TestCase):
             }
 
         return {
-            "candidate_id": first_pending.get("candidate_id"),
+            "id": first_pending.get("id"),
             "target": first_pending.get("target"),
             "type": first_pending.get("type"),
             "description": first_pending.get("description"),

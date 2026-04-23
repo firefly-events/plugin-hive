@@ -10,7 +10,7 @@ class CloseValidationError(Exception):
 
 
 class MissingEvidenceError(CloseValidationError):
-    """Neither commit_ref nor pr_ref is present."""
+    """No close evidence is present, or pr_ref is present without pr_state."""
 
 
 class AmbiguousEvidenceError(CloseValidationError):
@@ -29,7 +29,7 @@ class InvalidDecisionError(CloseValidationError):
     """decision is missing or not a recognized terminal/decision value."""
 
 
-_CLOSABLE_DECISIONS = {"accept", "reject", "reverted"}
+_CLOSABLE_DECISIONS = {"accept", "discard", "reject", "reverted"}
 _PLACEHOLDER_REFS = frozenset({"tbd", "pending", "n/a", "unknown"})
 
 
@@ -66,16 +66,22 @@ def _validate_decision(envelope: dict[str, _Any]) -> None:
 
 
 def _validate_evidence(envelope: dict[str, _Any]) -> None:
+    decision = envelope.get("decision")
     commit_ref_set = _has_reference(envelope.get("commit_ref"))
     # Forward-looking S10 support: the current C1 envelope schema documents
     # commit_ref only, but the closure-evidence-shape-mismatch escalation
     # requires this shared validator to accept PR-only close evidence too.
     pr_ref_set = _has_reference(envelope.get("pr_ref"))
+    pr_state_set = _has_reference(envelope.get("pr_state"))
 
+    if decision in {"discard", "reject"} and not commit_ref_set and not pr_ref_set and not pr_state_set:
+        return
     if commit_ref_set and pr_ref_set:
         raise AmbiguousEvidenceError("exactly one of commit_ref or pr_ref must be present; both are set")
     if not commit_ref_set and not pr_ref_set:
         raise MissingEvidenceError("either commit_ref or pr_ref must be present")
+    if pr_ref_set and not pr_state_set:
+        raise MissingEvidenceError("pr_state must be present when pr_ref is used")
 
 
 def _validate_metrics_snapshot(envelope: dict[str, _Any]) -> None:
