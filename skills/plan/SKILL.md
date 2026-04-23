@@ -45,7 +45,21 @@ If all checks pass, proceed normally.
 ## Before Executing Any Skill
 
 1. **Load your persona.** Read `hive/agents/orchestrator.md` — it contains team evaluation criteria, pre-spawn checklist, circuit breakers, model tier routing, dev-on-standby pattern, decision protocols, and research prompt construction rules. This is WHO you are and HOW you make decisions.
-2. **Load project config.** Read `hive/hive.config.yaml` for execution settings (methodology, parallel teams, circuit breaker limits, model overrides).
+2. **Load project config.** Read configuration with root-first precedence:
+   - Read ROOT `hive.config.yaml` first for routing and execution settings:
+     `agent_backends`, `model_overrides`, `planning.collaborative_review`,
+     `execution.default_methodology`, `execution.parallel_teams`,
+     `circuit_breakers.*`.
+   - For any key missing from the root file, fall through to the shipped
+     baseline at `hive/hive.config.yaml` (neutral consumer-safe defaults).
+   - Graceful fallback: if the root `hive.config.yaml` is absent or its
+     `agent_backends:` key is missing, proceed with an EMPTY routing map
+     — all personas default to direct TeamCreate, no backend routing is
+     applied. Do NOT crash and do NOT substitute values from the shipped
+     baseline for `agent_backends` specifically (that would reintroduce
+     the consumer-pollution bug Slice 0 fixed).
+   - Reference `hive/references/state-boundary.md` for the two-file
+     precedence contract that applies here.
 3. **Load your memories.** Read the `knowledge` paths from your orchestrator frontmatter. Scan `~/.claude/hive/memories/orchestrator/` for all `.md` files. Read each file's frontmatter `description` field. Load the full content of any memories relevant to the current task. If no memories exist yet, proceed — this is expected for new projects.
 
 ## Process
