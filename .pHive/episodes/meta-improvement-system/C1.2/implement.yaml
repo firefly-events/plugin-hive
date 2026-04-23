@@ -1,0 +1,23 @@
+story: C1.2
+step: implement
+status: completed
+methodology: classic
+backend: codex
+model: codex-cli-0.118.0 (--full-auto)
+timestamp: "2026-04-21T04:11:00Z"
+artifacts:
+  - .pHive/metrics/metrics-event.schema.md (201 lines, NEW)
+  - .pHive/metrics/README.md (1 line added — schema cross-link, line 24)
+judgment_calls:
+  - id: 1
+    description: "swarm_id, phase, agent cardinality (optional vs required)"
+    resolution: "accepted optional — lean per Q3, required set remains 6 core + one-of story_id/proposal_id"
+  - id: 2
+    description: "dimensions cardinality"
+    resolution: "accepted required object with empty allowed — predictable shape, no null branch"
+  - id: 3
+    description: "B0 query-usage phrasing 'may be read by'"
+    resolution: "accepted indirect phrasing — technically correct (B0 queries read envelope's metrics_snapshot, which points at event-derived evidence)"
+  - id: 4
+    description: "source in S5 invariant list"
+    resolution: "accepted prompt-faithful list; noted for follow-up at C1.4/C1.5 to reconcile with §3.13 field-level required cardinality"

@@ -17,6 +17,17 @@ paths:
   # No CLI argument form exists; config-first, cwd-fallback only.
   target_project: null
 
+# Metrics collection
+# Controls whether Hive emits per-run event records. Opt-in at kickoff time
+# (user decision Q-new-B) — disabled by default so no writes occur unless the
+# user explicitly enables this feature.
+# Note: after Slice 1 of hive-release-readiness, the metrics hooks read this
+# block from the ROOT `hive.config.yaml` (consumer override layer). Keys here
+# document the schema but do not drive runtime behavior — consumers opt in by
+# adding `metrics: { enabled: true }` to their root `hive.config.yaml`.
+metrics:
+  enabled: false              # opt-in only; no <state_dir>/metrics/events/*.jsonl writes when false
+
 # Quality gate thresholds
 quality_gates:
   auto_pass_threshold: 0.9

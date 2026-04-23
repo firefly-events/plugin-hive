@@ -12,14 +12,24 @@
 
 **Mode:** autonomous
 
-Validate each change from step 4 using the prescribed check set. Produce a test results document.
+**Authority model:** this step is read-only. Test results are returned via the
+`test_results` and `validation_report` workflow outputs; tester does NOT write
+cycle-state, ledger, envelope, or metrics-carrier files from within this step.
+Persistent control-plane writes are owned by downstream steps (evaluation,
+promotion, close) coordinated via the workflow output graph and the B0 envelope
+contract (`.pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md`).
+The team-grant for this role is read-only by design; see the swarm-specific
+team configs `.pHive/teams/meta-optimize.yaml` and
+`.pHive/teams/meta-meta-optimize.yaml` (introduced in A2.6).
+
+Validate each change from step 4 using the prescribed check set. Produce the
+structured `test_results` workflow output and companion `validation_report`.
 
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
 - `changes_made` from step 4 — list of files modified and actions taken
 - Full codebase read access
-- `.pHive/meta-team/cycle-state.yaml`
 
 **NOT available:**
 - Write access to any files
@@ -80,6 +90,9 @@ For each modified existing file:
 - If new line count < 50% of original: record as `CONTENT_LOSS` failure (catches pure deletions)
 
 ### 4. Compile test results
+This structured dictionary is the `test_results` workflow output for this step,
+not an intermediate artifact.
+
 For each change from step 4:
 ```yaml
 change_id: {proposal_id}_{file_slug}
@@ -92,16 +105,7 @@ overall: pass | fail
 failure_notes: {details if any test failed}
 ```
 
-### 5. Update cycle-state.yaml
-Append to `.pHive/meta-team/cycle-state.yaml`:
-```yaml
-phase: testing
-test_results:
-  - {test result objects}
-overall_pass_rate: {X}/{total}
-```
-
-### 6. Produce validation report
+### 5. Produce validation report
 ```
 ## Validation Report — Cycle {cycle_id}
 
@@ -120,7 +124,7 @@ Results by change:
 - [ ] Cross-reference integrity checked for all new files
 - [ ] Schema compliance checked against appropriate schema
 - [ ] Content safety checked for all modified existing files
-- [ ] `cycle-state.yaml` updated with test results
+- [ ] `test_results` output produced for every change
 - [ ] Validation report produced
 
 ## FAILURE MODES
@@ -129,8 +133,17 @@ Results by change:
 - File was blocked in step 4 (not created): mark as `skip` in test results
 - Test result is ambiguous: default to `fail` with note `ambiguous` — false negatives are safer than false positives
 
+## WHAT THIS STEP DOES NOT OWN
+
+- Persistent cycle-state / ledger / envelope writes — Step 8 (close) is the single lifecycle writer per A2.1–A2.5; Steps 4–7 (including evaluation) are output-graph-only and do not perform inline persistent writes
+- Metrics-carrier emission (C2 emitters, opt-in; Step 5 does not emit events)
+- Quality-bar verdicts (Step 6 evaluation)
+- Promotion or revert decisions (Step 7)
+- Closure invariant checks (Step 8 close validator per B0 §1.11)
+- Fixing failures discovered in testing (flagged for re-planning / downstream handling)
+
 ## NEXT STEP
 
-**Gating:** Test results produced for all changes (pass or fail — not absent).
+**Gating:** Test results produced for every change from Step 4 and surfaced in the `test_results` output (pass or fail — not absent). No file-system writes from this step.
 **Next:** Load `hive/workflows/steps/meta-team-cycle/step-06-evaluation.md`
 **If gating fails:** Report which changes have no test results and why.

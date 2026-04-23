@@ -1,0 +1,15 @@
+epic: meta-improvement-system
+story: BL2.6
+step: test
+agent: orchestrator
+status: passed
+notes: |
+  Combined with implement — 10 structural tests ran inline after the live
+  rollback-realism proof cycle executed. All assertions target real artifacts
+  on disk (not synthetic): proof.yaml shape, git ref resolution for both
+  regressive and revert commits, envelope state=reverted, latest pointer
+  updated, path signature named, proof_integrity negatives.
+suites:
+  - target: tests/meta_meta/test_rollback_realism_e2e.py
+    passed: 10
+verdict: PASS

@@ -1,0 +1,8 @@
+story: C2.1
+step: integrate
+status: completed
+completed_at: "2026-04-21T00:00:00Z"
+artifacts:
+  - /Users/don/Documents/plugin-hive/hive/hive.config.yaml
+branch: hive-C2.1
+commit: e58082a

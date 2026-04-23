@@ -1,0 +1,53 @@
+{
+  "mechanism": "claude_code_jsonl_transcript",
+  "sample": {
+    "session_id": "<SESSION_ID>",
+    "session_path": "<SESSION_PATH>",
+    "cwd": "<CWD>",
+    "git_branch": "refactor/configurable-state-dir",
+    "claude_code_version": "2.1.116",
+    "extracted_at": "2026-04-21T19:55:47Z",
+    "assistant_usage_rows": 543,
+    "total_input_tokens": 6886,
+    "total_output_tokens": 665932,
+    "total_cache_creation_input_tokens": 2586192,
+    "total_cache_read_input_tokens": 161621847,
+    "models_observed": [
+      "claude-opus-4-7"
+    ],
+    "sidechain_rows": 0,
+    "main_thread_rows": 543,
+    "first_usage_row": {
+      "uuid": "<UUID_FIRST>",
+      "timestamp": "2026-04-21T03:20:03.146Z",
+      "isSidechain": false,
+      "model": "claude-opus-4-7",
+      "usage": {
+        "input_tokens": 5,
+        "output_tokens": 364,
+        "cache_creation_input_tokens": 24668,
+        "cache_read_input_tokens": 18177
+      }
+    },
+    "last_usage_row": {
+      "uuid": "<UUID_LAST>",
+      "timestamp": "2026-04-21T06:59:30.369Z",
+      "isSidechain": false,
+      "model": "claude-opus-4-7",
+      "usage": {
+        "input_tokens": 1,
+        "output_tokens": 887,
+        "cache_creation_input_tokens": 746,
+        "cache_read_input_tokens": 565695
+      }
+    }
+  },
+  "evidence": {
+    "jsonl_line_shape": "{\"type\":\"assistant\",\"sessionId\":\"<uuid>\",\"isSidechain\":<bool>,\"message\":{\"model\":\"claude-opus-4-7\",\"usage\":{\"input_tokens\":N,\"output_tokens\":M,\"cache_creation_input_tokens\":X,\"cache_read_input_tokens\":Y,...}}}",
+    "rejected_surfaces": {
+      "tmp_task_output_jsonl": "grep over /private/tmp/claude-501/<project>/<session>/tasks/*.output found 0 usage blocks; files contain agent prompt traces only",
+      "post_tool_use_hook": "PostToolUse hook stdin payload exposes {session_id, transcript_path, tool_name, tool_input, tool_response} — no usage field (per Claude Code hook spec and existing hooks/check-agent-misuse.sh sample)",
+      "session_end_hook": "SessionEnd hook stdin exposes {session_id, transcript_path, reason} — no usage field. However transcript_path points back to the JSONL, so SessionEnd can be a trigger for reading the JSONL."
+    }
+  }
+}

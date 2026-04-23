@@ -110,4 +110,3 @@ references:
     relevant_excerpt: |
       `.pHive/teams/meta-team.yaml` → split into two team files with correct per-role `.pHive/**`
       write grants matching new step obligations.
-

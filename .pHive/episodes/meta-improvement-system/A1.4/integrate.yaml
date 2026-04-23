@@ -1,0 +1,18 @@
+story: A1.4
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-A1.4
+parent_branch: hive-A1.3 (cb92de6)
+timestamp: "2026-04-21T04:40:00Z"
+artifacts:
+  - hive/references/meta-experiment-isolation.md (89 lines, NEW)
+  - hive/references/meta-team-sandbox.md (modified 98→108 lines, demoted)
+backend_split:
+  implement: codex
+  review: claude (opus)
+ac_check: 3/3 pass
+review_verdict: passed (first submission)
+q4_compliance: explicit (worktree required; file-copy not acceptable default)
+cross_link_audit: "zero live links to meta-team-sandbox.md outside .pHive/epics/ planning docs"

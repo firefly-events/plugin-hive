@@ -1,0 +1,28 @@
+story_id: K.1
+branch: meta-improvement-system-s6
+commit: not-created-sandbox-blocked
+files_changed:
+  - skills/kickoff/SKILL.md
+  - hive/references/kickoff-protocol.md
+  - .pHive/episodes/meta-improvement-system/K.1/integrate.yaml
+ac_to_line_mapping:
+  AC1:
+    - skills/kickoff/SKILL.md:13
+    - hive/references/kickoff-protocol.md:45
+  AC2:
+    - skills/kickoff/SKILL.md:14
+    - hive/references/kickoff-protocol.md:47
+  AC3:
+    - skills/kickoff/SKILL.md:15
+    - hive/references/kickoff-protocol.md:49
+  AC4:
+    - skills/kickoff/SKILL.md:16
+    - hive/references/kickoff-protocol.md:51
+decisions_made:
+  - Kept the user-facing opt-in copy in the kickoff skill and the concrete persistence instructions in the kickoff protocol, matching the owner-file split.
+  - Used the exact persisted key `metrics.enabled` and preserved default-off semantics by requiring an explicit yes to write `true`.
+  - Kept the trade-off to a single inline sentence and did not add brownfield preservation or broader backlog-fallback documentation.
+notes_for_reviewer:
+  - Both kickoff owner files now reference the question `Enable metrics tracking?` and the persisted key `metrics.enabled`.
+  - "`hive/hive.config.yaml` was not modified; `metrics.enabled: false` remains unchanged as the default."
+  - Git staging and commit were blocked by sandbox denial on `.git/index.lock`; final report includes the exact failure and current HEAD for context.

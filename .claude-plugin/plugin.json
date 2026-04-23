@@ -24,6 +24,11 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/stop-interrupt-capture.sh",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/metrics-stop-dispatch.sh || true",
+            "timeout": 15
           }
         ]
       }

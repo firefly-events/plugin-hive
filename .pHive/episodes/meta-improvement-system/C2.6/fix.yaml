@@ -1,0 +1,28 @@
+story: C2.6
+phase: fix-pass
+branch: hive-C2.6
+date: "2026-04-21"
+
+findings_addressed:
+  - id: C-1
+    severity: critical
+    summary: event_id collision on same-second emissions
+    fix: Appended $$_${RANDOM} disambiguator to event_id — pattern is set -euo pipefail safe since both variables expand without subshells
+  - id: C-2
+    severity: critical
+    summary: Unescaped user-supplied values produce invalid JSON
+    fix: Replaced raw string interpolation with jq -cn using --arg for every user-supplied field (run_id, story_id, proposal_id, swarm_id, phase, agent_name, reason); jq provides automatic JSON escaping
+  - id: I-1
+    severity: improvement
+    summary: YAML-scope the config grep
+    fix: Replaced flat regex grep with yq -> python3(yaml.safe_load) -> awk-scoped fallback chain; awk uses /^metrics:/{flag=1} /^[a-zA-Z]/{flag=0} guard to read only the metrics block
+  - id: I-2
+    severity: improvement
+    summary: Test coverage for the two criticals
+    fix: Added two test sections to human-escalation.test.sh — (d) same-second uniqueness emits twice and asserts distinct event_id values; (e) embedded-quote reason calls with --reason 'a"b\c' and asserts JSON parses + exact roundtrip
+
+test_counts:
+  before: 21
+  after: 24
+  passed: 24
+  failed: 0

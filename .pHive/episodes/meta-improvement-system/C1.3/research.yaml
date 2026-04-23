@@ -1,0 +1,18 @@
+story: C1.3
+step: research
+status: completed
+methodology: classic
+backend: orchestrator
+timestamp: "2026-04-21T04:15:00Z"
+artifacts:
+  - .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md (§1 authoritative fields)
+  - .pHive/epics/meta-improvement-system/docs/horizontal-plan.md (historical, pre-B0)
+  - .pHive/epics/meta-improvement-system/docs/user-decisions-dd.md (Q3)
+  - .pHive/metrics/metrics-event.schema.md (C1.2 — matching tone/structure)
+notes: |
+  Key drift surfaced: horizontal-plan predates B0 and lists 12 envelope fields
+  including baseline_metrics_ref / candidate_metrics_ref. B0 contract §1 has
+  9 fields with metrics_snapshot subsuming the split. Authority rule: B0 wins
+  on contract fields; HP's extras (experiment_id, swarm_id, target_ref) are
+  record-identity, not contract fields. Prompt encoded this reconciliation
+  rule explicitly so Codex wouldn't re-litigate it.

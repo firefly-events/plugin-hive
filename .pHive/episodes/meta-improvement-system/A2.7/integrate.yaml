@@ -1,0 +1,17 @@
+story: A2.7
+step: integrate
+status: completed
+methodology: classic
+backend: orchestrator
+branch: hive-A2.7
+parent_branch: hive-A2.6 (2352314)
+timestamp: "2026-04-21T05:28:00Z"
+artifacts:
+  - .pHive/meta-team/charter-meta-optimize.md (66 lines, NEW — public swarm)
+  - .pHive/meta-team/charter-meta-meta-optimize.md (76 lines, NEW — maintainer swarm)
+ac_check: 4/4 pass
+review_verdict: passed (first submission)
+duplication_check: "zero restatement of A1.2 hard-constraint bullets; referenced only"
+public_scope: "explicitly disavows legacy plugin-internal-only restriction at L16; authorizes {project_root}/** per team grant"
+maintainer_local_only: "L45-52 cites maintainer-skills/meta-meta-optimize/ per L9 decision; S8 BL2i.5 regression test forward-referenced"
+promotion_asymmetry: "public = PR-artifact + user-as-promoter; maintainer = direct-commit gated by A2.5 closure validator"

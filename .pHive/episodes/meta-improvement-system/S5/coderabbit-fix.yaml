@@ -1,0 +1,55 @@
+episode: coderabbit-fix
+branch: meta-improvement-system-s5
+date: 2026-04-21
+scope: PR #12 consolidated CodeRabbit fix pass
+
+findings_addressed:
+  F1:
+    file: hooks/metrics-agent-spawn.sh
+    severity: major
+    summary: HIVE_CONFIG and events_dir were cwd-relative; anchored to HIVE_ROOT via SCRIPT_DIR derivation
+  F2:
+    file: hooks/metrics-agent-spawn.sh
+    severity: major
+    summary: event_row built via shell string-concat; replaced with jq -cn --arg construction
+  F3:
+    file: hooks/metrics-execute-boundaries.sh
+    severity: major
+    summary: HIVE_CONFIG and events_dir anchored to HIVE_ROOT; same pattern as F1
+  F4:
+    file: hooks/metrics-execute-boundaries.sh
+    severity: major
+    summary: unscoped python3/grep config reader replaced with _read_metrics_config (awk-block-scoped three-tier parser from agent-spawn.sh)
+  F5:
+    file: hooks/metrics-stop-dispatch.sh
+    severity: minor
+    summary: EVENT_ID and RUN_ID lacked PID+RANDOM suffix; added $$_${RANDOM} to both + WALL_EVENT_ID
+  F6:
+    file: hooks/metrics-token-capture.sh
+    severity: minor
+    summary: cwd encoding only replaced /; extended to replace all non-[a-zA-Z0-9-] chars with -
+  F7:
+    file: tests/meta-improvement-system/metrics/execute-boundaries.test.sh
+    severity: minor
+    summary: tautological binary-distinguishability assertion replaced with real cross-scenario value comparison using python3
+  F8:
+    files:
+      - tests/meta-improvement-system/metrics/human-escalation.test.sh
+      - tests/meta-improvement-system/metrics/agent-spawn-emission.test.sh
+      - tests/meta-improvement-system/metrics/execute-boundaries.test.sh
+    severity: minor
+    summary: flag-off tests used wrong config path or relative HIVE_CONFIG; updated to pass HIVE_ROOT pointing to dir with hive/hive.config.yaml
+    note: stop-hook-emission.test.sh and token-capture.test.sh already used correct HIVE_REPO_ROOT_OVERRIDE/HIVE_ROOT patterns
+  F9:
+    file: tests/meta-improvement-system/metrics/token-capture.test.sh
+    severity: minor
+    summary: scenario (c) silently passed when event file existed but had no codex_gap row; now fails explicitly if event file is non-empty without a codex_gap:true row
+
+test_results:
+  before: 129 passes across 5 files
+  after:  129 passes across 5 files
+  human-escalation: 24/24
+  agent-spawn-emission: 24/24
+  execute-boundaries: 39/39
+  stop-hook-emission: 24/24
+  token-capture: 18/18
