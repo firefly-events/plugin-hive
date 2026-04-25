@@ -1,42 +1,80 @@
 schema_version: 1
-cycle_id: meta-2026-04-22-r2
-story: BL2.6
+cycle_id: meta-2026-04-25
+story: BL2.2
 slice: S9
 status: closed
-branch: meta-improvement-system-s9
-candidate_id: mmo-2026-04-21-002
-candidate_target: .pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md
+branch: meta-meta/nightly-20260425
+candidate_id: mmo-2026-04-21-003
+candidate_target: .pHive/meta-team/archive/2026-04-19/ledger.yaml
+started: '2026-04-25T00:00:00Z'
+closed: '2026-04-25T00:05:00Z'
+phase: close
+charter_constraints:
+  - Commit messages use [meta-meta-optimize] prefix
+  - Direct-commit promotion only after closure_validator invariants satisfied (decision, commit_ref, metrics_snapshot, rollback_ref)
+  - No changes to hive/hive.config.yaml without human confirmation
+  - No changes to agent tool lists without human confirmation
+  - No new external service integrations without human confirmation
+  - Scope limited to paths granted in .pHive/teams/meta-meta-optimize.yaml
+  - No user-project files in scope
+  - Local-only execution; does not appear in plugin.json
+prior_cycle:
+  id: meta-2026-04-22-r2
+  outcome: reverted
 steps:
   step_01_boot:
-    started_at: '2026-04-22T10:41:34Z'
+    started_at: '2026-04-25T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-04-22-r2
     events_path: .pHive/metrics/events/meta-2026-04-22-r2.jsonl
   step_02_analysis:
-    mode: proof
-    reason: prove real post-close regression watch auto-revert
+    mode: backlog-fallback
+    reason: no metric-driven optimization signal; backlog candidate available
+    metric_signal: false
   step_03b_backlog_fallback:
     selected_candidate:
-      candidate_id: mmo-2026-04-21-002
-      target: .pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md
-      type: archive-provenance-note
-commit_ref: 548c2f67c12a84f42db0f3a9d2170629a4f4884f
-rollback_ref: c2407ca32e371cc3782ab242a93a9e6e793aa54f
-auto_revert_commit_ref: c8694138cfc9ec2b034bfca69529ba99801f741f
-audit_path: .pHive/audits/mvl-proof/2026-04-22T10-41-35Z/proof.yaml
-decision: reverted
+      candidate_id: mmo-2026-04-21-003
+      target: .pHive/meta-team/archive/2026-04-19/ledger.yaml
+      type: archive-provenance-comment
+    decision: would-execute
+commit_ref: 2949c3e9f9490f1c329d60f27129c92d3fff8969
+rollback_ref: 9820fd924fda9ac70a4b07cf296a0a60e54fb32a
+decision: accept
 metrics_snapshot:
   tokens: 0
-  wall_clock_ms: 39
+  wall_clock_ms: 35
   first_attempt_pass: true
 regression_watch:
-  state: tripped
-  tripped_by:
+  state: armed
+  armed_at: '2026-04-25T00:00:00Z'
+observation_window:
+  start: '2026-04-25T00:00:00Z'
+  end: '2026-04-25T04:00:00Z'
+summary:
+  total_findings: 2
+  proposals_generated: 1
+  changes_attempted: 1
+  changes_promoted: 1
+  changes_reverted: 0
+  flagged_for_human: 0
+  cycle_verdict: passed
+closure_evidence:
+  commit_ref: 2949c3e9f9490f1c329d60f27129c92d3fff8969
+  metrics_snapshot:
     tokens: 0
-    wall_clock_ms: 78
+    wall_clock_ms: 35
     first_attempt_pass: true
-  tripped_at: '2026-04-22T10:41:34.943769Z'
-  rollback_result:
-    success: true
-    revert_ref: c8694138cfc9ec2b034bfca69529ba99801f741f
-    notes: reverted via git revert
+  rollback_ref: 9820fd924fda9ac70a4b07cf296a0a60e54fb32a
+findings:
+  - id: finding-1
+    category: OTHER
+    severity: low
+    location: .pHive/meta-team/queue-meta-meta-optimize.yaml
+    description: Two previously-processed candidates (mmo-2026-04-21-001, mmo-2026-04-21-002) remain status pending in queue though both appear in ledger
+    evidence: ledger.yaml has experiment entries for both; queue still shows status pending
+  - id: finding-2
+    category: OTHER
+    severity: low
+    location: .pHive/meta-team/archive/2026-04-19/ledger.yaml
+    description: Archived ledger had no provenance comment marking it as frozen — addressed by candidate mmo-2026-04-21-003
+    evidence: File began directly with YAML list without a frozen-record comment; comment appended by this cycle
