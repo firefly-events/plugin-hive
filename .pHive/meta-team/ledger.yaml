@@ -7,6 +7,24 @@
   commit_ref: 96d410046ccac86c69806b6b0e5335522af93216
   rollback_ref: ea5b73a8fa4a76f69ff4ca2024d7f1c37b3b688d
   audit_path: .pHive/audits/mvl-proof/2026-04-22T10-29-48Z/proof.yaml
+- experiment_id: meta-2026-04-26
+  date: '2026-04-26'
+  story: BL2.6
+  candidate_id: mmo-2026-04-21-003
+  target: .pHive/meta-team/archive/2026-04-19/ledger.yaml
+  decision: accept
+  commit_ref: aa0f0fd3cde6da197131aa4da5eb8162e045559a
+  rollback_ref: 9820fd924fda9ac70a4b07cf296a0a60e54fb32a
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 50
+    first_attempt_pass: true
+  regression_watch:
+    state: armed
+    armed_at: '2026-04-26T00:00:00Z'
+  observation_window:
+    start: '2026-04-26T00:00:00Z'
+    end: '2026-04-26T04:00:00Z'
 - experiment_id: meta-2026-04-22-r2
   date: '2026-04-22'
   story: BL2.6
