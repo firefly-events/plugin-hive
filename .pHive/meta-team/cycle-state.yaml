@@ -1,42 +1,90 @@
 schema_version: 1
-cycle_id: meta-2026-04-22-r2
+cycle_id: meta-2026-04-26
+started: '2026-04-26T00:00:00Z'
+closed: '2026-04-26T00:10:00Z'
+status: closed
+phase: close
 story: BL2.6
 slice: S9
-status: closed
-branch: meta-improvement-system-s9
-candidate_id: mmo-2026-04-21-002
-candidate_target: .pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md
+branch: meta-meta/nightly-20260426
+candidate_id: mmo-2026-04-21-003
+candidate_target: .pHive/meta-team/archive/2026-04-19/ledger.yaml
+charter_constraints:
+  - Commit messages use the [meta-meta-optimize] prefix
+  - Direct-commit promotion allowed only after closure validator invariants satisfied
+  - Must not expand authority by editing guarded config or adding external integrations
+  - hive/hive.config.yaml is out of scope unless human confirms
+  - Scope limited to hive/**, skills/hive/agents/memories/**, .pHive/teams/**, .pHive/meta-meta-optimize/**, hive/lib/**
+prior_cycle:
+  id: meta-2026-04-22-r2
+  outcome: reverted
+baseline_available: true
+prior_run_id: meta-2026-04-22-r2
 steps:
   step_01_boot:
-    started_at: '2026-04-22T10:41:34Z'
+    started_at: '2026-04-26T00:00:00Z'
     baseline_available: true
-    run_id: meta-2026-04-22-r2
-    events_path: .pHive/metrics/events/meta-2026-04-22-r2.jsonl
+    run_id: meta-2026-04-26
+    events_path: .pHive/metrics/events/meta-2026-04-26.jsonl
   step_02_analysis:
-    mode: proof
-    reason: prove real post-close regression watch auto-revert
+    mode: normal
+    findings_count: 2
+    metric_signal: false
   step_03b_backlog_fallback:
     selected_candidate:
-      candidate_id: mmo-2026-04-21-002
-      target: .pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md
-      type: archive-provenance-note
-commit_ref: 548c2f67c12a84f42db0f3a9d2170629a4f4884f
-rollback_ref: c2407ca32e371cc3782ab242a93a9e6e793aa54f
-auto_revert_commit_ref: c8694138cfc9ec2b034bfca69529ba99801f741f
-audit_path: .pHive/audits/mvl-proof/2026-04-22T10-41-35Z/proof.yaml
-decision: reverted
+      candidate_id: mmo-2026-04-21-003
+      target: .pHive/meta-team/archive/2026-04-19/ledger.yaml
+      type: archive-provenance-comment
+commit_ref: aa0f0fd3cde6da197131aa4da5eb8162e045559a
+rollback_ref: 9820fd924fda9ac70a4b07cf296a0a60e54fb32a
+decision: accept
 metrics_snapshot:
   tokens: 0
-  wall_clock_ms: 39
+  wall_clock_ms: 50
   first_attempt_pass: true
 regression_watch:
-  state: tripped
-  tripped_by:
-    tokens: 0
-    wall_clock_ms: 78
-    first_attempt_pass: true
-  tripped_at: '2026-04-22T10:41:34.943769Z'
-  rollback_result:
-    success: true
-    revert_ref: c8694138cfc9ec2b034bfca69529ba99801f741f
-    notes: reverted via git revert
+  state: armed
+  armed_at: '2026-04-26T00:00:00Z'
+observation_window:
+  start: '2026-04-26T00:00:00Z'
+  end: '2026-04-26T04:00:00Z'
+summary:
+  total_findings: 2
+  proposals_generated: 1
+  changes_attempted: 1
+  changes_promoted: 1
+  changes_reverted: 0
+  flagged_for_human: 0
+  cycle_verdict: passed
+closure_evidence:
+  commit_ref: aa0f0fd3cde6da197131aa4da5eb8162e045559a
+  metrics_snapshot_present: true
+  rollback_ref: 9820fd924fda9ac70a4b07cf296a0a60e54fb32a
+changes:
+  - proposal_id: proposal-1
+    action: add_entry
+    file: .pHive/meta-team/archive/2026-04-19/ledger.yaml
+    description: Prepended YAML comment marking file as frozen historical record
+    status: done
+findings:
+  - id: finding-1
+    category: SCHEMA_INCONSISTENCY
+    severity: medium
+    location: hive/workflows/development.classic.workflow.yaml
+    description: >
+      step_file paths use hive-relative convention (e.g. workflows/steps/development-classic/...)
+      while meta-team-cycle.workflow.yaml uses repo-root-relative paths (hive/workflows/steps/...).
+      Affects development.classic, development.tdd, development.tdd-codex, daily-ceremony,
+      test-swarm, and ui-design workflow files.
+    evidence: >
+      development.classic line: 'step_file: workflows/steps/development-classic/step-01-preflight.md'
+      vs meta-team-cycle line: 'step_file: hive/workflows/steps/meta-team-cycle/step-01-boot.md'
+  - id: finding-2
+    category: STUB_DOC
+    severity: low
+    location: hive/references/meta-optimize-maintainer.md
+    description: >
+      Reference doc has only 5 lines — a single one-paragraph note with a pytest command.
+      No title sections, no procedure context, no links to broader docs.
+    evidence: >
+      File content is a heading, one sentence, and a single code block.
