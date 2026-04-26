@@ -9,6 +9,15 @@ paths:
   # No CLI argument form exists; config-first, cwd-fallback only.
   target_project: null
 
+# Metrics — local maintainer override. The shipped baseline at
+# `hive/hive.config.yaml` keeps `enabled: false` per the original opt-in-at-
+# kickoff design. For plugin-hive itself we turn it on so the meta-meta
+# improvement loop has real per-agent token + wall-clock signal to grade
+# against. Hooks (metrics-token-capture, metrics-stop-dispatch, etc.) silently
+# no-op when disabled, so flipping this is the only switch needed.
+metrics:
+  enabled: true
+
 # Quality gate thresholds
 quality_gates:
   auto_pass_threshold: 0.9

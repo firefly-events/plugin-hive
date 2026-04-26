@@ -77,6 +77,12 @@ Load and follow `hive/workflows/steps/meta-team-cycle/step-02-analysis.md`.
 
 Use the current cycle context, charter constraints, backlog candidate, and prior ledger context to produce the cycle analysis outputs.
 
+### Step 2b External Research
+
+Load and follow `hive/workflows/steps/meta-team-cycle/step-02b-external-research.md`.
+
+This step is additive: it produces a candidate proposal list tagged `discovery_source: external_research` that is merged into the Step 3 proposal queue. It does not replace or override Step 2 findings. Skip this step cleanly (no abort) if charter scope forbids external sources or if the research providers (Firecrawl, Context7, arXiv) are unavailable.
+
 ### Step 3 Proposal
 
 Load and follow `hive/workflows/steps/meta-team-cycle/step-03-proposal.md` when metric signal is present.
