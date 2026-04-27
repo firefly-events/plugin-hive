@@ -18,7 +18,7 @@ index updates into a single timed window with latency monitoring.
 The session-end window has three phases with strict ordering:
 
 ### Phase A: Insight Promotion (Sequential Prerequisite)
-1. Identify promoted insights staged in `state/insights/{epic-id}/{story-id}/`
+1. Identify promoted insights staged in `.pHive/insights/{epic-id}/{story-id}/`
 2. Write each insight file to `~/.claude/hive/memories/{agent}/` (slug-based naming)
 3. **Await completion before Phase B.** KG triples reference promoted slugs —
    kg_write() must not start until all promotion writes are complete.
