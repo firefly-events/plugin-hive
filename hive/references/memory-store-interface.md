@@ -38,6 +38,8 @@ This is a **documentation schema**, not executable code. Implementations are des
 
 **L1 implementation:** Write the memory file to `~/.claude/hive/memories/{agent}/{slug}.md`. The slug is derived from the memory's `name` field (lowercase, hyphenated). If a file with the same slug exists and the new memory is type `override`, replace it; otherwise append a version suffix.
 
+**L2 side-effect (kg_write):** When the memory being written has type `decision` or `lifecycle`, additionally insert a triple into `~/.claude/hive/kg.sqlite`. The triple subject is the memory's `source_epic` or agent name; predicate maps from memory type; object is the memory's `name` slug. This side-effect is a no-op if kg.sqlite is unavailable.
+
 **L3 future:** Write to disk (same as L1) and additionally upsert a vector embedding into the Qdrant collection for the agent's namespace.
 
 ---
@@ -118,6 +120,26 @@ Called by: session-end (step 8) after insight promotion completes.
 
 ---
 
+### 7. `query_decisions(filter: DecisionFilter) → Triple[]`
+
+**Purpose:** Retrieve decision and lifecycle triples from the KG for agent context injection.
+
+**Inputs:**
+- `filter` — a `DecisionFilter` object with any combination of:
+  - `subject?: string` — filter by subject (e.g., epic ID, story ID, agent name)
+  - `predicate?: string` — filter by predicate (must be in controlled vocabulary)
+  - `as_of?: string` — ISO 8601 timestamp; return only triples valid at that time (valid_from ≤ as_of AND (valid_until IS NULL OR valid_until > as_of)). Defaults to now.
+  - `include_superseded?: boolean` — if true, include triples where valid_until is set. Default false.
+
+**Outputs:**
+- `Triple[]` — array of matching triple objects: `{subject, predicate, object, valid_from, valid_until, source_epic, source_agent}`
+
+**L2 implementation (SQLite KG):** Query `~/.claude/hive/kg.sqlite` triples table with the filter criteria. Use the composite index (valid_from, valid_until) for point-in-time queries.
+
+**Note:** This method is KG-specific. L1 (wiki) and L3 (Qdrant) do not implement this method — it supplements, not replaces, the existing `read()` method.
+
+---
+
 ## Import Strategies
 
 | Strategy | Behavior | Use Case |
@@ -134,7 +156,8 @@ For `reference` type memories under `merge` or `overwrite`: append new entries t
 
 | Layer | Implementation | Ships When | Implements |
 |-------|---------------|------------|------------|
-| L1 | Compiled wiki (`memory-wiki/`) | Now | All 6 methods. `compile()` is the core operation; `read()` navigates wiki articles, falls back to L0 keyword scan if stale. |
+| L1 | Compiled wiki (`memory-wiki/`) | Now | All core methods except `query_decisions()`. `compile()` is the core operation; `read()` navigates wiki articles, falls back to L0 keyword scan if stale. |
+| L2 | SQLite knowledge graph (`~/.claude/hive/kg.sqlite`) | Now (memory-autonomy-foundation epic) | Stores structured decision triples and lifecycle events. Adds `query_decisions()` for filtered retrieval. `kg_write()` is a side-effect of `write()` — fires when memory type is `decision` or `lifecycle`. |
 | L3 | Qdrant vector store | When corpus exceeds ~400k words | `read()` replaces keyword/wiki scan with semantic search. `write()` additionally upserts embeddings. `compile()` becomes a no-op. Other methods unchanged. |
 
 The wiki-compilation step in L1 implements `compile()`. If Qdrant is adopted for L3, `read()` is the primary method that changes — the rest of the interface remains identical.
