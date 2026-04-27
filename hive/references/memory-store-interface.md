@@ -128,7 +128,7 @@ Called by: session-end (step 8) after insight promotion completes.
 - `filter` — a `DecisionFilter` object with any combination of:
   - `subject?: string` — filter by subject (e.g., epic ID, story ID, agent name)
   - `predicate?: string` — filter by predicate (must be in controlled vocabulary)
-  - `as_of?: string` — ISO 8601 timestamp; return only triples valid at that point in time (valid_from ≤ as_of AND (valid_until IS NULL OR valid_until > as_of)). Defaults to now.
+  - `as_of?: string` — ISO 8601 timestamp; return only triples valid at that time (valid_from ≤ as_of AND (valid_until IS NULL OR valid_until > as_of)). Defaults to now.
   - `include_superseded?: boolean` — if true, include triples where valid_until is set. Default false.
 
 **Outputs:**
@@ -156,7 +156,7 @@ For `reference` type memories under `merge` or `overwrite`: append new entries t
 
 | Layer | Implementation | Ships When | Implements |
 |-------|---------------|------------|------------|
-| L1 | Compiled wiki (`memory-wiki/`) | Now | All 6 methods. `compile()` is the core operation; `read()` navigates wiki articles, falls back to L0 keyword scan if stale. |
+| L1 | Compiled wiki (`memory-wiki/`) | Now | All core methods except `query_decisions()`. `compile()` is the core operation; `read()` navigates wiki articles, falls back to L0 keyword scan if stale. |
 | L2 | SQLite knowledge graph (`~/.claude/hive/kg.sqlite`) | Now (memory-autonomy-foundation epic) | Stores structured decision triples and lifecycle events. Adds `query_decisions()` for filtered retrieval. `kg_write()` is a side-effect of `write()` — fires when memory type is `decision` or `lifecycle`. |
 | L3 | Qdrant vector store | When corpus exceeds ~400k words | `read()` replaces keyword/wiki scan with semantic search. `write()` additionally upserts embeddings. `compile()` becomes a no-op. Other methods unchanged. |
 
