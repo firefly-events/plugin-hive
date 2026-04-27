@@ -88,7 +88,7 @@ function toTriple(decision, epicId, fileMtime) {
   const fmt = detectFormat(decision);
   if (fmt === 'canonical') {
     return {
-      subject: `${epicId}_orchestrator`,
+      subject: epicId,
       predicate: 'decided',
       // Truncate to 500 chars to stay within SQLite TEXT field conventions.
       // Note: the same truncation applies on re-runs (idempotent for consistent inputs).
@@ -100,7 +100,7 @@ function toTriple(decision, epicId, fileMtime) {
     };
   } else if (fmt === 'legacy') {
     return {
-      subject: `${epicId}_orchestrator`,
+      subject: epicId,
       predicate: 'decided',
       object: String(decision.decision || '').substring(0, 500),
       valid_from: fileMtime,
@@ -125,8 +125,10 @@ async function main() {
   if (!DRY_RUN) {
     const Database = require('better-sqlite3');
     db = new Database(DB_PATH);
-    // Ensure unique index for idempotency
-    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_triple ON triples(subject, predicate, object, source_epic)');
+    // idx_unique_triple is part of the canonical bootstrap DDL — see
+    // hive/references/knowledge-graph-schema.md#sqlite-bootstrap. Run kickoff
+    // bootstrap first if this script reports a UNIQUE constraint error or
+    // missing-index error.
   }
 
   const files = fs.readdirSync(CYCLE_STATE_DIR).filter(f => f.endsWith('.yaml'));

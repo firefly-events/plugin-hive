@@ -188,4 +188,7 @@ CREATE INDEX IF NOT EXISTS idx_subject ON triples(subject);
 CREATE INDEX IF NOT EXISTS idx_object ON triples(object);
 CREATE INDEX IF NOT EXISTS idx_predicate ON triples(predicate);
 CREATE INDEX IF NOT EXISTS idx_valid ON triples(valid_from, valid_until);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_triple ON triples(subject, predicate, object, source_epic);
 ```
+
+The `idx_unique_triple` constraint enforces that a given `(subject, predicate, object)` is recorded at most once per `source_epic`. Writers (`kg_write()`, `scripts/kg-import-cycle-state.js`) rely on this invariant via `INSERT OR IGNORE`; if the index is missing, both will fail with `SQLITE_CONSTRAINT` or duplicate rows on re-run.
