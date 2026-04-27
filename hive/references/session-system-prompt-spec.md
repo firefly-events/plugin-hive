@@ -32,12 +32,23 @@ Story `story-execution-migration` (S9) builds the session creation logic using t
 
 ### Table
 
+This table covers only the four Phase 2 workflow roles (`researcher`, `developer`, `tester`, `reviewer`). The full orchestrator roster — `technical-writer`, `architect`, `analyst`, `tpm`, `ui-designer`, `pair-programmer`, `peer-validator`, `team-lead`, plus specialist agents — will be mapped in subsequent phases. Treat this mapping as partial and Phase 2-scoped, not exhaustive.
+
 | Role | Persona Source | System Prompt Template | Notes |
 |------|----------------|----------------------|-------|
 | `researcher` | `hive/agents/researcher.md` | See template below | Read-only by default; may write to `.pHive/` and `hive/memory/` |
 | `developer` | `hive/agents/backend-developer.md` or `hive/agents/frontend-developer.md` (resolved by story domain) | See template below | Resolves to backend or frontend based on `story.domain` field |
-| `tester` | `hive/agents/test-architect.md` | See template below | Write access scoped to `tests/` and `.pHive/` |
+| `tester` | `hive/agents/tester.md` | See template below | Write access scoped to `tests/` and `.pHive/` |
 | `reviewer` | `hive/agents/reviewer.md` | See template below | Read-only; writes review artifacts to `.pHive/episodes/` |
+
+### Developer Role Resolution
+
+Map `story.domain` to persona file:
+
+- `backend`, `api`, `database`, `service` → `hive/agents/backend-developer.md`
+- `frontend`, `ui`, `components`, `web` → `hive/agents/frontend-developer.md`
+
+If `story.domain` is missing or matches no entry above, session creation must raise an error. Do not guess a default — story authors are responsible for declaring `domain` explicitly.
 
 ### System Prompt Template (all roles)
 
@@ -132,6 +143,8 @@ If the Prior Knowledge block exceeds **4,000 characters**, apply truncation in p
 2. **Truncate to first 200 chars each:** entries with type `reference` or `codebase`
 3. **Drop lowest-recency entries:** if block still exceeds limit after steps 1–2, drop entries with the oldest `last_verified` dates until under limit
 
+**Character limit scope:** The 4,000-character limit applies to the memory entries only. Decision Context (KG triples from `query_decisions()`) is exempt and does not count toward the limit. Memories are truncated per the priority order above; KG triples are never truncated.
+
 **Truncation signal:** Append the following line at the end of the Prior Knowledge block when any truncation occurs:
 
 ```
@@ -215,7 +228,7 @@ If the orchestrator sends additional steps within the same session (sub-tasks wi
 1. Resolve agent role from story step definition
 2. Load persona from `hive/agents/{role}.md`
 3. Call `MemoryStore.read({role, story_id})` — returns up to 5 memory entries
-4. Call `query_decisions({subject: story_id OR agent_role})` — returns KG decision triples
+4. Call `query_decisions({entity: story_id OR agent_role})` — returns KG decision triples
 5. Compose system prompt: persona + prior knowledge block + KG decision context block + domain note
 6. `POST /v1/sessions` with composed `system_prompt`
 7. `POST /v1/sessions/{id}/messages` with first user_turn (story context + step instructions)
@@ -259,8 +272,8 @@ Sessions must not be left open. The orchestrator is responsible for cleanup even
 Call `query_decisions()` with subject scoped to the story or agent role:
 
 ```
-query_decisions({ subject: story_id })
-query_decisions({ subject: agent_role })
+query_decisions({ entity: story_id })
+query_decisions({ entity: agent_role })
 ```
 
 Both calls are merged; deduplication is by triple identity `(subject, predicate, object)`. See `hive/references/knowledge-graph-schema.md` for the full `query_decisions()` contract.
