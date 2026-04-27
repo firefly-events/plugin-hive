@@ -3,7 +3,7 @@
  * ONE-TIME UTILITY: Import cycle-state decisions into kg.sqlite
  *
  * Seeds ~/.claude/hive/kg.sqlite with decision triples derived from
- * existing cycle-state YAML files in state/cycle-state/*.yaml.
+ * existing cycle-state YAML files in .pHive/cycle-state/*.yaml.
  *
  * Safe to run multiple times — idempotent via INSERT OR IGNORE.
  * After initial import, kg_write() (hive/lib/session-end.js) handles
@@ -34,7 +34,7 @@ try {
 }
 
 const DB_PATH = path.join(os.homedir(), '.claude', 'hive', 'kg.sqlite');
-const CYCLE_STATE_DIR = path.join(__dirname, '..', 'state', 'cycle-state');
+const CYCLE_STATE_DIR = path.join(__dirname, '..', '.pHive', 'cycle-state');
 const DRY_RUN = process.argv.includes('--dry-run');
 
 function parseSimpleYaml(content) {
