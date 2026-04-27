@@ -28,7 +28,7 @@ When you receive a pre-shutdown message from the orchestrator:
 
 1. **Record insights and write KG triples.** Execute in order:
    1a. **Write insight files.** Record any non-obvious, reusable patterns or findings to your memory path (defined in your persona frontmatter `knowledge` field). Use the insight format from `hive/references/insight-capture.md`. If nothing reusable emerged, skip this sub-step.
-   1b. **Call kg_write().** After insight files are written (not before), persist decision and lifecycle triples to `~/.claude/hive/kg.sqlite`. Triples reference promoted insight slugs — ordering matters. See `hive/references/knowledge-graph-schema.md` for the kg_write() contract. If kg.sqlite is unavailable, skip silently.
+   1b. **Call kg_write().** After insight files are written (not before), persist decision and lifecycle triples to `~/.claude/hive/kg.sqlite`. Triples reference promoted insight slugs — ordering matters. See `hive/references/knowledge-graph-schema.md` for the kg_write() contract. If kg.sqlite is unavailable, kg_write() logs a warning and returns without error.
    1c. **Compile memory wiki.** Call compile() to refresh the memory wiki with the newly written insights.
    
    **Step 1 ordering is mandatory:** insight files → kg_write() → compile()
