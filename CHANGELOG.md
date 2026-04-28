@@ -9,6 +9,72 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-04-28
+
+### Added
+- **Memory & Autonomous Execution Phase 1 — Knowledge Graph (KG) substrate ships.**
+  Cross-project, time-versioned decision/lifecycle store at `~/.claude/hive/kg.sqlite`.
+  Triples are subject–predicate–object with controlled predicate vocabulary
+  (`decided`, `superseded`, `assigned_to`, `blocked_by`, `depends_on`, `phase_started`,
+  `phase_complete`, `phase_failed`, `phase_blocked`). WAL-mode SQLite, idempotent
+  bootstrap DDL, unique index on `(subject, predicate, object, source_epic)`.
+  See `hive/references/knowledge-graph-schema.md`.
+- `MemoryStore.query_decisions(filter)` method — point-in-time triple retrieval
+  with `entity` / `predicate` / `as_of` / `include_superseded` filters. Documented
+  in `hive/references/memory-store-interface.md`.
+- KG write path: `kg_write()` in `hive/lib/session-end.js` persists triples at
+  session-end and pre-shutdown via the canonical three-op orchestration
+  (insights → kg_write → compile ‖ chromadb.index). `INSERT OR IGNORE` with
+  runtime `idx_unique_triple` precondition guard.
+- KG bootstrap utility: `scripts/kg-import-cycle-state.js` — one-time backfill
+  from existing `.pHive/cycle-state/*.yaml`. Atomic transaction wrapping,
+  ISO-normalized `valid_from`, dry-run preview, surfaced fallback YAML parse drops.
+- KG read path: `agent-spawn` Step 5e injects a "Decision Context" block into
+  agent prompts using two `query_decisions({entity})` calls (current_agent +
+  current_epic), merged and dedup'd by `(subject, predicate, object, valid_from)`.
+- **ChromaDB L3 semantic memory tier (optional).** JSON-RPC wrapper at
+  `hive/lib/chromadb-wrapper.js` (`isAvailable()`, `query()`, `index()`),
+  agent-namespaced docIds (`${agentName}/${slug}`), graceful degradation to
+  L1+L0 when sidecar absent. Indexed at session-end Phase C in parallel with
+  `compile()`.
+- **Session System Prompt Specification.** Authoritative design at
+  `hive/references/session-system-prompt-spec.md` defining session prompt
+  composition (persona + prior knowledge + KG decision context + domain note),
+  per-step story context injection, session lifecycle, completion detection,
+  and cleanup. Foundation for Phase 2 Managed Agent API migration.
+- Session-end orchestration skill at `skills/hive/skills/session-end/SKILL.md`
+  with three-phase ordering (Phase A insights → Phase B kg_write → Phase C
+  compile ‖ chromadb.index), 30-second latency monitoring, asymmetric failure
+  handling (KG = surface error, ChromaDB = warn only), and `skipCompile` for
+  hard-shutdown pressure.
+- Pre-shutdown protocol updated to share the canonical session-end orchestration
+  via `runSessionEnd({ skipCompile: true })`.
+
+### Changed
+- Memory tier table in `memory-store-interface.md`: L3 row replaces the Qdrant
+  placeholder with the actual ChromaDB JSON-RPC wrapper that ships in this release.
+- `DecisionFilter.subject?` renamed to `DecisionFilter.entity?` to match the
+  canonical SQL placeholder and accurately describe the cross-column matching
+  behaviour (`subject = :entity OR object = :entity`).
+
+### Fixed
+- `session-end.js`: replaced `process.env.HOME` with `os.homedir()` so paths
+  resolve in containerized / sanitized environments.
+- `session-end.js`: agent-name and slug input validation (kebab-case regex +
+  resolved-path containment) guards ChromaDB indexing against directory
+  traversal via crafted inputs.
+- `session-end.js` `kgWrite()`: `db.close()` is now guaranteed via try/finally
+  even when `sqlite3()` open or `prepare()` setup throws.
+- `chromadb-wrapper.js`: `query()` checks HTTP status before parsing the body
+  (rejecting 4xx/5xx error payloads); `index()` drains the response body for
+  keep-alive cleanliness; dropped unused `metadatas` from `query()` include list.
+- `kg-import-cycle-state.js`: real-mode imports now wrap the entire backfill
+  in `db.transaction()` for atomicity; fallback YAML parse drops are surfaced
+  rather than silently swallowed; dry-run summary renamed to "Would process"
+  to remove the optimistic claim that all parsed triples would insert.
+- Markdown lint: collapsed multi-space blockquote continuations and removed
+  spaces inside code spans across the KG/memory-autonomy stack.
+
 ## [1.1.2] - 2026-04-23
 
 ### Added
