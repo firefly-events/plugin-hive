@@ -90,4 +90,4 @@ const { elapsed, kgError, chromadbWarning } = await runSessionEnd({
   skipCompile: false                            // boolean — true under hard-shutdown pressure
 });
 ```
-`chromadbWarning` is a `; `-joined string of all warnings raised during the ChromaDB phase (or `null` if none).
+`chromadbWarning` joins all warnings raised during the ChromaDB phase with a `;` separator (semicolon followed by a single space), or is `null` if no warnings occurred.

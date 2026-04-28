@@ -35,8 +35,8 @@ The L3 check appears at the top of step 5, before the L0/L1 freshness gate (`com
 **PASS**
 
 > "- From remaining candidates, rank by: `score = relevance_score × (1 / (1 + days_since_created))`
->   where `relevance_score` is ChromaDB distance (lower = more relevant, normalize to 0–1),
->   and `days_since_created` is derived from the memory's `timestamp` field"
+> where `relevance_score` is ChromaDB distance (lower = more relevant, normalize to 0–1),
+> and `days_since_created` is derived from the memory's `timestamp` field"
 
 Formula matches the required form exactly.
 
@@ -66,8 +66,8 @@ The fallback section explicitly notes it is "unchanged."
 **PASS**
 
 > "1b. **Call kg_write() and chromadb.index() (parallel, best-effort).** After insight files are written:
->    - Call `kg_write()` to persist decision and lifecycle triples to `~/.claude/hive/kg.sqlite`...
->    - Call `chromadb.index()` for each promoted insight document to update the ChromaDB semantic index."
+> - Call `kg_write()` to persist decision and lifecycle triples to `~/.claude/hive/kg.sqlite`...
+> - Call `chromadb.index()` for each promoted insight document to update the ChromaDB semantic index."
 
 ---
 
