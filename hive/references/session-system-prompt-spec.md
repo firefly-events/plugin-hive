@@ -24,7 +24,7 @@ Story `story-execution-migration` (S9) builds the session creation logic using t
 - **State persistence:** Session maintains full conversation context between turns; each `user_turn` sees all prior exchanges
 - **Session granularity:** One session per workflow step (not one per story). Each step — research, implement, test, review — gets a fresh session with fresh system prompt injection
 - **System prompt role:** Sets agent identity, domain constraints, prior knowledge, and KG decision context. Does not change between turns in a session
-- **User turn role:** Delivers per-step task instructions and story context. Can be sent multiple times within a session for sub-task follow-up
+- **User turn role:** Delivers per-step task instructions and story context. `user_turn` messages can be sent multiple times within a session for sub-task follow-up.
 
 ---
 
@@ -227,7 +227,7 @@ If the orchestrator sends additional steps within the same session (sub-tasks wi
 
 1. Resolve agent role from story step definition
 2. Load persona from `hive/agents/{role}.md`
-3. Call `MemoryStore.read({role, story_id})` — returns up to 5 memory entries
+3. Build a query string from `story.description` plus `story.steps[current].description` (and any other story context fields the implementer chooses), then call `MemoryStore.read(query)` — returns up to 5 memory entries. The interface contract in `hive/references/memory-store-interface.md` defines `read(query: string)`; do NOT pass an object
 4. Call `query_decisions({entity: story_id OR agent_role})` — returns KG decision triples
 5. Compose system prompt: persona + prior knowledge block + KG decision context block + domain note
 6. `POST /v1/sessions` with composed `system_prompt`
@@ -276,7 +276,7 @@ query_decisions({ entity: story_id })
 query_decisions({ entity: agent_role })
 ```
 
-Both calls are merged; deduplication is by triple identity `(subject, predicate, object)`. See `hive/references/knowledge-graph-schema.md` for the full `query_decisions()` contract.
+Both calls are merged; deduplication is by triple identity `(subject, predicate, object, valid_from)` — including `valid_from` preserves distinct historical entries when a triple has been superseded and re-asserted. (Note: this read-time merge key differs from the writer-side unique index `(subject, predicate, object, source_epic)` defined in `knowledge-graph-schema.md`; the writer key enforces idempotent inserts per epic, while the reader key preserves time-versioned semantics.) See `hive/references/knowledge-graph-schema.md` for the full `query_decisions()` contract.
 
 ### Placement Decision
 

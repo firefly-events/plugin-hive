@@ -87,12 +87,12 @@ Read the agent's memory directory (from the resolved `knowledge` paths).
 - Proceed to step 5d for staleness surfacing
 
 **5c-L3 (ChromaDB active path):**
-- Query ChromaDB: `query(collectionName, agentContext, 20)` to fetch top-20 candidate memories
+- Build `queryText` from the story description plus current step task description
+- Call `query(collectionName, queryText, 20)` per the wrapper signature in `hive/lib/chromadb-wrapper.js` (`query(collectionName, queryText, topK = 5, ...)`) to fetch top-20 candidate memory IDs ranked by ChromaDB distance
+- **Agent isolation:** memories are written with namespaced docIds of the form `${agentName}/${slug}` (see `hive/lib/session-end.js` Phase C). Filter results to those whose `id` starts with `${agentName}/` before further processing. This protects against cross-agent retrieval from the shared `hive-memories` collection.
+- For each remaining candidate, read the memory file at `~/.claude/hive/memories/{agent}/{slug}.md` to access frontmatter (`type`, `timestamp`, `last_verified`, `ttl_days`). The current `query()` wrapper does not return ChromaDB metadata, so frontmatter must be read from disk.
 - **Step A — Always include** all `override` and `pitfall` type memories unconditionally. These are immune to the 5-memory cap.
-- From remaining candidates, rank by: `score = relevance_score × (1 / (1 + days_since_created))`
-  where `relevance_score` is ChromaDB distance (lower = more relevant, normalize to 0–1),
-  and `days_since_created` is derived from the memory's `timestamp` field
-  where `relevance_score = 1 - distance` for cosine distance (ChromaDB default) — higher score = more relevant.
+- **Step B — Rank remaining candidates by ChromaDB distance only** (lower distance = more relevant). Future work: extend `query()` to surface metadata so a recency-weighted score (`1 / (1 + days_since_created)`) can multiply the distance-based score; tracked separately from this story.
 - **Step C — Cap** the remaining (non-override/pitfall) memories at `max(0, 5 - override_pitfall_count)`. Total Prior Knowledge set size is `override_pitfall_count + remaining_cap`, which may exceed 5 when many overrides/pitfalls exist — this is intentional.
 - Format as the "Prior Knowledge" block (same format as L0/L1 path)
 - Proceed to step 5d for staleness surfacing

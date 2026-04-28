@@ -30,12 +30,12 @@ When you receive a pre-shutdown message from the orchestrator:
    1a. **Write insight files.** Record any non-obvious, reusable patterns or findings to your memory path (defined in your persona frontmatter `knowledge` field). Use the insight format from `hive/references/insight-capture.md`. If nothing reusable emerged, skip this sub-step.
    1b. **Call kg_write() (sequential, after 1a).** Persist decision and lifecycle triples to `~/.claude/hive/kg.sqlite`. Triples reference promoted insight slugs — ordering matters. See `hive/references/knowledge-graph-schema.md` for the kg_write() contract. If kg.sqlite is unavailable, kg_write() logs a warning and returns without error. Surface KG errors but do not block; proceed to 1c.
    1c. **Call compile() and chromadb.index() (parallel, after 1b).** Both run concurrently:
-       - `compile()` refreshes the memory wiki with newly written insights.
+       - `compile()` refreshes the memory wiki with newly written insights. **Conditional under hard shutdown:** when invoked via `runSessionEnd({ skipCompile: true })` (2-turn timeout pressure), `compile()` is skipped entirely and the wiki is rebuilt at the next normal session-end. `chromadb.index()` still runs best-effort regardless of `skipCompile`.
        - `chromadb.index()` indexes each promoted insight document via `hive/lib/chromadb-wrapper.js`. **Best-effort:** if ChromaDB is unavailable or index() fails, log a warning and continue — do NOT block shutdown response.
 
        The two calls are independent; either may fail without affecting the other.
 
-   **Step 1 ordering is mandatory:** insight files → kg_write() → compile() ‖ chromadb.index(). This matches the canonical orchestration in `hive/lib/session-end.js` (`runSessionEnd`); the pre-shutdown receiver invokes the same library with `skipCompile: true` on hard shutdown.
+   **Step 1 ordering is mandatory:** insight files → kg_write() → compile() ‖ chromadb.index(). This matches the canonical orchestration in `hive/lib/session-end.js` (`runSessionEnd`); the pre-shutdown receiver invokes the same library with `skipCompile: true` on hard shutdown (compile is skipped, chromadb.index still runs best-effort).
 2. **Reply "ready to shut down"** via `SendMessage` back to the orchestrator.
 3. **Do NOT send `shutdown_response`** before receiving the formal `shutdown_request`. The pre-shutdown message and the shutdown request are two separate turns.
 4. When the `shutdown_request` arrives, respond with `shutdown_response` as normal.

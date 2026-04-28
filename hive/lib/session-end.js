@@ -72,11 +72,29 @@ async function runSessionEnd({ agentName, epicId, promotedSlugs = [], triples = 
         console.warn(`[session-end] ${chromadbWarning}`);
         return;
       }
+      const SLUG_RE = /^[a-z0-9-]+$/;
+      const agentDir = path.resolve(MEMORIES_BASE, agentName);
       for (const slug of promotedSlugs) {
-        const memPath = path.join(MEMORIES_BASE, agentName, `${slug}.md`);
+        if (!SLUG_RE.test(slug)) {
+          chromadbWarning = `invalid memory slug skipped: ${slug}`;
+          console.warn(`[session-end] ${chromadbWarning}`);
+          continue;
+        }
+        const memPath = path.resolve(agentDir, `${slug}.md`);
+        if (memPath !== path.join(agentDir, `${slug}.md`) || !memPath.startsWith(`${agentDir}${path.sep}`)) {
+          chromadbWarning = `unsafe memory path skipped for slug: ${slug}`;
+          console.warn(`[session-end] ${chromadbWarning}`);
+          continue;
+        }
         try {
           const content = await fs.promises.readFile(memPath, 'utf8');
-          await chromadbIndex('hive-memories', slug, content, { agentName, epicId });
+          // Namespace docId with agentName to prevent cross-agent collisions in shared collection
+          const docId = `${agentName}/${slug}`;
+          const ok = await chromadbIndex('hive-memories', docId, content, { agentName, epicId, slug });
+          if (!ok) {
+            chromadbWarning = `chromadb.index() failed for ${docId}`;
+            console.warn(`[session-end] ${chromadbWarning}`);
+          }
         } catch (err) {
           chromadbWarning = `chromadb.index() skipped/failed for ${slug}: ${err.message}`;
           console.warn(`[session-end] ${chromadbWarning}`);
@@ -114,27 +132,27 @@ async function kgWrite(triples, sourceEpic, sourceAgent) {
   }
 
   const db = sqlite3(KG_SQLITE_PATH);
-  const validPredicates = new Set(
-    db.prepare('SELECT predicate FROM predicates').all().map(r => r.predicate)
-  );
-
-  const insert = db.prepare(
-    'INSERT OR IGNORE INTO triples (subject, predicate, object, valid_from, source_epic, source_agent) VALUES (?, ?, ?, ?, ?, ?)'
-  );
-
-  const writeAll = db.transaction((rows) => {
-    const now = new Date().toISOString();
-    for (const t of rows) {
-      if (!validPredicates.has(t.predicate)) {
-        throw new Error(
-          `unknown predicate "${t.predicate}" — must be one of: ${[...validPredicates].join(', ')}`
-        );
-      }
-      insert.run(t.subject, t.predicate, t.object, t.valid_from || now, sourceEpic, t.source_agent || sourceAgent);
-    }
-  });
-
   try {
+    const validPredicates = new Set(
+      db.prepare('SELECT predicate FROM predicates').all().map(r => r.predicate)
+    );
+
+    const insert = db.prepare(
+      'INSERT OR IGNORE INTO triples (subject, predicate, object, valid_from, source_epic, source_agent) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+
+    const writeAll = db.transaction((rows) => {
+      const now = new Date().toISOString();
+      for (const t of rows) {
+        if (!validPredicates.has(t.predicate)) {
+          throw new Error(
+            `unknown predicate "${t.predicate}" — must be one of: ${[...validPredicates].join(', ')}`
+          );
+        }
+        insert.run(t.subject, t.predicate, t.object, t.valid_from || now, sourceEpic, t.source_agent || sourceAgent);
+      }
+    });
+
     writeAll(triples);
   } finally {
     db.close();
