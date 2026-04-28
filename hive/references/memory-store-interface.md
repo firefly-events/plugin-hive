@@ -158,7 +158,7 @@ For `reference` type memories under `merge` or `overwrite`: append new entries t
 |-------|---------------|------------|------------|
 | L1 | Compiled wiki (`memory-wiki/`) | Now | All core methods except `query_decisions()`. `compile()` is the core operation; `read()` navigates wiki articles, falls back to L0 keyword scan if stale. |
 | L2 | SQLite knowledge graph (`~/.claude/hive/kg.sqlite`) | Now (memory-autonomy-foundation epic) | Stores structured decision triples and lifecycle events. Adds `query_decisions()` for filtered retrieval. `kg_write()` is a side-effect of `write()` — fires when memory type is `decision` or `lifecycle`. |
-| L3 | Qdrant vector store | When corpus exceeds ~400k words | `read()` replaces keyword/wiki scan with semantic search. `write()` additionally upserts embeddings. `compile()` becomes a no-op. Other methods unchanged. |
+| L3 | ChromaDB JSON-RPC wrapper (`hive/lib/chromadb-wrapper.js`) | Optional — active when ChromaDB sidecar is running (see kickoff-protocol.md Phase 5) | `read()` calls `isAvailable()` first; if false, falls back to L1+L0 silently. `write()` additionally calls `index()` for semantic search. Optional — all paths degrade to L1+L0 when sidecar absent. |
 
 The wiki-compilation step in L1 implements `compile()`. If Qdrant is adopted for L3, `read()` is the primary method that changes — the rest of the interface remains identical.
 
