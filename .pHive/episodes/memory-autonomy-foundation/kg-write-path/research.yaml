@@ -1,0 +1,6 @@
+step_id: research
+status: completed
+timestamp: "2026-04-13T01:00:00Z"
+artifacts:
+  - hive/references/pre-shutdown-protocol.md
+  - hive/references/knowledge-graph-schema.md

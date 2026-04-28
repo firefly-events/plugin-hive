@@ -95,6 +95,76 @@ INSERT INTO triples (subject, predicate, object, valid_from, valid_until, source
 VALUES ('use-sqlite-for-l2-kg', 'superseded', 'use-redis-for-l2-kg', '2026-04-13T14:00:00Z', NULL, 'memory-autonomy-foundation', 'architect');
 ```
 
+## kg_write() Behavioral Contract
+
+```
+kg_write(triples: Array<{
+  subject: string,         // required — agent name, epic ID, story ID, or decision key
+  predicate: string,       // required — must be in controlled vocabulary
+  object: string,          // required — value, slug, or identifier
+  valid_from?: string,     // ISO 8601 timestamp; defaults to current time if omitted
+  source_epic?: string,    // optional — epic providing context for this triple
+  source_agent?: string    // optional — agent that produced this triple
+}>) → void
+```
+
+**Validation:** Before writing, each predicate is validated against the `predicates` table:
+```sql
+SELECT 1 FROM predicates WHERE predicate = ?
+```
+Unknown predicates are rejected immediately with an error naming the invalid predicate:
+```
+Error: unknown predicate "my-custom-predicate" — must be one of: decided, superseded, assigned_to, blocked_by, depends_on, phase_started, phase_complete, phase_failed, phase_blocked
+```
+
+**Atomicity:** All triples in a single kg_write() call are written in a WAL transaction:
+```sql
+BEGIN;
+INSERT INTO triples (subject, predicate, object, valid_from, valid_until, source_epic, source_agent)
+VALUES (?, ?, ?, ?, NULL, ?, ?);
+-- ... repeat for each triple
+COMMIT;
+```
+If any insert fails, the transaction is rolled back (no partial writes).
+
+**Availability gate:** If `~/.claude/hive/kg.sqlite` is unavailable (file not found, locked, or permission error), kg_write() logs a warning and returns without error. KG writes are best-effort — callers must not depend on them for correctness.
+
+**Performance:** WAL mode enables concurrent reads during writes. Writing 20 triples completes in <100ms on standard hardware — well within the pre-shutdown 2-turn timeout window.
+
+## query_decisions() Query Logic
+
+The `query_decisions()` method from the MemoryStore interface runs against the triples table:
+
+### Point-in-time query (as_of provided)
+```sql
+SELECT subject, predicate, object, valid_from, valid_until, source_epic, source_agent
+FROM triples
+WHERE
+  (subject = :entity OR object = :entity)
+  AND valid_from <= :as_of
+  AND (valid_until IS NULL OR valid_until > :as_of)
+ORDER BY valid_from DESC
+```
+
+### Current-state query (as_of omitted — default)
+```sql
+SELECT subject, predicate, object, valid_from, valid_until, source_epic, source_agent
+FROM triples
+WHERE
+  (subject = :entity OR object = :entity)
+  AND valid_until IS NULL
+ORDER BY valid_from DESC
+```
+
+### Optional filters
+- `:predicate` filter: add `AND predicate = :predicate` to either query
+- `include_superseded: true`: remove the `valid_until IS NULL` clause entirely (returns all matching triples regardless of validity period)
+
+### Index usage
+- Subject/object filters use `idx_subject` and `idx_object` indexes
+- The composite `idx_valid` index optimizes valid_from <= :as_of range scans
+- Current-state queries benefit most from the `WHERE valid_until IS NULL` clause
+
 ## SQLite Bootstrap
 
 Run this DDL to initialize the schema. All statements are idempotent (`IF NOT EXISTS`, `INSERT OR IGNORE`).
@@ -118,4 +188,7 @@ CREATE INDEX IF NOT EXISTS idx_subject ON triples(subject);
 CREATE INDEX IF NOT EXISTS idx_object ON triples(object);
 CREATE INDEX IF NOT EXISTS idx_predicate ON triples(predicate);
 CREATE INDEX IF NOT EXISTS idx_valid ON triples(valid_from, valid_until);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_triple ON triples(subject, predicate, object, source_epic);
 ```
+
+The `idx_unique_triple` constraint enforces that a given `(subject, predicate, object)` is recorded at most once per `source_epic`. Writers (`kg_write()`, `scripts/kg-import-cycle-state.js`) rely on this invariant via `INSERT OR IGNORE`; if the index is missing, both will fail with `SQLITE_CONSTRAINT` or duplicate rows on re-run.
