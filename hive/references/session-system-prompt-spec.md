@@ -228,7 +228,7 @@ If the orchestrator sends additional steps within the same session (sub-tasks wi
 1. Resolve agent role from story step definition
 2. Load persona from `hive/agents/{role}.md`
 3. Build a query string from `story.description` plus `story.steps[current].description` (and any other story context fields the implementer chooses), then call `MemoryStore.read(query)` — returns up to 5 memory entries. The interface contract in `hive/references/memory-store-interface.md` defines `read(query: string)`; do NOT pass an object
-4. Call `query_decisions({entity: story_id OR agent_role})` — returns KG decision triples
+4. Call `query_decisions({ entity: story_id })` and `query_decisions({ entity: agent_role })` (two explicit calls), then merge and deduplicate the returned KG decision triples by `(subject, predicate, object, valid_from)` (see Section 6 for the merge rule)
 5. Compose system prompt: persona + prior knowledge block + KG decision context block + domain note
 6. `POST /v1/sessions` with composed `system_prompt`
 7. `POST /v1/sessions/{id}/messages` with first user_turn (story context + step instructions)

@@ -35,8 +35,10 @@ The session-end window has three phases with strict ordering:
 7. Fire `compile()` and `chromadb.index()` concurrently using `Promise.all` or equivalent.
 8. `compile()`: rebuild `~/.claude/hive/memory-wiki/` from promoted memories.
 9. `chromadb.index()`: index promoted documents via `hive/lib/chromadb-wrapper.js`.
-   **On failure:** catch error, log warning, do not rethrow. ChromaDB failure does not
-   block session-end completion.
+   **On failure:** if `chromadb.index()` throws **or returns a falsy / failed result**,
+   log a warning and do not rethrow. The wrapper resolves `false` on transport or
+   non-2xx errors instead of throwing, so callers must check the return value
+   alongside try/catch. ChromaDB failure does not block session-end completion.
 10. **Await both** before closing the session-end window.
 
 ## Latency Monitoring

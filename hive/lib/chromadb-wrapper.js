@@ -49,7 +49,7 @@ async function query(collectionName, queryText, topK = 5, host = DEFAULT_HOST, p
   const body = JSON.stringify({
     query_texts: [queryText],
     n_results: topK,
-    include: ['documents', 'distances', 'metadatas']
+    include: ['documents', 'distances']
   });
 
   return new Promise((resolve) => {

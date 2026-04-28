@@ -77,8 +77,18 @@ async function runSessionEnd({ agentName, epicId, promotedSlugs = [], triples = 
         warnChromadb('ChromaDB unavailable — semantic index not updated');
         return;
       }
-      const SLUG_RE = /^[a-z0-9-]+$/;
-      const agentDir = path.resolve(MEMORIES_BASE, agentName);
+      const NAME_RE = /^[a-z0-9-]+$/;
+      if (!NAME_RE.test(agentName)) {
+        warnChromadb(`invalid agentName — skipping ChromaDB indexing: ${agentName}`);
+        return;
+      }
+      const memoriesBaseResolved = path.resolve(MEMORIES_BASE);
+      const agentDir = path.resolve(memoriesBaseResolved, agentName);
+      if (!agentDir.startsWith(`${memoriesBaseResolved}${path.sep}`)) {
+        warnChromadb(`unsafe agent directory — skipping ChromaDB indexing: ${agentName}`);
+        return;
+      }
+      const SLUG_RE = NAME_RE;
       for (const slug of promotedSlugs) {
         if (!SLUG_RE.test(slug)) {
           warnChromadb(`invalid memory slug skipped: ${slug}`);
