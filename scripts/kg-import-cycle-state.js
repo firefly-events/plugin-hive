@@ -18,18 +18,17 @@ const os = require('os');
 
 // Use js-yaml for YAML parsing (check if available, else use simple regex fallback)
 let yaml;
+let usingFallbackYaml = false;
 try {
   yaml = require('js-yaml');
 } catch {
-  // Minimal YAML fallback — good enough for cycle-state structure
+  usingFallbackYaml = true;
+  console.warn('WARN: js-yaml not installed — using minimal fallback parser. Install js-yaml for full YAML coverage.');
+  // Minimal YAML fallback — good enough for cycle-state structure.
+  // Surface parse errors instead of swallowing them so silent backfill drops
+  // produce a visible signal rather than an undercounted import.
   yaml = {
-    load: (str) => {
-      try {
-        return parseSimpleYaml(str);
-      } catch (e) {
-        return null;
-      }
-    }
+    load: (str) => parseSimpleYaml(str)
   };
 }
 
@@ -153,55 +152,75 @@ async function main() {
 
   const files = fs.readdirSync(CYCLE_STATE_DIR).filter(f => f.endsWith('.yaml'));
   let totalDecisions = 0;
-  let totalInserted = 0;
+  let totalProcessed = 0;
   let totalSkipped = 0;
   let totalMisformat = 0;
-  for (const file of files) {
-    const filePath = path.join(CYCLE_STATE_DIR, file);
-    const content = fs.readFileSync(filePath, 'utf8');
-    const fileMtime = fs.statSync(filePath).mtime.toISOString();
 
-    let parsed;
-    try {
-      parsed = yaml.load(content);
-    } catch (e) {
-      console.warn(`  WARN: Failed to parse ${file}: ${e.message}`);
-      continue;
-    }
+  // All work is wrapped so that real-mode imports run in a single SQLite
+  // transaction. A runtime failure rolls back the entire backfill rather than
+  // leaving a partial KG state.
+  const runImport = () => {
+    for (const file of files) {
+      const filePath = path.join(CYCLE_STATE_DIR, file);
+      const content = fs.readFileSync(filePath, 'utf8');
+      const fileMtime = fs.statSync(filePath).mtime.toISOString();
 
-    if (!parsed || !parsed.decisions || !Array.isArray(parsed.decisions)) continue;
-
-    const epicId = parsed.epic_id || file.replace('.yaml', '');
-    const decisions = parsed.decisions;
-    totalDecisions += decisions.length;
-
-    for (const dec of decisions) {
-      const triple = toTriple(dec, epicId, fileMtime);
-      if (!triple) {
+      let parsed;
+      try {
+        parsed = yaml.load(content);
+      } catch (e) {
         totalMisformat++;
-        console.warn(`  WARN: [${file}] Unknown format for decision: ${JSON.stringify(dec).substring(0, 80)}`);
+        console.warn(`  WARN: Failed to parse ${file}${usingFallbackYaml ? ' (fallback parser)' : ''}: ${e.message}`);
         continue;
       }
 
-      if (DRY_RUN) {
-        console.log(`  DRY: ${triple.subject} -[${triple.predicate}]-> ${triple.object.substring(0, 60)}`);
-        totalInserted++;
-      } else {
-        const result = insertStmt.run(
-          triple.subject,
-          triple.predicate,
-          triple.object,
-          triple.valid_from,
-          triple.source_epic,
-          triple.source_agent
-        );
-        if (result.changes > 0) {
-          totalInserted++;
+      if (!parsed || !parsed.decisions || !Array.isArray(parsed.decisions)) {
+        totalMisformat++;
+        console.warn(`  WARN: [${file}] No decisions array found${usingFallbackYaml ? ' (fallback parser)' : ''}`);
+        continue;
+      }
+
+      const epicId = parsed.epic_id || file.replace('.yaml', '');
+      const decisions = parsed.decisions;
+      totalDecisions += decisions.length;
+
+      for (const dec of decisions) {
+        const triple = toTriple(dec, epicId, fileMtime);
+        if (!triple) {
+          totalMisformat++;
+          console.warn(`  WARN: [${file}] Unknown format for decision: ${JSON.stringify(dec).substring(0, 80)}`);
+          continue;
+        }
+
+        if (DRY_RUN) {
+          console.log(`  DRY: ${triple.subject} -[${triple.predicate}]-> ${triple.object.substring(0, 60)}`);
+          // Dry-run cannot consult INSERT OR IGNORE; count rows as "processed
+          // preview" rather than asserting they would all be newly inserted.
+          totalProcessed++;
         } else {
-          totalSkipped++;
+          const result = insertStmt.run(
+            triple.subject,
+            triple.predicate,
+            triple.object,
+            triple.valid_from,
+            triple.source_epic,
+            triple.source_agent
+          );
+          if (result.changes > 0) {
+            totalProcessed++;
+          } else {
+            totalSkipped++;
+          }
         }
       }
     }
+  };
+
+  if (!DRY_RUN) {
+    const tx = db.transaction(runImport);
+    tx();
+  } else {
+    runImport();
   }
 
   if (!DRY_RUN) {
@@ -210,7 +229,7 @@ async function main() {
     console.log('\n=== Import Summary ===');
     console.log(`Files scanned:      ${files.length}`);
     console.log(`Decisions found:    ${totalDecisions}`);
-    console.log(`Triples inserted:   ${totalInserted}`);
+    console.log(`Triples inserted:   ${totalProcessed}`);
     console.log(`Skipped (dup):      ${totalSkipped}`);
     console.log(`Misformat:          ${totalMisformat}`);
     console.log(`Total in kg.sqlite: ${dbCount}`);
@@ -219,8 +238,9 @@ async function main() {
     console.log('\n=== Dry Run Summary ===');
     console.log(`Files scanned:    ${files.length}`);
     console.log(`Decisions found:  ${totalDecisions}`);
-    console.log(`Would insert:     ${totalInserted}`);
+    console.log(`Would process:    ${totalProcessed}`);
     console.log(`Misformat:        ${totalMisformat}`);
+    console.log('(Note: dry-run does not consult INSERT OR IGNORE — actual inserted count in real mode may be lower due to dedup.)');
   }
 }
 

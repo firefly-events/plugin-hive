@@ -143,8 +143,9 @@ async function kgWrite(triples, sourceEpic, sourceAgent) {
     throw new Error('better-sqlite3 not available — cannot write KG triples');
   }
 
-  const db = sqlite3(KG_SQLITE_PATH);
+  let db;
   try {
+    db = sqlite3(KG_SQLITE_PATH);
     const validPredicates = new Set(
       db.prepare('SELECT predicate FROM predicates').all().map(r => r.predicate)
     );
@@ -167,7 +168,7 @@ async function kgWrite(triples, sourceEpic, sourceAgent) {
 
     writeAll(triples);
   } finally {
-    db.close();
+    if (db) db.close();
   }
 }
 
