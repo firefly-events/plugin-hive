@@ -126,7 +126,7 @@ Called by: session-end (step 8) after insight promotion completes.
 
 **Inputs:**
 - `filter` — a `DecisionFilter` object with any combination of:
-  - `subject?: string` — filter by subject (e.g., epic ID, story ID, agent name)
+  - `entity?: string` — filter by an entity identifier (e.g., epic ID, story ID, agent name); the SQL implementation matches this value against BOTH the `subject` and `object` columns (`(subject = :entity OR object = :entity)`), so a single value retrieves triples regardless of which side of the relationship the entity appears on
   - `predicate?: string` — filter by predicate (must be in controlled vocabulary)
   - `as_of?: string` — ISO 8601 timestamp; return only triples valid at that time (valid_from ≤ as_of AND (valid_until IS NULL OR valid_until > as_of)). Defaults to now.
   - `include_superseded?: boolean` — if true, include triples where valid_until is set. Default false.

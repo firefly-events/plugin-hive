@@ -13,10 +13,12 @@
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { index: chromadbIndex, isAvailable: chromadbAvailable } = require('./chromadb-wrapper');
 
-const KG_SQLITE_PATH = path.join(process.env.HOME, '.claude', 'hive', 'kg.sqlite');
-const MEMORIES_BASE = path.join(process.env.HOME, '.claude', 'hive', 'memories');
+const HOME = os.homedir();
+const KG_SQLITE_PATH = path.join(HOME, '.claude', 'hive', 'kg.sqlite');
+const MEMORIES_BASE = path.join(HOME, '.claude', 'hive', 'memories');
 const LATENCY_THRESHOLD_MS = 30000; // 30 seconds
 
 /**
@@ -146,6 +148,19 @@ async function kgWrite(triples, sourceEpic, sourceAgent) {
   let db;
   try {
     db = sqlite3(KG_SQLITE_PATH);
+
+    // Guard: idx_unique_triple is required for INSERT OR IGNORE to dedupe re-runs.
+    // Mirrors the precondition check in scripts/kg-import-cycle-state.js.
+    const hasUniqueIdx = db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_unique_triple'")
+      .get();
+    if (!hasUniqueIdx) {
+      throw new Error(
+        'Missing required index idx_unique_triple — run kickoff bootstrap before kg_write(). ' +
+        'Without it, INSERT OR IGNORE cannot enforce uniqueness across re-runs.'
+      );
+    }
+
     const validPredicates = new Set(
       db.prepare('SELECT predicate FROM predicates').all().map(r => r.predicate)
     );
