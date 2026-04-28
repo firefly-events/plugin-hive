@@ -84,6 +84,12 @@ function detectFormat(decision) {
   return 'unknown';
 }
 
+function toIsoOrFallback(ts, fallbackIso) {
+  if (!ts) return fallbackIso;
+  const d = new Date(ts);
+  return Number.isNaN(d.getTime()) ? fallbackIso : d.toISOString();
+}
+
 function toTriple(decision, epicId, fileMtime) {
   const fmt = detectFormat(decision);
   if (fmt === 'canonical') {
@@ -94,7 +100,7 @@ function toTriple(decision, epicId, fileMtime) {
       // Note: the same truncation applies on re-runs (idempotent for consistent inputs).
       // If source text changes between runs, a new triple may be inserted alongside the old one.
       object: `${decision.key}:${decision.value}`.substring(0, 500),
-      valid_from: decision.timestamp || fileMtime,
+      valid_from: toIsoOrFallback(decision.timestamp, fileMtime),
       source_epic: epicId,
       source_agent: 'orchestrator'
     };
@@ -122,13 +128,27 @@ async function main() {
   }
 
   let db;
+  let insertStmt;
   if (!DRY_RUN) {
     const Database = require('better-sqlite3');
     db = new Database(DB_PATH);
     // idx_unique_triple is part of the canonical bootstrap DDL — see
-    // hive/references/knowledge-graph-schema.md#sqlite-bootstrap. Run kickoff
-    // bootstrap first if this script reports a UNIQUE constraint error or
-    // missing-index error.
+    // hive/references/knowledge-graph-schema.md#sqlite-bootstrap.
+    // Verify it exists at runtime so INSERT OR IGNORE can actually dedupe re-runs.
+    const hasUniqueIdx = db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_unique_triple'")
+      .get();
+    if (!hasUniqueIdx) {
+      db.close();
+      throw new Error(
+        'Missing required index idx_unique_triple — run kickoff bootstrap before importing. ' +
+        'Without it, INSERT OR IGNORE cannot deduplicate re-runs.'
+      );
+    }
+    // Prepare the insert statement once; reuse across all decisions for backfill speed.
+    insertStmt = db.prepare(
+      'INSERT OR IGNORE INTO triples (subject, predicate, object, valid_from, valid_until, source_epic, source_agent) VALUES (?, ?, ?, ?, NULL, ?, ?)'
+    );
   }
 
   const files = fs.readdirSync(CYCLE_STATE_DIR).filter(f => f.endsWith('.yaml'));
@@ -167,9 +187,6 @@ async function main() {
         console.log(`  DRY: ${triple.subject} -[${triple.predicate}]-> ${triple.object.substring(0, 60)}`);
         totalInserted++;
       } else {
-        const insertStmt = db.prepare(
-          'INSERT OR IGNORE INTO triples (subject, predicate, object, valid_from, valid_until, source_epic, source_agent) VALUES (?, ?, ?, ?, NULL, ?, ?)'
-        );
         const result = insertStmt.run(
           triple.subject,
           triple.predicate,
