@@ -66,9 +66,12 @@ If elapsed ≤ 30s: no warning. Continue normally.
 
 ## Pre-Shutdown Compatibility
 
-The pre-shutdown receiver follows the same A→B→C ordering but may skip compile()
-on hard shutdown (2-turn timeout pressure). Use the shared orchestration from
-`hive/lib/session-end.js` with `skipCompile: true` option for pre-shutdown path.
+`hive/lib/session-end.js` (`runSessionEnd`) is the canonical orchestrator for both
+paths. The pre-shutdown receiver invokes the same function with `skipCompile: true`
+on hard shutdown (2-turn timeout pressure), preserving the A→B→C ordering: insights
+→ kg_write() (sequential) → compile() ‖ chromadb.index() (parallel). See
+`hive/references/pre-shutdown-protocol.md` for receiver-side details; that doc has
+been aligned to this ordering.
 
 ## Implementation Reference
 

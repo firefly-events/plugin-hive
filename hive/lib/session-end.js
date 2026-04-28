@@ -74,12 +74,12 @@ async function runSessionEnd({ agentName, epicId, promotedSlugs = [], triples = 
       }
       for (const slug of promotedSlugs) {
         const memPath = path.join(MEMORIES_BASE, agentName, `${slug}.md`);
-        if (fs.existsSync(memPath)) {
-          const content = fs.readFileSync(memPath, 'utf8');
-          await chromadbIndex('hive-memories', slug, content, { agentName, epicId }).catch(err => {
-            chromadbWarning = `chromadb.index() failed for ${slug}: ${err.message}`;
-            console.warn(`[session-end] ${chromadbWarning}`);
-          });
+        try {
+          const content = await fs.promises.readFile(memPath, 'utf8');
+          await chromadbIndex('hive-memories', slug, content, { agentName, epicId });
+        } catch (err) {
+          chromadbWarning = `chromadb.index() skipped/failed for ${slug}: ${err.message}`;
+          console.warn(`[session-end] ${chromadbWarning}`);
         }
       }
     })();
@@ -119,7 +119,7 @@ async function kgWrite(triples, sourceEpic, sourceAgent) {
   );
 
   const insert = db.prepare(
-    'INSERT INTO triples (subject, predicate, object, valid_from, source_epic, source_agent) VALUES (?, ?, ?, ?, ?, ?)'
+    'INSERT OR IGNORE INTO triples (subject, predicate, object, valid_from, source_epic, source_agent) VALUES (?, ?, ?, ?, ?, ?)'
   );
 
   const writeAll = db.transaction((rows) => {
@@ -134,8 +134,11 @@ async function kgWrite(triples, sourceEpic, sourceAgent) {
     }
   });
 
-  writeAll(triples);
-  db.close();
+  try {
+    writeAll(triples);
+  } finally {
+    db.close();
+  }
 }
 
 /**
