@@ -65,6 +65,11 @@ async function query(collectionName, queryText, topK = 5, host = DEFAULT_HOST, p
         let data = '';
         res.on('data', (chunk) => { data += chunk; });
         res.on('end', () => {
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            console.warn(`[chromadb-wrapper] query failed with status ${res.statusCode} — falling back to L1+L0`);
+            resolve([]);
+            return;
+          }
           try {
             const parsed = JSON.parse(data);
             const ids = (parsed.ids && parsed.ids[0]) || [];
@@ -111,7 +116,12 @@ async function index(collectionName, docId, content, metadata = {}, host = DEFAU
         headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
         timeout: QUERY_TIMEOUT_MS
       },
-      (res) => { resolve(res.statusCode === 200 || res.statusCode === 201); }
+      (res) => {
+        // Drain response body to free the keep-alive connection before resolving
+        res.on('data', () => {});
+        res.on('end', () => { resolve(res.statusCode === 200 || res.statusCode === 201); });
+        res.on('error', () => { resolve(false); });
+      }
     );
     req.on('error', () => { console.warn('[chromadb-wrapper] index error'); resolve(false); });
     req.on('timeout', () => { req.destroy(); resolve(false); });

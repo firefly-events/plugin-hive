@@ -78,5 +78,14 @@ been aligned to this ordering.
 See `hive/lib/session-end.js` for the JavaScript orchestration module. Call:
 ```javascript
 const { runSessionEnd } = require('./session-end');
-await runSessionEnd({ agentName, epicId, skipCompile: false });
+const { elapsed, kgError, chromadbWarning } = await runSessionEnd({
+  agentName,                                    // string — persona whose memories were promoted
+  epicId,                                       // string — current epic id (becomes triple source_epic)
+  promotedSlugs: ['avoid-x', 'prefer-y'],       // string[] — kebab-case slugs written to ~/.claude/hive/memories/{agent}/
+  triples: [                                    // Array — KG triples to persist in Phase B
+    { subject, predicate, object, source_agent } // valid_from defaults to now if omitted
+  ],
+  skipCompile: false                            // boolean — true under hard-shutdown pressure
+});
 ```
+`chromadbWarning` is a `; `-joined string of all warnings raised during the ChromaDB phase (or `null` if none).

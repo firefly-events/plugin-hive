@@ -29,11 +29,17 @@ const LATENCY_THRESHOLD_MS = 30000; // 30 seconds
  * @param {Array<{subject, predicate, object, source_agent}>} options.triples - KG triples to write
  * @param {boolean} [options.skipCompile=false] - skip compile() (for pre-shutdown hard shutdown)
  * @returns {Promise<{elapsed: number, kgError: Error|null, chromadbWarning: string|null}>}
+ *   `chromadbWarning` is a `; `-joined string of all warnings raised during the
+ *   ChromaDB phase (or null if none). All warnings are also `console.warn`'d.
  */
 async function runSessionEnd({ agentName, epicId, promotedSlugs = [], triples = [], skipCompile = false }) {
   const startMs = Date.now();
   let kgError = null;
-  let chromadbWarning = null;
+  const chromadbWarnings = [];
+  const warnChromadb = (msg) => {
+    chromadbWarnings.push(msg);
+    console.warn(`[session-end] ${msg}`);
+  };
 
   // Phase A: Insight promotion
   // Caller is responsible for writing insight files before calling runSessionEnd.
@@ -68,22 +74,19 @@ async function runSessionEnd({ agentName, epicId, promotedSlugs = [], triples = 
     const indexPromise = (async () => {
       const available = await chromadbAvailable();
       if (!available) {
-        chromadbWarning = 'ChromaDB unavailable — semantic index not updated';
-        console.warn(`[session-end] ${chromadbWarning}`);
+        warnChromadb('ChromaDB unavailable — semantic index not updated');
         return;
       }
       const SLUG_RE = /^[a-z0-9-]+$/;
       const agentDir = path.resolve(MEMORIES_BASE, agentName);
       for (const slug of promotedSlugs) {
         if (!SLUG_RE.test(slug)) {
-          chromadbWarning = `invalid memory slug skipped: ${slug}`;
-          console.warn(`[session-end] ${chromadbWarning}`);
+          warnChromadb(`invalid memory slug skipped: ${slug}`);
           continue;
         }
         const memPath = path.resolve(agentDir, `${slug}.md`);
         if (memPath !== path.join(agentDir, `${slug}.md`) || !memPath.startsWith(`${agentDir}${path.sep}`)) {
-          chromadbWarning = `unsafe memory path skipped for slug: ${slug}`;
-          console.warn(`[session-end] ${chromadbWarning}`);
+          warnChromadb(`unsafe memory path skipped for slug: ${slug}`);
           continue;
         }
         try {
@@ -92,12 +95,10 @@ async function runSessionEnd({ agentName, epicId, promotedSlugs = [], triples = 
           const docId = `${agentName}/${slug}`;
           const ok = await chromadbIndex('hive-memories', docId, content, { agentName, epicId, slug });
           if (!ok) {
-            chromadbWarning = `chromadb.index() failed for ${docId}`;
-            console.warn(`[session-end] ${chromadbWarning}`);
+            warnChromadb(`chromadb.index() failed for ${docId}`);
           }
         } catch (err) {
-          chromadbWarning = `chromadb.index() skipped/failed for ${slug}: ${err.message}`;
-          console.warn(`[session-end] ${chromadbWarning}`);
+          warnChromadb(`chromadb.index() skipped/failed for ${slug}: ${err.message}`);
         }
       }
     })();
@@ -115,6 +116,7 @@ async function runSessionEnd({ agentName, epicId, promotedSlugs = [], triples = 
     );
   }
 
+  const chromadbWarning = chromadbWarnings.length ? chromadbWarnings.join('; ') : null;
   return { elapsed, kgError, chromadbWarning };
 }
 
