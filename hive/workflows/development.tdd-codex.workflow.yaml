@@ -21,7 +21,7 @@ steps:
   - id: research
     agent: researcher
     backend: claude
-    step_file: workflows/steps/development-classic/step-02-research.md
+    step_file: hive/workflows/steps/development-classic/step-02-research.md
     task: >
       Read the story spec and explore the codebase. Gather raw findings:
       affected files, existing patterns, architectural constraints, risks,
@@ -65,7 +65,7 @@ steps:
   - id: test-spec
     agent: tester
     backend: claude
-    step_file: workflows/steps/development-tdd/step-02-test-spec.md
+    step_file: hive/workflows/steps/development-tdd/step-02-test-spec.md
     task: >
       Write failing tests from the story specification ONLY. You do NOT see any
       implementation code — this is TDD mode. Tests define the expected behavior
@@ -182,7 +182,7 @@ steps:
   - id: review
     agent: reviewer
     backend: claude
-    step_file: workflows/steps/development-classic/step-06-review.md
+    step_file: hive/workflows/steps/development-classic/step-06-review.md
     task: >
       Review the Codex-written implementation against the story spec, test
       coverage, and conventions. This is Claude reviewing Codex's work —
@@ -285,7 +285,7 @@ steps:
   - id: integrate
     agent: developer
     backend: claude
-    step_file: workflows/steps/development-classic/step-08-integrate.md
+    step_file: hive/workflows/steps/development-classic/step-08-integrate.md
     task: >
       Commit and integrate the implementation. Stage all changed files, write a
       clear commit message following the repository convention, and push to the

@@ -41,13 +41,13 @@ phases:
     agent: orchestrator
     steps:
       - id: load-state
-        step_file: workflows/steps/daily-ceremony/step-01-load-state.md
+        step_file: hive/workflows/steps/daily-ceremony/step-01-load-state.md
         agent: orchestrator
       - id: load-memories
-        step_file: workflows/steps/daily-ceremony/step-02-load-memories.md
+        step_file: hive/workflows/steps/daily-ceremony/step-02-load-memories.md
         agent: orchestrator
       - id: present-standup
-        step_file: workflows/steps/daily-ceremony/step-03-present-standup.md
+        step_file: hive/workflows/steps/daily-ceremony/step-03-present-standup.md
         agent: orchestrator
 
   - id: planning
@@ -72,13 +72,13 @@ phases:
     depends_on: [standup]
     steps:
       - id: select-work
-        step_file: workflows/steps/daily-ceremony/step-04-select-work.md
+        step_file: hive/workflows/steps/daily-ceremony/step-04-select-work.md
         agent: orchestrator
       - id: validate-stories
-        step_file: workflows/steps/daily-ceremony/step-05-validate-stories.md
+        step_file: hive/workflows/steps/daily-ceremony/step-05-validate-stories.md
         agent: analyst
       - id: approve-plan
-        step_file: workflows/steps/daily-ceremony/step-06-approve-plan.md
+        step_file: hive/workflows/steps/daily-ceremony/step-06-approve-plan.md
         agent: orchestrator
 
   - id: execution
@@ -106,7 +106,7 @@ phases:
     depends_on: [planning]
     steps:
       - id: kick-off
-        step_file: workflows/steps/daily-ceremony/step-07-kick-off.md
+        step_file: hive/workflows/steps/daily-ceremony/step-07-kick-off.md
         agent: orchestrator
 
   - id: commit
@@ -221,5 +221,5 @@ phases:
     depends_on: [push]
     steps:
       - id: session-end
-        step_file: workflows/steps/daily-ceremony/step-08-session-end.md
+        step_file: hive/workflows/steps/daily-ceremony/step-08-session-end.md
         agent: orchestrator
