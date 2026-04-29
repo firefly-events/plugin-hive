@@ -1,60 +1,31 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-04-13 | **Date:** 2026-04-13 | **Verdict:** PASSED
+**Cycle:** meta-2026-04-29 | **Date:** 2026-04-29 | **Verdict:** passed | **Branch:** meta-meta/nightly-20260429
 
----
+## What Changed
 
-## What Changed Tonight
+- **`.pHive/meta-team/archive/2026-04-19/ledger.yaml`** — Added a leading YAML comment marking the file as a frozen historical record that should not be reopened. This is a pure append-only provenance note on a dormant archive artifact; no data or schema was altered. Implements backlog candidate `mmo-2026-04-21-003` (archive-provenance-comment).
 
-- **`skills/hive/agents/memories/accessibility-specialist/run-automated-audit-before-manual-fixes.md`** — New pattern memory: run axe/pa11y automated audit before writing any manual ARIA fixes; tool priority order, fallback for missing tooling, and before/after audit verification step
-- **`skills/hive/agents/memories/accessibility-specialist/cite-wcag-criterion-for-every-fix.md`** — New pitfall memory: every fix must cite the specific WCAG 2.1 success criterion it addresses; includes the required citation format and a top-10 criteria reference table
-- **`skills/hive/agents/memories/animations-specialist/every-animation-needs-reduced-motion-alternative.md`** — New pitfall memory: every animated element MUST have a `prefers-reduced-motion` alternative before the implementation is considered done; CSS and JS examples, audit step
-- **`skills/hive/agents/memories/animations-specialist/compositor-only-properties-for-animation.md`** — New pattern memory: animate only `transform` and `opacity`; all other CSS properties flag as PERFORMANCE_RISK; `will-change` usage guidance included
-- **`skills/hive/agents/memories/idiomatic-reviewer/stay-in-idiomatic-lane-only.md`** — New pitfall memory: only 5 valid categories (naming/stdlib/anti-pattern/style/idiom); suppress correctness/security/performance findings; in-lane vs. out-of-lane examples
-- **`skills/hive/agents/memories/idiomatic-reviewer/acknowledge-wins-before-issues.md`** — New pattern memory: Idiomatic Summary MUST acknowledge wins before issues (required by output format); Idiomatic Summary template with wins section provided
-- **`skills/hive/agents/memories/performance-reviewer/stay-in-performance-lane-only.md`** — New pitfall memory: only 6 valid categories (complexity/allocation/io/caching/bundle/lazy-loading); suppress correctness/security/idiom findings; in-lane vs. out-of-lane examples
-- **`skills/hive/agents/memories/performance-reviewer/quantify-impact-dont-just-label-it.md`** — New pattern memory: every finding must quantify or bound its impact; per-category quantification templates (complexity, allocation, io, caching, bundle, lazy-loading)
-- **`skills/hive/agents/memories/test-inspector/manual-ac-table-when-coverage-tooling-unavailable.md`** — New pattern memory: when coverage tooling is absent, produce a manual AC coverage table rather than reporting "tooling unavailable"; format, covered/partial/not-covered rules, and manual analysis notes section
-- **`skills/hive/agents/memories/test-sentinel/regression-block-report-format.md`** — New pattern memory: regression block reports must include failing tests table, baseline/current metrics, delta, and recommended action; PASS report format also provided
-- **`hive/agents/tester.md`** — Added 6-rule Scope Discipline section with time budgets (10 min small / 20 min medium / 30 min large): stay on story spec, note adjacent issues without fixing them, one assertion per test, no implementation detail testing, use existing utilities, time budget enforcement
-- **`hive/agents/technical-writer.md`** — Added 5-rule Scope Discipline section with time budgets (5 / 15 / 25 min): work only from provided input, one document per task, structure don't analyze, match injected skill verbatim, time budget enforcement
-- **`.pHive/meta-team/queue.yaml`** — All 3 queued targets marked completed: 001 (gate-policy, already done), 002 (tester.md), 003 (technical-writer.md)
+## Analysis Findings (Not Fixed This Cycle)
 
----
+8 structural findings identified by Step 2 analysis (none addressed by backlog-fallback path):
 
-## Memory Coverage — All Roster Agents Now Have ≥1 Starter Memory
+- **[critical] MISSING_STEP_FILE** — `hive/workflows/daily-ceremony.workflow.yaml` (+ 5 others): 35 `step_file` paths missing the `hive/` prefix. All 6 affected workflows (daily-ceremony, development-classic, development-tdd, development-tdd-codex, test-swarm, ui-design) use relative `workflows/steps/…` paths instead of `hive/workflows/steps/…`.
+- **[high] SCHEMA_INCONSISTENCY** — `hive/GUIDE.md`: 5 agent persona files (accessibility-specialist, animations-specialist, idiomatic-reviewer, performance-reviewer, security-reviewer) exist under `hive/agents/` but are absent from the GUIDE.md agent roster.
+- **[high] STUB_DOC** — `hive/references/meta-optimize-maintainer.md`: only 5 lines of content; lacks substantive procedures or examples expected of a reference doc.
+- **[medium] SCHEMA_INCONSISTENCY** — `hive/workflows/steps/meta-team-cycle/step-07-promotion.md`: heading `## Execution Protocols` uses mixed case instead of the all-caps `## EXECUTION PROTOCOLS` used in all other step files.
+- **[medium] OTHER** — Path format inconsistency across workflow files: `meta-team-cycle` uses `hive/workflows/…` (correct); 6 other workflows use `workflows/…` (relative, incorrect from repo root).
+- **[low] OTHER** — `hive/GUIDE.md` uses `references/` notation instead of `hive/references/` for reference links.
+- **[low] MEMORY_GAP** — security-reviewer and pair-programmer agents have zero or minimal starter memories.
+- **[low] INCOMPLETE_STEP_FILE** — `step-07-promotion.md` heading capitalization deviation (same issue as medium finding above; counted separately per schema).
 
-This cycle completes the memory coverage initiative started in cycle 1:
+## Metrics
 
-| Agent | Memories | Status |
-|---|---|---|
-| `security-reviewer` | 0 | **NEXT PRIORITY** |
-| `orchestrator` | 1 | Could use pre-shutdown coordination memory |
-| `pair-programmer` | 1 | Could use don't-rewrite-refactor discipline |
-| `tester` | 1 | Could use TDD/Classic mode selection memory |
-| All other agents | 1–3 | Covered |
+- Findings: 8 | Proposals: 1 (backlog-fallback) | Promoted: 1 | Reverted: 0
+- Candidate metrics: tokens=0, wall_clock_ms=39, first_attempt_pass=true
+- Compare vs baseline (meta-2026-04-22-r2): no regressions, verdict=accept
+- Rollback ref: `8af615587ab92b1a4e1c43706393991771d39b64` (pre-cycle HEAD)
+- Commit ref: `b9ed587ad67201acd2bd51b6a74ac45dd20cf3ad`
 
----
+## Next Cycle Priority
 
-## What Was Found (Not Fixed This Cycle)
-
-Nothing deferred. All 9 findings were either addressed by proposals or resolved as maintenance (queue stale entry corrected). The 4 previously-zero-memory agents were the last unaddressed items from the prior cycle.
-
----
-
-## Flagged for Human Review
-
-- Nothing requires your attention.
-
----
-
-## Cycle Metrics
-
-| Metric | Count |
-|--------|-------|
-| Findings identified | 9 |
-| Proposals generated | 5 |
-| Changes promoted | 13 |
-| Changes reverted | 0 |
-| Flagged for human | 0 |
-
-**Next cycle priority:** security-reviewer (0 memories); orchestrator second memory (pre-shutdown coordination); pair-programmer second memory (targeted-edit discipline); tester second memory (TDD/Classic mode selection)
+The critical `MISSING_STEP_FILE` finding (workflow paths missing `hive/` prefix in 6 workflow files) is the highest-priority structural issue for the next cycle. The high-severity `STUB_DOC` for `hive/references/meta-optimize-maintainer.md` and the agent roster gap in `hive/GUIDE.md` are close seconds.
