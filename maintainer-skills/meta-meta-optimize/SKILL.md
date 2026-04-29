@@ -79,11 +79,17 @@ Use the current cycle context, charter constraints, backlog candidate, and prior
 
 ### Step 3 Proposal
 
-Load and follow `hive/workflows/steps/meta-team-cycle/step-03-proposal.md` when metric signal is present.
+Load and follow `hive/workflows/steps/meta-team-cycle/step-03-proposal.md` when ANY of the following actionable inputs is present:
 
-If there is no metric signal, load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` instead. Step 3b is the backlog fallback path for no metric signal; it selects from `.pHive/meta-team/queue-meta-meta-optimize.yaml` rather than inventing a proposal path.
+- Step 2 produced one or more `findings` (structural-audit signal), OR
+- Step 2b produced one or more `external_research_candidates`, OR
+- A metric signal is present (perf-baseline delta available for proposal ranking).
 
-Do not run both branches for the same cycle. Choose one based on whether metric signal exists.
+Load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` ONLY when ALL three are empty: zero findings AND zero external candidates AND no metric signal. Step 3b is the backlog fallback path for the "nothing-actionable-from-this-cycle" case; it selects from `.pHive/meta-team/queue-meta-meta-optimize.yaml` rather than inventing a proposal path.
+
+`metric_signal` is a perf-baseline-only flag (orthogonal to findings). A cycle that produced findings but no perf delta MUST route to step-03, not step-03b.
+
+Do not run both branches for the same cycle. The router decides based on the AND-of-empty rule above.
 
 ### Step 4 Implementation
 

@@ -3,7 +3,8 @@
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
 - Read this entire step file before taking any action
-- Run this step ONLY when step 2 analysis produced no metric signal; this is a FALLBACK path, not the default path
+- Run this step ONLY when step 2 produced ZERO findings AND step 2b produced ZERO external_research_candidates AND no metric signal is present. If ANY of the three actionable inputs exist, the cycle MUST route to step-03-proposal — never step-03b. This is a FALLBACK path, not the default path
+- `metric_signal` is a perf-baseline-only flag and is orthogonal to findings. A cycle that produced findings but no perf delta routes to step-03, not here
 - S8 is dry-run only and non-destructive: read the backlog, report which candidate would be selected, and stop
 - Do NOT mutate backlog files, do NOT invoke promotion, and do NOT advance to step 4 from this step in S8
 - The backlog is human-edited only (`Q-new-D` locked): do NOT auto-populate, auto-surface, or reorder entries
@@ -41,10 +42,14 @@ gracefully.
 ## TASK SEQUENCE
 
 ### 1. Confirm this branch is actually eligible
-Before reading the backlog, verify that step 2 ended with no metric signal.
+Before reading the backlog, verify that the cycle has NO actionable input from step 2 or step 2b.
 
-- If metric-driven analysis produced a usable candidate: STOP and return to the normal step 3 path
-- If analysis produced no metric signal: continue into backlog fallback mode
+- If step 2 `findings` is non-empty: STOP and return to step-03-proposal (findings drive proposals regardless of metric signal)
+- If step 2b `external_research_candidates` is non-empty: STOP and return to step-03-proposal
+- If a metric signal is present (perf-baseline delta usable for ranking): STOP and return to step-03-proposal
+- ONLY if all three are empty (zero findings AND zero external candidates AND no metric signal): continue into backlog fallback mode
+
+This routing rule is the canonical resolution to the conflation bug where `metric_signal: false` was treated as equivalent to "nothing to do" even when structural findings existed (see meta-2026-04-29 nightly: 8 findings ignored).
 
 ### 2. Read the backlog as-is
 Load `.pHive/meta-team/queue-meta-meta-optimize.yaml` from disk.
@@ -127,7 +132,7 @@ After the report is emitted:
 - Backlog file missing: emit the structured YAML report with all nullable fields set to `null` and `decision: no-fallback-available`
 - Backlog YAML invalid: report the parse failure in operator-facing logs, then emit `decision: no-fallback-available`
 - Backlog has zero pending entries: emit `decision: no-fallback-available` and end the cycle
-- Caller invokes this step even though step 2 produced metric signal: reject the fallback run and return control to the metric-driven path
+- Caller invokes this step even though step 2 produced findings, step 2b produced external candidates, OR a metric signal is present: reject the fallback run and return control to step-03-proposal (see §1 eligibility check)
 
 ## NEXT STEP
 

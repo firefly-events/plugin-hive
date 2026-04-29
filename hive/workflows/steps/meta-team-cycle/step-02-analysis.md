@@ -101,6 +101,8 @@ findings:
   - {finding objects}
 ```
 
+**`metric_signal` field (orthogonal to findings):** If the analyzer also evaluates a perf-baseline delta (token / wall_clock_ms / first_attempt_pass) against a prior cycle baseline, record the result as a separate `metric_signal: true | false` field on this step's output. This flag is **perf-baseline-only** — it indicates whether a usable baseline-vs-candidate metric delta exists for proposal ranking. It is NOT a proxy for "are there findings". Routing between step-03 and step-03b uses an AND-of-empty rule across `findings`, `external_research_candidates`, and `metric_signal`; structural findings drive step-03 even when `metric_signal: false`. See `step-03b-backlog-fallback.md` §MANDATORY EXECUTION RULES for the canonical routing rule.
+
 ### 9. Produce analysis report
 ```
 ## Analysis Report — Cycle {cycle_id}
