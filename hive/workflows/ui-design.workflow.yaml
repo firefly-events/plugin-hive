@@ -14,7 +14,7 @@ methodology: ui-design
 steps:
   - id: read-story
     agent: ui-designer
-    step_file: workflows/steps/ui-design/step-01-read-story.md
+    step_file: hive/workflows/steps/ui-design/step-01-read-story.md
     task: >
       Read the story spec and discover existing design context (wireframes,
       design tokens, component patterns). Produce a screen list and design
@@ -34,7 +34,7 @@ steps:
 
   - id: discover-tools
     agent: ui-designer
-    step_file: workflows/steps/ui-design/step-02-discover-tools.md
+    step_file: hive/workflows/steps/ui-design/step-02-discover-tools.md
     task: >
       Check for Frame0 CLI, live export capability, and image generation
       MCP tools. Produce a tool report.
@@ -53,7 +53,7 @@ steps:
 
   - id: plan-screens
     agent: ui-designer
-    step_file: workflows/steps/ui-design/step-03-plan-screens.md
+    step_file: hive/workflows/steps/ui-design/step-03-plan-screens.md
     task: >
       Plan layout, component hierarchy, and build order for every screen.
       Reference existing design patterns. Produce screen manifest.
@@ -81,7 +81,7 @@ steps:
 
   - id: create-project
     agent: ui-designer
-    step_file: workflows/steps/ui-design/step-04-create-project.md
+    step_file: hive/workflows/steps/ui-design/step-04-create-project.md
     task: >
       Create .f0 project file and add one page per planned screen.
       Capture all page IDs.
@@ -102,7 +102,7 @@ steps:
 
   - id: build-wireframe
     agent: ui-designer
-    step_file: workflows/steps/ui-design/step-05-build-wireframe.md
+    step_file: hive/workflows/steps/ui-design/step-05-build-wireframe.md
     task: >
       Build wireframe shapes on each page following the manifest build order.
       Device frame first, then containers, then content, then labels and icons.
@@ -133,7 +133,7 @@ steps:
 
   - id: export
     agent: ui-designer
-    step_file: workflows/steps/ui-design/step-06-export.md
+    step_file: hive/workflows/steps/ui-design/step-06-export.md
     task: >
       Export each page as PNG if live mode available, or produce export
       commands for manual execution.
@@ -160,7 +160,7 @@ steps:
 
   - id: design-brief
     agent: ui-designer
-    step_file: workflows/steps/ui-design/step-07-design-brief.md
+    step_file: hive/workflows/steps/ui-design/step-07-design-brief.md
     task: >
       Produce one design brief per screen with layout, components,
       interactions, states, and accessibility notes.

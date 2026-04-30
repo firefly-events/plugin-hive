@@ -5,7 +5,7 @@ version: "1.0.0"
 steps:
   - id: rebuild
     agent: test-scout
-    step_file: workflows/steps/test-swarm/step-00-rebuild.md
+    step_file: hive/workflows/steps/test-swarm/step-00-rebuild.md
     task: >
       Rebuild the project from latest commit and deploy to test targets.
       Verify build artifacts are fresh before any tests run.
@@ -18,7 +18,7 @@ steps:
 
   - id: gather-context
     agent: test-scout
-    step_file: workflows/steps/test-swarm/step-01-scout.md
+    step_file: hive/workflows/steps/test-swarm/step-01-scout.md
     task: >
       Read the story spec, PR, or commit context. Cross-reference with baseline
       knowledge. Produce a structured context document covering what was built,
@@ -39,7 +39,7 @@ steps:
 
   - id: verify-baseline
     agent: test-scout
-    step_file: workflows/steps/test-swarm/step-01-scout.md
+    step_file: hive/workflows/steps/test-swarm/step-01-scout.md
     task: >
       Check if baseline knowledge exists for this project. If missing, run a
       discovery pass: inspect codebase structure, detect test frameworks, map
@@ -63,7 +63,7 @@ steps:
 
   - id: author-tests
     agent: test-architect
-    step_file: workflows/steps/test-swarm/step-02-architect.md
+    step_file: hive/workflows/steps/test-swarm/step-02-architect.md
     task: >
       Detect the project's test framework. Author test scripts for each
       acceptance criterion: happy paths, edge cases, error states. Map every
@@ -92,7 +92,7 @@ steps:
 
   - id: validate-coverage
     agent: test-inspector
-    step_file: workflows/steps/test-swarm/step-04-inspector.md
+    step_file: hive/workflows/steps/test-swarm/step-04-inspector.md
     task: >
       Validate that authored tests adequately cover the story's acceptance
       criteria. Map each requirement to its covering test(s). Identify gaps
@@ -119,7 +119,7 @@ steps:
 
   - id: execute-platform-a
     agent: test-worker
-    step_file: workflows/steps/test-swarm/step-03-worker.md
+    step_file: hive/workflows/steps/test-swarm/step-03-worker.md
     task: >
       Execute authored tests on the primary platform. Detect connected
       devices/environments. Run each test, capturing pass/fail, timing,
@@ -143,7 +143,7 @@ steps:
 
   - id: execute-platform-b
     agent: test-worker
-    step_file: workflows/steps/test-swarm/step-03-worker.md
+    step_file: hive/workflows/steps/test-swarm/step-03-worker.md
     task: >
       Execute authored tests on the secondary platform (if configured).
       Same protocol as platform-a but targeting a different device/browser/environment.
@@ -167,7 +167,7 @@ steps:
 
   - id: file-bugs
     agent: test-sentinel
-    step_file: workflows/steps/test-swarm/step-05-sentinel.md
+    step_file: hive/workflows/steps/test-swarm/step-05-sentinel.md
     task: >
       Process all test failures from both platforms. For each failure: gather
       expected vs actual, screenshots, repro steps. Generate AI hypothesis on
@@ -197,7 +197,7 @@ steps:
 
   - id: triage-failures
     agent: test-sentinel
-    step_file: workflows/steps/test-swarm/step-06-triage.md
+    step_file: hive/workflows/steps/test-swarm/step-06-triage.md
     task: >
       Categorize failures: transient (retry), story issue (back to planning),
       human blocker (escalate). Map to error-handling categories. Produce
@@ -221,7 +221,7 @@ steps:
 
   - id: compile-report
     agent: test-inspector
-    step_file: workflows/steps/test-swarm/step-07-report.md
+    step_file: hive/workflows/steps/test-swarm/step-07-report.md
     task: >
       Compile the test session report. Synthesize: test results per platform,
       coverage analysis, bugs filed, severity distribution, and actionable
@@ -261,7 +261,7 @@ steps:
 
   - id: promote-baseline
     agent: test-architect
-    step_file: workflows/steps/test-swarm/step-08-promote.md
+    step_file: hive/workflows/steps/test-swarm/step-08-promote.md
     task: >
       Promote passing test patterns to baseline knowledge. Update baseline with
       verified framework detections and regression candidates. Archive test

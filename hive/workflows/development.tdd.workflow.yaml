@@ -11,7 +11,7 @@ methodology: tdd
 steps:
   - id: research
     agent: researcher
-    step_file: workflows/steps/development-classic/step-02-research.md
+    step_file: hive/workflows/steps/development-classic/step-02-research.md
     task: >
       Read the story spec and explore the codebase. Gather raw findings:
       affected files, existing patterns, architectural constraints, risks,
@@ -53,7 +53,7 @@ steps:
 
   - id: test-spec
     agent: tester
-    step_file: workflows/steps/development-tdd/step-02-test-spec.md
+    step_file: hive/workflows/steps/development-tdd/step-02-test-spec.md
     task: >
       Write failing tests from the story specification ONLY. You do NOT see any
       implementation code — this is TDD mode. Tests define the expected behavior
@@ -80,7 +80,7 @@ steps:
 
   - id: implement
     agent: developer
-    step_file: workflows/steps/development-tdd/step-03-implement.md
+    step_file: hive/workflows/steps/development-tdd/step-03-implement.md
     task: >
       Implement the story to make all failing tests pass. You receive the test
       files and the research brief — write the minimum code needed to satisfy
@@ -108,7 +108,7 @@ steps:
 
   - id: review
     agent: reviewer
-    step_file: workflows/steps/development-classic/step-06-review.md
+    step_file: hive/workflows/steps/development-classic/step-06-review.md
     task: >
       Review the implementation and tests for correctness, security, performance,
       and convention compliance. Check that all acceptance criteria are satisfied.
@@ -142,7 +142,7 @@ steps:
 
   - id: optimize
     agent: developer
-    step_file: workflows/steps/development-classic/step-07-optimize.md
+    step_file: hive/workflows/steps/development-classic/step-07-optimize.md
     task: >
       Apply the improvements listed in the review findings. Address each
       needs_optimization item. Do not change behavior — only improve quality,
@@ -169,7 +169,7 @@ steps:
 
   - id: integrate
     agent: developer
-    step_file: workflows/steps/development-classic/step-08-integrate.md
+    step_file: hive/workflows/steps/development-classic/step-08-integrate.md
     task: >
       Commit and integrate the implementation. Stage all changed files, write a
       clear commit message following the repository convention, and push to the

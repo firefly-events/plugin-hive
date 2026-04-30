@@ -27,7 +27,7 @@ methodology: classic
 steps:
   - id: preflight
     agent: researcher
-    step_file: workflows/steps/development-classic/step-01-preflight.md
+    step_file: hive/workflows/steps/development-classic/step-01-preflight.md
     task: >
       Before any implementation, verify the project is in a buildable state:
       1. Run the project's build command (from CLAUDE.md or project config)
@@ -51,7 +51,7 @@ steps:
 
   - id: research
     agent: researcher
-    step_file: workflows/steps/development-classic/step-02-research.md
+    step_file: hive/workflows/steps/development-classic/step-02-research.md
     task: >
       Read the story spec and explore the codebase. Gather raw findings:
       affected files, existing patterns, architectural constraints, risks,
@@ -102,7 +102,7 @@ steps:
 
   - id: implement
     agent: developer
-    step_file: workflows/steps/development-classic/step-03-implement.md
+    step_file: hive/workflows/steps/development-classic/step-03-implement.md
     task: >
       Implement the story according to the spec and research brief. Follow existing
       patterns identified in the research phase. Write clean, minimal code — only
@@ -132,7 +132,7 @@ steps:
 
   - id: test
     agent: tester
-    step_file: workflows/steps/development-classic/step-05-test.md
+    step_file: hive/workflows/steps/development-classic/step-05-test.md
     task: >
       Write tests for the implementation. Tests should cover the acceptance criteria
       in the story spec. Use the existing test patterns found during research. Include
@@ -168,7 +168,7 @@ steps:
 
   - id: platform-verify
     agent: tester
-    step_file: workflows/steps/development-classic/step-04-platform-verify.md
+    step_file: hive/workflows/steps/development-classic/step-04-platform-verify.md
     task: >
       For cross-platform stories: build and run on EACH target platform to verify
       the implementation works everywhere, not just where it was developed.
@@ -198,7 +198,7 @@ steps:
 
   - id: review
     agent: reviewer
-    step_file: workflows/steps/development-classic/step-06-review.md
+    step_file: hive/workflows/steps/development-classic/step-06-review.md
     task: >
       Review the implementation AND tests for correctness, security, performance,
       and convention compliance. Check that all acceptance criteria are satisfied.
@@ -292,7 +292,7 @@ steps:
 
   - id: optimize
     agent: developer
-    step_file: workflows/steps/development-classic/step-07-optimize.md
+    step_file: hive/workflows/steps/development-classic/step-07-optimize.md
     task: >
       Apply the improvements listed in the review findings. Address each
       needs_optimization item. Do not change behavior — only improve quality,
@@ -327,7 +327,7 @@ steps:
 
   - id: dev-standby
     agent: developer
-    step_file: workflows/steps/development-classic/step-05b-dev-standby.md
+    step_file: hive/workflows/steps/development-classic/step-05b-dev-standby.md
     task: >
       Stay idle while the test swarm runs. The dev agent has full
       implementation context and can fix bugs faster than a cold agent.
@@ -353,7 +353,7 @@ steps:
 
   - id: integrate
     agent: developer
-    step_file: workflows/steps/development-classic/step-08-integrate.md
+    step_file: hive/workflows/steps/development-classic/step-08-integrate.md
     task: >
       Commit and integrate the implementation. Stage all changed files, write a
       clear commit message following the repository convention, and push to the
