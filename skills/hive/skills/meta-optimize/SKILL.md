@@ -72,9 +72,15 @@ Load and follow `hive/workflows/steps/meta-team-cycle/step-02-analysis.md`.
 
 ### Step 3 Proposal
 
-Load and follow `hive/workflows/steps/meta-team-cycle/step-03-proposal.md` when metrics signal is present and yields ranked proposals.
+Load and follow `hive/workflows/steps/meta-team-cycle/step-03-proposal.md` when ANY of the following actionable inputs is present:
 
-If kickoff metrics were enabled but the baseline-to-compare proposal path produces no ranked proposals above threshold, load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` as the public backlog-selection branch.
+- Step 2 produced one or more `findings` (structural-audit signal), OR
+- Step 2b produced one or more `external_research_candidates`, OR
+- A metric signal is present and yields ranked proposals (perf-baseline delta above threshold).
+
+Load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` ONLY when ALL three are empty: zero findings AND zero external candidates AND no usable metric signal. The public fallback branch is the "nothing-actionable-from-this-cycle" path, not the "no perf delta" path.
+
+`metric_signal` is a perf-baseline-only flag (orthogonal to findings). A cycle with findings but no perf delta MUST route to step-03, not step-03b. Kickoff metrics opt-out (no baseline ever captured) plus zero findings plus zero external candidates is the canonical case for step-03b.
 
 Do not run both branches for the same cycle. The public fallback branch consumes the consumer-managed backlog file at `{HIVE_TARGET_PROJECT}/.pHive/meta-team/queue-meta-optimize.yaml`.
 
@@ -157,10 +163,13 @@ If the close gate fails:
 
 ## Backlog Fallback
 
-Trigger this branch only when both conditions are true:
+Trigger this branch only when all three actionable inputs are empty:
 
-- kickoff metrics state is enabled
-- the baseline -> compare proposal path yields no ranked proposals above threshold
+- step 2 `findings` is empty (zero structural-audit findings)
+- step 2b `external_research_candidates` is empty
+- no usable `metric_signal` is present (kickoff metrics opt-out, OR opt-in with no perf delta above threshold)
+
+`metric_signal` is a perf-baseline-only flag and is orthogonal to findings. A cycle that produced findings but no perf delta MUST route to step-03, not step-03b. The canonical case for step-03b is "metrics opt-out + zero findings + zero external candidates".
 
 Consumer backlog location:
 
