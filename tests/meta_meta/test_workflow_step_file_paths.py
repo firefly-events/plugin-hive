@@ -20,19 +20,25 @@ import yaml
 WORKFLOWS_DIR = Path("hive/workflows")
 
 
-def _iter_step_files(workflow_yaml: dict) -> list[str]:
-    """Return every `step_file` value in a workflow YAML, regardless of nesting."""
+def _iter_step_files(node: object) -> list[str]:
+    """Return every `step_file` value found anywhere in a workflow YAML.
+
+    Walks dicts and lists recursively so any current or future nesting shape
+    is covered. Required because workflow YAMLs use varied structures —
+    `daily-ceremony.workflow.yaml` nests under `phases[].steps[]`, while
+    most others use a top-level `steps[]` with optional `tasks`/`subtasks`/
+    `phase_steps` children.
+    """
     paths: list[str] = []
-    for step in workflow_yaml.get("steps", []) or []:
-        if not isinstance(step, dict):
-            continue
-        if "step_file" in step and isinstance(step["step_file"], str):
-            paths.append(step["step_file"])
-        # Some workflows use nested task lists with step_file entries
-        for nested_key in ("tasks", "subtasks", "phase_steps"):
-            for sub in step.get(nested_key, []) or []:
-                if isinstance(sub, dict) and isinstance(sub.get("step_file"), str):
-                    paths.append(sub["step_file"])
+    if isinstance(node, dict):
+        step_file = node.get("step_file")
+        if isinstance(step_file, str):
+            paths.append(step_file)
+        for value in node.values():
+            paths.extend(_iter_step_files(value))
+    elif isinstance(node, list):
+        for item in node:
+            paths.extend(_iter_step_files(item))
     return paths
 
 
