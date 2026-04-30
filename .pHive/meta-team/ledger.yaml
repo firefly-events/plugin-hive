@@ -7,6 +7,29 @@
   commit_ref: 96d410046ccac86c69806b6b0e5335522af93216
   rollback_ref: ea5b73a8fa4a76f69ff4ca2024d7f1c37b3b688d
   audit_path: .pHive/audits/mvl-proof/2026-04-22T10-29-48Z/proof.yaml
+- experiment_id: meta-2026-04-30
+  date: '2026-04-30'
+  story: nightly
+  slice: S9
+  started_at: '2026-04-30T08:22:45Z'
+  closed_at: '2026-04-30T08:26:23Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 2
+  top_changes:
+    - hive/references/meta-optimize-maintainer.md: expanded from 5-line stub to 65-line reference (overview, queue management, cycle procedure, outcomes, ledger guide)
+  commit_ref: 0e8a7092c0f711703a43aa6fe83c2061cbc12d5c
+  rollback_ref: 9820fd924fda9ac70a4b07cf296a0a60e54fb32a
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 0
+    first_attempt_pass: true
+  notes: |
+    First nightly run for 2026-04-30. Analysis found 2 findings (STUB_DOC +
+    SCHEMA_INCONSISTENCY). Addressed STUB_DOC by expanding
+    meta-optimize-maintainer.md. Schema inconsistency in
+    daily-ceremony.workflow.yaml deferred as likely intentional phases schema.
 - experiment_id: meta-2026-04-22-r2
   date: '2026-04-22'
   story: BL2.6
