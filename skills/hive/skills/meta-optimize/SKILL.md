@@ -163,10 +163,13 @@ If the close gate fails:
 
 ## Backlog Fallback
 
-Trigger this branch only when both conditions are true:
+Trigger this branch only when all three actionable inputs are empty:
 
-- kickoff metrics state is enabled
-- the baseline -> compare proposal path yields no ranked proposals above threshold
+- step 2 `findings` is empty (zero structural-audit findings)
+- step 2b `external_research_candidates` is empty
+- no usable `metric_signal` is present (kickoff metrics opt-out, OR opt-in with no perf delta above threshold)
+
+`metric_signal` is a perf-baseline-only flag and is orthogonal to findings. A cycle that produced findings but no perf delta MUST route to step-03, not step-03b. The canonical case for step-03b is "metrics opt-out + zero findings + zero external candidates".
 
 Consumer backlog location:
 

@@ -121,7 +121,7 @@ After the report is emitted:
 
 ## SUCCESS METRICS
 
-- [ ] Step used only after step 2 reported no metric signal
+- [ ] Step used only when all actionable inputs were empty: step 2 findings = 0, step 2b external_research_candidates = 0, and no metric_signal
 - [ ] Backlog loaded from `.pHive/meta-team/queue-meta-meta-optimize.yaml` without modification
 - [ ] First `status: pending` candidate selected with no priority scoring
 - [ ] Exactly one structured YAML report emitted
