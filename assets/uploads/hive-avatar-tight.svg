@@ -1,0 +1,24 @@
+<svg viewBox="0 0 100 100" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Hive avatar — Concept 4 tight crop for upload (GitHub/npm/social) -->
+  <rect width="100" height="100" fill="#FFF1CF"/>
+  <g transform="translate(28, 22) scale(1.0)" fill="none" stroke="#3A255F" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Partial NE neighbor cell -->
+    <polyline points="22,0 22,-15 41.05,-26 60.10,-15 60.10,0"
+              stroke-width="2" opacity="0.45"/>
+    <!-- Partial SW neighbor cell -->
+    <polyline points="2.95,33 -16.10,44 -16.10,59 2.95,70"
+              stroke-width="2" opacity="0.3"/>
+    <!-- Main hex -->
+    <polygon points="22,0 41.05,11 41.05,33 22,44 2.95,33 2.95,11"
+             stroke-width="2.6"/>
+    <!-- Vertex dots -->
+    <g stroke="none">
+      <circle cx="22"    cy="0"  r="4.8" fill="#FFCD61"/>
+      <circle cx="41.05" cy="11" r="4.8" fill="#A12468"/>
+      <circle cx="41.05" cy="33" r="4.8" fill="#3A255F"/>
+      <circle cx="22"    cy="44" r="4.8" fill="#FFCD61"/>
+      <circle cx="2.95"  cy="33" r="4.8" fill="#A12468"/>
+      <circle cx="2.95"  cy="11" r="4.8" fill="#3A255F"/>
+    </g>
+  </g>
+</svg>

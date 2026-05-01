@@ -9,7 +9,21 @@
  * After initial import, kg_write() (hive/lib/session-end.js) handles
  * all new triple writes at session-end.
  *
- * Usage: node scripts/kg-import-cycle-state.js [--dry-run]
+ * Usage: node scripts/kg-import-cycle-state.js [--dry-run] \
+ *          [--cycle-state-dir <path>] [--source-epic-prefix <name>]
+ *
+ * --cycle-state-dir <path>
+ *   Override the default cycle-state directory (the script's repo root /
+ *   .pHive/cycle-state). Used by kg-bootstrap-from-projects.js to import
+ *   triples from registered sibling projects without changing cwd.
+ *
+ * --source-epic-prefix <name>
+ *   Prefix every emitted triple's `source_epic` with `<name>/`. Used by
+ *   the multi-project bootstrap to namespace epics so two projects with
+ *   the same epic ID (e.g., `memory-redesign`) do not collide on the
+ *   `idx_unique_triple(subject, predicate, object, source_epic)` index.
+ *   Without the prefix, project B's triples would be silently dropped by
+ *   INSERT OR IGNORE.
  */
 
 const path = require('path');
@@ -33,8 +47,22 @@ try {
 }
 
 const DB_PATH = path.join(os.homedir(), '.claude', 'hive', 'kg.sqlite');
-const CYCLE_STATE_DIR = path.join(__dirname, '..', '.pHive', 'cycle-state');
-const DRY_RUN = process.argv.includes('--dry-run');
+
+// argv parser — minimal, in-pattern with the existing --dry-run flag.
+function argvFlag(name) {
+  return process.argv.includes(name);
+}
+function argvValue(name) {
+  const i = process.argv.indexOf(name);
+  if (i === -1 || i === process.argv.length - 1) return null;
+  return process.argv[i + 1];
+}
+
+const CYCLE_STATE_DIR =
+  argvValue('--cycle-state-dir') ||
+  path.join(__dirname, '..', '.pHive', 'cycle-state');
+const SOURCE_EPIC_PREFIX = argvValue('--source-epic-prefix') || '';
+const DRY_RUN = argvFlag('--dry-run');
 
 function parseSimpleYaml(content) {
   // Minimal YAML parser for cycle-state files
@@ -91,6 +119,13 @@ function toIsoOrFallback(ts, fallbackIso) {
 
 function toTriple(decision, epicId, fileMtime) {
   const fmt = detectFormat(decision);
+  // namespacedEpic prevents idx_unique_triple collisions when triples are
+  // imported from sibling projects via kg-bootstrap-from-projects.js. With
+  // no prefix configured, the value is identical to the bare epicId — the
+  // single-project import path is unchanged.
+  const namespacedEpic = SOURCE_EPIC_PREFIX
+    ? `${SOURCE_EPIC_PREFIX}/${epicId}`
+    : epicId;
   if (fmt === 'canonical') {
     return {
       subject: epicId,
@@ -100,7 +135,7 @@ function toTriple(decision, epicId, fileMtime) {
       // If source text changes between runs, a new triple may be inserted alongside the old one.
       object: `${decision.key}:${decision.value}`.substring(0, 500),
       valid_from: toIsoOrFallback(decision.timestamp, fileMtime),
-      source_epic: epicId,
+      source_epic: namespacedEpic,
       source_agent: 'orchestrator'
     };
   } else if (fmt === 'legacy') {
@@ -109,7 +144,7 @@ function toTriple(decision, epicId, fileMtime) {
       predicate: 'decided',
       object: String(decision.decision || '').substring(0, 500),
       valid_from: fileMtime,
-      source_epic: epicId,
+      source_epic: namespacedEpic,
       source_agent: 'orchestrator'
     };
   }
