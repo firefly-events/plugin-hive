@@ -9,6 +9,30 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+- **kg_signal proposal source for `/meta-optimize`.** New optional workflow
+  step `step-02c-kg-signal.md` queries the L2 knowledge graph for
+  `phase_failed`, `phase_blocked`, and `superseded` triples and emits
+  `kg-findings.yaml` with `discovery_source: kg_signal`. Three-layer relevance
+  filter: predicate vocabulary, recency window, project-tag rank penalty.
+- **System-level project registry + KG bootstrap.** New
+  `~/.claude/hive/projects.yaml` registry plus
+  `scripts/kg-bootstrap-from-projects.js` walks registered project roots and
+  seeds `~/.claude/hive/kg.sqlite` with multi-project decision history.
+- **step-03 proposal merge accepts kg_signal findings.** Auto-tags untagged
+  KG findings with `discovery_source: kg_signal`, dedupes against internal
+  grouped findings, and ranks the merged pool.
+- **KG-before-backlog routing in meta-optimize.** Precedence is now
+  metrics → external research → kg_signal → backlog. Threshold blending,
+  new `meta_optimize.kg_signal` config block (`enabled` / `window_days` /
+  `cross_project_penalty`); `enabled: false` reverts to the legacy
+  metrics → backlog flow. No-op when `kg.sqlite` is absent.
+- **README audit for 1.1.3 drift cleanup.** New "Memory architecture"
+  section (L0–L3 tiers + KG + ChromaDB graceful degradation + session-end
+  three-op orchestration), Meta Optimization "Proposal sources" rewrite,
+  badge bump 1.0.0 → 1.1.3, persona count correction (20 → 24), Extensibility
+  path-prefix fixes, cmux row description refresh, migration callout.
+
 ## [1.1.3] - 2026-04-28
 
 ### Added
