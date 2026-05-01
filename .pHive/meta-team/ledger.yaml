@@ -20,6 +20,67 @@
     findings addressed: a stub reference doc expanded and a schema inconsistency
     in a step file header fixed. Closure validator passed programmatically.
     Regression watch armed for 4-hour observation window.
+- experiment_id: meta-2026-04-30
+  date: '2026-04-30'
+  story: nightly
+  slice: S9
+  started_at: '2026-04-30T08:22:45Z'
+  closed_at: '2026-04-30T08:26:23Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 2
+  top_changes:
+    - hive/references/meta-optimize-maintainer.md: expanded from 5-line stub to 65-line reference (overview, queue management, cycle procedure, outcomes, ledger guide)
+  commit_ref: 0e8a7092c0f711703a43aa6fe83c2061cbc12d5c
+  rollback_ref: 9820fd924fda9ac70a4b07cf296a0a60e54fb32a
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 0
+    first_attempt_pass: true
+  notes: |
+    First nightly run for 2026-04-30. Analysis found 2 findings (STUB_DOC +
+    SCHEMA_INCONSISTENCY). Addressed STUB_DOC by expanding
+    meta-optimize-maintainer.md. Schema inconsistency in
+    daily-ceremony.workflow.yaml deferred as likely intentional phases schema.
+- experiment_id: meta-2026-04-29
+  date: '2026-04-29'
+  story: BL2.2
+  candidate_id: mmo-2026-04-21-003
+  target: .pHive/meta-team/archive/2026-04-19/ledger.yaml
+  decision: accept
+  commit_ref: b9ed587ad67201acd2bd51b6a74ac45dd20cf3ad
+  rollback_ref: 8af615587ab92b1a4e1c43706393991771d39b64
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 39
+    first_attempt_pass: true
+- experiment_id: meta-2026-04-27
+  date: '2026-04-27'
+  story: BL2.2
+  candidate_id: mmo-2026-04-21-003
+  target: .pHive/meta-team/archive/2026-04-19/ledger.yaml
+  decision: accept
+  commit_ref: 0c6018953c162eb2fa83cecbdaf98737699c93ef
+  rollback_ref: 9820fd924fda9ac70a4b07cf296a0a60e54fb32a
+- experiment_id: meta-2026-04-26
+  date: '2026-04-26'
+  story: BL2.6
+  candidate_id: mmo-2026-04-21-003
+  target: .pHive/meta-team/archive/2026-04-19/ledger.yaml
+  decision: accept
+  commit_ref: aa0f0fd3cde6da197131aa4da5eb8162e045559a
+  rollback_ref: 9820fd924fda9ac70a4b07cf296a0a60e54fb32a
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 50
+    first_attempt_pass: true
+  regression_watch:
+    state: armed
+    armed_at: '2026-04-26T00:00:00Z'
+  observation_window:
+    start: '2026-04-26T00:00:00Z'
+    end: '2026-04-26T04:00:00Z'
 - experiment_id: meta-2026-04-22
   date: '2026-04-22'
   story: BL2.5
