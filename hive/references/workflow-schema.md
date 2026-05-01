@@ -68,6 +68,43 @@ Step files live at `hive/workflows/steps/{workflow-name}/step-{NN}-{kebab-name}.
 | `json` | Structured JSON data |
 | `artifact_ref` | Reference to a file produced by the step |
 
+## Conditional Skip (`skip_when`)
+
+Steps may declare a `skip_when` predicate that suppresses execution when true. The predicate is a free-form string evaluated by the orchestrator against the workflow execution context (story spec, prior step outputs, hive.config.yaml).
+
+```yaml
+steps:
+  - id: research
+    agent: researcher
+    skip_when: "story.complexity == 'low'"
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `skip_when` | string | null | Predicate; when true the step is skipped and downstream `optional` inputs receive null |
+
+When a step is skipped, downstream steps that bind to its outputs via per-input `optional: true` receive `null` and proceed; bindings without `optional: true` halt the dependent step.
+
+## Output Gate (`gate`)
+
+Steps may declare a `gate` assertion that the step's outputs must satisfy before downstream steps run. The gate text is a free-form predicate evaluated against the step's output dict.
+
+```yaml
+steps:
+  - id: test
+    agent: tester
+    outputs:
+      - name: test_artifacts
+        type: artifact_ref
+    gate: "test_artifacts must not be empty"
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `gate` | string | null | Predicate over step outputs; failure halts the workflow with a gate-rejection record |
+
+Gates are distinct from the `retry` block: a gate failure is a hard halt at the step's output boundary, while `retry` governs how many times a step may be re-attempted before that gate is consulted.
+
 ## Gate Retry Configuration
 
 Steps can define retry behavior for when quality gates fail. Add a `retry` block to any step:
@@ -113,3 +150,19 @@ if not passed after all attempts:
 - **Validation steps** — coverage gaps found → feed gaps to test author → retry
 
 Steps without a `retry` block default to `max_attempts: 1` (no retry).
+
+## Forthcoming Additive Fields
+
+The DAG executor (epic `hive-dag-executor`) loads the following fields without erroring; their semantics are enforced by later stories. Workflow authors may include them today, but no behavioral change occurs until the corresponding handler ships.
+
+| Field | Scope | Loaded? | Enforced by |
+|-------|-------|---------|-------------|
+| `when` | per-step / edge | yes (round-trips on the model) | hde-3a (predicate evaluator) |
+| `tools` | per-step | yes (round-trips on the model) | hde-7 (tool gating) |
+| `disallowed_tools` | per-step | yes (round-trips on the model) | hde-7 (tool gating) |
+| `node_type: pause` | per-step | yes (enum value accepted) | hde-8 (pause semantics) |
+| `trigger_rule` | per-step | placeholder; loader passthrough | hde-3a (trigger-rule policy) |
+
+`when:` is intended as a per-step or per-edge predicate that gates whether the step runs at all (distinct from `skip_when`, which evaluates against the workflow context rather than upstream-edge truth values). `tools` and `disallowed_tools` will compose with the agent persona's tool grant in hde-7. `node_type: pause` will instruct the executor to checkpoint and wait for an external resume signal in hde-8. `trigger_rule` will let a step declare `all_success | any_success | always` semantics over its `depends_on` set.
+
+These fields are documented here so workflow authors can plan for them; until the enforcing handlers ship, including these fields has no runtime effect.
