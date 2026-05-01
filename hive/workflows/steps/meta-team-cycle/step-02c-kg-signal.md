@@ -64,15 +64,13 @@ Check whether the KG is reachable BEFORE issuing queries:
 
 ### 3. Query the KG
 
-Issue exactly two `MemoryStore.query_decisions()` calls. Both calls use `as_of=now` so only currently-valid triples are returned (the SQL applies `valid_until IS NULL` for current-state queries).
+Issue `MemoryStore.query_decisions()` calls covering the three predicates `phase_failed`, `phase_blocked`, and `superseded`. Conceptually this is **two logical groupings** (failures = `phase_failed` + `phase_blocked`; supersessions = `superseded`); concretely it is **three single-predicate calls** because the underlying `DecisionFilter` interface accepts at most one `predicate` per call. Both framings are acceptable as long as the three predicates are covered. All calls use `as_of=now` so only currently-valid triples are returned (the SQL applies `valid_until IS NULL` for current-state queries).
 
 ```
 failures   = query_decisions({ predicate: "phase_failed",   as_of: now })
             ∪ query_decisions({ predicate: "phase_blocked", as_of: now })
 supersessions = query_decisions({ predicate: "superseded",   as_of: now })
 ```
-
-> Implementation note: the underlying `DecisionFilter` interface accepts at most one `predicate` per call, so the failure pull is two underlying calls combined. The story's "two calls" framing groups by signal-type (failure vs supersession), not by raw SQL invocations — both groupings are acceptable as long as the three predicates are covered.
 
 > CANONICAL FIELD NAME: pass `entity` and `predicate` keys on the filter object. Do NOT use `subject` — `subject` was deprecated in 1.1.3 because it implied a column-only match; the canonical `entity` field matches against BOTH the `subject` and `object` columns. See `hive/references/memory-store-interface.md` §`query_decisions` and the design decision recorded in this story.
 
@@ -140,7 +138,7 @@ rank_score: {final_rank from step 5}
 ```
 
 > ID NAMESPACE: use `kg-finding-{N}` to keep the kg_signal feed grep-separable from step-02's `finding-{N}` and step-02b's `external-proposal-{N}`. Step-03 consumers MUST accept `kg-finding-` alongside `finding-` and `external-proposal-`; the `discovery_source` field is the authoritative routing key.
-
+>
 > SEVERITY MAPPING: default to `medium` for clusters of 1–2 triples, `high` for 3–4 triples, `critical` for 5+ triples. `superseded` clusters of 1 trip to `low` (single supersessions are routine, not failures). The proposal step may re-rank.
 
 #### De-duplication against step-02 findings
@@ -209,7 +207,7 @@ kg_signal_summary: {string summary of availability, counts, and notable clusters
 
 - [ ] KG availability check executed and outcome logged before any query
 - [ ] Two query groupings issued (failures: phase_failed + phase_blocked; supersessions: superseded), each with `as_of=now` and `entity:` field semantics if entity filtering is later added (currently no entity scope is required — predicate-only)
-- [ ] Recency window applied client-side using `valid_from > now - window_days`
+- [ ] Recency window applied client-side using `valid_from >= recency_cutoff` (inclusive boundary, matching the §4 Layer 2 rule and the fixture's `valid_from >= cutoff` comparator)
 - [ ] Each retained triple tagged `local_signal` or `cross_project_signal` based on the `local_epics` set
 - [ ] Cross-project findings carry a `rank_score` multiplied by `0.7`
 - [ ] Output is shaped for direct consumption by step-03's eligible-findings merge — schema parity verified against `step-02-analysis.md` §7

@@ -32,10 +32,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - **End-to-end fixture for kg-augmented-meta-signal.** New
   `tests/fixtures/kg-augmented-meta-signal/` (seed.sql + run.sh + README.md)
   proves the full path with no Node deps — uses system `sqlite3` CLI per
-  the bring-your-own-enhancements philosophy. LLM-mediated step-02c run
-  + mental-trace through step-03 + meta-optimize routing, all 6 fixture ACs verified.
-- **OSS rollout brand foundation.** Concept-4 logo (`assets/hive-logo.svg`
-  + 256/400/512/1024 PNGs and lockup variants), README hero block with
+  the bring-your-own-enhancements philosophy. Includes LLM-mediated step-02c
+  run, mental-trace through step-03 and meta-optimize routing; all 6 fixture
+  ACs verified.
+- **OSS rollout brand foundation.** Concept-4 logo (`assets/hive-logo.svg`,
+  256/400/512/1024 PNGs and lockup variants), README hero block with
   positioning tagline, Inspirations credit block.
 - **README audit for 1.1.3+ drift cleanup.** New "Memory architecture"
   section (L0–L3 tiers + KG + ChromaDB graceful degradation + session-end

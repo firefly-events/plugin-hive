@@ -113,7 +113,15 @@ function loadRegistry() {
   }
 
   // Normalize and validate entries; drop malformed ones with a logged note.
+  // Also reject duplicate names and duplicate canonical paths — both inflate
+  // KG signal in different ways:
+  //   - Duplicate `name` collapses two projects into the same source_epic
+  //     namespace, silently losing one project's triples to INSERT OR IGNORE.
+  //   - Duplicate canonical `path` imports the same project twice under two
+  //     namespaces, double-counting the same decision history.
   const normalized = [];
+  const seenNames = new Map();   // name -> first index
+  const seenPaths = new Map();   // canonical path -> first index
   for (const entry of parsed.projects) {
     if (!entry || typeof entry !== 'object') continue;
     const projPath = entry.path && String(entry.path).trim();
@@ -122,6 +130,17 @@ function loadRegistry() {
       console.warn(`  WARN: registry entry missing path or name — ${JSON.stringify(entry).substring(0, 80)}`);
       continue;
     }
+    const canonicalPath = path.resolve(projPath);
+    if (seenNames.has(name)) {
+      console.warn(`  WARN: duplicate registry name '${name}' — keeping first occurrence (entry #${seenNames.get(name) + 1}); dropping later duplicate at path ${projPath}`);
+      continue;
+    }
+    if (seenPaths.has(canonicalPath)) {
+      console.warn(`  WARN: duplicate registry path '${canonicalPath}' (resolves to same dir as entry '${normalized[seenPaths.get(canonicalPath)].name}') — keeping first occurrence; dropping later duplicate '${name}'`);
+      continue;
+    }
+    seenNames.set(name, normalized.length);
+    seenPaths.set(canonicalPath, normalized.length);
     normalized.push({ path: projPath, name });
   }
   return normalized;
@@ -155,7 +174,10 @@ function runImportForProject(project, status) {
 
   // We surface the child's stdio inline so per-project plans / summaries are
   // visible to the user. spawnSync with stdio: 'inherit' keeps ordering tidy.
-  const result = spawnSync('node', args, { stdio: 'inherit' });
+  // Use process.execPath so the child runs under the SAME Node binary as the
+  // parent — version managers (nvm, fnm) and custom installs do not always
+  // resolve `node` from PATH to the same interpreter.
+  const result = spawnSync(process.execPath, args, { stdio: 'inherit' });
   return {
     exitCode: result.status,
     error: result.error ? String(result.error.message || result.error) : null

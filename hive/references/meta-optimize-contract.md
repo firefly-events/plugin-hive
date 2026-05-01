@@ -78,8 +78,10 @@ taxonomies.
 
 ## Proposal sources
 
-The public `/meta-optimize` cycle accepts four orthogonal proposal sources at
-step-03. Source presence is checked in this precedence order:
+The public `/meta-optimize` cycle merges four independent proposal sources at
+step-03. All non-empty sources contribute to the ranked pool simultaneously —
+this is NOT first-match selection. Within the merged pool, sources are weighted
+in this priority order:
 
 1. `metric_signal` — perf-baseline delta above threshold (requires kickoff
    metrics opt-in).
@@ -88,10 +90,11 @@ step-03. Source presence is checked in this precedence order:
 4. `kg_signal` — knowledge-graph-derived findings from step-02c, sourced from
    `kg.sqlite` when present.
 
-Routing precedence in fallback order is signal-first: metrics → external
-research → kg_signal → backlog. KG is checked BEFORE backlog because KG is
-automatic signal-derived input, while backlog is human-curated. The backlog
-fallback (`step-03b`) runs ONLY when all four sources are empty.
+Routing to the backlog fallback is signal-first: any non-empty source from the
+list above routes to step-03 (which merges and ranks). KG is checked BEFORE
+backlog because KG is automatic signal-derived input, while backlog is
+human-curated. The backlog fallback (`step-03b`) runs ONLY when all four
+sources are empty (the AND-of-empty gate).
 
 ### kg_signal source (public)
 

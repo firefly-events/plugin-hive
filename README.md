@@ -1,6 +1,8 @@
+<!-- markdownlint-disable MD033 -->
 <p align="center">
   <img src="assets/hive-logo.svg" width="140" alt="Hive logo — pointy-top hex with adjacent cells forming">
 </p>
+<!-- markdownlint-enable MD033 -->
 
 # Hive
 
@@ -45,7 +47,7 @@ We don't compete with them; we synthesize, in a specific shape, on a specific su
 
 ## Features
 
-- **Multi-agent teams** — 24 specialized personas (analyst, architect, developer, tester, reviewer, and more) coordinate through structured workflows
+- **Multi-agent teams** — 25 specialized personas (analyst, architect, developer, tester, reviewer, and more) coordinate through structured workflows
 - **Cross-model execution** — route implementation and planning agents to OpenAI Codex while Claude handles orchestration, review, and gating — reduces cost and model bias
 - **Structured planning** — decompose requirements into dependency-tracked stories with horizontal/vertical planning for medium and large features
 - **Test swarm** — 5-agent pipeline runs tests across platforms, files bugs, and routes fixes automatically
@@ -194,7 +196,7 @@ meta_optimize:
     cross_project_penalty: 0.7 # rank multiplier applied to cross-project signal
 ```
 
-Setting `enabled: false` reverts routing to the pre-1.1.3 metrics → backlog flow.
+Setting `enabled: false` reverts routing to the pre-1.1.4 metrics → backlog flow.
 
 `/meta-meta-optimize` is maintainer-local and is not part of the shipped
 consumer command surface.

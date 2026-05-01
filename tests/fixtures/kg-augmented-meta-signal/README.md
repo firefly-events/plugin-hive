@@ -13,7 +13,7 @@ proposals that:
 - include only the **recent** triples (older than 30 days are filtered)
 - penalise **cross-project** triples by the 0.7× rank multiplier vs equivalent local-signal triples
 - merge into step-03's proposal stream tagged `discovery_source: kg_signal`
-- fall through to step-03b only when ALL three feeds are empty (the AND-of-empty gate)
+- fall through to step-03b only when ALL four feeds are empty (the AND-of-empty gate over `findings`, `external_research_candidates`, `kg_signal`, and `metric_signal`)
 
 The fixture is the seeded *input*. The asserts read the kg-findings.yaml
 that step-02c emits when an LLM walks the step against this seeded
