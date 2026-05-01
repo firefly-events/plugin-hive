@@ -1,0 +1,23 @@
+name: ux-team
+description: Specialist UX-affordance audit team — reviews schema documentation placement, error-surface design, fail-closed UX paths for agent-author and operator workflows. Distinct from ui-team (visual/brand).
+lead: team-lead
+methodology: classic
+
+members:
+  - agent: ux-reviewer
+    role: UX-affordance audit — review contract-authoring ergonomics, error surfaces, fail-closed paths, and operator workflow clarity
+    domain:
+      - path: "**"
+        read: true
+        write: false
+        delete: false
+
+context:
+  notes: |
+    Specialist team invoked by the orchestrator when UX-affordance concerns are detected.
+    Read-only access — findings are reported, not auto-remediated.
+    Workflow deferred: ux-audit workflow ships in a follow-on.
+    Persona dependency: hive/agents/ux-reviewer.md does not exist yet and ships separately.
+
+workflow: ~
+team_memory_path: .pHive/team-memories/ux-team/

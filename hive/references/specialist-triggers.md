@@ -65,6 +65,24 @@ type: reference
     Raise when: new data-intensive endpoints, client-side rendering of large datasets,
     database query patterns changed, or any feature with latency SLA implications.
 
+- trigger: observability:audit
+  description: "Observability specialist team audit — locks per-node telemetry conventions before runtime executor implementation. Reviews event_type taxonomy, payload schema, run_id propagation, and metrics emission patterns. (v1 deferred — catalog-registered; execution of the pre-exec observability team phase ships with the observability-team epic.)"
+  placement: pre-exec
+  raised_by: [architect, tpm]
+  responds_with:
+    type: team
+    id: observability-team
+  workflow: ~
+  skill: ~
+  severity_guidance: |
+    major → block execution until resolved
+    moderate → execute but flag results
+    minor → informational only
+  conditions: |
+    Raise when: per-node telemetry ownership undefined for new executor primitives;
+    event_type / payload schema introduced without specialist review; run_id
+    propagation paths added to existing telemetry.
+
 - trigger: ui:major
   description: "Full UI specialist team phase for large-scope UI work requiring dedicated design execution. (v1 deferred — catalog-registered; execution of the pre-exec UI team phase ships with the ui-team-skills epic.)"
   placement: pre-exec
@@ -123,6 +141,24 @@ type: reference
   conditions: |
     Raise when: any story involves transitions, micro-interactions, loading states,
     or motion design. animations-specialist reads hive/agents/animations-specialist.md.
+
+- trigger: ux:major
+  description: "UX-affordance specialist team review for major changes that affect agent-author or operator workflow ergonomics — schema documentation placement, error-surface design, fail-closed UX paths. Distinct from ui:* which covers visual/brand surfaces. (v1 deferred — catalog-registered; execution of the pre-exec UX team phase ships with the ux-team epic.)"
+  placement: pre-exec
+  raised_by: [tpm, architect]
+  responds_with:
+    type: team
+    id: ux-team
+  workflow: ~
+  skill: ~
+  severity_guidance: |
+    major → block execution until resolved
+    moderate → execute but flag results
+    minor → informational only
+  conditions: |
+    Raise when: a change materially alters agent-author or operator UX (new contract
+    authoring required, error-surface design needed, fail-closed paths affecting
+    workflow execution); does NOT apply to visual/brand work (use ui:major).
 ```
 
 ---
