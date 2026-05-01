@@ -10,7 +10,7 @@
 - `pass` changes are promoted and may generate reusable insights
 - Do NOT change evaluation verdicts in this step — Step 6 owns those decisions
 
-## Execution Protocols
+## EXECUTION PROTOCOLS
 
 **Mode:** autonomous
 
