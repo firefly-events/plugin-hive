@@ -76,6 +76,50 @@ That set is declared in the plugin-hive maintainer charter, not in step
 code. See `hive/references/meta-team-charter-template.md` for both example
 taxonomies.
 
+## Proposal sources
+
+The public `/meta-optimize` cycle accepts four orthogonal proposal sources at
+step-03. Source presence is checked in this precedence order:
+
+1. `metric_signal` — perf-baseline delta above threshold (requires kickoff
+   metrics opt-in).
+2. `findings` — structural-audit signal from step-02 analysis.
+3. `external_research_candidates` — step-02b external research output.
+4. `kg_signal` — knowledge-graph-derived findings from step-02c, sourced from
+   `kg.sqlite` when present.
+
+Routing precedence in fallback order is signal-first: metrics → external
+research → kg_signal → backlog. KG is checked BEFORE backlog because KG is
+automatic signal-derived input, while backlog is human-curated. The backlog
+fallback (`step-03b`) runs ONLY when all four sources are empty.
+
+### kg_signal source (public)
+
+`kg_signal` is a public proposal source. It is governed by the
+`meta_optimize.kg_signal` config block in the consumer's root
+`hive.config.yaml`:
+
+| Key | Default | Purpose |
+|---|---|---|
+| `meta_optimize.kg_signal.enabled` | `true` | Enable the knowledge-graph proposal source. When `false`, step-02c is skipped entirely and routing falls through metrics → backlog (legacy behavior). |
+| `meta_optimize.kg_signal.window_days` | `30` | Recency window (days) for triple inclusion in the kg_signal scan. |
+| `meta_optimize.kg_signal.cross_project_penalty` | `0.7` | Rank multiplier applied to cross-project signal (penalizes triples sourced from outside the resolved `HIVE_TARGET_PROJECT`). |
+
+When the `meta_optimize` section is missing from the consumer's
+`hive.config.yaml`, the defaults above apply.
+
+Consumer behavioral guarantees:
+
+- Consumers without `kg.sqlite` see no behavioral change. Step-02c emits empty
+  findings and routing falls through to metrics → backlog as before.
+- Consumers with `meta_optimize.kg_signal.enabled: false` see legacy routing:
+  metrics → backlog, with no kg_signal branch.
+- Consumers with `kg.sqlite` populated and `enabled: true` (default) gain
+  kg_signal as a fallback proposal source between metric_signal and backlog.
+
+`kg_signal` proposals MUST conform to the charter-defined taxonomy contract
+(see "Taxonomy" below). Step-02c does not introduce a hardcoded category set.
+
 ## Out of scope
 
 Non-goals for this contract:
