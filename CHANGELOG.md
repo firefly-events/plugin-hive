@@ -9,6 +9,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-05-01
+
 ### Added
 - **kg_signal proposal source for `/meta-optimize`.** New optional workflow
   step `step-02c-kg-signal.md` queries the L2 knowledge graph for
@@ -27,11 +29,23 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   new `meta_optimize.kg_signal` config block (`enabled` / `window_days` /
   `cross_project_penalty`); `enabled: false` reverts to the legacy
   metrics → backlog flow. No-op when `kg.sqlite` is absent.
-- **README audit for 1.1.3 drift cleanup.** New "Memory architecture"
+- **End-to-end fixture for kg-augmented-meta-signal.** New
+  `tests/fixtures/kg-augmented-meta-signal/` (seed.sql + run.sh + README.md)
+  proves the full path with no Node deps — uses system `sqlite3` CLI per
+  the bring-your-own-enhancements philosophy. LLM-mediated step-02c run
+  + mental-trace through step-03 + meta-optimize routing, all 6 fixture ACs verified.
+- **OSS rollout brand foundation.** Concept-4 logo (`assets/hive-logo.svg`
+  + 256/400/512/1024 PNGs and lockup variants), README hero block with
+  positioning tagline, Inspirations credit block.
+- **README audit for 1.1.3+ drift cleanup.** New "Memory architecture"
   section (L0–L3 tiers + KG + ChromaDB graceful degradation + session-end
   three-op orchestration), Meta Optimization "Proposal sources" rewrite,
-  badge bump 1.0.0 → 1.1.3, persona count correction (20 → 24), Extensibility
-  path-prefix fixes, cmux row description refresh, migration callout.
+  persona count correction, Extensibility path-prefix fixes, cmux row
+  description refresh, migration callout.
+- **Versioning cross-cutting concern.** New entry in
+  `.pHive/cross-cutting-concerns.yaml` requires consumer-visible epics to
+  bump `.claude-plugin/plugin.json` + `marketplace.json`, update the README
+  badge, and add a CHANGELOG entry. Prevents silent version drift.
 
 ## [1.1.3] - 2026-04-28
 
