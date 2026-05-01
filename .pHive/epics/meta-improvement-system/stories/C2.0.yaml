@@ -5,7 +5,12 @@ title: Token capture feasibility spike
 status: pending
 complexity: high
 methodology: classic
-depends_on: ["C1.4"]
+# Dep loosened 2026-04-26: C2.0 deliverables are docs-only (feasibility.md +
+# proof.json). It does not consume C1.4's writer/reader primitives. Original
+# dep was structural, not material. Loosened so the spike can run before the
+# rest of the C-slice and inform whether real token capture is even viable
+# before we invest in C1.1–C1.4.
+depends_on: []
 
 description: |
   Identify and prove the viable token-capture mechanism that S5 will use for MVP
