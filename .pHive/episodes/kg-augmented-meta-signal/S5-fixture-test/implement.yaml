@@ -7,4 +7,4 @@ artifacts:
   - tests/fixtures/kg-augmented-meta-signal/run.sh
   - tests/fixtures/kg-augmented-meta-signal/README.md
   - .pHive/episodes/kg-augmented-meta-signal/S5-fixture-test/test-results.md
-commit: TBD
+commit: 01e0a3394c10c6800c118e686a6db30a6a73ba05
