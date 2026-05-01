@@ -1,3 +1,25 @@
+- experiment_id: meta-2026-05-01
+  date: '2026-05-01'
+  started: '2026-05-01T00:00:00Z'
+  closed: '2026-05-01T00:10:00Z'
+  verdict: passed
+  changes_promoted: 2
+  changes_reverted: 0
+  findings_identified: 2
+  top_changes:
+    - hive/references/meta-optimize-maintainer.md: expanded 5-line stub to full reference doc
+    - hive/workflows/steps/meta-team-cycle/step-07-promotion.md: normalized EXECUTION PROTOCOLS header capitalization
+  commit: 4eb7b45c0d37699c593f6f55b0928d41ff19d304
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 45000
+    first_attempt_pass: true
+  rollback_ref: c83fc8dfb3dce8e64bd0b79d6ef48abdb889effd
+  notes: |
+    First successful (accepted) nightly cycle since BL2.5. Two structural
+    findings addressed: a stub reference doc expanded and a schema inconsistency
+    in a step file header fixed. Closure validator passed programmatically.
+    Regression watch armed for 4-hour observation window.
 - experiment_id: meta-2026-04-22
   date: '2026-04-22'
   story: BL2.5
