@@ -8,7 +8,7 @@ Add a third proposal-source feed in parallel with the internal audit (step-02) a
 
 ## When this step runs
 
-This step runs after step-02-analysis and in parallel with step-02b-external-research. It is OPTIONAL — see `hive/workflows/development.classic.workflow.yaml` and the meta-optimize SKILL routing for invocation conditions. The step is also self-skipping when its inputs are absent (see Task Sequence §2 "Verify KG availability" and the FAILURE MODES section).
+This step runs after step-02-analysis and in parallel with step-02b-external-research. It is OPTIONAL — it is wired via the `/meta-optimize` SKILL routing (`skills/hive/skills/meta-optimize/SKILL.md`). The step is also self-skipping when its inputs are absent (see Task Sequence §2 "Verify KG availability" and the FAILURE MODES section).
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
