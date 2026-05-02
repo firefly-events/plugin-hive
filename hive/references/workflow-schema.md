@@ -151,6 +151,58 @@ if not passed after all attempts:
 
 Steps without a `retry` block default to `max_attempts: 1` (no retry).
 
+## Per-Step Tool Gating (`tools`, `disallowed_tools`)
+
+Steps may narrow or override the agent persona's default tool grant via two per-step fields:
+
+```yaml
+steps:
+  - id: implement
+    agent: developer
+    tools: ["Read", "Edit", "Bash(git *)"]
+    disallowed_tools: ["Write"]
+```
+
+### Composition policy: `pure_override_with_surface_when_overrides`
+
+Cycle-state composition rationale (`security:plan-audit` lock):
+
+> "situation dictates which tools are used; step-author has most specific context; trust step-level authority but surface/log when step overrides persona for security observability."
+
+- **`tools:`** — when set, **REPLACES** the persona default tool list entirely. NOT a merge. The step-author's intent supersedes the persona baseline because the step has the most specific context.
+- **`disallowed_tools:`** — when set, subtracts from the active set. If `tools:` is also set, subtraction runs against `tools:`; otherwise against the persona default.
+- **Neither set** — persona defaults pass through unchanged. No audit event.
+
+### Audit-event contract
+
+Every override path emits one `tool_gating_overridden` event via the executor telemetry channel. Event payload:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `persona_default_tools` | list[str] | Pre-override baseline |
+| `effective_tools` | list[str] | Post-composition tool list |
+| `step_override_tools` | list[str] | Present iff `tools:` was set |
+| `step_disallowed_tools` | list[str] | Present iff `disallowed_tools:` was set |
+| `persona_id` | str | Present iff resolved at policy time |
+
+Standard executor event envelope (`run_id`, `step_id`, `event_type`, `timestamp`) is added by the telemetry layer. See `executor-event-schema.md` for the envelope contract.
+
+### Allow-list — `escalatable_tools.yaml` (second factor)
+
+`hive/lib/dag_executor/executor/escalatable_tools.yaml` is the maintainer-controlled second factor on top of the audit event. Without it, a workflow YAML edit could silently grant any tool. With it, an unlisted tool causes `ToolNotEscalatableError` at policy resolution.
+
+| Section | Meaning |
+|---------|---------|
+| `always_grantable` | Low-blast tools (Read, Grep, Glob, LS) any step may grant |
+| `escalatable` | High-blast tools (Bash, Write, Edit, codex, cmux) — listed = allowed; unlisted = `ToolNotEscalatableError` |
+| `persona_deny.<tool>` | Personas that may **never** receive `<tool>` via override (e.g. `codex` is denied to `reviewer`, `peer-validator`, `security-reviewer` so verifier isolation holds) — violation raises `BackendIsolationViolationError` |
+
+A step that *narrows* a tool already in the persona default (`Bash(git *)` against persona `Bash`) is treated as a constraint, not a grant — the allow-list is not consulted.
+
+### Platform check (Risk #11)
+
+Tools `codex` and `cmux` are macOS-only by upstream constraint. When a step grants either on a non-Darwin platform, `compose_tool_policy` raises `PlatformIncompatibilityError`. **No silent fallback** — surfacing the mismatch at policy resolution time prevents cryptic agent-runtime confusion.
+
 ## Forthcoming Additive Fields
 
 The DAG executor (epic `hive-dag-executor`) loads the following fields without erroring; their semantics are enforced by later stories. Workflow authors may include them today, but no behavioral change occurs until the corresponding handler ships.
@@ -158,11 +210,9 @@ The DAG executor (epic `hive-dag-executor`) loads the following fields without e
 | Field | Scope | Loaded? | Enforced by |
 |-------|-------|---------|-------------|
 | `when` | per-step / edge | yes (round-trips on the model) | hde-3a (predicate evaluator) |
-| `tools` | per-step | yes (round-trips on the model) | hde-7 (tool gating) |
-| `disallowed_tools` | per-step | yes (round-trips on the model) | hde-7 (tool gating) |
 | `node_type: pause` | per-step | yes (enum value accepted) | hde-8 (pause semantics) |
 | `trigger_rule` | per-step | placeholder; loader passthrough | hde-3a (trigger-rule policy) |
 
-`when:` is intended as a per-step or per-edge predicate that gates whether the step runs at all (distinct from `skip_when`, which evaluates against the workflow context rather than upstream-edge truth values). `tools` and `disallowed_tools` will compose with the agent persona's tool grant in hde-7. `node_type: pause` will instruct the executor to checkpoint and wait for an external resume signal in hde-8. `trigger_rule` will let a step declare `all_success | any_success | always` semantics over its `depends_on` set.
+`when:` is intended as a per-step or per-edge predicate that gates whether the step runs at all (distinct from `skip_when`, which evaluates against the workflow context rather than upstream-edge truth values). `node_type: pause` will instruct the executor to checkpoint and wait for an external resume signal in hde-8. `trigger_rule` will let a step declare `all_success | any_success | always` semantics over its `depends_on` set.
 
 These fields are documented here so workflow authors can plan for them; until the enforcing handlers ship, including these fields has no runtime effect.
