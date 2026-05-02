@@ -36,7 +36,11 @@ from .handlers import (
     StubAgentSpawn,
 )
 from .run_id import make_run_id, new_ulid
-from .telemetry import RESERVED_EVENT_TYPES, Telemetry
+from .telemetry import (
+    REQUIRED_EXECUTOR_EVENT_FIELDS,
+    RESERVED_EVENT_TYPES,
+    Telemetry,
+)
 from .tool_gating import compose_tool_policy
 from .walker import Walker
 
@@ -51,6 +55,7 @@ __all__ = [
     "HandlerError",
     "NodeOutput",
     "PauseHandler",
+    "REQUIRED_EXECUTOR_EVENT_FIELDS",
     "RESERVED_EVENT_TYPES",
     "ScriptHandler",
     "ScriptHandlerError",

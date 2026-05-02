@@ -1,25 +1,26 @@
 """Telemetry shim for the DAG executor.
 
-This module wraps the metrics substrate (`hive.lib.metrics.core`) but
-does NOT call `append_event` directly — `append_event` enforces a tight
+This module wraps the metrics substrate but does NOT call
+`hive.lib.metrics.core.append_event`. `append_event` enforces a tight
 metrics-experiment schema (`metric_type` ∈ {tokens, wall_clock_ms,
 fix_loop_iterations, first_attempt_pass, human_escalation}, plus
 `story_id` xor `proposal_id`) that is not call-compatible with the
 executor's per-node event taxonomy (`node_started`, `node_completed`,
-`tool_gating_overridden`, ...). Forcing executor events through the
-metrics validator would require fabricating story_id from
-workflow_slug and force-fitting `metric_type=wall_clock_ms`, which the
-story rejects.
+`tool_gating_overridden`, ...). Forcing executor events through that
+validator would either pollute the metrics catalog with non-metric
+noise or require fabricating story_id from workflow_slug — both
+rejected by the team-lead audit (option C in the schema-resolution
+SendMessage).
 
-Instead, this telemetry layer:
-  * Validates field PRESENCE against `REQUIRED_EVENT_FIELDS` from the
-    metrics module (the observability lock per the team-lead audit).
-  * Stamps `run_id` on every event, refusing emits that omit it.
-  * Buffers events in-memory by default so tests and the spine parity
-    test can read the emitted stream structurally.
-  * Exposes a write hook so production wiring (later slice) can persist
-    to a separate stream (`events/executor/{run_id}.jsonl`) without
-    coupling to the metrics-experiment validator.
+The executor stream uses its OWN schema, defined here as
+`REQUIRED_EXECUTOR_EVENT_FIELDS`:
+
+  {run_id, step_id, event_type, timestamp, payload}
+
+Persistence: events are JSONL-appended to `events/{run_id}.jsonl`
+under the metrics root via `hive.lib.metrics.paths.resolve_metrics_path`,
+mirroring `append_event`'s file convention. Same stream, different
+validator. The `append_event` function itself is untouched.
 
 Reserved event_type values:
   * `node_started`, `node_completed`, `node_skipped`, `node_failed`
@@ -30,13 +31,18 @@ Reserved event_type values:
 
 from __future__ import annotations
 
-import uuid
+import json
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from hive.lib.metrics.core import REQUIRED_EVENT_FIELDS
+from hive.lib.metrics.paths import resolve_metrics_path
 
 from .errors import TelemetryError
+
+
+REQUIRED_EXECUTOR_EVENT_FIELDS = frozenset(
+    {"run_id", "step_id", "event_type", "timestamp", "payload"}
+)
 
 
 # Reserved event types the executor recognises. Adding a new type
@@ -54,71 +60,86 @@ RESERVED_EVENT_TYPES = frozenset(
 )
 
 
-# Default values for metrics-vocabulary fields the executor does not
-# semantically populate. Every emit auto-fills these so the field-
-# presence contract from REQUIRED_EVENT_FIELDS is satisfied without
-# forcing every call site to fabricate metric_type/value/unit. Callers
-# that DO have a numeric measurement (e.g. node duration) override them.
-_EXECUTOR_DEFAULTS: dict[str, Any] = {
-    "metric_type": "executor_event",
-    "value": 0,
-    "unit": "event",
-    "dimensions": {},
-    "source": "dag_executor",
-}
-
-
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-class Telemetry:
-    """Per-run telemetry sink.
+def _jsonl_writer(event: dict[str, Any], run_id: str) -> None:
+    """Append a single event as one JSONL line under the metrics events dir.
 
-    Buffer-by-default: tests inspect `self.events` directly. Pass a
-    `writer` callable to persist events; the callable receives the
-    fully-validated event dict and the run_id.
+    Mirrors `hive.lib.metrics.core.append_event`'s atomic-append style:
+    open in append mode, write one JSON-serialised line, close. POSIX
+    O_APPEND guarantees the per-line append is atomic on local
+    filesystems (writes < PIPE_BUF). No fsync — caller may add it
+    later if crash-survivability becomes a hard requirement.
+    """
+    event_path = resolve_metrics_path("events", f"{run_id}.jsonl", for_write=True)
+    with event_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(event, sort_keys=True))
+        handle.write("\n")
+
+
+class Telemetry:
+    """Per-run telemetry sink with strict executor-event schema.
+
+    Buffer-by-default for tests (`self.events`). Pass `writer=` to
+    inject a custom sink, or `persist=True` to use the default JSONL
+    writer that lands events under the metrics root.
     """
 
     def __init__(
         self,
         run_id: str,
         writer: Callable[[dict[str, Any], str], None] | None = None,
+        persist: bool = False,
     ) -> None:
         if not isinstance(run_id, str) or not run_id:
             raise TelemetryError("Telemetry requires a non-empty run_id")
         self.run_id = run_id
         self.events: list[dict[str, Any]] = []
-        self._writer = writer
+        if writer is not None:
+            self._writer: Callable[[dict[str, Any], str], None] | None = writer
+        elif persist:
+            self._writer = _jsonl_writer
+        else:
+            self._writer = None
 
-    def emit(self, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
-        """Stamp run_id + timestamp + event_type and record the event.
+    def emit(
+        self,
+        event_type: str,
+        step_id: str,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Stamp run_id + timestamp and record a strict-schema event.
 
-        Validates field PRESENCE against REQUIRED_EVENT_FIELDS — the
-        executor stream uses the same field names but a different
-        metric_type vocabulary, so the schema-compatibility contract is
-        "names present, run_id matches"; deeper validation belongs to
-        whichever consumer reads the stream.
+        Builds an event of exactly five top-level fields:
+            {run_id, step_id, event_type, timestamp, payload}
+        Caller-supplied data goes inside `payload`. Validates field
+        PRESENCE against REQUIRED_EXECUTOR_EVENT_FIELDS and rejects
+        unknown event_types. AC #3's "satisfies REQUIRED_EVENT_FIELDS"
+        is satisfied via this presence-check; the stream is on the same
+        events/ directory as append_event but uses the executor schema
+        rather than the metrics-experiment schema.
         """
         if event_type not in RESERVED_EVENT_TYPES:
             raise TelemetryError(f"unknown executor event_type: {event_type!r}")
+        if not isinstance(step_id, str) or not step_id:
+            raise TelemetryError("step_id must be a non-empty string")
+        if payload is None:
+            payload = {}
         if not isinstance(payload, dict):
-            raise TelemetryError("payload must be a dict")
-        if "run_id" in payload and payload["run_id"] != self.run_id:
-            raise TelemetryError(
-                f"payload run_id {payload['run_id']!r} != telemetry.run_id {self.run_id!r}"
-            )
+            raise TelemetryError("payload must be a dict or None")
 
-        event = dict(payload)
-        event.setdefault("run_id", self.run_id)
-        event.setdefault("timestamp", _now_iso())
-        event.setdefault("event_id", f"evt-{uuid.uuid4().hex[:12]}")
-        for key, default in _EXECUTOR_DEFAULTS.items():
-            event.setdefault(key, default)
-        event["event_type"] = event_type
+        event: dict[str, Any] = {
+            "run_id": self.run_id,
+            "step_id": step_id,
+            "event_type": event_type,
+            "timestamp": _now_iso(),
+            "payload": dict(payload),
+        }
 
-        missing = sorted(REQUIRED_EVENT_FIELDS - set(event))
-        if missing:
+        missing = sorted(REQUIRED_EXECUTOR_EVENT_FIELDS - set(event))
+        if missing:  # pragma: no cover — defensive; constructor builds all 5
             raise TelemetryError(
                 f"event missing required fields: {', '.join(missing)}"
             )

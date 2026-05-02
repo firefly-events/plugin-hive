@@ -126,25 +126,23 @@ class Walker:
             if node.skip_when:
                 telemetry.emit(
                     "node_skipped",
-                    {"step_id": node.id, "reason": "skip_when present (hde-3a evaluation pending)"},
+                    node.id,
+                    {"reason": "skip_when present (hde-3a evaluation pending)"},
                 )
                 skipped.add(node_id)
                 continue
 
             inputs = _resolve_inputs(node, materialised, ctx)
 
-            telemetry.emit("node_started", {"step_id": node.id})
+            telemetry.emit("node_started", node.id, {})
             try:
                 output = dispatcher.dispatch(node, inputs, run_id)
             except HandlerError as exc:
                 if node.optional:
                     telemetry.emit(
                         "node_failed",
-                        {
-                            "step_id": node.id,
-                            "optional": True,
-                            "error": str(exc),
-                        },
+                        node.id,
+                        {"optional": True, "error": str(exc)},
                     )
                     materialised[node_id] = NodeOutput(
                         outputs={}, meta={"optional_failure": str(exc)}
@@ -152,21 +150,15 @@ class Walker:
                     continue
                 telemetry.emit(
                     "node_failed",
-                    {
-                        "step_id": node.id,
-                        "optional": False,
-                        "error": str(exc),
-                    },
+                    node.id,
+                    {"optional": False, "error": str(exc)},
                 )
                 raise
             except Exception as exc:
                 telemetry.emit(
                     "node_failed",
-                    {
-                        "step_id": node.id,
-                        "optional": bool(node.optional),
-                        "error": str(exc),
-                    },
+                    node.id,
+                    {"optional": bool(node.optional), "error": str(exc)},
                 )
                 if node.optional:
                     raise WalkerOptionalStepFailure(
@@ -177,10 +169,8 @@ class Walker:
             materialised[node_id] = output
             telemetry.emit(
                 "node_completed",
-                {
-                    "step_id": node.id,
-                    "outputs": list(output.outputs.keys()),
-                },
+                node.id,
+                {"outputs": list(output.outputs.keys())},
             )
 
         return materialised

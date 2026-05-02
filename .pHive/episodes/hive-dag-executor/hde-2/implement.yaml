@@ -32,20 +32,22 @@ ulid_rationale: |
   python-ulid not installed in repo; per BYO-enhancements policy and prior
   S5-fixture-test precedent, no root deps added. Inline 30-LOC Crockford
   base32 helper with monotonic-within-ms semantics matches the ULID spec.
-test_summary: "54 executor tests pass; 52 graph tests still pass; total 106; spine parity diff zero on code-review.workflow.yaml"
+test_summary: "57 executor tests pass; 52 graph tests pass; total 109; spine parity diff zero on code-review.workflow.yaml"
 telemetry_blocker_resolution: |
   hive.lib.metrics.core.append_event enforces a metrics-experiment schema
   (metric_type whitelist + story_id/proposal_id requirement) incompatible
-  with the executor's per-node event taxonomy. Implementation choice (option
-  A from SendMessage to team-lead): telemetry.py validates field PRESENCE
-  against REQUIRED_EVENT_FIELDS, auto-fills metrics-vocabulary defaults
-  (metric_type=executor_event, value=0, unit=event, source=dag_executor,
-  dimensions={}, event_id=evt-<uuid>), and does NOT call append_event.
-  append_event itself is untouched. Pending team-lead reply on whether to
-  switch to option B (separate stream) before merge.
+  with the executor's per-node event taxonomy. Resolved per team-lead
+  confirmation (option A): telemetry.py defines its own
+  REQUIRED_EXECUTOR_EVENT_FIELDS = {run_id, step_id, event_type,
+  timestamp, payload}, validates field PRESENCE against that constant,
+  and JSONL-appends to events/{run_id}.jsonl via
+  hive.lib.metrics.paths.resolve_metrics_path — same stream as
+  append_event, different validator. append_event itself is untouched.
+  Persistence is opt-in via Telemetry(persist=True); buffer-only by
+  default for tests. Walker call sites pass (event_type, step_id,
+  payload) explicitly so the strict schema is enforced at the seam.
 catalog_promotion_status: |
   observability:audit was already in hive/references/specialist-triggers.md
-  at lines 68-80 (added by 689fb6b on this branch). Story step #14 is
-  satisfied without modification; flagged in the SendMessage to team-lead
-  for confirmation.
-commit: TBD
+  at lines 68-80 (added by prep PR #37, commit 689fb6b on this branch).
+  Story step #14 catalog promotion satisfied; team-lead confirmed skip.
+commit: 1a11763 (initial) + TBD (schema lock follow-up)

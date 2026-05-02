@@ -34,8 +34,8 @@ def test_step_tools_pure_override_emits_event():
     assert _emit_count(tel, "tool_gating_overridden") == 1
     evt = tel.events[0]
     assert evt["step_id"] == "step-1"
-    assert evt["persona_default_tools"] == _PERSONA
-    assert evt["step_override_tools"] == ["Bash(git *)"]
+    assert evt["payload"]["persona_default_tools"] == _PERSONA
+    assert evt["payload"]["step_override_tools"] == ["Bash(git *)"]
 
 
 def test_disallowed_subtracts_from_persona_emits_event():
@@ -46,8 +46,8 @@ def test_disallowed_subtracts_from_persona_emits_event():
     assert out == ["Read", "Edit"]
     assert _emit_count(tel, "tool_gating_overridden") == 1
     evt = tel.events[0]
-    assert evt["step_disallowed_tools"] == ["Bash"]
-    assert "step_override_tools" not in evt
+    assert evt["payload"]["step_disallowed_tools"] == ["Bash"]
+    assert "step_override_tools" not in evt["payload"]
 
 
 def test_both_step_tools_and_disallowed_compose_emits_one_event():

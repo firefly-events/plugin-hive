@@ -54,13 +54,12 @@ def compose_tool_policy(
 
     if telemetry is not None:
         payload: dict[str, object] = {
-            "step_id": step_id,
             "persona_default_tools": list(persona_default_tools),
         }
         if step_tools is not None:
             payload["step_override_tools"] = list(step_tools)
         if step_disallowed_tools is not None:
             payload["step_disallowed_tools"] = list(step_disallowed_tools)
-        telemetry.emit("tool_gating_overridden", payload)
+        telemetry.emit("tool_gating_overridden", step_id, payload)
 
     return active

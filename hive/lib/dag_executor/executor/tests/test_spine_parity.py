@@ -52,19 +52,10 @@ _CANNED = {
 }
 
 
-# Path-stripped fields. Anything in this set is removed before the
-# structural diff so timestamps and run_id (path-introduced
-# identifiers per the parity clause) don't make the diff fail.
-_NORMALISE_STRIP = {
-    "run_id",
-    "timestamp",
-    "event_id",
-    "metric_type",
-    "value",
-    "unit",
-    "dimensions",
-    "source",
-}
+# Path-introduced identifiers. Stripped before the structural diff
+# per the parity-bar normalisation clause: timestamps and run_id are
+# expected to differ between paths.
+_NORMALISE_STRIP = {"run_id", "timestamp"}
 
 
 def _normalise(event: dict[str, Any]) -> dict[str, Any]:
@@ -82,12 +73,14 @@ def _orchestrator_narrated_events() -> list[dict[str, Any]]:
     expected: list[dict[str, Any]] = []
     for step_id in ["analyze", "review", "summarize"]:
         node = graph.nodes[step_id]
-        expected.append({"event_type": "node_started", "step_id": step_id})
+        expected.append(
+            {"event_type": "node_started", "step_id": step_id, "payload": {}}
+        )
         expected.append(
             {
                 "event_type": "node_completed",
                 "step_id": step_id,
-                "outputs": [o.name for o in node.outputs],
+                "payload": {"outputs": [o.name for o in node.outputs]},
             }
         )
     return expected
