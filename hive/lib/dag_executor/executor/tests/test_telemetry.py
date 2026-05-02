@@ -118,6 +118,10 @@ def test_reserved_event_types_are_authoritative():
         "predicate_evaluated",
         "gate_checked",
         "tool_gating_overridden",
+        # Worktree lifecycle events (hde-6 isolation subsystem)
+        "worktree_created",
+        "worktree_cleanup_success",
+        "worktree_preserved_on_failure",
     }
     assert RESERVED_EVENT_TYPES == expected
 

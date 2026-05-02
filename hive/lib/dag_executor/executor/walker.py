@@ -120,13 +120,19 @@ class Walker:
         telemetry: Telemetry,
         context: dict[str, Any] | None = None,
         run_state_path: Path | None = None,
+        worktree_manager: Any | None = None,
     ) -> dict[str, NodeOutput]:
-        """Walk the graph; if `run_state_path` is set, persist run-state."""
+        """Walk the graph; persist state if `run_state_path` is set; isolate in a worktree if `worktree_manager` is set."""
 
         ctx = context or {}
         order = _topological_order(graph)
         materialised: dict[str, NodeOutput] = {}
         skipped: set[str] = set()
+
+        worktree_path, owns_worktree = _maybe_open_worktree(
+            worktree_manager=worktree_manager,
+            run_id=run_id,
+        )
 
         state, save_state = _maybe_open_run_state(
             run_id=run_id,
@@ -134,6 +140,43 @@ class Walker:
             run_state_path=run_state_path,
         )
 
+        run_failed = False
+        try:
+            return self._walk_loop(
+                order=order,
+                graph=graph,
+                dispatcher=dispatcher,
+                run_id=run_id,
+                telemetry=telemetry,
+                ctx=ctx,
+                materialised=materialised,
+                skipped=skipped,
+                state=state,
+                save_state=save_state,
+            )
+        except BaseException:
+            run_failed = True
+            raise
+        finally:
+            if worktree_manager is not None and owns_worktree:
+                if run_failed:
+                    worktree_manager.preserve_on_failure(run_id)
+                else:
+                    worktree_manager.cleanup_success(run_id)
+
+    def _walk_loop(
+        self,
+        order,
+        graph,
+        dispatcher,
+        run_id,
+        telemetry,
+        ctx,
+        materialised,
+        skipped,
+        state,
+        save_state,
+    ):
         for node_id in order:
             node = graph.nodes[node_id]
 
@@ -298,6 +341,29 @@ class Walker:
         state = mark_completed(state)
         save(state, root=runs_root)
         return state
+
+
+def _maybe_open_worktree(worktree_manager: Any | None, run_id: str):
+    """Decide whether to create a fresh worktree or reuse an outer one.
+
+    Returns `(path, owned_by_us)` — `owned_by_us=False` means an outer
+    skill (e.g., meta-meta-optimize) created the worktree and owns
+    its cleanup; the walker must NOT cleanup or preserve in that case.
+    """
+
+    if worktree_manager is None:
+        return None, False
+    from hive.lib.dag_executor.isolation import decide_run_worktree
+
+    decision = decide_run_worktree(
+        run_id=run_id,
+        repo_path=worktree_manager.repo_path,
+        runs_root=worktree_manager.runs_root,
+    )
+    if decision.reused_outer:
+        return decision.path, False
+    worktree_manager.create(run_id)
+    return decision.path, True
 
 
 def _maybe_open_run_state(
