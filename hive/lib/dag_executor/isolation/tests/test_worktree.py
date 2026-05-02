@@ -9,6 +9,7 @@ import pytest
 
 from hive.lib.dag_executor.executor.telemetry import Telemetry
 from hive.lib.dag_executor.isolation import (
+    NestedWorktreeError,
     WorktreeCollisionError,
     WorktreeContaminationError,
     WorktreeManager,
@@ -141,6 +142,27 @@ def test_walker_creates_and_cleans_worktree_on_success(tmp_repo: Path):
         worktree_manager=mgr,
     )
     assert not (runs_root / rid).exists(), "worktree should be cleaned on success"
+
+
+def test_nested_git_worktree_add_raises_nested_error(tmp_repo: Path):
+    """Direct attempt to `git worktree add` a path inside an existing
+    worktree raises `NestedWorktreeError`. This is the unsanctioned
+    nesting path; the sanctioned path goes through NestingDetector."""
+
+    runs_root = tmp_repo / "runs"
+    mgr = WorktreeManager(repo_path=tmp_repo, runs_root=runs_root)
+    rid_outer = "01ARZ3NDEKTSV4RRFFQ69G5FAV-outer"
+    outer = mgr.create(rid_outer)
+    # Try to add a worktree at the SAME path again — git rejects with
+    # "is already a working tree" message.
+    rid_dup = "01ARZ3NDEKTSV4RRFFQ69G5FBA-dup"
+    inner_mgr = WorktreeManager(repo_path=tmp_repo, runs_root=runs_root)
+    # Simulate git saying "already a working tree" — manually invoke
+    # the underlying _git helper with a duplicate add.
+    from hive.lib.dag_executor.isolation.worktree import _git
+
+    with pytest.raises(NestedWorktreeError):
+        _git(tmp_repo, "worktree", "add", "--detach", str(outer))
 
 
 def test_walker_preserves_worktree_on_failure(tmp_repo: Path):

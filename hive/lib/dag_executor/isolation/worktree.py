@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .errors import (
+    NestedWorktreeError,
     WorktreeCollisionError,
     WorktreeContaminationError,
     WorktreeLifecycleError,
@@ -35,8 +36,22 @@ if TYPE_CHECKING:
 _DEFAULT_RUNS_ROOT = Path(".pHive") / "runs"
 
 
+_NESTED_WORKTREE_HINTS = (
+    "is already a working tree",
+    "is already registered",
+    "is already checked out",
+    "missing but locked",
+    "already exists",
+)
+
+
 def _git(repo_path: Path, *args: str) -> str:
-    """Run `git` in `repo_path` and return stdout (raises on non-zero)."""
+    """Run `git` in `repo_path` and return stdout (raises on non-zero).
+
+    Distinguishes nested-worktree failures (`NestedWorktreeError`) from
+    generic lifecycle failures so the caller can decide whether the
+    error is structural or operational.
+    """
 
     result = subprocess.run(
         ["git", *args],
@@ -46,8 +61,16 @@ def _git(repo_path: Path, *args: str) -> str:
         check=False,
     )
     if result.returncode != 0:
+        stderr = result.stderr.strip()
+        is_worktree_add = len(args) >= 2 and args[0] == "worktree" and args[1] == "add"
+        if is_worktree_add and any(hint in stderr for hint in _NESTED_WORKTREE_HINTS):
+            raise NestedWorktreeError(
+                f"nested worktree rejected by git: {stderr}. Use the "
+                "meta-meta-optimize co-existence path (NestingDetector) "
+                "instead of attempting nested `git worktree add`."
+            )
         raise WorktreeLifecycleError(
-            f"git {' '.join(args)} failed in {repo_path}: {result.stderr.strip()}"
+            f"git {' '.join(args)} failed in {repo_path}: {stderr}"
         )
     return result.stdout.strip()
 

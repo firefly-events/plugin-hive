@@ -29,6 +29,7 @@ from .store import (
     set_last_successful_node,
     set_node_output,
     set_node_status,
+    unfreeze_for_resume,
 )
 
 if TYPE_CHECKING:
@@ -78,20 +79,8 @@ def resume_run(
     """Replay a previously failed/interrupted run from the last checkpoint."""
 
     state = load(run_id, root=runs_root)
-    state = state.__class__(  # unfreeze for replay; new dataclass per narrow-mutation discipline
-        run_id=state.run_id,
-        workflow_slug=state.workflow_slug,
-        started_at=state.started_at,
-        last_updated_at=state.last_updated_at,
-        status=state.status,
-        last_successful_node_id=state.last_successful_node_id,
-        node_statuses=dict(state.node_statuses),
-        output_graph=dict(state.output_graph),
-        failure_info=state.failure_info,
-        schema_version=state.schema_version,
-        frozen=False,  # explicit unfreeze gate; only resume_run flips this back
-    )
     _validate_resumable(state)
+    state = unfreeze_for_resume(state)  # sole sanctioned freeze bypass
 
     # Walker drives the replay; it consults `state` for already-completed
     # nodes (skip + reuse output) vs. nodes-to-re-execute (failed node

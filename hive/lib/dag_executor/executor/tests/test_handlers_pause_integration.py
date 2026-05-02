@@ -97,6 +97,89 @@ def test_pause_workflow_resumes_on_approve(tmp_path: Path):
     assert len(resumed_events) == 1
 
 
+def test_pause_run_state_transitions_suspended_then_running(tmp_path: Path):
+    """run_state.yaml records SUSPENDED during the pause and RUNNING
+    after approve, with terminal COMPLETED at the end. Asserts the
+    walker brackets the pause dispatch with the run_state status
+    helpers (hde-8 AC #3 + AC #4)."""
+
+    from hive.lib.dag_executor.run_state import RunStatus, load
+
+    graph = load_workflow(_FIXTURE_PATH)
+    rid = make_run_id("pause-fixture")
+    runs_root = tmp_path / "runs"
+    state_root = tmp_path / "state"
+    tel = Telemetry(run_id=rid)
+    handler = PauseHandler(runs_root=runs_root, telemetry=tel, poll_interval=0.05)
+    dispatcher = Dispatcher(
+        handlers={
+            NodeType.AGENT: _stub_developer,
+            NodeType.PAUSE: handler.handle,
+        }
+    )
+
+    captured_status: dict[str, RunStatus] = {}
+
+    def _capture_when_pause_handler_runs():
+        # Wait briefly for pause handler to set SUSPENDED, then snapshot.
+        time.sleep(0.1)
+        snapshot = load(rid, root=state_root)
+        captured_status["mid_pause"] = snapshot.status
+        token = generate(rid, "human_approval", runs_root)
+        path = runs_root / rid / "pause" / "human_approval.approve"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(token, encoding="utf-8")
+
+    threading.Thread(target=_capture_when_pause_handler_runs, daemon=True).start()
+
+    Walker().walk(
+        graph=graph,
+        dispatcher=dispatcher,
+        run_id=rid,
+        telemetry=tel,
+        run_state_path=state_root,
+    )
+    assert captured_status["mid_pause"] == RunStatus.SUSPENDED
+    final = load(rid, root=state_root)
+    assert final.status == RunStatus.COMPLETED
+
+
+def test_pause_run_state_marks_failed_on_reject(tmp_path: Path):
+    """Reject sentinel → walker's failure path → run_state status FAILED
+    + failure_info populated (hde-8 AC #5)."""
+
+    from hive.lib.dag_executor.run_state import RunStatus, load
+
+    graph = load_workflow(_FIXTURE_PATH)
+    rid = make_run_id("pause-fixture")
+    runs_root = tmp_path / "runs"
+    state_root = tmp_path / "state"
+    tel = Telemetry(run_id=rid)
+    handler = PauseHandler(runs_root=runs_root, telemetry=tel, poll_interval=0.05)
+    dispatcher = Dispatcher(
+        handlers={
+            NodeType.AGENT: _stub_developer,
+            NodeType.PAUSE: handler.handle,
+        }
+    )
+    _drop_reject_after_delay(
+        runs_root, rid, "human_approval", "operator decided no", delay=0.15
+    )
+
+    with pytest.raises(PauseRejectedError):
+        Walker().walk(
+            graph=graph,
+            dispatcher=dispatcher,
+            run_id=rid,
+            telemetry=tel,
+            run_state_path=state_root,
+        )
+    final = load(rid, root=state_root)
+    assert final.status == RunStatus.FAILED
+    assert final.failure_info is not None
+    assert final.failure_info["error_class"] == "PauseRejectedError"
+
+
 def test_pause_workflow_fails_on_reject(tmp_path: Path):
     graph = load_workflow(_FIXTURE_PATH)
     rid = make_run_id("pause-fixture")

@@ -196,6 +196,16 @@ class Walker:
             telemetry.emit("node_started", node.id, {})
             state = _record_running(state, node_id)
             save_state(state)
+
+            # Pause nodes flip the run-level status to SUSPENDED for the
+            # duration of the wait so external observers see the
+            # suspension. We use `set_status` (non-freezing) so the
+            # post-approve transition back to RUNNING is in-process.
+            is_pause = _is_pause_node(node)
+            if is_pause:
+                state = _record_pause_suspended(state)
+                save_state(state)
+
             try:
                 output = dispatcher.dispatch(node, inputs, run_id)
             except HandlerError as exc:
@@ -242,6 +252,9 @@ class Walker:
                 raise
 
             materialised[node_id] = output
+            if is_pause:
+                state = _record_pause_resumed(state)
+                save_state(state)
             telemetry.emit(
                 "node_completed",
                 node.id,
@@ -388,6 +401,33 @@ def _maybe_open_run_state(
 
     save(state, root=runs_root_dir)
     return state, _save
+
+
+def _is_pause_node(node) -> bool:
+    """Whether `node` is a pause node — by enum value or string."""
+
+    nt = getattr(node, "node_type", None)
+    if nt is None:
+        return False
+    if hasattr(nt, "value"):
+        return nt.value == "pause"
+    return str(nt).lower() == "pause"
+
+
+def _record_pause_suspended(state):
+    if state is None:
+        return None
+    from hive.lib.dag_executor.run_state import RunStatus, set_status
+
+    return set_status(state, RunStatus.SUSPENDED)
+
+
+def _record_pause_resumed(state):
+    if state is None:
+        return None
+    from hive.lib.dag_executor.run_state import RunStatus, set_status
+
+    return set_status(state, RunStatus.RUNNING)
 
 
 def _record_skipped(state, node_id: str):

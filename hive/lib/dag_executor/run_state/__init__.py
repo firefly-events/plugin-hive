@@ -39,6 +39,8 @@ from .store import (
     set_last_successful_node,
     set_node_output,
     set_node_status,
+    set_status,
+    unfreeze_for_resume,
     validate_run_id,
 )
 
@@ -66,5 +68,7 @@ __all__ = [
     "set_last_successful_node",
     "set_node_output",
     "set_node_status",
+    "set_status",
+    "unfreeze_for_resume",
     "validate_run_id",
 ]

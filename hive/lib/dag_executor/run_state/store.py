@@ -198,7 +198,18 @@ def mark_failed(state: RunState, failure_info: dict[str, Any]) -> RunState:
 
 
 def mark_suspended(state: RunState) -> RunState:
-    """Used by hde-8 pause; freezes the run for external resume signal."""
+    """Used by hde-8 pause; freezes the run for external resume signal.
+
+    Two distinct call sites:
+      * Walker special-case at pause-node enter (synchronous wait
+        mode): the walker uses `set_status(SUSPENDED)` instead, so the
+        state stays unfrozen across the wait — resume back to RUNNING
+        is in-process. This `mark_suspended` is for the cross-process
+        pause path where `--resume` re-enters via `resume_run`.
+      * `pause.signal.wait_for_signal` after a host restart: the
+        loaded state is frozen at SUSPENDED until `unfreeze_for_resume`
+        flips frozen=False inside the resume entry.
+    """
 
     _check_not_frozen(state)
     return replace(
@@ -207,3 +218,33 @@ def mark_suspended(state: RunState) -> RunState:
         frozen=True,
         last_updated_at=_now_iso(),
     )
+
+
+def set_status(state: RunState, status: RunStatus) -> RunState:
+    """Non-terminal status transition — RUNNING ↔ SUSPENDED only.
+
+    For terminal transitions (COMPLETED / FAILED), use the dedicated
+    `mark_*` functions which freeze the state. This helper exists for
+    the in-process pause path where the walker brackets the pause
+    dispatch with SUSPENDED → RUNNING and never freezes.
+    """
+
+    _check_not_frozen(state)
+    if status not in (RunStatus.RUNNING, RunStatus.SUSPENDED):
+        raise RunStateFrozenError(
+            f"set_status only handles RUNNING/SUSPENDED transitions; "
+            f"use mark_completed/mark_failed/mark_suspended for {status.value!r}"
+        )
+    return replace(state, status=status, last_updated_at=_now_iso())
+
+
+def unfreeze_for_resume(state: RunState) -> RunState:
+    """Explicit unfreeze gate — the ONLY sanctioned way to revive a frozen run.
+
+    `resume_run` calls this on a loaded SUSPENDED or FAILED state
+    before replaying. Documented as a sanctioned bypass of the freeze
+    invariant; the freeze guarantees the on-disk state is terminal
+    until an operator deliberately resumes.
+    """
+
+    return replace(state, frozen=False, last_updated_at=_now_iso())
