@@ -122,6 +122,11 @@ def test_reserved_event_types_are_authoritative():
         "worktree_created",
         "worktree_cleanup_success",
         "worktree_preserved_on_failure",
+        # Pause/approve gate lifecycle (hde-8)
+        "pause_suspended",
+        "pause_resumed",
+        "pause_rejected",
+        "pause_timeout",
     }
     assert RESERVED_EVENT_TYPES == expected
 

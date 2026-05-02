@@ -45,10 +45,20 @@ def test_script_routing_runs_task():
     assert out.outputs["stdout"].strip() == "hi"
 
 
-def test_pause_routing_returns_stub():
-    d = Dispatcher()
+def test_pause_routing_dispatches_to_registered_handler():
+    """Pause handlers require explicit configuration (runs_root +
+    telemetry); the default-dispatcher binding works structurally
+    but a real call needs a sentinel-coordinated environment, so
+    the routing-level test substitutes a non-blocking handler."""
+
+    from hive.lib.dag_executor.executor.handlers import NodeOutput
+
+    def _stub_pause(node, inputs, run_id):
+        return NodeOutput(outputs={"paused": True, "approved": True}, meta={})
+
+    d = Dispatcher(handlers={NodeType.PAUSE: _stub_pause})
     out = d.dispatch(_node(NodeType.PAUSE), inputs={}, run_id="rid-1")
-    assert out.meta["stub"] is True
+    assert out.outputs["approved"] is True
 
 
 def test_pluggable_handler_override():

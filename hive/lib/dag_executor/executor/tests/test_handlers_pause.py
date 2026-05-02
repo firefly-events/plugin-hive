@@ -1,13 +1,18 @@
-"""Pause handler — STUB. Full semantics in hde-8."""
+"""Pause handler — full implementation in hde-8.
+
+The hde-2 stub-shape test is now superseded by the integration tests
+in `test_handlers_pause_integration.py`. Keep one smoke test here that
+asserts the handler can be constructed without arguments and exposes
+the expected attribute surface; deeper coverage lives in
+`hive/lib/dag_executor/pause/tests/`.
+"""
 
 from __future__ import annotations
 
 from hive.lib.dag_executor.executor.handlers.pause import PauseHandler
-from hive.lib.dag_executor.graph import Node, NodeType
 
 
-def test_pause_stub_returns_immediately():
-    node = Node(id="pause-x", agent="orchestrator", node_type=NodeType.PAUSE)
-    out = PauseHandler().handle(node, inputs={}, run_id="rid-1")
-    assert out.outputs["paused"] is False
-    assert out.meta["stub"] is True
+def test_pause_handler_construction_smoke():
+    handler = PauseHandler()
+    assert handler.runs_root is not None
+    assert callable(handler.handle)

@@ -203,6 +203,53 @@ A step that *narrows* a tool already in the persona default (`Bash(git *)` again
 
 Tools `codex` and `cmux` are macOS-only by upstream constraint. When a step grants either on a non-Darwin platform, `compose_tool_policy` raises `PlatformIncompatibilityError`. **No silent fallback** — surfacing the mismatch at policy resolution time prevents cryptic agent-runtime confusion.
 
+## Pause / Approve Gates (`node_type: pause`)
+
+A `node_type: pause` step SUSPENDS the run, persists a per-run HMAC signing key (mode `0600`), emits a signed resume token to telemetry, and waits for an external sentinel. Operators (or upstream automation) approve or reject by writing a sentinel file under `.pHive/runs/{run_id}/pause/`.
+
+```yaml
+steps:
+  - id: human_approval
+    node_type: pause
+    timeout_ms: 86400000   # optional; default = no user timeout
+    depends_on: [pre_pause]
+```
+
+### Sentinel files
+
+| Path | Effect |
+|------|--------|
+| `.pHive/runs/{run_id}/pause/{node_id}.approve` | Resume the workflow. Sentinel body MUST contain the resume token issued at suspend time. |
+| `.pHive/runs/{run_id}/pause/{node_id}.reject` | Fail the workflow. Sentinel body MUST contain the token; an optional reason follows after a blank line. |
+
+The pause directory is created with mode `0700`. The signing key file (`.signing_key`) is written with mode `0600` and never leaves the local machine.
+
+### Token format
+
+```
+<base64url(payload_json)>.<hex_hmac_sha256>
+```
+
+Payload: `{"run_id": "...", "node_id": "...", "timestamp": "..."}`. The token is bound to BOTH `run_id` AND `node_id` — a token from one run cannot resume another, and a token from one pause node cannot resume a sibling node within the same run (Risk #10 mitigation). Sentinel filenames alone NEVER honor the pause: `signal.py` reads the body and verifies the signature against the per-run key BEFORE returning. An invalid token raises `PauseSignalForgedError`; the polling loop continues so an attacker cannot force success by writing a junk sentinel.
+
+### Timeout & security floor
+
+| Setting | Behavior |
+|---------|----------|
+| `timeout_ms` set | Wait up to `min(timeout_ms / 1000, hard_ceiling)` seconds. |
+| `timeout_ms` omitted | Wait up to `hard_ceiling` seconds (default **30 days**). |
+
+The hard ceiling is a security floor — a forgotten "no timeout" pause cannot hold an open run-state, worktree, and signing key indefinitely (security:plan-audit finding #3).
+
+### State transitions
+
+| Trigger | run_state status | Telemetry event |
+|---------|------------------|-----------------|
+| Pause node enters handler | `RUNNING` → `SUSPENDED` (via `mark_suspended`) | `pause_suspended` (payload includes the resume token) |
+| Approve sentinel verified | `SUSPENDED` → `RUNNING` (via resume) | `pause_resumed` |
+| Reject sentinel verified | `SUSPENDED` → `FAILED` (via `mark_failed`) | `pause_rejected` (payload carries the reason) |
+| Timeout elapsed | `SUSPENDED` → `FAILED` (via `mark_failed`) | `pause_timeout` |
+
 ## Forthcoming Additive Fields
 
 The DAG executor (epic `hive-dag-executor`) loads the following fields without erroring; their semantics are enforced by later stories. Workflow authors may include them today, but no behavioral change occurs until the corresponding handler ships.
@@ -210,9 +257,8 @@ The DAG executor (epic `hive-dag-executor`) loads the following fields without e
 | Field | Scope | Loaded? | Enforced by |
 |-------|-------|---------|-------------|
 | `when` | per-step / edge | yes (round-trips on the model) | hde-3a (predicate evaluator) |
-| `node_type: pause` | per-step | yes (enum value accepted) | hde-8 (pause semantics) |
 | `trigger_rule` | per-step | placeholder; loader passthrough | hde-3a (trigger-rule policy) |
 
-`when:` is intended as a per-step or per-edge predicate that gates whether the step runs at all (distinct from `skip_when`, which evaluates against the workflow context rather than upstream-edge truth values). `node_type: pause` will instruct the executor to checkpoint and wait for an external resume signal in hde-8. `trigger_rule` will let a step declare `all_success | any_success | always` semantics over its `depends_on` set.
+`when:` is intended as a per-step or per-edge predicate that gates whether the step runs at all (distinct from `skip_when`, which evaluates against the workflow context rather than upstream-edge truth values). `trigger_rule` will let a step declare `all_success | any_success | always` semantics over its `depends_on` set.
 
 These fields are documented here so workflow authors can plan for them; until the enforcing handlers ship, including these fields has no runtime effect.
