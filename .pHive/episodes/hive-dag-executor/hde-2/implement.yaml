@@ -1,0 +1,51 @@
+story_id: hde-2-executor-skeleton
+step_id: implement
+status: completed
+timestamp: "2026-05-01T19:00:00Z"
+agent: dev-s5 (codex)
+artifacts:
+  - hive/lib/dag_executor/executor/__init__.py
+  - hive/lib/dag_executor/executor/run_id.py
+  - hive/lib/dag_executor/executor/walker.py
+  - hive/lib/dag_executor/executor/dispatcher.py
+  - hive/lib/dag_executor/executor/tool_gating.py
+  - hive/lib/dag_executor/executor/telemetry.py
+  - hive/lib/dag_executor/executor/errors.py
+  - hive/lib/dag_executor/executor/handlers/__init__.py
+  - hive/lib/dag_executor/executor/handlers/agent.py
+  - hive/lib/dag_executor/executor/handlers/script.py
+  - hive/lib/dag_executor/executor/handlers/gate.py
+  - hive/lib/dag_executor/executor/handlers/pause.py
+  - hive/lib/dag_executor/executor/tests/__init__.py
+  - hive/lib/dag_executor/executor/tests/test_run_id.py
+  - hive/lib/dag_executor/executor/tests/test_telemetry.py
+  - hive/lib/dag_executor/executor/tests/test_tool_gating.py
+  - hive/lib/dag_executor/executor/tests/test_handlers_agent.py
+  - hive/lib/dag_executor/executor/tests/test_handlers_script.py
+  - hive/lib/dag_executor/executor/tests/test_handlers_gate.py
+  - hive/lib/dag_executor/executor/tests/test_handlers_pause.py
+  - hive/lib/dag_executor/executor/tests/test_dispatcher.py
+  - hive/lib/dag_executor/executor/tests/test_walker.py
+  - hive/lib/dag_executor/executor/tests/test_spine_parity.py
+ulid_library: inline-helper
+ulid_rationale: |
+  python-ulid not installed in repo; per BYO-enhancements policy and prior
+  S5-fixture-test precedent, no root deps added. Inline 30-LOC Crockford
+  base32 helper with monotonic-within-ms semantics matches the ULID spec.
+test_summary: "54 executor tests pass; 52 graph tests still pass; total 106; spine parity diff zero on code-review.workflow.yaml"
+telemetry_blocker_resolution: |
+  hive.lib.metrics.core.append_event enforces a metrics-experiment schema
+  (metric_type whitelist + story_id/proposal_id requirement) incompatible
+  with the executor's per-node event taxonomy. Implementation choice (option
+  A from SendMessage to team-lead): telemetry.py validates field PRESENCE
+  against REQUIRED_EVENT_FIELDS, auto-fills metrics-vocabulary defaults
+  (metric_type=executor_event, value=0, unit=event, source=dag_executor,
+  dimensions={}, event_id=evt-<uuid>), and does NOT call append_event.
+  append_event itself is untouched. Pending team-lead reply on whether to
+  switch to option B (separate stream) before merge.
+catalog_promotion_status: |
+  observability:audit was already in hive/references/specialist-triggers.md
+  at lines 68-80 (added by 689fb6b on this branch). Story step #14 is
+  satisfied without modification; flagged in the SendMessage to team-lead
+  for confirmation.
+commit: TBD
