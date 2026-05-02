@@ -151,3 +151,32 @@ linear:
 | `stories.{id}.branch` | Execution (branch created) | Team Lead |
 | `bugs[]` | Fix loop (bug sub-issues created) | Test Sentinel / Orchestrator |
 | `user_id` | Session start (resolved from config or linearis) | Orchestrator |
+
+## Coexistence with `run_state.yaml`
+
+The DAG executor (epic `hive-dag-executor`, story `hde-5`) introduces a **second** state file with a deliberately separate scope. The two files coexist; they do **not** mirror each other.
+
+| File | Path | Scope | Owner | Lifetime |
+|------|------|-------|-------|----------|
+| `cycle-state.yaml` | `.pHive/cycle-state/{epic_id}.yaml` | Epic-level decision log accumulated across phases | Orchestrator (read by every agent prompt) | Persists with the epic |
+| `run_state.yaml` | `.pHive/runs/{run_id}/run_state.yaml` | Per-workflow-execution durable state — node statuses, output graph, last successful node, failure info | DAG executor walker | Per executor invocation; may be cleaned up after completion |
+
+### What lives where
+
+| Concern | Cycle state | Run state |
+|---------|-------------|-----------|
+| User-gate decisions, sign-offs, escalations | yes | no |
+| Per-story status (`pending` / `in_progress` / `done`) | yes | no |
+| Per-node status within a single executor run (`running` / `completed` / `failed`) | no | yes |
+| Materialized output graph for resume | no | yes |
+| `last_successful_node_id` for `--resume` checkpoints | no | yes |
+| Failure info captured at executor halt | no | yes |
+| `schema_version` (pinned at 0 from day one) | no | yes |
+
+### Why the split
+
+`cycle-state.yaml` exists to keep agent prompts coherent across the lifetime of an epic — settled decisions stay settled. `run_state.yaml` exists to make a single executor invocation resumable without conflating that with the epic's decision log. Mixing them blurs ownership and bloats both files (Risk #4 in `hive-dag-executor` epic registry).
+
+### The two files do not mirror each other
+
+A node completing inside a single executor run writes to `run_state.yaml.node_statuses` and `run_state.yaml.output_graph` — the cycle state is unaffected. Conversely, a user-gate decision or escalation banked at planning time writes to `cycle-state.yaml` and never appears in any run_state. Code that needs to update both for the same data point is a sign of blurred ownership; route through the `hive.lib.dag_executor.run_state.store` narrow-mutation API for run-state writes and through the orchestrator's cycle-state writers for epic-level writes.
