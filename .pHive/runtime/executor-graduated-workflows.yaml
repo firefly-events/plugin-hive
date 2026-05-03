@@ -9,4 +9,11 @@
 # top-level `workflows:` list of workflow-name strings. Missing file
 # OR malformed shape → empty list, default-safe orchestrator path.
 # Per-workflow rollback: removing a name rolls back ONLY that workflow.
-workflows: []
+workflows:
+  # Order 1 (hde-10): acceptance cutover. AND-of-empty routing between
+  # `proposal` and `backlog-fallback` graduates from prose-narrated to
+  # mechanical YAML routing — structurally retires the metric_signal
+  # conflation bug class that produced PR #31. See
+  # tests/dag_executor/test_cutover_acceptance_meta_team_cycle.py and
+  # hive/decisions/001-executor-cutover.md (commit 4).
+  - meta-team-cycle

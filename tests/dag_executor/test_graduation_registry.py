@@ -66,22 +66,13 @@ def test_canonical_registry_file_exists() -> None:
     )
 
 
-def test_canonical_registry_initially_empty() -> None:
-    """Initial registry MUST be `workflows: []`. Adding a workflow is
-    the next slice's job; no workflow may graduate without a separate
-    cutover commit per the Order 1-9 sequence."""
-
-    assert is_workflow_graduated("code-review", REPO_ROOT) is False
-    assert is_workflow_graduated("meta-team-cycle", REPO_ROOT) is False
-    assert is_workflow_graduated("test-swarm", REPO_ROOT) is False
-
-
-def test_canonical_registry_yaml_loads_to_empty_list() -> None:
+def test_canonical_registry_yaml_loads_to_workflows_list() -> None:
     """Schema parity with hde-9a's reader. The wrapper expects the
     top-level `workflows:` list shape; the canonical file must satisfy
     that contract directly (not via the malformed-file fail-closed
-    branch). Any maintainer who renames the key would silently break
-    every downstream graduation; this test catches that."""
+    branch). Any maintainer who renames the key (e.g. to
+    `graduated_workflows:`) would silently break every downstream
+    graduation; this test catches that."""
 
     import yaml
 
@@ -94,9 +85,12 @@ def test_canonical_registry_yaml_loads_to_empty_list() -> None:
         "canonical registry must contain top-level `workflows:` key "
         "(hde-9a wrapper contract at hive/lib/dag_executor/__init__.py)"
     )
-    assert parsed["workflows"] == [], (
-        f"canonical registry must start empty; found {parsed['workflows']!r}. "
-        "Workflows are added during cutover events (next slice)."
+    assert "graduated_workflows" not in parsed, (
+        "spec drift guard: the canonical key is `workflows:`, not "
+        "`graduated_workflows:` (hde-9b lock)"
+    )
+    assert isinstance(parsed["workflows"], list), (
+        f"`workflows:` must be a list; got {type(parsed['workflows']).__name__}"
     )
 
 
@@ -111,6 +105,10 @@ def test_empty_registry_plus_flag_on_routes_orchestrator(tmp_path: Path) -> None
     required."""
 
     _seed_consumer_repo(tmp_path, flag_on=True)
+    # Override the seeded (canonical) registry with an explicitly empty
+    # one; the canonical file ships graduated workflows post-Order-1.
+    registry_path = tmp_path / GRADUATED_REGISTRY_PATH
+    registry_path.write_text("workflows: []\n", encoding="utf-8")
     assert executor_enabled_for("code-review", tmp_path) is False
     assert executor_enabled_for("meta-team-cycle", tmp_path) is False
     assert executor_enabled_for("test-swarm", tmp_path) is False
