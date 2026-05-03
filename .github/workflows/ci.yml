@@ -25,3 +25,19 @@ jobs:
         with:
           file_or_dir: "."
           config_file: .yamllint.yml
+
+  config-guard:
+    name: Shipped config guard (hde-9a)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject `executor:` in shipped hive/hive.config.yaml
+        # Mechanical defense against the eefbff3 / project_config_shipping_deferred
+        # pattern: maintainer-only flags (like the hive-dag executor flag) must
+        # NOT land in the shipped baseline. The consumer-side equivalent lives
+        # at .pHive/hive.config.yaml per the hde-9a / Q4 user-gate lock.
+        run: |
+          if grep -nE '^[[:space:]]*executor:' hive/hive.config.yaml; then
+            echo "::error file=hive/hive.config.yaml::shipped baseline must not contain top-level 'executor:' key (hde-9a Q4 lock; consumer-side flag belongs in .pHive/hive.config.yaml)"
+            exit 1
+          fi

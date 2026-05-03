@@ -285,3 +285,15 @@ Steps with multiple `depends_on` entries (multi-upstream joins) are gated by a s
 The policy name is intentionally explicit and fixed; alternative trigger rules (`all_success`, `any_success`, `always`, `one_failed`) are NOT supported. Adding one requires an epic — see [`predicate-grammar.md`](./predicate-grammar.md).
 
 Single-upstream nodes do not pass through the trigger-rule layer — the per-input `optional: true` semantics from [Conditional Skip](#conditional-skip-skip_when) and [Input Sources](#input-sources) preserve the legacy contract: an upstream optional failure surfaces as `None` on the downstream binding rather than skipping the downstream.
+
+## Executor Cutover — Additive + Registry-Gated
+
+The Hive DAG executor (`hive.lib.dag_executor`) is a deterministic alternative to the orchestrator-narrated execution path. Its rollout is **additive**: graduating a workflow to the executor does not break, change, or version the workflow YAML schema. The same workflow file runs unchanged under either path; the executor lights up the structured `output_format` contracts (hde-3b) and `when:` predicates (hde-3a) when present, and falls back to prose-output equivalents otherwise.
+
+Cutover gating is per-consumer and per-workflow:
+
+- **Consumer flag:** `.pHive/hive.config.yaml` (consumer-side, NOT shipped) carries `executor: hive-dag` and `executor_default: off|on`. Default OFF.
+- **Graduation registry:** `.pHive/runtime/executor-graduated-workflows.yaml` lists the workflow names that have been graduated to the executor. A workflow runs through the executor only when the consumer flag is on AND the workflow appears in the registry.
+- **Routing point:** `skills/execute/SKILL.md` step 5pre is the single dispatch point. See `hive/lib/dag_executor/__init__.py` for the `executor_enabled_for(workflow_name)` reader.
+
+Workflow authors do not need to schema-version their files when graduating. Existing workflows that pass spine-parity tests under the executor are graduation candidates.

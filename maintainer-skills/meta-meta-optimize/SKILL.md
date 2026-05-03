@@ -177,6 +177,18 @@ If the close gate fails:
 - Promotion failure: treat `PromotionFailure` as discard, keep the main tree untouched, log the reason, and continue to step 8 for close handling
 - Close gate failure: record `close_rejected`, do not append the ledger, do not remove the worktree, and leave the cycle incomplete until the missing evidence is fixed
 
+## Executor Cutover Gating (hde-9a)
+
+Any time this skill — or any step file it loads — would invoke the public `/execute` skill (or otherwise hand a workflow YAML off to a runner), it MUST honour the same flag-check + registry-check decision tree documented in `skills/execute/SKILL.md` step 5pre. Concretely:
+
+1. Read `.pHive/hive.config.yaml`. If missing OR `executor_default` is not truthy OR `executor` is not `hive-dag` → orchestrator-narrated path.
+2. Read `.pHive/runtime/executor-graduated-workflows.yaml`. If the workflow is not listed → orchestrator-narrated path.
+3. Both gates pass → invoke `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`.
+
+**Worktree nesting policy.** This skill already creates a per-cycle worktree at `.pHive/meta-team/worktrees/{cycle_id}/` (Worktree Isolation section above). When the executor activates inside this skill, it MUST reuse the outer cycle worktree rather than nest a new one (hde-6 NestingDetector contract; nested worktrees raise `NestedWorktreeError`). Pass the outer worktree-aware manager (or `worktree_manager=None` plus a pre-resolved `cwd`) when calling `run_workflow`. The flag-check happens BEFORE worktree resolution, so the executor inherits the cycle's worktree if it activates.
+
+**Today's reality:** the live cycle steps 1–8 above implement directly inside the cycle worktree and do NOT invoke `/execute`. This gating policy is a forward-looking contract: if any future step file under `hive/workflows/steps/meta-team-cycle/` adds an `/execute` call, that step MUST apply this gating. Consistent gating across both invocation paths is mandatory (Phase 5 §4 lock).
+
 ## What This Skill Must Not Do
 
 - Mutate the control plane outside the dedicated worktree while steps 4-6 are in progress
