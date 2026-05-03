@@ -266,6 +266,63 @@ Select development methodology: `/hive:execute {epic} --methodology tdd`
 
 ---
 
+## Hive DAG Executor (optional, per-workflow opt-in)
+
+Hive ships an optional DAG executor that runs workflow YAMLs mechanically.
+Where the orchestrator-narrated path interprets the workflow as prose and
+makes routing decisions inline, the executor walks the declared graph,
+calls LLMs only at agent nodes, and binds `when:` predicates to declared
+output_format fields. Routing becomes a function of explicit data, not
+prose interpretation.
+
+### Opting in
+
+The executor is OFF by default. Two consumer-side gates must both pass
+before any workflow takes the executor path:
+
+1. **Consumer flag** at `.pHive/hive.config.yaml`:
+   ```yaml
+   executor: hive-dag
+   executor_default: true
+   ```
+   Default-OFF posture; this file is consumer-local and not shipped via
+   the plugin baseline.
+
+2. **Per-workflow graduation registry** at
+   `.pHive/runtime/executor-graduated-workflows.yaml`:
+   ```yaml
+   workflows:
+     - meta-team-cycle
+     - code-review
+     # ...
+   ```
+   Workflows are added one at a time during cutover events. Removing a
+   name rolls back ONLY that workflow.
+
+When both gates pass for a given workflow, `/hive:execute` invokes the
+executor instead of the orchestrator-narrated path.
+
+### Migration guide
+
+To graduate a custom workflow:
+
+1. Predicate the routing — replace prose decisions in step files with
+   `when:` clauses on the declared workflow YAML, using the strict-Archon
+   grammar at `hive/references/predicate-grammar.md`.
+2. Add structured `output_format` blocks to step files whose outputs
+   downstream `when:` predicates reference. Booleans, ints, and strings
+   only — predicates address structured data, not prose.
+3. List the workflow in `.pHive/runtime/executor-graduated-workflows.yaml`.
+4. Run any per-workflow parity tests (`tests/dag_executor/`) under both
+   paths until the executor's output matches the orchestrator-narrated
+   one (events compared on `event_type` + `payload`, ignoring timestamps,
+   run_id, and path-introduced identifiers).
+
+See `hive/decisions/001-executor-cutover.md` for the canonical migration
+guide and the rollout history of the built-in workflows.
+
+---
+
 ## Swarm Types
 
 ### Planning Team

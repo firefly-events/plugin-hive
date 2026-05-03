@@ -297,3 +297,14 @@ Cutover gating is per-consumer and per-workflow:
 - **Routing point:** `skills/execute/SKILL.md` step 5pre is the single dispatch point. See `hive/lib/dag_executor/__init__.py` for the `executor_enabled_for(workflow_name)` reader.
 
 Workflow authors do not need to schema-version their files when graduating. Existing workflows that pass spine-parity tests under the executor are graduation candidates.
+
+### Authoring forward — defaults for new workflows
+
+New workflow authors should default to executor-friendly shapes and treat prose-routed behaviour as deprecated. Specifically:
+
+- **Routing decisions**: declare `when:` predicates against named output_format fields, not prose instructions. The strict-Archon grammar at `hive/references/predicate-grammar.md` is small on purpose; conformance to it is what makes routing mechanical.
+- **Step outputs**: declare structured `outputs:` with explicit names and types. Downstream `when:` predicates and `inputs:` bindings address those named fields.
+- **Step files**: include an `OUTPUT FORMAT` block listing the named fields the step is contracted to emit. The executor binds predicates by name; prose-only outputs that "encode" a routing signal in narrative are a deprecated pattern (see PR #31's metric_signal/findings conflation, structurally retired by hde-3b's output_format contract on `step-02-analysis`).
+- **Multi-domain forks**: declare two declarative nodes with `when:` predicates rather than a single prose step that branches inline. The grammar has no `contains` operator on purpose; pre-compute booleans on a story-context node's outputs and predicate against those (see `hive/references/story-spec-schema.md`).
+
+Workflows that ship today as prose-routed (and have not been graduated to the executor registry) continue to work unchanged. Treat that path as **maintenance-mode**: existing workflows are still supported under the orchestrator, but new prose-routed workflows are discouraged. The migration path is documented in `hive/decisions/001-executor-cutover.md`.

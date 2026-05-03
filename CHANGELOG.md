@@ -9,6 +9,51 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+- **Hive DAG executor v1 — cutover complete.** The deterministic DAG
+  executor (`hive/lib/dag_executor/`) graduates from optional opt-in to
+  the target runtime for workflows. 9 of 9 built-in workflows are now
+  in the per-workflow graduation registry at
+  `.pHive/runtime/executor-graduated-workflows.yaml`:
+  `meta-team-cycle`, `code-review`, `performance-audit`, `test-swarm`,
+  `development.tdd`, `development.bdd`, `development.tdd-codex`,
+  `ui-design`, `design-review`, `daily-ceremony`. Workflows opt in via
+  `executor: hive-dag` + `executor_default: true` in
+  `.pHive/hive.config.yaml`; default OFF posture preserved for
+  consumers that don't flip the flag.
+- **PR #31's metric_signal/findings conflation bug class is structurally
+  retired.** AND-of-empty routing between `meta-team-cycle`'s
+  `proposal` and `backlog-fallback` graduates from prose-narrated
+  orchestrator judgement to mechanical YAML predicate evaluation against
+  `step-02-analysis`'s declared `output_format` fields (`metric_signal`,
+  `findings_count`, `external_candidates_count`).
+- **`daily-ceremony` plan-approval gate ships as `node_type: pause`.**
+  Operator approval sentinels at
+  `<runs_root>/<run_id>/pause/plan-approval.{approve,reject}` carry the
+  HMAC-signed token from the `pause_suspended` telemetry event (hde-8
+  anti-forgery contract). Existing `step-06-approve-plan.md` is
+  preserved as the operator-facing presentation script.
+- **`hive/decisions/001-executor-cutover.md`** — canonical migration
+  guide for graduating custom workflows; rollout history and sunset
+  path for orchestrator-narrated routing; per-workflow rollback
+  primitives.
+- **`hive/references/story-spec-schema.md`** — minimal schema for the
+  `metadata.needs_backend` / `metadata.needs_frontend` story booleans
+  consumed by `development.classic`'s YAML-level domain decomposition.
+
+### Changed
+- `hive/references/workflow-schema.md` — the existing "Executor Cutover"
+  section now also documents authoring-forward defaults: declarative
+  `when:` predicates, structured `output_format` blocks, and named
+  outputs are recommended for new workflows. Prose-routed workflows
+  remain supported under the orchestrator-narrated path
+  (maintenance-mode); the path is not removed in this release.
+- `hive/GUIDE.md` — adds a "Hive DAG Executor (optional, per-workflow
+  opt-in)" section with the consumer opt-in shape and migration guide.
+- `hive/MAIN.md` — adds a "Two Execution Paths" architecture note and
+  updates the Key References table with predicate-grammar, story-spec,
+  and the executor ADR.
+
 ## [1.1.3] - 2026-04-28
 
 ### Added
