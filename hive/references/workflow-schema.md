@@ -250,15 +250,38 @@ The hard ceiling is a security floor — a forgotten "no timeout" pause cannot h
 | Reject sentinel verified | `SUSPENDED` → `FAILED` (via `mark_failed`) | `pause_rejected` (payload carries the reason) |
 | Timeout elapsed | `SUSPENDED` → `FAILED` (via `mark_failed`) | `pause_timeout` |
 
-## Forthcoming Additive Fields
+## Predicate Routing (`when:`)
 
-The DAG executor (epic `hive-dag-executor`) loads the following fields without erroring; their semantics are enforced by later stories. Workflow authors may include them today, but no behavioral change occurs until the corresponding handler ships.
+Per-step `when:` is a strict-Archon predicate evaluated against the materialised output graph of upstream steps before dispatch. When the predicate evaluates False (or fails closed), the step is skipped — the walker emits `predicate_evaluated` (with the result) and `node_skipped` (with `reason: when_predicate_false`).
 
-| Field | Scope | Loaded? | Enforced by |
-|-------|-------|---------|-------------|
-| `when` | per-step / edge | yes (round-trips on the model) | hde-3a (predicate evaluator) |
-| `trigger_rule` | per-step | placeholder; loader passthrough | hde-3a (trigger-rule policy) |
+```yaml
+steps:
+  - id: triage
+    agent: researcher
+    outputs:
+      - name: metric_signal
+        type: json
 
-`when:` is intended as a per-step or per-edge predicate that gates whether the step runs at all (distinct from `skip_when`, which evaluates against the workflow context rather than upstream-edge truth values). `trigger_rule` will let a step declare `all_success | any_success | always` semantics over its `depends_on` set.
+  - id: deep-dive
+    agent: researcher
+    depends_on: [triage]
+    when: "$triage.output.metric_signal == true"
+```
 
-These fields are documented here so workflow authors can plan for them; until the enforcing handlers ship, including these fields has no runtime effect.
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `when` | string | null | Strict-Archon predicate; False or fail-closed skips the step. Distinct from `skip_when` (which gates on workflow context). |
+
+The grammar — operators, fail-closed semantics, change_verdict / cycle_verdict disambiguation, and the cultural lock that grammar additions require an epic — is documented in [`predicate-grammar.md`](./predicate-grammar.md). Workflow authors should read that doc before adding any `when:` predicate.
+
+## Multi-Upstream Joins (`trigger_rule`)
+
+Steps with multiple `depends_on` entries (multi-upstream joins) are gated by a single trigger-rule policy:
+
+| Trigger rule | Behaviour |
+|--------------|-----------|
+| `none_failed_min_one_success` (default and only) | RUN iff at least one upstream completed; SKIP otherwise. Failed upstreams convert to SKIP for the candidate node — failure does NOT cascade as failure. |
+
+The policy name is intentionally explicit and fixed; alternative trigger rules (`all_success`, `any_success`, `always`, `one_failed`) are NOT supported. Adding one requires an epic — see [`predicate-grammar.md`](./predicate-grammar.md).
+
+Single-upstream nodes do not pass through the trigger-rule layer — the per-input `optional: true` semantics from [Conditional Skip](#conditional-skip-skip_when) and [Input Sources](#input-sources) preserve the legacy contract: an upstream optional failure surfaces as `None` on the downstream binding rather than skipping the downstream.

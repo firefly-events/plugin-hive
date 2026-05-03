@@ -2,9 +2,6 @@
 
 Per hde-2 design locks:
   * Sequential execution only. Parallel fan-out is hde-4.
-  * Predicate evaluation for `when:` is hde-3a — the walker recognises
-    `skip_when` as a presence flag and emits `node_skipped` if set,
-    but does NOT evaluate the predicate text yet.
   * Per-step `optional: true` + a recoverable handler error → log
     + continue. Per-input `optional` is honored when resolving inputs
     (a missing/skipped upstream becomes `None`).
@@ -18,6 +15,17 @@ hde-5 additions:
   * `replay(...)` is the resume entry — loads checkpointed state,
     re-executes the previously-failed node first (idempotent
     contract), continues forward.
+
+hde-3a additions:
+  * `when:` predicates are parsed and evaluated against the materialised
+    output graph BEFORE dispatch. False predicates skip the node and
+    emit a ``predicate_evaluated`` event. Invalid predicates (parse
+    error, missing field) are fail-closed → False + warning event;
+    they do NOT abort the run.
+  * Multi-upstream nodes (depends_on count > 1) are gated by the
+    ``none_failed_min_one_success`` trigger rule: RUN iff ≥1 upstream
+    is COMPLETED, else SKIP. Failed upstreams convert to SKIP for the
+    candidate node — failure does NOT cascade as failure.
 """
 
 from __future__ import annotations
@@ -27,6 +35,13 @@ from pathlib import Path
 from typing import Any
 
 from hive.lib.dag_executor.graph import Graph, InputBinding, Node
+from hive.lib.dag_executor.routing import (
+    ActivationDecision,
+    Skipped,
+    evaluate as eval_predicate,
+    none_failed_min_one_success,
+    parse as parse_predicate,
+)
 
 from .dispatcher import Dispatcher
 from .errors import (
@@ -69,6 +84,121 @@ def _topological_order(graph: Graph) -> list[str]:
             f"cycle detected; unresolved nodes: {unresolved}"
         )
     return order
+
+
+def _output_graph_view(
+    materialised: dict[str, NodeOutput],
+) -> dict[str, dict[str, Any]]:
+    """Project materialised outputs into the predicate evaluator's shape.
+
+    The evaluator addresses values via ``$nodeId.output.field``; the
+    walker's runtime view is ``materialised[node_id].outputs[field]``.
+    This wraps each NodeOutput's outputs dict under an ``"output"`` key
+    so dot-paths resolve cleanly without coupling the routing layer to
+    the executor's NodeOutput dataclass.
+    """
+
+    return {
+        node_id: {"output": dict(out.outputs)}
+        for node_id, out in materialised.items()
+    }
+
+
+def _evaluate_when_predicate(
+    node: Node,
+    materialised: dict[str, NodeOutput],
+    telemetry: Telemetry,
+) -> bool:
+    """Return True if the node's ``when:`` predicate (if any) holds.
+
+    Fail-closed: a missing/empty predicate counts as True (don't skip).
+    A parse failure or a missing-field eval failure resolves to False
+    AND emits a ``predicate_evaluated`` warning event so the divergence
+    is observable in the telemetry stream.
+    """
+
+    predicate_text = getattr(node, "when", None)
+    if not predicate_text:
+        return True
+
+    ast = parse_predicate(predicate_text)
+    if isinstance(ast, Skipped):
+        telemetry.emit(
+            "predicate_evaluated",
+            node.id,
+            {
+                "expr": predicate_text,
+                "result": False,
+                "fail_closed": True,
+                "reason": ast.reason,
+            },
+        )
+        return False
+
+    output_graph = _output_graph_view(materialised)
+    result = eval_predicate(ast, output_graph)
+    payload: dict[str, Any] = {
+        "expr": predicate_text,
+        "result": bool(result),
+    }
+    if not result:
+        # Fail-closed evaluation paths (missing field, type mismatch)
+        # also funnel through this branch. We can't distinguish a
+        # legitimate False from a fail-closed False at this layer
+        # without re-running the AST through a probing evaluator;
+        # the contract documents both as "False".
+        payload["fail_closed"] = False
+    telemetry.emit("predicate_evaluated", node.id, payload)
+    return bool(result)
+
+
+def _trigger_rule_decision(
+    node: Node,
+    node_statuses: dict[str, Any],
+    telemetry: Telemetry,
+) -> ActivationDecision:
+    """Apply ``none_failed_min_one_success`` AT MULTI-UPSTREAM JOINS.
+
+    Per the hde-3a story spec: trigger-rule semantics gate
+    multi-upstream joins (depends_on count > 1). Single-upstream nodes
+    fall through to the legacy hde-2 path so the per-input ``optional``
+    binding semantics (an upstream optional failure surfaces as None
+    on the downstream binding rather than skipping the downstream)
+    are preserved.
+
+    Root nodes (no upstreams) always RUN. A SKIP decision emits a
+    ``node_skipped`` event with the upstream status set so
+    failure-cascade observers can see the chain.
+    """
+
+    upstream_ids = list(node.depends_on)
+    if len(upstream_ids) <= 1:
+        # Root or single-upstream: legacy behaviour. The walker's
+        # `_resolve_inputs` + per-input optional handle missing/failed
+        # upstream values; trigger_rule does not gate here.
+        return ActivationDecision.RUN
+
+    from hive.lib.dag_executor.run_state import NodeStatus
+
+    statuses: list[Any] = []
+    for upstream_id in upstream_ids:
+        status = node_statuses.get(upstream_id, NodeStatus.PENDING)
+        statuses.append(status)
+
+    decision = none_failed_min_one_success(statuses)
+    if decision == ActivationDecision.SKIP:
+        telemetry.emit(
+            "node_skipped",
+            node.id,
+            {
+                "reason": "trigger_rule:none_failed_min_one_success",
+                "upstream_statuses": {
+                    uid: (s.value if hasattr(s, "value") else str(s))
+                    for uid, s in zip(upstream_ids, statuses)
+                },
+            },
+        )
+    return decision
 
 
 def _resolve_inputs(
@@ -184,6 +314,12 @@ class Walker:
         state,
         save_state,
     ):
+        from hive.lib.dag_executor.run_state import NodeStatus
+
+        # Local per-node status mirror so the trigger_rule policy works
+        # even when run_state persistence is disabled (no run_state_path).
+        # When state IS persisted, this mirrors state.node_statuses.
+        node_statuses: dict[str, Any] = {nid: NodeStatus.PENDING for nid in order}
         for node_id in order:
             node = graph.nodes[node_id]
 
@@ -194,6 +330,31 @@ class Walker:
                     {"reason": "skip_when present (hde-3a evaluation pending)"},
                 )
                 skipped.add(node_id)
+                node_statuses[node_id] = NodeStatus.SKIPPED
+                state = _record_skipped(state, node_id)
+                save_state(state)
+                continue
+
+            # hde-3a: trigger_rule first (upstream-status gate), then
+            # `when:` predicate (output-value gate). Order matters —
+            # a SKIP from trigger_rule means upstreams didn't produce
+            # outputs the predicate could meaningfully reference.
+            decision = _trigger_rule_decision(node, node_statuses, telemetry)
+            if decision == ActivationDecision.SKIP:
+                skipped.add(node_id)
+                node_statuses[node_id] = NodeStatus.SKIPPED
+                state = _record_skipped(state, node_id)
+                save_state(state)
+                continue
+
+            if not _evaluate_when_predicate(node, materialised, telemetry):
+                telemetry.emit(
+                    "node_skipped",
+                    node.id,
+                    {"reason": "when_predicate_false"},
+                )
+                skipped.add(node_id)
+                node_statuses[node_id] = NodeStatus.SKIPPED
                 state = _record_skipped(state, node_id)
                 save_state(state)
                 continue
@@ -225,6 +386,7 @@ class Walker:
                     materialised[node_id] = NodeOutput(
                         outputs={}, meta={"optional_failure": str(exc)}
                     )
+                    node_statuses[node_id] = NodeStatus.FAILED
                     state = _record_optional_failure(state, node_id)
                     save_state(state)
                     continue
@@ -233,6 +395,7 @@ class Walker:
                     node.id,
                     {"optional": False, "error": str(exc)},
                 )
+                node_statuses[node_id] = NodeStatus.FAILED
                 state = _record_failure(
                     state,
                     node_id,
@@ -246,6 +409,7 @@ class Walker:
                     node.id,
                     {"optional": bool(node.optional), "error": str(exc)},
                 )
+                node_statuses[node_id] = NodeStatus.FAILED
                 state = _record_failure(
                     state,
                     node_id,
@@ -267,6 +431,7 @@ class Walker:
                 node.id,
                 {"outputs": list(output.outputs.keys())},
             )
+            node_statuses[node_id] = NodeStatus.COMPLETED
             state = _record_completion(state, node_id, output)
             save_state(state)
 
@@ -312,6 +477,12 @@ class Walker:
 
         start_index = _replay_starting_index(order, state)
 
+        # Mirror state.node_statuses into a local dict so trigger_rule
+        # has access to upstream statuses for the replay segment too.
+        node_statuses: dict[str, Any] = {
+            nid: state.node_statuses.get(nid, NodeStatus.PENDING) for nid in order
+        }
+
         for node_id in order[start_index:]:
             node = graph.nodes[node_id]
 
@@ -321,6 +492,25 @@ class Walker:
                     node.id,
                     {"reason": "skip_when present (hde-3a evaluation pending)"},
                 )
+                node_statuses[node_id] = NodeStatus.SKIPPED
+                state = set_node_status(state, node_id, NodeStatus.SKIPPED)
+                save(state, root=runs_root)
+                continue
+
+            decision = _trigger_rule_decision(node, node_statuses, telemetry)
+            if decision == ActivationDecision.SKIP:
+                node_statuses[node_id] = NodeStatus.SKIPPED
+                state = set_node_status(state, node_id, NodeStatus.SKIPPED)
+                save(state, root=runs_root)
+                continue
+
+            if not _evaluate_when_predicate(node, materialised, telemetry):
+                telemetry.emit(
+                    "node_skipped",
+                    node.id,
+                    {"reason": "when_predicate_false"},
+                )
+                node_statuses[node_id] = NodeStatus.SKIPPED
                 state = set_node_status(state, node_id, NodeStatus.SKIPPED)
                 save(state, root=runs_root)
                 continue
@@ -348,6 +538,7 @@ class Walker:
                     materialised[node_id] = NodeOutput(
                         outputs={}, meta={"optional_failure": str(exc)}
                     )
+                    node_statuses[node_id] = NodeStatus.FAILED
                     state = _record_optional_failure(state, node_id)
                     save(state, root=runs_root)
                     continue
@@ -356,6 +547,7 @@ class Walker:
                     node.id,
                     {"optional": False, "error": str(exc), "replay": True},
                 )
+                node_statuses[node_id] = NodeStatus.FAILED
                 state = _record_failure(
                     state,
                     node_id,
@@ -369,6 +561,7 @@ class Walker:
                     node.id,
                     {"optional": bool(node.optional), "error": str(exc), "replay": True},
                 )
+                node_statuses[node_id] = NodeStatus.FAILED
                 state = _record_failure(
                     state,
                     node_id,
@@ -385,6 +578,7 @@ class Walker:
             if is_pause:
                 state = _record_pause_resumed(state)
                 save(state, root=runs_root)
+            node_statuses[node_id] = NodeStatus.COMPLETED
             telemetry.emit(
                 "node_completed",
                 node.id,
