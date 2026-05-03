@@ -1,3 +1,26 @@
+- experiment_id: meta-2026-05-03
+  date: '2026-05-03'
+  started: '2026-05-03T00:00:00Z'
+  closed: '2026-05-03T00:10:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 0
+  top_changes:
+    - .pHive/meta-team/archive/2026-04-19/MANIFEST.md: appended reviewed-on provenance line for meta-2026-05-03 nightly cycle
+  commit: 0c5a3db5c300ad7de5596e8ce7f35ff529261f01
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 32000
+    first_attempt_pass: true
+  rollback_ref: 5c4248aafc7522b97699024f515691edb96ade54
+  notes: |
+    Nightly run for 2026-05-03. Analysis found 0 in-scope findings (two out-of-scope
+    issues noted: wrong config path in GUIDE.md, missing step-02c ref in SKILL.md —
+    both outside developer write authority). Routed to step-03b backlog fallback.
+    Processed candidate mmo-2026-04-21-001: appended reviewed-on provenance line to
+    archived MANIFEST. Closure validator passed. Regression watch armed for 4-hour
+    observation window.
 - experiment_id: meta-2026-05-02
   date: '2026-05-02'
   started: '2026-05-02T00:00:00Z'
