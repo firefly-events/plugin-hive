@@ -45,6 +45,12 @@ from .grammar import (
     NotEquals,
     Or,
 )
+from .parallel import (
+    ParallelScheduler,
+    ScheduleResult,
+    decide_join_activation,
+    disambiguate_insight_slug,
+)
 from .parser import parse
 from .trigger_rule import ActivationDecision, none_failed_min_one_success
 
@@ -60,11 +66,15 @@ __all__ = [
     "Lte",
     "NotEquals",
     "Or",
+    "ParallelScheduler",
     "PredicateEvalError",
     "PredicateParseError",
     "RoutingError",
+    "ScheduleResult",
     "Skipped",
     "TriggerRuleViolationError",
+    "decide_join_activation",
+    "disambiguate_insight_slug",
     "evaluate",
     "none_failed_min_one_success",
     "parse",

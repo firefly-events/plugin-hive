@@ -148,4 +148,36 @@ class AgentHandler:
             raise AgentHandlerError(
                 f"agent-spawn returned non-dict outputs for node {node.id!r}"
             )
+
+        # hde-4 Risk #9 guard: when this node ran in a parallel branch
+        # context, two siblings could both want to write the SAME
+        # `.pHive/insights/{epic_id}/{story_id}/<slug>.md` path. We
+        # disambiguate the slug deterministically here — first 8 chars
+        # of run_id are appended — so the actual write (performed by
+        # the agent-spawn chain or a later promotion step) lands on a
+        # unique path. Only triggered when the spawn explicitly
+        # surfaces an `insight_slug` and the caller passes epic_id +
+        # story_id via inputs; otherwise the outputs round-trip
+        # untouched.
+        insight_slug = outputs.get("insight_slug")
+        epic_id = inputs.get("epic_id")
+        story_id = inputs.get("story_id")
+        if (
+            isinstance(insight_slug, str)
+            and insight_slug
+            and isinstance(epic_id, str)
+            and epic_id
+            and isinstance(story_id, str)
+            and story_id
+        ):
+            from hive.lib.dag_executor.routing import disambiguate_insight_slug
+
+            outputs = dict(outputs)
+            outputs["insight_slug"] = disambiguate_insight_slug(
+                epic_id=epic_id,
+                story_id=story_id,
+                slug=insight_slug,
+                run_id=run_id,
+            )
+
         return NodeOutput(outputs=outputs)
