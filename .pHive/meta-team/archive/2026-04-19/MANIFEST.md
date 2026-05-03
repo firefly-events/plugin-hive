@@ -32,3 +32,4 @@ current plan.
 - User decisions: Q9 (archive rather than delete legacy meta-team assets).
 - User decisions: Q-new-D (preserve and flag the historical `commit: TBD` break).
 <!-- reviewed-on: meta-2026-04-22 -->
+<!-- reviewed-on: meta-2026-05-03 -->
