@@ -162,7 +162,15 @@ Expected handoff:
 external_research_candidates:
   - {proposal object with usual step-03 fields, discovery_source: external_research}
 research_summary: {string summary of provider usage and notable candidate themes}
+external_candidates_count: {int — MUST equal len(external_research_candidates), 0 when the list is empty}
 ```
+
+`external_candidates_count` is the executor-facing companion of
+`external_research_candidates`. The DAG executor's `when:` predicates
+bind to it by explicit field name because the strict-Archon grammar
+does not support `len(...)` — see `hive/references/predicate-grammar.md`.
+List-length parity is a contract invariant; diverging counts will
+silently misroute step-03 vs step-03b.
 
 ## SUCCESS METRICS
 
@@ -171,6 +179,7 @@ research_summary: {string summary of provider usage and notable candidate themes
 - [ ] Every candidate includes `discovery_source: external_research`
 - [ ] Output is shaped for direct consumption by step 3 proposal ranking
 - [ ] Internal-audit proposals remain intact and unsuppressed
+- [ ] `external_candidates_count` emitted as int and equal to `len(external_research_candidates)` (0 when the list is empty)
 
 ## FAILURE MODES
 

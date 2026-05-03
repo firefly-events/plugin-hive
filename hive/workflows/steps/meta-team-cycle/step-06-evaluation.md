@@ -1,5 +1,43 @@
 # Step 6: Evaluation
 
+## OUTPUT FORMAT (executor contract)
+
+Step output is a JSON object that distinguishes per-change and
+cycle-level verdicts. The DAG executor binds downstream `when:`
+predicates to specific fields by name; missing fields fail-closed
+(downstream skips with a `predicate_evaluated` warning event per
+`hive/references/predicate-grammar.md`).
+
+```yaml
+output_format:
+  # Per-change entries — one per change with status: done from step 4.
+  evaluations: list  # [{change_id: str, change_verdict: str, reason: str, ...}]
+                     # change_verdict ∈ {passed, needs_optimization, needs_revision}
+  # Cycle-level aggregate — single value over all changes in the cycle.
+  cycle_verdict: str        # one of: passed | partial | poor
+  pass_count: int
+  needs_optimization_count: int
+  needs_revision_count: int
+  # Promotion-evidence inputs for step 7 / step 8.
+  metrics_snapshot: dict    # raw candidate metric values (non-empty)
+  compare: dict             # hive.lib.meta_experiment.compare output
+```
+
+`change_verdict` and `cycle_verdict` are DIFFERENT fields living in
+DIFFERENT value spaces:
+
+- `change_verdict` (per change): `passed | needs_optimization | needs_revision`.
+  Same 3-value space as `reviewer.md` and `step-06-review.md`.
+- `cycle_verdict` (per cycle, aggregate): `passed | partial | poor`.
+  `passed` here means "cycle-aggregate-pass" — different semantics
+  from change-level `passed`.
+
+Predicates referencing the change-level verdict MUST use
+`$step.output.evaluations[*].change_verdict` or the per-change view —
+never bare `$step.output.verdict`. Bare `verdict` is undefined under
+the executor contract and fail-closes to False — see
+`hive/references/predicate-grammar.md` Risk #13.
+
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
 - Read this entire step file before taking any action
@@ -42,7 +80,7 @@ swarm-specific charter criteria. Produce a final verdict per change.
 
 ## YOUR TASK
 
-Evaluate each implemented change against the safety-constraints quality bar plus swarm charter criteria. Assign `pass`, `needs_optimization`, or `needs_revision` verdict per change, with rationale.
+Evaluate each implemented change against the safety-constraints quality bar plus swarm charter criteria. Assign `passed`, `needs_optimization`, or `needs_revision` change_verdict per change, with rationale.
 
 ## TASK SEQUENCE
 
@@ -82,18 +120,24 @@ A change needs_optimization when:
 #### 2c. Score the change
 ```yaml
 change_id: {proposal_id}_{file_slug}
-verdict: pass | needs_optimization | needs_revision
+change_verdict: passed | needs_optimization | needs_revision
 charter_objective: {which objective this addresses}
 quality_score: {0.0-1.0}
 rationale: |
-  {Why this verdict. Cite specific evidence.}
+  {Why this change_verdict. Cite specific evidence.}
 revision_notes: |
   {Only if needs_revision — specific fix required}
 ```
 
+The field name is `change_verdict`, not bare `verdict`. Predicates on
+this output bind by name (`$step.output.evaluations[*].change_verdict`);
+silent renames will fail-close downstream routing — see
+`hive/references/predicate-grammar.md` Risk #13.
+
 ### 3. Aggregate results
-- Count: pass, needs_optimization, needs_revision
-- Overall cycle verdict: `passed` if ≥ 70% of changes pass or needs_optimization; `partial` if 40–70%; `poor` if < 40%
+- Count: passed, needs_optimization, needs_revision (per-change `change_verdict`)
+- Overall `cycle_verdict`: `passed` if ≥ 70% of changes are passed or needs_optimization; `partial` if 40–70%; `poor` if < 40%
+- Cycle-level value space (`passed | partial | poor`) is distinct from change-level (`passed | needs_optimization | needs_revision`); bind predicates by explicit field name (see OUTPUT FORMAT above)
 
 ### 4. Bind compare output to metrics_snapshot (BL2.3)
 Use `hive.lib.meta_experiment.compare` with the captured baseline already present in the envelope context and the candidate metrics collected during the step-04/step-05 run.
@@ -147,14 +191,14 @@ compare: {structured compare output}
 ```
 ## Evaluation Report — Cycle {cycle_id}
 
-Cycle verdict: {verdict}
+Cycle verdict: {cycle_verdict}   # passed | partial | poor
 Changes evaluated: {N}
-  Pass: {N}
+  Passed: {N}
   Needs optimization: {N}
   Needs revision: {N}
 
 Results:
-  [pass] {proposal_id}: {rationale summary}
+  [passed] {proposal_id}: {rationale summary}
   [needs_optimization] {proposal_id}: {what to improve}
   [needs_revision] {proposal_id}: {what to fix}
 ```

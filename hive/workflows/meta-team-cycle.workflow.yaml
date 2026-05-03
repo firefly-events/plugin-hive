@@ -42,6 +42,19 @@ steps:
         type: json
       - name: analysis_report
         type: string
+      # hde-3b output_format contract: structured fields the executor
+      # binds downstream `when:` predicates to. See step-02-analysis.md
+      # OUTPUT FORMAT block. Routing between step-03 and step-03b is
+      # AND-of-empty across `findings_count`, `external_candidates_count`,
+      # and `metric_signal` — see hive/references/predicate-grammar.md
+      # and tests/meta_meta/test_routing_findings.py for the canonical
+      # contract. Type `json` is the graph-validator container — the
+      # runtime values are scalar (bool, int) per the step file's
+      # OUTPUT FORMAT declaration.
+      - name: metric_signal
+        type: json
+      - name: findings_count
+        type: json
 
   - id: external-research
     agent: researcher
@@ -74,6 +87,13 @@ steps:
         type: json
       - name: research_summary
         type: string
+      # hde-3b: count companion of external_research_candidates so the
+      # routing predicate can bind by name (strict-Archon grammar has
+      # no len(...)). external_candidates_count MUST equal
+      # len(external_research_candidates). Type `json` is the
+      # graph-validator container — runtime value is an int.
+      - name: external_candidates_count
+        type: json
 
   - id: proposal
     agent: architect
@@ -85,6 +105,13 @@ steps:
     depends_on:
       - analysis
       - external-research
+    # hde-3b routing predicate: step-03 runs when ANY of the three
+    # actionable signals is non-empty. Mirrors the canonical AND-of-empty
+    # rule documented in maintainer-skills/meta-meta-optimize/SKILL.md
+    # and locked by tests/meta_meta/test_routing_findings.py. Strict-Archon
+    # grammar (no parens) — left-associative `||`. See
+    # hive/references/predicate-grammar.md.
+    when: "$analysis.output.findings_count > 0 || $analysis.output.metric_signal == true || $external-research.output.external_candidates_count > 0"
     inputs:
       - name: findings
         source: step_output
@@ -98,6 +125,40 @@ steps:
       - name: approved_proposals
         type: json
       - name: skipped_proposals
+        type: json
+
+  - id: backlog-fallback
+    agent: orchestrator
+    # hde-3b routing predicate: step-03b runs ONLY when ALL three signals
+    # are empty — the inverse of the step-03 `when:` predicate. The
+    # strict-Archon grammar evaluates left-to-right; the conjunction form
+    # below is the De Morgan complement of step-03's disjunction.
+    when: "$analysis.output.findings_count == 0 && $analysis.output.metric_signal == false && $external-research.output.external_candidates_count == 0"
+    task: >
+      Backlog fallback: run only when analysis produced zero findings,
+      external research produced zero candidates, AND no perf-baseline
+      metric signal is present. Loads `.pHive/meta-team/queue-meta-meta-optimize.yaml`,
+      reports which pending entry would be selected, and ends the cycle
+      without side effects (S8 dry-run gate).
+    step_file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+    depends_on:
+      - analysis
+      - external-research
+    inputs:
+      - name: cycle_id
+        source: step_output
+        step_id: boot
+        output_name: cycle_id
+      - name: findings
+        source: step_output
+        step_id: analysis
+        output_name: findings
+      - name: external_research_candidates
+        source: step_output
+        step_id: external-research
+        output_name: external_research_candidates
+    outputs:
+      - name: backlog_dry_run_report
         type: json
 
   - id: implementation
