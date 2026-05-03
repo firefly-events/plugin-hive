@@ -17,3 +17,32 @@ workflows:
   # tests/dag_executor/test_cutover_acceptance_meta_team_cycle.py and
   # hive/decisions/001-executor-cutover.md (commit 4).
   - meta-team-cycle
+  # Order 2 (hde-10): linear spine, 3 nodes. Lowest-risk production
+  # graduation; exercises the spine-parity invariant under live use.
+  - code-review
+  # Order 3 (hde-10): linear spine, 2 nodes. Mirror of code-review's
+  # post-implementation review shape; smallest production workflow.
+  - performance-audit
+  # Order 4 (hde-10): parallel fan-out validation in production. Two
+  # `execute-platform-*` nodes converge on `file-bugs` — exercises
+  # the hde-4 wave detection + barrier join path live.
+  - test-swarm
+  # Order 5 (hde-10): linear development workflow, 7 nodes. First
+  # development methodology to graduate.
+  - development.tdd
+  # Order 6 (hde-10): the BDD methodology partner to TDD; tdd-codex
+  # validates hde-7 tool-gating + the macOS-only Codex pane in
+  # production (Linux CI runners skip the cross-model assertions).
+  - development.bdd
+  - development.tdd-codex
+  # Order 7 (hde-10): UI workflow + design-review. design-review
+  # validates hde-8 pause-gate semantics in production (the
+  # blocking/needs_revision/needs_redesign verdict drives downstream
+  # design-team rework via operator-written sentinels).
+  - ui-design
+  - design-review
+  # Order 9 (hde-10): post-hde-0 normalized daily-ceremony. The prose
+  # plan-approval gate now ships as a declarative `node_type: pause`
+  # node (`plan-approval`); operator sentinels at
+  # `<runs_root>/<run_id>/pause/plan-approval.{approve,reject}`.
+  - daily-ceremony

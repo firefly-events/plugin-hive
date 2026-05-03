@@ -56,16 +56,32 @@ steps:
     agent: analyst
     depends_on: [planning-select-work]
 
-  - id: planning-approve-plan
-    step_file: hive/workflows/steps/daily-ceremony/step-06-approve-plan.md
+  # plan-approval was previously prose-narrated through
+  # step-06-approve-plan.md — the orchestrator paused, presented the plan,
+  # and waited for the user's "yes/approve/go". Under the executor it is a
+  # declarative `node_type: pause` step. The operator approval signal is
+  # written at `<runs_root>/<run_id>/pause/plan-approval.approve` with the
+  # signed token from the `pause_suspended` telemetry event; rejection is
+  # the matching `.reject` sentinel. The original step file is preserved
+  # as the operator-facing presentation script (loaded as `task`) so the
+  # plan view is unchanged.
+  - id: plan-approval
+    node_type: pause
     agent: orchestrator
     depends_on: [planning-select-work, planning-validate-stories]
+    step_file: hive/workflows/steps/daily-ceremony/step-06-approve-plan.md
+    task: >
+      Pause for explicit plan approval. Present the validated plan
+      (work list + validation results + cross-cutting concerns) per
+      step-06-approve-plan.md, then write
+      `<runs_root>/<run_id>/pause/plan-approval.approve` (token from
+      `pause_suspended`) to resume, or `.reject` to halt the cycle.
 
   # ── execution phase ───────────────────────────────────────────────────
   - id: execution-kick-off
     step_file: hive/workflows/steps/daily-ceremony/step-07-kick-off.md
     agent: orchestrator
-    depends_on: [planning-approve-plan]
+    depends_on: [plan-approval]
 
   # ── commit phase (no child steps in original; barrier step) ───────────
   - id: commit

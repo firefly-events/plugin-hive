@@ -24,6 +24,7 @@ the hde-2 spine test for parameterisation.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -237,3 +238,209 @@ def test_workflow_executes_without_error(workflow_slug, canned, context):
 
     materialised = Walker().walk(graph, dispatcher, run_id, tel, context=context)
     assert set(materialised.keys()) == set(graph.nodes.keys())
+
+
+# ---------------------------------------------------------------------------
+# Per-Order parity (hde-10) — Orders 2-7 + 9
+# ---------------------------------------------------------------------------
+#
+# Per-Order parity bar v1.1 normalisation clause: events compared on
+# `event_type` + `payload`, ignoring timestamps + run_id + path-introduced
+# identifiers. Equality is STRUCTURAL, not byte-exact.
+#
+# The orchestrator-narrated "expected trace" is synthesised from each
+# workflow's declared step order: a `node_started` + `node_completed`
+# event pair per step that runs (skipped steps appear as `node_skipped`).
+# That's the parity bar — both paths must visit every declared step that
+# the executor visits, with the same materialised output names.
+#
+# Order 8 (development.classic) lands in commit 3 with its own
+# decomposition-aware test; it is NOT covered here.
+# ---------------------------------------------------------------------------
+
+
+def _canned_for_step_outputs(graph, overrides=None):
+    """Build canned outputs that satisfy every declared OutputRef on the
+    workflow's nodes. Each output gets a placeholder string keyed by its
+    declared name; structural OutputRef shape is what the parity bar
+    cares about, not specific values. ``overrides`` lets callers inject
+    real values for routing-relevant fields (e.g. metric_signal)."""
+
+    overrides = overrides or {}
+    canned: dict[str, dict[str, Any]] = {}
+    for step_id, node in graph.nodes.items():
+        canned[step_id] = {
+            o.name: f"<<{step_id}.{o.name}>>" for o in node.outputs
+        }
+        if step_id in overrides:
+            canned[step_id].update(overrides[step_id])
+    return canned
+
+
+_PER_ORDER_CONTEXTS = {
+    "code-review": {"diff_content": "<<diff>>"},
+    "performance-audit": {"implementation_artifacts": "<<artifacts>>"},
+    "test-swarm": {"story_spec": "<<spec>>", "baseline_path": "/tmp/baseline"},
+    "development.tdd": {"story_spec": "<<spec>>"},
+    "development.bdd": {"story_spec": "<<spec>>"},
+    "development.tdd-codex": {"story_spec": "<<spec>>"},
+    "ui-design": {"story_spec": "<<spec>>"},
+    "design-review": {"design_artifacts": "<<artifacts>>"},
+}
+
+
+@pytest.mark.parametrize(
+    "workflow_slug",
+    [
+        "code-review",          # Order 2
+        "performance-audit",    # Order 3
+        "test-swarm",           # Order 4
+        "development.tdd",      # Order 5
+        "development.bdd",      # Order 6
+        "development.tdd-codex",  # Order 6 (cross-model partner)
+        "ui-design",            # Order 7
+        "design-review",        # Order 7
+    ],
+)
+def test_per_order_parity_event_set_matches_declared_steps(workflow_slug):
+    """Per-Order parity bar: every declared step in the workflow
+    produces a ``node_completed`` event under the executor; materialised
+    outputs match the declared OutputRef names. The orchestrator-narrated
+    path's expected trace is the workflow's own declaration — that's the
+    structural-equality contract."""
+
+    fixture = WORKFLOWS / f"{workflow_slug}.workflow.yaml"
+    graph = load_workflow(fixture)
+    run_id = make_run_id(workflow_slug)
+    canned = _canned_for_step_outputs(graph)
+
+    spy = StubAgentSpawn(canned_outputs=canned)
+    dispatcher = Dispatcher()
+    dispatcher.register(NodeType.AGENT, AgentHandler(spawn=spy).handle)
+    tel = Telemetry(run_id=run_id)
+
+    materialised = Walker().walk(
+        graph,
+        dispatcher,
+        run_id,
+        tel,
+        context=_PER_ORDER_CONTEXTS[workflow_slug],
+    )
+
+    # Every declared step ran (no when:/skip_when in any of these
+    # production-grade workflows on the happy path).
+    completed_ids = {
+        e["step_id"] for e in tel.events if e["event_type"] == "node_completed"
+    }
+    assert completed_ids == set(graph.nodes.keys()), (
+        f"{workflow_slug}: completed-event set must equal declared step set"
+    )
+
+    # Materialised outputs match declared OutputRef names step-for-step.
+    for step_id, node in graph.nodes.items():
+        declared = sorted(o.name for o in node.outputs)
+        actual = sorted(materialised[step_id].outputs.keys())
+        assert actual == declared, (
+            f"{workflow_slug}/{step_id}: declared {declared}, "
+            f"materialised {actual}"
+        )
+
+    # Observability invariant: every event carries the run_id (the
+    # parity-bar normalisation strips it, but we still require it
+    # present — the strip is for comparison, not absence).
+    for event in tel.events:
+        assert event["run_id"] == run_id
+
+
+# ---------------------------------------------------------------------------
+# Order 6 — tdd-codex cross-model assertion (Darwin only)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin",
+    reason="tdd-codex relies on the macOS-only Codex/cmux pane; Linux CI skips",
+)
+def test_tdd_codex_runs_under_executor_with_codex_step():
+    """Smoke: the cross-model TDD workflow walks to completion when the
+    Codex step is present. The walker treats `backend: codex` as an
+    additive field (loader passes it through), so the executor-path
+    parity is unchanged from a same-model run on Darwin."""
+
+    fixture = WORKFLOWS / "development.tdd-codex.workflow.yaml"
+    graph = load_workflow(fixture)
+    run_id = make_run_id("development.tdd-codex")
+    canned = _canned_for_step_outputs(graph)
+
+    spy = StubAgentSpawn(canned_outputs=canned)
+    dispatcher = Dispatcher()
+    dispatcher.register(NodeType.AGENT, AgentHandler(spawn=spy).handle)
+    tel = Telemetry(run_id=run_id)
+
+    materialised = Walker().walk(
+        graph,
+        dispatcher,
+        run_id,
+        tel,
+        context={"story_spec": "<<spec>>"},
+    )
+    assert set(materialised.keys()) == set(graph.nodes.keys())
+
+
+# ---------------------------------------------------------------------------
+# Per-workflow rollback regression
+# ---------------------------------------------------------------------------
+
+
+def test_per_workflow_rollback_only_affects_named_workflow(tmp_path: Path):
+    """Removing a workflow from the registry rolls back ONLY that
+    workflow. The other graduated workflows continue to take the
+    executor path. Regression for the per-workflow rollback granularity
+    invariant locked at hde-9b."""
+
+    from hive.lib.dag_executor import (
+        CONSUMER_CONFIG_PATH,
+        GRADUATED_REGISTRY_PATH,
+        executor_enabled_for,
+    )
+
+    config_path = tmp_path / CONSUMER_CONFIG_PATH
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "executor: hive-dag\nexecutor_default: on\n",
+        encoding="utf-8",
+    )
+    registry_path = tmp_path / GRADUATED_REGISTRY_PATH
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # All Orders 1-7 + 9 graduated.
+    full = [
+        "meta-team-cycle",
+        "code-review",
+        "performance-audit",
+        "test-swarm",
+        "development.tdd",
+        "development.bdd",
+        "development.tdd-codex",
+        "ui-design",
+        "design-review",
+        "daily-ceremony",
+    ]
+    registry_path.write_text(
+        "workflows:\n" + "".join(f"  - {w}\n" for w in full),
+        encoding="utf-8",
+    )
+    for w in full:
+        assert executor_enabled_for(w, tmp_path) is True
+
+    # Roll back ONLY test-swarm.
+    rolled = [w for w in full if w != "test-swarm"]
+    registry_path.write_text(
+        "workflows:\n" + "".join(f"  - {w}\n" for w in rolled),
+        encoding="utf-8",
+    )
+    assert executor_enabled_for("test-swarm", tmp_path) is False
+    for w in rolled:
+        assert executor_enabled_for(w, tmp_path) is True, (
+            f"per-workflow rollback contaminated {w!r}"
+        )
