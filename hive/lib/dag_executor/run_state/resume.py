@@ -80,6 +80,11 @@ def resume_run(
 
     state = load(run_id, root=runs_root)
     _validate_resumable(state)
+    if state.workflow_slug and graph.workflow_name != state.workflow_slug:
+        raise ResumeFromInvalidStateError(
+            f"run {run_id!r} belongs to workflow {state.workflow_slug!r}, "
+            f"not {graph.workflow_name!r}"
+        )
     state = unfreeze_for_resume(state)  # sole sanctioned freeze bypass
 
     # Walker drives the replay; it consults `state` for already-completed

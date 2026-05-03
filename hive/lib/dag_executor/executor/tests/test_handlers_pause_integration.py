@@ -44,29 +44,39 @@ def _stub_developer(node, inputs, run_id):
 
 
 def _drop_approve_after_delay(runs_root: Path, run_id: str, node_id: str, delay: float = 0.3):
+    exc: list[BaseException] = []
+
     def _runner():
-        time.sleep(delay)
-        token = generate(run_id, node_id, runs_root)
-        path = runs_root / run_id / "pause" / f"{node_id}.approve"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(token, encoding="utf-8")
+        try:
+            time.sleep(delay)
+            token = generate(run_id, node_id, runs_root)
+            path = runs_root / run_id / "pause" / f"{node_id}.approve"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(token, encoding="utf-8")
+        except BaseException as e:  # capture so the test can surface it
+            exc.append(e)
 
     thread = threading.Thread(target=_runner, daemon=True)
     thread.start()
-    return thread
+    return thread, exc
 
 
 def _drop_reject_after_delay(runs_root: Path, run_id: str, node_id: str, reason: str, delay: float = 0.3):
+    exc: list[BaseException] = []
+
     def _runner():
-        time.sleep(delay)
-        token = generate(run_id, node_id, runs_root)
-        path = runs_root / run_id / "pause" / f"{node_id}.reject"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f"{token}\n\n{reason}", encoding="utf-8")
+        try:
+            time.sleep(delay)
+            token = generate(run_id, node_id, runs_root)
+            path = runs_root / run_id / "pause" / f"{node_id}.reject"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f"{token}\n\n{reason}", encoding="utf-8")
+        except BaseException as e:
+            exc.append(e)
 
     thread = threading.Thread(target=_runner, daemon=True)
     thread.start()
-    return thread
+    return thread, exc
 
 
 def test_pause_workflow_resumes_on_approve(tmp_path: Path):
@@ -81,7 +91,7 @@ def test_pause_workflow_resumes_on_approve(tmp_path: Path):
             NodeType.PAUSE: handler.handle,
         }
     )
-    _drop_approve_after_delay(runs_root, rid, "human_approval", delay=0.15)
+    _, drop_exc = _drop_approve_after_delay(runs_root, rid, "human_approval", delay=0.15)
 
     materialised = Walker().walk(
         graph=graph,
@@ -89,6 +99,7 @@ def test_pause_workflow_resumes_on_approve(tmp_path: Path):
         run_id=rid,
         telemetry=tel,
     )
+    assert not drop_exc, drop_exc[0]
     assert "post_pause" in materialised
     assert materialised["post_pause"].outputs["marker"] == "out-post_pause"
     suspended_events = [e for e in tel.events if e["event_type"] == "pause_suspended"]
@@ -119,16 +130,37 @@ def test_pause_run_state_transitions_suspended_then_running(tmp_path: Path):
     )
 
     captured_status: dict[str, RunStatus] = {}
+    capture_exc: list[BaseException] = []
+    sentinel_written = threading.Event()
 
     def _capture_when_pause_handler_runs():
-        # Wait briefly for pause handler to set SUSPENDED, then snapshot.
-        time.sleep(0.1)
-        snapshot = load(rid, root=state_root)
-        captured_status["mid_pause"] = snapshot.status
-        token = generate(rid, "human_approval", runs_root)
-        path = runs_root / rid / "pause" / "human_approval.approve"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(token, encoding="utf-8")
+        try:
+            state_file = state_root / rid / "run_state.yaml"
+            # Wait for run_state to exist AND reach SUSPENDED before snapshot.
+            deadline = time.monotonic() + 5.0
+            while time.monotonic() < deadline:
+                if state_file.exists():
+                    snapshot = load(rid, root=state_root)
+                    if snapshot.status == RunStatus.SUSPENDED:
+                        captured_status["mid_pause"] = snapshot.status
+                        break
+                time.sleep(0.02)
+            else:
+                # Deadline elapsed — record whatever we last saw (or None) so
+                # the assertion below fails with a useful message.
+                captured_status.setdefault("mid_pause", None)
+        except BaseException as e:
+            capture_exc.append(e)
+        finally:
+            # ALWAYS drop the sentinel so the walker is not left waiting.
+            try:
+                token = generate(rid, "human_approval", runs_root)
+                path = runs_root / rid / "pause" / "human_approval.approve"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(token, encoding="utf-8")
+            except BaseException as e:
+                capture_exc.append(e)
+            sentinel_written.set()
 
     threading.Thread(target=_capture_when_pause_handler_runs, daemon=True).start()
 
@@ -139,6 +171,8 @@ def test_pause_run_state_transitions_suspended_then_running(tmp_path: Path):
         telemetry=tel,
         run_state_path=state_root,
     )
+    sentinel_written.wait(timeout=10.0)
+    assert not capture_exc, capture_exc[0]
     assert captured_status["mid_pause"] == RunStatus.SUSPENDED
     final = load(rid, root=state_root)
     assert final.status == RunStatus.COMPLETED
@@ -162,7 +196,7 @@ def test_pause_run_state_marks_failed_on_reject(tmp_path: Path):
             NodeType.PAUSE: handler.handle,
         }
     )
-    _drop_reject_after_delay(
+    _, drop_exc = _drop_reject_after_delay(
         runs_root, rid, "human_approval", "operator decided no", delay=0.15
     )
 
@@ -174,6 +208,7 @@ def test_pause_run_state_marks_failed_on_reject(tmp_path: Path):
             telemetry=tel,
             run_state_path=state_root,
         )
+    assert not drop_exc, drop_exc[0]
     final = load(rid, root=state_root)
     assert final.status == RunStatus.FAILED
     assert final.failure_info is not None
@@ -192,7 +227,7 @@ def test_pause_workflow_fails_on_reject(tmp_path: Path):
             NodeType.PAUSE: handler.handle,
         }
     )
-    _drop_reject_after_delay(
+    _, drop_exc = _drop_reject_after_delay(
         runs_root, rid, "human_approval", "operator decided no", delay=0.15
     )
 
@@ -203,6 +238,7 @@ def test_pause_workflow_fails_on_reject(tmp_path: Path):
             run_id=rid,
             telemetry=tel,
         )
+    assert not drop_exc, drop_exc[0]
     assert "operator decided no" in str(exc.value)
     rejected_events = [e for e in tel.events if e["event_type"] == "pause_rejected"]
     assert len(rejected_events) == 1

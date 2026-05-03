@@ -105,7 +105,14 @@ def _resolve_one(
             )
         if binding.output_name is None:
             return upstream.outputs
-        return upstream.outputs.get(binding.output_name)
+        if binding.output_name in upstream.outputs:
+            return upstream.outputs[binding.output_name]
+        if binding.optional:
+            return None
+        raise HandlerError(
+            f"input {binding.name!r} requires output {binding.output_name!r} "
+            f"from {binding.step_id!r}, but that output was not produced"
+        )
     return None
 
 
@@ -288,7 +295,6 @@ class Walker:
         from hive.lib.dag_executor.run_state import (
             NodeStatus,
             mark_completed,
-            mark_failed,
             save,
             set_last_successful_node,
             set_node_output,
@@ -324,23 +330,61 @@ class Walker:
             telemetry.emit("node_started", node.id, {"replay": True})
             state = set_node_status(state, node_id, NodeStatus.RUNNING)
             save(state, root=runs_root)
+
+            is_pause = _is_pause_node(node)
+            if is_pause:
+                state = _record_pause_suspended(state)
+                save(state, root=runs_root)
+
             try:
                 output = dispatcher.dispatch(node, inputs, run_id)
+            except HandlerError as exc:
+                if node.optional:
+                    telemetry.emit(
+                        "node_failed",
+                        node.id,
+                        {"optional": True, "error": str(exc), "replay": True},
+                    )
+                    materialised[node_id] = NodeOutput(
+                        outputs={}, meta={"optional_failure": str(exc)}
+                    )
+                    state = _record_optional_failure(state, node_id)
+                    save(state, root=runs_root)
+                    continue
+                telemetry.emit(
+                    "node_failed",
+                    node.id,
+                    {"optional": False, "error": str(exc), "replay": True},
+                )
+                state = _record_failure(
+                    state,
+                    node_id,
+                    {"node_id": node_id, "error_class": type(exc).__name__, "message": str(exc)},
+                )
+                save(state, root=runs_root)
+                raise
             except Exception as exc:
                 telemetry.emit(
                     "node_failed",
                     node.id,
                     {"optional": bool(node.optional), "error": str(exc), "replay": True},
                 )
-                state = set_node_status(state, node_id, NodeStatus.FAILED)
-                state = mark_failed(
+                state = _record_failure(
                     state,
+                    node_id,
                     {"node_id": node_id, "error_class": type(exc).__name__, "message": str(exc)},
                 )
                 save(state, root=runs_root)
+                if node.optional:
+                    raise WalkerOptionalStepFailure(
+                        f"optional node {node.id!r} raised non-handler exception: {exc}"
+                    ) from exc
                 raise
 
             materialised[node_id] = output
+            if is_pause:
+                state = _record_pause_resumed(state)
+                save(state, root=runs_root)
             telemetry.emit(
                 "node_completed",
                 node.id,
@@ -464,8 +508,13 @@ def _record_completion(state, node_id: str, output: NodeOutput):
 def _record_optional_failure(state, node_id: str):
     if state is None:
         return None
-    from hive.lib.dag_executor.run_state import NodeStatus, set_node_status
+    from hive.lib.dag_executor.run_state import (
+        NodeStatus,
+        set_node_output,
+        set_node_status,
+    )
 
+    state = set_node_output(state, node_id, {})
     return set_node_status(state, node_id, NodeStatus.FAILED)
 
 

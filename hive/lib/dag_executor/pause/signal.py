@@ -48,14 +48,11 @@ class SignalResult:
 
 
 def _ensure_pause_dir(run_id: str, runs_root: Path) -> Path:
+    import os
+
     base = runs_root / run_id / "pause"
     base.mkdir(parents=True, exist_ok=True)
-    try:
-        import os
-
-        os.chmod(base, 0o700)
-    except OSError:
-        pass
+    os.chmod(base, 0o700)
     return base
 
 

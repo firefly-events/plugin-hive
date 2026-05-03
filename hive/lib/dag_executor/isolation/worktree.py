@@ -113,11 +113,15 @@ class WorktreeManager:
             raise WorktreeCollisionError(
                 f"worktree path already exists: {target} (clobbering prior run not allowed)"
             )
-        # Parent must exist for git worktree add; symlink check applies to parent too.
+        # Parent must exist for git worktree add. Check EVERY existing
+        # ancestor: mkdir(parents=True) would traverse a symlinked
+        # intermediate component before the parent-only check fires.
+        # target.parents iterates immediate parent → root.
         parent = target.parent
-        if parent.exists():
-            _check_no_symlink_contamination(parent)
-        else:
+        for ancestor in target.parents:
+            if ancestor.exists():
+                _check_no_symlink_contamination(ancestor)
+        if not parent.exists():
             parent.mkdir(parents=True, exist_ok=True)
 
         args = ["worktree", "add", "--detach", str(target)]
