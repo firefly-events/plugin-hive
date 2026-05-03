@@ -44,6 +44,12 @@ state/
 # repo doubles as the canonical consumer for plugin-hive itself; consumers of
 # the plugin choose whether to commit their own .pHive/hive.config.yaml.
 !.pHive/hive.config.yaml
+# Consumer-side per-workflow graduation registry (hde-9b). Same maintainer-
+# as-canonical-consumer rationale as the flag above; other content under
+# .pHive/runtime/ stays ignored.
+!.pHive/runtime/
+.pHive/runtime/*
+!.pHive/runtime/executor-graduated-workflows.yaml
 agents/memories/
 .claude/settings.local.json
 .history/

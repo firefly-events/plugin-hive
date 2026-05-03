@@ -16,6 +16,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SHIPPED_CONFIG = REPO_ROOT / "hive" / "hive.config.yaml"
+SHIPPED_REGISTRY = REPO_ROOT / "hive" / "runtime" / "executor-graduated-workflows.yaml"
 
 
 def test_shipped_config_exists() -> None:
@@ -38,4 +39,20 @@ def test_shipped_config_has_no_top_level_executor_key() -> None:
         f"hive/hive.config.yaml contains top-level 'executor:' key — this is "
         f"the eefbff3 accidental-ship pattern (Q4 lock). Move the key to "
         f"`.pHive/hive.config.yaml` (consumer-side). Found {len(matches)} match(es)."
+    )
+
+
+def test_no_shipped_graduation_registry() -> None:
+    """The hde-9b extension of the Q4 lock: the per-workflow graduation
+    registry is consumer-side ONLY (`.pHive/runtime/executor-graduated-
+    workflows.yaml`). A registry under `hive/runtime/` would ship globally
+    to every consumer, defeating per-workflow opt-in. Mirrors the
+    `config-guard` CI job so local pytest catches the regression too.
+    """
+
+    assert not SHIPPED_REGISTRY.exists(), (
+        f"shipped tree contains a graduation registry at {SHIPPED_REGISTRY} — "
+        "this is the hde-9b lock violation. The registry is consumer-side at "
+        "`.pHive/runtime/executor-graduated-workflows.yaml` so graduation "
+        "events do NOT ship to other consumers."
     )

@@ -1,0 +1,12 @@
+# Per-workflow executor graduation registry.
+# Workflows listed here run under the executor when
+# `.pHive/hive.config.yaml` has `executor_default: true` (or unquoted
+# YAML 1.1 `on`). Workflows are added during cutover events per the
+# locked Order 1-9 sequence (see structured-outline §3).
+#
+# Schema (canonical, matches hde-9a wrapper at
+# `hive/lib/dag_executor/__init__.py::_load_graduated_registry`):
+# top-level `workflows:` list of workflow-name strings. Missing file
+# OR malformed shape → empty list, default-safe orchestrator path.
+# Per-workflow rollback: removing a name rolls back ONLY that workflow.
+workflows: []
