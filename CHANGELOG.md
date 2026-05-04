@@ -9,6 +9,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-04
+
 ### Added
 - **Hive DAG executor v1 — cutover complete.** The deterministic DAG
   executor (`hive/lib/dag_executor/`) graduates from optional opt-in to
