@@ -185,6 +185,22 @@ def test_test_swarm_parity_node_completed_set_matches_workflow_steps():
     }
     assert completed_ids == set(graph.nodes.keys())
 
+    # Barrier-join ordering: `file-bugs` consumes both platform branches,
+    # so it MUST complete strictly after both `execute-platform-a` and
+    # `execute-platform-b`. Without this assertion a scheduler that
+    # violates the wave barrier (e.g. dispatches `file-bugs` before its
+    # upstreams finish) would still pass the set-equality check above.
+    completion_index: dict[str, int] = {}
+    for i, e in enumerate(tel.events):
+        if e["event_type"] == "node_completed":
+            completion_index[e["step_id"]] = i
+    for upstream in ("execute-platform-a", "execute-platform-b"):
+        assert completion_index["file-bugs"] > completion_index[upstream], (
+            f"barrier-join violation: file-bugs completed at index "
+            f"{completion_index['file-bugs']} but {upstream} completed at "
+            f"index {completion_index[upstream]} — wave barrier did not hold"
+        )
+
 
 def test_test_swarm_every_event_carries_run_id():
     """Observability lock survives parallel dispatch: NO emit path

@@ -128,25 +128,54 @@ def test_numeric_comparison_works_for_int_and_float():
     assert evaluate(parse("$b.output.n > 7"), graph) is True
 
 
-def test_short_circuit_and():
+def test_short_circuit_and(monkeypatch):
     """``False && <missing>`` short-circuits to False without evaluating
     the right side, so a missing-field RHS does not even get looked up.
+
+    Detection: monkeypatch the dotpath resolver to flip a flag if it is
+    asked for node ``b``. A regression that turns short-circuit into
+    eager evaluation raises through this path, failing the test.
     """
+
+    from hive.lib.dag_executor.routing import evaluator as ev_mod
+
+    rhs_touched = {"called": False}
+    real_resolve = ev_mod._resolve_dotpath
+
+    def spy_resolve(path, output_graph):
+        if path.node_id == "b":
+            rhs_touched["called"] = True
+            raise AssertionError("RHS resolved despite short-circuit")
+        return real_resolve(path, output_graph)
+
+    monkeypatch.setattr(ev_mod, "_resolve_dotpath", spy_resolve)
 
     graph = {"a": {"output": {"x": False}}}
     ast = parse("$a.output.x == true && $b.output.y == true")
-    # Right-hand side references node `b` which doesn't exist; with
-    # short-circuit, evaluator never resolves it. Either way we expect
-    # False (short-circuit OR fail-closed both produce False).
     assert evaluate(ast, graph) is False
+    assert rhs_touched["called"] is False
 
 
-def test_short_circuit_or():
+def test_short_circuit_or(monkeypatch):
     """``True || <missing>`` short-circuits to True without evaluating RHS."""
+
+    from hive.lib.dag_executor.routing import evaluator as ev_mod
+
+    rhs_touched = {"called": False}
+    real_resolve = ev_mod._resolve_dotpath
+
+    def spy_resolve(path, output_graph):
+        if path.node_id == "ghost":
+            rhs_touched["called"] = True
+            raise AssertionError("RHS resolved despite short-circuit")
+        return real_resolve(path, output_graph)
+
+    monkeypatch.setattr(ev_mod, "_resolve_dotpath", spy_resolve)
 
     graph = {"a": {"output": {"x": True}}}
     ast = parse("$a.output.x == true || $ghost.output.y == true")
     assert evaluate(ast, graph) is True
+    assert rhs_touched["called"] is False
 
 
 def test_combined_and_or_evaluation():

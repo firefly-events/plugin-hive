@@ -82,6 +82,31 @@ def _wait_until(predicate, timeout=2.0, poll=0.02):
     return predicate()
 
 
+def _wait_for_pause_token(tel: Telemetry, step_id: str, timeout: float = 5.0) -> str:
+    """Block until ``pause_suspended`` for ``step_id`` lands and return its
+    token. Asserts on timeout so a stuck operator thread surfaces as a
+    test failure rather than a silent hang on Walker().walk()."""
+
+    ready = _wait_until(
+        lambda: any(
+            e["event_type"] == "pause_suspended" and e["step_id"] == step_id
+            for e in tel.events
+        ),
+        timeout=timeout,
+    )
+    assert ready, f"timed out waiting for pause_suspended event for {step_id!r}"
+    for e in tel.events:
+        if e["event_type"] == "pause_suspended" and e["step_id"] == step_id:
+            token = e.get("payload", {}).get("token")
+            assert token, (
+                f"pause_suspended payload missing token for {step_id!r}: {e}"
+            )
+            return token
+    raise AssertionError(
+        f"pause_suspended event vanished between wait and read for {step_id!r}"
+    )
+
+
 def test_plan_approval_pause_node_replaces_prose_gate():
     """Structural assertion: the workflow ships a ``node_type: pause``
     node at the planning→execution boundary. The prose
@@ -111,33 +136,20 @@ def test_plan_approval_resumes_when_approve_sentinel_written(tmp_path: Path):
     tel = Telemetry(run_id=run_id)
     dispatcher = _build_dispatcher(_all_nodes_canned(graph), runs_root, tel)
 
-    suspended_payload: dict[str, Any] = {}
-
     def operator():
         # Wait for the pause_suspended event to land in telemetry, then
         # write the approve sentinel with the signed token from it.
-        _wait_until(
-            lambda: any(
-                e["event_type"] == "pause_suspended"
-                and e["step_id"] == "plan-approval"
-                for e in tel.events
-            ),
-            timeout=2.0,
-        )
-        for e in tel.events:
-            if e["event_type"] == "pause_suspended" and e["step_id"] == "plan-approval":
-                suspended_payload.update(e["payload"])
-                break
-        token = suspended_payload["token"]
+        token = _wait_for_pause_token(tel, "plan-approval")
         sentinel_dir = runs_root / run_id / "pause"
         sentinel_dir.mkdir(parents=True, exist_ok=True)
         (sentinel_dir / "plan-approval.approve").write_text(token, encoding="utf-8")
 
-    op_thread = threading.Thread(target=operator, daemon=True)
+    op_thread = threading.Thread(target=operator, daemon=False)
     op_thread.start()
 
     materialised = Walker().walk(graph, dispatcher, run_id, tel)
-    op_thread.join(timeout=2.0)
+    op_thread.join(timeout=5.0)
+    assert not op_thread.is_alive(), "operator thread did not finish"
 
     assert "plan-approval" in materialised
     assert materialised["plan-approval"].outputs.get("paused") is True
@@ -167,18 +179,7 @@ def test_plan_approval_fails_cleanly_when_reject_sentinel_written(tmp_path: Path
     dispatcher = _build_dispatcher(_all_nodes_canned(graph), runs_root, tel)
 
     def operator():
-        _wait_until(
-            lambda: any(
-                e["event_type"] == "pause_suspended"
-                and e["step_id"] == "plan-approval"
-                for e in tel.events
-            ),
-            timeout=2.0,
-        )
-        for e in tel.events:
-            if e["event_type"] == "pause_suspended" and e["step_id"] == "plan-approval":
-                token = e["payload"]["token"]
-                break
+        token = _wait_for_pause_token(tel, "plan-approval")
         sentinel_dir = runs_root / run_id / "pause"
         sentinel_dir.mkdir(parents=True, exist_ok=True)
         # Sentinel format: line 1 = token; blank line; reason.
@@ -187,7 +188,7 @@ def test_plan_approval_fails_cleanly_when_reject_sentinel_written(tmp_path: Path
             encoding="utf-8",
         )
 
-    op_thread = threading.Thread(target=operator, daemon=True)
+    op_thread = threading.Thread(target=operator, daemon=False)
     op_thread.start()
 
     # Walker tolerates the rejection: it raises PauseRejectedError into
@@ -201,7 +202,8 @@ def test_plan_approval_fails_cleanly_when_reject_sentinel_written(tmp_path: Path
         # the rejection-clean-fail contract — what matters is that the
         # rejection telemetry landed and downstream did not run.
         pass
-    op_thread.join(timeout=2.0)
+    op_thread.join(timeout=5.0)
+    assert not op_thread.is_alive(), "operator thread did not finish"
 
     rejected = [
         e for e in tel.events

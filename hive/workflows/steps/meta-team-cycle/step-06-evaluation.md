@@ -136,7 +136,7 @@ silent renames will fail-close downstream routing — see
 
 ### 3. Aggregate results
 - Count: passed, needs_optimization, needs_revision (per-change `change_verdict`)
-- Overall `cycle_verdict`: `passed` if ≥ 70% of changes are passed or needs_optimization; `partial` if 40–70%; `poor` if < 40%
+- Overall `cycle_verdict`: `passed` if ≥ 70% of changes are passed or needs_optimization; `partial` if ≥ 40% AND < 70%; `poor` if < 40% (boundaries are non-overlapping; exactly 70% is `passed`, exactly 40% is `partial`)
 - Cycle-level value space (`passed | partial | poor`) is distinct from change-level (`passed | needs_optimization | needs_revision`); bind predicates by explicit field name (see OUTPUT FORMAT above)
 
 ### 4. Bind compare output to metrics_snapshot (BL2.3)

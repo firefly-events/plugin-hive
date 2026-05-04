@@ -211,8 +211,13 @@ class ParallelScheduler:
             futures: dict[Future, str] = {}
             for node_id in ready_node_ids:
                 node = graph.nodes[node_id]
-                inputs = resolve_inputs(node)
-                fut = pool.submit(_run_one, node, inputs, dispatcher, run_id)
+                fut = pool.submit(
+                    _run_one_with_resolve,
+                    node,
+                    dispatcher,
+                    run_id,
+                    resolve_inputs,
+                )
                 futures[fut] = node_id
 
             # Per-step timeout_ms is enforced per-future via .result().
@@ -245,6 +250,28 @@ class ParallelScheduler:
                     )
 
         return results
+
+
+def _run_one_with_resolve(
+    node: Any,
+    dispatcher: DispatchCallable,
+    run_id: str,
+    resolve_inputs: Callable[[Any], dict[str, Any]],
+) -> ScheduleResult:
+    """Resolve inputs inside the worker so a failed resolution on one
+    branch is captured as a per-node skip without aborting siblings.
+    """
+
+    try:
+        inputs = resolve_inputs(node)
+    except BaseException as exc:  # noqa: BLE001 — siblings must survive
+        return ScheduleResult(
+            node_id=node.id,
+            status="skipped",
+            error=exc,
+            skip_reason="input_resolution_error",
+        )
+    return _run_one(node, inputs, dispatcher, run_id)
 
 
 def _run_one(

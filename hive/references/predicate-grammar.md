@@ -108,11 +108,19 @@ The same step typically also publishes `$step.output.cycle_verdict`
 (loop-level decision) and the two are NOT interchangeable. Always pick
 the specific name; never rely on a generic `verdict`.
 
+`change_verdict` is a string-valued field (`"approve"`, `"reject"`,
+`"needs_changes"`, …). Compare against the literal string, never a
+boolean. A `bool == string` comparison is fail-closed False under
+strict-equality rules and would silently never route.
+
 ```yaml
-# Correct
+# Correct — string equality against the documented value
+when: "$verifier.output.change_verdict == \"approve\""
+
+# Wrong — bool vs string, fail-closed False every time
 when: "$verifier.output.change_verdict == true"
 
-# Wrong — fail-closed False every time
+# Wrong — bare `verdict` is not a defined field
 when: "$verifier.output.verdict == true"
 ```
 

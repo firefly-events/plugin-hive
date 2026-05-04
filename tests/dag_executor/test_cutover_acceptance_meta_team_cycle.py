@@ -73,8 +73,9 @@ def test_meta_team_cycle_listed_in_canonical_registry() -> None:
     )
     workflows = parsed.get("workflows")
     assert isinstance(workflows, list), "`workflows:` must be a list"
-    assert "meta-team-cycle" in workflows, (
-        "Order 1 acceptance: meta-team-cycle must be the first graduation"
+    assert workflows and workflows[0] == "meta-team-cycle", (
+        "Order 1 acceptance: meta-team-cycle must be the FIRST graduation "
+        f"(got {workflows[0] if workflows else 'empty list'!r})"
     )
 
 

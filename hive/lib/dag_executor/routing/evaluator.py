@@ -60,6 +60,11 @@ def _resolve_dotpath(path: DotPath, output_graph: dict[str, Any]) -> Any:
             f"node id {path.node_id!r} has no recorded output"
         )
     cursor: Any = output_graph[path.node_id]
+    if not path.field_path or path.field_path[0] != "output":
+        raise PredicateEvalError(
+            f"dot-path must start with 'output': "
+            f"${path.node_id}.{'.'.join(path.field_path)}"
+        )
     for seg in path.field_path:
         if not isinstance(cursor, dict) or seg not in cursor:
             raise PredicateEvalError(

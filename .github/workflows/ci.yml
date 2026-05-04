@@ -37,7 +37,7 @@ jobs:
         # NOT land in the shipped baseline. The consumer-side equivalent lives
         # at .pHive/hive.config.yaml per the hde-9a / Q4 user-gate lock.
         run: |
-          if grep -nE '^[[:space:]]*executor:' hive/hive.config.yaml; then
+          if grep -nE '^executor:' hive/hive.config.yaml; then
             echo "::error file=hive/hive.config.yaml::shipped baseline must not contain top-level 'executor:' key (hde-9a Q4 lock; consumer-side flag belongs in .pHive/hive.config.yaml)"
             exit 1
           fi

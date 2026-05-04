@@ -63,7 +63,7 @@ See `hive/references/wiki-compilation-guide.md` for wiki compilation procedure a
 
 Hive runs workflows two ways. The DEFAULT is the orchestrator-narrated path: this session reads the workflow YAML, interprets routing decisions in prose, and dispatches step-by-step.
 
-The OPTIONAL path is the **DAG executor** (`hive/lib/dag_executor/`): a runtime that calls LLMs only at agent nodes; everything else (routing predicates, parallel waves, pause gates, run-state, worktree isolation, tool gating) is mechanical. Workflows opt in per-consumer via `.pHive/hive.config.yaml` AND per-workflow via the graduation registry at `.pHive/runtime/executor-graduated-workflows.yaml`. See `hive/GUIDE.md#hive-dag-executor` for the public-facing summary and `hive/decisions/001-executor-cutover.md` for the rollout history + migration guide.
+The OPTIONAL path is the **DAG executor** (`hive/lib/dag_executor/`): a runtime that calls LLMs only at agent nodes; everything else (routing predicates, parallel waves, pause gates, run-state, worktree isolation, tool gating) is mechanical. Workflows opt in per-consumer via `.pHive/hive.config.yaml` AND per-workflow via the graduation registry at `.pHive/runtime/executor-graduated-workflows.yaml`. See `hive/GUIDE.md#hive-dag-executor-optional-per-workflow-opt-in` for the public-facing summary and `hive/decisions/001-executor-cutover.md` for the rollout history + migration guide.
 
 ## Key References
 

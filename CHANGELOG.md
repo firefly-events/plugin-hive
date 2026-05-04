@@ -12,12 +12,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 - **Hive DAG executor v1 — cutover complete.** The deterministic DAG
   executor (`hive/lib/dag_executor/`) graduates from optional opt-in to
-  the target runtime for workflows. 9 of 9 built-in workflows are now
+  the target runtime for workflows. 11 of 11 built-in workflows are now
   in the per-workflow graduation registry at
   `.pHive/runtime/executor-graduated-workflows.yaml`:
   `meta-team-cycle`, `code-review`, `performance-audit`, `test-swarm`,
   `development.tdd`, `development.bdd`, `development.tdd-codex`,
-  `ui-design`, `design-review`, `daily-ceremony`. Workflows opt in via
+  `ui-design`, `design-review`, `development.classic`, `daily-ceremony`.
+  Workflows opt in via
   `executor: hive-dag` + `executor_default: true` in
   `.pHive/hive.config.yaml`; default OFF posture preserved for
   consumers that don't flip the flag.

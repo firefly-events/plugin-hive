@@ -62,14 +62,17 @@ def test_doc_encodes_and_of_empty_rule(doc: Path):
 
     text = doc.read_text(encoding="utf-8")
     has_label = "AND-of-empty" in text
-    # Concrete predicate form — analysis output dotpath OR/AND wiring.
-    has_predicate_or = (
-        "$analysis.output.findings_count > 0"
-        in text
-    )
-    has_predicate_and = (
-        "$analysis.output.findings_count == 0"
-        in text
+    # Concrete predicate form — require ALL canonical routing-field
+    # tokens, not a single fragment. A doc that mentions only
+    # `findings_count` has lost the three-input eligibility contract
+    # and is back in conflation territory.
+    has_canonical_predicate_terms = all(
+        token in text
+        for token in (
+            "$analysis.output.findings_count",
+            "$analysis.output.metric_signal",
+            "$external-research.output.external_candidates_count",
+        )
     )
     # The routing-target step files describe the rule in prose without
     # using the literal label; they must spell out the three-input
@@ -80,7 +83,7 @@ def test_doc_encodes_and_of_empty_rule(doc: Path):
         or "ANY of the three actionable" in text
         or "all three actionable inputs" in text
     )
-    assert has_label or has_predicate_or or has_predicate_and or has_prose_rule, (
+    assert has_label or has_canonical_predicate_terms or has_prose_rule, (
         f"{doc.relative_to(REPO_ROOT)} lost the AND-of-empty rule wording. "
         "Re-add the prose label, the concrete `when:` predicate, or the "
         "three-input eligibility prose. See "

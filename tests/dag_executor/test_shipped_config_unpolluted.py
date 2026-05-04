@@ -33,7 +33,7 @@ def test_shipped_config_has_no_top_level_executor_key() -> None:
     """
 
     text = SHIPPED_CONFIG.read_text(encoding="utf-8")
-    pattern = re.compile(r"^\s*executor:", re.MULTILINE)
+    pattern = re.compile(r"^executor:", re.MULTILINE)
     matches = pattern.findall(text)
     assert not matches, (
         f"hive/hive.config.yaml contains top-level 'executor:' key — this is "

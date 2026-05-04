@@ -110,8 +110,10 @@ def _load_graduated_registry(repo_root: Path) -> set[str]:
     raw = parsed.get("workflows")
     if not isinstance(raw, list):
         return set()
+    if not all(isinstance(item, str) and item for item in raw):
+        return set()
 
-    return {str(item) for item in raw if isinstance(item, (str, int))}
+    return set(raw)
 
 
 def is_workflow_graduated(
