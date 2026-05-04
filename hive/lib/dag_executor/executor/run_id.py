@@ -26,11 +26,18 @@ random with monotonic-within-ms incrementing.
 from __future__ import annotations
 
 import os
+import re
 import threading
 import time
 
 # Crockford's base32 alphabet — no I, L, O, U.
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+# Mirror of `_RUN_ID_PATTERN`'s slug clause in
+# `hive/lib/dag_executor/run_state/store.py`. Validating up-front in
+# `make_run_id` prevents generating a run_id that the persistence layer
+# would later reject.
+_WORKFLOW_SLUG_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 _lock = threading.Lock()
 _last_ms: int = 0
@@ -87,14 +94,9 @@ def make_run_id(workflow_slug: str) -> str:
     """
     if not isinstance(workflow_slug, str) or not workflow_slug.strip():
         raise ValueError("workflow_slug must be a non-empty string")
-    if (
-        "/" in workflow_slug
-        or "\\" in workflow_slug
-        or workflow_slug in {".", ".."}
-        or workflow_slug.startswith(".")
-    ):
+    if not _WORKFLOW_SLUG_PATTERN.fullmatch(workflow_slug):
         raise ValueError(
-            "workflow_slug must be filesystem-safe "
-            "(no '/', '\\\\', or leading dot)"
+            "workflow_slug must match [A-Za-z0-9][A-Za-z0-9_.-]* "
+            "(filesystem-safe; mirrors run_state.store._RUN_ID_PATTERN)"
         )
     return f"{new_ulid()}-{workflow_slug}"
