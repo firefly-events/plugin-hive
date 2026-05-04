@@ -1,0 +1,23 @@
+name: observability-team
+description: Specialist observability audit team — reviews telemetry contracts, event taxonomy, payload schemas, run_id propagation, and metrics emission patterns.
+lead: team-lead
+methodology: classic
+
+members:
+  - agent: observability-reviewer
+    role: Observability audit — review telemetry contracts, taxonomy, payload shape, run_id propagation, and metrics emission
+    domain:
+      - path: "**"
+        read: true
+        write: false
+        delete: false
+
+context:
+  notes: |
+    Specialist team invoked by the orchestrator when observability concerns are detected.
+    Read-only access — findings are reported, not auto-remediated.
+    Workflow deferred: observability-audit workflow ships in a follow-on.
+    Persona dependency: hive/agents/observability-reviewer.md does not exist yet and ships separately.
+
+workflow: ~
+team_memory_path: .pHive/team-memories/observability-team/

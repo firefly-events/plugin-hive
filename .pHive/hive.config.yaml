@@ -1,0 +1,18 @@
+# Consumer-side executor configuration.
+# NOT shipped via the plugin baseline — local to this consumer.
+# Q4 user-gate lock: maintainer-only flag stays out of shipped
+# `hive/hive.config.yaml` to avoid the eefbff3 accidental-ship
+# pattern (`project_config_shipping_deferred`).
+
+executor: hive-dag
+# Default OFF. Flip to `true` to opt this consumer into the executor
+# path; per-workflow gating still applies (graduation registry below).
+# yamllint enforces canonical `true`/`false` here; PyYAML 1.1 unquoted
+# `on`/`off` would round-trip as bools but fail repo lint. The reader
+# (`executor_enabled_for`) accepts both bool and string forms.
+executor_default: false
+
+# When `executor: hive-dag` AND `executor_default: true` AND a workflow
+# appears in `.pHive/runtime/executor-graduated-workflows.yaml`
+# (registry from hde-9b), `skills/execute` invokes the executor instead
+# of the orchestrator-narrated path.

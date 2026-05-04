@@ -25,3 +25,31 @@ jobs:
         with:
           file_or_dir: "."
           config_file: .yamllint.yml
+
+  config-guard:
+    name: Shipped config guard (hde-9a + hde-9b)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject `executor:` in shipped hive/hive.config.yaml
+        # Mechanical defense against the eefbff3 / project_config_shipping_deferred
+        # pattern: maintainer-only flags (like the hive-dag executor flag) must
+        # NOT land in the shipped baseline. The consumer-side equivalent lives
+        # at .pHive/hive.config.yaml per the hde-9a / Q4 user-gate lock.
+        run: |
+          if grep -nE '^executor:' hive/hive.config.yaml; then
+            echo "::error file=hive/hive.config.yaml::shipped baseline must not contain top-level 'executor:' key (hde-9a Q4 lock; consumer-side flag belongs in .pHive/hive.config.yaml)"
+            exit 1
+          fi
+      - name: Reject shipped graduation registry at hive/runtime/
+        # hde-9b extension: the per-workflow graduation registry is consumer-
+        # side only (`.pHive/runtime/executor-graduated-workflows.yaml`).
+        # A registry under the shipped tree (`hive/runtime/...`) would let a
+        # graduation event ship globally to every consumer — exactly the Q4
+        # lock this layer was built to prevent. Fail the build if the shipped
+        # path appears.
+        run: |
+          if [ -e hive/runtime/executor-graduated-workflows.yaml ]; then
+            echo "::error file=hive/runtime/executor-graduated-workflows.yaml::shipped tree must not contain a graduation registry (hde-9b: registry is consumer-side at .pHive/runtime/executor-graduated-workflows.yaml)"
+            exit 1
+          fi

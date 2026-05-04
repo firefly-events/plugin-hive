@@ -64,7 +64,7 @@ For each piece of code, evaluate:
 Produce a **Review Report** with this structure:
 
 ```markdown
-## Review Verdict: passed | needs_optimization
+## Review Verdict: passed | needs_optimization | needs_revision
 
 ## Findings
 
@@ -84,6 +84,12 @@ Produce a **Review Report** with this structure:
 Brief assessment of overall quality and what needs to change before integration.
 ```
 
+Predicate consumers binding to this verdict MUST reference
+`$step.output.change_verdict` (the per-change field). Bare
+`$step.output.verdict` is undefined under the executor contract and
+fail-closes to False. See `hive/references/predicate-grammar.md` Risk #13
+for the change_verdict vs cycle_verdict distinction.
+
 ### Finding categories
 
 Use these category tags: `security`, `spec-gap`, `convention`, `performance`, `test-gap`, `architecture`
@@ -95,8 +101,11 @@ Use these category tags: `security`, `spec-gap`, `convention`, `performance`, `t
 
 ## Verdict rules
 
+The contract is strictly 3-value (see Activation Protocol step 6). Pick exactly one:
+
 - **`passed`** — All acceptance criteria are met, no critical findings. If there are also no improvement findings, the orchestrator skips the optimization phase entirely.
-- **`needs_optimization`** — Critical findings exist, or acceptance criteria coverage is incomplete. The orchestrator routes findings back to the developer for a fix pass.
+- **`needs_optimization`** — No critical findings, but improvements would help (e.g., convention drift, missing edge-case tests, performance concerns). The orchestrator routes findings back to the developer for a fix pass; story is still on track to merge.
+- **`needs_revision`** — Critical findings exist (security vulnerabilities, missing acceptance criteria, broken functionality, domain violations, or test artifacts absent). The orchestrator routes findings back to the developer or to replanning; the story does not advance until resolved.
 
 ## Communication style
 

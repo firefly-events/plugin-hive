@@ -8,6 +8,10 @@
 - Each proposal must have an explicit implementation plan — "improve this doc" is not a plan
 - Cap approved proposals at 5 per cycle — prioritize depth over breadth
 
+## ROUTING GATE (upstream)
+
+Step 3 runs whenever ANY of three actionable signals from steps 2 / 2b is non-empty: `findings`, `external_research_candidates`, or `metric_signal`. Step-03b is the inverse fallback that runs ONLY when ALL three are empty. This is the **AND-of-empty** rule — `metric_signal` is orthogonal to findings, and structural findings drive this step even when `metric_signal: false`. The DAG executor encodes the rule via `when:` predicates on the step-03 and step-03b nodes in `meta-team-cycle.workflow.yaml`; see `hive/references/predicate-grammar.md` and `step-02-analysis.md` OUTPUT FORMAT for the field-binding contract.
+
 ## EXECUTION PROTOCOLS
 
 **Mode:** autonomous

@@ -1,0 +1,61 @@
+# Maintainer-controlled tool allow-list for step-level overrides.
+#
+# This file is the second factor on top of the
+# `tool_gating_overridden` audit event. The pure-override
+# composition policy lets a workflow YAML step grant tools the
+# persona disallows; without this allow-list, that grant is silent
+# (only an audit event traces it). With this allow-list, an
+# unlisted tool causes `ToolNotEscalatableError` at policy
+# resolution.
+#
+# Source: security:plan-audit finding #6 + #7 (severity: moderate).
+# See `.pHive/specialist-phases/security:plan-audit/hive-dag-executor/findings.md`.
+#
+# Schema:
+#   always_grantable: [tool, ...]
+#     Tools any step may grant via `tools:` override without an
+#     allow-list entry. Low blast radius (read-only data access,
+#     pattern matching). Step-author trust is sufficient.
+#
+#   escalatable: [tool, ...]
+#     Tools a step may grant only because they appear here. High
+#     blast radius (writes, shell, external backends). Maintainer
+#     pre-approval (this file) plus the audit event together form
+#     the two-factor check.
+#
+#   persona_deny:
+#     <tool>: [persona_id, ...]
+#       Personas that may NEVER receive `<tool>` via step override
+#       even though `<tool>` is in `escalatable`. Source: per-persona
+#       backend-isolation rules (verifier personas pinned to a
+#       different backend than the tool routes to).
+
+always_grantable:
+  - Read
+  - Grep
+  - Glob
+  - LS
+  - WebFetch
+  - WebSearch
+
+escalatable:
+  - Bash
+  - Edit
+  - Write
+  - NotebookEdit
+  - codex
+  - cmux
+
+# Verifier personas are pinned to Opus precisely so they cross-verify
+# Codex output. A step-level `tools: [codex]` override on a verifier
+# would silently re-route the verifier through the same backend it
+# is meant to verify. See `feedback_codex_general_backend.md`.
+persona_deny:
+  codex:
+    - reviewer
+    - peer-validator
+    - security-reviewer
+  cmux:
+    - reviewer
+    - peer-validator
+    - security-reviewer

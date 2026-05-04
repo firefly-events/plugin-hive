@@ -1,0 +1,18 @@
+name: pause_fixture
+methodology: classic
+description: |
+  Synthetic 3-node fixture for hde-8 pause-handler integration tests.
+  Real workflow YAMLs do not migrate to `node_type: pause` until
+  hde-10 cutover Order 9; this fixture exercises the mechanism.
+steps:
+  - id: pre_pause
+    agent: developer
+    task: "Emit deterministic output for downstream"
+    depends_on: []
+  - id: human_approval
+    node_type: pause
+    depends_on: [pre_pause]
+  - id: post_pause
+    agent: developer
+    task: "Run after approval"
+    depends_on: [human_approval]

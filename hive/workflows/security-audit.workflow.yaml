@@ -1,0 +1,73 @@
+name: security-audit
+description: Security specialist team audit — adversarial review of architectural plans before execution begins. Reviews auth model changes, external API surfaces, privilege escalation, PII data flows, and multi-system integration risks.
+version: "1.0.0"
+timeout_ms: 1800000
+
+steps:
+  - id: security-critique
+    agent: security-reviewer
+    task: >
+      Review the implementation artifacts for security risks.
+      Evaluate: auth flows and trust boundaries, secrets handling and exposure risk,
+      input validation and injection surfaces, privilege escalation paths, PII data
+      flows and storage/transport exposure, and multi-system integration boundaries.
+      Stay strictly in the security lane — do NOT surface performance, correctness,
+      or idiomatic findings; those belong to other specialized reviewers.
+      Produce a structured findings report.
+    depends_on: []
+    inputs:
+      - name: implementation_artifacts
+        source: context
+        context_key: implementation_artifacts
+    outputs:
+      - name: security_critique
+        type: string
+    optional: false
+    timeout_ms: 900000
+
+  - id: synthesis
+    agent: security-reviewer
+    task: >
+      Synthesize the security critique into a unified audit verdict.
+      Rank findings by severity per the catalog's severity_guidance:
+      major → block execution until resolved
+      moderate → execute but flag results
+      minor → informational only
+
+      Produce a structured verdict:
+
+      ## Security Audit: {artifacts reviewed}
+
+      ## Findings
+      - `{file}:{line}` — {finding} [severity: major | moderate | minor]
+
+      ## Recommended Changes
+      - {specific actionable change that reduces the identified risk}
+
+      ## Threat Model Notes
+      - {trust boundary, attacker capability, or data-flow note relevant to the review}
+
+      ## Summary
+      One-paragraph assessment of overall security posture and execution readiness.
+
+      ## Verdict
+      approved | needs_revision | needs_redesign
+
+      Verdict criteria:
+      - approved: no major findings; moderate findings documented and flagged
+      - needs_revision: one or more major findings that must be addressed before execution
+      - needs_redesign: security model is fundamentally flawed; requires architectural change
+    depends_on:
+      - security-critique
+    inputs:
+      - name: security_critique
+        source: step_output
+        step_id: security-critique
+        output_name: security_critique
+    outputs:
+      - name: audit_verdict
+        type: string
+      - name: audit_summary
+        type: string
+    optional: false
+    timeout_ms: 600000

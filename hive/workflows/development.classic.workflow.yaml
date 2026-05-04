@@ -17,12 +17,28 @@ methodology: classic
 #   developer → frontend-developer (UI/component work) or backend-developer (API/server work)
 # The generic "developer" agent is kept for backward compatibility.
 #
-# MULTI-DOMAIN STORIES:
-# When a story spans both frontend and backend, the team lead executes the
-# implement step as two sequential sub-steps (backend first, then frontend).
-# Both agents' changes are merged into a single "implementation" output that
-# downstream steps (test, review) consume. The team lead tracks which agent
-# modified which files for domain validation.
+# MULTI-DOMAIN STORIES (executor cutover, hde-10 / Order 8 / Q9 path-A):
+# Multi-domain stories are decomposed at the YAML LEVEL rather than via
+# orchestrator-narrated sub-steps. Two declarative nodes — `backend-implement`
+# and `frontend-implement` — each gate on a `when:` predicate against
+# story-domain booleans surfaced by `preflight`
+# (`$preflight.output.needs_backend`, `$preflight.output.needs_frontend` —
+# see `hive/references/story-spec-schema.md`). Backend-first sequencing is
+# preserved by `frontend-implement.depends_on: [..., backend-implement]`.
+#
+# Downstream consumers (test, platform-verify, review, codex-review,
+# optimize, dev-standby, integrate, doc-check) bind the `implementation`
+# input from BOTH `backend-implement` and `frontend-implement` as
+# `optional: true`. When a domain skips (its predicate is false), the
+# binding receives None per per-input optional semantics. When BOTH
+# implement nodes skip (empty-domain story), `review`'s
+# `trigger_rule: none_failed_min_one_success` cascades a SKIP through
+# the rest of the pipeline.
+#
+# The strict-Archon predicate grammar
+# (`hive/references/predicate-grammar.md`) does not support `contains` or
+# string membership operators. Pre-computed booleans are the canonical
+# solution.
 
 steps:
   - id: preflight
@@ -46,6 +62,17 @@ steps:
     outputs:
       - name: preflight_status
         type: string
+      # Story-domain booleans surfaced from `story.metadata` so the
+      # downstream `when:` predicates on `backend-implement` /
+      # `frontend-implement` can address them. See
+      # `hive/references/story-spec-schema.md` for the schema and
+      # step-01-preflight.md OUTPUT FORMAT for the materialisation
+      # contract. Type `json` is the graph-validator container — runtime
+      # values are scalar bool per the step file's declaration.
+      - name: needs_backend
+        type: json
+      - name: needs_frontend
+        type: json
     optional: false
     timeout_ms: 300000
 
@@ -100,26 +127,60 @@ steps:
     skip_when: "story.complexity == 'low'"
     timeout_ms: 180000
 
-  - id: implement
-    agent: developer
-    step_file: hive/workflows/steps/development-classic/step-03-implement.md
+  # Q9 path-A YAML decomposition (hde-10 / Order 8): the legacy
+  # `implement` step is split into two declarative nodes guarded by
+  # story-domain `when:` predicates. Backend-first sequencing is the
+  # historical contract; `frontend-implement.depends_on` includes
+  # `backend-implement` so the front-end agent reads the back-end's
+  # API surface from its output graph.
+  - id: backend-implement
+    agent: backend-developer
+    step_file: hive/workflows/steps/development-classic/step-03-implement-backend.md
     task: >
-      Implement the story according to the spec and research brief. Follow existing
-      patterns identified in the research phase. Write clean, minimal code — only
-      what is needed. Do not add extra features, error handling, or abstractions
-      beyond the story scope.
-
-      IMPORTANT: You are a SEPARATE agent from the researcher and writer. Do not
-      rely on context you "remember" from prior phases — work from the research
-      brief and story spec only. This ensures you follow the spec, not shortcuts.
+      Implement the BACKEND scope of the story per the research brief.
+      APIs, server logic, database, services, infrastructure ONLY.
     depends_on:
       - preflight
       - write-brief
+    when: "$preflight.output.needs_backend == true"
     inputs:
       - name: research_brief
         source: step_output
         step_id: write-brief
         output_name: research_brief
+        optional: true
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: implementation
+        type: string
+    optional: false
+    timeout_ms: 600000
+
+  - id: frontend-implement
+    agent: frontend-developer
+    step_file: hive/workflows/steps/development-classic/step-03-implement-frontend.md
+    task: >
+      Implement the FRONTEND scope of the story per the research brief.
+      UI components, view layer, client-side state, presentation logic
+      ONLY. Consume the backend's published API surface from
+      `backend-implement.output.implementation` when needed.
+    depends_on:
+      - preflight
+      - write-brief
+      - backend-implement
+    when: "$preflight.output.needs_frontend == true"
+    inputs:
+      - name: research_brief
+        source: step_output
+        step_id: write-brief
+        output_name: research_brief
+        optional: true
+      - name: backend_implementation
+        source: step_output
+        step_id: backend-implement
+        output_name: implementation
         optional: true
       - name: story_spec
         source: context
@@ -143,12 +204,19 @@ steps:
       with only a "tests look good" assessment — actual test code is required.
       The review step is BLOCKED until test artifacts exist.
     depends_on:
-      - implement
+      - backend-implement
+      - frontend-implement
     inputs:
-      - name: implementation
+      - name: backend_implementation
         source: step_output
-        step_id: implement
+        step_id: backend-implement
         output_name: implementation
+        optional: true
+      - name: frontend_implementation
+        source: step_output
+        step_id: frontend-implement
+        output_name: implementation
+        optional: true
       - name: research_brief
         source: step_output
         step_id: write-brief
@@ -182,10 +250,16 @@ steps:
     depends_on:
       - test
     inputs:
-      - name: implementation
+      - name: backend_implementation
         source: step_output
-        step_id: implement
+        step_id: backend-implement
         output_name: implementation
+        optional: true
+      - name: frontend_implementation
+        source: step_output
+        step_id: frontend-implement
+        output_name: implementation
+        optional: true
       - name: story_spec
         source: context
         context_key: story_spec
@@ -216,10 +290,16 @@ steps:
       - test
       - platform-verify
     inputs:
-      - name: implementation
+      - name: backend_implementation
         source: step_output
-        step_id: implement
+        step_id: backend-implement
         output_name: implementation
+        optional: true
+      - name: frontend_implementation
+        source: step_output
+        step_id: frontend-implement
+        output_name: implementation
+        optional: true
       - name: test_results
         source: step_output
         step_id: test
@@ -270,10 +350,16 @@ steps:
     depends_on:
       - review
     inputs:
-      - name: implementation
+      - name: backend_implementation
         source: step_output
-        step_id: implement
+        step_id: backend-implement
         output_name: implementation
+        optional: true
+      - name: frontend_implementation
+        source: step_output
+        step_id: frontend-implement
+        output_name: implementation
+        optional: true
       - name: review_verdict
         source: step_output
         step_id: review
@@ -312,10 +398,16 @@ steps:
         step_id: codex-review
         output_name: codex_findings
         optional: true
-      - name: implementation
+      - name: backend_implementation
         source: step_output
-        step_id: implement
+        step_id: backend-implement
         output_name: implementation
+        optional: true
+      - name: frontend_implementation
+        source: step_output
+        step_id: frontend-implement
+        output_name: implementation
+        optional: true
       - name: story_spec
         source: context
         context_key: story_spec
@@ -337,10 +429,16 @@ steps:
     depends_on:
       - review
     inputs:
-      - name: implementation
+      - name: backend_implementation
         source: step_output
-        step_id: implement
+        step_id: backend-implement
         output_name: implementation
+        optional: true
+      - name: frontend_implementation
+        source: step_output
+        step_id: frontend-implement
+        output_name: implementation
+        optional: true
       - name: story_spec
         source: context
         context_key: story_spec
@@ -364,10 +462,16 @@ steps:
       - codex-review
       - dev-standby
     inputs:
-      - name: implementation
+      - name: backend_implementation
         source: step_output
-        step_id: implement
+        step_id: backend-implement
         output_name: implementation
+        optional: true
+      - name: frontend_implementation
+        source: step_output
+        step_id: frontend-implement
+        output_name: implementation
+        optional: true
       - name: review_verdict
         source: step_output
         step_id: review
@@ -408,10 +512,16 @@ steps:
     depends_on:
       - integrate
     inputs:
-      - name: implementation
+      - name: backend_implementation
         source: step_output
-        step_id: implement
+        step_id: backend-implement
         output_name: implementation
+        optional: true
+      - name: frontend_implementation
+        source: step_output
+        step_id: frontend-implement
+        output_name: implementation
+        optional: true
       - name: commit_ref
         source: step_output
         step_id: integrate
