@@ -118,6 +118,13 @@ def validate_graph(graph: Graph) -> None:
     for node in graph.nodes.values():
         if node.timeout_ms is None:
             continue
+        # bool is a subclass of int — exclude it explicitly so a
+        # `timeout_ms: true` typo does not silently coerce to 1.
+        if not isinstance(node.timeout_ms, int) or isinstance(node.timeout_ms, bool):
+            raise TimeoutOutOfRangeError(
+                node_id=node.id,
+                timeout_ms=node.timeout_ms,
+            )
         if node.timeout_ms < TIMEOUT_MIN_MS or node.timeout_ms > TIMEOUT_MAX_MS:
             raise TimeoutOutOfRangeError(
                 node_id=node.id,

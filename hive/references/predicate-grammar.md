@@ -109,20 +109,36 @@ The same step typically also publishes `$step.output.cycle_verdict`
 the specific name; never rely on a generic `verdict`.
 
 `change_verdict` is a string-valued field (`"approve"`, `"reject"`,
-`"needs_changes"`, …). Compare against the literal string, never a
-boolean. A `bool == string` comparison is fail-closed False under
-strict-equality rules and would silently never route.
+`"needs_changes"`, …). The current grammar (Q5 lock) does NOT support
+string literals (see "Disallowed" above), so you cannot route on
+`change_verdict`'s value directly under a `when:` predicate. Two
+sanctioned patterns:
+
+1. **Existence-only routing.** Compare against `null` to detect
+   whether the field is set at all; route follow-on work behind the
+   gate, then resolve the value in the agent step's prose.
+
+   ```yaml
+   # Run reviewer-followup whenever a verdict was emitted at all
+   when: "$verifier.output.change_verdict != null"
+   ```
+
+2. **Companion boolean field.** When value-level routing IS required,
+   have the upstream emit a sibling boolean (e.g.
+   `change_verdict_blocking`) alongside `change_verdict` and bind
+   `when:` to the boolean. Document the new field in the upstream's
+   `output_format` block.
 
 ```yaml
-# Correct — string equality against the documented value
-when: "$verifier.output.change_verdict == \"approve\""
-
-# Wrong — bool vs string, fail-closed False every time
+# Wrong — bool vs string, fail-closed False every time (no string literals)
 when: "$verifier.output.change_verdict == true"
 
 # Wrong — bare `verdict` is not a defined field
 when: "$verifier.output.verdict == true"
 ```
+
+A grammar extension to admit string literals is an epic-level decision
+(Q5 lock), not a story-level patch.
 
 ## Fail-closed semantics
 

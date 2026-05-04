@@ -244,7 +244,14 @@ def unfreeze_for_resume(state: RunState) -> RunState:
     `resume_run` calls this on a loaded SUSPENDED or FAILED state
     before replaying. Documented as a sanctioned bypass of the freeze
     invariant; the freeze guarantees the on-disk state is terminal
-    until an operator deliberately resumes.
+    until an operator deliberately resumes. COMPLETED runs are
+    irrevocably terminal and cannot be unfrozen — re-opening one would
+    let post-completion mutation slip past the freeze guarantee.
     """
 
+    if state.status not in (RunStatus.SUSPENDED, RunStatus.FAILED):
+        raise RunStateFrozenError(
+            f"cannot resume run in status {state.status.value!r}; "
+            "expected suspended or failed"
+        )
     return replace(state, frozen=False, last_updated_at=_now_iso())

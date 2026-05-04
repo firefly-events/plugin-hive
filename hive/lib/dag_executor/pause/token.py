@@ -86,7 +86,13 @@ def load_or_create_signing_key(run_id: str, runs_root: Path) -> bytes:
         os.chmod(parent, 0o700)
     except OSError:
         pass
-    fd = os.open(str(key_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    # O_EXCL closes the TOCTOU window from the exists() check above:
+    # if a sibling pause node beat us to creating the key file, we get
+    # FileExistsError here and just read the existing bytes.
+    try:
+        fd = os.open(str(key_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        return key_path.read_bytes()
     try:
         key = secrets.token_bytes(_KEY_BYTES)
         os.write(fd, key)
@@ -141,6 +147,10 @@ def parse(token: str) -> Token:
         payload = json.loads(payload_bytes.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise PauseTokenInvalidError(f"malformed token (json decode): {exc}") from exc
+    if not isinstance(payload, dict):
+        raise PauseTokenInvalidError(
+            "malformed token (payload must be a JSON object)"
+        )
     return Token(
         run_id=payload.get("run_id", ""),
         node_id=payload.get("node_id", ""),

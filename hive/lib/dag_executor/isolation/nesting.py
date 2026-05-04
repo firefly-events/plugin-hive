@@ -52,6 +52,12 @@ def detect_outer_worktree(cwd: Path | None = None) -> Path | None:
     common_resolved = (here / common).resolve(strict=False)
     gd_resolved = (here / gd).resolve(strict=False)
     if common_resolved != gd_resolved:
+        # We're inside a worktree. Return the worktree ROOT, not `here`
+        # — `here` may be a nested subdirectory, and downstream callers
+        # expect WorktreeDecision.path to be the actual checkout root.
+        rc3, top = _git_capture(here, "rev-parse", "--show-toplevel")
+        if rc3 == 0 and top:
+            return Path(top).resolve(strict=False)
         return here
     return None
 

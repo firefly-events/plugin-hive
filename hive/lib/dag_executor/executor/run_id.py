@@ -85,6 +85,16 @@ def make_run_id(workflow_slug: str) -> str:
     leading dot) — `hive.lib.metrics` validates this when the run_id
     is later used for an events file path.
     """
-    if not isinstance(workflow_slug, str) or not workflow_slug:
+    if not isinstance(workflow_slug, str) or not workflow_slug.strip():
         raise ValueError("workflow_slug must be a non-empty string")
+    if (
+        "/" in workflow_slug
+        or "\\" in workflow_slug
+        or workflow_slug in {".", ".."}
+        or workflow_slug.startswith(".")
+    ):
+        raise ValueError(
+            "workflow_slug must be filesystem-safe "
+            "(no '/', '\\\\', or leading dot)"
+        )
     return f"{new_ulid()}-{workflow_slug}"

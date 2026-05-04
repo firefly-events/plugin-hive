@@ -31,7 +31,12 @@ WORKFLOW_GLOB = "*.workflow.yaml"
 
 
 def _coerce_node_type(raw: Any) -> NodeType:
-    """Map a string `node_type` value to the enum, defaulting to AGENT."""
+    """Map a string `node_type` value to the enum.
+
+    Unknown values raise ``ValueError`` so a typo (e.g. ``pasue``) does
+    not silently downgrade a pause/script node to AGENT execution.
+    Missing ``node_type`` still defaults to AGENT.
+    """
     if raw is None:
         return NodeType.AGENT
     if isinstance(raw, NodeType):
@@ -40,10 +45,7 @@ def _coerce_node_type(raw: Any) -> NodeType:
     for nt in NodeType:
         if nt.value == text:
             return nt
-    # Unknown values are accepted as raw strings via the enum's default;
-    # validator will not currently reject unknown node types because the
-    # loader-level enum coercion intentionally falls back to AGENT.
-    return NodeType.AGENT
+    raise ValueError(f"Unknown node_type: {raw!r}")
 
 
 def _build_input_binding(raw: dict[str, Any]) -> InputBinding:
@@ -122,6 +124,14 @@ def load_workflow(path: Path | str) -> Graph:
     nodes = [_build_node(step) for step in steps_raw]
     nodes_by_id: dict[str, Node] = {}
     for node in nodes:
+        if not node.id:
+            raise ValueError(
+                f"workflow step in {p.name} has empty id"
+            )
+        if node.id in nodes_by_id:
+            raise ValueError(
+                f"duplicate workflow step id {node.id!r} in {p.name}"
+            )
         nodes_by_id[node.id] = node
 
     return Graph(
@@ -144,5 +154,10 @@ def load_all_workflows(workflows_dir: Path | str = "hive/workflows") -> dict[str
     out: dict[str, Graph] = {}
     for path in sorted(d.glob(WORKFLOW_GLOB)):
         graph = load_workflow(path)
+        if graph.workflow_name in out:
+            raise ValueError(
+                f"duplicate workflow name {graph.workflow_name!r} "
+                f"loading {path.name}"
+            )
         out[graph.workflow_name] = graph
     return out

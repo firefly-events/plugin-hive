@@ -9,6 +9,7 @@ here (hde-3a owns that); script handler runs whatever string is in
 
 from __future__ import annotations
 
+import shlex
 import subprocess
 from typing import Any
 
@@ -34,10 +35,16 @@ class ScriptHandler:
         if node.timeout_ms is not None:
             timeout_s = node.timeout_ms / 1000.0
 
+        # Run with shell=False + argv list to structurally prevent shell
+        # injection. Workflow YAML is the trusted source today, but this
+        # eliminates the injection surface if task derivation ever becomes
+        # dynamic. Callers needing shell features must wrap explicitly
+        # (e.g. `bash -lc '<...>'`) and accept the surface.
+        argv = task if isinstance(task, list) else shlex.split(task)
         try:
             completed = subprocess.run(
-                task,
-                shell=True,
+                argv,
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=timeout_s,

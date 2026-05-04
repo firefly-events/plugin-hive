@@ -101,10 +101,26 @@ class AgentHandler:
         self._repo_root = Path(repo_root) if repo_root is not None else None
 
     def _read_step_file(self, step_file: str) -> str:
-        """Read the step_file's content verbatim. No transformation."""
+        """Read the step_file's content verbatim. No transformation.
+
+        When ``repo_root`` is configured, ``step_file`` MUST resolve inside
+        that root. ``..`` segments and absolute paths that escape the root
+        are rejected up-front so an attacker-controlled or malformed
+        workflow cannot inject arbitrary file content into agent input.
+        """
         path = Path(step_file)
-        if self._repo_root is not None and not path.is_absolute():
-            path = self._repo_root / path
+        if self._repo_root is not None:
+            root = self._repo_root.resolve()
+            candidate = (
+                path if path.is_absolute() else (root / path)
+            ).resolve()
+            try:
+                candidate.relative_to(root)
+            except ValueError as exc:
+                raise AgentHandlerError(
+                    f"step_file escapes repo_root: {step_file}"
+                ) from exc
+            path = candidate
         try:
             return path.read_text(encoding="utf-8")
         except FileNotFoundError as exc:

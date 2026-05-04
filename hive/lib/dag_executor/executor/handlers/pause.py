@@ -34,7 +34,7 @@ from hive.lib.dag_executor.pause import (
     generate,
     wait_for_signal,
 )
-from hive.lib.dag_executor.pause.errors import PauseRejectedError
+from hive.lib.dag_executor.pause.errors import PauseRejectedError, PauseTimeoutError
 
 from .agent import NodeOutput
 
@@ -75,13 +75,22 @@ class PauseHandler:
                 {"token": token, "timeout_seconds": timeout_seconds},
             )
 
-        result = wait_for_signal(
-            run_id=run_id,
-            node_id=node.id,
-            runs_root=self.runs_root,
-            timeout_seconds=timeout_seconds,
-            poll_interval=self.poll_interval,
-        )
+        try:
+            result = wait_for_signal(
+                run_id=run_id,
+                node_id=node.id,
+                runs_root=self.runs_root,
+                timeout_seconds=timeout_seconds,
+                poll_interval=self.poll_interval,
+            )
+        except PauseTimeoutError:
+            if self.telemetry is not None:
+                self.telemetry.emit(
+                    "pause_timeout",
+                    node.id,
+                    {"timeout_seconds": timeout_seconds},
+                )
+            raise
 
         if result.kind == SignalKind.APPROVED:
             if self.telemetry is not None:

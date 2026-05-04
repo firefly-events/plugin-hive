@@ -191,13 +191,12 @@ def _evaluate_when_predicate(
         "expr": predicate_text,
         "result": bool(result),
     }
-    if not result:
-        # Fail-closed evaluation paths (missing field, type mismatch)
-        # also funnel through this branch. We can't distinguish a
-        # legitimate False from a fail-closed False at this layer
-        # without re-running the AST through a probing evaluator;
-        # the contract documents both as "False".
-        payload["fail_closed"] = False
+    # `fail_closed` is intentionally unset on the runtime-False path:
+    # this layer cannot distinguish a legitimate False from a
+    # missing-field / type-mismatch fail-closed False without re-running
+    # the AST through a probing evaluator. Reporting `fail_closed: False`
+    # would be misleading; consumers that need that distinction should
+    # subscribe to evaluator-level events.
     telemetry.emit("predicate_evaluated", node.id, payload)
     return bool(result)
 

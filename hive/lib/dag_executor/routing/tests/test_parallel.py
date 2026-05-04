@@ -250,7 +250,7 @@ def _stub_canned_for_test_swarm() -> dict[str, dict[str, Any]]:
     }
 
 
-def test_test_swarm_executes_e2e_with_parallel_platforms():
+def test_test_swarm_executes_e2e_with_parallel_platforms(tmp_path):
     graph = load_workflow(TEST_SWARM_FIXTURE)
     spy = _SpawnRecorder(canned=_stub_canned_for_test_swarm())
 
@@ -258,13 +258,14 @@ def test_test_swarm_executes_e2e_with_parallel_platforms():
     dispatcher = Dispatcher()
     dispatcher.register(NodeType.AGENT, AgentHandler(spawn=spy).handle)
     tel = Telemetry(run_id=run_id)
+    baseline_path = tmp_path / "baseline"
 
     out = Walker().walk(
         graph,
         dispatcher,
         run_id,
         tel,
-        context={"story_spec": "<<spec>>", "baseline_path": "/tmp/baseline"},
+        context={"story_spec": "<<spec>>", "baseline_path": str(baseline_path)},
     )
 
     expected_steps = {
@@ -285,7 +286,7 @@ def test_test_swarm_executes_e2e_with_parallel_platforms():
     assert out["file-bugs"].outputs == {"bug_reports": "none"}
 
 
-def test_test_swarm_one_branch_failure_skips_branch_join_runs():
+def test_test_swarm_one_branch_failure_skips_branch_join_runs(tmp_path):
     """execute-platform-b raises; execute-platform-a succeeds.
     file-bugs sees [a=COMPLETED, b=SKIPPED] → trigger_rule = RUN."""
 
@@ -299,13 +300,14 @@ def test_test_swarm_one_branch_failure_skips_branch_join_runs():
     dispatcher = Dispatcher()
     dispatcher.register(NodeType.AGENT, AgentHandler(spawn=spy).handle)
     tel = Telemetry(run_id=run_id)
+    baseline_path = tmp_path / "baseline"
 
     out = Walker().walk(
         graph,
         dispatcher,
         run_id,
         tel,
-        context={"story_spec": "<<spec>>", "baseline_path": "/tmp/baseline"},
+        context={"story_spec": "<<spec>>", "baseline_path": str(baseline_path)},
     )
 
     # Sibling A completed; B was skipped (no entry in materialised).
@@ -320,7 +322,7 @@ def test_test_swarm_one_branch_failure_skips_branch_join_runs():
     assert b_failed[0]["payload"].get("parallel") is True
 
 
-def test_test_swarm_all_branches_fail_join_skips():
+def test_test_swarm_all_branches_fail_join_skips(tmp_path):
     """Both platform branches raise → join sees zero successes → SKIP.
 
     file-bugs SKIPs via trigger_rule. compile-report consumes file-bugs +
@@ -344,13 +346,14 @@ def test_test_swarm_all_branches_fail_join_skips():
     dispatcher = Dispatcher()
     dispatcher.register(NodeType.AGENT, AgentHandler(spawn=spy).handle)
     tel = Telemetry(run_id=run_id)
+    baseline_path = tmp_path / "baseline"
 
     out = Walker().walk(
         graph,
         dispatcher,
         run_id,
         tel,
-        context={"story_spec": "<<spec>>", "baseline_path": "/tmp/baseline"},
+        context={"story_spec": "<<spec>>", "baseline_path": str(baseline_path)},
     )
 
     # Neither platform produced output.
