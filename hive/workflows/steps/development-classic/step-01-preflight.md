@@ -62,6 +62,36 @@ PREFLIGHT REPORT:
   Status: {READY | BLOCKED — reason}
 ```
 
+### 6. Surface story domain booleans (executor cutover, hde-10)
+
+Read `story.metadata.needs_backend` and `story.metadata.needs_frontend`
+from the story spec (see `hive/references/story-spec-schema.md`).
+Default both to `false` when the field is missing.
+
+These two booleans are surfaced as named outputs (`needs_backend`,
+`needs_frontend`) on this preflight step so downstream
+`backend-implement` and `frontend-implement` nodes can route via the
+strict-Archon `when:` predicates against
+`$preflight.output.needs_backend` / `$preflight.output.needs_frontend`.
+The grammar has no `$story.metadata.X` form — the booleans must come
+off a node's output graph.
+
+## OUTPUT FORMAT
+
+The orchestrator-narrated path consumes the prose preflight report.
+The executor path additionally requires the following structured
+fields on this step's output graph:
+
+```yaml
+preflight_status: string         # "READY" | "BLOCKED — <reason>"
+needs_backend: bool              # from story.metadata.needs_backend, default false
+needs_frontend: bool             # from story.metadata.needs_frontend, default false
+```
+
+Missing booleans default to `false` (predicate evaluator's fail-closed
+semantics) which causes both implement nodes to skip — the canonical
+empty-domain behaviour.
+
 ## SUCCESS METRICS
 
 - [ ] Build command executed (not assumed)

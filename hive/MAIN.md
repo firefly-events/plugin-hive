@@ -59,12 +59,21 @@ For borderline cases, present to the user for a keep/discard decision. Most insi
 See `hive/references/agent-memory-schema.md` for the full schema, memory types, and keep/discard criteria.
 See `hive/references/wiki-compilation-guide.md` for wiki compilation procedure and templates.
 
+## Architecture: Two Execution Paths
+
+Hive runs workflows two ways. The DEFAULT is the orchestrator-narrated path: this session reads the workflow YAML, interprets routing decisions in prose, and dispatches step-by-step.
+
+The OPTIONAL path is the **DAG executor** (`hive/lib/dag_executor/`): a runtime that calls LLMs only at agent nodes; everything else (routing predicates, parallel waves, pause gates, run-state, worktree isolation, tool gating) is mechanical. Workflows opt in per-consumer via `.pHive/hive.config.yaml` AND per-workflow via the graduation registry at `.pHive/runtime/executor-graduated-workflows.yaml`. See `hive/GUIDE.md#hive-dag-executor-optional-per-workflow-opt-in` for the public-facing summary and `hive/decisions/001-executor-cutover.md` for the rollout history + migration guide.
+
 ## Key References
 
 | Resource | Path |
 |----------|------|
 | **Orchestrator persona** | `hive/agents/orchestrator.md` — coordination principles, team evaluation, circuit breakers, model routing, decision protocols |
 | Workflow schema | `hive/references/workflow-schema.md` |
+| Predicate grammar (executor) | `hive/references/predicate-grammar.md` |
+| Story spec schema | `hive/references/story-spec-schema.md` |
+| Executor decision (ADR) | `hive/decisions/001-executor-cutover.md` |
 | Step file schema | `hive/references/step-file-schema.md` |
 | Episode schema | `hive/references/episode-schema.md` |
 | Agent memory schema | `hive/references/agent-memory-schema.md` |

@@ -127,6 +127,20 @@ If all checks pass, proceed silently — do not announce that the kickoff gate p
    If all four: use **agent team execution**. If `execution.terminal_mux` resolves to `cmux`, use step 6b. Otherwise use step 6.
    Otherwise: use **sequential execution** (step 7).
 
+5pre. **Executor cutover routing (hde-9a + hde-9b).** Before dispatching the chosen execution mode for a single workflow, decide whether to invoke the deterministic DAG executor (`hive.lib.dag_executor`) or stay on the orchestrator-narrated path. This check applies per-workflow at the point where this skill would otherwise hand off a workflow YAML to the orchestrator-narrated runner.
+
+   **Decision tree (default OFF — fail-closed orchestrator path on any miss):**
+
+   1. **Read consumer config.** Look for `.pHive/hive.config.yaml` (consumer-side, NOT the shipped `hive/hive.config.yaml`). If the file is missing → orchestrator path. Done.
+   2. **Check the flag.** Parse the file. If `executor` is anything other than `hive-dag` (`hive-dag` is the only valid value today) → orchestrator path with a warning. If `executor_default` is not truthy (`on`, `true`, `yes`, or YAML bool `True`; `off`/`false`/`no`/missing → false) → orchestrator path.
+   3. **Read graduation registry.** Look for `.pHive/runtime/executor-graduated-workflows.yaml` (created by hde-9b — may not exist yet; treat missing as empty, no workflows graduated). Parse the top-level `workflows:` list.
+   4. **Per-workflow gate.** If the workflow being dispatched is NOT in the registry → orchestrator path.
+   5. **Both gates pass.** Invoke `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`. Pass a populated `run_state_path` and `worktree_manager` so the L3 functionality (run-state persistence + worktree-per-run isolation) is available; the wrapper honours `worktree_manager=None` (no isolation, hde-2 spine path) when caller-decided context says so (e.g., already inside an outer worktree per hde-6 nesting policy).
+
+   **Why this gating exists (Q4 lock):** the consumer-side flag layer keeps maintainer-only execution choices out of the shipped `hive/hive.config.yaml` (the eefbff3 / `project_config_shipping_deferred` pattern). The per-workflow registry layer lets graduation events ship without consumer config edits. Default OFF preserves zero-behaviour-change for non-opt-in consumers. Both gates must be true; either gate empty falls through to the orchestrator path.
+
+   **Single dispatch point:** this is the ONLY place where `/execute` chooses between executor and orchestrator. No other skill or step file should re-implement this decision tree — they should call back into this skill or the `executor_enabled_for(workflow_name)` reader exposed by `hive.lib.dag_executor`.
+
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
 
 6b. **Agent team execution (cmux path).** Use this path when all four step-5 conditions are true and `execution.terminal_mux` resolves to `cmux`.
@@ -181,3 +195,5 @@ If all checks pass, proceed silently — do not announce that the kickoff gate p
 - `hive/agents/orchestrator.md` — Orchestrator coordination guidance
 - `skills/hive/skills/respawn/SKILL.md` — Agent respawn protocol and detection heuristics
 - `skills/hive/skills/agent-spawn/SKILL.md` — Agent spawning with respawn continuation support
+- `hive/lib/dag_executor/__init__.py` — `executor_enabled_for(workflow_name)` and `run_workflow(...)` (consumer-side flag readers and the executor invocation surface from hde-9a)
+- `hive/references/workflow-schema.md#executor-cutover-additive--registry-gated` — schema-level note that cutover is additive and registry-gated

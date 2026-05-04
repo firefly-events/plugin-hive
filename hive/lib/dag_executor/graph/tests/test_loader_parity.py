@@ -67,30 +67,45 @@ def test_each_workflow_validates(path: Path):
 
 
 def test_per_step_and_per_input_optional_distinct():
-    """development.classic ships both flavors of `optional` — they must not collapse."""
+    """development.classic ships both flavors of `optional` — they must not collapse.
+
+    Post-Order-8 (hde-10): the legacy `implement` step is decomposed
+    into `backend-implement` + `frontend-implement`. The optional-flag
+    parity now applies to the new nodes.
+    """
     graph = load_workflow(WORKFLOWS_DIR / "development.classic.workflow.yaml")
 
     # Per-step `optional: true` lives on at least one step (e.g., `research`,
     # `write-brief`, `codex-review`). Per-input `optional: true` lives on
-    # bindings that consume previously-optional steps (e.g., `implement`'s
-    # `research_brief` input). Both must survive on the loaded Graph.
+    # bindings that consume previously-optional steps (e.g., the implement
+    # nodes' `research_brief` input). Both must survive on the loaded Graph.
     research = graph.nodes["research"]
     assert research.optional is True, "per-step `optional: true` lost on `research`"
 
-    implement = graph.nodes["implement"]
-    assert implement.optional is False, "implement should be required (per-step)"
+    backend = graph.nodes["backend-implement"]
+    assert backend.optional is False, "backend-implement should be required (per-step)"
     research_brief_binding = next(
-        b for b in implement.inputs if b.name == "research_brief"
+        b for b in backend.inputs if b.name == "research_brief"
     )
     assert research_brief_binding.optional is True, (
-        "per-input `optional: true` lost on implement.research_brief"
+        "per-input `optional: true` lost on backend-implement.research_brief"
+    )
+
+    frontend = graph.nodes["frontend-implement"]
+    backend_impl_binding = next(
+        b for b in frontend.inputs if b.name == "backend_implementation"
+    )
+    assert backend_impl_binding.optional is True, (
+        "per-input `optional: true` lost on frontend-implement.backend_implementation"
     )
 
 
-def test_generic_developer_agent_round_trips_as_raw_string():
-    """Generic `agent: developer` must NOT be resolved by the loader."""
+def test_decomposed_developer_agents_round_trip_as_raw_strings():
+    """Generic developer agent strings on the decomposed implement nodes
+    must NOT be resolved by the loader. Post-Order-8 (hde-10) the
+    decomposition uses explicit `backend-developer` / `frontend-developer`
+    persona names because the YAML-level decomposition expresses the
+    domain split that the legacy generic `developer` deferred to runtime."""
     graph = load_workflow(WORKFLOWS_DIR / "development.classic.workflow.yaml")
-    implement = graph.nodes["implement"]
-    assert implement.agent == "developer", (
-        f"loader leaked agent resolution: implement.agent = {implement.agent!r}"
-    )
+    assert graph.nodes["backend-implement"].agent == "backend-developer"
+    assert graph.nodes["frontend-implement"].agent == "frontend-developer"

@@ -2,6 +2,38 @@
 
 # Step 2: Analysis
 
+## OUTPUT FORMAT (executor contract)
+
+Step output is a JSON object that downstream `when:` predicates bind to
+by explicit field name. The DAG executor fail-closes (downstream skips
+with a `predicate_evaluated` warning event) when any required field is
+missing — see `hive/references/predicate-grammar.md`.
+
+```yaml
+output_format:
+  metric_signal: bool                    # perf-baseline-only flag (orthogonal to findings)
+  findings_count: int                    # number of structural findings emitted in this cycle
+  external_candidates_count: int         # number of step-02b external_research_candidates available at routing time
+  findings: list                         # full structural findings (id, category, severity, location, ...)
+  external_research_candidates: list     # candidate proposals from step-02b (may be empty)
+```
+
+Routing between step-03 and step-03b is an **AND-of-empty** rule across
+the three signals — `metric_signal` is NOT a proxy for "are there
+findings". The canonical predicates (left-associative, no parentheses
+per strict-Archon grammar) are:
+
+- step-03 runs when ANY signal is non-empty:
+  `$analysis.output.findings_count > 0 || $analysis.output.external_candidates_count > 0 || $analysis.output.metric_signal == true`
+- step-03b runs ONLY when ALL three are empty:
+  `$analysis.output.findings_count == 0 && $analysis.output.external_candidates_count == 0 && $analysis.output.metric_signal == false`
+
+Predicates bind to the explicit `_count` fields rather than to list
+lengths because the strict-Archon grammar does not support `len(...)`.
+Cycles that produce findings but no perf delta route to step-03 — the
+meta-2026-04-29 regression scenario covered by
+`tests/meta_meta/test_routing_findings.py`.
+
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
 - Read this entire step file before taking any action
@@ -103,7 +135,28 @@ findings:
 
 **`metric_signal` field (orthogonal to findings):** If the analyzer also evaluates a perf-baseline delta (token / wall_clock_ms / first_attempt_pass) against a prior cycle baseline, record the result as a separate `metric_signal: true | false` field on this step's output. This flag is **perf-baseline-only** — it indicates whether a usable baseline-vs-candidate metric delta exists for proposal ranking. It is NOT a proxy for "are there findings". Routing between step-03 and step-03b uses an AND-of-empty rule across `findings`, `external_research_candidates`, and `metric_signal`; structural findings drive step-03 even when `metric_signal: false`. See `step-03b-backlog-fallback.md` §MANDATORY EXECUTION RULES for the canonical routing rule.
 
-### 9. Produce analysis report
+### 9. Emit structured output (executor contract)
+In addition to the cycle-state write above, emit a JSON object matching
+the OUTPUT FORMAT declared at the top of this file. The DAG executor
+binds downstream `when:` predicates to these fields by name:
+
+```json
+{
+  "metric_signal": false,
+  "findings_count": 8,
+  "external_candidates_count": 0,
+  "findings": [{"id": "finding-1", "category": "MISSING_FILE", "severity": "high", ...}],
+  "external_research_candidates": []
+}
+```
+
+`findings_count` MUST equal `len(findings)` and `external_candidates_count`
+MUST equal `len(external_research_candidates)`. Predicates bind to the
+explicit count fields (the strict-Archon grammar does not support
+`len(...)`); list-length parity is a contract invariant — diverging
+counts will silently misroute step-03 vs step-03b.
+
+### 10. Produce analysis report
 ```
 ## Analysis Report — Cycle {cycle_id}
 
@@ -133,6 +186,7 @@ Top findings:
 - [ ] Each finding has category, severity, location, description, evidence
 - [ ] Findings appended to `cycle-state.yaml`
 - [ ] Analysis report produced with counts by severity and category
+- [ ] Structured output emitted matching the OUTPUT FORMAT contract: `metric_signal: bool`, `findings_count: int` (== len(findings)), `external_candidates_count: int`, `findings: list`, `external_research_candidates: list`
 
 ## FAILURE MODES
 

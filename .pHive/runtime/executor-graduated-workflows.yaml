@@ -1,0 +1,57 @@
+# Per-workflow executor graduation registry.
+# Workflows listed here run under the executor when
+# `.pHive/hive.config.yaml` has `executor_default: true` (or unquoted
+# YAML 1.1 `on`). Workflows are added during cutover events per the
+# locked Order 1-9 sequence (see structured-outline §3).
+#
+# Schema (canonical, matches hde-9a wrapper at
+# `hive/lib/dag_executor/__init__.py::_load_graduated_registry`):
+# top-level `workflows:` list of workflow-name strings. Missing file
+# OR malformed shape → empty list, default-safe orchestrator path.
+# Per-workflow rollback: removing a name rolls back ONLY that workflow.
+workflows:
+  # Order 1 (hde-10): acceptance cutover. AND-of-empty routing between
+  # `proposal` and `backlog-fallback` graduates from prose-narrated to
+  # mechanical YAML routing — structurally retires the metric_signal
+  # conflation bug class that produced PR #31. See
+  # tests/dag_executor/test_cutover_acceptance_meta_team_cycle.py and
+  # hive/decisions/001-executor-cutover.md (commit 4).
+  - meta-team-cycle
+  # Order 2 (hde-10): linear spine, 3 nodes. Lowest-risk production
+  # graduation; exercises the spine-parity invariant under live use.
+  - code-review
+  # Order 3 (hde-10): linear spine, 2 nodes. Mirror of code-review's
+  # post-implementation review shape; smallest production workflow.
+  - performance-audit
+  # Order 4 (hde-10): parallel fan-out validation in production. Two
+  # `execute-platform-*` nodes converge on `file-bugs` — exercises
+  # the hde-4 wave detection + barrier join path live.
+  - test-swarm
+  # Order 5 (hde-10): linear development workflow, 7 nodes. First
+  # development methodology to graduate.
+  - development.tdd
+  # Order 6 (hde-10): the BDD methodology partner to TDD; tdd-codex
+  # validates hde-7 tool-gating + the macOS-only Codex pane in
+  # production (Linux CI runners skip the cross-model assertions).
+  - development.bdd
+  - development.tdd-codex
+  # Order 7 (hde-10): UI workflow + design-review. design-review
+  # validates hde-8 pause-gate semantics in production (the
+  # blocking/needs_revision/needs_redesign verdict drives downstream
+  # design-team rework via operator-written sentinels).
+  - ui-design
+  - design-review
+  # Order 8 (hde-10): Q9 path-A YAML-level decomposition. The legacy
+  # `implement` step is split into `backend-implement` + `frontend-implement`
+  # nodes, each gated by a `when:` predicate against story-domain booleans
+  # surfaced by `preflight`. Empty-domain stories skip both implement
+  # nodes; the multi-upstream `test` step's `none_failed_min_one_success`
+  # trigger_rule cascades a SKIP through the rest of the pipeline. See
+  # tests/dag_executor/test_classic_implement_decomposition.py and
+  # hive/references/story-spec-schema.md.
+  - development.classic
+  # Order 9 (hde-10): post-hde-0 normalized daily-ceremony. The prose
+  # plan-approval gate now ships as a declarative `node_type: pause`
+  # node (`plan-approval`); operator sentinels at
+  # `<runs_root>/<run_id>/pause/plan-approval.{approve,reject}`.
+  - daily-ceremony

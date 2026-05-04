@@ -250,15 +250,61 @@ The hard ceiling is a security floor — a forgotten "no timeout" pause cannot h
 | Reject sentinel verified | `SUSPENDED` → `FAILED` (via `mark_failed`) | `pause_rejected` (payload carries the reason) |
 | Timeout elapsed | `SUSPENDED` → `FAILED` (via `mark_failed`) | `pause_timeout` |
 
-## Forthcoming Additive Fields
+## Predicate Routing (`when:`)
 
-The DAG executor (epic `hive-dag-executor`) loads the following fields without erroring; their semantics are enforced by later stories. Workflow authors may include them today, but no behavioral change occurs until the corresponding handler ships.
+Per-step `when:` is a strict-Archon predicate evaluated against the materialised output graph of upstream steps before dispatch. When the predicate evaluates False (or fails closed), the step is skipped — the walker emits `predicate_evaluated` (with the result) and `node_skipped` (with `reason: when_predicate_false`).
 
-| Field | Scope | Loaded? | Enforced by |
-|-------|-------|---------|-------------|
-| `when` | per-step / edge | yes (round-trips on the model) | hde-3a (predicate evaluator) |
-| `trigger_rule` | per-step | placeholder; loader passthrough | hde-3a (trigger-rule policy) |
+```yaml
+steps:
+  - id: triage
+    agent: researcher
+    outputs:
+      - name: metric_signal
+        type: json
 
-`when:` is intended as a per-step or per-edge predicate that gates whether the step runs at all (distinct from `skip_when`, which evaluates against the workflow context rather than upstream-edge truth values). `trigger_rule` will let a step declare `all_success | any_success | always` semantics over its `depends_on` set.
+  - id: deep-dive
+    agent: researcher
+    depends_on: [triage]
+    when: "$triage.output.metric_signal == true"
+```
 
-These fields are documented here so workflow authors can plan for them; until the enforcing handlers ship, including these fields has no runtime effect.
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `when` | string | null | Strict-Archon predicate; False or fail-closed skips the step. Distinct from `skip_when` (which gates on workflow context). |
+
+The grammar — operators, fail-closed semantics, change_verdict / cycle_verdict disambiguation, and the cultural lock that grammar additions require an epic — is documented in [`predicate-grammar.md`](./predicate-grammar.md). Workflow authors should read that doc before adding any `when:` predicate.
+
+## Multi-Upstream Joins (`trigger_rule`)
+
+Steps with multiple `depends_on` entries (multi-upstream joins) are gated by a single trigger-rule policy:
+
+| Trigger rule | Behaviour |
+|--------------|-----------|
+| `none_failed_min_one_success` (default and only) | RUN iff at least one upstream completed; SKIP otherwise. Failed upstreams convert to SKIP for the candidate node — failure does NOT cascade as failure. |
+
+The policy name is intentionally explicit and fixed; alternative trigger rules (`all_success`, `any_success`, `always`, `one_failed`) are NOT supported. Adding one requires an epic — see [`predicate-grammar.md`](./predicate-grammar.md).
+
+Single-upstream nodes do not pass through the trigger-rule layer — the per-input `optional: true` semantics from [Conditional Skip](#conditional-skip-skip_when) and [Input Sources](#input-sources) preserve the legacy contract: an upstream optional failure surfaces as `None` on the downstream binding rather than skipping the downstream.
+
+## Executor Cutover — Additive + Registry-Gated
+
+The Hive DAG executor (`hive.lib.dag_executor`) is a deterministic alternative to the orchestrator-narrated execution path. Its rollout is **additive**: graduating a workflow to the executor does not break, change, or version the workflow YAML schema. The same workflow file runs unchanged under either path; the executor lights up the structured `output_format` contracts (hde-3b) and `when:` predicates (hde-3a) when present, and falls back to prose-output equivalents otherwise.
+
+Cutover gating is per-consumer and per-workflow:
+
+- **Consumer flag:** `.pHive/hive.config.yaml` (consumer-side, NOT shipped) carries `executor: hive-dag` and `executor_default: off|on`. Default OFF.
+- **Graduation registry:** `.pHive/runtime/executor-graduated-workflows.yaml` lists the workflow names that have been graduated to the executor. A workflow runs through the executor only when the consumer flag is on AND the workflow appears in the registry.
+- **Routing point:** `skills/execute/SKILL.md` step 5pre is the single dispatch point. See `hive/lib/dag_executor/__init__.py` for the `executor_enabled_for(workflow_name)` reader.
+
+Workflow authors do not need to schema-version their files when graduating. Existing workflows that pass spine-parity tests under the executor are graduation candidates.
+
+### Authoring forward — defaults for new workflows
+
+New workflow authors should default to executor-friendly shapes and treat prose-routed behaviour as deprecated. Specifically:
+
+- **Routing decisions**: declare `when:` predicates against named output_format fields, not prose instructions. The strict-Archon grammar at `hive/references/predicate-grammar.md` is small on purpose; conformance to it is what makes routing mechanical.
+- **Step outputs**: declare structured `outputs:` with explicit names and types. Downstream `when:` predicates and `inputs:` bindings address those named fields.
+- **Step files**: include an `OUTPUT FORMAT` block listing the named fields the step is contracted to emit. The executor binds predicates by name; prose-only outputs that "encode" a routing signal in narrative are a deprecated pattern (see PR #31's metric_signal/findings conflation, structurally retired by hde-3b's output_format contract on `step-02-analysis`).
+- **Multi-domain forks**: declare two declarative nodes with `when:` predicates rather than a single prose step that branches inline. The grammar has no `contains` operator on purpose; pre-compute booleans on a story-context node's outputs and predicate against those (see `hive/references/story-spec-schema.md`).
+
+Workflows that ship today as prose-routed (and have not been graduated to the executor registry) continue to work unchanged. Treat that path as **maintenance-mode**: existing workflows are still supported under the orchestrator, but new prose-routed workflows are discouraged. The migration path is documented in `hive/decisions/001-executor-cutover.md`.
