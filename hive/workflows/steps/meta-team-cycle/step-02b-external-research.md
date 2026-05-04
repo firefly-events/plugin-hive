@@ -193,9 +193,9 @@ missing count is fail-closed False and silently misroutes step-03 vs
 step-03b. List-length parity (`external_candidates_count ==
 len(external_research_candidates)`) is a routing contract invariant.
 Step 03 declares `external-research` as a predecessor; the empty-list
-+ explicit-zero-count guarantee is how this step remains additive-only
-rather than a blocker on proposal. Downstream consumers treat an empty
-list identically to a missing one (additive = additive + ∅).
+plus explicit-zero-count guarantee is how this step remains
+additive-only rather than a blocker on proposal. Downstream consumers
+treat an empty list identically to a missing one (additive = additive + ∅).
 
 - No useful external ideas found: emit `external_research_candidates: []`
   AND `external_candidates_count: 0`, then proceed normally.

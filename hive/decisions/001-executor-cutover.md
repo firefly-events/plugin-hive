@@ -132,7 +132,7 @@ To graduate a custom workflow:
    as a template: drive the executor with a `StubAgentSpawn` and assert
    the materialised output graph matches the workflow's declared step
    set. The parity bar is structural (events compared on `event_type`
-   + `payload`, ignoring timestamps + run_id + path-introduced
+   plus `payload`, ignoring timestamps, run_id, and path-introduced
    identifiers). Roll back the workflow from the registry if the parity
    bar fails; fix; re-add.
 
