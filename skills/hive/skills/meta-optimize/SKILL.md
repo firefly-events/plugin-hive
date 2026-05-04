@@ -27,6 +27,7 @@ Before starting, verify all of the following:
 - Kickoff metrics opt-in is explicit and defaults OFF. If metrics are OFF, inform the user and stop, or continue only in backlog-backed mode when `{HIVE_TARGET_PROJECT}/.pHive/meta-team/queue-meta-optimize.yaml` is populated.
 - `HIVE_TARGET_PROJECT` resolves through `paths.target_project` in the root `hive.config.yaml`, with invoking cwd fallback when unset
 - The target project is a git repository with a clean working tree before creating the cycle worktree
+- `meta_optimize.kg_signal.enabled` (default `true`) controls the knowledge-graph proposal source. When `false`, step-02c is skipped entirely and routing falls through metrics → backlog (legacy behavior). Consumers without `kg.sqlite` see no behavioral change either way: step-02c emits empty findings and routing falls through to backlog.
 
 If the target is dirty, not a git repo, or unresolved, stop before boot and do not start the cycle.
 
@@ -76,11 +77,14 @@ Load and follow `hive/workflows/steps/meta-team-cycle/step-03-proposal.md` when 
 
 - Step 2 produced one or more `findings` (structural-audit signal), OR
 - Step 2b produced one or more `external_research_candidates`, OR
+- Step 2c produced one or more `kg_signal` proposals (knowledge-graph-derived findings), OR
 - A metric signal is present and yields ranked proposals (perf-baseline delta above threshold).
 
-Load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` ONLY when ALL three are empty: zero findings AND zero external candidates AND no usable metric signal. The public fallback branch is the "nothing-actionable-from-this-cycle" path, not the "no perf delta" path.
+Routing precedence is signal-first: metrics → external research → kg_signal → backlog. KG is checked BEFORE backlog because KG is automatic signal-derived input, while backlog is human-curated. Signal-first preserves the auto-improvement loop intent.
 
-`metric_signal` is a perf-baseline-only flag (orthogonal to findings). A cycle with findings but no perf delta MUST route to step-03, not step-03b. Kickoff metrics opt-out (no baseline ever captured) plus zero findings plus zero external candidates is the canonical case for step-03b.
+Load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` ONLY when ALL four are empty: zero findings AND zero external candidates AND zero kg_signal AND no usable metric signal. The public fallback branch is the "nothing-actionable-from-this-cycle" path, not the "no perf delta" path.
+
+`metric_signal` is a perf-baseline-only flag (orthogonal to findings, external candidates, and kg_signal). A cycle with findings, external candidates, or kg_signal but no perf delta MUST route to step-03, not step-03b. A cycle with kg_signal but metrics-thin still routes to step-03. Kickoff metrics opt-out (no baseline ever captured) plus zero findings plus zero external candidates plus zero kg_signal is the canonical case for step-03b.
 
 Do not run both branches for the same cycle. The public fallback branch consumes the consumer-managed backlog file at `{HIVE_TARGET_PROJECT}/.pHive/meta-team/queue-meta-optimize.yaml`.
 
@@ -163,13 +167,14 @@ If the close gate fails:
 
 ## Backlog Fallback
 
-Trigger this branch only when all three actionable inputs are empty:
+Trigger this branch only when all four actionable inputs are empty:
 
 - step 2 `findings` is empty (zero structural-audit findings)
 - step 2b `external_research_candidates` is empty
+- step 2c `kg_signal` is empty (zero knowledge-graph-derived findings, or `meta_optimize.kg_signal.enabled: false`, or `kg.sqlite` absent)
 - no usable `metric_signal` is present (kickoff metrics opt-out, OR opt-in with no perf delta above threshold)
 
-`metric_signal` is a perf-baseline-only flag and is orthogonal to findings. A cycle that produced findings but no perf delta MUST route to step-03, not step-03b. The canonical case for step-03b is "metrics opt-out + zero findings + zero external candidates".
+`metric_signal` is a perf-baseline-only flag and is orthogonal to findings, external candidates, and kg_signal. A cycle that produced any of those but no perf delta MUST route to step-03, not step-03b. The canonical case for step-03b is "metrics opt-out + zero findings + zero external candidates + zero kg_signal".
 
 Consumer backlog location:
 

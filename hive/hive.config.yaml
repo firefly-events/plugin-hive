@@ -164,6 +164,19 @@ meta_team:
                              # when false, meta-team only optimizes locally
                              # when true, out-of-scope plugin issues are filed as GitHub issues
 
+# Meta-optimize cycle inputs
+# Knowledge-graph-derived signal source. Step-02c reads kg.sqlite for triples
+# within the recency window; if non-empty, step-03 routes through the
+# kg_signal proposal source before falling back to backlog.
+# When `enabled: false`, step-02c is skipped entirely and routing falls
+# through metrics → backlog (legacy behavior). Consumers without kg.sqlite
+# see no behavioral change either way.
+meta_optimize:
+  kg_signal:
+    enabled: true              # set false to disable kg_signal source
+    window_days: 30            # recency window for triple inclusion
+    cross_project_penalty: 0.7 # rank multiplier for cross-project signal
+
 # Planning settings
 planning:
   collaborative_review: true   # set to false to skip collaborative review gates

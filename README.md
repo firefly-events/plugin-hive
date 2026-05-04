@@ -1,9 +1,17 @@
+<!-- markdownlint-disable MD033 -->
+<p align="center">
+  <img src="assets/hive-logo.svg" width="140" alt="Hive logo — pointy-top hex with adjacent cells forming">
+</p>
+<!-- markdownlint-enable MD033 -->
+
 # Hive
 
-**Multi-agent workflow orchestration for Claude Code** — plan, build, test, and review software with coordinated AI teams.
+> **A director's chair for the agentic SDLC — disciplined swarms, kickoff to ship.**
+
+A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-1.1.4-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
@@ -23,13 +31,27 @@ Everything else — research, implementation, test authoring, fix loops, code re
 
 ---
 
+## Inspirations
+
+Hive stands on the shoulders of the agentic-engineering community. We borrow patterns and posture from camps that came before us:
+
+- **[IndyDevDan](https://www.youtube.com/@indydevdan)** — agentic engineering as a *practice*; videos, principles, taste
+- **QRISPY** — builder workflows and real-world Claude Code patterns
+- **[BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)** — structured multi-agent methodology and role taxonomy
+- **[archon](https://github.com/coleam00/archon)** — orchestration runtime and agent-execution patterns
+- **[Andrej Karpathy](https://karpathy.ai)** — the intellectual current of software 2.0/3.0
+
+We don't compete with them; we synthesize, in a specific shape, on a specific surface (Claude Code), and put it in the open. Where their patterns show up in Hive, the credit travels with the claim.
+
+---
+
 ## Features
 
-- **Multi-agent teams** — 20 specialized personas (analyst, architect, developer, tester, reviewer, and more) coordinate through structured workflows
+- **Multi-agent teams** — 25 specialized personas (analyst, architect, developer, tester, reviewer, and more) coordinate through structured workflows
 - **Cross-model execution** — route implementation and planning agents to OpenAI Codex while Claude handles orchestration, review, and gating — reduces cost and model bias
 - **Structured planning** — decompose requirements into dependency-tracked stories with horizontal/vertical planning for medium and large features
 - **Test swarm** — 5-agent pipeline runs tests across platforms, files bugs, and routes fixes automatically
-- **Layered memory system** — agents accumulate cross-project knowledge in a compiled wiki with TTL-aware staleness tracking
+- **Layered memory (L0–L3)** — sessions persist decisions to a cross-project knowledge graph; agents read prior decisions on spawn, with optional ChromaDB semantic recall
 - **Daily ceremony** — standup → planning → execution → review cycle with quality gates and human touchpoints
 - **Extensible by design** — add agents, skills, workflows, and teams without touching core code
 
@@ -55,6 +77,8 @@ Everything else — research, implementation, test authoring, fix loops, code re
 ```
 
 Alternatively, run `/plugin` and use the **Discover** tab to browse and install interactively.
+
+> **Migrating from a pre-1.1.2 install?** The default state directory was renamed `state/` → `.pHive/` in 1.1.2. See [CHANGELOG](CHANGELOG.md) for the auto- and manual-migration paths.
 
 ---
 
@@ -147,21 +171,86 @@ PR-style artifact instead of mutating `main` directly.
 - A close record containing `pr_ref`, `pr_state`, and rollback references.
 - Baseline and candidate metrics snapshots captured for comparison at close.
 
-**Backlog fallback**
+**Proposal sources**
 
-When the metrics signal is insufficient to rank a candidate, the skill falls
-back to the consumer-managed backlog at:
+`/meta-optimize` ranks candidate experiments from up to four input sources,
+in precedence order:
 
-`{target}/.pHive/meta-team/queue-meta-optimize.yaml`
+1. **Metrics** — structural-audit findings keyed off opted-in metric dimensions
+2. **External research** — trending-advancements signal from the optional research loop
+3. **kg_signal** — knowledge-graph-derived findings (`phase_failed`, `phase_blocked`, `superseded` triples) from prior cycles, including cross-project history when a system-level KG is bootstrapped
+4. **Backlog** — human-curated proposals at `{target}/.pHive/meta-team/queue-meta-optimize.yaml` (edit-only; the skill never auto-populates it)
 
-That file is human-edit-only. The skill reads it as a fallback proposal source;
-it does not auto-populate backlog items for you.
+When earlier sources don't produce a rankable candidate, the skill falls
+through to the next. Consumers without `~/.claude/hive/kg.sqlite` get the
+metrics → external research → backlog flow with no behavioral change.
+
+The kg_signal source is configured under `meta_optimize.kg_signal` in
+`hive/hive.config.yaml`:
+
+```yaml
+meta_optimize:
+  kg_signal:
+    enabled: true              # set false to skip step-02c entirely (legacy routing)
+    window_days: 30            # recency window for triple inclusion
+    cross_project_penalty: 0.7 # rank multiplier applied to cross-project signal
+```
+
+Setting `enabled: false` reverts routing to the pre-1.1.4 metrics → backlog flow.
 
 `/meta-meta-optimize` is maintainer-local and is not part of the shipped
 consumer command surface.
 
 For the detailed operating contract, see
-[`skills/hive/skills/meta-optimize/SKILL.md`](skills/hive/skills/meta-optimize/SKILL.md).
+[`skills/hive/skills/meta-optimize/SKILL.md`](skills/hive/skills/meta-optimize/SKILL.md)
+and [`hive/references/meta-optimize-contract.md`](hive/references/meta-optimize-contract.md).
+
+---
+
+## Memory architecture
+
+Hive persists agent knowledge across sessions, stories, and projects through a
+four-tier memory system. Each tier handles a different time and recall horizon
+so insights don't get lost when a session compacts or a story closes.
+
+| Tier | Substrate | Scope | What lives here |
+|------|-----------|-------|-----------------|
+| **L0** | Session insights (per-agent JSONL) | Single session | Raw observations captured during a run |
+| **L1** | Compiled wiki (Markdown) | Per agent, all projects | Curated patterns, conventions, lessons |
+| **L2** | Knowledge graph (`~/.claude/hive/kg.sqlite`) | Cross-project | Time-versioned subject–predicate–object decisions |
+| **L3** | ChromaDB semantic index *(optional)* | Per agent | Embedding-based recall over L0+L1 corpus |
+
+**L2 — Knowledge graph.** Decisions, lifecycle events, and dependencies are
+written as triples with a controlled predicate vocabulary (`decided`,
+`superseded`, `assigned_to`, `blocked_by`, `depends_on`, `phase_started`,
+`phase_complete`, `phase_failed`, `phase_blocked`). The KG is a WAL-mode SQLite
+file at `~/.claude/hive/kg.sqlite` with an `idx_unique_triple` invariant on
+`(subject, predicate, object, source_epic)`. Agent spawn injects a "Decision
+Context" block from `query_decisions({entity})` so a new agent reads what was
+already decided before it starts. See [`hive/references/knowledge-graph-schema.md`](hive/references/knowledge-graph-schema.md).
+
+**L3 — ChromaDB semantic recall.** Optional sidecar that wraps a local
+ChromaDB instance via JSON-RPC. When the sidecar is unavailable, Hive
+**degrades gracefully to L1+L0** — no consumer setup required to use the rest
+of the stack.
+
+**Session-end orchestration.** Every session closes with a three-phase write:
+insights → `kg_write` → compile in parallel with `chromadb.index`. KG failures
+surface as errors; ChromaDB failures warn-only. See
+[`skills/hive/skills/session-end/SKILL.md`](skills/hive/skills/session-end/SKILL.md).
+
+**Bootstrapping the KG from existing projects.** A system-level registry at
+`~/.claude/hive/projects.yaml` lists Hive-using project roots. Run
+[`scripts/kg-bootstrap-from-projects.js`](scripts/kg-bootstrap-from-projects.js)
+to seed the KG with cross-project decision history. A separate one-time
+backfill, [`scripts/kg-import-cycle-state.js`](scripts/kg-import-cycle-state.js),
+imports legacy `.pHive/cycle-state/*.yaml` records into the KG.
+
+For the authoritative tier table, store interface, and filter API, see
+[`hive/references/memory-store-interface.md`](hive/references/memory-store-interface.md).
+The forward-looking [`hive/references/session-system-prompt-spec.md`](hive/references/session-system-prompt-spec.md)
+describes how memory composes into session prompts; it's the foundation for
+the upcoming Phase 2 Managed Agent API migration.
 
 ---
 
@@ -205,6 +294,8 @@ flowchart TB
 
 Each story produces a working, committed state. Quality gates run between phases. The orchestrator routes bugs from the test swarm back to the dev team and tracks circuit-breaker limits to prevent runaway loops.
 
+Underneath the pipeline, the L0–L3 memory system and KG (described above) persist decisions across sessions and projects so subsequent agents pick up where prior ones left off.
+
 For full operational detail, see [docs/operations-guide.md](docs/operations-guide.md).
 
 ---
@@ -215,7 +306,7 @@ For full operational detail, see [docs/operations-guide.md](docs/operations-guid
 |-------------|---------|-------|
 | **Frame0** | UI wireframe generation by the ui-designer agent | `frame0` CLI in PATH |
 | **Codex** | Optional second-model review or full per-agent implementation backend via `agent_backends` | `npm install -g @openai/codex && codex login` |
-| **cmux** | Visible multi-agent split panes for Codex-backed execution paths | `brew install --cask cmux` |
+| **cmux** | Native parallel team execution backend — orchestrator manages stories in cmux panes via the v2 JSON-RPC API | `brew install --cask cmux` |
 | **Linear** | Task tracking adapter — stories sync to Linear issues | Set `task_tracker: linear` in `hive/hive.config.yaml` |
 | **GitHub Issues** | Task tracking adapter | Set `task_tracker: github` in `hive/hive.config.yaml` |
 | **Jira** | Task tracking adapter | Set `task_tracker: jira` in `hive/hive.config.yaml` |
@@ -228,11 +319,11 @@ Enable integrations in `hive/hive.config.yaml`. All integrations are optional �
 
 Hive is built to grow. Each component is a discrete file you can add or replace:
 
-**Add an agent** — create a `.md` file in `.claude-plugin/agents/` with YAML frontmatter (`name`, `description`, `model`, `tools`). See `references/agent-config-schema.md`.
+**Add an agent** — create a `.md` file in `hive/agents/` with YAML frontmatter (`name`, `description`, `model`, `tools`). See [`hive/references/agent-config-schema.md`](hive/references/agent-config-schema.md).
 
-**Add a skill** — create a `.md` file in `.claude-plugin/skills/`. Skills are prompt templates invoked via `/hive:<skill-name>`.
+**Add a skill** — create a `SKILL.md` under `skills/<skill-name>/` (consumer slash commands) or `skills/hive/skills/<name>/` (internal orchestration skills). Skills auto-register via `./skills/` in `.claude-plugin/plugin.json`.
 
-**Add a workflow** — create a YAML file in `hive/workflows/` following the workflow schema. Assign it to stories via `methodology` in `hive.config.yaml`. See `references/workflow-schema.md`.
+**Add a workflow** — create a YAML file in `hive/workflows/` following the workflow schema. Assign it to stories via `methodology` in `hive.config.yaml`. See [`hive/references/workflow-schema.md`](hive/references/workflow-schema.md).
 
 **Compose a team** — create or edit a file in `.pHive/teams/`. Team configs define members, roles, domain restrictions, and methodology. The orchestrator loads them at execution time.
 

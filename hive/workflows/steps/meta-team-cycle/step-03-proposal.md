@@ -69,6 +69,26 @@ step-02b's guaranteed-output contract). Before ranking:
 
 The merged pool is the input to Step 3 ranking.
 
+### 2c. Merge kg_signal findings into the eligible pool
+
+Step `kg-signal` (step-02c) supplies a `kg-findings.yaml` file as a workflow
+input. When present, treat each entry as an eligible analysis finding (the
+step-02 shape, NOT the step-02b candidate shape). Before ranking:
+
+- Tag each entry with `discovery_source: kg_signal` if that field isn't
+  already set on it.
+- De-duplicate against grouped internal findings from Step 2: if a kg entry
+  overlaps a grouped internal finding, prefer the internal-derived proposal
+  (it has concrete finding evidence) but append the kg entry's `rationale`
+  text as additional context on the merged proposal. Same precedence rule as
+  external candidates in 2b. Do not silently drop the kg evidence.
+- IDs: kg findings use `kg-finding-{N}` per step-02c's namespace. Consumers
+  MUST accept this prefix alongside `proposal-{N}` (internal) and
+  `external-proposal-{N}` (external). The `discovery_source` field is the
+  authoritative feed identifier, not the ID prefix.
+- Absence-graceful: if `kg-findings.yaml` is missing or empty, fall through
+  to existing behavior with no error.
+
 ### 3. Rank proposals
 Score each proposal on three dimensions (1–5 each):
 - **Impact:** How much does this improve Hive's quality/usability? (5 = blocks real usage, 1 = cosmetic)
@@ -84,7 +104,7 @@ For each proposal (top 5 by priority):
 ```yaml
 id: proposal-{N}
 title: {one-line title}
-discovery_source: internal_audit  # or: external_research
+discovery_source: internal_audit  # or: external_research, kg_signal
 addresses_findings: [finding-{N}, ...]
 impact_score: {1-5}
 risk_score: {1-5}
@@ -101,7 +121,7 @@ risk_notes: |
   {What could go wrong, what to check before shipping}
 ```
 
-> **Backward compatibility:** Proposals written before this field was added (i.e., proposals without a `discovery_source` entry) default to `internal_audit` for schema-handling purposes. Do NOT reject or fail a proposal for a missing `discovery_source` field — treat it as the default.
+> **Backward compatibility:** Proposals written before this field was added (i.e., proposals without a `discovery_source` entry) default to `internal_audit` for schema-handling purposes. Do NOT reject or fail a proposal for a missing `discovery_source` field — treat it as the default. Valid `discovery_source` values are: `internal_audit`, `external_research`, `kg_signal`.
 
 ### 5. List skipped findings
 Document all findings that were skipped:
