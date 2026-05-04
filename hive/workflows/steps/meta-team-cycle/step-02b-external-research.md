@@ -162,7 +162,15 @@ Expected handoff:
 external_research_candidates:
   - {proposal object with usual step-03 fields, discovery_source: external_research}
 research_summary: {string summary of provider usage and notable candidate themes}
+external_candidates_count: {int — MUST equal len(external_research_candidates), 0 when the list is empty}
 ```
+
+`external_candidates_count` is the executor-facing companion of
+`external_research_candidates`. The DAG executor's `when:` predicates
+bind to it by explicit field name because the strict-Archon grammar
+does not support `len(...)` — see `hive/references/predicate-grammar.md`.
+List-length parity is a contract invariant; diverging counts will
+silently misroute step-03 vs step-03b.
 
 ## SUCCESS METRICS
 
@@ -171,25 +179,36 @@ research_summary: {string summary of provider usage and notable candidate themes
 - [ ] Every candidate includes `discovery_source: external_research`
 - [ ] Output is shaped for direct consumption by step 3 proposal ranking
 - [ ] Internal-audit proposals remain intact and unsuppressed
+- [ ] `external_candidates_count` emitted as int and equal to `len(external_research_candidates)` (0 when the list is empty)
 
 ## FAILURE MODES
 
-**Guaranteed output contract:** this step ALWAYS emits a
-`external_research_candidates` list as its output, including an explicit empty
-list `[]` when no candidates qualify. Step 03 declares `external-research` as
-a predecessor; the empty-list guarantee is how this step remains additive-only
-rather than a blocker on proposal. Downstream consumers treat an empty list
-identically to a missing one (additive = additive + ∅).
+**Guaranteed output contract:** this step ALWAYS emits BOTH an
+`external_research_candidates` list AND an `external_candidates_count`
+integer. When no candidates qualify, the list is an explicit empty
+list `[]` AND the count MUST be emitted as `external_candidates_count: 0`
+(not omitted). The DAG executor's `when:` predicates bind to the count
+by explicit field name (strict-Archon grammar, no `len(...)`); a
+missing count is fail-closed False and silently misroutes step-03 vs
+step-03b. List-length parity (`external_candidates_count ==
+len(external_research_candidates)`) is a routing contract invariant.
+Step 03 declares `external-research` as a predecessor; the empty-list
++ explicit-zero-count guarantee is how this step remains additive-only
+rather than a blocker on proposal. Downstream consumers treat an empty
+list identically to a missing one (additive = additive + ∅).
 
-- No useful external ideas found: emit an empty candidate list and proceed normally.
+- No useful external ideas found: emit `external_research_candidates: []`
+  AND `external_candidates_count: 0`, then proceed normally.
 - Provider unavailable (Firecrawl/Context7/arXiv network or auth error):
-  continue with remaining providers if any; if ALL providers fail, emit an
-  empty candidate list, note the full provider-outage in the summary, and
-  proceed normally. Do NOT fail the step.
+  continue with remaining providers if any; if ALL providers fail, emit
+  `external_research_candidates: []` AND `external_candidates_count: 0`,
+  note the full provider-outage in the summary, and proceed normally. Do
+  NOT fail the step.
 - Sanitizer refusal: log the refusal, skip that query, continue with remaining
-  queries. If every query is refused, emit an empty candidate list.
+  queries. If every query is refused, emit `external_research_candidates: []`
+  AND `external_candidates_count: 0`.
 - Candidate too vague to implement: discard it rather than passing low-quality
-  noise to step 3.
+  noise to step 3; recompute `external_candidates_count` against the surviving list.
 
 ## NEXT STEP
 

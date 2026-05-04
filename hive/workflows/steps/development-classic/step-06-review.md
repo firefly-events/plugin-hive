@@ -1,5 +1,24 @@
 # Step 6: Review
 
+## OUTPUT FORMAT (executor contract)
+
+Step output is a JSON object matching this schema. The DAG executor
+binds downstream `when:` predicates to these fields; missing fields
+fail-closed (downstream skips with a `predicate_evaluated` warning
+event per `hive/references/predicate-grammar.md`).
+
+```yaml
+output_format:
+  change_verdict: str   # one of: passed | needs_optimization | needs_revision
+  critical_findings: list  # [{category: str, file: str, line: int, message: str}]
+  needs_fix_loop: bool  # true when change_verdict != "passed"
+```
+
+Predicates referencing the change-level verdict MUST use the explicit
+field name `$step.output.change_verdict`. Bare `$step.output.verdict`
+is undefined under this contract and fail-closes to False — see
+predicate-grammar.md Risk #13.
+
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
 - You are a DIFFERENT agent from the developer — fresh context, no shared state
@@ -88,6 +107,27 @@ If the story has a `cross_cutting` section:
 - **passed** — no critical findings, all AC satisfied, tests meaningful
 - **needs_optimization** — no blockers, but improvements would help (triggers step 7)
 - **needs_revision** — critical issues that must be fixed (triggers fix loop or replanning)
+
+### 6. Emit structured output (executor contract)
+
+In addition to the prose verdict above, emit a JSON object matching the
+OUTPUT FORMAT declared at the top of this file. Predicate-evaluator
+fail-closed semantics: omit a required field and downstream `when:`
+predicates skip with a warning — see `hive/references/predicate-grammar.md`.
+
+```json
+{
+  "change_verdict": "passed | needs_optimization | needs_revision",
+  "critical_findings": [
+    {"category": "security", "file": "file.ts", "line": 42, "message": "..."}
+  ],
+  "needs_fix_loop": false
+}
+```
+
+Set `needs_fix_loop: true` whenever `change_verdict != "passed"`. The
+orchestrator-narrated path consumes the prose section; the executor
+path binds to this JSON. Both must agree.
 
 ## SUCCESS METRICS
 
