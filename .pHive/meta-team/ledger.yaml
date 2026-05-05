@@ -7,11 +7,8 @@
   changes_reverted: 0
   findings_identified: 2
   top_changes:
-    - hive/workflows/steps/meta-team-cycle/step-02b-external-research.md: updated
-        Providers section to reflect tool availability after PR #43 (WebSearch/WebFetch
-        listed as primary; Firecrawl noted as deferred)
-    - skills/hive/agents/memories/security-reviewer/: created starter memory directory
-        with binary-verdict-only.md (binary verdict rule for security reviews)
+    - "hive/workflows/steps/meta-team-cycle/step-02b-external-research.md: updated Providers section to reflect tool availability after PR #43 (WebSearch/WebFetch listed as primary; Firecrawl noted as deferred)"
+    - "skills/hive/agents/memories/security-reviewer/: created starter memory directory with binary-verdict-only.md (binary verdict rule for security reviews)"
   commit: 8f664a5333e0b93e778508a195c5ab49121a2a80
   metrics_snapshot:
     tokens: 0
