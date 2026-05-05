@@ -1,25 +1,30 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-05-01 | **Date:** 2026-05-01 | **Verdict:** PASSED
+**Cycle:** meta-2026-05-02 | **Date:** 2026-05-02 | **Verdict:** passed
 
 ---
 
 ## What Changed Tonight
 
-- **`hive/references/meta-optimize-maintainer.md`** — Expanded from a 5-line stub to a
-  57-line reference doc. Added: purpose statement, nightly cycle procedure summary,
-  MVS proof section (retaining the existing pytest command), key files table, and
-  scope & charter section. Addresses STUB_DOC finding from today's structural audit.
+- **`hive/workflows/steps/meta-team-cycle/step-02c-kg-signal.md`** — Corrected "When
+  this step runs" section: removed the false claim that step-02c is wired into
+  `hive/workflows/development.classic.workflow.yaml` (that file contains no kg-signal
+  step). Replaced with accurate reference to the `/meta-optimize` SKILL routing
+  (`skills/hive/skills/meta-optimize/SKILL.md`). Addresses SCHEMA_INCONSISTENCY finding.
 
-- **`hive/workflows/steps/meta-team-cycle/step-07-promotion.md`** — Normalized
-  `## Execution Protocols` header to `## EXECUTION PROTOCOLS` (all-caps) to match
-  every other step file. Addresses SCHEMA_INCONSISTENCY finding; grep-based section
-  completeness checks in step-02 analysis will now detect this section correctly.
+---
+
+## Infrastructure Update
+
+- First cycle writing lifecycle state to swarm-specific paths
+  (`.pHive/meta-meta-optimize/cycle-state.yaml`, `.pHive/meta-meta-optimize/ledger.yaml`)
+  per A2.5 migration. Legacy `.pHive/meta-team/` paths also updated for compatibility
+  during the A2.6/A2.7 migration window.
 
 ---
 
 ## What Was Found (Not Fixed This Cycle)
 
-Nothing deferred. Both findings were addressed by proposals.
+Nothing deferred. The one finding (SCHEMA_INCONSISTENCY) was addressed by the proposal.
 
 ---
 
@@ -33,18 +38,18 @@ Nothing deferred. Both findings were addressed by proposals.
 
 | Metric | Count |
 |--------|-------|
-| Findings identified | 2 |
-| Proposals generated | 2 |
-| Changes promoted | 2 |
+| Findings identified | 1 |
+| Proposals generated | 1 |
+| Changes promoted | 1 |
 | Changes reverted | 0 |
 | Flagged for human | 0 |
 | Cycle verdict | passed |
 
-**Commit:** `4eb7b45c0d37699c593f6f55b0928d41ff19d304`
-**Rollback ref:** `c83fc8dfb3dce8e64bd0b79d6ef48abdb889effd`
-**Regression watch:** armed through 2026-05-01T04:10:00Z
+**Commit:** `a3af5365a07e6c3d170e7e7406d835da66174501`
+**Rollback ref:** `5c4248aafc7522b97699024f515691edb96ade54`
+**Regression watch:** armed through 2026-05-02T04:10:00Z
 
-**Next cycle priority:** queue candidate `mmo-2026-04-21-003` (ledger.yaml provenance
-comment) is the only remaining `status: pending` entry with no ledger record.
-Consider updating queue status for `mmo-2026-04-21-001` and `mmo-2026-04-21-002`
-to `completed` so the queue state reflects actual history.
+**Next cycle priority:** Standard 6-check audit. Queue candidates
+`mmo-2026-04-21-001`, `mmo-2026-04-21-002`, `mmo-2026-04-21-003` remain
+`status: pending` in the queue despite prior ledger records — consider
+human update of queue statuses.

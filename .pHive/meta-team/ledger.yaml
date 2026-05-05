@@ -1,3 +1,26 @@
+- experiment_id: meta-2026-05-02
+  date: '2026-05-02'
+  started: '2026-05-02T00:00:00Z'
+  closed: '2026-05-02T00:10:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 1
+  top_changes:
+    - hive/workflows/steps/meta-team-cycle/step-02c-kg-signal.md: corrected false
+        development.classic.workflow.yaml reference in "When this step runs" section
+  commit: a3af5365a07e6c3d170e7e7406d835da66174501
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 39
+    first_attempt_pass: true
+  rollback_ref: 5c4248aafc7522b97699024f515691edb96ade54
+  notes: |
+    One SCHEMA_INCONSISTENCY finding: step-02c-kg-signal.md cited
+    development.classic.workflow.yaml as a wiring location, but that file had no
+    kg-signal step. Fix removes the inaccurate reference, pointing to the correct
+    /meta-optimize SKILL routing. First cycle writing to swarm-specific paths
+    (.pHive/meta-meta-optimize/) per A2.5 migration.
 - experiment_id: meta-2026-05-01
   date: '2026-05-01'
   started: '2026-05-01T00:00:00Z'
