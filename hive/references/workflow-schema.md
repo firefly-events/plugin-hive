@@ -308,3 +308,14 @@ New workflow authors should default to executor-friendly shapes and treat prose-
 - **Multi-domain forks**: declare two declarative nodes with `when:` predicates rather than a single prose step that branches inline. The grammar has no `contains` operator on purpose; pre-compute booleans on a story-context node's outputs and predicate against those (see `hive/references/story-spec-schema.md`).
 
 Workflows that ship today as prose-routed (and have not been graduated to the executor registry) continue to work unchanged. Treat that path as **maintenance-mode**: existing workflows are still supported under the orchestrator, but new prose-routed workflows are discouraged. The migration path is documented in `hive/decisions/001-executor-cutover.md`.
+
+## Ceremony Workflow Variant
+
+The `daily-ceremony.workflow.yaml` uses `phases:` as the top-level collection key instead of `steps:`. This is an intentional semantic distinction: the daily ceremony is an orchestrator-driven coordination ceremony rather than a multi-agent development workflow. The `phases:` key signals that entries represent ordered ceremony phases, not parallelisable agent task steps.
+
+Ceremony workflow phases follow the same per-entry structure as development steps (each phase has `id:`, `step_file:`, and related fields) but have two operational differences from development workflows:
+
+1. **Sequential only** — phases run in declared order; the `depends_on` mechanism does not apply
+2. **Orchestrator-executed** — the orchestrator works through all phases itself; no sub-agent roster is spawned per phase
+
+When auditing or validating workflow YAML files, treat `phases:` as a recognised variant of `steps:` for ceremony workflows. Do not flag `phases:` as a schema violation in `daily-ceremony.workflow.yaml`.
