@@ -8,10 +8,17 @@ Add an external-research pass between analysis and proposal so the meta-team can
 
 ## Providers
 
-The research agent may query these external sources:
-- Firecrawl
-- Context7
-- arXiv
+The research agent may query external sources using its granted tools. Current tool availability (as of PR #43, 2026-05-04):
+
+| Tool | Status | Notes |
+|------|--------|-------|
+| **WebSearch** | Available | Always-grantable; use for arXiv, general web research |
+| **WebFetch** | Available | Always-grantable; use for fetching specific URLs |
+| **Context7 MCP** (`mcp__context7__*`) | Available | Requires the Context7 MCP server to be mounted in the session |
+| **Firecrawl** | Deferred — NOT available | Requires Bash grant; deferred per PR #43 scope decision |
+
+Use WebSearch/WebFetch as the primary research path. Fall back to WebSearch for arXiv searches. Use Context7 MCP when library documentation is needed and the server is mounted.
+
 Use them to identify relevant ideas, patterns, safeguards, or implementation approaches that could improve Hive within charter scope.
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
