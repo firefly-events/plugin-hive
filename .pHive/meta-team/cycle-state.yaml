@@ -3,7 +3,7 @@ story: BL2.2
 slice: S9
 started: '2026-05-05T00:00:00Z'
 closed: '2026-05-05T00:15:00Z'
-status: closing
+status: closed
 phase: close
 branch: meta-meta/nightly-20260505
 charter_constraints:
