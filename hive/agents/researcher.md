@@ -11,7 +11,16 @@ skills: []
   # - path: ~/.claude/skills/get-api-docs/SKILL.md
   #   use-when: "needing current documentation for a third-party library, SDK, or API"
   #   optional: true
-tools: ["Grep", "Glob", "Read"]
+tools:
+  - Grep
+  - Glob
+  - Read
+  - WebSearch
+  - WebFetch
+  - mcp__context7__resolve-library-id
+  - mcp__context7__query-docs
+  - mcp__plugin_context7_context7__resolve-library-id
+  - mcp__plugin_context7_context7__query-docs
 required_tools:
   - name: firecrawl
     type: mcp
