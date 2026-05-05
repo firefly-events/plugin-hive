@@ -1,3 +1,31 @@
+- experiment_id: meta-2026-05-05
+  date: '2026-05-05'
+  started: '2026-05-05T03:00:00Z'
+  closed: '2026-05-05T03:28:00Z'
+  verdict: passed
+  changes_promoted: 2
+  changes_reverted: 0
+  findings_identified: 2
+  top_changes:
+    - hive/workflows/steps/meta-team-cycle/step-02b-external-research.md: updated
+        Providers section to reflect tool availability after PR #43 (WebSearch/WebFetch
+        listed as primary; Firecrawl noted as deferred)
+    - skills/hive/agents/memories/security-reviewer/: created starter memory directory
+        with binary-verdict-only.md (binary verdict rule for security reviews)
+  commit: 8f664a5333e0b93e778508a195c5ab49121a2a80
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 28000
+    first_attempt_pass: true
+  rollback_ref: 60903e30db2ce22ab089e8e7746b73a696c2998e
+  notes: |
+    Nightly cycle meta-2026-05-05. Analysis found 2 findings: SCHEMA_INCONSISTENCY
+    in step-02b Providers section (stale after PR #43 researcher tool fix) and
+    MEMORY_GAP for security-reviewer (no starter memory directory). Both addressed.
+    Providers section now accurately lists WebSearch/WebFetch as available and
+    Firecrawl as deferred. Security-reviewer now has starter memory directory and
+    binary-verdict-only.md memory. Closure validator passed. Regression watch
+    armed for 4-hour window.
 - experiment_id: meta-2026-05-04
   date: '2026-05-04'
   started: '2026-05-04T00:00:00Z'
