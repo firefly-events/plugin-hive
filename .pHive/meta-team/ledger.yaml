@@ -1,3 +1,25 @@
+- experiment_id: meta-2026-05-07
+  date: '2026-05-07'
+  started: '2026-05-07T00:00:00Z'
+  closed: '2026-05-07T00:30:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 1
+  top_changes:
+    - "hive/workflows/steps/meta-team-cycle/step-08-close.md: renamed ## CYCLE COMPLETE to ## NEXT STEP to satisfy step-file-schema.md 7-section requirement"
+  commit: 626fc06627d252cb3ec51e2f8afbc49cbb9c4da2
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 20000
+    first_attempt_pass: true
+  rollback_ref: eb4fb7e64d00280e989d5b6b4d7c60314cf364c4
+  notes: |
+    Nightly cycle meta-2026-05-07. Analysis found 1 finding: INCOMPLETE_STEP_FILE
+    in step-08-close.md (## CYCLE COMPLETE header not in step-file-schema.md
+    7-section list). Fixed by renaming ## CYCLE COMPLETE to ## NEXT STEP and
+    reformatting content to the schema template. Closure validator passed.
+    Regression watch armed for 4-hour window.
 - experiment_id: meta-2026-05-05
   date: '2026-05-05'
   started: '2026-05-05T03:00:00Z'
