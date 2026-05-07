@@ -9,6 +9,44 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-05-07
+
+### Added
+- **Session-based execution path (memory-autonomy Phase 2).** New
+  opt-in `/v1/sessions` runtime brings session-aware story execution
+  to the `execute` skill as a top-priority mode. Ships a session
+  registry at `${HIVE_STATE_DIR}/sessions/index.yaml`
+  (`pending|active|completed|failed|stuck`) plus six lib modules
+  (`session-client`, `session-episode-writer`, `session-prompt-builder`,
+  `session-registry`, `session-sse-reader`, `session-turn-builder`),
+  the `hive/scripts/session-invoke.mjs` driver, and an SSE
+  stuck-detection + retry contract that replaces respawn for session
+  execution. Default OFF; consumers opt in via
+  `sessions.enabled: true` in `hive.config.yaml` or
+  `HIVE_SESSIONS_ENABLED=1`. The existing TeamCreate path
+  (step 6 / 6b cmux) is preserved unchanged.
+- **`hive/references/session-registry-schema.md`** and
+  **`hive/references/session-resilience.md`** — schema + resilience
+  contracts for the new path.
+- **`skills/hive/skills/session-registry/SKILL.md`** — bootstrap skill
+  for the registry.
+
+### Changed
+- `skills/execute/SKILL.md` — adds `step 6c` session execution block;
+  routes session sidecar injection through main's `appends[]` map and
+  the canonical `specialist-triggers.md` catalog.
+- `skills/hive/skills/respawn/SKILL.md` — callout that respawn does
+  not apply under the session execution path.
+- `hive/references/configuration.md` — documents the new `sessions.*`
+  config block.
+- `README.md` — version badge bumped to 1.2.1; ToC, revised North
+  Star, and QRSPI inspiration link landed via PR #47.
+
+### Chores
+- Backfill `integrate.yaml` episode stamps for all 13
+  `hive-dag-executor` stories (`hde-0` through `hde-10`).
+- Meta-meta nightly cycle for 2026-05-07 (telemetry + ledger).
+
 ## [1.2.0] - 2026-05-04
 
 ### Added

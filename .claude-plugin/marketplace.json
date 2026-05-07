@@ -25,7 +25,7 @@
       "name": "plugin-hive",
       "source": "./",
       "description": "Hive — multi-agent workflow orchestration for Claude Code. Decomposes requirements into dependency-tracked stories, executes them through planning → development → testing → review pipelines with quality gates, agent memories, and extensible workflows.",
-      "version": "1.2.0"
+      "version": "1.2.1"
     }
   ]
 }
