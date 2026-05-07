@@ -1,0 +1,19 @@
+step_id: integrate
+status: completed
+timestamp: "2026-05-02T15:07:20-05:00"
+agent: orchestrator
+shipped_via: "PR #37"
+backfilled_on: "2026-05-07"
+backfill_note: |
+  Story shipped to main via direct feature-branch PR (no per-step
+  episode authoring during execution). Backfilled to align episode state
+  with git ground truth per feedback_story_status_stale.
+artifacts:
+  - hive/lib/dag_executor/run_state.js
+  - hive/lib/dag_executor/resume.js
+commits:
+  - 6a7da97
+  - f77e52d
+notes: |
+  Run-state persistence + --resume primitives for hde-5; pause↔run-state
+  wiring + NestedWorktreeError + narrow-mutation resume hardening.

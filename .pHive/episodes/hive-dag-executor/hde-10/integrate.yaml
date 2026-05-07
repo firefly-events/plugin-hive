@@ -1,0 +1,27 @@
+step_id: integrate
+status: completed
+timestamp: "2026-05-02T23:31:18-05:00"
+agent: orchestrator
+shipped_via: "PR #37 + PR #40 + PR #39"
+backfilled_on: "2026-05-07"
+backfill_note: |
+  Story shipped to main as the cutover capstone — moved meta-team-cycle
+  and development.classic onto the executor. Backfilled to align episode
+  state with git ground truth per feedback_story_status_stale.
+artifacts:
+  - hive/workflows/development.classic.workflow.yaml
+  - hive/workflows/meta-team-cycle.workflow.yaml
+  - docs/decisions/README.md
+  - CHANGELOG.md
+commits:
+  - ad5930f
+  - 3a89b66
+  - 4088956
+  - 36c91dc
+  - b4d0679
+notes: |
+  Order 1 acceptance cutover for meta-team-cycle (ad5930f); Orders 2-7 +
+  9 production graduations (3a89b66); Order 8 + Q9 path-A
+  development.classic decomposition (4088956); GUIDE/MAIN executor intro
+  + workflow-schema deprecation + ADR + CHANGELOG (36c91dc); ADR README +
+  convention template follow-up (b4d0679).

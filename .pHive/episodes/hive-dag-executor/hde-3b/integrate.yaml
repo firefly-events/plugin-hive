@@ -1,0 +1,18 @@
+step_id: integrate
+status: completed
+timestamp: "2026-05-02T21:49:48-05:00"
+agent: orchestrator
+shipped_via: "PR #37"
+backfilled_on: "2026-05-07"
+backfill_note: |
+  Story shipped to main via direct feature-branch PR (no per-step
+  episode authoring during execution). Backfilled to align episode state
+  with git ground truth per feedback_story_status_stale.
+artifacts:
+  - hive/lib/dag_executor/output_format.js
+  - hive/workflows/meta-team-cycle.workflow.yaml
+commit: c6df433
+notes: |
+  output_format JSON contracts + meta-team-cycle AND-of-empty when:
+  predicates for hde-3b. Structurally retires PR #31 metric_signal
+  conflation bug class.
