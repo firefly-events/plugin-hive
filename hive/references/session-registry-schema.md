@@ -67,8 +67,8 @@ sessions:
 ```
 pending → active → completed
                  ↘ failed
-         ↓ (no SSE within stuck_timeout_ms)
-         stuck → [retry: new session_id, status: pending again]
+                 ↓ (no SSE within stuck_timeout_ms)
+                 stuck → [retry: new session_id, status: pending again]
 ```
 
 A stuck session is never resumed — its `status` is set to `stuck` and a new session

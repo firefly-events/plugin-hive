@@ -38,9 +38,20 @@ async function acquireLock(registryPath) {
   const lockPath = registryPath + '.lock';
   for (let i = 0; i < 10; i++) {
     try {
-      fs.writeFileSync(lockPath, '', { flag: 'wx' });
+      fs.writeFileSync(lockPath, String(process.pid), { flag: 'wx' });
       return true;
     } catch {
+      try {
+        const pid = parseInt(fs.readFileSync(lockPath, 'utf8').trim(), 10);
+        if (pid && pid !== process.pid) {
+          try {
+            process.kill(pid, 0);
+          } catch {
+            try { fs.unlinkSync(lockPath); } catch { /* race: already gone */ }
+            continue;
+          }
+        }
+      } catch { /* lock file vanished between checks */ }
       await new Promise(r => setTimeout(r, 100));
     }
   }
@@ -112,7 +123,7 @@ async function upsert(sessionId, fields, registryPath = REGISTRY_PATH) {
     if (idx >= 0) {
       data.sessions[idx] = { ...data.sessions[idx], ...fields, session_id: sessionId };
     } else {
-      data.sessions.push({ session_id: sessionId, ...fields });
+      data.sessions.push({ ...fields, session_id: sessionId });
     }
     writeRegistry(registryPath, data);
   } finally {

@@ -53,7 +53,8 @@ function writeEpisode(episode, episodesBase = EPISODES_BASE) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  const filename = `${step_id}.yaml`;
+  const suffix = String(session_id).replace(/[^a-zA-Z0-9_-]/g, '').slice(-12);
+  const filename = suffix ? `${step_id}-${suffix}.yaml` : `${step_id}.yaml`;
   const targetPath = path.join(dir, filename);
   const tmpPath = targetPath + '.tmp';
 

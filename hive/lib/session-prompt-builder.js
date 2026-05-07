@@ -13,10 +13,11 @@
 'use strict';
 
 const path = require('path');
+const os = require('os');
 const { execSync } = require('child_process');
 
 const MAX_CHARS = 4000;
-const KG_SQLITE_PATH = path.join(process.env.HOME || '~', '.claude', 'hive', 'kg.sqlite');
+const KG_SQLITE_PATH = path.join(os.homedir(), '.claude', 'hive', 'kg.sqlite');
 
 /**
  * Query KG decisions for a given epic.
