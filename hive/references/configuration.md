@@ -92,6 +92,22 @@ steps, see `hive/references/state-relocation.md`.
 | `execution.parallel_teams` | false | Allow parallel dev teams (future) |
 | `execution.max_retry_attempts` | 2 | Default retry attempts for gate failures |
 
+### Sessions (Managed Agent Execution)
+
+When `sessions.enabled: true` (or `HIVE_SESSIONS_ENABLED=1` env var), the execute skill uses the Claude Agent SDK `/v1/sessions` API instead of `TeamCreate` for story-level execution. The session registry at `${HIVE_STATE_DIR}/sessions/index.yaml` tracks all active sessions.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `sessions.enabled` | false | Enable session-based execution (step 6c). Set `true` or use `HIVE_SESSIONS_ENABLED=1` env var |
+| `sessions.model` | (inherits from model_tiers) | Model to use for session agents; inherits tier assignment if not set |
+| `sessions.timeout_ms` | 600000 | Max time (ms) to wait for a session to complete (10 minutes) |
+| `sessions.stuck_timeout_ms` | 90000 | SSE silence (ms) before a session is considered stuck; doubled for implement/test/optimize steps (90 seconds default) |
+| `sessions.max_retries` | 3 | Max stuck+retry cycles per story before escalating to the user |
+
+**Session registry:** See `hive/references/session-registry-schema.md`.
+**Bootstrap skill:** See `skills/hive/skills/session-registry/SKILL.md`.
+**Resilience:** See `hive/references/session-resilience.md` for stuck detection and retry.
+
 ## Maintainer Boundary
 
 Some Hive assets are maintainer-only and are used to improve the plugin itself rather than support marketplace consumers. Those assets do not belong in marketplace consumer installs, and consumers receive only the neutral baseline configuration plus any repo-local override they choose to add.
