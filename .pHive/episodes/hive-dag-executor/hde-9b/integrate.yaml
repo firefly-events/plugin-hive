@@ -1,0 +1,15 @@
+step_id: integrate
+status: completed
+timestamp: "2026-05-02T22:49:08-05:00"
+agent: orchestrator
+shipped_via: "PR #37"
+backfilled_on: "2026-05-07"
+backfill_note: |
+  Story shipped to main via direct feature-branch PR (no per-step
+  episode authoring during execution). Backfilled to align episode state
+  with git ground truth per feedback_story_status_stale.
+artifacts:
+  - hive/lib/dag_executor/graduation_registry.js
+commit: 850801a
+notes: |
+  Per-workflow graduation registry for hde-9b.
