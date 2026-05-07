@@ -241,100 +241,105 @@ async function main() {
   };
 
   const rawEvents = [];
+  const MAX_TOOL_TURNS = 16;
 
-  // 9. Stream SSE
-  try {
+  // Send tool responses for one requires_action turn.
+  async function handleRequiresAction(stopReason) {
+    const eventIds = (stopReason.event_ids || []);
+    for (const eventId of eventIds) {
+      const sourceEvent = rawEvents.find(e => e.id === eventId);
+      const eventType = sourceEvent ? sourceEvent.type : null;
+
+      if (eventType === 'agent.custom_tool_use') {
+        emitJson({
+          type: 'tool_request',
+          custom_tool_use_id: eventId,
+          tool_name: sourceEvent.name || null,
+          tool_input: sourceEvent.input || {},
+        });
+        let resultLine;
+        try {
+          resultLine = await readLineFromStdin();
+        } catch (err) {
+          await fatalExit(14, 'NETWORK', `stdin read failed: ${err.message}`, sessionId);
+        }
+        let toolResult;
+        try {
+          toolResult = JSON.parse(resultLine);
+        } catch {
+          toolResult = { result: resultLine };
+        }
+        const resultEvent = sessionTurnBuilder.buildCustomToolResult(eventId, toolResult.result || '');
+        await withRetry(() => sessionClient.sendEvents(sessionId, [resultEvent]), RETRY_POLICY.NETWORK)
+          .catch(async (err) => {
+            const code = err.code || 'API_5XX';
+            await fatalExit(EXIT_CODES[code] || 14, code, err.message, sessionId);
+          });
+      } else {
+        emitJson({
+          type: 'tool_request',
+          tool_use_id: eventId,
+          tool_name: sourceEvent ? sourceEvent.name : null,
+          tool_input: sourceEvent ? (sourceEvent.input || {}) : {},
+        });
+        let resultLine;
+        try {
+          resultLine = await readLineFromStdin();
+        } catch (err) {
+          await fatalExit(14, 'NETWORK', `stdin read failed: ${err.message}`, sessionId);
+        }
+        let confirmation;
+        try {
+          confirmation = JSON.parse(resultLine);
+        } catch {
+          confirmation = { result: 'allow' };
+        }
+        const confirmEvent = sessionTurnBuilder.buildToolConfirmation(
+          eventId,
+          confirmation.result || 'allow',
+          confirmation.deny_message
+        );
+        await withRetry(() => sessionClient.sendEvents(sessionId, [confirmEvent]), RETRY_POLICY.NETWORK)
+          .catch(async (err) => {
+            const code = err.code || 'API_5XX';
+            await fatalExit(EXIT_CODES[code] || 14, code, err.message, sessionId);
+          });
+      }
+    }
+  }
+
+  // Drain the stream until either 'complete' or 'requires_action'. Returns
+  // { kind: 'complete' } or { kind: 'requires_action', stopReason }.
+  async function drainStream() {
     for await (const item of sessionSseReader.readStream(sessionId, { onSseEvent, onStuck, stuckThresholdMs })) {
       if (item.type === 'event') {
         rawEvents.push(item.event);
         continue;
       }
-
-      if (item.type === 'complete') {
-        // Done — fall through to completion handling below
-        break;
-      }
-
-      if (item.type === 'requires_action') {
-        const stopReason = item.stopReason;
-        const eventIds = (stopReason.event_ids || []);
-
-        for (const eventId of eventIds) {
-          // Look up event details from rawEvents
-          const sourceEvent = rawEvents.find(e => e.id === eventId);
-          const eventType = sourceEvent ? sourceEvent.type : null;
-
-          if (eventType === 'agent.custom_tool_use') {
-            // Emit tool_request to stdout, read result from stdin
-            emitJson({
-              type: 'tool_request',
-              custom_tool_use_id: eventId,
-              tool_name: sourceEvent.name || null,
-              tool_input: sourceEvent.input || {},
-            });
-            let resultLine;
-            try {
-              resultLine = await readLineFromStdin();
-            } catch (err) {
-              await fatalExit(14, 'NETWORK', `stdin read failed: ${err.message}`, sessionId);
-            }
-            let toolResult;
-            try {
-              toolResult = JSON.parse(resultLine);
-            } catch {
-              toolResult = { result: resultLine };
-            }
-            const resultEvent = sessionTurnBuilder.buildCustomToolResult(eventId, toolResult.result || '');
-            await withRetry(() => sessionClient.sendEvents(sessionId, [resultEvent]), RETRY_POLICY.NETWORK)
-              .catch(async (err) => {
-                const code = err.code || 'API_5XX';
-                await fatalExit(EXIT_CODES[code] || 14, code, err.message, sessionId);
-              });
-          } else {
-            // Treat as built-in tool_use requiring confirmation
-            emitJson({
-              type: 'tool_request',
-              tool_use_id: eventId,
-              tool_name: sourceEvent ? sourceEvent.name : null,
-              tool_input: sourceEvent ? (sourceEvent.input || {}) : {},
-            });
-            let resultLine;
-            try {
-              resultLine = await readLineFromStdin();
-            } catch (err) {
-              await fatalExit(14, 'NETWORK', `stdin read failed: ${err.message}`, sessionId);
-            }
-            let confirmation;
-            try {
-              confirmation = JSON.parse(resultLine);
-            } catch {
-              confirmation = { result: 'allow' };
-            }
-            const confirmEvent = sessionTurnBuilder.buildToolConfirmation(
-              eventId,
-              confirmation.result || 'allow',
-              confirmation.deny_message
-            );
-            await withRetry(() => sessionClient.sendEvents(sessionId, [confirmEvent]), RETRY_POLICY.NETWORK)
-              .catch(async (err) => {
-                const code = err.code || 'API_5XX';
-                await fatalExit(EXIT_CODES[code] || 14, code, err.message, sessionId);
-              });
-          }
-        }
-
-        // Re-enter the SSE stream after sending tool responses
-        for await (const resumeItem of sessionSseReader.readStream(sessionId, { onSseEvent, onStuck, stuckThresholdMs })) {
-          if (resumeItem.type === 'event') {
-            rawEvents.push(resumeItem.event);
-          } else if (resumeItem.type === 'complete' || resumeItem.type === 'requires_action') {
-            // Handle nested requires_action by breaking — full recursion not needed per spec
-            break;
-          }
-        }
-        break;
-      }
+      if (item.type === 'complete') return { kind: 'complete' };
+      if (item.type === 'requires_action') return { kind: 'requires_action', stopReason: item.stopReason };
     }
+    return { kind: 'complete' };
+  }
+
+  // 9. Stream SSE — drive tool turns until terminal 'complete' or turn cap.
+  try {
+    let outcome = await drainStream();
+    let toolTurns = 0;
+    while (outcome.kind === 'requires_action') {
+      if (toolTurns >= MAX_TOOL_TURNS) {
+        await fatalExit(
+          14,
+          'API_5XX',
+          `Tool turn limit (${MAX_TOOL_TURNS}) exceeded with pending requires_action`,
+          sessionId,
+        );
+      }
+      await handleRequiresAction(outcome.stopReason);
+      toolTurns++;
+      outcome = await drainStream();
+    }
+    // outcome.kind === 'complete' — fall through to completion handling
   } catch (err) {
     const code = err.code || 'API_5XX';
     const exitCode = EXIT_CODES[code] || 14;

@@ -1,7 +1,7 @@
 # Session Resilience
 
 Defines SSE stuck detection and session retry for Managed Agent session execution (step
-6b in `skills/execute/SKILL.md`). This document covers the session-native resilience
+6c in `skills/execute/SKILL.md`). This document covers the session-native resilience
 mechanisms that replace the respawn skill when sessions are active.
 
 **Respawn vs Session Retry:** The respawn skill (`skills/hive/skills/respawn/SKILL.md`)

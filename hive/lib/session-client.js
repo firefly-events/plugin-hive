@@ -73,7 +73,7 @@ async function createSession(agentId, environmentId) {
 async function sendEvents(sessionId, events) {
   const client = buildClient();
   try {
-    await client.beta.sessions.events.create(sessionId, { events });
+    await client.beta.sessions.events.send(sessionId, { events });
   } catch (err) {
     err.code = classifyError(err);
     throw err;
