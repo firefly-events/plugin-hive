@@ -9,6 +9,47 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-05-07
+
+### Fixed
+- **Session runtime CodeRabbit pass (PR #50 follow-up).** Resolves all
+  8 inline findings filed against the memory-autonomy Phase 2 session
+  execution path. Behavior unchanged for `sessions.enabled: false`
+  (the default), but every fix is correctness-relevant once the
+  feature is opted in.
+  - `hive/lib/session-client.js` — `sendEvents()` now calls
+    `client.beta.sessions.events.send()` (the actual SDK method)
+    instead of the non-existent `events.create()`. Would have thrown
+    `TypeError` on the first tool turn.
+  - `hive/scripts/session-invoke.mjs` — extracted
+    `handleRequiresAction()` and `drainStream()` helpers; the SSE
+    flow now loops tool turns until a terminal `complete` is observed
+    (capped at `MAX_TOOL_TURNS=16`). Previously a session with a
+    nested `requires_action` was silently marked `completed` after the
+    first tool round and the episode YAML was written without the
+    unanswered turn.
+  - `hive/lib/session-registry.js` — `acquireLock()` now PID-stamps
+    the sentinel file and detects dead holders via
+    `process.kill(pid, 0)`, unlinking and retrying immediately.
+    Prevents a single crash from degrading the registry to permanent
+    fail-open.
+  - `hive/lib/session-episode-writer.js` — episode filenames include
+    a 12-char sanitized `session_id` suffix
+    (`<step_id>-<suffix>.yaml`); stuck-retry no longer overwrites the
+    prior failed attempt's episode YAML.
+  - `hive/lib/session-prompt-builder.js` — `KG_SQLITE_PATH` uses
+    `os.homedir()` instead of `process.env.HOME || '~'` (Windows
+    safe; no literal `~` paths).
+  - `hive/lib/session-registry.js` — `upsert` insert-path pins
+    `session_id` last in the spread, mirroring the update-path's
+    ordering.
+  - `hive/references/session-registry-schema.md` — re-aligned the
+    ASCII lifecycle diagram so the `stuck` arrow visually originates
+    under `active`, not `pending`.
+  - `hive/references/session-resilience.md` — opening paragraph now
+    references `step 6c` (matching line 8 + the References section);
+    the previous `step 6b` collided with `cmux`'s 6b in main.
+
 ## [1.2.1] - 2026-05-07
 
 ### Added
