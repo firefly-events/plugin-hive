@@ -11,23 +11,28 @@
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.4-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-1.2.0-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
 
-## North Star
+## Contents
 
-Hive is heading toward a **lights-on software factory** — a pipeline where most of the work flows automatically and humans stay in the loop only where judgment actually matters. We're not there yet, and we want to be honest about that: today you'll hit plenty of touchpoints, hand-offs, and moments where the orchestrator needs you to steer. Even with `--dangerously-skip-permissions`, the interaction count is higher than we'd like.
-
-The trajectory is what we're betting on. We chose the plugin format because Claude Code is built by an exceptional team at Anthropic and gets better every week. Every capability they ship — managed agents, tighter hooks, richer sub-agent tooling — is something Hive can fold in without writing it from scratch. Our job is to compose those primitives into a cohesive workflow, not to compete with the platform.
-
-Where we're heading, a developer's day eventually collapses to two touchpoints:
-
-- **A daily standup** — see what shipped overnight, what's blocked, what needs a decision
-- **An issues queue** — triage bugs the test swarm filed and direction questions the planning team raised
-
-Everything else — research, implementation, test authoring, fix loops, code review — runs through coordinated agent teams. Today that process has more seams than we want. Tomorrow it has fewer. That's the work.
+- [Inspirations](#inspirations)
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [UI Team Skills](#ui-team-skills)
+- [Meta Optimization](#meta-optimization)
+- [Memory architecture](#memory-architecture)
+- [Architecture Overview](#architecture-overview)
+- [Optional Integrations](#optional-integrations)
+- [Extensibility](#extensibility)
+- [North Star](#north-star)
+- [Contributing](#contributing)
+- [License](#license)
+- [Links](#links)
 
 ---
 
@@ -36,7 +41,7 @@ Everything else — research, implementation, test authoring, fix loops, code re
 Hive stands on the shoulders of the agentic-engineering community. We borrow patterns and posture from camps that came before us:
 
 - **[IndyDevDan](https://www.youtube.com/@indydevdan)** — agentic engineering as a *practice*; videos, principles, taste
-- **QRISPY** — builder workflows and real-world Claude Code patterns
+- **[QRSPI](https://github.com/matanshavit/qrspi)** — 8-phase Claude Code workflow (Question · Research · Structure · Plan · Implement); builder workflows and real-world patterns
 - **[BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)** — structured multi-agent methodology and role taxonomy
 - **[archon](https://github.com/coleam00/archon)** — orchestration runtime and agent-execution patterns
 - **[Andrej Karpathy](https://karpathy.ai)** — the intellectual current of software 2.0/3.0
@@ -177,7 +182,7 @@ PR-style artifact instead of mutating `main` directly.
 in precedence order:
 
 1. **Metrics** — structural-audit findings keyed off opted-in metric dimensions
-2. **External research** — trending-advancements signal from the optional research loop
+2. **Auto-research** — trending-advancements signal from the optional [external research loop](hive/references/meta-team-external-research.md), where the meta-team auto-researches Claude Code updates, ecosystem patterns, and external best-practice drift, then proposes candidate improvements back into `/meta-optimize`
 3. **kg_signal** — knowledge-graph-derived findings (`phase_failed`, `phase_blocked`, `superseded` triples) from prior cycles, including cross-project history when a system-level KG is bootstrapped
 4. **Backlog** — human-curated proposals at `{target}/.pHive/meta-team/queue-meta-optimize.yaml` (edit-only; the skill never auto-populates it)
 
@@ -328,6 +333,21 @@ Hive is built to grow. Each component is a discrete file you can add or replace:
 **Compose a team** — create or edit a file in `.pHive/teams/`. Team configs define members, roles, domain restrictions, and methodology. The orchestrator loads them at execution time.
 
 **Hive-to-hive communication** *(forward-looking)* — a cross-system collaboration protocol is in design that will allow Hive instances to share stories, hand off work, and coordinate across repositories and organizations.
+
+---
+
+## North Star
+
+Hive is heading toward a **lights-on software factory** — a pipeline where most of the work flows automatically and humans stay in the loop only where judgment actually matters.
+
+We chose the plugin format because Claude Code is built by an exceptional team at Anthropic and gets better every week. Every capability they ship — managed agents, tighter hooks, richer sub-agent tooling, **auto mode** — is something Hive can fold in without writing it from scratch. Auto mode in particular is a match made in heaven for Hive: long-running multi-agent teams executing structured work without micromanagement, with the harness pacing itself instead of pinging the developer for routine decisions. Our job is to compose those primitives into a cohesive workflow, not to compete with the platform.
+
+Where we're heading, a developer's day collapses to two touchpoints:
+
+- **A daily standup** — see what shipped overnight, what's blocked, what needs a decision
+- **An issues queue** — triage bugs the test swarm filed and direction questions the planning team raised
+
+Everything else — research, implementation, test authoring, fix loops, code review — runs through coordinated agent teams. That's the work.
 
 ---
 
