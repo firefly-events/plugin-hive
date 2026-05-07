@@ -117,14 +117,18 @@ If all checks pass, proceed silently — do not announce that the kickoff gate p
 
    > **v1 note:** v1 routing handles `workflow`-based catalog entries only. A catalog entry with `skill: <path>` (allowed by catalog schema but unused in v1) is not reached by condition (i) and falls to condition (ii) or (iii). Skill-based routing is a Phase 6 extension point.
 
-5. **Choose execution mode.** Determine whether to use agent teams or sequential execution:
+5. **Choose execution mode.** Determine whether to use sessions, agent teams, or sequential execution:
+
+   **Session check (highest priority).** Is `HIVE_SESSIONS_ENABLED` set (value `1`, `true`, or `"true"`) OR does `hive.config.yaml` have `sessions.enabled: true`? If yes → use **session-based execution** (step 6c below). Skip the remaining checks.
+
+   **Team check (when sessions not available):**
 
    1. Check: Is `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` set (value `1`, `true`, or `"true"`)?
    2. Check: Does `hive.config.yaml` have `parallel_teams: true`?
    3. Check: Does the topological sort reveal multiple stories at the same depth (independent stories that can run concurrently)?
    4. Check: Is `--sequential` flag NOT present in arguments?
 
-   If all four: use **agent team execution**. If `execution.terminal_mux` resolves to `cmux`, use step 6b. Otherwise use step 6.
+   If all four team checks pass: use **agent team execution**. If `execution.terminal_mux` resolves to `cmux`, use step 6b. Otherwise use step 6.
    Otherwise: use **sequential execution** (step 7).
 
 5pre. **Executor cutover routing (hde-9a + hde-9b).** Before dispatching the chosen execution mode for a single workflow, decide whether to invoke the deterministic DAG executor (`hive.lib.dag_executor`) or stay on the orchestrator-narrated path. This check applies per-workflow at the point where this skill would otherwise hand off a workflow YAML to the orchestrator-narrated runner.
@@ -158,6 +162,33 @@ If all checks pass, proceed silently — do not announce that the kickoff gate p
    - Use `cmux send --surface <id>` to deliver respawn prompts or sidecar injection messages to active panes.
    - When all stories complete: close every tracked surface via `cmux close-surface`, then produce the epic summary.
    - Follow **`references/team-execution.md`** for the cmux variant details.
+
+6c. **Session-based execution** (used when `HIVE_SESSIONS_ENABLED` or `sessions.enabled: true`). Replaces the TeamCreate path with the Claude Agent SDK `/v1/sessions` API for story-level execution. One session per story, isolated context, structured retry on stuck SSE.
+
+   **6c-1. Bootstrap session registry.** Run the session-registry bootstrap skill (`skills/hive/skills/session-registry/SKILL.md`) to ensure `${HIVE_STATE_DIR}/sessions/index.yaml` exists. Idempotent — safe to call even if already initialized. See `hive/references/session-registry-schema.md` for the registry record shape.
+
+   **6c-2. Create session entries.** For each story in dependency order:
+   - Append a session record to `${HIVE_STATE_DIR}/sessions/index.yaml` with `status: pending`, `story_id: {story-id}`, `epic_id: {epic-id}`, and `created_at: {NOW}`.
+   - Use the model from `hive.config.yaml sessions.model` (or inherit from `model_tiers` for the story's primary agent).
+
+   **6c-3. Invoke each session.** When a story's dependencies are complete, open its session using the `/v1/sessions` API via `hive/scripts/session-invoke.mjs`. Format the initial session prompt using the session prompt spec from `hive/references/session-system-prompt-spec.md`. The prompt must include: story spec, workflow step sequence, episode write path, and any escalation context from step 2b's `appends[]` map (sidecar reviewers).
+   - Update the registry record: set `status: active` and `last_active_at: {NOW}`.
+
+   **6c-4. Sidecar injection (session path).** When step 2b populated `appends[]` for this story, append the matched sidecar reviewer agents to the review-phase session context as:
+   ```
+   Additional reviewers: {agent-1}, {agent-2}
+   Each additional reviewer should run their activation protocol after the primary review.
+   Load their persona from hive/agents/{agent-name}.md.
+   ```
+   Use the canonical specialist catalog at `hive/references/specialist-triggers.md` to resolve `responds_with.id` for each escalation (already done in step 2b). If `appends[]` is empty for the story, proceed with the standard reviewer only.
+
+   **6c-5. Monitor and update.** As sessions run, update `sse_last_event_at` in the registry on each received SSE event. Watch for stuck sessions per the resilience procedure in `hive/references/session-resilience.md`.
+
+   **6c-6. Close sessions.** On session completion, set `status: completed` (or `failed`) and update `last_active_at`. Sessions are never reopened — each story run gets a new session record.
+
+   **Per-story commits (session path):** Stories commit independently on their own feature branches (`hive-{story-id}`) as soon as review passes, same as the TeamCreate path.
+
+   **Resilience monitoring:** While sessions are active, poll `sse_last_event_at` in `${HIVE_STATE_DIR}/sessions/index.yaml`. If any active session has not updated `sse_last_event_at` within `sessions.stuck_timeout_ms` (default 90s), trigger the session retry procedure from `hive/references/session-resilience.md`. Max `sessions.max_retries` retries per story (default 3) before escalating to the user. This **replaces** the respawn skill for session-based execution — do NOT use the respawn protocol for step 6c stories.
 
 7. **Sequential execution.** Follow **`references/sequential-execution.md`** for the step-by-step workflow within each story, sidecar injection at the review step, episode records, gate checks, and respawn monitoring.
 

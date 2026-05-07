@@ -194,3 +194,15 @@ execution:
   #   terminal_mux: auto           # tmux | cmux | auto  (default: TeamCreate's built-in tmux)
   #   interactive_panes: true      # visible agent conversation (cmux only)
   #   idle_timeout_seconds: 300    # 5-min idle reaper for persistent Codex panes
+
+# Session-based execution (Phase 2 of memory-autonomy-foundation)
+# When enabled, the execute skill uses the Claude Agent SDK /v1/sessions API
+# (one session per story) instead of TeamCreate. See step 6c in
+# skills/execute/SKILL.md and hive/references/session-resilience.md.
+# Default OFF — opt-in only. Activate via this flag OR HIVE_SESSIONS_ENABLED=1.
+sessions:
+  enabled: false               # set true to route execute through /v1/sessions
+  # model: <inherits from model_tiers when unset>
+  timeout_ms: 600000           # max session wall-time (10 min)
+  stuck_timeout_ms: 90000      # SSE silence before stuck (90s; doubled for implement/test/optimize)
+  max_retries: 3               # max stuck+retry cycles per story before user escalation
