@@ -285,14 +285,10 @@ Verify:
 - PR-artifact promotion adapter for /meta-optimize (S10 scope)
 - Re-opening a closed cycle (out of cycle lifecycle scope)
 
-## CYCLE COMPLETE
+## NEXT STEP
 
-This is the final step of the meta-team cycle. No next step.
+This is the final step of the meta-team cycle.
 
-The close is SUCCESSFUL only when:
-- The closure invariant passed
-- Commit succeeded
-- Ledger append happened
-- Morning summary written
-
-If the closure invariant FAILED: record `close_rejected` in the output and produce a diagnostic morning-summary-stub that names what's missing. Do NOT call the cycle `closed`.
+**Gating:** Closure invariant passed, commit succeeded, ledger appended, and morning summary written.
+**Next:** Cycle complete — no further steps.
+**If gating fails:** Record `close_rejected` in the output and produce a diagnostic morning-summary-stub that names what's missing. Do NOT call the cycle `closed`.
