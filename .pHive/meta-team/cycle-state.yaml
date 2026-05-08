@@ -1,8 +1,8 @@
-cycle_id: meta-2026-05-07
-started: '2026-05-07T00:00:00Z'
+cycle_id: meta-2026-05-08
+started: '2026-05-08T00:00:00Z'
 status: closed
 phase: close
-closed: '2026-05-07T00:30:00Z'
+closed: '2026-05-08T00:30:00Z'
 charter_constraints:
   - operate only on hive/**, skills/hive/agents/memories/**, .pHive/teams/**,
     .pHive/meta-meta-optimize/**, hive/lib/**
@@ -12,43 +12,48 @@ charter_constraints:
   - no new external service integrations without human confirmation
   - no file deletions, no >50% content removal per file
 prior_cycle:
-  id: meta-2026-05-05
+  id: meta-2026-05-07
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-05-07T00:00:00Z'
+    started_at: '2026-05-08T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
     prior_cycle_status: closed
   step_02_analysis:
-    findings_count: 1
+    findings_count: 0
     metric_signal: false
     external_candidates_count: 0
+    out_of_scope_notes: >
+      One out-of-scope issue noted: hive/GUIDE.md line 521 references
+      skills/hive/hive.config.yaml which does not exist (actual location is
+      hive/hive.config.yaml). File is outside the developer agent write domain;
+      flagged for human awareness, not actioned this cycle.
   step_02b_external_research:
     external_research_candidates_count: 0
     summary: >
       External research not executed — orchestrator-narrated path.
       No providers available (Firecrawl/Context7 not mounted). Empty candidate list.
-  step_03_proposal:
-    routing: step-03 (findings_count=1 > 0)
-    approved_proposals_count: 1
-    skipped_findings_count: 0
+  step_03b_backlog_fallback:
+    routing: step-03b (findings_count=0, external_candidates_count=0, metric_signal=false)
+    selected_candidate_id: mmo-2026-04-21-001
+    selected_target: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
+    decision: would-execute
   step_04_implementation:
     changes_made:
-      - proposal_id: proposal-1
-        action: update_field
-        file: hive/workflows/steps/meta-team-cycle/step-08-close.md
+      - proposal_id: mmo-2026-04-21-001
+        action: add_entry
+        file: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
         description: >
-          Renamed ## CYCLE COMPLETE section header to ## NEXT STEP and reformatted
-          content to match step-file-schema.md NEXT STEP template (Gating / Next /
-          If gating fails). Preserves semantic content of the terminal-step
-          completion rules. No behavioral change.
+          Appended reviewed-on provenance line for meta-2026-05-08 nightly cycle.
+          Pure append-only edit on a frozen archive file. Adds a third
+          reviewed-on HTML comment following the existing pattern.
         status: done
   step_05_testing:
     test_results:
-      - change_id: proposal-1_step-08-close
-        file: hive/workflows/steps/meta-team-cycle/step-08-close.md
+      - change_id: mmo-2026-04-21-001_MANIFEST
+        file: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
         tests:
           cross_reference_integrity: pass
           schema_compliance: pass
@@ -61,20 +66,25 @@ steps:
     needs_revision_count: 0
     metrics_snapshot:
       tokens: 0
-      wall_clock_ms: 20000
+      wall_clock_ms: 15000
       first_attempt_pass: true
+    compare:
+      baseline_run_id: meta-2026-05-01
+      baseline: {tokens: 0, wall_clock_ms: 45000, first_attempt_pass: true}
+      candidate: {tokens: 0, wall_clock_ms: 15000, first_attempt_pass: true}
+      verdict: accept
   step_07_promotion:
     promoted_changes:
-      - proposal_id: proposal-1
-        file: hive/workflows/steps/meta-team-cycle/step-08-close.md
+      - proposal_id: mmo-2026-04-21-001
+        file: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
         verdict: pass
         status: promoted
-        commit_ref: 626fc06627d252cb3ec51e2f8afbc49cbb9c4da2
-        rollback_target: eb4fb7e64d00280e989d5b6b4d7c60314cf364c4
+        commit_ref: 540480cd7a16e27b6bd60355814470d62a399e87
+        rollback_target: a18299f379acd99699190297a5e0f6f7f7cf0e2d
     reverted_changes: []
     insights_staged: 0
 summary:
-  total_findings: 1
+  total_findings: 0
   proposals_generated: 1
   changes_attempted: 1
   changes_promoted: 1
@@ -82,15 +92,15 @@ summary:
   flagged_for_human: 0
   cycle_verdict: passed
 closure_evidence:
-  commit_ref: 626fc06627d252cb3ec51e2f8afbc49cbb9c4da2
+  commit_ref: 540480cd7a16e27b6bd60355814470d62a399e87
   metrics_snapshot:
     tokens: 0
-    wall_clock_ms: 20000
+    wall_clock_ms: 15000
     first_attempt_pass: true
-  rollback_ref: eb4fb7e64d00280e989d5b6b4d7c60314cf364c4
+  rollback_ref: a18299f379acd99699190297a5e0f6f7f7cf0e2d
 decision: accept
 regression_watch:
   state: armed
 observation_window:
-  start: '2026-05-07T00:30:00Z'
-  end: '2026-05-07T04:30:00Z'
+  start: '2026-05-08T00:30:00Z'
+  end: '2026-05-08T04:30:00Z'
