@@ -1,21 +1,30 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-05-07 | **Date:** 2026-05-07 | **Verdict:** passed
+**Cycle:** meta-2026-05-09 | **Date:** 2026-05-09 | **Verdict:** passed
 
 ---
 
 ## What Changed Tonight
 
-- **`hive/workflows/steps/meta-team-cycle/step-08-close.md`** — Renamed `## CYCLE COMPLETE`
-  section header to `## NEXT STEP` and reformatted its content to match the
-  step-file-schema.md NEXT STEP template (Gating / Next / If gating fails). The terminal
-  step now satisfies the 7-section schema requirement; all prior semantic content is
-  preserved. No behavioral change. Addresses INCOMPLETE_STEP_FILE finding.
+- **`hive/GUIDE.md`** — Corrected `## Workflows (6)` heading to `## Workflows (7)`.
+  The development and other workflow tables directly below the heading list 7 workflows
+  combined (Classic, TDD, BDD + Code Review, Test Swarm, Daily Ceremony, Design Review),
+  not 6. The count had drifted when the Design Review workflow was added.
+  Addresses SCHEMA_INCONSISTENCY finding.
+
+- **`hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md`** — Added `(S8)`
+  qualifier and a clarifying S9/BL2.2+ note to the SUCCESS METRICS bullet
+  "No promotion, mutation, experiment execution, or step-4 advancement occurred."
+  The bullet now reads: `(S8) No promotion, mutation, experiment execution, or step-4
+  advancement occurred (S9/BL2.2+ live mode: step-4 advancement is expected — see NEXT
+  STEP forward-compatibility note)`. This aligns the success metric with the existing
+  NEXT STEP forward-compatibility note, eliminating a contradiction that could mislead
+  automated validators or future editors. Addresses SCHEMA_INCONSISTENCY finding.
 
 ---
 
 ## What Was Found (Not Fixed This Cycle)
 
-Nothing deferred. The one finding was addressed.
+No deferred findings. Both structural findings were addressed this cycle.
 
 ---
 
@@ -29,15 +38,15 @@ Nothing deferred. The one finding was addressed.
 
 | Metric | Count |
 |--------|-------|
-| Findings identified | 1 |
-| Proposals generated | 1 |
-| Changes promoted | 1 |
+| Findings identified | 2 |
+| Proposals generated | 2 |
+| Changes promoted | 2 |
 | Changes reverted | 0 |
 | Flagged for human | 0 |
 | Cycle verdict | passed |
 
-**Commit:** `626fc06627d252cb3ec51e2f8afbc49cbb9c4da2`
-**Rollback ref:** `eb4fb7e64d00280e989d5b6b4d7c60314cf364c4`
-**Regression watch:** armed through 2026-05-07T04:30:00Z
+**Commit:** `6f1de135b3581c093e3348a04ba9e780fb797c3a`
+**Rollback ref:** `a18299f379acd99699190297a5e0f6f7f7cf0e2d`
+**Regression watch:** armed through 2026-05-09T04:30:00Z
 
-**Next cycle:** No deferred findings. No backlog candidates carried forward.
+**Next cycle:** No deferred findings. Fresh structural audit from scratch.
