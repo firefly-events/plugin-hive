@@ -245,7 +245,7 @@ Orchestrator (main session — you)
 
 ---
 
-## Workflows (6)
+## Workflows (7)
 
 ### Development Workflows
 | Workflow | File | Phase Order |

@@ -125,7 +125,7 @@ After the report is emitted:
 - [ ] Backlog loaded from `.pHive/meta-team/queue-meta-meta-optimize.yaml` without modification
 - [ ] First `status: pending` candidate selected with no priority scoring
 - [ ] Exactly one structured YAML report emitted
-- [ ] No promotion, mutation, experiment execution, or step-4 advancement occurred
+- [ ] (S8) No promotion, mutation, experiment execution, or step-4 advancement occurred (S9/BL2.2+ live mode: step-4 advancement is expected — see NEXT STEP forward-compatibility note)
 
 ## FAILURE MODES
 
