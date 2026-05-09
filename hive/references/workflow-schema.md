@@ -250,6 +250,24 @@ The hard ceiling is a security floor — a forgotten "no timeout" pause cannot h
 | Reject sentinel verified | `SUSPENDED` → `FAILED` (via `mark_failed`) | `pause_rejected` (payload carries the reason) |
 | Timeout elapsed | `SUSPENDED` → `FAILED` (via `mark_failed`) | `pause_timeout` |
 
+## Scheduler Overrides (`under_scheduler`)
+
+Steps that normally require an interactive pause may declare an `under_scheduler` block to define non-interactive behavior when the workflow is running in scheduler context.
+
+```yaml
+steps:
+  - id: plan-approval
+    node_type: pause
+    under_scheduler:
+      auto_approve: true
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `under_scheduler.auto_approve` | bool | null | Scheduler-context override for a pause step: `true` auto-passes the step without dispatching the pause handler; `false` fails closed with an error instead of blocking on a non-interactive pause. |
+
+Interactive runs ignore `under_scheduler` and dispatch the pause step normally. The key is step-level and generalizable to any future workflow whose interactive gate needs explicit scheduler behavior.
+
 ## Predicate Routing (`when:`)
 
 Per-step `when:` is a strict-Archon predicate evaluated against the materialised output graph of upstream steps before dispatch. When the predicate evaluates False (or fails closed), the step is skipped — the walker emits `predicate_evaluated` (with the result) and `node_skipped` (with `reason: when_predicate_false`).

@@ -34,6 +34,8 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from hive.lib.dag_executor.graph import Graph, InputBinding, Node
 from hive.lib.dag_executor.routing import (
     ActivationDecision,
@@ -53,6 +55,77 @@ from .errors import (
 )
 from .handlers import NodeOutput
 from .telemetry import Telemetry
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+def _normalise_scheduler_flag(raw: Any) -> bool:
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        return raw.strip().lower() in {"1", "true", "yes", "on"}
+    if isinstance(raw, int):
+        return raw != 0
+    return False
+
+
+def _workflow_step_metadata(
+    graph: Graph,
+    context: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    metadata: dict[str, dict[str, Any]] = {}
+    workflow_path = _REPO_ROOT / "hive" / "workflows" / f"{graph.workflow_name}.workflow.yaml"
+    if workflow_path.is_file():
+        try:
+            raw = yaml.safe_load(workflow_path.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            raw = {}
+        steps = raw.get("steps") if isinstance(raw, dict) else None
+        if isinstance(steps, list):
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                step_id = step.get("id")
+                under_scheduler = step.get("under_scheduler")
+                if isinstance(step_id, str) and isinstance(under_scheduler, dict):
+                    metadata[step_id] = {"under_scheduler": dict(under_scheduler)}
+
+    overrides = context.get("step_metadata")
+    if isinstance(overrides, dict):
+        for step_id, override in overrides.items():
+            if not isinstance(step_id, str) or not isinstance(override, dict):
+                continue
+            merged = dict(metadata.get(step_id, {}))
+            if "under_scheduler" in override and isinstance(override["under_scheduler"], dict):
+                merged["under_scheduler"] = dict(override["under_scheduler"])
+            if merged:
+                metadata[step_id] = merged
+    return metadata
+
+
+def _scheduler_pause_decision(
+    node: Node,
+    context: dict[str, Any],
+    step_metadata: dict[str, dict[str, Any]],
+) -> str | None:
+    if not _normalise_scheduler_flag(context.get("scheduler")):
+        return None
+    if not _is_pause_node(node):
+        return None
+
+    under_scheduler = getattr(node, "under_scheduler", None)
+    if not isinstance(under_scheduler, dict):
+        under_scheduler = step_metadata.get(node.id, {}).get("under_scheduler")
+    if not isinstance(under_scheduler, dict):
+        return None
+
+    auto_approve = under_scheduler.get("auto_approve")
+    if auto_approve is True:
+        return "auto_approve"
+    if auto_approve is False:
+        return "error"
+    return None
 
 
 def _effective_deps(node: Node) -> set[str]:
@@ -333,6 +406,7 @@ class Walker:
         """Walk the graph; persist state if `run_state_path` is set; isolate in a worktree if `worktree_manager` is set."""
 
         ctx = context or {}
+        step_metadata = _workflow_step_metadata(graph, ctx)
         order = _topological_order(graph)
         materialised: dict[str, NodeOutput] = {}
         skipped: set[str] = set()
@@ -357,6 +431,7 @@ class Walker:
                 run_id=run_id,
                 telemetry=telemetry,
                 ctx=ctx,
+                step_metadata=step_metadata,
                 materialised=materialised,
                 skipped=skipped,
                 state=state,
@@ -380,6 +455,7 @@ class Walker:
         run_id,
         telemetry,
         ctx,
+        step_metadata,
         materialised,
         skipped,
         state,
@@ -421,6 +497,7 @@ class Walker:
                     run_id=run_id,
                     telemetry=telemetry,
                     ctx=ctx,
+                    step_metadata=step_metadata,
                     materialised=materialised,
                     skipped=skipped,
                     node_statuses=node_statuses,
@@ -447,6 +524,7 @@ class Walker:
                     run_id=run_id,
                     telemetry=telemetry,
                     ctx=ctx,
+                    step_metadata=step_metadata,
                     materialised=materialised,
                     skipped=skipped,
                     node_statuses=node_statuses,
@@ -468,6 +546,7 @@ class Walker:
                     run_id=run_id,
                     telemetry=telemetry,
                     ctx=ctx,
+                    step_metadata=step_metadata,
                     materialised=materialised,
                     skipped=skipped,
                     node_statuses=node_statuses,
@@ -485,6 +564,7 @@ class Walker:
                 run_id=run_id,
                 telemetry=telemetry,
                 ctx=ctx,
+                step_metadata=step_metadata,
                 materialised=materialised,
                 skipped=skipped,
                 node_statuses=node_statuses,
@@ -506,6 +586,7 @@ class Walker:
         run_id,
         telemetry,
         ctx,
+        step_metadata,
         materialised,
         skipped,
         node_statuses,
@@ -566,17 +647,29 @@ class Walker:
         state = _record_running(state, node_id)
         save_state(state)
 
-        # Pause nodes flip the run-level status to SUSPENDED for the
-        # duration of the wait so external observers see the
-        # suspension. We use `set_status` (non-freezing) so the
-        # post-approve transition back to RUNNING is in-process.
-        is_pause = _is_pause_node(node)
-        if is_pause:
-            state = _record_pause_suspended(state)
-            save_state(state)
+        scheduler_pause = _scheduler_pause_decision(node, ctx, step_metadata)
+        is_pause = _is_pause_node(node) and scheduler_pause is None
 
         try:
-            output = dispatcher.dispatch(node, inputs, run_id)
+            if scheduler_pause == "auto_approve":
+                output = NodeOutput(
+                    outputs={},
+                    meta={"under_scheduler": "auto_approved"},
+                )
+            else:
+                if scheduler_pause == "error":
+                    raise HandlerError(
+                        f"pause node {node.id!r} reached in scheduler context with "
+                        "under_scheduler.auto_approve=false"
+                    )
+                # Pause nodes flip the run-level status to SUSPENDED for the
+                # duration of the wait so external observers see the
+                # suspension. We use `set_status` (non-freezing) so the
+                # post-approve transition back to RUNNING is in-process.
+                if is_pause:
+                    state = _record_pause_suspended(state)
+                    save_state(state)
+                output = dispatcher.dispatch(node, inputs, run_id)
         except HandlerError as exc:
             if node.optional:
                 telemetry.emit(
@@ -645,6 +738,7 @@ class Walker:
         run_id,
         telemetry,
         ctx,
+        step_metadata,
         materialised,
         skipped,
         node_statuses,
@@ -805,6 +899,7 @@ class Walker:
         from hive.lib.dag_executor.run_state.resume import _replay_starting_index
 
         ctx = context or {}
+        step_metadata = _workflow_step_metadata(graph, ctx)
         order = _topological_order(graph)
         materialised: dict[str, NodeOutput] = {}
         for node_id, status in state.node_statuses.items():
@@ -864,13 +959,25 @@ class Walker:
             state = set_node_status(state, node_id, NodeStatus.RUNNING)
             save(state, root=runs_root)
 
-            is_pause = _is_pause_node(node)
-            if is_pause:
-                state = _record_pause_suspended(state)
-                save(state, root=runs_root)
+            scheduler_pause = _scheduler_pause_decision(node, ctx, step_metadata)
+            is_pause = _is_pause_node(node) and scheduler_pause is None
 
             try:
-                output = dispatcher.dispatch(node, inputs, run_id)
+                if scheduler_pause == "auto_approve":
+                    output = NodeOutput(
+                        outputs={},
+                        meta={"under_scheduler": "auto_approved"},
+                    )
+                else:
+                    if scheduler_pause == "error":
+                        raise HandlerError(
+                            f"pause node {node.id!r} reached in scheduler context with "
+                            "under_scheduler.auto_approve=false"
+                        )
+                    if is_pause:
+                        state = _record_pause_suspended(state)
+                        save(state, root=runs_root)
+                    output = dispatcher.dispatch(node, inputs, run_id)
             except HandlerError as exc:
                 if node.optional:
                     telemetry.emit(
