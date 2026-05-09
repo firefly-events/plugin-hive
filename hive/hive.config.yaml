@@ -169,14 +169,25 @@ meta_team:
 # Knowledge-graph-derived signal source. Step-02c reads kg.sqlite for triples
 # within the recency window; if non-empty, step-03 routes through the
 # kg_signal proposal source before falling back to backlog.
-# When `enabled: false`, step-02c is skipped entirely and routing falls
-# through metrics → backlog (legacy behavior). Consumers without kg.sqlite
-# see no behavioral change either way.
+# Cross-session dreaming replay is the 5th source. It runs after kg_signal and
+# before backlog because it is still automatic signal, not human-curated input.
+# When either source is disabled or unavailable, routing falls through without
+# error and remaining sources continue normally.
 meta_optimize:
   kg_signal:
     enabled: true              # set false to disable kg_signal source
     window_days: 30            # recency window for triple inclusion
     cross_project_penalty: 0.7 # rank multiplier for cross-project signal
+  dreaming_source:
+    enabled: true              # set false to skip the 5th source entirely
+    rank_weight: 0.65          # lower than direct metrics/KG; still above backlog fallback
+    episode_root: .pHive/episodes # cross-session replay corpus; mirrors local episode walker input
+
+# Dreaming preview runs asynchronously and is waitlist-gated upstream. Hive's
+# local adapter uses this timeout as the scheduler budget for the cross-session
+# replay window rather than extending per-session session-end phases.
+dreaming:
+  timeout_hours: 12            # overnight replay window; keeps capability-skip bounded for daily routines
 
 # Planning settings
 planning:

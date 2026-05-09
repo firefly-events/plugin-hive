@@ -28,6 +28,7 @@ Before starting, verify all of the following:
 - `HIVE_TARGET_PROJECT` resolves through `paths.target_project` in the root `hive.config.yaml`, with invoking cwd fallback when unset
 - The target project is a git repository with a clean working tree before creating the cycle worktree
 - `meta_optimize.kg_signal.enabled` (default `true`) controls the knowledge-graph proposal source. When `false`, step-02c is skipped entirely and routing falls through metrics → backlog (legacy behavior). Consumers without `kg.sqlite` see no behavioral change either way: step-02c emits empty findings and routing falls through to backlog.
+- `meta_optimize.dreaming_source.enabled` (default `true`) controls the cross-session dreaming replay proposal source. If `meta_optimize.dreaming_source.enabled` is `false`, or dreaming replay capability-checks unavailable, step-02d returns `[]` and routing falls through unchanged.
 
 If the target is dirty, not a git repo, or unresolved, stop before boot and do not start the cycle.
 
@@ -78,13 +79,14 @@ Load and follow `hive/workflows/steps/meta-team-cycle/step-03-proposal.md` when 
 - Step 2 produced one or more `findings` (structural-audit signal), OR
 - Step 2b produced one or more `external_research_candidates`, OR
 - Step 2c produced one or more `kg_signal` proposals (knowledge-graph-derived findings), OR
+- Step 2d produced one or more `dreaming_replay` proposals (cross-session replay findings), OR
 - A metric signal is present and yields ranked proposals (perf-baseline delta above threshold).
 
-Routing precedence is signal-first: metrics → external research → kg_signal → backlog. KG is checked BEFORE backlog because KG is automatic signal-derived input, while backlog is human-curated. Signal-first preserves the auto-improvement loop intent.
+Routing precedence is signal-first: metrics → external research → kg_signal → dreaming_replay → backlog. KG and dreaming replay are checked BEFORE backlog because both are automatic signal-derived inputs, while backlog is human-curated. Signal-first preserves the auto-improvement loop intent.
 
-Load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` ONLY when ALL four are empty: zero findings AND zero external candidates AND zero kg_signal AND no usable metric signal. The public fallback branch is the "nothing-actionable-from-this-cycle" path, not the "no perf delta" path.
+Load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` ONLY when ALL five are empty: zero findings AND zero external candidates AND zero kg_signal AND zero dreaming_replay AND no usable metric signal. The public fallback branch is the "nothing-actionable-from-this-cycle" path, not the "no perf delta" path.
 
-`metric_signal` is a perf-baseline-only flag (orthogonal to findings, external candidates, and kg_signal). A cycle with findings, external candidates, or kg_signal but no perf delta MUST route to step-03, not step-03b. A cycle with kg_signal but metrics-thin still routes to step-03. Kickoff metrics opt-out (no baseline ever captured) plus zero findings plus zero external candidates plus zero kg_signal is the canonical case for step-03b.
+`metric_signal` is a perf-baseline-only flag (orthogonal to findings, external candidates, kg_signal, and dreaming_replay). A cycle with findings, external candidates, kg_signal, or dreaming_replay but no perf delta MUST route to step-03, not step-03b. A cycle with dreaming_replay but metrics-thin still routes to step-03. Kickoff metrics opt-out (no baseline ever captured) plus zero findings plus zero external candidates plus zero kg_signal plus zero dreaming_replay is the canonical case for step-03b.
 
 Do not run both branches for the same cycle. The public fallback branch consumes the consumer-managed backlog file at `{HIVE_TARGET_PROJECT}/.pHive/meta-team/queue-meta-optimize.yaml`.
 
@@ -167,14 +169,15 @@ If the close gate fails:
 
 ## Backlog Fallback
 
-Trigger this branch only when all four actionable inputs are empty:
+Trigger this branch only when all five actionable inputs are empty:
 
 - step 2 `findings` is empty (zero structural-audit findings)
 - step 2b `external_research_candidates` is empty
 - step 2c `kg_signal` is empty (zero knowledge-graph-derived findings, or `meta_optimize.kg_signal.enabled: false`, or `kg.sqlite` absent)
+- step 2d `dreaming_replay` is empty (zero cross-session replay findings, or `meta_optimize.dreaming_source.enabled: false`, or the dreaming capability-check returns `[]`)
 - no usable `metric_signal` is present (kickoff metrics opt-out, OR opt-in with no perf delta above threshold)
 
-`metric_signal` is a perf-baseline-only flag and is orthogonal to findings, external candidates, and kg_signal. A cycle that produced any of those but no perf delta MUST route to step-03, not step-03b. The canonical case for step-03b is "metrics opt-out + zero findings + zero external candidates + zero kg_signal".
+`metric_signal` is a perf-baseline-only flag and is orthogonal to findings, external candidates, kg_signal, and dreaming_replay. A cycle that produced any of those but no perf delta MUST route to step-03, not step-03b. The canonical case for step-03b is "metrics opt-out + zero findings + zero external candidates + zero kg_signal + zero dreaming_replay".
 
 Consumer backlog location:
 
