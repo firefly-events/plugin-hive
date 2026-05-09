@@ -50,8 +50,9 @@ trust:
 
 # Token budget limits
 tokens:
-  per_task_limit: 100000
-  per_story_limit: 500000
+  per_task_limit: 200000       # CWC 2026-05-06 doubled Opus quotas; 100000 -> 200000 keeps per-step headroom ~2x prior cap
+  per_story_limit: 1000000     # CWC 2026-05-06 doubled Opus quotas; 500000 -> 1000000 keeps per-story budget aligned with the higher tier ceiling
+  per_session_limit: 1000000   # CWC 2026-05-06 doubled Opus quotas; unset -> 1000000 keeps session-mode budgets aligned with the doubled per-story Opus cap
   per_epic_limit: 2000000
   warning_threshold: 0.8
 
@@ -102,7 +103,9 @@ model_tiers:
     - test-worker
 
 # Override a specific agent's model (takes precedence over tier)
-model_overrides: {}
+model_overrides:
+  reviewer: opus               # story-zero wiring preserved; reviewer remains on Opus
+  peer-validator: opus         # story-zero wiring preserved; peer-validator remains on Opus
   # example: researcher: opus    # promote researcher to opus for complex projects
 
 # Circuit breakers — prevent wasted time and tokens
