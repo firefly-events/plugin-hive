@@ -1,0 +1,104 @@
+id: a-25-skill-prelude-extraction
+epic: catalog-hygiene-and-borrows
+title: Extract skill-prelude.md and replace boilerplate in 12 top-level skills
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+wave: W0
+action_id: A-25
+
+description: |
+  ~600 lines of boilerplate are duplicated across 12 top-level skills:
+  ~25 lines of "Before Executing Any Skill" + ~25 lines of "Kickoff Gate"
+  copy-pasted into each. Extract this to a single canonical reference at
+  hive/references/skill-prelude.md and replace each duplicate with a one-line
+  citation. Net code delta: ~-528 lines.
+
+  The 12 affected skills are:
+    skills/{kickoff,plan,execute,standup,status,review,test,ui-audit,
+           polish-audit,visual-qa,design-review,brand-system,design-system}/SKILL.md
+  (note: kickoff itself contains the canonical kickoff-gate logic; check whether
+  it should cite the prelude or remain authoritative)
+
+  This is the substrate for W1 (warning lift) and W2 (CONTEXT.md prelude citation).
+
+acceptance_criteria:
+  - "hive/references/skill-prelude.md exists with full boilerplate (kickoff gate logic + Before Executing Any Skill steps)"
+  - "12 affected SKILL.md files cite the prelude via a single line (e.g., 'See hive/references/skill-prelude.md')"
+  - "Net line delta across the 12 SKILL.md files + new prelude is ≥-500 lines (target ~-528)"
+  - "All skills still execute correctly — kickoff gate still fires; persona/config/memory loading still happens"
+  - "git diff shows clean line-count reduction; no functional drift"
+
+steps:
+  - id: research
+    description: |
+      Read all 12 affected SKILL.md files. Identify the exact boilerplate
+      sections to extract. Confirm the boilerplate is byte-identical or
+      near-identical across files (recommendation says ~25 + ~25 lines each).
+      Document any variations that need preservation.
+    agent: researcher
+  - id: implement
+    description: |
+      Create hive/references/skill-prelude.md with the canonical boilerplate.
+      Edit each of the 12 SKILL.md files to replace boilerplate with citation line.
+      Special-case kickoff/SKILL.md if it owns the canonical kickoff-gate logic
+      (cite vs author).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Verify line-count delta meets ≥-500 target. Spot-check 3 skills
+      (kickoff, plan, execute) by invoking them and confirming kickoff gate
+      + persona loading still fires correctly.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify no functional drift. Confirm prelude is single source of truth.
+      Confirm citation pattern is consistent across the 12 skills.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/catalog-hygiene-and-borrows; PR description cites recommendation.md A-25.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown]
+    frameworks: [claude-code-plugin-system]
+  key_files:
+    - path: skills/kickoff/SKILL.md
+      purpose: Authoritative kickoff-gate logic; check if it cites prelude or remains source
+    - path: skills/plan/SKILL.md
+      purpose: Largest skill (~734 lines); biggest beneficiary
+    - path: skills/execute/SKILL.md
+      purpose: Multi-mode skill; second-largest
+    - path: hive/references/skill-prelude.md
+      purpose: NEW — canonical boilerplate destination
+
+design_decisions:
+  - decision: Single citation line, not directive include
+    rationale: Markdown has no native include; agents read prelude as a referenced file
+  - decision: kickoff SKILL.md retains canonical kickoff-gate logic
+    rationale: Avoids citation cycle; kickoff is the source, others cite
+
+risks:
+  - severity: medium
+    description: Boilerplate has subtle drift between skills; treating identical may erase real differences
+    mitigation: research step documents variations explicitly; preserve in prelude or per-skill overrides
+  - severity: low
+    description: Skills break if prelude path is wrong
+    mitigation: test step spot-checks 3 skills end-to-end
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-25: Extract shared reference. ~600 lines duplicated across 12 skills
+      (~25 lines `Before Executing Any Skill` + ~25 lines `Kickoff Gate` × 12).
+      Replace with one citation line; net **~528 lines deleted**. Single source of truth.
+  - path: .pHive/epics/hive-composability-audit/spikes/skills-lens/catalog-matrix.md
+    relevant_excerpt: |
+      §2.4 boilerplate cross-cutting action — substrate for W1 and W2 dependencies.

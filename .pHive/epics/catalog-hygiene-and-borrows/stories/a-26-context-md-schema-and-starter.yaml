@@ -1,0 +1,91 @@
+id: a-26-context-md-schema-and-starter
+epic: catalog-hygiene-and-borrows
+title: Define .pHive/CONTEXT.md schema and produce starter content
+status: pending
+complexity: low
+methodology: classic
+depends_on: [a-25-skill-prelude-extraction]
+wave: W2
+action_id: A-26
+
+description: |
+  Borrow 2 from mattpocock atomic-skill posture: a single-file domain glossary
+  at .pHive/CONTEXT.md. Mattpocock-aligned, low blast radius.
+
+  This story: define the schema (sections, format, content rules) and produce
+  starter content for plugin-hive's own CONTEXT.md so the substrate exists.
+
+  Subsequent stories wire it into kickoff bootstrap (a-26-context-md-kickoff-bootstrap)
+  and skill-prelude citation (a-26-context-md-skill-prelude-citation).
+
+acceptance_criteria:
+  - "hive/references/context-md-schema.md documents the CONTEXT.md format (sections, content rules, when to update)"
+  - ".pHive/CONTEXT.md exists for plugin-hive itself with starter content (domain terms: Hive, epic, story, wave, slice, kickoff-gate, persona, backend, etc.)"
+  - "Schema mandates one-file rule (NOT a multi-file knowledge tree) per Borrow 2 posture"
+  - "Schema specifies maintenance contract — who updates, when, on what trigger"
+  - "Starter CONTEXT.md fits in <200 lines; serves as exemplar for downstream projects"
+
+steps:
+  - id: research
+    description: |
+      Read borrows-scope.md §2 for Borrow 2 specification. Read mattpocock
+      CONTEXT.md pattern references. Inventory plugin-hive domain terms that
+      belong in starter content (Hive, epic, story, wave, persona, backend,
+      kickoff-gate, etc.).
+    agent: researcher
+  - id: implement
+    description: |
+      Write hive/references/context-md-schema.md (schema doc).
+      Write .pHive/CONTEXT.md (starter content for plugin-hive itself —
+      domain glossary in defined schema).
+    agent: technical-writer
+    depends_on: [research]
+  - id: test
+    description: |
+      Verify schema doc covers: format, content rules, update triggers,
+      one-file constraint. Verify starter CONTEXT.md instantiates schema cleanly.
+      Confirm <200 lines.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify schema is mattpocock-coherent (one file, not a tree). Verify
+      starter content is genuine domain glossary (terms agents would actually
+      need), not project status / changelog (wrong shape).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/catalog-hygiene-and-borrows; PR cites A-26 schema+starter story.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/references/context-md-schema.md
+      purpose: NEW — schema specification for CONTEXT.md format
+    - path: .pHive/CONTEXT.md
+      purpose: NEW — plugin-hive's own domain glossary (also serves as exemplar)
+    - path: .pHive/epics/hive-composability-audit/spikes/skills-lens/borrows-scope.md
+      purpose: Borrow 2 specification (mattpocock alignment)
+
+design_decisions:
+  - decision: Schema mandates single file, not tree
+    rationale: Mattpocock posture — atomic, single source. Tree invites memory-stack creep (Epic G concern).
+  - decision: Starter is domain glossary, not project status
+    rationale: Wrong shape would conflate with project memos / changelog; CONTEXT.md is "what do these terms mean in this codebase"
+
+risks:
+  - severity: low
+    description: Starter CONTEXT.md drifts toward project-status / changelog format
+    mitigation: review step explicitly checks shape vs schema intent
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-26 Borrow 2 — `.pHive/CONTEXT.md`: Domain-language single-file glossary.
+      Mattpocock-aligned, low blast radius, unblocks Borrow 1 substrate.
+      3 stories: schema + starter, kickoff bootstrap, skill-prelude citation.
+  - path: .pHive/epics/hive-composability-audit/spikes/skills-lens/borrows-scope.md
+    relevant_excerpt: |
+      §2.5 — CONTEXT.md is substrate for Borrow 1 (Grill); load before W4.

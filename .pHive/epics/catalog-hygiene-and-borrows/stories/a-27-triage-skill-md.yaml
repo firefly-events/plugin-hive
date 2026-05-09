@@ -1,0 +1,110 @@
+id: a-27-triage-skill-md
+epic: catalog-hygiene-and-borrows
+title: Write skills/triage/SKILL.md with canonical 5-state intake flow
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [a-25-skill-prelude-extraction]
+wave: W3
+action_id: A-27
+
+description: |
+  Borrow 3 adds a new top-level skill at skills/triage/SKILL.md for brownfield
+  bug + feature intake. Recommendation anchors the shape: top-level atomic
+  surface, process-owning internally, warning-only kickoff gate, hand-offs to
+  /plan --from-triage and standup Phase 1.
+
+  This story authors the skill contract only. It defines the canonical five
+  intake states from the borrow source, the operator flow between them, and the
+  warning-only gate behavior. It does NOT implement /plan wiring, standup
+  surfacing, or optional adapter write-back; those land in follow-on stories.
+
+  Scope boundary:
+  - DO author skills/triage/SKILL.md as the authoritative triage procedure.
+  - DO preserve warning-only posture on missing kickoff state.
+  - DO cite the queue artifact at .pHive/triage/queue.yaml as the persistence
+    surface used by follow-on stories.
+  - DO NOT invent extra states, hard-gates, or adapter semantics not retained in
+    recommendation artifacts.
+
+acceptance_criteria:
+  - "`test -f skills/triage/SKILL.md` succeeds"
+  - "`rg -n 'warning-only|warn and proceed|Proceeding with defaults' skills/triage/SKILL.md` returns at least one match"
+  - "`rg -n '/plan --from-triage|standup Phase 1|queue.yaml' skills/triage/SKILL.md` returns all three hand-off references"
+  - "SKILL.md documents exactly five triage states and states that the names/ordering must match the canonical borrow source"
+  - "SKILL.md positions triage as brownfield bug + feature intake and does not describe it as greenfield planning"
+
+steps:
+  - id: research
+    description: |
+      Read recommendation.md Section 2.3 and the retained architect-section rows
+      for A-27. Confirm the non-negotiables: brownfield bug + feature intake,
+      five-state machine, warning-only kickoff gate, atomic-at-surface but
+      process-owning internally, and /plan + standup hand-offs.
+    agent: researcher
+  - id: implement
+    description: |
+      Write skills/triage/SKILL.md. Define the five-state intake procedure,
+      state transitions, operator prompts, warning-only kickoff behavior, and
+      explicit references to .pHive/triage/queue.yaml, /plan --from-triage, and
+      standup Phase 1.
+    agent: technical-writer
+    depends_on: [research]
+  - id: test
+    description: |
+      Verify the file exists and grep for the required strings: warning-only
+      posture, queue artifact path, /plan --from-triage hand-off, standup
+      Phase 1 hand-off, and a five-state section.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify the skill stays at skill scope rather than spreading into plan or
+      standup implementation. Confirm no hard-gate language or invented state
+      names beyond what the retained audit artifacts support.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/catalog-hygiene-and-borrows; PR cites A-27 Borrow 3 skill-author story.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/triage/SKILL.md
+      purpose: NEW — authoritative triage skill contract
+    - path: .pHive/triage/queue.yaml
+      purpose: NEW — queue persistence surface referenced by the triage procedure
+    - path: hive/references/skill-prelude.md
+      purpose: Substrate from A-25; warning-vs-hard gate wording should align with shared prelude semantics
+    - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+      purpose: Primary retained source for Borrow 3 scope, wave ordering, and hand-offs
+
+design_decisions:
+  - decision: Keep triage as a top-level skill, not an inline /plan subsection
+    rationale: Recommendation classifies Borrow 3 as a new top-level skill with atomic surface and process-owning internals
+  - decision: Warning-only kickoff gate, not hard-block
+    rationale: Borrow 3 is intended to be standalone-usable on brownfield intake paths
+  - decision: Defer queue schema, /plan wiring, and standup surfacing to separate stories
+    rationale: Epic wave plan decomposes A-27 into four stories with separate hand-off responsibilities
+
+risks:
+  - severity: medium
+    description: Canonical state names are not retained in recommendation.md itself
+    mitigation: Spec requires downstream author to lift the five names/order from the canonical borrow source rather than invent replacements
+  - severity: low
+    description: Triage drifts into implementation-planning territory
+    mitigation: Review step checks that /plan hand-off is referenced, not absorbed
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-27 Borrow 3 — new top-level skill + .pHive/triage/queue.yaml.
+      Brownfield bug + feature intake; 5-state machine; warning-only gate;
+      hand-offs to /plan --from-triage and standup Phase 1.
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation-architect-sections.md
+    relevant_excerpt: |
+      Posture: atomic at surface, process-owning internally — coherent.
+      Four stories: skill author + queue schema, plan input parser, standup
+      queue surfacing, optional adapter write-back.

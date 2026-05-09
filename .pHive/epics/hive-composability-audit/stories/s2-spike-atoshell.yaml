@@ -1,0 +1,133 @@
+id: s2-spike-atoshell
+epic: hive-composability-audit
+title: Atoshell feasibility spike — local task_tracking adapter evaluation
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s1-spike-sandcastle]
+
+description: |
+  Bounded ~half-day spike evaluating atoshell (GeekKingCloud) as a candidate
+  local-files alternative for hive.config.yaml `task_tracking.adapter` slot
+  (currently null; supports linear/github). Both CLI smoke test AND working
+  adapter wire-up. Includes sandcastle compatibility test — sandcastle currently
+  couples to GH issues; atoshell + sandcastle = candidate fully-local stack
+  aligned with project_oss_rollout_brand North Star.
+
+  Maturity caveat: atoshell is 3 days old (created 2026-05-05), 0 stars, single
+  squashed commit. Spike output specifies ADOPT-WHEN-MATURE / VENDOR-NOW / SKIP
+  per R2 mitigation.
+
+  Serial after s1 — sandcastle GO/NO-GO call informs whether atoshell-sandcastle
+  synergy story is meaningful.
+
+acceptance_criteria:
+  - "Atoshell installed via curl + smoke test (create / take / move / done) executed successfully"
+  - "Source code read end-to-end (single bash file, ~few hundred lines per research-brief)"
+  - "Working adapter wire-up: prototype atoshell adapter at .pHive/spikes/atoshell/adapter.ts (or .sh) implementing same interface as Linear/GitHub adapters"
+  - "Sandcastle compatibility test: atoshell --json export consumed by sandcastle.run() (or shim) — ticket flows from atoshell to sandboxed agent"
+  - "Findings doc at .pHive/spikes/atoshell/findings.md produces ADOPT / ADOPT-WHEN-MATURE / VENDOR-NOW / SKIP call"
+  - "If VENDOR-NOW: explicit estimate of vendor-fork maintenance burden + which features Hive would re-implement directly"
+  - "Sandcastle-atoshell synergy assessment: full-local stack feasibility (depends on s1 outcome — if sandcastle is NO-GO, mark synergy as N/A)"
+
+steps:
+  - id: research
+    description: |
+      Read atoshell source (single bash file). Inventory primitives:
+      tickets / columns / take next / disciplines / --as agent / --json /
+      --import. Read existing Linear adapter (if any) at hive/lib/task-tracking/
+      or equivalent. Map atoshell shape onto adapter interface.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Two parts:
+      A. CLI smoke test:
+         - curl install atoshell to spike dir
+         - run atoshell init / create / take / move / done
+         - verify .atoshell/ JSON files
+      B. Adapter wire-up:
+         - prototype adapter at .pHive/spikes/atoshell/adapter.{ts,sh}
+         - implement create_ticket / list_tickets / update_ticket / close_ticket
+         - test against existing task_tracking interface (read hive.config.yaml +
+           any existing adapter for shape reference)
+      C. Sandcastle compatibility (if s1 GO/HYBRID):
+         - export atoshell tickets via --json
+         - feed into sandcastle.run() spike harness from s1
+         - verify ticket → sandboxed agent → branch flow
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Verify each acceptance criterion. Smoke test + adapter wire-up + sandcastle
+      synergy (if applicable). Document any failures or N/A items.
+    agent: tester
+    depends_on: [implement]
+
+  - id: findings
+    description: |
+      Write .pHive/spikes/atoshell/findings.md with required sections:
+        1. Primitives inventory (atoshell ↔ task_tracking adapter mapping)
+        2. CLI smoke test results
+        3. Adapter wire-up results — does atoshell back the existing adapter interface cleanly?
+        4. Maturity assessment — 0 stars + 3 days old; vendor vs depend trade-off with concrete LOC estimate for vendor-fork
+        5. Sandcastle synergy assessment (or N/A if s1 NO-GO)
+        6. ADOPT / ADOPT-WHEN-MATURE / VENDOR-NOW / SKIP call
+        7. If VENDOR-NOW: which features Hive would re-implement directly
+    agent: technical-writer
+    depends_on: [test]
+
+  - id: review
+    description: |
+      Reviewer (Opus 4.7) verifies findings doc against spike artifacts.
+      Confirms maturity assessment is honest (no premature-adoption optimism),
+      sandcastle synergy claim matches actual integration test result.
+    agent: reviewer
+    depends_on: [findings]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: bash + jq + git
+    install_method: curl pipe
+  key_files:
+    - path: hive.config.yaml
+      purpose: Lines 47-58 — task_tracking section showing existing linear/github adapter shape
+    - path: .pHive/spikes/sandcastle/findings.md
+      purpose: Sandcastle GO/NO-GO call gates whether sandcastle-synergy test runs
+
+files_to_modify:
+  - file: .pHive/spikes/atoshell/  (new)
+    change: Spike artifacts isolated here
+
+design_decisions:
+  - decision: Both CLI test AND adapter wire-up
+    rationale: User pick (Q5); pure CLI test wouldn't validate adapter-slot fit, pure adapter wire-up wouldn't validate UX
+  - decision: Serial after s1
+    rationale: User pick (Q2); also sandcastle GO/NO-GO informs whether sandcastle-synergy story is meaningful
+  - decision: VENDOR-NOW as explicit option (not just adopt/skip)
+    rationale: 0 stars + 3 days old maturity gap may make vendor-fork more credible than dependency
+
+cross_cutting:
+  - concern: documentation
+    action: "No high-level docs change during spike. If recommendation (s4) calls for atoshell adoption, hive.config.yaml task_tracking docs update in follow-on epic."
+
+risks:
+  - severity: high
+    description: Atoshell maturity (3 days, 0 stars) blocks honest evaluation
+    mitigation: Treat spike as "would we adopt if mature?" — output specifies ADOPT-WHEN-MATURE / VENDOR-NOW alternatives (R2)
+  - severity: medium
+    description: Adapter interface drift — Hive may not have a stable task_tracking adapter interface yet
+    mitigation: Researcher inventories existing interface FIRST; if no clean interface exists, adapter prototype defines one (output to recommendation doc as bonus)
+  - severity: medium
+    description: Sandcastle synergy test depends on s1 outcome being GO/HYBRID
+    mitigation: If s1 NO-GO, mark synergy section N/A; spike still completes via parts A + B
+
+references:
+  - path: .pHive/research-drafts/2026-05-08-sandcastle-atoshell-positioning.md
+    relevant_excerpt: |
+      Sandcastle currently couples to GH issues for ticket source. Atoshell ships
+      --json + JSON-on-disk + --as <agent> flag. If both adopted: Hive runs fully
+      local (atoshell tickets → sandcastle sandboxed agents → branch-merge back to
+      host) with no SaaS dep. Significant North-Star alignment for OSS distribution.

@@ -22,6 +22,17 @@ state/
 !.pHive/epics/meta-improvement-system/**
 !.pHive/episodes/meta-improvement-system/
 !.pHive/episodes/meta-improvement-system/**
+# Hive composability audit + 2.0 milestone epics — planning + audit trail tracked
+# at the maintainer level so the audit recommendation, follow-on epics, and
+# cycle-state stay reviewable.
+!.pHive/epics/hive-composability-audit/
+!.pHive/epics/hive-composability-audit/**
+!.pHive/epics/catalog-hygiene-and-borrows/
+!.pHive/epics/catalog-hygiene-and-borrows/**
+!.pHive/epics/structural-refactor-and-gate-lift/
+!.pHive/epics/structural-refactor-and-gate-lift/**
+!.pHive/epics/task-tracking-adapter-abi/
+!.pHive/epics/task-tracking-adapter-abi/**
 # Per-epic cycle-state lives under .pHive/cycle-state/; only the
 # meta-improvement-system entry is tracked at this time (same maintainer-
 # infrastructure rationale as the epics/ and episodes/ subtrees above).

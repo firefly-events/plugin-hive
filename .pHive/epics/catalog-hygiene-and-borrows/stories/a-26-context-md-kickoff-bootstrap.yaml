@@ -1,0 +1,86 @@
+id: a-26-context-md-kickoff-bootstrap
+epic: catalog-hygiene-and-borrows
+title: Wire CONTEXT.md bootstrap into kickoff skill
+status: pending
+complexity: low
+methodology: classic
+depends_on: [a-26-context-md-schema-and-starter]
+wave: W2
+action_id: A-26
+
+description: |
+  Add CONTEXT.md creation to the kickoff workflow. When a user runs /hive:kickoff,
+  the skill scaffolds .pHive/CONTEXT.md alongside project-profile.yaml (per the
+  schema from a-26-context-md-schema-and-starter).
+
+  For brownfield kickoff: kickoff infers initial domain terms from codebase scan
+  and seeds CONTEXT.md with those terms (via researcher).
+
+  For greenfield kickoff: kickoff creates an empty CONTEXT.md scaffold the user
+  populates as the project takes shape.
+
+acceptance_criteria:
+  - "skills/kickoff/SKILL.md adds CONTEXT.md scaffolding step"
+  - "Brownfield path: kickoff seeds CONTEXT.md with domain terms inferred from codebase scan (researcher)"
+  - "Greenfield path: kickoff creates empty CONTEXT.md scaffold with section headers"
+  - "Existing kickoffs (project-profile.yaml exists) — kickoff offers to backfill CONTEXT.md if missing"
+  - "Schema citation in kickoff points to hive/references/context-md-schema.md"
+
+steps:
+  - id: research
+    description: |
+      Read skills/kickoff/SKILL.md and identify the right insertion point for
+      CONTEXT.md scaffolding (likely alongside project-profile.yaml creation).
+      Determine brownfield vs greenfield branch logic.
+    agent: researcher
+  - id: implement
+    description: |
+      Edit skills/kickoff/SKILL.md to add CONTEXT.md scaffolding.
+      Brownfield: add researcher step that emits domain terms; writer fills schema.
+      Greenfield: empty scaffold with section headers from schema.
+      Backfill path: if .pHive/ exists but CONTEXT.md missing, prompt user.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Run kickoff on test fresh-project (greenfield) — confirm scaffold created.
+      Run kickoff on plugin-hive itself with .pHive/CONTEXT.md temporarily
+      removed (brownfield + backfill) — confirm domain terms inferred sensibly.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify kickoff doesn't double-create CONTEXT.md if it exists.
+      Verify backfill prompt is opt-in (user can skip).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/catalog-hygiene-and-borrows; PR cites A-26 kickoff bootstrap.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/kickoff/SKILL.md
+      purpose: Receives CONTEXT.md scaffolding logic
+    - path: hive/references/context-md-schema.md
+      purpose: Schema citation point (from a-26 schema story)
+    - path: .pHive/CONTEXT.md
+      purpose: Output target for brownfield kickoff
+
+design_decisions:
+  - decision: Brownfield seeds via researcher; greenfield empties scaffold
+    rationale: Brownfield has codebase to mine; greenfield has nothing yet
+  - decision: Backfill is opt-in
+    rationale: Existing projects shouldn't be auto-modified without user consent
+
+risks:
+  - severity: low
+    description: Researcher emits noisy / wrong domain terms on brownfield
+    mitigation: User reviews seeded CONTEXT.md before proceeding; can edit before save
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-26 stories: schema + starter, kickoff bootstrap, skill-prelude citation.

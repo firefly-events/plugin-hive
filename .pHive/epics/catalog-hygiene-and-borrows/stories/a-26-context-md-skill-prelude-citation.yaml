@@ -1,0 +1,79 @@
+id: a-26-context-md-skill-prelude-citation
+epic: catalog-hygiene-and-borrows
+title: Cite CONTEXT.md from skill-prelude.md
+status: pending
+complexity: low
+methodology: classic
+depends_on: [a-26-context-md-schema-and-starter, a-25-skill-prelude-extraction]
+wave: W2
+action_id: A-26
+
+description: |
+  Add a citation in hive/references/skill-prelude.md (created in A-25) that
+  instructs every skill execution to read .pHive/CONTEXT.md if present. This
+  makes the domain glossary load alongside persona + config + memories during
+  the standard "Before Executing Any Skill" step.
+
+  CONTEXT.md is silent if absent (per W1 warning-lift posture — substrate
+  shouldn't hard-block on missing files).
+
+acceptance_criteria:
+  - "hive/references/skill-prelude.md includes a citation step for .pHive/CONTEXT.md"
+  - "Citation pattern: 'Read .pHive/CONTEXT.md if it exists; silently proceed if absent'"
+  - "All 12 skills citing the prelude now load CONTEXT.md transitively (single source of truth)"
+  - "No regression on fresh-repo runs (CONTEXT.md absent → no warning, no error, just skipped)"
+
+steps:
+  - id: research
+    description: |
+      Read hive/references/skill-prelude.md (post A-25). Identify the right
+      step ordering for CONTEXT.md citation (likely after persona load, with
+      project config + memories).
+    agent: researcher
+  - id: implement
+    description: |
+      Edit skill-prelude.md to add CONTEXT.md citation step.
+      Pattern: "Read .pHive/CONTEXT.md if it exists; silently proceed if absent."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Spot-check 3 skills (plan, execute, status) with CONTEXT.md present and
+      absent. Confirm load happens when present, no error when absent.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify citation positioning makes sense (after persona, before substantive work).
+      Verify silent-on-absence pattern matches W1 warning-lift posture.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/catalog-hygiene-and-borrows; PR cites A-26 prelude citation.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/references/skill-prelude.md
+      purpose: Receives CONTEXT.md citation step
+    - path: .pHive/CONTEXT.md
+      purpose: File being cited
+
+design_decisions:
+  - decision: Silent-on-absence (no warning if CONTEXT.md missing)
+    rationale: Composable substrate posture — substrate doesn't shame the user for not having every artifact
+
+risks:
+  - severity: low
+    description: Citation order in skill-prelude.md positions CONTEXT.md load before persona/config and breaks expected substrate
+    mitigation: Research step pins ordering after persona+config, before substantive work; review verifies positioning
+  - severity: low
+    description: Future tooling assumes CONTEXT.md always present and crashes on absence
+    mitigation: "Silent-on-absence is documented in skill-prelude.md as contract — downstream must handle absence"
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-26 Borrow 2: skill-prelude citation step (3rd of 3 stories under A-26).

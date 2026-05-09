@@ -1,0 +1,103 @@
+id: a-27-triage-queue-yaml
+epic: catalog-hygiene-and-borrows
+title: Define .pHive/triage/queue.yaml schema and warning-only gate contract
+status: pending
+complexity: low
+methodology: classic
+depends_on: [a-27-triage-skill-md]
+wave: W3
+action_id: A-27
+
+description: |
+  Borrow 3 persists intake state in .pHive/triage/queue.yaml. This story defines
+  the queue schema that the triage skill authors and the /plan + standup hand-off
+  stories consume. Recommendation retains the shape at a high level: five-state
+  queue, warning-only kickoff behavior, brownfield bug + feature intake.
+
+  Required schema fields for each queue item are retained by the planning brief:
+  state, severity, timestamps, and assignee. This story documents those fields,
+  defines how they are represented in queue.yaml, and binds the warning-only gate
+  behavior to queue creation/update semantics.
+
+  Scope boundary:
+  - DO define the queue.yaml schema and field meanings.
+  - DO document how warning-only kickoff behavior affects queue creation.
+  - DO NOT wire /plan or standup here.
+  - DO NOT add adapter-sync fields unless later A-27 optional write-back work is explicitly pulled in.
+
+acceptance_criteria:
+  - "`test -f .pHive/triage/queue.yaml` succeeds or the story explicitly defines it as a created-by-implementation target"
+  - "Story names the required queue item fields: state, severity, timestamps, assignee"
+  - "`rg -n 'warning-only|warn and proceed|fail-open' .pHive/epics/catalog-hygiene-and-borrows/stories/a-27-triage-queue-yaml.yaml` returns at least one match"
+  - "Schema description states that queue state values align with the canonical five triage states from the Borrow 3 source"
+  - "No acceptance criterion or step mentions /plan decomposition logic or standup presentation logic"
+
+steps:
+  - id: research
+    description: |
+      Read the retained A-27 recommendation rows plus the triage-skill story.
+      Confirm the queue role: persistence surface for a five-state intake flow
+      with warning-only kickoff semantics.
+    agent: researcher
+  - id: implement
+    description: |
+      Write the planning spec for .pHive/triage/queue.yaml. Document the top-level
+      structure, per-item fields, canonical state binding, and the warning-only
+      behavior when kickoff context is absent or partial.
+    agent: technical-writer
+    depends_on: [research]
+  - id: test
+    description: |
+      Verify the story names the exact target path, the required fields, and the
+      warning-only gate contract. Grep the spec for state, severity, timestamps,
+      assignee, and queue.yaml.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify the schema is small and consumable by downstream /plan and standup
+      stories. Confirm no invented tracker fields or execution metadata appear.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/catalog-hygiene-and-borrows; PR cites A-27 queue-schema story.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/triage/queue.yaml
+      purpose: NEW — queue schema target for Borrow 3
+    - path: skills/triage/SKILL.md
+      purpose: Upstream consumer/producer of queue state
+    - path: skills/plan/SKILL.md
+      purpose: Downstream consumer via /plan --from-triage
+    - path: skills/standup/SKILL.md
+      purpose: Downstream consumer via standup Phase 1 surfacing
+
+design_decisions:
+  - decision: "Keep the schema minimal — state, severity, timestamps, assignee"
+    rationale: Those are the only queue fields retained by the planning brief; extra structure would be invented
+  - decision: Bind state values to the canonical five triage states
+    rationale: Queue integrity depends on matching the Borrow 3 state machine exactly
+  - decision: Warning-only semantics are documented at schema level as well as skill level
+    rationale: Queue creation/update behavior is part of the persistence contract, not just operator instructions
+
+risks:
+  - severity: medium
+    description: Downstream agents may guess additional metadata fields
+    mitigation: Spec explicitly limits the schema to retained fields unless optional adapter write-back is separately activated
+  - severity: low
+    description: Queue.yaml gets treated as runtime workflow config rather than planning-state data
+    mitigation: Description states that it is intake persistence for planning hand-offs, not execution logic
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-27 includes a new top-level triage skill plus .pHive/triage/queue.yaml.
+      Triage is a 5-state machine with warning-only gate and /plan + standup hand-offs.
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation-architect-sections.md
+    relevant_excerpt: |
+      Four-story decomposition retains queue schema as its own story between
+      triage skill authoring and the hand-off integrations.

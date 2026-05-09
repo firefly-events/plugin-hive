@@ -1,0 +1,108 @@
+name: hive-composability-audit
+title: Hive Composability + Substrate + Tracker Audit
+description: |
+  Strategic audit producing a single structural recommendation that decides:
+    1. CWC 2026 Group A (Messages-API substrate) fate — adopt sandcastle adapter,
+       proceed as-designed, or hybrid
+    2. Hive skill catalog reshape plan along atomic-composability lines
+       (mattpocock skills lens, full 30+ skill audit)
+    3. task_tracking.adapter direction — atoshell as local-files alternative to
+       Linear/GitHub
+    4. Cross-tool synergy decision — sandcastle-atoshell stack as fully-local
+       OSS posture aligned with project_oss_rollout_brand North Star
+    5. Process-owning vs composable posture statement for Hive
+
+  Three serial spikes feed one joint TPM+architect recommendation doc. Doc is
+  gate-keeping — no further CWC 2026 A-group / skill-catalog reshape /
+  task_tracking adoption work proceeds until user signs off.
+
+  Hard duration cap: 2 working days. Output: recommendation doc only —
+  execution stories spawn from follow-on epics if recommendations accepted.
+
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+scale: medium                          # reframed from large per Q9 + Q7 streamlining
+branch: feat/hive-composability-audit
+duration_cap_days: 2
+
+planning_artifacts:
+  - docs/research-brief.md             # tool research findings (sandcastle + atoshell)
+  - docs/design-discussion.md          # this epic's framing + 7 risks + 9 decisions
+  - docs/recommendation.md             # produced by s4 — gate-keeping artifact
+
+cycle_state: ../../cycle-state/hive-composability-audit.yaml
+
+decision_points_signed_off:
+  - "Q1 duration: 2 working days (user override of 5-7 estimate)"
+  - "Q2 sequencing: serial (s1 → s2 → s3 → s4)"
+  - "Q3 recommendation owner: joint TPM + architect with disagreement protocol"
+  - "Q4 sandbox: Podman"
+  - "Q5 atoshell eval: both — CLI smoke + adapter wire-up"
+  - "Q6 skill matrix: full (all 30+) — user reversal of orchestrator's sampled recommendation"
+  - "Q7 output: recommendation doc only"
+  - "Q8 CWC 2026 A1: continue as no-regret work in parallel session"
+  - "Q9 scale: reframed medium + --fast (orchestrator override of user's 'probably large' given Q7+Q6 streamlining)"
+
+parallel_work:
+  cwc_2026_dc_groups:
+    description: |
+      D-group (s1-d3, s2-d2, s3-d1) + C-group (s11-c1, s12-c2, s13-c3) of CWC 2026
+      execute in parallel session on feat/cwc-2026-integration. No substrate dep.
+    handoff_doc: .pHive/research-drafts/2026-05-08-cwc-dc-parallel-session-prompt.md
+  cwc_2026_a1:
+    description: |
+      A1 (session-spec rewrite) continues as no-regret work — independent of audit
+      outcome. Other A-group + B-group stories remain blocked.
+
+risks_inherited:
+  - id: R1
+    description: Sandcastle hybrid call harder to scope than pure paths
+    mitigation: s1 HYBRID requires upfront criteria
+  - id: R2
+    description: Atoshell maturity (3 days, 0 stars) blocks honest evaluation
+    mitigation: s2 outputs ADOPT-WHEN-MATURE / VENDOR-NOW alternatives
+  - id: R3
+    description: Skills audit scope creep
+    mitigation: s3 caps at one-line classification per skill, hour-4 circuit break
+  - id: R4
+    description: Audit blocks CWC 2026 indefinitely
+    mitigation: 2-day hard cap; D/C groups + A1 progress in parallel
+  - id: R5
+    description: Spike findings disagree
+    mitigation: s4 disagreement protocol (open disagreements section)
+  - id: R6
+    description: Mattpocock author bias (sandcastle + skills same author)
+    mitigation: s4 section 5 requires cited counter-precedent
+  - id: R7
+    description: Recommendation becomes shelfware
+    mitigation: s4 next-epics section is acceptance criterion
+
+stories:
+  - id: s1-spike-sandcastle
+    title: Sandcastle feasibility spike — substrate evaluation
+    complexity: medium
+    depends_on: []
+  - id: s2-spike-atoshell
+    title: Atoshell feasibility spike — local task_tracking adapter evaluation
+    complexity: medium
+    depends_on: [s1-spike-sandcastle]
+  - id: s3-spike-skills-lens
+    title: Skills composability audit — full 30-skill catalog matrix + 3-borrow scope
+    complexity: high
+    depends_on: [s2-spike-atoshell]
+  - id: s4-synthesis-recommendation
+    title: Joint TPM+architect structural recommendation — single gate-keeping doc
+    complexity: high
+    depends_on: [s1-spike-sandcastle, s2-spike-atoshell, s3-spike-skills-lens]
+
+out_of_scope:
+  - "Execution of any recommendation — happens in follow-on epics after sign-off"
+  - "CWC 2026 A-group resume — depends on s4 sign-off (except A1 no-regret work)"
+  - "Skill catalog reshape — recommendation list only, no edits to skills/ during this epic"
+  - "atoshell adoption — recommendation only, adapter wire-up is spike artifact, not landed"
+  - "Full reshape per-skill detailed designs — matrix is one-line per skill, deep designs deferred"
+
+still_open_questions:
+  - "Will sandcastle spike resolve substrate question cleanly, or produce HYBRID requiring user tiebreak?"
+  - "If atoshell maturity gate triggers VENDOR-NOW, does Hive accept the maintenance burden?"
+  - "Does skills posture-check produce coherent dissent, or expose that Hive's process-owning posture is the load-bearing differentiator?"

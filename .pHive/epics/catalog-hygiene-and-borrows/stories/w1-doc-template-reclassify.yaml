@@ -1,0 +1,111 @@
+id: w1-doc-template-reclassify
+epic: catalog-hygiene-and-borrows
+title: Reclassify 5 doc-template skills as references/document-templates/
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [a-25-skill-prelude-extraction]
+wave: W1
+action_ids: [A-20, A-21, A-22, A-23, A-24]
+
+description: |
+  Five "skills" in skills/hive/skills/ are pure document specifications, not
+  executable skills:
+    - design-discussion
+    - horizontal-plan
+    - vertical-plan
+    - structured-outline
+    - greenfield-discovery
+
+  Move them out of skills/ namespace (where they bloat the catalog) into
+  hive/references/document-templates/. Update all references that point at
+  the old paths. Catalog count drops 24 → 19.
+
+  Greenfield-discovery is hybrid (A-24): the Brief schema moves to references;
+  the facilitation procedure stays in hive/agents/analyst.md or as a thin
+  skill stub that references the analyst persona.
+
+acceptance_criteria:
+  - "hive/references/document-templates/{design-discussion,horizontal-plan,vertical-plan,structured-outline}.md exist with content from old SKILL.md files"
+  - "hive/references/document-templates/greenfield-discovery-brief.md exists with Brief schema only"
+  - "skills/hive/skills/{design-discussion,horizontal-plan,vertical-plan,structured-outline,greenfield-discovery}/ removed (or stub-only)"
+  - "All references in /plan, /kickoff, /execute, /standup, agents/, references/ updated to new paths"
+  - "greenfield-discovery facilitation procedure preserved in hive/agents/analyst.md OR thin skill stub"
+  - "Top-level skill catalog count drops by 5 (24 → 19 in user-facing context)"
+  - "grep for old paths returns no live references (dead refs cleaned)"
+
+steps:
+  - id: research
+    description: |
+      Read each of the 5 doc-template skills. Catalog every reference to them
+      across skills/, agents/, references/, .pHive/. Document what to keep
+      verbatim vs adapt vs split (greenfield-discovery hybrid case).
+    agent: researcher
+  - id: implement
+    description: |
+      Create hive/references/document-templates/ directory.
+      Move each doc-template content (design-discussion, horizontal-plan,
+      vertical-plan, structured-outline). For greenfield-discovery: split
+      Brief schema → references/document-templates/greenfield-discovery-brief.md;
+      facilitation procedure → preserve in analyst.md.
+      Delete or stub-out the old skills/hive/skills/{name}/ directories.
+      Update every reference to the new paths.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Run /plan ceremony end-to-end on a test epic — confirm design-discussion,
+      H/V plans, structured-outline production still work using new reference paths.
+      grep verifies no broken references remain.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify analyst.md still has working facilitation procedure for
+      greenfield-discovery; doc-templates contain full schemas; no rot.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/catalog-hygiene-and-borrows; PR cites A-20–A-24.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/design-discussion/SKILL.md
+      purpose: ~200-line brain-dump format; pure spec
+    - path: skills/hive/skills/horizontal-plan/SKILL.md
+      purpose: H-plan spec
+    - path: skills/hive/skills/vertical-plan/SKILL.md
+      purpose: V-plan spec
+    - path: skills/hive/skills/structured-outline/SKILL.md
+      purpose: ~1000-line detailed plan with elicitation
+    - path: skills/hive/skills/greenfield-discovery/SKILL.md
+      purpose: HYBRID — Brief schema + facilitation procedure
+    - path: hive/agents/analyst.md
+      purpose: Receives greenfield-discovery facilitation procedure
+    - path: hive/references/document-templates/
+      purpose: NEW — destination directory
+
+design_decisions:
+  - decision: greenfield-discovery split — schema → references, procedure → analyst.md
+    rationale: Schema is pure spec; procedure is facilitation logic owned by analyst persona
+  - decision: Old skills/hive/skills/{name}/ paths removed entirely (not stub'd)
+    rationale: Plan/kickoff already updated to use new paths; stubs invite confusion
+
+risks:
+  - severity: medium
+    description: References to old paths missed; /plan ceremony breaks at runtime
+    mitigation: research step catalogs ALL references; test step runs full ceremony
+  - severity: low
+    description: External docs (CLAUDE.md, READMEs) reference old skill names
+    mitigation: grep across docs/ + .md files in research step
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-20–A-23: reclassify — Pure document specs; belong at
+      hive/references/document-templates/.
+      A-24: greenfield-discovery — Hybrid — Brief schema → references/document-templates/;
+      facilitation procedure stays in `analyst.md` or thin skill stub.
