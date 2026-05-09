@@ -25,6 +25,8 @@ function buildMetricsEvent(loopConfig, runtime) {
     event_type: metrics.event_type,
     story_id: runtime.story_id,
     iterations_used: runtime.iterations_used,
+    tokens_used: runtime.tokens_used,
+    wall_clock_ms: runtime.wall_clock_ms,
     terminated_by: runtime.terminated_by,
     final_verdict: runtime.final_verdict,
   };
@@ -38,6 +40,8 @@ test('case a — every Outcomes invocation emits exactly one metrics event', () 
   const emitted = buildMetricsEvent(loop, {
     story_id: 's15-b2-outcomes-loop-code-review',
     iterations_used: 2,
+    tokens_used: 12000,
+    wall_clock_ms: 450,
     terminated_by: 'rubric_pass',
     final_verdict: 'passed',
   });
@@ -46,12 +50,14 @@ test('case a — every Outcomes invocation emits exactly one metrics event', () 
   assert.equal(emitted.length, 1);
 });
 
-test("case b — payload includes iterations_used + terminated_by ('rubric_pass'|'iter_cap'|'budget') + final verdict", () => {
+test("case b — payload includes token + wall-clock telemetry and terminated_by stays within ('rubric_pass'|'iter_cap')", () => {
   const workflow = loadYaml(WORKFLOW_PATH);
   const loop = workflow.outcomes_loop;
   const emitted = buildMetricsEvent(loop, {
     story_id: 's15-b2-outcomes-loop-code-review',
     iterations_used: 3,
+    tokens_used: 24500,
+    wall_clock_ms: 1800,
     terminated_by: 'iter_cap',
     final_verdict: 'needs_revision',
   });
@@ -59,6 +65,8 @@ test("case b — payload includes iterations_used + terminated_by ('rubric_pass'
   assert.deepEqual(loop.metrics.payload_fields, [
     'story_id',
     'iterations_used',
+    'tokens_used',
+    'wall_clock_ms',
     'terminated_by',
     'final_verdict',
   ]);
@@ -67,10 +75,14 @@ test("case b — payload includes iterations_used + terminated_by ('rubric_pass'
     event_type: loop.metrics.event_type,
     story_id: 's15-b2-outcomes-loop-code-review',
     iterations_used: 3,
+    tokens_used: 24500,
+    wall_clock_ms: 1800,
     terminated_by: 'iter_cap',
     final_verdict: 'needs_revision',
   });
-  assert.ok(['rubric_pass', 'iter_cap', 'budget'].includes(emitted[0].terminated_by));
+  assert.ok(['rubric_pass', 'iter_cap'].includes(emitted[0].terminated_by));
+  assert.equal(typeof emitted[0].tokens_used, 'number');
+  assert.equal(typeof emitted[0].wall_clock_ms, 'number');
 });
 
 test('case c — ingestion uses the existing metrics emitter, no new sink', () => {

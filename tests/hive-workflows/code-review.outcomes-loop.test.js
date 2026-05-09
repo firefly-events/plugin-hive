@@ -43,11 +43,7 @@ function simulateOutcomesLoop(verdictsByIteration, loopConfig) {
       return { iterations_used: iterationsUsed, terminated_by: 'iter_cap', final_verdict: finalVerdict };
     }
   }
-  return {
-    iterations_used: verdictsByIteration.length,
-    terminated_by: 'budget',
-    final_verdict: aggregateVerdicts(verdictsByIteration.at(-1), precedence),
-  };
+  throw new Error('simulateOutcomesLoop fixture exhausted before rubric_pass or iter_cap');
 }
 
 test('case a — loop terminates at iter_cap (max_outcomes_iterations: 3)', () => {
@@ -115,4 +111,15 @@ test('case d — graders spawn via messages-session substrate from s5', () => {
   assert.equal(graderSpawn.module, 'hive/lib/messages-session.js');
   assert.equal(graderSpawn.entrypoint, 'runMessagesSession');
   assert.equal(graderSpawn.own_context, true);
+});
+
+test('case e — convergence contract exposes only rubric_pass and iter_cap in this slice', () => {
+  const workflow = loadYaml(WORKFLOW_PATH);
+  const terminatedBy = workflow.outcomes_loop.convergence.terminated_by;
+
+  assert.deepEqual(terminatedBy, {
+    success: 'rubric_pass',
+    iteration_cap: 'iter_cap',
+  });
+  assert.equal(Object.values(terminatedBy).includes('budget'), false);
 });

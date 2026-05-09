@@ -17,7 +17,10 @@ in an Outcomes loop.
   - the aggregated verdict is `passed` (`terminated_by: rubric_pass`)
   - `circuit_breakers.max_outcomes_iterations` is reached
     (`terminated_by: iter_cap`)
-  - the enclosing run budget halts the loop (`terminated_by: budget`)
+
+Today, `iter_cap` is the only deterministic backstop inside the loop itself.
+TODO: add a first-class budget-trip terminator in a future slice once
+per-iteration token accounting is wired through the loop executor.
 
 ## Peer Validator Stacking
 
@@ -34,7 +37,11 @@ Outcomes and `peer-validator` are stacked, not redundant.
 - This is intentionally symmetric with `max_fix_iterations: 3`.
 - This slice does not tune the cap to `5`.
 - Every loop completion emits one metrics event carrying:
-  `story_id`, `iterations_used`, `terminated_by`, and `final_verdict`.
+  `story_id`, `iterations_used`, `tokens_used`, `wall_clock_ms`,
+  `terminated_by`, and `final_verdict`.
+- `tokens_used` is the sum of input + output tokens across all grader passes in
+  the loop.
+- `wall_clock_ms` measures loop start to loop termination.
 
 ## Q7 Escalation
 
@@ -43,4 +50,6 @@ Q7 is the budget-envelope review path for the Outcomes loop.
 - Land the cap at `3` in S15.
 - Review the metric distribution at `+30 days` from S15 close.
 - Tune to `5` only if more than `40%` of loops hit the cap.
+- Use `tokens_used` and `wall_clock_ms` alongside iter-cap rate for that
+  decision so the retune does not ignore near-budget loops.
 - TPM owns the calendar reminder and the follow-up decision.

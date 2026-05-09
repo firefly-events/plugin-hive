@@ -29,6 +29,8 @@ try {
   yaml = null;
 }
 
+const CONFIG_PATH = path.join(__dirname, '..', 'hive.config.yaml');
+
 async function runDreamingReplay({
   episodeRoot,
   kg = null,
@@ -43,6 +45,8 @@ async function runDreamingReplay({
   const root = path.resolve(String(episodeRoot || '.pHive/episodes'));
   const files = listEpisodeFiles(root);
   const playbookDeltas = [];
+  const timeoutMs = readDreamingTimeoutMs();
+  const startedAt = Date.now();
 
   for (const filePath of files) {
     const parsed = parseEpisodeFile(filePath);
@@ -51,6 +55,10 @@ async function runDreamingReplay({
     playbookDeltas.push(delta);
     emitDelta(wiki, 'applyDelta', delta.outputs[0].wiki);
     emitDelta(kg, 'applyDelta', delta.outputs[0].kg);
+
+    if (Number.isFinite(timeoutMs) && timeoutMs >= 0 && (Date.now() - startedAt) > timeoutMs) {
+      return { playbookDeltas, capabilityErr: null, timeoutErr: true };
+    }
   }
 
   return { playbookDeltas, capabilityErr: null };
@@ -69,9 +77,11 @@ function listEpisodeFiles(root) {
   if (!fs.existsSync(root)) return [];
   const queue = [root];
   const files = [];
+  let index = 0;
 
-  while (queue.length > 0) {
-    const current = queue.shift();
+  while (index < queue.length) {
+    const current = queue[index];
+    index += 1;
     const entries = fs.readdirSync(current, { withFileTypes: true })
       .sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
@@ -144,6 +154,35 @@ function toObject(value) {
 
 function stringOrEmpty(value) {
   return typeof value === 'string' ? value : '';
+}
+
+function readDreamingTimeoutMs() {
+  let config;
+  try {
+    config = parseConfigFile(CONFIG_PATH);
+  } catch {
+    return Infinity;
+  }
+
+  const timeoutHours = config && config.dreaming && Number(config.dreaming.timeout_hours);
+  if (!Number.isFinite(timeoutHours) || timeoutHours < 0) {
+    return Infinity;
+  }
+  return timeoutHours * 60 * 60 * 1000;
+}
+
+function parseConfigFile(filePath) {
+  const raw = fs.readFileSync(filePath, 'utf8');
+  if (yaml) {
+    return yaml.load(raw) || {};
+  }
+  const match = raw.match(/^\s*dreaming:\s*$[\s\S]*?^\s*timeout_hours:\s*([0-9.]+)/m);
+  if (!match) return {};
+  return {
+    dreaming: {
+      timeout_hours: Number(match[1]),
+    },
+  };
 }
 
 module.exports = { runDreamingReplay };

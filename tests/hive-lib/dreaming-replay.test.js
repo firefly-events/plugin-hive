@@ -128,6 +128,43 @@ test('case c — capability-skip activates when Dreaming is unreachable and retu
   assert.deepEqual(result, { playbookDeltas: [], capabilityErr: null });
 });
 
+test('case c2 — timeout_hours aborts the walker and returns partial deltas with timeoutErr=true', async () => {
+  const { runDreamingReplay } = loadModule();
+  const originalReadFileSync = fs.readFileSync;
+  const originalNow = Date.now;
+  let nowCallCount = 0;
+
+  fs.readFileSync = function patchedReadFileSync(filePath, ...args) {
+    if (path.resolve(filePath) === CONFIG_PATH) {
+      return 'dreaming:\n  timeout_hours: 0.0001\n';
+    }
+    return originalReadFileSync.call(this, filePath, ...args);
+  };
+
+  Date.now = () => {
+    nowCallCount += 1;
+    return nowCallCount === 1 ? 0 : 1000;
+  };
+
+  try {
+    const result = await runDreamingReplay({
+      episodeRoot: FIXTURE_ROOT,
+      capabilityProbe: async () => true,
+    });
+
+    assert.equal(result.timeoutErr, true);
+    assert.equal(result.capabilityErr, null);
+    assert.deepEqual(
+      result.playbookDeltas.map(delta => delta.source_episode),
+      ['dreaming-session-a'],
+      'walker returns the partial delta set emitted before the timeout trips'
+    );
+  } finally {
+    fs.readFileSync = originalReadFileSync;
+    Date.now = originalNow;
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Case (d): 5th source dispatch contract
 // ---------------------------------------------------------------------------

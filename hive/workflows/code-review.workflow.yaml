@@ -12,7 +12,6 @@ outcomes_loop:
     terminated_by:
       success: rubric_pass
       iteration_cap: iter_cap
-      budget_exhausted: budget
   graders:
     own_context: true
     spawn:
@@ -46,6 +45,8 @@ outcomes_loop:
     payload_fields:
       - story_id
       - iterations_used
+      - tokens_used
+      - wall_clock_ms
       - terminated_by
       - final_verdict
 
