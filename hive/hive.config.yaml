@@ -189,11 +189,18 @@ execution:
   default_methodology: classic
   parallel_teams: true
   max_retry_attempts: 2
+  substrate: messages         # default caller-side Messages API substrate; sessions-cloud stays explicit opt-in
   # Optional maintainer-only execution tuning — consumers do NOT need these
   # keys. Uncomment in your root `hive.config.yaml` to override:
   #   terminal_mux: auto           # tmux | cmux | auto  (default: TeamCreate's built-in tmux)
   #   interactive_panes: true      # visible agent conversation (cmux only)
   #   idle_timeout_seconds: 300    # 5-min idle reaper for persistent Codex panes
+
+# Cloud adapter gate
+# Keeps the legacy Sessions-API substrate dark by default until cloud
+# bootstrap (agent_id + environment_id provisioning) is configured.
+cloud-adapter:
+  enabled: false             # explicit guardrail: sessions-cloud must opt in and prove adapter capability
 
 # Session-based execution (Phase 2 of memory-autonomy-foundation)
 # When enabled, the execute skill uses the Claude Agent SDK /v1/sessions API

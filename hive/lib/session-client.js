@@ -11,6 +11,10 @@
 
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
+const { getCloudMode } = require('./runtime-mode');
+
 let Anthropic;
 try {
   Anthropic = require('@anthropic-ai/sdk');
@@ -23,6 +27,9 @@ const REQUIRED_HEADERS = {
   'anthropic-beta': 'managed-agents-2026-04-01',
   'content-type': 'application/json',
 };
+
+const DEFAULT_PROJECT_CONFIG_PATH = path.join(process.cwd(), 'hive.config.yaml');
+const DEFAULT_BASELINE_CONFIG_PATH = path.join(__dirname, '..', 'hive.config.yaml');
 
 /**
  * Build an Anthropic SDK client instance.
@@ -151,12 +158,12 @@ async function registerSession(sessionId, fields, registryPath) {
 /**
  * Delegation entry point — routes by execution.substrate.
  *
- * substrate: 'messages'        → hive/lib/messages-session.js (S5/A2)
- * substrate: 'sessions-cloud'  → cloud bootstrap (deferred to S8/A4 + Hive Cloud epic)
+ * Default precedence:
+ *   explicit call override → env HIVE_EXECUTION_SUBSTRATE → project hive.config.yaml
+ *   → shipped baseline hive/hive.config.yaml
  *
- * Default substrate is NOT flipped here; that ships in S8 / A4. Until then
- * this entry point is reachable only when a caller explicitly requests
- * substrate: 'messages' (e.g. the test harness).
+ * substrate: 'messages'        → hive/lib/messages-session.js (default path)
+ * substrate: 'sessions-cloud'  → cloud adapter bootstrap guard / Sessions-API path
  *
  * @param {Object} opts
  * @param {string} opts.substrate
@@ -168,22 +175,165 @@ async function registerSession(sessionId, fields, registryPath) {
  * @returns {Promise<{messages, stopReason, usage, terminationReason?}>}
  */
 async function runSession(opts) {
-  const substrate = opts && opts.substrate;
-  if (substrate === 'messages') {
-    const { runMessagesSession } = require('./messages-session');
-    return runMessagesSession(opts);
+  const runtime = resolveRuntimeSubstrate(opts || {});
+  logRuntimeResolution(runtime);
+
+  if (runtime.cloudAdapterEnabled && !runtime.cloudMode) {
+    console.warn('[session-client] cloud-adapter.enabled ignored on non-cloud substrate');
   }
-  if (substrate === 'sessions-cloud') {
+
+  if (runtime.cloudMode && !runtime.cloudAdapterEnabled) {
     const err = new Error(
-      'sessions-cloud substrate not yet implemented — cloud bootstrap (agent_id + environment_id provisioning) ' +
-      'is deferred to the Hive Cloud epic. See hive/references/session-system-prompt-spec.md §7 cloud adapter footnote.',
+      'capability-error: execution.substrate requests the cloud adapter, but cloud-adapter.enabled is false. ' +
+      'Enable the adapter before selecting the cloud substrate.',
     );
-    err.code = 'SubstrateNotImplemented';
+    err.code = 'CapabilityError';
     throw err;
   }
-  const err = new Error(`unsupported execution.substrate: ${substrate}`);
+
+  const dispatch = {
+    messages: async () => {
+      const { runMessagesSession } = require('./messages-session');
+      return runMessagesSession(opts);
+    },
+    'sessions-cloud': async () => runSessionsCloudSession(opts),
+  };
+
+  if (dispatch[runtime.substrate]) {
+    return dispatch[runtime.substrate]();
+  }
+
+  const err = new Error(`unsupported execution.substrate: ${runtime.substrate}`);
   err.code = 'UnknownSubstrate';
   throw err;
+}
+
+async function runSessionsCloudSession() {
+  const err = new Error(
+    'sessions-cloud substrate requires cloud bootstrap (agent_id + environment_id provisioning). ' +
+    'See hive/references/session-system-prompt-spec.md §7 cloud adapter footnote.',
+  );
+  err.code = 'CapabilityError';
+  throw err;
+}
+
+function resolveRuntimeSubstrate(opts) {
+  const sources = resolveConfigSources(opts);
+  const callValue = typeof opts.substrate === 'string' ? opts.substrate : undefined;
+  const baselineConfig = readRuntimeConfig(sources.baselineConfigPath);
+  const projectConfig = readRuntimeConfig(sources.projectConfigPath);
+  const baselineValue = readNestedValue(baselineConfig, ['execution', 'substrate']);
+  const projectValue = readNestedValue(projectConfig, ['execution', 'substrate']);
+  const envValue = typeof process.env.HIVE_EXECUTION_SUBSTRATE === 'string' && process.env.HIVE_EXECUTION_SUBSTRATE.length > 0
+    ? process.env.HIVE_EXECUTION_SUBSTRATE
+    : undefined;
+
+  const resolvedSubstrate = callValue || envValue || projectValue || baselineValue;
+  const resolvedFrom = callValue
+    ? 'call'
+    : envValue
+      ? 'env'
+      : projectValue
+        ? 'project'
+        : 'baseline';
+
+  const cloudAdapterEnabled = resolveCloudAdapterEnabled(opts, baselineConfig, projectConfig);
+  const valuesForConflict = [baselineValue, projectValue, envValue, callValue].filter(Boolean);
+  const conflict = new Set(valuesForConflict).size > 1;
+  const cloudMode = getCloudMode({ execution: { substrate: resolvedSubstrate } });
+
+  return {
+    substrate: resolvedSubstrate,
+    resolvedFrom,
+    conflict,
+    cloudAdapterEnabled,
+    cloudMode,
+  };
+}
+
+function resolveCloudAdapterEnabled(opts, baselineConfig, projectConfig) {
+  if (typeof opts.cloudAdapterEnabled === 'boolean') return opts.cloudAdapterEnabled;
+
+  const baselineValue = readNestedValue(baselineConfig, ['cloud-adapter', 'enabled']);
+  const projectValue = readNestedValue(projectConfig, ['cloud-adapter', 'enabled']);
+  if (typeof projectValue === 'boolean') return projectValue;
+  if (typeof baselineValue === 'boolean') return baselineValue;
+  return false;
+}
+
+function resolveConfigSources(opts) {
+  return {
+    baselineConfigPath: opts.baselineConfigPath || DEFAULT_BASELINE_CONFIG_PATH,
+    projectConfigPath: opts.projectConfigPath || process.env.HIVE_CONFIG || DEFAULT_PROJECT_CONFIG_PATH,
+  };
+}
+
+function logRuntimeResolution(runtime) {
+  console.info(
+    `[session-client] substrate.resolved_from=${runtime.resolvedFrom} substrate.conflict=${runtime.conflict}`,
+  );
+}
+
+function readRuntimeConfig(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return {};
+  const raw = fs.readFileSync(filePath, 'utf8');
+  return parseConfigText(raw);
+}
+
+function parseConfigText(raw) {
+  if (!raw || !raw.trim()) return {};
+
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {}
+
+  return {
+    execution: parseYamlSection(raw, 'execution', ['substrate']),
+    'cloud-adapter': parseYamlSection(raw, 'cloud-adapter', ['enabled']),
+  };
+}
+
+function parseYamlSection(raw, sectionName, keys) {
+  const result = {};
+  const lines = raw.split(/\r?\n/);
+  let active = false;
+
+  for (const line of lines) {
+    if (/^\S/.test(line) && line.trim() !== `${sectionName}:`) {
+      active = false;
+    }
+    if (line.trim() === `${sectionName}:`) {
+      active = true;
+      continue;
+    }
+    if (!active) continue;
+
+    const match = line.match(/^\s{2}([A-Za-z0-9_-]+):\s*(.+?)\s*(?:#.*)?$/);
+    if (!match) continue;
+    const [, key, rawValue] = match;
+    if (!keys.includes(key)) continue;
+    result[key] = coerceConfigValue(rawValue);
+  }
+
+  return result;
+}
+
+function coerceConfigValue(value) {
+  const normalized = value.trim().replace(/^['"]|['"]$/g, '');
+  if (normalized === 'true') return true;
+  if (normalized === 'false') return false;
+  if (normalized === 'null') return null;
+  return normalized;
+}
+
+function readNestedValue(obj, keys) {
+  let current = obj;
+  for (const key of keys) {
+    if (!current || typeof current !== 'object' || !(key in current)) return undefined;
+    current = current[key];
+  }
+  return current;
 }
 
 module.exports = { createSession, sendEvents, streamEvents, classifyError, runSession, registerSession };

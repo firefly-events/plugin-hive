@@ -1,12 +1,8 @@
 /**
- * Delegation test for session-client.js runtime fork.
+ * Exhaustive runtime fork coverage for session-client.js substrate dispatch.
  *
- * Story s5-a2-messages-session-loop. Scope: ONE delegation test only —
- * full coverage of the substrate-fork ships at S8 / A4.
- *
- * Asserts: when execution.substrate === 'messages', session-client's
- * delegation entry point routes to messages-session.runMessagesSession()
- * instead of touching the Sessions-API path.
+ * Story s8-a4-substrate-flag-default-flip. Covers the four substrate/adapter
+ * states plus the derived cloud_mode helper and precedence logging.
  *
  * Run: node tests/hive-lib/session-client.runtime-fork.test.js
  */
@@ -15,18 +11,14 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const Module = require('node:module');
 
 const REPO_ROOT = path.join(__dirname, '..', '..');
 const SDK_NAME = '@anthropic-ai/sdk';
 
-/**
- * The real session-client.js does `require('@anthropic-ai/sdk')` at module
- * load time and throws if absent (line 14-19 in session-client.js). The SDK
- * is not installed in this repo's test environment, so we stub the resolver
- * to hand back a no-op constructor before any require triggers it.
- */
 function stubAnthropicSdk() {
   const origResolve = Module._resolveFilename;
   const origLoad = Module._load;
@@ -51,84 +43,221 @@ function freshRequire(modPath) {
   return require(modPath);
 }
 
-test('delegation — execution.substrate "messages" routes to messages-session.runMessagesSession', async () => {
+function makeTempFile(name, value) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-client-runtime-fork-'));
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, value, 'utf8');
+  return file;
+}
+
+function withPatchedConsole(method, fn) {
+  const original = console[method];
+  const calls = [];
+  console[method] = (...args) => {
+    calls.push(args.map((arg) => String(arg)).join(' '));
+  };
+  return Promise.resolve()
+    .then(() => fn(calls))
+    .finally(() => {
+      console[method] = original;
+    });
+}
+
+async function withEnv(tempEnv, fn) {
+  const previous = new Map();
+  for (const [key, value] of Object.entries(tempEnv)) {
+    previous.set(key, process.env[key]);
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  try {
+    return await fn();
+  } finally {
+    for (const [key, value] of previous.entries()) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
+function makeMessagesClient(recordedCalls) {
+  return {
+    messages: {
+      async create(args) {
+        recordedCalls.push(args);
+        return {
+          id: 'msg_x',
+          role: 'assistant',
+          stop_reason: 'end_turn',
+          content: [{ type: 'text', text: 'ok' }],
+          usage: { input_tokens: 1, output_tokens: 1 },
+        };
+      },
+    },
+  };
+}
+
+async function runSessionWithMessagesStub(sessionClient, recordedCalls, overrides) {
+  const messagesSession = freshRequire(path.join(REPO_ROOT, 'hive', 'lib', 'messages-session.js'));
+  messagesSession.__setClientFactoryForTesting(() => makeMessagesClient(recordedCalls));
+  try {
+    return await sessionClient.runSession({
+      system: 'sys',
+      tools: [],
+      messages: [{ role: 'user', content: 'go' }],
+      budget: { max_tool_iterations: 5, story_token_limit: 1_000_000 },
+      ...overrides,
+    });
+  } finally {
+    messagesSession.__resetClientFactoryForTesting();
+  }
+}
+
+test('case a — default config resolves to messages substrate and routes to messages-session', async () => {
   const restore = stubAnthropicSdk();
   try {
-    // Make ANTHROPIC_API_KEY present so the legacy Sessions-API path would
-    // not bail on AUTH_MISSING — that way if delegation accidentally falls
-    // through, we'd see a different error than what we assert.
-    const prevKey = process.env.ANTHROPIC_API_KEY;
-    process.env.ANTHROPIC_API_KEY = 'test-key';
-
-    try {
+    await withEnv({ ANTHROPIC_API_KEY: 'test-key', HIVE_EXECUTION_SUBSTRATE: undefined }, async () => {
       const sessionClient = freshRequire(path.join(REPO_ROOT, 'hive', 'lib', 'session-client.js'));
-
-      assert.equal(typeof sessionClient.runSession, 'function',
-        'session-client must export runSession (delegation entry point)');
-
-      // Inject recording into messages-session via its testing seam so we
-      // can confirm the delegation actually called runMessagesSession.
-      const messagesSession = freshRequire(path.join(REPO_ROOT, 'hive', 'lib', 'messages-session.js'));
       const recordedCalls = [];
-      messagesSession.__setClientFactoryForTesting(() => ({
-        messages: {
-          async create(args) {
-            recordedCalls.push(args);
-            return {
-              id: 'msg_x',
-              role: 'assistant',
-              stop_reason: 'end_turn',
-              content: [{ type: 'text', text: 'ok' }],
-              usage: { input_tokens: 1, output_tokens: 1 },
-            };
-          },
-        },
-      }));
+      const result = await runSessionWithMessagesStub(sessionClient, recordedCalls, {});
 
-      const result = await sessionClient.runSession({
-        substrate: 'messages',
-        system: 'sys',
-        tools: [],
-        messages: [{ role: 'user', content: 'go' }],
-        budget: { max_tool_iterations: 5, story_token_limit: 1_000_000 },
-      });
-
-      assert.equal(recordedCalls.length, 1, 'delegation called messages.create exactly once');
+      assert.equal(recordedCalls.length, 1, 'default substrate should route through messages.create');
       assert.equal(result.stopReason, 'end_turn');
-    } finally {
-      if (prevKey === undefined) delete process.env.ANTHROPIC_API_KEY;
-      else process.env.ANTHROPIC_API_KEY = prevKey;
-    }
+    });
   } finally {
     restore();
   }
 });
 
-test('delegation — non-messages substrate is a no-op stub today (sessions-cloud path is S8 territory)', async () => {
+test('case b — sessions-cloud with cloud-adapter.enabled=true routes to the Sessions-API path', async () => {
   const restore = stubAnthropicSdk();
+  const projectConfigPath = makeTempFile('hive.config.yaml', JSON.stringify({
+    execution: { substrate: 'sessions-cloud' },
+    'cloud-adapter': { enabled: true },
+  }));
+
   try {
-    const sessionClient = freshRequire(path.join(REPO_ROOT, 'hive', 'lib', 'session-client.js'));
-    // Either runSession exists and rejects with a clear "not yet implemented"
-    // for non-messages substrate, OR sessions-cloud falls through to a
-    // recognizable error. Either way: it must NOT silently succeed.
-    await assert.rejects(
-      () => sessionClient.runSession({
-        substrate: 'sessions-cloud',
-        system: 'sys',
-        tools: [],
-        messages: [{ role: 'user', content: 'go' }],
-        budget: { max_tool_iterations: 5, story_token_limit: 1_000_000 },
-      }),
-      (err) => {
-        // Accepts either a "not implemented" sentinel or an unknown-substrate sentinel.
-        const msg = String(err && err.message || '');
-        assert.ok(
-          /not.{0,5}implemented|sessions-cloud|unsupported|S8|substrate/i.test(msg),
-          `expected substrate-related error, got: ${msg}`,
-        );
-        return true;
-      },
-    );
+    await withEnv({ ANTHROPIC_API_KEY: 'test-key', HIVE_EXECUTION_SUBSTRATE: undefined }, async () => {
+      const sessionClient = freshRequire(path.join(REPO_ROOT, 'hive', 'lib', 'session-client.js'));
+      await assert.rejects(
+        () => sessionClient.runSession({
+          system: 'sys',
+          tools: [],
+          messages: [{ role: 'user', content: 'go' }],
+          budget: { max_tool_iterations: 5, story_token_limit: 1_000_000 },
+          projectConfigPath,
+        }),
+        (err) => {
+          const message = String(err && err.message || '');
+          assert.match(message, /cloud|bootstrap|agent_id|environment_id|sessions/i);
+          return true;
+        },
+      );
+    });
+  } finally {
+    restore();
+  }
+});
+
+test('case c — sessions-cloud with cloud-adapter.enabled=false fails fast with a capability error', async () => {
+  const restore = stubAnthropicSdk();
+  const projectConfigPath = makeTempFile('hive.config.yaml', JSON.stringify({
+    execution: { substrate: 'sessions-cloud' },
+    'cloud-adapter': { enabled: false },
+  }));
+
+  try {
+    await withEnv({ ANTHROPIC_API_KEY: 'test-key', HIVE_EXECUTION_SUBSTRATE: undefined }, async () => {
+      const sessionClient = freshRequire(path.join(REPO_ROOT, 'hive', 'lib', 'session-client.js'));
+      await assert.rejects(
+        () => sessionClient.runSession({
+          system: 'sys',
+          tools: [],
+          messages: [{ role: 'user', content: 'go' }],
+          budget: { max_tool_iterations: 5, story_token_limit: 1_000_000 },
+          projectConfigPath,
+        }),
+        (err) => {
+          assert.equal(err.code, 'CapabilityError');
+          assert.match(String(err.message), /cloud-adapter\.enabled|enable.*cloud.*adapter/i);
+          return true;
+        },
+      );
+    });
+  } finally {
+    restore();
+  }
+});
+
+test('case d — messages with leftover cloud-adapter.enabled=true warns and still routes to messages', async () => {
+  const restore = stubAnthropicSdk();
+  const projectConfigPath = makeTempFile('hive.config.yaml', JSON.stringify({
+    execution: { substrate: 'messages' },
+    'cloud-adapter': { enabled: true },
+  }));
+
+  try {
+    await withEnv({ ANTHROPIC_API_KEY: 'test-key', HIVE_EXECUTION_SUBSTRATE: undefined }, async () => {
+      const sessionClient = freshRequire(path.join(REPO_ROOT, 'hive', 'lib', 'session-client.js'));
+      const recordedCalls = [];
+
+      await withPatchedConsole('warn', async (warnCalls) => {
+        const result = await runSessionWithMessagesStub(sessionClient, recordedCalls, { projectConfigPath });
+        assert.equal(recordedCalls.length, 1, 'messages route should still execute');
+        assert.equal(result.stopReason, 'end_turn');
+        assert.equal(warnCalls.length, 1, 'leftover cloud adapter flag should warn once');
+        assert.match(warnCalls[0], /cloud-adapter\.enabled|ignored|messages/i);
+      });
+    });
+  } finally {
+    restore();
+  }
+});
+
+test('case e — runtime-mode.getCloudMode is derived from execution.substrate only', () => {
+  const runtimeMode = freshRequire(path.join(REPO_ROOT, 'hive', 'lib', 'runtime-mode.js'));
+
+  assert.equal(runtimeMode.getCloudMode({
+    execution: { substrate: 'sessions-cloud' },
+    'cloud-adapter': { enabled: false },
+    cloud_mode: false,
+  }), true);
+
+  assert.equal(runtimeMode.getCloudMode({
+    execution: { substrate: 'messages' },
+    'cloud-adapter': { enabled: true },
+    cloud_mode: true,
+  }), false);
+});
+
+test('case f — env substrate overrides project config and logs only structured resolution metadata', async () => {
+  const restore = stubAnthropicSdk();
+  const projectConfigPath = makeTempFile('hive.config.yaml', JSON.stringify({
+    execution: { substrate: 'sessions-cloud' },
+    'cloud-adapter': { enabled: true },
+  }));
+
+  try {
+    await withEnv({
+      ANTHROPIC_API_KEY: 'test-key',
+      HIVE_EXECUTION_SUBSTRATE: 'messages',
+    }, async () => {
+      const sessionClient = freshRequire(path.join(REPO_ROOT, 'hive', 'lib', 'session-client.js'));
+      const recordedCalls = [];
+
+      await withPatchedConsole('info', async (infoCalls) => {
+        const result = await runSessionWithMessagesStub(sessionClient, recordedCalls, { projectConfigPath });
+        assert.equal(recordedCalls.length, 1, 'env override should force messages route');
+        assert.equal(result.stopReason, 'end_turn');
+
+        const line = infoCalls.find((entry) => entry.includes('substrate.resolved_from=env'));
+        assert.ok(line, `expected startup precedence log, got: ${infoCalls.join('\n')}`);
+        assert.match(line, /substrate\.resolved_from=env/);
+        assert.match(line, /substrate\.conflict=true/);
+        assert.doesNotMatch(line, /\bsessions-cloud\b/);
+        assert.doesNotMatch(line, /\bmessages\b/);
+      });
+    });
   } finally {
     restore();
   }
