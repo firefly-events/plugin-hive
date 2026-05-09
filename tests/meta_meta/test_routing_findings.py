@@ -128,7 +128,7 @@ class PublicSkillRoutingTests(unittest.TestCase):
 
     def test_step_03b_only_when_all_three_empty(self) -> None:
         self.assertIn(
-            "ONLY when ALL four are empty: zero findings AND zero external candidates AND zero kg_signal AND no usable metric signal",
+            "ONLY when ALL five are empty: zero findings AND zero external candidates AND zero kg_signal AND zero dreaming_replay AND no usable metric signal",
             self.section,
         )
 
