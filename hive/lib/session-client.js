@@ -118,4 +118,42 @@ function classifyError(err) {
   return 'API_5XX';
 }
 
-module.exports = { createSession, sendEvents, streamEvents, classifyError };
+/**
+ * Delegation entry point — routes by execution.substrate.
+ *
+ * substrate: 'messages'        → hive/lib/messages-session.js (S5/A2)
+ * substrate: 'sessions-cloud'  → cloud bootstrap (deferred to S8/A4 + Hive Cloud epic)
+ *
+ * Default substrate is NOT flipped here; that ships in S8 / A4. Until then
+ * this entry point is reachable only when a caller explicitly requests
+ * substrate: 'messages' (e.g. the test harness).
+ *
+ * @param {Object} opts
+ * @param {string} opts.substrate
+ * @param {string} opts.system
+ * @param {Array<Object>} opts.tools
+ * @param {Array<Object>} opts.messages
+ * @param {Function} [opts.toolHandler]
+ * @param {Object} [opts.budget]
+ * @returns {Promise<{messages, stopReason, usage, terminationReason?}>}
+ */
+async function runSession(opts) {
+  const substrate = opts && opts.substrate;
+  if (substrate === 'messages') {
+    const { runMessagesSession } = require('./messages-session');
+    return runMessagesSession(opts);
+  }
+  if (substrate === 'sessions-cloud') {
+    const err = new Error(
+      'sessions-cloud substrate not yet implemented — cloud bootstrap (agent_id + environment_id provisioning) ' +
+      'is deferred to the Hive Cloud epic. See hive/references/session-system-prompt-spec.md §7 cloud adapter footnote.',
+    );
+    err.code = 'SubstrateNotImplemented';
+    throw err;
+  }
+  const err = new Error(`unsupported execution.substrate: ${substrate}`);
+  err.code = 'UnknownSubstrate';
+  throw err;
+}
+
+module.exports = { createSession, sendEvents, streamEvents, classifyError, runSession };
