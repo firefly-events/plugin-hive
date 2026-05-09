@@ -88,6 +88,39 @@ async function sendEvents(sessionId, events) {
 }
 
 /**
+ * Build a Sessions-only custom tool result event when cloud mode is active.
+ * Returns null on non-cloud substrates so callers can keep the Messages path
+ * free of Sessions-only event shapes.
+ *
+ * @param {Object} config
+ * @param {string} customToolUseId
+ * @param {string} result
+ * @returns {Object|null}
+ */
+function buildCustomToolResultEvent(config, customToolUseId, result) {
+  if (!getCloudMode(config)) return null;
+  const { buildCustomToolResult } = require('./session-turn-builder');
+  return buildCustomToolResult(customToolUseId, result);
+}
+
+/**
+ * Build a Sessions-only tool confirmation event when cloud mode is active.
+ * Returns null on non-cloud substrates so callers can keep the Messages path
+ * free of Sessions-only event shapes.
+ *
+ * @param {Object} config
+ * @param {string} toolUseId
+ * @param {string} result
+ * @param {string} [denyMessage]
+ * @returns {Object|null}
+ */
+function buildToolConfirmationEvent(config, toolUseId, result, denyMessage) {
+  if (!getCloudMode(config)) return null;
+  const { buildToolConfirmation } = require('./session-turn-builder');
+  return buildToolConfirmation(toolUseId, result, denyMessage);
+}
+
+/**
  * Stream SSE events from a session.
  * Returns an async iterable that yields raw SSE event objects.
  * @param {string} sessionId
@@ -336,4 +369,13 @@ function readNestedValue(obj, keys) {
   return current;
 }
 
-module.exports = { createSession, sendEvents, streamEvents, classifyError, runSession, registerSession };
+module.exports = {
+  buildCustomToolResultEvent,
+  buildToolConfirmationEvent,
+  createSession,
+  sendEvents,
+  streamEvents,
+  classifyError,
+  runSession,
+  registerSession,
+};
