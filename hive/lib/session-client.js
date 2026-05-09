@@ -119,6 +119,36 @@ function classifyError(err) {
 }
 
 /**
+ * Register a Hive session row in the registry, stamping the Claude Code
+ * harness session id (process.env.CLAUDE_CODE_SESSION_ID) onto the row's
+ * `cc_session_id` correlation column when present.
+ *
+ * Env-var pickup is centralized HERE — upstream of substrate selection in
+ * runSession() — so the same correlation behavior holds regardless of
+ * whether the caller subsequently drives the legacy Sessions-API path or
+ * the Messages-API substrate. Per binding decision
+ * `claude-code-session-id-precedence`, the Hive `sessionId` argument
+ * remains canonical for KG triples; cc_session_id sits alongside as
+ * correlation only.
+ *
+ * Empty-string env var is treated as unset (no key written) so YAML stays
+ * clean. Existing registry rows without the column remain valid.
+ *
+ * @param {string} sessionId - canonical Hive session id (KG-canonical)
+ * @param {Object} fields - any subset of the session entry schema
+ * @param {string} [registryPath] - override default path (for testing)
+ * @returns {Promise<void>}
+ */
+async function registerSession(sessionId, fields, registryPath) {
+  const { upsert } = require('./session-registry');
+  const ccId = process.env.CLAUDE_CODE_SESSION_ID;
+  const stamped = (typeof ccId === 'string' && ccId.length > 0)
+    ? { ...fields, cc_session_id: ccId }
+    : { ...fields };
+  await upsert(sessionId, stamped, registryPath);
+}
+
+/**
  * Delegation entry point — routes by execution.substrate.
  *
  * substrate: 'messages'        → hive/lib/messages-session.js (S5/A2)
@@ -156,4 +186,4 @@ async function runSession(opts) {
   throw err;
 }
 
-module.exports = { createSession, sendEvents, streamEvents, classifyError, runSession };
+module.exports = { createSession, sendEvents, streamEvents, classifyError, runSession, registerSession };
