@@ -181,6 +181,10 @@ domain:
 
 **Rule of thumb:** if the orchestrator/team lead needs it to spawn or validate the agent, it's frontmatter. If the agent needs it to do its job well, it's body.
 
+### Prompt-Language Slots
+
+Reusable prompt-language slots live in the agent body, not in frontmatter. This is where you put short, portable posture statements that should survive model upgrades and be easy to reuse across personas, such as a `design for next model` slot. Treat the matching lines in [architect.md](../agents/architect.md) and [tpm.md](../agents/tpm.md) as the canonical examples for that pattern: one sentence, same wording, placed in the system-prompt prose where it shapes how the persona reasons.
+
 ## Interaction with hive.config.yaml
 
 `hive.config.yaml` defines project-level defaults:

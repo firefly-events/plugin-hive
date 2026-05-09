@@ -69,6 +69,8 @@ In MAIN.md execute flow, after review and test steps:
 4. If retry configured (see workflow-schema.md): attempt retry loop before escalating
 ```
 
+For code-change workflows, the practical ladder is layered rather than singular: Hive runs its local fix-loop first, then the branch is pushed, then CC CI auto-fix gets its chance to repair what only appears in CI, and only after that does CodeRabbit provide review feedback on the post-fix result. This sequencing keeps the fastest, most local repair loop closest to the author while still benefiting from the CI auto-fix capability described in the brief's CC release-notes coverage.
+
 ---
 
 ## Validation Handshake
