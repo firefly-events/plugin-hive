@@ -113,6 +113,7 @@ circuit_breakers:
   ceremony_timeout_hours: 4      # max time for the full daily ceremony
   max_step_retries: 2            # retry a failed step this many times
   max_fix_iterations: 3          # fix loop iterations before back-to-planning
+  max_outcomes_iterations: 3     # Outcomes loop iterations before deterministic stop
   max_same_error_repeats: 3      # same error N times = stop, change strategy
 
 # Example codebases — directories agents can reference to learn your coding

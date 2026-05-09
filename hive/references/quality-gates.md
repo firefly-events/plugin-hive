@@ -108,6 +108,22 @@ handshake:
 - Skipped for auto-pass tier (high trust, score ≥0.9)
 - Skipped for human escalation tier (goes directly to human)
 
+### Outcomes Loop Stacking
+
+For `code-review.workflow.yaml`, the reviewer is wrapped in an Outcomes loop
+before this handshake runs.
+
+- The Outcomes loop re-runs reviewer graders against
+  [`rubric-format.md`](rubric-format.md) until the aggregated verdict is
+  `passed` or a loop breaker terminates the run.
+- `peer-validator` still runs after the loop as a deterministic single-shot
+  gate.
+- This is stacked, not redundant: Outcomes drives convergence; the
+  post-loop `peer-validator` verifies the final artifact against the same
+  rubric exactly once.
+- The loop's breaker is `circuit_breakers.max_outcomes_iterations`, initially
+  set to `3` for symmetry with `max_fix_iterations`.
+
 ---
 
 ## Trust Scoring

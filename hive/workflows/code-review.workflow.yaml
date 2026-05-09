@@ -2,6 +2,53 @@ name: code-review
 description: Structured code review workflow for /hive:review command.
 version: "1.0.0"
 
+outcomes_loop:
+  wraps_step: review
+  rubric_path: hive/references/rubric-format.md
+  max_iterations_config: circuit_breakers.max_outcomes_iterations
+  iteration_cap: 3
+  convergence:
+    pass_verdict: passed
+    terminated_by:
+      success: rubric_pass
+      iteration_cap: iter_cap
+      budget_exhausted: budget
+  graders:
+    own_context: true
+    spawn:
+      substrate: messages
+      module: hive/lib/messages-session.js
+      entrypoint: runMessagesSession
+      own_context: true
+    aggregation:
+      verdict_precedence:
+        - needs_revision
+        - needs_optimization
+        - passed
+      final_verdict_field: final_verdict
+      findings_field: final_findings
+  post_loop_gate:
+    agent: peer-validator
+    runs_after: outcomes_loop
+    mode: deterministic-single-shot
+    inputs:
+      rubric_path: hive/references/rubric-format.md
+      diff: context.diff_content
+      scope_analysis: steps.analyze.scope_analysis
+      final_verdict: outcomes_loop.final_verdict
+      final_findings: outcomes_loop.final_findings
+  metrics:
+    emit_on: completion
+    emitter: hive.lib.dag_executor.executor.telemetry.Telemetry.emit
+    sink: existing-executor-telemetry-jsonl
+    new_sink: false
+    event_type: outcomes_loop_completed
+    payload_fields:
+      - story_id
+      - iterations_used
+      - terminated_by
+      - final_verdict
+
 steps:
   - id: analyze
     agent: researcher
@@ -26,11 +73,16 @@ steps:
     agent: reviewer
     task: >
       Review the code changes for correctness, security, performance, and
-      convention compliance. Use the scope analysis to prioritize attention
-      on high-risk areas. Categorize each finding as: critical (must fix),
-      improvement (should fix), or nit (optional). Produce a verdict:
-      passed (no critical findings), needs_optimization (improvements
-      recommended), or needs_revision (critical issues must be addressed).
+      convention compliance. This step is wrapped by the Outcomes loop
+      declared at workflow root: graders re-run against the rubric in
+      hive/references/rubric-format.md until the aggregated verdict is
+      passed or circuit_breakers.max_outcomes_iterations trips. Use the
+      scope analysis to prioritize attention on high-risk areas. Categorize
+      each finding as: critical (must fix), improvement (should fix), or nit
+      (optional). Produce a verdict: passed (no critical findings),
+      needs_optimization (improvements recommended), or needs_revision
+      (critical issues must be addressed). After the loop terminates,
+      peer-validator runs once as the deterministic post-loop gate.
     depends_on:
       - analyze
     inputs:
