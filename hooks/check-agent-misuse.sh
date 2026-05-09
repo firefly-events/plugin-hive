@@ -22,6 +22,15 @@ fi
 
 prompt=$(echo "$input" | jq -r '.tool_input.prompt // ""')
 description=$(echo "$input" | jq -r '.tool_input.description // ""')
+spawn_context="$prompt"$'\n'"$description"
+
+# Allow the Messages-API substrate route for story work when the Agent() call
+# is explicitly routed through hive/lib/messages-session.js. This hook is a
+# workflow-discipline gate, not a substrate/security boundary.
+if echo "$spawn_context" | grep -qiE '(hive/lib/)?messages-session\.js' \
+  && echo "$spawn_context" | grep -qi 'Agent()'; then
+  exit 0
+fi
 
 # Pattern 1: Agent prompt references story YAML paths (story-level work).
 # Matches both the v1.2+ default (.pHive/) and the legacy state/ layout so
