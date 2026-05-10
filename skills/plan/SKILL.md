@@ -195,9 +195,19 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 ### Phase B: Design Discussion (always runs)
 
-4. **Produce design discussion.** `SendMessage` to the technical writer with the `design-discussion` skill (`hive/references/document-templates/design-discussion.md`). Input: the research brief + the original user request. Output: a ~200-line design discussion document covering goal, proposed approach, risks, dependencies, open questions, and a scale assessment.
+4. **Produce design discussion (draft).** `SendMessage` to the technical writer with the `design-discussion` skill (`hive/references/document-templates/design-discussion.md`). Input: the research brief + the original user request. Output: a ~200-line design discussion document covering goal, proposed approach, risks, dependencies, open questions, and a scale assessment. Write the **draft** to `.pHive/epics/{epic-id}/docs/design-discussion.md` — Phase A2 (next step) grills it before the collaborative review gate.
 
-4b. **Collaborative review gate (if enabled).** Check `hive.config.yaml → planning.collaborative_review`. If `true` (default), run the collaborative review gate (see Collaborative Review Gate section below). `SendMessage` the design discussion to all active team agents for review. Collect feedback, have the writer revise if needed, then proceed. If `false`, skip the review gate and present the document directly to the user.
+### Phase A2: Adversarial Alignment (Grill)
+
+4a. **Run grill against the draft design-discussion.** Invoke the **grill** skill (atomic; `skills/grill/SKILL.md`) — this is an **external call**, NOT inline prose copied from the grill skill. Pass the draft path from step 4 plus the research brief (so grill can read its `inconsistency_risk_signals` field, emitted by the researcher). Grill produces `.pHive/epics/{epic-id}/docs/grill-record.md` per [`hive/references/grill-record-template.md`](../../hive/references/grill-record-template.md).
+
+The grill-record surfaces five categories of finding (vocabulary mismatches, hidden assumptions, unresolved tensions, convention violations, posture mismatches) — descriptive only, no prescriptions, no quality scoring. Each finding ends with a question for the planner to answer.
+
+If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (silent-on-absence per skill-prelude contract). If the research brief is missing `inconsistency_risk_signals`, grill runs heuristically against the draft alone.
+
+**Atomic boundary:** if grill ever appears as inline prose inside this skill, that is a regression. Phase A2 is a single skill invocation that returns a grill-record path; this skill does not duplicate grill's pass.
+
+4b. **Collaborative review gate (if enabled).** Check `hive.config.yaml → planning.collaborative_review`. If `true` (default), run the collaborative review gate (see Collaborative Review Gate section below). `SendMessage` the design discussion AND the grill-record from Phase A2 to all active team agents for review. The technical writer revises the draft to address each grill-record finding (or annotates explicitly-accepted-and-justified deviations) and incorporate team feedback. If `false`, skip the review gate; the writer still revises against the grill-record, then the document is presented directly to the user.
 
 5. **Present design discussion to user.** Show the full document, including a summary of what the team flagged and resolved during collaborative review. The user reads it and provides feedback:
    - Affirm or correct the understanding of the goal
