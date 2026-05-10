@@ -28,6 +28,7 @@ sessions:
     created_at: "2026-04-14T08:01:00Z"
     last_active_at: "2026-04-14T08:05:00Z"
     sse_last_event_at: "2026-04-14T08:05:00Z"
+    cc_session_id: "cc_sess_xyz789"
 ```
 
 ## Session Record Fields
@@ -44,6 +45,7 @@ sessions:
 | `created_at` | string | yes | ISO 8601 timestamp when the session was opened |
 | `last_active_at` | string | yes | ISO 8601 timestamp of last status update |
 | `sse_last_event_at` | string | no | ISO 8601 timestamp of last SSE event received — used by stuck detection (see `session-resilience.md`) |
+| `cc_session_id` | string | no | Claude Code harness session id (`process.env.CLAUDE_CODE_SESSION_ID`) — additive correlation column. Hive `session_id` remains canonical for KG `source_epic` / `source_session` per binding decision `claude-code-session-id-precedence`. Stamped at registry-write time by `session-client.registerSession()`; absent when the env var is unset or empty. |
 
 ## Status Values
 

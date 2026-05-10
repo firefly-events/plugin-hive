@@ -69,6 +69,8 @@ In MAIN.md execute flow, after review and test steps:
 4. If retry configured (see workflow-schema.md): attempt retry loop before escalating
 ```
 
+For code-change workflows, the practical ladder is layered rather than singular: Hive runs its local fix-loop first, then the branch is pushed, then CC CI auto-fix gets its chance to repair what only appears in CI, and only after that does CodeRabbit provide review feedback on the post-fix result. This sequencing keeps the fastest, most local repair loop closest to the author while still benefiting from the CI auto-fix capability described in the brief's CC release-notes coverage.
+
 ---
 
 ## Validation Handshake
@@ -107,6 +109,22 @@ handshake:
 - Only for outputs in the peer review tier (score 0.3–0.9)
 - Skipped for auto-pass tier (high trust, score ≥0.9)
 - Skipped for human escalation tier (goes directly to human)
+
+### Outcomes Loop Stacking
+
+For `code-review.workflow.yaml`, the reviewer is wrapped in an Outcomes loop
+before this handshake runs.
+
+- The Outcomes loop re-runs reviewer graders against
+  [`rubric-format.md`](rubric-format.md) until the aggregated verdict is
+  `passed` or a loop breaker terminates the run.
+- `peer-validator` still runs after the loop as a deterministic single-shot
+  gate.
+- This is stacked, not redundant: Outcomes drives convergence; the
+  post-loop `peer-validator` verifies the final artifact against the same
+  rubric exactly once.
+- The loop's breaker is `circuit_breakers.max_outcomes_iterations`, initially
+  set to `3` for symmetry with `max_fix_iterations`.
 
 ---
 

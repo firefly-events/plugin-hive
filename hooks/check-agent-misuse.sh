@@ -11,6 +11,8 @@
 
 set -euo pipefail
 
+BYPASS_MARKER="__MESSAGES_SESSION_BYPASS__"
+
 input=$(cat)
 
 tool_name=$(echo "$input" | jq -r '.tool_name // ""')
@@ -22,6 +24,14 @@ fi
 
 prompt=$(echo "$input" | jq -r '.tool_input.prompt // ""')
 description=$(echo "$input" | jq -r '.tool_input.description // ""')
+spawn_context="$prompt"$'\n'"$description"
+
+# Allow the Messages-API substrate route only when the caller emits the
+# dedicated structured bypass token. This hook is a workflow-discipline gate,
+# not a substrate/security boundary.
+if printf '%s' "$spawn_context" | grep -Fq "$BYPASS_MARKER"; then
+  exit 0
+fi
 
 # Pattern 1: Agent prompt references story YAML paths (story-level work).
 # Matches both the v1.2+ default (.pHive/) and the legacy state/ layout so

@@ -4,7 +4,8 @@ Background: meta-2026-04-29 nightly cycle conflated `metric_signal: false`
 with "no actionable input" and routed 8 structural findings into step-03b
 backlog-fallback instead of step-03 proposal. The routing rule was
 clarified to use an AND-of-empty gate across `findings`,
-`external_research_candidates`, and `metric_signal`. These tests pin that
+`external_research_candidates`, `kg_signal`, `dreaming_replay`, and
+`metric_signal`. These tests pin that
 contract into both the step file and both SKILL.md routers (maintainer +
 public) so the bug cannot silently regress.
 """
@@ -124,11 +125,13 @@ class PublicSkillRoutingTests(unittest.TestCase):
     def test_step_03_runs_on_findings_or_external_or_metric(self) -> None:
         self.assertIn("`findings`", self.section)
         self.assertIn("`external_research_candidates`", self.section)
+        self.assertIn("`kg_signal`", self.section)
+        self.assertIn("`dreaming_replay`", self.section)
         self.assertIn("metric signal is present", self.section)
 
     def test_step_03b_only_when_all_three_empty(self) -> None:
         self.assertIn(
-            "ONLY when ALL four are empty: zero findings AND zero external candidates AND zero kg_signal AND no usable metric signal",
+            "ONLY when ALL five are empty: zero findings AND zero external candidates AND zero kg_signal AND zero dreaming_replay AND no usable metric signal",
             self.section,
         )
 
@@ -159,9 +162,17 @@ class Step02MetricSignalContractTests(unittest.TestCase):
 class Meta20260429RegressionScenarioTests(unittest.TestCase):
     """Replays the meta-2026-04-29 cycle-state shape and asserts correct route."""
 
-    def _route(self, *, findings: list, external_candidates: list, metric_signal: bool) -> str:
+    def _route(
+        self,
+        *,
+        findings: list,
+        external_candidates: list,
+        kg_signal: list,
+        dreaming_replay: list,
+        metric_signal: bool,
+    ) -> str:
         """Pure-Python router mirroring the documented AND-of-empty rule."""
-        if findings or external_candidates or metric_signal:
+        if findings or external_candidates or kg_signal or dreaming_replay or metric_signal:
             return "step-03-proposal"
         return "step-03b-backlog-fallback"
 
@@ -171,22 +182,58 @@ class Meta20260429RegressionScenarioTests(unittest.TestCase):
         route = self._route(
             findings=[{"id": f"finding-{n}"} for n in range(8)],
             external_candidates=[],
+            kg_signal=[],
+            dreaming_replay=[],
             metric_signal=False,
         )
         self.assertEqual(route, "step-03-proposal")
 
     def test_truly_empty_cycle_routes_to_03b(self) -> None:
-        route = self._route(findings=[], external_candidates=[], metric_signal=False)
+        route = self._route(
+            findings=[],
+            external_candidates=[],
+            kg_signal=[],
+            dreaming_replay=[],
+            metric_signal=False,
+        )
         self.assertEqual(route, "step-03b-backlog-fallback")
 
     def test_metric_signal_alone_routes_to_step_03(self) -> None:
-        route = self._route(findings=[], external_candidates=[], metric_signal=True)
+        route = self._route(
+            findings=[],
+            external_candidates=[],
+            kg_signal=[],
+            dreaming_replay=[],
+            metric_signal=True,
+        )
         self.assertEqual(route, "step-03-proposal")
 
     def test_external_candidates_alone_routes_to_step_03(self) -> None:
         route = self._route(
             findings=[],
             external_candidates=[{"id": "external-proposal-1"}],
+            kg_signal=[],
+            dreaming_replay=[],
+            metric_signal=False,
+        )
+        self.assertEqual(route, "step-03-proposal")
+
+    def test_kg_signal_alone_routes_to_step_03(self) -> None:
+        route = self._route(
+            findings=[],
+            external_candidates=[],
+            kg_signal=[{"id": "kg-1"}],
+            dreaming_replay=[],
+            metric_signal=False,
+        )
+        self.assertEqual(route, "step-03-proposal")
+
+    def test_dreaming_replay_alone_routes_to_step_03(self) -> None:
+        route = self._route(
+            findings=[],
+            external_candidates=[],
+            kg_signal=[],
+            dreaming_replay=[{"id": "dream-1"}],
             metric_signal=False,
         )
         self.assertEqual(route, "step-03-proposal")
