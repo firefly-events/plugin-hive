@@ -1,27 +1,26 @@
-- experiment_id: meta-2026-05-08
-  date: '2026-05-08'
-  started: '2026-05-08T00:00:00Z'
-  closed: '2026-05-08T00:30:00Z'
+- experiment_id: meta-2026-05-09
+  date: '2026-05-09'
+  started: '2026-05-09T00:00:00Z'
+  closed: '2026-05-09T00:30:00Z'
   verdict: passed
-  changes_promoted: 1
+  changes_promoted: 2
   changes_reverted: 0
-  findings_identified: 0
+  findings_identified: 2
   top_changes:
-    - ".pHive/meta-team/archive/2026-04-19/MANIFEST.md: appended reviewed-on provenance line for meta-2026-05-08 nightly cycle (backlog fallback candidate mmo-2026-04-21-001)"
-  commit: 540480cd7a16e27b6bd60355814470d62a399e87
+    - "hive/GUIDE.md: corrected ## Workflows (6) heading to ## Workflows (7) to match 7-entry combined table"
+    - "hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md: added (S8) qualifier and S9/BL2.2+ note to SUCCESS METRICS step-4 check"
+  commit: 6f1de135b3581c093e3348a04ba9e780fb797c3a
   metrics_snapshot:
     tokens: 0
     wall_clock_ms: 15000
     first_attempt_pass: true
   rollback_ref: a18299f379acd99699190297a5e0f6f7f7cf0e2d
   notes: |
-    Nightly cycle meta-2026-05-08. Analysis found 0 in-scope findings (one
-    out-of-scope issue noted: hive/GUIDE.md references non-existent
-    skills/hive/hive.config.yaml — outside developer write domain). Routed to
-    step-03b backlog fallback. Processed candidate mmo-2026-04-21-001: appended
-    reviewed-on provenance line to archived MANIFEST (third reviewed-on comment,
-    following meta-2026-04-22 and meta-2026-05-03). Closure validator passed.
-    Regression watch armed for 4-hour window.
+    Nightly cycle meta-2026-05-09. Analysis found 2 SCHEMA_INCONSISTENCY findings:
+    (1) GUIDE.md Workflows heading said 6 but tables list 7 workflows; (2) step-03b
+    SUCCESS METRICS had an unqualified step-4 prohibition that contradicted the S9
+    forward-compatibility note in NEXT STEP. Both addressed with targeted field updates.
+    Closure validator passed. Regression watch armed for 4-hour window.
 - experiment_id: meta-2026-05-07
   date: '2026-05-07'
   started: '2026-05-07T00:00:00Z'
