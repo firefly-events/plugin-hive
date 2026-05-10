@@ -203,7 +203,18 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 - **`references/sequential-execution.md`** — Per-story workflow steps, sidecar injection at review, episode records, gate checks
 - `hive/references/agent-teams-guide.md` — Team mechanics and limitations
 - `hive/references/methodology-routing.md` — Methodology selection
-- `hive/references/episode-schema.md` — Status marker format
+- `hive/references/episode-schema.md` — Status marker format. **Story state is derived from these markers — do NOT free-write `status:` in story YAMLs.** When a workflow step completes, write the corresponding episode marker; story-level state is computed from the marker set per the schema. The free-write `status:` field in some legacy story YAMLs is deprecated (per `feedback_story_status_stale`).
+
+### Per-step token budgets (advisory caps)
+
+When `hive.config.yaml → circuit_breakers` defines `max_tokens_per_step`, `max_tokens_per_fix_loop`, or `max_tokens_per_story`, treat them as **advisory caps** during execution:
+
+- Track token usage per step via the existing token-capture substrate.
+- When a step's cumulative tokens approach the advisory cap (≥80%), emit a structured warning to the orchestrator. Do NOT hard-block on the cap.
+- When a step crosses the cap, log it as a budget_exceeded telemetry event and continue. The cap is a tuning signal for future planning, not a runtime stop.
+- **Fail-open semantics.** If token data is missing for any reason (capture not enabled, persona doesn't emit usage, etc.), proceed without warnings — never fail the step on missing telemetry. The advisory cap requires data to apply; absence is silent skip, not error.
+
+This is intentionally softer than the existing iteration-count breakers (`max_step_retries`, `max_fix_iterations`, etc.) — those gate runtime behavior; token caps tune empirical defaults via telemetry.
 - `hive/references/cycle-state-schema.md` — Persistent decision tracking
 - `hive/references/step-file-schema.md` — Step file format
 - `hive/references/specialist-triggers.md` — Trigger catalog (loaded in step 2b)

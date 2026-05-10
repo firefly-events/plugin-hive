@@ -125,6 +125,13 @@ circuit_breakers:
   max_step_retries: 2            # retry a failed step this many times
   max_fix_iterations: 3          # fix loop iterations before back-to-planning
   max_same_error_repeats: 3      # same error N times = stop, change strategy
+  # Advisory token caps (story w5-sidecar-bundle, A-31). Fail-open: missing
+  # token data silently skips the cap (NOT an error). Crossing the cap emits
+  # a budget_exceeded telemetry event but does NOT hard-block — tuning
+  # signals, not runtime gates. See skills/execute/SKILL.md.
+  max_tokens_per_step: null      # null = unset (no warning, no cap)
+  max_tokens_per_fix_loop: null  # null = unset
+  max_tokens_per_story: null     # null = unset
 
 # Example codebases — directories agents can reference to learn your coding
 # style, structure patterns, naming conventions, etc. Add paths to your own
