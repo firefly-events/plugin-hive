@@ -22,6 +22,19 @@ Forces approach validation (context7 + web research) regardless of scope size or
 **`--gate-hv`**
 Retains the H/V user-facing review gate at medium scope (opt-in conservative path). Default at medium scope is to auto-proceed after collaborative review (no user gate). This flag restores the gate. No effect at large scope — the gate is always present at large scope regardless of this flag.
 
+**`--from-triage <id>`**
+Reads `.pHive/triage/queue.yaml` and decomposes one item (the triage entry whose `id` matches `<id>`) into a normal planning flow. Triage is the upstream input source — this flag does NOT replace plan phases or absorb triage's intake responsibilities. Workflow:
+
+1. Open the queue at `.pHive/triage/queue.yaml`. If the file is missing or malformed, emit an error naming the path and stop — `--from-triage` requires a valid queue.
+2. Locate the entry with the requested `id`. If it does not exist, error out with the available IDs (limit 20) for the operator to disambiguate.
+3. Verify the entry's `state` is `prioritized`. If not, error out — only `prioritized` entries can hand off to plan (`inbox` / `clarified` need more triage work; `plan-ready` / `closed` are already in or past planning). The triage skill is the right tool to advance state.
+4. Use the entry's `title` + `description` + `priority` + `severity` as the input for normal plan decomposition. Plan continues with its standard phases (research, design discussion, H/V or stories, etc.) as if those fields had been the original `$ARGUMENTS`.
+5. On planning success — when an epic + stories have been written — call back into triage with the produced epic/story IDs. Triage advances the entry from `prioritized → plan-ready` and writes `linked_epic` / `linked_story` per the queue schema. Plan does NOT write to `queue.yaml` directly — triage owns persistence (single-writer invariant).
+
+**Single-item rule.** Each `--from-triage` invocation handles exactly one queue item. To plan multiple triage items, run plan once per item. This keeps decomposition coherent: plan output (one epic) maps to one triage source.
+
+**Triage stays atomic.** This flag is a hand-off surface only — do NOT inline triage's clarification or prioritization steps into plan. If an operator runs `--from-triage` against an entry that should still be in triage (wrong state above), the right response is the error in step 3 above, not a fallback that does both jobs.
+
 ## Skill Preamble
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — state-directory note, kickoff gate, persona / config / memory loading. This skill consults routing keys (`agent_backends`, `model_overrides`, `planning.collaborative_review`) so also follow the **Root-first config precedence** subsection of the prelude.
