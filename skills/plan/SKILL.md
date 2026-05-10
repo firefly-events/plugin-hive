@@ -182,7 +182,7 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 ### Phase B: Design Discussion (always runs)
 
-4. **Produce design discussion.** `SendMessage` to the technical writer with the `design-discussion` skill (`skills/hive/skills/design-discussion/SKILL.md`). Input: the research brief + the original user request. Output: a ~200-line design discussion document covering goal, proposed approach, risks, dependencies, open questions, and a scale assessment.
+4. **Produce design discussion.** `SendMessage` to the technical writer with the `design-discussion` skill (`hive/references/document-templates/design-discussion.md`). Input: the research brief + the original user request. Output: a ~200-line design discussion document covering goal, proposed approach, risks, dependencies, open questions, and a scale assessment.
 
 4b. **Collaborative review gate (if enabled).** Check `hive.config.yaml → planning.collaborative_review`. If `true` (default), run the collaborative review gate (see Collaborative Review Gate section below). `SendMessage` the design discussion to all active team agents for review. Collect feedback, have the writer revise if needed, then proceed. If `false`, skip the review gate and present the document directly to the user.
 
@@ -235,7 +235,7 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 ### Phase B3: Structured Outline (large scope only)
 
-9. **Produce structured outline.** `SendMessage` to the technical writer with the `structured-outline` skill (`skills/hive/skills/structured-outline/SKILL.md`). Input: H/V plans + design discussion + user feedback + research brief. Output: a ~1000-line structured outline with detailed approach, file manifest, risk registry, and elicitation questions. The outline now builds ON the vertical slice plan — each phase in the outline maps to a vertical slice.
+9. **Produce structured outline.** `SendMessage` to the technical writer with the `structured-outline` skill (`hive/references/document-templates/structured-outline.md`). Input: H/V plans + design discussion + user feedback + research brief. Output: a ~1000-line structured outline with detailed approach, file manifest, risk registry, and elicitation questions. The outline now builds ON the vertical slice plan — each phase in the outline maps to a vertical slice.
 
 9b. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the structured outline. This is the most critical review — all active team agents review the full outline. The TPM validates sequencing, the researcher confirms technical accuracy, the architect (if present) stress-tests feasibility, and the UI designer (if present) validates UI approach. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
 
@@ -672,10 +672,10 @@ All planning documents are written to `.pHive/epics/{epic-id}/docs/{document-typ
 | Document type | Sub-skill | Output path |
 |---------------|-----------|-------------|
 | research-brief | None (no sub-skill — see note) | `.pHive/epics/{epic-id}/docs/research-brief.md` |
-| design-discussion | `skills/hive/skills/design-discussion/SKILL.md` | `.pHive/epics/{epic-id}/docs/design-discussion.md` |
-| horizontal-plan | `skills/hive/skills/horizontal-plan/SKILL.md` | `.pHive/epics/{epic-id}/docs/horizontal-plan.md` |
-| vertical-plan | `skills/hive/skills/vertical-plan/SKILL.md` | `.pHive/epics/{epic-id}/docs/vertical-plan.md` |
-| structured-outline | `skills/hive/skills/structured-outline/SKILL.md` | `.pHive/epics/{epic-id}/docs/structured-outline.md` |
+| design-discussion | `hive/references/document-templates/design-discussion.md` | `.pHive/epics/{epic-id}/docs/design-discussion.md` |
+| horizontal-plan | `hive/references/document-templates/horizontal-plan.md` | `.pHive/epics/{epic-id}/docs/horizontal-plan.md` |
+| vertical-plan | `hive/references/document-templates/vertical-plan.md` | `.pHive/epics/{epic-id}/docs/vertical-plan.md` |
+| structured-outline | `hive/references/document-templates/structured-outline.md` | `.pHive/epics/{epic-id}/docs/structured-outline.md` |
 
 **Note on research-brief:** No sub-skill file exists for the research brief format. The technical writer produces it using the research-brief pattern from memory, based on raw findings from the researcher. Output path: `.pHive/epics/{epic-id}/docs/research-brief.md`. See `hive/agents/technical-writer.md`.
 
@@ -694,5 +694,5 @@ Existing planning documents at the `.pHive/` root are not moved — this convent
 - `hive/agents/ui-designer.md` — wireframes and UI review (conditional)
 - `hive/agents/analyst.md` — requirements analysis persona
 - `skills/hive/skills/agent-spawn/SKILL.md` — persona injection, memory loading, path resolution
-- `skills/hive/skills/design-discussion/SKILL.md` — ~200-line brain dump format
-- `skills/hive/skills/structured-outline/SKILL.md` — ~1000-line detailed plan with elicitation
+- `hive/references/document-templates/design-discussion.md` — ~200-line brain dump format
+- `hive/references/document-templates/structured-outline.md` — ~1000-line detailed plan with elicitation

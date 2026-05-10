@@ -797,14 +797,14 @@ For a new project starting from scratch.
 
 **Process:**
 
-1. **Product Discovery (via greenfield-discovery skill)**
+1. **Product Discovery (analyst greenfield-facilitation mode)**
 
-   Delegate to the **greenfield-discovery** skill for deep product exploration. This replaces inline brainstorming with a structured, Socratic facilitation conversation.
+   Delegate to the **analyst** agent in greenfield-facilitation mode for deep product exploration. The analyst conducts a structured Socratic conversation that replaces inline brainstorming.
 
-   - Read and invoke: `skills/hive/skills/greenfield-discovery/SKILL.md`
-   - Use the analyst agent in **creative/exploratory mode** (not requirements-analysis mode)
-   - If `$ARGUMENTS` has a description, pass it as input context to the skill
-   - The skill facilitates a 7-area discovery conversation: problem space, target users, competitive landscape, differentiators, success metrics, MVP boundaries, and technical constraints
+   - Read the persona: `hive/agents/analyst.md` — the "Greenfield Discovery Facilitation" section is the procedure
+   - Brief schema reference: `hive/references/document-templates/greenfield-discovery-brief.md`
+   - If `$ARGUMENTS` has a description, pass it as input context
+   - The analyst facilitates a 7-area discovery conversation: problem space, target users, competitive landscape, differentiators, success metrics, MVP boundaries, and technical constraints
    - Output: structured **Product Discovery Brief** written to `.pHive/planning/product-discovery-brief.md`
    - The user validates the brief before proceeding to Step 2
    - The discovery brief feeds directly into Step 2 (Product Brief) as structured input

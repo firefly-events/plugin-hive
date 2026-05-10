@@ -15,10 +15,10 @@ Document type → skill mapping:
 
 | Document | Skill | Use-when |
 |----------|-------|----------|
-| Design discussion | `skills/hive/skills/design-discussion/SKILL.md` | Planning phase, design choices need discussion |
-| Structured outline | `skills/hive/skills/structured-outline/SKILL.md` | Large-scope planning, multi-epic breakdown |
-| Horizontal plan | `skills/hive/skills/horizontal-plan/SKILL.md` | Mapping system layers before slicing vertically |
-| Vertical plan | `skills/hive/skills/vertical-plan/SKILL.md` | Defining delivery slices from the horizontal map |
+| Design discussion | `hive/references/document-templates/design-discussion.md` | Planning phase, design choices need discussion |
+| Structured outline | `hive/references/document-templates/structured-outline.md` | Large-scope planning, multi-epic breakdown |
+| Horizontal plan | `hive/references/document-templates/horizontal-plan.md` | Mapping system layers before slicing vertically |
+| Vertical plan | `hive/references/document-templates/vertical-plan.md` | Defining delivery slices from the horizontal map |
 | Research brief | No dedicated skill yet — use agent-memory-schema structure | Raw findings → structured summary |
 
 If the required skill file doesn't exist at the specified path: produce the document using
