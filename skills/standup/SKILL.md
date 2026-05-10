@@ -21,7 +21,9 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 Load `hive/workflows/daily-ceremony.workflow.yaml` and execute its three phases. Each phase has step files at `hive/workflows/steps/daily-ceremony/`.
 
-**Phase 1 — Standup:** Reconstruct state from previous sessions. Read status markers (`.pHive/episodes/`), cycle state (`.pHive/cycle-state/`), task tracker (pending human items), and agent memories. Present structured report to user.
+**Phase 1 — Standup:** Reconstruct state from previous sessions. Read status markers (`.pHive/episodes/`), cycle state (`.pHive/cycle-state/`), task tracker (pending human items), agent memories, and the **triage queue** at `.pHive/triage/queue.yaml`. Surface open triage items (any entry whose `state` is not `closed`) alongside in-flight epics so the operator sees the intake backlog before selecting today's work. Present structured report to user.
+
+**Triage surfacing — read-only.** Phase 1 is the only point where standup touches triage. Surface open items as ceremony context — title, state, priority/severity if set, and entry id — so the operator can decide whether to hand off via `/hive:triage <id> --hand-off` (which routes to `/plan --from-triage`) or defer. Standup does NOT mutate the triage state machine; the triage skill remains the single writer of `queue.yaml`. If `.pHive/triage/queue.yaml` is missing, treat the surfacing as empty (no warning needed — triage is opt-in per its warning-only kickoff posture).
 
 **Phase 2 — Planning:** User short-lists today's work. Evaluate whether items need new planning or are already storied. If new work, run a compressed planning swarm. Present plan with agent-ready checklist results. User approves.
 
