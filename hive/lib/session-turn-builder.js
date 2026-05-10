@@ -42,6 +42,7 @@ function buildFirstMessage(content, specialists) {
 
 /**
  * Build a user.custom_tool_result event.
+ * Sessions-cloud only: call via the cloud-mode gate in session-client.js.
  *
  * @param {string} customToolUseId - from stop_reason.event_ids lookup
  * @param {string} result - text result from tool execution
@@ -58,6 +59,7 @@ function buildCustomToolResult(customToolUseId, result) {
 
 /**
  * Build a user.tool_confirmation event.
+ * Sessions-cloud only: call via the cloud-mode gate in session-client.js.
  *
  * @param {string} toolUseId - from stop_reason.event_ids lookup
  * @param {string} result - 'allow' or 'deny'

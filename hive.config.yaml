@@ -91,8 +91,30 @@ model_tiers:
     - test-worker
 
 # Override a specific agent's model (takes precedence over tier)
-model_overrides: {}
+model_overrides:
+  reviewer: opus               # Opus 4.7 verifies Codex-produced work (cross-LLM gate)
+  peer-validator: opus         # peer-validator runs alongside reviewer — same tier
   # example: researcher: opus    # promote researcher to opus for complex projects
+
+# Per-persona backend routing.
+# Per feedback_codex_general_backend.md (2026-05-01 policy):
+#   Codex on (creates): researcher, developer(s), technical-writer, architect
+#   Claude on (verifies/sequences): reviewer, tester, tpm, analyst, team-lead,
+#     pair-programmer, peer-validator, all specialists, all test-* agents
+# Personas omitted from this map default to direct TeamCreate (Claude). The plan
+# skill emits one INFO-log line per persona at spawn time documenting the route.
+# Originally wired in shipped baseline at eefbff3 (2026-04-21); reverted at
+# 59a5451 to keep shipped neutral; re-applied here in maintainer-local root.
+agent_backends:
+  researcher: codex
+  developer: codex
+  frontend-developer: codex
+  backend-developer: codex
+  technical-writer: codex
+  architect: codex
+  # ui-designer omitted — known-incompatible per skills/hive/skills/codex-invoke
+  # tpm/pair-programmer/analyst/team-lead/reviewer/tester/qa/peer-validator omitted
+  # — verifier + sequencing roles stay on Claude per 2026-05-01 policy
 
 # Circuit breakers — prevent wasted time and tokens
 circuit_breakers:
@@ -120,7 +142,7 @@ example_codebases: []
 # Requires: npm install -g @openai/codex && codex login
 external_models:
   codex:
-    enabled: false              # set to true after installing and authenticating Codex CLI
+    enabled: true               # codex-cli 0.118+ installed + ChatGPT auth active (verified 2026-05-07)
     use_for:
       - adversarial-review      # run after Claude review, before optimize/integrate
     # companion_path is auto-detected from the codex plugin if installed
@@ -130,3 +152,6 @@ execution:
   default_methodology: classic
   parallel_teams: true
   max_retry_attempts: 2
+  terminal_mux: cmux            # required for codex-backend panes
+  interactive_panes: true       # visible agent conversation in cmux panes
+  idle_timeout_seconds: 300     # 5-min idle reaper for persistent Codex panes

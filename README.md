@@ -342,6 +342,8 @@ Hive is heading toward a **lights-on software factory** — a pipeline where mos
 
 We chose the plugin format because Claude Code is built by an exceptional team at Anthropic and gets better every week. Every capability they ship — managed agents, tighter hooks, richer sub-agent tooling, **auto mode** — is something Hive can fold in without writing it from scratch. Auto mode in particular is a match made in heaven for Hive: long-running multi-agent teams executing structured work without micromanagement, with the harness pacing itself instead of pinging the developer for routine decisions. Our job is to compose those primitives into a cohesive workflow, not to compete with the platform.
 
+That same posture applies to model behavior, not just platform surface area: we want prompts, workflows, and review loops that are already shaped for the next model tier, so capability upgrades drop into an existing operating system instead of forcing a redesign. Hive should assume the substrate keeps improving and position itself to absorb those gains immediately, which is the same compose-don't-rebuild instinct expressed at the prompt layer.
+
 Where we're heading, a developer's day collapses to two touchpoints:
 
 - **A daily standup** — see what shipped overnight, what's blocked, what needs a decision

@@ -250,6 +250,24 @@ The hard ceiling is a security floor — a forgotten "no timeout" pause cannot h
 | Reject sentinel verified | `SUSPENDED` → `FAILED` (via `mark_failed`) | `pause_rejected` (payload carries the reason) |
 | Timeout elapsed | `SUSPENDED` → `FAILED` (via `mark_failed`) | `pause_timeout` |
 
+## Scheduler Overrides (`under_scheduler`)
+
+Steps that normally require an interactive pause may declare an `under_scheduler` block to define non-interactive behavior when the workflow is running in scheduler context.
+
+```yaml
+steps:
+  - id: plan-approval
+    node_type: pause
+    under_scheduler:
+      auto_approve: true
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `under_scheduler.auto_approve` | bool | null | Scheduler-context override for a pause step: `true` auto-passes the step without dispatching the pause handler; `false` fails closed with an error instead of blocking on a non-interactive pause. |
+
+Interactive runs ignore `under_scheduler` and dispatch the pause step normally. The key is step-level and generalizable to any future workflow whose interactive gate needs explicit scheduler behavior.
+
 ## Predicate Routing (`when:`)
 
 Per-step `when:` is a strict-Archon predicate evaluated against the materialised output graph of upstream steps before dispatch. When the predicate evaluates False (or fails closed), the step is skipped — the walker emits `predicate_evaluated` (with the result) and `node_skipped` (with `reason: when_predicate_false`).
@@ -311,11 +329,9 @@ Workflows that ship today as prose-routed (and have not been graduated to the ex
 
 ## Ceremony Workflow Variant
 
-The `daily-ceremony.workflow.yaml` uses `phases:` as the top-level collection key instead of `steps:`. This is an intentional semantic distinction: the daily ceremony is an orchestrator-driven coordination ceremony rather than a multi-agent development workflow. The `phases:` key signals that entries represent ordered ceremony phases, not parallelisable agent task steps.
+The current `daily-ceremony.workflow.yaml` is expressed as flat `steps:`, not `phases:`. The ceremony remains a distinct operational variant because ordering is carried by the step ids plus barrier-style sequencing, and execution remains orchestrator-driven rather than a per-phase multi-agent swarm.
 
-Ceremony workflow phases follow the same per-entry structure as development steps (each phase has `id:`, `step_file:`, and related fields) but have two operational differences from development workflows:
+Ceremony workflows differ from standard development workflows in these ways:
 
-1. **Sequential only** — phases run in declared order; the `depends_on` mechanism does not apply
-2. **Orchestrator-executed** — the orchestrator works through all phases itself; no sub-agent roster is spawned per phase
-
-When auditing or validating workflow YAML files, treat `phases:` as a recognised variant of `steps:` for ceremony workflows. Do not flag `phases:` as a schema violation in `daily-ceremony.workflow.yaml`.
+1. **Sequential coordination** — effective order is enforced by the declared step graph and barrier steps, not by a separate `phases:` collection
+2. **Orchestrator-executed** — the orchestrator drives the ceremony flow directly; it does not spawn a dedicated per-phase agent roster

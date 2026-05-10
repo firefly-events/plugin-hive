@@ -106,5 +106,6 @@ If all checks pass, proceed silently — do not announce that the kickoff gate p
 ## Key References
 
 - `hive/agents/reviewer.md` — reviewer persona and verdict format
+- [code-review-integration.md](../../hive/references/code-review-integration.md) — Hive verdict mapping and ACR coexistence guidance
 - `hive/agents/researcher.md` — analysis persona
 - `hive/references/episode-schema.md` — episode record format

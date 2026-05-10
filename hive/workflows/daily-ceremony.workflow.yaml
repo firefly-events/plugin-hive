@@ -67,6 +67,8 @@ steps:
   # plan view is unchanged.
   - id: plan-approval
     node_type: pause
+    under_scheduler:
+      auto_approve: true
     agent: orchestrator
     depends_on: [planning-select-work, planning-validate-stories]
     step_file: hive/workflows/steps/daily-ceremony/step-06-approve-plan.md

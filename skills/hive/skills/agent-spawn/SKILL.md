@@ -174,8 +174,19 @@ If the resolved backend is `codex`:
   still apply — codex-invoke is the dispatch, not a replacement for the
   surrounding procedure.
 
-If the resolved backend is `claude`, proceed with the Agent/TeamCreate call
-below unchanged.
+If the resolved backend is `claude`, use this flow in order:
+
+1. **Capability-check first:** initialize the Claude client/session substrate
+   needed for story execution. If the client cannot be initialized, treat that
+   as a substrate capability miss rather than a story failure.
+2. **Messages-API substrate by default:** when the capability-check passes,
+   route the story-level `Agent()` spawn through `hive/lib/messages-session.js`.
+   This is the default Claude path for direct story execution because it keeps
+   the spawn on the Messages-API loop instead of opening a tmux pane first.
+3. **tmux fallback when client init fails:** if the Messages-API client init
+   fails, log the failure and fall back to the existing tmux `Agent`/`TeamCreate`
+   path below. Do not modify the story prompt shape during fallback; only the
+   transport changes.
 
 #### 7.1 Resolve terminal multiplexer and pane mode
 

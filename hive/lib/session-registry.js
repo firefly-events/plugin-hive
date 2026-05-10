@@ -10,9 +10,18 @@
  *   created: <ISO 8601>
  *   sessions:
  *     - session_id, epic_id, story_id, step_id, agent_name, model,
- *       status, created_at, last_active_at, sse_last_event_at
+ *       status, created_at, last_active_at, sse_last_event_at,
+ *       cc_session_id
  *
  * Status enum: pending | active | completed | failed | stuck
+ *
+ * `cc_session_id` is an additive correlation column — it carries the
+ * Claude Code harness session id (process.env.CLAUDE_CODE_SESSION_ID)
+ * when present. The Hive `session_id` remains canonical for KG
+ * source_epic / source_session per binding decision
+ * `claude-code-session-id-precedence`. Pickup happens in
+ * session-client.registerSession() at registry-write time; existing
+ * rows without this column remain valid.
  */
 
 'use strict';
