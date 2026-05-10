@@ -41,6 +41,7 @@ If all checks pass, proceed silently — do not announce that the kickoff gate p
 1. **Load your persona.** Read `hive/agents/orchestrator.md` — it contains team evaluation criteria, pre-spawn checklist, circuit breakers, model tier routing, dev-on-standby pattern, decision protocols, and research prompt construction rules. This is WHO you are and HOW you make decisions.
 2. **Load project config.** Read `hive/hive.config.yaml` for execution settings (methodology, parallel teams, circuit breaker limits, model overrides). For skills that consult `agent_backends` or `model_overrides`, see the **Root-first config precedence** subsection below.
 3. **Load your memories.** Read the `knowledge` paths from your orchestrator frontmatter. Scan `~/.claude/hive/memories/orchestrator/` for all `.md` files. Read each file's frontmatter `description` field. Load the full content of any memories relevant to the current task. If no memories exist yet, proceed — this is expected for new projects.
+4. **Load project CONTEXT (if present).** Read `.pHive/CONTEXT.md` if it exists. This is the project's single-file domain glossary — terms, paths, and conventions specific to this codebase. **Silent-on-absence:** if the file is missing, proceed without a warning or error. Schema spec: [`context-md-schema.md`](context-md-schema.md). This step lands after persona/config/memory so domain literacy comes BEFORE substantive work.
 
 ### Root-first config precedence (extended, opt-in)
 
