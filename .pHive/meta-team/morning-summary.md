@@ -1,52 +1,25 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-05-09 | **Date:** 2026-05-09 | **Verdict:** passed
+**Cycle:** meta-2026-05-10 | **Date:** 2026-05-10 | **Verdict:** passed
 
----
+## What Changed
 
-## What Changed Tonight
-
-- **`hive/GUIDE.md`** — Corrected `## Workflows (6)` heading to `## Workflows (7)`.
-  The development and other workflow tables directly below the heading list 7 workflows
-  combined (Classic, TDD, BDD + Code Review, Test Swarm, Daily Ceremony, Design Review),
-  not 6. The count had drifted when the Design Review workflow was added.
-  Addresses SCHEMA_INCONSISTENCY finding.
-
-- **`hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md`** — Added `(S8)`
-  qualifier and a clarifying S9/BL2.2+ note to the SUCCESS METRICS bullet
-  "No promotion, mutation, experiment execution, or step-4 advancement occurred."
-  The bullet now reads: `(S8) No promotion, mutation, experiment execution, or step-4
-  advancement occurred (S9/BL2.2+ live mode: step-4 advancement is expected — see NEXT
-  STEP forward-compatibility note)`. This aligns the success metric with the existing
-  NEXT STEP forward-compatibility note, eliminating a contradiction that could mislead
-  automated validators or future editors. Addresses SCHEMA_INCONSISTENCY finding.
-
----
+- **hive/references/dreaming-integration.md** — Added `## API Reference` section documenting
+  the `runDreamingReplay()` function signature (parameters: `episodeRoot`, `kg`, `wiki`,
+  `capabilityProbe` with defaults), return shape (`{ playbookDeltas, capabilityErr, timeoutErr? }`),
+  episode YAML consumed fields (`playbook_delta.*`, `timestamp`, `status`), and the
+  `dreaming.timeout_hours` config key. File grew from 12 to 53 lines; STUB_DOC finding
+  resolved. Content is derived from the implementation at `hive/lib/dreaming-replay.js`.
 
 ## What Was Found (Not Fixed This Cycle)
 
-No deferred findings. Both structural findings were addressed this cycle.
+- **hive/references/hive-cloud-roadmap.md** (STUB_DOC, low) — 13-line self-described "S16 stub
+  to close the forward reference". Flagged as `needs_human`; expanding it requires
+  cloud-roadmap content from the product team. Deferred to a human-driven update.
 
----
+## Metrics
 
-## Flagged for Human Review
-
-- Nothing requires your attention.
-
----
-
-## Cycle Metrics
-
-| Metric | Count |
-|--------|-------|
-| Findings identified | 2 |
-| Proposals generated | 2 |
-| Changes promoted | 2 |
-| Changes reverted | 0 |
-| Flagged for human | 0 |
-| Cycle verdict | passed |
-
-**Commit:** `6f1de135b3581c093e3348a04ba9e780fb797c3a`
-**Rollback ref:** `a18299f379acd99699190297a5e0f6f7f7cf0e2d`
-**Regression watch:** armed through 2026-05-09T04:30:00Z
-
-**Next cycle:** No deferred findings. Fresh structural audit from scratch.
+- Findings: 2 | Proposals: 1 | Promoted: 1 | Reverted: 0
+- Next cycle priority: hive-cloud-roadmap.md stub (needs_human — flag for product team)
+- Commit: fbb0b153c6a602e2607d1bf12a19be21a3cf778e
+- Rollback ref: d701c7d5670fe53bd2d2fcf46531c2b9de0889f5
+- Regression watch: armed (window closes 2026-05-10T04:30:00Z)
