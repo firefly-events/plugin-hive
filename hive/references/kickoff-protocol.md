@@ -670,6 +670,26 @@ Create `hive.config.yaml` in the project root. This is Hive-specific config — 
 
 **Never duplicate CLAUDE.md content in hive.config.yaml.**
 
+### Phase 4b: Scaffold CONTEXT.md (domain glossary)
+
+Bootstrap `.pHive/CONTEXT.md` — the project's single-file domain glossary. Schema spec: [`hive/references/context-md-schema.md`](context-md-schema.md). One file, single source — NOT a tree.
+
+**Brownfield path** (codebase already exists):
+- Spawn the **researcher** persona with a bounded brief: "Inventory the project's domain vocabulary from CLAUDE.md, README, top-level directories, and the most-cited terms in `hive/references/`. Return 10–20 candidate terms with 1-sentence definitions."
+- Pass the inventory to the **technical-writer** persona, who instantiates the schema and writes `.pHive/CONTEXT.md` (sections: Terminology, Key paths, Conventions, Canonical references). Length target <200 lines.
+- The user reviews the seeded glossary in the onboarding report (Phase 6) and may edit before Hive proceeds.
+
+**Greenfield path** (no codebase yet):
+- Write an empty scaffold to `.pHive/CONTEXT.md` with the schema's section headers and a one-line note ("Populate as the project's vocabulary stabilizes — see [`hive/references/context-md-schema.md`](../hive/references/context-md-schema.md) for content rules.").
+- Discovery brief vocabulary may be promoted into CONTEXT.md by the user later.
+
+**Backfill path** (existing kickoff, CONTEXT.md missing):
+- Detect: `.pHive/project-profile.yaml` exists AND `.pHive/CONTEXT.md` does NOT.
+- Prompt the user opt-in: "CONTEXT.md (domain glossary) was added in Hive 2.0. Want me to scaffold it now from your existing codebase? [yes / skip]". Skip leaves the project unmodified — CONTEXT.md is silent-on-absence per skill-prelude contract, so nothing breaks.
+- On yes: run the brownfield path above.
+
+**Idempotent:** if `.pHive/CONTEXT.md` already exists with non-empty content, skip Phase 4b entirely. Do not overwrite a maintained glossary.
+
 ### Phase 5: Initialize Hive State
 
 - Create `.pHive/cycle-state/` directory
