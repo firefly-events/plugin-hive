@@ -105,7 +105,7 @@ Use the `id` of each rubric criterion as the category tag (e.g. `security`, `spe
 The rubric criterion's `severity` (`critical` or `improvement`) governs both how the finding is reported and how it contributes to the verdict roll-up. Do not surface ad-hoc severity labels that diverge from the rubric.
 
 - **Critical** — `fail` on a `severity: critical` criterion. Blocks integration.
-- **Improvements** — `fail` on a `severity: improvement` criterion. Should be fixed but does not block.
+- **Improvements** — `fail` on a `severity: improvement` criterion. This should be fixed but does not block.
 
 ## Verdict rules
 

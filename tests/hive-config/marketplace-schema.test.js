@@ -154,14 +154,18 @@ function validate(value, schema, atPath) {
   if (schema.oneOf) {
     const successes = [];
     const failures = [];
-    for (const candidate of schema.oneOf) {
+    for (const [index, candidate] of schema.oneOf.entries()) {
       const errors = validate(value, candidate, atPath);
       if (errors.length === 0) successes.push(candidate);
-      else failures.push(errors);
+      else failures.push({ index, errors });
     }
     return successes.length === 1
       ? []
-      : [`${atPath}: expected exactly one supported schema variant`];
+      : [
+          `${atPath}: expected exactly one supported schema variant; ${failures
+            .map(({ index, errors }) => `candidate ${index}: ${errors.join('; ')}`)
+            .join(' | ')}`,
+        ];
   }
 
   if (schema.const !== undefined && value !== schema.const) {
@@ -222,4 +226,3 @@ test('marketplace.json matches the published Anthropic marketplace schema', () =
     `schema mismatch against ${CANONICAL_SOURCE_URL} (last checked ${LAST_CHECKED}): ${errors.join('; ')}`,
   );
 });
-

@@ -135,7 +135,12 @@ function applyMemoryTruncation(memories, budgetChars, reservedChars) {
   const prepared = memories.map((m) => {
     if (TRUNCATABLE.has(m.type) && (m.content || '').length > REFERENCE_TRUNCATE_CHARS) {
       truncatedCount++;
-      return { mem: m, rendered: renderEntry(m, (m.content || '').slice(0, REFERENCE_TRUNCATE_CHARS)), droppable: true };
+      return {
+        mem: m,
+        rendered: renderEntry(m, (m.content || '').slice(0, REFERENCE_TRUNCATE_CHARS)),
+        droppable: true,
+        truncatedAtRender: true,
+      };
     }
     return { mem: m, rendered: renderEntry(m, m.content || ''), droppable: !ALWAYS_FULL.has(m.type) };
   });
@@ -144,13 +149,13 @@ function applyMemoryTruncation(memories, budgetChars, reservedChars) {
   const sortKey = (m) => m.last_verified || '';
   const droppableSorted = prepared
     .filter((p) => p.droppable)
-    .map((p) => p)
     .sort((a, b) => sortKey(a.mem).localeCompare(sortKey(b.mem)));
 
   const totalChars = () => {
-    return prepared
-      .filter((p) => !p.dropped)
-      .reduce((acc, p) => acc + p.rendered.length + 5, 0); // +5 for "\n\n---" separator
+    const kept = prepared.filter((p) => !p.dropped);
+    if (kept.length === 0) return 0;
+    return kept.reduce((acc, p) => acc + p.rendered.length, 0)
+      + ((kept.length - 1) * '\n\n---\n\n'.length);
   };
 
   let dropIdx = 0;
@@ -158,7 +163,7 @@ function applyMemoryTruncation(memories, budgetChars, reservedChars) {
     const victim = droppableSorted[dropIdx++];
     if (!victim.dropped) {
       victim.dropped = true;
-      truncatedCount++;
+      if (!victim.truncatedAtRender) truncatedCount++;
     }
   }
 
@@ -283,6 +288,8 @@ function buildSystemPrompt({
   let priorBlock;
   if (rendered.length === 0 && !decisionBlock) {
     priorBlock = '';
+  } else if (rendered.length === 0) {
+    priorBlock = decisionBlock;
   } else {
     const memHeader = `\n\n---\n\n## Prior Knowledge\n\n${rendered.length} memories loaded for ${agent_role || 'unknown'}:\n\n`;
     const memBody = rendered.length ? rendered.join('\n\n---\n\n') : '';

@@ -128,41 +128,79 @@ async function runMessagesSession({ system, tools, messages, toolHandler, budget
 
     if (response.stop_reason === 'end_turn') {
       conversation.push({ role: 'assistant', content: response.content });
-      return { messages: conversation, stopReason: 'end_turn', usage: lastUsage || usage };
+      return {
+        messages: conversation,
+        stopReason: 'end_turn',
+        usage,
+        lastTurnUsage: lastUsage,
+      };
     }
 
-    if (response.stop_reason !== 'tool_use') {
+    if (response.stop_reason === 'tool_use') {
+      // tool_use cycle: append assistant verbatim, dispatch every tool_use,
+      // append a single user message with one tool_result per tool_use.
+      conversation.push({ role: 'assistant', content: response.content });
+
+      const toolUseBlocks = response.content.filter((b) => b && b.type === 'tool_use');
+      const toolResults = [];
+      for (const block of toolUseBlocks) {
+        if (typeof toolHandler !== 'function') {
+          const err = new Error(`toolHandler missing — model emitted tool_use ${block.name}`);
+          err.code = 'NoToolHandler';
+          throw err;
+        }
+        const result = await toolHandler(block);
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: typeof result === 'string' ? result : JSON.stringify(result),
+        });
+      }
+      conversation.push({ role: 'user', content: toolResults });
+
+      iterations += 1;
+
+      if (usage.input_tokens + usage.output_tokens >= storyTokenLimit) {
+        return { messages: conversation, stopReason: 'budget', usage, terminationReason: 'story_budget' };
+      }
+      continue;
+    }
+
+    if (response.stop_reason === 'max_tokens') {
+      conversation.push({ role: 'assistant', content: response.content });
+      return { messages: conversation, stopReason: 'max_tokens', usage, terminationReason: 'response_max_tokens' };
+    }
+
+    if (response.stop_reason === 'stop_sequence') {
+      conversation.push({ role: 'assistant', content: response.content });
+      return { messages: conversation, stopReason: 'stop_sequence', usage, terminationReason: 'stop_sequence' };
+    }
+
+    if (response.stop_reason === 'pause_turn') {
+      conversation.push({ role: 'assistant', content: response.content });
+      return { messages: conversation, stopReason: 'pause_turn', usage, terminationReason: 'pause_turn' };
+    }
+
+    if (response.stop_reason === 'refusal') {
+      conversation.push({ role: 'assistant', content: response.content });
+      return { messages: conversation, stopReason: 'refusal', usage, terminationReason: 'refusal' };
+    }
+
+    if (response.stop_reason === 'model_context_window_exceeded') {
+      conversation.push({ role: 'assistant', content: response.content });
+      return {
+        messages: conversation,
+        stopReason: 'model_context_window_exceeded',
+        usage,
+        terminationReason: 'model_context_window_exceeded',
+      };
+    }
+
+    {
       const err = new Error(`unexpected stop_reason: ${response.stop_reason}`);
       err.code = 'UnexpectedStopReason';
       err.stop_reason = response.stop_reason;
       throw err;
-    }
-
-    // tool_use cycle: append assistant verbatim, dispatch every tool_use,
-    // append a single user message with one tool_result per tool_use.
-    conversation.push({ role: 'assistant', content: response.content });
-
-    const toolUseBlocks = response.content.filter((b) => b && b.type === 'tool_use');
-    const toolResults = [];
-    for (const block of toolUseBlocks) {
-      if (typeof toolHandler !== 'function') {
-        const err = new Error(`toolHandler missing — model emitted tool_use ${block.name}`);
-        err.code = 'NoToolHandler';
-        throw err;
-      }
-      const result = await toolHandler(block);
-      toolResults.push({
-        type: 'tool_result',
-        tool_use_id: block.id,
-        content: typeof result === 'string' ? result : JSON.stringify(result),
-      });
-    }
-    conversation.push({ role: 'user', content: toolResults });
-
-    iterations += 1;
-
-    if (usage.input_tokens + usage.output_tokens >= storyTokenLimit) {
-      return { messages: conversation, stopReason: 'budget', usage, terminationReason: 'story_budget' };
     }
   }
 }

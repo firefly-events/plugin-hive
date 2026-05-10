@@ -174,7 +174,7 @@ Trigger this branch only when all five actionable inputs are empty:
 - step 2 `findings` is empty (zero structural-audit findings)
 - step 2b `external_research_candidates` is empty
 - step 2c `kg_signal` is empty (zero knowledge-graph-derived findings, or `meta_optimize.kg_signal.enabled: false`, or `kg.sqlite` absent)
-- step 2d `dreaming_replay` is empty (zero cross-session replay findings, or `meta_optimize.dreaming_source.enabled: false`, or the dreaming capability-check returns `[]`)
+- step 2d `dreaming_replay` is empty (zero cross-session replay findings, or `meta_optimize.dreaming_source.enabled: false`, or the step produced no proposals after the capability-check gate passes)
 - no usable `metric_signal` is present (kickoff metrics opt-out, OR opt-in with no perf delta above threshold)
 
 `metric_signal` is a perf-baseline-only flag and is orthogonal to findings, external candidates, kg_signal, and dreaming_replay. A cycle that produced any of those but no perf delta MUST route to step-03, not step-03b. The canonical case for step-03b is "metrics opt-out + zero findings + zero external candidates + zero kg_signal + zero dreaming_replay".

@@ -329,11 +329,9 @@ Workflows that ship today as prose-routed (and have not been graduated to the ex
 
 ## Ceremony Workflow Variant
 
-The `daily-ceremony.workflow.yaml` uses `phases:` as the top-level collection key instead of `steps:`. This is an intentional semantic distinction: the daily ceremony is an orchestrator-driven coordination ceremony rather than a multi-agent development workflow. The `phases:` key signals that entries represent ordered ceremony phases, not parallelisable agent task steps.
+The current `daily-ceremony.workflow.yaml` is expressed as flat `steps:`, not `phases:`. The ceremony remains a distinct operational variant because ordering is carried by the step ids plus barrier-style sequencing, and execution remains orchestrator-driven rather than a per-phase multi-agent swarm.
 
-Ceremony workflow phases follow the same per-entry structure as development steps (each phase has `id:`, `step_file:`, and related fields) but have two operational differences from development workflows:
+Ceremony workflows differ from standard development workflows in these ways:
 
-1. **Sequential only** — phases run in declared order; the `depends_on` mechanism does not apply
-2. **Orchestrator-executed** — the orchestrator works through all phases itself; no sub-agent roster is spawned per phase
-
-When auditing or validating workflow YAML files, treat `phases:` as a recognised variant of `steps:` for ceremony workflows. Do not flag `phases:` as a schema violation in `daily-ceremony.workflow.yaml`.
+1. **Sequential coordination** — effective order is enforced by the declared step graph and barrier steps, not by a separate `phases:` collection
+2. **Orchestrator-executed** — the orchestrator drives the ceremony flow directly; it does not spawn a dedicated per-phase agent roster

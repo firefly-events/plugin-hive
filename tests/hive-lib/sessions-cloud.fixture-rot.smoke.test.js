@@ -38,6 +38,7 @@ function parseRecording() {
 function loadClientWithSdkStub(fakeAnthropic) {
   const originalResolve = Module._resolveFilename;
   const originalLoad = Module._load;
+  let client;
 
   Module._resolveFilename = function (request, parent, ...rest) {
     if (request === SDK_NAME) return SDK_NAME;
@@ -49,14 +50,18 @@ function loadClientWithSdkStub(fakeAnthropic) {
     return originalLoad.call(this, request, parent, ...rest);
   };
 
-  delete require.cache[require.resolve(CLIENT_PATH)];
-  const client = require(CLIENT_PATH);
+  try {
+    delete require.cache[require.resolve(CLIENT_PATH)];
+    client = require(CLIENT_PATH);
+  } finally {
+    Module._resolveFilename = originalResolve;
+    Module._load = originalLoad;
+    delete require.cache[require.resolve(CLIENT_PATH)];
+  }
 
   return {
     client,
     restore() {
-      Module._resolveFilename = originalResolve;
-      Module._load = originalLoad;
       delete require.cache[require.resolve(CLIENT_PATH)];
     },
   };

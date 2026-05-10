@@ -37,7 +37,12 @@ async function runDreamingReplay({
   wiki = null,
   capabilityProbe = defaultCapabilityProbe,
 } = {}) {
-  const capable = await capabilityProbe();
+  let capable = false;
+  try {
+    capable = await capabilityProbe();
+  } catch {
+    return { playbookDeltas: [], capabilityErr: null };
+  }
   if (!capable) {
     return { playbookDeltas: [], capabilityErr: null };
   }
@@ -53,8 +58,8 @@ async function runDreamingReplay({
     const delta = toDreamAdapterDelta(root, filePath, parsed);
     if (!delta) continue;
     playbookDeltas.push(delta);
-    emitDelta(wiki, 'applyDelta', delta.outputs[0].wiki);
-    emitDelta(kg, 'applyDelta', delta.outputs[0].kg);
+    await emitDelta(wiki, 'applyDelta', delta.outputs[0].wiki);
+    await emitDelta(kg, 'applyDelta', delta.outputs[0].kg);
 
     if (Number.isFinite(timeoutMs) && timeoutMs >= 0 && (Date.now() - startedAt) > timeoutMs) {
       return { playbookDeltas, capabilityErr: null, timeoutErr: true };
@@ -68,9 +73,9 @@ async function defaultCapabilityProbe() {
   return false;
 }
 
-function emitDelta(target, methodName, payload) {
+async function emitDelta(target, methodName, payload) {
   if (!target || typeof target[methodName] !== 'function') return;
-  target[methodName](payload);
+  return target[methodName](payload);
 }
 
 function listEpisodeFiles(root) {

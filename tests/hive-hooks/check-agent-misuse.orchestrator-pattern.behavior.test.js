@@ -5,7 +5,7 @@
  * Run: node tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.js
  *
  * Three cases:
- *   a) Messages-API spawn (messages-session.js routed Agent()) — ALLOW
+ *   a) Messages-API spawn with structured bypass marker — ALLOW
  *   b) TeamCreate spawn — ALLOW
  *   c) Existing orchestrator-pattern catalog match — BLOCK
  */
@@ -35,20 +35,38 @@ function runHook(payload) {
 // ---------------------------------------------------------------------------
 // Case (a): Messages-API routed Agent() spawn — ALLOW
 // ---------------------------------------------------------------------------
-test('case a — Messages-API-routed Agent() spawn via hive/lib/messages-session.js is allowed', () => {
-  const result = runHook({
-    tool_name: 'Agent',
-    tool_input: {
-      prompt: [
-        'Implement story from .pHive/epics/cwc-2026-integration/stories/s10-a7-agent-spawn-flow-hook-relax.yaml.',
-        'Route the spawn through hive/lib/messages-session.js Agent() substrate.',
-        'This is an execution workflow phase for the story.',
-      ].join(' '),
-      description: 'developer working on s10-a7 through Messages-API',
-    },
+test('case a — Messages-API bypass requires the structured marker', async (t) => {
+  await t.test('marker present allows the bypass', () => {
+    const result = runHook({
+      tool_name: 'Agent',
+      tool_input: {
+        prompt: [
+          'Implement story from .pHive/epics/cwc-2026-integration/stories/s10-a7-agent-spawn-flow-hook-relax.yaml.',
+          '__MESSAGES_SESSION_BYPASS__',
+          'This is an execution workflow phase for the story.',
+        ].join(' '),
+        description: 'developer working on s10-a7 through Messages-API',
+      },
+    });
+
+    assert.equal(result.status, 0, `expected ALLOW, got exit=${result.status} stderr=${result.stderr}`);
   });
 
-  assert.equal(result.status, 0, `expected ALLOW, got exit=${result.status} stderr=${result.stderr}`);
+  await t.test('legacy free-form substrings no longer bypass', () => {
+    const result = runHook({
+      tool_name: 'Agent',
+      tool_input: {
+        prompt: [
+          'Implement story from .pHive/epics/cwc-2026-integration/stories/s10-a7-agent-spawn-flow-hook-relax.yaml.',
+          'Route the spawn through hive/lib/messages-session.js Agent() substrate.',
+          'This is an execution workflow phase for the story.',
+        ].join(' '),
+        description: 'developer working on s10-a7 through Messages-API',
+      },
+    });
+
+    assert.equal(result.status, 2, `expected BLOCK, got exit=${result.status} stderr=${result.stderr}`);
+  });
 });
 
 // ---------------------------------------------------------------------------

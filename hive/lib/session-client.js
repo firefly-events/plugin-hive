@@ -14,6 +14,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { getCloudMode } = require('./runtime-mode');
+let yaml = null;
+try {
+  yaml = require('js-yaml');
+} catch {
+  yaml = null;
+}
 
 let Anthropic;
 try {
@@ -321,32 +327,45 @@ function parseConfigText(raw) {
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {}
 
-  return {
-    execution: parseYamlSection(raw, 'execution', ['substrate']),
-    'cloud-adapter': parseYamlSection(raw, 'cloud-adapter', ['enabled']),
-  };
+  if (yaml) {
+    try {
+      const parsed = yaml.load(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {}
+  }
+
+  console.info('[session-client] falling back to limited YAML parser; install/use js-yaml for full config support');
+
+  return parseYamlSections(raw);
 }
 
-function parseYamlSection(raw, sectionName, keys) {
+function parseYamlSections(raw) {
   const result = {};
   const lines = raw.split(/\r?\n/);
-  let active = false;
+  let activeSection = null;
+  let activeIndent = null;
 
   for (const line of lines) {
-    if (/^\S/.test(line) && line.trim() !== `${sectionName}:`) {
-      active = false;
-    }
-    if (line.trim() === `${sectionName}:`) {
-      active = true;
+    const sectionMatch = line.match(/^(\s*)([A-Za-z0-9_-]+):\s*(?:#.*)?$/);
+    if (sectionMatch) {
+      activeSection = sectionMatch[2];
+      activeIndent = sectionMatch[1].length;
+      if (!result[activeSection]) result[activeSection] = {};
       continue;
     }
-    if (!active) continue;
 
-    const match = line.match(/^\s{2}([A-Za-z0-9_-]+):\s*(.+?)\s*(?:#.*)?$/);
+    if (!activeSection) continue;
+    const lineIndent = (line.match(/^(\s*)/) || ['',''])[1].length;
+    if (lineIndent <= activeIndent && line.trim()) {
+      activeSection = null;
+      activeIndent = null;
+      continue;
+    }
+
+    const match = line.match(/^\s*([A-Za-z0-9_-]+):\s*(.+?)\s*(?:#.*)?$/);
     if (!match) continue;
     const [, key, rawValue] = match;
-    if (!keys.includes(key)) continue;
-    result[key] = coerceConfigValue(rawValue);
+    result[activeSection][key] = coerceConfigValue(rawValue);
   }
 
   return result;
