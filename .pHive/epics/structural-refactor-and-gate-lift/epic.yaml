@@ -1,0 +1,168 @@
+name: structural-refactor-and-gate-lift
+title: Structural Refactor + Gate Lift (Epic B)
+description: |
+  Second in-flight epic from hive-composability-audit recommendation (2026-05-08).
+  Splits big skills into composable atoms, collapses ui-audit into design-review,
+  extracts inlined config from brand-system + design-system, AND folds in D4
+  Position A (lift /plan + /execute hard-gates to warnings via paths.gate_mode knob).
+
+  D4 Position A fold-in is per user course-correction 2026-05-08:
+    - North Star reframes from "director's chair" to "composable substrate, user-directed"
+    - A composable substrate that hard-blocks on its own initialization ritual is anti-substrate
+    - Lift /plan + /execute hard-gates to warnings + sane defaults
+    - Mitigation: paths.gate_mode: warning|hard config knob, default warning for 2.0,
+      telemetry-validate over one release cycle, flip default to hard if miscoordination at scale
+
+  Gate-lift work (A-32–A-36) and structural splits (A-04, A-05, A-14) all touch the
+  same files (skills/plan, skills/execute, skills/agent-spawn). Folding gate-lift into
+  this epic is cheaper than separate epic — files already open for restructure.
+
+  This epic is one of three required for 2.0 (with catalog-hygiene-and-borrows
+  and task-tracking-adapter-abi).
+
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+scale: medium
+branch: feat/structural-refactor-and-gate-lift
+parent_audit: hive-composability-audit
+milestone: hive-2.0
+
+planning_artifacts:
+  - ../hive-composability-audit/docs/recommendation.md  # Section 2 (W6 + §2.6) + Section 7 Epic B
+
+dependencies:
+  blocks:
+    - ui-cluster-extract-config-deeper       # Epic F post-2.0; depends on extract-config pattern
+  blocked_by:
+    - catalog-hygiene-and-borrows            # W4 Grill atomic skill must land first
+
+stories:
+  # W6 — Structural splits
+  - id: a-04-plan-skill-split-routing
+    title: Split /plan Phase 0 routing into separate skill or module
+    complexity: high
+    wave: W6
+    depends_on: []
+    action_id: A-04
+
+  - id: a-04-plan-skill-split-escalation
+    title: Split /plan escalation backfill (steps 11/14) into separate concern
+    complexity: medium
+    wave: W6
+    depends_on: [a-04-plan-skill-split-routing]
+    action_id: A-04
+
+  - id: a-05-execute-skill-split-dispatch
+    title: Split /execute mode dispatch into separate skill or module
+    complexity: medium
+    wave: W6
+    depends_on: []
+    action_id: A-05
+
+  - id: a-05-execute-skill-split-modes
+    title: Split /execute three execution modes into composable atoms
+    complexity: high
+    wave: W6
+    depends_on: [a-05-execute-skill-split-dispatch]
+    action_id: A-05
+
+  - id: a-14-agent-spawn-split-persona
+    title: Split agent-spawn persona resolution into separate skill or reference
+    complexity: medium
+    wave: W6
+    depends_on: []
+    action_id: A-14
+
+  - id: a-14-agent-spawn-split-memory-and-dispatch
+    title: Split agent-spawn memory loading (L0–L3) and backend dispatch
+    complexity: high
+    wave: W6
+    depends_on: [a-14-agent-spawn-split-persona]
+    action_id: A-14
+
+  - id: a-08-brand-system-extract-config
+    title: Move brand-system inlined YAML/HTML schemas to references
+    complexity: small
+    wave: W6
+    depends_on: []
+    action_id: A-08
+
+  - id: a-09-design-system-extract-config
+    title: Move design-system W3C token spec inline to references
+    complexity: small
+    wave: W6
+    depends_on: []
+    action_id: A-09
+
+  - id: a-11-ui-audit-collapse
+    title: Collapse ui-audit into design-review with --artifact-target flag
+    complexity: medium
+    wave: W6
+    depends_on: []
+    action_id: A-11
+
+  # W6 — Gate-lift (D4 Position A fold-in, 2026-05-08)
+  - id: a-32-plan-methodology-auto-detect
+    title: /plan methodology auto-detect (tests → tdd, gherkin → bdd, else → classic)
+    complexity: medium
+    wave: W6
+    depends_on: [a-04-plan-skill-split-routing]
+    action_id: A-32
+
+  - id: a-33-plan-gate-lift-and-gate-mode-knob
+    title: Lift /plan hard-gate to warning under paths.gate_mode default warning
+    complexity: medium
+    wave: W6
+    depends_on: [a-04-plan-skill-split-routing, a-32-plan-methodology-auto-detect]
+    action_id: A-33
+
+  - id: a-34-execute-backend-auto-resolve
+    title: /execute backend auto-resolve (env > hive.config.yaml > prompt)
+    complexity: medium
+    wave: W6
+    depends_on: [a-05-execute-skill-split-dispatch]
+    action_id: A-34
+
+  - id: a-35-execute-epic-create-on-fly-and-gate-lift
+    title: /execute epic-create-on-the-fly path + hard-gate lift to warning
+    complexity: medium
+    wave: W6
+    depends_on: [a-05-execute-skill-split-dispatch, a-34-execute-backend-auto-resolve]
+    action_id: A-35
+
+  - id: a-36-post-run-audit-telemetry
+    title: Post-run audit check warns on nonsensical default state; telemetry feeds gate_mode flip decision
+    complexity: medium
+    wave: W6
+    depends_on: [a-33-plan-gate-lift-and-gate-mode-knob, a-35-execute-epic-create-on-fly-and-gate-lift]
+    action_id: A-36
+
+acceptance_criteria:
+  - "skills/plan split into routing + escalation atoms; line-count delta ≥-300 lines net"
+  - "skills/execute split into dispatch + mode atoms; mode-dispatch reusable outside execute"
+  - "skills/agent-spawn split into persona + memory + dispatch atoms"
+  - "brand-system + design-system inline schemas extracted to hive/references/"
+  - "ui-audit collapsed into design-review with --artifact-target flag; ui-audit skill removed"
+  - "paths.gate_mode: warning|hard config knob exists; default warning for 2.0; hard preserves original behavior"
+  - "/plan runs on fresh repo with sane defaults under gate_mode: warning; warns on missing config"
+  - "/execute runs without pre-existing epic under gate_mode: warning; ad-hoc epic scaffolded"
+  - "Methodology auto-detect signals documented (tests → tdd; gherkin → bdd; else → classic); --methodology= flag overrides"
+  - "Backend auto-resolve order: env > hive.config.yaml > prompt; warns on no-config"
+  - "Post-run audit emits warning if defaults produced nonsensical state; telemetry captured for gate_mode default-flip decision"
+
+out_of_scope:
+  - "W0–W5 catalog hygiene + borrows — Epic A (blocking dep)"
+  - "Adapter ABI — Epic C"
+  - "Deeper UI cluster extract-config (full D2 resolution) — Epic F post-2.0"
+  - "Memory-stack optionalization — Epic G post-2.0"
+
+risks:
+  - severity: high
+    description: Lifting /plan + /execute hard-gates produces silent miscoordination at scale (wrong methodology, wrong backend, ad-hoc epic state)
+    mitigation: paths.gate_mode default warning for 2.0; A-36 post-run audit captures telemetry; flip default to hard if signal shows up
+  - severity: medium
+    description: Splitting /plan during in-flight Phase A2 grill wiring causes merge churn
+    mitigation: Blocked-by Epic A W4 — Grill must land first per dependency chain
+  - severity: medium
+    description: Methodology auto-detect produces wrong default on edge cases (e.g., tdd repos with no tests yet)
+    mitigation: --methodology= flag override always works; warning is loud; telemetry captures miss rate

@@ -1,0 +1,104 @@
+id: a-28-grill-plan-a2-wiring
+epic: catalog-hygiene-and-borrows
+title: Wire /plan Phase A2 to call grill; add researcher field and grill-record consumption
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [a-28-grill-skill-md]
+wave: W4
+action_id: A-28
+
+description: |
+  After the atomic grill skill exists, /plan Phase A2 calls it from outside.
+  Recommendation also retains two companion edits in the same story: researcher
+  persona output gains an inconsistency_risk_signals field, and design-discussion
+  consumes the resulting grill-record.
+
+  This story wires those three surfaces together: skills/plan/SKILL.md invokes
+  the grill skill in Phase A2; hive/agents/researcher.md emits the new field;
+  skills/hive/skills/design-discussion/SKILL.md (or its post-reclassify successor)
+  consumes grill-record. The story assumes the grill skill and template already
+  define the produced artifact.
+
+  Scope boundary:
+  - DO wire plan Phase A2 to call the grill skill.
+  - DO add inconsistency_risk_signals to researcher output.
+  - DO edit design-discussion consumption of grill-record.
+  - DO NOT re-author the grill skill or template here.
+
+acceptance_criteria:
+  - "`rg -n 'Phase A2|grill' skills/plan/SKILL.md` returns the call-out after implementation"
+  - "`rg -n 'inconsistency_risk_signals' hive/agents/researcher.md` returns at least one match"
+  - "`rg -n 'grill-record' skills/hive/skills/design-discussion/SKILL.md` returns at least one match, or the story names the post-reclassify successor path explicitly"
+  - "Plan wiring describes grill as an external atomic call, not inline prose copied from skills/grill/SKILL.md"
+  - "Story scope excludes new queue/triage work and excludes changes outside the plan, researcher, and design-discussion surfaces"
+
+steps:
+  - id: research
+    description: |
+      Read the retained A-28 rows, the grill skill story, and the current plan,
+      researcher, and design-discussion paths. Confirm the three required edits
+      are still those exact surfaces.
+    agent: researcher
+  - id: implement
+    description: |
+      Edit skills/plan/SKILL.md for Phase A2 grill invocation, update
+      hive/agents/researcher.md to emit inconsistency_risk_signals, and edit
+      design-discussion to consume grill-record from the atomic skill output.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Verify grep hits for Phase A2 + grill in plan, inconsistency_risk_signals
+      in researcher, and grill-record in design-discussion consumption text.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify plan still owns planning flow while grill remains a separate atomic
+      skill. Confirm the new researcher field is additive and that
+      design-discussion consumes grill-record rather than re-deriving it.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/catalog-hygiene-and-borrows; PR cites A-28 plan-wiring story.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Target for Phase A2 external grill invocation
+    - path: hive/agents/researcher.md
+      purpose: Target for inconsistency_risk_signals output field
+    - path: skills/hive/skills/design-discussion/SKILL.md
+      purpose: Current design-discussion skill path that should consume grill-record unless W1 reclassify lands first
+    - path: skills/grill/SKILL.md
+      purpose: Upstream atomic skill being called from plan
+
+design_decisions:
+  - decision: Keep grill invocation external to plan internals
+    rationale: Recommendation explicitly rejects inline Phase A2 shape
+  - decision: Add inconsistency_risk_signals at researcher persona level
+    rationale: Recommendation names that field as part of the A-28 wiring story
+  - decision: Consume grill-record in design-discussion rather than duplicating the analysis
+    rationale: Stable artifact hand-off is the point of separating the atomic grill skill
+
+risks:
+  - severity: medium
+    description: Design-discussion path may move if W1 reclassify lands first
+    mitigation: Story explicitly allows the post-reclassify successor path while preserving grill-record consumption as the invariant
+  - severity: low
+    description: Researcher field naming drifts from recommendation
+    mitigation: Acceptance criteria require the exact inconsistency_risk_signals identifier
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-28 wiring story includes plan Phase A2 call-out, researcher
+      inconsistency_risk_signals field, and design-discussion consumption.
+  - path: .pHive/epics/catalog-hygiene-and-borrows/epic.yaml
+    relevant_excerpt: |
+      a-28-grill-plan-a2-wiring — Wire /plan Phase A2 to call grill skill;
+      researcher emits inconsistency_risk_signals; design-discussion consumes grill-record.

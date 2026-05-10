@@ -1,0 +1,98 @@
+id: w1-warning-lift
+epic: catalog-hygiene-and-borrows
+title: Lift kickoff-gate hard-block to warning on 5 read-only-shaped skills
+status: pending
+complexity: low
+methodology: classic
+depends_on: [a-25-skill-prelude-extraction]
+wave: W1
+action_ids: [A-03, A-06, A-07]
+
+description: |
+  Five read-only-shaped skills (status, review, test, standup, ui-audit) currently
+  HARD-BLOCK if .pHive/project-profile.yaml or hive.config.yaml are missing.
+  Hostile to standalone use — user runs /status on a fresh repo, gets refusal.
+
+  Lift the hard-gate to a warning on these 5 skills. They can run with sane
+  defaults; warning surfaces missing kickoff state but doesn't block.
+
+  Note: /plan and /execute hard-gates remain UNTOUCHED here; they're addressed
+  in Epic B (D4 Position A fold-in via paths.gate_mode knob).
+
+acceptance_criteria:
+  - "skills/status/SKILL.md emits warning instead of hard-block on missing .pHive/"
+  - "skills/review/SKILL.md emits warning instead of hard-block"
+  - "skills/test/SKILL.md emits warning instead of hard-block"
+  - "skills/standup/SKILL.md emits warning instead of hard-block"
+  - "skills/ui-audit/SKILL.md emits warning instead of hard-block"
+  - "Each skill produces useful output on a fresh repo (no .pHive/) — warning is loud, work proceeds"
+  - "Warning text consistent across the 5 skills (suggest format: 'Warning: Hive not initialized for this project. Run /hive:kickoff for full context. Proceeding with defaults.')"
+
+steps:
+  - id: research
+    description: |
+      Read each of the 5 affected SKILL.md files. Locate the kickoff gate section
+      (now likely cited from skill-prelude.md after A-25). Identify the exact
+      "stop" / "do not proceed" pattern and what to replace it with.
+    agent: researcher
+  - id: implement
+    description: |
+      For each of the 5 skills, override the kickoff-gate behavior to "warn and
+      proceed" instead of "stop". Pattern depends on whether skill-prelude.md
+      authors the gate centrally (override pattern) or each skill owns its gate
+      (per-skill edit).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      For each skill, run on a fresh directory (no .pHive/). Confirm warning
+      fires AND skill produces useful output. Run on initialized repo to confirm
+      no regression.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify warning message consistency across the 5 skills; no false-positive warnings on initialized repos.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/catalog-hygiene-and-borrows; PR cites A-03/A-06/A-07.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/status/SKILL.md
+      purpose: One-verb read-only skill; trivial gate-lift
+    - path: skills/review/SKILL.md
+      purpose: Single-verb workflow fallback; matrix row 6
+    - path: skills/test/SKILL.md
+      purpose: 9-step pipeline; gate is at top
+    - path: skills/standup/SKILL.md
+      purpose: 3-phase ceremony; gate at top
+    - path: skills/ui-audit/SKILL.md
+      purpose: 3-step ceremony (will be collapsed in Epic B; lift gate first)
+    - path: hive/references/skill-prelude.md
+      purpose: If A-25 centralized gate logic, override may be configurable here
+
+design_decisions:
+  - decision: Warning text consistent across 5 skills
+    rationale: User experience — same warning shape no matter which skill they hit first
+
+risks:
+  - severity: low
+    description: User assumes /plan + /execute also lifted, gets confused when they hard-block
+    mitigation: Warning text mentions /hive:kickoff explicitly; Epic B adds plan/execute lift via gate_mode knob
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-03: status — extract config; one read-only verb; kickoff-gate is the only
+      coupling — gate becomes warning under W1.
+      A-06: review — Touched by W1 warning lift.
+      A-07: test — Touched by W1 warning lift.
+      §5.4 D4: Section 2 W1 warning-lift addresses 5 read-only-shaped skills
+      (status, review, standup, ui-audit, test).
+  - path: .pHive/epics/hive-composability-audit/spikes/skills-lens/catalog-matrix.md
+    relevant_excerpt: |
+      Status row 3 / Review row 6 / Test row 7 / Standup row 2 / Ui-audit row 11.

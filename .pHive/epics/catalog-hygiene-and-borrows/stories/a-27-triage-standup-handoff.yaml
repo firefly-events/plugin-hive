@@ -1,0 +1,101 @@
+id: a-27-triage-standup-handoff
+epic: catalog-hygiene-and-borrows
+title: Surface open triage queue items during standup Phase 1
+status: pending
+complexity: low
+methodology: classic
+depends_on: [a-27-triage-skill-md, a-27-triage-queue-yaml]
+wave: W3
+action_id: A-27
+
+description: |
+  Borrow 3 also hands triage state into the daily ceremony. Recommendation keeps
+  the integration narrow: standup Phase 1 surfaces open triage items. This story
+  wires that behavior into skills/standup/SKILL.md so the ceremony can expose
+  intake work before selecting execution candidates.
+
+  This story is presentation and hand-off only. It does not redefine queue
+  semantics, and it does not let standup mutate the triage state machine. Triage
+  remains the author of queue state; standup reads and surfaces open items.
+
+  Scope boundary:
+  - DO edit standup to surface open triage items in Phase 1.
+  - DO reference .pHive/triage/queue.yaml as the source of truth.
+  - DO NOT add /plan decomposition logic here.
+  - DO NOT introduce queue write-back or adapter sync.
+
+acceptance_criteria:
+  - "`rg -n 'Phase 1|triage|queue.yaml|open triage items' skills/standup/SKILL.md` returns the required surfacing language"
+  - "Standup skill text makes clear it reads/surfaces triage items rather than owning their lifecycle"
+  - "Story scopes the integration to Phase 1 and does not add /plan --from-triage behavior"
+  - "Open triage items are described as inputs to ceremony visibility before work selection"
+  - "No acceptance criterion mentions optional adapter write-back"
+
+steps:
+  - id: research
+    description: |
+      Read the retained A-27 recommendation rows, the triage skill story, and
+      the queue story. Confirm the standup hand-off is specifically Phase 1
+      surfacing of open triage items.
+    agent: researcher
+  - id: implement
+    description: |
+      Edit skills/standup/SKILL.md to add Phase 1 queue-read and presentation
+      guidance. Surface open triage items as ceremony context before later work
+      selection phases.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Verify the standup skill references Phase 1, the triage queue path, and
+      open-item surfacing. Confirm /plan decomposition language is absent.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify ownership boundaries: triage writes queue state, standup reads and
+      surfaces, plan decomposes. No cross-over.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/catalog-hygiene-and-borrows; PR cites A-27 standup hand-off story.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/standup/SKILL.md
+      purpose: Target for ceremony surfacing instructions
+    - path: .pHive/triage/queue.yaml
+      purpose: Read-only queue source surfaced during Phase 1
+    - path: skills/triage/SKILL.md
+      purpose: Upstream owner of triage states and queue writes
+    - path: hive/workflows/steps/daily-ceremony/step-01-load-state.md
+      purpose: Existing ceremony decomposition reference for where Phase 1 context is loaded
+
+design_decisions:
+  - decision: Surface only open triage items
+    rationale: User brief scopes the standup hand-off to open triage visibility, not full queue replay
+  - decision: Bind the integration to Phase 1
+    rationale: Recommendation names standup Phase 1 specifically
+  - decision: Keep standup read-only against the triage queue
+    rationale: Borrow 3 keeps process ownership inside triage, not ceremony steps
+
+risks:
+  - severity: medium
+    description: Standup grows into triage queue management
+    mitigation: Review step checks that the ceremony only reads and surfaces queue items
+  - severity: low
+    description: Phase placement drifts later in the ceremony
+    mitigation: Acceptance criteria require explicit Phase 1 wording
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      Borrow 3 includes hand-offs to /plan --from-triage and standup Phase 1.
+      The triage queue is part of the same action cluster.
+  - path: .pHive/epics/catalog-hygiene-and-borrows/epic.yaml
+    relevant_excerpt: |
+      a-27-triage-standup-handoff — Wire standup Phase 1 → triage handoff.
+      Depends on the triage skill and queue schema stories.

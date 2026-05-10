@@ -1,0 +1,158 @@
+id: s3-spike-skills-lens
+epic: hive-composability-audit
+title: Skills composability audit — full 30-skill catalog matrix + 3-borrow scope
+status: pending
+complexity: high
+methodology: classic
+depends_on: [s2-spike-atoshell]
+
+description: |
+  Full audit of Hive's 30+ skill catalog through mattpocock atomic-composability
+  lens. Pulls forward the deferred mattpocock atomic-skill audit (filed
+  2026-05-06), expands with sandcastle posture cross-check (different layer,
+  same author, same "process-owning vs composable" critique).
+
+  Output: catalog matrix (one-line classification per skill) + scope for three
+  concrete borrows (grill-before-plan, CONTEXT.md, triage skill) + /goal
+  sidecar prompt edits + sandcastle-posture decision (does sandcastle's
+  "no opinions about workflow / task management / context sources" stance
+  refute or refine Hive's process-owning approach).
+
+  User explicit: full 30 skills audit, not sampled.
+
+  Serial after s2 — atoshell + sandcastle outcomes inform the "process-owning vs
+  composable" decision context.
+
+acceptance_criteria:
+  - "Skill catalog matrix produced at .pHive/spikes/skills-lens/catalog-matrix.md covering ALL skills under skills/ — one row per skill"
+  - "Each skill row classifies: atomic vs process-owning; duplicates-vs-composes-with (other skill IDs); workflow-coupled vs stand-alone; recommendation (split / collapse / extract config / leave alone)"
+  - "Three borrow proposals scoped — grill-before-plan, CONTEXT.md domain glossary, triage skill — each with: shape (skill / sub-phase / new artifact), insertion point, dependencies, estimated effort"
+  - "/goal sidecar prompt-edit list — concrete file:line edits for: structured story state (fixes feedback_story_status_stale), audit-first completion (tester/reviewer prompts), token budget (loop iteration ceilings)"
+  - "Sandcastle posture cross-check section — does Hive's process-owning approach hold under sandcastle's posture-agnostic critique? Concrete arguments for retention or refinement with cited counter-precedent (e.g., Archon NO-GO, internal feedback memos)"
+  - "All outputs delivered as inputs to s4 synthesis — not standalone recommendations"
+
+steps:
+  - id: research
+    description: |
+      Inventory ALL skills under skills/. Read each SKILL.md. For each skill,
+      capture: trigger keywords, frontmatter description, primitives owned,
+      dependencies on other skills, dependencies on workflow files. Read
+      .pHive/meta-team/deferred/2026-05-06-mattpocock-atomic-skill-audit.md
+      for prior audit framing. Read mattpocock/skills + sandcastle README
+      stances for current external posture.
+    agent: researcher
+
+  - id: matrix
+    description: |
+      Build catalog-matrix.md. One row per skill. Columns:
+        - id (skill name)
+        - shape: atomic / process-owning / hybrid
+        - composability: which other skills it composes with cleanly
+        - duplication: which other skills overlap with it
+        - workflow-coupling: stand-alone-usable / workflow-only
+        - recommendation: split / collapse / extract config / leave alone
+        - rationale: 1-line justification
+      No reshape work in this story — matrix is the deliverable.
+    agent: technical-writer
+    depends_on: [research]
+
+  - id: borrows
+    description: |
+      Scope the three concrete borrows from deferred audit memo:
+      1. Grill-before-plan — adversarial alignment step before story decomp.
+         Shape decision: new skill / sub-phase in /plan / pre-/plan check.
+         Insertion point in current /plan flow.
+      2. CONTEXT.md — domain glossary doc consumed by all skills.
+         Shape decision: new artifact / extend project-profile.yaml.
+         Discoverability mechanism (which skills must read it).
+      3. Triage skill — issue triage state machine.
+         Shape decision: new skill / extension of /kickoff.
+         Brownfield bug intake scope.
+      Output: .pHive/spikes/skills-lens/borrows-scope.md with one section per borrow.
+    agent: technical-writer
+    depends_on: [matrix]
+
+  - id: sidecar
+    description: |
+      Compile /goal sidecar prompt-edit list. Three edits from deferred memo:
+      1. update_goal-style structured story state — concrete edits to story
+         schema + which agents read/write status fields
+      2. audit-first completion — concrete edits to tester/reviewer agent prompts
+      3. token budget — concrete edits to fix-loop / outcomes loop iteration ceilings
+      Output: .pHive/spikes/skills-lens/sidecar-edits.md with file:line proposals.
+    agent: technical-writer
+    depends_on: [matrix]
+
+  - id: posture-check
+    description: |
+      Sandcastle posture cross-check. Mattpocock claims: "imposes no opinions
+      about workflow, task management, or context sources." Hive opposes:
+      ceremonies, workflows, DAG executor, agent roster, skill catalog.
+      Audit which Hive design decisions:
+        - Stand independent (defensible regardless of posture critique)
+        - Are author-bias-vulnerable (would change if Hive adopted sandcastle posture)
+        - Are critique-resistant via internal precedent (Archon NO-GO, feedback memos)
+      Output: .pHive/spikes/skills-lens/posture-check.md with concrete arguments.
+    agent: architect
+    depends_on: [borrows, sidecar]
+
+  - id: review
+    description: |
+      Reviewer (Opus 4.7) verifies matrix completeness (all skills covered),
+      borrow scopes are concrete (not hand-wavy), posture-check has actual
+      counter-precedent citations (R6 dissent requirement).
+    agent: reviewer
+    depends_on: [posture-check]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    audit_target: skills/ directory + plugin.json registered skills
+    external_lenses: mattpocock/skills (atomic), sandcastle (posture-agnostic)
+  key_files:
+    - path: skills/
+      purpose: All Hive skills — full audit target
+    - path: .pHive/meta-team/deferred/2026-05-06-mattpocock-atomic-skill-audit.md
+      purpose: Prior audit framing + 3 borrow proposals
+    - path: hive/agents/
+      purpose: Agent roster shape — context for skill-vs-agent boundary
+
+design_decisions:
+  - decision: Full 30-skill audit (not sampled)
+    rationale: User explicit override (Q6 reversal); 2-day duration accepts the work
+  - decision: Matrix is one-row-per-skill, not deep per-skill reshape proposals
+    rationale: Reshape work belongs to follow-on epics; this story produces decision input
+  - decision: Architect owns posture-check section
+    rationale: Cross-cutting structural argument requires architect persona; technical-writer produces formatted output but architect makes the call
+  - decision: All outputs feed s4 synthesis — no standalone recommendations
+    rationale: User picked recommendation-doc-only output (Q7); spikes produce inputs, synthesis produces decisions
+
+cross_cutting:
+  - concern: documentation
+    action: "Spike outputs are .pHive/spikes/ artifacts. Recommendation (s4) may trigger doc updates in follow-on epics if reshape actions are accepted."
+
+risks:
+  - severity: high
+    description: 30-skill audit scope creep — risks spike taking >1 day alone
+    mitigation: Cap matrix at one-line classification per skill; defer per-skill reshape to follow-on; circuit-break if matrix not done by hour 4 (R3)
+  - severity: medium
+    description: Mattpocock author bias — both sandcastle + skills come from same author
+    mitigation: Posture-check section explicitly required to cite counter-precedent (Archon NO-GO, feedback memos) — R6
+  - severity: medium
+    description: Borrow proposals become hand-wavy without concrete shape decisions
+    mitigation: Each borrow output requires shape / insertion-point / dependencies fields — reviewer verifies (R3)
+
+references:
+  - path: .pHive/meta-team/deferred/2026-05-06-mattpocock-atomic-skill-audit.md
+    relevant_excerpt: |
+      Three concrete borrows: grill-before-plan, CONTEXT.md, triage skill.
+      /goal extracted patterns (low-priority sidecar): update_goal structured
+      story state, continuation.md audit-first completion, token budget over
+      iteration count.
+      Open questions for cycle scoping: one epic or split? audit-first or
+      borrow-first? does grill-before-plan fit kickoff or new pre-plan skill?
+  - path: .pHive/research-drafts/2026-05-08-sandcastle-atoshell-positioning.md
+    relevant_excerpt: |
+      Sandcastle ↔ mattpocock/skills relationship: same author, different layer.
+      No shared primitives in either README. Same "process-owning vs composable"
+      critique mattpocock leveled at GSD/BMAD/Spec-Kit applies.

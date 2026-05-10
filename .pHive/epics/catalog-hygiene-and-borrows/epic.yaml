@@ -1,0 +1,170 @@
+name: catalog-hygiene-and-borrows
+title: Catalog Hygiene + Atomic Borrows (Epic A)
+description: |
+  First in-flight epic from hive-composability-audit recommendation (2026-05-08).
+  Walks back kickoff-gate paternalism, extracts duplicated boilerplate, reclassifies
+  document-templates out of skills/, and adopts 3 atomic borrows from mattpocock
+  posture (CONTEXT.md, Triage, Grill).
+
+  Net catalog delta is reduction (~528-line preamble extraction + 5 doc-template
+  reclassifications) plus 3 additive borrows in posture-coherent shape:
+    - Borrow 2 (W2): .pHive/CONTEXT.md — single-file domain glossary, substrate for Borrow 1
+    - Borrow 3 (W3): skills/triage/ — brownfield bug+feature intake, 5-state queue
+    - Borrow 1 (W4): skills/grill/ — adversarial-alignment as atomic skill called from /plan A2
+
+  Wave ordering encodes dependency chain (W0 substrate → W2 CONTEXT.md → W4 Grill).
+  W3 Triage is parallel to W2. W5 sidecar bundle is independent, low priority.
+
+  This epic is one of three required for 2.0 (with structural-refactor-and-gate-lift
+  and task-tracking-adapter-abi).
+
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+scale: medium
+branch: feat/catalog-hygiene-and-borrows
+parent_audit: hive-composability-audit
+milestone: hive-2.0
+
+planning_artifacts:
+  - ../hive-composability-audit/docs/recommendation.md  # canonical source — Section 2 + 7 Epic A
+  - ../hive-composability-audit/spikes/skills-lens/catalog-matrix.md
+  - ../hive-composability-audit/spikes/skills-lens/borrows-scope.md
+  - ../hive-composability-audit/spikes/skills-lens/sidecar-edits.md
+  - ../hive-composability-audit/spikes/skills-lens/posture-check.md
+
+dependencies:
+  blocks:
+    - structural-refactor-and-gate-lift   # W4 Grill must land before W6 plan-split
+  blocked_by: []                           # no upstream gates
+
+pr_strategy:
+  description: |
+    ≥4 PRs to stay <150 files per feedback_pr_file_count_limit:
+      PR1: W0 boilerplate extract + W1 warning lift + reclassifies (combined)
+      PR2: W2 CONTEXT.md (3 stories bundled)
+      PR3: W3 Triage skill (4 stories bundled)
+      PR4: W4 Grill atomic skill + plan A2 wiring
+      PR5: W5 sidecar bundle (1 bundled-PR)
+
+stories:
+  # W0 — boilerplate extraction (substrate)
+  - id: a-25-skill-prelude-extraction
+    title: Extract skill-prelude.md and replace boilerplate in 12 top-level skills
+    complexity: medium
+    wave: W0
+    depends_on: []
+    action_id: A-25
+
+  # W1 — warning lift + doc-template reclassify
+  - id: w1-warning-lift
+    title: Lift kickoff-gate to warning on status, review, test, standup, ui-audit
+    complexity: small
+    wave: W1
+    depends_on: [a-25-skill-prelude-extraction]
+    action_ids: [A-03, A-06, A-07]
+
+  - id: w1-doc-template-reclassify
+    title: Reclassify design-discussion / horizontal-plan / vertical-plan / structured-outline / greenfield-discovery as document-templates
+    complexity: medium
+    wave: W1
+    depends_on: [a-25-skill-prelude-extraction]
+    action_ids: [A-20, A-21, A-22, A-23, A-24]
+
+  # W2 — CONTEXT.md (Borrow 2)
+  - id: a-26-context-md-schema-and-starter
+    title: Define .pHive/CONTEXT.md schema and produce starter content
+    complexity: small
+    wave: W2
+    depends_on: [a-25-skill-prelude-extraction]
+    action_id: A-26
+
+  - id: a-26-context-md-kickoff-bootstrap
+    title: Wire CONTEXT.md bootstrap into kickoff skill
+    complexity: small
+    wave: W2
+    depends_on: [a-26-context-md-schema-and-starter]
+    action_id: A-26
+
+  - id: a-26-context-md-skill-prelude-citation
+    title: Cite CONTEXT.md from skill-prelude.md
+    complexity: small
+    wave: W2
+    depends_on: [a-26-context-md-schema-and-starter, a-25-skill-prelude-extraction]
+    action_id: A-26
+
+  # W3 — Triage skill (Borrow 3)
+  - id: a-27-triage-skill-md
+    title: Write skills/triage/SKILL.md with 5-state machine
+    complexity: medium
+    wave: W3
+    depends_on: [a-25-skill-prelude-extraction]
+    action_id: A-27
+
+  - id: a-27-triage-queue-yaml
+    title: Define .pHive/triage/queue.yaml schema and warning-only gate
+    complexity: small
+    wave: W3
+    depends_on: [a-27-triage-skill-md]
+    action_id: A-27
+
+  - id: a-27-triage-plan-handoff
+    title: Wire /plan --from-triage handoff path
+    complexity: small
+    wave: W3
+    depends_on: [a-27-triage-skill-md, a-27-triage-queue-yaml]
+    action_id: A-27
+
+  - id: a-27-triage-standup-handoff
+    title: Wire standup Phase 1 → triage handoff
+    complexity: small
+    wave: W3
+    depends_on: [a-27-triage-skill-md, a-27-triage-queue-yaml]
+    action_id: A-27
+
+  # W4 — Grill atomic skill (Borrow 1)
+  - id: a-28-grill-skill-md
+    title: Write skills/grill/SKILL.md and grill-record template
+    complexity: medium
+    wave: W4
+    depends_on: [a-26-context-md-schema-and-starter]
+    action_id: A-28
+
+  - id: a-28-grill-plan-a2-wiring
+    title: Wire /plan Phase A2 to call grill skill; researcher emits inconsistency_risk_signals; design-discussion consumes grill-record
+    complexity: medium
+    wave: W4
+    depends_on: [a-28-grill-skill-md]
+    action_id: A-28
+
+  # W5 — Sidecar bundle (1 bundled-PR; addresses 3 prompt-tuning fixes)
+  - id: w5-sidecar-bundle
+    title: Sidecar prompt-tuning bundle (story-state, audit-first completion, token budget)
+    complexity: medium
+    wave: W5
+    depends_on: []                          # parallel to W2/W3/W4; ships when convenient
+    action_ids: [A-29, A-30, A-31]
+    pr_type: bundled
+
+acceptance_criteria:
+  - "skill-prelude.md exists at hive/references/skill-prelude.md; 12 top-level skills cite it; net code delta ≥-500 lines"
+  - "5 read-only-shaped skills (status, review, test, standup, ui-audit) emit warning instead of hard-blocking on missing .pHive/"
+  - "5 doc-templates moved to hive/references/document-templates/; greenfield-discovery procedure stays in analyst.md"
+  - ".pHive/CONTEXT.md exists with starter content; cited from skill-prelude.md and bootstrapped by kickoff"
+  - "skills/triage/SKILL.md exists with 5-state machine; .pHive/triage/queue.yaml schema documented; /plan and standup handoff paths wired"
+  - "skills/grill/SKILL.md exists as atomic skill (NOT inline /plan section); /plan Phase A2 calls it; researcher emits inconsistency_risk_signals; design-discussion consumes grill-record"
+  - "Sidecar bundle ships as one PR addressing story-state, audit-first completion, and token-budget fixes"
+
+out_of_scope:
+  - "Structural splits of plan/execute/agent-spawn — Epic B"
+  - "Gate-lift on /plan and /execute (D4 Position A) — Epic B"
+  - "Adapter ABI work — Epic C"
+  - "Brand-system update reflecting reframe — Epic H (post-2.0)"
+  - "Memory-stack optionalization — Epic G (post-2.0)"
+
+risks:
+  - severity: medium
+    description: W4 Grill wiring forces churn against in-flight Phase A2 changes if Epic B starts before this lands
+    mitigation: Hard sequencing — Epic B blocked on this epic's W4 PR
+  - severity: low
+    description: Doc-template reclassify breaks references in existing docs/agents
+    mitigation: Grep for skill names before move; redirect references to new path
