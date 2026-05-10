@@ -5,12 +5,6 @@ description: Decompose a requirement into an epic with dependency-tracked storie
 
 # Hive Plan
 
-> **State Directory Note:** Paths shown as `.pHive/...` assume the default
-> state directory. If you have relocated state via `paths.state_dir`,
-> substitute your configured location. See
-> [state-relocation.md](../../hive/references/state-relocation.md) (or
-> `hive/references/state-relocation.md` from repo root).
-
 Decompose a requirement into an epic with dependency-tracked stories.
 
 **Input:** `$ARGUMENTS` contains the requirement or feature description. Optionally a target codebase path. Supports optional flags (see `$ARGUMENTS` section below).
@@ -28,39 +22,9 @@ Forces approach validation (context7 + web research) regardless of scope size or
 **`--gate-hv`**
 Retains the H/V user-facing review gate at medium scope (opt-in conservative path). Default at medium scope is to auto-proceed after collaborative review (no user gate). This flag restores the gate. No effect at large scope — the gate is always present at large scope regardless of this flag.
 
-## Kickoff Gate
+## Skill Preamble
 
-**Before doing anything else**, check whether Hive has been initialized for this project:
-
-1. Check if `.pHive/project-profile.yaml` exists in the project root
-2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
-3. As a secondary check, verify `hive.config.yaml` exists (check both `hive/hive.config.yaml` and `hive.config.yaml` in the project root — either location is valid)
-
-If **any** of these checks fail, display this message and **stop** — do not proceed with planning:
-
-> Hive hasn't been set up for this project yet. Run `/hive:kickoff` first — it takes a few minutes and ensures every agent has full context about your codebase, preferences, and available tools.
-
-If all checks pass, proceed silently — do not announce that the kickoff gate passed. Only surface this section when a check fails.
-
-## Before Executing Any Skill
-
-1. **Load your persona.** Read `hive/agents/orchestrator.md` — it contains team evaluation criteria, pre-spawn checklist, circuit breakers, model tier routing, dev-on-standby pattern, decision protocols, and research prompt construction rules. This is WHO you are and HOW you make decisions.
-2. **Load project config.** Read configuration with root-first precedence:
-   - Read ROOT `hive.config.yaml` first for routing and execution settings:
-     `agent_backends`, `model_overrides`, `planning.collaborative_review`,
-     `execution.default_methodology`, `execution.parallel_teams`,
-     `circuit_breakers.*`.
-   - For any key missing from the root file, fall through to the shipped
-     baseline at `hive/hive.config.yaml` (neutral consumer-safe defaults).
-   - Graceful fallback: if the root `hive.config.yaml` is absent or its
-     `agent_backends:` key is missing, proceed with an EMPTY routing map
-     — all personas default to direct TeamCreate, no backend routing is
-     applied. Do NOT crash and do NOT substitute values from the shipped
-     baseline for `agent_backends` specifically (that would reintroduce
-     the consumer-pollution bug Slice 0 fixed).
-   - Reference `hive/references/state-boundary.md` for the two-file
-     precedence contract that applies here.
-3. **Load your memories.** Read the `knowledge` paths from your orchestrator frontmatter. Scan `~/.claude/hive/memories/orchestrator/` for all `.md` files. Read each file's frontmatter `description` field. Load the full content of any memories relevant to the current task. If no memories exist yet, proceed — this is expected for new projects.
+See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — state-directory note, kickoff gate, persona / config / memory loading. This skill consults routing keys (`agent_backends`, `model_overrides`, `planning.collaborative_review`) so also follow the **Root-first config precedence** subsection of the prelude.
 
 ## Process
 
