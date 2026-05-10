@@ -15,6 +15,10 @@ This command is **read-only** — it never modifies state files. It is safe to r
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — kickoff gate (initialization check) + persona / config / memory loading.
 
+**Kickoff gate override — warn, don't block.** This skill is read-only-shaped. On a fresh repo without `.pHive/project-profile.yaml`, emit the warning below and proceed with sane defaults instead of stopping. The hard-stop in the prelude does NOT apply here.
+
+> Warning: Hive not initialized for this project. Run `/hive:kickoff` for full context. Proceeding with defaults.
+
 ## Process
 
 ### 1. Find Active Epics

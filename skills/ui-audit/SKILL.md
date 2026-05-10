@@ -13,16 +13,16 @@ Run a collaborative UI audit — accessibility and animation specialists surface
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — standard skill preamble (persona / config / memory loading).
 
-## Gate Check
+## Gate Check (warn, don't block)
 
 Check `.pHive/project-profile.yaml`:
 
 1. Verify the file exists
 2. Verify it has a `tech_stack` key that is non-empty
 
-If either check fails, display this message and **stop**:
+If either check fails, emit the warning below and proceed with sane defaults — do NOT stop. The audit runs with reduced fidelity (generic conventions instead of project-specific tech-stack rules):
 
-> Hive hasn't been set up for this project yet. Run `/hive:kickoff` first — ui-audit needs the tech stack profile to audit against the right conventions.
+> Warning: Hive not initialized for this project. Run `/hive:kickoff` for full context. Proceeding with defaults.
 
 See `hive/references/ui-skill-gates.md` for the full gate specification.
 
