@@ -17,67 +17,28 @@ Spawn a roster agent with full config validation, persona injection, and memory 
 
 ## Procedure
 
-### 1. Validate the agent name
+### 1-4. Resolve persona context
 
-Check that the requested agent exists in the roster:
+Invoke `skills/hive/skills/persona-resolve/SKILL.md` with:
 
-```
-hive/agents/{agent-name}.md
-```
+- `agent_name` from `$ARGUMENTS`
+- `task_context` from `$ARGUMENTS`
 
-If the file does not exist: **STOP. Do not improvise a replacement.** Report the error and suggest the closest roster match.
-
-Available roster (check `hive/agents/` for the current list):
-`researcher`, `technical-writer`, `developer`, `frontend-developer`, `backend-developer`, `tester`, `reviewer`, `architect`, `analyst`, `tpm`, `ui-designer`, `pair-programmer`, `peer-validator`, `team-lead`, `test-scout`, `test-worker`, `test-inspector`, `test-sentinel`, `test-architect`, `animations-specialist`, `accessibility-specialist`, `idiomatic-reviewer`, `performance-reviewer`, `security-reviewer`
-
-### 2. Read the agent's persona and config
-
-Read `hive/agents/{agent-name}.md` in full. Parse the YAML frontmatter to extract:
-
-- `model` → maps to the `model` parameter on Agent/TeamCreate
-- `knowledge` → memory paths to load
-- `skills` → skills to inject if their `use-when` matches the task
-- `tools` → tool list for the agent
-- `required_tools` → external tools to validate
-- `domain` → write restrictions to communicate to the agent
-
-### 3. Check required tools
-
-For each entry in `required_tools`:
-
-- **CLI tools** (`type: cli`): run `which {name}` to check availability
-- **MCP tools** (`type: mcp`): check if the MCP server is in the active session
-
-If a required tool is missing:
-- If `fallback` is specified: note the fallback, proceed with a warning
-- If no `fallback`: **STOP. Report the missing tool.** Do not silently proceed.
-
-### 4. Resolve all paths
-
-Before reading any `knowledge` or `skills` paths, normalize them:
-
-- `~` or `~/` → expand to the user's home directory (`$HOME`)
-- `${CLAUDE_PLUGIN_ROOT}` → expand to the plugin's installation directory
-- Relative paths (no prefix) → resolve relative to the project root
-
-**This is mandatory.** Paths containing unexpanded `~` or `${CLAUDE_PLUGIN_ROOT}` will silently fail to resolve. Always expand before reading.
-
-Validation: after expansion, check that the resolved path exists. If it doesn't and no fallback is specified, log a warning (don't block the spawn — the directory may not have been bootstrapped yet).
+Bind the returned `persona_context`. Subsequent sections must read persona text,
+frontmatter, resolved paths, validated tools, and domain constraints from
+`persona_context` instead of re-reading `hive/agents/{agent-name}.md`.
 
 ### 5. Load agent memories (wiki-first retrieval)
-
-Read the agent's memory directory (from the resolved `knowledge` paths).
+Read the agent's memory directory (from `persona_context.resolved_paths.knowledge`).
 
 **5a. L3 availability check (ChromaDB):**
 - Call `isAvailable()` from `hive/lib/chromadb-wrapper.js`
 - If available (L3 active): **skip steps 5b and 5c entirely** — proceed directly to **5c-L3** (see below). The compiled-at.md freshness gate does not apply when ChromaDB is active; semantic search operates independently of wiki compilation state.
 - If unavailable: proceed to the existing freshness gate below.
-
 **5a (L0/L1 path). Check wiki freshness:**
 - Read `~/.claude/hive/memory-wiki/meta/compiled-at.md`
 - If file absent or timestamp > 24 hours old: go to step 5c (L0 fallback)
 - If file present and recent: proceed to step 5b
-
 **5b. Wiki-based retrieval (L1):**
 - Read `~/.claude/hive/memory-wiki/index.md`
 - Identify topic slugs most relevant to the current task/story description
@@ -85,7 +46,6 @@ Read the agent's memory directory (from the resolved `knowledge` paths).
 - Optionally read the agent's digest from `~/.claude/hive/memory-wiki/agents/{agent}.md`
 - Format loaded content as the "Prior Knowledge" block (same injection format as below)
 - Proceed to step 5d for staleness surfacing
-
 **5c-L3 (ChromaDB active path):**
 - Build `queryText` from the story description plus current step task description
 - Call `query(collectionName, queryText, 20)` per the wrapper signature in `hive/lib/chromadb-wrapper.js` (`query(collectionName, queryText, topK = 5, ...)`) to fetch top-20 candidate memory IDs ranked by ChromaDB distance
@@ -96,7 +56,6 @@ Read the agent's memory directory (from the resolved `knowledge` paths).
 - **Step C — Cap** the remaining (non-override/pitfall) memories at `max(0, 5 - override_pitfall_count)`. Total Prior Knowledge set size is `override_pitfall_count + remaining_cap`, which may exceed 5 when many overrides/pitfalls exist — this is intentional.
 - Format as the "Prior Knowledge" block (same format as L0/L1 path)
 - Proceed to step 5d for staleness surfacing
-
 **5c (L0/L1 fallback path — unchanged):**
 - Scan the memory directory for all `.md` files
 - Read each memory's frontmatter `description` field
@@ -106,14 +65,12 @@ Read the agent's memory directory (from the resolved `knowledge` paths).
 - `reference` type loads when topic keyword matches
 - Cap at 5 memories; prefer recency
 - Format as "Prior Knowledge" block
-
 **5d. Staleness and override surfacing:**
 - For each loaded memory: check `last_verified` + `ttl_days` vs today's date
 - If past TTL: prepend `⚠ last verified: N days ago` to that memory's entry in Prior Knowledge
 - Count override-type memories loaded; if count > 0, add header line:
   `{N} override memories loaded — oldest: {X} days since last_verified`
 - These are informational signals, not blocking errors
-
 **5e. KG Decision Context (L2 — when kg.sqlite active):**
 - Run `query_decisions({entity: current_agent})` to fetch currently-valid triples where the agent appears as subject or object
 - Also run `query_decisions({entity: current_epic})` to fetch epic-level decisions (e.g. those imported from `cycle-state/` by `scripts/kg-import-cycle-state.js`, which writes `subject: epicId`)
@@ -133,9 +90,9 @@ Include relevant memories in the agent's prompt as a "Prior Knowledge" section, 
 
 ### 6. Check for applicable skills
 
-For each skill in the agent's `skills` list:
+For each skill in `persona_context.frontmatter.skills`:
 1. Read the `use-when` description
-2. If it matches the current task, check if the skill file exists at the resolved path
+2. If it matches the current task, check if the skill file exists at the path in `persona_context.resolved_paths.skills`
 3. If the file exists: read it and include in the agent's prompt
 4. If the file does not exist and `optional: true`: skip silently — the agent has fallback behavior
 5. If the file does not exist and not optional: **STOP. Report the missing skill.**
@@ -211,61 +168,49 @@ When `terminal_mux` resolves to `tmux`, use the standard Agent/TeamCreate call:
 
 ```
 Agent(
-  prompt: [full persona markdown + story context + memories + skills + domain note],
-  model: "{model}",  // opus, sonnet, or haiku
+  prompt: [persona_context.persona_text + story context + memories + skills + domain note],
+  model: "{persona_context.frontmatter.model}",  // opus, sonnet, or haiku
   name: "{agent-name}-{story-id}",
   description: "{agent-name} working on {story-id}"
 )
 ```
-
 #### 7.3 cmux pane spawn (claude backend, cmux path)
-
 When `terminal_mux` resolves to `cmux`, spawn the agent in a visible cmux
 split pane instead of using TeamCreate:
-
 1. **Pre-flight:** `which cmux` — if missing, fall back to tmux path with a
    warning (not a hard-fail; cmux is a visibility preference, not a backend).
-
 2. **Open pane:** `cmux new-split right` in the current workspace.
    (v2: `surface.split`)
-
 3. **Capture surface:** `cmux tree` before and after the split — diff to
    identify the new surface ref (e.g., `surface:13`). Record `surface_id`.
    (v2: `system.tree`)
-
 4. **Prepare prompt files:** split the prompt into two temp files via `mktemp`:
-
    **System prompt file** (`<persona-tempfile>`): contains the agent's identity
    and constraints — everything that should be a system-level instruction:
-   - Persona — the full agent markdown file
+   - Persona — `persona_context.persona_text`
    - Domain note — "You may modify files matching: {allow patterns}."
    - Prior knowledge — relevant memories
-
    **Task prompt file** (`<task-tempfile>`): contains the work assignment —
    everything that should be a user-level message:
    - Applicable skills
    - Continuation context (respawn only)
    - Task — the story spec, step instructions, and inputs from prior steps
-
    This split matters: with `--append-system-prompt-file`, the persona is
    injected as a system instruction with full authority. With TeamCreate/Agent,
    the `prompt` parameter handled this implicitly. In cmux panes, we must be
    explicit — persona-as-user-message loses authority and agents drift.
 
-5. **Build the allowed tools list:** read the agent's `tools` field from the
-   persona frontmatter. Map each tool name to the `--allowedTools` format:
+5. **Build the allowed tools list:** read `persona_context.frontmatter.tools`.
+   Map each tool name to the `--allowedTools` format:
    - Standard tools: `Bash`, `Edit`, `Read`, `Write`, `Grep`, `Glob`
    - Tool patterns: `Bash(git *)`, `Bash(npm *)`, etc.
-   - If the persona has `domain.allow` patterns, include `Edit` and `Write`
-     scoped to those patterns where possible
-
+   - If `persona_context.domain_constraints` has allow patterns, include `Edit`
+     and `Write` scoped to those patterns where possible
    Also resolve `--permission-mode`:
    - If running in a worktree: `auto` (pre-approve safe operations)
    - If running in the main tree: `default` (prompt for destructive ops)
    - Caller can override via `permission_mode_override`
-
 6. **Launch claude in the pane:** choose mode based on `execution.interactive_panes`:
-
    **One-shot mode** (`interactive_panes: false`):
    ```
    cmux send --surface <id> "claude -p --model <model> \
@@ -276,7 +221,6 @@ split pane instead of using TeamCreate:
    cmux send-key --surface <id> enter
    ```
    (`cmux send` v2: `surface.send_text`; `cmux send-key` v2: `surface.send_key`)
-
    **Interactive mode** (`interactive_panes: true`, default):
    ```
    cmux send --surface <id> "claude --model <model> \
@@ -293,24 +237,19 @@ split pane instead of using TeamCreate:
    cmux send --surface <id> --from-file <task-tempfile>
    cmux send-key --surface <id> enter
    ```
-
    If the cmux version in use does not support `--from-file`, fall back to
    `cmux send --surface <id> "$(cat <task-tempfile>)"` — but this is best-effort
    and may mangle special characters.
-
    **Note:** cmux team execution (execute step 6b) requires `interactive_panes: true`.
    If the orchestrator detects `interactive_panes: false` with `terminal_mux: cmux`
    and parallel stories, it should warn and fall back to TeamCreate (tmux path).
-
 7. **Clean up temp files** after delivery. Remove both `<persona-tempfile>` and
    `<task-tempfile>`.
-
 8. **Record in episode:** surface_id, terminal_mux: cmux, pane direction,
    permission_mode, allowed_tools list.
    The user can focus this pane anytime via `cmux focus-pane --pane <id>`
    (v2: `pane.focus`). Capture output later via
    `cmux read-screen --surface <id> --scrollback` (v2: `surface.read_text`).
-
 9. **Completion handling depends on caller mode:**
    - **Team execution mode (execute step 6b):** return immediately after spawn
      with `surface_id`. Do not poll for completion and do not close the pane
@@ -323,7 +262,6 @@ split pane instead of using TeamCreate:
      cleanup/reporting early. Also check `surface.health` periodically — if the
      surface is no longer healthy, claude has exited unexpectedly. Capture
      scrollback and report failure.
-
 10. **Close policy depends on caller mode:**
     - **Team execution mode:** orchestrator closes surfaces during global cleanup
       (execute step 6b). Do not close here.
@@ -331,7 +269,6 @@ split pane instead of using TeamCreate:
       `cmux read-screen --scrollback`: `cmux close-surface --surface <id>`
       (v2: `surface.close`). Skip if capture failed so the user can inspect
       manually.
-
 11. **Completion marker (team execution only):** when the agent's workflow
     completes successfully, emit `[STORY-COMPLETE:{story-id}]` as the final
     output line. The orchestrator's poll loop watches for this marker via
@@ -343,30 +280,24 @@ domain, and memories go into `--append-system-prompt-file` (system-level authori
 while skills, continuation context, and the task go as the first user message.
 Memory loading, skill injection, and respawn continuation are identical in
 content — only the injection point differs.
-
 **Prompt structure (shared by both paths):**
-
 For the **tmux path** (TeamCreate/Agent), all six parts are concatenated into
 the single `prompt` parameter — the framework handles system-level injection:
-1. **Persona** — the full agent markdown file
+1. **Persona** — `persona_context.persona_text`
 2. **Domain note** — "You may modify files matching: {allow patterns}."
 3. **Prior knowledge** — relevant memories from the agent's memory directory
 4. **Applicable skills** — skill content if any matched
 5. **Continuation Context** (respawn only) — see step 7b below
 6. **Task** — the story spec, step instructions, and any inputs from prior steps
-
 For the **cmux path**, the same content is split across two injection points:
-
 *System prompt file* (via `--append-system-prompt-file`):
-1. **Persona** — the full agent markdown file
+1. **Persona** — `persona_context.persona_text`
 2. **Domain note**
 3. **Prior knowledge**
-
 *Task prompt* (first user message):
 4. **Applicable skills**
 5. **Continuation Context** (respawn only)
 6. **Task**
-
 This split ensures the persona has system-level authority. Skills and task
 content work correctly as user messages since they're instructions to execute,
 not identity to embody.
@@ -399,7 +330,7 @@ After spawning, report:
 - Backend: claude (Agent/TeamCreate) | codex (cmux pane via codex-invoke)
 - Terminal mux: tmux (TeamCreate) | cmux (surface id: X)
 - Respawn: yes (iteration {N} of 3) | no (fresh spawn)
-- Required tools: available / missing (with fallback)
+- Required tools: `persona_context.validated_tools` available / missing (with fallback)
 - Memories loaded: count and names
 - Skills injected: count and names
 - Continuation context: loaded from {path} | none
@@ -412,7 +343,7 @@ After spawning, report:
 ## Key Rules
 
 1. **Never improvise replacements.** If a roster persona exists for the task, use it. If it fails, improve the persona — don't bypass it.
-2. **Always inject the full persona.** Do not summarize, excerpt, or paraphrase the agent markdown.
+2. **Always inject the full persona text.** Do not summarize, excerpt, or paraphrase `persona_context.persona_text`.
 3. **Always pass the model parameter.** Without it, the spawner may default to the wrong tier.
 4. **Always load memories.** Memories are what make agents improve over time. Skipping them wastes accumulated knowledge.
 5. **Always communicate domain.** The agent needs to know its write boundaries.
