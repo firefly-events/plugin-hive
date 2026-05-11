@@ -123,8 +123,9 @@ function parseSimpleYaml(content) {
 //       captured_at?|locked_at?|timestamp?: "...",
 //       source?, implication?, phase? }
 //     Mapped: subject=epicId, predicate="decided",
-//             object=value||rationale (value preferred when both present;
-//             truncated to 500),
+//             object=value (when value is not null/undefined; falsy values
+//             like 0, false, '' are preserved) else rationale
+//             (truncated to 500),
 //             valid_from=captured_at||locked_at||timestamp||fileMtime.
 //     `id`, `source`, `implication`, `phase` are not currently projected
 //     into the triple — they are decision-row metadata the KG schema does
