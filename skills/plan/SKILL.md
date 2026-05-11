@@ -146,11 +146,26 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 ### Phase C: Story Decomposition
 
-10c. **Resolve methodology.** Before decomposing stories, determine the development methodology:
+10c. **Resolve methodology.** Before decomposing stories, determine the development methodology with strict 4-tier precedence:
 
-   1. Check `hive.config.yaml` for a `methodology` field (project-level default)
-   2. Check `epic.yaml` for a `methodology` override (if the epic specifies one)
-   3. Fall back to `classic` if neither exists
+   1. **Flag override:** If `$ARGUMENTS` contains `--methodology=<value>`, use that value. This always wins; do not auto-detect and do not warn. Emit telemetry with `source=flag`.
+   2. **Epic override:** Else, if `epic.yaml` contains a `methodology` field, use that value. It wins over auto-detect. Emit telemetry with `source=epic-yaml`.
+   3. **Project default:** Else, if `hive.config.yaml` contains a `methodology` field, use that value. It wins over auto-detect. Emit telemetry with `source=hive-config`.
+   4. **Auto-detect:** Else, inspect the codebase and emit telemetry with `source=auto-detect`:
+      - Gherkin path: scan for `.feature` files, excluding `node_modules/`, `.history/`, `.pHive/spikes/`, `dist/`, and `build/`. If at least one `.feature` file is found, resolve `bdd`.
+      - Test path: scan common locations (`./`, `src/`, `lib/`, `packages/*`) for directories named `tests/`, `test/`, `__tests__/`, or `spec/`. Require at least one actual test file inside: files matching `.test.*`, `.spec.*`, `_test.*`, or any file inside `__tests__/`. If found, resolve `tdd`.
+      - Tiebreaker: `.feature` files win over tests because they are the more specific signal. If both signals are detected, resolve `bdd` and warn that both BDD and TDD signals were found.
+      - If neither signal is detected, resolve `classic`.
+
+   False-positive guards for auto-detect:
+   - Empty `tests/`, `test/`, `__tests__/`, or `spec/` directories do not trigger `tdd`; require at least one actual test file matching the rules above.
+   - `.feature` files under excluded paths (`node_modules/`, `.history/`, `.pHive/spikes/`, `dist/`, `build/`) are ignored.
+
+   When auto-detect fires (Tier 4 only), emit a loud warning:
+   `WARNING: Auto-detected methodology: {value} ({rationale, e.g. "found 47 test files under tests/"}). Override with --methodology=classic|tdd|bdd or set in hive.config.yaml.`
+
+   Emit one printable inline telemetry line for every resolution:
+   `[telemetry] methodology_resolution source={flag|epic-yaml|hive-config|auto-detect} value={value}`
 
    Available methodologies (must match a workflow YAML in `hive/workflows/`):
    - `classic` — Research → Implement → Test → Review → Integrate
