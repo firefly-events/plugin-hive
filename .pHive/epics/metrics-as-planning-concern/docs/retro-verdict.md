@@ -82,17 +82,13 @@ Classifier:
 
 Recall (gate catch rate): TP / (TP+FN) = 4 / (4+0) = 1.00
 Precision: TP / (TP+FP) — omitted because FP = 0
-
-Verdict-revision note: initial pass scored tdd-cross-model-workflow as
-FAIL (TP) on a single-disjunct file-presence read that wrongly returned
-0. Second-reader review caught the error, flipped the row to PASS (TN),
-and recomputed the classifier. The correction itself is evidence that
-the gate works best with a second-reader review pass at integrate.
 ```
+
+See the Method §"Second-reader correction note" for the two verdict revisions (tdd-cross-model-workflow flipped FAIL→PASS; a-25-skill-prelude-extraction held FAIL but corrected from -27 to +31) and why they themselves count as evidence the gate works best with a second-reader review pass at integrate.
 
 **Reading.** On this 18-story sample, the metrics gate would have flagged every real failure (recall = 1.00) and cried wolf on zero successes (no FPs). The 4 TPs span three distinct failure modes:
 
-- **Over-promised quantitative target** (A-25): recommendation claimed -528 line-delta; actual was -27. A gate-FAIL at integrate would have forced an explicit re-target or a follow-up story.
+- **Over-promised quantitative target with wrong-sign outcome** (A-25): recommendation claimed -528 line-delta; corrected-scope measurement (`git diff bb067f1..2251936` over the 14 target paths) shows +31 net (added=187, removed=156). A-25 actually *added* lines across the SKILL.md+prelude set, the opposite of the down-direction target. A gate-FAIL at integrate would have forced an explicit re-target, a follow-up story, OR a re-evaluation of the recommendation that drove the -500 promise.
 - **Shipped-but-inert feature** (S7, codex-developer-poc): the feed/PoC landed structurally but the upstream writers/instrumentation that would make it observable were never wired. Both would have been gate-FLAGGED before close.
 - **Story claimed work that didn't ship** (A-26 kickoff-bootstrap): the story was merged but the artifact the AC promised does not exist. A presence-check at integrate would have failed.
 
