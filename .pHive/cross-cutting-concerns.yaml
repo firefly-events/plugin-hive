@@ -1,0 +1,97 @@
+# cross-cutting-concerns.yaml
+# Project-specific cross-cutting concerns for Hive story planning and execution.
+# Each concern is evaluated per-story during planning. The planner marks which
+# apply and what action is needed.
+
+concerns:
+
+  - id: documentation
+    name: Documentation Updates
+    description: >
+      When a story changes user-facing behavior, workflow steps, agent behavior,
+      retrieval logic, schemas, directory structure, or configuration, the
+      corresponding high-level documentation must be updated. This prevents
+      docs from drifting out of sync with the system.
+    applies_when: >
+      Story modifies workflow steps, agent personas, retrieval or loading logic,
+      schema definitions, directory structure, configuration files, skill files,
+      or adds/removes/renames reference documents
+    planning_prompt: >
+      Which documentation files reference the behavior this story changes?
+      Check: GUIDE.md, README, reference docs in hive/references/, agent
+      persona files, skill descriptions, and any docs that describe the
+      affected workflow or feature. List each doc and what section needs updating.
+    implementation_checklist:
+      - "All high-level docs referencing changed behavior identified"
+      - "Affected sections updated to reflect new behavior"
+      - "No stale references to old behavior remain in docs"
+      - "New features/concepts mentioned in at least one discoverable doc"
+
+  - id: versioning
+    name: Plugin Version Incrementing
+    description: >
+      When an epic ships consumer-visible changes (new skills, new workflow
+      steps, new public config keys, new public skill behavior, breaking
+      changes), the plugin version in `.claude-plugin/plugin.json` and
+      `.claude-plugin/marketplace.json` must be bumped per semver, the README
+      version badge must be updated, and CHANGELOG.md must gain a new entry.
+      This prevents the consumer-facing version from drifting silently as
+      capabilities ship.
+    applies_when: >
+      Epic adds, removes, or modifies any consumer-visible surface — including
+      public skills (skills/<name>/SKILL.md), workflow step files referenced
+      by public skills, agent personas (when consumer-facing), public config
+      keys in hive/hive.config.yaml (the shipped baseline), README content,
+      or installation/quickstart commands. NOT triggered by pure-internal
+      edits (e.g., maintainer-only orchestration tweaks, internal references
+      not surfaced to consumers).
+    planning_prompt: >
+      Does this epic change anything a consumer would observe after pulling
+      the latest plugin version? List each consumer-visible change. Map each
+      to the semver bump level: patch (bug fix or doc-only), minor (additive
+      feature), major (breaking change). The TPM owns the final bump
+      decision; story authors flag the level at planning time.
+    implementation_checklist:
+      - ".claude-plugin/plugin.json version bumped per semver"
+      - ".claude-plugin/marketplace.json version bumped to match plugin.json"
+      - "README.md version badge updated to match plugin.json"
+      - "CHANGELOG.md gains a new dated section for the new version with bullet entries for each consumer-visible change"
+      - "Bump commit is the LAST commit on the epic branch (so the version reflects the full landed state, not a partial)"
+      - "If breaking change: migration notes added to CHANGELOG and (if substantive) a separate migration doc under hive/references/"
+
+  - id: metrics
+    name: Metrics as a Planning Concern
+    description: >
+      Every story that claims to move a measurable outcome must declare what
+      number moves, by how much, in what window, and how the move is measured —
+      OR explicitly opt out with a one-line justification (e.g., process
+      substrate, schema-only docs, internal-only refactor with no observable
+      surface). This prevents un-falsifiable success claims from accumulating
+      across epics. The declared metric is the evidence contract for the
+      story's review and retro. See
+      [`metrics-event.schema.md`](metrics/metrics-event.schema.md) for the
+      event-row carrier and
+      [`experiment-envelope.schema.md`](metrics/experiment-envelope.schema.md)
+      for the per-experiment envelope carrier.
+    applies_when: >
+      Story claims to improve, reduce, accelerate, or otherwise change a
+      measurable outcome — including throughput, coverage, latency, token
+      cost, error rate, signal-to-noise of a meta loop, KG completeness, or
+      any other quantitative property. NOT triggered by pure-substrate stories
+      (schema docs, planner-prompt edits, gitignored config seeding) where
+      the gate itself is what's shipping; those use applies:false with a
+      one-line justification.
+    planning_prompt: >
+      What number does this story move, by how much, in what window, and how
+      is the move measured? Specify: metric name, direction (up/down),
+      baseline (null = first-measurement), target, observation window
+      (e.g., "7d post-merge", "epic-close", "next-3-cycles"), and source
+      carrier (events|sql|envelope|manual). If the story is substrate or
+      otherwise un-falsifiable, set metric.applies:false and write a one-line
+      justification — a one-word answer is not acceptable.
+    implementation_checklist:
+      - "metric: block declared in story YAML (applies:true with name/direction/baseline/target/window/source) OR metric.applies:false with one-line justification"
+      - "If applies:true and source.kind=events: instrumentation emits rows conforming to .pHive/metrics/metrics-event.schema.md"
+      - "If applies:true and source.kind=envelope: an envelope file under .pHive/metrics/experiments/ is created or linked via envelope_id per .pHive/metrics/experiment-envelope.schema.md"
+      - "verify_at set to a concrete point (story integrate step, epic close, or ISO-8601 timestamp) — not 'eventually'"
+      - "Review confirms metric is falsifiable: a future reader can decide pass/fail from the declared source without re-reading the story"
