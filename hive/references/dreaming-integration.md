@@ -10,44 +10,52 @@ This document defines the S16 local adapter contract for cross-session replay.
 - Proposal source contract: meta-optimize consumes dreaming replay as the fifth ranked source after `kg_signal` and before backlog. A capability skip propagates as `[]`; the other four sources remain unaffected.
 - Output intent: the replay module is cross-session only. It does not change per-session substrate semantics from `hive/references/session-system-prompt-spec.md`; it consumes episode artifacts produced by those sessions later.
 
-## API Reference
+## Module Interface
 
-### `runDreamingReplay({ episodeRoot, kg, wiki, capabilityProbe })`
-
-Exported from `hive/lib/dreaming-replay.js`. Walks the episode corpus and emits local playbook-delta outputs for wiki/KG consumers.
-
-**Parameters**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `episodeRoot` | string | `.pHive/episodes` | Root directory scanned for `*.yaml` episode files (recursive, alphabetical order) |
-| `kg` | object \| null | `null` | Optional KG adapter; must implement `applyDelta(payload)` |
-| `wiki` | object \| null | `null` | Optional wiki adapter; must implement `applyDelta(payload)` |
-| `capabilityProbe` | async () → bool | `() => false` | Probe that returns `true` when the Dreaming capability is available |
-
-**Return value**
+`hive/lib/dreaming-replay.js` exports one function:
 
 ```js
-{ playbookDeltas: DreamDelta[], capabilityErr: null, timeoutErr?: true }
+runDreamingReplay({ episodeRoot, kg, wiki, capabilityProbe })
 ```
 
-Returns `{ playbookDeltas: [], capabilityErr: null }` immediately when the capability probe returns `false`. Sets `timeoutErr: true` when the wall-clock budget (see Timeout below) is exceeded mid-run; partial `playbookDeltas` are still returned.
+**Parameters** (all optional):
 
-### Episode YAML schema (consumed fields)
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `episodeRoot` | `.pHive/episodes` | Root directory scanned recursively for `.yaml` episode files |
+| `kg` | `null` | Knowledge-graph instance; must expose `applyDelta(delta)` if provided |
+| `wiki` | `null` | Wiki instance; must expose `applyDelta(delta)` if provided |
+| `capabilityProbe` | `async () => false` | Async predicate — return `true` to enable replay; default always skips |
 
-Each `.pHive/episodes/**/*.yaml` file may contain:
+**Return value:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `playbook_delta` | object | Required to produce a delta; file is skipped when absent or non-object |
-| `playbook_delta.title` | string | Free-text title for the delta |
-| `playbook_delta.rationale` | string | Rationale string passed through to the delta output |
-| `playbook_delta.wiki` | object | Wiki delta payload forwarded to the `wiki` adapter |
-| `playbook_delta.kg` | object | KG delta payload forwarded to the `kg` adapter |
-| `timestamp` | string | ISO-8601 timestamp recorded in `created_at` / `ended_at` of the dream envelope |
-| `status` | string | Lifecycle status; defaults to `'completed'` when absent |
+```js
+{
+  playbookDeltas: DreamAdapterDelta[],  // one entry per episode with a playbook_delta key
+  capabilityErr: null,                  // always null in current implementation
+  timeoutErr?: true,                    // present when dreaming.timeout_hours elapsed
+}
+```
 
-### Timeout
+Each `DreamAdapterDelta` mirrors the public Dreams envelope shape:
 
-`dreaming.timeout_hours` in `hive.config.yaml` caps the total wall-clock time for a replay run. When absent or non-finite, the run is unlimited. Partial results with `timeoutErr: true` are returned when the budget is exceeded.
+```js
+{
+  type: 'dream',
+  source_episode: string,           // relative path of the episode file (no extension)
+  status: string,                   // episode.status or 'completed'
+  inputs: [{ type: 'sessions', session_ids: [string] }],
+  outputs: [{
+    type: 'playbook_delta',
+    title: string,
+    rationale: string,
+    wiki: object,                   // episode.playbook_delta.wiki (empty object if absent)
+    kg: object,                     // episode.playbook_delta.kg (empty object if absent)
+  }],
+  model: { id: 'local-episode-walker' },
+  usage: { input_tokens: 0, output_tokens: 0, ... },  // always zero for local replay
+}
+```
+
+**Configuration:** `hive.config.yaml → dreaming.timeout_hours` (float, optional). When set, replay stops after the specified wall-clock hours and returns with `timeoutErr: true`. Omitting the key or setting a non-positive value disables the timeout.
 
