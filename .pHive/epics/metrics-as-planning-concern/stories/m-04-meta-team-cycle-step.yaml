@@ -1,7 +1,7 @@
 id: m-04-meta-team-cycle-step
 epic: metrics-as-planning-concern
-title: Add step-04c-metric-declaration to meta-team-cycle workflow
-status: pending
+title: Add step-03c-metric-declaration to meta-team-cycle workflow
+status: completed
 complexity: small
 methodology: classic
 depends_on: [m-01-add-metrics-concern, m-02-story-schema-metric-fields]
@@ -13,14 +13,14 @@ description: |
   from /meta-optimize. Both routes create story-shaped work and must enforce
   the same metric gate.
 
-  Add step-04c-metric-declaration.md as a sibling to existing step-03-proposal.md.
+  Add step-03c-metric-declaration.md as a sibling to existing step-03-proposal.md.
   When a proposal is promoted into a backlog item or story, this step asks the
   metric questions and produces a metric: block (or applies:false + justification).
   Proposals lacking falsifiable metrics get tagged `un-falsifiable: true` and
   surface at user-review.
 
 acceptance_criteria:
-  - "hive/workflows/steps/meta-team-cycle/step-04c-metric-declaration.md exists"
+  - "hive/workflows/steps/meta-team-cycle/step-03c-metric-declaration.md exists"
   - "Step file follows existing step-file conventions in meta-team-cycle/ (frontmatter, inputs, outputs, agent)"
   - "Step is wired into meta-team-cycle.workflow.yaml in the right slot (after step-04, before promote-to-backlog)"
   - "Step output enriches the proposal record with metric: block; carries `un-falsifiable: true` when applies:false"
@@ -35,7 +35,7 @@ steps:
     agent: researcher
   - id: implement
     description: |
-      Create step-04c-metric-declaration.md. Wire into workflow YAML. Ensure
+      Create step-03c-metric-declaration.md. Wire into workflow YAML. Ensure
       proposal record gains metric: block field.
     agent: developer
     depends_on: [research]
