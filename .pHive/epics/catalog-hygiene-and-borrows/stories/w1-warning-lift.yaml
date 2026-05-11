@@ -28,6 +28,21 @@ acceptance_criteria:
   - "Each skill produces useful output on a fresh repo (no .pHive/) — warning is loud, work proceeds"
   - "Warning text consistent across the 5 skills (suggest format: 'Warning: Hive not initialized for this project. Run /hive:kickoff for full context. Proceeding with defaults.')"
 
+metric:
+  applies: true
+  backfilled: true
+  name: catalog_hygiene.warning_lift_applied_to_5_skills
+  direction: up
+  unit: count
+  baseline: 0
+  target: 5
+  window: "story-integrate"
+  source:
+    kind: manual
+    ref: "for s in status review test standup ui-audit; do grep -l 'warn, don.t block' skills/$s/SKILL.md; done | wc -l (expect 5)"
+  verify_at: "story-integrate"
+  owner: developer
+
 steps:
   - id: research
     description: |

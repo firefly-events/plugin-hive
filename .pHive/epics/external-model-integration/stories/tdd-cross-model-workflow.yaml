@@ -77,6 +77,27 @@ acceptance_criteria:
      execution starts, then 3 concurrent Claude+Codex pairs spin up in
      separate cmux panes — parallelism is between stories, not within them."
 
+metric:
+  applies: true
+  backfilled: true
+  name: external_model.tdd_workflow_definition_landed
+  direction: up
+  unit: bool
+  baseline: 0
+  target: 1
+  window: "story-integrate"
+  source:
+    kind: manual
+    ref: "test -f hive/workflows/development.tdd.workflow.yaml OR test -f hive/workflows/development.tdd-codex.workflow.yaml"
+  verify_at: "story-integrate"
+  owner: developer
+  verdict:
+    outcome: PASS
+    measured_value: 1
+    ran_at: "2026-05-11T17:50:00Z"
+    evidence_ref: "test -f hive/workflows/development.tdd.workflow.yaml (and development.tdd-codex.workflow.yaml) — both files exist"
+    note: "Initial M-07 reading recorded FAIL=0; corrected during commit-readiness review when the file was found on disk. The correction is itself evidence the gate works best with a second-reader pass."
+
 steps:
   - id: research
     agent: researcher

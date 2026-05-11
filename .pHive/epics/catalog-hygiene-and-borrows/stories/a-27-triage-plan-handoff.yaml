@@ -32,6 +32,21 @@ acceptance_criteria:
   - "Plan skill text treats triage as an upstream source, not an inline replacement for normal plan phases"
   - "Story scope excludes standup and optional adapter write-back"
 
+metric:
+  applies: true
+  backfilled: true
+  name: catalog_hygiene.plan_from_triage_flag_present
+  direction: up
+  unit: count
+  baseline: 0
+  target: 1
+  window: "story-integrate"
+  source:
+    kind: manual
+    ref: "grep -c -- '--from-triage' skills/plan/SKILL.md (expect >=1)"
+  verify_at: "story-integrate"
+  owner: developer
+
 steps:
   - id: research
     description: |

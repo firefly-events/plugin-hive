@@ -1,7 +1,7 @@
 id: m-07-retro-backfill
 epic: metrics-as-planning-concern
 title: Retro-backfill metric blocks for 3 shipped epics; run verdict pass
-status: pending
+status: completed
 complexity: medium
 methodology: classic
 depends_on: [m-05-metrics-check-skill]

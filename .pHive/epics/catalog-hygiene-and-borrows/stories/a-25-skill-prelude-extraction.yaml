@@ -30,6 +30,27 @@ acceptance_criteria:
   - "All skills still execute correctly — kickoff gate still fires; persona/config/memory loading still happens"
   - "git diff shows clean line-count reduction; no functional drift"
 
+metric:
+  applies: true
+  backfilled: true
+  name: catalog_hygiene.a25_line_delta
+  direction: down
+  unit: count
+  baseline: null
+  target: -500
+  window: "story-integrate"
+  source:
+    kind: manual
+    ref: "git diff <A-25-parent>..<A-25-merge-commit> -- skills/{kickoff,plan,execute,standup,status,review,test,ui-audit,polish-audit,visual-qa,design-review,brand-system,design-system}/SKILL.md hive/references/skill-prelude.md | awk '/^[+]/&&!/^[+][+][+]/{p++} /^[-]/&&!/^[-][-][-]/{m++} END{print p-m}' — concrete: git diff bb067f1..2251936 over those 14 paths (PR #58 catalog-hygiene-and-borrows Epic A merge)"
+  verify_at: "story-integrate"
+  owner: developer
+  verdict:
+    outcome: FAIL
+    measured_value: 31
+    ran_at: "2026-05-11T17:50:00Z"
+    evidence_ref: "git diff bb067f1..2251936 -- (14 paths) => added=187 removed=156 net=+31"
+    note: "Initial M-07 reading used incorrect scope (main..HEAD on metrics branch instead of pre-A-25..A-25-merge) and reported net=-27. Corrected scope shows the change actually ADDED 31 net lines across these 14 files — the opposite of the -500 target. The recommendation.md A-25 promise of '~-528 lines deleted' was substantially over-stated; the gate would have caught a regression direction, not just an under-shoot."
+
 steps:
   - id: research
     description: |

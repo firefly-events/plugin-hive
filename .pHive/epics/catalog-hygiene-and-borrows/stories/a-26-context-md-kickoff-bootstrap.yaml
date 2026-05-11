@@ -26,6 +26,21 @@ acceptance_criteria:
   - "Existing kickoffs (project-profile.yaml exists) — kickoff offers to backfill CONTEXT.md if missing"
   - "Schema citation in kickoff points to hive/references/context-md-schema.md"
 
+metric:
+  applies: true
+  backfilled: true
+  name: catalog_hygiene.kickoff_writes_context_md
+  direction: up
+  unit: bool
+  baseline: 0
+  target: 1
+  window: "story-integrate"
+  source:
+    kind: manual
+    ref: "test -f .pHive/CONTEXT.md after running /hive:kickoff in a fresh project (post-integrate state)"
+  verify_at: "story-integrate"
+  owner: tester
+
 steps:
   - id: research
     description: |
