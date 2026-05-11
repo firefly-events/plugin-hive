@@ -1,7 +1,7 @@
 id: m-01-add-metrics-concern
 epic: metrics-as-planning-concern
 title: Add `metrics` block to cross-cutting-concerns.yaml
-status: pending
+status: completed
 complexity: small
 methodology: classic
 depends_on: []
