@@ -1,7 +1,7 @@
 id: m-08-kg-import-decision-shape-v2
 epic: metrics-as-planning-concern
 title: Teach kg-import to recognize v2 decision shape (id/value/rationale)
-status: pending
+status: completed
 complexity: small
 methodology: classic
 depends_on: []
