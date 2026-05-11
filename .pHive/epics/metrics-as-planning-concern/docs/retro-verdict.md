@@ -38,7 +38,7 @@ These three story YAMLs did not previously exist on disk — see Meta-finding be
 |---|---|---:|---:|:---:|---|:---:|
 | S5-fixture-test | `kg_augmented.fixture_emits_kg_findings` (up, count) | 1 | 15 | **PASS** | Fixture shipped and emitted ≥1 finding against seeded KG | Y (TN) |
 | S6-readme-audit | `kg_augmented.readme_changelog_drift_closed` (up, count) | 3 | 3 | **PASS** | README + CHANGELOG + drift-checklist all landed | Y (TN) |
-| S7-kg-signal-production-emission | `kg_augmented.production_kg_signal_predicate_coverage` (up, count) | 1 | 0 | **FAIL** | Production KG has 66 triples but ZERO of predicate `phase_failed|phase_blocked|superseded` (only `decided`). Step-02c emits nothing in production. **Canary.** | Y (TP) |
+| S7-kg-signal-production-emission | `kg_augmented.production_kg_signal_predicate_coverage` (up, count) | 1 | 0 | **FAIL** | Production KG has 66 triples but ZERO of predicate `phase_failed`/`phase_blocked`/`superseded` (only `decided`). Step-02c emits nothing in production. **Canary.** | Y (TP) |
 
 ### Epic: catalog-hygiene-and-borrows (13 stories)
 
