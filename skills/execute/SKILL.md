@@ -101,33 +101,8 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
    > **v1 note:** v1 routing handles `workflow`-based catalog entries only. A catalog entry with `skill: <path>` (allowed by catalog schema but unused in v1) is not reached by condition (i) and falls to condition (ii) or (iii). Skill-based routing is a Phase 6 extension point.
 
-5. **Choose execution mode.** Determine whether to use sessions, agent teams, or sequential execution:
-
-   **Session check (highest priority).** Is `HIVE_SESSIONS_ENABLED` set (value `1`, `true`, or `"true"`) OR does `hive.config.yaml` have `sessions.enabled: true`? If yes → use **session-based execution** (step 6c below). Skip the remaining checks.
-
-   **Team check (when sessions not available):**
-
-   1. Check: Is `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` set (value `1`, `true`, or `"true"`)?
-   2. Check: Does `hive.config.yaml` have `parallel_teams: true`?
-   3. Check: Does the topological sort reveal multiple stories at the same depth (independent stories that can run concurrently)?
-   4. Check: Is `--sequential` flag NOT present in arguments?
-
-   If all four team checks pass: use **agent team execution**. If `execution.terminal_mux` resolves to `cmux`, use step 6b. Otherwise use step 6.
-   Otherwise: use **sequential execution** (step 7).
-
-5pre. **Executor cutover routing (hde-9a + hde-9b).** Before dispatching the chosen execution mode for a single workflow, decide whether to invoke the deterministic DAG executor (`hive.lib.dag_executor`) or stay on the orchestrator-narrated path. This check applies per-workflow at the point where this skill would otherwise hand off a workflow YAML to the orchestrator-narrated runner.
-
-   **Decision tree (default OFF — fail-closed orchestrator path on any miss):**
-
-   1. **Read consumer config.** Look for `.pHive/hive.config.yaml` (consumer-side, NOT the shipped `hive/hive.config.yaml`). If the file is missing → orchestrator path. Done.
-   2. **Check the flag.** Parse the file. If `executor` is anything other than `hive-dag` (`hive-dag` is the only valid value today) → orchestrator path with a warning. If `executor_default` is not truthy (`on`, `true`, `yes`, or YAML bool `True`; `off`/`false`/`no`/missing → false) → orchestrator path.
-   3. **Read graduation registry.** Look for `.pHive/runtime/executor-graduated-workflows.yaml` (created by hde-9b — may not exist yet; treat missing as empty, no workflows graduated). Parse the top-level `workflows:` list.
-   4. **Per-workflow gate.** If the workflow being dispatched is NOT in the registry → orchestrator path.
-   5. **Both gates pass.** Invoke `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`. Pass a populated `run_state_path` and `worktree_manager` so the L3 functionality (run-state persistence + worktree-per-run isolation) is available; the wrapper honours `worktree_manager=None` (no isolation, hde-2 spine path) when caller-decided context says so (e.g., already inside an outer worktree per hde-6 nesting policy).
-
-   **Why this gating exists (Q4 lock):** the consumer-side flag layer keeps maintainer-only execution choices out of the shipped `hive/hive.config.yaml` (the eefbff3 / `project_config_shipping_deferred` pattern). The per-workflow registry layer lets graduation events ship without consumer config edits. Default OFF preserves zero-behaviour-change for non-opt-in consumers. Both gates must be true; either gate empty falls through to the orchestrator path.
-
-   **Single dispatch point:** this is the ONLY place where `/execute` chooses between executor and orchestrator. No other skill or step file should re-implement this decision tree — they should call back into this skill or the `executor_enabled_for(workflow_name)` reader exposed by `hive.lib.dag_executor`.
+5. **Choose execution mode.** Invoke `skills/hive/skills/execute-dispatch/SKILL.md` with env, parsed root `hive.config.yaml`, parsed consumer `.pHive/hive.config.yaml`, parsed graduation registry, `workflow_name`, and `$ARGUMENTS`; consume `mode_decision`, `mode_reason`, `runner_path`, and `runner_reason`. Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7.
+5pre. **Executor cutover routing.** Use only the returned `runner_path` and `runner_reason`; do not re-evaluate the cutover tree here. If `runner_path == hive-dag`, call `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`; otherwise continue on the orchestrator-narrated path. Single dispatch point: this skill call is the only `/execute` policy boundary for executor-vs-orchestrator routing.
 
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
 
