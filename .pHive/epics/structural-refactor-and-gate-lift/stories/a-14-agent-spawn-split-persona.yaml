@@ -1,7 +1,7 @@
 id: a-14-agent-spawn-split-persona
 epic: structural-refactor-and-gate-lift
 title: Split agent-spawn persona resolution into separate skill or reference
-status: pending
+status: completed
 complexity: medium
 methodology: classic
 depends_on: []
