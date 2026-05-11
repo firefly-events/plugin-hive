@@ -1,7 +1,7 @@
 id: a-04-plan-skill-split-routing
 epic: structural-refactor-and-gate-lift
 title: Split /plan Phase 0 routing into separate skill or module
-status: pending
+status: completed
 complexity: high
 methodology: classic
 depends_on: []

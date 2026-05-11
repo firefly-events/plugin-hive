@@ -1,7 +1,7 @@
 id: a-11-ui-audit-collapse
 epic: structural-refactor-and-gate-lift
 title: Collapse ui-audit into design-review with --artifact-target flag
-status: pending
+status: completed
 complexity: medium
 methodology: classic
 depends_on: []
