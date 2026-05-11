@@ -107,47 +107,20 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
 
 6b. **Agent team execution (cmux path).** Use this path when all four step-5 conditions are true and `execution.terminal_mux` resolves to `cmux`.
+   Invoke `skills/hive/skills/execute-mode-team-cmux/SKILL.md` with:
+   - `workflow_path`: the workflow loaded in step 3
+   - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
+   - `appends_map`: the review-phase sidecar map from step 2b
+   - `epic_handle`: the current epic identifier
+   See `references/team-execution.md` for cmux-variant TeamCreate prompt details.
 
-   - Spawn each unblocked story via the agent-spawn skill. Section 7.3 of that skill handles the cmux pane lifecycle and prompt delivery.
-   - Track active work in a map:
-     ```
-     {story_id -> surface_id, status, depends_on}
-     ```
-   - Run a poll loop every 10 seconds. For each active surface:
-     - Call `cmux read-screen --surface <id>` and look for `[STORY-COMPLETE:{story-id}]`
-     - Call `surface.health` to confirm the pane is still live
-   - When a story completes: mark it done, then scan blocked stories and spawn any whose `depends_on` set is now fully satisfied.
-   - When a story fails: mark `failed`, propagate failure to all transitive dependents (they cannot run), and continue executing remaining independent stories. Terminate the epic with a failure summary once no runnable stories remain.
-   - Use `cmux send --surface <id>` to deliver respawn prompts or sidecar injection messages to active panes.
-   - When all stories complete: close every tracked surface via `cmux close-surface`, then produce the epic summary.
-   - Follow **`references/team-execution.md`** for the cmux variant details.
-
-6c. **Session-based execution** (used when `HIVE_SESSIONS_ENABLED` or `sessions.enabled: true`). Replaces the TeamCreate path with the Claude Agent SDK `/v1/sessions` API for story-level execution. One session per story, isolated context, structured retry on stuck SSE.
-
-   **6c-1. Bootstrap session registry.** Run the session-registry bootstrap skill (`skills/hive/skills/session-registry/SKILL.md`) to ensure `${HIVE_STATE_DIR}/sessions/index.yaml` exists. Idempotent — safe to call even if already initialized. See `hive/references/session-registry-schema.md` for the registry record shape.
-
-   **6c-2. Create session entries.** For each story in dependency order:
-   - Append a session record to `${HIVE_STATE_DIR}/sessions/index.yaml` with `status: pending`, `story_id: {story-id}`, `epic_id: {epic-id}`, and `created_at: {NOW}`.
-   - Use the model from `hive.config.yaml sessions.model` (or inherit from `model_tiers` for the story's primary agent).
-
-   **6c-3. Invoke each session.** When a story's dependencies are complete, open its session using the `/v1/sessions` API via `hive/scripts/session-invoke.mjs`. Format the initial session prompt using the session prompt spec from `hive/references/session-system-prompt-spec.md`. The prompt must include: story spec, workflow step sequence, episode write path, and any escalation context from step 2b's `appends[]` map (sidecar reviewers).
-   - Update the registry record: set `status: active` and `last_active_at: {NOW}`.
-
-   **6c-4. Sidecar injection (session path).** When step 2b populated `appends[]` for this story, append the matched sidecar reviewer agents to the review-phase session context as:
-   ```
-   Additional reviewers: {agent-1}, {agent-2}
-   Each additional reviewer should run their activation protocol after the primary review.
-   Load their persona from hive/agents/{agent-name}.md.
-   ```
-   Use the canonical specialist catalog at `hive/references/specialist-triggers.md` to resolve `responds_with.id` for each escalation (already done in step 2b). If `appends[]` is empty for the story, proceed with the standard reviewer only.
-
-   **6c-5. Monitor and update.** As sessions run, update `sse_last_event_at` in the registry on each received SSE event. Watch for stuck sessions per the resilience procedure in `hive/references/session-resilience.md`.
-
-   **6c-6. Close sessions.** On session completion, set `status: completed` (or `failed`) and update `last_active_at`. Sessions are never reopened — each story run gets a new session record.
-
-   **Per-story commits (session path):** Stories commit independently on their own feature branches (`hive-{story-id}`) as soon as review passes, same as the TeamCreate path.
-
-   **Resilience monitoring:** While sessions are active, poll `sse_last_event_at` in `${HIVE_STATE_DIR}/sessions/index.yaml`. If any active session has not updated `sse_last_event_at` within `sessions.stuck_timeout_ms` (default 90s), trigger the session retry procedure from `hive/references/session-resilience.md`. Max `sessions.max_retries` retries per story (default 3) before escalating to the user. This **replaces** the respawn skill for session-based execution — do NOT use the respawn protocol for step 6c stories.
+6c. **Session-based execution** (used when `HIVE_SESSIONS_ENABLED` or `sessions.enabled: true`). Replaces the TeamCreate path with the Claude Agent SDK `/v1/sessions` API for story-level execution.
+   Invoke `skills/hive/skills/execute-mode-session/SKILL.md` with:
+   - `workflow_path`: the workflow loaded in step 3
+   - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
+   - `appends_map`: the review-phase sidecar map from step 2b
+   - `epic_handle`: the current epic identifier
+   - `hive_config`: parsed root `hive.config.yaml` (for `sessions.*` and `model_tiers`)
 
 7. **Sequential execution.** Follow **`references/sequential-execution.md`** for the step-by-step workflow within each story, sidecar injection at the review step, episode records, gate checks, and respawn monitoring.
 
