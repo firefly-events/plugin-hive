@@ -64,6 +64,21 @@ acceptance_criteria:
      Claude-specific `tools:` and `model:` frontmatter; the rest of
      backend-developer.md is verbatim."
 
+metric:
+  applies: true
+  backfilled: true
+  name: external_model.codex_developer_routing_events
+  direction: up
+  unit: count
+  baseline: 0
+  target: 1
+  window: "story-integrate"
+  source:
+    kind: events
+    ref: "metric_type=agent_spawn AND backend=codex AND agent=developer (over .pHive/metrics/events/*.jsonl)"
+  verify_at: "story-integrate"
+  owner: tester
+
 steps:
   - id: research
     agent: researcher

@@ -33,6 +33,21 @@ acceptance_criteria:
   - "Plan wiring describes grill as an external atomic call, not inline prose copied from skills/grill/SKILL.md"
   - "Story scope excludes new queue/triage work and excludes changes outside the plan, researcher, and design-discussion surfaces"
 
+metric:
+  applies: true
+  backfilled: true
+  name: catalog_hygiene.plan_a2_calls_grill
+  direction: up
+  unit: count
+  baseline: 0
+  target: 1
+  window: "story-integrate"
+  source:
+    kind: manual
+    ref: "grep -c -i 'grill' skills/plan/SKILL.md (expect >=1)"
+  verify_at: "story-integrate"
+  owner: developer
+
 steps:
   - id: research
     description: |

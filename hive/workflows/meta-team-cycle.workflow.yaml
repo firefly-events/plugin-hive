@@ -161,21 +161,68 @@ steps:
       - name: backlog_dry_run_report
         type: json
 
+  - id: metric-declaration
+    agent: architect
+    # Planning-phase enrichment: apply the `metrics` cross-cutting concern
+    # (.pHive/cross-cutting-concerns.yaml id:metrics) to every approved
+    # proposal. Each enriched proposal carries a `metric:` block per
+    # hive/references/story-yaml-schema.md §3 — applies:true with the full
+    # name/direction/baseline/target/window/source/verify_at/owner shape,
+    # OR applies:false with a one-line justification. Mirrors `/plan` SKILL
+    # step 14/14a. Step is additive: enriched_proposals length equals
+    # approved_proposals length; gate failures are reported but non-blocking.
+    # No `when:` predicate is needed — depends_on: [proposal] handles routing.
+    # If step-03b (backlog-fallback) was the chosen branch, step-03's `when:`
+    # evaluates false, step-03 produces no outputs, and this step's input
+    # binding to proposal.approved_proposals receives null/empty. The step
+    # file's FAILURE MODES handles the empty-input case (emit
+    # enriched_proposals: [], summary with zero counts) so step-04 still has
+    # a consumable input shape.
+    task: >
+      Apply the metrics cross-cutting concern's planning_prompt to each approved
+      proposal. Enrich every proposal with a metric: block (applies:true with
+      name/direction/baseline/target/window/source/verify_at/owner) OR
+      metric.applies:false with a one-line justification. Apply the M-03
+      step-14a review-gate rules (reject one-word justifications, reject
+      "eventually" verify_at). Emit enriched_proposals (same set, same order,
+      each carrying a metric: block) plus a metric_declaration_summary
+      surfacing any gate failures.
+    step_file: hive/workflows/steps/meta-team-cycle/step-03c-metric-declaration.md
+    depends_on:
+      - proposal
+    inputs:
+      - name: cycle_id
+        source: step_output
+        step_id: boot
+        output_name: cycle_id
+      - name: approved_proposals
+        source: step_output
+        step_id: proposal
+        output_name: approved_proposals
+    outputs:
+      - name: enriched_proposals
+        type: json
+      - name: metric_declaration_summary
+        type: string
+      - name: metric_gate_failures
+        type: json
+        optional: true
+
   - id: implementation
     agent: developer
     task: >
-      Implement each approved proposal in sequence. Write files, add sections,
+      Implement each enriched proposal in sequence. Write files, add sections,
       create memories. Return structured per-change entries in the
       `changes_made` output; persistent control-plane writes happen in later
       steps and are coordinated by the workflow output graph, not this step.
     step_file: hive/workflows/steps/meta-team-cycle/step-04-implementation.md
     depends_on:
-      - proposal
+      - metric-declaration
     inputs:
       - name: approved_proposals
         source: step_output
-        step_id: proposal
-        output_name: approved_proposals
+        step_id: metric-declaration
+        output_name: enriched_proposals
     outputs:
       - name: changes_made
         type: json

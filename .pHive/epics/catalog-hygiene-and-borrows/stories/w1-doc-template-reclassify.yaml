@@ -34,6 +34,21 @@ acceptance_criteria:
   - "Top-level skill catalog count drops by 5 (24 → 19 in user-facing context)"
   - "grep for old paths returns no live references (dead refs cleaned)"
 
+metric:
+  applies: true
+  backfilled: true
+  name: catalog_hygiene.doc_template_reclassified
+  direction: up
+  unit: count
+  baseline: 0
+  target: 5
+  window: "story-integrate"
+  source:
+    kind: manual
+    ref: "ls hive/references/document-templates/ 2>/dev/null | wc -l (expect >=5)"
+  verify_at: "story-integrate"
+  owner: developer
+
 steps:
   - id: research
     description: |

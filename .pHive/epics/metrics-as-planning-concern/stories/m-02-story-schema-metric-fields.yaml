@@ -1,0 +1,93 @@
+id: m-02-story-schema-metric-fields
+epic: metrics-as-planning-concern
+title: Document `metric:` field group in story YAML conventions
+status: completed
+complexity: small
+methodology: classic
+depends_on: [m-01-add-metrics-concern]
+wave: W0
+action_id: M-02
+
+description: |
+  Story YAMLs currently have no agreed shape for declaring metrics. M-01 added
+  the planning concern; M-02 defines the YAML shape that satisfies it.
+
+  Add `metric:` block to canonical story-yaml conventions reference at
+  hive/references/story-yaml-schema.md (create if missing — check first).
+
+  Block shape:
+    metric:
+      applies: true|false
+      # if applies: true
+      name: string              # e.g. "kg_signal.findings_emitted_per_cycle"
+      direction: up|down
+      unit: string              # count | ratio | seconds | bytes
+      baseline: number|null     # null = first-measurement
+      target: number
+      window: duration          # "7d post-merge" | "epic-close" | "next-3-cycles"
+      source:
+        kind: events|sql|envelope|manual
+        ref: string             # query name or envelope_id
+      envelope_id: string|null  # optional link to .pHive/metrics/experiments/*.yaml
+      verify_at: ISO-8601|relative
+      owner: agent|role
+      # if applies: false
+      justification: string     # one-line reason metric does not apply
+
+  Reference both metrics-event.schema.md and experiment-envelope.schema.md so
+  authors know which carrier their `source.kind` writes to.
+
+acceptance_criteria:
+  - "hive/references/story-yaml-schema.md exists (created or extended) with metric: section"
+  - "Field shape matches description; both applies:true and applies:false variants documented with full example"
+  - "References metrics-event.schema.md + experiment-envelope.schema.md as authority"
+  - "Schema doc lists which existing fields already exist on story YAMLs (don't redefine; just slot metric: in)"
+
+steps:
+  - id: research
+    description: |
+      Check whether hive/references/story-yaml-schema.md exists. Read 3 recent
+      story YAMLs (catalog-hygiene + structural-refactor) to inventory existing
+      fields. Read both metrics schemas. Do not invent new schema fields outside
+      `metric:`.
+    agent: researcher
+  - id: implement
+    description: |
+      Create or extend the schema doc. Add `metric:` section with both variants
+      and a fully-worked example for each. Slot it logically (probably after
+      acceptance_criteria, before steps).
+    agent: technical-writer
+    depends_on: [research]
+  - id: review
+    description: |
+      Verify schema doc is self-contained (no need to read this story to use it),
+      references both metric schemas, and the example metric is realistic.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit on feat/metrics-as-planning-concern.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/references/story-yaml-schema.md
+      purpose: Target — create or extend
+    - path: .pHive/metrics/metrics-event.schema.md
+      purpose: Authority — source.kind=events writes here
+    - path: .pHive/metrics/experiment-envelope.schema.md
+      purpose: Authority — source.kind=envelope links here
+
+design_decisions:
+  - decision: source.kind enum bounded to events|sql|envelope|manual
+    rationale: Limits scope; later kinds can be added but each needs a reader
+
+risks:
+  - severity: medium
+    description: Authors copy applies:false without thinking
+    mitigation: planning_prompt in M-01 asks for justification; review step in /plan flags one-word justifications
+
+metric:
+  applies: false
+  justification: "Schema-doc story; tested by M-03/M-04 consuming the schema in planner prompts."
