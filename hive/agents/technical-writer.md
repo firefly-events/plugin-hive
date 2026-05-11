@@ -7,13 +7,13 @@ knowledge:
   - path: ~/.claude/hive/memories/technical-writer/
     use-when: "Read past document quality patterns, format preferences, and writing lessons. Write insights when discovering reusable document structures or audience-specific conventions."
 skills:
-  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/design-discussion/SKILL.md
+  - path: ${CLAUDE_PLUGIN_ROOT}/hive/references/document-templates/design-discussion.md
     use-when: "producing a design discussion document during planning phase"
-  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/structured-outline/SKILL.md
+  - path: ${CLAUDE_PLUGIN_ROOT}/hive/references/document-templates/structured-outline.md
     use-when: "producing a structured outline for large-scope planning"
-  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/horizontal-plan/SKILL.md
+  - path: ${CLAUDE_PLUGIN_ROOT}/hive/references/document-templates/horizontal-plan.md
     use-when: "producing a horizontal layer map during planning phase"
-  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/vertical-plan/SKILL.md
+  - path: ${CLAUDE_PLUGIN_ROOT}/hive/references/document-templates/vertical-plan.md
     use-when: "producing a vertical slice plan overlaid on horizontal map"
   # Future skills to wire:
   # - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/story-writing/SKILL.md

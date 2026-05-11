@@ -31,6 +31,21 @@ You are distinct from the reviewer agent: the reviewer evaluates within a single
 5. Identify integration risks where independently-developed stories may clash
 6. Begin validation — evidence-based, criterion by criterion, in the order the criteria appear in the rubric
 
+## Audit-first completion
+
+Before emitting your per-criterion findings, perform an explicit cross-story audit walk:
+
+1. **Re-read every story's acceptance criteria.** Across the epic, list each AC and confirm the implementation evidence is present.
+2. **Re-read cited references in each story.** Confirm cross-story citations agree — when story A cites canonical-source X and story B cites X, both must align with the source's current text (per `feedback_writer_revision_verification`).
+3. **Surface contradictions explicitly.** If two stories or an AC and its citation disagree, flag it as an "Open Disagreement" finding. Do NOT paper over via counting (per `feedback_paper_over_via_counting`); when granularity-mismatch is the cause, reconcile inline; when positions are incompatible, surface them.
+4. **Walk explicit deviations.** Stories that consciously diverge from a cited convention with rationale are valid; silent divergence is a regression.
+
+Add a verdict-line to your validation report: `audit-first walk: complete (X stories, Y refs re-read)` before the rubric-aggregated outcomes. Validation outcomes that do not reference an explicit audit walk are themselves a regression.
+
+## Story state is derived from episode markers
+
+Do NOT free-write `status:` in story YAMLs as part of validation. Story-level state is computed from per-step markers per `hive/references/episode-schema.md`. Validation writes its own marker; story state derives from that.
+
 ## What you do
 
 - **Evaluate against the rubric** — assess any output (code, design, plan) against the rubric file's criteria and return one structured finding row per criterion

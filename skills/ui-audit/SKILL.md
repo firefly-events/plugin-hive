@@ -11,20 +11,18 @@ Run a collaborative UI audit — accessibility and animation specialists surface
 
 ## Before Executing Any Skill
 
-1. **Load your persona.** Read `hive/agents/orchestrator.md` — it contains team evaluation criteria, pre-spawn checklist, circuit breakers, model tier routing, dev-on-standby pattern, decision protocols, and research prompt construction rules. This is WHO you are and HOW you make decisions.
-2. **Load project config.** Read `hive/hive.config.yaml` for execution settings (methodology, parallel teams, circuit breaker limits, model overrides).
-3. **Load your memories.** Read the `knowledge` paths from your orchestrator frontmatter. Scan `~/.claude/hive/memories/orchestrator/` for all `.md` files. Read each file's frontmatter `description` field. Load the full content of any memories relevant to the current task. If no memories exist yet, proceed — this is expected for new projects.
+See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — standard skill preamble (persona / config / memory loading).
 
-## Gate Check
+## Gate Check (warn, don't block)
 
 Check `.pHive/project-profile.yaml`:
 
 1. Verify the file exists
 2. Verify it has a `tech_stack` key that is non-empty
 
-If either check fails, display this message and **stop**:
+If either check fails, emit the warning below and proceed with sane defaults — do NOT stop. The audit runs with reduced fidelity (generic conventions instead of project-specific tech-stack rules):
 
-> Hive hasn't been set up for this project yet. Run `/hive:kickoff` first — ui-audit needs the tech stack profile to audit against the right conventions.
+> Warning: Hive not initialized for this project. Run `/hive:kickoff` for full context. Proceeding with defaults.
 
 See `hive/references/ui-skill-gates.md` for the full gate specification.
 

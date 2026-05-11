@@ -9,31 +9,21 @@ Run the daily ceremony workflow: standup → planning → execution.
 
 **Input:** `$ARGUMENTS` optionally contains an epic ID to focus on.
 
-## Kickoff Gate
+## Skill Preamble
 
-**Before doing anything else**, check whether Hive has been initialized for this project:
+See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — kickoff gate (initialization check) + persona / config / memory loading.
 
-1. Check if `.pHive/project-profile.yaml` exists in the project root
-2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
-3. As a secondary check, verify `hive.config.yaml` exists (check both `hive/hive.config.yaml` and `hive.config.yaml` in the project root — either location is valid)
+**Kickoff gate override — warn, don't block.** This skill is read-only-shaped. On a fresh repo without `.pHive/project-profile.yaml`, emit the warning below and proceed with sane defaults instead of stopping. The hard-stop in the prelude does NOT apply here.
 
-If **any** of these checks fail, display this message and **stop** — do not proceed with the standup:
-
-> Hive hasn't been set up for this project yet. Run `/hive:kickoff` first — it takes a few minutes and ensures every agent has full context about your codebase, preferences, and available tools.
-
-If all checks pass, proceed silently — do not announce that the kickoff gate passed. Only surface this section when a check fails.
-
-## Before Executing Any Skill
-
-1. **Load your persona.** Read `hive/agents/orchestrator.md` — it contains team evaluation criteria, pre-spawn checklist, circuit breakers, model tier routing, dev-on-standby pattern, decision protocols, and research prompt construction rules. This is WHO you are and HOW you make decisions.
-2. **Load project config.** Read `hive/hive.config.yaml` for execution settings (methodology, parallel teams, circuit breaker limits, model overrides).
-3. **Load your memories.** Read the `knowledge` paths from your orchestrator frontmatter. Scan `~/.claude/hive/memories/orchestrator/` for all `.md` files. Read each file's frontmatter `description` field. Load the full content of any memories relevant to the current task. If no memories exist yet, proceed — this is expected for new projects.
+> Warning: Hive not initialized for this project. Run `/hive:kickoff` for full context. Proceeding with defaults.
 
 ## Process
 
 Load `hive/workflows/daily-ceremony.workflow.yaml` and execute its three phases. Each phase has step files at `hive/workflows/steps/daily-ceremony/`.
 
-**Phase 1 — Standup:** Reconstruct state from previous sessions. Read status markers (`.pHive/episodes/`), cycle state (`.pHive/cycle-state/`), task tracker (pending human items), and agent memories. Present structured report to user.
+**Phase 1 — Standup:** Reconstruct state from previous sessions. Read status markers (`.pHive/episodes/`), cycle state (`.pHive/cycle-state/`), task tracker (pending human items), agent memories, and the **triage queue** at `.pHive/triage/queue.yaml`. Surface open triage items (any entry whose `state` is not `closed`) alongside in-flight epics so the operator sees the intake backlog before selecting today's work. Present structured report to user.
+
+**Triage surfacing — read-only.** Phase 1 is the only point where standup touches triage. Surface open items as ceremony context — title, state, priority/severity if set, and entry id — so the operator can decide whether to hand off via `/hive:triage <id> --hand-off` (which routes to `/plan --from-triage`) or defer. Standup does NOT mutate the triage state machine; the triage skill remains the single writer of `queue.yaml`. If `.pHive/triage/queue.yaml` is missing, treat the surfacing as empty (no warning needed — triage is opt-in per its warning-only kickoff posture).
 
 **Phase 2 — Planning:** User short-lists today's work. Evaluate whether items need new planning or are already storied. If new work, run a compressed planning swarm. Present plan with agent-ready checklist results. User approves.
 

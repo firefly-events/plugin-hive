@@ -87,6 +87,14 @@ EXTERNAL_REFERENCES:
 
 UNANSWERED_QUESTIONS:
 - [anything you couldn't determine from available sources]
+
+INCONSISTENCY_RISK_SIGNALS:
+- Signal: [vocabulary mismatch / hidden assumption / unresolved tension / convention violation / posture mismatch]
+  | Where: [file path or "user requirement"]
+  | Detail: [one-line description of the inconsistency or risk]
+- (List zero or more — empty if no signals surfaced. Used by the grill skill in
+  Phase A2 to focus its adversarial pass against the draft design-discussion.
+  These are signals, not findings — grill decides whether each is a finding.)
 ```
 
 This format is intentionally flat and scannable. The downstream writer will structure it into whatever document format the task requires.

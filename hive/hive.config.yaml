@@ -118,6 +118,14 @@ circuit_breakers:
   max_fix_iterations: 3          # fix loop iterations before back-to-planning
   max_outcomes_iterations: 3     # Outcomes loop iterations before deterministic stop
   max_same_error_repeats: 3      # same error N times = stop, change strategy
+  # Advisory token caps (story w5-sidecar-bundle, A-31). Fail-open: when token
+  # data is missing for a step, the cap is silently skipped (NOT an error).
+  # When data is present, crossing the cap emits a budget_exceeded telemetry
+  # event but does NOT hard-block — these are tuning signals, not runtime gates.
+  # See skills/execute/SKILL.md "Per-step token budgets" for full semantics.
+  max_tokens_per_step: null      # null = unset (no warning, no cap). Set per project.
+  max_tokens_per_fix_loop: null  # null = unset
+  max_tokens_per_story: null     # null = unset
 
 # Example codebases — directories agents can reference to learn your coding
 # style, structure patterns, naming conventions, etc. Add paths to your own

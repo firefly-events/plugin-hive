@@ -2,7 +2,15 @@
 
 Produce a ~200-line design discussion document from raw research findings. This is a developer brain dump — informal, comprehensive, and opinionated. The reader should walk away understanding what the agent thinks it's about to do, what worries it, and what it doesn't know yet.
 
-**Input:** Raw research findings from the researcher agent, plus the original user request.
+**Input:** Raw research findings from the researcher agent (including any `INCONSISTENCY_RISK_SIGNALS` block), the original user request, and on revision passes a **grill-record** from Phase A2 of `/plan` (path: `.pHive/epics/{epic-id}/docs/grill-record.md`, schema: [`hive/references/grill-record-template.md`](../grill-record-template.md)).
+
+## Grill-record consumption (revision pass)
+
+Phase A2 of `/plan` invokes the atomic `grill` skill against the FIRST DRAFT of this design-discussion. The grill-record returned has five sections (vocabulary mismatches, hidden assumptions, unresolved tensions, convention violations, posture mismatches), each with findings or "clean". On the revision pass:
+
+- Walk every finding in the grill-record. For each: either revise the draft to address it, or annotate an explicitly-accepted-and-justified deviation in the relevant section of the design-discussion (typically §4 "What Could Go Wrong" for risks the planner is consciously taking, or §6 "What I'm Not Sure About" for unresolved questions).
+- Do NOT re-derive grill's analysis — the grill-record is the canonical adversarial pass for this iteration. Re-running grill is only appropriate after a substantive revision; that's a planner-level decision, not the writer's job.
+- Skipping findings silently is a regression. Every finding either resolves into a draft change or surfaces as an explicit deviation note.
 
 ## Tone
 

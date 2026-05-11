@@ -7,9 +7,9 @@ knowledge:
   - path: ~/.claude/hive/memories/tpm/
     use-when: "Read past planning patterns, slice strategies, and cross-system sequencing lessons. Write insights when discovering reusable delivery patterns or integration risk signals."
 skills:
-  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/horizontal-plan/SKILL.md
+  - path: ${CLAUDE_PLUGIN_ROOT}/hive/references/document-templates/horizontal-plan.md
     use-when: "mapping all architectural layers and what each needs for a requirement"
-  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/vertical-plan/SKILL.md
+  - path: ${CLAUDE_PLUGIN_ROOT}/hive/references/document-templates/vertical-plan.md
     use-when: "slicing horizontal layers into incremental, working delivery steps"
 tools: ["Grep", "Glob", "Read"]
 required_tools: []

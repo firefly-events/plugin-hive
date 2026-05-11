@@ -31,7 +31,7 @@ H/V planning triggers for medium and large epics. The orchestrator or analyst de
 
 ## Phase 1: Horizontal Planning Scan
 
-**Skill:** `skills/hive/skills/horizontal-plan/SKILL.md`
+**Skill:** `hive/references/document-templates/horizontal-plan.md`
 **Agent:** TPM (with researcher and analyst input)
 **Output:** ~200–400 lines
 
@@ -56,7 +56,7 @@ The horizontal scan maps breadth — what does each architectural layer need ove
 
 ## Phase 2: Vertical Slice Plan
 
-**Skill:** `skills/hive/skills/vertical-plan/SKILL.md`
+**Skill:** `hive/references/document-templates/vertical-plan.md`
 **Agent:** TPM
 **Input:** horizontal layer map + design discussion + user feedback
 **Output:** ~300–500 lines
@@ -143,8 +143,8 @@ Each step leaves the product in a state where search WORKS for what's been built
 
 | File | Purpose |
 |------|---------|
-| `skills/hive/skills/horizontal-plan/SKILL.md` | Horizontal planning scan procedure |
-| `skills/hive/skills/vertical-plan/SKILL.md` | Vertical slice plan procedure |
-| `skills/hive/skills/design-discussion/SKILL.md` | Design discussion (precedes H/V planning) |
-| `skills/hive/skills/structured-outline/SKILL.md` | Structured outline (follows V planning for large epics) |
+| `hive/references/document-templates/horizontal-plan.md` | Horizontal planning scan procedure |
+| `hive/references/document-templates/vertical-plan.md` | Vertical slice plan procedure |
+| `hive/references/document-templates/design-discussion.md` | Design discussion (precedes H/V planning) |
+| `hive/references/document-templates/structured-outline.md` | Structured outline (follows V planning for large epics) |
 | `hive/references/agent-ready-checklist.md` | 9-point story validation applied to V-plan stories |

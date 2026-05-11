@@ -73,3 +73,8 @@ agents/memories/
 __pycache__/
 *.pyc
 *.pyo
+
+# Single-file domain glossary (story a-26-context-md-schema-and-starter).
+# This file IS tracked — it serves as plugin-hive own CONTEXT.md and as
+# an exemplar for downstream projects.
+!.pHive/CONTEXT.md

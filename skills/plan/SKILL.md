@@ -5,12 +5,6 @@ description: Decompose a requirement into an epic with dependency-tracked storie
 
 # Hive Plan
 
-> **State Directory Note:** Paths shown as `.pHive/...` assume the default
-> state directory. If you have relocated state via `paths.state_dir`,
-> substitute your configured location. See
-> [state-relocation.md](../../hive/references/state-relocation.md) (or
-> `hive/references/state-relocation.md` from repo root).
-
 Decompose a requirement into an epic with dependency-tracked stories.
 
 **Input:** `$ARGUMENTS` contains the requirement or feature description. Optionally a target codebase path. Supports optional flags (see `$ARGUMENTS` section below).
@@ -28,39 +22,22 @@ Forces approach validation (context7 + web research) regardless of scope size or
 **`--gate-hv`**
 Retains the H/V user-facing review gate at medium scope (opt-in conservative path). Default at medium scope is to auto-proceed after collaborative review (no user gate). This flag restores the gate. No effect at large scope — the gate is always present at large scope regardless of this flag.
 
-## Kickoff Gate
+**`--from-triage <id>`**
+Reads `.pHive/triage/queue.yaml` and decomposes one item (the triage entry whose `id` matches `<id>`) into a normal planning flow. Triage is the upstream input source — this flag does NOT replace plan phases or absorb triage's intake responsibilities. Workflow:
 
-**Before doing anything else**, check whether Hive has been initialized for this project:
+1. Open the queue at `.pHive/triage/queue.yaml`. If the file is missing or malformed, emit an error naming the path and stop — `--from-triage` requires a valid queue.
+2. Locate the entry with the requested `id`. If it does not exist, error out with the available IDs (limit 20) for the operator to disambiguate.
+3. Verify the entry's `state` is `prioritized`. If not, error out — only `prioritized` entries can hand off to plan (`inbox` / `clarified` need more triage work; `plan-ready` / `closed` are already in or past planning). The triage skill is the right tool to advance state.
+4. Use the entry's `title` + `description` + `priority` + `severity` as the input for normal plan decomposition. Plan continues with its standard phases (research, design discussion, H/V or stories, etc.) as if those fields had been the original `$ARGUMENTS`.
+5. On planning success — when an epic + stories have been written — call back into triage with the produced epic/story IDs. Triage advances the entry from `prioritized → plan-ready` and writes `linked_epic` / `linked_story` per the queue schema. Plan does NOT write to `queue.yaml` directly — triage owns persistence (single-writer invariant).
 
-1. Check if `.pHive/project-profile.yaml` exists in the project root
-2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
-3. As a secondary check, verify `hive.config.yaml` exists (check both `hive/hive.config.yaml` and `hive.config.yaml` in the project root — either location is valid)
+**Single-item rule.** Each `--from-triage` invocation handles exactly one queue item. To plan multiple triage items, run plan once per item. This keeps decomposition coherent: plan output (one epic) maps to one triage source.
 
-If **any** of these checks fail, display this message and **stop** — do not proceed with planning:
+**Triage stays atomic.** This flag is a hand-off surface only — do NOT inline triage's clarification or prioritization steps into plan. If an operator runs `--from-triage` against an entry that should still be in triage (wrong state above), the right response is the error in step 3 above, not a fallback that does both jobs.
 
-> Hive hasn't been set up for this project yet. Run `/hive:kickoff` first — it takes a few minutes and ensures every agent has full context about your codebase, preferences, and available tools.
+## Skill Preamble
 
-If all checks pass, proceed silently — do not announce that the kickoff gate passed. Only surface this section when a check fails.
-
-## Before Executing Any Skill
-
-1. **Load your persona.** Read `hive/agents/orchestrator.md` — it contains team evaluation criteria, pre-spawn checklist, circuit breakers, model tier routing, dev-on-standby pattern, decision protocols, and research prompt construction rules. This is WHO you are and HOW you make decisions.
-2. **Load project config.** Read configuration with root-first precedence:
-   - Read ROOT `hive.config.yaml` first for routing and execution settings:
-     `agent_backends`, `model_overrides`, `planning.collaborative_review`,
-     `execution.default_methodology`, `execution.parallel_teams`,
-     `circuit_breakers.*`.
-   - For any key missing from the root file, fall through to the shipped
-     baseline at `hive/hive.config.yaml` (neutral consumer-safe defaults).
-   - Graceful fallback: if the root `hive.config.yaml` is absent or its
-     `agent_backends:` key is missing, proceed with an EMPTY routing map
-     — all personas default to direct TeamCreate, no backend routing is
-     applied. Do NOT crash and do NOT substitute values from the shipped
-     baseline for `agent_backends` specifically (that would reintroduce
-     the consumer-pollution bug Slice 0 fixed).
-   - Reference `hive/references/state-boundary.md` for the two-file
-     precedence contract that applies here.
-3. **Load your memories.** Read the `knowledge` paths from your orchestrator frontmatter. Scan `~/.claude/hive/memories/orchestrator/` for all `.md` files. Read each file's frontmatter `description` field. Load the full content of any memories relevant to the current task. If no memories exist yet, proceed — this is expected for new projects.
+See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — state-directory note, kickoff gate, persona / config / memory loading. This skill consults routing keys (`agent_backends`, `model_overrides`, `planning.collaborative_review`) so also follow the **Root-first config precedence** subsection of the prelude.
 
 ## Process
 
@@ -218,9 +195,19 @@ If all checks pass, proceed silently — do not announce that the kickoff gate p
 
 ### Phase B: Design Discussion (always runs)
 
-4. **Produce design discussion.** `SendMessage` to the technical writer with the `design-discussion` skill (`skills/hive/skills/design-discussion/SKILL.md`). Input: the research brief + the original user request. Output: a ~200-line design discussion document covering goal, proposed approach, risks, dependencies, open questions, and a scale assessment.
+4. **Produce design discussion (draft).** `SendMessage` to the technical writer with the `design-discussion` skill (`hive/references/document-templates/design-discussion.md`). Input: the research brief + the original user request. Output: a ~200-line design discussion document covering goal, proposed approach, risks, dependencies, open questions, and a scale assessment. Write the **draft** to `.pHive/epics/{epic-id}/docs/design-discussion.md` — Phase A2 (next step) grills it before the collaborative review gate.
 
-4b. **Collaborative review gate (if enabled).** Check `hive.config.yaml → planning.collaborative_review`. If `true` (default), run the collaborative review gate (see Collaborative Review Gate section below). `SendMessage` the design discussion to all active team agents for review. Collect feedback, have the writer revise if needed, then proceed. If `false`, skip the review gate and present the document directly to the user.
+### Phase A2: Adversarial Alignment (Grill)
+
+4a. **Run grill against the draft design-discussion.** Invoke the **grill** skill (atomic; `skills/grill/SKILL.md`) — this is an **external call**, NOT inline prose copied from the grill skill. Pass the draft path from step 4 plus the research brief (so grill can read its `inconsistency_risk_signals` field, emitted by the researcher). Grill produces `.pHive/epics/{epic-id}/docs/grill-record.md` per [`hive/references/grill-record-template.md`](../../hive/references/grill-record-template.md).
+
+The grill-record surfaces five categories of finding (vocabulary mismatches, hidden assumptions, unresolved tensions, convention violations, posture mismatches) — descriptive only, no prescriptions, no quality scoring. Each finding ends with a question for the planner to answer.
+
+If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (silent-on-absence per skill-prelude contract). If the research brief is missing `inconsistency_risk_signals`, grill runs heuristically against the draft alone.
+
+**Atomic boundary:** if grill ever appears as inline prose inside this skill, that is a regression. Phase A2 is a single skill invocation that returns a grill-record path; this skill does not duplicate grill's pass.
+
+4b. **Collaborative review gate (if enabled).** Check `hive.config.yaml → planning.collaborative_review`. If `true` (default), run the collaborative review gate (see Collaborative Review Gate section below). `SendMessage` the design discussion AND the grill-record from Phase A2 to all active team agents for review. The technical writer revises the draft to address each grill-record finding (or annotates explicitly-accepted-and-justified deviations) and incorporate team feedback. If `false`, skip the review gate; the writer still revises against the grill-record, then the document is presented directly to the user.
 
 5. **Present design discussion to user.** Show the full document, including a summary of what the team flagged and resolved during collaborative review. The user reads it and provides feedback:
    - Affirm or correct the understanding of the goal
@@ -271,7 +258,7 @@ If all checks pass, proceed silently — do not announce that the kickoff gate p
 
 ### Phase B3: Structured Outline (large scope only)
 
-9. **Produce structured outline.** `SendMessage` to the technical writer with the `structured-outline` skill (`skills/hive/skills/structured-outline/SKILL.md`). Input: H/V plans + design discussion + user feedback + research brief. Output: a ~1000-line structured outline with detailed approach, file manifest, risk registry, and elicitation questions. The outline now builds ON the vertical slice plan — each phase in the outline maps to a vertical slice.
+9. **Produce structured outline.** `SendMessage` to the technical writer with the `structured-outline` skill (`hive/references/document-templates/structured-outline.md`). Input: H/V plans + design discussion + user feedback + research brief. Output: a ~1000-line structured outline with detailed approach, file manifest, risk registry, and elicitation questions. The outline now builds ON the vertical slice plan — each phase in the outline maps to a vertical slice.
 
 9b. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the structured outline. This is the most critical review — all active team agents review the full outline. The TPM validates sequencing, the researcher confirms technical accuracy, the architect (if present) stress-tests feasibility, and the UI designer (if present) validates UI approach. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
 
@@ -708,10 +695,10 @@ All planning documents are written to `.pHive/epics/{epic-id}/docs/{document-typ
 | Document type | Sub-skill | Output path |
 |---------------|-----------|-------------|
 | research-brief | None (no sub-skill — see note) | `.pHive/epics/{epic-id}/docs/research-brief.md` |
-| design-discussion | `skills/hive/skills/design-discussion/SKILL.md` | `.pHive/epics/{epic-id}/docs/design-discussion.md` |
-| horizontal-plan | `skills/hive/skills/horizontal-plan/SKILL.md` | `.pHive/epics/{epic-id}/docs/horizontal-plan.md` |
-| vertical-plan | `skills/hive/skills/vertical-plan/SKILL.md` | `.pHive/epics/{epic-id}/docs/vertical-plan.md` |
-| structured-outline | `skills/hive/skills/structured-outline/SKILL.md` | `.pHive/epics/{epic-id}/docs/structured-outline.md` |
+| design-discussion | `hive/references/document-templates/design-discussion.md` | `.pHive/epics/{epic-id}/docs/design-discussion.md` |
+| horizontal-plan | `hive/references/document-templates/horizontal-plan.md` | `.pHive/epics/{epic-id}/docs/horizontal-plan.md` |
+| vertical-plan | `hive/references/document-templates/vertical-plan.md` | `.pHive/epics/{epic-id}/docs/vertical-plan.md` |
+| structured-outline | `hive/references/document-templates/structured-outline.md` | `.pHive/epics/{epic-id}/docs/structured-outline.md` |
 
 **Note on research-brief:** No sub-skill file exists for the research brief format. The technical writer produces it using the research-brief pattern from memory, based on raw findings from the researcher. Output path: `.pHive/epics/{epic-id}/docs/research-brief.md`. See `hive/agents/technical-writer.md`.
 
@@ -730,5 +717,5 @@ Existing planning documents at the `.pHive/` root are not moved — this convent
 - `hive/agents/ui-designer.md` — wireframes and UI review (conditional)
 - `hive/agents/analyst.md` — requirements analysis persona
 - `skills/hive/skills/agent-spawn/SKILL.md` — persona injection, memory loading, path resolution
-- `skills/hive/skills/design-discussion/SKILL.md` — ~200-line brain dump format
-- `skills/hive/skills/structured-outline/SKILL.md` — ~1000-line detailed plan with elicitation
+- `hive/references/document-templates/design-discussion.md` — ~200-line brain dump format
+- `hive/references/document-templates/structured-outline.md` — ~1000-line detailed plan with elicitation

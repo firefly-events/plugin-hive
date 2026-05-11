@@ -670,6 +670,26 @@ Create `hive.config.yaml` in the project root. This is Hive-specific config — 
 
 **Never duplicate CLAUDE.md content in hive.config.yaml.**
 
+### Phase 4b: Scaffold CONTEXT.md (domain glossary)
+
+Bootstrap `.pHive/CONTEXT.md` — the project's single-file domain glossary. Schema spec: [`hive/references/context-md-schema.md`](context-md-schema.md). One file, single source — NOT a tree.
+
+**Brownfield path** (codebase already exists):
+- Spawn the **researcher** persona with a bounded brief: "Inventory the project's domain vocabulary from CLAUDE.md, README, top-level directories, and the most-cited terms in `hive/references/`. Return 10–20 candidate terms with 1-sentence definitions."
+- Pass the inventory to the **technical-writer** persona, who instantiates the schema and writes `.pHive/CONTEXT.md` (sections: Terminology, Key paths, Conventions, Canonical references). Length target <200 lines.
+- The user reviews the seeded glossary in the onboarding report (Phase 6) and may edit before Hive proceeds.
+
+**Greenfield path** (no codebase yet):
+- Write an empty scaffold to `.pHive/CONTEXT.md` with the schema's section headers and a one-line note ("Populate as the project's vocabulary stabilizes — see [`hive/references/context-md-schema.md`](../hive/references/context-md-schema.md) for content rules.").
+- Discovery brief vocabulary may be promoted into CONTEXT.md by the user later.
+
+**Backfill path** (existing kickoff, CONTEXT.md missing):
+- Detect: `.pHive/project-profile.yaml` exists AND `.pHive/CONTEXT.md` does NOT.
+- Prompt the user opt-in: "CONTEXT.md (domain glossary) was added in Hive 2.0. Want me to scaffold it now from your existing codebase? [yes / skip]". Skip leaves the project unmodified — CONTEXT.md is silent-on-absence per skill-prelude contract, so nothing breaks.
+- On yes: run the brownfield path above.
+
+**Idempotent:** if `.pHive/CONTEXT.md` already exists with non-empty content, skip Phase 4b entirely. Do not overwrite a maintained glossary.
+
 ### Phase 5: Initialize Hive State
 
 - Create `.pHive/cycle-state/` directory
@@ -797,14 +817,14 @@ For a new project starting from scratch.
 
 **Process:**
 
-1. **Product Discovery (via greenfield-discovery skill)**
+1. **Product Discovery (analyst greenfield-facilitation mode)**
 
-   Delegate to the **greenfield-discovery** skill for deep product exploration. This replaces inline brainstorming with a structured, Socratic facilitation conversation.
+   Delegate to the **analyst** agent in greenfield-facilitation mode for deep product exploration. The analyst conducts a structured Socratic conversation that replaces inline brainstorming.
 
-   - Read and invoke: `skills/hive/skills/greenfield-discovery/SKILL.md`
-   - Use the analyst agent in **creative/exploratory mode** (not requirements-analysis mode)
-   - If `$ARGUMENTS` has a description, pass it as input context to the skill
-   - The skill facilitates a 7-area discovery conversation: problem space, target users, competitive landscape, differentiators, success metrics, MVP boundaries, and technical constraints
+   - Read the persona: `hive/agents/analyst.md` — the "Greenfield Discovery Facilitation" section is the procedure
+   - Brief schema reference: `hive/references/document-templates/greenfield-discovery-brief.md`
+   - If `$ARGUMENTS` has a description, pass it as input context
+   - The analyst facilitates a 7-area discovery conversation: problem space, target users, competitive landscape, differentiators, success metrics, MVP boundaries, and technical constraints
    - Output: structured **Product Discovery Brief** written to `.pHive/planning/product-discovery-brief.md`
    - The user validates the brief before proceeding to Step 2
    - The discovery brief feeds directly into Step 2 (Product Brief) as structured input

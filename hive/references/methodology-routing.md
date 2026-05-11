@@ -50,3 +50,14 @@ When the user specifies `--methodology tdd` (or similar), load the corresponding
 - `workflows/development.bdd.workflow.yaml`
 
 If no methodology is specified, default to **classic**.
+
+## Per-step token budgets (advisory caps, all methodologies)
+
+All methodology workflows honor advisory token caps from `hive.config.yaml → circuit_breakers.max_tokens_per_step`, `max_tokens_per_fix_loop`, and `max_tokens_per_story` (story `w5-sidecar-bundle`, A-31). The semantics are uniform across classic / tdd / tdd-codex / bdd / fdd:
+
+- **Soft caps, not hard breakers.** Crossing a cap emits a `budget_exceeded` telemetry event but does NOT stop the step. The existing iteration-count breakers (`max_step_retries`, `max_fix_iterations`, `max_same_error_repeats`) are the hard gates; token caps are tuning signals.
+- **Fail-open on missing data.** When token usage data is missing for a step (capture not enabled, persona doesn't emit usage, etc.), the cap is silently skipped. NO error, NO warning. Token caps require data to apply; absence is a no-op.
+- **Per-step granularity.** Each workflow step (research / test / implement / review / etc.) gets its own usage tally; `max_tokens_per_step` applies to each individually. Fix-loop and story caps aggregate across multiple step invocations.
+- **Set per project.** Defaults are `null` (unset) so consumers don't get spurious warnings before they've calibrated. Maintainer projects (like plugin-hive) may set caps based on observed historical usage.
+
+These advisory caps complement the existing iteration breakers — choose token caps when "this step ran too long via too much output" is the right signal; choose iteration breakers when "this step keeps retrying without convergence" is the right signal.

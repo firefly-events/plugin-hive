@@ -13,25 +13,9 @@ Execute stories through development workflow phases.
 
 All state paths in this skill are written as `${HIVE_STATE_DIR}/...`. Resolve `HIVE_STATE_DIR` from `paths.state_dir` in the ROOT `hive.config.yaml` (the consumer override layer). The shipped baseline at `hive/hive.config.yaml` is a fall-through source — it does NOT drive runtime path decisions per the Slice 1 resolver contract. The default is `.pHive`. When the root config sets a different value, substitute that value everywhere this skill writes `${HIVE_STATE_DIR}`, so relocation after marketplace install still works.
 
-## Kickoff Gate
+## Skill Preamble
 
-**Before doing anything else**, check whether Hive has been initialized for this project:
-
-1. Check if `${HIVE_STATE_DIR}/project-profile.yaml` exists (resolved from `paths.state_dir`; see the resolution note above)
-2. If it exists, verify it has a populated `tech_stack` field (not empty, not null)
-3. As a secondary check, verify `hive.config.yaml` exists (check both `hive/hive.config.yaml` and `hive.config.yaml` in the project root — either location is valid)
-
-If **any** of these checks fail, display this message and **stop** — do not proceed with execution:
-
-> Hive hasn't been set up for this project yet. Run `/hive:kickoff` first — it takes a few minutes and ensures every agent has full context about your codebase, preferences, and available tools.
-
-If all checks pass, proceed silently — do not announce that the kickoff gate passed. Only surface this section when a check fails.
-
-## Before Executing Any Skill
-
-1. **Load your persona.** Read `hive/agents/orchestrator.md` — it contains team evaluation criteria, pre-spawn checklist, circuit breakers, model tier routing, dev-on-standby pattern, decision protocols, and research prompt construction rules. This is WHO you are and HOW you make decisions.
-2. **Load project config.** Read `hive/hive.config.yaml` for execution settings (methodology, parallel teams, circuit breaker limits, model overrides).
-3. **Load your memories.** Read the `knowledge` paths from your orchestrator frontmatter. Scan `~/.claude/hive/memories/orchestrator/` for all `.md` files. Read each file's frontmatter `description` field. Load the full content of any memories relevant to the current task. If no memories exist yet, proceed — this is expected for new projects.
+See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — kickoff gate (initialization check) + persona / config / memory loading. The kickoff gate's `${HIVE_STATE_DIR}/project-profile.yaml` reference resolves via the section above.
 
 ## Delegation Rules (MANDATORY)
 
@@ -219,7 +203,18 @@ If all checks pass, proceed silently — do not announce that the kickoff gate p
 - **`references/sequential-execution.md`** — Per-story workflow steps, sidecar injection at review, episode records, gate checks
 - `hive/references/agent-teams-guide.md` — Team mechanics and limitations
 - `hive/references/methodology-routing.md` — Methodology selection
-- `hive/references/episode-schema.md` — Status marker format
+- `hive/references/episode-schema.md` — Status marker format. **Story state is derived from these markers — do NOT free-write `status:` in story YAMLs.** When a workflow step completes, write the corresponding episode marker; story-level state is computed from the marker set per the schema. The free-write `status:` field in some legacy story YAMLs is deprecated (per `feedback_story_status_stale`).
+
+### Per-step token budgets (advisory caps)
+
+When `hive.config.yaml → circuit_breakers` defines `max_tokens_per_step`, `max_tokens_per_fix_loop`, or `max_tokens_per_story`, treat them as **advisory caps** during execution:
+
+- Track token usage per step via the existing token-capture substrate.
+- When a step's cumulative tokens approach the advisory cap (≥80%), emit a structured warning to the orchestrator. Do NOT hard-block on the cap.
+- When a step crosses the cap, log it as a budget_exceeded telemetry event and continue. The cap is a tuning signal for future planning, not a runtime stop.
+- **Fail-open semantics.** If token data is missing for any reason (capture not enabled, persona doesn't emit usage, etc.), proceed without warnings — never fail the step on missing telemetry. The advisory cap requires data to apply; absence is silent skip, not error.
+
+This is intentionally softer than the existing iteration-count breakers (`max_step_retries`, `max_fix_iterations`, etc.) — those gate runtime behavior; token caps tune empirical defaults via telemetry.
 - `hive/references/cycle-state-schema.md` — Persistent decision tracking
 - `hive/references/step-file-schema.md` — Step file format
 - `hive/references/specialist-triggers.md` — Trigger catalog (loaded in step 2b)
