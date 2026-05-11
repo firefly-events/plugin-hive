@@ -1,0 +1,145 @@
+id: a-35-execute-epic-create-on-fly-and-gate-lift
+epic: structural-refactor-and-gate-lift
+title: /execute epic-create-on-the-fly path + hard-gate lift to warning
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [a-05-execute-skill-split-dispatch, a-34-execute-backend-auto-resolve]
+wave: W6
+action_id: A-35
+
+description: |
+  Today /execute requires .pHive/epics/{epic-id}/epic.yaml to exist —
+  hard-blocks if missing. Per D4 Position A, /execute should support
+  epic-create-on-the-fly under gate_mode: warning.
+
+  When /execute receives an epic_id with no matching epic.yaml AND
+  paths.gate_mode: warning:
+    1. Warn loudly: "Epic {epic-id} not found. Creating ad-hoc epic from $ARGUMENTS."
+    2. Generate a placeholder .pHive/epics/{epic-id}/epic.yaml with:
+       - title from $ARGUMENTS
+       - one story stub: id={epic-id}-default, title from $ARGUMENTS
+       - methodology from a-34 auto-resolve
+    3. Proceed with execution.
+
+  When paths.gate_mode: hard: original block behavior preserved.
+
+  This is the /execute counterpart to a-33 (/plan gate-lift). Same
+  paths.gate_mode knob, same telemetry source.
+
+  Depends on a-05-dispatch (which is where /execute pre-flight lives) and
+  a-34-backend-auto-resolve (which provides the methodology default for
+  ad-hoc epics).
+
+acceptance_criteria:
+  - "skills/execute/SKILL.md kickoff gate honors paths.gate_mode (introduced by a-33)"
+  - "Warning mode: missing epic.yaml triggers ad-hoc creation + warning + proceed"
+  - "Ad-hoc epic.yaml structurally valid: title, methodology, ≥1 story stub"
+  - "Hard mode: original block behavior preserved byte-equivalent"
+  - "Ad-hoc story stub uses methodology from a-34 auto-resolve"
+  - "Telemetry event emitted on every ad-hoc creation: epic_create_on_fly with epic_id + source"
+  - "Warning message includes override instructions (run /plan first OR use paths.gate_mode: hard)"
+  - "/execute runs on a fresh repo with no epic at all → produces working execution with ad-hoc epic + warning trail"
+
+steps:
+  - id: research
+    description: |
+      1. Read skills/execute/SKILL.md step 1 (Load the epic) — hard-block path.
+      2. Read a-33-plan-gate-lift-and-gate-mode-knob to align on shared knob semantics.
+      3. Read a-34-execute-backend-auto-resolve for methodology resolution dependency.
+      4. Sketch ad-hoc epic.yaml template + minimum viable story stub.
+    agent: researcher
+
+  - id: implement
+    description: |
+      - Update skills/execute/SKILL.md step 1 to honor paths.gate_mode:
+        - warning: if epic.yaml missing, generate from template; warn; proceed.
+        - hard: original block.
+      - Ad-hoc epic.yaml template:
+        ```
+        name: {epic-id}
+        title: {from $ARGUMENTS}
+        methodology: {from a-34 auto-resolve}
+        stories:
+          - id: {epic-id}-default
+            title: {from $ARGUMENTS}
+            depends_on: []
+        ```
+      - Add telemetry hook for epic_create_on_fly events.
+      - Preserve cycle-state initialization (step 2) for ad-hoc epics.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Run /execute new-epic-id "build login screen" on fresh repo → verify ad-hoc epic created, warning emitted, execution proceeds.
+      2. Run /execute existing-epic-id → verify normal path unchanged.
+      3. Run /execute new-epic-id with paths.gate_mode: hard → verify original block behavior.
+      4. Verify ad-hoc epic.yaml is structurally valid (passes /status read).
+      5. Verify methodology in ad-hoc epic.yaml matches a-34 auto-resolve output.
+      6. Verify cycle-state initialized for ad-hoc epic.
+      7. Verify telemetry event emitted.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      1. Verify warning is loud + actionable.
+      2. Verify hard mode is byte-equivalent.
+      3. Verify ad-hoc epic.yaml passes /status read without errors.
+      4. Verify alignment with a-33 (shared knob).
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): /execute ad-hoc epic create + gate lift (story a-35-execute-epic-create-on-fly-and-gate-lift, W6)`.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml]
+    frameworks: [hive-orchestrator]
+  key_files:
+    - path: skills/execute/SKILL.md
+      purpose: Source — step 1 (Load the epic) updated to honor gate_mode
+    - path: hive/hive.config.yaml
+      purpose: paths.gate_mode introduced by a-33 — same knob applies here
+    - path: hive/references/epic-yaml-schema.md
+      purpose: Schema — ad-hoc epic.yaml must conform
+
+design_decisions:
+  - decision: Ad-hoc epic gets one story stub (not zero, not many)
+    rationale: Zero stories = nothing to execute = ambiguous. One stub = minimum viable; user can refine via /plan later.
+  - decision: Share paths.gate_mode knob with /plan (a-33), not separate execute_gate_mode
+    rationale: Consistent semantics across /plan and /execute. Operators set one knob, not two.
+
+cross_cutting:
+  - concern: backward-compatibility
+    action: "Hard mode preserves original block behavior; warning mode + ad-hoc creation is opt-out via gate_mode: hard."
+  - concern: observability
+    action: "epic_create_on_fly telemetry feeds a-36 audit; aggregate rate signals whether default flip is warranted."
+
+risks:
+  - severity: high
+    description: Ad-hoc epic with one stub may produce poor execution output without proper planning context.
+    mitigation: Warning includes "run /plan first" recommendation; A-36 audit catches no-op outputs; gate_mode: hard available for cautious users.
+  - severity: medium
+    description: Ad-hoc story stub lacks acceptance criteria + design context; developer agent may produce overly broad output.
+    mitigation: Warning makes ad-hoc nature visible; agent prompts include "this is an ad-hoc execution — escalate if scope is unclear."
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-35: /execute epic-create-on-the-fly path + hard-gate lift to
+      warning. Same gate_mode knob as a-33. Lowest-friction substrate
+      onboarding for new users.
+  - path: skills/execute/SKILL.md
+    relevant_excerpt: |
+      Step 1. Load the epic. Read ${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml.
+      (currently hard-blocks if missing)
+  - path: .pHive/epics/structural-refactor-and-gate-lift/stories/a-33-plan-gate-lift-and-gate-mode-knob.yaml
+    relevant_excerpt: |
+      Sibling story — introduces paths.gate_mode: warning|hard. This
+      story uses the same knob for /execute kickoff gate.

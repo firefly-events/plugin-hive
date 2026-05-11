@@ -1,0 +1,137 @@
+id: a-32-plan-methodology-auto-detect
+epic: structural-refactor-and-gate-lift
+title: /plan methodology auto-detect (tests → tdd, gherkin → bdd, else → classic)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [a-04-plan-skill-split-routing]
+wave: W6
+action_id: A-32
+
+description: |
+  Today /plan asks the user to pick methodology (classic | tdd | bdd) via
+  hive.config.yaml or epic.yaml override; falls back to classic if neither.
+  Per D4 Position A fold-in (2026-05-08), /plan should auto-detect on
+  fresh repos with sane defaults.
+
+  Detection signals (order of priority):
+    1. --methodology= flag in $ARGUMENTS → always wins, no auto-detect
+    2. epic.yaml `methodology` field → wins over auto-detect
+    3. hive.config.yaml `methodology` field → wins over auto-detect
+    4. Auto-detect from codebase:
+       - Tests directory present (tests/, test/, __tests__/, spec/) + ≥1 test file → tdd
+       - Gherkin .feature files present → bdd
+       - Otherwise → classic
+    5. Warn loudly when auto-detect fires: "Auto-detected methodology: tdd (found tests/ with 47 files). Override with --methodology= or set in hive.config.yaml."
+
+  Depends on a-04-plan-skill-split-routing because the methodology
+  resolution becomes part of /plan Phase 0 routing decisions, and the
+  split atom is where this lives cleanly.
+
+acceptance_criteria:
+  - "/plan resolves methodology via 4-tier precedence: --methodology flag > epic.yaml > hive.config.yaml > auto-detect"
+  - "Auto-detect signals documented: tests directory + ≥1 test file → tdd; .feature files → bdd; else classic"
+  - "Auto-detect warning emitted loudly with detection rationale + override instructions"
+  - "Override paths remain: --methodology=classic|tdd|bdd flag always works; YAML config always works"
+  - "Telemetry captured: methodology source (flag|epic-yaml|hive-config|auto-detect) + auto-detected value when applicable"
+  - "Auto-detect false-positive guard: empty tests/ directory does NOT trigger tdd; .feature files in node_modules ignored"
+  - "skills/plan/SKILL.md step 10c (Resolve methodology) updated to use the new auto-detect path"
+  - "Methodology-aware step templates (classic/tdd/bdd) at step 13 unchanged in behavior"
+
+steps:
+  - id: research
+    description: |
+      1. Read skills/plan/SKILL.md step 10c (~lines 279-290) to lock the current resolution path.
+      2. Read hive/references/methodology-routing.md for the canonical methodology definitions.
+      3. Identify common test directory + .feature file conventions across major languages.
+      4. Sketch auto-detect heuristics with explicit false-positive guards.
+      5. Decide where auto-detect lives: inline in step 10c, in the a-04-routing atom, or in a new hive/lib/methodology-detect.js. Default: inline in step 10c (small enough; no reuse outside /plan).
+    agent: researcher
+
+  - id: implement
+    description: |
+      - Update skills/plan/SKILL.md step 10c with 4-tier resolution.
+      - Add auto-detect block that scans for tests/ directories (count files, require ≥1) and .feature files (exclude node_modules).
+      - Emit warning when auto-detect fires; include detected value + counts + override hints.
+      - Add telemetry hook: emit methodology_resolution event with source + value.
+      - If a-04-plan-skill-split-routing landed and resolution moved into the routing atom, update there instead.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Run /plan on repo with tests/ dir + Jest tests → verify tdd auto-detected, warning emitted.
+      2. Run /plan on repo with features/*.feature → verify bdd auto-detected.
+      3. Run /plan on repo with neither → verify classic auto-detected.
+      4. Run /plan --methodology=bdd on repo with tests/ → verify --methodology wins (no auto-detect).
+      5. Run /plan with hive.config.yaml methodology: tdd → verify config wins.
+      6. Run /plan on repo with empty tests/ dir → verify tdd NOT triggered.
+      7. Run /plan on repo with .feature files in node_modules/ → verify bdd NOT triggered.
+      8. Verify telemetry event emitted with correct source + value.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      1. Verify precedence order is strict.
+      2. Verify warnings are loud enough to course-correct user.
+      3. Verify false-positive guards work on the test cases.
+      4. Verify telemetry shape feeds into a-36 post-run audit (downstream story).
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): /plan methodology auto-detect (story a-32-plan-methodology-auto-detect, W6)`.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml]
+    frameworks: [hive-orchestrator]
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Source — step 10c (Resolve methodology) updated
+    - path: hive/references/methodology-routing.md
+      purpose: Canonical methodology definitions; detect signals must align
+    - path: skills/hive/skills/planning-routing/SKILL.md
+      purpose: If a-04 landed as atomic skill, resolution moves here
+    - path: hive/workflows/development.classic.workflow.yaml
+      purpose: Methodology -> workflow file mapping; auto-detect output must be valid workflow name
+
+design_decisions:
+  - decision: Auto-detect is opt-out, not opt-in (default fires when no explicit config)
+    rationale: Sane defaults for fresh repos = no friction. Warning ensures user notices auto-detect happened.
+  - decision: Detection lives inline in step 10c (or in a-04 routing atom)
+    rationale: Small, /plan-specific. Library extraction is over-engineering for ~30 lines.
+  - decision: Telemetry source enum {flag, epic-yaml, hive-config, auto-detect}
+    rationale: A-36 post-run audit reads telemetry to flag nonsensical defaults. Source attribution is the signal.
+
+cross_cutting:
+  - concern: backward-compatibility
+    action: "Explicit config paths (flag, epic.yaml, hive.config.yaml) take precedence — no auto-detect surprises for users with existing config."
+  - concern: observability
+    action: "Telemetry event emitted on every methodology resolution; feeds a-36 audit."
+
+risks:
+  - severity: medium
+    description: Auto-detect on a polyglot repo (tests AND features) is ambiguous.
+    mitigation: Precedence: .feature files → bdd (more specific). Document tiebreaker. Warning emits both signals so user can override.
+  - severity: medium
+    description: False-positive in monorepos with tests/ at root but feature implementations far away.
+    mitigation: Warning is loud + override is trivial; A-36 telemetry captures override rate.
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-32: /plan methodology auto-detect — D4 Position A fold-in.
+      A composable substrate that hard-blocks on initialization ritual is
+      anti-substrate. Auto-detect with loud warning + override paths.
+  - path: skills/plan/SKILL.md
+    relevant_excerpt: |
+      Step 10c. Resolve methodology.
+      1. Check hive.config.yaml methodology field
+      2. Check epic.yaml methodology override
+      3. Fall back to classic
+      (no auto-detect today)

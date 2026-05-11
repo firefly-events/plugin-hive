@@ -1,0 +1,136 @@
+id: a-14-agent-spawn-split-persona
+epic: structural-refactor-and-gate-lift
+title: Split agent-spawn persona resolution into separate skill or reference
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+wave: W6
+action_id: A-14
+
+description: |
+  skills/hive/skills/agent-spawn/SKILL.md is 418 lines with 8 numbered
+  sections. Sections 1-4 (~75 lines) cover persona resolution:
+    - Section 1: Validate agent name against roster
+    - Section 2: Read persona + parse YAML frontmatter (model, knowledge,
+      skills, tools, required_tools, domain)
+    - Section 3: Check required tools (CLI via `which`, MCP via session)
+    - Section 4: Resolve all paths (~, ${CLAUDE_PLUGIN_ROOT}, relative)
+
+  This persona-resolution block is the deterministic, no-side-effect
+  pre-flight any spawn pathway needs. Sessions, TeamCreate, codex-invoke,
+  cmux all need the same persona + path + tool validation done upfront.
+
+  Extract sections 1-4 into atomic skill or reference. Default form (a)
+  atomic skill at skills/hive/skills/persona-resolve/SKILL.md. The atom
+  returns a `persona_context` object (parsed frontmatter + validated
+  tools + resolved paths) that the caller passes to the spawn pathway.
+
+  Section 6 (applicable skills check) is left in agent-spawn for now —
+  it depends on persona_context output but introduces skill-file reading,
+  which is heavier than the pre-flight validation in 1-4.
+
+acceptance_criteria:
+  - "Sections 1-4 (validate, read persona, check tools, resolve paths) extracted from skills/hive/skills/agent-spawn/SKILL.md"
+  - "skills/hive/skills/agent-spawn/SKILL.md reduced by ≥60 lines; sections 1-4 replaced with single invocation"
+  - "Net line delta across agent-spawn + extracted artifact is ≥-50 lines"
+  - "Roster validation contract preserved: STOP if hive/agents/{agent-name}.md does not exist"
+  - "Path resolution contract preserved: ~ + ${CLAUDE_PLUGIN_ROOT} + relative all expand correctly"
+  - "Required-tools validation preserved: CLI via `which`, MCP via active session, fallback handling"
+  - "persona_context output is reusable by sibling story a-14-agent-spawn-split-memory-and-dispatch + by cmux team-spawn path"
+  - "agent-spawn end-to-end still works: spawn researcher / developer / tester through agent-spawn unchanged behavior"
+
+steps:
+  - id: research
+    description: |
+      1. Read skills/hive/skills/agent-spawn/SKILL.md sections 1-4 in full (lines 20-65).
+      2. Read hive/agents/researcher.md (or any roster persona) to confirm the frontmatter fields the atom must parse.
+      3. Read the sibling a-14-agent-spawn-split-memory-and-dispatch description to align form decision.
+      4. Sketch invocation signature: inputs (agent_name, task_context), outputs (persona_context: {persona_text, frontmatter, resolved_paths, validated_tools, domain_constraints}).
+      5. Decide form (atomic skill preferred per A-04 / A-05 precedent).
+    agent: researcher
+
+  - id: implement
+    description: |
+      Form (a) atomic skill:
+        - Create skills/hive/skills/persona-resolve/SKILL.md with sections 1-4 logic.
+        - Replace agent-spawn sections 1-4 with a single invocation returning persona_context.
+        - Pass persona_context to section 5 (memory loading), section 6 (skills check), section 7 (spawn construction).
+
+      Either form:
+        - Roster validation MUST be the first check (sanity gate for unknown agents).
+        - Required-tools validation MUST honor `fallback` field semantics (warn + proceed if fallback exists; STOP if not).
+        - Path resolution MUST cover all three prefix forms (~, ${CLAUDE_PLUGIN_ROOT}, relative).
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Line-count check: wc -l agent-spawn/SKILL.md before/after.
+      2. Spawn each of the 3 most common roster agents (researcher, developer, reviewer); verify each spawns successfully.
+      3. Spawn an INVALID agent name; verify STOP behavior + roster suggestion.
+      4. Spawn an agent with a missing required CLI tool (mock via PATH manipulation); verify STOP behavior.
+      5. Spawn an agent whose persona has a `knowledge` path containing ${CLAUDE_PLUGIN_ROOT}; verify expansion.
+      6. Confirm persona_context object is exposed to downstream sections in the expected shape.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      1. Verify byte-equivalence of validation, parsing, tool-check, and path-resolution behavior.
+      2. Confirm persona_context invocation signature matches sibling story's consumption expectations.
+      3. Verify form alignment with a-04 + a-05 (all atomic skills, or all references).
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): split agent-spawn persona resolution (story a-14-agent-spawn-split-persona, W6)`.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown]
+    frameworks: [hive-orchestrator, claude-code-plugin-system]
+  key_files:
+    - path: skills/hive/skills/agent-spawn/SKILL.md
+      purpose: Source — sections 1-4 (lines 20-65) extracted
+    - path: hive/agents/researcher.md
+      purpose: Sample roster persona — frontmatter shape the atom must parse
+    - path: skills/hive/skills/persona-resolve/SKILL.md
+      purpose: NEW (form a) — destination atomic skill
+    - path: hive/references/persona-resolve.md
+      purpose: NEW (form b) — destination reference (only if form a infeasible)
+
+design_decisions:
+  - decision: Sections 1-4 stay bundled (single persona_context output)
+    rationale: All four sections are pre-flight validation with no side effects. Splitting them further adds invocation overhead without value.
+  - decision: Section 6 (skills check) stays in agent-spawn
+    rationale: Section 6 depends on persona_context but introduces file reads (skill content into prompt). Keeping it close to spawn construction is clearer.
+
+cross_cutting:
+  - concern: backward-compatibility
+    action: "Roster + path + tool validation semantics must be byte-equivalent. Existing callers of agent-spawn must see identical pre-flight outcomes."
+
+risks:
+  - severity: medium
+    description: Section 4 path resolution has three prefix forms (~, ${CLAUDE_PLUGIN_ROOT}, relative); subtle drift could break agent spawning across plugin install locations.
+    mitigation: Test step exercises ${CLAUDE_PLUGIN_ROOT} expansion specifically; AC #5 enforces all three forms.
+  - severity: low
+    description: Required-tools fallback semantics (warn vs STOP) could be re-implemented incorrectly.
+    mitigation: Test step exercises both missing-with-fallback and missing-without-fallback paths.
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-14: Split agent-spawn into composable atoms. Persona resolution
+      (sections 1-4) + memory loading (section 5) + backend dispatch
+      (section 7) are three distinct concerns each reusable independently.
+      Combined line-count target ≥-150 lines for both a-14 stories.
+  - path: skills/hive/skills/agent-spawn/SKILL.md
+    relevant_excerpt: |
+      Section 1: Validate the agent name (roster check).
+      Section 2: Read the agent's persona and config (parse frontmatter).
+      Section 3: Check required tools (CLI via `which`, MCP via session).
+      Section 4: Resolve all paths (~, ${CLAUDE_PLUGIN_ROOT}, relative).

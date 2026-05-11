@@ -1,0 +1,150 @@
+id: a-04-plan-skill-split-escalation
+epic: structural-refactor-and-gate-lift
+title: Split /plan escalation backfill (steps 11/14) into separate concern
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [a-04-plan-skill-split-routing]
+wave: W6
+action_id: A-04
+
+description: |
+  skills/plan/SKILL.md Phase C step 11 contains an escalation-stories[]-
+  backfill block (~30 lines, lines 298-312) that walks
+  .pHive/cycle-state/{epic-id}.yaml escalations[] and replaces topic-area
+  strings with canonical story IDs after decomposition. Step 14 (~10 lines)
+  evaluates cross-cutting concerns per story. Both are well-defined,
+  side-effecting transformations that any planner could re-use — they
+  belong outside the /plan procedural narrative.
+
+  Extract step 11 backfill + step 14 cross-cutting evaluation into either:
+    (a) Atomic skill at skills/hive/skills/escalation-backfill/SKILL.md
+        (preferred — matches sibling a-04-plan-skill-split-routing form)
+    (b) Reference at hive/references/escalation-backfill.md
+
+  Decide form in research step. Default to (a) for consistency with
+  sibling story. If sibling routing-split landed as (a), this story MUST
+  land as (a) too — split the same skill the same way.
+
+  This story depends on a-04-plan-skill-split-routing because that
+  story's form-decision (a vs b) is binding precedent for this one.
+
+acceptance_criteria:
+  - "step 11 escalation-stories[]-backfill logic extracted from skills/plan/SKILL.md"
+  - "step 14 cross-cutting concern evaluation extracted to the same artifact (single coherent backfill phase)"
+  - "skills/plan/SKILL.md step 11 + step 14 each reduced to ≤10 lines — single invocation/citation, no inline duplicate"
+  - "Net line delta across skills/plan/SKILL.md + extracted artifact is ≥-30 lines"
+  - "Two-phase population pattern preserved: topic areas at raise time, canonical IDs at backfill (no semantic change)"
+  - "Fuzzy-match + exact-match rules preserved byte-identical (case-insensitive substring match on title/description)"
+  - "Unmatched-topic-area warning preserved: WARNING: escalation \"{trigger}\" stories[] entry \"{topic-area}\" could not be matched to a canonical story ID — leaving as topic area string"
+  - "Form matches sibling a-04-plan-skill-split-routing (both atomic skill OR both reference; never mixed)"
+  - "/plan continues to pass end-to-end on a sample epic with at least one pre-decomposition escalation in cycle state"
+
+steps:
+  - id: research
+    description: |
+      1. Read skills/plan/SKILL.md lines 277-330 (Phase C step 10c through step 14) to lock the exact extraction surface.
+      2. Read .pHive/epics/structural-refactor-and-gate-lift/stories/a-04-plan-skill-split-routing.yaml to confirm sibling form decision.
+      3. Read hive/references/cross-cutting-concerns.md to understand step 14's input contract.
+      4. Decide form (must match sibling) and document.
+      5. Sketch invocation signature: inputs (story IDs, cycle state path, cross-cutting concerns file), outputs (updated cycle state file written, warnings logged).
+    agent: researcher
+
+  - id: implement
+    description: |
+      Form (a) path (preferred):
+        - Create skills/hive/skills/escalation-backfill/SKILL.md with both step 11 backfill and step 14 cross-cutting evaluation.
+        - Replace skills/plan/SKILL.md step 11 backfill block (lines ~298-312) with ≤10-line invocation.
+        - Replace step 14 with ≤10-line invocation citing the same artifact.
+
+      Form (b) path:
+        - Create hive/references/escalation-backfill.md with the same content.
+        - Inline-by-reference rewrite in /plan.
+
+      Either form:
+        - Two-phase population pattern note (line 312) MUST be preserved verbatim — it documents the invariant for /execute consumers.
+        - Do NOT change cross-cutting concerns evaluation semantics — applies_when condition logic stays as-is.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Line-count check: wc -l skills/plan/SKILL.md before/after; verify ≥-30 line reduction net.
+      2. Invoke /plan on a test epic with cycle state pre-seeded with one pre-canonical escalation (topic area string in stories[]).
+      3. Verify exact-match path: topic-area equal to a story ID → replaced.
+      4. Verify fuzzy-match path: topic-area as substring of story title → replaced.
+      5. Verify no-match path: nonsense topic-area → preserved as-is + WARNING log emitted.
+      6. Verify cross-cutting concerns still apply per-story when applies_when matches.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      1. Diff the extracted artifact against the original step 11 + step 14 blocks; verify byte-equivalence aside from format-shift.
+      2. Verify the two-phase population pattern callout is preserved.
+      3. Confirm sibling form alignment (both atomic skill or both reference).
+      4. Check that /execute (which reads the backfilled canonical IDs) does not need any change — semantic contract preserved.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): split /plan escalation backfill (story a-04-plan-skill-split-escalation, W6)`.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown]
+    frameworks: [hive-orchestrator]
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Source — lines 298-312 (step 11) + step 14 extracted
+    - path: hive/references/cross-cutting-concerns.md
+      purpose: Step 14's input contract — concerns format + applies_when semantics
+    - path: skills/hive/skills/escalation-backfill/SKILL.md
+      purpose: NEW (form a) — destination atomic skill
+    - path: hive/references/escalation-backfill.md
+      purpose: NEW (form b) — destination reference (only if form a infeasible)
+    - path: skills/execute/SKILL.md
+      purpose: Consumer of backfilled canonical IDs (step 2b reads cycle state escalations[]); must remain semantically unchanged
+
+design_decisions:
+  - decision: Bundle step 11 + step 14 in one extraction (single skill/reference)
+    rationale: Both are post-decomposition side-effects on the story set; conceptually one "post-decomposition fixup" phase. Splitting them across two artifacts adds churn without value.
+  - decision: Form must match sibling a-04-plan-skill-split-routing
+    rationale: Reviewing a single skill split as half-atomic + half-reference is confusing; form-consistency reduces cognitive load.
+
+cross_cutting:
+  - concern: backward-compatibility
+    action: "Two-phase population pattern (topic-areas at raise time, canonical IDs at backfill) is a contract /execute step 2b reads. Must not change."
+  - concern: observability
+    action: "Unmatched-topic-area WARNING log format must be preserved — operators rely on it to spot mis-named stories."
+
+risks:
+  - severity: medium
+    description: Fuzzy-match heuristic (case-insensitive substring) is subtle; re-implementing in extracted artifact risks behavior drift.
+    mitigation: Test step exercises exact-match + fuzzy-match + no-match paths explicitly.
+  - severity: low
+    description: Step 14 cross-cutting evaluation reads applies_when conditions that may be project-specific; extracting risks losing project context.
+    mitigation: Extract operates on inputs only — concerns file path passed as parameter, applies_when evaluated at invocation time.
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-04: Split /plan into composable atoms. Escalation backfill is the
+      smaller of the two atom-shaped extractions. Combined with sibling
+      routing-split, net line delta target is ≥-300 lines (recommendation §2.7 AC).
+  - path: skills/plan/SKILL.md
+    relevant_excerpt: |
+      Step 11 (lines 298-312): Escalation stories[] backfill (always runs
+      after story IDs are determined). Walks cycle-state escalations[],
+      matches topic-area strings against story IDs (exact > fuzzy), writes
+      canonical IDs back. Two-phase population pattern note follows.
+
+      Step 14: Evaluate cross-cutting concerns per story.
+  - path: .pHive/epics/structural-refactor-and-gate-lift/stories/a-04-plan-skill-split-routing.yaml
+    relevant_excerpt: |
+      Sibling story — form decision binds this story. If routing-split is
+      atomic skill, escalation-split is atomic skill. If routing-split is
+      reference, escalation-split is reference.

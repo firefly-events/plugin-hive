@@ -1,0 +1,102 @@
+id: a-08-brand-system-extract-config
+epic: structural-refactor-and-gate-lift
+title: Move brand-system inlined YAML/HTML schemas to references
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+wave: W6
+action_id: A-08
+
+description: |
+  skills/brand-system/SKILL.md (175 lines) inlines a ~100-line brand-
+  system.yaml schema directly inside the ui-designer task prompt (lines
+  ~38-104). The schema covers colors (primary/secondary/neutral/surface
+  with hex/rgb/cmyk/pms/usage), typography (fonts/scale/weights), spacing,
+  radius, personality. It is data, not procedure — belongs in references/.
+
+  Pattern precedent: Epic A W1 doc-template-reclassify (commit 6cc851e)
+  moved 5 doc-template skills to hive/references/document-templates/.
+  This story extends that pattern to config schemas embedded in
+  procedural skills.
+
+  Extract the brand-system.yaml schema to hive/references/brand-system-
+  schema.yaml. Replace the inline block in skills/brand-system/SKILL.md
+  with a citation. Net delta target ~-90 lines from the SKILL.md.
+
+acceptance_criteria:
+  - "hive/references/brand-system-schema.yaml exists with the canonical YAML schema"
+  - "skills/brand-system/SKILL.md inline schema block (~100 lines) replaced with citation: 'See hive/references/brand-system-schema.yaml for the canonical schema.'"
+  - "Net line delta on skills/brand-system/SKILL.md is ≥-85 lines"
+  - "ui-designer task still produces .pHive/brand/brand-system.yaml conforming to the same schema"
+  - "Visual HTML brand guide (Part 2) generation unchanged — no impact on .pHive/brand/brand-guide.html output"
+  - "Frame0 optional path (Part 3, --with-frame0) unchanged"
+
+steps:
+  - id: research
+    description: |
+      1. Read skills/brand-system/SKILL.md in full.
+      2. Identify exact line range of inline YAML schema.
+      3. Read W1 commit 6cc851e to see the reference-citation pattern Epic A established.
+      4. Sketch citation line + reference file structure.
+    agent: researcher
+
+  - id: implement
+    description: |
+      - Create hive/references/brand-system-schema.yaml with the YAML schema verbatim.
+      - Replace the inline block in skills/brand-system/SKILL.md with: "See hive/references/brand-system-schema.yaml for the canonical schema. Produce a structured brand system conforming to that schema and write it to .pHive/brand/brand-system.yaml."
+      - Preserve all other parts of the ui-designer task prompt (HTML brand guide instructions, Frame0 optional path, derivation guidance).
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Run /brand-system on a test project; verify .pHive/brand/brand-system.yaml is produced and conforms to schema.
+      2. Verify .pHive/brand/brand-guide.html still includes all 6 sections.
+      3. wc -l skills/brand-system/SKILL.md before/after; verify ≥-85.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: Verify schema byte-equivalence; verify citation is unambiguous; spot-check brand output quality unchanged.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): extract brand-system schema to references (story a-08-brand-system-extract-config, W6)`.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml]
+    frameworks: [hive-orchestrator]
+  key_files:
+    - path: skills/brand-system/SKILL.md
+      purpose: Source — inline YAML schema (lines ~38-104) extracted
+    - path: hive/references/brand-system-schema.yaml
+      purpose: NEW — destination canonical schema
+    - path: hive/references/html-preview-format.md
+      purpose: Already-referenced HTML format spec — unchanged
+
+design_decisions:
+  - decision: Reference is YAML file (not markdown)
+    rationale: Schema is YAML; storing as .yaml allows tooling to lint/validate; matches what the ui-designer ultimately writes.
+
+risks:
+  - severity: low
+    description: ui-designer may need slight prompt rephrasing to reference an external schema instead of inline.
+    mitigation: Implement step preserves task framing; test step verifies output unchanged.
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-08: Move brand-system inlined YAML/HTML schemas to references.
+      ~90 lines extracted from skills/brand-system/SKILL.md to hive/references/.
+      Same pattern as W1 doc-template reclassify; same reference shape.
+  - path: skills/brand-system/SKILL.md
+    relevant_excerpt: |
+      Inline YAML schema block in ui-designer task prompt (lines ~38-104):
+      colors (primary/secondary/neutral/surface), typography (fonts/scale/weights),
+      spacing, radius, personality. ~100 lines of pure data inside a procedural skill.
