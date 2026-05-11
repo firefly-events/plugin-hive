@@ -1,7 +1,7 @@
 id: m-05-metrics-check-skill
 epic: metrics-as-planning-concern
 title: New /metrics-check skill — post-merge verdict against story metrics
-status: pending
+status: completed
 complexity: medium
 methodology: classic
 depends_on: [m-02-story-schema-metric-fields]
