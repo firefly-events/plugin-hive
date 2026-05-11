@@ -1,7 +1,7 @@
 id: a-14-agent-spawn-split-memory-and-dispatch
 epic: structural-refactor-and-gate-lift
 title: Split agent-spawn memory loading (L0–L3) and backend dispatch
-status: pending
+status: completed
 complexity: high
 methodology: classic
 depends_on: [a-14-agent-spawn-split-persona]

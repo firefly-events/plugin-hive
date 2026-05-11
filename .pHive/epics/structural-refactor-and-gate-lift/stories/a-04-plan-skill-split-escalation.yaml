@@ -1,7 +1,7 @@
 id: a-04-plan-skill-split-escalation
 epic: structural-refactor-and-gate-lift
 title: Split /plan escalation backfill (steps 11/14) into separate concern
-status: pending
+status: completed
 complexity: medium
 methodology: classic
 depends_on: [a-04-plan-skill-split-routing]

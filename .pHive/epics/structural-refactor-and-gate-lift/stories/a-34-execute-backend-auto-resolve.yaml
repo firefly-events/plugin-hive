@@ -1,7 +1,7 @@
 id: a-34-execute-backend-auto-resolve
 epic: structural-refactor-and-gate-lift
 title: /execute backend auto-resolve (env > hive.config.yaml > prompt)
-status: pending
+status: completed
 complexity: medium
 methodology: classic
 depends_on: [a-05-execute-skill-split-dispatch]
