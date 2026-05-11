@@ -182,7 +182,28 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
    > **v1 note:** v1 routing handles `workflow`-based catalog entries only. A catalog entry with `skill: <path>` (allowed by catalog schema but unused in v1) is not reached by condition (i) and falls to condition (ii) or (iii). Skill-based routing is a Phase 6 extension point.
 
-8. After all stories complete, produce a summary of the epic execution.
+8. After all stories complete, produce a summary plus the post-run audit:
+
+   1. **Run summary** — existing behavior: list completed stories, any failed/blocked, and final status.
+
+   2. **Post-run audit** — scan this run's resolved state per `hive/references/gate-lift-telemetry.md`:
+      - `gate_lift_fired` (true if step 1 took the warning branch and synthesized an ad-hoc plan)
+      - `backend_resolution` sources (collected from the `execute-dispatch` sub-skill invoked at step 5 per a-34 Sane Default Resolution; map of `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor` → `flag|env|hive-config|default`)
+      - methodology (resolved value + source)
+      - work artifacts (commits made, files modified during the run)
+
+   3. Evaluate nonsensical-default heuristics from the reference doc:
+      - **Lifted gate + no work**: `gate_lift_fired` was true AND the run produced zero commits + zero file modifications.
+      - **All backend defaults**: every `backend_resolution` field resolved from `default` (user has not configured anything).
+      - **TDD without tests**: resolved methodology is `tdd` AND no test files were touched during the run.
+
+   4. If ANY heuristic fires, emit ONE consolidated warning to stdout listing every triggered field plus its override path. Use the same shape documented in `skills/plan/SKILL.md` step 19 (warning header + per-field bullets + final override line pointing at `paths.gate_mode: hard`).
+
+   5. Always write the audit record to `.pHive/audits/post-run/<run-id>.yaml` (create the directory if absent). Same schema as `skills/plan/SKILL.md` step 19, with two differences:
+      - `skill: execute`
+      - additional field `backend_sources` mapping `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor` to their resolved source.
+
+   6. Silent on healthy runs (no stdout warning when zero heuristics fire) — YAML record still written with empty `nonsensical_defaults: []` for cross-run aggregation by `hive/scripts/gate-mode-audit.mjs`.
 
 ## Key References
 

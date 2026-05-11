@@ -352,6 +352,42 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     ```
     ````
 
+19. **Post-run audit.** After step 18 completes (whether user confirmed or aborted), run the in-process audit per `hive/references/gate-lift-telemetry.md`:
+
+    1. Collect this run's resolved state:
+       - methodology (resolved value + source from a-32 auto-detect)
+       - gate_lift_fired (true if the `gate_mode: warning` branch fired during the kickoff override at the top of this skill)
+       - story specs produced (count of YAML files written under `${HIVE_STATE_DIR}/epics/<id>/stories/`)
+
+    2. Evaluate the nonsensical-default heuristics from `hive/references/gate-lift-telemetry.md`:
+       - **TDD without tests**: resolved methodology is `tdd` AND zero story specs reference test artifacts.
+       - **Lifted gate + empty plan**: `gate_lift_fired` AND zero story specs produced.
+
+    3. If ANY heuristic fires, emit ONE consolidated warning to stdout listing every triggered field plus its override path. Example shape:
+
+       > Audit: nonsensical defaults detected this run:
+       > - methodology=tdd auto-detected but no test artifacts referenced → run `/hive:kickoff` to set explicit methodology
+       > - gate_lift_fired with zero story specs → run `/plan` after `/hive:kickoff` for a properly decomposed plan
+       >
+       > Override: set `paths.gate_mode: hard` in `hive.config.yaml` to restore blocking behavior.
+
+    4. Always write the audit record to `.pHive/audits/post-run/<run-id>.yaml` (create the directory if absent). Schema:
+
+       ```yaml
+       run_id: <run-id>
+       skill: plan
+       timestamp: <ISO 8601>
+       gate_lift_fired: <bool>
+       methodology: <resolved value>
+       methodology_source: <source>
+       story_specs_produced: <count>
+       nonsensical_defaults:
+         - <heuristic id, e.g. tdd-without-tests>
+       warnings_emitted: <count>
+       ```
+
+       Silent runs (zero heuristics fire) still write a record with `nonsensical_defaults: []` for cross-run aggregation by `hive/scripts/gate-mode-audit.mjs`.
+
 ### Flow Summary
 
 ```
