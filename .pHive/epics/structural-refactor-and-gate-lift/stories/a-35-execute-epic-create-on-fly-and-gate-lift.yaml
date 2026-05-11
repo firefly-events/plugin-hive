@@ -92,7 +92,7 @@ steps:
     depends_on: [test]
 
   - id: integrate
-    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): /execute ad-hoc epic create + gate lift (story a-35-execute-epic-create-on-fly-and-gate-lift, W6)`.
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): /execute ad-hoc epic create + gate lift (story a-35-execute-epic-create-on-fly-and-gate-lift, W6)`.'
     agent: developer
     depends_on: [review]
 
@@ -124,7 +124,7 @@ cross_cutting:
 risks:
   - severity: high
     description: Ad-hoc epic with one stub may produce poor execution output without proper planning context.
-    mitigation: Warning includes "run /plan first" recommendation; A-36 audit catches no-op outputs; gate_mode: hard available for cautious users.
+    mitigation: 'Warning includes "run /plan first" recommendation; A-36 audit catches no-op outputs; gate_mode: hard available for cautious users.'
   - severity: medium
     description: Ad-hoc story stub lacks acceptance criteria + design context; developer agent may produce overly broad output.
     mitigation: Warning makes ad-hoc nature visible; agent prompts include "this is an ad-hoc execution — escalate if scope is unclear."

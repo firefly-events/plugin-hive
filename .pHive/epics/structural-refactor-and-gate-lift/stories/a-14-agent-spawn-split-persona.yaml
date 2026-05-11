@@ -84,7 +84,7 @@ steps:
     depends_on: [test]
 
   - id: integrate
-    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): split agent-spawn persona resolution (story a-14-agent-spawn-split-persona, W6)`.
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): split agent-spawn persona resolution (story a-14-agent-spawn-split-persona, W6)`.'
     agent: developer
     depends_on: [review]
 

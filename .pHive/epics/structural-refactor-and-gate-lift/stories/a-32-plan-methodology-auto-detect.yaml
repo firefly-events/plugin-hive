@@ -81,7 +81,7 @@ steps:
     depends_on: [test]
 
   - id: integrate
-    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): /plan methodology auto-detect (story a-32-plan-methodology-auto-detect, W6)`.
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): /plan methodology auto-detect (story a-32-plan-methodology-auto-detect, W6)`.'
     agent: developer
     depends_on: [review]
 
@@ -117,7 +117,7 @@ cross_cutting:
 risks:
   - severity: medium
     description: Auto-detect on a polyglot repo (tests AND features) is ambiguous.
-    mitigation: Precedence: .feature files → bdd (more specific). Document tiebreaker. Warning emits both signals so user can override.
+    mitigation: 'Precedence: .feature files → bdd (more specific). Document tiebreaker. Warning emits both signals so user can override.'
   - severity: medium
     description: False-positive in monorepos with tests/ at root but feature implementations far away.
     mitigation: Warning is loud + override is trivial; A-36 telemetry captures override rate.

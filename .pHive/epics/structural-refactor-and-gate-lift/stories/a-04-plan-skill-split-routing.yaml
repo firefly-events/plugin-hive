@@ -113,7 +113,7 @@ steps:
     depends_on: [test]
 
   - id: integrate
-    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): split /plan Phase 0 routing (story a-04-plan-skill-split-routing, W6)`.
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): split /plan Phase 0 routing (story a-04-plan-skill-split-routing, W6)`.'
     agent: developer
     depends_on: [review]
 

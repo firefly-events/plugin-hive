@@ -63,7 +63,7 @@ steps:
     depends_on: [test]
 
   - id: integrate
-    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): extract brand-system schema to references (story a-08-brand-system-extract-config, W6)`.
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): extract brand-system schema to references (story a-08-brand-system-extract-config, W6)`.'
     agent: developer
     depends_on: [review]
 

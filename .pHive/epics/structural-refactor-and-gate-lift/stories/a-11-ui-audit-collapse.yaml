@@ -86,7 +86,7 @@ steps:
     depends_on: [test]
 
   - id: integrate
-    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): collapse ui-audit into design-review (story a-11-ui-audit-collapse, W6)`.
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): collapse ui-audit into design-review (story a-11-ui-audit-collapse, W6)`.'
     agent: developer
     depends_on: [review]
 

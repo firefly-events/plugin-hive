@@ -100,7 +100,7 @@ steps:
     depends_on: [test]
 
   - id: integrate
-    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): post-run audit + telemetry aggregation (story a-36-post-run-audit-telemetry, W6)`.
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): post-run audit + telemetry aggregation (story a-36-post-run-audit-telemetry, W6)`.'
     agent: developer
     depends_on: [review]
 
@@ -111,9 +111,9 @@ context:
     frameworks: [hive-orchestrator, hive-metrics, hive-meta-team]
   key_files:
     - path: skills/plan/SKILL.md
-      purpose: Source — final step: post-run audit
+      purpose: 'Source — final step: post-run audit'
     - path: skills/execute/SKILL.md
-      purpose: Source — final step: post-run audit
+      purpose: 'Source — final step: post-run audit'
     - path: .pHive/metrics/events/
       purpose: Existing telemetry infrastructure — events written here
     - path: hive/scripts/gate-mode-audit.mjs

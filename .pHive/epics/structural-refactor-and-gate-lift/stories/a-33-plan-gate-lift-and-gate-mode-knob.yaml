@@ -81,7 +81,7 @@ steps:
     depends_on: [test]
 
   - id: integrate
-    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): /plan kickoff-gate lift + gate_mode knob (story a-33-plan-gate-lift-and-gate-mode-knob, W6)`.
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): /plan kickoff-gate lift + gate_mode knob (story a-33-plan-gate-lift-and-gate-mode-knob, W6)`.'
     agent: developer
     depends_on: [review]
 
@@ -117,10 +117,10 @@ cross_cutting:
 risks:
   - severity: high
     description: Lifting /plan gate could mask genuine config errors (e.g., user invoked /plan in wrong directory).
-    mitigation: Warning is loud; A-36 audit catches nonsensical defaults; paths.gate_mode: hard available for cautious users.
+    mitigation: 'Warning is loud; A-36 audit catches nonsensical defaults; paths.gate_mode: hard available for cautious users.'
   - severity: medium
     description: Placeholder project-profile.yaml could be mistaken for real config and not filled in.
-    mitigation: Placeholder includes prominent warning + tech_stack: [] (obvious empty); kickoff skill upgrades placeholder to full profile.
+    mitigation: 'Placeholder includes prominent warning + tech_stack: [] (obvious empty); kickoff skill upgrades placeholder to full profile.'
   - severity: medium
     description: gate_mode default flip later (warning → hard) would surprise consumers.
     mitigation: Treat as MAJOR version bump if flipping; A-36 telemetry justifies the flip with data.

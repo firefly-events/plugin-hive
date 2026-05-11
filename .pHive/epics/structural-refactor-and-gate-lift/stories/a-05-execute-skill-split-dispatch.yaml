@@ -86,7 +86,7 @@ steps:
     depends_on: [test]
 
   - id: integrate
-    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): split /execute mode dispatch (story a-05-execute-skill-split-dispatch, W6)`.
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): split /execute mode dispatch (story a-05-execute-skill-split-dispatch, W6)`.'
     agent: developer
     depends_on: [review]
 

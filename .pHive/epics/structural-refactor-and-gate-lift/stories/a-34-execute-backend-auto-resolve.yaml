@@ -85,7 +85,7 @@ steps:
     depends_on: [test]
 
   - id: integrate
-    description: Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): /execute backend auto-resolve (story a-34-execute-backend-auto-resolve, W6)`.
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): /execute backend auto-resolve (story a-34-execute-backend-auto-resolve, W6)`.'
     agent: developer
     depends_on: [review]
 
