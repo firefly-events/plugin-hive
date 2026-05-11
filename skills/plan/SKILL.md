@@ -166,20 +166,12 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     **If no vertical slice plan:** Decompose as before — independently implementable stories with dependency tracking.
 
     **Escalation stories[] backfill (always runs after story IDs are determined):**
-    Once canonical story YAML IDs are finalized, iterate every entry in `escalations:` in `.pHive/cycle-state/{epic-id}.yaml`:
-    - For each entry, inspect its `stories` list — entries may contain topic area strings from raise time
-    - For each topic area string, attempt a match against decomposed story IDs:
-      - **Exact match:** topic area string equals a story ID → replace in place
-      - **Fuzzy match:** topic area string overlaps with a story's `title` or `description` keywords (case-insensitive substring match) → replace with the matched canonical ID
-    - **Already canonical:** if an entry already matches a story YAML ID exactly, leave it unchanged (no re-matching needed)
-    - After replacement, write the updated `stories` list back to the escalation entry in cycle state
-    - For any topic area with **no match found:** preserve the original string as-is and log:
-      ```
-      WARNING: escalation "{trigger}" stories[] entry "{topic-area}" could not be matched to a canonical story ID — leaving as topic area string
-      ```
-    - Entries whose `stories` list is already canonical IDs (from a prior run or manual edit) require no change
-
-    > **Two-phase population pattern:** `escalations[].stories[]` is populated in two phases: (1) topic areas at raise time by the raising agent, (2) canonical IDs at plan step 11 by orchestrator backfill. Execute reads the backfilled canonical IDs.
+    Invoke `skills/hive/skills/escalation-backfill/SKILL.md` after canonical story YAML IDs are finalized.
+    Pass inputs:
+    - `epic_id`: current epic ID
+    - `story_ids[]`: decomposed canonical story YAML IDs from this step
+    - `cycle_state_path`: `.pHive/cycle-state/{epic_id}.yaml`
+    Use its outputs before continuing to requirements traceability.
 
 12. **Requirements traceability check.** Before finalizing stories, verify every aspect of the original requirement is covered by at least one story:
     - Re-read the original requirement/PRD
