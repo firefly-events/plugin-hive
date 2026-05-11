@@ -1,8 +1,8 @@
-cycle_id: meta-2026-05-09
-started: '2026-05-09T00:00:00Z'
+cycle_id: meta-2026-05-10
+started: '2026-05-10T00:00:00Z'
 status: closed
 phase: close
-closed: '2026-05-09T00:30:00Z'
+closed: '2026-05-10T00:30:00Z'
 charter_constraints:
   - operate only on hive/**, skills/hive/agents/memories/**, .pHive/teams/**,
     .pHive/meta-meta-optimize/**, hive/lib/**
@@ -12,11 +12,11 @@ charter_constraints:
   - no new external service integrations without human confirmation
   - no file deletions, no >50% content removal per file
 prior_cycle:
-  id: meta-2026-05-07
+  id: meta-2026-05-09
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-05-09T00:00:00Z'
+    started_at: '2026-05-10T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
@@ -32,38 +32,26 @@ steps:
       No providers available (Firecrawl/Context7 not mounted). Empty candidate list.
   step_03_proposal:
     routing: step-03 (findings_count=2 > 0)
-    approved_proposals_count: 2
-    skipped_findings_count: 0
+    approved_proposals_count: 1
+    skipped_findings_count: 1
   step_04_implementation:
     changes_made:
-      - proposal_id: proposal-2
-        action: update_field
-        file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
-        description: >
-          Added (S8) qualifier and S9/BL2.2+ clarifying note to the SUCCESS METRICS
-          bullet "No promotion, mutation, experiment execution, or step-4 advancement
-          occurred", aligning it with the NEXT STEP forward-compatibility note that
-          step-4 advancement is expected in BL2.2+ live mode.
-        status: done
       - proposal_id: proposal-1
-        action: update_field
-        file: hive/GUIDE.md
+        action: add_section
+        file: hive/references/dreaming-integration.md
         description: >
-          Updated "## Workflows (6)" heading to "## Workflows (7)" to match the
-          actual count of 7 workflows listed in the development (3) and other (4)
-          workflow tables directly below the heading.
+          Added ## API Reference section documenting runDreamingReplay()
+          function signature (episodeRoot, kg, wiki, capabilityProbe parameters
+          with defaults), return shape ({ playbookDeltas, capabilityErr,
+          timeoutErr? }), episode YAML consumed fields (playbook_delta.*,
+          timestamp, status), and dreaming.timeout_hours config key.
+          Content derived from hive/lib/dreaming-replay.js. File grew from
+          12 to 53 lines, resolving the STUB_DOC finding.
         status: done
   step_05_testing:
     test_results:
-      - change_id: proposal-2_step-03b-backlog-fallback
-        file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
-        tests:
-          cross_reference_integrity: pass
-          schema_compliance: pass
-          content_safety: pass
-        overall: pass
-      - change_id: proposal-1_GUIDE
-        file: hive/GUIDE.md
+      - change_id: proposal-1_dreaming-integration
+        file: hive/references/dreaming-integration.md
         tests:
           cross_reference_integrity: pass
           schema_compliance: pass
@@ -71,47 +59,41 @@ steps:
         overall: pass
   step_06_evaluation:
     cycle_verdict: passed
-    pass_count: 2
+    pass_count: 1
     needs_optimization_count: 0
     needs_revision_count: 0
     metrics_snapshot:
       tokens: 0
-      wall_clock_ms: 15000
+      wall_clock_ms: 20000
       first_attempt_pass: true
   step_07_promotion:
     promoted_changes:
-      - proposal_id: proposal-2
-        file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
-        verdict: pass
-        status: promoted
-        commit_ref: 6f1de135b3581c093e3348a04ba9e780fb797c3a
-        rollback_target: a18299f379acd99699190297a5e0f6f7f7cf0e2d
       - proposal_id: proposal-1
-        file: hive/GUIDE.md
+        file: hive/references/dreaming-integration.md
         verdict: pass
         status: promoted
-        commit_ref: 6f1de135b3581c093e3348a04ba9e780fb797c3a
-        rollback_target: a18299f379acd99699190297a5e0f6f7f7cf0e2d
+        commit_ref: fbb0b153c6a602e2607d1bf12a19be21a3cf778e
+        rollback_target: d701c7d5670fe53bd2d2fcf46531c2b9de0889f5
     reverted_changes: []
     insights_staged: 0
 summary:
   total_findings: 2
-  proposals_generated: 2
-  changes_attempted: 2
-  changes_promoted: 2
+  proposals_generated: 1
+  changes_attempted: 1
+  changes_promoted: 1
   changes_reverted: 0
-  flagged_for_human: 0
+  flagged_for_human: 1
   cycle_verdict: passed
 closure_evidence:
-  commit_ref: 6f1de135b3581c093e3348a04ba9e780fb797c3a
+  commit_ref: fbb0b153c6a602e2607d1bf12a19be21a3cf778e
   metrics_snapshot:
     tokens: 0
-    wall_clock_ms: 15000
+    wall_clock_ms: 20000
     first_attempt_pass: true
-  rollback_ref: a18299f379acd99699190297a5e0f6f7f7cf0e2d
+  rollback_ref: d701c7d5670fe53bd2d2fcf46531c2b9de0889f5
 decision: accept
 regression_watch:
   state: armed
 observation_window:
-  start: '2026-05-09T00:30:00Z'
-  end: '2026-05-09T04:30:00Z'
+  start: '2026-05-10T00:30:00Z'
+  end: '2026-05-10T04:30:00Z'
