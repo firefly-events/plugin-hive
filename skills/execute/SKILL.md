@@ -37,7 +37,46 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 ## Process
 
-1. **Load the epic.** Read `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`.
+1. **Load the epic.** Read `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`. Behavior when this file is absent depends on `paths.gate_mode` (read from root `hive.config.yaml` consumer override layer; falls back to `hive/hive.config.yaml`; default `warning`; knob introduced by story `a-33-plan-gate-lift-and-gate-mode-knob`).
+
+   **When `gate_mode: hard`:** the original behavior applies byte-equivalently — if the YAML is missing, stop and report the missing path. Do not proceed to step 2.
+
+   **When `gate_mode: warning`:** synthesize an ad-hoc plan from `$ARGUMENTS` and proceed. The sequence is:
+
+   1. Emit the warning below (verbatim):
+
+      > Warning: `{epic-id}` not found at `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`. Synthesizing ad-hoc plan from `$ARGUMENTS`. Run `/plan` first for a properly decomposed plan, or set `paths.gate_mode: hard` to restore blocking behavior.
+
+   2. Resolve methodology via story `a-34-backend-auto-resolve` (already merged on this branch). Fall back to `classic` if auto-resolve cannot determine.
+
+   3. Generate the ad-hoc YAML at `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`. Create the parent `${HIVE_STATE_DIR}/epics/{epic-id}/` and the `stories` subdirectory beneath it if absent. Template:
+
+      ```yaml
+      name: {epic-id}
+      title: {one-line summary derived from $ARGUMENTS}
+      methodology: {resolved by a-34 auto-resolve, fallback classic}
+      ad_hoc: true
+      created_by: /execute-gate-lift
+      created_at: "<ISO 8601 timestamp>"
+      stories:
+        - id: {epic-id}-default
+          title: {same as title above}
+          depends_on: []
+      ```
+
+      The `ad_hoc: true` flag signals to downstream consumers (audit, /standup, /status) that this YAML was synthesized rather than planned. The single-story stub uses `{epic-id}-default` as its ID.
+
+   4. Append one JSONL record to `${HIVE_STATE_DIR}/metrics/events/epic-create-on-fly-<ISO 8601 timestamp>.jsonl` with shape:
+
+      ```json
+      {"event":"epic_create_on_fly","skill":"execute","gate_mode":"warning","epic_id":"<epic-id>","source":"<$ARGUMENTS verbatim>","methodology":"<resolved>","timestamp":"<ISO 8601>"}
+      ```
+
+      Create `${HIVE_STATE_DIR}/metrics/events/` if absent. This event feeds the audit introduced by story `a-36-post-run-audit-telemetry`.
+
+   5. Inject the ad-hoc context into agent prompts downstream: include "This is an ad-hoc run — the YAML was synthesized from `$ARGUMENTS` without prior planning. Escalate to the orchestrator if scope is unclear or acceptance criteria are unspecified." in the system context of every spawned agent. This prevents agents from over-broadly interpreting the one-line story stub.
+
+   6. Proceed to step 2 (cycle state) as normal.
 
 2. **Load or create cycle state.** Check `${HIVE_STATE_DIR}/cycle-state/{epic-id}.yaml`. If it doesn't exist, create a minimal one with `epic_id` and `created` timestamp. The cycle state accumulates decisions across phases — see `hive/references/cycle-state-schema.md`. Include the cycle state in all downstream agent prompts as system-level constraints.
 
