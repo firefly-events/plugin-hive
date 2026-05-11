@@ -1,26 +1,27 @@
-- experiment_id: meta-2026-05-10
-  date: '2026-05-10'
-  started: '2026-05-10T00:00:00Z'
-  closed: '2026-05-10T00:30:00Z'
+- experiment_id: meta-2026-05-11
+  date: '2026-05-11'
+  started: '2026-05-11T00:00:00Z'
+  closed: '2026-05-11T00:30:00Z'
   verdict: passed
   changes_promoted: 1
   changes_reverted: 0
   findings_identified: 2
   top_changes:
-    - "hive/references/dreaming-integration.md: added API reference section documenting runDreamingReplay() signature, return shape, episode YAML fields, and timeout config"
-  commit: fbb0b153c6a602e2607d1bf12a19be21a3cf778e
+    - "hive/references/dreaming-integration.md: appended Module Interface section documenting runDreamingReplay() signature, parameters, return shape, and timeout config"
+  commit: 21a0357406b802ad7d98d767d87fb7635791a14f
   metrics_snapshot:
     tokens: 0
-    wall_clock_ms: 20000
+    wall_clock_ms: 0
     first_attempt_pass: true
   rollback_ref: d701c7d5670fe53bd2d2fcf46531c2b9de0889f5
   notes: |
-    Nightly cycle meta-2026-05-10. Analysis found 2 STUB_DOC findings:
-    (1) dreaming-integration.md (12 lines, below 30-line threshold) — addressed
-    by adding API reference section with function signature, parameters, return
-    shape, episode YAML schema, and timeout configuration, all derived from
-    hive/lib/dreaming-replay.js; (2) hive-cloud-roadmap.md (13 lines, S16 stub)
-    — skipped as needs_human (requires cloud roadmap content from product team).
+    Nightly cycle meta-2026-05-11. Analysis found 2 STUB_DOC findings:
+    (1) dreaming-integration.md (12 lines) lacks module interface documentation
+    despite referencing hive/lib/dreaming-replay.js; (2) hive-cloud-roadmap.md
+    (13 lines) is an explicit placeholder stub — marked out_of_scope (deferred
+    Hive Cloud epic). Proposal-1 addressed finding-1: appended a Module Interface
+    section to dreaming-integration.md documenting runDreamingReplay() parameters,
+    return shape, and timeout configuration derived from the implementation file.
     Closure validator passed. Regression watch armed for 4-hour window.
 - experiment_id: meta-2026-05-09
   date: '2026-05-09'
