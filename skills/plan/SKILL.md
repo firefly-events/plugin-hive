@@ -39,6 +39,37 @@ Reads `.pHive/triage/queue.yaml` and decomposes one item (the triage entry whose
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — state-directory note, kickoff gate, persona / config / memory loading. This skill consults routing keys (`agent_backends`, `model_overrides`, `planning.collaborative_review`) so also follow the **Root-first config precedence** subsection of the prelude.
 
+**Kickoff gate override — gate_mode aware.** Read `paths.gate_mode` from the root `hive.config.yaml` (consumer override layer; falls back to `hive/hive.config.yaml`; default `warning`). When `gate_mode: hard`, the prelude's hard-stop applies byte-equivalently. When `gate_mode: warning`, the hard-stop is replaced by warn-and-proceed with sane defaults:
+
+1. Emit the warning below (verbatim) when `.pHive/project-profile.yaml` is missing or its `tech_stack` field is empty/null:
+
+   > Warning: Hive not initialized for this project. Running `/plan` with sane defaults — methodology auto-detected per story a-32, placeholder project-profile written to disk. Run `/hive:kickoff` for full context, or set `paths.gate_mode: hard` to restore blocking behavior.
+
+2. If `.pHive/project-profile.yaml` is absent, generate a placeholder at that path before proceeding. Placeholder content (YAML):
+
+   ```yaml
+   tech_stack: []
+   languages: []
+   frameworks: []
+   placeholder: true
+   created_by: /plan-gate-lift
+   created_at: "<ISO 8601 timestamp>"
+   ```
+
+   This placeholder unblocks future invocations without re-warning every run. Hive treats `placeholder: true` as "needs kickoff" but does not re-block.
+
+3. Methodology resolution: defer to the auto-detect path introduced by story `a-32-plan-methodology-auto-detect` (already merged on this branch). If auto-detect cannot determine a methodology, fall back to `classic`.
+
+4. Telemetry: append one JSONL record to `.pHive/metrics/events/gate-lift-<ISO 8601 timestamp>.jsonl` with shape:
+
+   ```json
+   {"event":"gate_lift_fired","skill":"plan","gate_mode":"warning","epic_id":"<from $ARGUMENTS or generated>","timestamp":"<ISO 8601>","project_profile_present":<true|false>,"tech_stack_present":<true|false>}
+   ```
+
+   Create the `.pHive/metrics/events/` directory if absent. This event feeds the story `a-36-post-run-audit-telemetry` audit.
+
+5. Proceed with the rest of `/plan` after these defaults are in place.
+
 ## Process
 
 ### Phase 0: Assemble Planning Team
