@@ -1,0 +1,117 @@
+id: m-08-kg-import-decision-shape-v2
+epic: metrics-as-planning-concern
+title: Teach kg-import to recognize v2 decision shape (id/value/rationale)
+status: pending
+complexity: small
+methodology: classic
+depends_on: []
+wave: W0
+action_id: M-08
+
+description: |
+  Discovered while seeding KG on 2026-05-11: scripts/kg-import-cycle-state.js
+  hard-codes the old decision shape {subject, predicate, object}. Newer
+  cycle-state files use v2 shape:
+
+    decisions:
+      - id: "codex-for-implementation"
+        value: "..."           # or rationale: "..."
+        rationale: "..."
+        captured_at: "2026-05-11T00:00:00Z"
+
+  Result: ~29 of 64 decisions (~45%) silently drop as "Unknown format". Affected
+  epics: structural-refactor-and-gate-lift, hive-release-readiness, portability-audit,
+  plus partials from others.
+
+  Fix: extend the importer's decision-shape detection. Map v2 to triples:
+    - subject  = decisions array context (epic id or explicit subject field if present)
+    - predicate = "decided" (default; preserve explicit predicate if v2 entry has one)
+    - object   = value || rationale (value preferred when both present)
+    - valid_from = captured_at || now
+
+  Idempotent: INSERT OR IGNORE + idx_unique_triple handles re-runs.
+
+  Without this, the KG remains under-seeded and step-02c-kg-signal misses
+  the most recent epic decisions — defeating the leverage axis of the metrics
+  epic (M-07 retro pass cannot evaluate kg-augmented-meta-signal fairly if KG
+  itself is incomplete).
+
+acceptance_criteria:
+  - "scripts/kg-import-cycle-state.js recognizes v2 decision shape (id + value|rationale + captured_at)"
+  - "Re-running bootstrap on plugin-hive imports ≥20 additional triples (target ≥65 total, baseline 45)"
+  - "Old shape still works — existing 45 triples remain idempotent under re-run"
+  - "Misformat count drops to ≤5 (genuinely unparseable rows only)"
+  - "structural-refactor-and-gate-lift contributes ≥3 triples (currently 0)"
+  - "Inline comment documents both supported shapes for future maintainers"
+
+steps:
+  - id: research
+    description: |
+      Read scripts/kg-import-cycle-state.js shape-detection code. Inventory
+      v2 shape variants across .pHive/cycle-state/*.yaml — note any fields
+      beyond {id, value, rationale, captured_at}. Document mapping rules
+      before editing.
+    agent: researcher
+  - id: implement
+    description: |
+      Add v2-shape branch in importer's decision-row handler. Preserve old
+      shape path. Add inline comment block documenting both shapes.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Snapshot current triple count. Run --apply. Verify count increased by
+      ≥20 and structural-refactor + hive-release-readiness now have triples.
+      Re-run --apply; verify zero new triples (idempotent).
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify v2-shape branch does not regress old shape. Verify mapping rules
+      match design (value preferred over rationale; captured_at → valid_from).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/metrics-as-planning-concern.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: scripts/kg-import-cycle-state.js
+      purpose: Target — extend shape detection
+    - path: .pHive/cycle-state/structural-refactor-and-gate-lift.yaml
+      purpose: Reference v2 shape example
+    - path: .pHive/cycle-state/hive-release-readiness.yaml
+      purpose: Reference v2 shape example (different sub-variants)
+    - path: hive/references/knowledge-graph-schema.md
+      purpose: Authority for triple shape; index invariants must be preserved
+
+design_decisions:
+  - decision: "value preferred over rationale when both present"
+    rationale: "value is the decision content; rationale is the why — KG stores the what"
+  - decision: "valid_from = captured_at || now"
+    rationale: "Preserves temporal accuracy when present; doesn't block import when absent"
+
+risks:
+  - severity: medium
+    description: v2 shape has variants this story doesn't capture; import silently drops them
+    mitigation: research step inventories all variants before implementation; surface unknown fields as WARN not silent drop
+  - severity: low
+    description: Backfill writes 45+ duplicate-key conflicts on re-run
+    mitigation: INSERT OR IGNORE + idx_unique_triple already enforces dedup
+
+metric:
+  applies: true
+  name: kg.import_coverage_ratio
+  direction: up
+  unit: ratio
+  baseline: 0.55         # 35 / 64 decisions ingested today
+  target: 0.92           # ~59 / 64; allows ≤5 genuinely unparseable
+  window: "first apply post-merge"
+  source:
+    kind: manual
+    ref: "sqlite3 ~/.claude/hive/kg.sqlite 'SELECT COUNT(*) FROM triples;' / bootstrap-summary decisions-found"
+  verify_at: "story integrate step"
+  owner: developer

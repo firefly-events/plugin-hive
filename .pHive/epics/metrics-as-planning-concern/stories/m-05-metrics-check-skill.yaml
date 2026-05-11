@@ -1,0 +1,106 @@
+id: m-05-metrics-check-skill
+epic: metrics-as-planning-concern
+title: New /metrics-check skill — post-merge verdict against story metrics
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [m-02-story-schema-metric-fields]
+wave: W2
+action_id: M-05
+
+description: |
+  Closes the claim-vs-reality loop. New skill `skills/metrics-check/SKILL.md`
+  that:
+    1. Scans story YAMLs across .pHive/epics/*/stories/*.yaml for `metric:` blocks
+    2. For each story whose `verify_at` has elapsed and status=completed:
+       a. If source.kind=envelope — read .pHive/metrics/experiments/{envelope_id}.yaml
+          and run baseline-vs-candidate query
+       b. If source.kind=events — run named query against .pHive/metrics/events/*.jsonl
+       c. If source.kind=sql — execute SQL against system tables / DB
+       d. If source.kind=manual — flag for human verification
+    3. Compute verdict: PASS (target met) | FAIL (target missed) | INCONCLUSIVE (insufficient data)
+    4. Write verdict back to story YAML under `metric.verdict:` block (verdict, measured_value, ran_at, evidence_ref)
+    5. Print summary table: epic, story, target, actual, verdict
+
+  This is the gate that would have caught kg-bootstrap silent failure at D+30.
+
+acceptance_criteria:
+  - "skills/metrics-check/SKILL.md exists with full skill structure (description, when-to-use, steps)"
+  - "Skill scans all story YAMLs; handles all 4 source.kind values"
+  - "Writes metric.verdict block back to story YAML (does not overwrite metric: declaration)"
+  - "Summary table includes counts: total, pass, fail, inconclusive, overdue"
+  - "FAIL verdicts surface as actionable findings (suggest follow-up story or revert)"
+  - "Idempotent — re-running on already-verified story is a no-op unless --reverify flag passed"
+
+steps:
+  - id: research
+    description: |
+      Read existing skill files (skills/review, skills/status) for skill-structure
+      convention. Read both metrics schemas. Read B0 query shapes from
+      b0-consumer-contract.md (baseline-vs-candidate, run-over-run, delayed-regression-watch).
+      Decide: implement query shapes inline or shell out to a script.
+    agent: researcher
+  - id: implement
+    description: |
+      Create skills/metrics-check/SKILL.md with full skill body. If reader needs
+      heavier logic, add scripts/metrics-check-runner.js (preferred over
+      better-sqlite3 root dep per repo norms; use sqlite3 CLI + jq).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Synthetic fixtures: 1 PASS story, 1 FAIL story, 1 INCONCLUSIVE story,
+      1 OVERDUE story (verify_at elapsed but no envelope data). Verify skill
+      writes correct verdict to each. Verify idempotency.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify skill respects "don't add features beyond the task" — no premature
+      visualization, no alerting integration. Just verdict + table.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/metrics-as-planning-concern.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/metrics-check/SKILL.md
+      purpose: NEW — primary deliverable
+    - path: .pHive/metrics/events/
+      purpose: Event source for source.kind=events
+    - path: .pHive/metrics/experiments/
+      purpose: Envelope source for source.kind=envelope
+    - path: .pHive/epics/meta-improvement-system/docs/b0-consumer-contract.md
+      purpose: Authority for the 3 query shapes
+
+design_decisions:
+  - decision: Verdict written to story YAML, not separate file
+    rationale: Story is single source of truth; verdict-as-sidecar splits the record
+  - decision: Use sqlite3 CLI + jq, not better-sqlite3
+    rationale: Per repo convention (feedback_byo_enhancements_no_root_deps)
+
+risks:
+  - severity: medium
+    description: source.kind=manual blocks automated verdicts
+    mitigation: Skill flags manual-source stories for explicit human verification; doesn't pretend to score them
+  - severity: medium
+    description: Story YAML writes corrupt formatting
+    mitigation: Use yaml dump library or templated string; preserve original key order
+
+metric:
+  applies: true
+  name: metrics_check.stories_with_verdict_pct
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 0.8
+  window: "first run after M-07 backfill"
+  source:
+    kind: manual
+    ref: "M-07 fixtures + first real run"
+  verify_at: "M-07 completion"
+  owner: tpm

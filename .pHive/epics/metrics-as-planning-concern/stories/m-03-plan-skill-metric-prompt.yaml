@@ -1,0 +1,97 @@
+id: m-03-plan-skill-metric-prompt
+epic: metrics-as-planning-concern
+title: /plan A-step prompts for metric declaration per story
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [m-01-add-metrics-concern, m-02-story-schema-metric-fields]
+wave: W1
+action_id: M-03
+
+description: |
+  Wire the metrics concern into /plan. During story decomposition, the planner
+  agent must, for each story:
+    1. Read the metrics concern from cross-cutting-concerns.yaml
+    2. Apply the concern's planning_prompt
+    3. Either fill `metric:` block (per M-02 schema) or set applies:false with
+       a non-trivial justification (≥10 words, references story content)
+    4. Surface un-falsifiable stories in the plan summary so user can challenge
+
+  This is the trend-axis gate. Without it, ship-and-forget stays the default.
+
+acceptance_criteria:
+  - "skills/plan/SKILL.md A-step references cross-cutting-concerns.yaml metrics block"
+  - "Planner agent prompt asks the 4 trend/claim questions verbatim from M-01 planning_prompt"
+  - "Generated story YAMLs include metric: block conforming to M-02 schema"
+  - "Plan summary section flags every story with metric.applies:false; quotes their justification"
+  - "Empty/one-word justifications fail the planning review gate"
+
+steps:
+  - id: research
+    description: |
+      Read skills/plan/SKILL.md A-step (story decomposition). Identify where to
+      inject metric-declaration prompt (likely after acceptance_criteria draft,
+      before story-yaml emit). Read existing concern-loading pattern (how
+      documentation/versioning concerns are consumed today).
+    agent: researcher
+  - id: implement
+    description: |
+      Edit skills/plan/SKILL.md to load metrics concern and apply its
+      planning_prompt per story. Add summary section that lists metric.applies:false
+      stories with their justifications. Add review-gate check for trivial
+      justifications.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Run /plan against a small synthetic requirement (3-5 stories). Verify each
+      generated story has a metric: block. Verify summary section appears.
+      Verify a deliberately-empty justification fails the gate.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify edit honors existing /plan structure (no rewrite, just inject).
+      Confirm no regression in documentation/versioning concern handling.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/metrics-as-planning-concern.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Target — inject metric prompt into A-step
+    - path: .pHive/cross-cutting-concerns.yaml
+      purpose: Source of planning_prompt text (after M-01)
+    - path: hive/references/story-yaml-schema.md
+      purpose: "Authority for metric: block shape (after M-02)"
+
+design_decisions:
+  - decision: Reject one-word justifications, not silently accept
+    rationale: Trivial opt-out defeats the gate; user request was OBJECTIVE measurement
+
+risks:
+  - severity: medium
+    description: Planner over-flags low-value stories (e.g. typo fix) as failing metric gate
+    mitigation: applies_when in M-01 distinguishes infra/docs-only from behavioral; tester step exercises both
+  - severity: low
+    description: Existing planner prompts get bloated
+    mitigation: Inject as a single concern-loop, not per-concern hardcode
+
+metric:
+  applies: true
+  name: plan.stories_with_metric_block_pct
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 0.9
+  window: "first 3 epics planned post-merge"
+  source:
+    kind: manual
+    ref: "grep metric: .pHive/epics/<new-epic>/stories/*.yaml | wc -l divided by story count"
+  verify_at: "M-07 retro pass"
+  owner: tpm
