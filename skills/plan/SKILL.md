@@ -43,145 +43,15 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 ### Phase 0: Assemble Planning Team
 
-0. **Assemble the planning team.** The orchestrator (main agent) stays as coordinator, directing work via `SendMessage`.
+0. **Assemble and route the planning team.** Invoke the **planning-routing** skill (atomic; `skills/hive/skills/planning-routing/SKILL.md`) — this is an **external call**, NOT inline prose copied from the routing skill.
 
-   **Step 0.1: Build team composition.**
+Pass three inputs: `assembled_personas` (core planning personas plus conditional architect/ui-designer selected from the requirement), the root-first `agent_backends` map (empty map if absent per [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)), and `requirement_summary`.
 
-   **Core team (always spawned):**
-   - **Researcher** (`hive/agents/researcher.md`) — codebase/web exploration, raw findings
-   - **Technical Writer** (`hive/agents/technical-writer.md`) — produces all formatted documents
-   - **TPM** (`hive/agents/tpm.md`) — delivery sequencing, horizontal/vertical thinking
+The skill builds final `routing_decisions`, spawns direct and/or Codex-backed teammates, emits exactly one structured routing INFO log per persona, and handles Codex runtime fallback plus circuit breaker behavior.
 
-   **Conditional team members (spawned when applicable):**
-   - **Architect** (`hive/agents/architect.md`) — added when the requirement involves architecture decisions, multi-system integration, or when scale assessment is medium/large
-   - **UI Designer** (`hive/agents/ui-designer.md`) — added when the requirement involves UI work (screens, components, visual design, wireframes). Not spawned for purely backend/infrastructure work
+Continue Phase A using the returned active planning team handles and `routing_decisions`.
 
-   **How to decide conditional members:** The orchestrator evaluates the requirement text at team assembly time. Use the same detection keywords from the UI Step Detection section below for the UI designer. For the architect, look for signals like: multiple systems, API design, data model changes, infrastructure, or the word "architecture" itself.
-
-   Routing happens only after this assembled persona list is finalized. Do not let backend routing change team composition.
-
-   **Step 0.2: Build routing decisions.**
-
-   Before spawning anyone, consult `agent_backends` using the root-first precedence contract loaded in the pre-flight config step above. For each persona in the assembled list, compare the configured backend (if any) against the `skills/hive/skills/codex-invoke/SKILL.md` contract under `Supported personas (PoC)` and `Known-incompatible personas`.
-
-   Produce a `routing_decisions` map for the assembled personas with one value per persona: `codex` or `direct`. Also store a tentative `routing_reason` per persona so Step 0.3 can emit the final structured INFO log after the spawn path succeeds or falls back.
-
-   - If `agent_backends[persona] == codex` and the persona is in codex-invoke `Supported personas (PoC)`, set that persona to `codex`.
-   - If `agent_backends[persona] == codex` and the persona is in codex-invoke `Known-incompatible personas`, set that persona to `direct`.
-   - If `agent_backends[persona] == codex` but the persona is in neither contract list, set that persona to `direct` because the persona is unvalidated for Codex, so routing stays conservative.
-   - If `agent_backends[persona] == "claude"`, set that persona to `direct` via explicit direct TeamCreate routing.
-   - If `agent_backends[persona]` is unset, or `agent_backends` is absent, set that persona to `direct` and keep current direct-TeamCreate behavior.
-
-   Apply this per assembled persona, including optional members only when they were added in Step 0.1. `ui-designer` is always routed `direct` even when configured to `codex`, because codex-invoke marks that persona as known-incompatible.
-
-   Step 0.2 decides and stores tentative routing only. It does NOT emit the INFO log. The single source of truth is: exactly one INFO log line per persona, at the final spawn decision point in Step 0.3.
-
-   **Step 0.3: Spawn the team across two paths.**
-
-   Use the `routing_decisions` map to assemble one conceptual planning team that may be created through two backend paths:
-
-   - **Direct path (`TeamCreate`):** collect every persona routed `direct` and create them in a single `TeamCreate` call. Use the existing planning-team prompt template, but include only the direct-routed personas in the `## Team Members` section.
-   - **Codex path (`agent-spawn` -> `codex-invoke`):** for each persona routed `codex`, create a separate teammate through the `agent-spawn` skill, which in turn invokes the Codex backend via `codex-invoke`. Use persistent pane mode and pass the full persona context, resolved paths, memory loading context, and the same planning-team coordination context that the direct teammates receive.
-
-   Mixed teams are valid. Some planning personas may come from `TeamCreate` while others come from `agent-spawn` -> `codex-invoke`; they are still the same planning team. The orchestrator remains the single coordination point, uses `SendMessage` for all work assignment and review loops, and keeps collaborative review gates identical for both backend paths.
-
-   Emit the structured INFO log here, after each persona's final spawn path is known. This is the definitive observability point: exactly one INFO log line per persona, at the final spawn decision point. If Step 0.5 later handles a runtime Codex failure, it updates the Step 0.3 result for that persona by replacing the earlier would-be success log with the fallback outcome instead of adding a second line.
-
-   Preserve the 4-field template exactly:
-   - `[info] planning routing: persona={X} requested={requested_backend|unset} path={codex-invoke|TeamCreate} reason={reason}`
-
-   Valid `reason=` values at this emission point are:
-   - `no-fallback-needed`
-   - `known-incompatible`
-   - `unvalidated-persona`
-   - `claude-requested`
-   - `agent_backends-unset`
-   - `codex-dispatch-failed: {error}`
-
-   Examples:
-   - `[info] planning routing: persona=technical-writer requested=codex path=codex-invoke reason=no-fallback-needed`
-   - `[info] planning routing: persona=ui-designer requested=codex path=TeamCreate reason=known-incompatible`
-   - `[info] planning routing: persona={X} requested=codex path=TeamCreate reason=unvalidated-persona`
-   - `[info] planning routing: persona={X} requested=claude path=TeamCreate reason=claude-requested`
-   - `[info] planning routing: persona={X} requested=unset path=TeamCreate reason=agent_backends-unset`
-
-   **Step 0.4: Mixed-team prompt template.**
-
-   Use this `TeamCreate` prompt template for the direct path only:
-   ```
-   Create a planning team for requirement: "{requirement-summary}"
-
-   ## Team Members
-
-   [include only personas whose routing_decisions entry is direct]
-
-   **researcher** — Explore the target codebase. Read persona from hive/agents/researcher.md.
-   Load memories from the agent's knowledge paths. Gather raw findings: file paths, patterns,
-   constraints, risks.
-
-   **technical-writer** — Produce formatted planning documents. Read persona from
-   hive/agents/technical-writer.md. Load memories from the agent's knowledge paths.
-   Transform raw findings into research briefs, design discussions, H/V plans, structured outlines.
-
-   **tpm** — Sequence delivery planning. Read persona from hive/agents/tpm.md.
-   Load memories from the agent's knowledge paths. Own horizontal/vertical thinking.
-   Review all documents for delivery feasibility.
-
-   [if architect is in the assembled list and routed direct]
-   **architect** — Evaluate technical feasibility. Read persona from hive/agents/architect.md.
-   Load memories from the agent's knowledge paths. Review designs for architectural soundness.
-
-   [if ui-designer is in the assembled list and routed direct]
-   **ui-designer** — Produce wireframes and review UI aspects. Read persona from
-   hive/agents/ui-designer.md. Load memories from the agent's knowledge paths.
-   Scan existing design language before proposing new UI.
-
-   ## Coordination
-   - Orchestrator assigns work via SendMessage
-   - All agents review documents before user presentation (collaborative review gate)
-   - Each agent reads their full persona file and loads their memory directory
-   - Use agent-spawn skill patterns: load full persona, resolve paths, load memories
-   ```
-
-   If at least one persona is routed through Codex and at least one persona is routed direct, the `TeamCreate` prompt still includes only the direct-routed personas. Codex-routed personas participate via separate panes; they read the team context from their own `agent-spawn` prompt, not the `TeamCreate` prompt.
-
-   **Agent-spawn compliance:** Every codex-routed teammate must follow the agent-spawn skill (`skills/hive/skills/agent-spawn/SKILL.md`) patterns — full persona injection, path resolution (`~`, `${CLAUDE_PLUGIN_ROOT}`), memory loading, domain constraints, and required tool validation. The direct `TeamCreate` prompt must still instruct each direct teammate to read their persona file and load their knowledge paths on startup.
-
-   **Step 0.5: Runtime fallback**
-
-   If codex-invoke dispatch FAILS at runtime for any persona (e.g., Codex CLI
-   not installed, authentication expired, cmux pane creation error, pre-flight
-   check failure, timeout, or any other error returned from agent-spawn or
-   codex-invoke), handle it gracefully:
-
-   1. Do NOT hard-fail planning-team assembly. A single Codex failure must not
-      block the whole planning flow.
-   2. Re-route the failed persona to direct TeamCreate in a follow-up call.
-      (The original TeamCreate prompt was composed without this persona; re-
-      compose it to ADD the failed persona back into the direct team. Or use
-      SendMessage to instruct the existing TeamCreate-spawned teammates to
-      adopt the re-routed teammate via the same SendMessage coordination.)
-   3. Update the Step 0.3 INFO log outcome for that persona so the final emitted
-      line reflects the runtime-failure reason instead of the earlier would-be
-      success result:
-      [info] planning routing: persona={X} requested=codex path=TeamCreate reason=codex-dispatch-failed: {error}
-      where {error} is a short excerpt of the failure (max 120 chars — truncate
-      long stderr dumps).
-   4. Continue with the rest of the planning flow. Planning-team quality may
-      degrade (persona now runs on Claude instead of Codex), but assembly
-      succeeds.
-
-   If the orchestrator observes repeated Codex failures (>=3 within one
-   planning invocation), it MAY choose to skip remaining Codex-routed personas
-   for the rest of the invocation (fail-fast behavior) — still via TeamCreate
-   fallback, still with per-persona INFO log. This is an operator-friendly
-   circuit breaker; the underlying fallback contract is unchanged.
-
-   **Observability contract:** Every planning-persona spawn — success or
-   fallback — must emit exactly one structured INFO log line per persona at the
-   final spawn decision point in Step 0.3. Operators diagnosing backend-routing
-   issues rely on these lines as the authoritative trace. Do NOT skip the INFO
-   log. Do NOT collapse multiple persona routings into one log line.
+See [`skills/hive/skills/planning-routing/SKILL.md`](../hive/skills/planning-routing/SKILL.md).
 
 ### Phase A: Research
 
