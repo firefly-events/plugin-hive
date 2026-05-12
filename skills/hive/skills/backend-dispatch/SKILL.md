@@ -34,7 +34,7 @@ Call this skill after `memory-loading` returned `prior_knowledge_block` and the 
 Decide whether this spawn runs through Claude (default) or an external model. Resolution order, first match wins:
 
 1. Explicit `backend_override` passed in by the caller.
-2. `agent_backends.{persona_context.agent_name}` in `hive/hive.config.yaml`.
+2. `agent_backends.{persona_context.agent_name}` from root `hive.config.yaml` (consumer override layer; falls back to `hive/hive.config.yaml`). Matches the input-section contract at line 16.
 3. Default: `claude`.
 
 Supported backends: `claude` | `codex`.

@@ -136,7 +136,7 @@ One-paragraph assessment covering overall UI health, top issues, and readiness.
 
 ### 6. Write report
 
-Generate a timestamp: `{YYYY-MM-DD}T{HHMM}`.
+Generate a timestamp with second-level precision: `{YYYY-MM-DD}T{HHMMSS}` (minute-level granularity risks collision when two audits run in the same minute).
 
 Write the synthesis output to `.pHive/audits/design-review/{timestamp}/report.md` for
 `artifact_target: design`, or `.pHive/audits/ui-audit/{timestamp}/report.md` for

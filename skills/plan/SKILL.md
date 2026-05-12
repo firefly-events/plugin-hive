@@ -408,7 +408,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
        >
        > Override: set `paths.gate_mode: hard` in `hive.config.yaml` to restore blocking behavior.
 
-    4. Always write the audit record to `.pHive/audits/post-run/<run-id>.yaml` (create the directory if absent). Schema:
+    4. Always write the audit record to `${HIVE_STATE_DIR}/audits/post-run/<run-id>.yaml` (create the directory if absent). Schema:
 
        ```yaml
        run_id: <run-id>

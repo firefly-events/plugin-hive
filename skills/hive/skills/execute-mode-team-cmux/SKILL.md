@@ -47,7 +47,7 @@ Run a poll loop every 10 seconds. For each active surface:
 
 When a story completes: mark it done, then scan blocked stories and spawn any whose `depends_on` set is now fully satisfied (loop back to Step 1 for each new spawn).
 
-When a story fails: mark `failed`, propagate failure to all transitive dependents (they cannot run), and continue working remaining independent stories. Terminate with a failure summary once no runnable stories remain.
+When a story fails: mark `failed`, propagate failure to all transitive dependents (they cannot run), and continue working remaining independent stories. When no runnable stories remain, invoke the Step 5 cleanup branch (close every tracked surface via `cmux close-surface`) BEFORE emitting the failure summary, so failed runs do not leak panes.
 
 ### Step 4: Deliver respawn + sidecar injection
 
@@ -65,6 +65,8 @@ Resolution uses `hive/references/specialist-triggers.md` `responds_with.id` (alr
 
 ### Step 5: Close surfaces
 
-When all stories complete: close every tracked surface via `cmux close-surface`, then return control to the caller for the parent's summary step.
+Mandatory cleanup branch — runs on BOTH terminal paths:
+- All stories complete (success): close every tracked surface via `cmux close-surface`, then return control to the caller for the parent's summary step.
+- Failure termination (per Step 3): close every tracked surface via `cmux close-surface` BEFORE emitting the failure summary. Prevents leaked panes on partial-failure runs.
 
 Follow `references/team-execution.md` for cmux-variant TeamCreate prompt details and the per-story commit pattern (`hive-{story-id}` branch + commit on review pass).

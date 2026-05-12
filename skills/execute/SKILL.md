@@ -140,7 +140,7 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
    > **v1 note:** v1 routing handles `workflow`-based catalog entries only. A catalog entry with `skill: <path>` (allowed by catalog schema but unused in v1) is not reached by condition (i) and falls to condition (ii) or (iii). Skill-based routing is a Phase 6 extension point.
 
-5. **Choose execution mode.** Invoke `skills/hive/skills/execute-dispatch/SKILL.md` with env, parsed root `hive.config.yaml`, parsed consumer `.pHive/hive.config.yaml`, parsed graduation registry, `workflow_name`, and `$ARGUMENTS`; consume `mode_decision`, `mode_reason`, `runner_path`, and `runner_reason`. Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7.
+5. **Choose execution mode.** Invoke `skills/hive/skills/execute-dispatch/SKILL.md` with env, parsed root `hive.config.yaml`, parsed consumer `${HIVE_STATE_DIR}/hive.config.yaml`, parsed graduation registry, `workflow_name`, and `$ARGUMENTS`; consume `mode_decision`, `mode_reason`, `runner_path`, and `runner_reason`. Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7.
 5pre. **Executor cutover routing.** Use only the returned `runner_path` and `runner_reason`; do not re-evaluate the cutover tree here. If `runner_path == hive-dag`, call `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`; otherwise continue on the orchestrator-narrated path. Single dispatch point: this skill call is the only `/execute` policy boundary for executor-vs-orchestrator routing.
 
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
@@ -199,7 +199,7 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
    4. If ANY heuristic fires, emit ONE consolidated warning to stdout listing every triggered field plus its override path. Use the same shape documented in `skills/plan/SKILL.md` step 19 (warning header + per-field bullets + final override line pointing at `paths.gate_mode: hard`).
 
-   5. Always write the audit record to `.pHive/audits/post-run/<run-id>.yaml` (create the directory if absent). Same schema as `skills/plan/SKILL.md` step 19, with two differences:
+   5. Always write the audit record to `${HIVE_STATE_DIR}/audits/post-run/<run-id>.yaml` (create the directory if absent). Same schema as `skills/plan/SKILL.md` step 19, with two differences:
       - `skill: execute`
       - additional field `backend_sources` mapping `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor` to their resolved source.
 

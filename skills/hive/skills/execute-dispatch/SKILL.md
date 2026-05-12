@@ -81,7 +81,7 @@ Evaluate in this order and stop at the first selected path:
 3. If parallel teams config is not true, return `mode_decision=sequential` and `mode_reason=parallel-teams-disabled`.
 4. If the dependency-depth summary does not show multiple stories at the same depth, return `mode_decision=sequential` and `mode_reason=no-peer-depth`.
 5. If `--sequential` is present in `arguments`, return `mode_decision=sequential` and `mode_reason=sequential-flag`.
-6. If `execution.terminal_mux` resolves to `cmux`, return `mode_decision=team-cmux` and `mode_reason=team-checks-pass-cmux`.
+6. When the resolved `terminal_mux` field (from Step 0, env > config > default) equals `cmux`, return `mode_decision=team-cmux` and `mode_reason=team-checks-pass-cmux`.
 7. Otherwise return `mode_decision=team` and `mode_reason=team-checks-pass`.
 
 This preserves precedence: `sessions > team-cmux > team > sequential`.
@@ -90,7 +90,7 @@ This preserves precedence: `sessions > team-cmux > team > sequential`.
 
 Evaluate the deterministic executor cutover as a five-stage decision tree. Default OFF: any miss returns `runner_path=orchestrator-narrated`.
 
-> **WARNING:** Block 5pre reads CONSUMER .pHive/hive.config.yaml ONLY. Never read shipped hive/hive.config.yaml for runner flags — that would regress to pre-Slice-1 contamination.
+> **WARNING:** Step 2 (this runner-path resolver) reads CONSUMER `.pHive/hive.config.yaml` ONLY for runner flags. Never read shipped `hive/hive.config.yaml` for runner flags — that would regress to pre-Slice-1 contamination.
 
 1. **Read consumer config.** Use the caller-supplied consumer `.pHive/hive.config.yaml` parse result. If it is `None` or absent, return `runner_path=orchestrator-narrated` and `runner_reason=consumer-config-missing`.
 2. **Check executor value.** If `executor` is unset or empty, return `runner_path=orchestrator-narrated` and `runner_reason=executor-unset`. If `executor` is anything other than `hive-dag`, emit a structured warning and return `runner_path=orchestrator-narrated` with `runner_reason=unknown-executor`.

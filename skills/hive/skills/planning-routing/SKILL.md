@@ -45,11 +45,11 @@ For each persona in `assembled_personas`, consult `agent_backends` using the roo
 
 Produce `routing_decisions` with one value per persona: `codex` or `direct`. Also store tentative `routing_reason` for Step 0.3 final INFO emission.
 
-- If `agent_backends[persona] == codex` and persona is supported, route `codex` with reason `no-fallback-needed`.
-- If `agent_backends[persona] == codex` and persona is known-incompatible, route `direct` with reason `known-incompatible`.
-- If `agent_backends[persona] == codex` and persona is in neither list, route `direct` with reason `unvalidated-persona`.
-- If `agent_backends[persona] == direct`, route `direct` with reason `no-fallback-needed`.
-- If `agent_backends[persona]` is unset or `agent_backends` is absent, route `direct` with reason `agent_backends-unset`.
+- When `agent_backends[persona] == codex` and persona is supported, route `codex` with reason `no-fallback-needed`.
+- When `agent_backends[persona] == codex` and persona is known-incompatible, route `direct` with reason `known-incompatible`.
+- When `agent_backends[persona] == codex` and persona is in neither list, route `direct` with reason `unvalidated-persona`.
+- When `agent_backends[persona] == claude`, route `direct` with reason `claude-requested` (configured Claude personas use the direct TeamCreate path; the value `claude` is canonical per hive.config.yaml `Supported backends: claude | codex`).
+- When `agent_backends[persona]` is unset or `agent_backends` is absent, route `direct` with reason `agent_backends-unset`.
 
 Apply this only to personas present in the assembled list. `ui-designer` is always `direct` even when configured to `codex`, because codex-invoke marks it known-incompatible. Step 0.2 does not emit INFO logs.
 
