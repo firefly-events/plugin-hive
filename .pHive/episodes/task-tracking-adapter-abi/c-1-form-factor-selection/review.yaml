@@ -1,0 +1,11 @@
+step_id: review
+story_id: c-1-form-factor-selection
+epic_id: task-tracking-adapter-abi
+agent: reviewer
+status: completed
+verdict: APPROVE
+non_blocking_notes_for_c2:
+  - "Pin caching semantics for CLI capabilities — per-call vs per-session memoization (52ms × every call)"
+  - "Error code vocabulary (NOT_FOUND, UNKNOWN_METHOD) needs closed enum in c-2"
+  - "team_field/project_field: clarify capability metadata keys vs runtime filter values in c-2"
+  - "Normalize atoshell-if-revisited placeholder reference"

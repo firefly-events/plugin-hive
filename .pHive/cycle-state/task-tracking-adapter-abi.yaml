@@ -1,0 +1,25 @@
+epic_id: task-tracking-adapter-abi
+created: "2026-05-11T00:00:00Z"
+methodology: classic
+branch: feat/task-tracking-adapter-abi
+target_codebase: /Users/don/Documents/plugin-hive
+
+decisions:
+  form_factor: cli
+  form_factor_rationale: "CLI (21pts) over MCP (20pts) — Axis 4 user-facing complexity decisive. Both sketched (AC §5 dual sketch)."
+  hierarchy_enum: "flat | hierarchical | mixed"
+  abi_sketch: hive/references/task-tracking-adapter-abi-sketch.md
+
+escalations: []
+
+story_outcomes:
+  c-1-form-factor-selection:
+    status: approved
+    key_artifacts:
+      - .pHive/epics/task-tracking-adapter-abi/docs/form-factor-decision.md
+      - hive/references/task-tracking-adapter-abi-sketch.md
+    notes_for_c2:
+      - "Pin capability caching semantics — per-call vs per-session (52ms CLI cost matters)"
+      - "Error code closed enum needed: NOT_FOUND, UNKNOWN_METHOD, AUTH_FAILURE, RATE_LIMIT"
+      - "Clarify team_field/project_field as capability metadata vs runtime filter values"
+      - "Normalize atoshell-if-revisited placeholder"

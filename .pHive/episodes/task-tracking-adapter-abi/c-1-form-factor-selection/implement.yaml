@@ -1,0 +1,9 @@
+step_id: implement
+story_id: c-1-form-factor-selection
+epic_id: task-tracking-adapter-abi
+agent: developer
+status: completed
+artifacts:
+  - path: .pHive/epics/task-tracking-adapter-abi/docs/form-factor-decision.md
+  - path: hive/references/task-tracking-adapter-abi-sketch.md
+key_finding: "CLI selected (21pts) over MCP (20pts). AC §5 dual sketch written for both. hierarchy enum (flat|hierarchical|mixed) replaces boolean flag."
