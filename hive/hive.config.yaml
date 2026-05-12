@@ -61,18 +61,46 @@ context_window:
   budget_fraction: 0.7
   degradation_threshold: 0.85
 
-# External task tracking
-# Set adapter to enable. All linear_* fields required when adapter: linear.
+# External task tracking (Epic C — task-tracking-adapter-abi)
+# Read by hive/lib/task-tracking-dispatch (ABI 1.x). Setting `adapter` enables
+# executable tracker integration; leaving it null preserves the prior
+# "skip tracker ops" behavior via gate_mode.
+#
+#   adapter:
+#     null                        — no adapter; gate_mode controls behavior
+#     github | linear             — built-in adapters in hive/adapters/
+#     /abs/path/to/adapter.ts     — custom adapter conforming to ABI 1.x
+#
+#   gate_mode (when adapter is null):
+#     warning  — emit warning + skip tracker ops (default)
+#     hard     — hard-block on any tracker call
+#
+# Adapter credentials are read from env at call time (GITHUB_TOKEN /
+# `gh auth token` for github; LINEAR_API_KEY + LINEAR_TEAM for linear). The
+# nested `github`/`linear` keys below are an alternate config-driven path —
+# values are propagated into the matching env vars before invocation.
 task_tracking:
-  adapter: null              # linear, github, jira — null = disabled
+  adapter: null
+  adapter_timeout_ms: 30000
+  gate_mode: warning           # warning | hard — applies when adapter is null
+  # Runtime context — passed at invoke time (not at load time):
+  team_value: null             # github: owner; linear: team key (e.g., "ACME")
+  project_value: null          # github: repo;  linear: project name
+  # Adapter-specific sub-config (propagated to env if non-null):
+  github:
+    token: null                # falls through to GITHUB_TOKEN env / `gh auth token`
+  linear:
+    api_key: null              # falls through to LINEAR_API_KEY env
+    team: null                 # falls through to LINEAR_TEAM env
+  # Legacy keys retained for the pre-ABI queue/prefix tooling; c-5b will swap
+  # callers to the dispatch module and these will graduate to deprecated.
   queue_name: "Hive — Human Intervention"
   auto_expire_days: 7
-  # Linear-specific
-  linear_team: null          # team key (e.g., "ACME")
-  linear_project: null       # project name (e.g., "my-project")
-  linear_user_id: null       # user UUID for assignment locking (from linearis users list)
-  linear_prefix: "[Hive]"   # prefix for Hive-created issues
-  branch_prefix: "acme"     # branch naming: {prefix}-{N}-{slug} (enables GitHub auto-link)
+  linear_team: null            # legacy — same as task_tracking.linear.team
+  linear_project: null
+  linear_user_id: null
+  linear_prefix: "[Hive]"
+  branch_prefix: "acme"
 
 # Model tier routing
 # Assigns the right model to the right job. Orchestrator and complex reasoning
