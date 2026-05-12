@@ -33,6 +33,10 @@ state/
 !.pHive/epics/structural-refactor-and-gate-lift/**
 !.pHive/epics/task-tracking-adapter-abi/
 !.pHive/epics/task-tracking-adapter-abi/**
+!.pHive/epics/sandcastle-adoption-followon/
+!.pHive/epics/sandcastle-adoption-followon/**
+!.pHive/episodes/sandcastle-adoption-followon/
+!.pHive/episodes/sandcastle-adoption-followon/**
 # Per-epic cycle-state lives under .pHive/cycle-state/; only the
 # meta-improvement-system entry is tracked at this time (same maintainer-
 # infrastructure rationale as the epics/ and episodes/ subtrees above).
@@ -79,3 +83,6 @@ __pycache__/
 # This file IS tracked — it serves as plugin-hive own CONTEXT.md and as
 # an exemplar for downstream projects.
 !.pHive/CONTEXT.md
+# upstream-watch: durable upstream blocker records tracked at maintainer level.
+!.pHive/upstream-watch/
+!.pHive/upstream-watch/**
