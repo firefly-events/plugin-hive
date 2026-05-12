@@ -11,9 +11,11 @@ Atomic skill, NOT inline `/execute` prose. It resolves the pre-execution dispatc
 
 Call this skill once at the single `/execute` dispatch point where the caller has both the story execution context and the current workflow handoff context.
 
-**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; and `arguments` containing the `--sequential` flag state plus dependency-depth summary.
+**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, `HIVE_EXECUTION_MODE`, and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; and `arguments` containing the `--sequential` flag state plus dependency-depth summary.
 
-**Outputs:** `mode_decision` enum `sessions | team | team-cmux | sequential`; `mode_reason` as a one-line string explaining the selected mode; `runner_path` enum `hive-dag | orchestrator-narrated`; `runner_reason` as a one-line string explaining the selected runner path; and `field_sources` map `{field_name: env|config|default}` covering `sessions_enabled`, `parallel_teams`, `terminal_mux`, and `executor` so callers can attribute every resolution.
+**Outputs:** `mode_decision` enum `sessions | team | team-cmux | sequential | sandcastle`; `mode_reason` as a one-line string explaining the selected mode; `runner_path` enum `hive-dag | orchestrator-narrated`; `runner_reason` as a one-line string explaining the selected runner path; and `field_sources` map `{field_name: env|config|default}` covering `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor`, and `execution_mode` so callers can attribute every resolution.
+
+`field_sources.execution_mode` tracks the source of an explicit sandcastle override only: `env` when `HIVE_EXECUTION_MODE=sandcastle` wins, `config` when `execution.mode: sandcastle` from root `hive.config.yaml` wins, `default` when neither env nor config selects sandcastle (fall-through to the standard mode resolution chain). Unlike the four existing fields, `execution_mode=default` does NOT trigger the loud "fell to defaults" warning — default is the normal case for non-sandcastle runs. The `execution_mode={source}` token is always appended to the telemetry line regardless of source.
 
 **Side effects:** emit a structured warning only when consumer config sets `executor` to an unknown non-empty value, OR when any of the four tracked fields resolves to `default` (loud no-config warning + telemetry line). Missing consumer config, missing graduation registry, unset `executor`, false `executor_default`, and workflow-not-graduated remain normal fail-closed states and emit no warning for the runner gate itself.
 
@@ -59,8 +61,14 @@ For each tracked field, apply strict precedence: **env > config > default**. Rec
   - Always read from consumer `.pHive/hive.config.yaml` per Q4 lock. Env never overrides — env path is intentionally absent for this field.
   - config path: consumer config `executor: hive-dag` with `executor_default` truthy → `hive-dag`, source `config`
   - default: `orchestrator-narrated`, source `default`
+- `execution_mode`:
+  - env path: `env.HIVE_EXECUTION_MODE` equals exactly `sandcastle` (case-sensitive) → source `env`; any other value is ignored (not an error — reserved for future modes)
+  - config path: root `hive.config.yaml execution.mode: sandcastle` → source `config`
+  - default: neither env nor config selects sandcastle → source `default` (fall-through to standard mode resolution)
+  - When source is `env` or `config`: immediately set `mode_decision=sandcastle` and `mode_reason=execution-mode-override-{source}`. Skip Step 1 entirely. This takes precedence over sessions, team, and sequential.
+  - `execution_mode=default` does NOT trigger the "fell to defaults" warning — it is the normal non-sandcastle path. Always include `execution_mode={source}` in the telemetry line.
 
-When ANY of the four fields resolves with source `default`, emit a loud warning before returning, enumerating each defaulted field and the override path:
+When ANY of the four fields (`sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor`) resolves with source `default`, emit a loud warning before returning, enumerating each defaulted field and the override path:
 
 ```
 WARNING: Backend auto-resolved fields fell to defaults — sessions_enabled=false, parallel_teams=true, terminal_mux=tmux, executor=orchestrator-narrated. Override in hive.config.yaml (or env: HIVE_SESSIONS_ENABLED, HIVE_PARALLEL_TEAMS, HIVE_TERMINAL_MUX; executor lives in consumer .pHive/hive.config.yaml).
@@ -69,10 +77,12 @@ WARNING: Backend auto-resolved fields fell to defaults — sessions_enabled=fals
 Emit one printable inline telemetry line covering every field resolution:
 
 ```
-[telemetry] backend_resolution sessions_enabled={source} parallel_teams={source} terminal_mux={source} executor={source}
+[telemetry] backend_resolution sessions_enabled={source} parallel_teams={source} terminal_mux={source} executor={source} execution_mode={source}
 ```
 
 ### Step 1: Resolve Mode Decision
+
+**Precondition:** only reached when `field_sources.execution_mode=default` (Step 0 did not select sandcastle via env or config). When sandcastle was selected in Step 0, skip this step entirely.
 
 Evaluate in this order and stop at the first selected path:
 
