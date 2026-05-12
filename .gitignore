@@ -67,6 +67,7 @@ agents/memories/
 .DS_Store
 *.log
 .claude/*.lock
+.sandcastle/
 # Python bytecode/caches — C1.4 (hive/lib/metrics/) introduced Python 3 runtime
 # primitives with stdlib-only deps. Prevent __pycache__/ and *.pyc files from
 # polluting the tree as future maintainer tooling adds more Python.
