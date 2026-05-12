@@ -181,23 +181,35 @@ export class TaskTrackingDispatch {
    *   gate_mode=warning -> emit warning + JSONL telemetry once, return
    *                        NO_ADAPTER (non-recoverable, caller routes to skip)
    *   gate_mode=hard    -> return NO_ADAPTER (non-recoverable, hard block)
+   *
+   * `options.skill_context` (optional) is recorded in prose-runbook-fallback
+   * telemetry so cost/migration dashboards can attribute terminal failures to
+   * the calling skill (e.g. "plan", "execute", "kickoff").
    */
-  async invoke(method: string, params: any = {}): Promise<DispatchResult> {
+  async invoke(
+    method: string,
+    params: any = {},
+    options?: { skill_context?: string },
+  ): Promise<DispatchResult> {
     if (!this.handle) {
       return this.handleNoAdapter(method);
     }
+
+    const skillContext = options?.skill_context ?? "unknown";
 
     // Guard linkStories by supports_parent_link capability.
     if (
       method === "linkStories" &&
       this.handle.capabilities?.supports_parent_link === false
     ) {
-      return {
+      const r: DispatchResult = {
         ok: false,
         recoverable: false,
         code: "OPERATION_UNSUPPORTED",
         message: "Adapter does not support parent-child links",
       };
+      this.maybeEmitProseRunbookFallback(method, r, skillContext);
+      return r;
     }
 
     const timeoutMs =
@@ -210,12 +222,14 @@ export class TaskTrackingDispatch {
       );
     } catch (err: any) {
       if (err && err.message === "TIMEOUT") {
-        return {
+        const r: DispatchResult = {
           ok: false,
           recoverable: false,
           code: "TIMEOUT",
           message: `Adapter call ${method} exceeded ${timeoutMs}ms`,
         };
+        this.maybeEmitProseRunbookFallback(method, r, skillContext);
+        return r;
       }
       // Adapter threw — distinguish AdapterError (ABI-shaped) from uncaught.
       // AdapterError instances expose `.code` matching the 5 ABI error codes;
@@ -224,20 +238,24 @@ export class TaskTrackingDispatch {
       const retry_after_ms =
         ((err as any)?.retry_after_ms as number | null | undefined) ?? null;
       if (code && isAbiErrorCode(code)) {
-        return {
+        const r: DispatchResult = {
           ok: false,
           recoverable: code === "RATE_LIMIT",
           code,
           message: err?.message ?? "",
           retry_after_ms,
         };
+        this.maybeEmitProseRunbookFallback(method, r, skillContext);
+        return r;
       }
-      return {
+      const r: DispatchResult = {
         ok: false,
         recoverable: false,
         code: "INTERNAL_ERROR",
         message: `Adapter threw uncaught error in ${method}: ${err?.message ?? err}`,
       };
+      this.maybeEmitProseRunbookFallback(method, r, skillContext);
+      return r;
     }
 
     return { ok: true, result };
@@ -309,6 +327,71 @@ export class TaskTrackingDispatch {
     const filePath = path.join(
       eventsDir,
       `task-tracking-no-adapter-${timestamp.replace(/[:.]/g, "-")}.jsonl`,
+    );
+    try {
+      fs.appendFileSync(filePath, JSON.stringify(event) + "\n");
+    } catch {
+      // best-effort
+    }
+  }
+
+  /**
+   * Emit prose-runbook-fallback telemetry when a loaded adapter returns a
+   * terminal (non-recoverable) result under gate_mode=warning. Skips:
+   *   - successful results
+   *   - recoverable results (RATE_LIMIT)
+   *   - NO_ADAPTER (handled by writeNoAdapterTelemetry instead)
+   *   - any gate_mode other than warning
+   *
+   * Per-occurrence emit: every qualifying terminal call writes a fresh event
+   * (each terminal is a distinct migration signal away from prose runbooks).
+   */
+  private maybeEmitProseRunbookFallback(
+    method: string,
+    result: DispatchResult,
+    skillContext: string,
+  ): void {
+    if (result.ok) return;
+    if (result.recoverable) return;
+    if (result.code === "NO_ADAPTER") return;
+
+    const gateMode = this.config?.gate_mode ?? DEFAULT_GATE_MODE;
+    if (gateMode !== "warning") return;
+
+    this.writeProseRunbookFallbackTelemetry(method, result.code, skillContext);
+  }
+
+  private writeProseRunbookFallbackTelemetry(
+    method: string,
+    code: string,
+    skillContext: string,
+  ): void {
+    const stateDir = this.config?.state_dir ?? ".pHive";
+    const eventsDir = path.join(stateDir, "metrics", "events");
+    try {
+      fs.mkdirSync(eventsDir, { recursive: true });
+    } catch {
+      return; // best-effort; never block on telemetry
+    }
+    const timestamp = new Date().toISOString();
+    const event = {
+      event_id: crypto.randomUUID(),
+      timestamp,
+      run_id: process.env.HIVE_RUN_ID ?? "unknown",
+      metric_type: "prose-runbook-fallback",
+      skill: skillContext,
+      method,
+      adapter: this.config?.adapter ?? null,
+      gate_mode: "warning",
+      error_code: code,
+    };
+    // Include random suffix so per-occurrence events within the same ms don't
+    // collide on filename.
+    const filePath = path.join(
+      eventsDir,
+      `prose-runbook-fallback-${timestamp.replace(/[:.]/g, "-")}-${crypto
+        .randomBytes(4)
+        .toString("hex")}.jsonl`,
     );
     try {
       fs.appendFileSync(filePath, JSON.stringify(event) + "\n");

@@ -307,6 +307,200 @@ describe("no-adapter behavior", () => {
   });
 });
 
+describe("prose-runbook-fallback telemetry", () => {
+  function listFallbackFiles(stateDir: string): string[] {
+    const eventsDir = path.join(stateDir, "metrics", "events");
+    if (!fs.existsSync(eventsDir)) return [];
+    return fs
+      .readdirSync(eventsDir)
+      .filter((f) => f.startsWith("prose-runbook-fallback-"));
+  }
+
+  function readFallbackEvent(stateDir: string, file: string): any {
+    const raw = fs.readFileSync(
+      path.join(stateDir, "metrics", "events", file),
+      "utf8",
+    );
+    return JSON.parse(raw.trim());
+  }
+
+  it("writes prose-runbook-fallback event on terminal error under gate_mode=warning", async () => {
+    const fixture = copyFixtureToTmp(MOCK_GOOD);
+    const tmpState = fs.mkdtempSync(path.join(os.tmpdir(), "ttd-state-"));
+    const d = new TaskTrackingDispatch();
+    await d.load({
+      adapter: fixture,
+      state_dir: tmpState,
+      gate_mode: "warning",
+    });
+    const mock: any = await loadMockState(fixture);
+    mock.__state.mode = "auth-fail";
+
+    const r = await d.invoke("createStory", {}, { skill_context: "plan" });
+    assert.equal(r.ok, false);
+    if (r.ok) return;
+    assert.equal(r.code, "AUTH_FAILURE");
+
+    const files = listFallbackFiles(tmpState);
+    assert.equal(files.length, 1, "exactly one fallback event should exist");
+    const event = readFallbackEvent(tmpState, files[0]);
+    assert.equal(event.metric_type, "prose-runbook-fallback");
+    assert.equal(event.skill, "plan");
+    assert.equal(event.method, "createStory");
+    assert.equal(event.error_code, "AUTH_FAILURE");
+    assert.equal(event.gate_mode, "warning");
+    assert.equal(event.adapter, fixture);
+    assert.ok(event.event_id);
+    assert.ok(event.timestamp);
+  });
+
+  it("emits per-occurrence (every terminal call writes a fresh event)", async () => {
+    const fixture = copyFixtureToTmp(MOCK_GOOD);
+    const tmpState = fs.mkdtempSync(path.join(os.tmpdir(), "ttd-state-"));
+    const d = new TaskTrackingDispatch();
+    await d.load({
+      adapter: fixture,
+      state_dir: tmpState,
+      gate_mode: "warning",
+    });
+    const mock: any = await loadMockState(fixture);
+    mock.__state.mode = "auth-fail";
+
+    await d.invoke("createStory", {}, { skill_context: "plan" });
+    await d.invoke("updateStatus", {}, { skill_context: "execute" });
+    await d.invoke("createStory", {}, { skill_context: "plan" });
+
+    const files = listFallbackFiles(tmpState);
+    assert.equal(files.length, 3, "3 terminals -> 3 events");
+  });
+
+  it("does NOT emit under gate_mode=hard", async () => {
+    const fixture = copyFixtureToTmp(MOCK_GOOD);
+    const tmpState = fs.mkdtempSync(path.join(os.tmpdir(), "ttd-state-"));
+    const d = new TaskTrackingDispatch();
+    await d.load({
+      adapter: fixture,
+      state_dir: tmpState,
+      gate_mode: "hard",
+    });
+    const mock: any = await loadMockState(fixture);
+    mock.__state.mode = "auth-fail";
+
+    const r = await d.invoke("createStory", {}, { skill_context: "plan" });
+    assert.equal(r.ok, false);
+    if (r.ok) return;
+    assert.equal(r.code, "AUTH_FAILURE");
+
+    assert.equal(
+      listFallbackFiles(tmpState).length,
+      0,
+      "hard mode should never emit fallback telemetry",
+    );
+  });
+
+  it("does NOT emit for RATE_LIMIT (recoverable)", async () => {
+    const fixture = copyFixtureToTmp(MOCK_GOOD);
+    const tmpState = fs.mkdtempSync(path.join(os.tmpdir(), "ttd-state-"));
+    const d = new TaskTrackingDispatch();
+    await d.load({
+      adapter: fixture,
+      state_dir: tmpState,
+      gate_mode: "warning",
+    });
+    const mock: any = await loadMockState(fixture);
+    mock.__state.mode = "rate-limit";
+
+    const r = await d.invoke("createStory", {}, { skill_context: "plan" });
+    assert.equal(r.ok, false);
+    if (r.ok) return;
+    assert.equal(r.recoverable, true);
+    assert.equal(r.code, "RATE_LIMIT");
+
+    assert.equal(
+      listFallbackFiles(tmpState).length,
+      0,
+      "recoverable errors should not emit fallback telemetry",
+    );
+  });
+
+  it("does NOT emit for NO_ADAPTER (no-adapter telemetry handles it instead)", async () => {
+    const tmpState = fs.mkdtempSync(path.join(os.tmpdir(), "ttd-state-"));
+    const d = new TaskTrackingDispatch();
+    await d.load({
+      adapter: null,
+      state_dir: tmpState,
+      gate_mode: "warning",
+    });
+
+    // Suppress the warning emitted by no-adapter path.
+    const origWarn = console.warn;
+    console.warn = () => {};
+    try {
+      await d.invoke("createStory", {}, { skill_context: "plan" });
+    } finally {
+      console.warn = origWarn;
+    }
+
+    assert.equal(
+      listFallbackFiles(tmpState).length,
+      0,
+      "NO_ADAPTER must not double-emit prose-runbook-fallback",
+    );
+    // The existing no-adapter event still fires.
+    const eventsDir = path.join(tmpState, "metrics", "events");
+    const noAdapterFiles = fs
+      .readdirSync(eventsDir)
+      .filter((f) => f.startsWith("task-tracking-no-adapter-"));
+    assert.equal(noAdapterFiles.length, 1);
+  });
+
+  it("records skill_context in the event payload; defaults to 'unknown'", async () => {
+    const fixture = copyFixtureToTmp(MOCK_GOOD);
+    const tmpState = fs.mkdtempSync(path.join(os.tmpdir(), "ttd-state-"));
+    const d = new TaskTrackingDispatch();
+    await d.load({
+      adapter: fixture,
+      state_dir: tmpState,
+      gate_mode: "warning",
+    });
+    const mock: any = await loadMockState(fixture);
+    mock.__state.mode = "auth-fail";
+
+    // No options -> default
+    await d.invoke("createStory", {});
+
+    const files = listFallbackFiles(tmpState);
+    assert.equal(files.length, 1);
+    const event = readFallbackEvent(tmpState, files[0]);
+    assert.equal(event.skill, "unknown");
+  });
+
+  it("emits for TIMEOUT (terminal, non-NO_ADAPTER) under gate_mode=warning", async () => {
+    const fixture = copyFixtureToTmp(MOCK_GOOD);
+    const tmpState = fs.mkdtempSync(path.join(os.tmpdir(), "ttd-state-"));
+    const d = new TaskTrackingDispatch();
+    await d.load({
+      adapter: fixture,
+      state_dir: tmpState,
+      gate_mode: "warning",
+      adapter_timeout_ms: 50,
+    });
+    const mock: any = await loadMockState(fixture);
+    mock.__state.mode = "slow";
+
+    const r = await d.invoke("createStory", {}, { skill_context: "execute" });
+    assert.equal(r.ok, false);
+    if (r.ok) return;
+    assert.equal(r.code, "TIMEOUT");
+
+    const files = listFallbackFiles(tmpState);
+    assert.equal(files.length, 1);
+    const event = readFallbackEvent(tmpState, files[0]);
+    assert.equal(event.error_code, "TIMEOUT");
+    assert.equal(event.skill, "execute");
+  });
+});
+
 describe("handle cache", () => {
   it("shares the same handle across two load() calls with equivalent config", async () => {
     const fixture = copyFixtureToTmp(MOCK_GOOD);
