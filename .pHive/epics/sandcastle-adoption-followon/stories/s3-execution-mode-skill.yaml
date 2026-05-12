@@ -1,0 +1,99 @@
+id: s3-execution-mode-skill
+epic: sandcastle-adoption-followon
+title: Sandcastle execution mode skill with lifecycle ownership contract
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s2-provider-wrap, s2-hooks-minimal]
+tier: 2
+slice: S3
+description: |
+  Add `skills/hive/skills/execute-mode-sandcastle/SKILL.md` as the mode body
+  consumed by `/execute` after dispatch selects `sandcastle`. The skill must
+  declare `@ai-hero/sandcastle >=0.5.10` runtime preflight, provider-wrapper
+  usage, `wt.close()` ownership for Sandcastle-created worktrees, and the
+  lifecycle-hook boundary.
+
+acceptance_criteria:
+  - "Given execute-mode-sandcastle/SKILL.md is read, then it instructs callers to use hive/lib/sandcastle-provider.js rather than constructing SandboxProvider inline"
+  - "Given the mode runs with @ai-hero/sandcastle below 0.5.10, when preflight executes, then it fails before auth, hook, or provider setup"
+  - "Given a Sandcastle-created worktree exists, when the mode exits, then the skill contract requires wt.close() before returning"
+  - "Given a legacy .claude/worktrees/{story-id} worktree is handed in by another owner, when the mode exits, then the skill contract forbids calling wt.close() for that path"
+  - "Given hooks are described, when the skill is read, then it says Sandcastle hooks are lifecycle hooks and not Hive PreToolUse"
+
+steps:
+  - id: context-discovery
+    name: discovery
+    description: Read existing execute-mode skills and the architect ownership wording before authoring the new mode skill.
+  - id: build-change
+    name: build
+    description: Create `skills/hive/skills/execute-mode-sandcastle/SKILL.md` with preflight, wrapper usage, lifecycle, and teardown contract.
+  - id: verify-result
+    name: verify
+    description: Run markdown/link checks and any skill-schema lint used by existing execute-mode skill files.
+  - id: audit-notes
+    name: audit
+    description: Capture performance and dependency escalation notes without running live merge validation yet.
+  - id: commit-ready
+    name: commit
+    description: Commit only the new execution-mode skill and focused documentation tests.
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/execute-mode-session/SKILL.md
+      purpose: Existing execution-mode skill pattern.
+    - path: skills/hive/skills/execute-mode-team-cmux/SKILL.md
+      purpose: Existing mode-specific execution contract pattern.
+    - path: skills/hive/skills/execute-mode-sandcastle/SKILL.md
+      purpose: New Sandcastle mode body.
+    - path: hive/lib/sandcastle-provider.js
+      purpose: Required wrapper consumed by the mode.
+
+files_to_modify:
+  - file: skills/hive/skills/execute-mode-sandcastle/SKILL.md
+    change: New mode skill for Sandcastle execution through the provider wrapper.
+
+code_examples:
+  - title: Required ownership wording
+    file: skills/hive/skills/execute-mode-sandcastle/SKILL.md
+    snippet: |
+      ## Worktree Ownership
+
+      Do not call `wt.close()` for a legacy `.claude/worktrees/{story-id}`
+      worktree handed in by another owner.
+      Do call `wt.close()` for the Sandcastle-created worktree before
+      returning from the Sandcastle execution path.
+
+design_decisions:
+  - decision: Runtime preflight belongs in the mode and provider wrapper.
+    rationale: S2 protects direct wrapper users; S3 protects `/execute` users before mode setup proceeds.
+  - decision: Sandcastle mode is Codex-path-only.
+    rationale: Upstream issue #191 blocks the `claudeCode()` subscription lane until a future story.
+
+cross_cutting:
+  - concern: performance:audit
+    action: Minor post-exec audit applies because every Sandcastle mode run adds container cold-start overhead.
+  - concern: dependency:version-gate
+    action: Minor pre-exec gate requires the mode to fail fast below `@ai-hero/sandcastle >=0.5.10`.
+
+risks:
+  - severity: high
+    description: Mode prose omits the split worktree ownership rule and causes double cleanup.
+    mitigation: Include the architect wording verbatim in the mode skill and tests/docs review.
+  - severity: medium
+    description: Implementer bypasses provider wrapper and duplicates auth/redaction/version behavior.
+    mitigation: Make wrapper usage a hard acceptance criterion.
+
+references:
+  - path: .pHive/epics/sandcastle-adoption-followon/docs/architect-review-b2.md
+    relevant_excerpt: |
+      Add provider wrapper tests for lifecycle cleanup ownership and a mode
+      preflight for package version. This is an implementation acceptance
+      addition, not a layer recut.
+  - path: .pHive/epics/sandcastle-adoption-followon/docs/tpm-sequencing-memo-b2.md
+    relevant_excerpt: |
+      NEW: `skills/hive/skills/execute-mode-sandcastle/SKILL.md`
+      MOD: `skills/hive/skills/execute-dispatch/SKILL.md`
+      MOD: `skills/execute/SKILL.md` (line 143 switch case)
+

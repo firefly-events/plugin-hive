@@ -1,0 +1,94 @@
+id: s1-gitignore-template
+epic: sandcastle-adoption-followon
+title: Add .sandcastle directory to the canonical gitignore template
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+tier: 1
+slice: S1
+description: |
+  Add `.sandcastle/` to the canonical shipped ignore surface, the repo-root
+  `.gitignore`, because this codebase has no separate kickoff `.gitignore`
+  generator or template file. This closes the S1 log-leak gate by ensuring
+  Sandcastle auth config and logs are ignored by default.
+
+acceptance_criteria:
+  - "Given the root .gitignore, when read, then it contains a standalone .sandcastle/ entry"
+  - "Given .sandcastle/logs/fake.log is created, when git status --ignored is checked, then the file is ignored"
+  - "Given existing .pHive whitelist rules, when .sandcastle/ is added, then no existing tracked .pHive planning artifacts become ignored"
+  - "Given S1 redaction tests pass, when this story is reviewed, then gitignore coverage is treated as a ship gate alongside redaction"
+
+steps:
+  - id: context-discovery
+    name: discovery
+    description: Confirm there is no separate kickoff gitignore template and treat root `.gitignore` as the canonical shipped template surface.
+  - id: build-change
+    name: build
+    description: Add `.sandcastle/` near the existing hidden-state and log ignore entries in `.gitignore`.
+  - id: verify-result
+    name: verify
+    description: Use `git check-ignore .sandcastle/logs/fake.log` and inspect that `.pHive` whitelist behavior remains unchanged.
+  - id: audit-notes
+    name: audit
+    description: Record the exact path decision for the architect open item and link it to S1 security gate evidence.
+  - id: commit-ready
+    name: commit
+    description: Commit the root `.gitignore` update only.
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .gitignore
+      purpose: Exact canonical `.gitignore` template path for this repo; no separate kickoff template exists.
+    - path: .pHive/spikes/sandcastle/.gitignore
+      purpose: Spike-local precedent for ignoring Sandcastle-generated state.
+    - path: .pHive/epics/sandcastle-adoption-followon/docs/architect-review-b2.md
+      purpose: Requires story specs to name the exact `.gitignore` template path.
+
+files_to_modify:
+  - file: .gitignore
+    change: Add a standalone `.sandcastle/` ignore entry.
+
+code_examples:
+  - title: Root gitignore insertion target
+    file: .gitignore
+    snippet: |
+      agents/memories/
+      .claude/settings.local.json
+      .history/
+      .DS_Store
+      *.log
+      .claude/*.lock
+      .sandcastle/
+
+design_decisions:
+  - decision: Use `/Users/don/Documents/plugin-hive/.gitignore` as the exact template path.
+    rationale: Repo search found no dedicated kickoff `.gitignore` template; root `.gitignore` is the shipped ignore contract.
+  - decision: Ignore the whole `.sandcastle/` directory.
+    rationale: Both logs and auth config under that directory are generated local runtime state.
+
+cross_cutting:
+  - concern: security:plan-audit
+    action: Major pre-exec audit applies because `.sandcastle/` can contain logs and auth material.
+
+risks:
+  - severity: medium
+    description: Adding a broad ignore rule accidentally hides planning artifacts.
+    mitigation: Limit the new rule to `.sandcastle/` and verify existing `.pHive` negations still behave.
+  - severity: low
+    description: Future kickoff code introduces a separate template and misses this rule.
+    mitigation: S5 adoption docs should mention root `.gitignore` as the current canonical surface.
+
+references:
+  - path: .pHive/epics/sandcastle-adoption-followon/docs/architect-review-b2.md
+    relevant_excerpt: |
+      Issue: no blocker. Story specs must name the `.gitignore`
+      template path.
+      The logging/redaction layer blocks key leakage before any provider path can ship.
+  - path: .pHive/epics/sandcastle-adoption-followon/docs/research-brief.md
+    relevant_excerpt: |
+      The Sandcastle file logger writes the full `podman run` argv,
+      including `-e OPENAI_API_KEY=<value>`, to `.sandcastle/logs/<name>.log`.
+      This is a real key-leak hazard if the log directory is committed.
+

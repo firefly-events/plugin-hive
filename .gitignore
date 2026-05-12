@@ -43,6 +43,18 @@ state/
 !.pHive/cycle-state/
 .pHive/cycle-state/*
 !.pHive/cycle-state/meta-improvement-system.yaml
+!.pHive/cycle-state/sandcastle-adoption-followon.yaml
+# Specialist-phase audit trail for the Sandcastle adoption work (security plan-audit
+# verdict + re-audit, performance post-run audit). Tracked as decision provenance for
+# the major-severity pre-exec gate resolution + minor post-run informational audit.
+!.pHive/specialist-phases/
+.pHive/specialist-phases/*
+!.pHive/specialist-phases/security:plan-audit/
+!.pHive/specialist-phases/security:plan-audit/sandcastle-adoption-followon/
+!.pHive/specialist-phases/security:plan-audit/sandcastle-adoption-followon/**
+!.pHive/specialist-phases/performance:audit/
+!.pHive/specialist-phases/performance:audit/sandcastle-adoption-followon/
+!.pHive/specialist-phases/performance:audit/sandcastle-adoption-followon/**
 # Metrics carrier (.pHive/metrics/) — authored by S2 stories of the
 # meta-improvement-system epic; contains schema docs and, from C1.4 on,
 # fixtures consumed by hive/lib/metrics/ unit tests.
