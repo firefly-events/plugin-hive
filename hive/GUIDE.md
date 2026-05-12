@@ -20,10 +20,9 @@ Hive runs as a set of Claude Code skills. The orchestrator is always the main se
 | `/hive:review` | "review this code", "review my changes" | Run structured code review |
 | `/hive:brand-system` | "create brand system", "establish brand identity" | Brand identity: colors (HEX/RGB/CMYK/PMS), typography, spacing. Produces YAML + visual guide PNG. No prerequisites. |
 | `/hive:design-system` | "generate design tokens", "create token file" | Convert brand YAML to W3C Design Token JSON. Requires `/hive:brand-system` first. |
-| `/hive:ui-audit` | "run ui audit", "audit accessibility" | Collaborative audit: accessibility-specialist + animations-specialist + ui-designer synthesis. Requires `/hive:kickoff` first. |
-| `/hive:polish-audit` | "run polish audit", "find animation opportunities" | Animation/motion opportunity pass. Requires `/hive:ui-audit` first. |
+| `/hive:polish-audit` | "run polish audit", "find animation opportunities" | Animation/motion opportunity pass. Requires `/hive:design-review --artifact-target implementation` first. |
 | `/hive:visual-qa` | "run visual qa", "check design fidelity" | Compare design briefs and wireframe PNGs against implementation. Requires `/hive:ui-design` on a story first. |
-| `/hive:design-review` | "run design review", "review the design" | Design review ceremony with domain specialist critiques. Requires `/hive:ui-design` or `/hive:brand-system`. Supports `--skip accessibility` and `--skip animations`. |
+| `/hive:design-review` | "run design review", "review the design", "run ui audit" | Target-aware design or implementation review with domain specialist critiques. Use `--artifact-target implementation` for the removed `/hive:ui-audit` flow. Supports `--skip accessibility` and `--skip animations`. |
 | `/meta-optimize` | "optimize this project", "run meta improvements" | Public meta-improvement cycle for the resolved target project. Requires kickoff-time metrics opt-in for metrics-backed proposal ranking; otherwise uses backlog fallback when available. Produces PR-style artifacts rather than mutating `main`. |
 
 ---
@@ -414,7 +413,7 @@ YAML-defined quality rules per workflow at `gate-policies/{workflow}.yaml`. Type
 | Team memories | `.pHive/team-memories/{team}/` | Project-level team knowledge |
 | Team configs | `.pHive/teams/{team-name}.yaml` | Loadable team compositions |
 | Test baselines | `.pHive/test-baseline/{project}/` | Project test knowledge |
-| Audit reports | `.pHive/audits/{audit-type}/{timestamp}/report.md` | Ad-hoc audit output (ui-audit, polish-audit, visual-qa, design-review) |
+| Audit reports | `.pHive/audits/{audit-type}/{timestamp}/report.md` | Ad-hoc audit output (design-review, design-review implementation records under ui-audit, polish-audit, visual-qa) |
 | Latest audit pointer | `.pHive/audits/{audit-type}/latest.yaml` | Pointer to most recent completed audit of each type |
 | Design briefs | `.pHive/design/briefs/{story-id}.md` | Stable canonical design briefs (written by ui-design workflow) |
 | Design brief manifest | `.pHive/design/index.yaml` | Lists all brief paths and wireframe export paths (gate file for visual-qa, design-review) |

@@ -32,7 +32,9 @@ If **any** of these checks fail, display this message and **stop** — do not pr
 
 If all checks pass, proceed silently — do not announce that the kickoff gate passed. Only surface this section when a check fails.
 
-> **Note for read-only-shaped skills (status, review, test, standup, ui-audit):** when W1 of Epic A (catalog-hygiene-and-borrows) lifts the kickoff gate to a warning, those skills will print a "Hive not initialized — proceeding with reduced fidelity" warning instead of stopping. The hard-stop above remains the default for skills that genuinely cannot run without project profile data (plan, execute, kickoff itself).
+> **Note for read-only-shaped skills (status, review, test, standup, design-review --artifact-target implementation):** those modes print a "Hive not initialized — proceeding with reduced fidelity" warning instead of stopping (per Epic A W1, commit 08b472d).
+>
+> For `/plan` and `/execute`, behavior is controlled by `paths.gate_mode` (`warning` or `hard`) from config. Default is `warning` (Epic B stories a-33, a-35) — emit the warning above, then proceed with sane defaults (auto-detect methodology, placeholder profile, ad-hoc plan synthesis). Set `paths.gate_mode: hard` to restore byte-equivalent hard-stop behavior. `/hive:kickoff` itself remains hard-stop regardless of `gate_mode`.
 
 ---
 

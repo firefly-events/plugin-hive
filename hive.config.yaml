@@ -8,6 +8,14 @@ paths:
   # When unset (null), the resolver falls back to the invoking cwd.
   # No CLI argument form exists; config-first, cwd-fallback only.
   target_project: null
+  # Kickoff-gate behavior for procedural skills (/plan, /execute).
+  # warning: emit warning + proceed with sane defaults (auto-detect methodology,
+  #   placeholder project-profile written to disk).
+  # hard: original behavior — block when project-profile.yaml is missing.
+  # Read-only skills (status, review, test, standup, ui-audit) already warn-and-
+  # proceed per Epic A W1 (commit 08b472d); this knob extends that pattern to
+  # /plan and /execute, which previously hard-blocked.
+  gate_mode: warning
 
 # Metrics — local maintainer override. The shipped baseline at
 # `hive/hive.config.yaml` keeps `enabled: false` per the original opt-in-at-

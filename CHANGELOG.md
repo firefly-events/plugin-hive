@@ -9,6 +9,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Removed
+
+- **BREAKING:** `/hive:ui-audit` skill removed. Use `/hive:design-review --artifact-target implementation` instead. The record path `.pHive/audits/ui-audit/latest.yaml` is preserved by the new flag for backward compatibility with `polish-audit` consumers.
+
 ## [1.2.2] - 2026-05-07
 
 ### Fixed

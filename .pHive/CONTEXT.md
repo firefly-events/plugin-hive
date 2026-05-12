@@ -11,7 +11,7 @@ This file is the project's domain glossary. Schema: [`hive/references/context-md
 - **Story** — a workflow-tracked unit of dev work at `.pHive/epics/{id}/stories/{id}.yaml`. Has acceptance criteria, complexity, dependencies, and a methodology.
 - **Wave** — a sequencing label (W0, W1, …) on stories that gates dependency ordering. Synonymous with the older term *slice*.
 - **Slice** — legacy synonym for wave. CWC 2026 used "slice" throughout; new epics prefer "wave".
-- **Kickoff Gate** — initialization check that skills perform before running (verifies `.pHive/project-profile.yaml` + `hive.config.yaml`). See [`hive/references/skill-prelude.md`](../hive/references/skill-prelude.md). Five read-only-shaped skills (status, review, test, standup, ui-audit) lift the gate to a warning instead of hard-blocking — see story `w1-warning-lift`.
+- **Kickoff Gate** — initialization check that skills perform before running (verifies `.pHive/project-profile.yaml` + `hive.config.yaml`). See [`hive/references/skill-prelude.md`](../hive/references/skill-prelude.md). Five read-only-shaped skill modes (status, review, test, standup, design-review implementation target) lift the gate to a warning instead of hard-blocking — see story `w1-warning-lift`.
 - **Persona** — an agent identity defined at `hive/agents/{name}.md`. Roster includes researcher, developer (frontend/backend), tester, reviewer, peer-validator, architect, analyst, tpm, ui-designer, technical-writer, pair-programmer, team-lead, plus specialists.
 - **Roster** — the set of personas available to spawn. Agents off the roster are forbidden — see `feedback_use_roster_agents` memo.
 - **Backend** — execution backend for an agent. Either direct (Claude via TeamCreate) or `codex` (codex-rescue subagent). Routing controlled by `agent_backends` in root `hive.config.yaml`.
@@ -43,7 +43,7 @@ This file is the project's domain glossary. Schema: [`hive/references/context-md
 - `hive/references/skill-prelude.md` — standard skill preamble (kickoff gate + persona/config/memory loading).
 - `hive/references/specialist-triggers.md` — escalation routing catalog (workflow / responds_with / placement per trigger).
 - `hive/workflows/` — workflow YAMLs + step files.
-- `skills/{name}/SKILL.md` — user-invocable skills (kickoff, plan, execute, standup, status, review, test, ui-audit, polish-audit, visual-qa, design-review, brand-system, design-system, triage, grill).
+- `skills/{name}/SKILL.md` — user-invocable skills (kickoff, plan, execute, standup, status, review, test, polish-audit, visual-qa, design-review, brand-system, design-system, triage, grill). Former `ui-audit` behavior is `design-review --artifact-target implementation`.
 - `skills/hive/skills/` — internal sub-skills (agent-spawn, codex-invoke, meta-optimize, respawn, session-end, session-registry).
 - `.pHive/` — runtime state: epics, episodes, cycle-state, planning artifacts, triage queue, brand assets, design briefs.
 - `.pHive/epics/{id}/` — per-epic docs and stories.

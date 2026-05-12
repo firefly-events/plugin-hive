@@ -1,0 +1,160 @@
+id: a-05-execute-skill-split-modes
+epic: structural-refactor-and-gate-lift
+title: Split /execute three execution modes into composable atoms
+status: completed
+complexity: high
+methodology: classic
+depends_on: [a-05-execute-skill-split-dispatch]
+wave: W6
+action_id: A-05
+
+description: |
+  skills/execute/SKILL.md contains three execution-mode bodies that
+  together make up the bulk of the skill:
+    - Step 6: Agent team execution (TeamCreate path) — cites references/team-execution.md
+    - Step 6b: Agent team execution (cmux path) — ~14 lines inline + cites references/team-execution.md
+    - Step 6c: Session-based execution — ~26 lines inline with 6 sub-steps (6c-1 through 6c-6)
+    - Step 7: Sequential execution — cites references/sequential-execution.md
+
+  Steps 6 and 7 are already mostly extracted (cite references). Step 6b
+  (cmux variant) and step 6c (sessions) are still inline-heavy in
+  skills/execute/SKILL.md and need extraction.
+
+  Extract into composable atom skills:
+    - skills/hive/skills/execute-mode-team-cmux/SKILL.md (covers step 6b)
+    - skills/hive/skills/execute-mode-session/SKILL.md (covers step 6c-1 through 6c-6)
+    OR consolidate into a single skills/hive/skills/execute-modes/SKILL.md
+    with sub-sections for each mode (decide in research).
+
+  Depends on a-05-execute-skill-split-dispatch landing first because:
+    1. The dispatch decision drives which mode atom is invoked
+    2. Form-decision for dispatch (atomic skill vs reference) binds this story
+
+acceptance_criteria:
+  - "step 6b cmux-variant body extracted from skills/execute/SKILL.md"
+  - "step 6c session-execution body (6c-1 through 6c-6) extracted from skills/execute/SKILL.md"
+  - "skills/execute/SKILL.md step 6, 6b, 6c, 7 each reduced to ≤8 lines — single invocation per mode"
+  - "Net line delta across skills/execute/SKILL.md + extracted artifacts is ≥-50 lines (target ~-75)"
+  - "Mode atoms are independently invokable: an external orchestrator can call team-cmux or session mode without /execute as a wrapper"
+  - "Sidecar injection (appends[] map) is preserved in each mode atom — review-phase sidecar reviewers still attach per step 2b's partition"
+  - "Per-story commits on hive-{story-id} feature branches preserved in all modes"
+  - "Session resilience monitoring preserved: sse_last_event_at + stuck_timeout_ms + max_retries"
+  - "cmux pane lifecycle preserved: poll loop, surface.health, surface close on completion"
+  - "/execute continues to pass end-to-end on all 4 mode paths (sequential, team-default, team-cmux, session)"
+
+steps:
+  - id: research
+    description: |
+      1. Read skills/execute/SKILL.md lines 132-200 (step 6 through step 7a) in full.
+      2. Read hive/references/team-execution.md and hive/references/sequential-execution.md to understand what is already extracted vs what is still inline.
+      3. Read sibling a-05-execute-skill-split-dispatch to confirm form decision.
+      4. Read skills/hive/skills/respawn/SKILL.md and skills/hive/skills/session-registry/SKILL.md to map adjacent invocations the mode atoms must coordinate with.
+      5. Decide: separate skills per mode OR single execute-modes skill with sub-sections.
+      6. Sketch invocation signature for each mode atom — inputs (story spec, workflow definition, sidecar map, session/team config), outputs (episode markers written, mode-specific status).
+    agent: researcher
+
+  - id: implement
+    description: |
+      Path A — separate skills per mode (preferred):
+        - Create skills/hive/skills/execute-mode-team-cmux/SKILL.md with cmux poll loop, surface.health, completion detection, respawn coordination.
+        - Create skills/hive/skills/execute-mode-session/SKILL.md with 6 sub-steps (6c-1 through 6c-6), session registry coordination, sidecar injection at review phase, resilience monitoring.
+        - Replace skills/execute/SKILL.md step 6b + step 6c with ≤8-line invocations each.
+        - Step 6 + step 7 already cite references — extend them to ≤8-line cite-only blocks for consistency.
+
+      Path B — single execute-modes skill:
+        - Less preferred; mode atoms can grow independently if separate.
+
+      Either path:
+        - Sidecar injection (review-phase append of specialist agents) preserved per mode.
+        - Per-story commit pattern preserved (hive-{story-id} branch + commit on review pass).
+        - Session resilience contract preserved (replaces respawn for session-path stories).
+        - cmux surface lifecycle preserved (close-surface on completion).
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Line-count check: wc -l skills/execute/SKILL.md before/after.
+      2. Run /execute on test epic in team mode (default) → verify TeamCreate path still works.
+      3. Run /execute with execution.terminal_mux=cmux → verify cmux poll loop fires, [STORY-COMPLETE:{id}] detected, surface closed on completion.
+      4. Run /execute with sessions.enabled=true → verify 6 sub-steps fire in order, session record created+updated in index.yaml, sse_last_event_at advances.
+      5. Run /execute with one escalation in appends[] → verify sidecar reviewer attached at review phase in every mode.
+      6. Run /execute --sequential → verify sequential path still works (references/sequential-execution.md citation intact).
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      1. Confirm each mode atom is independently invokable (no hidden /execute dependency).
+      2. Verify sidecar-injection contract is identical across modes.
+      3. Verify form consistency with sibling a-05-execute-skill-split-dispatch.
+      4. Spot-check session-resilience timeout and retry counts match pre-extraction values.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): split /execute modes into composable atoms (story a-05-execute-skill-split-modes, W6)`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, javascript]
+    frameworks: [hive-orchestrator, claude-code-cmux, claude-agent-sdk-sessions]
+  key_files:
+    - path: skills/execute/SKILL.md
+      purpose: Source — step 6 (132-133), 6b (134-148), 6c (150-175), 7 (177-178) extracted
+    - path: hive/references/team-execution.md
+      purpose: Already-extracted TeamCreate prompt template + sidecar injection + respawn — mode atoms cite this
+    - path: hive/references/sequential-execution.md
+      purpose: Already-extracted sequential workflow — mode atoms cite this for step 7
+    - path: hive/scripts/session-invoke.mjs
+      purpose: Session invocation entry point — session-mode atom calls this
+    - path: skills/hive/skills/session-registry/SKILL.md
+      purpose: Bootstrap step 6c-1 invokes — preserved as adjacent
+    - path: skills/hive/skills/execute-mode-team-cmux/SKILL.md
+      purpose: NEW — cmux variant extraction destination
+    - path: skills/hive/skills/execute-mode-session/SKILL.md
+      purpose: NEW — session variant extraction destination
+
+design_decisions:
+  - decision: Separate skills per mode, not single execute-modes skill
+    rationale: Modes evolve independently — sessions in active development, cmux variant stable. Separate skills allow per-mode revision without churn on others.
+  - decision: Step 6 (TeamCreate default) and step 7 (sequential) keep their citation pattern
+    rationale: Already extracted to references; further atomization adds churn. Goal is line-count reduction in /execute, not architectural purity across all modes.
+
+cross_cutting:
+  - concern: backward-compatibility
+    action: "All four execution paths must remain runnable. Sidecar injection contract identical across modes. Per-story commit pattern unchanged."
+  - concern: observability
+    action: "Preserve mode-specific log messages: [STORY-COMPLETE:{id}] markers for cmux, sse_last_event_at advances for sessions, episode markers for sequential."
+
+risks:
+  - severity: high
+    description: Session-mode atom is complex (6 sub-steps + registry coordination + resilience); extraction risks subtle drift in sse polling or retry semantics.
+    mitigation: Test step exercises session path with active SSE; review step compares retry counts byte-for-byte; resilience reference (hive/references/session-resilience.md) preserved as-is.
+  - severity: medium
+    description: cmux poll loop has implicit assumptions (10-second poll, [STORY-COMPLETE:{id}] marker format); extracted atom must preserve these.
+    mitigation: Implement step lists each assumption explicitly; test step verifies completion detection.
+  - severity: medium
+    description: Mode atoms may accidentally cross-reference /execute state (e.g., escalation partition), defeating reusability.
+    mitigation: Invocation signature explicit — sidecar map passed in, not read from /execute. AC #5 enforces standalone invokability.
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-05: Split /execute three execution modes into composable atoms.
+      Mode atoms reusable outside /execute. Combined with dispatch-split,
+      net line-count target ≥-200 lines.
+  - path: skills/execute/SKILL.md
+    relevant_excerpt: |
+      Step 6 (agent-team default) — cites references/team-execution.md
+      Step 6b (cmux variant, ~14 lines inline) — pane lifecycle + poll loop
+      Step 6c (session-based, ~26 lines inline, 6 sub-steps) — session registry,
+      sidecar at review, resilience monitoring, per-story commits
+      Step 7 (sequential) — cites references/sequential-execution.md
+  - path: .pHive/epics/structural-refactor-and-gate-lift/stories/a-05-execute-skill-split-dispatch.yaml
+    relevant_excerpt: |
+      Sibling story — dispatch returns mode_decision enum; this story
+      provides the mode-atom skills that the enum routes to.

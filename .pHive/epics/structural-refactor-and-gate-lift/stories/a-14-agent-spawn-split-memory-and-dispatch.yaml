@@ -1,0 +1,184 @@
+id: a-14-agent-spawn-split-memory-and-dispatch
+epic: structural-refactor-and-gate-lift
+title: Split agent-spawn memory loading (L0–L3) and backend dispatch
+status: completed
+complexity: high
+methodology: classic
+depends_on: [a-14-agent-spawn-split-persona]
+wave: W6
+action_id: A-14
+
+description: |
+  skills/hive/skills/agent-spawn/SKILL.md Section 5 is the memory-loading
+  block (~65 lines, lines 67-132) with five sub-steps:
+    - 5a: L3 availability check (ChromaDB) + wiki freshness check fallback
+    - 5b: Wiki-based retrieval (L1)
+    - 5c-L3: ChromaDB query + namespaced agent isolation + override/pitfall pinning
+    - 5c (L0/L1 fallback): scan memory dir + relevance filter + 5-cap
+    - 5d: Staleness + override surfacing (TTL warnings)
+    - 5e: KG Decision Context (L2 — kg.sqlite triples)
+
+  Section 7 (spawn construction, starting line 143) contains backend
+  resolution at 7.0 (Claude default vs external models — codex, etc.).
+
+  Memory loading is reusable: any spawn pathway (TeamCreate, cmux,
+  session, codex-invoke) wants the same Prior Knowledge block injected.
+  Backend dispatch is reusable: a-34 backend auto-resolve will want to
+  invoke the same resolution.
+
+  Extract section 5 into one atomic skill (memory-loading) and section
+  7.0 + downstream dispatch logic into another (backend-dispatch). OR
+  bundle both into a single agent-spawn-coordination atom — decide in
+  research.
+
+  Depends on a-14-agent-spawn-split-persona because persona_context is
+  the input to both memory loading and backend dispatch.
+
+acceptance_criteria:
+  - "Section 5 memory loading (5a, 5b, 5c-L3, 5c L0/L1, 5d, 5e) extracted from agent-spawn"
+  - "Section 7.0 backend resolution + downstream Codex/Claude dispatch extracted"
+  - "skills/hive/skills/agent-spawn/SKILL.md reduced to ≤200 lines (from 418)"
+  - "Net line delta across agent-spawn + extracted artifacts is ≥-100 lines"
+  - "Memory tier ladder preserved: L3 (ChromaDB) > L1 (wiki) > L0 (scan)"
+  - "Agent isolation preserved: ChromaDB filter to ${agent}/ namespaced docIds"
+  - "Override + pitfall types always-load preserved (bypass relevance filter + cap)"
+  - "5-memory cap preserved for non-override/pitfall entries"
+  - "KG Decision Context block format preserved (silent-on-absence if kg.sqlite missing)"
+  - "TTL staleness warnings preserved (⚠ last verified: N days ago prefix)"
+  - "Backend resolution precedence preserved: explicit override > agent_backends config > default (Claude)"
+  - "agent-spawn end-to-end still works: spawn researcher / developer / reviewer with memory + backend resolution unchanged"
+
+steps:
+  - id: research
+    description: |
+      1. Read skills/hive/skills/agent-spawn/SKILL.md sections 5 + 7 in full (lines 67-200ish).
+      2. Read hive/lib/chromadb-wrapper.js to confirm isAvailable() + query() signatures.
+      3. Read hive/lib/session-end.js (Phase C) to confirm docId namespacing (${agentName}/${slug}).
+      4. Read hive/references/knowledge-graph-schema.md for query_decisions() shape.
+      5. Read sibling a-14-agent-spawn-split-persona to align form decision.
+      6. Read skills/hive/skills/codex-invoke/SKILL.md to confirm dispatch contract.
+      7. Decide: one atom (agent-spawn-coordination) OR two atoms (memory-loading + backend-dispatch). Default = two atoms (cleaner reuse).
+      8. Sketch invocation signatures.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Two-atom path (preferred):
+        - Create skills/hive/skills/memory-loading/SKILL.md with 5a-5e logic.
+          Input: persona_context (agent_name, knowledge paths), task_description.
+          Output: prior_knowledge_block (formatted markdown) + staleness signals.
+        - Create skills/hive/skills/backend-dispatch/SKILL.md with section 7.0 + downstream Codex/Claude dispatch.
+          Input: persona_context, agent_backends config, optional backend_override.
+          Output: dispatch_decision (Claude | codex-invoke | fallback) + spawn call.
+        - Replace section 5 + section 7.0 in agent-spawn with ≤8-line invocations each.
+
+      One-atom path: bundle both into agent-spawn-coordination/SKILL.md if research shows tight coupling.
+
+      Either path:
+        - ChromaDB agent isolation MUST filter docId by ${agent_name}/ prefix.
+        - Override + pitfall types MUST bypass relevance filter and 5-cap.
+        - 5-cap applies only to non-override/pitfall entries.
+        - KG Decision Context block MUST be silent-on-absence.
+        - Backend resolution MUST honor ui-designer = direct override even when agent_backends maps to codex.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Line-count check: wc -l agent-spawn/SKILL.md before/after.
+      2. Spawn agent with ChromaDB active → verify L3 path fires, namespaced docId filter applied.
+      3. Spawn agent with ChromaDB unavailable + recent wiki → verify L1 path fires (wiki retrieval).
+      4. Spawn agent with no ChromaDB + stale wiki → verify L0 fallback (memory dir scan).
+      5. Spawn agent with override + pitfall memories present → verify both bypass 5-cap.
+      6. Spawn agent with TTL-expired memory → verify ⚠ prefix applied.
+      7. Spawn agent with kg.sqlite present → verify Decision Context block appended.
+      8. Spawn agent with agent_backends=codex (and persona in Supported list) → verify codex-invoke dispatch.
+      9. Spawn ui-designer with agent_backends=codex → verify forced Claude dispatch (known-incompatible).
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      1. Confirm Prior Knowledge block format is byte-equivalent.
+      2. Verify ChromaDB namespace filter is correct (no cross-agent retrieval from shared collection).
+      3. Verify 5-cap math: total = override_pitfall_count + min(5 - override_pitfall_count, remaining); may exceed 5 when many overrides.
+      4. Verify backend dispatch precedence matches /plan Phase 0 routing rules (which a-04-plan-skill-split-routing extracted).
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): split agent-spawn memory + dispatch (story a-14-agent-spawn-split-memory-and-dispatch, W6)`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, javascript]
+    frameworks: [hive-orchestrator, chromadb, claude-code-plugin-system]
+  key_files:
+    - path: skills/hive/skills/agent-spawn/SKILL.md
+      purpose: Source — section 5 + section 7.0 extracted
+    - path: hive/lib/chromadb-wrapper.js
+      purpose: isAvailable() + query() contracts for L3 retrieval
+    - path: hive/lib/session-end.js
+      purpose: Phase C — docId namespacing (${agentName}/${slug}) the filter relies on
+    - path: hive/references/knowledge-graph-schema.md
+      purpose: KG triple shape + query_decisions() SQL for 5e block
+    - path: skills/hive/skills/codex-invoke/SKILL.md
+      purpose: Codex dispatch contract + Supported/Known-incompatible persona lists
+    - path: skills/hive/skills/persona-resolve/SKILL.md
+      purpose: Sibling output — persona_context input to memory + dispatch atoms
+    - path: skills/hive/skills/memory-loading/SKILL.md
+      purpose: NEW — memory-loading atomic skill (5a-5e)
+    - path: skills/hive/skills/backend-dispatch/SKILL.md
+      purpose: NEW — backend-dispatch atomic skill (7.0 + downstream)
+
+design_decisions:
+  - decision: Default to two atoms (memory-loading + backend-dispatch), not one bundle
+    rationale: Memory and dispatch are orthogonal concerns. Two atoms enables reuse by /execute (memory loading without dispatch) and by /plan Phase 0 routing (dispatch without memory).
+  - decision: Section 6 (applicable skills) stays in agent-spawn
+    rationale: It bridges persona + spawn construction; doesn't reuse independently.
+  - decision: Section 7 inner dispatch (not just 7.0 backend choice) extracted
+    rationale: The actual spawn call differs by backend; bundling the choice + the call in one atom keeps a single point of truth.
+
+cross_cutting:
+  - concern: backward-compatibility
+    action: "Memory tier ladder, agent isolation, override/pitfall pinning, 5-cap math, TTL warnings, KG silent-on-absence, backend resolution precedence — all byte-equivalent."
+  - concern: observability
+    action: "Preserve override-count header (⚠ last verified: N days ago) and Prior Knowledge block boundaries."
+
+risks:
+  - severity: high
+    description: Memory loading has 5 sub-paths (L3, L1 wiki, L0 fallback, KG triples, staleness); extraction risks subtle drift in any one.
+    mitigation: Test step exercises L3, L1, L0, KG, TTL paths separately; review step verifies block format byte-equivalence.
+  - severity: high
+    description: Backend dispatch interacts with codex-invoke contract; misalignment with /plan Phase 0 routing (a-04 sibling) creates inconsistent routing.
+    mitigation: Review step explicitly cross-checks a-04's routing rules; both stories cite the same codex-invoke contract.
+  - severity: medium
+    description: ChromaDB namespace filter (${agent}/ prefix) is a 2026-04 security fix; re-implementing risks regression to cross-agent retrieval.
+    mitigation: Test step #2 verifies the filter; AC #6 enforces the contract.
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-14: Split agent-spawn into composable atoms. Memory loading is the
+      single biggest reusable block — any spawn pathway needs Prior Knowledge
+      injection. Backend dispatch decoupling enables /plan Phase 0 routing
+      (a-04) to invoke the same dispatch logic.
+  - path: skills/hive/skills/agent-spawn/SKILL.md
+    relevant_excerpt: |
+      Section 5 (lines 67-132): Load agent memories (wiki-first retrieval)
+        5a: L3 availability check
+        5b: Wiki-based retrieval (L1)
+        5c-L3: ChromaDB query + agent isolation + override/pitfall pinning
+        5c: L0/L1 fallback (memory dir scan + relevance + 5-cap)
+        5d: Staleness + override surfacing
+        5e: KG Decision Context (L2)
+      Section 7.0: Resolve backend (explicit override > agent_backends > default)
+  - path: .pHive/epics/structural-refactor-and-gate-lift/stories/a-04-plan-skill-split-routing.yaml
+    relevant_excerpt: |
+      Sibling story (a-04 series) — /plan Phase 0 routing extraction.
+      Both stories reference the codex-invoke contract; both must agree
+      on backend-resolution precedence (ui-designer = direct override,
+      Supported/Known-incompatible per persona).
