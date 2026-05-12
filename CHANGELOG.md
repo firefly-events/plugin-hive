@@ -9,9 +9,23 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-### Removed
+## [1.3.0] - 2026-05-12
 
-- **BREAKING:** `/hive:ui-audit` skill removed. Use `/hive:design-review --artifact-target implementation` instead. The record path `.pHive/audits/ui-audit/latest.yaml` is preserved by the new flag for backward compatibility with `polish-audit` consumers.
+### Added
+
+- 6 new public reference files under `hive/references/ui-prompts/`: `brand-system`, `design-system`, `polish-audit`, `visual-qa`, `design-review-design-critique`, and `design-review-synthesis`.
+- `step_file:` loading support in `skills/design-review/SKILL.md` step-execution loop. Precedence is `step_file` > `task`, per `hive/references/workflow-schema.md:39`.
+- `hive/references/ui-prompt-extraction-verification.md` regression-gate documentation.
+
+### Changed
+
+- `skills/brand-system/SKILL.md`, `skills/design-system/SKILL.md`, `skills/polish-audit/SKILL.md`, and `skills/visual-qa/SKILL.md` inline ui-designer task bodies replaced with load -> cite -> inject -> spawn invocation envelopes. No behavior change; net -125 lines across the four:
+  - `skills/brand-system/SKILL.md`: 109 -> 72 (-37)
+  - `skills/design-system/SKILL.md`: 89 -> 75 (-14)
+  - `skills/polish-audit/SKILL.md`: 162 -> 134 (-28)
+  - `skills/visual-qa/SKILL.md`: 128 -> 82 (-46)
+- `hive/workflows/design-review.workflow.yaml` design-critique and synthesis steps now use `step_file:` instead of inline `task:`. Two specialist steps, accessibility-critique and animations-critique, keep inline `task:` content. Workflow size changed from 5750 -> 3698 bytes (-2052 bytes).
+- `skills/design-review/SKILL.md` gained the `step_file:` loading extension code (+287 bytes).
 
 ## [1.2.2] - 2026-05-07
 
