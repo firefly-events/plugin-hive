@@ -1,0 +1,158 @@
+id: c-3-github-adapter-as-abi-validator
+epic: task-tracking-adapter-abi
+title: Implement GitHub adapter against new ABI as first validator
+status: pending
+complexity: high
+methodology: classic
+depends_on: [c-2-abi-specification]
+wave: W3
+action_id: C-3
+
+description: |
+  Migrate the existing GitHub prose-runbook adapter to an executable adapter
+  implementing the ABI from c-2. This story is the FIRST validator — its
+  job is to surface ABI gaps that only emerge from real implementation.
+
+  GitHub's hierarchy is MIXED: issues are flat (sibling tickets in a repo),
+  Projects v2 are hierarchical (parent-child via project items + sub-issues).
+  This mixed shape stress-tests the ABI's capability declaration mechanism
+  more sharply than purely-flat or purely-hierarchical trackers.
+
+  Validator charter — this story is allowed to:
+    1. Flag ABI gaps and request c-2 revisions (one revision cycle max)
+    2. Document GitHub-specific friction in a `friction-notes.md` alongside
+       the adapter source
+    3. Defer non-essential GitHub features (e.g., Discussions, custom fields)
+       to a future enhancement story
+
+  Output:
+    - hive/adapters/github/index.<ext> (extension per c-1 form factor)
+    - hive/adapters/github/README.md (adapter author notes + GitHub-specific
+      caveats)
+    - hive/adapters/github/test/*.test.<ext> (integration tests against real
+      repo OR mock server)
+    - hive/adapters/github/friction-notes.md (any ABI friction surfaced)
+
+  Parallel with c-4 (Linear adapter) — both depend on c-2 only, can land
+  in either order.
+
+acceptance_criteria:
+  - 'hive/adapters/github/index.<ext> exists and implements all 6 ABI methods (createStory, updateStatus, listOpen, getStory, addComment, linkStories)'
+  - 'Adapter declares capabilities as `hierarchy: mixed` per c-2 capability declaration mechanism'
+  - 'Integration tests cover every ABI method with both happy path and at least one error path (rate limit OR auth failure OR not-found)'
+  - 'Tests pass against a real GitHub repo (test repo created for this purpose) OR a documented mock server fixture'
+  - 'No per-tracker special-casing leaks into Hive-side dispatch — all GitHub-specifics live in hive/adapters/github/'
+  - 'Adapter README.md documents auth (GITHUB_TOKEN env or gh CLI auth), rate-limit handling, and the mixed-hierarchy mapping (issues vs projects)'
+  - 'friction-notes.md exists — may be empty if no ABI gaps surfaced, but the file is present as a deliverable'
+  - 'Any c-2 ABI revisions made during this story are documented in the spec changelog'
+
+steps:
+  - id: research
+    description: |
+      1. Read hive/references/task-tracking-adapter-abi.md (output of c-2) to lock the contract.
+      2. Read existing GitHub prose-runbook adapter at hive/references/task-tracking-adapter-github.md if present; otherwise read hive/references/task-tracking-adapter.md sections referring to GitHub.
+      3. Query context7 for GitHub REST + GraphQL API docs covering: issues create/update/list/get, comments, sub-issues, Projects v2 items.
+      4. Decide auth mechanism: GITHUB_TOKEN env var OR `gh` CLI auth (preferred — uses existing user auth). Document tradeoff.
+      5. Decide test strategy: real test repo vs mock server. Real repo preferred for fidelity; mock server fallback if repo provisioning is friction.
+      6. Map GitHub concepts to ABI capabilities: issues = flat list, sub-issues = parent_id link, Projects v2 = hierarchy bucket.
+    agent: researcher
+
+  - id: implement
+    description: |
+      1. Scaffold hive/adapters/github/ in the c-1 form factor (TS module, MCP server, or CLI binary).
+      2. Implement capability declaration — `hierarchy: mixed`, supportsLabels: true, supportsAssignees: true, supportsParent: true (via sub-issues).
+      3. Implement all 6 ABI methods. Map ABI method → GitHub API:
+         - createStory → POST /repos/{owner}/{repo}/issues
+         - updateStatus → PATCH /repos/{owner}/{repo}/issues/{number} (state + labels)
+         - listOpen → GET /repos/{owner}/{repo}/issues?state=open
+         - getStory → GET /repos/{owner}/{repo}/issues/{number}
+         - addComment → POST /repos/{owner}/{repo}/issues/{number}/comments
+         - linkStories → sub-issues API or body-edit fallback
+      4. Implement error mapping — 401 → terminal auth-failed; 403 (rate-limited) → recoverable; 404 → terminal not-found.
+      5. Write hive/adapters/github/README.md.
+      6. Write hive/adapters/github/friction-notes.md (capture anything that did not fit the ABI cleanly).
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Run integration tests against real test repo (env: GITHUB_TEST_REPO, GITHUB_TOKEN); skip if env unset and document the skip in friction-notes.md.
+      2. Verify all 6 methods invoked at least once.
+      3. Force at least one error path: invalid token → terminal auth-failed; 5000-req burst → recoverable rate-limit with backoff.
+      4. Verify capability declaration parses against c-2 schema.
+      5. Verify no GitHub-specific code outside hive/adapters/github/ — `grep -r "github" hive/lib/ skills/` returns only generic adapter-dispatch references, not GitHub specifics.
+      6. yamllint on this story file.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Opus 4.7 reviewer cross-LLM gate:
+      1. Verify adapter is genuinely hierarchy-agnostic at the ABI surface — Hive code that calls createStory does not know it is talking to GitHub.
+      2. Verify error mapping covers GitHub-specific cases (secondary rate limit, abuse detection, expired token).
+      3. Verify integration test coverage is meaningful, not just happy-path smoke.
+      4. Read friction-notes.md — if ABI revisions were requested, verify they actually landed in c-2 spec.
+      5. Stress-test: can the same adapter pattern work for GitHub Enterprise Server (different base URL, different auth flow)?
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: 'Commit on feat/task-tracking-adapter-abi; commit message format `feat(adapter-abi): GitHub adapter as ABI validator (story c-3-github-adapter-as-abi-validator, W3)`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [typescript, json, yaml, markdown]
+    frameworks: [hive-adapters, octokit, gh-cli]
+  key_files:
+    - path: hive/references/task-tracking-adapter-abi.md
+      purpose: 'Input — canonical ABI spec from c-2; this adapter validates against it'
+    - path: hive/adapters/github/index.<ext>
+      purpose: 'NEW — adapter source; primary deliverable'
+    - path: hive/adapters/github/test/
+      purpose: 'NEW — integration tests against ABI methods'
+    - path: hive/adapters/github/friction-notes.md
+      purpose: 'NEW — friction surfacing log; informs any c-2 revisions'
+    - path: hive/references/task-tracking-adapter.md
+      purpose: 'Current prose contract — informs the migration path'
+
+design_decisions:
+  - decision: 'GitHub hierarchy declared as mixed, not flat or hierarchical'
+    rationale: 'GitHub issues are flat siblings within a repo, but Projects v2 + sub-issues introduce hierarchy. Declaring flat loses the hierarchy carry; declaring hierarchical forces fake parent IDs for plain issues. Mixed lets capability consumers reason about both.'
+  - decision: 'Auth via gh CLI preferred over raw GITHUB_TOKEN'
+    rationale: 'gh CLI reuses user auth, handles token refresh, and is already a dependency of many Hive workflows. Raw token is fallback for CI environments without gh installed.'
+  - decision: 'friction-notes.md is a mandatory deliverable even when empty'
+    rationale: 'Forcing the file to exist creates a habit — every validator surfaces friction or explicitly documents that none was found. Empty file is also a signal.'
+
+cross_cutting:
+  - concern: observability
+    action: 'Hive-side dispatch (c-5) wraps adapter calls with telemetry; adapter itself emits no telemetry. Friction-notes is a per-story log, not runtime telemetry.'
+  - concern: backward-compatibility
+    action: 'GitHub prose-runbook stays present during c-3; deprecation happens in c-6 after both validators land.'
+
+risks:
+  - severity: high
+    description: 'Mixed-hierarchy mapping surfaces ABI gap that requires non-trivial c-2 revision; ripples to c-4 (Linear adapter) parallel work'
+    mitigation: 'c-3/c-4 are explicitly chartered to flag ABI gaps; one revision cycle allowed; if revision is non-trivial, c-4 pauses and waits for revised spec'
+  - severity: medium
+    description: 'Real-repo integration tests require GitHub repo provisioning; CI environments may lack credentials'
+    mitigation: 'Mock server fallback documented in friction-notes.md; tests skip with explanation rather than fail when GITHUB_TEST_REPO unset'
+  - severity: low
+    description: 'Octokit version drift causes adapter to break on Hive upgrade'
+    mitigation: 'Adapter pins octokit version in its own package.json; Hive does not transitively own this dependency'
+
+references:
+  - path: hive/references/task-tracking-adapter-abi.md
+    relevant_excerpt: |
+      Capability declaration mechanism: adapter exports a capabilities()
+      method returning a capability object. Required keys: hierarchy
+      (flat | hierarchical | mixed | other), supportsLabels, supportsAssignees,
+      supportsParent. Optional keys: adapter-specific extensions.
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      Section 3 — c-3 GitHub adapter validates ABI against mixed-hierarchy
+      tracker (issues flat, Projects v2 hierarchical). Captures friction points
+      and revises ABI if needed. Together with c-4 Linear adapter, confirms ABI
+      accommodates both flat and hierarchical models without per-tracker hacks.
