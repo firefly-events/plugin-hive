@@ -93,10 +93,14 @@ Read the full persona files for each step that will execute:
 ### 4. Execute workflow steps sequentially
 
 Execute `hive/workflows/design-review.workflow.yaml` steps in order. For each step that is
-NOT skipped, spawn a subagent with the full persona, the step `task`, `artifact_target`,
-target-specific `artifact_paths` passed as `design_artifacts`, target-specific verdict
-vocabulary, implementation `tech_stack` context when available, and prior step outputs.
-Capture each output and pass it to subsequent steps as specified in workflow `inputs`.
+NOT skipped, resolve the step's primary procedure before spawning its subagent:
+if `step_file` is set, read `<repo>/<step_file>` and use that loaded content; otherwise
+use the inline step `task`. `step_file` has precedence over `task`, matching
+`hive/references/workflow-schema.md`. Spawn the subagent with the full persona, the
+resolved primary procedure, `artifact_target`, target-specific `artifact_paths` passed as
+`design_artifacts`, target-specific verdict vocabulary, implementation `tech_stack`
+context when available, and prior step outputs. Capture each output and pass it to
+subsequent steps as specified in workflow `inputs`.
 
 Announce which steps are running before execution:
 
