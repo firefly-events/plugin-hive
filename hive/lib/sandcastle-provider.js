@@ -105,11 +105,19 @@ function runVersionPreflight(versionResolver) {
 /**
  * Create a Sandcastle provider pair (sandboxProvider + helpers).
  *
+ * @typedef {{ command: string; timeoutMs?: number }} HostHookCmd
+ *   Sandcastle HostHookCmd shape — NO `sudo`, NO `cwd` (host-hook contract).
+ *   See user-decisions-b1.md Q4 for authoritative shape definition.
+ *
  * @param {object} [options]
  * @param {boolean} [options.useDocker=false]        — opt-in Docker; default is Podman
  * @param {string}  [options.imageName]              — override container image name
  * @param {string}  [options.codexConfigHostPath]    — override .sandcastle/codex-config host path
  * @param {Function} [options.logger]                — custom base logger (default: console.log)
+ * @param {object}  [options.hooks]                  — Sandcastle lifecycle hook lists (V1: host.onWorktreeReady only)
+ * @param {HostHookCmd[]} [options.hooks.host.onWorktreeReady] — run on host after worktree is ready
+ *   NOTE: Sandcastle hooks are lifecycle hooks (worktree/container layer), NOT Hive PreToolUse hooks.
+ *   See user-decisions-b1.md Q4 and the inline comment at the hook wiring site below.
  *
  * @param {object} [_deps]  — TEST SEAM; not public API. Inject module factories
  *                            to avoid real @ai-hero/sandcastle install in tests.
@@ -123,6 +131,69 @@ function runVersionPreflight(versionResolver) {
 function createSandcastleProvider(options, _deps) {
   const opts = options || {};
   const deps = _deps || {};
+
+  // ------------------------------------------------------------------
+  // Step 0: Validate hook options — V1 minimal-hooks contract
+  //
+  // Sandcastle hooks are lifecycle hooks (worktree/container layer),
+  // NOT Hive PreToolUse hooks. See user-decisions-b1.md Q4.
+  //
+  // V1 wires ONLY host.onWorktreeReady. The deferred hook points
+  // (host.onSandboxReady, sandbox.onSandboxReady) are explicitly NOT
+  // surfaced here — they will be added only when a real consumer story
+  // requires them.
+  // ------------------------------------------------------------------
+  const hooksOpts = opts.hooks;
+
+  if (hooksOpts !== undefined && hooksOpts !== null && typeof hooksOpts === 'object') {
+    // Reject deferred hook points if caller attempts to pass them
+    if (hooksOpts.host && hooksOpts.host.onSandboxReady !== undefined) {
+      throw new Error(
+        '[hive/sandcastle-provider] hooks.host.onSandboxReady is deferred in V1 (minimal-hooks decision). ' +
+        'See .pHive/epics/sandcastle-adoption-followon/docs/user-decisions-b1.md Q4. ' +
+        'Remove this option until a real consumer story requires it.',
+      );
+    }
+
+    if (hooksOpts.sandbox && hooksOpts.sandbox.onSandboxReady !== undefined) {
+      throw new Error(
+        '[hive/sandcastle-provider] hooks.sandbox.onSandboxReady is deferred in V1 (minimal-hooks decision). ' +
+        'See .pHive/epics/sandcastle-adoption-followon/docs/user-decisions-b1.md Q4. ' +
+        'Remove this option until a real consumer story requires it.',
+      );
+    }
+
+    // Validate HostHookCmd shape for onWorktreeReady entries
+    const onWorktreeReady = hooksOpts.host && hooksOpts.host.onWorktreeReady;
+    if (onWorktreeReady !== undefined) {
+      if (!Array.isArray(onWorktreeReady)) {
+        throw new TypeError('[hive/sandcastle-provider] hooks.host.onWorktreeReady must be an array of HostHookCmd');
+      }
+
+      for (let i = 0; i < onWorktreeReady.length; i++) {
+        const cmd = onWorktreeReady[i];
+        if (!cmd || typeof cmd !== 'object') {
+          throw new TypeError(`[hive/sandcastle-provider] hooks.host.onWorktreeReady[${i}] must be an object`);
+        }
+        if (typeof cmd.command !== 'string' || !cmd.command) {
+          throw new TypeError(`[hive/sandcastle-provider] hooks.host.onWorktreeReady[${i}].command must be a non-empty string`);
+        }
+        // HostHookCmd has no `sudo` or `cwd` — reject extra keys that violate the contract
+        if ('sudo' in cmd) {
+          throw new Error(
+            `[hive/sandcastle-provider] hooks.host.onWorktreeReady[${i}]: 'sudo' is not allowed on host hooks (HostHookCmd contract). ` +
+            'Only { command, timeoutMs? } are valid.',
+          );
+        }
+        if ('cwd' in cmd) {
+          throw new Error(
+            `[hive/sandcastle-provider] hooks.host.onWorktreeReady[${i}]: 'cwd' is not allowed on host hooks (HostHookCmd contract). ` +
+            'Only { command, timeoutMs? } are valid.',
+          );
+        }
+      }
+    }
+  }
 
   // ------------------------------------------------------------------
   // Step 1: Version preflight — throws before any Sandcastle code runs
@@ -153,6 +224,31 @@ function createSandcastleProvider(options, _deps) {
     ],
     logger: redactingLogger,
   };
+
+  // ------------------------------------------------------------------
+  // Hook wiring — V1 minimal: host.onWorktreeReady only
+  //
+  // Sandcastle hooks are lifecycle hooks (worktree/container layer),
+  // NOT Hive PreToolUse hooks. See user-decisions-b1.md Q4.
+  //
+  // host.onWorktreeReady: runs on the host machine after the worktree
+  // is prepared but before the sandbox container starts. Use to copy
+  // persona files, memory paths, or in-worktree config snapshots.
+  //
+  // DEFERRED (not wired here): host.onSandboxReady, sandbox.onSandboxReady
+  // These are deferred per V1 minimal-hooks decision until a real
+  // consumer story requires them.
+  // ------------------------------------------------------------------
+  const onWorktreeReadyCmds =
+    hooksOpts && hooksOpts.host && hooksOpts.host.onWorktreeReady;
+
+  if (Array.isArray(onWorktreeReadyCmds) && onWorktreeReadyCmds.length > 0) {
+    sandboxOptions.hooks = {
+      host: {
+        onWorktreeReady: onWorktreeReadyCmds,
+      },
+    };
+  }
 
   let sandboxProvider;
 
