@@ -44,6 +44,7 @@ Hive stands on the shoulders of the agentic-engineering community. We borrow pat
 - **[QRSPI](https://github.com/matanshavit/qrspi)** — 8-phase Claude Code workflow (Question · Research · Structure · Plan · Implement); builder workflows and real-world patterns
 - **[BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)** — structured multi-agent methodology and role taxonomy
 - **[archon](https://github.com/coleam00/archon)** — orchestration runtime and agent-execution patterns
+- **[Matt Pocock](https://www.mattpocock.com)** — atomic-skill design: composable, single-purpose, well-named units of capability
 - **[Andrej Karpathy](https://karpathy.ai)** — the intellectual current of software 2.0/3.0
 
 We don't compete with them; we synthesize, in a specific shape, on a specific surface (Claude Code), and put it in the open. Where their patterns show up in Hive, the credit travels with the claim.
