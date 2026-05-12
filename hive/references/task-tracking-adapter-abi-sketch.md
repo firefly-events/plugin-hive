@@ -1,3 +1,5 @@
+> **Superseded by [task-tracking-adapter-abi.md](task-tracking-adapter-abi.md) (c-2).** Kept for historical traceability.
+
 # Task-Tracking Adapter ABI Sketch
 
 **Form factor selected:** CLI contract  

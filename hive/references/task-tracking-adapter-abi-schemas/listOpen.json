@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "listOpen",
+  "description": "Returns stories that are not in a terminal state. 'Open' is relative to the adapter's supported_states.",
+  "request": {
+    "type": "object",
+    "properties": {
+      "method": { "type": "string", "const": "listOpen" },
+      "params": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 50,
+            "description": "Maximum number of stories to return. Default 50."
+          },
+          "team_value": {
+            "oneOf": [{ "type": "string" }, { "type": "null" }],
+            "description": "Filter by team/workspace — runtime value for the field named by capabilities.metadata.team_field"
+          },
+          "project_value": {
+            "oneOf": [{ "type": "string" }, { "type": "null" }],
+            "description": "Filter by project/board — runtime value for the field named by capabilities.metadata.project_field"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "required": ["method", "params"],
+    "additionalProperties": false
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "result": {
+        "type": "object",
+        "properties": {
+          "stories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "title": { "type": "string" },
+                "state": { "type": "string" },
+                "labels": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "url": { "type": "string" }
+              },
+              "required": ["id", "title", "state", "labels", "url"],
+              "additionalProperties": false
+            },
+            "description": "Array of open stories. May be empty."
+          }
+        },
+        "required": ["stories"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["result"],
+    "additionalProperties": false
+  }
+}
