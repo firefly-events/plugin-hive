@@ -1,0 +1,80 @@
+id: m-06-standup-surface
+epic: metrics-as-planning-concern
+title: /standup surfaces overdue + failing metric verdicts
+status: completed
+complexity: small
+methodology: classic
+depends_on: [m-05-metrics-check-skill]
+wave: W2
+action_id: M-06
+
+description: |
+  M-05 runs the verdict on demand. M-06 makes the verdicts visible without
+  someone explicitly running /metrics-check.
+
+  Extend skills/standup/SKILL.md with a "Metrics health" section that:
+    1. Counts stories with metric.verify_at in the past (overdue)
+    2. Counts stories with metric.verdict.outcome = FAIL (regressions)
+    3. Lists top 5 oldest overdue stories
+    4. Lists all FAIL verdicts with a 1-line action suggestion (rerun, revert, or new story)
+    5. Recommends `/metrics-check` if any overdue exist
+
+  Read-only. Does not invoke /metrics-check itself (decoupling).
+
+acceptance_criteria:
+  - "skills/standup/SKILL.md has new 'Metrics health' section after existing standup body"
+  - "Section reads story YAMLs only — no DB queries, no event-file scans"
+  - "Output is concise: counts + top-5 + actionable suggestions; no flooding standup"
+  - "Section gracefully handles 'no stories with metric blocks yet' (silent, not error)"
+
+steps:
+  - id: research
+    description: Read skills/standup/SKILL.md structure; find correct insertion point.
+    agent: researcher
+  - id: implement
+    description: Add Metrics health section. Use existing standup formatting conventions.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Three fixtures: zero stories with metrics, mixed stories, all-overdue.
+      Verify output is sensible in each.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify section is concise; doesn't double standup length.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/metrics-as-planning-concern.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/standup/SKILL.md
+      purpose: Target — add Metrics health section
+
+design_decisions:
+  - decision: /standup reads YAMLs only; doesn't invoke /metrics-check
+    rationale: Standup is fast-read; verdict computation belongs to its own skill
+
+risks:
+  - severity: low
+    description: Standup output becomes noisy
+    mitigation: Top-5 cap + collapse-when-empty
+
+metric:
+  applies: true
+  name: standup.surfaces_overdue_within_24h_of_due
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 1.0
+  window: "next 5 standups post-merge"
+  source:
+    kind: manual
+    ref: "tester step + spot-check during first week"
+  verify_at: "epic-close"
+  owner: tpm

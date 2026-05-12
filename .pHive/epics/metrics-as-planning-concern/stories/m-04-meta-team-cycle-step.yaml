@@ -1,0 +1,88 @@
+id: m-04-meta-team-cycle-step
+epic: metrics-as-planning-concern
+title: Add step-03c-metric-declaration to meta-team-cycle workflow
+status: completed
+complexity: small
+methodology: classic
+depends_on: [m-01-add-metrics-concern, m-02-story-schema-metric-fields]
+wave: W1
+action_id: M-04
+
+description: |
+  /plan covers epic decomposition (M-03). meta-team-cycle covers proposals
+  from /meta-optimize. Both routes create story-shaped work and must enforce
+  the same metric gate.
+
+  Add step-03c-metric-declaration.md as a sibling to existing step-03-proposal.md.
+  When a proposal is promoted into a backlog item or story, this step asks the
+  metric questions and produces a metric: block (or applies:false + justification).
+  Proposals lacking falsifiable metrics get tagged `un-falsifiable: true` and
+  surface at user-review.
+
+acceptance_criteria:
+  - "hive/workflows/steps/meta-team-cycle/step-03c-metric-declaration.md exists"
+  - "Step file follows existing step-file conventions in meta-team-cycle/ (frontmatter, inputs, outputs, agent)"
+  - "Step is wired into meta-team-cycle.workflow.yaml in the right slot (after step-04, before promote-to-backlog)"
+  - "Step output enriches the proposal record with metric: block; carries `un-falsifiable: true` when applies:false"
+
+steps:
+  - id: research
+    description: |
+      Read existing meta-team-cycle step files to understand step-file shape.
+      Read meta-team-cycle.workflow.yaml to find correct insertion point.
+      Read step-03-proposal.md (already merges kg_signal findings) to align on
+      proposal record shape.
+    agent: researcher
+  - id: implement
+    description: |
+      Create step-03c-metric-declaration.md. Wire into workflow YAML. Ensure
+      proposal record gains metric: block field.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Run one meta-team-cycle dry-pass against fixture proposals. Verify each
+      proposal gets a metric block or un-falsifiable flag.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify step composition matches catalog convention.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/metrics-as-planning-concern.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/workflows/meta-team-cycle.workflow.yaml
+      purpose: Target — wire new step into orchestration
+    - path: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
+      purpose: Sibling — shows proposal record shape
+    - path: hive/workflows/steps/meta-team-cycle/step-02c-kg-signal.md
+      purpose: Pattern for letter-suffixed steps
+
+design_decisions:
+  - decision: Use 04c (letter suffix) not new integer step
+    rationale: Existing 02c-kg-signal sets precedent; avoids renumbering downstream steps
+
+risks:
+  - severity: low
+    description: Proposal record shape drift between /plan stories and meta-team-cycle proposals
+    mitigation: M-02 schema is canonical for both routes
+
+metric:
+  applies: true
+  name: meta_cycle.proposals_with_metric_block_pct
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 0.9
+  window: "next 5 meta-team-cycles post-merge"
+  source:
+    kind: events
+    ref: "filter metric_type=proposal_emit; check dimensions.has_metric_block"
+  verify_at: "M-07 retro pass"
+  owner: tpm

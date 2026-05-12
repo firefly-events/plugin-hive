@@ -105,8 +105,40 @@ function parseSimpleYaml(content) {
   return result;
 }
 
+// Supported decision-row shapes:
+//
+//   canonical (existing — kg_write at session-end + early cycle-state files):
+//     { key: "...", value: "...", timestamp?: "..." }
+//     Mapped: subject=epicId, predicate="decided",
+//             object=`${key}:${value}` (truncated to 500),
+//             valid_from=timestamp||fileMtime.
+//
+//   legacy (existing — pre-canonical handwritten cycle-state):
+//     { decision: "...", rationale?: "..." }
+//     Mapped: subject=epicId, predicate="decided",
+//             object=decision (truncated), valid_from=fileMtime.
+//
+//   v2 (added 2026-05-11 per M-08 — newer epic cycle-state files):
+//     { id: "...", value?: "...", rationale?: "...",
+//       captured_at?|locked_at?|timestamp?: "...",
+//       source?, implication?, phase? }
+//     Mapped: subject=epicId, predicate="decided",
+//             object=value (when value is not null/undefined; falsy values
+//             like 0, false, '' are preserved) else rationale
+//             (truncated to 500),
+//             valid_from=captured_at||locked_at||timestamp||fileMtime.
+//     `id`, `source`, `implication`, `phase` are not currently projected
+//     into the triple — they are decision-row metadata the KG schema does
+//     not have first-class fields for. If a future reader needs them,
+//     surface via a richer projection rather than encoding into `object`.
+//
+// Rows that match none of the above are reported as `unknown` and
+// surfaced as WARN at WARN log level (not silently dropped) so that
+// shape drift produces a visible signal rather than an undercounted
+// import.
 function detectFormat(decision) {
   if ('key' in decision && 'value' in decision) return 'canonical';
+  if ('id' in decision && ('value' in decision || 'rationale' in decision)) return 'v2';
   if ('decision' in decision) return 'legacy';
   return 'unknown';
 }
@@ -144,6 +176,19 @@ function toTriple(decision, epicId, fileMtime) {
       predicate: 'decided',
       object: String(decision.decision || '').substring(0, 500),
       valid_from: fileMtime,
+      source_epic: namespacedEpic,
+      source_agent: 'orchestrator'
+    };
+  } else if (fmt === 'v2') {
+    // value preferred over rationale when both present; rationale is the
+    // why and value is the what — the KG stores the what.
+    const rawObject = decision.value != null ? decision.value : decision.rationale;
+    const ts = decision.captured_at || decision.locked_at || decision.timestamp;
+    return {
+      subject: epicId,
+      predicate: 'decided',
+      object: String(rawObject || '').substring(0, 500),
+      valid_from: toIsoOrFallback(ts, fileMtime),
       source_epic: namespacedEpic,
       source_agent: 'orchestrator'
     };

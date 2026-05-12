@@ -31,6 +31,21 @@ acceptance_criteria:
   - "Open triage items are described as inputs to ceremony visibility before work selection"
   - "No acceptance criterion mentions optional adapter write-back"
 
+metric:
+  applies: true
+  backfilled: true
+  name: catalog_hygiene.standup_surfaces_triage
+  direction: up
+  unit: count
+  baseline: 0
+  target: 1
+  window: "story-integrate"
+  source:
+    kind: manual
+    ref: "grep -c -i 'triage' skills/standup/SKILL.md (expect >=1)"
+  verify_at: "story-integrate"
+  owner: developer
+
 steps:
   - id: research
     description: |

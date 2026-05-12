@@ -32,6 +32,21 @@ acceptance_criteria:
   - "Schema description states that queue state values align with the canonical five triage states from the Borrow 3 source"
   - "No acceptance criterion or step mentions /plan decomposition logic or standup presentation logic"
 
+metric:
+  applies: true
+  backfilled: true
+  name: catalog_hygiene.triage_queue_schema_doc_exists
+  direction: up
+  unit: bool
+  baseline: 0
+  target: 1
+  window: "story-integrate"
+  source:
+    kind: manual
+    ref: "test -f hive/references/triage-queue-schema.md && grep -qE '^## ' hive/references/triage-queue-schema.md"
+  verify_at: "story-integrate"
+  owner: developer
+
 steps:
   - id: research
     description: |

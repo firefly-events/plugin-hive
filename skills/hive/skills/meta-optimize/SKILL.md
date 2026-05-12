@@ -90,6 +90,16 @@ Load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.
 
 Do not run both branches for the same cycle. The public fallback branch consumes the consumer-managed backlog file at `{HIVE_TARGET_PROJECT}/.pHive/meta-team/queue-meta-optimize.yaml`.
 
+### Step 3c Metric Declaration
+
+Load and follow `hive/workflows/steps/meta-team-cycle/step-03c-metric-declaration.md` after step-03 produces any `approved_proposals`. This step applies the `metrics` cross-cutting concern (`.pHive/cross-cutting-concerns.yaml` id:`metrics`) to each approved proposal so it carries a `metric:` block per `hive/references/story-yaml-schema.md` §3 (`applies: true` with name/direction/baseline/target/window/source/verify_at/owner, OR `applies: false` with a one-line justification) before step-04 implements anything.
+
+- Enrichment-only: `enriched_proposals` is the same set and order as `approved_proposals`, each entry adorned with a `metric:` block
+- Applies the `/plan` SKILL.md step 14/14a review-gate rules verbatim: rejects one-word justifications (`N/A`, `none`, `-`, `pending`, `TBD`, `not applicable`) and rejects `verify_at` values of `"eventually"`, `"someday"`, or empty
+- Gate failures are reported in the step summary (`metric_declaration_summary`) but are NON-blocking — the orchestrator/user decides whether to proceed with gaps or send the proposal back to step-03
+- Step is self-skipping in two cases: (a) the metrics concern is missing from `.pHive/cross-cutting-concerns.yaml` — emit `enriched_proposals = approved_proposals` and log; (b) step-03b (backlog-fallback) was the chosen branch — there are no `approved_proposals` to enrich, the workflow YAML `when:` predicate keeps this step inactive
+- Step-04 implementation MUST consume `enriched_proposals` from this step rather than `approved_proposals` directly from step-03 (the workflow YAML wires this in the `implementation.inputs[approved_proposals].step_id` field)
+
 ### Step 4 Implementation
 
 Load and follow `hive/workflows/steps/meta-team-cycle/step-04-implementation.md`.

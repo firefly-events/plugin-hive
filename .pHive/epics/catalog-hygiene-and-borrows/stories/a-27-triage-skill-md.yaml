@@ -34,6 +34,21 @@ acceptance_criteria:
   - "SKILL.md documents exactly five triage states and states that the names/ordering must match the canonical borrow source"
   - "SKILL.md positions triage as brownfield bug + feature intake and does not describe it as greenfield planning"
 
+metric:
+  applies: true
+  backfilled: true
+  name: catalog_hygiene.triage_skill_exists
+  direction: up
+  unit: bool
+  baseline: 0
+  target: 1
+  window: "story-integrate"
+  source:
+    kind: manual
+    ref: "test -f skills/triage/SKILL.md"
+  verify_at: "story-integrate"
+  owner: developer
+
 steps:
   - id: research
     description: |

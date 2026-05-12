@@ -21,9 +21,55 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 Load `hive/workflows/daily-ceremony.workflow.yaml` and execute its three phases. Each phase has step files at `hive/workflows/steps/daily-ceremony/`.
 
-**Phase 1 — Standup:** Reconstruct state from previous sessions. Read status markers (`.pHive/episodes/`), cycle state (`.pHive/cycle-state/`), task tracker (pending human items), agent memories, and the **triage queue** at `.pHive/triage/queue.yaml`. Surface open triage items (any entry whose `state` is not `closed`) alongside in-flight epics so the operator sees the intake backlog before selecting today's work. Present structured report to user.
+**Phase 1 — Standup:** Reconstruct state from previous sessions. Read status markers (`.pHive/episodes/`), cycle state (`.pHive/cycle-state/`), task tracker (pending human items), agent memories, the **triage queue** at `.pHive/triage/queue.yaml`, and **metrics health** across story-declared `metric:` blocks (per [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3). Surface open triage items (any entry whose `state` is not `closed`) alongside in-flight epics so the operator sees the intake backlog before selecting today's work. Surface OVERDUE and FAIL metric verdicts alongside the same context so claim-vs-reality gaps land in the operator's eye before they pick today's work. Present structured report to user.
 
 **Triage surfacing — read-only.** Phase 1 is the only point where standup touches triage. Surface open items as ceremony context — title, state, priority/severity if set, and entry id — so the operator can decide whether to hand off via `/hive:triage <id> --hand-off` (which routes to `/plan --from-triage`) or defer. Standup does NOT mutate the triage state machine; the triage skill remains the single writer of `queue.yaml`. If `.pHive/triage/queue.yaml` is missing, treat the surfacing as empty (no warning needed — triage is opt-in per its warning-only kickoff posture).
+
+**Metrics health — read-only.** Phase 1 is also the only point where standup touches story-level metrics. This section surfaces the gap between declared metric claims and observed verdicts so the operator sees regressions and overdue verifications before selecting today's work. Standup READS story YAMLs only — it does NOT invoke `/metrics-check`, query event JSONLs, open the KG, or read experiment envelopes. Verdict computation belongs to `/metrics-check` (M-05); standup is the read-side surfacing of whatever verdicts that skill has already written back.
+
+Scan `.pHive/epics/*/stories/*.yaml`. For each story:
+
+1. Skip files without a top-level `metric:` block (story declared no falsifiable claim).
+2. Skip stories with `metric.applies: false` (planning-time opt-out, recorded by M-01/M-03; nothing to verify).
+3. Otherwise, classify the story into one of three buckets based on the `metric.verdict:` sub-block (written by `/metrics-check`):
+   - **OVERDUE:** `metric.verify_at` resolves to a past timestamp (use the resolution table in `skills/metrics-check/SKILL.md` §1a; if unresolvable, treat the story as `verify_at_unparseable` and skip it from this bucket) AND no `metric.verdict:` sub-block exists.
+   - **FAIL:** `metric.verdict.outcome == "FAIL"` (regardless of `verify_at`).
+   - **HEALTHY:** any other state (`PASS`, `INCONCLUSIVE`, `MANUAL`, or not-yet-due with no verdict).
+
+Emit the section in the standup report only when OVERDUE > 0 OR FAIL > 0. Empty-state collapse is mandatory: on repos with zero `metric:` blocks, or with all stories HEALTHY, the section MUST be silent — no header, no zero-count line, no padding. The triage section uses the same collapse-on-empty discipline.
+
+When the section IS emitted, render it as:
+
+```
+### Metrics health
+
+Counts: overdue=<N>, fail=<N>
+
+Top 5 oldest overdue (oldest verify_at first):
+  · <epic-id>/<story-id> — <metric.name> <direction>: target=<target>; verify_at=<resolved ISO-8601>; overdue by <duration>
+
+Failing verdicts:
+  ✗ <epic-id>/<story-id> — <metric.name> <direction>: measured=<verdict.measured_value> vs target=<target>; ran_at=<verdict.ran_at>
+      action: <one-line suggestion>
+
+→ Run `/metrics-check` for the latest verdicts.
+```
+
+Section sizing rules:
+- OVERDUE list is capped at the 5 oldest. Additional overdue stories are summarized as `… and <N> more older than <oldest displayed verify_at>`.
+- FAIL list is uncapped (regressions are higher-signal than overdue; capping would hide active failures). If the FAIL count exceeds 10, render the top 10 by `verdict.ran_at` descending (most recently observed first) plus the same `… and <N> more` summary tail.
+- The closing `→ Run /metrics-check` hint appears only when OVERDUE > 0 (suggesting a fresh verdict pass); on FAIL-only sections, the per-row action suggestions carry the call-to-action and the trailing hint is omitted.
+
+One-line action suggestion (FAIL rows): templated per `metric.direction` and `metric.source.kind`:
+- `direction: up` → "consider follow-up story to close the gap or revisit `target` if over-ambitious"
+- `direction: down` → "consider reverting the regressing change or file a follow-up story to bring the number back below target"
+- prefix `source.kind: events` rows with "review event rows at `verdict.evidence_ref` first to confirm not a sampling artifact; "
+- prefix `source.kind: manual` rows with "manual source — re-run the read recipe in `metric.source.ref` and re-run /metrics-check; "
+
+Failure modes:
+- `.pHive/epics/` missing or empty: silent (no error, no section). This is the canonical empty-state case.
+- A story YAML fails to parse: count it as a `parse_error` and increment a single rolled-up note at the end of the section (`Note: <N> story YAML files failed to parse — run /hive:status for details`). Do NOT abort phase 1.
+- `metric.verify_at` is `"eventually"`, `"someday"`, empty, or otherwise unparseable: skip the story from the OVERDUE bucket (it is the planning-time gate's job to reject these per M-03/M-01, not standup's job to flag them again). FAIL classification is unaffected.
 
 **Phase 2 — Planning:** User short-lists today's work. Evaluate whether items need new planning or are already storied. If new work, run a compressed planning swarm. Present plan with agent-ready checklist results. User approves.
 
@@ -60,3 +106,5 @@ This recommendation is additive only. Manual invocation via `/hive:standup` rema
 - `hive/references/agent-memory-schema.md` — insight evaluation at session end
 - `hive/references/episode-schema.md` — status marker format
 - `hive/agents/orchestrator.md` — orchestrator coordination guidance
+- [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3 — `metric:` block shape that the Metrics health section reads
+- [`skills/metrics-check/SKILL.md`](../metrics-check/SKILL.md) — verdict computation (the writer of the `metric.verdict:` sub-block Phase 1 surfaces)

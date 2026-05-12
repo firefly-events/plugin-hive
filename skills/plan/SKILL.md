@@ -333,13 +333,50 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 14. **Evaluate cross-cutting concerns per story.** For each story, evaluate each concern's `applies_when` condition. For applicable concerns, determine the specific action needed and add a `cross_cutting` section to the story YAML. See `hive/references/cross-cutting-concerns.md` for format and examples.
 
+    **Concern routing.** Most concerns emit their per-story output into the generic `cross_cutting:` section as `{concern, action}` entries. A small number of concerns instead emit into a dedicated top-level field on the story YAML; the loop must route those concerns to their target field rather than to `cross_cutting:`. Currently the only such concern is `metrics`, which writes to a top-level `metric:` block per the shape in [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3. To add a new dedicated-field concern later, extend this routing table; do not hardcode metrics-specific logic elsewhere in the skill.
+
+    **Metrics concern (`id: metrics`) — per-story handling.** When the metrics concern is present in `.pHive/cross-cutting-concerns.yaml` (loaded at step 3), evaluate it for each story as follows:
+
+    1. Apply the concern's `applies_when` clause to the story. If it does NOT apply (e.g., pure-substrate story like a schema doc or planner-prompt edit), set the story's `metric:` block to `{applies: false, justification: "<one-line reason that references the story content>"}`. The justification must name the substrate kind or explain why the story has no observable surface; one-word answers (`N/A`, `none`, `-`, empty) are rejected at step 14a.
+    2. If it DOES apply, surface the concern's `planning_prompt` verbatim to the planning persona and require an answer covering the four trend/claim questions:
+       - what number moves (`metric.name` + `metric.direction`)
+       - by how much (`metric.baseline` + `metric.target`)
+       - in what window (`metric.window`)
+       - measured how (`metric.source.kind` + `metric.source.ref`, plus `metric.envelope_id` when `source.kind: envelope`)
+    3. Emit a `metric:` block on the story YAML conforming to [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3.1, including `verify_at` (a concrete step id, epic milestone, or ISO-8601 timestamp — `"eventually"` is rejected) and `owner` (the agent role that performs the verification read).
+    4. The metrics concern's `implementation_checklist` still flows through to execute via the generic concern-loop — its bullets reach the developer/reviewer alongside other concerns.
+
+14a. **Metric review gate.** After step 14 has populated every story's `metric:` block, validate each block before proceeding:
+
+    - Every story has exactly one of `metric.applies: true` or `metric.applies: false` (no missing blocks, no both-set).
+    - When `applies: true`: `name`, `direction`, `unit`, `target`, `window`, `source.kind`, `source.ref`, `verify_at`, `owner` are all present and non-empty; `direction` is `up` or `down`; `source.kind` is one of `events|sql|envelope|manual`; `verify_at` is not `"eventually"`/`"someday"`/empty; if `source.kind: envelope` then either `source.ref` or `envelope_id` resolves to an envelope file under `.pHive/metrics/experiments/`.
+    - When `applies: false`: `justification` is a full sentence that references story content. Reject (gate fails) when the justification is one word, a single token, or generic (`N/A`, `none`, `-`, `pending`, `TBD`, `not applicable`).
+
+    Stories that fail the gate are flagged in the step 18 confirmation output alongside `agent-ready-checklist` failures; the user can approve with known gaps or ask to fix them before proceeding.
+
 15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories.
 
 16. **Detect UI stories.** After generating stories and before presenting for confirmation, scan each story for UI work indicators. See the UI Step Detection section below.
 
 17. **Run agent-ready checklist.** Validate each story against the 9-point checklist in `hive/references/agent-ready-checklist.md` (including check #9: cross-cutting concerns). Flag stories that fail checks in the confirmation output.
 
-18. **Present for confirmation.** Show the dependency graph (using Mermaid format — see Diagram Format section below), story summaries, traceability results, cross-cutting concerns applied, UI detection results, and checklist results. Ask for final confirmation before saving.
+18. **Present for confirmation.** Show the dependency graph (using Mermaid format — see Diagram Format section below), story summaries, traceability results, cross-cutting concerns applied, UI detection results, checklist results, and the **metric summary** (described below). Ask for final confirmation before saving.
+
+    **Metric summary section.** After the per-story summaries, render a `METRICS:` block that lists every story along with its `metric:` decision. For stories with `metric.applies: true`, show one line per story: `<story-id> — <name> (<direction>): <baseline> → <target> over <window>; verify_at=<verify_at>`. For stories with `metric.applies: false`, group them under an `UN-FALSIFIABLE:` subsection and quote each story's full `justification` verbatim so the user can challenge thin opt-outs before approving the plan. Any story flagged by step 14a's metric review gate appears in a third `GATE_FAILURES:` subsection with the specific failing field named.
+
+    Example:
+    ```
+    METRICS:
+      a-04-plan-skill-split-routing — plan.first_attempt_pass_rate (up): 0.64 → 0.80 over next-3-cycles; verify_at=2026-06-01T00:00:00Z
+      a-25-skill-prelude-extraction — skill.line_count (down): 600 → 72 over story-integrate; verify_at=integrate
+
+    UN-FALSIFIABLE:
+      m-01-add-metrics-concern — "Process-substrate; M-07 retro backfill measures whether the gate works."
+      m-02-story-schema-metric-fields — "Schema-doc story; tested by M-03/M-04 consuming the schema in planner prompts."
+
+    GATE_FAILURES:
+      x-99-thin-opt-out — metric.justification is one word ("N/A")
+    ```
 
     Example dependency graph:
     ````
