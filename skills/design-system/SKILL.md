@@ -37,25 +37,11 @@ Read `hive/agents/ui-designer.md` in full.
 
 ### 3. Spawn ui-designer for token generation
 
-Spawn a subagent with the full ui-designer persona and this task:
+Read and cite `hive/references/ui-prompts/design-system.md` as the canonical ui-designer task prompt.
 
-```
-Read .pHive/brand/brand-system.yaml.
+Inject the following placeholder values before passing to the subagent: none.
 
-Convert it to W3C Design Token format JSON and write to .pHive/brand/tokens.json.
-
-See hive/references/design-token-spec.md for the canonical W3C Design Token spec. Produce W3C-format JSON tokens at .pHive/brand/tokens.json conforming to that spec.
-
-After writing tokens.json, produce a visual HTML preview at .pHive/brand/tokens-preview.html showing the tokens IN USE (not as raw JSON):
-
-- Color tokens: swatches with token name + hex value + usage context
-- Typography tokens: type scale demonstration rendering each scale-* token at its size
-- Spacing tokens: visual row of boxes sized to each spacing value
-- Border radius tokens: rounded corner demonstration
-- Raw tokens.json embedded at the bottom in a collapsible <details> block for developers to copy
-
-Read hive/references/html-preview-format.md for the HTML structure requirements, styling guidelines, and self-contained file rules (Google Fonts CDN, no external stylesheets, no JavaScript dependencies).
-```
+Spawn a subagent with the full ui-designer persona (`hive/agents/ui-designer.md`) and the rendered prompt body.
 
 ### 4. Report output
 
