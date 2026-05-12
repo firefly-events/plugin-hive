@@ -33,12 +33,15 @@ state/
 !.pHive/epics/structural-refactor-and-gate-lift/**
 !.pHive/epics/task-tracking-adapter-abi/
 !.pHive/epics/task-tracking-adapter-abi/**
+!.pHive/epics/ui-cluster-extract-config-deeper/
+!.pHive/epics/ui-cluster-extract-config-deeper/**
 # Per-epic cycle-state lives under .pHive/cycle-state/; only the
 # meta-improvement-system entry is tracked at this time (same maintainer-
 # infrastructure rationale as the epics/ and episodes/ subtrees above).
 !.pHive/cycle-state/
 .pHive/cycle-state/*
 !.pHive/cycle-state/meta-improvement-system.yaml
+!.pHive/cycle-state/ui-cluster-extract-config-deeper.yaml
 # Metrics carrier (.pHive/metrics/) — authored by S2 stories of the
 # meta-improvement-system epic; contains schema docs and, from C1.4 on,
 # fixtures consumed by hive/lib/metrics/ unit tests.
