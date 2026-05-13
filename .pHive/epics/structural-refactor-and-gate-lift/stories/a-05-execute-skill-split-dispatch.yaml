@@ -1,0 +1,144 @@
+id: a-05-execute-skill-split-dispatch
+epic: structural-refactor-and-gate-lift
+title: Split /execute mode dispatch into separate skill or module
+status: completed
+complexity: medium
+methodology: classic
+depends_on: []
+wave: W6
+action_id: A-05
+
+description: |
+  skills/execute/SKILL.md step 5 (~14 lines) + step 5pre executor-cutover
+  routing (~14 lines) is the mode-selection layer — decides between:
+    - 6c session-based execution (HIVE_SESSIONS_ENABLED gate)
+    - 6 / 6b agent-team execution (TeamCreate vs cmux variant)
+    - 7 sequential execution (fallback)
+  PLUS the deterministic DAG executor cutover (5pre): consumer-flag +
+  per-workflow graduation registry.
+
+  This dispatch layer is reusable: any orchestrator that wants the same
+  mode-selection (sessions > teams-cmux > teams-default > sequential)
+  plus the same executor-cutover gates should be able to invoke it
+  without re-narrating. Today it lives only inside /execute.
+
+  Extract step 5 + step 5pre into atomic skill or reference. Default form
+  (a) atomic skill, consistent with a-04 split form. The dispatch layer
+  returns a `mode_decision` enum + an `executor_path` enum that the
+  caller switches on.
+
+acceptance_criteria:
+  - "step 5 mode-selection logic extracted from skills/execute/SKILL.md"
+  - "step 5pre executor-cutover routing extracted to the same artifact (single coherent dispatch phase)"
+  - "skills/execute/SKILL.md step 5 + step 5pre each reduced to ≤10 lines — single invocation, no inline duplicate"
+  - "Net line delta across skills/execute/SKILL.md + extracted artifact is ≥-25 lines"
+  - "Mode-selection precedence preserved: sessions > teams-cmux > teams-default > sequential"
+  - "Executor cutover gates preserved: consumer .pHive/hive.config.yaml flag AND graduation registry, default OFF"
+  - "Single-dispatch-point invariant preserved (line 130): no other skill re-implements the decision tree"
+  - "Form matches a-04 sibling split (both atomic skill OR both reference; never mixed)"
+  - "/execute continues to pass end-to-end on a sample epic across all mode paths (sequential, team, cmux, session, executor)"
+  - "Dispatch artifact is reusable: a-34 backend auto-resolve can invoke the same mode-selection"
+
+steps:
+  - id: research
+    description: |
+      1. Read skills/execute/SKILL.md lines 104-131 (step 5 + step 5pre) in full.
+      2. Read hive/lib/dag_executor/__init__.py if it exists (executor_enabled_for + run_workflow surfaces).
+      3. Read sibling a-04 stories to confirm form decision.
+      4. Read hive/references/methodology-routing.md and hive/references/workflow-schema.md to map the cutover-gating contract.
+      5. Sketch invocation signature: inputs (env, hive.config.yaml, .pHive/hive.config.yaml, workflow_name, arguments), outputs (mode_decision: sessions|team|team-cmux|sequential, executor_path: hive-dag|orchestrator).
+    agent: researcher
+
+  - id: implement
+    description: |
+      Form (a) atomic skill (preferred):
+        - Create skills/hive/skills/execute-dispatch/SKILL.md.
+        - Capture step 5 (4-check precedence + session-gate) AND step 5pre (consumer-flag + registry gates).
+        - Replace skills/execute/SKILL.md step 5 + step 5pre with ≤10-line invocations each.
+        - Preserve the "single dispatch point" invariant by adding a guard comment in /execute referencing the new skill.
+
+      Either form:
+        - Do NOT touch step 6, 6b, 6c, or 7 — those are the mode-execution paths (sibling story a-05-execute-skill-split-modes).
+        - Do NOT change the hde-9a/9b consumer-flag layer rationale: maintainer-only execution choices stay out of shipped hive/hive.config.yaml.
+        - Do NOT change session priority: HIVE_SESSIONS_ENABLED / sessions.enabled remains highest priority.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Line-count check: wc -l skills/execute/SKILL.md before/after.
+      2. Run /execute on epic with HIVE_SESSIONS_ENABLED=true → verify dispatch returns sessions mode.
+      3. Run /execute with parallel_teams=true + multiple independent stories → verify dispatch returns team mode.
+      4. Run /execute with execution.terminal_mux=cmux → verify dispatch returns team-cmux variant.
+      5. Run /execute with --sequential flag → verify dispatch returns sequential.
+      6. Run /execute with consumer .pHive/hive.config.yaml executor=hive-dag + workflow in graduation registry → verify executor_path=hive-dag.
+      7. Run /execute with executor flag set but workflow NOT in registry → verify executor_path=orchestrator (per-workflow gate works).
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      1. Confirm single-dispatch-point invariant: no other skill calls into mode-selection logic directly; everything goes through the new artifact.
+      2. Verify form alignment with a-04 sibling.
+      3. Confirm executor-cutover gates are byte-equivalent (default OFF, both gates required, treat missing as falsy).
+      4. Verify dispatch artifact's invocation signature is callable from a-34 backend auto-resolve.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): split /execute mode dispatch (story a-05-execute-skill-split-dispatch, W6)`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, python]
+    frameworks: [hive-orchestrator, hive-dag-executor]
+  key_files:
+    - path: skills/execute/SKILL.md
+      purpose: Source — step 5 (lines 104-117) + step 5pre (lines 118-131) extracted
+    - path: hive/lib/dag_executor/__init__.py
+      purpose: executor_enabled_for(workflow_name) reader surface; the dispatch result drives this call
+    - path: hive/references/workflow-schema.md
+      purpose: Executor cutover schema (additive + registry-gated)
+    - path: skills/hive/skills/execute-dispatch/SKILL.md
+      purpose: NEW (form a) — destination atomic skill
+
+design_decisions:
+  - decision: Bundle mode-selection + executor-cutover in one dispatch artifact
+    rationale: Both are pre-execution routing decisions. Separate artifacts would force /execute to invoke twice; one artifact returns both decisions in one call.
+  - decision: Default OFF preserved
+    rationale: Per Q4 lock — consumer-side flag layer keeps maintainer-only execution choices out of shipped hive/hive.config.yaml. Extraction must not change this fail-closed default.
+
+cross_cutting:
+  - concern: backward-compatibility
+    action: "Mode-selection precedence (sessions > teams-cmux > teams-default > sequential) and executor cutover defaults (fail-closed) must remain byte-equivalent."
+  - concern: observability
+    action: "Preserve the structured warnings on invalid executor flag values and missing graduation registry."
+
+risks:
+  - severity: medium
+    description: Mode-selection has 4 environment-driven inputs (HIVE_SESSIONS_ENABLED, CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS, parallel_teams config, --sequential flag); extraction risks input-handling drift.
+    mitigation: Test step covers each mode path explicitly; review step verifies byte-equivalence.
+  - severity: medium
+    description: Executor cutover gates are subtle (consumer-side flag layer separate from shipped baseline); extraction risks accidentally reading shipped baseline for executor flag (regression to pre-Slice-1 contamination).
+    mitigation: Implement step explicitly mentions consumer-side .pHive/hive.config.yaml only; test step verifies fail-closed behavior when consumer config missing.
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-05: Split /execute mode dispatch into composable atoms. Dispatch
+      layer is reusable outside /execute; modes themselves are composable
+      atoms once dispatch is decoupled. Combined line-count target ≥-200
+      lines for both a-05 stories.
+  - path: skills/execute/SKILL.md
+    relevant_excerpt: |
+      Step 5: Choose execution mode (sessions > teams-cmux > teams-default > sequential).
+      Step 5pre: Executor cutover routing (hde-9a + hde-9b). Default OFF —
+      fail-closed orchestrator path on any miss. Consumer .pHive/hive.config.yaml
+      flag + per-workflow graduation registry. Both gates required.
+
+      "Single dispatch point: this is the ONLY place where /execute chooses
+      between executor and orchestrator. No other skill or step file should
+      re-implement this decision tree."

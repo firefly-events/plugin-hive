@@ -35,73 +35,7 @@ You are creating a complete brand system for this project. Your output has two p
 
 **Part 1: brand-system.yaml (required)**
 
-Produce a structured brand system and write it to `.pHive/brand/brand-system.yaml`. Use this exact schema:
-
-```yaml
-# .pHive/brand/brand-system.yaml
-colors:
-  primary:
-    name: "Color Name"
-    hex: "#3B5BDB"
-    rgb: "rgb(59, 91, 219)"
-    cmyk: "cmyk(73, 58, 0, 14)"
-    pms: "PMS 2726 C"
-    usage: "Primary actions, CTAs, key UI elements"
-  secondary:
-    name: "Color Name"
-    hex: "#F03E3E"
-    rgb: "rgb(240, 62, 62)"
-    cmyk: "cmyk(0, 74, 74, 6)"
-    pms: "PMS 185 C"
-    usage: "Accent, alerts, destructive actions"
-  neutral:
-    name: "Color Name"
-    hex: "#495057"
-    rgb: "rgb(73, 80, 87)"
-    cmyk: "cmyk(16, 8, 0, 66)"
-    pms: "PMS Cool Gray 10 C"
-    usage: "Body text, secondary content"
-  surface:
-    name: "Color Name"
-    hex: "#F8F9FA"
-    rgb: "rgb(248, 249, 250)"
-    cmyk: "cmyk(1, 0, 0, 2)"
-    pms: "PMS 9120 C"
-    usage: "Backgrounds, cards, containers"
-typography:
-  heading_font: "Inter"
-  body_font: "Inter"
-  scale: [12, 14, 16, 20, 24, 32, 40]
-  weights:
-    - weight: 400
-      name: "Regular"
-      usage: "Body text, captions"
-    - weight: 500
-      name: "Medium"
-      usage: "Labels, navigation items"
-    - weight: 600
-      name: "SemiBold"
-      usage: "Subheadings, emphasis"
-    - weight: 700
-      name: "Bold"
-      usage: "Headings, CTAs"
-  usage_guidance: "Use heading_font for all display text; body_font for all reading text"
-spacing:
-  base: 4          # px, 4-point grid
-  scale: [4, 8, 12, 16, 24, 32, 48, 64]
-radius:
-  small: 4
-  medium: 8
-  large: 16
-  full: 9999
-personality:
-  statement: "One sentence describing the brand's core character"
-  tone: "Adjectives: e.g., confident, approachable, precise"
-  voice_principles:
-    - "Principle 1"
-    - "Principle 2"
-    - "Principle 3"
-```
+See hive/references/brand-system-schema.yaml for the canonical schema. Produce a structured brand system conforming to that schema and write it to .pHive/brand/brand-system.yaml.
 
 Derive colors from the project context (existing code, product name, industry, user-provided hints). If no hints are given, establish a professional, accessible palette with all four WCAG-compliant roles (primary, secondary, neutral, surface).
 

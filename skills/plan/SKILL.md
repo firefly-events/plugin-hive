@@ -39,149 +39,50 @@ Reads `.pHive/triage/queue.yaml` and decomposes one item (the triage entry whose
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — state-directory note, kickoff gate, persona / config / memory loading. This skill consults routing keys (`agent_backends`, `model_overrides`, `planning.collaborative_review`) so also follow the **Root-first config precedence** subsection of the prelude.
 
+**Kickoff gate override — gate_mode aware.** Read `paths.gate_mode` from the root `hive.config.yaml` (consumer override layer; falls back to `hive/hive.config.yaml`; default `warning`). When `gate_mode: hard`, the prelude's hard-stop applies byte-equivalently. When `gate_mode: warning`, the hard-stop is replaced by warn-and-proceed with sane defaults:
+
+1. Emit the warning below (verbatim) when `.pHive/project-profile.yaml` is missing or its `tech_stack` field is empty/null:
+
+   > Warning: Hive not initialized for this project. Running `/plan` with sane defaults — methodology auto-detected per story a-32, placeholder project-profile written to disk. Run `/hive:kickoff` for full context, or set `paths.gate_mode: hard` to restore blocking behavior.
+
+2. If `.pHive/project-profile.yaml` is absent, generate a placeholder at that path before proceeding. Placeholder content (YAML):
+
+   ```yaml
+   tech_stack: []
+   languages: []
+   frameworks: []
+   placeholder: true
+   created_by: /plan-gate-lift
+   created_at: "<ISO 8601 timestamp>"
+   ```
+
+   This placeholder unblocks future invocations without re-warning every run. Hive treats `placeholder: true` as "needs kickoff" but does not re-block.
+
+3. Methodology resolution: defer to the auto-detect path introduced by story `a-32-plan-methodology-auto-detect` (already merged on this branch). If auto-detect cannot determine a methodology, fall back to `classic`.
+
+4. Telemetry: append one JSONL record to `.pHive/metrics/events/gate-lift-<ISO 8601 timestamp>.jsonl` with shape:
+
+   ```json
+   {"event":"gate_lift_fired","skill":"plan","gate_mode":"warning","epic_id":"<from $ARGUMENTS or generated>","timestamp":"<ISO 8601>","project_profile_present":<true|false>,"tech_stack_present":<true|false>}
+   ```
+
+   Create the `.pHive/metrics/events/` directory if absent. This event feeds the story `a-36-post-run-audit-telemetry` audit.
+
+5. Proceed with the rest of `/plan` after these defaults are in place.
+
 ## Process
 
 ### Phase 0: Assemble Planning Team
 
-0. **Assemble the planning team.** The orchestrator (main agent) stays as coordinator, directing work via `SendMessage`.
+0. **Assemble and route the planning team.** Invoke the **planning-routing** skill (atomic; `skills/hive/skills/planning-routing/SKILL.md`) — this is an **external call**, NOT inline prose copied from the routing skill.
 
-   **Step 0.1: Build team composition.**
+Pass three inputs: `assembled_personas` (core planning personas plus conditional architect/ui-designer selected from the requirement), the root-first `agent_backends` map (empty map if absent per [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)), and `requirement_summary`.
 
-   **Core team (always spawned):**
-   - **Researcher** (`hive/agents/researcher.md`) — codebase/web exploration, raw findings
-   - **Technical Writer** (`hive/agents/technical-writer.md`) — produces all formatted documents
-   - **TPM** (`hive/agents/tpm.md`) — delivery sequencing, horizontal/vertical thinking
+The skill builds final `routing_decisions`, spawns direct and/or Codex-backed teammates, emits exactly one structured routing INFO log per persona, and handles Codex runtime fallback plus circuit breaker behavior.
 
-   **Conditional team members (spawned when applicable):**
-   - **Architect** (`hive/agents/architect.md`) — added when the requirement involves architecture decisions, multi-system integration, or when scale assessment is medium/large
-   - **UI Designer** (`hive/agents/ui-designer.md`) — added when the requirement involves UI work (screens, components, visual design, wireframes). Not spawned for purely backend/infrastructure work
+Continue Phase A using the returned active planning team handles and `routing_decisions`.
 
-   **How to decide conditional members:** The orchestrator evaluates the requirement text at team assembly time. Use the same detection keywords from the UI Step Detection section below for the UI designer. For the architect, look for signals like: multiple systems, API design, data model changes, infrastructure, or the word "architecture" itself.
-
-   Routing happens only after this assembled persona list is finalized. Do not let backend routing change team composition.
-
-   **Step 0.2: Build routing decisions.**
-
-   Before spawning anyone, consult `agent_backends` using the root-first precedence contract loaded in the pre-flight config step above. For each persona in the assembled list, compare the configured backend (if any) against the `skills/hive/skills/codex-invoke/SKILL.md` contract under `Supported personas (PoC)` and `Known-incompatible personas`.
-
-   Produce a `routing_decisions` map for the assembled personas with one value per persona: `codex` or `direct`. Also store a tentative `routing_reason` per persona so Step 0.3 can emit the final structured INFO log after the spawn path succeeds or falls back.
-
-   - If `agent_backends[persona] == codex` and the persona is in codex-invoke `Supported personas (PoC)`, set that persona to `codex`.
-   - If `agent_backends[persona] == codex` and the persona is in codex-invoke `Known-incompatible personas`, set that persona to `direct`.
-   - If `agent_backends[persona] == codex` but the persona is in neither contract list, set that persona to `direct` because the persona is unvalidated for Codex, so routing stays conservative.
-   - If `agent_backends[persona] == "claude"`, set that persona to `direct` via explicit direct TeamCreate routing.
-   - If `agent_backends[persona]` is unset, or `agent_backends` is absent, set that persona to `direct` and keep current direct-TeamCreate behavior.
-
-   Apply this per assembled persona, including optional members only when they were added in Step 0.1. `ui-designer` is always routed `direct` even when configured to `codex`, because codex-invoke marks that persona as known-incompatible.
-
-   Step 0.2 decides and stores tentative routing only. It does NOT emit the INFO log. The single source of truth is: exactly one INFO log line per persona, at the final spawn decision point in Step 0.3.
-
-   **Step 0.3: Spawn the team across two paths.**
-
-   Use the `routing_decisions` map to assemble one conceptual planning team that may be created through two backend paths:
-
-   - **Direct path (`TeamCreate`):** collect every persona routed `direct` and create them in a single `TeamCreate` call. Use the existing planning-team prompt template, but include only the direct-routed personas in the `## Team Members` section.
-   - **Codex path (`agent-spawn` -> `codex-invoke`):** for each persona routed `codex`, create a separate teammate through the `agent-spawn` skill, which in turn invokes the Codex backend via `codex-invoke`. Use persistent pane mode and pass the full persona context, resolved paths, memory loading context, and the same planning-team coordination context that the direct teammates receive.
-
-   Mixed teams are valid. Some planning personas may come from `TeamCreate` while others come from `agent-spawn` -> `codex-invoke`; they are still the same planning team. The orchestrator remains the single coordination point, uses `SendMessage` for all work assignment and review loops, and keeps collaborative review gates identical for both backend paths.
-
-   Emit the structured INFO log here, after each persona's final spawn path is known. This is the definitive observability point: exactly one INFO log line per persona, at the final spawn decision point. If Step 0.5 later handles a runtime Codex failure, it updates the Step 0.3 result for that persona by replacing the earlier would-be success log with the fallback outcome instead of adding a second line.
-
-   Preserve the 4-field template exactly:
-   - `[info] planning routing: persona={X} requested={requested_backend|unset} path={codex-invoke|TeamCreate} reason={reason}`
-
-   Valid `reason=` values at this emission point are:
-   - `no-fallback-needed`
-   - `known-incompatible`
-   - `unvalidated-persona`
-   - `claude-requested`
-   - `agent_backends-unset`
-   - `codex-dispatch-failed: {error}`
-
-   Examples:
-   - `[info] planning routing: persona=technical-writer requested=codex path=codex-invoke reason=no-fallback-needed`
-   - `[info] planning routing: persona=ui-designer requested=codex path=TeamCreate reason=known-incompatible`
-   - `[info] planning routing: persona={X} requested=codex path=TeamCreate reason=unvalidated-persona`
-   - `[info] planning routing: persona={X} requested=claude path=TeamCreate reason=claude-requested`
-   - `[info] planning routing: persona={X} requested=unset path=TeamCreate reason=agent_backends-unset`
-
-   **Step 0.4: Mixed-team prompt template.**
-
-   Use this `TeamCreate` prompt template for the direct path only:
-   ```
-   Create a planning team for requirement: "{requirement-summary}"
-
-   ## Team Members
-
-   [include only personas whose routing_decisions entry is direct]
-
-   **researcher** — Explore the target codebase. Read persona from hive/agents/researcher.md.
-   Load memories from the agent's knowledge paths. Gather raw findings: file paths, patterns,
-   constraints, risks.
-
-   **technical-writer** — Produce formatted planning documents. Read persona from
-   hive/agents/technical-writer.md. Load memories from the agent's knowledge paths.
-   Transform raw findings into research briefs, design discussions, H/V plans, structured outlines.
-
-   **tpm** — Sequence delivery planning. Read persona from hive/agents/tpm.md.
-   Load memories from the agent's knowledge paths. Own horizontal/vertical thinking.
-   Review all documents for delivery feasibility.
-
-   [if architect is in the assembled list and routed direct]
-   **architect** — Evaluate technical feasibility. Read persona from hive/agents/architect.md.
-   Load memories from the agent's knowledge paths. Review designs for architectural soundness.
-
-   [if ui-designer is in the assembled list and routed direct]
-   **ui-designer** — Produce wireframes and review UI aspects. Read persona from
-   hive/agents/ui-designer.md. Load memories from the agent's knowledge paths.
-   Scan existing design language before proposing new UI.
-
-   ## Coordination
-   - Orchestrator assigns work via SendMessage
-   - All agents review documents before user presentation (collaborative review gate)
-   - Each agent reads their full persona file and loads their memory directory
-   - Use agent-spawn skill patterns: load full persona, resolve paths, load memories
-   ```
-
-   If at least one persona is routed through Codex and at least one persona is routed direct, the `TeamCreate` prompt still includes only the direct-routed personas. Codex-routed personas participate via separate panes; they read the team context from their own `agent-spawn` prompt, not the `TeamCreate` prompt.
-
-   **Agent-spawn compliance:** Every codex-routed teammate must follow the agent-spawn skill (`skills/hive/skills/agent-spawn/SKILL.md`) patterns — full persona injection, path resolution (`~`, `${CLAUDE_PLUGIN_ROOT}`), memory loading, domain constraints, and required tool validation. The direct `TeamCreate` prompt must still instruct each direct teammate to read their persona file and load their knowledge paths on startup.
-
-   **Step 0.5: Runtime fallback**
-
-   If codex-invoke dispatch FAILS at runtime for any persona (e.g., Codex CLI
-   not installed, authentication expired, cmux pane creation error, pre-flight
-   check failure, timeout, or any other error returned from agent-spawn or
-   codex-invoke), handle it gracefully:
-
-   1. Do NOT hard-fail planning-team assembly. A single Codex failure must not
-      block the whole planning flow.
-   2. Re-route the failed persona to direct TeamCreate in a follow-up call.
-      (The original TeamCreate prompt was composed without this persona; re-
-      compose it to ADD the failed persona back into the direct team. Or use
-      SendMessage to instruct the existing TeamCreate-spawned teammates to
-      adopt the re-routed teammate via the same SendMessage coordination.)
-   3. Update the Step 0.3 INFO log outcome for that persona so the final emitted
-      line reflects the runtime-failure reason instead of the earlier would-be
-      success result:
-      [info] planning routing: persona={X} requested=codex path=TeamCreate reason=codex-dispatch-failed: {error}
-      where {error} is a short excerpt of the failure (max 120 chars — truncate
-      long stderr dumps).
-   4. Continue with the rest of the planning flow. Planning-team quality may
-      degrade (persona now runs on Claude instead of Codex), but assembly
-      succeeds.
-
-   If the orchestrator observes repeated Codex failures (>=3 within one
-   planning invocation), it MAY choose to skip remaining Codex-routed personas
-   for the rest of the invocation (fail-fast behavior) — still via TeamCreate
-   fallback, still with per-persona INFO log. This is an operator-friendly
-   circuit breaker; the underlying fallback contract is unchanged.
-
-   **Observability contract:** Every planning-persona spawn — success or
-   fallback — must emit exactly one structured INFO log line per persona at the
-   final spawn decision point in Step 0.3. Operators diagnosing backend-routing
-   issues rely on these lines as the authoritative trace. Do NOT skip the INFO
-   log. Do NOT collapse multiple persona routings into one log line.
+See [`skills/hive/skills/planning-routing/SKILL.md`](../hive/skills/planning-routing/SKILL.md).
 
 ### Phase A: Research
 
@@ -276,11 +177,26 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 ### Phase C: Story Decomposition
 
-10c. **Resolve methodology.** Before decomposing stories, determine the development methodology:
+10c. **Resolve methodology.** Before decomposing stories, determine the development methodology with strict 4-tier precedence:
 
-   1. Check `hive.config.yaml` for a `methodology` field (project-level default)
-   2. Check `epic.yaml` for a `methodology` override (if the epic specifies one)
-   3. Fall back to `classic` if neither exists
+   1. **Flag override:** If `$ARGUMENTS` contains `--methodology=<value>`, use that value. This always wins; do not auto-detect and do not warn. Emit telemetry with `source=flag`.
+   2. **Epic override:** Else, if `epic.yaml` contains a `methodology` field, use that value. It wins over auto-detect. Emit telemetry with `source=epic-yaml`.
+   3. **Project default:** Else, if `hive.config.yaml` contains a `methodology` field, use that value. It wins over auto-detect. Emit telemetry with `source=hive-config`.
+   4. **Auto-detect:** Else, inspect the codebase and emit telemetry with `source=auto-detect`:
+      - Gherkin path: scan for `.feature` files, excluding `node_modules/`, `.history/`, `.pHive/spikes/`, `dist/`, and `build/`. If at least one `.feature` file is found, resolve `bdd`.
+      - Test path: scan common locations (`./`, `src/`, `lib/`, `packages/*`) for directories named `tests/`, `test/`, `__tests__/`, or `spec/`. Require at least one actual test file inside: files matching `.test.*`, `.spec.*`, `_test.*`, or any file inside `__tests__/`. If found, resolve `tdd`.
+      - Tiebreaker: `.feature` files win over tests because they are the more specific signal. If both signals are detected, resolve `bdd` and warn that both BDD and TDD signals were found.
+      - If neither signal is detected, resolve `classic`.
+
+   False-positive guards for auto-detect:
+   - Empty `tests/`, `test/`, `__tests__/`, or `spec/` directories do not trigger `tdd`; require at least one actual test file matching the rules above.
+   - `.feature` files under excluded paths (`node_modules/`, `.history/`, `.pHive/spikes/`, `dist/`, `build/`) are ignored.
+
+   When auto-detect fires (Tier 4 only), emit a loud warning:
+   `WARNING: Auto-detected methodology: {value} ({rationale, e.g. "found 47 test files under tests/"}). Override with --methodology=classic|tdd|bdd or set in hive.config.yaml.`
+
+   Emit one printable inline telemetry line for every resolution:
+   `[telemetry] methodology_resolution source={flag|epic-yaml|hive-config|auto-detect} value={value}`
 
    Available methodologies (must match a workflow YAML in `hive/workflows/`):
    - `classic` — Research → Implement → Test → Review → Integrate
@@ -296,20 +212,12 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     **If no vertical slice plan:** Decompose as before — independently implementable stories with dependency tracking.
 
     **Escalation stories[] backfill (always runs after story IDs are determined):**
-    Once canonical story YAML IDs are finalized, iterate every entry in `escalations:` in `.pHive/cycle-state/{epic-id}.yaml`:
-    - For each entry, inspect its `stories` list — entries may contain topic area strings from raise time
-    - For each topic area string, attempt a match against decomposed story IDs:
-      - **Exact match:** topic area string equals a story ID → replace in place
-      - **Fuzzy match:** topic area string overlaps with a story's `title` or `description` keywords (case-insensitive substring match) → replace with the matched canonical ID
-    - **Already canonical:** if an entry already matches a story YAML ID exactly, leave it unchanged (no re-matching needed)
-    - After replacement, write the updated `stories` list back to the escalation entry in cycle state
-    - For any topic area with **no match found:** preserve the original string as-is and log:
-      ```
-      WARNING: escalation "{trigger}" stories[] entry "{topic-area}" could not be matched to a canonical story ID — leaving as topic area string
-      ```
-    - Entries whose `stories` list is already canonical IDs (from a prior run or manual edit) require no change
-
-    > **Two-phase population pattern:** `escalations[].stories[]` is populated in two phases: (1) topic areas at raise time by the raising agent, (2) canonical IDs at plan step 11 by orchestrator backfill. Execute reads the backfilled canonical IDs.
+    Invoke `skills/hive/skills/escalation-backfill/SKILL.md` after canonical story YAML IDs are finalized.
+    Pass inputs:
+    - `epic_id`: current epic ID
+    - `story_ids[]`: decomposed canonical story YAML IDs from this step
+    - `cycle_state_path`: `.pHive/cycle-state/{epic_id}.yaml`
+    Use its outputs before continuing to requirements traceability.
 
 12. **Requirements traceability check.** Before finalizing stories, verify every aspect of the original requirement is covered by at least one story:
     - Re-read the original requirement/PRD
@@ -530,6 +438,42 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     After the loop, write `tracker_id` and `tracker_url` back into each
     story YAML when populated so downstream skills (execute, review) can
     correlate runs to tracker records.
+
+20. **Post-run audit.** After step 19 completes (whether user confirmed or aborted in step 18, and whether Phase D published or was a no-op), run the in-process audit per `hive/references/gate-lift-telemetry.md`:
+
+    1. Collect this run's resolved state:
+       - methodology (resolved value + source from a-32 auto-detect)
+       - gate_lift_fired (true if the `gate_mode: warning` branch fired during the kickoff override at the top of this skill)
+       - story specs produced (count of YAML files written under `${HIVE_STATE_DIR}/epics/<id>/stories/`)
+
+    2. Evaluate the nonsensical-default heuristics from `hive/references/gate-lift-telemetry.md`:
+       - **TDD without tests**: resolved methodology is `tdd` AND zero story specs reference test artifacts.
+       - **Lifted gate + empty plan**: `gate_lift_fired` AND zero story specs produced.
+
+    3. If ANY heuristic fires, emit ONE consolidated warning to stdout listing every triggered field plus its override path. Example shape:
+
+       > Audit: nonsensical defaults detected this run:
+       > - methodology=tdd auto-detected but no test artifacts referenced → run `/hive:kickoff` to set explicit methodology
+       > - gate_lift_fired with zero story specs → run `/plan` after `/hive:kickoff` for a properly decomposed plan
+       >
+       > Override: set `paths.gate_mode: hard` in `hive.config.yaml` to restore blocking behavior.
+
+    4. Always write the audit record to `${HIVE_STATE_DIR}/audits/post-run/<run-id>.yaml` (create the directory if absent). Schema:
+
+       ```yaml
+       run_id: <run-id>
+       skill: plan
+       timestamp: <ISO 8601>
+       gate_lift_fired: <bool>
+       methodology: <resolved value>
+       methodology_source: <source>
+       story_specs_produced: <count>
+       nonsensical_defaults:
+         - <heuristic id, e.g. tdd-without-tests>
+       warnings_emitted: <count>
+       ```
+
+       Silent runs (zero heuristics fire) still write a record with `nonsensical_defaults: []` for cross-run aggregation by `hive/scripts/gate-mode-audit.mjs`.
 
 ### Flow Summary
 

@@ -37,7 +37,46 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 ## Process
 
-1. **Load the epic.** Read `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`.
+1. **Load the epic.** Read `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`. Behavior when this file is absent depends on `paths.gate_mode` (read from root `hive.config.yaml` consumer override layer; falls back to `hive/hive.config.yaml`; default `warning`; knob introduced by story `a-33-plan-gate-lift-and-gate-mode-knob`).
+
+   **When `gate_mode: hard`:** the original behavior applies byte-equivalently — if the YAML is missing, stop and report the missing path. Do not proceed to step 2.
+
+   **When `gate_mode: warning`:** synthesize an ad-hoc plan from `$ARGUMENTS` and proceed. The sequence is:
+
+   1. Emit the warning below (verbatim):
+
+      > Warning: `{epic-id}` not found at `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`. Synthesizing ad-hoc plan from `$ARGUMENTS`. Run `/plan` first for a properly decomposed plan, or set `paths.gate_mode: hard` to restore blocking behavior.
+
+   2. Resolve methodology via story `a-34-backend-auto-resolve` (already merged on this branch). Fall back to `classic` if auto-resolve cannot determine.
+
+   3. Generate the ad-hoc YAML at `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`. Create the parent `${HIVE_STATE_DIR}/epics/{epic-id}/` and the `stories` subdirectory beneath it if absent. Template:
+
+      ```yaml
+      name: {epic-id}
+      title: {one-line summary derived from $ARGUMENTS}
+      methodology: {resolved by a-34 auto-resolve, fallback classic}
+      ad_hoc: true
+      created_by: /execute-gate-lift
+      created_at: "<ISO 8601 timestamp>"
+      stories:
+        - id: {epic-id}-default
+          title: {same as title above}
+          depends_on: []
+      ```
+
+      The `ad_hoc: true` flag signals to downstream consumers (audit, /standup, /status) that this YAML was synthesized rather than planned. The single-story stub uses `{epic-id}-default` as its ID.
+
+   4. Append one JSONL record to `${HIVE_STATE_DIR}/metrics/events/epic-create-on-fly-<ISO 8601 timestamp>.jsonl` with shape:
+
+      ```json
+      {"event":"epic_create_on_fly","skill":"execute","gate_mode":"warning","epic_id":"<epic-id>","source":"<$ARGUMENTS verbatim>","methodology":"<resolved>","timestamp":"<ISO 8601>"}
+      ```
+
+      Create `${HIVE_STATE_DIR}/metrics/events/` if absent. This event feeds the audit introduced by story `a-36-post-run-audit-telemetry`.
+
+   5. Inject the ad-hoc context into agent prompts downstream: include "This is an ad-hoc run — the YAML was synthesized from `$ARGUMENTS` without prior planning. Escalate to the orchestrator if scope is unclear or acceptance criteria are unspecified." in the system context of every spawned agent. This prevents agents from over-broadly interpreting the one-line story stub.
+
+   6. Proceed to step 2 (cycle state) as normal.
 
 2. **Load or create cycle state.** Check `${HIVE_STATE_DIR}/cycle-state/{epic-id}.yaml`. If it doesn't exist, create a minimal one with `epic_id` and `created` timestamp. The cycle state accumulates decisions across phases — see `hive/references/cycle-state-schema.md`. Include the cycle state in all downstream agent prompts as system-level constraints.
 
@@ -101,78 +140,26 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
    > **v1 note:** v1 routing handles `workflow`-based catalog entries only. A catalog entry with `skill: <path>` (allowed by catalog schema but unused in v1) is not reached by condition (i) and falls to condition (ii) or (iii). Skill-based routing is a Phase 6 extension point.
 
-5. **Choose execution mode.** Determine whether to use sessions, agent teams, or sequential execution:
-
-   **Session check (highest priority).** Is `HIVE_SESSIONS_ENABLED` set (value `1`, `true`, or `"true"`) OR does `hive.config.yaml` have `sessions.enabled: true`? If yes → use **session-based execution** (step 6c below). Skip the remaining checks.
-
-   **Team check (when sessions not available):**
-
-   1. Check: Is `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` set (value `1`, `true`, or `"true"`)?
-   2. Check: Does `hive.config.yaml` have `parallel_teams: true`?
-   3. Check: Does the topological sort reveal multiple stories at the same depth (independent stories that can run concurrently)?
-   4. Check: Is `--sequential` flag NOT present in arguments?
-
-   If all four team checks pass: use **agent team execution**. If `execution.terminal_mux` resolves to `cmux`, use step 6b. Otherwise use step 6.
-   Otherwise: use **sequential execution** (step 7).
-
-5pre. **Executor cutover routing (hde-9a + hde-9b).** Before dispatching the chosen execution mode for a single workflow, decide whether to invoke the deterministic DAG executor (`hive.lib.dag_executor`) or stay on the orchestrator-narrated path. This check applies per-workflow at the point where this skill would otherwise hand off a workflow YAML to the orchestrator-narrated runner.
-
-   **Decision tree (default OFF — fail-closed orchestrator path on any miss):**
-
-   1. **Read consumer config.** Look for `.pHive/hive.config.yaml` (consumer-side, NOT the shipped `hive/hive.config.yaml`). If the file is missing → orchestrator path. Done.
-   2. **Check the flag.** Parse the file. If `executor` is anything other than `hive-dag` (`hive-dag` is the only valid value today) → orchestrator path with a warning. If `executor_default` is not truthy (`on`, `true`, `yes`, or YAML bool `True`; `off`/`false`/`no`/missing → false) → orchestrator path.
-   3. **Read graduation registry.** Look for `.pHive/runtime/executor-graduated-workflows.yaml` (created by hde-9b — may not exist yet; treat missing as empty, no workflows graduated). Parse the top-level `workflows:` list.
-   4. **Per-workflow gate.** If the workflow being dispatched is NOT in the registry → orchestrator path.
-   5. **Both gates pass.** Invoke `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`. Pass a populated `run_state_path` and `worktree_manager` so the L3 functionality (run-state persistence + worktree-per-run isolation) is available; the wrapper honours `worktree_manager=None` (no isolation, hde-2 spine path) when caller-decided context says so (e.g., already inside an outer worktree per hde-6 nesting policy).
-
-   **Why this gating exists (Q4 lock):** the consumer-side flag layer keeps maintainer-only execution choices out of the shipped `hive/hive.config.yaml` (the eefbff3 / `project_config_shipping_deferred` pattern). The per-workflow registry layer lets graduation events ship without consumer config edits. Default OFF preserves zero-behaviour-change for non-opt-in consumers. Both gates must be true; either gate empty falls through to the orchestrator path.
-
-   **Single dispatch point:** this is the ONLY place where `/execute` chooses between executor and orchestrator. No other skill or step file should re-implement this decision tree — they should call back into this skill or the `executor_enabled_for(workflow_name)` reader exposed by `hive.lib.dag_executor`.
+5. **Choose execution mode.** Invoke `skills/hive/skills/execute-dispatch/SKILL.md` with env, parsed root `hive.config.yaml`, parsed consumer `${HIVE_STATE_DIR}/hive.config.yaml`, parsed graduation registry, `workflow_name`, and `$ARGUMENTS`; consume `mode_decision`, `mode_reason`, `runner_path`, and `runner_reason`. Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7.
+5pre. **Executor cutover routing.** Use only the returned `runner_path` and `runner_reason`; do not re-evaluate the cutover tree here. If `runner_path == hive-dag`, call `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`; otherwise continue on the orchestrator-narrated path. Single dispatch point: this skill call is the only `/execute` policy boundary for executor-vs-orchestrator routing.
 
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
 
 6b. **Agent team execution (cmux path).** Use this path when all four step-5 conditions are true and `execution.terminal_mux` resolves to `cmux`.
+   Invoke `skills/hive/skills/execute-mode-team-cmux/SKILL.md` with:
+   - `workflow_path`: the workflow loaded in step 3
+   - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
+   - `appends_map`: the review-phase sidecar map from step 2b
+   - `epic_handle`: the current epic identifier
+   See `references/team-execution.md` for cmux-variant TeamCreate prompt details.
 
-   - Spawn each unblocked story via the agent-spawn skill. Section 7.3 of that skill handles the cmux pane lifecycle and prompt delivery.
-   - Track active work in a map:
-     ```
-     {story_id -> surface_id, status, depends_on}
-     ```
-   - Run a poll loop every 10 seconds. For each active surface:
-     - Call `cmux read-screen --surface <id>` and look for `[STORY-COMPLETE:{story-id}]`
-     - Call `surface.health` to confirm the pane is still live
-   - When a story completes: mark it done, then scan blocked stories and spawn any whose `depends_on` set is now fully satisfied.
-   - When a story fails: mark `failed`, propagate failure to all transitive dependents (they cannot run), and continue executing remaining independent stories. Terminate the epic with a failure summary once no runnable stories remain.
-   - Use `cmux send --surface <id>` to deliver respawn prompts or sidecar injection messages to active panes.
-   - When all stories complete: close every tracked surface via `cmux close-surface`, then produce the epic summary.
-   - Follow **`references/team-execution.md`** for the cmux variant details.
-
-6c. **Session-based execution** (used when `HIVE_SESSIONS_ENABLED` or `sessions.enabled: true`). Replaces the TeamCreate path with the Claude Agent SDK `/v1/sessions` API for story-level execution. One session per story, isolated context, structured retry on stuck SSE.
-
-   **6c-1. Bootstrap session registry.** Run the session-registry bootstrap skill (`skills/hive/skills/session-registry/SKILL.md`) to ensure `${HIVE_STATE_DIR}/sessions/index.yaml` exists. Idempotent — safe to call even if already initialized. See `hive/references/session-registry-schema.md` for the registry record shape.
-
-   **6c-2. Create session entries.** For each story in dependency order:
-   - Append a session record to `${HIVE_STATE_DIR}/sessions/index.yaml` with `status: pending`, `story_id: {story-id}`, `epic_id: {epic-id}`, and `created_at: {NOW}`.
-   - Use the model from `hive.config.yaml sessions.model` (or inherit from `model_tiers` for the story's primary agent).
-
-   **6c-3. Invoke each session.** When a story's dependencies are complete, open its session using the `/v1/sessions` API via `hive/scripts/session-invoke.mjs`. Format the initial session prompt using the session prompt spec from `hive/references/session-system-prompt-spec.md`. The prompt must include: story spec, workflow step sequence, episode write path, and any escalation context from step 2b's `appends[]` map (sidecar reviewers).
-   - Update the registry record: set `status: active` and `last_active_at: {NOW}`.
-
-   **6c-4. Sidecar injection (session path).** When step 2b populated `appends[]` for this story, append the matched sidecar reviewer agents to the review-phase session context as:
-   ```
-   Additional reviewers: {agent-1}, {agent-2}
-   Each additional reviewer should run their activation protocol after the primary review.
-   Load their persona from hive/agents/{agent-name}.md.
-   ```
-   Use the canonical specialist catalog at `hive/references/specialist-triggers.md` to resolve `responds_with.id` for each escalation (already done in step 2b). If `appends[]` is empty for the story, proceed with the standard reviewer only.
-
-   **6c-5. Monitor and update.** As sessions run, update `sse_last_event_at` in the registry on each received SSE event. Watch for stuck sessions per the resilience procedure in `hive/references/session-resilience.md`.
-
-   **6c-6. Close sessions.** On session completion, set `status: completed` (or `failed`) and update `last_active_at`. Sessions are never reopened — each story run gets a new session record.
-
-   **Per-story commits (session path):** Stories commit independently on their own feature branches (`hive-{story-id}`) as soon as review passes, same as the TeamCreate path.
-
-   **Resilience monitoring:** While sessions are active, poll `sse_last_event_at` in `${HIVE_STATE_DIR}/sessions/index.yaml`. If any active session has not updated `sse_last_event_at` within `sessions.stuck_timeout_ms` (default 90s), trigger the session retry procedure from `hive/references/session-resilience.md`. Max `sessions.max_retries` retries per story (default 3) before escalating to the user. This **replaces** the respawn skill for session-based execution — do NOT use the respawn protocol for step 6c stories.
+6c. **Session-based execution** (used when `HIVE_SESSIONS_ENABLED` or `sessions.enabled: true`). Replaces the TeamCreate path with the Claude Agent SDK `/v1/sessions` API for story-level execution.
+   Invoke `skills/hive/skills/execute-mode-session/SKILL.md` with:
+   - `workflow_path`: the workflow loaded in step 3
+   - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
+   - `appends_map`: the review-phase sidecar map from step 2b
+   - `epic_handle`: the current epic identifier
+   - `hive_config`: parsed root `hive.config.yaml` (for `sessions.*` and `model_tiers`)
 
 7. **Sequential execution.** Follow **`references/sequential-execution.md`** for the step-by-step workflow within each story, sidecar injection at the review step, episode records, gate checks, and respawn monitoring.
 
@@ -223,7 +210,28 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
     Episode markers (per `hive/references/episode-schema.md`) are still authoritative for in-Hive state. Tracker status updates are a one-way projection — failures here never block the workflow.
 
-8. After all stories complete, produce a summary of the epic execution.
+8. After all stories complete, produce a summary plus the post-run audit:
+
+   1. **Run summary** — existing behavior: list completed stories, any failed/blocked, and final status.
+
+   2. **Post-run audit** — scan this run's resolved state per `hive/references/gate-lift-telemetry.md`:
+      - `gate_lift_fired` (true if step 1 took the warning branch and synthesized an ad-hoc plan)
+      - `backend_resolution` sources (collected from the `execute-dispatch` sub-skill invoked at step 5 per a-34 Sane Default Resolution; map of `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor` → `flag|env|hive-config|default`)
+      - methodology (resolved value + source)
+      - work artifacts (commits made, files modified during the run)
+
+   3. Evaluate nonsensical-default heuristics from the reference doc:
+      - **Lifted gate + no work**: `gate_lift_fired` was true AND the run produced zero commits + zero file modifications.
+      - **All backend defaults**: every `backend_resolution` field resolved from `default` (user has not configured anything).
+      - **TDD without tests**: resolved methodology is `tdd` AND no test files were touched during the run.
+
+   4. If ANY heuristic fires, emit ONE consolidated warning to stdout listing every triggered field plus its override path. Use the same shape documented in `skills/plan/SKILL.md` step 20 (warning header + per-field bullets + final override line pointing at `paths.gate_mode: hard`).
+
+   5. Always write the audit record to `${HIVE_STATE_DIR}/audits/post-run/<run-id>.yaml` (create the directory if absent). Same schema as `skills/plan/SKILL.md` step 20, with two differences:
+      - `skill: execute`
+      - additional field `backend_sources` mapping `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor` to their resolved source.
+
+   6. Silent on healthy runs (no stdout warning when zero heuristics fire) — YAML record still written with empty `nonsensical_defaults: []` for cross-run aggregation by `hive/scripts/gate-mode-audit.mjs`.
 
 ## Key References
 

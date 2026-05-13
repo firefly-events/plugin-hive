@@ -21,11 +21,11 @@ Check `.pHive/audits/ui-audit/latest.yaml`:
 
 If the check fails, display this message and **stop**:
 
-> No ui-audit found. Run `/hive:ui-audit` first — polish-audit builds on audit findings to identify refinement opportunities.
+> No implementation audit found. Run `/hive:design-review --artifact-target implementation` first — polish-audit builds on audit findings to identify refinement opportunities. Legacy references to `/hive:ui-audit` mean this implementation-target review.
 
 See `hive/references/ui-skill-gates.md` for the full gate specification.
 
-Note: Even a clean ui-audit (verdict: passed) justifies a polish pass. The gate checks existence, not verdict.
+Note: Even a clean implementation audit (verdict: passed) justifies a polish pass. The gate checks existence, not verdict.
 
 ## Process
 
