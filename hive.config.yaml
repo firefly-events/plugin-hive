@@ -51,18 +51,47 @@ context_window:
   budget_fraction: 0.7
   degradation_threshold: 0.85
 
-# External task tracking
-# Set adapter to enable. All linear_* fields required when adapter: linear.
+# External task tracking (Epic C — task-tracking-adapter-abi)
+# Maintainer override layer. Keep `adapter: null` so opt-in is explicit.
+# See hive/hive.config.yaml for the full schema commentary.
+#
+# Examples — uncomment ONE block to enable a tracker:
+#
+#   # GitHub (built-in):
+#   task_tracking:
+#     adapter: github
+#     team_value: firefly-events     # GitHub owner/org
+#     project_value: plugin-hive     # GitHub repo
+#     github:
+#       token: null                  # falls through to GITHUB_TOKEN / `gh auth token`
+#
+#   # Linear (built-in):
+#   task_tracking:
+#     adapter: linear
+#     team_value: ACME               # Linear team key
+#     project_value: my-project      # Linear project name (optional)
+#     linear:
+#       api_key: null                # falls through to LINEAR_API_KEY env
+#       team: ACME                   # falls through to LINEAR_TEAM env
 task_tracking:
-  adapter: null              # linear, github, jira — null = disabled
+  adapter: null
+  adapter_timeout_ms: 30000
+  gate_mode: warning
+  team_value: null
+  project_value: null
+  github:
+    token: null
+  linear:
+    api_key: null
+    team: null
+  # Legacy keys retained for pre-ABI tooling; will graduate to deprecated in c-5b.
   queue_name: "Hive — Human Intervention"
   auto_expire_days: 7
-  # Linear-specific
-  linear_team: null          # team key (e.g., "ACME")
-  linear_project: null       # project name (e.g., "my-project")
-  linear_user_id: null       # user UUID for assignment locking (from linearis users list)
-  linear_prefix: "[Hive]"   # prefix for Hive-created issues
-  branch_prefix: "acme"     # branch naming: {prefix}-{N}-{slug} (enables GitHub auto-link)
+  linear_team: null
+  linear_project: null
+  linear_user_id: null
+  linear_prefix: "[Hive]"
+  branch_prefix: "acme"
 
 # Model tier routing
 # Assigns the right model to the right job. Orchestrator and complex reasoning

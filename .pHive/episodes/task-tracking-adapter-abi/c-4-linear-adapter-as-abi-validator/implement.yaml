@@ -1,0 +1,13 @@
+step_id: implement
+story_id: c-4-linear-adapter-as-abi-validator
+epic_id: task-tracking-adapter-abi
+agent: developer
+status: completed
+artifacts:
+  - path: hive/adapters/linear/index.ts
+  - path: hive/adapters/linear/package.json
+  - path: hive/adapters/linear/README.md
+  - path: hive/adapters/linear/friction-notes.md
+  - path: hive/adapters/linear/test/adapter.test.ts
+test_results: "33/33 PASS"
+key_finding: "All 7 methods + capabilities. Raw Authorization (no Bearer). mapGraphqlError reads RATELIMITED from body. Team metadata cached. linkStories single-call. supported_states/labels dynamic from LINEAR_TEAM."

@@ -1,0 +1,9 @@
+step_id: implement
+story_id: c-2-abi-specification
+epic_id: task-tracking-adapter-abi
+agent: developer
+status: completed
+artifacts:
+  - path: hive/references/task-tracking-adapter-abi.md
+  - path: hive/references/task-tracking-adapter-abi-schemas/
+key_finding: "7 methods documented (6 required + setAssignee). 8 JSON schemas. 4-code error enum. Semver versioning. c-1 sketch marked superseded."

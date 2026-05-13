@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "updateStatus",
+  "description": "Transitions a story to a new workflow state. Returns the full updated story object.",
+  "request": {
+    "type": "object",
+    "properties": {
+      "method": { "type": "string", "const": "updateStatus" },
+      "params": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Tracker-assigned story ID"
+          },
+          "state": {
+            "type": "string",
+            "description": "Target state. MUST be one of capabilities.supported_states."
+          }
+        },
+        "required": ["id", "state"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["method", "params"],
+    "additionalProperties": false
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "result": {
+        "type": "object",
+        "description": "Full story object reflecting the updated state",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "state": { "type": "string" },
+          "labels": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "parent_id": {
+            "oneOf": [{ "type": "string" }, { "type": "null" }]
+          },
+          "url": { "type": "string" }
+        },
+        "required": ["id", "title", "body", "state", "labels", "parent_id", "url"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["result"],
+    "additionalProperties": false
+  }
+}

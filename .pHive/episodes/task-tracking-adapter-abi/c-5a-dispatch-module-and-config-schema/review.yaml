@@ -1,0 +1,15 @@
+step_id: review
+story_id: c-5a-dispatch-module-and-config-schema
+epic_id: task-tracking-adapter-abi
+agent: reviewer
+status: completed
+verdict: APPROVE
+non_blocking_followup:
+  - "MINOR-version clamp missing — currently any 1.x.y adapter loads; tighten to match c-2 §compatibility check (latent, Hive only publishes 1.0.0 today)"
+  - "noAdapterWarningEmitted is instance-scoped, not module-scoped — README claims once-per-process but actual behavior is once-per-instance; either hoist flag or relax README"
+notes_for_c5b:
+  - "Import: TaskTrackingDispatch from hive/lib/task-tracking-dispatch/index.ts"
+  - "Lifecycle: new() → load(config) → invoke(method, params); cache survives via module-scoped handleCache"
+  - "Result handling: check r.ok; if !r.ok and r.code===NO_ADAPTER → gated skip/hard block per config.gate_mode; if r.recoverable → retry after r.retry_after_ms"
+  - "c-5b owns prose_runbook_fallback telemetry (second event writer)"
+  - "team_value/project_value are invoke-time runtime params, not load-time"

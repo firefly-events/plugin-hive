@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "setAssignee",
+  "description": "Assigns or unassigns a user on a story. Pass null as assignee_id to remove the current assignee. Returns an empty result object (void).",
+  "request": {
+    "type": "object",
+    "properties": {
+      "method": { "type": "string", "const": "setAssignee" },
+      "params": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Tracker-assigned story ID"
+          },
+          "assignee_id": {
+            "oneOf": [{ "type": "string" }, { "type": "null" }],
+            "description": "Tracker-assigned user/member ID to assign, or null to remove the current assignee"
+          }
+        },
+        "required": ["id", "assignee_id"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["method", "params"],
+    "additionalProperties": false
+  },
+  "response": {
+    "type": "object",
+    "description": "Void return.",
+    "properties": {
+      "result": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Empty object — void return"
+      }
+    },
+    "required": ["result"],
+    "additionalProperties": false
+  }
+}

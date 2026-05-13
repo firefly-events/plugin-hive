@@ -658,7 +658,7 @@ Create `hive.config.yaml` in the project root. This is Hive-specific config — 
 
 **What goes in hive.config.yaml:**
 - Hive workflow settings (methodology, retry attempts, model tiers)
-- Task tracking config (Linear team, project, user ID)
+- Task tracking config (`task_tracking.adapter` + adapter-specific keys; see "Loading the task-tracking adapter" below)
 - Quality gate thresholds
 - Token budgets
 
@@ -669,6 +669,41 @@ Create `hive.config.yaml` in the project root. This is Hive-specific config — 
 - Project-specific instructions for Claude
 
 **Never duplicate CLAUDE.md content in hive.config.yaml.**
+
+### Loading the task-tracking adapter
+
+When `task_tracking.adapter` is configured (`github` | `linear` | a filesystem
+path to a custom adapter), Hive loads the adapter via the dispatch module.
+Skills, hooks, and the orchestrator should reach trackers exclusively through
+this surface — direct imports of `hive/adapters/<vendor>/index.ts` are
+reserved for adapter tests.
+
+```typescript
+import { TaskTrackingDispatch } from "hive/lib/task-tracking-dispatch/index.ts";
+
+const dispatch = new TaskTrackingDispatch();
+await dispatch.load(config.task_tracking);
+
+if (!dispatch.hasAdapter) {
+  // gate_mode=warning -> dispatch.invoke() returns NO_ADAPTER and emits the
+  //                      no-adapter telemetry event; callers route to skip.
+  // gate_mode=hard    -> dispatch.invoke() returns NO_ADAPTER (terminal);
+  //                      callers should halt the operation.
+  // No skill-side branching on adapter vendor is needed — the dispatch
+  // module owns gate_mode behavior + telemetry.
+}
+```
+
+Terminal failures from a loaded adapter (auth, timeout, internal error,
+operation-unsupported) under `gate_mode: warning` are recorded as
+`prose-runbook-fallback` events at `<state_dir>/metrics/events/` —
+per-occurrence, one event per terminal call. The events feed migration
+dashboards tracking moves away from the legacy prose-runbook path.
+
+See `hive/lib/task-tracking-dispatch/README.md` for the full dispatch
+surface (capability inspection, error codes, cache semantics). This
+replaces the legacy prose-runbook reference path; see Epic C
+(`task-tracking-adapter-abi`) for migration context.
 
 ### Phase 4b: Scaffold CONTEXT.md (domain glossary)
 

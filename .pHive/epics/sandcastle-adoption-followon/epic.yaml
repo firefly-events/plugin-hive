@@ -1,0 +1,86 @@
+name: sandcastle-adoption-followon
+title: Sandcastle Adoption Follow-on (Project D)
+description: |
+  Adopt Sandcastle as an opt-in Codex-path execution substrate around Hive's
+  existing mode routing, provider lifecycle, and worktree isolation. This
+  project is post-2.0 work on top of `dev/hive-2.0`, preserving existing
+  sessions, team, team-cmux, and sequential behavior while adding a validated
+  Sandcastle mode.
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+branch: feat/sandcastle-adoption-followon
+placement: post-2.0
+integration_branch: dev/hive-2.0
+stories:
+  - id: s1-auth-setup-skill
+    title: Sandbox setup skill for Codex auth mount readiness
+    complexity: medium
+    tier: 1
+    slice: S1
+    depends_on: []
+  - id: s1-redaction-wrapper
+    title: In-Hive Sandcastle stdout and stderr redaction wrapper
+    complexity: medium
+    tier: 1
+    slice: S1
+    depends_on: []
+  - id: s1-gitignore-template
+    title: Add .sandcastle directory to the canonical gitignore template
+    complexity: low
+    tier: 1
+    slice: S1
+    depends_on: []
+  - id: s2-provider-wrap
+    title: Wrap Sandcastle providers with Hive defaults and version preflight
+    complexity: high
+    tier: 2
+    slice: S2
+    depends_on: [s1-auth-setup-skill, s1-redaction-wrapper, s1-gitignore-template]
+  - id: s2-hooks-minimal
+    title: Wire only host.onWorktreeReady for copyToWorktree preparation
+    complexity: medium
+    tier: 2
+    slice: S2
+    depends_on: [s1-auth-setup-skill, s1-redaction-wrapper, s1-gitignore-template]
+  - id: s3-execution-mode-skill
+    title: Sandcastle execution mode skill with lifecycle ownership contract
+    complexity: medium
+    tier: 2
+    slice: S3
+    depends_on: [s2-provider-wrap, s2-hooks-minimal]
+  - id: s3-dispatch-routing
+    title: Route sandcastle as the fifth execute mode with field-source attribution
+    complexity: high
+    tier: 2
+    slice: S3
+    depends_on: [s2-provider-wrap, s2-hooks-minimal]
+  - id: s4-merge-validation
+    title: Live-quota merge validation for Sandcastle branch strategy
+    complexity: high
+    tier: 2
+    slice: S4
+    depends_on: [s3-execution-mode-skill, s3-dispatch-routing]
+  - id: s5-adoption-guide
+    title: Sandcastle adoption guide for setup, provider defaults, branch strategy, and redaction
+    complexity: medium
+    tier: 3
+    slice: S5
+    depends_on: [s4-merge-validation]
+  - id: s5-hooks-reference
+    title: Minimal Sandcastle hooks reference
+    complexity: low
+    tier: 3
+    slice: S5
+    depends_on: [s4-merge-validation]
+  - id: s6-issue-191-defer-marker
+    title: Defer marker and audit gate for Sandcastle issue 191
+    complexity: medium
+    tier: 3
+    slice: S6
+    depends_on: [s3-execution-mode-skill, s3-dispatch-routing]
+  - id: s7-warm-pool-placeholder
+    title: Warm-pool placeholder for future createSandbox optimization
+    complexity: low
+    tier: 3
+    slice: S7
+    depends_on: [s2-provider-wrap]

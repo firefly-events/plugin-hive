@@ -389,7 +389,57 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     ```
     ````
 
-19. **Post-run audit.** After step 18 completes (whether user confirmed or aborted), run the in-process audit per `hive/references/gate-lift-telemetry.md`:
+### Phase D: Publishing stories to the task tracker
+
+19. **Publish each story to the configured tracker.** Only run after the user
+    confirms the plan in step 18. If `task_tracking.adapter` is unset, this
+    phase is a no-op — local story YAMLs remain the source of truth.
+
+    Use the task-tracking dispatch module rather than vendor-specific calls.
+    The dispatch surface handles `gate_mode`, telemetry, and error mapping;
+    do not branch on the adapter vendor (`github` vs `linear`) here.
+
+    ```typescript
+    import { TaskTrackingDispatch } from "hive/lib/task-tracking-dispatch/index.ts";
+
+    const dispatch = new TaskTrackingDispatch();
+    await dispatch.load(config.task_tracking);
+
+    for (const story of stories) {
+      const result = await dispatch.invoke(
+        "createStory",
+        {
+          title: story.title,
+          body: story.description,
+          labels: story.labels,
+          parent_id: story.parent_id,
+        },
+        { skill_context: "plan" },
+      );
+
+      if (result.ok) {
+        story.tracker_id = result.result.id;
+        story.tracker_url = result.result.url;
+      } else if (result.code === "NO_ADAPTER") {
+        // gate_mode=warning -> skip publish silently (dispatch already
+        //                      emitted the no-adapter telemetry event).
+        // gate_mode=hard    -> dispatch returned terminal; halt publishing.
+        break;
+      } else if (result.recoverable) {
+        // RATE_LIMIT — pause for result.retry_after_ms and retry.
+      } else {
+        // Terminal failure (auth, timeout, internal error). Dispatch wrote a
+        // prose-runbook-fallback event under gate_mode=warning. Surface to
+        // the user; planning can continue without tracker IDs.
+      }
+    }
+    ```
+
+    After the loop, write `tracker_id` and `tracker_url` back into each
+    story YAML when populated so downstream skills (execute, review) can
+    correlate runs to tracker records.
+
+20. **Post-run audit.** After step 19 completes (whether user confirmed or aborted in step 18, and whether Phase D published or was a no-op), run the in-process audit per `hive/references/gate-lift-telemetry.md`:
 
     1. Collect this run's resolved state:
        - methodology (resolved value + source from a-32 auto-detect)

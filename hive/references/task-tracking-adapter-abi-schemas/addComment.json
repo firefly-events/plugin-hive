@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "addComment",
+  "description": "Appends a comment to an existing story. Returns the stable comment ID.",
+  "request": {
+    "type": "object",
+    "properties": {
+      "method": { "type": "string", "const": "addComment" },
+      "params": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Tracker-assigned story ID"
+          },
+          "body": {
+            "type": "string",
+            "description": "Comment body; may contain Markdown"
+          }
+        },
+        "required": ["id", "body"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["method", "params"],
+    "additionalProperties": false
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "result": {
+        "type": "object",
+        "properties": {
+          "comment_id": {
+            "type": "string",
+            "description": "Stable tracker-assigned identifier for the new comment"
+          }
+        },
+        "required": ["comment_id"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["result"],
+    "additionalProperties": false
+  }
+}
