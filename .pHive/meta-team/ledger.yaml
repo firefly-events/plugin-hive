@@ -1,3 +1,30 @@
+- experiment_id: meta-2026-05-13
+  date: '2026-05-13'
+  started: '2026-05-13T03:00:00Z'
+  closed: '2026-05-13T03:30:00Z'
+  verdict: passed
+  changes_promoted: 2
+  changes_reverted: 0
+  findings_identified: 2
+  top_changes:
+    - "hive/GUIDE.md: corrected config path on line 520 from non-existent 'skills/hive/hive.config.yaml' to correct 'hive/hive.config.yaml' with clarification note"
+    - "skills/ui-design/SKILL.md: created new routing skill for /hive:ui-design command linking to ui-design.workflow.yaml"
+  commit: 6c897d1fda45529a8ffffe2f9ada10297f9a79d0
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 0
+    first_attempt_pass: true
+  rollback_ref: d2ed82d
+  notes: |
+    Nightly cycle meta-2026-05-13. Analysis found 2 findings: (1)
+    SCHEMA_INCONSISTENCY in GUIDE.md line 520 referencing non-existent
+    'skills/hive/hive.config.yaml' (correct path is 'hive/hive.config.yaml');
+    (2) MISSING_FILE for skills/ui-design/SKILL.md — /hive:ui-design is
+    referenced in user-facing messages in design-review, visual-qa, and GUIDE.md
+    but had no routing skill. Both fixed. Previously finding-1 was marked
+    out_of_scope in meta-2026-05-03; meta-2026-05-09 established GUIDE.md write
+    authority precedent. Closure validator passed. Regression watch armed for
+    4-hour window.
 - experiment_id: meta-2026-05-12
   date: '2026-05-12'
   started: '2026-05-12T00:00:00Z'
