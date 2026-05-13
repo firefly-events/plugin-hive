@@ -1,0 +1,106 @@
+id: s1-redaction-wrapper
+epic: sandcastle-adoption-followon
+title: In-Hive Sandcastle stdout and stderr redaction wrapper
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+tier: 1
+slice: S1
+description: |
+  Add `hive/lib/sandcastle-log-redaction.js` as the in-Hive wrapper for
+  Sandcastle logger output before any provider path is wired. The wrapper
+  masks `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `*_TOKEN`, and `*_KEY` values
+  in stdout/stderr and file logger text so the known `.sandcastle/logs` leak
+  cannot ship as cleanup work.
+
+acceptance_criteria:
+  - "Given output containing OPENAI_API_KEY=sk-test, when passed through hive/lib/sandcastle-log-redaction.js, then the emitted text contains OPENAI_API_KEY=[REDACTED]"
+  - "Given ANTHROPIC_API_KEY, FOO_TOKEN, and BAR_KEY values in podman argv text, when redacted, then each value is masked without removing the variable name"
+  - "Given provider wrapping later supplies a Sandcastle logger, when instantiated, then the logger is wrapped before SandboxProvider construction"
+  - "Given sidecar bundles exist elsewhere, when this wrapper emits logs, then it does not claim to produce sidecar-compatible redaction spans in V1"
+  - "Given security audits apply, when reviewing fixtures, then no fake secret literal remains in captured stdout, stderr, or log fixture output"
+  - "Given log output containing 'Authorization: Bearer sk-test' (case-insensitive header form), when passed through the wrapper, then the bearer value is masked to [REDACTED] while preserving the header name"
+  - "Given log output containing JSON form \"api_key\": \"sk-test\" or \"openai_api_key\": \"sk-test\", when passed through the wrapper, then the value is masked to [REDACTED] while preserving the key name"
+  - "Given the redaction wrapper is installed before the first sandcastle import, when sandcastle emits its startup log, then no unredacted key value appears in stdout or stderr"
+  - "Given the wrapper's redact function throws on a non-string chunk, when an exception is caught, then a safe placeholder string is emitted and execution continues without propagating the exception into provider construction"
+
+steps:
+  - id: context-discovery
+    name: discovery
+    description: Read the spike leak evidence and existing JS library naming conventions under `hive/lib/`.
+  - id: build-change
+    name: build
+    description: Add `hive/lib/sandcastle-log-redaction.js` with exported redaction helpers and focused fixtures.
+  - id: verify-result
+    name: verify
+    description: Run the redaction fixture tests with fake key values covering exact and wildcard patterns.
+  - id: audit-notes
+    name: audit
+    description: Capture security audit evidence that the wrapper gates provider usage and is local to Sandcastle mode.
+  - id: commit-ready
+    name: commit
+    description: Commit only the wrapper, tests, and any minimal documentation note needed for S5.
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/sandcastle-log-redaction.js
+      purpose: New exact wrapper module required by the architect open item.
+    - path: .pHive/spikes/sandcastle/harness.ts
+      purpose: Contains the spike logger and Podman argv context that motivated redaction.
+    - path: .pHive/epics/sandcastle-adoption-followon/docs/research-brief.md
+      purpose: Primary evidence for the key-leak gate condition.
+
+files_to_modify:
+  - file: hive/lib/sandcastle-log-redaction.js
+    change: New exported redaction wrapper for Sandcastle stdout, stderr, and file logger text.
+  - file: tests/sandcastle-log-redaction.test.js
+    change: New fixture tests for OPENAI_API_KEY, ANTHROPIC_API_KEY, *_TOKEN, and *_KEY masking.
+
+code_examples:
+  - title: Intended redaction helper shape
+    file: hive/lib/sandcastle-log-redaction.js
+    snippet: |
+      const SECRET_ASSIGNMENT =
+        /\b([A-Z0-9_]*(?:API_KEY|TOKEN|_KEY))=([^\s"'`]+)/g;
+      function redactSandcastleLogLine(line) {
+        return String(line).replace(SECRET_ASSIGNMENT, "$1=[REDACTED]");
+      }
+      function wrapSandcastleLogger(logger) {
+        return (chunk) => logger(redactSandcastleLogLine(chunk));
+      }
+      module.exports = { redactSandcastleLogLine, wrapSandcastleLogger };
+
+design_decisions:
+  - decision: Use `hive/lib/sandcastle-log-redaction.js` as the exact wrapper module name.
+    rationale: The repo uses JS helper modules directly under `hive/lib/`, and the name scopes the helper to Sandcastle without implying global logging ownership.
+  - decision: Preserve variable names while masking values.
+    rationale: Reviewers need to see which configuration fields were present without exposing the secret material.
+
+cross_cutting:
+  - concern: security:plan-audit
+    action: Major pre-exec audit applies because Sandcastle logs can expose API keys before downstream consumers see the stream.
+  - concern: security:impl-audit
+    action: Moderate append audit verifies the implemented regex fixtures and provider-wrapper call site.
+
+risks:
+  - severity: high
+    description: A permissive regex misses wildcard key names and leaves real values in `.sandcastle/logs`.
+    mitigation: Test exact keys plus generic `*_TOKEN` and `*_KEY` fixtures with fake values.
+  - severity: medium
+    description: Wrapper gets added after provider creation and misses early Sandcastle output.
+    mitigation: S2 acceptance must instantiate the provider only through the wrapped logger path.
+
+references:
+  - path: .pHive/epics/sandcastle-adoption-followon/docs/horizontal-plan.md
+    relevant_excerpt: |
+      The logging/redaction layer blocks key leakage before any Sandcastle
+      provider path can ship. It wraps Sandcastle file logger stdout/stderr
+      handling in Hive and adds `.sandcastle/` to the default `.gitignore`.
+  - path: .pHive/epics/sandcastle-adoption-followon/docs/user-decisions-b1.md
+    relevant_excerpt: |
+      Pre-story decisions (R-A, R-B) locked from architect review:
+      dedicated `/hive:sandbox-setup` skill + in-Hive logger redaction wrapper.
+      Both Tier-1 hard prereqs.
+

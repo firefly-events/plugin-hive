@@ -1,0 +1,106 @@
+id: s1-auth-setup-skill
+epic: sandcastle-adoption-followon
+title: Sandbox setup skill for Codex auth mount readiness
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+tier: 1
+slice: S1
+description: |
+  Create a dedicated `/hive:sandbox-setup` skill that prepares Codex auth
+  material for Sandcastle runs without putting auth setup in the `/execute`
+  hot path. The story is a Tier-1 ship gate because Sandcastle Codex runs
+  require a mounted `auth.json`; plain `OPENAI_API_KEY` is not enough for the
+  Codex CLI path captured by the spike.
+
+acceptance_criteria:
+  - "Given skills/hive/skills/sandbox-setup/SKILL.md does not exist, when the story lands, then the skill documents idempotent setup for .sandcastle/codex-config/auth.json"
+  - "Given a host with OPENAI_API_KEY set, when the setup command is run twice, then the second run preserves the existing usable auth.json without duplicating state"
+  - "Given a test container mounts .sandcastle/codex-config at /home/agent/.codex, when codex auth is inspected, then auth.json is present at the expected mount path"
+  - "Given OPENAI_API_KEY is absent, when /hive:sandbox-setup runs, then it fails before container execution with a setup-focused message"
+  - "Given security:plan-audit and security:impl-audit apply, when reviewing this story, then auth material handling is documented as a gated precondition rather than execution-mode logic"
+  - "Given an existing auth.json that fails JSON.parse or is missing a required apiKey field, when /hive:sandbox-setup runs, then it fails loud with a message indicating malformed auth and prompts rotation rather than silently preserving the file"
+  - "Given the setup skill documents key delivery to podman, when reviewers read the example, then the documented form avoids `printenv OPENAI_API_KEY | podman run -i` (shell-history exposure) and instead uses `printf '%s' \"$OPENAI_API_KEY\" | podman run -i ...` or a `--env-file` reading from a 0600 file"
+
+steps:
+  - id: context-discovery
+    name: discovery
+    description: Read the spike auth workaround, kickoff skill conventions, and setup-path references before drafting the setup skill.
+  - id: build-change
+    name: build
+    description: Add `skills/hive/skills/sandbox-setup/SKILL.md` and a concise setup checklist reference for auth mount prerequisites.
+  - id: verify-result
+    name: verify
+    description: Run markdown checks and a dry-run or fixture-backed shell check proving idempotent auth directory handling.
+  - id: audit-notes
+    name: audit
+    description: Record security audit expectations in story evidence; do not run execution-mode Sandcastle routing in this story.
+  - id: commit-ready
+    name: commit
+    description: Commit only the setup skill, setup checklist, and focused tests or fixtures.
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/kickoff/SKILL.md
+      purpose: Existing slash-command skill shape to mirror for user-facing setup instructions.
+    - path: .pHive/spikes/sandcastle/harness.ts
+      purpose: Spike-proven auth config mount and Podman provider example.
+    - path: hive/references/kickoff-protocol.md
+      purpose: Canonical project setup conventions and state directory language.
+
+files_to_modify:
+  - file: skills/hive/skills/sandbox-setup/SKILL.md
+    change: New setup skill for idempotent Codex auth.json provisioning and mount instructions.
+  - file: hive/references/sandcastle-setup-checklist.md
+    change: New short checklist for image, Podman/Docker, auth directory, and verification command.
+
+code_examples:
+  - title: Spike auth mount pattern
+    file: .pHive/spikes/sandcastle/harness.ts
+    snippet: |
+      const podmanSandbox = podman({
+        imageName: "sandcastle:spike",
+        userns: false,
+        mounts: [
+          {
+            hostPath: path.join(__dirname, ".sandcastle/codex-config"),
+            sandboxPath: "/home/agent/.codex",
+          },
+        ],
+      });
+
+design_decisions:
+  - decision: Auth setup is a dedicated `/hive:sandbox-setup` skill.
+    rationale: User decisions lock the setup skill as Tier-1 and keep one-time auth provisioning outside `/execute`.
+  - decision: The mounted auth directory is `.sandcastle/codex-config`.
+    rationale: The spike used this path successfully and it aligns with the S1 `.sandcastle/` gitignore ship gate.
+
+cross_cutting:
+  - concern: security:plan-audit
+    action: Major pre-exec audit applies because this story changes auth material handling and mount semantics.
+  - concern: security:impl-audit
+    action: Moderate append audit applies to verify the implemented setup does not expose auth.json or API keys in logs.
+
+risks:
+  - severity: high
+    description: Codex auth silently fails later if setup accepts a missing or malformed auth.json.
+    mitigation: Fail fast in the setup skill and include a direct container mount verification step.
+  - severity: medium
+    description: Auth setup becomes coupled to execution-mode routing.
+    mitigation: Keep this story limited to setup docs/skill and make S3 consume the precondition.
+
+references:
+  - path: .pHive/epics/sandcastle-adoption-followon/docs/research-brief.md
+    relevant_excerpt: |
+      Sandcastle's `codex()` provider does not auto-write `~/.codex/auth.json`,
+      and Codex CLI 0.129+ ignores plain `OPENAI_API_KEY` env.
+      The failure mode is 401.
+  - path: .pHive/epics/sandcastle-adoption-followon/docs/tpm-sequencing-memo-b2.md
+    relevant_excerpt: |
+      Surface: new `/hive:sandbox-setup` skill.
+      Owns `auth.json` mount semantics, container image expectations,
+      podman-rootless prerequisites.
+      Files touched: none of the existing dispatch paths.
+

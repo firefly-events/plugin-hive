@@ -140,7 +140,7 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
    > **v1 note:** v1 routing handles `workflow`-based catalog entries only. A catalog entry with `skill: <path>` (allowed by catalog schema but unused in v1) is not reached by condition (i) and falls to condition (ii) or (iii). Skill-based routing is a Phase 6 extension point.
 
-5. **Choose execution mode.** Invoke `skills/hive/skills/execute-dispatch/SKILL.md` with env, parsed root `hive.config.yaml`, parsed consumer `${HIVE_STATE_DIR}/hive.config.yaml`, parsed graduation registry, `workflow_name`, and `$ARGUMENTS`; consume `mode_decision`, `mode_reason`, `runner_path`, and `runner_reason`. Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7.
+5. **Choose execution mode.** Invoke `skills/hive/skills/execute-dispatch/SKILL.md` with env, parsed root `hive.config.yaml`, parsed consumer `${HIVE_STATE_DIR}/hive.config.yaml`, parsed graduation registry, `workflow_name`, and `$ARGUMENTS`; consume `mode_decision`, `mode_reason`, `runner_path`, and `runner_reason`. Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d.
 5pre. **Executor cutover routing.** Use only the returned `runner_path` and `runner_reason`; do not re-evaluate the cutover tree here. If `runner_path == hive-dag`, call `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`; otherwise continue on the orchestrator-narrated path. Single dispatch point: this skill call is the only `/execute` policy boundary for executor-vs-orchestrator routing.
 
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
@@ -160,6 +160,14 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
    - `appends_map`: the review-phase sidecar map from step 2b
    - `epic_handle`: the current epic identifier
    - `hive_config`: parsed root `hive.config.yaml` (for `sessions.*` and `model_tiers`)
+
+6d. **Sandcastle execution** (used when `HIVE_EXECUTION_MODE=sandcastle` or root config `execution.mode: sandcastle`). Routes each story into an isolated sandcastle container via the Codex auth-mounted provider.
+   Invoke `skills/hive/skills/execute-mode-sandcastle/SKILL.md` with:
+   - `workflow_path`: the workflow loaded in step 3
+   - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
+   - `appends_map`: the review-phase sidecar map from step 2b
+   - `epic_handle`: the current epic identifier
+   - `hive_config`: parsed root `hive.config.yaml` (for `execution.sandcastle.*` options)
 
 7. **Sequential execution.** Follow **`references/sequential-execution.md`** for the step-by-step workflow within each story, sidecar injection at the review step, episode records, gate checks, and respawn monitoring.
 
