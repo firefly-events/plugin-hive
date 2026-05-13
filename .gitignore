@@ -33,6 +33,8 @@ state/
 !.pHive/epics/structural-refactor-and-gate-lift/**
 !.pHive/epics/task-tracking-adapter-abi/
 !.pHive/epics/task-tracking-adapter-abi/**
+!.pHive/epics/ui-cluster-extract-config-deeper/
+!.pHive/epics/ui-cluster-extract-config-deeper/**
 !.pHive/epics/sandcastle-adoption-followon/
 !.pHive/epics/sandcastle-adoption-followon/**
 !.pHive/episodes/sandcastle-adoption-followon/
@@ -43,6 +45,7 @@ state/
 !.pHive/cycle-state/
 .pHive/cycle-state/*
 !.pHive/cycle-state/meta-improvement-system.yaml
+!.pHive/cycle-state/ui-cluster-extract-config-deeper.yaml
 !.pHive/cycle-state/sandcastle-adoption-followon.yaml
 # Specialist-phase audit trail for the Sandcastle adoption work (security plan-audit
 # verdict + re-audit, performance post-run audit). Tracked as decision provenance for
