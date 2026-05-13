@@ -9,6 +9,55 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-05-12
+
+**Hive 2.0 milestone.** Cut from `dev/hive-2.0`. Bundles CWC 2026 A-group + Epic A (catalog hygiene + 3 mattpocock-aligned borrows) + Epic B (structural refactor + gate-lift) + Epic C (Task-Tracking Adapter ABI) as the 2.0 cut-line, with Epic D (Sandcastle adoption follow-on) and Epic F (UI cluster extract-config deeper) riding parallel.
+
+Brand reframe: from *"director's chair"* (Hive directs swarms) to *"composable substrate, user-directed"* (user directs Hive; Hive provides composable atoms + workflow primitives). See `recommendation.md:239-241`.
+
+### Added
+
+- **Epic A — Catalog hygiene + borrows** (PR #58, 13 stories, W0-W5). W0 boilerplate extraction; W1 doc-template reclassify; mattpocock-aligned borrows (CONTEXT.md, atomic-shape audit, grill-before-plan).
+- **Epic B — Structural refactor + gate-lift** (PR #62, 14 stories, W6). Plan/execute skill split; `paths.gate_mode` knob (`hard` vs `warning`); post-run audit + gate-lift telemetry under `${HIVE_STATE_DIR}/audits/post-run/<run-id>.yaml`; 5-cluster brand/design/polish/visual-qa extract-config (3 of 5 cluster members thinned).
+- **Epic C — Task-Tracking Adapter ABI** (PR #63, 7 stories, W1-W5). Hierarchy-agnostic ABI under `hive/lib/task-tracking-dispatch/`; reference adapters for GitHub Issues + Linear under `hive/adapters/{github,linear}/`; JSON schemas under `hive/references/task-tracking-adapter-abi-schemas/`; migration guide + prose-runbook deprecation; plan-skill Phase D (publish stories to tracker) + execute-skill step 7b (status updates) wired through dispatch; `gate_mode` + prose-runbook-fallback telemetry.
+- **Epic D — Sandcastle adoption follow-on** (PR #66, 12 specs / 7 slices). Sandcastle as 5th `execute` mode; provider wrapper at `hive/lib/sandcastle-provider.js` with preflight semver pin (`>=0.5.10 <0.6.0`); log-line redaction at `hive/lib/sandcastle-log-redaction.js` (argv/env, bearer, JSON-kv forms); V1 hooks reference; `gate-claudecode-sandcastle.mjs` policy gate scanning `.js/.mjs/.cjs/.ts/.mts/.cts` for `sandcastle + claudeCode()` blocked-lane usage; adoption guide at `hive/references/sandcastle-adoption-guide.md`; issue #191 defer marker + warm-pool placeholder; specialist-phase security plan-audit + performance audit trail.
+- **Epic F — UI cluster extract-config deeper** (PR #65, 4 stories). D2 full closure. 6 public reference files under `hive/references/ui-prompts/` (`brand-system`, `design-system`, `polish-audit`, `visual-qa`, `design-review-design-critique`, `design-review-synthesis`); `step_file:` loading support in `skills/design-review/SKILL.md` (precedence `step_file` > `task` per `hive/references/workflow-schema.md:39`); regression-gate documentation at `hive/references/ui-prompt-extraction-verification.md`.
+
+### Changed
+
+- `skills/brand-system/SKILL.md`, `skills/design-system/SKILL.md`, `skills/polish-audit/SKILL.md`, `skills/visual-qa/SKILL.md` — inline ui-designer task bodies replaced with load → cite → inject → spawn invocation envelopes. Net -125 lines (109→72, 89→75, 162→134, 128→82).
+- `hive/workflows/design-review.workflow.yaml` — design-critique + synthesis steps use `step_file:` instead of inline `task:` (5750 → 3698 bytes, -2052).
+- `skills/plan/SKILL.md` — added Phase D (step 19 tracker publish) + step 20 (post-run audit).
+- `skills/execute/SKILL.md` — added step 7b (tracker status update) + expanded step 8 (post-run audit with backend resolution sources).
+
+### Fixed
+
+- CodeRabbit findings on PR #65 (CHANGELOG footer link map; `{artifact_target}` placeholder docs) and PR #66 (`RE_ARGV` case-insensitive `/gi`, `parseSemver` `$` anchor, `.cts` in `SCAN_EXTS`, `userns: false` security-default clarification, `printenv | podman` anti-pattern guidance corrected).
+
+### Notes
+
+- **2.0 cut-line** per `.pHive/epics/hive-composability-audit/docs/recommendation.md:432` = CWC 2026 A-group + Epic A + B + C merged.
+- **Post-2.0 follow-ons** queued: Epic G (`memory-stack-optionalize`, discretionary) and Epic H (`brand-system-2.0-update`, auto-triggered on 2.0 merge).
+- Epic E (`atoshell-reconsider`) remains dormant — trigger requires explicit user reopen.
+
+## [1.3.0] - 2026-05-12
+
+### Added
+
+- 6 new public reference files under `hive/references/ui-prompts/`: `brand-system`, `design-system`, `polish-audit`, `visual-qa`, `design-review-design-critique`, and `design-review-synthesis`.
+- `step_file:` loading support in `skills/design-review/SKILL.md` step-execution loop. Precedence is `step_file` > `task`, per `hive/references/workflow-schema.md:39`.
+- `hive/references/ui-prompt-extraction-verification.md` regression-gate documentation.
+
+### Changed
+
+- `skills/brand-system/SKILL.md`, `skills/design-system/SKILL.md`, `skills/polish-audit/SKILL.md`, and `skills/visual-qa/SKILL.md` inline ui-designer task bodies replaced with load -> cite -> inject -> spawn invocation envelopes. No behavior change; net -125 lines across the four:
+  - `skills/brand-system/SKILL.md`: 109 -> 72 (-37)
+  - `skills/design-system/SKILL.md`: 89 -> 75 (-14)
+  - `skills/polish-audit/SKILL.md`: 162 -> 134 (-28)
+  - `skills/visual-qa/SKILL.md`: 128 -> 82 (-46)
+- `hive/workflows/design-review.workflow.yaml` design-critique and synthesis steps now use `step_file:` instead of inline `task:`. Two specialist steps, accessibility-critique and animations-critique, keep inline `task:` content. Workflow size changed from 5750 -> 3698 bytes (-2052 bytes).
+- `skills/design-review/SKILL.md` gained the `step_file:` loading extension code (+287 bytes).
+
 ## [1.2.2] - 2026-05-07
 
 ### Fixed
@@ -470,7 +519,16 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/firefly-events/plugin-hive/compare/v1.3.0...v2.0.0
+[1.3.0]: https://github.com/firefly-events/plugin-hive/compare/v1.2.2...v1.3.0
+[1.2.2]: https://github.com/firefly-events/plugin-hive/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/firefly-events/plugin-hive/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/firefly-events/plugin-hive/compare/v1.1.4...v1.2.0
+[1.1.4]: https://github.com/firefly-events/plugin-hive/compare/v1.1.3...v1.1.4
+[1.1.3]: https://github.com/firefly-events/plugin-hive/compare/v1.1.2...v1.1.3
+[1.1.2]: https://github.com/firefly-events/plugin-hive/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/firefly-events/plugin-hive/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/firefly-events/plugin-hive/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/firefly-events/plugin-hive/releases/tag/v1.0.0
 [0.9.0]: https://github.com/firefly-events/plugin-hive/releases/tag/v0.9.0

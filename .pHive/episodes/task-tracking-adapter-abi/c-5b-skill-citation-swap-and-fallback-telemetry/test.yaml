@@ -1,0 +1,7 @@
+step_id: test
+story_id: c-5b-skill-citation-swap-and-fallback-telemetry
+epic_id: task-tracking-adapter-abi
+agent: tester
+status: completed
+verdict: 8/8 PASS
+test_results: "23/23 unit tests + fallback telemetry smoke + hard-mode suppression + skill citations + smoke SKIP behavior + no skill-side branching all verified"

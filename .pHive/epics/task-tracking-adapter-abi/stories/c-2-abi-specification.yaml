@@ -1,0 +1,153 @@
+id: c-2-abi-specification
+epic: task-tracking-adapter-abi
+title: Author ABI specification — methods, types, error model, capability declaration
+status: pending
+complexity: high
+methodology: classic
+depends_on: [c-1-form-factor-selection]
+wave: W2
+action_id: C-2
+
+description: |
+  Author the canonical ABI specification for task_tracking.adapter in the
+  form factor selected by c-1. This story produces the contract that c-3
+  (GitHub) and c-4 (Linear) validate against.
+
+  Required content:
+    1. Method signatures (createStory, updateStatus, listOpen, getStory,
+       addComment, linkStories, listEpics if hierarchical) with input/output
+       types in the chosen form factor.
+    2. Error model — distinguishes recoverable (rate-limit, transient network)
+       from terminal (auth-failed, schema-mismatch). Sync exceptions vs async
+       Result tagged-union depending on form factor.
+    3. Capability declaration mechanism — adapters declare hierarchy
+       (flat | hierarchical | mixed), supported labels, supported assignees,
+       supported parent links. Hive-side dispatch reads capabilities before
+       invoking methods that require them.
+    4. ABI versioning policy — semver on the ABI itself; adapters declare
+       which ABI version they implement; Hive checks compatibility at load
+       time.
+    5. Wire format details — for MCP/CLI form factors, JSON schemas for each
+       method's request and response.
+
+  Output: hive/references/task-tracking-adapter-abi.md (canonical spec,
+  supersedes the c-1 sketch which becomes archival).
+
+  This story is high-complexity because the API surface is the entire
+  contract — getting it wrong forces rework across c-3/c-4/c-5/c-6.
+
+acceptance_criteria:
+  - 'hive/references/task-tracking-adapter-abi.md exists with all 6 required methods documented (createStory, updateStatus, listOpen, getStory, addComment, linkStories)'
+  - 'Each method has input type, output type, error variants, and at least one example'
+  - 'Error model section distinguishes recoverable from terminal; documents retry semantics for recoverable errors'
+  - 'Capability declaration mechanism documented with example capability objects for all 3 hierarchy types (flat | hierarchical | mixed)'
+  - 'ABI versioning policy documented — semver scheme, adapter-declared version, Hive-side compatibility check'
+  - 'Wire format JSON schemas published (if MCP/CLI form factor) at hive/references/task-tracking-adapter-abi-schemas/*.json'
+  - 'Spec is self-consistent — no method requires a capability not in the declaration list; no capability is declared but unused'
+  - 'c-1 sketch at hive/references/task-tracking-adapter-abi-sketch.md marked as superseded (frontmatter or top-of-file note)'
+
+steps:
+  - id: research
+    description: |
+      1. Read hive/references/task-tracking-adapter-abi-sketch.md (output of c-1) — the form-factor-specific starting point.
+      2. Read .pHive/spikes/atoshell/atoshell-adapter-runbook.md sections covering method shapes Hive currently expects from adapters.
+      3. Read existing prose-runbook references for Linear + GitHub if present at hive/references/task-tracking-adapter-{linear,github}.md — capture the method vocabulary they document.
+      4. Query context7 for the form-factor-specific reference: if TS, language-level interface patterns; if MCP, Anthropic MCP spec; if CLI, conventional JSON-stdio patterns.
+      5. Sketch error model — survey Linear/GitHub API error categories; map to recoverable vs terminal.
+      6. Sketch capability declaration — flat (atoshell) vs hierarchical (Linear teams/projects) vs mixed (GitHub repos+issues+projects).
+    agent: researcher
+
+  - id: implement
+    description: |
+      1. Write hive/references/task-tracking-adapter-abi.md (~600-1000 lines):
+         - Section: Overview + form-factor reference (cites c-1 decision)
+         - Section: Methods (one per method, with signature + types + errors + example)
+         - Section: Error model (recoverable vs terminal, retry semantics)
+         - Section: Capability declaration (mechanism + example objects)
+         - Section: ABI versioning (semver scheme + Hive compatibility check pseudocode)
+         - Section: Wire format (if MCP/CLI — JSON schemas inline or linked)
+      2. If MCP or CLI form factor: write hive/references/task-tracking-adapter-abi-schemas/{createStory,updateStatus,listOpen,getStory,addComment,linkStories}.json — one per method.
+      3. Update hive/references/task-tracking-adapter-abi-sketch.md with a top-of-file note: `> Superseded by task-tracking-adapter-abi.md (c-2). Kept for historical traceability.`
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Markdown lint the spec file.
+      2. JSON schema validation (if applicable): `ajv compile -s hive/references/task-tracking-adapter-abi-schemas/*.json` exits 0.
+      3. Self-consistency check via grep: every method-required capability appears in the capability declaration section; every declared capability is referenced by ≥1 method.
+      4. ABI versioning compatibility-check pseudocode parses (TS → tsc --noEmit on snippet; CLI → shellcheck).
+      5. Example capability objects parse as YAML/JSON.
+      6. yamllint on this story file.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Opus 4.7 reviewer cross-LLM gate:
+      1. Verify spec coherence — methods do not contradict each other (e.g., createStory output is consumable by addComment input).
+      2. Verify error model handles real-world failure cases: rate limits, expired auth tokens, schema drift, network partition.
+      3. Verify capability declaration is genuinely hierarchy-agnostic — Linear, GitHub, atoshell all expressible without per-tracker hacks.
+      4. Verify versioning policy specifies what counts as a breaking change.
+      5. Stress-test: can a custom adapter author write a new tracker integration using ONLY this spec, without reading Linear/GitHub adapter source?
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: 'Commit on feat/task-tracking-adapter-abi; commit message format `feat(adapter-abi): ABI specification (story c-2-abi-specification, W2)`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, typescript, json, yaml]
+    frameworks: [hive-references]
+  key_files:
+    - path: hive/references/task-tracking-adapter-abi-sketch.md
+      purpose: 'Input — c-1 form-factor sketch becomes the seed for the full spec'
+    - path: hive/references/task-tracking-adapter-abi.md
+      purpose: 'NEW — canonical ABI spec; output of this story'
+    - path: hive/references/task-tracking-adapter-abi-schemas/
+      purpose: 'NEW directory (conditional on form factor) — per-method JSON schemas'
+    - path: hive/references/task-tracking-adapter.md
+      purpose: 'Current prose contract — informs which methods exist in the prose world'
+
+design_decisions:
+  - decision: 'Capability declaration is a separate concern from method signatures'
+    rationale: 'Hive-side dispatch checks capabilities BEFORE invoking; conflating them forces every method call to do capability inspection, which adds latency and obscures the contract.'
+  - decision: 'Error model uses tagged union for recoverable vs terminal, not exceptions-everywhere'
+    rationale: 'Recoverable errors (rate-limit, transient) are routine and should not crash callers; terminal errors (auth-failed, schema-mismatch) are programmer or config problems. Mixing them as exceptions loses that distinction.'
+  - decision: 'ABI is semver-versioned independently of Hive version'
+    rationale: 'Adapters and Hive evolve at different cadences. Pinning the ABI to Hive version forces simultaneous releases. Separate versioning lets adapters declare ABI 1.x and run against any compatible Hive.'
+
+cross_cutting:
+  - concern: observability
+    action: 'Spec documents that adapter invocations are wrapped by Hive-side dispatch (introduced in c-5) which captures telemetry. The ABI itself does not mandate logging.'
+
+risks:
+  - severity: high
+    description: 'Spec inconsistency — method requires a capability not declared, or capability declared but never read'
+    mitigation: 'Self-consistency grep check in test step (AC §7); reviewer stress-tests with hypothetical custom adapter author scenario'
+  - severity: medium
+    description: 'Error model fails to cover a real-world failure category — surfaces during c-3/c-4 implementation'
+    mitigation: 'c-3/c-4 are explicitly chartered to flag friction and revise ABI; c-2 publication is not frozen — minor revisions allowed during validator implementation'
+  - severity: medium
+    description: 'Capability declaration too rigid — atoshell-future or new tracker cannot express its shape cleanly'
+    mitigation: 'Open enum for hierarchy field (flat | hierarchical | mixed | other); capability object allows arbitrary extension keys with adapter-declared semantics'
+
+references:
+  - path: hive/references/task-tracking-adapter-abi-sketch.md
+    relevant_excerpt: |
+      Form-factor decision: <chosen form factor from c-1>. ABI sketch covers
+      createStory + capability declaration stub. Hierarchy-agnostic carry
+      validated against flat/hierarchical/mixed example capability objects.
+      Sketch is intentionally minimal — full method set + error model + versioning
+      are c-2 work.
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      Section 3 — c-2 specifies required methods, type signatures, error model,
+      and capability declaration mechanism for hierarchical-vs-flat trackers.
+      ABI must accommodate Linear (hierarchical via parent issue), GitHub
+      (mixed — issues flat, projects hierarchical), and any future flat
+      tracker (atoshell-if-revisited).

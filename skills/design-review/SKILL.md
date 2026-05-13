@@ -1,46 +1,60 @@
 ---
 name: design-review
-description: Design review ceremony — structured critique of design artifacts by domain specialists. OR gate (design briefs OR brand system). Supports --skip flags for optional participants.
+description: Target-aware UI review ceremony for design artifacts or implementation artifacts. Supports --artifact-target {design|implementation} plus --skip flags for optional participants.
 ---
 
 # Hive Design Review
 
-Run a structured design review ceremony on design artifacts (wireframes, design briefs, brand system).
+Run a structured review ceremony on UI artifacts. By default this critiques design artifacts
+(briefs, wireframes, brand system); with `--artifact-target implementation`, it audits running
+code, screens, and components while preserving the historical ui-audit record path.
 
 **Input:** `$ARGUMENTS` optionally contains:
+- `--artifact-target {design|implementation}` — choose artifact mode; default is `design`
+- `--artifact-target={design|implementation}` — equivalent form
 - `--skip accessibility` — skip the accessibility-specialist critique (step 1)
 - `--skip animations` — skip the animations-specialist critique (step 2)
-- Artifact paths to review (overrides auto-detection from design index)
+- Artifact paths to review (overrides auto-detection)
 
 ## Before Executing Any Skill
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — standard skill preamble (persona / config / memory loading).
 
-## Gate Check (OR condition)
+## Argument Parsing
 
-Check at least one of:
-1. `.pHive/design/index.yaml` — exists
-2. `.pHive/brand/brand-system.yaml` — exists
+Parse `$ARGUMENTS` before gate checks. Default `artifact_target` to `design`.
+Accept `--artifact-target design`, `--artifact-target=design`,
+`--artifact-target implementation`, and `--artifact-target=implementation`.
+Accept only `design` or `implementation`; if any other value is supplied, stop with:
 
-If **both** are missing, display this message and **stop**:
+```
+Usage: /hive:design-review [--artifact-target {design|implementation}] [--skip accessibility] [--skip animations] [artifact paths...]
+```
+
+Preserve the `--skip` parsing pattern exactly: `--skip accessibility` skips step 1,
+`--skip animations` skips step 2, and both flags leave only ui-designer critique plus
+synthesis. Treat all remaining non-flag tokens as explicit artifact paths.
+
+## Gate Check
+
+Use the gate for the selected target.
+
+### Design target
+
+Check for `.pHive/design/index.yaml` OR `.pHive/brand/brand-system.yaml`. If **both**
+are missing, display this message and **stop**:
 
 > Nothing to review yet. Design-review needs at least wireframes (run `/hive:ui-design`) or a brand system (run `/hive:brand-system`) before it can run a critique.
 
-If either file exists, the gate passes. Proceed.
+### Implementation target
+
+Check `.pHive/project-profile.yaml` exists and has a non-empty `tech_stack` key. If either
+check fails, emit the warning below and proceed with sane defaults — do NOT stop. The audit
+runs with reduced fidelity (generic conventions instead of project-specific tech-stack rules):
+
+> Warning: Hive not initialized for this project. Run `/hive:kickoff` for full context. Proceeding with defaults.
 
 See `hive/references/ui-skill-gates.md` for the full gate specification.
-
-## Argument Parsing
-
-Parse `$ARGUMENTS`:
-
-| Argument | Effect |
-|----------|--------|
-| `--skip accessibility` | Step 1 (accessibility-critique) is skipped |
-| `--skip animations` | Step 2 (animations-critique) is skipped |
-| Both `--skip` flags | Only steps 3 (design-critique) and 4 (synthesis) run |
-| *(neither flag)* | All 4 steps run |
-| Explicit file/brief paths | Scope review to those artifacts only |
 
 ## Process
 
@@ -48,89 +62,120 @@ Parse `$ARGUMENTS`:
 
 Read `hive/workflows/design-review.workflow.yaml` in full.
 
-### 2. Collect design artifacts
+### 2. Collect artifacts
 
-Build the artifact list for review:
-- If `$ARGUMENTS` contains explicit paths: use those
-- If `.pHive/design/index.yaml` exists: read it, collect all `brief_path` and `export_paths`
-- If `.pHive/brand/brand-system.yaml` exists: include it
-- If both: include all
+Build `artifact_paths` for the selected target.
 
-### 3. Load specialist personas (for steps that will run)
+For `artifact_target: design`, use explicit paths if provided; otherwise collect
+`.pHive/design/index.yaml` `brief_path` and `export_paths` entries plus
+`.pHive/brand/brand-system.yaml` when present. Set `record_type` to `design-review`,
+`report_dir` to `.pHive/audits/design-review/{timestamp}/`, and verdict vocabulary to
+`approved | needs_revision | needs_redesign`.
+
+For `artifact_target: implementation`, use explicit paths if provided; otherwise collect
+all files under `.pHive/wireframes/`, all files under `.pHive/design/`, and frontend source
+files identified from `.pHive/project-profile.yaml` `tech_stack` when available. Include
+`tech_stack` context when available; otherwise include a generic conventions note. Set
+`record_type` to `ui-audit`, `report_dir` to `.pHive/audits/ui-audit/{timestamp}/`, and
+verdict vocabulary to `passed | needs_optimization | needs_revision`.
+
+Pass the selected target, artifact paths, record type, verdict vocabulary, and any tech-stack
+context as workflow context. The workflow still receives `design_artifacts` for compatibility;
+for implementation mode, treat that key as the implementation artifact list.
+
+### 3. Load specialist personas
 
 Read the full persona files for each step that will execute:
-- If step 1 runs (no `--skip accessibility`): read `hive/agents/accessibility-specialist.md`
-- If step 2 runs (no `--skip animations`): read `hive/agents/animations-specialist.md`
-- Always read: `hive/agents/ui-designer.md` (steps 3 and 4 always run)
+- `hive/agents/accessibility-specialist.md` if step 1 runs (skippable)
+- `hive/agents/animations-specialist.md` if step 2 runs (skippable)
+- `hive/agents/ui-designer.md` always (critique plus synthesis)
 
 ### 4. Execute workflow steps sequentially
 
-Execute `hive/workflows/design-review.workflow.yaml` steps in order. For each step that is NOT skipped:
-
-**a.** Read the agent persona referenced by the step's `agent` field (already loaded in step 3 above).
-
-**b.** Spawn a subagent with:
-- The full agent persona as system context
-- The step's `task` description
-- The `design_artifacts` context
-- Any `inputs` from previous steps (pass as empty/absent for skipped steps)
-
-**c.** Capture the step output.
-
-**d.** Pass captured outputs to subsequent steps as specified in the workflow `inputs`.
+Execute `hive/workflows/design-review.workflow.yaml` steps in order. For each step that is
+NOT skipped, resolve the step's primary procedure before spawning its subagent:
+if `step_file` is set, read `<repo>/<step_file>` and use that loaded content; otherwise
+use the inline step `task`. `step_file` has precedence over `task`, matching
+`hive/references/workflow-schema.md`. Spawn the subagent with the full persona, the
+resolved primary procedure, `artifact_target`, target-specific `artifact_paths` passed as
+`design_artifacts`, target-specific verdict vocabulary, implementation `tech_stack`
+context when available, and prior step outputs. Capture each output and pass it to
+subsequent steps as specified in workflow `inputs`.
 
 Announce which steps are running before execution:
+
 ```
-Design Review — Participants:
+Design Review — Target: {design | implementation}
+Participants:
   Step 1: accessibility-specialist [running | SKIPPED (--skip accessibility)]
   Step 2: animations-specialist    [running | SKIPPED (--skip animations)]
   Step 3: ui-designer (critique)   [running]
   Step 4: ui-designer (synthesis)  [running]
 ```
 
-### 5. Write review record
+### 5. Synthesize target-aware verdict
 
-Generate a timestamp: `{YYYY-MM-DD}T{HHMM}`.
+The final synthesis must:
+- Merge findings across domains, deduplicating overlapping issues
+- Rank by severity: blocking → significant → cosmetic
+- Distinguish findings that require design decisions from findings that require code fixes
+- Use design wording for design artifacts and implementation wording for implementation artifacts
+- Emit one verdict from the target-specific verdict vocabulary
 
-Write the synthesis output (from step 4) to:
+Use this shared report structure:
+
 ```
-.pHive/audits/design-review/{timestamp}/report.md
+## Work Report: Design Review — {timestamp}
+## Findings
+- `{file-or-artifact}:{section-or-line}` — {finding} [severity: blocking | significant | cosmetic] [domain: accessibility | motion | design]
+## Changes Made
+(Leave empty — this is an audit/review, not a fix pass.)
+## Remaining Issues
+- Findings requiring human design decisions, code fixes, or follow-up validation
+## Summary
+One-paragraph assessment covering overall UI health, top issues, and readiness.
+## Verdict
+{target-specific verdict}
 ```
 
-### 6. Display structured verdict
+### 6. Write report
 
+Generate a timestamp with second-level precision: `{YYYY-MM-DD}T{HHMMSS}` (minute-level granularity risks collision when two audits run in the same minute).
+
+Write the synthesis output to `.pHive/audits/design-review/{timestamp}/report.md` for
+`artifact_target: design`, or `.pHive/audits/ui-audit/{timestamp}/report.md` for
+`artifact_target: implementation`.
+
+### 7. Write latest.yaml pointer (on success only)
+
+Only after the report is successfully written, write:
+
+```yaml
+completed_at: "{ISO 8601}"
+report_path: ".pHive/audits/{design-review|ui-audit}/{timestamp}/report.md"
+artifact_target: "{design|implementation}"
+findings_count: {N}
+verdict: "{target-specific verdict}"
 ```
-## Design Review Results
 
-### Participants
-{list of specialists who ran, with "SKIPPED" for those that didn't}
+Write the pointer to:
+- `.pHive/audits/design-review/latest.yaml` for `artifact_target: design`
+- `.pHive/audits/ui-audit/latest.yaml` for `artifact_target: implementation`
 
-### Findings Summary
-{domain critique highlights — 3-5 key findings per domain that ran}
+**Do NOT write latest.yaml if any step fails.** An incomplete implementation audit must not unblock the polish-audit gate.
 
-### Verdict: {approved | needs_revision | needs_redesign}
+### 8. Display results
 
-#### Blocking
-{critical findings that must be addressed before implementation}
-
-#### Significant
-{findings that degrade UX but don't block implementation}
-
-#### Cosmetic
-{minor polish items}
-
-### Recommended Next Steps
-{1-3 concrete next actions based on verdict}
-
----
-Full report: .pHive/audits/design-review/{timestamp}/report.md
-```
+Display target, report path, verdict, total findings by severity, specialist finding counts
+or skipped status, and a target-aware next action. For implementation target, the next action
+may be `/hive:polish-audit` because the preserved `.pHive/audits/ui-audit/latest.yaml`
+pointer satisfies its gate.
 
 ## Key References
 
-- `hive/workflows/design-review.workflow.yaml` — the ceremony workflow this skill orchestrates
+- `hive/workflows/design-review.workflow.yaml` — shared review workflow
 - `hive/agents/accessibility-specialist.md` — step 1 persona
 - `hive/agents/animations-specialist.md` — step 2 persona
 - `hive/agents/ui-designer.md` — steps 3 and 4 persona
-- `hive/references/ui-skill-gates.md` — gate specification (OR condition for design-review)
+- `hive/references/ui-skill-gates.md` — target-aware gate specification
 - `skills/review/SKILL.md` — reference pattern for skills that orchestrate workflows

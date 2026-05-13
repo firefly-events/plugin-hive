@@ -1,0 +1,166 @@
+id: a-36-post-run-audit-telemetry
+epic: structural-refactor-and-gate-lift
+title: Post-run audit check warns on nonsensical default state; telemetry feeds gate_mode flip decision
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [a-33-plan-gate-lift-and-gate-mode-knob, a-35-execute-epic-create-on-fly-and-gate-lift]
+wave: W6
+action_id: A-36
+
+description: |
+  Stories a-32 / a-33 / a-34 / a-35 each emit telemetry events when
+  auto-resolve or gate-lift fires:
+    - methodology_resolution {source, value}
+    - gate_lift_fired {source, decision}
+    - backend_resolution {field, source, value}
+    - epic_create_on_fly {epic_id, source}
+
+  This story closes the loop. Two pieces:
+
+  1. Post-run audit check (synchronous): after /plan or /execute completes,
+     scan the run for nonsensical defaults and emit a CONSOLIDATED warning.
+     Examples of nonsensical defaults:
+       - methodology=tdd auto-detected but no tests actually written by the run
+       - epic_create_on_fly fired AND no story spec was produced
+       - all 4 backend fields defaulted (signals user hasn't configured anything)
+       - gate_lift_fired AND output is structurally empty
+
+  2. Telemetry aggregation (async/cumulative): events written to
+     .pHive/metrics/events/ are read by /meta-optimize or a new
+     /gate-mode-audit skill that aggregates across runs and recommends
+     whether paths.gate_mode default should flip from warning → hard.
+
+  Aggregation thresholds (initial guesses, tunable via telemetry):
+    - >20% of runs see gate_lift fire AND produce nonsensical output → recommend flip to hard
+    - >50% of runs default ALL backend fields → recommend ship config template
+    - <5% of runs see gate_lift fire → consider keeping warning safely
+
+  Depends on a-33 + a-35 because they emit the gate_lift telemetry this
+  story consumes.
+
+acceptance_criteria:
+  - "Post-run audit step added to /plan and /execute final phases"
+  - "Audit scans the run for nonsensical defaults (criteria listed in description) and emits a CONSOLIDATED warning summarizing all defaulted fields"
+  - "Audit warning includes per-field source + override path (run /kickoff, set hive.config.yaml field X)"
+  - "Telemetry events from a-32/a-33/a-34/a-35 flow into .pHive/metrics/events/ (existing infrastructure)"
+  - "Aggregation reader: a small script (hive/scripts/gate-mode-audit.mjs) or extension to /meta-optimize that reads events + outputs recommendation"
+  - "Aggregation recommendation written to .pHive/meta-team/gate-mode-recommendation.md when thresholds cross"
+  - "No false positives: legitimate runs (user has config) don't trigger audit warnings"
+  - "Telemetry shape documented at hive/references/gate-lift-telemetry.md"
+
+steps:
+  - id: research
+    description: |
+      1. Read existing telemetry infrastructure: .pHive/metrics/events/ format + stop hook + any existing readers.
+      2. Read sibling stories a-32/a-33/a-34/a-35 to confirm event shapes they emit.
+      3. Read /meta-optimize skill if relevant — could be the reader.
+      4. Define nonsensical-default heuristics precisely (avoid false positives).
+      5. Define aggregation thresholds (initial guesses).
+    agent: researcher
+
+  - id: implement
+    description: |
+      Post-run audit:
+        - Add a final step to skills/plan/SKILL.md and skills/execute/SKILL.md:
+          "Run post-run audit: scan telemetry events from this run; emit
+          consolidated warning if any nonsensical defaults detected; record
+          audit result to .pHive/audits/post-run/{run-id}.yaml."
+
+      Telemetry aggregation:
+        - Create hive/scripts/gate-mode-audit.mjs:
+          - Read .pHive/metrics/events/*.jsonl
+          - Aggregate gate_lift_fired + backend_resolution + epic_create_on_fly + methodology_resolution
+          - Apply thresholds; emit recommendation if crossed
+          - Write recommendation to .pHive/meta-team/gate-mode-recommendation.md
+        - Wire into /meta-optimize as an additional proposal source (optional; can be standalone).
+
+      Documentation:
+        - Create hive/references/gate-lift-telemetry.md documenting event shapes + thresholds.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Run /plan on fresh repo (defaults fire) → verify post-run audit emits warning.
+      2. Run /plan on populated repo (no defaults fire) → verify no audit warning.
+      3. Run /execute with ad-hoc epic → verify audit catches "nonsensical: ad-hoc epic + no story spec produced" if applicable.
+      4. Run gate-mode-audit.mjs against a fixture event log → verify recommendation logic.
+      5. Verify telemetry shape matches documented schema.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      1. Verify nonsensical-default heuristics don't false-positive on legitimate sparse runs.
+      2. Verify audit consolidates per-field warnings into one message.
+      3. Verify aggregation thresholds are reasonable (not too sensitive, not too lax).
+      4. Verify telemetry documentation is complete.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(gate-lift): post-run audit + telemetry aggregation (story a-36-post-run-audit-telemetry, W6)`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, yaml, javascript]
+    frameworks: [hive-orchestrator, hive-metrics, hive-meta-team]
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: 'Source — final step: post-run audit'
+    - path: skills/execute/SKILL.md
+      purpose: 'Source — final step: post-run audit'
+    - path: .pHive/metrics/events/
+      purpose: Existing telemetry infrastructure — events written here
+    - path: hive/scripts/gate-mode-audit.mjs
+      purpose: NEW — aggregation reader + recommendation emitter
+    - path: hive/references/gate-lift-telemetry.md
+      purpose: NEW — telemetry event shapes + threshold documentation
+    - path: .pHive/audits/post-run/
+      purpose: NEW directory — per-run audit results
+
+design_decisions:
+  - decision: Consolidated warning per run, not per field
+    rationale: Multiple per-field warnings produce noise; one summary listing all defaulted fields is actionable.
+  - decision: Aggregation is async (separate script) not inline in /plan or /execute
+    rationale: Per-run cost stays low; aggregation runs nightly (via meta-team or cron) or on-demand.
+  - decision: Recommendation is advisory, not enforced
+    rationale: gate_mode default flip is a major-version decision; telemetry justifies it but a human approves.
+
+cross_cutting:
+  - concern: observability
+    action: "Telemetry is the substrate; per-run audit is consumer; aggregation is decision-input. All three layers documented."
+  - concern: backward-compatibility
+    action: "No behavior changes for runs that don't trigger auto-resolve or gate-lift — audit is silent."
+
+risks:
+  - severity: medium
+    description: Nonsensical-default heuristics may false-positive (e.g., legitimate sparse run flagged).
+    mitigation: Heuristics are conservative; test step explicitly verifies no false-positives on legitimate runs; warning is informational, not blocking.
+  - severity: medium
+    description: Aggregation thresholds are initial guesses; may need tuning.
+    mitigation: Threshold values documented + parameterized in script; future telemetry tuning is a small adjustment.
+  - severity: low
+    description: Stop-hook + metrics infrastructure may not capture all telemetry events.
+    mitigation: Test step verifies event flow end-to-end; fix any capture gaps as found.
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-36: Post-run audit check warns on nonsensical default state;
+      telemetry feeds gate_mode flip decision. Closes D4 Position A
+      mitigation: "telemetry-validate over one release cycle, flip
+      default to hard if miscoordination at scale."
+  - path: skills/execute/SKILL.md
+    relevant_excerpt: |
+      Advisory token-cap pattern (lines 208-217) — same shape this story
+      extends: emit warning, do NOT hard-block, telemetry captures signal.
+  - path: .pHive/metrics/events/
+    relevant_excerpt: |
+      Existing telemetry infrastructure — JSONL events written by stop
+      hook and skill emissions. Consumers: /meta-optimize, /ctx-stats,
+      and now post-run audit + gate-mode-audit.mjs.

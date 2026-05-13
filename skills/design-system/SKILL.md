@@ -37,68 +37,11 @@ Read `hive/agents/ui-designer.md` in full.
 
 ### 3. Spawn ui-designer for token generation
 
-Spawn a subagent with the full ui-designer persona and this task:
+Read and cite `hive/references/ui-prompts/design-system.md` as the canonical ui-designer task prompt.
 
-```
-Read .pHive/brand/brand-system.yaml.
+Inject the following placeholder values before passing to the subagent: none.
 
-Convert it to W3C Design Token format JSON and write to .pHive/brand/tokens.json.
-
-Use this structure (extend with all colors, all spacing values, all type scale entries):
-
-{
-  "color": {
-    "primary": { "value": "{brand-system colors.primary.hex}", "type": "color" },
-    "secondary": { "value": "{brand-system colors.secondary.hex}", "type": "color" },
-    "neutral": { "value": "{brand-system colors.neutral.hex}", "type": "color" },
-    "surface": { "value": "{brand-system colors.surface.hex}", "type": "color" }
-  },
-  "typography": {
-    "font-heading": { "value": "{brand-system typography.heading_font}", "type": "fontFamily" },
-    "font-body": { "value": "{brand-system typography.body_font}", "type": "fontFamily" },
-    "scale-xs": { "value": "{scale[0]}px", "type": "dimension" },
-    "scale-sm": { "value": "{scale[1]}px", "type": "dimension" },
-    "scale-base": { "value": "{scale[2]}px", "type": "dimension" },
-    "scale-lg": { "value": "{scale[3]}px", "type": "dimension" },
-    "scale-xl": { "value": "{scale[4]}px", "type": "dimension" },
-    "scale-2xl": { "value": "{scale[5]}px", "type": "dimension" },
-    "scale-3xl": { "value": "{scale[6]}px", "type": "dimension" }
-  },
-  "spacing": {
-    "1": { "value": "{spacing.scale[0]}px", "type": "dimension" },
-    "2": { "value": "{spacing.scale[1]}px", "type": "dimension" },
-    "3": { "value": "{spacing.scale[2]}px", "type": "dimension" },
-    "4": { "value": "{spacing.scale[3]}px", "type": "dimension" },
-    "6": { "value": "{spacing.scale[4]}px", "type": "dimension" },
-    "8": { "value": "{spacing.scale[5]}px", "type": "dimension" },
-    "12": { "value": "{spacing.scale[6]}px", "type": "dimension" },
-    "16": { "value": "{spacing.scale[7]}px", "type": "dimension" }
-  },
-  "border-radius": {
-    "small": { "value": "{radius.small}px", "type": "dimension" },
-    "medium": { "value": "{radius.medium}px", "type": "dimension" },
-    "large": { "value": "{radius.large}px", "type": "dimension" },
-    "full": { "value": "{radius.full}px", "type": "dimension" }
-  }
-}
-
-Rules:
-- Use the actual values from brand-system.yaml (do not use placeholders in the output file)
-- Valid JSON only — no comments, no trailing commas
-- Use W3C Design Token spec: each token has "value" and "type" fields
-- All dimension values must include "px" unit
-- Include every entry from the brand system — do not omit any color or spacing step
-
-After writing tokens.json, produce a visual HTML preview at .pHive/brand/tokens-preview.html showing the tokens IN USE (not as raw JSON):
-
-- Color tokens: swatches with token name + hex value + usage context
-- Typography tokens: type scale demonstration rendering each scale-* token at its size
-- Spacing tokens: visual row of boxes sized to each spacing value
-- Border radius tokens: rounded corner demonstration
-- Raw tokens.json embedded at the bottom in a collapsible <details> block for developers to copy
-
-Read hive/references/html-preview-format.md for the HTML structure requirements, styling guidelines, and self-contained file rules (Google Fonts CDN, no external stylesheets, no JavaScript dependencies).
-```
+Spawn a subagent with the full ui-designer persona (`hive/agents/ui-designer.md`) and the rendered prompt body.
 
 ### 4. Report output
 

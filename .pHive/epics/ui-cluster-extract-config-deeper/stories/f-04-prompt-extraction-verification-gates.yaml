@@ -1,0 +1,205 @@
+id: f-04-prompt-extraction-verification-gates
+epic: ui-cluster-extract-config-deeper
+title: "Codify grep gates + aggregate line-delta verification"
+status: pending
+complexity: low
+methodology: classic
+depends_on:
+  - f-02-prompt-convention-polish-visual-qa
+  - f-03-workflow-prompt-extraction-design-review
+tier: 2
+
+description: |
+  Codify the verification plan as enforceable acceptance criteria. Document
+  grep commands that future Hive contributors can run to catch re-inlined
+  ui-designer prompts. Record aggregate SKILL line-delta from S1+S2 reductions.
+  Bump plugin version per cross-cutting versioning concern — this story
+  carries the LAST commit on the epic branch so the version reflects the full
+  landed state.
+
+  This slice does NOT ship new behavior. It ships:
+  - A documented set of grep gates (regression artifact for future contributors)
+  - An aggregate line-delta record across S1+S2
+  - The version bump commit + CHANGELOG entry for the epic
+  - Final cross-cutting documentation updates if any drift surfaced during
+    S1/S2/S3 implementation
+
+acceptance_criteria:
+  - "Given all four direct SKILLs are extracted, when running `rg \"Task for ui-designer|Spawn a subagent with the full ui-designer persona\" skills/{brand-system,design-system,polish-audit,visual-qa}/SKILL.md`, then the grep returns ZERO matches (no inline ui-designer task blocks remain in direct SKILLs)."
+  - "Given direct SKILLs cite prompt files, when running `rg \"hive/references/ui-prompts/\" skills/{brand-system,design-system,polish-audit,visual-qa}/SKILL.md`, then the grep returns exactly 4 matches (one citation per direct SKILL)."
+  - "Given design-review workflow extraction (Choice A), when running `rg \"hive/references/ui-prompts/design-review-\" hive/workflows/design-review.workflow.yaml`, then the grep returns exactly 2 matches (one per extracted ui-designer step)."
+  - "Given step_file is used for ui-designer steps, when running `rg \"step_file: hive/references/ui-prompts/\" hive/workflows/design-review.workflow.yaml`, then the grep returns exactly 2 matches."
+  - "Given specialist steps still use inline task, when running `rg \"task: >\" hive/workflows/design-review.workflow.yaml`, then the grep returns exactly 2 matches (accessibility-critique and animations-critique only)."
+  - "Given S1+S2 SKILL line reductions, when summed, then the story note records the aggregate negative line delta (target roughly -150 to -200 lines total across the four direct SKILLs, refined at implementation)."
+  - "Given six new prompt files, when running `test -f` on each of hive/references/ui-prompts/{brand-system,design-system,polish-audit,visual-qa,design-review-design-critique,design-review-synthesis}.md, then all six exist."
+  - "Given the epic ships new public reference files + SKILL behavior change, when the epic branch is ready to merge, then .claude-plugin/plugin.json, .claude-plugin/marketplace.json, and the README version badge are bumped to the next minor version, and CHANGELOG.md has a dated section listing each consumer-visible change."
+  - "Given documentation drift, when S1/S2/S3 implementations surfaced any docs referencing the old inline-prompt locations, then those docs (e.g. hive/agents/ui-designer.md, hive/references/workflow-schema.md examples) are updated to the new convention or confirmed unaffected."
+
+steps:
+  - id: research
+    description: |
+      1. Re-run all S1/S2/S3 acceptance grep gates locally; confirm each
+         passes before codifying.
+      2. Diff SKILL line counts: pre-f-01 vs post-f-02 for each of the four
+         direct SKILLs. Compute aggregate delta.
+      3. Survey for docs that reference the old inline prompt locations —
+         hive/agents/ui-designer.md, hive/references/workflow-schema.md
+         examples, README, GUIDE.md, any quickstart. List any drift to fix.
+      4. Determine semver level — minor (additive reference files + SKILL
+         capability extension; no breaking change).
+    agent: researcher
+
+  - id: implement
+    description: |
+      1. Create or update a verification-gates section in hive/references/
+         (e.g. hive/references/ui-prompt-extraction-verification.md or as a
+         new section in an existing reference) that documents the four grep
+         gates above for future contributors to grep against.
+      2. Update any docs identified in research step (likely small or zero).
+      3. Bump .claude-plugin/plugin.json version (minor).
+      4. Bump .claude-plugin/marketplace.json version to match.
+      5. Update README version badge.
+      6. Add a new dated section to CHANGELOG.md listing each consumer-visible
+         change of this epic: 6 new reference files under
+         hive/references/ui-prompts/; step_file: support in
+         skills/design-review/SKILL.md; thinner direct UI cluster SKILLs.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Run all gates as one regression sweep:
+        # Direct SKILL gates
+        rg "Task for ui-designer|Spawn a subagent with the full ui-designer persona" \
+          skills/{brand-system,design-system,polish-audit,visual-qa}/SKILL.md
+        # expect: 0 matches
+        rg "hive/references/ui-prompts/" \
+          skills/{brand-system,design-system,polish-audit,visual-qa}/SKILL.md
+        # expect: 4 matches
+        # Workflow gates (Choice A)
+        rg "hive/references/ui-prompts/design-review-" \
+          hive/workflows/design-review.workflow.yaml
+        # expect: 2 matches
+        rg "step_file: hive/references/ui-prompts/" \
+          hive/workflows/design-review.workflow.yaml
+        # expect: 2 matches
+        rg "task: >" hive/workflows/design-review.workflow.yaml
+        # expect: 2 matches (specialist steps only)
+        # Prompt file existence
+        for f in brand-system design-system polish-audit visual-qa \
+                 design-review-design-critique design-review-synthesis; do
+          test -f "hive/references/ui-prompts/$f.md"
+        done
+        # all 6 exit 0
+      Confirm version files all match:
+        jq -r .version .claude-plugin/plugin.json
+        jq -r .version .claude-plugin/marketplace.json
+        rg "version-" README.md
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      1. Verify aggregate line-delta math; confirm it's recorded in story
+         notes or in a separate retro file.
+      2. Verify CHANGELOG entry mentions every consumer-visible change (6
+         reference files, SKILL behavior change, new step_file: capability
+         in design-review).
+      3. Confirm bump commit is the LAST commit on the epic branch (per
+         versioning cross-cutting concern). If S1/S2/S3 added later commits,
+         re-bump or rebase before merge.
+      4. Confirm no inline ui-designer task content survives anywhere in the
+         four direct SKILLs or the two extracted workflow steps.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: "Final commit on the epic branch. This is the version-bump commit per the versioning cross-cutting concern. Push to feature branch."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: ripgrep + bash + jq verification
+  key_files:
+    - path: .claude-plugin/plugin.json
+      purpose: "Plugin version — minor bump for additive features (6 new reference files + SKILL capability)."
+    - path: .claude-plugin/marketplace.json
+      purpose: "Must match plugin.json version."
+    - path: README.md
+      purpose: "Version badge must match plugin.json."
+    - path: CHANGELOG.md
+      purpose: "New dated section listing every consumer-visible change in this epic."
+    - path: hive/workflows/design-review.workflow.yaml
+      purpose: "Verification target — has 4 steps; 2 should now use step_file:, 2 stay inline task:."
+    - path: skills/brand-system/SKILL.md
+      purpose: "Verification target — should cite hive/references/ui-prompts/brand-system.md and contain no inline ui-designer task block."
+    - path: skills/design-system/SKILL.md
+      purpose: "Verification target — same as brand-system."
+    - path: skills/polish-audit/SKILL.md
+      purpose: "Verification target — same pattern."
+    - path: skills/visual-qa/SKILL.md
+      purpose: "Verification target — same pattern."
+
+files_to_modify:
+  - file: .claude-plugin/plugin.json
+    change: "Bump version (minor)."
+  - file: .claude-plugin/marketplace.json
+    change: "Bump version to match plugin.json."
+  - file: README.md
+    change: "Update version badge."
+  - file: CHANGELOG.md
+    change: "Add new dated section with consumer-visible changes (6 new reference files, design-review step_file: support, thinner UI cluster SKILLs)."
+  - file: hive/references/ui-prompt-extraction-verification.md
+    change: "OPTIONAL CREATE — document the four grep gates as a regression-catching reference. Story author may instead inline the gates in CHANGELOG; reviewer accepts either form."
+
+code_examples:
+  - title: "Regression-catching grep gate template"
+    file: hive/references/ui-prompt-extraction-verification.md
+    snippet: |
+      # Run periodically or in CI to catch re-inlined ui-designer prompts.
+      # Each command's expected output is documented inline.
+      rg "Task for ui-designer|Spawn a subagent" \
+        skills/{brand-system,design-system,polish-audit,visual-qa}/SKILL.md
+      # expect: 0 lines
+      rg "hive/references/ui-prompts/" \
+        skills/{brand-system,design-system,polish-audit,visual-qa}/SKILL.md
+      # expect: 4 lines
+
+design_decisions:
+  - decision: "Dedicated verification story (not folded into S2 or S3)"
+    rationale: "Future Hive contributors will grep for 'have we already verified the UI cluster extraction?' — a dedicated story is the single grep target. Also the natural place for the line-delta aggregate that spans S1+S2."
+  - decision: "Bump commit is the LAST commit on the epic branch"
+    rationale: "Cross-cutting versioning concern: version reflects the full landed state, not a partial. f-04 owns this commit."
+
+cross_cutting:
+  - concern: documentation
+    action: "Sweep for any docs referencing the old inline-prompt locations and update them. Likely small surface; research step quantifies."
+  - concern: versioning
+    action: "Bump plugin.json + marketplace.json + README badge to the next minor version. Add CHANGELOG section listing consumer-visible changes: 6 new public reference files under hive/references/ui-prompts/; step_file: loading support in skills/design-review/SKILL.md; reduced bodies of brand-system, design-system, polish-audit, visual-qa SKILLs."
+
+risks:
+  - severity: low
+    description: "Grep gate over-matches (catches accidental future re-use of the same path pattern)."
+    mitigation: "Gates are scoped to specific SKILL files and the specific workflow file. Each gate documents its expected count."
+  - severity: low
+    description: "Bump commit lands before all S1/S2/S3 commits, leaving version reflecting partial state."
+    mitigation: "Review step verifies bump commit is LAST on the epic branch before merge; rebase if needed."
+  - severity: low
+    description: "Line-delta record drifts from reality if SKILL files are touched after S1/S2 by an unrelated change."
+    mitigation: "Capture pre/post counts at S1 and S2 completion (in their integrate-step notes); S4 sums those, not the current head."
+
+references:
+  - path: .pHive/epics/ui-cluster-extract-config-deeper/docs/vertical-plan.md
+    relevant_excerpt: |
+      Slice S4: Verification + Grep Gates (Tier 2)
+      Working state: S1, S2, and S3 are all inspectably complete; future
+      contributors can run the documented grep gates to catch re-inlined
+      ui-designer prompts. depends_on: S2, S3.
+  - path: .pHive/cross-cutting-concerns.yaml
+    relevant_excerpt: |
+      versioning: Epic adds, removes, or modifies any consumer-visible
+      surface — including public skills, workflow step files referenced by
+      public skills, public config keys, README content. Bump commit is the
+      LAST commit on the epic branch.

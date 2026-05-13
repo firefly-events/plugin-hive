@@ -1,5 +1,7 @@
 # Task Tracking Adapter — Full Lifecycle
 
+> **DEPRECATED:** The prose-runbook adapter pattern is superseded by the executable adapter ABI in [`task-tracking-adapter-abi.md`](task-tracking-adapter-abi.md). New integrations should implement the ABI directly. See [`task-tracking-adapter-migration.md`](task-tracking-adapter-migration.md) for the migration path. **Removal target:** Hive 2.1 (the release after 2.0).
+
 Linear is the project board for Hive workflows. Every ceremony phase interacts with Linear: planning creates tickets, execution claims them, testing transitions them, and push auto-closes them.
 
 **Tool:** `linearis` CLI | **Team:** ACME | **Project:** my-project

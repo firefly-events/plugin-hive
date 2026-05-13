@@ -21,11 +21,11 @@ Check `.pHive/audits/ui-audit/latest.yaml`:
 
 If the check fails, display this message and **stop**:
 
-> No ui-audit found. Run `/hive:ui-audit` first — polish-audit builds on audit findings to identify refinement opportunities.
+> No implementation audit found. Run `/hive:design-review --artifact-target implementation` first — polish-audit builds on audit findings to identify refinement opportunities. Legacy references to `/hive:ui-audit` mean this implementation-target review.
 
 See `hive/references/ui-skill-gates.md` for the full gate specification.
 
-Note: Even a clean ui-audit (verdict: passed) justifies a polish pass. The gate checks existence, not verdict.
+Note: Even a clean implementation audit (verdict: passed) justifies a polish pass. The gate checks existence, not verdict.
 
 ## Process
 
@@ -80,39 +80,11 @@ Capture the animation opportunities output.
 
 ### 5. Step 2 — UI designer synthesis
 
-Spawn a subagent with the full ui-designer persona and this task:
+Read and cite `hive/references/ui-prompts/polish-audit.md` as the canonical ui-designer task prompt.
 
-```
-Synthesize animation and polish opportunities into a polish report.
+Inject the following placeholder values before passing to the subagent: `{animation_opportunities}`, `{prior_verdict}`.
 
-Animation opportunities from animations-specialist:
-{animation_opportunities}
-
-Prior ui-audit verdict (for context): {prior_verdict}
-
-Produce a polish report using the Work Report format. Add a priority matrix:
-
-## Work Report: Polish Audit — {timestamp}
-
-## Findings
-- `{file}:{line}` — {opportunity} [effort: low | medium | high] [impact: high | medium | low]
-
-## Changes Made
-(Leave empty — this is a discovery pass, not a fix pass.)
-
-## Remaining Issues
-- Opportunities that require design decisions or brand direction before implementation
-- Anything that conflicts with existing UX patterns and needs human sign-off
-
-## Summary
-One-paragraph assessment: overall polish opportunity, highest-ROI items to tackle first.
-
-## Priority Matrix
-| Opportunity | File | Effort | Impact | Recommendation |
-|-------------|------|--------|--------|----------------|
-| ... | ... | low | high | Do immediately |
-| ... | ... | high | low | Defer |
-```
+Spawn a subagent with the full ui-designer persona (`hive/agents/ui-designer.md`) and the rendered prompt body.
 
 Capture the synthesis output.
 

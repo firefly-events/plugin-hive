@@ -1,0 +1,126 @@
+epic: sandcastle-adoption-followon
+phase: executed
+created: "2026-05-12T07:00:00Z"
+planning_completed: "2026-05-12T09:00:00Z"
+execution_completed: "2026-05-12T13:30:00Z"
+
+execution_summary:
+  total_stories: 12
+  completed: 12
+  commits_on_branch: 13   # 12 story commits + 1 incidental episode-record commit (572c100)
+  waves:
+    W0_serialized:
+      - { story: s1-gitignore-template, commit: ce1f7ba }
+      - { story: s1-redaction-wrapper, commit: 0f37723, sidecar: security-reviewer (passed) }
+      - { story: s1-auth-setup-skill, commit: 5ee8583, sidecar: security-reviewer (passed) }
+    W1_serialized_file_conflict:
+      - { story: s2-provider-wrap, commit: 785b539, sidecar: security-reviewer (passed) }
+      - { story: s2-hooks-minimal, commit: 83d559c }
+    W2_parallel:
+      - { story: s7-warm-pool-placeholder, commit: 2434d4f }
+      - { story: s3-dispatch-routing, commit: ece1169 }
+      - { story: s3-execution-mode-skill, commit: 072e678 }
+    W3_parallel:
+      - { story: s4-merge-validation, commit: d4df339, outcome: class-B-blocked-on-prereq }
+      - { story: s6-issue-191-defer-marker, commit: 7d7814f }
+    W4_parallel:
+      - { story: s5-adoption-guide, commit: d063915 }
+      - { story: s5-hooks-reference, commit: 3b67917 }
+  follow_ups:
+    - "s4-merge-validation Class-A re-run requires: OPENAI_API_KEY, @ai-hero/sandcastle install, podman daemon, .sandcastle/codex-config/auth.json. Re-run captures parallel-run cold-start baseline."
+    - "Cleanup of issue-191 audit gate after upstream resolution — separate future status-flip work item per s6 spec."
+    - "Hyphenated header names (X-API-KEY style) not caught by redaction \\b regex — documented in adoption guide V1 gaps. Tighten if leaked in practice."
+spec_count: 12
+slice_count: 7
+tier_rollup: { tier_1: 3, tier_2: 5, tier_3: 4 }
+placement: post-2.0
+integration_branch: dev/hive-2.0
+branch: feat/sandcastle-adoption-followon
+
+escalations:
+  - trigger: security:plan-audit
+    placement: pre-exec
+    severity: major
+    stories:
+      - s1-auth-setup-skill
+      - s1-redaction-wrapper
+      - s1-gitignore-template
+      - s2-provider-wrap
+    reason: "architect: auth model change (auth.json mount semantics) + active key-leak surface (sandcastle logger writes -e OPENAI_API_KEY=<value> to disk per spike §5.3); both require pre-exec security review | tpm: auth setup plus redaction must be reviewed before stories author"
+    raised_by: "architect, tpm"
+    raised_at: "2026-05-12T07:00:00Z"
+    status: resolved
+    resolved_at: "2026-05-12T12:00:00Z"
+    resolution: "spec-patches applied verbatim from audit Recommended Changes (4 majors): regex extends to Authorization: Bearer + JSON form; wrapper-before-import timing AC; wrapper error-path safe fallback AC; auth.json validity check AC; printf-not-printenv setup form; sandcastle pin tightened to >=0.5.10 <0.6.0. Narrow re-audit pending."
+    verdict_path: ".pHive/specialist-phases/security:plan-audit/sandcastle-adoption-followon/verdict.md"
+    moderate_carryover_for_impl_audit:
+      - "userns:false production guidance (s2-provider-wrap) — flag for adoption guide, OK for macOS dev"
+      - "hyphenated header names (X-API-KEY style) not caught by \\b in regex — sidecar verifies fixture coverage"
+      - "wrapper error-path try/catch — sidecar verifies implementation matches AC"
+    minor_carryover_to_s5_scope:
+      - "gitignore .sandcastle/ is non-anchored global rule — document in adoption guide"
+      - "auth.json rotation/revocation path — document in adoption guide"
+      - "*.log alone insufficient — informational confirmation"
+
+  - trigger: security:impl-audit
+    placement: append
+    severity: moderate
+    stories:
+      - s1-auth-setup-skill
+      - s1-redaction-wrapper
+      - s2-provider-wrap
+    reason: "Implementation touches secrets handling (auth.json mount + redaction patterns for OPENAI_API_KEY/ANTHROPIC_API_KEY/*_TOKEN/*_KEY). Sidecar reviewer should sign off per-story before merge."
+    raised_by: tpm
+    raised_at: "2026-05-12T07:00:00Z"
+    status: executed
+    executed_at: "2026-05-12T13:05:00Z"
+    sidecar_results:
+      - { story: s1-redaction-wrapper, verdict: passed, episode: ".pHive/episodes/sandcastle-adoption-followon/s1-redaction-wrapper/security-review.md" }
+      - { story: s1-auth-setup-skill, verdict: passed, episode: ".pHive/episodes/sandcastle-adoption-followon/s1-auth-setup-skill/security-review.md", findings: "3 informational (0 critical)" }
+      - { story: s2-provider-wrap, verdict: passed, episode: ".pHive/episodes/sandcastle-adoption-followon/s2-provider-wrap/security-review.md", findings: "5 informational (0 critical)" }
+
+  - trigger: performance:audit
+    placement: post-exec
+    severity: minor
+    stories:
+      - s2-provider-wrap
+      - s3-execution-mode-skill
+      - s4-merge-validation
+    reason: "Sandbox cold-start latency on every story dispatch is a new perf surface (per-run podman start vs in-process execution). Not blocking but baseline benchmarks should be captured for future warm-pool decision."
+    raised_by: tpm
+    raised_at: "2026-05-12T07:00:00Z"
+    status: executed
+    executed_at: "2026-05-12T13:25:00Z"
+    verdict: informational
+    verdict_path: ".pHive/specialist-phases/performance:audit/sandcastle-adoption-followon/verdict.md"
+    note: "Cold-start surface localized at sandcastle-provider.js:264-268 (per-run podmanFactory(), no reuse). S4 returned class B so no measurements; re-run conditions documented. Warm-pool trigger remains categorical per placeholder."
+
+  - trigger: dependency:version-gate
+    placement: pre-exec
+    severity: minor
+    stories:
+      - s2-provider-wrap
+      - s3-execution-mode-skill
+    reason: "Sandcastle is a 0.x runtime dependency. H/V plans only flag a version check as a re-validation item; raised to acceptance behavior. Add @ai-hero/sandcastle >=0.5.10 as package pin AND runtime/preflight error before execution mode runs, so an older local install fails fast (not after auth/redaction/provider setup)."
+    raised_by: architect
+    raised_at: "2026-05-12T08:30:00Z"
+    status: skipped_per_catalog
+    skip_reason: "trigger id `dependency:version-gate` not present in specialist-triggers catalog → /execute step 2b skips. AC coverage confirmed inline in s2-provider-wrap (range tightened to `>=0.5.10 <0.6.0` per security:plan-audit major finding F4) and s3-execution-mode-skill (preflight before auth/hook/provider). No specialist-team execution needed."
+
+planning_routing:
+  - persona: researcher
+    requested: codex
+    path: orchestrator-self
+    reason: "codex-dispatch-failed: stalled 22min after dispatch, cancelled — fell back per SKILL §0.5"
+  - persona: technical-writer
+    requested: codex
+    path: codex-invoke
+    reason: no-fallback-needed
+  - persona: architect
+    requested: codex
+    path: codex-invoke
+    reason: no-fallback-needed
+  - persona: tpm
+    requested: unset
+    path: TeamCreate
+    reason: agent_backends-unset

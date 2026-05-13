@@ -1,0 +1,194 @@
+id: a-04-plan-skill-split-routing
+epic: structural-refactor-and-gate-lift
+title: Split /plan Phase 0 routing into separate skill or module
+status: completed
+complexity: high
+methodology: classic
+depends_on: []
+wave: W6
+action_id: A-04
+
+description: |
+  skills/plan/SKILL.md is 721 lines. Phase 0 (Assemble Planning Team) is
+  ~140 lines (lines 44-184) of mostly prescriptive routing logic:
+    - Step 0.1: build team composition (core + conditional members)
+    - Step 0.2: build routing_decisions map (codex vs direct per persona)
+    - Step 0.3: spawn team across two paths + emit structured INFO logs
+    - Step 0.4: mixed-team TeamCreate prompt template
+    - Step 0.5: runtime Codex fallback + repeat-failure circuit breaker
+
+  This block is reusable outside /plan — any orchestrator that spawns a
+  team should consult the same agent_backends routing rules and emit the
+  same observability lines. Today it lives only inside /plan.
+
+  Extract Phase 0 into either:
+    (a) Atomic skill at skills/hive/skills/planning-routing/SKILL.md
+        invoked by /plan as Phase 0 (analogous to /plan invoking grill at
+        Phase A2 — single invocation, returns routing_decisions + emits
+        INFO logs)
+    (b) Reference at hive/references/planning-routing.md cited inline
+        (analogous to skill-prelude.md citation pattern from A-25)
+
+  Form (a) is preferred — Phase 0 contains procedural logic that runs,
+  not text the orchestrator paraphrases. Reference (b) would force /plan
+  to re-author the procedure inline against the citation, defeating the
+  split. Decide in research step.
+
+  Phase 0 lift is the BIGGEST single deletion target in skills/plan/SKILL.md
+  — ~140 lines extracted means a step closer to the recommendation §2.7
+  acceptance criterion ("skills/plan split into routing + escalation atoms;
+  line-count delta ≥-300 lines net").
+
+  Cross-cutting note (POST-EPIC-A): Epic A landed Phase A2 (grill skill
+  invocation, lines 200-208) AFTER synthesis was written. Phase A2 is
+  already a thin call to the grill atomic skill — no inline logic to
+  preserve. Phase A2 does NOT change the routing-vs-escalation split cut:
+  routing extraction touches only Phase 0; escalation extraction (sibling
+  story a-04-plan-skill-split-escalation) touches only step 11/14. Phase
+  A2 stays in /plan unchanged.
+
+acceptance_criteria:
+  - "Phase 0 routing logic extracted from skills/plan/SKILL.md to one of: skills/hive/skills/planning-routing/SKILL.md OR hive/references/planning-routing.md (form decided in research step)"
+  - "skills/plan/SKILL.md Phase 0 reduced to ≤15 lines — single invocation/citation, no inline duplicate"
+  - "Net line delta across skills/plan/SKILL.md + extracted artifact is ≥-100 lines (target ~-125)"
+  - "INFO log contract preserved: exactly one [info] planning routing: persona=X requested=Y path=Z reason=W line per persona at final spawn decision point — identical 4-field template"
+  - "Mixed-team behavior preserved: direct TeamCreate + codex-invoke can coexist in one planning team"
+  - "Runtime fallback preserved: codex dispatch failure re-routes to TeamCreate with updated INFO log; ≥3-failure circuit breaker still trips"
+  - "ui-designer routing rule preserved: always direct, even when agent_backends maps it to codex (codex-invoke known-incompatible)"
+  - "Phase A2 grill invocation unchanged (not part of this extraction)"
+  - "/plan continues to pass end-to-end on a sample epic — no regression in agent spawn quality"
+  - "Routing extraction is reusable: documented invocation contract enables /execute (a-34) and any future orchestrator to invoke the same routing"
+
+steps:
+  - id: research
+    description: |
+      1. Read skills/plan/SKILL.md lines 44-184 in full to lock the exact Phase 0 surface.
+      2. Read skills/hive/skills/codex-invoke/SKILL.md to confirm Supported/Known-incompatible persona lists are the canonical contract Phase 0 reads.
+      3. Read skills/grill/SKILL.md to see the atomic-skill invocation pattern Phase A2 uses — this is the model for form (a).
+      4. Read hive/references/skill-prelude.md to see the citation pattern A-25 established — this is the model for form (b).
+      5. Decide: form (a) atomic skill OR form (b) reference. Default to (a) per description rationale; only switch to (b) if research finds Phase 0 is more declarative than procedural.
+      6. If form (a): sketch the invocation signature /plan will call with — inputs (assembled persona list, agent_backends, requirement_summary) and outputs (routing_decisions map, INFO log lines, spawn outcome).
+      7. Document the decision + signature in design-decisions before implementing.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Form (a) path (preferred):
+        - Create skills/hive/skills/planning-routing/SKILL.md with the 5-step Phase 0 procedure.
+        - Replace skills/plan/SKILL.md lines 44-184 with a ≤15-line section that invokes the new skill, passes inputs, receives routing_decisions + INFO logs.
+        - Preserve the TeamCreate prompt template (Step 0.4) inside the new skill, NOT in /plan.
+        - Preserve the runtime-fallback contract (Step 0.5) inside the new skill.
+        - Cross-reference: add "See skills/hive/skills/planning-routing/SKILL.md" line in /plan Phase 0.
+
+      Form (b) path (fallback):
+        - Create hive/references/planning-routing.md with the same content.
+        - Replace lines 44-184 with the procedure rewritten to read AS IF following the citation — preserve all logic inline-by-reference.
+        - This form is more boilerplate-y; only use if (a) proves infeasible.
+
+      Either form:
+        - Do NOT touch Phase A, Phase A2, Phase B, Phase B2, Phase B3, or Phase C.
+        - Do NOT change escalation-backfill logic (step 11) — that is sibling story a-04-plan-skill-split-escalation.
+        - Do NOT change agent_backends precedence contract — root hive.config.yaml first, shipped baseline fallthrough, EMPTY map if root absent (graceful fallback per current Phase 0 step 2 rules).
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Line-count check: wc -l skills/plan/SKILL.md before/after; verify ≥-100 line reduction.
+      2. Invoke /plan against a sample fresh epic (use any test fixture or a no-op scratch requirement).
+      3. Verify per-persona INFO log emission — exactly one line per spawned persona, 4-field template.
+      4. Simulate codex-dispatch failure for one persona (e.g., temporarily disable codex backend); verify fallback re-routes to TeamCreate + updates the INFO log + does NOT hard-fail the planning team.
+      5. Verify mixed-team behavior: configure agent_backends with researcher=codex + tpm=claude; confirm both spawn correctly and coordinate via SendMessage.
+      6. Confirm Phase A2 grill invocation still fires unchanged.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      1. Verify no functional drift: routing_decisions output matches pre-extraction behavior across the matrix of agent_backends configurations.
+      2. Verify INFO log lines are byte-identical (or only differ in source file path metadata).
+      3. Verify the extracted artifact is reusable — sibling story a-34 (execute backend auto-resolve) should be able to invoke or cite it without modification.
+      4. Confirm acceptance criteria #4-7 met by reading the diff.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: 'Commit on feat/structural-refactor-and-gate-lift; commit message format `feat(structural): split /plan Phase 0 routing (story a-04-plan-skill-split-routing, W6)`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown]
+    frameworks: [claude-code-plugin-system, hive-orchestrator]
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Source of Phase 0 logic; lines 44-184 extracted to new artifact
+    - path: skills/hive/skills/codex-invoke/SKILL.md
+      purpose: Canonical Supported/Known-incompatible persona contract Phase 0 reads
+    - path: skills/grill/SKILL.md
+      purpose: Atomic-skill invocation pattern model for form (a); Phase A2 of /plan invokes grill this way
+    - path: hive/references/skill-prelude.md
+      purpose: Citation pattern model for form (b); A-25 established this
+    - path: skills/hive/skills/planning-routing/SKILL.md
+      purpose: NEW (form a) — destination atomic skill
+    - path: hive/references/planning-routing.md
+      purpose: NEW (form b) — destination reference (only if form a infeasible)
+
+design_decisions:
+  - decision: Default to form (a) atomic skill, not form (b) reference
+    rationale: Phase 0 contains procedural logic that the orchestrator EXECUTES (build routing_decisions map, emit INFO logs, spawn paths, handle fallback). Procedures belong in skills; citations belong in references. A-25 reference pattern fits boilerplate text; A-04 fits the atomic-skill pattern grill established.
+  - decision: Phase A2 stays unchanged; not part of A-04 split
+    rationale: Phase A2 is already atomic (single grill invocation). Re-extracting would be redundant. A-04's split cut is routing-only.
+  - decision: Sibling escalation extraction (a-04-plan-skill-split-escalation) lands in a separate commit
+    rationale: One commit per story per feedback_git_flow_per_epic.md (2026-05-01). Smaller diffs, cleaner review.
+
+cross_cutting:
+  - concern: observability
+    action: "Preserve the per-persona INFO log contract exactly — 4-field template, exactly one line per persona at final spawn decision point. Operators rely on these for backend-routing diagnostics."
+  - concern: backward-compatibility
+    action: "agent_backends precedence rules (root hive.config.yaml first, shipped baseline fallthrough, EMPTY map graceful fallback) must not change. The extraction is mechanical relocation, not policy revision."
+
+risks:
+  - severity: high
+    description: Form (a) atomic skill invocation introduces a new layer; if the new skill has a bug, every /plan invocation fails.
+    mitigation: Test step 4 simulates codex-dispatch failure to exercise the new fallback path; test step 5 verifies mixed-team behavior; sample /plan run before merge.
+  - severity: medium
+    description: Phase 0's INFO log emission point depends on knowing "final spawn decision" — if extraction blurs that boundary, logs may emit twice or zero times.
+    mitigation: AC #4 explicitly requires exactly-one-per-persona. Test step 3 + 4 validate count.
+  - severity: medium
+    description: Re-derivation of the runtime-failure circuit breaker (≥3 failures = skip remaining codex personas) is subtle and easy to miss.
+    mitigation: Implement step explicitly lists Step 0.5 preservation; test step 4 exercises one-failure path; review step verifies circuit breaker still trips at threshold.
+  - severity: low
+    description: Form (b) reference path is more boilerplate-prone — /plan would re-author the procedure inline against the citation.
+    mitigation: Research step decides form before implementation; (b) only used if (a) proves infeasible.
+
+references:
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      A-04: Split /plan into composable atoms. Phase 0 routing (~140 lines)
+      is the biggest single block. Decompose into atomic skill or reference
+      following A-25 (skill-prelude) and Phase A2 (grill) precedent.
+      AC §2.7: skills/plan split into routing + escalation atoms;
+      line-count delta ≥-300 lines net (combined across a-04 stories).
+  - path: skills/plan/SKILL.md
+    relevant_excerpt: |
+      ### Phase 0: Assemble Planning Team (lines 44-184)
+
+      Step 0.1: Build team composition.
+      Step 0.2: Build routing decisions.
+      Step 0.3: Spawn the team across two paths.
+      Step 0.4: Mixed-team prompt template.
+      Step 0.5: Runtime fallback.
+  - path: skills/grill/SKILL.md
+    relevant_excerpt: |
+      Pattern: /plan Phase A2 invokes grill as an atomic skill, passing
+      the draft design-discussion path. Grill returns a grill-record path.
+      No inline duplication. This is the form (a) precedent for a-04.
+  - path: hive/references/skill-prelude.md
+    relevant_excerpt: |
+      Pattern: 12 skills cite this prelude with one line. The prelude
+      contains text the skill READS, not procedure the skill EXECUTES.
+      This is the form (b) precedent — wrong fit for procedural Phase 0,
+      but documented here for completeness.

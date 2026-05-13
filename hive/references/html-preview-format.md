@@ -25,7 +25,7 @@ HTML previews are **primary output** for visual artifacts. Frame0 wireframes are
 | Brand system | `.pHive/brand/brand-guide.html` |
 | Design tokens | `.pHive/brand/tokens-preview.html` |
 | Logo concepts | `.pHive/brand/logo-concepts.html` |
-| UI audit report | `.pHive/audits/ui-audit/{ts}/report.html` (optional) |
+| Design-review implementation report | `.pHive/audits/ui-audit/{ts}/report.html` (optional) |
 
 All HTML files must be **self-contained** — no external stylesheets, no JavaScript dependencies. Fonts load from Google Fonts CDN via `<link>` tags.
 

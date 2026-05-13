@@ -1,0 +1,158 @@
+id: f-01-prompt-convention-brand-design
+epic: ui-cluster-extract-config-deeper
+title: "Establish prompt-reference convention on brand-system + design-system"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+tier: 1
+
+description: |
+  Extract the inline ui-designer task prompts from skills/brand-system/SKILL.md
+  and skills/design-system/SKILL.md into flat files under
+  hive/references/ui-prompts/. SKILL bodies reduce to load -> cite -> inject ->
+  spawn pattern. This is the convention-establishment slice for Epic F; S2 and
+  S3 inherit the file layout, header convention, and placeholder discipline
+  defined here.
+
+  Pattern (load -> cite -> inject -> spawn) mirrors W6 a-08/a-09 reference-file
+  precedent (brand-system-schema.yaml, design-token-spec.md). Task text moves
+  byte-equivalent (Q8 lock); only the invocation envelope stays in SKILL.
+
+acceptance_criteria:
+  - "Given the prompt convention is being established, when S1 completes, then hive/references/ui-prompts/brand-system.md and hive/references/ui-prompts/design-system.md exist as flat markdown files."
+  - "Given each new prompt file, when read, then it begins with a `## Required placeholders` header listing every {placeholder} variable used in the body (e.g. {brief_path}, {story_id}, {prior_verdict})."
+  - "Given the four task-text blocks at skills/brand-system/SKILL.md:32 and skills/design-system/SKILL.md:42, when extraction is complete, then SKILL bodies cite the prompt files via `hive/references/ui-prompts/<name>.md` (citation grep returns one match per SKILL)."
+  - "Given prompt text is moved, when diffed, then the extracted text is byte-equivalent to the prior inline block — no whitespace normalization, no wording edits (Q8 lock)."
+  - "Given the SKILLs are invoked end-to-end, when brand-system runs, then .pHive/brand/brand-system.yaml is produced as before; when design-system runs, then .pHive/brand/tokens.json is produced as before — no behavior change."
+  - "Given SKILL line counts pre- vs post-, when recorded, then the story note captures the negative delta (target -30 to -45 lines per SKILL, refined at implementation)."
+
+steps:
+  - id: research
+    description: |
+      Read skills/brand-system/SKILL.md and skills/design-system/SKILL.md;
+      identify the exact ui-designer task blocks to extract. Note every
+      placeholder variable. Confirm SKILL file paths are skills/<name>/SKILL.md
+      (NOT skills/hive/skills/<name>/SKILL.md — architect §2 confirms actual
+      location). Re-read hive/references/workflow-schema.md to understand the
+      Required-placeholders header style this epic establishes.
+    agent: researcher
+
+  - id: implement
+    description: |
+      1. Create hive/references/ui-prompts/brand-system.md with `## Required
+         placeholders` header + extracted task body (byte-equivalent).
+      2. Create hive/references/ui-prompts/design-system.md with the same
+         pattern.
+      3. Rewrite skills/brand-system/SKILL.md ui-designer spawn block to:
+         load the prompt file -> cite the path -> inject placeholder values ->
+         spawn ui-designer.
+      4. Apply the same rewrite to skills/design-system/SKILL.md.
+      5. Run end-to-end smoke: invoke brand-system and design-system; verify
+         .pHive/brand/brand-system.yaml and .pHive/brand/tokens.json still
+         materialize.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Run acceptance grep gates:
+        test -f hive/references/ui-prompts/brand-system.md
+        test -f hive/references/ui-prompts/design-system.md
+        rg "Required placeholders" hive/references/ui-prompts/{brand-system,design-system}.md
+        rg "hive/references/ui-prompts/(brand-system|design-system)\.md" skills/{brand-system,design-system}/SKILL.md
+      Both `test` exit 0; placeholder grep returns 2 matches; citation grep
+      returns exactly 2 matches. Record net SKILL line delta in story notes.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Verify byte-equivalent extraction (diff prompt body against the original
+      SKILL block — no wording changes). Verify SKILL flow still loads,
+      cites, injects, spawns in that order. Confirm path prefix is
+      skills/<name>/SKILL.md, not skills/hive/skills/<name>/SKILL.md.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: "Commit and push to feature branch (one commit per story per project memory feedback_git_flow_per_epic)."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: bash + claude-code SKILL execution
+    markdown_convention: "hive/references/<topic>.md flat files, byte-equivalent extraction (Q8)"
+  key_files:
+    - path: skills/brand-system/SKILL.md
+      purpose: "Source of the ui-designer task block to extract (line ~32 in current file)."
+    - path: skills/design-system/SKILL.md
+      purpose: "Source of the second ui-designer task block (line ~42)."
+    - path: .pHive/epics/structural-refactor-and-gate-lift/stories/a-08-brand-system-extract-config.yaml
+      purpose: "W6 precedent for extract-config story style; mirror its acceptance-criteria + grep-gate shape."
+    - path: hive/references/brand-system-schema.yaml
+      purpose: "W6 precedent for hive/references/ flat-file convention (this story extends it to ui-prompts/)."
+    - path: hive/references/design-token-spec.md
+      purpose: "Second W6 precedent for hive/references/ flat-file convention."
+
+files_to_modify:
+  - file: skills/brand-system/SKILL.md
+    change: "Replace inline ui-designer task block with load -> cite -> inject -> spawn pattern referencing hive/references/ui-prompts/brand-system.md."
+  - file: skills/design-system/SKILL.md
+    change: "Replace inline ui-designer task block with load -> cite -> inject -> spawn pattern referencing hive/references/ui-prompts/design-system.md."
+  - file: hive/references/ui-prompts/brand-system.md
+    change: "CREATE — Required placeholders header + extracted task body (byte-equivalent)."
+  - file: hive/references/ui-prompts/design-system.md
+    change: "CREATE — Required placeholders header + extracted task body (byte-equivalent)."
+
+code_examples:
+  - title: "W6 reference-file extraction precedent (a-08 brand-system-schema.yaml)"
+    file: .pHive/epics/structural-refactor-and-gate-lift/stories/a-08-brand-system-extract-config.yaml
+    snippet: |
+      # W6 a-08 acceptance pattern — mirror this for f-01:
+      # - hive/references/<topic>.yaml exists
+      # - SKILL.md cites the reference file path
+      # - byte-equivalent extraction; no behavior change
+      # - grep gate proves the citation lives in SKILL.md
+
+design_decisions:
+  - decision: "One prompt file per SKILL, not one aggregate registry"
+    rationale: "Q1 lock — W6 used one canonical reference per concern; consistent with brand-system-schema.yaml / design-token-spec.md pattern."
+  - decision: "Path: hive/references/ui-prompts/<skill-name>.md (flat, no nesting)"
+    rationale: "Q2 lock — matches W6 simplicity. Audit names references/ui-prompts/ directly."
+  - decision: "Required placeholders header convention starts here"
+    rationale: "S2 and S3 inherit the format. List every {placeholder} variable used in the body before any prose. Catches drift when SKILLs add/remove injection variables."
+
+cross_cutting:
+  - concern: documentation
+    action: "Update hive/agents/ui-designer.md (if it cites old inline SKILL prompt path) to reference hive/references/ui-prompts/. Skip if no citation present (Q3 lock = leave persona unchanged unless cited)."
+
+risks:
+  - severity: medium
+    description: "Placeholder injection silently drops a variable after extraction (SKILL no longer interpolates {foo} into the prompt body)."
+    mitigation: "Required placeholders header lists every variable; reviewer step compares pre/post variable sets. End-to-end smoke catches missing injection (output artifacts would mismatch)."
+  - severity: low
+    description: "Prompt text drifts from byte-equivalent during extraction (whitespace normalization, smart-quote substitution)."
+    mitigation: "Tester step diffs extracted body against original SKILL block. Q8 locks byte-equivalent moves only."
+  - severity: low
+    description: "Path prefix mismatch (skills/hive/skills/... vs skills/...) creates vacuous grep passes."
+    mitigation: "All grep gates use skills/<name>/SKILL.md prefix. Story files_to_modify uses the same. Architect §2 confirmed the actual location."
+
+references:
+  - path: .pHive/epics/ui-cluster-extract-config-deeper/docs/vertical-plan.md
+    relevant_excerpt: |
+      Slice S1: Convention Establishment on W6-precedent Pair (Tier 1)
+      Goal: Prove hive/references/ui-prompts/ end-to-end on brand-system and
+      design-system, the two direct SKILLs that already have W6 config/spec
+      extraction precedent.
+  - path: .pHive/epics/ui-cluster-extract-config-deeper/docs/architect-review-b2.md
+    relevant_excerpt: |
+      §2 SKILL path prefix convention: use skills/<skill-name>/SKILL.md, not
+      skills/hive/skills/<skill-name>/SKILL.md. W6 a-08 path precedent is
+      skills/brand-system/SKILL.md.
+  - path: .pHive/epics/ui-cluster-extract-config-deeper/docs/user-decisions-b1.md
+    relevant_excerpt: |
+      Q1 = one prompt file per skill. Q2 = hive/references/ui-prompts/<skill-name>.md.
+      Q8 = preserve byte-equivalent text on extraction; no format normalization.

@@ -1,0 +1,97 @@
+id: s6-issue-191-defer-marker
+epic: sandcastle-adoption-followon
+title: Defer marker and audit gate for Sandcastle issue 191
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s3-execution-mode-skill, s3-dispatch-routing]
+tier: 3
+slice: S6
+description: |
+  Make the blocked `claudeCode()` Sandcastle lane enforceable while upstream
+  issue #191 remains open. The story creates an upstream-watch file, extends
+  the `hive/scripts/gate-mode-audit.mjs` pattern or adds an equivalent narrow
+  check, and records a project memory pointer. Cleanup after upstream resolves
+  is explicitly a separate future story.
+
+acceptance_criteria:
+  - "Given .pHive/upstream-watch/sandcastle-191.md is read, then it includes upstream link, current behavior, unblock condition, owner, and cleanup-out-of-scope note"
+  - "Given a fixture wires claudeCode() through Sandcastle while the watch is open, when the audit gate runs, then it fails"
+  - "Given Codex-path Sandcastle mode exists, when the audit gate runs, then it does not block that path"
+  - "Given project memory is scanned, when this story lands, then a memory entry points future planners to the upstream-watch file"
+
+steps:
+  - id: build-change
+    name: build
+    description: Add the upstream-watch file, narrow audit gate, fixture, and project memory pointer.
+  - id: verify-result
+    name: verify
+    description: Run the audit gate against both blocked `claudeCode()` fixture and allowed Codex-path fixture.
+  - id: audit-notes
+    name: audit
+    description: Confirm the gate searches only for `claudeCode()` Sandcastle wiring and does not block Codex mode.
+  - id: commit-ready
+    name: commit
+    description: Commit watch file, audit gate, tests, and memory pointer together.
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/upstream-watch/sandcastle-191.md
+      purpose: New durable upstream blocker watch file.
+    - path: hive/scripts/gate-mode-audit.mjs
+      purpose: Existing audit-gate pattern to extend or mirror.
+    - path: .pHive/team-memories/sandcastle-adoption-followon/sandcastle-191.md
+      purpose: Project memory pointer for future planners.
+
+files_to_modify:
+  - file: .pHive/upstream-watch/sandcastle-191.md
+    change: New watch file for issue #191.
+  - file: hive/scripts/gate-mode-audit.mjs
+    change: Extend pattern with a narrow `claudeCode()` Sandcastle wiring check, or add a small sibling script if cleaner.
+  - file: tests/gate-mode-audit-sandcastle-191.test.*
+    change: New fixtures proving blocked Claude-code lane and allowed Codex lane.
+  - file: .pHive/team-memories/sandcastle-adoption-followon/sandcastle-191.md
+    change: New project memory pointer to the upstream-watch file.
+
+code_examples:
+  - title: Watch file skeleton
+    file: .pHive/upstream-watch/sandcastle-191.md
+    snippet: |
+      # Sandcastle issue 191 watch
+
+      Upstream: https://github.com/mattpocock/sandcastle/issues/191
+      Current behavior: `claudeCode()` subscription auth is blocked.
+      Hive scope: Codex-path Sandcastle only.
+      Unblock condition: upstream supports the Claude subscription lane.
+
+design_decisions:
+  - decision: Use an enforceable audit gate, not memory-only tracking.
+    rationale: User decisions say memory entries decay and the constraint should fail visibly.
+  - decision: Keep cleanup out of this epic.
+    rationale: Removing the gate after upstream resolution needs a future status-flip story.
+
+cross_cutting:
+  - concern: upstream-watch
+    action: Guard only the blocked `claudeCode()` Sandcastle lane while allowing Codex-path mode.
+
+risks:
+  - severity: medium
+    description: Audit gate is too broad and blocks legitimate Codex-path Sandcastle mode.
+    mitigation: Fixture both blocked and allowed paths; search for `claudeCode()` wiring specifically.
+  - severity: low
+    description: Future planners miss the cleanup boundary.
+    mitigation: Put cleanup-out-of-scope text in the watch file and memory pointer.
+
+references:
+  - path: .pHive/epics/sandcastle-adoption-followon/docs/user-decisions-b1.md
+    relevant_excerpt: |
+      Create `.pHive/upstream-watch/sandcastle-191.md`.
+      Add audit check that fails if any Hive code path wires `claudeCode()`
+      lane via Sandcastle while #191 is open.
+  - path: .pHive/epics/sandcastle-adoption-followon/docs/research-brief.md
+    relevant_excerpt: |
+      The `claudeCode()` provider requires an API key,
+      and Pro/Max subscription auth is unimplemented upstream.
+      As of the 2026-05-08 spike, issue #191 remained open.
+

@@ -1,0 +1,15 @@
+step_id: implement
+story_id: c-5b-skill-citation-swap-and-fallback-telemetry
+epic_id: task-tracking-adapter-abi
+agent: developer
+status: completed
+artifacts:
+  - path: hive/lib/task-tracking-dispatch/index.ts
+  - path: hive/lib/task-tracking-dispatch/test/dispatch.test.ts
+  - path: hive/references/kickoff-protocol.md
+  - path: skills/plan/SKILL.md
+  - path: skills/execute/SKILL.md
+  - path: hive/lib/task-tracking-dispatch/test/smoke-github.mjs
+  - path: hive/lib/task-tracking-dispatch/test/smoke-linear.mjs
+test_results: "23/23 PASS (16 existing + 7 new)"
+key_finding: "invoke(method, params, options?) extension. Fallback emits per-occurrence under warning. Suppressed for NO_ADAPTER + recoverable + hard mode. Kickoff citation in kickoff-protocol.md not SKILL.md stub. Filename uses 4-byte random suffix for collision avoidance."

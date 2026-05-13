@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "getStory",
+  "description": "Returns full detail for a single story by ID.",
+  "request": {
+    "type": "object",
+    "properties": {
+      "method": { "type": "string", "const": "getStory" },
+      "params": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Tracker-assigned story ID"
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["method", "params"],
+    "additionalProperties": false
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "result": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "state": { "type": "string" },
+          "labels": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "parent_id": {
+            "oneOf": [{ "type": "string" }, { "type": "null" }],
+            "description": "Parent issue ID, or null if none"
+          },
+          "url": { "type": "string" }
+        },
+        "required": ["id", "title", "body", "state", "labels", "parent_id", "url"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["result"],
+    "additionalProperties": false
+  }
+}

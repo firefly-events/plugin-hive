@@ -33,12 +33,31 @@ state/
 !.pHive/epics/structural-refactor-and-gate-lift/**
 !.pHive/epics/task-tracking-adapter-abi/
 !.pHive/epics/task-tracking-adapter-abi/**
+!.pHive/epics/ui-cluster-extract-config-deeper/
+!.pHive/epics/ui-cluster-extract-config-deeper/**
+!.pHive/epics/sandcastle-adoption-followon/
+!.pHive/epics/sandcastle-adoption-followon/**
+!.pHive/episodes/sandcastle-adoption-followon/
+!.pHive/episodes/sandcastle-adoption-followon/**
 # Per-epic cycle-state lives under .pHive/cycle-state/; only the
 # meta-improvement-system entry is tracked at this time (same maintainer-
 # infrastructure rationale as the epics/ and episodes/ subtrees above).
 !.pHive/cycle-state/
 .pHive/cycle-state/*
 !.pHive/cycle-state/meta-improvement-system.yaml
+!.pHive/cycle-state/ui-cluster-extract-config-deeper.yaml
+!.pHive/cycle-state/sandcastle-adoption-followon.yaml
+# Specialist-phase audit trail for the Sandcastle adoption work (security plan-audit
+# verdict + re-audit, performance post-run audit). Tracked as decision provenance for
+# the major-severity pre-exec gate resolution + minor post-run informational audit.
+!.pHive/specialist-phases/
+.pHive/specialist-phases/*
+!.pHive/specialist-phases/security:plan-audit/
+!.pHive/specialist-phases/security:plan-audit/sandcastle-adoption-followon/
+!.pHive/specialist-phases/security:plan-audit/sandcastle-adoption-followon/**
+!.pHive/specialist-phases/performance:audit/
+!.pHive/specialist-phases/performance:audit/sandcastle-adoption-followon/
+!.pHive/specialist-phases/performance:audit/sandcastle-adoption-followon/**
 # Metrics carrier (.pHive/metrics/) — authored by S2 stories of the
 # meta-improvement-system epic; contains schema docs and, from C1.4 on,
 # fixtures consumed by hive/lib/metrics/ unit tests.
@@ -67,6 +86,7 @@ agents/memories/
 .DS_Store
 *.log
 .claude/*.lock
+.sandcastle/
 # Python bytecode/caches — C1.4 (hive/lib/metrics/) introduced Python 3 runtime
 # primitives with stdlib-only deps. Prevent __pycache__/ and *.pyc files from
 # polluting the tree as future maintainer tooling adds more Python.
@@ -78,3 +98,6 @@ __pycache__/
 # This file IS tracked — it serves as plugin-hive own CONTEXT.md and as
 # an exemplar for downstream projects.
 !.pHive/CONTEXT.md
+# upstream-watch: durable upstream blocker records tracked at maintainer level.
+!.pHive/upstream-watch/
+!.pHive/upstream-watch/**
