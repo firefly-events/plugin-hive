@@ -1,0 +1,67 @@
+epic: brand-system-2.0-update
+phase: planning
+created: "2026-05-12T20:00:00Z"
+audit_origin: ".pHive/epics/hive-composability-audit/docs/recommendation.md:405-408"
+trigger: "auto on PR #67 (Hive 2.0) merge"
+branch_base: dev/hive-2.0
+branch: feat/brand-system-2.0-update
+
+scope_bounds:
+  max_stories: 3
+  scope_class: small  # provisional — design discussion may revise
+  artifacts_in_scope:
+    - "memory: project_oss_rollout_brand"
+    - "brand-system YAML (path TBD by research)"
+    - "brand-guide HTML (path TBD by research)"
+  reframe:
+    from: "director's chair (Hive directs swarms)"
+    to: "composable substrate, user-directed (user directs Hive)"
+  source_of_truth: ".pHive/epics/hive-composability-audit/docs/recommendation.md:239-241"
+
+planning_routing:
+  - persona: researcher
+    requested: codex
+    path: codex-invoke
+    reason: no-fallback-needed
+  - persona: technical-writer
+    requested: codex
+    path: codex-invoke
+    reason: no-fallback-needed
+  - persona: architect
+    requested: codex
+    path: codex-invoke
+    reason: no-fallback-needed
+  - persona: tpm
+    requested: unset
+    path: TeamCreate
+    reason: agent_backends-unset
+
+escalations: []
+
+planning_artifacts:
+  research_brief: .pHive/epics/brand-system-2.0-update/docs/research-brief.md
+  design_discussion: .pHive/epics/brand-system-2.0-update/docs/design-discussion.md
+  user_decisions_b1: .pHive/epics/brand-system-2.0-update/docs/user-decisions-b1.md
+  epic_index: .pHive/epics/brand-system-2.0-update/epic.yaml
+
+phase_gate: stories_decomposed
+phase_gate_at: "2026-05-12T21:00:00Z"
+
+stories_decomposed_at: "2026-05-12T21:00:00Z"
+story_count: 3
+methodology: classic
+
+# Branch model decision — see user-decisions-b1.md Q4
+branch_model:
+  current: dev/hive-2.0
+  target: develop  # new long-lived integration branch, created after PR #67 merges to main
+  retire_after: "PR #67 merge"
+
+locked_wording:
+  hero_tagline: "Composable substrate for the agentic SDLC — user-directed, disciplined, kickoff to ship."
+  body_copy_879_885: "Builders direct work; Hive composes primitives."
+
+scope:
+  story_count: 3
+  scale_class: small
+  asset_exports_in_scope: true  # Q5 confirmed — H-02 includes PNG/SVG re-export
