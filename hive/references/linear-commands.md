@@ -1,5 +1,7 @@
 # Linear Commands Quick Reference
 
+> **DEPRECATED:** The prose-runbook adapter pattern is superseded by the executable adapter ABI in [`task-tracking-adapter-abi.md`](task-tracking-adapter-abi.md). New integrations should implement the ABI directly. See [`task-tracking-adapter-migration.md`](task-tracking-adapter-migration.md) for the migration path. **Removal target:** Hive 2.1 (the release after 2.0).
+
 Copy-paste commands for each ceremony phase. Values come from `hive.config.yaml` → `task_tracking`:
 - `{TEAM}` = `linear_team` (e.g., "ACME")
 - `{PROJECT}` = `linear_project` (e.g., "my-project")

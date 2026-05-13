@@ -1,0 +1,160 @@
+id: c-6-migration-guide-and-prose-runbook-deprecation
+epic: task-tracking-adapter-abi
+title: Migration guide + deprecate prose-runbook adapter paths
+status: pending
+complexity: low
+methodology: classic
+depends_on: [c-5b-skill-citation-swap-and-fallback-telemetry]
+wave: W5
+action_id: C-6
+
+description: |
+  Final story of Epic C. Closes the loop: now that the ABI works end-to-end
+  (c-5), users with custom prose-runbook adapters need a migration path
+  and the prose-runbook references need a deprecation window before removal.
+
+  Three deliverables:
+
+    1. Migration guide at hive/references/task-tracking-adapter-migration.md
+       covering: how to port a prose-runbook adapter to the new ABI,
+       what changes for users with no custom adapter, what happens to
+       hive.config.yaml during migration, and rollback plan.
+
+    2. Deprecation markers on prose-runbook paths — the existing files at
+       hive/references/task-tracking-adapter*.md get a top-of-file
+       deprecation note pointing at the ABI and noting the removal
+       timeline. One-release deprecation window — they are removed in the
+       release after 2.0 ships.
+
+    3. Telemetry for prose-runbook fallback usage — c-5 dispatch falls back
+       to prose-runbook references when adapter is unset and gate_mode: hard.
+       Each such fallback writes a JSONL event. Aggregated rate informs
+       when prose paths can actually be deleted (data-driven removal date
+       rather than calendar-driven).
+
+  No code changes — this story is pure documentation + telemetry + deprecation
+  markers. Low complexity, but high importance for users.
+
+acceptance_criteria:
+  - 'hive/references/task-tracking-adapter-migration.md exists covering: porting custom adapters, default user experience, rollback plan'
+  - 'All hive/references/task-tracking-adapter*.md files (except adapter-abi.md and adapter-migration.md) carry a deprecation note at the top'
+  - 'Deprecation note references the ABI spec + migration guide + removal timeline'
+  - 'Removal timeline is one release after 2.0 ships (e.g., if 2.0 = 2026-Q3, removal = 2026-Q4)'
+  - 'c-5 dispatch emits prose-runbook-fallback telemetry event when fallback occurs'
+  - 'Telemetry event shape documented in hive/references/gate-lift-telemetry.md (the file from Epic B story a-36)'
+  - 'Migration guide includes a "what to do if you have no custom adapter" section — answer: nothing, just configure task_tracking.adapter in hive.config.yaml'
+  - 'Migration guide references the c-3 + c-4 adapter source as reference implementations'
+
+steps:
+  - id: research
+    description: |
+      1. List every existing prose-runbook reference: `find hive/references/ -name 'task-tracking-adapter*.md' -not -name 'task-tracking-adapter-abi*' -not -name 'task-tracking-adapter-migration*'`.
+      2. Read each — capture what they document so the migration guide can map prose-runbook concepts to ABI methods.
+      3. Read hive/references/gate-lift-telemetry.md (Epic B a-36 output) to confirm the JSONL event shape and naming convention for prose-runbook-fallback events.
+      4. Identify what a custom adapter author needs to know: ABI method signatures, capability declaration, error model, packaging (in-tree vs filesystem path).
+      5. Sketch the rollback plan — if a user reverts task_tracking.adapter to null, what happens? Answer: dispatch falls back to gate_mode behavior per c-5.
+    agent: researcher
+
+  - id: implement
+    description: |
+      1. Write hive/references/task-tracking-adapter-migration.md (~200 lines):
+         - "For most users — nothing changes" section (default experience)
+         - "Porting a custom prose-runbook adapter to the ABI" section (concrete steps)
+         - "Configuration reference" section (task_tracking.adapter values)
+         - "Rollback plan" section
+         - "Reference implementations" section (citing c-3 GitHub + c-4 Linear)
+         - "Removal timeline" section (specific date or release-name)
+      2. Add deprecation note to each prose-runbook file (top of file, after frontmatter if any):
+         > **DEPRECATED:** This prose-runbook adapter pattern is superseded by the executable adapter ABI in `hive/references/task-tracking-adapter-abi.md`. See `hive/references/task-tracking-adapter-migration.md` for the migration path. Removal target: <release after 2.0>.
+      3. Update c-5 dispatch to emit prose-runbook-fallback telemetry:
+         ```json
+         {"event":"prose_runbook_fallback","skill":"<calling skill>","adapter":"<configured or null>","gate_mode":"hard","timestamp":"<ISO 8601>"}
+         ```
+         Path: .pHive/metrics/events/prose-runbook-fallback-<ISO>.jsonl
+      4. Document the new event in hive/references/gate-lift-telemetry.md (append to the event-shapes section).
+      5. Update hive/scripts/gate-mode-audit.mjs to optionally aggregate prose_runbook_fallback events into the recommendation output (informational, not threshold-driven for v1).
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Markdown lint the migration guide.
+      2. grep every prose-runbook file confirms deprecation note present.
+      3. Smoke-test fallback telemetry: configure dispatch with no adapter + gate_mode: hard → expect block (per c-5) without telemetry write; configure with gate_mode: warning + adapter unset → expect warning + no-adapter-event (already exists from c-5); configure with adapter set but call fails → expect prose-runbook-fallback event.
+      4. Run hive/scripts/gate-mode-audit.mjs against fixture event log including prose-runbook-fallback → verify event counted in details output without affecting recommendation.
+      5. yamllint on this story file.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Opus 4.7 reviewer cross-LLM gate:
+      1. Verify migration guide is actionable — a user with a custom prose-runbook can follow the steps without asking questions.
+      2. Verify deprecation note is consistent across all prose-runbook files (same wording, same removal target).
+      3. Verify rollback plan does not leave the user in a broken state.
+      4. Verify telemetry event shape matches the documented schema in gate-lift-telemetry.md.
+      5. Verify "removal timeline" is concrete — a release name or a date, not vague language.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: 'Commit on feat/task-tracking-adapter-abi; commit message format `feat(adapter-abi): migration guide + prose-runbook deprecation (story c-6-migration-guide-and-prose-runbook-deprecation, W5)`. Final story of Epic C; ready for PR.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, javascript, yaml]
+    frameworks: [hive-references, hive-scripts]
+  key_files:
+    - path: hive/references/task-tracking-adapter-migration.md
+      purpose: 'NEW — migration guide; primary deliverable'
+    - path: hive/references/task-tracking-adapter.md
+      purpose: 'Gets deprecation note; one-release removal window starts here'
+    - path: hive/references/gate-lift-telemetry.md
+      purpose: 'Extend with prose_runbook_fallback event shape (introduced in this story)'
+    - path: hive/scripts/gate-mode-audit.mjs
+      purpose: 'Extend with optional prose_runbook_fallback aggregation (informational)'
+    - path: hive/lib/task-tracking-dispatch/index.<ext>
+      purpose: 'c-5 dispatch — adds prose-runbook-fallback telemetry write at the fallback path'
+
+design_decisions:
+  - decision: 'One-release deprecation window, removal at release N+1'
+    rationale: 'Two-release window is conservative but slow; same-release removal breaks users mid-cycle. One-release is the balance — users see deprecation warning in release N, removal lands in release N+1.'
+  - decision: 'Migration guide does not advise on signed/sandboxed custom adapters'
+    rationale: 'Custom adapter security is c-5 design decision (run with full Hive permissions). Migration guide reflects current state; future enhancement story owns sandbox/signing.'
+  - decision: 'prose_runbook_fallback telemetry is informational in v1, not threshold-driven'
+    rationale: 'a-36 audit thresholds are about gate_mode flip decision; prose-runbook removal is a separate decision with a different timeline. Lumping them together would conflate two release decisions.'
+
+cross_cutting:
+  - concern: observability
+    action: 'Prose-runbook-fallback event introduced; documented in gate-lift-telemetry.md; aggregated by gate-mode-audit.mjs for data-driven removal date.'
+  - concern: backward-compatibility
+    action: 'Deprecation is announced, not enforced; one-release window protects users; removal is data-driven via telemetry.'
+
+risks:
+  - severity: low
+    description: 'Migration guide misses a custom-adapter use case; user with edge-case prose-runbook gets stuck'
+    mitigation: 'Migration guide explicitly invites issue reports; one-release deprecation window provides time to address gaps before removal'
+  - severity: low
+    description: 'Removal target slips because no one tracks the date'
+    mitigation: 'Telemetry-driven removal — prose-runbook-fallback event count over the deprecation window informs whether to remove on schedule or extend'
+
+references:
+  - path: .pHive/epics/structural-refactor-and-gate-lift/stories/a-36-post-run-audit-telemetry.yaml
+    relevant_excerpt: |
+      Epic B story a-36 introduced hive/references/gate-lift-telemetry.md
+      with event shapes for gate_lift_fired + epic_create_on_fly. c-6
+      extends this with prose_runbook_fallback. Same JSONL convention,
+      same .pHive/metrics/events/ directory.
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      Section 3 — c-6 documents migration from prose-runbook to executable
+      adapter; deprecates prose paths with one-release deprecation window.
+      Updates kickoff + plan + execute to use ABI dispatch instead of prose-
+      runbook references.
+  - path: hive/references/task-tracking-adapter-abi.md
+    relevant_excerpt: |
+      ABI spec (c-2 output) — migration guide cites this as the target
+      contract; custom adapter authors implement against this surface.

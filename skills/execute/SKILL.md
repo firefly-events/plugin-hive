@@ -182,6 +182,34 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
    > **v1 note:** v1 routing handles `workflow`-based catalog entries only. A catalog entry with `skill: <path>` (allowed by catalog schema but unused in v1) is not reached by condition (i) and falls to condition (ii) or (iii). Skill-based routing is a Phase 6 extension point.
 
+7b. **Update story status in the task tracker.** When a story advances through a workflow phase that warrants an externally-visible status change (e.g., research → in-progress, review → in-review, integrate → done), call the dispatch module. This is a no-op when `task_tracking.adapter` is unset.
+
+    Only stories with a populated `tracker_id` (written by `plan` Phase D) are eligible. The dispatch module owns gate_mode behavior, telemetry, and error mapping — do not branch on the adapter vendor here.
+
+    ```typescript
+    import { TaskTrackingDispatch } from "hive/lib/task-tracking-dispatch/index.ts";
+
+    const dispatch = new TaskTrackingDispatch();
+    await dispatch.load(config.task_tracking);
+
+    if (!story.tracker_id) return; // no tracker record to update
+
+    const result = await dispatch.invoke(
+      "updateStatus",
+      { id: story.tracker_id, state: newState },
+      { skill_context: "execute" },
+    );
+
+    if (!result.ok && result.code !== "NO_ADAPTER" && !result.recoverable) {
+      // Terminal error: dispatch wrote a prose-runbook-fallback telemetry
+      // event under gate_mode=warning. Surface to the user; execution can
+      // proceed without the tracker update — local episode markers remain
+      // the source of truth for story state per the episode-schema.
+    }
+    ```
+
+    Episode markers (per `hive/references/episode-schema.md`) are still authoritative for in-Hive state. Tracker status updates are a one-way projection — failures here never block the workflow.
+
 8. After all stories complete, produce a summary plus the post-run audit:
 
    1. **Run summary** — existing behavior: list completed stories, any failed/blocked, and final status.
@@ -197,9 +225,9 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
       - **All backend defaults**: every `backend_resolution` field resolved from `default` (user has not configured anything).
       - **TDD without tests**: resolved methodology is `tdd` AND no test files were touched during the run.
 
-   4. If ANY heuristic fires, emit ONE consolidated warning to stdout listing every triggered field plus its override path. Use the same shape documented in `skills/plan/SKILL.md` step 19 (warning header + per-field bullets + final override line pointing at `paths.gate_mode: hard`).
+   4. If ANY heuristic fires, emit ONE consolidated warning to stdout listing every triggered field plus its override path. Use the same shape documented in `skills/plan/SKILL.md` step 20 (warning header + per-field bullets + final override line pointing at `paths.gate_mode: hard`).
 
-   5. Always write the audit record to `${HIVE_STATE_DIR}/audits/post-run/<run-id>.yaml` (create the directory if absent). Same schema as `skills/plan/SKILL.md` step 19, with two differences:
+   5. Always write the audit record to `${HIVE_STATE_DIR}/audits/post-run/<run-id>.yaml` (create the directory if absent). Same schema as `skills/plan/SKILL.md` step 20, with two differences:
       - `skill: execute`
       - additional field `backend_sources` mapping `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor` to their resolved source.
 

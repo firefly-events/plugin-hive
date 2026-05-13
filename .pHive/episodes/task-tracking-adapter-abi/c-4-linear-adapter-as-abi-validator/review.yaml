@@ -1,0 +1,16 @@
+step_id: review
+story_id: c-4-linear-adapter-as-abi-validator
+epic_id: task-tracking-adapter-abi
+agent: reviewer
+status: completed
+verdict: APPROVE
+cross_validator_verdict: "ABI hierarchy-agnostic — Holds. No per-tracker branching needed at dispatch boundary."
+notes_for_c5a:
+  - "Subprocess pooling pays off for Linear (cached team metadata); GitHub doesn't benefit. Consider per-tracker session abstraction if pipelining is cheap."
+  - "capabilities is zero-arg in both — Linear needs LINEAR_TEAM env before first call; null labels handled gracefully."
+  - "team_value/project_value pass through opaquely; capabilities.metadata declares shape per tracker"
+  - "Error mapping identical at envelope level — no special-case routing needed"
+c2_revision_candidates_v1_1:
+  - "capabilities({team_value?}) — Linear supported_states depends on team; remove out-of-band env dependency"
+  - "GraphQL adapter pattern note in c-6 migration guide — rate-limit in body not HTTP"
+  - "VALIDATION_ERROR (6th adapter-emitted code) — both adapters needed it; GitHub 422, Linear param validation"

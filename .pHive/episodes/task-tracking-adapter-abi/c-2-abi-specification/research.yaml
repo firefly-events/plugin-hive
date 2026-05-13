@@ -1,0 +1,8 @@
+step_id: research
+story_id: c-2-abi-specification
+epic_id: task-tracking-adapter-abi
+agent: researcher
+status: completed
+artifacts:
+  - path: .pHive/epics/task-tracking-adapter-abi/docs/c-2-research-brief.md
+key_finding: "CLI fresh-per-call confirmed. 4-code error enum. addComment + linkStories need stubs. Proposed setAssignee as 7th method. team_field/project_field renamed to team_value/project_value for runtime params."

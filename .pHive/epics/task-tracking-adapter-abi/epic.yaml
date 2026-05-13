@@ -30,6 +30,8 @@ milestone: hive-2.0
 planning_artifacts:
   - ../hive-composability-audit/docs/recommendation.md       # Section 3 (post-review) + Section 7 Epic C
   - ../hive-composability-audit/spikes/atoshell/findings.md  # data-model context: hierarchy-agnostic justification
+  - docs/form-factor-decision.md                             # c-1 output: rubric evaluation + CLI selection rationale
+  - ../../hive/references/task-tracking-adapter-abi-sketch.md  # c-1 output: CLI primary sketch + MCP dual sketch (AC §5)
 
 dependencies:
   blocks:

@@ -1,0 +1,11 @@
+step_id: review
+story_id: c-6-migration-guide-and-prose-runbook-deprecation
+epic_id: task-tracking-adapter-abi
+agent: reviewer
+status: completed
+verdict: APPROVE
+epic_c_pr_ready: true
+notes:
+  - "c-6 story spec wrongly said fallback fires under gate_mode hard; migration guide correctly reflects shipped behavior (fires under warning) per feedback_internally_inconsistent_story_specs"
+  - "No misleading content: guide does NOT claim gate-lift-telemetry.md exists; reframes as future Epic B a-36 deliverable"
+  - "Epic C ships coherent story: form-factor → spec → 2 adapters → dispatch + citations + telemetry → migration"

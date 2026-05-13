@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "capabilities",
+  "description": "Returns the adapter's capability declaration. Called by Hive once per session at session start; response is cached in cycle state.",
+  "request": {
+    "type": "object",
+    "properties": {
+      "method": { "type": "string", "const": "capabilities" },
+      "params": { "type": "object", "additionalProperties": false }
+    },
+    "required": ["method", "params"],
+    "additionalProperties": false
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "result": {
+        "type": "object",
+        "properties": {
+          "abi_version": {
+            "type": "string",
+            "description": "Semver string of the ABI version this adapter implements (e.g., '1.0.0')"
+          },
+          "hierarchy": {
+            "type": "string",
+            "enum": ["flat", "hierarchical", "mixed"],
+            "description": "Story nesting model supported by this adapter"
+          },
+          "supports_parent_link": {
+            "type": "boolean",
+            "description": "Whether the adapter accepts parent_id in createStory. Must be false when hierarchy is 'flat'."
+          },
+          "supported_states": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "description": "Non-empty list of valid state values accepted by updateStatus"
+          },
+          "supported_labels": {
+            "oneOf": [
+              { "type": "array", "items": { "type": "string" } },
+              { "type": "null" }
+            ],
+            "description": "Valid label strings for createStory, or null if the tracker accepts arbitrary labels"
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "team_field": {
+                "oneOf": [{ "type": "string" }, { "type": "null" }],
+                "description": "Field name in the tracker for team/workspace grouping. Null if not applicable."
+              },
+              "project_field": {
+                "oneOf": [{ "type": "string" }, { "type": "null" }],
+                "description": "Field name in the tracker for project/board grouping. Null if not applicable."
+              }
+            },
+            "required": ["team_field", "project_field"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["abi_version", "hierarchy", "supports_parent_link", "supported_states", "supported_labels", "metadata"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["result"],
+    "additionalProperties": false
+  }
+}

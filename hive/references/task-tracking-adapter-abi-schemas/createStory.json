@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "createStory",
+  "description": "Creates a new story or issue in the tracker. Returns the stable ID and browser URL of the created issue.",
+  "request": {
+    "type": "object",
+    "properties": {
+      "method": { "type": "string", "const": "createStory" },
+      "params": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Story title / issue headline"
+          },
+          "body": {
+            "type": "string",
+            "description": "Full description; may contain Markdown"
+          },
+          "labels": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Zero or more label strings. Must be values from supported_labels, or any string if supported_labels is null."
+          },
+          "parent_id": {
+            "oneOf": [{ "type": "string" }, { "type": "null" }],
+            "description": "Parent issue ID. Adapters with hierarchy 'flat' MUST silently ignore this field."
+          },
+          "team_value": {
+            "oneOf": [{ "type": "string" }, { "type": "null" }],
+            "description": "Runtime value for the team/workspace (field identified by capabilities.metadata.team_field)"
+          },
+          "project_value": {
+            "oneOf": [{ "type": "string" }, { "type": "null" }],
+            "description": "Runtime value for the project/board (field identified by capabilities.metadata.project_field)"
+          }
+        },
+        "required": ["title", "body", "labels"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["method", "params"],
+    "additionalProperties": false
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "result": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable tracker-assigned identifier for the new story"
+          },
+          "url": {
+            "type": "string",
+            "description": "Browser-navigable URL to the created issue"
+          }
+        },
+        "required": ["id", "url"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["result"],
+    "additionalProperties": false
+  }
+}

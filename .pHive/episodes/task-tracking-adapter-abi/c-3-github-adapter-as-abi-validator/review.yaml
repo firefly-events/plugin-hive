@@ -1,0 +1,21 @@
+step_id: review
+story_id: c-3-github-adapter-as-abi-validator
+epic_id: task-tracking-adapter-abi
+agent: reviewer
+status: completed
+verdict: APPROVE
+non_blocking_findings:
+  - "Friction-note #1 confirmed load-bearing: VALIDATION_ERROR (6th code) should land in c-2 revision"
+  - "listOpen emits UNKNOWN_METHOD for missing owner/repo params — should be VALIDATION_ERROR when added"
+  - "decodeStoryId regex permissive on repo chars but round-trip works"
+notes_for_c4:
+  - "Reuse __setFetch test seam pattern"
+  - "Mirror mapHttpError structure (exported + per-branch unit tests)"
+  - "Linear hierarchical → linkStories non-optional; GraphQL gives parent in one call (no lazy fetch needed)"
+  - "Linear rate-limiting is single-mode; do NOT replicate GitHub tri-modal"
+  - "Encode story IDs as TEAM-123 (Linear native), not URL components"
+notes_for_c5a:
+  - "Adapter exports dispatch() directly callable — c-5a can unit-test without shelling out"
+  - "Capability response pins abi_version: 1.0.0 — dispatch must check majors"
+  - "Dispatch must pass team_value/project_value from hive.config.yaml"
+  - "Dispatch must guard linkStories with supports_parent_link (adapter has no internal guard)"

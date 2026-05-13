@@ -1,0 +1,107 @@
+epic_id: task-tracking-adapter-abi
+created: "2026-05-11T00:00:00Z"
+methodology: classic
+branch: feat/task-tracking-adapter-abi
+target_codebase: /Users/don/Documents/plugin-hive
+
+decisions:
+  form_factor: cli
+  form_factor_rationale: "CLI (21pts) over MCP (20pts) — Axis 4 user-facing complexity decisive. Both sketched (AC §5 dual sketch)."
+  hierarchy_enum: "flat | hierarchical | mixed"
+  abi_sketch: hive/references/task-tracking-adapter-abi-sketch.md
+
+escalations: []
+
+decisions:
+  abi_spec: hive/references/task-tracking-adapter-abi.md
+  abi_schemas_dir: hive/references/task-tracking-adapter-abi-schemas/
+  abi_version: "1.0.0"
+  error_codes: [NOT_FOUND, AUTH_FAILURE, RATE_LIMIT, UNKNOWN_METHOD, OPERATION_UNSUPPORTED]
+  hive_virtual_codes: [SCHEMA_MISMATCH]
+  adapter_timeout_ms: 30000
+  linkStories_conditional: "requires supports_parent_link=true"
+  notes_for_c3_c4:
+    - "Story ID type is string everywhere — do not coerce to integer"
+    - "team_value/project_value are runtime params; team_field/project_field are capability metadata only"
+    - "listOpen returns subset shape (no body, no parent_id)"
+    - "Void methods return {result:{}} — not {result:{ok:true}}"
+    - "Retry-After header is seconds — multiply by 1000 for retry_after_ms"
+    - "linkStories guarded by supports_parent_link; flat adapters will never receive it"
+
+story_outcomes:
+  c-1-form-factor-selection:
+    status: approved
+    key_artifacts:
+      - .pHive/epics/task-tracking-adapter-abi/docs/form-factor-decision.md
+      - hive/references/task-tracking-adapter-abi-sketch.md
+  c-2-abi-specification:
+    status: approved_after_revise
+    key_artifacts:
+      - hive/references/task-tracking-adapter-abi.md
+      - hive/references/task-tracking-adapter-abi-schemas/
+    revise_summary: "Schema drift, subprocess timeout, linkStories conditional — all fixed in single pass"
+  c-3-github-adapter-as-abi-validator:
+    status: approved
+    key_artifacts:
+      - hive/adapters/github/index.ts
+      - hive/adapters/github/test/adapter.test.ts
+      - hive/adapters/github/friction-notes.md
+    test_results: "25/25 PASS"
+    abi_revision_candidates: ["VALIDATION_ERROR as 6th adapter-emitted error code"]
+  c-4-linear-adapter-as-abi-validator:
+    status: approved
+    key_artifacts:
+      - hive/adapters/linear/index.ts
+      - hive/adapters/linear/test/adapter.test.ts
+      - hive/adapters/linear/friction-notes.md
+    test_results: "33/33 PASS"
+    cross_validator_verdict: "ABI hierarchy-agnostic — Holds. No per-tracker branching at dispatch boundary."
+  c-5a-dispatch-module-and-config-schema:
+    status: approved
+    key_artifacts:
+      - hive/lib/task-tracking-dispatch/index.ts
+      - hive/hive.config.yaml
+      - hive.config.yaml
+    test_results: "16/16 PASS"
+  c-5b-skill-citation-swap-and-fallback-telemetry:
+    status: approved
+    key_artifacts:
+      - hive/references/kickoff-protocol.md
+      - skills/plan/SKILL.md
+      - skills/execute/SKILL.md
+      - hive/lib/task-tracking-dispatch/test/smoke-github.mjs
+      - hive/lib/task-tracking-dispatch/test/smoke-linear.mjs
+    test_results: "23/23 PASS (16 existing + 7 new)"
+  c-6-migration-guide-and-prose-runbook-deprecation:
+    status: approved
+    key_artifacts:
+      - hive/references/task-tracking-adapter-migration.md
+    epic_c_pr_ready: true
+
+epic_status: complete
+commits:
+  - c-1: b5723b5
+  - c-2: b86cd84
+  - c-3: 1e4e7c0
+  - c-4: 2000855
+  - c-5a: 666940b
+  - c-5b: 027e6d4
+  - c-6: d48bf25
+
+c5a_inputs:
+  adapter_paths:
+    github: hive/adapters/github/index.ts
+    linear: hive/adapters/linear/index.ts
+  dispatch_module_notes:
+    - "Both adapters export dispatch({method, params}) directly callable — unit-test without shelling out"
+    - "Both pin abi_version 1.0.0 — dispatch must check major version match"
+    - "Hive must pass team_value/project_value from config — capabilities.metadata declares shape"
+    - "Hive must guard linkStories by supports_parent_link (adapter has no internal guard)"
+    - "Subprocess pooling pays off for Linear (team metadata cache); not for GitHub"
+    - "capabilities is zero-arg in both today; Linear needs LINEAR_TEAM env set out-of-band"
+  config_schema_required_keys:
+    - "task_tracking.adapter (string: 'github' | 'linear' | <path>)"
+    - "task_tracking.adapter_timeout_ms (number, default 30000)"
+    - "task_tracking.gate_mode ('warning' | 'hard', default 'warning')"
+    - "task_tracking.team_value (string, optional — runtime team identifier)"
+    - "task_tracking.project_value (string, optional — runtime project identifier)"

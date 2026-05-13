@@ -1,0 +1,13 @@
+step_id: research
+story_id: c-5a-dispatch-module-and-config-schema
+epic_id: task-tracking-adapter-abi
+agent: researcher
+status: completed
+artifacts:
+  - path: .pHive/epics/task-tracking-adapter-abi/docs/c-5a-research-brief.md
+key_findings:
+  - "Adapters configure via env vars, NOT init(config) — dispatch must probe-and-call init if present, else propagate config to env"
+  - "Both adapters export dispatch(req) for direct in-process calls — use ESM dynamic import, not subprocess spawn"
+  - "Epic B a-33 not yet planned; gate_mode semantics inferred from catalog-hygiene w1-warning-lift precedent"
+  - "JSONL event shape: event_id, timestamp ISO-8601, run_id, metric_type:task-tracking-no-adapter"
+  - "Hive virtual codes: INTERNAL_ERROR, TIMEOUT, NO_ADAPTER (alongside 5 adapter-emitted codes)"

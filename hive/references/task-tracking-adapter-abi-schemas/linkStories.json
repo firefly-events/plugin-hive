@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "linkStories",
+  "description": "Establishes a parent-child relationship between two existing stories. Returns an empty result object (void).",
+  "request": {
+    "type": "object",
+    "properties": {
+      "method": { "type": "string", "const": "linkStories" },
+      "params": {
+        "type": "object",
+        "properties": {
+          "parent_id": {
+            "type": "string",
+            "description": "Tracker-assigned ID of the parent story"
+          },
+          "child_id": {
+            "type": "string",
+            "description": "Tracker-assigned ID of the child story"
+          }
+        },
+        "required": ["parent_id", "child_id"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["method", "params"],
+    "additionalProperties": false
+  },
+  "response": {
+    "type": "object",
+    "description": "Void return. Adapters with hierarchy 'flat' should return UNKNOWN_METHOD error instead.",
+    "properties": {
+      "result": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Empty object — void return"
+      }
+    },
+    "required": ["result"],
+    "additionalProperties": false
+  }
+}
