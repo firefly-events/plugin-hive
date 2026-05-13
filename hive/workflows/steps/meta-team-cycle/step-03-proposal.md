@@ -176,5 +176,5 @@ Skipped findings:
 ## NEXT STEP
 
 **Gating:** At least one approved proposal with a concrete implementation plan, OR explicit "no proposals" close.
-**Next:** Load `hive/workflows/steps/meta-team-cycle/step-04-implementation.md`
+**Next:** Load `hive/workflows/steps/meta-team-cycle/step-03c-metric-declaration.md`
 **If gating fails:** Stop and report which proposals could not be finalized.
