@@ -60,7 +60,18 @@
           }
         },
         "required": ["abi_version", "hierarchy", "supports_parent_link", "supported_states", "supported_labels", "metadata"],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": { "hierarchy": { "const": "flat" } },
+              "required": ["hierarchy"]
+            },
+            "then": {
+              "properties": { "supports_parent_link": { "const": false } }
+            }
+          }
+        ]
       }
     },
     "required": ["result"],

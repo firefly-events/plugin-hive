@@ -64,6 +64,9 @@ before(() => {
 
 beforeEach(() => {
   __resetHandleCache();
+  // Reset the process-wide no-adapter warning flag so each test sees
+  // "first invocation" semantics (warning + telemetry fire once per test).
+  TaskTrackingDispatch.__resetNoAdapterWarningForTests();
 });
 
 describe("load() — built-in adapter resolution", () => {

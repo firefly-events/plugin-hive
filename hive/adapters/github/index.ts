@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 // GitHub task-tracking adapter — implements Hive ABI 1.0.0
 // Hierarchy: mixed (issues flat; sub-issues hierarchical via Sub-Issues alpha API)
 //

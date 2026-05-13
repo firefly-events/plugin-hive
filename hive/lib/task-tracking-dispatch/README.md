@@ -17,7 +17,7 @@ import { TaskTrackingDispatch } from "@hive/task-tracking-dispatch";
 
 const dispatch = new TaskTrackingDispatch();
 await dispatch.load({
-  adapter: "github",                // "github" | "linear" | absolute path | null
+  adapter: "github",                // "github" | "linear" | filesystem path (absolute, or relative with a slash) | null
   adapter_timeout_ms: 30000,
   gate_mode: "warning",             // "warning" (default) | "hard"
   team_value: "firefly-events",
@@ -54,7 +54,7 @@ The dispatcher reads its config from a `task_tracking` block in
 
 | Field                | Type      | Default     | Notes                                                                 |
 |----------------------|-----------|-------------|-----------------------------------------------------------------------|
-| `adapter`            | string \| null | `null`  | `github`, `linear`, or absolute path to a custom ABI 1.x adapter      |
+| `adapter`            | string \| null | `null`  | `github`, `linear`, or filesystem path (absolute, or relative with a slash — resolved against cwd) to a custom ABI 1.x adapter |
 | `adapter_timeout_ms` | number    | `30000`     | Max wall-clock for any single adapter call                            |
 | `gate_mode`          | string    | `warning`   | `warning` skips tracker ops; `hard` blocks any call                   |
 | `team_value`         | string    | `null`      | Runtime team identifier — passed at invoke time, not at load time     |

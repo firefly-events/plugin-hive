@@ -4,7 +4,11 @@
 
 ## Findings
 
-- `s1-redaction-wrapper.yaml:62` — Regex `\b([A-Z0-9_]*(?:API_KEY|TOKEN|_KEY))=([^\s"'` + "`" + `]+)` does not match `Authorization: Bearer <token>` header form, JSON `"key": "<value>"` form, or multiline base64-encoded secrets. A Sandcastle `WorktreeError` or debug dump could emit these alternate forms in the same log file the regex is meant to protect. The regex catches the known `-e VAR=VALUE` argv form but does not constitute exhaustive secret redaction. [severity: major]
+- `s1-redaction-wrapper.yaml:62` — Regex (see fenced block below) does not match `Authorization: Bearer <token>` header form, JSON `"key": "<value>"` form, or multiline base64-encoded secrets. A Sandcastle `WorktreeError` or debug dump could emit these alternate forms in the same log file the regex is meant to protect. The regex catches the known `-e VAR=VALUE` argv form but does not constitute exhaustive secret redaction. [severity: major]
+
+  ```
+  \b([A-Z0-9_]*(?:API_KEY|TOKEN|_KEY))=([^\s"'`]+)
+  ```
 
 - `harness.ts:23-24` — The spike logs `OPENAI_API_KEY prefix` characters to stdout before the redaction wrapper is installed (line 23: `console.log(...OPENAI_API_KEY.slice(0,7)...)`). The harness installs stdout/stderr intercepts on lines 35-40 **after** this console.log. If the production wrapper follows the same ordering pattern, early provider log lines (e.g., the Sandcastle import on line 42) escape redaction. The s1-redaction-wrapper AC requires wrapper-before-provider-construction but the spike shows a timing gap that must be explicitly closed in the implementation spec. [severity: major]
 

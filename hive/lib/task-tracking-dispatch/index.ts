@@ -72,10 +72,23 @@ const BUILTIN_ADAPTERS: Record<string, string> = {
 // Module-scoped cache: per-process, keyed by SHA-1 of normalized config.
 const handleCache = new Map<string, AdapterHandle>();
 
+// Process-wide flag so the no-adapter warning + telemetry is emitted exactly
+// once across all dispatcher instances per process (matches the documented
+// behavior in README — was instance-scoped before, which double-fired in
+// multi-dispatcher setups).
+let noAdapterWarningEmittedProcessWide = false;
+
 export class TaskTrackingDispatch {
   private handle: AdapterHandle | null = null;
-  private noAdapterWarningEmitted = false;
   private config: TaskTrackingConfig | null = null;
+
+  /**
+   * Test-only: reset the process-wide no-adapter warning flag so each test
+   * sees a fresh "first-invoke" state. Production code should never call this.
+   */
+  static __resetNoAdapterWarningForTests(): void {
+    noAdapterWarningEmittedProcessWide = false;
+  }
 
   /**
    * Load and validate the adapter declared in `config`. When `config.adapter`
@@ -212,8 +225,12 @@ export class TaskTrackingDispatch {
       return r;
     }
 
+    // Read timeout from THIS dispatcher's config, not the cached handle's
+    // config — handles can be shared across dispatcher instances with
+    // different adapter_timeout_ms; reading from handle.config would let the
+    // first instance's timeout bleed into the second.
     const timeoutMs =
-      this.handle.config.adapter_timeout_ms ?? DEFAULT_TIMEOUT_MS;
+      this.config?.adapter_timeout_ms ?? DEFAULT_TIMEOUT_MS;
     let result: any;
     try {
       result = await withTimeout(
@@ -287,10 +304,10 @@ export class TaskTrackingDispatch {
       };
     }
 
-    if (!this.noAdapterWarningEmitted) {
+    if (!noAdapterWarningEmittedProcessWide) {
       this.emitNoAdapterWarning();
       this.writeNoAdapterTelemetry(method);
-      this.noAdapterWarningEmitted = true;
+      noAdapterWarningEmittedProcessWide = true;
     }
     return {
       ok: false,
@@ -433,12 +450,25 @@ function resolveAdapterPath(adapter: string): string | null {
 }
 
 function propagateConfigToEnv(config: TaskTrackingConfig): void {
+  // GitHub token: set when present + adapter is github; clear otherwise so a
+  // previously-set GITHUB_TOKEN does not bleed across reload() calls or into
+  // a linear-adapter run.
   if (config.adapter === "github" && config.github?.token) {
     process.env.GITHUB_TOKEN = config.github.token;
+  } else {
+    delete process.env.GITHUB_TOKEN;
   }
-  if (config.adapter === "linear") {
-    if (config.linear?.api_key) process.env.LINEAR_API_KEY = config.linear.api_key;
-    if (config.linear?.team) process.env.LINEAR_TEAM = config.linear.team;
+  // Linear creds: same rule — set when present + adapter is linear; clear
+  // otherwise (covers explicit null/undefined and adapter-switch cases).
+  if (config.adapter === "linear" && config.linear?.api_key) {
+    process.env.LINEAR_API_KEY = config.linear.api_key;
+  } else {
+    delete process.env.LINEAR_API_KEY;
+  }
+  if (config.adapter === "linear" && config.linear?.team) {
+    process.env.LINEAR_TEAM = config.linear.team;
+  } else {
+    delete process.env.LINEAR_TEAM;
   }
 }
 

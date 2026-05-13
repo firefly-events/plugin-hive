@@ -22,7 +22,7 @@ paths:
   # warning: emit warning + proceed with sane defaults (auto-detect methodology,
   #   placeholder project-profile written to disk).
   # hard: original behavior — block when project-profile.yaml is missing.
-  # Read-only skills (status, review, test, standup, ui-audit) already warn-and-
+  # Read-only skills (status, review, test, standup, design-review) already warn-and-
   # proceed per Epic A W1 (commit 08b472d); this knob extends that pattern to
   # /plan and /execute, which previously hard-blocked.
   gate_mode: warning

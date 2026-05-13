@@ -41,7 +41,7 @@ podman run --env-file .sandcastle/run.env \
 rm .sandcastle/run.env   # clean up immediately
 ```
 
-**Do NOT use `printenv` form.** `printenv OPENAI_API_KEY | podman run -i ...` records the full key value in shell history.
+**Do NOT use `printenv` form.** `printenv OPENAI_API_KEY | podman run -i ...` looks safe because shell history only records the literal command (variable name, not value), but it still leaks the secret through other channels: the parent shell's environment is visible via `/proc/<pid>/environ` to anyone who can read it, `printenv`'s argv shows the key name in `ps`, and the piped stdin briefly resides in kernel buffers any container-runtime hook can capture. Use `printf '%s' "$OPENAI_API_KEY"` (stdin-only), `--env-file` with `chmod 600`, or a real secret manager (1Password CLI, `pass`, `aws secretsmanager get-secret-value`) instead.
 
 To rotate a key: delete `.sandcastle/codex-config/auth.json`, update `OPENAI_API_KEY` in your environment, then re-run `/hive:sandbox-setup`. No dedicated rotation skill exists in V1 — this manual path is the V1 rotation procedure.
 

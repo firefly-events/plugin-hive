@@ -12,8 +12,9 @@
           "limit": {
             "type": "integer",
             "minimum": 1,
+            "maximum": 200,
             "default": 50,
-            "description": "Maximum number of stories to return. Default 50."
+            "description": "Maximum number of stories to return. Default 50, capped at 200 to prevent oversized fetches that push adapters into rate-limit or timeout territory."
           },
           "team_value": {
             "oneOf": [{ "type": "string" }, { "type": "null" }],

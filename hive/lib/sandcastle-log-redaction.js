@@ -47,7 +47,7 @@ const RE_BEARER = /(Authorization\s*:\s*Bearer\s+)([^\s"'`,\]}\n]+)/gi;
  * (case-insensitive). Value must be a non-empty JSON string.
  */
 const RE_JSON_KV =
-  /("(?:[a-zA-Z0-9_]*(?:_key|_token)|api[_]?key|openai_api_key)")\s*:\s*"([^"\\]*)"/gi;
+  /("(?:[a-zA-Z0-9_]*(?:_key|_token)|api[_]?key|openai_api_key)")\s*:\s*"((?:\\.|[^"\\])*)"/gi;
 
 // ---------------------------------------------------------------------------
 // Core redact function
