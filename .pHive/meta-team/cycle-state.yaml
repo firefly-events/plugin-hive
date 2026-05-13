@@ -1,28 +1,27 @@
-cycle_id: meta-2026-05-12
-started: '2026-05-12T00:00:00Z'
-status: closed
+cycle_id: meta-2026-05-13
+started: '2026-05-13T03:00:00Z'
+status: closing
 phase: close
-closed: '2026-05-12T00:30:00Z'
 charter_constraints:
   - operate only on hive/**, skills/hive/agents/memories/**, .pHive/teams/**,
-    .pHive/meta-meta-optimize/**, hive/lib/**
-  - commit messages use [meta-meta-optimize] prefix
+    .pHive/meta-team/**, hive/lib/**
+  - commit messages use [meta-team] prefix
   - direct-commit promotion only after closure validator invariants satisfied
   - no changes to hive/hive.config.yaml without human confirmation
   - no new external service integrations without human confirmation
   - no file deletions, no >50% content removal per file
 prior_cycle:
-  id: meta-2026-05-11
+  id: meta-2026-05-12
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-05-12T00:00:00Z'
+    started_at: '2026-05-13T03:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
     prior_cycle_status: closed
   step_02_analysis:
-    findings_count: 1
+    findings_count: 2
     metric_signal: false
     external_candidates_count: 0
   step_02b_external_research:
@@ -32,16 +31,35 @@ steps:
       No-leak boundary prevents sanitizable queries with sufficient specificity.
       Empty candidate list produced. External_candidates_count: 0.
   step_03_proposal:
-    routing: step-03 (findings_count=1 > 0)
-    approved_proposals_count: 0
-    skipped_findings_count: 1
+    routing: step-03 (findings_count=2 > 0)
+    approved_proposals_count: 2
+    skipped_findings_count: 0
+  step_03c_metric_declaration:
+    enriched_proposals_count: 2
+    metric_gate_failures: []
   step_04_implementation:
-    changes_made: []
+    changes_made:
+      - file: hive/GUIDE.md
+        action: update_field
+        description: Corrected config path from 'skills/hive/hive.config.yaml' to 'hive/hive.config.yaml' with clarification note
+        proposal_id: proposal-1
+      - file: skills/ui-design/SKILL.md
+        action: create
+        description: Created new SKILL.md providing routing entry for /hive:ui-design command
+        proposal_id: proposal-2
   step_05_testing:
-    test_results: []
+    test_results:
+      - change: hive/GUIDE.md
+        cross_ref_integrity: pass
+        schema_compliance: pass
+        content_safety: pass
+      - change: skills/ui-design/SKILL.md
+        cross_ref_integrity: pass
+        schema_compliance: pass
+        content_safety: pass
   step_06_evaluation:
     cycle_verdict: passed
-    pass_count: 0
+    pass_count: 2
     needs_optimization_count: 0
     needs_revision_count: 0
     metrics_snapshot:
@@ -49,16 +67,72 @@ steps:
       wall_clock_ms: 0
       first_attempt_pass: true
   step_07_promotion:
-    promoted_changes: []
+    promoted_changes:
+      - file: hive/GUIDE.md
+        verdict: pass
+        rollback_target: d2ed82d
+      - file: skills/ui-design/SKILL.md
+        verdict: pass
+        rollback_target: d2ed82d
     reverted_changes: []
     insights_staged: 0
-    decision: discard
-    rollback_target: 706b7c3d05a4010e73d565ecf23d41b880b1ef86
+    decision: accept
+    rollback_target: d2ed82d
+findings:
+  - id: finding-1
+    category: SCHEMA_INCONSISTENCY
+    severity: high
+    location: hive/GUIDE.md:520
+    description: >
+      Config path 'skills/hive/hive.config.yaml' does not exist;
+      correct path is 'hive/hive.config.yaml'
+    evidence: >
+      Line 520 of GUIDE.md reads "All settings in `skills/hive/hive.config.yaml`:"
+      but `skills/hive/hive.config.yaml` does not exist. The correct shipped
+      baseline config is at `hive/hive.config.yaml`. Other lines in GUIDE.md
+      correctly reference `hive.config.yaml` without the `skills/hive/` prefix.
+      Previously noted in meta-2026-05-03 as out_of_scope; meta-2026-05-09
+      demonstrated GUIDE.md edits are within the meta-team's write authority.
+  - id: finding-2
+    category: MISSING_FILE
+    severity: medium
+    location: skills/ui-design/SKILL.md
+    description: >
+      /hive:ui-design command is referenced in 3 user-facing locations but
+      has no SKILL.md routing entry
+    evidence: >
+      skills/design-review/SKILL.md (line 47), skills/visual-qa/SKILL.md (line 21),
+      and hive/GUIDE.md commands table all reference `/hive:ui-design` in user-facing
+      messages, but skills/ui-design/SKILL.md did not exist and /hive:ui-design was
+      absent from MAIN.md's command routing table. The workflow ui-design.workflow.yaml
+      existed and was DAG-executor-graduated (CHANGELOG) but had no skill entry point.
+approved_proposals:
+  - id: proposal-1
+    title: Fix incorrect config path reference in hive/GUIDE.md
+    discovery_source: internal_audit
+    addresses_findings: [finding-1]
+    impact_score: 3
+    risk_score: 1
+    effort_score: 1
+    priority_score: 15.0
+    charter_objective: consistency
+    verdict: pass
+  - id: proposal-2
+    title: Create skills/ui-design/SKILL.md to enable /hive:ui-design command routing
+    discovery_source: internal_audit
+    addresses_findings: [finding-2]
+    impact_score: 4
+    risk_score: 2
+    effort_score: 3
+    priority_score: 5.33
+    charter_objective: completeness
+    verdict: pass
+skipped_findings: []
 summary:
-  total_findings: 1
-  proposals_generated: 0
-  changes_attempted: 0
-  changes_promoted: 0
+  total_findings: 2
+  proposals_generated: 2
+  changes_attempted: 2
+  changes_promoted: 2
   changes_reverted: 0
   flagged_for_human: 0
   cycle_verdict: passed
@@ -67,27 +141,15 @@ closure_evidence:
     tokens: 0
     wall_clock_ms: 0
     first_attempt_pass: true
-  rollback_ref: 706b7c3d05a4010e73d565ecf23d41b880b1ef86
-decision: discard
+  rollback_ref: d2ed82d
+decision: accept
 regression_watch:
-  state: not_applicable
-findings:
-  - id: finding-1
-    category: STUB_DOC
-    severity: low
-    location: hive/references/hive-cloud-roadmap.md
-    description: 13-line placeholder stub for deferred Hive Cloud epic
-    evidence: >
-      File has 13 lines. Content explicitly states 'S16 stub to close the
-      forward reference from hive/references/session-system-prompt-spec.md.'
-      session-system-prompt-spec.md notes 'that document may not yet exist on
-      main and is forward-referenced for continuity.'
-approved_proposals: []
-skipped_findings:
-  - finding_id: finding-1
-    reason: out_of_scope
-    notes: >
-      Deferred Hive Cloud epic. The stub is an intentional forward-reference
-      placeholder. Expanding it would be speculative without the Hive Cloud
-      epic active. Already flagged out_of_scope in meta-2026-05-11.
-changes: []
+  state: armed
+observation_window:
+  start: '2026-05-13T03:00:00Z'
+  end: '2026-05-13T07:00:00Z'
+changes:
+  - file: hive/GUIDE.md
+    description: Corrected config path reference on line 520 from 'skills/hive/hive.config.yaml' to 'hive/hive.config.yaml' with clarification note
+  - file: skills/ui-design/SKILL.md
+    description: Created new routing skill for /hive:ui-design command, linking to ui-design.workflow.yaml

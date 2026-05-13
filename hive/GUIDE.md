@@ -517,7 +517,7 @@ Every ceremony phase works in both modes. External tracker operations are additi
 
 ## Configuration
 
-All settings in `skills/hive/hive.config.yaml`:
+All settings in `hive/hive.config.yaml` (shipped baseline; root `hive.config.yaml` takes precedence when present):
 - Quality gate thresholds
 - Trust scoring parameters
 - Token budgets and context window limits
