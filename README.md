@@ -6,7 +6,7 @@
 
 # Hive
 
-> **A director's chair for the agentic SDLC — disciplined swarms, kickoff to ship.**
+> **Composable substrate for the agentic SDLC — user-directed, disciplined, kickoff to ship.**
 
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
