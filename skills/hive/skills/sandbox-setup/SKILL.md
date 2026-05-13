@@ -120,8 +120,15 @@ rm .sandcastle/run.env
 ```
 
 > **Anti-pattern — do not use:** `printenv OPENAI_API_KEY | podman run -i ...`
-> The `printenv` form records the full command including the key value in shell history.
-> Use `printf '%s' "$OPENAI_API_KEY"` or `--env-file` instead.
+> Shell history records only the literal command (variable name, not value), but
+> this form still exposes the secret through other vectors: the parent shell's
+> environment is visible via `/proc/<pid>/environ` to anyone who can read it
+> (ptrace, same-uid processes, debuggers), `printenv`'s own argv shows the key
+> name to `ps`, and the stdin pipe makes the expanded value briefly resident in
+> kernel buffers that any container-runtime hook can capture.
+> Use `printf '%s' "$OPENAI_API_KEY"` (stdin-only, no child argv leak), an
+> `--env-file` with `chmod 600`, or a real secret manager (1Password CLI,
+> `pass`, `aws secretsmanager get-secret-value`) instead.
 
 ## Verification
 

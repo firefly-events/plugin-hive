@@ -32,7 +32,7 @@ const SKIP_DIRS = new Set([
 ]);
 
 // Extensions to scan
-const SCAN_EXTS = new Set([".js", ".mjs", ".cjs", ".ts", ".mts"]);
+const SCAN_EXTS = new Set([".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"]);
 
 // Detects a Sandcastle import/require in file content
 const RE_SANDCASTLE_IMPORT =

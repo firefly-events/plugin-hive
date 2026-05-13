@@ -40,11 +40,11 @@ const { sandboxProvider, createWorktree } = createSandcastleProvider(options);
 | Option | Default | Notes |
 |---|---|---|
 | `useDocker` | `false` | Podman is the default runtime |
-| `userns` | `false` | Hard-coded in wrapper; do NOT set `userns: true` |
+| `userns` | `false` | Hard-coded in wrapper; security default for both macOS and Linux. Do NOT set `userns: true` |
 | Mount | `.sandcastle/codex-config` → `/home/agent/.codex` | Codex config host path mounted into sandbox |
 | `imageName` | `sandcastle:hive` | Override only if the story spec requires a custom image |
 
-Docker is opt-in: set `options.useDocker = true` only when the story spec or config explicitly requests Docker. Default Podman with `userns: false` is the correct choice for macOS parallel runs.
+Docker is opt-in: set `options.useDocker = true` only when the story spec or config explicitly requests Docker. Default Podman with `userns: false` is the correct choice in both contexts: macOS needs it for parallel-run stability, and Linux production uses it (i.e. `--userns=host`) for host file isolation and to prevent container processes from accessing unmapped UIDs.
 
 The wrapper also wraps the logger with redaction before constructing the provider — this is why inline `SandboxProvider` construction is prohibited. Auth token leakage in logs is the failure mode inline construction causes.
 

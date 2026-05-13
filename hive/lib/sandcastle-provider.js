@@ -39,7 +39,7 @@ const { wrapSandcastleLogger } = require('./sandcastle-log-redaction.js');
  * @returns {{ major: number, minor: number, patch: number } | null}
  */
 function parseSemver(v) {
-  const m = /^(\d+)\.(\d+)\.(\d+)/.exec(String(v));
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(v));
   if (!m) return null;
   return { major: parseInt(m[1], 10), minor: parseInt(m[2], 10), patch: parseInt(m[3], 10) };
 }
