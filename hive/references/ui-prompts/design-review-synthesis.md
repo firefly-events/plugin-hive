@@ -5,6 +5,7 @@
 - `{section}`
 - `{finding}`
 - `{specific actionable change with rationale}`
+- `{artifact_target}`
 
 Synthesize all domain critiques into a unified target-aware review verdict.
 Collect findings from: accessibility critique (if run), animations critique

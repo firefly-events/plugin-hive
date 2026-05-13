@@ -488,7 +488,15 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/firefly-events/plugin-hive/compare/v1.2.2...v1.3.0
+[1.2.2]: https://github.com/firefly-events/plugin-hive/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/firefly-events/plugin-hive/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/firefly-events/plugin-hive/compare/v1.1.4...v1.2.0
+[1.1.4]: https://github.com/firefly-events/plugin-hive/compare/v1.1.3...v1.1.4
+[1.1.3]: https://github.com/firefly-events/plugin-hive/compare/v1.1.2...v1.1.3
+[1.1.2]: https://github.com/firefly-events/plugin-hive/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/firefly-events/plugin-hive/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/firefly-events/plugin-hive/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/firefly-events/plugin-hive/releases/tag/v1.0.0
 [0.9.0]: https://github.com/firefly-events/plugin-hive/releases/tag/v0.9.0
