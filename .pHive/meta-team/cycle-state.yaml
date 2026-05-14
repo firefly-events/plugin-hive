@@ -1,7 +1,8 @@
 cycle_id: meta-2026-05-14
 started: '2026-05-14T00:00:00Z'
-status: closing
+status: closed
 phase: close
+closed: '2026-05-14T00:30:00Z'
 charter_constraints:
   - operate only on hive/**, skills/hive/agents/memories/**, .pHive/teams/**,
     .pHive/meta-meta-optimize/**, hive/lib/**
