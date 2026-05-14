@@ -21,6 +21,30 @@
     Fixed by updating the NEXT STEP pointer. STUB_DOC finding for
     hive-cloud-roadmap.md skipped as out_of_scope (deferred Hive Cloud epic).
     Closure validator passed. Regression watch armed for 4-hour window.
+- experiment_id: meta-2026-05-14
+  date: '2026-05-14'
+  started: '2026-05-14T00:00:00Z'
+  closed: '2026-05-14T00:30:00Z'
+  verdict: passed
+  changes_promoted: 0
+  changes_reverted: 0
+  findings_identified: 1
+  top_changes: []
+  commit: fbab7f0aab43fec37032381fcaf43d07de9a333b
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 0
+    first_attempt_pass: true
+  rollback_ref: d2ed82db8dd7003bf2b10f9317a49838534934d3
+  notes: |
+    Nightly cycle meta-2026-05-14. Analysis found 1 STUB_DOC finding:
+    hive/references/hive-cloud-roadmap.md (13 lines) is the S16 forward-reference
+    placeholder for the deferred Hive Cloud epic. Finding marked out_of_scope —
+    expanding this stub is premature without the Hive Cloud epic active.
+    This is the third consecutive discard cycle for this same finding (also in
+    meta-2026-05-11 and meta-2026-05-12). Zero proposals generated; zero changes
+    promoted. Cycle closes as discard. Closure validator passed (discard path;
+    rollback_ref and metrics_snapshot present). Regression watch: not_applicable.
 - experiment_id: meta-2026-05-12
   date: '2026-05-12'
   started: '2026-05-12T00:00:00Z'
