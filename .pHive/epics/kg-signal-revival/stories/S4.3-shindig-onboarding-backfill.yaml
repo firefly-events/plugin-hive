@@ -4,7 +4,7 @@ title: Onboard Shindig Mobile + backfill last-90-days
 status: pending
 complexity: low
 methodology: classic
-depends_on: [S4.1-register-project-skill, S4.2-bootstrap-since-dry-run-guardrail]
+depends_on: [S4.1-register-project-skill, S4.2-bootstrap-since-dry-run-guardrail, S4.2b-cross-project-hard-tag-wiring]
 wave: S4
 
 description: |

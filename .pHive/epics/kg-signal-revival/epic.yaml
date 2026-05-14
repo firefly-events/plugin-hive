@@ -95,13 +95,17 @@ stories:
     complexity: medium
     depends_on: [B0.2-persist-ref-telemetry-contract]
   - id: S4.2-bootstrap-since-dry-run-guardrail
-    title: kg-bootstrap --since + large-import guardrail
+    title: kg-bootstrap --since + large-import guardrail + legacy valid_from fix
     complexity: medium
+    depends_on: [S4.1-register-project-skill]
+  - id: S4.2b-cross-project-hard-tag-wiring
+    title: Wire [cross-project] hard-tag into step-02c + step-03 (sec audit S2)
+    complexity: low
     depends_on: [S4.1-register-project-skill]
   - id: S4.3-shindig-onboarding-backfill
     title: Onboard Shindig + backfill
     complexity: low
-    depends_on: [S4.1-register-project-skill, S4.2-bootstrap-since-dry-run-guardrail]
+    depends_on: [S4.1-register-project-skill, S4.2-bootstrap-since-dry-run-guardrail, S4.2b-cross-project-hard-tag-wiring]
   - id: S4.4-signal-flayr-onboarding-backfill
     title: Onboard Signal Flayr + backfill
     complexity: low

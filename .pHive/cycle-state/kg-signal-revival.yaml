@@ -102,3 +102,39 @@ team_review_history:
         no_new_escalations: true
     dispatched_to: [tpm]
     revision_cycles: 1  # v1.2 folds TPM sharpening + supplement before user gate
+
+pre_exec_phase_history:
+  - phase: pre-exec-specialist-audits
+    ran_at: "2026-05-14T00:06:59Z"  # ca5c95f commit time
+    triggers:
+      - id: performance:audit
+        outcome: passed
+        output_path: .pHive/specialist-phases/performance:audit/kg-signal-revival/pre-exec-audit.md
+        notes: |
+          3 sharpening recs (non-blocking SessionStart, knob caching, soft 1k log-warn).
+          Write-volume projection 20-80 triples/week (3-12x current 66). idx_predicate
+          sub-10ms through 100x growth. R1 mitigations correctly sized.
+      - id: security:plan-audit
+        outcome: needs_changes
+        output_path: .pHive/specialist-phases/security:plan-audit/kg-signal-revival/pre-exec-audit.md
+        notes: |
+          2 structural defects (sec audit S2 + S5) folded into execute plan:
+            - S2 (hard-tag wiring) -> NEW story S4.2b-cross-project-hard-tag-wiring
+              (depends_on: [S4.1]; blocks: [S4.3])
+            - S5 (legacy valid_from fileMtime fix) -> S4.2 amended (kg-import-cycle-
+              state.js:178 reads decision.set into valid_from for legacy format)
+          4 informational recs deferred (post-backfill content check, realpathSync
+          dedupe, README guidance, opt-out follow-on).
+        plan_commit: pending  # filled at plan(kg-signal-revival): fold ... commit
+
+  - phase: execute-pre-exec-loop
+    ran_at: "2026-05-14T00:35:00Z"
+    decision: skip-re-run
+    reason: |
+      Both pre-exec specialist audits already produced output at canonical paths
+      (committed in ca5c95f). Re-running TeamCreate would overwrite reviewed
+      findings. Step 4a of execute SKILL.md has no idempotency clause; this entry
+      documents the skip so subsequent invocations have the trail.
+    log_lines:
+      - "[info] pre-exec: trigger performance:audit output already exists at .pHive/specialist-phases/performance:audit/kg-signal-revival/pre-exec-audit.md (commit ca5c95f) -- skipping re-run"
+      - "[info] pre-exec: trigger security:plan-audit output already exists at .pHive/specialist-phases/security:plan-audit/kg-signal-revival/pre-exec-audit.md (commit ca5c95f) -- skipping re-run"

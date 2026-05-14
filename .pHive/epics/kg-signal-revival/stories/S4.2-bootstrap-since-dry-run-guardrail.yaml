@@ -1,6 +1,6 @@
 id: S4.2-bootstrap-since-dry-run-guardrail
 epic: kg-signal-revival
-title: kg-bootstrap-from-projects.js --since flag + large-import guardrail
+title: kg-bootstrap-from-projects.js --since flag + large-import guardrail + legacy valid_from fix
 status: pending
 complexity: medium
 methodology: classic
@@ -23,6 +23,13 @@ description: |
       interactive y/N confirmation succeeds. Prevents flood from all-history
       backfill across 3 source projects + 14+ epic namespaces.
 
+  (4) Legacy-format valid_from fix (security:plan-audit S5, pre-exec finding).
+      scripts/kg-import-cycle-state.js:178 currently uses fileMtime for legacy-
+      format (decision/rationale) entries. Signal Flayr's security-hotfix-p0.yaml
+      is legacy-format with `set:` field — fileMtime makes --since pass-all or
+      fail-all depending on disk timestamp. Read decision.set (ISO-stringified)
+      into valid_from when present, fall back to fileMtime when absent.
+
 acceptance_criteria:
   - "--since YYYY-MM-DD parsed correctly; invalid format errors clearly"
   - "Default --since = 2026-04-28 when not specified"
@@ -31,6 +38,8 @@ acceptance_criteria:
   - "Existing dedupe-by-name + dedupe-by-canonical-path behavior preserved"
   - "Backfill output namespaced as {project_name}/{epic_id} (existing pattern)"
   - "Tests: invalid --since date errors; --apply without --yes-large-import on >10k projected refuses"
+  - "kg-import-cycle-state.js: legacy-format decisions with `set:` field use set value (ISO) for valid_from, NOT file mtime"
+  - "Unit test: legacy-format fixture with `set: 2026-05-07` + recent mtime → valid_from = 2026-05-07, --since 2026-05-08 skips it"
 
 steps:
   - id: research
