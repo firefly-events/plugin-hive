@@ -694,6 +694,7 @@ class Walker:
                 state,
                 node_id,
                 {"node_id": node_id, "error_class": type(exc).__name__, "message": str(exc)},
+                source_epic=_source_epic(ctx),
             )
             save_state(state)
             raise
@@ -708,6 +709,7 @@ class Walker:
                 state,
                 node_id,
                 {"node_id": node_id, "error_class": type(exc).__name__, "message": str(exc)},
+                source_epic=_source_epic(ctx),
             )
             save_state(state)
             if node.optional:
@@ -1002,6 +1004,7 @@ class Walker:
                     state,
                     node_id,
                     {"node_id": node_id, "error_class": type(exc).__name__, "message": str(exc)},
+                    source_epic=_source_epic(ctx),
                 )
                 save(state, root=runs_root)
                 raise
@@ -1016,6 +1019,7 @@ class Walker:
                     state,
                     node_id,
                     {"node_id": node_id, "error_class": type(exc).__name__, "message": str(exc)},
+                    source_epic=_source_epic(ctx),
                 )
                 save(state, root=runs_root)
                 if node.optional:
@@ -1162,13 +1166,48 @@ def _record_optional_failure(state, node_id: str):
     return set_node_status(state, node_id, NodeStatus.FAILED)
 
 
-def _record_failure(state, node_id: str, failure_info: dict[str, Any]):
+def _record_failure(
+    state,
+    node_id: str,
+    failure_info: dict[str, Any],
+    *,
+    source_epic: str | None = None,
+):
     if state is None:
+        _emit_phase_failed(node_id, failure_info, source_epic)
         return None
     from hive.lib.dag_executor.run_state import NodeStatus, mark_failed, set_node_status
 
     state = set_node_status(state, node_id, NodeStatus.FAILED)
+    _emit_phase_failed(node_id, failure_info, source_epic)
     return mark_failed(state, failure_info)
+
+
+def _source_epic(ctx: dict[str, Any]) -> str:
+    for key in ("epic_id", "source_epic", "epic"):
+        value = ctx.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return "unknown"
+
+
+def _emit_phase_failed(
+    node_id: str,
+    failure_info: dict[str, Any],
+    source_epic: str | None,
+) -> None:
+    try:
+        from hive.lib.kg_emit import emit_kg_event, sanitize_obj
+
+        emit_kg_event(
+            subject=node_id,
+            predicate="phase_failed",
+            obj=sanitize_obj(failure_info.get("message", "")),
+            source_epic=source_epic or "unknown",
+            source_agent="dag-executor",
+        )
+    except Exception:
+        pass
 
 
 def _record_final_completion(state):

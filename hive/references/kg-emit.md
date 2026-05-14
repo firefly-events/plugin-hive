@@ -45,3 +45,30 @@ await emitKgEvent({
   sourceAgent: 'tester',
 });
 ```
+
+## Python Parity
+
+`hive/lib/kg_emit.py` mirrors the JS helper for Python executor code:
+
+```python
+from hive.lib.kg_emit import emit_kg_event, sanitize_obj
+
+emit_kg_event(
+    subject="S1.2-phase-failed-walker-emit",
+    predicate="phase_failed",
+    obj=sanitize_obj("HandlerError: phase failed"),
+    source_epic="kg-signal-revival",
+    source_agent="dag-executor",
+)
+```
+
+The Python helper reads the same `emit_lifecycle_at` knob through
+`hive/lib/config.py`, writes the same triple metadata shape to
+`~/.claude/hive/kg.sqlite`, and increments `kg_writes_total{predicate}`
+after successful writes. Tests can override the SQLite path with
+`HIVE_KG_SQLITE_PATH`.
+
+`phase_failed` is emitted by the Python DAG executor at the terminal
+failure-recording seam. The object is sanitized to a lowercase kebab-case
+reason with stack trace fragments, absolute paths, newlines, and
+non-`[a-z0-9-]` characters removed before the KG write.
