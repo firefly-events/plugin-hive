@@ -12,6 +12,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - KG signal revival S1.1 foundation: `emit_lifecycle_at` knob, `emitKgEvent()` helper, and `kg_writes_total{predicate}` counter registration.
+- KG signal revival S4.1: `/hive:register-project` skill, registry helper, and quoted path-with-space fixture for cross-project KG bootstrap registration.
 
 ## [2.0.0] - 2026-05-12
 

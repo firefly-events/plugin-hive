@@ -256,6 +256,8 @@ surface as errors; ChromaDB failures warn-only. See
 to seed the KG with cross-project decision history. A separate one-time
 backfill, [`scripts/kg-import-cycle-state.js`](scripts/kg-import-cycle-state.js),
 imports legacy `.pHive/cycle-state/*.yaml` records into the KG.
+Use [`/hive:register-project`](skills/hive/skills/register-project/SKILL.md)
+to add Hive-enabled project roots to the registry, including quoted paths with spaces.
 
 For the authoritative tier table, store interface, and filter API, see
 [`hive/references/memory-store-interface.md`](hive/references/memory-store-interface.md).
