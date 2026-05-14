@@ -1,0 +1,75 @@
+id: S6.2-planning-skill-why-helper
+epic: kg-signal-revival
+title: /plan integrates /hive:why for prior-decisions pre-flight section
+status: pending
+complexity: low
+methodology: classic
+depends_on: [S6.1-hive-why-slash-command]
+wave: S6
+
+description: |
+  Add a helper to skills/hive/skills/plan/SKILL.md that calls /hive:why during /plan
+  to surface "prior decisions on similar topics" inline.
+
+  Render as a §0 pre-flight section in the design discussion. Format:
+    "PRIOR DECISIONS:
+       - {subject} {predicate} {object} (in epic {source_epic}, {valid_from})
+       - ..."
+
+  If /hive:why returns zero results, omit the section entirely (don't print "no prior
+  decisions found" — adds noise).
+
+acceptance_criteria:
+  - "/plan SKILL.md has a pre-flight step that invokes /hive:why with the requirement topic"
+  - "When matches exist, design-discussion §0 includes PRIOR DECISIONS section"
+  - "When no matches, section omitted (no noise)"
+  - "Helper degrades silently if /hive:why fails"
+
+steps:
+  - id: research
+    description: Locate the right insertion point in /plan SKILL.md (before Phase A research, after kickoff gate).
+    agent: researcher
+  - id: implement
+    description: Add helper step in /plan SKILL.md. Renderer for PRIOR DECISIONS section.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run /plan against a topic with prior KG decisions; verify §0 renders. Run against fresh topic; verify section omitted.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm helper doesn't bloat design-discussion when no matches. Confirm topic-extraction logic for query string is sensible.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/plan/SKILL.md
+      purpose: Target file — insert helper near top
+    - path: skills/hive/skills/why/SKILL.md
+      purpose: Helper invokes this
+
+cross_cutting:
+  - concern: documentation
+    action: "Update /plan SKILL.md inline docs."
+  - concern: versioning
+    action: "Patch bump."
+  - concern: metrics
+    applies: true
+
+metric:
+  applies: true
+  name: planning.prior_decisions_surface_hits
+  direction: up
+  baseline: 0
+  target: 1
+  window: "next 5 /plan invocations"
+  source:
+    kind: events
+    ref: "Count of /plan invocations where §0 PRIOR DECISIONS rendered ≥1 result"
+  verify_at: "5 /plan invocations post-merge"

@@ -1,0 +1,104 @@
+epic: kg-signal-revival
+created_at: "2026-05-13T23:12:00Z"
+phase: planning
+scale: large
+
+escalations:
+  - trigger: performance:audit
+    placement: pre-exec
+    severity: moderate
+    stories: [S1.1-emit-foundation-knob-counter, S1.2-phase-failed-walker-emit, S2.1-phase-blocked-emit-sites, S2.2-superseded-emit-sites, S3.1-sidecar-lifecycle-scripts]
+    topic_areas_at_raise_time: [emit-foundation, emit-fanout, chroma-bootstrap]   # preserved for traceability
+    reason: |
+      tpm: R1 predicate over-emission is the biggest delivery risk. Phase-level
+      granularity default + scalar knob mitigations are good but unproven against
+      production write volume. Production has 66 triples today; this epic could
+      easily push to 1000s/week. Want a perf specialist to validate write-volume
+      projection, idx_predicate index hot-path impact, and ChromaDB sidecar
+      startup latency budget BEFORE Act I emit slices ship. Pre-exec timing —
+      perf-audit input should land before S1/S2 sequencing locks.
+    raised_by: tpm
+    raised_at: "2026-05-13T23:12:00Z"
+
+  - trigger: security:plan-audit
+    placement: pre-exec
+    severity: minor
+    stories: [S4.1-register-project-skill, S4.2-bootstrap-since-dry-run-guardrail, S4.3-shindig-onboarding-backfill, S4.4-signal-flayr-onboarding-backfill, S4.5-nail-tech-assistant-onboarding-backfill]
+    topic_areas_at_raise_time: [registry-expansion, cross-project-onboard]   # preserved for traceability
+    reason: |
+      tpm: Cross-project signal contamination (R3) is acknowledged with the
+      [cross-project: shindig] hard tag mitigation. But the boundary semantics
+      for what flows BETWEEN projects (planning proposals, decision-keys, agent
+      identifiers) deserve a plan-audit before the registry expansion slice.
+      Specifically: does Shindig's `decided` triple naming an agent or file path
+      leak meaningful information about Shindig into plugin-hive proposals?
+      Minor severity — existing rank penalty + tag mitigation cover most of the
+      surface, but explicit audit closes the question. Surface tripled at v1.1
+      (3 source projects + ~15 epic namespaces); structural mitigations (rank
+      penalty + hard-tag) remain — severity unchanged per TPM supplement.
+    raised_by: tpm
+    raised_at: "2026-05-13T23:12:00Z"
+    backfilled_at: "2026-05-13T23:48:00Z"   # step-11 canonical ID backfill
+
+cross_project_targets:
+  - registry_name: plugin-hive
+    path: /Users/don/Documents/plugin-hive
+    state: already-registered
+  - registry_name: shindig
+    path: /Users/don/Documents/KMP/Shindig
+    state: verified-reachable
+    cycle_state_epics: [a2p-10dlc-compliance, create-event-enhancements, event-distribution, facebook-integration]  # + more
+  - registry_name: signal-flayr
+    path: /Users/don/Documents/GitHub/ffe-social-engine
+    state: verified-reachable
+    cycle_state_epics: [landing-page-rethink, security-audit-2026-05-07, security-hotfix-p0, settings-redesign-v2, signal-flayr-reskin-p2]
+  - registry_name: nail-tech-assistant
+    path: /Users/don/Documents/GitHub/Nail Tech Assitant   # note: filesystem typo "Assitant"
+    state: verified-reachable
+    cycle_state_epics: [epic-a-foundation-auth, epic-b-pinterest-integration, epic-c-reference-and-generation, epic-d-visualizer-library, epic-e-chat-refinement]
+    path_quirk: contains_space   # /hive:register-project must accept quoted paths
+
+team_review_history:
+  - phase: design-discussion
+    reviewed_at: "2026-05-13T23:12:00Z"
+    reviews:
+      - agent: tpm
+        verdict: approve-with-escalation
+        summary: |
+          Three-act sequencing approved with sub-layer slice proposal (B0/S1-S6).
+          S7-kg-signal-production-emission reconceptualized as Act I exit criterion
+          (not a story). Min-viable-ship cut = B0+S1+S2+S5 (drops S3 Chroma, S4
+          registry, S6 UX). R1 mitigation tightened: granularity scalar
+          phase|story|step|off + write-rate counter in S1 not S5. Backfill --since
+          should align with step-02c's actual lookback (verify in B2). Scope
+          confirmed LARGE.
+    dispatched_to: [tpm]
+    not_reachable: [researcher, technical-writer, architect]  # codex async did not land
+    revision_cycles: 0  # design-discussion v2 incorporates feedback inline before user
+
+  - phase: structured-outline
+    reviewed_at: "2026-05-13T23:42:00Z"
+    reviews:
+      - agent: tpm
+        verdict: approve-with-escalation
+        summary: |
+          Phase-slice 1:1 discipline holds (7 outline phases ↔ 7 V-plan slices).
+          Risk registry R1-R9 correctly slice-mapped (R6 + R7 outline-introduced;
+          R8 + R9 carried from V-plan open questions). Drop-order matches V-plan
+          §6 Moldability. Elicitation E1-E10 mostly defensible — E2 sharpened
+          with API contract lock-in framing; E4 sharpened with 0.7× retune-trigger
+          caveat. 9/10 decision-point defaults agreed; DP #3 now RESOLVED via
+          user-provided paths (all 3 real-import); DP #9 doc-surface priority
+          note added. S7 mapping is exact match with B2 reconceptualization.
+          Story count drift: 18 stories at full scope (V-plan upper bound was 17;
+          S4 expansion S4.4+S4.5 = real-import is the +1).
+        supplement_summary: |
+          Cycle-state cross_project_targets[] block exposed two TPM-search misses
+          (signal-flayr is `ffe-social-engine` repo; NTA path has space+typo).
+          DP #3 default flipped from stub-seed to "all three real-import".
+          New S4.1 acceptance: skill must handle quoted/spaced paths.
+          New S4.2 acceptance: large-import guardrail (--yes-large-import flag
+          if >10,000 triples projected) reinforces R4 mitigation.
+        no_new_escalations: true
+    dispatched_to: [tpm]
+    revision_cycles: 1  # v1.2 folds TPM sharpening + supplement before user gate

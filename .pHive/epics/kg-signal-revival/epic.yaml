@@ -1,0 +1,160 @@
+name: kg-signal-revival
+title: KG Signal Revival — wire firing pins for the cold-but-shipped knowledge graph
+description: |
+  Hive's KG pipeline shipped over 1.1.3 (memory foundation) and 1.1.4 (kg-augmented-meta-signal).
+  Pipeline is COLD: only `decided` predicate fires (66 triples); priority predicates
+  (phase_failed, phase_blocked, superseded) that step-02c queries never emit; ChromaDB
+  sidecar never bootstrapped; projects.yaml has 1 entry; zero kg_signal proposals
+  in production /meta-optimize cycles.
+
+  This epic instruments the firing pins to deliver three north-stars:
+    1. Drive planning signal — kg_signal proposals surface in /meta-optimize.
+    2. Decision audit trail — /hive:why <topic> returns triples with provenance.
+    3. Cross-project learning — Shindig + Signal Flayr + NTA decisions cluster
+       into plugin-hive's planning gates.
+
+  Closes loop on kg-augmented-meta-signal/S7-kg-signal-production-emission via S2.3
+  Act I exit gate (no separate story).
+
+target_codebase: /Users/don/Documents/plugin-hive
+branch: feat/kg-signal-revival
+methodology: classic
+scale: large
+parallel_teams: true
+
+success_metrics:
+  - name: planning_signal
+    description: ≥1 /meta-optimize cycle produces ≥1 kg_signal proposal
+    window: next 5 cycles
+    threshold: any non-zero hit
+  - name: audit_trail
+    description: /hive:why <topic> returns triples for any in-window decision
+    threshold: 100%
+  - name: cross_project
+    description: ≥1 cross-project-tagged step-02c finding observable
+    window: next 5 cycles
+    threshold: ≥1
+
+slices:
+  B0: consumer-contract sliver (docs-only)
+  S1: emit foundation + phase_failed at walker
+  S2: priority fanout (phase_blocked + superseded) + Act I exit gate
+  S3: ChromaDB sidecar bootstrap
+  S4: multi-project registry + 3 real-imports
+  S5: telemetry + miss-reason + cycle rollup
+  S6: /hive:why retrospection UX + secondary predicates
+
+stories:
+  # B0 — consumer-contract sliver
+  - id: B0.1-consumer-contracts
+    title: Predicate consumer contracts document
+    complexity: low
+    depends_on: []
+  - id: B0.2-persist-ref-telemetry-contract
+    title: Persist + reference + telemetry contracts document
+    complexity: low
+    depends_on: []
+
+  # S1 — emit foundation
+  - id: S1.1-emit-foundation-knob-counter
+    title: emitKgEvent() helper + emit_lifecycle_at scalar knob + write-rate counter
+    complexity: medium
+    depends_on: [B0.1-consumer-contracts, B0.2-persist-ref-telemetry-contract]
+  - id: S1.2-phase-failed-walker-emit
+    title: Emit phase_failed at dag_executor walker fail path
+    complexity: medium
+    depends_on: [S1.1-emit-foundation-knob-counter]
+
+  # S2 — priority fanout
+  - id: S2.1-phase-blocked-emit-sites
+    title: Emit phase_blocked at 3 seams
+    complexity: medium
+    depends_on: [S1.2-phase-failed-walker-emit]
+  - id: S2.2-superseded-emit-sites
+    title: Emit superseded at 3 seams
+    complexity: medium
+    depends_on: [S2.1-phase-blocked-emit-sites]
+  - id: S2.3-act-i-exit-gate-verification
+    title: Act I exit gate (closes S7 outcome metric loop)
+    complexity: low
+    depends_on: [S2.2-superseded-emit-sites]
+
+  # S3 — ChromaDB sidecar (parallel with S4)
+  - id: S3.1-sidecar-lifecycle-scripts
+    title: ChromaDB sidecar lifecycle scripts + SessionStart hook
+    complexity: medium
+    depends_on: [B0.2-persist-ref-telemetry-contract]
+  - id: S3.2-wrapper-port-and-collection-bootstrap
+    title: chromadb-wrapper port + collection bootstrap
+    complexity: low
+    depends_on: [S3.1-sidecar-lifecycle-scripts]
+
+  # S4 — multi-project registry (parallel with S3)
+  - id: S4.1-register-project-skill
+    title: /hive:register-project skill (quoted/spaced-path handling)
+    complexity: medium
+    depends_on: [B0.2-persist-ref-telemetry-contract]
+  - id: S4.2-bootstrap-since-dry-run-guardrail
+    title: kg-bootstrap --since + large-import guardrail
+    complexity: medium
+    depends_on: [S4.1-register-project-skill]
+  - id: S4.3-shindig-onboarding-backfill
+    title: Onboard Shindig + backfill
+    complexity: low
+    depends_on: [S4.1-register-project-skill, S4.2-bootstrap-since-dry-run-guardrail]
+  - id: S4.4-signal-flayr-onboarding-backfill
+    title: Onboard Signal Flayr + backfill
+    complexity: low
+    depends_on: [S4.3-shindig-onboarding-backfill]
+  - id: S4.5-nail-tech-assistant-onboarding-backfill
+    title: Onboard NTA (path-with-space canary)
+    complexity: low
+    depends_on: [S4.4-signal-flayr-onboarding-backfill]
+
+  # S5 — telemetry
+  - id: S5.1-metric-registry-counters
+    title: KG counters + hit-rate gauge in metric_registry
+    complexity: medium
+    depends_on: [S2.2-superseded-emit-sites, S4.3-shindig-onboarding-backfill]
+  - id: S5.2-miss-reason-taxonomy
+    title: Miss-reason taxonomy at step-02c
+    complexity: medium
+    depends_on: [S5.1-metric-registry-counters]
+  - id: S5.3-cycle-rollup-jsonl
+    title: Per-cycle KG metrics JSONL + cycle-rollup line
+    complexity: low
+    depends_on: [S5.2-miss-reason-taxonomy]
+
+  # S6 — retrospection UX
+  - id: S6.1-hive-why-slash-command
+    title: /hive:why retrospection UX
+    complexity: medium
+    depends_on: [S2.2-superseded-emit-sites, S3.2-wrapper-port-and-collection-bootstrap]
+  - id: S6.2-planning-skill-why-helper
+    title: /plan integrates /hive:why for prior decisions
+    complexity: low
+    depends_on: [S6.1-hive-why-slash-command]
+  - id: S6.3-secondary-predicate-wiring
+    title: Conditional secondary predicate wiring (UX-driven)
+    complexity: medium
+    depends_on: [S6.1-hive-why-slash-command]
+
+escalations_pre_exec:
+  - trigger: performance:audit
+    severity: moderate
+    affected_stories: [S1.1-emit-foundation-knob-counter, S1.2-phase-failed-walker-emit, S2.1-phase-blocked-emit-sites, S2.2-superseded-emit-sites, S3.1-sidecar-lifecycle-scripts]
+    rationale: R1 over-emission write-volume validation + ChromaDB sidecar startup latency budget
+    raised_by: tpm
+  - trigger: security:plan-audit
+    severity: minor
+    affected_stories: [S4.1-register-project-skill, S4.2-bootstrap-since-dry-run-guardrail, S4.3-shindig-onboarding-backfill, S4.4-signal-flayr-onboarding-backfill, S4.5-nail-tech-assistant-onboarding-backfill]
+    rationale: Cross-project boundary semantics across 3 source projects + ~15 epic namespaces
+    raised_by: tpm
+
+s7_loop_closure:
+  prior_story: kg-augmented-meta-signal/S7-kg-signal-production-emission
+  closed_by: S2.3-act-i-exit-gate-verification
+  mechanism: |
+    SELECT COUNT(*) FROM triples WHERE predicate IN ('phase_failed','phase_blocked','superseded')
+    must return > 0 after S2.2 ships. S2.3 automates this check post-cycle and emits a
+    PASSED marker when crossed.
