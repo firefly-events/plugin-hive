@@ -243,7 +243,10 @@ already decided before it starts. See [`hive/references/knowledge-graph-schema.m
 **L3 — ChromaDB semantic recall.** Optional sidecar that wraps a local
 ChromaDB instance via JSON-RPC. When the sidecar is unavailable, Hive
 **degrades gracefully to L1+L0** — no consumer setup required to use the rest
-of the stack.
+of the stack. To enable the sidecar, install the CLI with `pip install chromadb`
+or `pipx install chromadb`; Hive's SessionStart hook launches it in the
+background and writes state under `~/.claude/hive/chromadb.{port,pid,lock}`.
+See [`hive/references/chromadb-ops.md`](hive/references/chromadb-ops.md).
 
 **Session-end orchestration.** Every session closes with a three-phase write:
 insights → `kg_write` → compile in parallel with `chromadb.index`. KG failures
