@@ -76,6 +76,8 @@ supersessions = query_decisions({ predicate: "superseded",   as_of: now })
 
 If both groupings return empty: jump to step 7, emit an empty findings list, and log `kg_signal: no eligible triples — skipping`.
 
+For any finding that will be tagged `cross_project_signal`, derive `<name>` from the source project's registry name (`projects[].name` in `~/.claude/hive/projects.yaml`, per the register-project row shape) and prepend `[cross-project: <name>]` to the finding `description` before any later rank or proposal handling. The rank multiplier in step 5 MUST NOT rewrite or strip this literal prefix.
+
 ### 4. Apply the three-layer relevance filter
 
 For each returned triple, apply the layers in order. A triple that fails any layer is discarded.
@@ -135,6 +137,18 @@ evidence:
 discovery_source: kg_signal
 tag: local_signal | cross_project_signal
 rank_score: {final_rank from step 5}
+```
+
+When `tag: cross_project_signal`, `description` MUST start with `[cross-project: <name>]`, where `<name>` is the source project's registry name (`projects[].name`) from the project registry shape. Preserve the rest of the description as a one-line human-readable summary.
+
+```yaml
+# Cross-project finding example
+description: "[cross-project: shindig] 3 phase_failed triples in epic create-event-enhancements within 30d window"
+tag: cross_project_signal
+evidence:
+  predicate: phase_failed
+  source_epic: shindig/create-event-enhancements
+  cluster_size: 3
 ```
 
 > ID NAMESPACE: use `kg-finding-{N}` to keep the kg_signal feed grep-separable from step-02's `finding-{N}` and step-02b's `external-proposal-{N}`. Step-03 consumers MUST accept `kg-finding-` alongside `finding-` and `external-proposal-`; the `discovery_source` field is the authoritative routing key.

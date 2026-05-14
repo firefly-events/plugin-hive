@@ -86,8 +86,28 @@ step-02 shape, NOT the step-02b candidate shape). Before ranking:
   MUST accept this prefix alongside `proposal-{N}` (internal) and
   `external-proposal-{N}` (external). The `discovery_source` field is the
   authoritative feed identifier, not the ID prefix.
+- Cross-project hard tag: when a kg finding's `tag` is
+  `cross_project_signal`, carry the `[cross-project: <name>]` prefix forward
+  from the finding description into the rendered proposal `description` and
+  `rationale` where applicable. If the finding description already starts with
+  `[cross-project: <name>]`, preserve that exact prefix and do not add a second
+  one.
 - Absence-graceful: if `kg-findings.yaml` is missing or empty, fall through
   to existing behavior with no error.
+
+Rendered cross-project proposal example:
+
+```yaml
+id: proposal-2
+title: Address repeated create-event phase failures
+discovery_source: kg_signal
+addresses_findings: [kg-finding-1]
+description: "[cross-project: shindig] 3 phase_failed triples in epic create-event-enhancements within 30d window"
+rationale: |
+  [cross-project: shindig] KG signal shows repeated phase_failed triples from
+  the source project. Preserve the prefix so reviewers can identify the
+  cross-project provenance in proposal review.
+```
 
 ### 3. Rank proposals
 Score each proposal on three dimensions (1–5 each):
