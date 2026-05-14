@@ -58,9 +58,13 @@ state/
 !.pHive/specialist-phases/security:plan-audit/
 !.pHive/specialist-phases/security:plan-audit/sandcastle-adoption-followon/
 !.pHive/specialist-phases/security:plan-audit/sandcastle-adoption-followon/**
+!.pHive/specialist-phases/security:plan-audit/kg-signal-revival/
+!.pHive/specialist-phases/security:plan-audit/kg-signal-revival/**
 !.pHive/specialist-phases/performance:audit/
 !.pHive/specialist-phases/performance:audit/sandcastle-adoption-followon/
 !.pHive/specialist-phases/performance:audit/sandcastle-adoption-followon/**
+!.pHive/specialist-phases/performance:audit/kg-signal-revival/
+!.pHive/specialist-phases/performance:audit/kg-signal-revival/**
 # Metrics carrier (.pHive/metrics/) — authored by S2 stories of the
 # meta-improvement-system epic; contains schema docs and, from C1.4 on,
 # fixtures consumed by hive/lib/metrics/ unit tests.
