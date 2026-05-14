@@ -9,6 +9,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- KG signal revival S1.1 foundation: `emit_lifecycle_at` knob, `emitKgEvent()` helper, and `kg_writes_total{predicate}` counter registration.
+
 ## [2.0.0] - 2026-05-12
 
 **Hive 2.0 milestone.** Cut from `dev/hive-2.0`. Bundles CWC 2026 A-group + Epic A (catalog hygiene + 3 mattpocock-aligned borrows) + Epic B (structural refactor + gate-lift) + Epic C (Task-Tracking Adapter ABI) as the 2.0 cut-line, with Epic D (Sandcastle adoption follow-on) and Epic F (UI cluster extract-config deeper) riding parallel.

@@ -19,9 +19,23 @@ KNOWN_DIMENSIONS = frozenset(
     }
 )
 
+REGISTERED_COUNTERS = {
+    "kg_writes_total": ("predicate",),
+}
+
 
 def is_known_dimension(name: str) -> bool:
     return name in KNOWN_DIMENSIONS
+
+
+def is_registered_counter(name: str) -> bool:
+    return name in REGISTERED_COUNTERS
+
+
+def counter_labels(name: str) -> tuple[str, ...]:
+    if name not in REGISTERED_COUNTERS:
+        raise ValueError(f"unknown counter: {name}")
+    return REGISTERED_COUNTERS[name]
 
 
 def normalize_dimensions(raw_metrics: list[dict[str, Any]] | dict[str, Any]) -> dict[str, Any]:

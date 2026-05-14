@@ -200,4 +200,4 @@ async function runCompile(memoriesBase) {
   console.log(`[session-end] compile() triggered for ${memoriesBase}`);
 }
 
-module.exports = { runSessionEnd };
+module.exports = { runSessionEnd, kgWrite };

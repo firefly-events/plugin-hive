@@ -43,6 +43,13 @@ paths:
 metrics:
   enabled: false              # opt-in only; no <state_dir>/metrics/events/*.jsonl writes when false
 
+# KG lifecycle emission granularity.
+# phase: emit lifecycle KG triples at phase boundaries (default, low volume).
+# story: emit at story boundaries.
+# step: emit at individual workflow steps (highest volume).
+# off: disable lifecycle KG emission without disabling KG reads/imports.
+emit_lifecycle_at: phase
+
 # Quality gate thresholds
 quality_gates:
   auto_pass_threshold: 0.9
