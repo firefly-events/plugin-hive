@@ -1,5 +1,5 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-05-14 | **Date:** 2026-05-14 | **Verdict:** PASSED (discard)
+**Cycle:** meta-2026-05-15 | **Date:** 2026-05-15 | **Verdict:** PASSED
 
 ---
 
@@ -11,7 +11,7 @@
 
 ## What Was Found (Not Fixed This Cycle)
 
-- **STUB_DOC** `hive/references/hive-cloud-roadmap.md` — 13-line placeholder stub for the deferred Hive Cloud epic _(reason: out_of_scope — S16 forward-reference stub; expanding it is premature without the Hive Cloud epic active; recurring finding since meta-2026-05-11)_
+- **STUB_DOC** `hive/references/hive-cloud-roadmap.md` — 13-line placeholder stub for the deferred Hive Cloud epic _(reason: out_of_scope — intentional forward-reference placeholder; expanding would be speculative without the Hive Cloud epic active; also flagged in meta-2026-05-11 and meta-2026-05-12)_
 
 ---
 
@@ -31,4 +31,4 @@
 | Changes reverted | 0 |
 | Flagged for human | 0 |
 
-**Next cycle priority:** Codebase analysis is currently stable. The only recurring finding (`hive-cloud-roadmap.md` stub) is intentionally deferred pending the Hive Cloud epic. If the Hive Cloud epic activates, expand this stub or remove the stub designation. Otherwise, consider seeding the backlog with new candidates to drive the cycle via the step-03b fallback path.
+**Next cycle priority:** The `hive-cloud-roadmap.md` stub will remain out-of-scope until the Hive Cloud epic is activated. Consider activating the backlog fallback (candidates mmo-2026-04-21-002 or mmo-2026-04-21-003 remain pending) in a future cycle where analysis again finds zero in-scope findings.
