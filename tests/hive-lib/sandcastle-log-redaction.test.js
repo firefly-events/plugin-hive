@@ -306,6 +306,13 @@ test('Header-line form — "X-API-Key: <value>" is masked, header name preserved
   assert.match(result, /^X-API-Key:\s*\[REDACTED\]$/);
 });
 
+test('Header-line form — quoted value "X-API-Key: \\"sk-live\\"" is masked, quotes preserved', () => {
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine('X-API-Key: "sk-live-quoted-leak"');
+  assert.doesNotMatch(result, /sk-live-quoted-leak/);
+  assert.match(result, /^X-API-Key:\s*"\[REDACTED\]"$/);
+});
+
 test('Header-line form — "X-Auth-Token: <value>" is masked', () => {
   const { redactSandcastleLogLine } = loadModule();
   const result = redactSandcastleLogLine('X-Auth-Token: leak-token-3');

@@ -74,7 +74,7 @@ const RE_JSON_KV =
  * JSON string (preceded by `"`) — those go through RE_JSON_KV instead.
  */
 const RE_HEADER_LINE =
-  /(^|[\n\r])([ \t]*(?!["'])[a-zA-Z][a-zA-Z0-9-]*(?:-key|-token|-secret)\s*:\s*)([^\s"'`,\]}\n]+)/gim;
+  /(^|[\n\r])([ \t]*(?!["'])[a-zA-Z][a-zA-Z0-9-]*(?:-key|-token|-secret)\s*:\s*)(?:"([^"\\\n]+)"|([^\s"'`,\]}\n]+))/gim;
 
 // ---------------------------------------------------------------------------
 // Core redact function
@@ -98,7 +98,9 @@ function redactSandcastleLogLine(line) {
   s = s.replace(RE_ARGV, '$1=[REDACTED]');
   s = s.replace(RE_BEARER, '$1[REDACTED]');
   s = s.replace(RE_JSON_KV, '$1: "[REDACTED]"');
-  s = s.replace(RE_HEADER_LINE, '$1$2[REDACTED]');
+  s = s.replace(RE_HEADER_LINE, (_m, p1, p2, quoted, _unquoted) =>
+    p1 + p2 + (quoted !== undefined ? '"[REDACTED]"' : '[REDACTED]')
+  );
   return s;
 }
 
