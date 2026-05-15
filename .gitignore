@@ -108,3 +108,6 @@ __pycache__/
 # upstream-watch: durable upstream blocker records tracked at maintainer level.
 !.pHive/upstream-watch/
 !.pHive/upstream-watch/**
+
+# Local dev — better-sqlite3 transient install for kg bootstrap (BYO enhancement)
+node_modules/
