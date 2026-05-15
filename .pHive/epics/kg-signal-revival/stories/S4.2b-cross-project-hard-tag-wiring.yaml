@@ -1,0 +1,99 @@
+id: S4.2b-cross-project-hard-tag-wiring
+epic: kg-signal-revival
+title: Wire [cross-project: <name>] hard tag into step-02c + step-03 finding/proposal shape
+status: pending
+complexity: low
+methodology: classic
+depends_on: [S4.1-register-project-skill]
+wave: S4
+
+description: |
+  Audit-driven story (security:plan-audit S2, pre-exec finding, severity needs-fix).
+
+  The [cross-project: <name>] hard tag is the R3 mitigation referenced in 6 plan
+  locations (design-discussion, structured-outline x2, vertical-plan x2, S4.3 +
+  S4.4 acceptance criteria). It is currently NOT wired in the consumer-contract
+  chain:
+
+  - hive/workflows/steps/meta-team-cycle/step-02c-kg-signal.md §6 finding shape
+    emits structured `tag: cross_project_signal` + `evidence.source_epic`, but
+    the `description` string carries no human-visible tag prefix.
+
+  - hive/workflows/steps/meta-team-cycle/step-03-proposal.md §2c preserves
+    `discovery_source: kg_signal` but does not inject `[cross-project: <name>]`
+    into the proposal `description` or `rationale` string.
+
+  Without this wiring, S4.3 / S4.4 / S4.5 acceptance criteria ("step-02c emits
+  ≥1 finding with [cross-project: shindig] hard-tag") fail at test time. Must
+  ship before S4.3.
+
+acceptance_criteria:
+  - "step-02c-kg-signal.md §6 amended: cross_project_signal-tagged findings set description: '[cross-project: <name>] <one-line>'"
+  - "step-03-proposal.md §2c amended: proposal render contract carries the [cross-project: <name>] prefix forward from finding description into proposal.description / rationale"
+  - "Both step files updated with explicit example showing the tag rendering"
+  - "S4.3, S4.4, S4.5 acceptance can verify literal [cross-project: <name>] string presence in kg-findings.yaml"
+
+steps:
+  - id: research
+    description: |
+      Read step-02c-kg-signal.md §6 (finding shape) + step-03-proposal.md §2c
+      (proposal render). Identify exact line/section where description string is
+      assembled for cross-project findings.
+    agent: researcher
+  - id: implement
+    description: |
+      Amend step-02c-kg-signal.md §6: cross_project_signal findings get
+      description prefixed with [cross-project: <name>].
+      Amend step-03-proposal.md §2c: proposal render must preserve the prefix
+      through to proposal.description (and rationale where applicable).
+      Add an example block in each file showing the rendered tag.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Smoke check: grep both step files for "[cross-project:" — must return a
+      non-zero match count (was zero pre-change). Cross-reference the example
+      block against the proposal schema.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify wording matches the plan canon (design-discussion, vertical-plan).
+      Confirm the tag prefix survives proposal-merge logic if any.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit as a single story commit on feat/kg-signal-revival.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive-ui-f
+  key_files:
+    - path: hive/workflows/steps/meta-team-cycle/step-02c-kg-signal.md
+      purpose: Finding-shape contract; §6 needs description tag-prefix
+    - path: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
+      purpose: Proposal-render contract; §2c needs to carry the tag forward
+    - path: .pHive/specialist-phases/security:plan-audit/kg-signal-revival/pre-exec-audit.md
+      purpose: Pre-exec audit finding #3 + recommendation S2 (source of this story)
+
+cross_cutting:
+  - concern: documentation
+    action: "Both step files are documentation. No CHANGELOG needed (workflow-internal)."
+  - concern: metrics
+    applies: false
+    justification: "Doc/spec sliver; enables S4.3-S4.5 ACs but doesn't move a metric directly."
+
+metric:
+  applies: false
+  justification: "Specification fix derived from pre-exec security audit S2 finding."
+
+risks:
+  - severity: low
+    description: |
+      step-03 proposal-merge logic could collapse duplicate proposals from multiple
+      source projects and lose individual cross-project prefixes.
+    mitigation: |
+      If proposal-merge is identified during research, document the dedup behavior
+      and either (a) preserve all prefixes joined, or (b) defer dedup of cross-
+      project findings as a follow-on.

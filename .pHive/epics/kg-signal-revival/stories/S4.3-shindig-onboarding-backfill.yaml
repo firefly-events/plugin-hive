@@ -1,0 +1,90 @@
+id: S4.3-shindig-onboarding-backfill
+epic: kg-signal-revival
+title: Onboard Shindig Mobile + backfill last-90-days
+status: pending
+complexity: low
+methodology: classic
+depends_on: [S4.1-register-project-skill, S4.2-bootstrap-since-dry-run-guardrail, S4.2b-cross-project-hard-tag-wiring]
+wave: S4
+
+description: |
+  First real-import. Register Shindig Mobile to the system project registry; run
+  filtered backfill from predicate-canon-date forward.
+
+  Path: /Users/don/Documents/KMP/Shindig
+  Registry name: shindig
+  Cycle-state epics present (4+ at planning time): a2p-10dlc-compliance,
+  create-event-enhancements, event-distribution, facebook-integration.
+
+  After this story: cross-project rank penalty in step-02c starts firing with real
+  Shindig triples to penalize. First cross-project-tagged finding observable in
+  plugin-hive's next /meta-optimize cycle.
+
+acceptance_criteria:
+  - "/hive:register-project /Users/don/Documents/KMP/Shindig succeeds"
+  - "~/.claude/hive/projects.yaml gains shindig entry"
+  - "kg-bootstrap-from-projects.js --apply --since 2026-04-28 imports Shindig's cycle-state"
+  - "≥5 Shindig triples land in plugin-hive KG under shindig/{epic_id} namespace"
+  - "Next /meta-optimize cycle on plugin-hive: step-02c emits ≥1 finding with [cross-project: shindig] hard-tag IF Shindig has relevant phase_failed/phase_blocked/superseded triples"
+  - "If Shindig has no priority-predicate triples (pre-canon project), document this in execution notes; the registration + backfill itself is the deliverable"
+
+steps:
+  - id: research
+    description: Inventory Shindig's .pHive/cycle-state/ files; confirm 4+ epic yamls + their decision-content density.
+    agent: researcher
+  - id: implement
+    description: |
+      Run /hive:register-project /Users/don/Documents/KMP/Shindig.
+      Run node scripts/kg-bootstrap-from-projects.js --dry-run (verify projected count <10k).
+      Run node scripts/kg-bootstrap-from-projects.js --apply --since 2026-04-28.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Verify projects.yaml entry. Verify KG triple count delta. Run a /meta-optimize
+      cycle and inspect kg-findings.yaml for cross-project tag.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Validate triples namespaced correctly; flag any contamination (Shindig-internal info bleeding into plugin-hive proposal descriptions beyond the hard-tag).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit. No code; commit is the registry + KG mutation. Document execution-result count in commit message.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: /Users/don/Documents/KMP/Shindig/.pHive/cycle-state/
+      purpose: Source corpus for backfill
+    - path: ~/.claude/hive/projects.yaml
+      purpose: Registry mutation target
+    - path: ~/.claude/hive/kg.sqlite
+      purpose: KG mutation target
+
+cross_cutting:
+  - concern: documentation
+    action: "Document in execution notes: triple count imported + namespace pattern verified."
+  - concern: versioning
+    action: "No code → no version bump."
+  - concern: metrics
+    applies: true
+
+metric:
+  applies: true
+  name: kg_signal.cross_project_shindig_triples
+  direction: up
+  baseline: 0
+  target: 5
+  window: "post-backfill"
+  source:
+    kind: sql
+    ref: "SELECT COUNT(*) FROM triples WHERE source_epic LIKE 'shindig/%';"
+  verify_at: "S4.3 integrate close"
+
+risks:
+  - severity: low
+    description: Shindig's .pHive/cycle-state/ may be predominantly pre-canon-date → backfill imports 0 triples.
+    mitigation: Acceptable; registration + bootstrap mechanism is the deliverable. Document in execution notes.

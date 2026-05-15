@@ -1,0 +1,95 @@
+id: S4.2-bootstrap-since-dry-run-guardrail
+epic: kg-signal-revival
+title: kg-bootstrap-from-projects.js --since flag + large-import guardrail + legacy valid_from fix
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [S4.1-register-project-skill]
+wave: S4
+
+description: |
+  Extend scripts/kg-bootstrap-from-projects.js with three new safety mechanisms:
+
+  (1) --since YYYY-MM-DD flag (default: 2026-04-28 = predicate-canon-date per DP #5).
+      Filters cycle-state entries by valid_from. Decisions older than --since are
+      skipped (prevents R4 pollution from pre-canon entries).
+
+  (2) Confirm --dry-run is DEFAULT mode + emits a diff-preview showing projected
+      triple count per project + sample triples. --apply required for actual writes.
+
+  (3) Large-import guardrail (per TPM supplement, reinforces R4): dry-run output
+      reports projected triple count BEFORE --apply. If projected count > 10,000
+      triples, --apply REFUSES unless --yes-large-import flag is also passed OR
+      interactive y/N confirmation succeeds. Prevents flood from all-history
+      backfill across 3 source projects + 14+ epic namespaces.
+
+  (4) Legacy-format valid_from fix (security:plan-audit S5, pre-exec finding).
+      scripts/kg-import-cycle-state.js:178 currently uses fileMtime for legacy-
+      format (decision/rationale) entries. Signal Flayr's security-hotfix-p0.yaml
+      is legacy-format with `set:` field — fileMtime makes --since pass-all or
+      fail-all depending on disk timestamp. Read decision.set (ISO-stringified)
+      into valid_from when present, fall back to fileMtime when absent.
+
+acceptance_criteria:
+  - "--since YYYY-MM-DD parsed correctly; invalid format errors clearly"
+  - "Default --since = 2026-04-28 when not specified"
+  - "--dry-run is default; output shows 'WOULD INSERT N triples (M skipped pre---since)'"
+  - "--apply requires either explicit count<10k OR --yes-large-import OR interactive confirmation"
+  - "Existing dedupe-by-name + dedupe-by-canonical-path behavior preserved"
+  - "Backfill output namespaced as {project_name}/{epic_id} (existing pattern)"
+  - "Tests: invalid --since date errors; --apply without --yes-large-import on >10k projected refuses"
+  - "kg-import-cycle-state.js: legacy-format decisions with `set:` field use set value (ISO) for valid_from, NOT file mtime"
+  - "Unit test: legacy-format fixture with `set: 2026-05-07` + recent mtime → valid_from = 2026-05-07, --since 2026-05-08 skips it"
+
+steps:
+  - id: research
+    description: Re-read kg-bootstrap-from-projects.js current state. Identify where to inject --since filter + --yes-large-import gate.
+    agent: researcher
+  - id: implement
+    description: |
+      Add --since parsing + filter in walk-cycle-state loop.
+      Confirm --dry-run default (it already is — verify diff-preview emits projected count).
+      Add --yes-large-import flag + interactive prompt fallback at >10k threshold.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Unit: --since parser; --yes-large-import gate logic.
+      Integration: run against tests/fixtures with synthetic large/small project sets.
+      Negative: invalid --since date errors; --apply on >10k without --yes-large-import errors.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm 10k threshold is reasonable; flag if it should be config-driven.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: scripts/kg-bootstrap-from-projects.js
+      purpose: Target file
+    - path: scripts/kg-import-cycle-state.js
+      purpose: Invoked per project; verify --since reaches it OR is filtered upstream
+
+cross_cutting:
+  - concern: documentation
+    action: "Add to README: 'Bootstrap historical KG triples from registered projects' section. CHANGELOG entry for new flags."
+  - concern: versioning
+    action: "Patch bump."
+  - concern: metrics
+    applies: false
+    justification: "Tooling enhancement; enables S4.3-S4.5 backfill; doesn't move metric directly."
+
+metric:
+  applies: false
+  justification: "Enabler story."
+
+risks:
+  - severity: low
+    description: 10k threshold may be too low if a single project has dense decision history.
+    mitigation: Configurable via env var BOOTSTRAP_LARGE_IMPORT_THRESHOLD (default 10000); document in skill.

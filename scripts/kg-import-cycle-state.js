@@ -10,7 +10,8 @@
  * all new triple writes at session-end.
  *
  * Usage: node scripts/kg-import-cycle-state.js [--dry-run] \
- *          [--cycle-state-dir <path>] [--source-epic-prefix <name>]
+ *          [--cycle-state-dir <path>] [--source-epic-prefix <name>] \
+ *          [--since YYYY-MM-DD]
  *
  * --cycle-state-dir <path>
  *   Override the default cycle-state directory (the script's repo root /
@@ -63,6 +64,23 @@ const CYCLE_STATE_DIR =
   path.join(__dirname, '..', '.pHive', 'cycle-state');
 const SOURCE_EPIC_PREFIX = argvValue('--source-epic-prefix') || '';
 const DRY_RUN = argvFlag('--dry-run');
+const SUMMARY_ONLY = argvFlag('--summary-only');
+const SINCE_VALUE = argvValue('--since') || '2026-04-28';
+
+function parseSinceDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    console.error(`Error: Invalid --since '${value}'. Expected YYYY-MM-DD.`);
+    process.exit(1);
+  }
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    console.error(`Error: Invalid --since '${value}'. Expected a real YYYY-MM-DD date.`);
+    process.exit(1);
+  }
+  return date;
+}
+
+const SINCE_DATE = parseSinceDate(SINCE_VALUE);
 
 function parseSimpleYaml(content) {
   // Minimal YAML parser for cycle-state files
@@ -114,9 +132,9 @@ function parseSimpleYaml(content) {
 //             valid_from=timestamp||fileMtime.
 //
 //   legacy (existing — pre-canonical handwritten cycle-state):
-//     { decision: "...", rationale?: "..." }
+//     { decision: "...", rationale?: "...", set?: "..." }
 //     Mapped: subject=epicId, predicate="decided",
-//             object=decision (truncated), valid_from=fileMtime.
+//             object=decision (truncated), valid_from=set||fileMtime.
 //
 //   v2 (added 2026-05-11 per M-08 — newer epic cycle-state files):
 //     { id: "...", value?: "...", rationale?: "...",
@@ -175,7 +193,7 @@ function toTriple(decision, epicId, fileMtime) {
       subject: epicId,
       predicate: 'decided',
       object: String(decision.decision || '').substring(0, 500),
-      valid_from: fileMtime,
+      valid_from: toIsoOrFallback(decision.set, fileMtime),
       source_epic: namespacedEpic,
       source_agent: 'orchestrator'
     };
@@ -234,6 +252,7 @@ async function main() {
   let totalDecisions = 0;
   let totalProcessed = 0;
   let totalSkipped = 0;
+  let totalSkippedSince = 0;
   let totalMisformat = 0;
 
   // All work is wrapped so that real-mode imports run in a single SQLite
@@ -271,9 +290,15 @@ async function main() {
           console.warn(`  WARN: [${file}] Unknown format for decision: ${JSON.stringify(dec).substring(0, 80)}`);
           continue;
         }
+        if (new Date(triple.valid_from) < SINCE_DATE) {
+          totalSkippedSince++;
+          continue;
+        }
 
         if (DRY_RUN) {
-          console.log(`  DRY: ${triple.subject} -[${triple.predicate}]-> ${triple.object.substring(0, 60)}`);
+          if (!SUMMARY_ONLY) {
+            console.log(`  DRY: ${triple.subject} -[${triple.predicate}]-> ${triple.object.substring(0, 60)}`);
+          }
           // Dry-run cannot consult INSERT OR IGNORE; count rows as "processed
           // preview" rather than asserting they would all be newly inserted.
           totalProcessed++;
@@ -311,6 +336,7 @@ async function main() {
     console.log(`Decisions found:    ${totalDecisions}`);
     console.log(`Triples inserted:   ${totalProcessed}`);
     console.log(`Skipped (dup):      ${totalSkipped}`);
+    console.log(`Skipped pre---since: ${totalSkippedSince}`);
     console.log(`Misformat:          ${totalMisformat}`);
     console.log(`Total in kg.sqlite: ${dbCount}`);
     db.close();
@@ -319,7 +345,9 @@ async function main() {
     console.log(`Files scanned:    ${files.length}`);
     console.log(`Decisions found:  ${totalDecisions}`);
     console.log(`Would process:    ${totalProcessed}`);
+    console.log(`Skipped pre---since: ${totalSkippedSince}`);
     console.log(`Misformat:        ${totalMisformat}`);
+    console.log(`WOULD INSERT ${totalProcessed} triples (${totalSkippedSince} skipped pre---since) -- DRY RUN`);
     console.log('(Note: dry-run does not consult INSERT OR IGNORE — actual inserted count in real mode may be lower due to dedup.)');
   }
 }

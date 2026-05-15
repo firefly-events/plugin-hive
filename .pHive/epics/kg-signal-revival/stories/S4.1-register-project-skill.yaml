@@ -1,0 +1,88 @@
+id: S4.1-register-project-skill
+epic: kg-signal-revival
+title: /hive:register-project skill with quoted/spaced-path handling
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [B0.2-persist-ref-telemetry-contract]
+wave: S4
+
+description: |
+  New skill at skills/hive/skills/register-project/SKILL.md.
+
+  Input: target absolute path.
+  Validation: path exists + .pHive/ directory present + .pHive/cycle-state/ populated (warn if empty).
+  Action: append entry to ~/.claude/hive/projects.yaml with dedupe-on-write
+  (deny duplicate names + duplicate canonical paths).
+  Output: registry entry preview + suggested invocation to
+  kg-bootstrap-from-projects.js --dry-run for that project.
+
+  CRITICAL — path-with-space handling: Nail Tech Assistant's path
+  /Users/don/Documents/GitHub/Nail Tech Assitant contains a space. Skill MUST accept
+  quoted paths OR shell-escaped paths. Test fixture verifies this.
+
+acceptance_criteria:
+  - "Skill file exists at skills/hive/skills/register-project/SKILL.md"
+  - "Skill accepts target path; rejects non-existent path with clear error"
+  - "Skill rejects path lacking .pHive/ directory with clear error"
+  - "Skill warns if .pHive/cycle-state/ empty but proceeds"
+  - "Quoted path with space works: /hive:register-project \"/Users/don/Documents/GitHub/Nail Tech Assitant\""
+  - "Dedupe blocks duplicate names + duplicate canonical paths with clear messages"
+  - "Registry entry includes name + canonical path"
+  - "Skill output suggests next-step bootstrap --dry-run invocation"
+  - "Skill docstring states: 'Quote paths containing spaces.'"
+
+steps:
+  - id: research
+    description: Inspect skills/hive/skills/ scaffold pattern (frontmatter + body). Re-read kg-bootstrap-from-projects.js dedupe logic to mirror in skill.
+    agent: researcher
+  - id: implement
+    description: |
+      Create SKILL.md with frontmatter. Skill body parses path (handling quotes),
+      validates, dedupes, appends to projects.yaml.
+      Add test fixture at .pHive/test-fixtures/register-project/path-with-space-test.sh.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Functional: register a fresh project; verify entry lands in projects.yaml.
+      Negative: non-existent path → error. Missing .pHive → error. Duplicate name → error.
+      Path-quirk: register Nail Tech Assistant with quoted path; succeeds.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Validate quoted-path handling against typical shells (bash/zsh). Confirm dedupe doesn't accidentally block legitimate re-registration after delete.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: scripts/kg-bootstrap-from-projects.js
+      purpose: Dedupe logic to mirror; bootstrap target
+    - path: ~/.claude/hive/projects.yaml
+      purpose: Write target
+    - path: .pHive/cycle-state/kg-signal-revival.yaml
+      purpose: cross_project_targets[] lists the 3 paths to register
+
+cross_cutting:
+  - concern: documentation
+    action: "Skill SKILL.md is the user-facing doc. README mentions /hive:register-project under usage."
+  - concern: versioning
+    action: "Minor bump (new user-visible skill)."
+  - concern: metrics
+    applies: false
+    justification: "Substrate: enables S4.3-S4.5 but doesn't itself move a measurable outcome."
+
+metric:
+  applies: false
+  justification: "Skill is enabler for S4.3-S4.5 backfill stories which move the metric."
+
+risks:
+  - severity: low
+    description: Path-quirk handling miss → S4.5 fails at register-time.
+    mitigation: Explicit test fixture for path with space.
