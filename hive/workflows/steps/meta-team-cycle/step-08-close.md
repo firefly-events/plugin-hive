@@ -24,6 +24,13 @@ Finalize the cycle only after the closure invariant passes: validate closure evi
 - Swarm-configured `ledger.yaml` — prior cycle records (legacy `.pHive/meta-team/ledger.yaml` only during the A2.6/A2.7 migration window)
 - Active swarm config / team config that determines the cycle-state target path (during the A2.6 migration window this may still resolve to a legacy-compatible path)
 - Git (for validating refs and committing changes)
+- KG telemetry placeholders (orchestrator-supplied at runtime; read from the live cycle scope, NOT inferred from unrelated counters):
+  - `kg_signal_findings_total` — current value of the S5.1 counter for this `cycle_id`, read via `skills/hive/skills/meta-optimize/metric_registry.py`'s reader. Sourced from step-02c's per-finding increments.
+  - `kg_signal_proposals_total` — current value for this `cycle_id`. Sourced from step-03's proposal-merge increment.
+  - `hit_rate_5cycle` — gauge value computed earlier in this step from the last 5 cycles' `kg_signal_proposals_total` values via the S5.1 hook.
+  - `miss_reason` — S5.2 bucket string from step-02c structured output when `kg_signal_findings_total == 0`; empty string when `> 0`.
+  - `cycle_report_path` — the swarm-resolved morning-summary file path used elsewhere in this step.
+  - `resolved_ledger_path` — same swarm-resolved ledger destination used for the ledger append. If the gauge / counter readers cannot find a value, record the gap in the close handoff rather than substituting a stale value.
 
 **NOT available:**
 - User input
@@ -216,6 +223,7 @@ resolvable. Append format:
   commit: {git commit hash}
   metrics_snapshot: {validated snapshot ref}
   rollback_ref: {validated rollback ref}
+  kg_signal_proposals_total: {N}
   notes: |
     {Any notable context: first run, all blocked, large improvement, etc.}
 ```
@@ -226,6 +234,29 @@ Prerequisite check before append:
 - If any prerequisite fails at this point, HALT without appending the ledger entry and record `close_rejected`
 
 If the resolved `ledger.yaml` does not exist at the swarm-configured path, create it with a YAML list header.
+
+After the ledger append succeeds, compute the KG-signal hit-rate gauge from the
+last cycle entries in the resolved ledger path. The ledger entry for this cycle
+MUST include `kg_signal_proposals_total`, populated from the number of
+`discovery_source: kg_signal` proposals represented in the approved proposal
+pool. If that count is unavailable in the output graph, write `0` and flag the
+missing count in the handoff rather than inferring it from unrelated fields.
+
+```bash
+python3 - <<'PY'
+import importlib.util
+import sys
+from pathlib import Path
+
+registry_path = Path("skills/hive/skills/meta-optimize/metric_registry.py")
+spec = importlib.util.spec_from_file_location("meta_optimize_metric_registry", registry_path)
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+last_6_cycle_entries = [{...}]  # already parsed from {resolved_ledger_path}
+module.update_hit_rate_5cycle(last_6_cycle_entries)
+PY
+```
 
 ### 6. Produce morning summary
 
@@ -292,3 +323,40 @@ This is the final step of the meta-team cycle.
 **Gating:** Closure invariant passed, commit succeeded, ledger appended, and morning summary written.
 **Next:** Cycle complete — no further steps.
 **If gating fails:** Record `close_rejected` in the output and produce a diagnostic morning-summary-stub that names what's missing. Do NOT call the cycle `closed`.
+
+## Post-cycle: KG signal cycle rollup JSONL (S5.3)
+
+After the ledger append succeeds, the `hit_rate_5cycle` gauge has been computed, and the morning summary / cycle report exists, flush the KG signal telemetry stream and append the greppable rollup line:
+
+```bash
+python3 -m hive.lib.kg_metrics_writer \
+  --cycle-id "{cycle_id}" \
+  --findings "{kg_signal_findings_total}" \
+  --proposals "{kg_signal_proposals_total}" \
+  --hit-rate-5cycle "{hit_rate_5cycle}" \
+  --miss-reason "{miss_reason}" \
+  --report-path "{cycle_report_path}"
+```
+
+Rules:
+- This creates `.pHive/metrics/kg/{cycle_id}.jsonl` on first close with all buffered `kg_write` rows for the cycle plus one `cycle_summary` row.
+- The JSONL write is append-only and idempotent by semantic row identity; rerunning close for the same `cycle_id` must not duplicate rows or overwrite the existing file.
+- The cycle report must contain exactly one line in this format:
+
+```text
+kg-signal: findings={N} proposals={M} hit_rate_5cycle={R} miss_reason={X}
+```
+
+- When `findings > 0`, pass an empty `miss_reason` so the rendered line ends with `miss_reason=`.
+- When `findings == 0`, pass the S5.2 `miss_reason` from step-02c structured output. If that value is unavailable, leave it empty and flag the missing wiring in the handoff rather than inferring a bucket.
+- If any of `kg_signal_findings_total`, `kg_signal_proposals_total`, `hit_rate_5cycle`, `miss_reason`, or `cycle_report_path` is unavailable in the close output graph, record the gap in the close handoff and do not invent data from unrelated counters.
+
+## Post-cycle: Act I exit gate verification (S2.3)
+
+After the morning summary is written and BEFORE the cycle is reported complete, run the Act I exit gate check. This closes the S7-kg-signal-production-emission outcome metric loop from the prior kg-augmented-meta-signal epic — once any of the three Act I priority predicates (`phase_failed`, `phase_blocked`, `superseded`) lands in `~/.claude/hive/kg.sqlite`, the gate emits a PASSED marker exactly once.
+
+```bash
+bash hive/scripts/act-i-exit-gate-check.sh
+```
+
+The script is silent-no-op when `kg.sqlite` is missing and is idempotent across re-runs. Do NOT branch on its exit code — it always exits `0` and emits its result to stdout. The PASSED latch lives at `~/.claude/hive/act-i-exit-gate-passed`; deleting that file lets PASSED re-fire on the next non-zero cycle.

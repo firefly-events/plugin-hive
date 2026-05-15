@@ -1,7 +1,7 @@
 {
   "name": "plugin-hive",
   "description": "Hive — workflow orchestration for Claude Code. Multi-agent swarms for planning, development, testing, and code review with quality gates, agent memories, and daily ceremony workflow.",
-  "version": "1.2.2",
+  "version": "2.0.0",
   "skills": "./skills/",
   "hooks": {
     "PreToolUse": [
@@ -11,6 +11,18 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/check-agent-misuse.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -lc 'bash \"${CLAUDE_PLUGIN_ROOT}/hive/scripts/chromadb-start.sh\" >/dev/null 2>&1 & disown || true'",
             "timeout": 5
           }
         ]

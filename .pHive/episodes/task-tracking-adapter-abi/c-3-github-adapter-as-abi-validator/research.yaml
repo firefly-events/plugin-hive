@@ -1,0 +1,8 @@
+step_id: research
+story_id: c-3-github-adapter-as-abi-validator
+epic_id: task-tracking-adapter-abi
+agent: researcher
+status: completed
+artifacts:
+  - path: .pHive/epics/task-tracking-adapter-abi/docs/c-3-research-brief.md
+key_finding: "ABI implementable on GitHub with NO spec changes. Raw REST via fetch (not gh CLI — need rate-limit headers). ID encoding owner/repo#number. linkStories = 2-call sequence (GET child → POST sub_issues). 422 may need c-2 revision (batch with c-4)."

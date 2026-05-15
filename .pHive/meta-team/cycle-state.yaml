@@ -1,8 +1,8 @@
-cycle_id: meta-2026-05-11
-started: '2026-05-11T00:00:00Z'
+cycle_id: meta-2026-05-12
+started: '2026-05-12T00:00:00Z'
 status: closed
 phase: close
-closed: '2026-05-11T00:30:00Z'
+closed: '2026-05-12T00:30:00Z'
 charter_constraints:
   - operate only on hive/**, skills/hive/agents/memories/**, .pHive/teams/**,
     .pHive/meta-meta-optimize/**, hive/lib/**
@@ -12,51 +12,36 @@ charter_constraints:
   - no new external service integrations without human confirmation
   - no file deletions, no >50% content removal per file
 prior_cycle:
-  id: meta-2026-05-09
+  id: meta-2026-05-11
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-05-11T00:00:00Z'
+    started_at: '2026-05-12T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
     prior_cycle_status: closed
   step_02_analysis:
-    findings_count: 2
+    findings_count: 1
     metric_signal: false
     external_candidates_count: 0
   step_02b_external_research:
     external_research_candidates_count: 0
     summary: >
-      External research not executed — orchestrator-narrated path.
-      No external candidates produced. Empty candidate list.
+      External research not executed — orchestrator-narrated nightly path.
+      No-leak boundary prevents sanitizable queries with sufficient specificity.
+      Empty candidate list produced. External_candidates_count: 0.
   step_03_proposal:
-    routing: step-03 (findings_count=2 > 0)
-    approved_proposals_count: 1
+    routing: step-03 (findings_count=1 > 0)
+    approved_proposals_count: 0
     skipped_findings_count: 1
   step_04_implementation:
-    changes_made:
-      - proposal_id: proposal-1
-        action: add_section
-        file: hive/references/dreaming-integration.md
-        description: >
-          Appended "## Module Interface" section documenting the
-          runDreamingReplay() function signature, parameters, return shape,
-          and hive.config.yaml dreaming.timeout_hours configuration key.
-          Based on direct reading of hive/lib/dreaming-replay.js.
-        status: done
+    changes_made: []
   step_05_testing:
-    test_results:
-      - change_id: proposal-1_dreaming-integration
-        file: hive/references/dreaming-integration.md
-        tests:
-          cross_reference_integrity: pass
-          schema_compliance: pass
-          content_safety: pass
-        overall: pass
+    test_results: []
   step_06_evaluation:
     cycle_verdict: passed
-    pass_count: 1
+    pass_count: 0
     needs_optimization_count: 0
     needs_revision_count: 0
     metrics_snapshot:
@@ -64,33 +49,45 @@ steps:
       wall_clock_ms: 0
       first_attempt_pass: true
   step_07_promotion:
-    promoted_changes:
-      - proposal_id: proposal-1
-        file: hive/references/dreaming-integration.md
-        verdict: pass
-        status: promoted
-        commit_ref: 21a0357406b802ad7d98d767d87fb7635791a14f
-        rollback_target: d701c7d5670fe53bd2d2fcf46531c2b9de0889f5
+    promoted_changes: []
     reverted_changes: []
     insights_staged: 0
+    decision: discard
+    rollback_target: 706b7c3d05a4010e73d565ecf23d41b880b1ef86
 summary:
-  total_findings: 2
-  proposals_generated: 1
-  changes_attempted: 1
-  changes_promoted: 1
+  total_findings: 1
+  proposals_generated: 0
+  changes_attempted: 0
+  changes_promoted: 0
   changes_reverted: 0
-  flagged_for_human: 1
+  flagged_for_human: 0
   cycle_verdict: passed
 closure_evidence:
-  commit_ref: 21a0357406b802ad7d98d767d87fb7635791a14f
   metrics_snapshot:
     tokens: 0
     wall_clock_ms: 0
     first_attempt_pass: true
-  rollback_ref: d701c7d5670fe53bd2d2fcf46531c2b9de0889f5
-decision: accept
+  rollback_ref: 706b7c3d05a4010e73d565ecf23d41b880b1ef86
+decision: discard
 regression_watch:
-  state: armed
-observation_window:
-  start: '2026-05-11T00:30:00Z'
-  end: '2026-05-11T04:30:00Z'
+  state: not_applicable
+findings:
+  - id: finding-1
+    category: STUB_DOC
+    severity: low
+    location: hive/references/hive-cloud-roadmap.md
+    description: 13-line placeholder stub for deferred Hive Cloud epic
+    evidence: >
+      File has 13 lines. Content explicitly states 'S16 stub to close the
+      forward reference from hive/references/session-system-prompt-spec.md.'
+      session-system-prompt-spec.md notes 'that document may not yet exist on
+      main and is forward-referenced for continuity.'
+approved_proposals: []
+skipped_findings:
+  - finding_id: finding-1
+    reason: out_of_scope
+    notes: >
+      Deferred Hive Cloud epic. The stub is an intentional forward-reference
+      placeholder. Expanding it would be speculative without the Hive Cloud
+      epic active. Already flagged out_of_scope in meta-2026-05-11.
+changes: []

@@ -1,0 +1,238 @@
+id: f-03-workflow-prompt-extraction-design-review
+epic: ui-cluster-extract-config-deeper
+title: "Extract design-review workflow ui-designer prompts via step_file:"
+status: pending
+complexity: high
+methodology: classic
+depends_on: [f-01-prompt-convention-brand-design]
+tier: 2
+
+description: |
+  Extract the two ui-designer task blocks from hive/workflows/design-review.workflow.yaml
+  (`design-critique` step at line 54 and `synthesis` step at line 86) into flat
+  prompt files under hive/references/ui-prompts/, and extend skills/design-review/SKILL.md
+  to load workflow `step_file:` field content at step execution time.
+
+  **S3 contract = Choice A (locked 2026-05-12):** Use the existing workflow-schema
+  `step_file:` field (NOT a new `task_file:` schema/runtime contract). Workflow
+  schema already documents `step_file:` as the external-instruction path with
+  precedence over inline `task:` (hive/references/workflow-schema.md:18,35,39).
+  DAG loader already reads it (hive/lib/dag_executor/graph/loader.py:75,76).
+  The work in this story is: write the two prompt files, swap the two workflow
+  steps from `task:` to `step_file:`, and extend the design-review SKILL's step
+  execution loop to load `step_file:` content when present.
+
+  **Critical backward-compat:** design-review.workflow.yaml has four steps —
+  `accessibility-critique` (line 7), `animations-critique` (line 27),
+  `design-critique` (line 54), `synthesis` (line 86). Only the last two are
+  ui-designer steps and get extracted. The first two MUST continue to use inline
+  `task:` content with their respective specialists. The SKILL change must
+  handle BOTH forms (precedence: `step_file:` > `task:`).
+
+  Closes D2 dissent fully — workflow-mediated path no longer contains inline
+  ui-designer prompts.
+
+acceptance_criteria:
+  - "Given the design-critique and synthesis workflow steps are extracted, when S3 completes, then hive/references/ui-prompts/design-review-design-critique.md and hive/references/ui-prompts/design-review-synthesis.md exist with `## Required placeholders` headers and byte-equivalent task bodies."
+  - "Given hive/workflows/design-review.workflow.yaml is updated, when read, then the `design-critique` step (was line 54) and `synthesis` step (was line 86) use `step_file: hive/references/ui-prompts/design-review-design-critique.md` and `step_file: hive/references/ui-prompts/design-review-synthesis.md` respectively — no inline `task:` body for those two steps."
+  - "Given the two specialist steps `accessibility-critique` and `animations-critique`, when read, then they STILL use inline `task:` content unchanged — extraction does NOT apply to specialist steps."
+  - "Given skills/design-review/SKILL.md is extended, when a step has `step_file:`, then the SKILL reads the referenced file and passes that body as the spawned agent's primary procedure (precedence: step_file > task per hive/references/workflow-schema.md:39)."
+  - "Given a workflow step has only `task:` (no `step_file:`), when the SKILL executes it, then the inline task body is used as before — backward compat preserved."
+  - "Given the design-review workflow is run with --artifact-target design, when complete, then design-critique and synthesis steps still spawn ui-designer with the extracted prompt content; output verdict is structurally identical to pre-extraction."
+  - "Given the design-review workflow is run with --artifact-target implementation (a-11 collapse mode), when complete, then both modes still produce their expected report artifacts."
+  - "Given verification grep, when running `rg \"hive/references/ui-prompts/design-review-\" hive/workflows/design-review.workflow.yaml`, then exactly 2 matches return (one per extracted step)."
+
+steps:
+  - id: research
+    description: |
+      1. Read hive/workflows/design-review.workflow.yaml — confirm exact line
+         locations of `design-critique` (line 54) and `synthesis` (line 86)
+         ui-designer task blocks. Note the specialist steps at lines 7 and 27
+         that must stay inline.
+      2. Read hive/references/workflow-schema.md:16-43 — confirm step_file:
+         contract (path field, replaces inline task, step_file > task
+         precedence).
+      3. Read hive/lib/dag_executor/graph/loader.py:75-76 and model.py:118-119
+         — confirm step_file is already loadable by the DAG layer.
+      4. Read skills/design-review/SKILL.md step-execution section (around
+         line 95-100 where "passes workflow task content to spawned agents") —
+         identify where to extend with step_file: loading.
+      5. Confirm path prefix: skills/design-review/SKILL.md (NOT
+         skills/hive/skills/design-review/SKILL.md — architect §2).
+    agent: researcher
+
+  - id: implement
+    description: |
+      1. Create hive/references/ui-prompts/design-review-design-critique.md —
+         `## Required placeholders` header + byte-equivalent body of the
+         current design-critique `task:` block (line 54). List every
+         {placeholder} (e.g. {accessibility_critique}, {animations_critique},
+         {design_artifacts}).
+      2. Create hive/references/ui-prompts/design-review-synthesis.md — same
+         pattern for the synthesis `task:` body (line 86).
+      3. Extend skills/design-review/SKILL.md step execution to:
+            for each step in workflow:
+              if step has step_file:
+                load file content from <repo>/<step_file>
+                pass loaded body to agent as the primary procedure
+              else:
+                use inline step.task as before
+         Implementation note: precedence is step_file > task. If both present,
+         step_file authoritative (matches workflow-schema.md:39).
+      4. Update hive/workflows/design-review.workflow.yaml — replace the
+         inline `task: >` body of the design-critique step with
+         `step_file: hive/references/ui-prompts/design-review-design-critique.md`
+         (drop the multi-line task body). Same for synthesis step.
+      5. DO NOT touch the accessibility-critique or animations-critique steps —
+         they keep inline `task:` content with their respective specialists.
+      6. Run the workflow end-to-end with --artifact-target design and again
+         with --artifact-target implementation. Compare verdict structure
+         against a pre-extraction baseline run (capture before changing the
+         workflow yaml).
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Acceptance grep + behavior gates:
+        test -f hive/references/ui-prompts/design-review-design-critique.md
+        test -f hive/references/ui-prompts/design-review-synthesis.md
+        rg "Required placeholders" hive/references/ui-prompts/{design-review-design-critique,design-review-synthesis}.md
+        rg "hive/references/ui-prompts/design-review-" hive/workflows/design-review.workflow.yaml   # expect 2
+        rg "step_file:" hive/workflows/design-review.workflow.yaml                                  # expect 2
+        rg "task: >" hive/workflows/design-review.workflow.yaml                                     # expect 2 (specialist steps only)
+        rg "artifact-target" skills/design-review/SKILL.md                                          # expect non-zero
+      End-to-end dry-run both targets:
+        /design-review --artifact-target design <fixture>
+        /design-review --artifact-target implementation <fixture>
+      Both must complete; verdict output structurally equivalent to baseline.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      1. Verify byte-equivalent extraction — diff each new prompt file body
+         against the pre-extraction workflow yaml `task:` content. No wording
+         changes.
+      2. Verify SKILL extension handles BOTH forms: a hand-crafted step with
+         only `task:` still runs (specialist steps prove this in production);
+         a step with `step_file:` loads the referenced file.
+      3. Verify the two specialist steps were NOT touched.
+      4. Confirm step_file > task precedence is exercised — if a step had
+         both, the file wins.
+      5. Confirm hive/agents/ui-designer.md still functions correctly under
+         the extended SKILL (persona unchanged per Q3).
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: "Commit and push to feature branch."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: claude-code SKILL execution + workflow YAML DAG runner
+    workflow_schema_field: "step_file (existing, supported)"
+    s3_choice: "A — extend skills/design-review/SKILL.md to load step_file content; no new task_file schema."
+  key_files:
+    - path: hive/workflows/design-review.workflow.yaml
+      purpose: "Source of design-critique (line 54) and synthesis (line 86) task blocks. ui-designer steps get extracted; specialist steps stay inline."
+    - path: skills/design-review/SKILL.md
+      purpose: "Procedural consumer that passes workflow task content to spawned agents (~line 95). Extend here to read step_file when present."
+    - path: hive/references/workflow-schema.md
+      purpose: "Defines step_file: contract and precedence (step_file > task). Lines 16, 18, 35, 39."
+    - path: hive/lib/dag_executor/graph/loader.py
+      purpose: "DAG loader reads step_file (lines 75-76). No loader changes needed — only SKILL-level reading."
+    - path: hive/lib/dag_executor/graph/model.py
+      purpose: "DAG model carries step_file (lines 118-119). No model changes needed."
+
+files_to_modify:
+  - file: hive/workflows/design-review.workflow.yaml
+    change: "Replace inline `task: >` body of design-critique step (line 54) with `step_file: hive/references/ui-prompts/design-review-design-critique.md`. Same for synthesis step (line 86). Leave accessibility-critique and animations-critique steps untouched."
+  - file: skills/design-review/SKILL.md
+    change: "Extend step-execution loop (~line 95) to read workflow step's step_file field when present and load the referenced file as the agent's primary procedure. Precedence: step_file > task. Backward compatible — steps with only `task:` execute unchanged."
+  - file: hive/references/ui-prompts/design-review-design-critique.md
+    change: "CREATE — Required placeholders header + byte-equivalent body extracted from workflow design-critique task."
+  - file: hive/references/ui-prompts/design-review-synthesis.md
+    change: "CREATE — Required placeholders header + byte-equivalent body extracted from workflow synthesis task."
+
+code_examples:
+  - title: "workflow-schema step_file precedence rule"
+    file: hive/references/workflow-schema.md
+    snippet: |
+      # Precedence: step_file > task. If both are present, the step file is
+      # authoritative. The orchestrator loads the step_file content and passes
+      # it to the agent as the primary procedure — the `task` field becomes
+      # a fallback summary.
+  - title: "DAG loader already reads step_file (no loader changes needed)"
+    file: hive/lib/dag_executor/graph/loader.py
+    snippet: |
+      # line 75-76:
+      task = raw.get("task")
+      step_file = raw.get("step_file")
+  - title: "Workflow yaml shape after extraction"
+    file: hive/workflows/design-review.workflow.yaml
+    snippet: |
+      # design-critique step BEFORE:
+      - id: design-critique
+        agent: ui-designer
+        task: >
+          Review the provided UI artifacts ...   # ~30 lines
+      # AFTER (Choice A):
+      - id: design-critique
+        agent: ui-designer
+        step_file: hive/references/ui-prompts/design-review-design-critique.md
+
+design_decisions:
+  - decision: "S3 contract = Choice A — step_file + extend skills/design-review/SKILL.md to load step_file content"
+    rationale: "step_file: is already a supported workflow-schema field. DAG loader already reads it. Choice B (new task_file schema) would require runtime + schema extension outside Epic F scope. Choice C (defer S3) would leave D2 partially closed. User locked this decision 2026-05-12."
+  - decision: "Specialist steps (accessibility-critique, animations-critique) stay inline `task:`"
+    rationale: "Only ui-designer steps are in scope for Epic F (D2 dissent). The SKILL change handles both forms, so accessibility-specialist and animations-specialist invocations continue unchanged."
+  - decision: "Path prefix skills/design-review/SKILL.md (not skills/hive/skills/...)"
+    rationale: "Architect §2 confirmed actual file location. W6 a-08/a-09 precedent uses skills/<name>/SKILL.md."
+
+cross_cutting:
+  - concern: documentation
+    action: "Update hive/references/workflow-schema.md if any example uses inline `task: >` for design-review specifically. Update skills/design-review/SKILL.md inline documentation block describing how it executes workflow steps (mention step_file: loading). Confirm hive/agents/ui-designer.md still accurate."
+
+risks:
+  - severity: high
+    description: "SKILL extension breaks specialist steps — if implementation switches unconditionally to step_file:, the two specialist steps (accessibility-critique, animations-critique) lose their inline task: content."
+    mitigation: "Explicit precedence rule: step_file > task IF step_file present, ELSE use task. Test step exercises both forms end-to-end. Reviewer step verifies specialist steps unchanged."
+  - severity: medium
+    description: "Byte-equivalent extraction drifts (workflow yaml multiline `task: >` block has implicit folding rules that markdown file lacks)."
+    mitigation: "Capture the rendered task body pre-extraction (run a one-shot dry-run to print resolved task text). Diff against new prompt file content. YAML folding chomping rules apply only to inline scalars — extraction lifts them out completely; verify no leading-whitespace artifacts."
+  - severity: medium
+    description: "step_file: path resolution differs between SKILL and DAG loader (relative vs absolute, ${CLAUDE_PLUGIN_ROOT} interpolation)."
+    mitigation: "Architect §2 noted: use plain repo-relative paths (hive/references/ui-prompts/...), no ${CLAUDE_PLUGIN_ROOT} prefix, unless a future runtime contract requires it. Test step runs both /design-review invocations end-to-end to catch path errors."
+  - severity: low
+    description: "S4 verification gates over-match — generic `step_file:` grep would catch any unrelated workflow using step_file."
+    mitigation: "S4 grep gates are scoped to hive/workflows/design-review.workflow.yaml only, and look for `hive/references/ui-prompts/design-review-` specifically (2-match expectation)."
+
+references:
+  - path: .pHive/epics/ui-cluster-extract-config-deeper/docs/architect-review-b2.md
+    relevant_excerpt: |
+      §1 S3 task: vs task_file: workflow runtime
+      Verdict: task_file: is unsupported until proven otherwise; S3 is blocked
+      as written. Definitive call: do not author task_file: without
+      runtime/schema support. Safer default: update skills/design-review/SKILL.md
+      to load supported step_file: content.
+  - path: .pHive/cycle-state/ui-cluster-extract-config-deeper.yaml
+    relevant_excerpt: |
+      escalation: workflow-contract:audit (major, pre-exec). Resolved
+      2026-05-12 with Choice A — step_file: + extend
+      skills/design-review/SKILL.md to load step_file content.
+  - path: hive/references/workflow-schema.md
+    relevant_excerpt: |
+      step_file: path to step file (optional)
+      Precedence: step_file > task. If both are present, the step file is
+      authoritative. The orchestrator loads the file and passes it to the
+      agent as the primary procedure.
+  - path: .pHive/epics/ui-cluster-extract-config-deeper/docs/vertical-plan.md
+    relevant_excerpt: |
+      Slice S3: Workflow Extraction for Design-review (Tier 2)
+      Goal: Extract the two ui-designer task blocks from
+      hive/workflows/design-review.workflow.yaml:54 and :86 to prompt files,
+      closing the Q4 full-D2 surface. depends_on: S1.

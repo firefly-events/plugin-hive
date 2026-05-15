@@ -11,7 +11,7 @@
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.2-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
@@ -243,7 +243,10 @@ already decided before it starts. See [`hive/references/knowledge-graph-schema.m
 **L3 — ChromaDB semantic recall.** Optional sidecar that wraps a local
 ChromaDB instance via JSON-RPC. When the sidecar is unavailable, Hive
 **degrades gracefully to L1+L0** — no consumer setup required to use the rest
-of the stack.
+of the stack. To enable the sidecar, install the CLI with `pip install chromadb`
+or `pipx install chromadb`; Hive's SessionStart hook launches it in the
+background and writes state under `~/.claude/hive/chromadb.{port,pid,lock}`.
+See [`hive/references/chromadb-ops.md`](hive/references/chromadb-ops.md).
 
 **Session-end orchestration.** Every session closes with a three-phase write:
 insights → `kg_write` → compile in parallel with `chromadb.index`. KG failures
@@ -253,9 +256,19 @@ surface as errors; ChromaDB failures warn-only. See
 **Bootstrapping the KG from existing projects.** A system-level registry at
 `~/.claude/hive/projects.yaml` lists Hive-using project roots. Run
 [`scripts/kg-bootstrap-from-projects.js`](scripts/kg-bootstrap-from-projects.js)
-to seed the KG with cross-project decision history. A separate one-time
-backfill, [`scripts/kg-import-cycle-state.js`](scripts/kg-import-cycle-state.js),
-imports legacy `.pHive/cycle-state/*.yaml` records into the KG.
+to preview cross-project decision history. Bootstrap is dry-run by default and
+prints the projected triple count as `WOULD INSERT N triples (M skipped pre---since) -- DRY RUN`.
+Pass `--apply` to write to `~/.claude/hive/kg.sqlite`. The default
+`--since 2026-04-28` skips pre-canon decisions; override with
+`--since YYYY-MM-DD`. Large applies refuse when the projection exceeds
+`BOOTSTRAP_LARGE_IMPORT_THRESHOLD` (default `10000`) unless
+`--yes-large-import` is supplied or an interactive confirmation succeeds.
+At `BOOTSTRAP_SOFT_WARN_THRESHOLD` (default `1000`) the tool warns on stderr
+but does not refuse. A separate one-time backfill,
+[`scripts/kg-import-cycle-state.js`](scripts/kg-import-cycle-state.js), imports
+legacy `.pHive/cycle-state/*.yaml` records into the KG.
+Use [`/hive:register-project`](skills/hive/skills/register-project/SKILL.md)
+to add Hive-enabled project roots to the registry, including quoted paths with spaces.
 
 For the authoritative tier table, store interface, and filter API, see
 [`hive/references/memory-store-interface.md`](hive/references/memory-store-interface.md).

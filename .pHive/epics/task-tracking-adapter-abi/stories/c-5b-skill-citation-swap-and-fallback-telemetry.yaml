@@ -1,0 +1,163 @@
+id: c-5b-skill-citation-swap-and-fallback-telemetry
+epic: task-tracking-adapter-abi
+title: Skill citation swap (kickoff/plan/execute) + prose-runbook fallback telemetry
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [c-5a-dispatch-module-and-config-schema]
+wave: W4
+action_id: C-5b
+
+description: |
+  Second half of the original c-5 (split per quality review — separating
+  module/config from skill-citation swaps + telemetry keeps each story in
+  single-session scope).
+
+  c-5a shipped the dispatch module. This story wires the existing skills
+  to call it:
+
+    1. skills/kickoff/SKILL.md — replace prose-runbook reference with
+       dispatch.load() at the point where Hive picks up the configured
+       tracker.
+    2. skills/plan/SKILL.md — replace prose-runbook citation at the plan-
+       publish-stories point with dispatch.invoke("createStory", {...}).
+    3. skills/execute/SKILL.md — replace prose-runbook citation at the
+       story-status-update point with dispatch.invoke("updateStatus", {...}).
+    4. Add prose-runbook-fallback telemetry write — dispatch falls back to
+       prose-runbook references when the configured adapter raises a
+       terminal error AND paths.gate_mode is warning. Each fallback writes
+       to .pHive/metrics/events/prose-runbook-fallback-<ISO>.jsonl. Sibling
+       c-6 surfaces this event in the migration guide + gate-mode-audit
+       aggregation.
+
+  Hard mode preserves byte-equivalent behavior: if the adapter raises
+  terminal AND paths.gate_mode: hard, the skill stops as before. Warning
+  mode emits the fallback warning + telemetry + continues.
+
+  End-to-end smoke test runs as part of this story: configure github
+  adapter → run /plan with one story → verify GitHub issue created via
+  dispatch (real API or mock).
+
+acceptance_criteria:
+  - 'skills/kickoff/SKILL.md citation at the tracker-load point is replaced with dispatch.load() invocation pattern'
+  - 'skills/plan/SKILL.md citation at the plan-publish-stories point is replaced with dispatch.invoke("createStory", ...)'
+  - 'skills/execute/SKILL.md citation at the story-status-update point is replaced with dispatch.invoke("updateStatus", ...)'
+  - 'Prose-runbook citations in the three skills no longer drive runtime — they may remain as deprecation pointers awaiting c-6 cleanup'
+  - 'Prose-runbook-fallback telemetry event written when dispatch invoke returns terminal + paths.gate_mode warning; event shape matches the JSONL convention from Epic B a-33/a-35'
+  - 'End-to-end smoke test: configure github adapter with test repo → /plan with a one-story epic → GitHub issue created via dispatch'
+  - 'Hard mode preserved: configure no adapter + paths.gate_mode hard → /kickoff blocks; same scenario with warning mode → /kickoff proceeds with warning'
+  - 'No skill-side logic branches on adapter type — all per-adapter behavior lives behind dispatch'
+
+steps:
+  - id: research
+    description: |
+      1. Read hive/lib/task-tracking-dispatch/index.<ext> + its README (c-5a outputs) to lock the public surface.
+      2. grep -n "task_tracking\|task-tracking-adapter" skills/kickoff/SKILL.md skills/plan/SKILL.md skills/execute/SKILL.md — list every citation point that needs to swap from prose to dispatch.
+      3. Sketch the replacement pattern per skill — generally a short block citing dispatch.load() / dispatch.invoke() with the args expected at that call site.
+      4. Identify telemetry write location — dispatch.invoke() returning terminal under gate_mode warning is the trigger; the dispatch module itself writes the JSONL (per c-5a) but skill-side may need to emit context.
+      5. Identify the smoke-test fixture path — real test repo (GITHUB_TEST_REPO env) or mock server.
+    agent: researcher
+
+  - id: implement
+    description: |
+      1. Update skills/kickoff/SKILL.md — replace the prose-runbook citation at the tracker-load point with a paragraph instructing dispatch.load(config.task_tracking) and capturing the handle in cycle state.
+      2. Update skills/plan/SKILL.md — at the plan-publish-stories point, replace prose-runbook citation with dispatch.invoke("createStory", { title, body, labels, ... }) pattern.
+      3. Update skills/execute/SKILL.md — at the story-status-update point, replace prose-runbook citation with dispatch.invoke("updateStatus", { id, state, ... }) pattern.
+      4. Extend c-5a's no-adapter telemetry hook to also write prose-runbook-fallback events when dispatch.invoke returns terminal under gate_mode warning. Event shape:
+         ```json
+         {"event":"prose_runbook_fallback","skill":"<calling skill>","method":"<ABI method>","adapter":"<configured adapter or null>","gate_mode":"warning","timestamp":"<ISO 8601>"}
+         ```
+         Path: .pHive/metrics/events/prose-runbook-fallback-<ISO>.jsonl
+      5. Add per-skill warning text when the fallback fires (matches the a-33/a-35 warning shape pattern).
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      1. Smoke-test: env GITHUB_TEST_REPO + GITHUB_TOKEN; configure task_tracking.adapter: github; run /plan with one-story epic; verify a GitHub issue is created.
+      2. Smoke-test gate_mode warning + adapter unset: run /kickoff with task_tracking unset → warning emitted, no-adapter telemetry written (from c-5a), /kickoff proceeds.
+      3. Smoke-test gate_mode hard + adapter unset: same scenario with gate_mode hard → /kickoff blocks.
+      4. Smoke-test fallback: configure adapter github with deliberately-invalid token + gate_mode warning → dispatch.invoke returns terminal → prose-runbook-fallback event written, warning emitted, skill continues.
+      5. grep skills/{kickoff,plan,execute}/SKILL.md for `if .* (github|linear)` patterns — should return zero hits (no skill-side adapter-type branching).
+      6. yamllint on this story file.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Opus 4.7 reviewer cross-LLM gate:
+      1. Verify the three skill files now drive runtime via dispatch — old prose-runbook citations either removed or marked deprecated awaiting c-6.
+      2. Verify the prose-runbook-fallback event shape matches the documented JSONL convention from Epic B a-36 (gate-lift-telemetry.md).
+      3. Verify hard mode preserves byte-equivalent block behavior — no behavior change for users on gate_mode: hard.
+      4. Verify the end-to-end smoke test is meaningful: real adapter call + real or mock API + real verification of the resulting tracker artifact.
+      5. Stress-test: dispatch.invoke raising unexpected JS exception (not ABI-shaped error) under warning mode — verify graceful handling, not Hive crash.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: 'Commit on feat/task-tracking-adapter-abi; commit message format `feat(adapter-abi): skill citation swap + fallback telemetry (story c-5b-skill-citation-swap-and-fallback-telemetry, W4)`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [markdown, typescript, yaml]
+    frameworks: [hive-skills, hive-lib]
+  key_files:
+    - path: skills/kickoff/SKILL.md
+      purpose: 'Citation update — swap prose-runbook reference for dispatch.load() pattern'
+    - path: skills/plan/SKILL.md
+      purpose: 'Citation update — swap at plan-publish-stories point to dispatch.invoke createStory'
+    - path: skills/execute/SKILL.md
+      purpose: 'Citation update — swap at story-status-update point to dispatch.invoke updateStatus'
+    - path: hive/lib/task-tracking-dispatch/index.<ext>
+      purpose: 'c-5a dispatch module — this story extends its telemetry surface with prose-runbook-fallback events'
+    - path: hive/references/gate-lift-telemetry.md
+      purpose: 'Epic B a-36 doc — telemetry shape inherits the JSONL convention documented there'
+
+design_decisions:
+  - decision: 'Skills cite dispatch as a thin pass-through, not as a wrapper layer'
+    rationale: 'Wrapping dispatch in skill-side helper functions would obscure the call site and duplicate error handling. Direct dispatch.invoke() at the citation point keeps the surface visible.'
+  - decision: 'Prose-runbook citations stay in the skill files until c-6 deprecation'
+    rationale: 'Some users have not migrated their custom prose-runbooks. Keeping the prose pointer present (now marked as fallback path) protects them during the deprecation window c-6 owns.'
+  - decision: 'Fallback telemetry shares the .pHive/metrics/events/ directory with sibling events'
+    rationale: 'Epic B a-36 audit script (gate-mode-audit.mjs) reads all *.jsonl events in that dir. Reusing the directory lets the audit generalize over event types without code changes; new event kinds surface in the details output for free.'
+
+cross_cutting:
+  - concern: observability
+    action: 'Prose-runbook-fallback event count over the deprecation window informs c-6 removal timing; data-driven, not calendar-driven.'
+  - concern: backward-compatibility
+    action: 'Prose-runbook citations remain in skill files as deprecation pointers; hard mode preserves byte-equivalent block behavior; users on gate_mode: hard see no change.'
+
+risks:
+  - severity: medium
+    description: 'Skill citation swap regresses prose-runbook behavior for users who have not migrated'
+    mitigation: 'Prose-runbook citations remain as deprecation pointers; fallback telemetry surfaces actual usage; c-6 deprecation timing is data-driven.'
+  - severity: medium
+    description: 'Smoke test requires GitHub test repo provisioning; CI may lack credentials'
+    mitigation: 'Smoke test skips with documented reason when env unset; mock server fallback path documented in adapter README from c-3.'
+  - severity: low
+    description: 'Per-skill warning text drifts from a-33/a-35 conventions over time'
+    mitigation: 'Reviewer checklist (step 4) explicitly verifies warning shape against the Epic B convention.'
+
+references:
+  - path: .pHive/epics/task-tracking-adapter-abi/stories/c-5a-dispatch-module-and-config-schema.yaml
+    relevant_excerpt: |
+      Sibling c-5a shipped the dispatch module + config schema. c-5b
+      consumes c-5a's public surface (load + invoke + capability) to
+      wire the skill citations and extend the telemetry hook with
+      prose-runbook-fallback events.
+  - path: hive/references/gate-lift-telemetry.md
+    relevant_excerpt: |
+      Telemetry event shape convention: JSONL records written to
+      .pHive/metrics/events/<event-name>-<ISO timestamp>.jsonl. Each event
+      has: event (string), skill (string), timestamp (ISO 8601), plus
+      event-specific fields. gate-mode-audit.mjs aggregates over all
+      *.jsonl files in this directory.
+  - path: .pHive/epics/hive-composability-audit/docs/recommendation.md
+    relevant_excerpt: |
+      Section 3 — Hive-side dispatch wires the configured adapter into
+      kickoff/plan/execute. Default-on-no-config follows paths.gate_mode
+      from Epic B. Skill citation swap is the user-facing surface of
+      the ABI migration.

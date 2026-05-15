@@ -45,3 +45,20 @@ WARNING: escalation "{trigger}" stories[] entry "{topic-area}" could not be matc
 ```
 
 > **Two-phase population pattern:** `escalations[].stories[]` is populated in two phases: (1) topic areas at raise time by the raising agent, (2) canonical IDs at plan step 11 by orchestrator backfill. Execute reads the backfilled canonical IDs.
+
+### Step 4: Emit `phase_blocked` KG triples (S2.1 seam 2 — TPM escalation-raise)
+
+After Step 3's write-back lands, emit one `phase_blocked` KG triple per `(escalation, canonical-story-id)` pair so the priority predicate surfaces TPM-raised blockers to /meta-optimize. Skip topic-area entries that did NOT match a canonical ID — those already have a WARNING from Step 3.
+
+For each canonical story ID in `escalations[].stories[]`, invoke the CLI emitter (silent no-op when the `kg.emit_lifecycle_at` knob is `off` or `kg.sqlite` is missing — safe under `set -e`):
+
+```bash
+python3 -m hive.lib.kg_emit_cli \
+  --subject "{canonical-story-id}" \
+  --predicate "phase_blocked" \
+  --object "escalation:{trigger-id}" \
+  --source-epic "{epic_id}" \
+  --source-agent "tpm"
+```
+
+The CLI runs `sanitize_obj` on `--object` by default; pass `--no-sanitize` only if you already kebab-normalized the trigger ID. Emit failures must NOT abort backfill — the emitter swallows internally and the surrounding skill MUST NOT add error handling around the call.

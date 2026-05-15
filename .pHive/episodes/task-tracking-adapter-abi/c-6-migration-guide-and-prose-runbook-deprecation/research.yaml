@@ -1,0 +1,13 @@
+step_id: research
+story_id: c-6-migration-guide-and-prose-runbook-deprecation
+epic_id: task-tracking-adapter-abi
+agent: researcher
+status: completed
+artifacts:
+  - path: .pHive/epics/task-tracking-adapter-abi/docs/c-6-research-brief.md
+key_findings:
+  - "Scope collapses: prose-runbook-fallback telemetry ALREADY shipped in c-5b — c-6 only needs to document it"
+  - "gate-lift-telemetry.md does NOT exist (Epic B a-36 undrafted) — inline event-shape doc in migration guide"
+  - "gate-mode-audit.mjs does NOT exist — defer audit script to future Epic B story; document what it would count"
+  - "Three files need deprecation banner: task-tracking-adapter.md, linear-integration.md, linear-commands.md"
+  - "Removal target: Hive 2.1 (release after 2.0); data-driven on prose-runbook-fallback event volume"

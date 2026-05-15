@@ -62,7 +62,7 @@ const RE_BEARER = /(Authorization\s*:\s*Bearer\s+)([^\s"'`,\]}\n]+)/gi;
  * Value must be a non-empty JSON string.
  */
 const RE_JSON_KV =
-  /("(?:[a-zA-Z0-9_-]*(?:[_-]key|[_-]token)|api[_-]?key|openai[_-]?api[_-]?key)")\s*:\s*"([^"\\]*)"/gi;
+  /("(?:[a-zA-Z0-9_-]*(?:[_-]key|[_-]token)|api[_-]?key|openai[_-]?api[_-]?key)")\s*:\s*"((?:\\.|[^"\\])*)"/gi;
 
 /**
  * Form 4: Bare HTTP header line — `Header-Name: value`.

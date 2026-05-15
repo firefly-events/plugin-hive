@@ -1,0 +1,77 @@
+id: S2.2-superseded-emit-sites
+epic: kg-signal-revival
+title: Emit superseded at 3 seams (plan overwrite, meta-optimize replace, insight promotion)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [S2.1-phase-blocked-emit-sites]
+wave: S2
+
+description: |
+  Wire the third priority predicate. superseded marks a prior decision triple as
+  replaced. Three emit seams:
+  (1) /plan skill — when a story YAML is overwritten (rare during normal use; common
+      during re-plan).
+  (2) /meta-optimize — when a new proposal supersedes a prior one (step-03 logic).
+  (3) Insight promotion in session-end — when a memory file is replaced.
+
+  Closes Act I's priority predicate coverage. After this, all 3 step-02c-consumed
+  predicates emit from production seams.
+
+acceptance_criteria:
+  - "/plan story-overwrite path emits superseded (old story id → new story id)"
+  - "step-03 proposal-replacement path emits superseded (old proposal id → new proposal id)"
+  - "session-end insight promotion overwrite path emits superseded (old memory slug → new slug)"
+  - "Each emit sets valid_until on the prior triple (per knowledge-graph-schema.md §valid_until convention)"
+  - "Integration test: simulate /plan overwrite → superseded triple lands"
+
+steps:
+  - id: research
+    description: Identify all 3 supersession seams. For session-end insight promotion, confirm the memory-replace detection logic. For meta-optimize step-03, find the proposal-replacement decision point.
+    agent: researcher
+  - id: implement
+    description: Insert emitKgEvent() at 3 sites. Update prior triple's valid_until in the same transaction (kg_write supports this; verify).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Unit + integration tests per seam. Verify valid_until set correctly.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Validate seam choices; flag if any common supersession path was missed.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/plan/SKILL.md
+      purpose: /plan overwrite seam
+    - path: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
+      purpose: Proposal-replacement seam
+    - path: hive/lib/session-end.js
+      purpose: Insight-promotion seam
+
+cross_cutting:
+  - concern: documentation
+    action: "kg-emit.md gains superseded example with valid_until pattern."
+  - concern: versioning
+    action: "Patch bump."
+  - concern: metrics
+    applies: true
+
+metric:
+  applies: true
+  name: kg_signal.superseded_per_replacement_event
+  direction: up
+  baseline: 0
+  target: 1
+  window: "first replacement event post-merge"
+  source:
+    kind: sql
+    ref: "SELECT COUNT(*) FROM triples WHERE predicate='superseded' AND valid_from >= <merge_time>"
+  verify_at: "7d post-merge OR first replacement event whichever first"

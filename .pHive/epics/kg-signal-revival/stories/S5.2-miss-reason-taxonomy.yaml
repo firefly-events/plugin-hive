@@ -1,0 +1,85 @@
+id: S5.2-miss-reason-taxonomy
+epic: kg-signal-revival
+title: Miss-reason taxonomy at step-02c with discriminator surface
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [S5.1-metric-registry-counters]
+wave: S5
+
+description: |
+  When step-02c emits empty findings, emit a miss_reason field with one of:
+
+  - empty_kg — no triples at all in window
+  - empty_predicate_filter — triples exist but none in phase_failed/phase_blocked/superseded
+  - recency_cutoff — relevant predicates exist but all older than window_days
+  - project_tag_cutoff — all triples cross-project; rank penalty pushes below threshold
+  - dedup_eviction — kg-findings duplicated step-02 findings; merged out by dedup
+
+  Per DP #2 default (verify-first, shim if needed): first task is to confirm step-02c
+  exposes enough query state to discriminate. If yes, just emit the field. If no, add
+  a thin observability layer that captures the discriminating state during the query.
+
+acceptance_criteria:
+  - "step-02c output (kg-findings.yaml or summary log) includes miss_reason field on empty cycles"
+  - "All 5 taxonomy buckets exercised by fixture tests"
+  - "Each bucket assertion can be derived from query-time state (no post-hoc guessing)"
+  - "miss_reason absent when findings non-empty"
+
+steps:
+  - id: research
+    description: Inspect step-02c's query path. Identify which buckets it can discriminate today vs which need a shim.
+    agent: researcher
+  - id: implement
+    description: |
+      Add miss_reason emit at step-02c summary point. If shim needed, add a small
+      observability wrapper around the query call to capture predicate-empty vs
+      recency-cutoff vs project-tag-cutoff. dedup_eviction is detectable post-step-02c
+      via the dedup logic — fire from there.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Fixture per bucket: empty_kg (no triples), empty_predicate_filter (only `decided`
+      present), recency_cutoff (all triples older than window), project_tag_cutoff
+      (only cross-project, all penalized below threshold), dedup_eviction (kg-findings
+      duplicate step-02 findings). Verify correct miss_reason emitted.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm taxonomy is mutually exclusive (no overlap). Confirm discriminator logic is correct against query state, not heuristic.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/workflows/steps/meta-team-cycle/step-02c-kg-signal.md
+      purpose: Query + filter site
+    - path: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
+      purpose: dedup_eviction detection site
+
+cross_cutting:
+  - concern: documentation
+    action: "meta-optimize-contract.md adds miss_reason taxonomy table."
+  - concern: versioning
+    action: "Patch bump."
+  - concern: metrics
+    applies: true
+
+metric:
+  applies: true
+  name: kg_signal.miss_reason_coverage
+  direction: up
+  baseline: 0
+  target: 5
+  unit: "distinct miss_reason values observed"
+  window: "first 10 cycles post-merge OR fixture exhaustive run"
+  source:
+    kind: events
+    ref: "Distinct miss_reason values emitted across cycles"
+  verify_at: "10 cycles post-merge"

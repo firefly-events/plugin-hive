@@ -9,9 +9,77 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-### Removed
+### Added
 
-- **BREAKING:** `/hive:ui-audit` skill removed. Use `/hive:design-review --artifact-target implementation` instead. The record path `.pHive/audits/ui-audit/latest.yaml` is preserved by the new flag for backward compatibility with `polish-audit` consumers.
+- KG signal revival follow-ups: `chromadb-wrapper.js query()` now returns per-hit `metadata` (predicate / source_epic / source_agent / valid_from per B0.2). New `scripts/kg-why-chroma.js` Node bridge plus `hive/lib/kg_why.py::_default_chromadb_query_fn()` wire S6.1 Phase B to the live sidecar when present; `HIVE_DISABLE_CHROMA_BRIDGE` env var disables the default for test isolation. `step-08-close.md` "Inputs available" now enumerates `kg_signal_findings_total`, `kg_signal_proposals_total`, `hit_rate_5cycle`, `miss_reason`, `cycle_report_path`, and `resolved_ledger_path` so the orchestrator threads telemetry placeholders through scope.
+- KG signal revival S6.3: secondary predicate wiring audit — all 5 candidate predicates (`phase_started`, `phase_complete`, `assigned_to`, `blocked_by`, `depends_on`) deferred per the anti-pattern guard (no current `/hive:why` surface names them by predicate). Story closes with audit doc as sole deliverable at `.pHive/epics/kg-signal-revival/docs/secondary-predicate-audit.md`. Re-audit triggers documented for follow-on epic.
+- KG signal revival S6.2: `/plan` pre-flight invokes `/hive:why` (free-form, --limit 10) against the requirement topic. Results materialize as a `PRIOR DECISIONS` section in design-discussion §0 when ≥1 triple returns; section is omitted entirely when zero results (no noise). Helper failure (missing sqlite, kg_why error) degrades silently — planning continues.
+- KG signal revival S6.1: `/hive:why` retrospection slash command. New skill at `skills/hive/skills/why/SKILL.md` with `--strict --predicate <name> --entity <id>` as primary usage (precision-first, KG-only Phase A) and free-form topic queries as documented fallback (merges Phase A + ChromaDB Phase B when available). Helper `hive/lib/kg_why.py` implements all three phases (KG query, semantic fallback, merge+dedupe+render). Degrades to SQLite-only when ChromaDB unavailable. Phase B live ChromaDB bridge deferred — `chromadb-wrapper.js query()` does not yet return metadata; tracked for follow-up.
+- KG signal revival S5.3: per-cycle KG metrics JSONL stream + cycle-rollup line. `hive/lib/kg_metrics_writer.py` buffers `kg_write` events in memory keyed by cycle_id (resolved from `--cycle-id` or `HIVE_CYCLE_ID`/`HIVE_META_CYCLE_ID` env), flushes one JSONL file at `.pHive/metrics/kg/{cycle_id}.jsonl` per close with all per-event rows + one `cycle_summary` row, and appends a single greppable `kg-signal: findings=N proposals=M hit_rate_5cycle=R miss_reason=X` line to the morning summary. Writer is append-idempotent — re-running close for the same cycle_id does not duplicate rows. step-08-close.md wires the flush after the ledger append.
+- KG signal revival S5.2: miss-reason taxonomy at step-02c — new `hive/lib/kg_signal/miss_reason.py` discriminator returns one of `empty_kg` / `empty_predicate_filter` / `recency_cutoff` / `project_tag_cutoff` from query-time state. step-02c emits the field on empty cycles; step-03 fires `dedup_eviction` when its dedup logic empties a non-zero kg-finding candidate set. Buckets are mutually exclusive; field is absent when findings non-empty.
+- KG signal revival S5.1: KG-signal observability surface — `kg_signal_findings_total{cycle_id}`, `kg_signal_proposals_total{cycle_id}` counters and `hit_rate_5cycle` gauge registered in `metric_registry.py` (idempotent against double-registration). `kg_writes_total{predicate}` re-registration confirmed idempotent. New `python3 -m hive.lib.metric_increment_cli` shell entry point for prompt-driven increment from step-02c (findings emitted) and step-03 (proposal merge — hit-rate join site). `hit_rate_5cycle` computed at step-08 cycle close with edge-case correctness for <5 cycles.
+- KG signal revival S4.5: Nail Tech Assistant onboarded — quoted-path canary (path contains both space and intentional `Assitant` typo). `kg-bootstrap-from-projects.js --apply --since 2026-04-28` imported 6 triples under `nail-tech-assistant/epic-b-pinterest-integration` namespace. kg.sqlite total: 74 → 80. Wave S4 complete; registry now holds plugin-hive, shindig, signal-flayr, nail-tech-assistant. Execution notes at `.pHive/epics/kg-signal-revival/execution-notes/S4.5.md`.
+- KG signal revival S4.4: Signal Flayr (`ffe-social-engine` repo) onboarded to `~/.claude/hive/projects.yaml`. `kg-bootstrap-from-projects.js --apply --since 2026-04-28` imported 7 triples under `signal-flayr/security-hotfix-p0` namespace. kg.sqlite total: 67 → 74. Execution notes at `.pHive/epics/kg-signal-revival/execution-notes/S4.4.md`.
+- KG signal revival S4.3: Shindig Mobile onboarded to `~/.claude/hive/projects.yaml`. `kg-bootstrap-from-projects.js --apply --since 2026-04-28` imported 0 Shindig triples (all 8 of Shindig's decisions are pre-predicate-canon date) — registration + bootstrap mechanism is the documented deliverable per the story's risk note. Execution notes at `.pHive/epics/kg-signal-revival/execution-notes/S4.3.md`. `node_modules/` added to `.gitignore` (transient BYO `better-sqlite3` install).
+- KG signal revival S2.3: Act I exit gate verification — `hive/scripts/act-i-exit-gate-check.sh` runs the priority-predicate count after every `/meta-optimize` cycle (wired into `step-08-close.md`), emits a PASSED marker exactly once on the first non-zero transition, and closes the `S7-kg-signal-production-emission` outcome metric loop from the prior `kg-augmented-meta-signal` epic.
+- KG signal revival S2.2: `superseded` predicate emission across three replacement seams — `/plan` story-overwrite, `/meta-optimize` step-03 proposal replacement, and `session-end` insight promotion. New `emit_superseded()` + `emitSupersededEvent()` helpers atomically `UPDATE valid_until` on the prior triple and `INSERT` one provenance edge in a single sqlite transaction. `kg_emit_cli` gains `--mode supersede` for prompt-driven callers.
+- KG signal revival S2.1: `phase_blocked` predicate emission fanned out to three seams — DAG executor walker `_record_skipped` upstream-skip path (Python helper); escalation-backfill skill emits one triple per `(trigger, canonical-story-id)` pair at TPM escalation-raise; orchestrator waiting-on-user gates (plan structured-outline sign-off, design-discussion review, H/V plan review, daily-ceremony approve-plan) emit via a new `python3 -m hive.lib.kg_emit_cli` shell entry point that wraps `emit_kg_event` for prompt-driven callers.
+- KG signal revival S3.2: ChromaDB wrapper dynamic port resolution from `~/.claude/hive/chromadb.port`, idempotent `decisions` collection bootstrap, and B0.2 schema docs.
+- KG signal revival S4.2: bootstrap `--since` filtering, dry-run projection output, large-import guardrails, and legacy decision `set:` to `valid_from` handling.
+- KG signal revival S4.2b: cross-project KG findings and proposals now preserve the `[cross-project: <name>]` hard-tag contract in workflow docs.
+- KG signal revival S1.2: Python `emit_kg_event()` parity helper and DAG executor terminal failure emission for `phase_failed`.
+- KG signal revival S1.1 foundation: `emit_lifecycle_at` knob, `emitKgEvent()` helper, and `kg_writes_total{predicate}` counter registration.
+- KG signal revival S4.1: `/hive:register-project` skill, registry helper, and quoted path-with-space fixture for cross-project KG bootstrap registration.
+- KG signal revival S3.1: ChromaDB sidecar lifecycle scripts, fire-and-forget SessionStart hook, operations guide, and bash lifecycle tests.
+
+## [2.0.0] - 2026-05-12
+
+**Hive 2.0 milestone.** Cut from `dev/hive-2.0`. Bundles CWC 2026 A-group + Epic A (catalog hygiene + 3 mattpocock-aligned borrows) + Epic B (structural refactor + gate-lift) + Epic C (Task-Tracking Adapter ABI) as the 2.0 cut-line, with Epic D (Sandcastle adoption follow-on) and Epic F (UI cluster extract-config deeper) riding parallel.
+
+Brand reframe: from *"director's chair"* (Hive directs swarms) to *"composable substrate, user-directed"* (user directs Hive; Hive provides composable atoms + workflow primitives). See `recommendation.md:239-241`.
+
+### Added
+
+- **Epic A — Catalog hygiene + borrows** (PR #58, 13 stories, W0-W5). W0 boilerplate extraction; W1 doc-template reclassify; mattpocock-aligned borrows (CONTEXT.md, atomic-shape audit, grill-before-plan).
+- **Epic B — Structural refactor + gate-lift** (PR #62, 14 stories, W6). Plan/execute skill split; `paths.gate_mode` knob (`hard` vs `warning`); post-run audit + gate-lift telemetry under `${HIVE_STATE_DIR}/audits/post-run/<run-id>.yaml`; 5-cluster brand/design/polish/visual-qa extract-config (3 of 5 cluster members thinned).
+- **Epic C — Task-Tracking Adapter ABI** (PR #63, 7 stories, W1-W5). Hierarchy-agnostic ABI under `hive/lib/task-tracking-dispatch/`; reference adapters for GitHub Issues + Linear under `hive/adapters/{github,linear}/`; JSON schemas under `hive/references/task-tracking-adapter-abi-schemas/`; migration guide + prose-runbook deprecation; plan-skill Phase D (publish stories to tracker) + execute-skill step 7b (status updates) wired through dispatch; `gate_mode` + prose-runbook-fallback telemetry.
+- **Epic D — Sandcastle adoption follow-on** (PR #66, 12 specs / 7 slices). Sandcastle as 5th `execute` mode; provider wrapper at `hive/lib/sandcastle-provider.js` with preflight semver pin (`>=0.5.10 <0.6.0`); log-line redaction at `hive/lib/sandcastle-log-redaction.js` (argv/env, bearer, JSON-kv forms); V1 hooks reference; `gate-claudecode-sandcastle.mjs` policy gate scanning `.js/.mjs/.cjs/.ts/.mts/.cts` for `sandcastle + claudeCode()` blocked-lane usage; adoption guide at `hive/references/sandcastle-adoption-guide.md`; issue #191 defer marker + warm-pool placeholder; specialist-phase security plan-audit + performance audit trail.
+- **Epic F — UI cluster extract-config deeper** (PR #65, 4 stories). D2 full closure. 6 public reference files under `hive/references/ui-prompts/` (`brand-system`, `design-system`, `polish-audit`, `visual-qa`, `design-review-design-critique`, `design-review-synthesis`); `step_file:` loading support in `skills/design-review/SKILL.md` (precedence `step_file` > `task` per `hive/references/workflow-schema.md:39`); regression-gate documentation at `hive/references/ui-prompt-extraction-verification.md`.
+
+### Changed
+
+- `skills/brand-system/SKILL.md`, `skills/design-system/SKILL.md`, `skills/polish-audit/SKILL.md`, `skills/visual-qa/SKILL.md` — inline ui-designer task bodies replaced with load → cite → inject → spawn invocation envelopes. Net -125 lines (109→72, 89→75, 162→134, 128→82).
+- `hive/workflows/design-review.workflow.yaml` — design-critique + synthesis steps use `step_file:` instead of inline `task:` (5750 → 3698 bytes, -2052).
+- `skills/plan/SKILL.md` — added Phase D (step 19 tracker publish) + step 20 (post-run audit).
+- `skills/execute/SKILL.md` — added step 7b (tracker status update) + expanded step 8 (post-run audit with backend resolution sources).
+
+### Fixed
+
+- CodeRabbit findings on PR #65 (CHANGELOG footer link map; `{artifact_target}` placeholder docs) and PR #66 (`RE_ARGV` case-insensitive `/gi`, `parseSemver` `$` anchor, `.cts` in `SCAN_EXTS`, `userns: false` security-default clarification, `printenv | podman` anti-pattern guidance corrected).
+
+### Notes
+
+- **2.0 cut-line** per `.pHive/epics/hive-composability-audit/docs/recommendation.md:432` = CWC 2026 A-group + Epic A + B + C merged.
+- **Post-2.0 follow-ons** queued: Epic G (`memory-stack-optionalize`, discretionary) and Epic H (`brand-system-2.0-update`, auto-triggered on 2.0 merge).
+- Epic E (`atoshell-reconsider`) remains dormant — trigger requires explicit user reopen.
+
+## [1.3.0] - 2026-05-12
+
+### Added
+
+- 6 new public reference files under `hive/references/ui-prompts/`: `brand-system`, `design-system`, `polish-audit`, `visual-qa`, `design-review-design-critique`, and `design-review-synthesis`.
+- `step_file:` loading support in `skills/design-review/SKILL.md` step-execution loop. Precedence is `step_file` > `task`, per `hive/references/workflow-schema.md:39`.
+- `hive/references/ui-prompt-extraction-verification.md` regression-gate documentation.
+
+### Changed
+
+- `skills/brand-system/SKILL.md`, `skills/design-system/SKILL.md`, `skills/polish-audit/SKILL.md`, and `skills/visual-qa/SKILL.md` inline ui-designer task bodies replaced with load -> cite -> inject -> spawn invocation envelopes. No behavior change; net -125 lines across the four:
+  - `skills/brand-system/SKILL.md`: 109 -> 72 (-37)
+  - `skills/design-system/SKILL.md`: 89 -> 75 (-14)
+  - `skills/polish-audit/SKILL.md`: 162 -> 134 (-28)
+  - `skills/visual-qa/SKILL.md`: 128 -> 82 (-46)
+- `hive/workflows/design-review.workflow.yaml` design-critique and synthesis steps now use `step_file:` instead of inline `task:`. Two specialist steps, accessibility-critique and animations-critique, keep inline `task:` content. Workflow size changed from 5750 -> 3698 bytes (-2052 bytes).
+- `skills/design-review/SKILL.md` gained the `step_file:` loading extension code (+287 bytes).
 
 ## [1.2.2] - 2026-05-07
 
@@ -474,7 +542,16 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/firefly-events/plugin-hive/compare/v1.3.0...v2.0.0
+[1.3.0]: https://github.com/firefly-events/plugin-hive/compare/v1.2.2...v1.3.0
+[1.2.2]: https://github.com/firefly-events/plugin-hive/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/firefly-events/plugin-hive/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/firefly-events/plugin-hive/compare/v1.1.4...v1.2.0
+[1.1.4]: https://github.com/firefly-events/plugin-hive/compare/v1.1.3...v1.1.4
+[1.1.3]: https://github.com/firefly-events/plugin-hive/compare/v1.1.2...v1.1.3
+[1.1.2]: https://github.com/firefly-events/plugin-hive/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/firefly-events/plugin-hive/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/firefly-events/plugin-hive/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/firefly-events/plugin-hive/releases/tag/v1.0.0
 [0.9.0]: https://github.com/firefly-events/plugin-hive/releases/tag/v0.9.0

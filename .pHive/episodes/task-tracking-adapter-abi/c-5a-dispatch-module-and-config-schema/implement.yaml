@@ -1,0 +1,13 @@
+step_id: implement
+story_id: c-5a-dispatch-module-and-config-schema
+epic_id: task-tracking-adapter-abi
+agent: developer
+status: completed
+artifacts:
+  - path: hive/lib/task-tracking-dispatch/index.ts
+  - path: hive/lib/task-tracking-dispatch/test/dispatch.test.ts
+  - path: hive/lib/task-tracking-dispatch/README.md
+  - path: hive/hive.config.yaml
+  - path: hive.config.yaml
+test_results: "16/16 PASS"
+key_finding: "TaskTrackingDispatch class with load/invoke/capability/hasAdapter. SHA-1 keyed module-scoped handle cache. Custom path requires slash. AdapterError code allowlist (non-ABI → INTERNAL_ERROR). Both hive.config.yaml files schema-updated."

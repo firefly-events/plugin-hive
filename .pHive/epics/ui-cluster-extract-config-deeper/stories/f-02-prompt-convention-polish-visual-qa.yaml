@@ -1,0 +1,144 @@
+id: f-02-prompt-convention-polish-visual-qa
+epic: ui-cluster-extract-config-deeper
+title: "Apply prompt-reference convention to polish-audit + visual-qa"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [f-01-prompt-convention-brand-design]
+tier: 2
+
+description: |
+  Apply the f-01 convention to the remaining two direct UI cluster SKILLs:
+  polish-audit and visual-qa. After this slice all four direct SKILLs are thin
+  prompt invocations citing hive/references/ui-prompts/. polish-audit keeps its
+  always-invokes-ui-designer behavior (Q7 lock). visual-qa's larger prompt
+  block extracts byte-equivalent; format normalization deferred to a later
+  epic.
+
+acceptance_criteria:
+  - "Given f-01 established the convention, when S2 completes, then hive/references/ui-prompts/polish-audit.md and hive/references/ui-prompts/visual-qa.md exist with `## Required placeholders` headers."
+  - "Given all four direct SKILLs are extracted, when greppingn `rg \"hive/references/ui-prompts/\" skills/{brand-system,design-system,polish-audit,visual-qa}/SKILL.md`, then the grep returns exactly 4 matches (one per SKILL)."
+  - "Given polish-audit invokes ui-designer, when run, then the spawn still occurs unconditionally (Q7 — no conditional skip mode; that would be behavior change, deferred)."
+  - "Given visual-qa's prompt block at skills/visual-qa/SKILL.md:49-97 is extracted, when diffed, then the body is byte-equivalent — no whitespace normalization, no wording edits."
+  - "Given placeholder variables (e.g. {animation_opportunities}, {prior_verdict}, {brief_path}, {story_id}), when the SKILL invokes the prompt, then the SKILL body injects each variable visible at spawn time."
+  - "Given SKILL line counts pre- vs post-, when recorded, then story notes capture the per-SKILL delta (target ~-30 lines polish-audit, ~-49 lines visual-qa, refined at implementation)."
+
+steps:
+  - id: research
+    description: |
+      Read skills/polish-audit/SKILL.md and skills/visual-qa/SKILL.md;
+      identify the ui-designer task blocks to extract (polish-audit:~85,
+      visual-qa:~49-97). Map every placeholder variable. Read f-01 outputs
+      (hive/references/ui-prompts/brand-system.md and design-system.md) as the
+      exact format to mirror. Confirm path prefix skills/<name>/SKILL.md.
+    agent: researcher
+
+  - id: implement
+    description: |
+      1. Create hive/references/ui-prompts/polish-audit.md with `## Required
+         placeholders` header + byte-equivalent task body.
+      2. Create hive/references/ui-prompts/visual-qa.md following the same
+         pattern.
+      3. Rewrite skills/polish-audit/SKILL.md ui-designer spawn block to
+         load -> cite -> inject -> spawn. Preserve always-invokes behavior.
+      4. Rewrite skills/visual-qa/SKILL.md ui-designer spawn block the same
+         way.
+      5. Smoke-test both SKILLs end-to-end; verify their downstream artifacts
+         (polish report; visual-qa report) are produced.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Run acceptance grep gates:
+        test -f hive/references/ui-prompts/polish-audit.md
+        test -f hive/references/ui-prompts/visual-qa.md
+        rg "Required placeholders" hive/references/ui-prompts/{polish-audit,visual-qa}.md
+        rg "hive/references/ui-prompts/" skills/{brand-system,design-system,polish-audit,visual-qa}/SKILL.md
+        rg "Task for ui-designer|Spawn a subagent with the full ui-designer persona" skills/{brand-system,design-system,polish-audit,visual-qa}/SKILL.md
+      First two `test` exit 0; placeholder grep returns 2 matches for new files;
+      citation grep returns 4 matches total; inline-block grep trends to zero
+      for direct SKILLs (S4 hard-gates this).
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Confirm byte-equivalent extraction (diff visual-qa prompt body against
+      original — visual-qa's larger block is highest-risk). Confirm
+      polish-audit still spawns ui-designer unconditionally (no Q7 drift).
+      Confirm placeholder header lists every {var} actually injected.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: "Commit and push to feature branch."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: bash + claude-code SKILL execution
+    convention_inherits_from: f-01-prompt-convention-brand-design
+  key_files:
+    - path: skills/polish-audit/SKILL.md
+      purpose: "Source of polish-audit ui-designer task block (line ~85)."
+    - path: skills/visual-qa/SKILL.md
+      purpose: "Source of visual-qa ui-designer task block (line ~49-97). Largest block — highest extraction risk."
+    - path: hive/references/ui-prompts/brand-system.md
+      purpose: "f-01 output — pattern template to mirror format + header."
+    - path: hive/references/ui-prompts/design-system.md
+      purpose: "f-01 output — second pattern template."
+
+files_to_modify:
+  - file: skills/polish-audit/SKILL.md
+    change: "Replace inline ui-designer task block with load -> cite -> inject -> spawn pattern referencing hive/references/ui-prompts/polish-audit.md. Preserve always-invokes behavior (Q7)."
+  - file: skills/visual-qa/SKILL.md
+    change: "Replace inline ui-designer task block (lines 49-97) with load -> cite -> inject -> spawn pattern referencing hive/references/ui-prompts/visual-qa.md."
+  - file: hive/references/ui-prompts/polish-audit.md
+    change: "CREATE — Required placeholders header + byte-equivalent task body."
+  - file: hive/references/ui-prompts/visual-qa.md
+    change: "CREATE — Required placeholders header + byte-equivalent task body (largest of the four)."
+
+code_examples:
+  - title: "Inherits f-01 SKILL spawn pattern"
+    file: skills/brand-system/SKILL.md
+    snippet: |
+      # After f-01 ships, brand-system/SKILL.md will have the canonical
+      # load -> cite -> inject -> spawn block. Read it and apply the same
+      # shape to polish-audit and visual-qa.
+
+design_decisions:
+  - decision: "polish-audit ui-designer invocation stays unconditional"
+    rationale: "Q7 lock — optional ui-designer mode would be behavior change, not extraction. Deferred to a future epic."
+  - decision: "visual-qa prompt extracted byte-equivalent; format normalization deferred"
+    rationale: "Q8 + per-slice risk note. visual-qa's larger block has higher drift risk; preserve text first, optimize later."
+
+cross_cutting:
+  - concern: documentation
+    action: "If hive/agents/ui-designer.md or any SKILL-adjacent docs reference the inline prompt locations of polish-audit/visual-qa, update them to point at hive/references/ui-prompts/. Skip if no citation present."
+
+risks:
+  - severity: medium
+    description: "visual-qa's larger block loses report-format detail during extraction."
+    mitigation: "Byte-equivalent rule + tester diff step. Reviewer scrutinizes visual-qa specifically. Defer format normalization to later epic — not in this story's scope."
+  - severity: medium
+    description: "polish-audit procedural flow accidentally drifts while moving only the prompt body."
+    mitigation: "Preserve SKILL flow around line 85; move only the prompt block, not the surrounding gate/context-loading steps. Q7 invariant audited in review step."
+  - severity: low
+    description: "Placeholder injection silently regresses (variable missing post-extraction)."
+    mitigation: "Required placeholders header lists every {var}; reviewer compares pre/post variable sets; smoke test catches missing injection (artifact mismatches)."
+
+references:
+  - path: .pHive/epics/ui-cluster-extract-config-deeper/docs/vertical-plan.md
+    relevant_excerpt: |
+      Slice S2: Full SKILL Cluster Coverage (Tier 2)
+      Goal: Apply the proven convention to polish-audit and visual-qa so all
+      four direct UI cluster SKILLs are thin prompt invocations.
+      depends_on: S1
+  - path: .pHive/epics/ui-cluster-extract-config-deeper/docs/tpm-sequencing-memo-b2.md
+    relevant_excerpt: |
+      Risk: polish-audit's procedural flow changes while extracting only the
+      prompt. Mitigation: preserve SKILL flow around line 85; Q7 locks
+      ui-designer as always required.
