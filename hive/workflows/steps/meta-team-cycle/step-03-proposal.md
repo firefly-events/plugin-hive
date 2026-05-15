@@ -119,6 +119,11 @@ python3 -m hive.lib.metric_increment_cli \
   --label cycle_id="{cycle_id}" \
   --by 1
 ```
+- Dedup miss reason: after de-duplication, if the `kg-findings.yaml` input count
+  was non-zero and every kg finding was removed by the step-02 merge, do not
+  mutate step-02c's already-written output. Emit the step-03 summary line
+  `miss_reason=dedup_eviction` so the empty downstream kg contribution is
+  attributable to the merge site that caused it.
 
 Rendered cross-project proposal example:
 

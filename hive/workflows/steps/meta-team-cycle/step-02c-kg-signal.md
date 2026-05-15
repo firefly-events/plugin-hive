@@ -27,6 +27,18 @@ This step runs after step-02-analysis and in parallel with step-02b-external-res
 
 Run a bounded read against the KG triples table, apply the three-layer relevance filter, and emit a findings list that step-03 consumes alongside step-02 findings and step-02b external candidates.
 
+Use the query helper for miss-reason discrimination so empty-cycle telemetry is
+based on query-time state rather than guessed after the output file is already
+empty:
+
+```bash
+python3 -m hive.lib.kg_signal.miss_reason --json
+```
+
+The helper returns `miss_reason: null` when KG findings should surface. When
+the emitted `kg_findings` list is empty, carry the returned non-null value into
+the output payload and summary line.
+
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
@@ -174,9 +186,12 @@ kg_findings:
 ```yaml
 phase: kg-signal
 kg_findings: []
+miss_reason: empty_kg | empty_predicate_filter | recency_cutoff | project_tag_cutoff
 ```
 
 The empty-list guarantee is how this step remains additive-only rather than a blocker on step-03. Downstream consumers MUST treat an empty list identically to a missing one (additive = additive + ∅).
+
+Omit `miss_reason` when `kg_findings` is non-empty.
 
 ### 8. Produce kg-signal summary
 
@@ -205,6 +220,14 @@ Findings emitted:   {N}
 Top findings (by rank):
   [{rank_score}] kg-finding-{N}: {description}  (tag={tag})
 ```
+
+Also emit one compact machine-grepable line:
+
+```
+[meta-optimize] kg-signal: findings={N} miss_reason={bucket}
+```
+
+Include `miss_reason=...` only when `findings=0`.
 
 ## Non-scope
 
@@ -236,6 +259,7 @@ kg_signal_summary: {string summary of availability, counts, and notable clusters
 - [ ] Cross-project findings carry a `rank_score` multiplied by `0.7`
 - [ ] Output is shaped for direct consumption by step-03's eligible-findings merge — schema parity verified against `step-02-analysis.md` §7
 - [ ] Empty cases (kg.sqlite absent, queries empty, all-filtered) emit `kg_findings: []` rather than failing
+- [ ] Empty cases include exactly one query-time `miss_reason`; non-empty cases omit the field
 - [ ] `discovery_source: kg_signal` set on every emitted finding
 
 ## FAILURE MODES
