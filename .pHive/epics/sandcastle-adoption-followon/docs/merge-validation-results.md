@@ -108,3 +108,56 @@ No live run executed, so no logs to inspect. As a proxy: `sandcastle-log-redacti
 ---
 
 *Outcome class B recorded per story s4-merge-validation AC OR-branch.*
+
+---
+
+## Refresh — 2026-05-14 (post-execution retry)
+
+Re-attempted Class-A validation. **Prerequisite gap closed; quota gap remains.**
+
+### Updated Environment Table
+
+| Probe | Command | Result | Status |
+|---|---|---|---|
+| Node version | `node --version` | (v25.9.0) | PASS |
+| Podman binary | `which podman` | `/opt/homebrew/bin/podman` | PRESENT |
+| Podman daemon | `podman info` | arm64 linux runtime=crun, machine `podman-machine-default` running (applehv) | **PASS** |
+| OPENAI_API_KEY (env) | `env \| grep OPENAI_API_KEY` | unset in shell | INFO (auth.json supplies) |
+| auth.json (repo) | `.sandcastle/codex-config/auth.json` | 4393 bytes, mode 600, keys=`OPENAI_API_KEY,auth_mode,last_refresh,tokens` | **PASS** (copied from `~/.codex/auth.json`) |
+| auth.json (spike) | `.pHive/spikes/sandcastle/.sandcastle/codex-config/auth.json` | present, mode 600 | **PASS** (pre-existing, registered via `codex login`) |
+| `@ai-hero/sandcastle` | `node_modules/@ai-hero/sandcastle/package.json` | version `0.5.10` | **PASS** (within s2 pin `>=0.5.10 <0.6.0`) |
+| Spike image | `podman images localhost/sandcastle` | `sandcastle:spike` (6 days old), `sandcastle:plugin-hive` (8 min old) | PRESENT |
+| OpenAI Responses API quota | Direct codex probe (single container exec) | `ERROR: Quota exceeded. Check your plan and billing details.` (exit 0, model `gpt-5.5`) | **FAIL — quota=0** |
+
+### Direct Codex Quota Probe Command (verbatim)
+
+```
+podman run --rm \
+  --entrypoint codex \
+  -v "$PWD/.pHive/spikes/sandcastle/.sandcastle/codex-config:/home/agent/.codex" \
+  sandcastle:spike exec --skip-git-repo-check 'reply OK'
+```
+
+Session id observed: `019e28f1-c115-7883-86f4-0dd7b4e7a777`. Output ended with two consecutive `ERROR: Quota exceeded.` lines — matches the May 8 spike `run.log` failure mode exactly. No parallel harness was launched because launching four sandboxed `codex exec` calls would only multiply the same quota failure.
+
+### Outcome Class
+
+**Class B — re-confirmed.** Blocker is now narrowed to a single upstream account-level constraint (OpenAI quota on this account), not a local infrastructure gap. Per the AC OR-branch (*"produce a documented blocking failure"*) this remains the recorded outcome.
+
+### Updated Re-Run Checklist
+
+Replaces the earlier checklist:
+
+- [x] `~/.codex/auth.json` exists and was copied to `.sandcastle/codex-config/auth.json` (mode 600)
+- [x] `@ai-hero/sandcastle@0.5.10` resolvable via `require()`
+- [x] `podman machine` running; `podman info` succeeds
+- [x] Spike image `sandcastle:spike` present
+- [ ] **OpenAI Responses API quota > 0 on the account behind `~/.codex/auth.json`** (top-up, billing change, or different account/auth.json)
+- [ ] Re-run unit suites to confirm S1–S3 still green
+- [ ] Execute parallel-branch harness (`.pHive/spikes/sandcastle/harness.ts` or a Class-A script that drives `createSandcastleProvider` through routed mode)
+
+### Findings (refresh)
+
+No new defects discovered. No code path was exercised under live quota. No fix-forward patches applied. The cold-start latency surface flagged by the post-exec performance audit (`sandcastle-provider.js:264-268`) remains unmeasured.
+
+*Refresh recorded 2026-05-14 during post-epic verification pass; story status unchanged.*

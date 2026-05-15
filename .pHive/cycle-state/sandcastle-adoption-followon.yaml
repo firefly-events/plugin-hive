@@ -27,7 +27,7 @@ execution_summary:
       - { story: s5-adoption-guide, commit: d063915 }
       - { story: s5-hooks-reference, commit: 3b67917 }
   follow_ups:
-    - "s4-merge-validation Class-A re-run requires: OPENAI_API_KEY, @ai-hero/sandcastle install, podman daemon, .sandcastle/codex-config/auth.json. Re-run captures parallel-run cold-start baseline."
+    - "s4-merge-validation Class-A re-run requires OpenAI Responses API quota > 0 on the auth.json account. All other prereqs confirmed green on 2026-05-14 (podman daemon up, @ai-hero/sandcastle@0.5.10 installed, auth.json provisioned at .sandcastle/codex-config/ and .pHive/spikes/sandcastle/.sandcastle/codex-config/). Direct codex probe returned `ERROR: Quota exceeded.` — same upstream blocker as 2026-05-08 spike. Refresh logged in docs/merge-validation-results.md (Refresh section)."
     - "Cleanup of issue-191 audit gate after upstream resolution — separate future status-flip work item per s6 spec."
     - "Hyphenated header names (X-API-KEY style) not caught by redaction \\b regex — documented in adoption guide V1 gaps. Tighten if leaked in practice."
 spec_count: 12
