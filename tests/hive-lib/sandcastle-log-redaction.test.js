@@ -259,3 +259,121 @@ test('module exports are synchronous functions — installable before any requir
   const wrapped = mod.wrapSandcastleLogger((_msg) => {});
   assert.equal(typeof wrapped, 'function');
 });
+
+// ---------------------------------------------------------------------------
+// AC 7 — Hyphenated header names (carried follow-on from s4 validation)
+//
+// Both forms are covered: JSON-serialised header dicts and bare HTTP
+// header lines. The pre-fix regex used a `\b`-anchored underscore-only
+// key pattern; hyphens broke word-boundary matching so X-API-KEY passed
+// through unredacted. See cycle-state follow_ups for the carryover note.
+// ---------------------------------------------------------------------------
+
+test('JSON form — hyphenated header name "X-API-Key" is masked', () => {
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine('{"X-API-Key": "sk-test-leak"}');
+  assert.doesNotMatch(result, /sk-test-leak/);
+  assert.match(result, /"X-API-Key":\s*"\[REDACTED\]"/);
+});
+
+test('JSON form — hyphenated header name "X-Auth-Token" is masked', () => {
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine('{"X-Auth-Token": "bearer-leak-1"}');
+  assert.doesNotMatch(result, /bearer-leak-1/);
+  assert.match(result, /"X-Auth-Token":\s*"\[REDACTED\]"/);
+});
+
+test('JSON form — mixed-case hyphenated "Api-Key" is masked', () => {
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine('{"Api-Key": "leak-2"}');
+  assert.doesNotMatch(result, /leak-2/);
+  assert.match(result, /"Api-Key":\s*"\[REDACTED\]"/);
+});
+
+test('JSON form — underscore form still masked after regex widening', () => {
+  // Regression guard: widening to accept hyphens must not break the
+  // existing underscore-separated path.
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine('{"openai_api_key": "underscore-leak"}');
+  assert.doesNotMatch(result, /underscore-leak/);
+  assert.match(result, /"openai_api_key":\s*"\[REDACTED\]"/);
+});
+
+test('Header-line form — "X-API-Key: <value>" is masked, header name preserved', () => {
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine('X-API-Key: sk-test-headerleak');
+  assert.doesNotMatch(result, /sk-test-headerleak/);
+  assert.match(result, /^X-API-Key:\s*\[REDACTED\]$/);
+});
+
+test('Header-line form — "X-Auth-Token: <value>" is masked', () => {
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine('X-Auth-Token: leak-token-3');
+  assert.doesNotMatch(result, /leak-token-3/);
+  assert.match(result, /X-Auth-Token:\s*\[REDACTED\]/);
+});
+
+test('Header-line form — "X-Client-Secret: <value>" is masked', () => {
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine('X-Client-Secret: hush-leak-4');
+  assert.doesNotMatch(result, /hush-leak-4/);
+  assert.match(result, /X-Client-Secret:\s*\[REDACTED\]/);
+});
+
+test('Header-line form — multi-line log preserves non-secret context', () => {
+  const { redactSandcastleLogLine } = loadModule();
+  const input = [
+    'POST /v1/responses HTTP/1.1',
+    'Host: api.openai.com',
+    'X-API-Key: sk-leakable-5',
+    'Content-Type: application/json',
+  ].join('\n');
+  const result = redactSandcastleLogLine(input);
+  assert.doesNotMatch(result, /sk-leakable-5/);
+  assert.match(result, /X-API-Key:\s*\[REDACTED\]/);
+  // Non-secret lines must pass through unchanged.
+  assert.match(result, /POST \/v1\/responses HTTP\/1\.1/);
+  assert.match(result, /Host: api\.openai\.com/);
+  assert.match(result, /Content-Type: application\/json/);
+});
+
+test('Header-line form — does NOT match Authorization: Bearer (handled by AC 2)', () => {
+  // Regression guard: the Authorization-Bearer form has its own dedicated
+  // regex that preserves the literal "Bearer " prefix. The header-line
+  // form must not double-fire on this input or it would strip "Bearer ".
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine('Authorization: Bearer sk-test-bearer-6');
+  assert.doesNotMatch(result, /sk-test-bearer-6/);
+  // The "Bearer " literal must survive — proves RE_BEARER fired, not RE_HEADER_LINE.
+  assert.match(result, /Authorization:\s*Bearer\s+\[REDACTED\]/);
+});
+
+test('Header-line form — does NOT match generic non-secret headers (Content-Type, Host)', () => {
+  // Negative coverage: avoid over-aggressive matching that would strip
+  // unrelated headers. Only header names ending in -Key/-Token/-Secret
+  // should be redacted.
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine([
+    'Content-Type: application/json',
+    'Host: api.example.com',
+    'User-Agent: codex/0.129',
+  ].join('\n'));
+  assert.match(result, /Content-Type: application\/json/);
+  assert.match(result, /Host: api\.example\.com/);
+  assert.match(result, /User-Agent: codex\/0\.129/);
+  assert.doesNotMatch(result, /\[REDACTED\]/);
+});
+
+test('Header-line form — does NOT match JSON-embedded hyphenated key (handled by RE_JSON_KV)', () => {
+  // Regression guard: a JSON-embedded `"X-API-Key": "..."` must be caught
+  // by the JSON form (preserves quotes) and NOT also captured by the
+  // bare-header form, which would corrupt the JSON shape.
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine('{"X-API-Key": "sk-test-7"}');
+  assert.doesNotMatch(result, /sk-test-7/);
+  // Quoted form preserved: "X-API-Key": "[REDACTED]"
+  assert.match(result, /"X-API-Key":\s*"\[REDACTED\]"/);
+  // The bare form would emit `X-API-Key: [REDACTED]"}` which destroys JSON
+  // quotes. Assert that does NOT appear.
+  assert.doesNotMatch(result, /X-API-Key:\s*\[REDACTED\]"/);
+});
