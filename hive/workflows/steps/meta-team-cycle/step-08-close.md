@@ -317,6 +317,33 @@ This is the final step of the meta-team cycle.
 **Next:** Cycle complete — no further steps.
 **If gating fails:** Record `close_rejected` in the output and produce a diagnostic morning-summary-stub that names what's missing. Do NOT call the cycle `closed`.
 
+## Post-cycle: KG signal cycle rollup JSONL (S5.3)
+
+After the ledger append succeeds, the `hit_rate_5cycle` gauge has been computed, and the morning summary / cycle report exists, flush the KG signal telemetry stream and append the greppable rollup line:
+
+```bash
+python3 -m hive.lib.kg_metrics_writer \
+  --cycle-id "{cycle_id}" \
+  --findings "{kg_signal_findings_total}" \
+  --proposals "{kg_signal_proposals_total}" \
+  --hit-rate-5cycle "{hit_rate_5cycle}" \
+  --miss-reason "{miss_reason}" \
+  --report-path "{cycle_report_path}"
+```
+
+Rules:
+- This creates `.pHive/metrics/kg/{cycle_id}.jsonl` on first close with all buffered `kg_write` rows for the cycle plus one `cycle_summary` row.
+- The JSONL write is append-only and idempotent by semantic row identity; rerunning close for the same `cycle_id` must not duplicate rows or overwrite the existing file.
+- The cycle report must contain exactly one line in this format:
+
+```text
+kg-signal: findings={N} proposals={M} hit_rate_5cycle={R} miss_reason={X}
+```
+
+- When `findings > 0`, pass an empty `miss_reason` so the rendered line ends with `miss_reason=`.
+- When `findings == 0`, pass the S5.2 `miss_reason` from step-02c structured output. If that value is unavailable, leave it empty and flag the missing wiring in the handoff rather than inferring a bucket.
+- If any of `kg_signal_findings_total`, `kg_signal_proposals_total`, `hit_rate_5cycle`, `miss_reason`, or `cycle_report_path` is unavailable in the close output graph, record the gap in the close handoff and do not invent data from unrelated counters.
+
 ## Post-cycle: Act I exit gate verification (S2.3)
 
 After the morning summary is written and BEFORE the cycle is reported complete, run the Act I exit gate check. This closes the S7-kg-signal-production-emission outcome metric loop from the prior kg-augmented-meta-signal epic — once any of the three Act I priority predicates (`phase_failed`, `phase_blocked`, `superseded`) lands in `~/.claude/hive/kg.sqlite`, the gate emits a PASSED marker exactly once.

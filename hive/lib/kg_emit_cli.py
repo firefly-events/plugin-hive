@@ -48,6 +48,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-epic", required=True, dest="source_epic")
     parser.add_argument("--source-agent", required=True, dest="source_agent")
     parser.add_argument(
+        "--cycle-id",
+        dest="cycle_id",
+        help="Cycle id for in-memory KG metrics buffering; defaults to HIVE_CYCLE_ID.",
+    )
+    parser.add_argument(
         "--no-sanitize",
         action="store_true",
         help="Skip sanitize_obj on the --object argument (caller pre-sanitized).",
@@ -84,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
                 obj=obj,
                 source_epic=args.source_epic,
                 source_agent=args.source_agent,
+                cycle_id=args.cycle_id,
             )
     except Exception as exc:  # pragma: no cover — emit_kg_event already swallows
         result = {"emitted": False, "metadata": None, "error": str(exc)}

@@ -39,6 +39,7 @@ def emit_kg_event(
     obj: str,
     source_epic: str,
     source_agent: str,
+    cycle_id: str | None = None,
 ) -> dict[str, Any | bool | None]:
     if EMIT_LIFECYCLE_AT == "off":
         return {"emitted": False, "metadata": None}
@@ -73,6 +74,20 @@ def emit_kg_event(
 
     try:
         _increment_kg_writes_counter(predicate)
+    except Exception:
+        pass
+    try:
+        from hive.lib.kg_metrics_writer import buffer_kg_write_event
+
+        buffer_kg_write_event(
+            cycle_id=cycle_id,
+            subject=subject,
+            predicate=predicate,
+            obj=obj,
+            source_epic=source_epic,
+            source_agent=source_agent,
+            timestamp=valid_from,
+        )
     except Exception:
         pass
     return {"emitted": True, "metadata": metadata}
