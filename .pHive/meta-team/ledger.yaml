@@ -1,3 +1,26 @@
+- experiment_id: meta-2026-05-13
+  date: '2026-05-13'
+  started: '2026-05-13T00:00:00Z'
+  closed: '2026-05-13T00:30:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 2
+  top_changes:
+    - "hive/workflows/steps/meta-team-cycle/step-03-proposal.md: corrected NEXT STEP to load step-03c-metric-declaration instead of step-04-implementation"
+  commit: cb34cfe70e29af92e697edc6f6ad8b8fb88ff992
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: d2ed82db8dd7003bf2b10f9317a49838534934d3
+  notes: |
+    Nightly cycle meta-2026-05-13. Analysis found 1 SCHEMA_INCONSISTENCY:
+    step-03-proposal.md NEXT STEP section pointed to step-04-implementation.md
+    but the live workflow routes through step-03c-metric-declaration first.
+    Fixed by updating the NEXT STEP pointer. STUB_DOC finding for
+    hive-cloud-roadmap.md skipped as out_of_scope (deferred Hive Cloud epic).
+    Closure validator passed. Regression watch armed for 4-hour window.
 - experiment_id: meta-2026-05-12
   date: '2026-05-12'
   started: '2026-05-12T00:00:00Z'
