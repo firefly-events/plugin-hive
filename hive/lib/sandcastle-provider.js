@@ -94,13 +94,14 @@ function runVersionPreflight(versionResolver) {
     const searchStarts = [process.cwd(), __dirname];
     for (const start of searchStarts) {
       let dir = path.resolve(start);
-      while (dir && dir !== path.parse(dir).root) {
+      while (dir) {
         const candidate = path.join(
           dir, 'node_modules', '@ai-hero', 'sandcastle', 'package.json',
         );
         if (fs.existsSync(candidate)) {
           return JSON.parse(fs.readFileSync(candidate, 'utf8')).version;
         }
+        if (dir === path.parse(dir).root) break;
         dir = path.dirname(dir);
       }
     }

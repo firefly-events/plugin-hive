@@ -9,7 +9,7 @@
  * `require('@ai-hero/sandcastle')` call so that sandcastle startup log lines are
  * already sanitised.
  *
- * Three redaction forms are covered:
+ * Four redaction forms are covered:
  *
  *  1. Argv/env form     OPENAI_API_KEY=sk-test          → OPENAI_API_KEY=[REDACTED]
  *                       FOO_TOKEN=value                 → FOO_TOKEN=[REDACTED]
