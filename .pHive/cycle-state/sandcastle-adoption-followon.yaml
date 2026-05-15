@@ -21,13 +21,16 @@ execution_summary:
       - { story: s3-dispatch-routing, commit: ece1169 }
       - { story: s3-execution-mode-skill, commit: 072e678 }
     W3_parallel:
-      - { story: s4-merge-validation, commit: d4df339, outcome: class-B-blocked-on-prereq }
+      - { story: s4-merge-validation, commit: d4df339, outcome: class-B-blocked-on-prereq, class_a_followup_commit: pending-this-commit, class_a_outcome: PASS, class_a_date: "2026-05-15" }
       - { story: s6-issue-191-defer-marker, commit: 7d7814f }
     W4_parallel:
       - { story: s5-adoption-guide, commit: d063915 }
       - { story: s5-hooks-reference, commit: 3b67917 }
   follow_ups:
-    - "s4-merge-validation Class-A re-run requires OpenAI Responses API quota > 0 on the auth.json account. All other prereqs confirmed green on 2026-05-14 (podman daemon up, @ai-hero/sandcastle@0.5.10 installed, auth.json provisioned at .sandcastle/codex-config/ and .pHive/spikes/sandcastle/.sandcastle/codex-config/). Direct codex probe returned `ERROR: Quota exceeded.` — same upstream blocker as 2026-05-08 spike. Refresh logged in docs/merge-validation-results.md (Refresh section)."
+    - "s4-merge-validation Class-A: PASSED on 2026-05-15 via ChatGPT subscription OAuth path (apikey path remains quota=0). Two parallel named-branch runs, wallclock 20.7s, no key leaks, distinct branches. See docs/merge-validation-results.md `## Class A — 2026-05-15` section."
+    - "S2 defect D1 — version preflight `require('@ai-hero/sandcastle/package.json')` throws ERR_PACKAGE_PATH_NOT_EXPORTED — FIXED in-scope for s4 fix-forward (defaultVersionResolver now walks fs). All 60 unit tests still pass."
+    - "S2 defect D2 — factory's default DI loaders use CJS `require()` against ESM-only sandcastle exports; consumers without injecting `_deps.podmanFactory`/`dockerFactory`/`createWorktreeFn` will fail. OUT-OF-SCOPE for s4 (needs ESM loader sibling or async factory API). Follow-on: add `hive/lib/sandcastle-provider-loader.mjs` that pre-imports deps and calls the CJS factory; update `execute-mode-sandcastle` SKILL to point ESM consumers at the loader."
+    - "Sandcastle 0.5.10 `wt.close()` does not auto-remove worktrees with uncommitted changes — caller must `git worktree remove --force`. Document in adoption guide cleanup section."
     - "Cleanup of issue-191 audit gate after upstream resolution — separate future status-flip work item per s6 spec."
     - "Hyphenated header names (X-API-KEY style) not caught by redaction \\b regex — documented in adoption guide V1 gaps. Tighten if leaked in practice."
 spec_count: 12
