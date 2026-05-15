@@ -292,3 +292,13 @@ This is the final step of the meta-team cycle.
 **Gating:** Closure invariant passed, commit succeeded, ledger appended, and morning summary written.
 **Next:** Cycle complete — no further steps.
 **If gating fails:** Record `close_rejected` in the output and produce a diagnostic morning-summary-stub that names what's missing. Do NOT call the cycle `closed`.
+
+## Post-cycle: Act I exit gate verification (S2.3)
+
+After the morning summary is written and BEFORE the cycle is reported complete, run the Act I exit gate check. This closes the S7-kg-signal-production-emission outcome metric loop from the prior kg-augmented-meta-signal epic — once any of the three Act I priority predicates (`phase_failed`, `phase_blocked`, `superseded`) lands in `~/.claude/hive/kg.sqlite`, the gate emits a PASSED marker exactly once.
+
+```bash
+bash hive/scripts/act-i-exit-gate-check.sh
+```
+
+The script is silent-no-op when `kg.sqlite` is missing and is idempotent across re-runs. Do NOT branch on its exit code — it always exits `0` and emits its result to stdout. The PASSED latch lives at `~/.claude/hive/act-i-exit-gate-passed`; deleting that file lets PASSED re-fire on the next non-zero cycle.
