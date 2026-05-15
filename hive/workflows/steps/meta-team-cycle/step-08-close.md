@@ -216,6 +216,7 @@ resolvable. Append format:
   commit: {git commit hash}
   metrics_snapshot: {validated snapshot ref}
   rollback_ref: {validated rollback ref}
+  kg_signal_proposals_total: {N}
   notes: |
     {Any notable context: first run, all blocked, large improvement, etc.}
 ```
@@ -226,6 +227,29 @@ Prerequisite check before append:
 - If any prerequisite fails at this point, HALT without appending the ledger entry and record `close_rejected`
 
 If the resolved `ledger.yaml` does not exist at the swarm-configured path, create it with a YAML list header.
+
+After the ledger append succeeds, compute the KG-signal hit-rate gauge from the
+last cycle entries in the resolved ledger path. The ledger entry for this cycle
+MUST include `kg_signal_proposals_total`, populated from the number of
+`discovery_source: kg_signal` proposals represented in the approved proposal
+pool. If that count is unavailable in the output graph, write `0` and flag the
+missing count in the handoff rather than inferring it from unrelated fields.
+
+```bash
+python3 - <<'PY'
+import importlib.util
+import sys
+from pathlib import Path
+
+registry_path = Path("skills/hive/skills/meta-optimize/metric_registry.py")
+spec = importlib.util.spec_from_file_location("meta_optimize_metric_registry", registry_path)
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+last_6_cycle_entries = [{...}]  # already parsed from {resolved_ledger_path}
+module.update_hit_rate_5cycle(last_6_cycle_entries)
+PY
+```
 
 ### 6. Produce morning summary
 

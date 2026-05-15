@@ -180,6 +180,16 @@ The empty-list guarantee is how this step remains additive-only rather than a bl
 
 ### 8. Produce kg-signal summary
 
+As each finding is appended to `kg_findings`, increment the findings counter
+once for that emitted finding:
+
+```bash
+python3 -m hive.lib.metric_increment_cli \
+  --counter kg_signal_findings_total \
+  --label cycle_id="{cycle_id}" \
+  --by 1
+```
+
 ```
 ## KG Signal Summary — Cycle {cycle_id}
 

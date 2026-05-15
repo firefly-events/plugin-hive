@@ -109,6 +109,16 @@ step-02 shape, NOT the step-02b candidate shape). Before ranking:
   one.
 - Absence-graceful: if `kg-findings.yaml` is missing or empty, fall through
   to existing behavior with no error.
+- Observability: increment `kg_signal_proposals_total` once for each kg finding
+  that enters the proposal pool, after de-duplication has decided it remains
+  represented in the pool:
+
+```bash
+python3 -m hive.lib.metric_increment_cli \
+  --counter kg_signal_proposals_total \
+  --label cycle_id="{cycle_id}" \
+  --by 1
+```
 
 Rendered cross-project proposal example:
 
