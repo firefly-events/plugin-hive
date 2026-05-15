@@ -45,6 +45,30 @@
     meta-2026-05-11 and meta-2026-05-12). Zero proposals generated; zero changes
     promoted. Cycle closes as discard. Closure validator passed (discard path;
     rollback_ref and metrics_snapshot present). Regression watch: not_applicable.
+- experiment_id: meta-2026-05-15
+  date: '2026-05-15'
+  started: '2026-05-15T00:00:00Z'
+  closed: '2026-05-15T00:30:00Z'
+  verdict: passed
+  changes_promoted: 0
+  changes_reverted: 0
+  findings_identified: 1
+  top_changes: []
+  commit: f4c596817b662b151bdbf5fda0e50e3065f98a3f
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 0
+    first_attempt_pass: true
+  rollback_ref: d2ed82db8dd7003bf2b10f9317a49838534934d3
+  notes: |
+    Nightly cycle meta-2026-05-15. Analysis found 1 STUB_DOC finding:
+    hive/references/hive-cloud-roadmap.md (13 lines) is the S16 forward-reference
+    placeholder for the deferred Hive Cloud epic. Finding marked out_of_scope —
+    expanding this stub is premature without the Hive Cloud epic active.
+    Finding also flagged out_of_scope in meta-2026-05-11 and meta-2026-05-12.
+    Zero proposals generated; zero changes promoted. Cycle closes as discard.
+    Closure validator passed (discard path; rollback_ref and metrics_snapshot
+    present). Regression watch: not_applicable.
 - experiment_id: meta-2026-05-12
   date: '2026-05-12'
   started: '2026-05-12T00:00:00Z'
