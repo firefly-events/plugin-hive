@@ -11,6 +11,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- KG signal revival S2.1: `phase_blocked` predicate emission fanned out to three seams — DAG executor walker `_record_skipped` upstream-skip path (Python helper); escalation-backfill skill emits one triple per `(trigger, canonical-story-id)` pair at TPM escalation-raise; orchestrator waiting-on-user gates (plan structured-outline sign-off, design-discussion review, H/V plan review, daily-ceremony approve-plan) emit via a new `python3 -m hive.lib.kg_emit_cli` shell entry point that wraps `emit_kg_event` for prompt-driven callers.
 - KG signal revival S3.2: ChromaDB wrapper dynamic port resolution from `~/.claude/hive/chromadb.port`, idempotent `decisions` collection bootstrap, and B0.2 schema docs.
 - KG signal revival S4.2: bootstrap `--since` filtering, dry-run projection output, large-import guardrails, and legacy decision `set:` to `valid_from` handling.
 - KG signal revival S4.2b: cross-project KG findings and proposals now preserve the `[cross-project: <name>]` hard-tag contract in workflow docs.

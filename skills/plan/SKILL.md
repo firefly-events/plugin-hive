@@ -175,6 +175,19 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Incorporate feedback into the planning context before proceeding.
 
+    **S2.1 seam 3 — waiting-on-user `phase_blocked` emission.** Before presenting the document and pausing for input, emit one `phase_blocked` triple keyed to this gate. The emit is fire-and-forget (CLI swallows knob==off + missing-sqlite; do NOT branch on its exit code):
+
+    ```bash
+    python3 -m hive.lib.kg_emit_cli \
+      --subject "{epic_id}" \
+      --predicate "phase_blocked" \
+      --object "waiting-user-input-structured-outline-sign-off" \
+      --source-epic "{epic_id}" \
+      --source-agent "orchestrator"
+    ```
+
+    Apply the same pattern at the two other waiting-on-user pauses in /plan: design-discussion review (Phase B) gate uses `--object "waiting-user-input-design-discussion"`, and H/V plan review gate uses `--object "waiting-user-input-hv-plan-review"`. Gate-name slugs are kebab-stable so /meta-optimize can group by gate. Add no new error handling — the CLI is silent on failure by design.
+
 ### Phase C: Story Decomposition
 
 10c. **Resolve methodology.** Before decomposing stories, determine the development methodology with strict 4-tier precedence:

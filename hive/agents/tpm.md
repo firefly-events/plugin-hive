@@ -120,6 +120,8 @@ Field reference (from cycle-state-schema):
 
 > **CRITICAL — field names in ESCALATION_FLAGS must exactly match the cycle state schema field names (trigger, placement, severity, stories, reason, raised_by). Any divergence causes silent empty partitions in L7.1.**
 
+> **KG `phase_blocked` emission is automatic.** The orchestrator invokes `skills/hive/skills/escalation-backfill/SKILL.md` at plan step 11 after canonical story YAML IDs are finalized. That skill emits one `phase_blocked` triple per `(trigger, canonical-story-id)` pair from your `ESCALATION_FLAGS` block — TPM does NOT call the KG emitter directly. Just write the block correctly and the priority predicate fans out via S2.1 seam 2.
+
 ## When to raise escalation flags
 
 TPM is authorized to raise ANY trigger in the specialist-triggers catalog, at any severity, with reason. Consult `hive/references/specialist-triggers.md` for the full catalog of trigger IDs, placement values, and conditions.
