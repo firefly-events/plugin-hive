@@ -1,0 +1,87 @@
+id: S4.5-nail-tech-assistant-onboarding-backfill
+epic: kg-signal-revival
+title: Onboard Nail Tech Assistant + backfill (path-with-space test)
+status: pending
+complexity: low
+methodology: classic
+depends_on: [S4.4-signal-flayr-onboarding-backfill]
+wave: S4
+
+description: |
+  Third real-import. Validates S4.1's path-with-space handling.
+
+  Path: /Users/don/Documents/GitHub/Nail Tech Assitant
+  NB: filesystem name has TYPO "Assitant" (missing 's'). Quote the path verbatim.
+  Registry name: nail-tech-assistant (canonical spelling — corrects the typo at the
+  registry layer; the canonical filesystem path stays as-is).
+
+  Cycle-state epics present (5): epic-a-foundation-auth, epic-b-pinterest-integration,
+  epic-c-reference-and-generation, epic-d-visualizer-library, epic-e-chat-refinement.
+
+  This story's pass/fail is the canary for S4.1's quoted-path handling. If S4.1 didn't
+  handle spaces, register-project here fails.
+
+acceptance_criteria:
+  - "/hive:register-project \"/Users/don/Documents/GitHub/Nail Tech Assitant\" succeeds (quoted path)"
+  - "~/.claude/hive/projects.yaml gains nail-tech-assistant entry"
+  - "Canonical path stored as-is (with space + 'Assitant' typo) for filesystem matching"
+  - "Registry name = nail-tech-assistant (canonical spelling)"
+  - "Bootstrap --apply --since 2026-04-28 succeeds"
+  - "≥5 triples under nail-tech-assistant/{epic_id} namespace"
+
+steps:
+  - id: research
+    description: Confirm path on filesystem; inventory cycle-state files. Verify S4.1 skill accepts space in path (from S4.1 tests).
+    agent: researcher
+  - id: implement
+    description: |
+      Run /hive:register-project "/Users/don/Documents/GitHub/Nail Tech Assitant" with explicit --name nail-tech-assistant.
+      Bootstrap --dry-run; verify count.
+      Bootstrap --apply --since 2026-04-28.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Same as S4.3 + S4.4 verification + explicit confirmation that quoted-path round-tripped correctly.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm path with space doesn't break dedupe logic (canonical-path comparison handles spaces). Confirm registry-name override succeeded.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit registry + KG mutation.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: /Users/don/Documents/GitHub/Nail Tech Assitant/.pHive/cycle-state/
+      purpose: Source corpus
+    - path: skills/hive/skills/register-project/SKILL.md
+      purpose: Skill under canary test for space handling
+
+cross_cutting:
+  - concern: documentation
+    action: "Execution notes capture path-with-space confirmation."
+  - concern: versioning
+    action: "No bump."
+  - concern: metrics
+    applies: true
+
+metric:
+  applies: true
+  name: kg_signal.cross_project_nta_triples
+  direction: up
+  baseline: 0
+  target: 5
+  window: "post-backfill"
+  source:
+    kind: sql
+    ref: "SELECT COUNT(*) FROM triples WHERE source_epic LIKE 'nail-tech-assistant/%';"
+  verify_at: "S4.5 integrate close"
+
+risks:
+  - severity: low
+    description: S4.1 path-quirk handling may surface bugs only here.
+    mitigation: S4.1 test fixture exercises this exact path; any bug should land in S4.1 review, not S4.5.

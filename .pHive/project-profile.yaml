@@ -1,0 +1,21 @@
+name: plugin-hive
+description: Hive — extensible multi-agent SDLC framework (Claude Code plugin)
+tech_stack:
+  - node
+  - bash
+  - python
+  - sqlite
+  - yaml
+  - markdown
+package_manager: npm
+runtime: node
+test_runner: bun
+linter: null
+typecheck: null
+notes: |
+  Placeholder profile written by /execute kickoff-gate (gate_mode: warning, Slice 1
+  policy). Generated 2026-05-14 during kg-signal-revival execute. Replace with a full
+  /hive:kickoff run when convenient.
+gate_mode_active: warning
+generated_by: /plugin-hive:execute
+generated_at: "2026-05-14T00:30:00Z"

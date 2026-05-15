@@ -16,6 +16,18 @@
         ]
       }
     ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -lc 'bash \"${CLAUDE_PLUGIN_ROOT}/hive/scripts/chromadb-start.sh\" >/dev/null 2>&1 & disown || true'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "",

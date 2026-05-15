@@ -14,6 +14,17 @@
 
 Present the validated plan to the user. Wait for explicit approval. Handle modifications and rejections.
 
+**S2.1 seam 3 — emit `phase_blocked` before the approval wait.** Before presenting the plan and pausing for user input, emit one fire-and-forget KG triple (CLI is silent on knob==off + missing-sqlite — do NOT branch on its exit code):
+
+```bash
+python3 -m hive.lib.kg_emit_cli \
+  --subject "{epic_id}" \
+  --predicate "phase_blocked" \
+  --object "waiting-user-input-approve-plan" \
+  --source-epic "{epic_id}" \
+  --source-agent "orchestrator"
+```
+
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**

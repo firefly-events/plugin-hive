@@ -1,0 +1,78 @@
+id: S5.3-cycle-rollup-jsonl
+epic: kg-signal-revival
+title: Per-cycle KG metrics JSONL + cycle-rollup line in /meta-optimize report
+status: pending
+complexity: low
+methodology: classic
+depends_on: [S5.2-miss-reason-taxonomy]
+wave: S5
+
+description: |
+  Two surfaces (per DP #7 default — both):
+
+  (1) Raw per-cycle JSONL stream at .pHive/metrics/kg/{cycle_id}.jsonl. One row per
+      kg_write() event AND one summary row at cycle close. Format per B0.2 telemetry
+      envelope contract.
+
+  (2) /meta-optimize retrospect step appends a cycle-rollup line to the cycle report:
+      "kg-signal: findings=N proposals=M hit_rate_5cycle=R miss_reason=X (if findings=0)"
+
+  Together: per-cycle audit trail (raw) + human-readable cycle summary.
+
+acceptance_criteria:
+  - ".pHive/metrics/kg/ directory exists; per-cycle JSONL file written on cycle close"
+  - "JSONL schema matches B0.2 telemetry envelope"
+  - "/meta-optimize cycle report includes one kg-signal: line"
+  - "Cycle report line correctly reflects S5.1 counters + S5.2 miss_reason"
+  - "Fixture: 6 cycles → 6 JSONL files + 6 report lines"
+
+steps:
+  - id: research
+    description: Inspect existing .pHive/metrics/ pattern (events/ subdir). Identify cycle-close hook in /meta-optimize.
+    agent: researcher
+  - id: implement
+    description: |
+      Add JSONL writer in metric_registry (or a small hive/lib/kg-metrics-writer.js).
+      Patch /meta-optimize SKILL.md or relevant retrospect step to render the rollup line.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Fixture run + manual verification of one /meta-optimize cycle.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm JSONL is append-only + per-cycle (not overwritten); confirm rollup line is concise + greppable.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/metrics/
+      purpose: Existing metrics root; kg/ sub-dir created here
+    - path: skills/hive/skills/meta-optimize/SKILL.md
+      purpose: Cycle-close + report-render site
+
+cross_cutting:
+  - concern: documentation
+    action: "README's observability section mentions .pHive/metrics/kg/ stream. meta-optimize-contract.md cites cycle-rollup line format."
+  - concern: versioning
+    action: "Patch bump."
+  - concern: metrics
+    applies: true
+
+metric:
+  applies: true
+  name: kg_signal.cycle_rollup_coverage
+  direction: up
+  baseline: 0
+  target: 1
+  window: "first cycle post-merge"
+  source:
+    kind: events
+    ref: "Existence + correctness of cycle JSONL + cycle-report line"
+  verify_at: "first cycle post-merge"
