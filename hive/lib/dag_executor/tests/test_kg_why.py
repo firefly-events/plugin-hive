@@ -208,3 +208,60 @@ def test_limit_clamping_truncates_to_n_rows(kg_db: Path):
     assert "story-3 phase_complete planning" in rendered
     assert "story-2 phase_complete planning" in rendered
     assert "story-1 phase_complete planning" not in rendered
+
+
+def test_default_chromadb_bridge_invoked_when_node_present(kg_db: Path, monkeypatch):
+    """When chromadb_query_fn is None, explain_why falls back to the live bridge.
+
+    We monkey-patch `_default_chromadb_query_fn` to return a stub so the test
+    does NOT shell out to real node — that's the contract the production code
+    relies on (env escape hatch + None-when-absent), and the unit test is
+    asserting it composes correctly.
+    """
+    _insert(
+        kg_db,
+        subject="architect",
+        predicate="decided",
+        object_="use-sqlite-for-l2-kg",
+        valid_from="2026-05-14T11:00:00Z",
+    )
+
+    bridge_called: list[tuple[str, int]] = []
+
+    def fake_bridge(topic: str, top_k: int):
+        bridge_called.append((topic, top_k))
+        return {
+            "available": True,
+            "results": [
+                {
+                    "id": "decision:architect:decided:use-sqlite-for-l2-kg",
+                    "document": "Use SQLite for L2 KG.",
+                    "distance": 0.02,
+                    "metadata": {
+                        "subject": "architect",
+                        "predicate": "decided",
+                        "object": "use-sqlite-for-l2-kg",
+                        "source_epic": "kg-signal-revival",
+                        "source_agent": "architect",
+                        "valid_from": "2026-05-14T11:00:00Z",
+                    },
+                }
+            ],
+        }
+
+    monkeypatch.setattr(kg_why, "_default_chromadb_query_fn", lambda: fake_bridge)
+
+    rendered = kg_why.explain_why(
+        db_path=kg_db,
+        topic="sqlite",
+        chromadb_query_fn=None,
+    )
+
+    assert bridge_called, "default bridge should be invoked when chromadb_query_fn=None"
+    assert "[via: both]" in rendered
+
+
+def test_default_chromadb_bridge_returns_none_when_disabled(monkeypatch):
+    """HIVE_DISABLE_CHROMA_BRIDGE env var disables the default bridge."""
+    monkeypatch.setenv("HIVE_DISABLE_CHROMA_BRIDGE", "1")
+    assert kg_why._default_chromadb_query_fn() is None

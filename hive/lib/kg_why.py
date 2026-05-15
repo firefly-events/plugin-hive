@@ -128,8 +128,10 @@ def explain_why(
         topic=topic,
     )
     chroma_rows: list[WhyTriple] = []
-    if not strict and topic and chromadb_query_fn is not None:
-        chroma_rows = query_chromadb(topic, capped_limit, chromadb_query_fn, db_path=db_path)
+    if not strict and topic:
+        effective_fn = chromadb_query_fn or _default_chromadb_query_fn()
+        if effective_fn is not None:
+            chroma_rows = query_chromadb(topic, capped_limit, effective_fn, db_path=db_path)
 
     merged = merge_triples(kg_rows, chroma_rows)
     if merged:
@@ -149,6 +151,49 @@ def explain_why(
         lines.append("Recent triples:")
         lines.append(render_triples(recent))
     return "\n".join(lines)
+
+
+def _default_chromadb_query_fn() -> ChromaQueryFn | None:
+    """Return a callable that shells out to scripts/kg-why-chroma.js.
+
+    Returns None when the bridge script is absent, when `node` is not on PATH,
+    or when the `HIVE_DISABLE_CHROMA_BRIDGE` env var is set (test escape hatch
+    so the unit suite never accidentally hits the real sidecar).
+    """
+    import shutil
+
+    if os.environ.get("HIVE_DISABLE_CHROMA_BRIDGE"):
+        return None
+    if shutil.which("node") is None:
+        return None
+    bridge = Path(__file__).resolve().parents[2] / "scripts" / "kg-why-chroma.js"
+    if not bridge.exists():
+        return None
+
+    def _run(topic: str, top_k: int) -> dict[str, Any]:
+        import json
+        import subprocess
+
+        try:
+            result = subprocess.run(
+                ["node", str(bridge), topic, str(top_k)],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+            return {"available": False, "results": []}
+
+        stdout = (result.stdout or "").strip()
+        if not stdout:
+            return {"available": False, "results": []}
+        try:
+            return json.loads(stdout.splitlines()[-1])
+        except json.JSONDecodeError:
+            return {"available": False, "results": []}
+
+    return _run
 
 
 def query_chromadb(

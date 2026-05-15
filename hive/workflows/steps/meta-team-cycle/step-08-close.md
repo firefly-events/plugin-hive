@@ -24,6 +24,13 @@ Finalize the cycle only after the closure invariant passes: validate closure evi
 - Swarm-configured `ledger.yaml` — prior cycle records (legacy `.pHive/meta-team/ledger.yaml` only during the A2.6/A2.7 migration window)
 - Active swarm config / team config that determines the cycle-state target path (during the A2.6 migration window this may still resolve to a legacy-compatible path)
 - Git (for validating refs and committing changes)
+- KG telemetry placeholders (orchestrator-supplied at runtime; read from the live cycle scope, NOT inferred from unrelated counters):
+  - `kg_signal_findings_total` — current value of the S5.1 counter for this `cycle_id`, read via `skills/hive/skills/meta-optimize/metric_registry.py`'s reader. Sourced from step-02c's per-finding increments.
+  - `kg_signal_proposals_total` — current value for this `cycle_id`. Sourced from step-03's proposal-merge increment.
+  - `hit_rate_5cycle` — gauge value computed earlier in this step from the last 5 cycles' `kg_signal_proposals_total` values via the S5.1 hook.
+  - `miss_reason` — S5.2 bucket string from step-02c structured output when `kg_signal_findings_total == 0`; empty string when `> 0`.
+  - `cycle_report_path` — the swarm-resolved morning-summary file path used elsewhere in this step.
+  - `resolved_ledger_path` — same swarm-resolved ledger destination used for the ledger append. If the gauge / counter readers cannot find a value, record the gap in the close handoff rather than substituting a stale value.
 
 **NOT available:**
 - User input

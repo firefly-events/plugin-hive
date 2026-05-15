@@ -211,8 +211,14 @@ test('sample document write and similarity query roundtrip', async () => {
       await readBody(req);
       const ids = Array.from(documents.keys());
       const docs = ids.map((id) => documents.get(id));
+      const metas = ids.map(() => ({
+        predicate: 'phase_failed',
+        source_epic: 'kg-signal-revival',
+        source_agent: 'tester',
+        valid_from: '2026-05-14T00:00:00.000Z'
+      }));
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ids: [ids], documents: [docs], distances: [[0.01]] }));
+      res.end(JSON.stringify({ ids: [ids], documents: [docs], distances: [[0.01]], metadatas: [metas] }));
       return;
     }
     res.writeHead(404);
@@ -238,6 +244,12 @@ test('sample document write and similarity query roundtrip', async () => {
         id: 'decision:kg-signal-revival:phase_failed:story:test:2026-05-14',
         document: 'Phase failed because tests did not pass.',
         distance: 0.01,
+        metadata: {
+          predicate: 'phase_failed',
+          source_epic: 'kg-signal-revival',
+          source_agent: 'tester',
+          valid_from: '2026-05-14T00:00:00.000Z',
+        },
       },
     ]);
   } finally {

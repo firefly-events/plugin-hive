@@ -107,13 +107,14 @@ async function isAvailable(host = DEFAULT_HOST, port = RESOLVED_PORT) {
  * @param {number} [topK=5] — number of results to return
  * @param {string} [host=localhost]
  * @param {number} [port=resolved dynamic port]
- * @returns {Promise<Array<{id: string, document: string, distance: number}>>} — empty array on error
+ * @returns {Promise<Array<{id: string, document: string, distance: number, metadata: Object}>>} — empty array on error.
+ * `metadata` is the document's metadata dict as stored at index time (predicate / source_epic / source_agent / valid_from per B0.2). May be `{}` for documents indexed without metadata.
  */
 async function query(collectionName, queryText, topK = 5, host = DEFAULT_HOST, port = RESOLVED_PORT) {
   const body = JSON.stringify({
     query_texts: [queryText],
     n_results: topK,
-    include: ['documents', 'distances']
+    include: ['documents', 'distances', 'metadatas']
   });
 
   return new Promise((resolve) => {
@@ -139,7 +140,13 @@ async function query(collectionName, queryText, topK = 5, host = DEFAULT_HOST, p
             const ids = (parsed.ids && parsed.ids[0]) || [];
             const docs = (parsed.documents && parsed.documents[0]) || [];
             const distances = (parsed.distances && parsed.distances[0]) || [];
-            resolve(ids.map((id, i) => ({ id, document: docs[i] || '', distance: distances[i] || 0 })));
+            const metadatas = (parsed.metadatas && parsed.metadatas[0]) || [];
+            resolve(ids.map((id, i) => ({
+              id,
+              document: docs[i] || '',
+              distance: distances[i] || 0,
+              metadata: metadatas[i] || {}
+            })));
           } catch {
             console.warn('[chromadb-wrapper] query parse error — falling back to L1+L0');
             resolve([]);
