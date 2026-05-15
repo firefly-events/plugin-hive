@@ -39,6 +39,8 @@ state/
 !.pHive/epics/sandcastle-adoption-followon/**
 !.pHive/episodes/sandcastle-adoption-followon/
 !.pHive/episodes/sandcastle-adoption-followon/**
+!.pHive/epics/brand-system-2.0-update/
+!.pHive/epics/brand-system-2.0-update/**
 !.pHive/epics/kg-signal-revival/
 !.pHive/epics/kg-signal-revival/**
 # Per-epic cycle-state lives under .pHive/cycle-state/; only the
@@ -49,6 +51,7 @@ state/
 !.pHive/cycle-state/meta-improvement-system.yaml
 !.pHive/cycle-state/ui-cluster-extract-config-deeper.yaml
 !.pHive/cycle-state/sandcastle-adoption-followon.yaml
+!.pHive/cycle-state/brand-system-2.0-update.yaml
 !.pHive/cycle-state/kg-signal-revival.yaml
 # Specialist-phase audit trail for the Sandcastle adoption work (security plan-audit
 # verdict + re-audit, performance post-run audit). Tracked as decision provenance for
