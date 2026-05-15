@@ -1,0 +1,83 @@
+id: S1.2-phase-failed-walker-emit
+epic: kg-signal-revival
+title: Emit phase_failed at dag_executor walker fail path
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [S1.1-emit-foundation-knob-counter]
+wave: S1
+
+description: |
+  Wire the first lifecycle predicate emit. In hive/lib/dag-executor/walker.js,
+  find the step.fail() handler. Call emitKgEvent({predicate: 'phase_failed',
+  subject: storyId, object: failureReasonSlug, sourceEpic: currentEpicId,
+  sourceAgent: 'dag-executor'}) on fail.
+
+  This is the FIRST production emit-site. One seam, one predicate. The measurement
+  window for R1 over-emission opens here.
+
+acceptance_criteria:
+  - "walker.js step.fail() path calls emitKgEvent() with phase_failed"
+  - "subject = storyId, object = failureReasonSlug (sanitized), sourceEpic + sourceAgent set"
+  - "Integration test: synthetic DAG with forced failure produces phase_failed triple in test kg.sqlite"
+  - "Production verification: one normal /meta-optimize cycle on plugin-hive with ≥1 failing step lands ≥1 phase_failed triple in ~/.claude/hive/kg.sqlite"
+  - "write-rate counter shows kg_writes_total{predicate=phase_failed} > 0 after the test cycle"
+  - "emit_lifecycle_at: off prevents the emit (kill-switch verified)"
+
+steps:
+  - id: research
+    description: Locate step.fail() handler in dag-executor/walker.js. Identify failureReasonSlug source. Confirm storyId + epicId are in scope at fail site.
+    agent: researcher
+  - id: implement
+    description: Insert emitKgEvent() call in walker.js fail path. Sanitize failureReasonSlug (kebab-case, max 80 chars).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Unit: synthetic step.fail() invocation triggers emitKgEvent with correct args.
+      Integration: fixture DAG with forced fail → query kg.sqlite for phase_failed.
+      Production-shaped: run /meta-optimize once on plugin-hive with at least one
+      historically failing scenario; confirm triple lands.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm emit is at the right seam (not duplicated upstream/downstream); verify failureReasonSlug doesn't leak sensitive info.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit. After merge, monitor first cycle's write-rate counter.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/dag-executor/walker.js
+      purpose: Target — step.fail() handler is the emit seam
+    - path: hive/lib/kg-emit.js
+      purpose: emitKgEvent() helper from S1.1
+
+cross_cutting:
+  - concern: documentation
+    action: "Update hive/references/kg-emit.md with phase_failed example. CHANGELOG: 'KG emits phase_failed at story fail.'"
+  - concern: versioning
+    action: "Behavior change (new triples in production KG). Bump patch on integrate."
+  - concern: metrics
+    applies: true
+
+metric:
+  applies: true
+  name: kg_signal.phase_failed_per_failing_cycle
+  direction: up
+  baseline: 0
+  target: 1
+  window: "first failing cycle post-merge"
+  source:
+    kind: sql
+    ref: "SELECT COUNT(*) FROM triples WHERE predicate='phase_failed' AND valid_from >= <merge_time>"
+  verify_at: "first failing cycle post-merge OR 7d post-merge whichever first"
+
+risks:
+  - severity: medium
+    description: walker.js fail path may fire more often than expected (R1).
+    mitigation: write-rate counter from S1.1 detects within first cycle; emit_lifecycle_at:off kill-switch.

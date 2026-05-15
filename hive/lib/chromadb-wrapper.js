@@ -10,25 +10,89 @@
  * when the sidecar is unavailable.
  */
 
+const fs = require('fs');
 const http = require('http');
+const os = require('os');
+const path = require('path');
 
 const DEFAULT_HOST = 'localhost';
 const DEFAULT_PORT = 8000;  // ChromaDB default HTTP port
 const AVAILABILITY_TIMEOUT_MS = 500;
 const QUERY_TIMEOUT_MS = 5000;
+const DECISIONS_COLLECTION = 'decisions';
+
+function readDynamicPort() {
+  try {
+    const portFile = path.join(os.homedir(), '.claude', 'hive', 'chromadb.port');
+    const port = Number.parseInt(fs.readFileSync(portFile, 'utf8').trim(), 10);
+    return Number.isInteger(port) ? port : DEFAULT_PORT;
+  } catch {
+    return DEFAULT_PORT;
+  }
+}
+
+const RESOLVED_PORT = readDynamicPort();
+let bootstrapDone = false;
+
+async function ensureDecisionsCollection(host = DEFAULT_HOST, port = RESOLVED_PORT) {
+  const body = JSON.stringify({
+    name: DECISIONS_COLLECTION,
+    get_or_create: true
+  });
+
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        host, port,
+        path: '/api/v1/collections',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        timeout: QUERY_TIMEOUT_MS
+      },
+      (res) => {
+        res.on('data', () => {});
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(true);
+            return;
+          }
+          console.warn(`[chromadb-wrapper] decisions collection bootstrap failed with status ${res.statusCode}`);
+          resolve(false);
+        });
+        res.on('error', () => {
+          console.warn('[chromadb-wrapper] decisions collection bootstrap response error');
+          resolve(false);
+        });
+      }
+    );
+    req.on('error', () => { console.warn('[chromadb-wrapper] decisions collection bootstrap error'); resolve(false); });
+    req.on('timeout', () => { req.destroy(); console.warn('[chromadb-wrapper] decisions collection bootstrap timeout'); resolve(false); });
+    req.write(body);
+    req.end();
+  });
+}
 
 /**
  * Check whether the ChromaDB sidecar is reachable.
  * @param {string} [host=localhost]
- * @param {number} [port=8000]
+ * @param {number} [port=resolved dynamic port]
  * @returns {Promise<boolean>} — never rejects; returns false on any error
  */
-async function isAvailable(host = DEFAULT_HOST, port = DEFAULT_PORT) {
+async function isAvailable(host = DEFAULT_HOST, port = RESOLVED_PORT) {
   return new Promise((resolve) => {
     const req = http.get(
       { host, port, path: '/api/v1/heartbeat', timeout: AVAILABILITY_TIMEOUT_MS },
       (res) => {
-        resolve(res.statusCode === 200);
+        if (res.statusCode !== 200) {
+          resolve(false);
+          return;
+        }
+        if (!bootstrapDone) {
+          bootstrapDone = true;
+          ensureDecisionsCollection(host, port).then(() => resolve(true));
+          return;
+        }
+        resolve(true);
       }
     );
     req.on('error', () => resolve(false));
@@ -42,14 +106,15 @@ async function isAvailable(host = DEFAULT_HOST, port = DEFAULT_PORT) {
  * @param {string} queryText — the search query
  * @param {number} [topK=5] — number of results to return
  * @param {string} [host=localhost]
- * @param {number} [port=8000]
- * @returns {Promise<Array<{id: string, document: string, distance: number}>>} — empty array on error
+ * @param {number} [port=resolved dynamic port]
+ * @returns {Promise<Array<{id: string, document: string, distance: number, metadata: Object}>>} — empty array on error.
+ * `metadata` is the document's metadata dict as stored at index time (predicate / source_epic / source_agent / valid_from per B0.2). May be `{}` for documents indexed without metadata.
  */
-async function query(collectionName, queryText, topK = 5, host = DEFAULT_HOST, port = DEFAULT_PORT) {
+async function query(collectionName, queryText, topK = 5, host = DEFAULT_HOST, port = RESOLVED_PORT) {
   const body = JSON.stringify({
     query_texts: [queryText],
     n_results: topK,
-    include: ['documents', 'distances']
+    include: ['documents', 'distances', 'metadatas']
   });
 
   return new Promise((resolve) => {
@@ -75,7 +140,13 @@ async function query(collectionName, queryText, topK = 5, host = DEFAULT_HOST, p
             const ids = (parsed.ids && parsed.ids[0]) || [];
             const docs = (parsed.documents && parsed.documents[0]) || [];
             const distances = (parsed.distances && parsed.distances[0]) || [];
-            resolve(ids.map((id, i) => ({ id, document: docs[i] || '', distance: distances[i] || 0 })));
+            const metadatas = (parsed.metadatas && parsed.metadatas[0]) || [];
+            resolve(ids.map((id, i) => ({
+              id,
+              document: docs[i] || '',
+              distance: distances[i] || 0,
+              metadata: metadatas[i] || {}
+            })));
           } catch {
             console.warn('[chromadb-wrapper] query parse error — falling back to L1+L0');
             resolve([]);
@@ -97,10 +168,10 @@ async function query(collectionName, queryText, topK = 5, host = DEFAULT_HOST, p
  * @param {string} content — the text content to index
  * @param {Object} [metadata={}] — optional metadata fields
  * @param {string} [host=localhost]
- * @param {number} [port=8000]
+ * @param {number} [port=resolved dynamic port]
  * @returns {Promise<boolean>} — true on success, false on error
  */
-async function index(collectionName, docId, content, metadata = {}, host = DEFAULT_HOST, port = DEFAULT_PORT) {
+async function index(collectionName, docId, content, metadata = {}, host = DEFAULT_HOST, port = RESOLVED_PORT) {
   const body = JSON.stringify({
     ids: [docId],
     documents: [content],
@@ -130,4 +201,4 @@ async function index(collectionName, docId, content, metadata = {}, host = DEFAU
   });
 }
 
-module.exports = { isAvailable, query, index };
+module.exports = { isAvailable, query, index, ensureDecisionsCollection, readDynamicPort };

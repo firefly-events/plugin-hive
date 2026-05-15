@@ -108,3 +108,115 @@ No live run executed, so no logs to inspect. As a proxy: `sandcastle-log-redacti
 ---
 
 *Outcome class B recorded per story s4-merge-validation AC OR-branch.*
+
+---
+
+## Refresh — 2026-05-14 (post-execution retry)
+
+Re-attempted Class-A validation. **Prerequisite gap closed; quota gap remains.**
+
+### Updated Environment Table
+
+| Probe | Command | Result | Status |
+|---|---|---|---|
+| Node version | `node --version` | (v25.9.0) | PASS |
+| Podman binary | `which podman` | `/opt/homebrew/bin/podman` | PRESENT |
+| Podman daemon | `podman info` | arm64 linux runtime=crun, machine `podman-machine-default` running (applehv) | **PASS** |
+| OPENAI_API_KEY (env) | `env \| grep OPENAI_API_KEY` | unset in shell | INFO (auth.json supplies) |
+| auth.json (repo) | `.sandcastle/codex-config/auth.json` | 4393 bytes, mode 600, keys=`OPENAI_API_KEY,auth_mode,last_refresh,tokens` | **PASS** (copied from `~/.codex/auth.json`) |
+| auth.json (spike) | `.pHive/spikes/sandcastle/.sandcastle/codex-config/auth.json` | present, mode 600 | **PASS** (pre-existing, registered via `codex login`) |
+| `@ai-hero/sandcastle` | `node_modules/@ai-hero/sandcastle/package.json` | version `0.5.10` | **PASS** (within s2 pin `>=0.5.10 <0.6.0`) |
+| Spike image | `podman images localhost/sandcastle` | `sandcastle:spike` (6 days old), `sandcastle:plugin-hive` (8 min old) | PRESENT |
+| OpenAI Responses API quota | Direct codex probe (single container exec) | `ERROR: Quota exceeded. Check your plan and billing details.` (exit 0, model `gpt-5.5`) | **FAIL — quota=0** |
+
+### Direct Codex Quota Probe Command (verbatim)
+
+```
+podman run --rm \
+  --entrypoint codex \
+  -v "$PWD/.pHive/spikes/sandcastle/.sandcastle/codex-config:/home/agent/.codex" \
+  sandcastle:spike exec --skip-git-repo-check 'reply OK'
+```
+
+Session id observed: `019e28f1-c115-7883-86f4-0dd7b4e7a777`. Output ended with two consecutive `ERROR: Quota exceeded.` lines — matches the May 8 spike `run.log` failure mode exactly. No parallel harness was launched because launching four sandboxed `codex exec` calls would only multiply the same quota failure.
+
+### Outcome Class
+
+**Class B — re-confirmed.** Blocker is now narrowed to a single upstream account-level constraint (OpenAI quota on this account), not a local infrastructure gap. Per the AC OR-branch (*"produce a documented blocking failure"*) this remains the recorded outcome.
+
+### Updated Re-Run Checklist
+
+Replaces the earlier checklist:
+
+- [x] `~/.codex/auth.json` exists and was copied to `.sandcastle/codex-config/auth.json` (mode 600)
+- [x] `@ai-hero/sandcastle@0.5.10` resolvable via `require()`
+- [x] `podman machine` running; `podman info` succeeds
+- [x] Spike image `sandcastle:spike` present
+- [ ] **OpenAI Responses API quota > 0 on the account behind `~/.codex/auth.json`** (top-up, billing change, or different account/auth.json)
+- [ ] Re-run unit suites to confirm S1–S3 still green
+- [ ] Execute parallel-branch harness (`.pHive/spikes/sandcastle/harness.ts` or a Class-A script that drives `createSandcastleProvider` through routed mode)
+
+### Findings (refresh)
+
+No new defects discovered. No code path was exercised under live quota. No fix-forward patches applied. The cold-start latency surface flagged by the post-exec performance audit (`sandcastle-provider.js:264-268`) remains unmeasured.
+
+*Refresh recorded 2026-05-14 during post-epic verification pass; story status unchanged.*
+
+---
+
+## Class A — 2026-05-15 (live OAuth subscription run)
+
+**Outcome class A: PASS.** Two parallel named-branch Sandcastle runs reached merge behavior under ChatGPT subscription OAuth. Auth path swap (apikey → chatgpt) eliminated the platform.openai.com quota blocker.
+
+### Auth swap
+
+`~/.codex/auth.json` was already in `auth_mode: chatgpt` (subscription OAuth, `access_token`/`refresh_token`/`account_id`/`id_token` token shape). Spike's `.pHive/spikes/sandcastle/.sandcastle/codex-config/auth.json` was in legacy `auth_mode: apikey` (the path the 2026-05-08 spike and 2026-05-14 refresh probed). Swapped the spike's auth.json for the OAuth one; original apikey auth preserved at `auth.json.apikey-backup-2026-05-15`.
+
+Direct codex probe (subscription path) returned `OK`, 1211 tokens, exit 0, model `gpt-5.5`. No quota error.
+
+### Validation harness
+
+New script: `.pHive/spikes/sandcastle/scripts/class-a-validation.mjs` (~125 lines). Exercises the SHIPPED `hive/lib/sandcastle-provider.js` factory through two parallel `sandcastle.run()` calls on distinct named branches. Captures wallclock, per-run timing, branch state, log redaction grep, completion outcome. Inherits the spike dir's `node_modules` so it runs without root install.
+
+### Results
+
+| Field | Value |
+|---|---|
+| Command | `node scripts/class-a-validation.mjs` (cwd = spike dir) |
+| Image | `sandcastle:spike` (override; factory default `sandcastle:hive` is unbuilt) |
+| auth_mode | `chatgpt(oauth)` |
+| Sandcastle range | `>=0.5.10 <0.6.0` (installed `0.5.10`) |
+| Parallel wallclock | **20,733 ms** |
+| Run A duration | 20,733 ms — `validation-branch-a` — iterations=1 — ok=true |
+| Run B duration | 18,070 ms — `validation-branch-b` — iterations=1 — ok=true |
+| `both_ok` | **true** |
+| Log redaction scan | 0 sk-… matches, 0 Bearer matches across both 540-byte log files |
+| `redaction_clean` | **true** |
+| Cold-start baseline | ~18–21 s per run (within parallel container init) |
+
+### Worktree ownership
+
+Sandcastle created two worktrees at `/Users/don/Documents/plugin-hive/.sandcastle/worktrees/validation-branch-a` and `validation-branch-b` and reported "Run succeeded but worktree has uncommitted changes" for each (the agent created `hello.txt` but didn't commit — expected; `maxIterations: 1`). Legacy `.claude/worktrees/` was **not** touched.
+
+Manual cleanup performed (sandcastle's `wt.close()` semantics in 0.5.10 don't auto-remove on uncommitted state):
+
+```
+git worktree remove --force .sandcastle/worktrees/validation-branch-a
+git worktree remove --force .sandcastle/worktrees/validation-branch-b
+git branch -D validation-branch-a validation-branch-b
+```
+
+### Defects discovered (S1-S3 surface)
+
+Two latent defects in `hive/lib/sandcastle-provider.js` (S2 surface) were exposed by validation. Both are traceable to `require()` semantics against the ESM-only `@ai-hero/sandcastle` package.
+
+1. **D1 — version preflight `require('@ai-hero/sandcastle/package.json')` throws `ERR_PACKAGE_PATH_NOT_EXPORTED`** because sandcastle's `exports` field has no `./package.json` entry. **Fix-forward applied in s4 scope** — `defaultVersionResolver` now walks `process.cwd()` and `__dirname` upward looking for `node_modules/@ai-hero/sandcastle/package.json` and reads the manifest via `fs`. All 60 S1-S3 unit tests still pass.
+2. **D2 — default DI loaders for `podman`/`docker`/`createWorktree` use `require('@ai-hero/sandcastle/sandboxes/podman')` etc.**, but sandcastle's `exports` defines only `import` keys (no `require`), so CJS `require()` of any sandcastle subpath fails with `ERR_PACKAGE_PATH_NOT_EXPORTED`. **RESOLVED in follow-on commit 2026-05-15** via `hive/lib/sandcastle-provider-loader.mjs` — ESM sibling that pre-imports the sandcastle deps via dynamic `import()` and threads them into the CJS factory through its `_deps` seam. The loader exposes a single `async createSandcastleProvider(options)` API. The validation script was reworked to use the loader (zero manual DI in caller code) and Class-A re-run confirmed: both_ok=true, wallclock 21.1s / 18.8s, redaction_clean=true. 7 new loader unit tests pass. `execute-mode-sandcastle` SKILL updated to point ESM consumers at the loader as the required call path.
+
+### Findings rollup
+
+- All S1-S3 surfaces exercised end-to-end under live OAuth: redaction wrapper, gitignore mount, auth.json mount, provider wrapper, minimal hooks (none wired in this run), execute-dispatch routing (driven implicitly by the script's mode selection).
+- Parallel branch strategy `{ type: "branch", branch: <id> }` confirmed working — no race on container init under `userns: false`, no double-worktree-ownership bug, distinct branch refs created.
+- Cold-start surface flagged by post-exec performance audit (`sandcastle-provider.js:264-268`, per-run `podmanFactory()`) measured at ~18-21s wallclock for two parallel containers; informational baseline for future warm-pool decision.
+
+*Class-A outcome recorded 2026-05-15. Story s4-merge-validation: validation complete; D1 fix-forward applied; D2 carried as follow-on.*

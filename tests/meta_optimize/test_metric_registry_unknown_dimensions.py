@@ -86,6 +86,13 @@ def test_is_known_dimension_matches_mvp_set_only() -> None:
     assert registry.is_known_dimension("custom_latency_p95") is False
 
 
+def test_kg_writes_total_counter_registered_with_predicate_label() -> None:
+    registry = _load_registry_module()
+
+    assert registry.is_registered_counter("kg_writes_total") is True
+    assert registry.counter_labels("kg_writes_total") == ("predicate",)
+
+
 def test_capture_from_run_tolerates_unknown_metric_dimensions(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
