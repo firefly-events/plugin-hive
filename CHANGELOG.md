@@ -11,6 +11,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- KG signal revival S3.2: ChromaDB wrapper dynamic port resolution from `~/.claude/hive/chromadb.port`, idempotent `decisions` collection bootstrap, and B0.2 schema docs.
 - KG signal revival S4.2: bootstrap `--since` filtering, dry-run projection output, large-import guardrails, and legacy decision `set:` to `valid_from` handling.
 - KG signal revival S4.2b: cross-project KG findings and proposals now preserve the `[cross-project: <name>]` hard-tag contract in workflow docs.
 - KG signal revival S1.2: Python `emit_kg_event()` parity helper and DAG executor terminal failure emission for `phase_failed`.

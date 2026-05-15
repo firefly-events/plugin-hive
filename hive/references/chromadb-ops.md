@@ -54,6 +54,17 @@ pipx install chromadb
 If `chroma` is absent, `chromadb-start.sh` exits 0 with a warning and Hive keeps
 using L1+L0 memory retrieval.
 
+## Collection schema
+
+On the first successful heartbeat per process, `hive/lib/chromadb-wrapper.js`
+idempotently creates the ChromaDB `decisions` collection with
+`get_or_create: true`. The canonical B0.2 schema is defined in
+`.pHive/epics/kg-signal-revival/docs/registry-chroma-telemetry-contract.md`:
+document IDs are stable decision keys, documents contain decision summary text,
+and metadata includes the S3.2 fields `predicate`, `source_epic`,
+`source_agent`, and `valid_from` plus KG identity fields used by downstream
+consumers.
+
 ## Troubleshooting
 
 Check current lifecycle state:
