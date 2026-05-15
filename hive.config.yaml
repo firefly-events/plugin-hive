@@ -86,6 +86,13 @@ task_tracking:
   gate_mode: warning
   team_value: null
   project_value: null
+  # GitHub Issues adapter (sandcastle-ops-layer s1) — extends task_tracking
+  # with labeled-issue publish + dependency-sweep. Wired into Phase D of
+  # skills/plan/SKILL.md and gated on `adapter == "github"`. Default consumers
+  # who do not opt in see zero behavior change.
+  github_owner: null             # falls through to team_value when null
+  github_repo: null              # falls through to project_value when null
+  label_prefix: "hive"           # prefix for hive:ready / hive:blocked-by:<id> labels
   github:
     token: null
   linear:

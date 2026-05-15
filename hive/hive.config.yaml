@@ -101,6 +101,22 @@ task_tracking:
   # Runtime context — passed at invoke time (not at load time):
   team_value: null             # github: owner; linear: team key (e.g., "ACME")
   project_value: null          # github: repo;  linear: project name
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sandcastle ops layer (Epic sandcastle-ops-layer, story s1) — additive,
+  # opt-in. When `adapter: github`, /plan Phase D publishes story YAMLs as
+  # labeled GitHub Issues so an autonomous worker can pick them up. Default
+  # consumers (adapter: null or other) see ZERO behavior change.
+  #
+  # github_owner / github_repo override team_value / project_value when the
+  # caller wants to publish to a different owner/repo than the dispatch ABI
+  # default. Leave null to fall through to team_value / project_value.
+  #
+  # label_prefix is the namespace for hive:ready, hive:blocked-by:<id>, etc.
+  # Default "hive" matches sandcastle-ops-layer spec.
+  github_owner: null
+  github_repo: null
+  label_prefix: "hive"
+  # ─────────────────────────────────────────────────────────────────────────
   # Adapter-specific sub-config (propagated to env if non-null):
   github:
     token: null                # falls through to GITHUB_TOKEN env / `gh auth token`

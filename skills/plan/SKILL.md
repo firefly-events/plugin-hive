@@ -485,6 +485,51 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     story YAML when populated so downstream skills (execute, review) can
     correlate runs to tracker records.
 
+19a. **Sandcastle-ops label pass (opt-in, additive).** Only runs when
+    `task_tracking.adapter === "github"`. For any other value (null, "linear",
+    unset, etc.) this step is a strict no-op — no GH calls, no logging beyond
+    a single skip line, no errors. This is the OUTBOUND half of the sandcastle
+    ops loop (epic `sandcastle-ops-layer`, story `s1-github-issues-adapter`)
+    — issues already created in step 19 receive the hive:* label namespace
+    so an autonomous worker can pick them up via
+    `gh issue list --label hive:ready --state open`.
+
+    **Label-existing only — does NOT create issues.** Step 19 (Epic C ABI
+    `createStory`) is the single creation point for GitHub issues. This step
+    reads each story's `tracker_id` (format `<owner>/<repo>#<number>`, set by
+    step 19) and calls `gh issue edit <n> --add-label <hive:*>` to add the
+    sandcastle namespace (`hive:ready`, `hive:epic:<epic-id>`,
+    `hive:story:<story-id>`, `hive:blocked-by:<dep>`). Stories that lack
+    `tracker_id` (because step 19 errored or was a no-op for that story) are
+    skipped with reason `no_tracker_id` — the adapter never falls back to
+    creating issues. Idempotent on re-run via `external_id` in the story YAML.
+
+    After labeling, the adapter writes `external_id: <issue-number>` (bare
+    integer) back into the story YAML alongside the existing slash-encoded
+    `tracker_id`. The worker queries by label and round-trips via
+    `hive:story:<id>` → story YAML, where `external_id` is the cross-reference.
+
+    ```javascript
+    const { publishStoriesToIssues } = require('hive/lib/external/github-issues-adapter.js');
+
+    if (config.task_tracking && config.task_tracking.adapter === 'github') {
+      const { labeled, skipped, errors } = await publishStoriesToIssues({
+        epicId,
+        storyIds: stories.map((s) => s.id),
+        config: config.task_tracking,
+      });
+      for (const c of labeled) console.log(`[sandcastle-ops] labeled ${c.id} → #${c.issue_number}`);
+      for (const s of skipped) console.log(`[sandcastle-ops] skipped ${s.id} (${s.reason})`);
+      for (const e of errors)  console.error(`[sandcastle-ops] FAILED ${e.id}: ${e.error}`);
+    }
+    ```
+
+    Failure handling: a mid-batch gh CLI failure (auth, rate limit, network)
+    surfaces in the `errors` array. Stories labeled before the failure have
+    their `external_id` already written to disk, so a re-run picks up where
+    it left off. Planning continues either way — sandcastle adoption is
+    optional, and a failed label pass is not a failed plan.
+
 20. **Post-run audit.** After step 19 completes (whether user confirmed or aborted in step 18, and whether Phase D published or was a no-op), run the in-process audit per `hive/references/gate-lift-telemetry.md`:
 
     1. Collect this run's resolved state:
