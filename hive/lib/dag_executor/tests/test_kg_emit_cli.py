@@ -27,10 +27,14 @@ def _make_kg_sqlite(path: Path) -> None:
             predicate TEXT,
             object TEXT,
             valid_from TEXT,
+            valid_until TEXT,
             source_epic TEXT,
             source_agent TEXT
         )
         """
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_triple ON triples(subject, predicate, object, source_epic)"
     )
     conn.commit()
     conn.close()
@@ -107,4 +111,52 @@ def test_cli_sqlite_missing_no_op(monkeypatch, tmp_path, capsys):
 def test_cli_missing_required_flag_exits_nonzero(capsys):
     with pytest.raises(SystemExit) as excinfo:
         kg_emit_cli.main(["--subject", "x"])
+    assert excinfo.value.code != 0
+
+
+def test_cli_supersede_mode_simulates_plan_story_overwrite(kg_sqlite, capsys, monkeypatch):
+    monkeypatch.setattr("hive.lib.kg_emit.EMIT_LIFECYCLE_AT", "phase")
+    with sqlite3.connect(str(kg_sqlite)) as conn:
+        conn.execute(
+            """
+            INSERT INTO triples
+              (subject, predicate, object, valid_from, source_epic, source_agent)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("story-x", "story-spec", "old-hash", "2026-05-01T00:00:00Z", "test-epic", "plan"),
+        )
+        conn.commit()
+
+    rc = kg_emit_cli.main(
+        _argv(predicate="story-spec", object="new hash")
+        + ["--mode", "supersede", "--prior-object", "old hash", "--json"]
+    )
+
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["emitted"] is True
+    assert payload["metadata"]["object"] == "old-hash->new-hash"
+    with sqlite3.connect(str(kg_sqlite)) as conn:
+        prior_valid_until = conn.execute(
+            "SELECT valid_until FROM triples WHERE subject = ? AND predicate = ? AND object = ?",
+            ("story-x", "story-spec", "old-hash"),
+        ).fetchone()[0]
+    assert prior_valid_until is not None
+
+
+def test_cli_supersede_no_sanitize_passes_clean_slugs(kg_sqlite, capsys, monkeypatch):
+    monkeypatch.setattr("hive.lib.kg_emit.EMIT_LIFECYCLE_AT", "phase")
+    rc = kg_emit_cli.main(
+        _argv(predicate="story-spec", object="new-clean")
+        + ["--mode", "supersede", "--prior-object", "old-clean", "--no-sanitize", "--json"]
+    )
+
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["metadata"]["object"] == "old-clean->new-clean"
+
+
+def test_cli_supersede_missing_prior_object_exits_nonzero(capsys):
+    with pytest.raises(SystemExit) as excinfo:
+        kg_emit_cli.main(_argv() + ["--mode", "supersede"])
     assert excinfo.value.code != 0

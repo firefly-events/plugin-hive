@@ -78,6 +78,73 @@ def emit_kg_event(
     return {"emitted": True, "metadata": metadata}
 
 
+def emit_superseded(
+    *,
+    subject: str,
+    predicate: str,
+    prior_object: str,
+    new_object: str,
+    source_epic: str,
+    source_agent: str,
+) -> dict[str, Any | bool | None]:
+    if EMIT_LIFECYCLE_AT == "off":
+        return {"emitted": False, "metadata": None}
+
+    prior_obj = sanitize_obj(prior_object)
+    new_obj = sanitize_obj(new_object)
+    superseded_obj = f"{prior_obj}->{new_obj}"
+    valid_from = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    metadata = {
+        "subject": subject,
+        "predicate": "superseded",
+        "object": superseded_obj,
+        "source_epic": source_epic,
+        "source_agent": source_agent,
+        "valid_from": valid_from,
+        "valid_until": None,
+        "superseded_subject": subject,
+        "superseded_predicate": predicate,
+        "prior_object": prior_obj,
+        "new_object": new_obj,
+        "prior_valid_until_updated": False,
+    }
+
+    try:
+        db_path = Path(os.environ.get("HIVE_KG_SQLITE_PATH", DEFAULT_KG_SQLITE_PATH))
+        if not db_path.exists():
+            return {"emitted": False, "metadata": None}
+        with sqlite3.connect(str(db_path)) as conn:
+            cur = conn.execute(
+                """
+                UPDATE triples
+                   SET valid_until = ?
+                 WHERE subject = ?
+                   AND predicate = ?
+                   AND object = ?
+                   AND valid_until IS NULL
+                """,
+                (valid_from, subject, predicate, prior_obj),
+            )
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO triples
+                  (subject, predicate, object, valid_from, source_epic, source_agent)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (subject, "superseded", superseded_obj, valid_from, source_epic, source_agent),
+            )
+            conn.commit()
+            metadata["prior_valid_until_updated"] = cur.rowcount > 0
+    except Exception:
+        return {"emitted": False, "metadata": None}
+
+    try:
+        _increment_kg_writes_counter("superseded")
+    except Exception:
+        pass
+    return {"emitted": True, "metadata": metadata}
+
+
 def get_kg_writes_counter_snapshot() -> dict[str, dict[str, int]]:
     return {KG_WRITES_TOTAL_COUNTER: dict(_kg_write_counter)}
 

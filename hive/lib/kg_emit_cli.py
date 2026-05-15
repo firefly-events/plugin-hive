@@ -1,4 +1,4 @@
-"""CLI wrapper around emit_kg_event for skill-prompt-driven emission sites.
+"""CLI wrapper around KG emit helpers for skill-prompt-driven emission sites.
 
 Invocation:
     python3 -m hive.lib.kg_emit_cli \
@@ -22,7 +22,7 @@ import argparse
 import json
 import sys
 
-from hive.lib.kg_emit import emit_kg_event, sanitize_obj
+from hive.lib.kg_emit import emit_kg_event, emit_superseded, sanitize_obj
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,7 +32,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--subject", required=True)
     parser.add_argument("--predicate", required=True)
-    parser.add_argument("--object", required=True, dest="obj")
+    parser.add_argument(
+        "--mode",
+        choices=("event", "supersede"),
+        default="event",
+        help="Emit a normal lifecycle event or a superseded provenance edge.",
+    )
+    parser.add_argument("--object", dest="obj")
+    parser.add_argument("--new-object", dest="obj")
+    parser.add_argument(
+        "--prior-object",
+        dest="prior_object",
+        help="Prior object to invalidate when --mode supersede is used.",
+    )
     parser.add_argument("--source-epic", required=True, dest="source_epic")
     parser.add_argument("--source-agent", required=True, dest="source_agent")
     parser.add_argument(
@@ -47,16 +59,32 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    if not args.obj:
+        parser.error("--object is required (--new-object is also accepted)")
+    if args.mode == "supersede" and not args.prior_object:
+        parser.error("--prior-object is required when --mode supersede")
+
     obj = args.obj if args.no_sanitize else sanitize_obj(args.obj)
 
     try:
-        result = emit_kg_event(
-            subject=args.subject,
-            predicate=args.predicate,
-            obj=obj,
-            source_epic=args.source_epic,
-            source_agent=args.source_agent,
-        )
+        if args.mode == "supersede":
+            prior_object = args.prior_object if args.no_sanitize else sanitize_obj(args.prior_object)
+            result = emit_superseded(
+                subject=args.subject,
+                predicate=args.predicate,
+                prior_object=prior_object,
+                new_object=obj,
+                source_epic=args.source_epic,
+                source_agent=args.source_agent,
+            )
+        else:
+            result = emit_kg_event(
+                subject=args.subject,
+                predicate=args.predicate,
+                obj=obj,
+                source_epic=args.source_epic,
+                source_agent=args.source_agent,
+            )
     except Exception as exc:  # pragma: no cover — emit_kg_event already swallows
         result = {"emitted": False, "metadata": None, "error": str(exc)}
 

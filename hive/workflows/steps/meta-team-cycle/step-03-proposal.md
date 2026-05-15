@@ -46,6 +46,21 @@ Review each finding from step 2:
 ### 2. Group related findings
 Some findings address the same root cause. Group them into single proposals where the implementation naturally covers multiple findings (e.g., "create missing reference doc" may resolve both a MISSING_FILE finding and a dangling cross-reference).
 
+If a grouped proposal deliberately replaces a prior proposal for the same root cause, emit `superseded` before recording the replacement. Use `subject` as the epic id or proposal id, `predicate` as `proposal`, `prior-object` as the replaced proposal id, `new-object` as the replacement proposal id, and `source-agent` as `meta-optimize`:
+
+```bash
+python3 -m hive.lib.kg_emit_cli \
+  --mode supersede \
+  --subject "{epic_id_or_proposal_id}" \
+  --predicate "proposal" \
+  --prior-object "{prior_proposal_id}" \
+  --new-object "{new_proposal_id}" \
+  --source-epic "{epic_id}" \
+  --source-agent "meta-optimize"
+```
+
+The helper sets `valid_until` on the prior `proposal` triple when present and inserts exactly one `superseded` provenance edge.
+
 ### 2b. Merge external-research candidates into the eligible pool
 
 Step `external-research` (step-02b) supplies an `external_research_candidates`

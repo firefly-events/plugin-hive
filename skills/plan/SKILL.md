@@ -249,6 +249,26 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 13. **Write detailed story files.** For each story, produce an individual YAML file in `.pHive/epics/{epic-id}/stories/{story-id}.yaml`. Stories are the primary artifact — they're what agents read when executing. They must contain enough context for an agent to work autonomously without reading the full epic or other stories.
 
+    **New-write vs overwrite rule:** Before writing each story YAML, check whether `.pHive/epics/{epic-id}/stories/{story-id}.yaml` already exists.
+
+    - If it does not exist, write the new story normally.
+    - If it exists, treat the write as a supersession. Compute a short content hash for the existing file and for the replacement content, emit `superseded`, then overwrite the file. The emit is fire-and-forget (CLI swallows knob==off + missing-sqlite; do NOT branch on its exit code):
+
+      ```bash
+      old_hash="$(git hash-object ".pHive/epics/{epic-id}/stories/{story-id}.yaml" | cut -c1-12)"
+      new_hash="$(printf '%s' "$replacement_story_yaml" | git hash-object --stdin | cut -c1-12)"
+      python3 -m hive.lib.kg_emit_cli \
+        --mode supersede \
+        --subject "{story-id}" \
+        --predicate "story-spec" \
+        --prior-object "$old_hash" \
+        --new-object "$new_hash" \
+        --source-epic "{epic-id}" \
+        --source-agent "plan"
+      ```
+
+      The supersession edge is `old story id/hash -> new story id/hash` at the `story-spec` predicate; the helper also sets `valid_until` on the prior `story-spec` triple when present.
+
     **Self-containment rule:** Stories must work identically whether read from local disk or pulled from an external tracker (e.g., Linear). To achieve this, **inline relevant context snippets** alongside file references:
 
     - For `code_examples`: extract the relevant lines (~10 max) into a `snippet` field. The agent gets the pattern without needing the source file on disk.

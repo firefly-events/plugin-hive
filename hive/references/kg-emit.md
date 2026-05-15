@@ -4,6 +4,7 @@
 
 ```js
 emitKgEvent({ subject, predicate, object, sourceEpic, sourceAgent })
+emitSupersededEvent({ subject, predicate, priorObject, newObject, sourceEpic, sourceAgent })
 ```
 
 Parameters:
@@ -20,6 +21,13 @@ Return:
 - `{ emitted: false, metadata: null }` when emission is disabled or the local KG is unavailable.
 
 The returned metadata follows the B0.2 contract: `subject`, `predicate`, `object`, `source_epic`, `source_agent`, `valid_from`, `valid_until`.
+
+`emitSupersededEvent()` is additive: it marks the prior
+`(subject, predicate, priorObject)` triple historical by setting
+`valid_until`, then inserts exactly one `superseded` provenance edge whose
+object is `priorObject->newObject` after object sanitization. It does not
+insert the replacement authoritative triple; callers that own the replacement
+write keep doing so.
 
 ## `emit_lifecycle_at`
 
@@ -46,12 +54,27 @@ await emitKgEvent({
 });
 ```
 
+Supersession example:
+
+```js
+const { emitSupersededEvent } = require('./kg-emit');
+
+await emitSupersededEvent({
+  subject: 'S2.2-superseded-emit-sites',
+  predicate: 'story-spec',
+  priorObject: 'old-hash',
+  newObject: 'new-hash',
+  sourceEpic: 'kg-signal-revival',
+  sourceAgent: 'plan',
+});
+```
+
 ## Python Parity
 
 `hive/lib/kg_emit.py` mirrors the JS helper for Python executor code:
 
 ```python
-from hive.lib.kg_emit import emit_kg_event, sanitize_obj
+from hive.lib.kg_emit import emit_kg_event, emit_superseded, sanitize_obj
 
 emit_kg_event(
     subject="S1.2-phase-failed-walker-emit",
@@ -59,6 +82,15 @@ emit_kg_event(
     obj=sanitize_obj("HandlerError: phase failed"),
     source_epic="kg-signal-revival",
     source_agent="dag-executor",
+)
+
+emit_superseded(
+    subject="S2.2-superseded-emit-sites",
+    predicate="story-spec",
+    prior_object="old-hash",
+    new_object="new-hash",
+    source_epic="kg-signal-revival",
+    source_agent="plan",
 )
 ```
 

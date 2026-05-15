@@ -36,11 +36,12 @@ async function withConfigText(text, fn) {
   }
 }
 
-function loadEmitterWithKgWrite(text, kgWrite) {
+function loadEmitterWithKgWrite(text, kgWrite, kgSupersede = async () => ({ updated: 0 })) {
   clearModules();
   return withConfigText(text, () => {
     const sessionEnd = require(SESSION_END_PATH);
     sessionEnd.kgWrite = kgWrite;
+    sessionEnd.kgSupersede = kgSupersede;
     return require(EMIT_PATH);
   });
 }
@@ -123,6 +124,89 @@ test('no-op when kg.sqlite unavailable', async () => {
 
   assert.deepEqual(result, { emitted: false, metadata: null });
   assert.equal(writes, 1);
+  assert.deepEqual(emitter.getKgWritesCounterSnapshot(), { kg_writes_total: {} });
+});
+
+test('emitSupersededEvent updates prior and emits one provenance edge', async () => {
+  const writes = [];
+  const emitter = await loadEmitterWithKgWrite(
+    'emit_lifecycle_at: phase\n',
+    async () => {},
+    async (...args) => {
+      writes.push(args);
+      return { updated: 1 };
+    }
+  );
+
+  const result = await emitter.emitSupersededEvent({
+    subject: 'story-1',
+    predicate: 'story-spec',
+    priorObject: 'Old Hash',
+    newObject: 'New Hash',
+    sourceEpic: 'kg-signal-revival',
+    sourceAgent: 'plan',
+  });
+
+  assert.equal(result.emitted, true);
+  assert.equal(result.metadata.object, 'old-hash->new-hash');
+  assert.equal(result.metadata.prior_valid_until_updated, true);
+  assert.deepEqual(writes[0], [
+    'story-1',
+    'story-spec',
+    'old-hash',
+    'new-hash',
+    'kg-signal-revival',
+    'plan',
+  ]);
+  assert.deepEqual(emitter.getKgWritesCounterSnapshot(), {
+    kg_writes_total: { superseded: 1 },
+  });
+});
+
+test('emitSupersededEvent off knob no-ops before kg write', async () => {
+  let writes = 0;
+  const emitter = await loadEmitterWithKgWrite(
+    'emit_lifecycle_at: off\n',
+    async () => {},
+    async () => {
+      writes += 1;
+    }
+  );
+
+  const result = await emitter.emitSupersededEvent({
+    subject: 'story-1',
+    predicate: 'story-spec',
+    priorObject: 'old',
+    newObject: 'new',
+    sourceEpic: 'kg-signal-revival',
+    sourceAgent: 'plan',
+  });
+
+  assert.deepEqual(result, { emitted: false, metadata: null });
+  assert.equal(writes, 0);
+});
+
+test('emitSupersededEvent no-ops when kg.sqlite unavailable', async () => {
+  const emitter = await loadEmitterWithKgWrite(
+    'emit_lifecycle_at: phase\n',
+    async () => {},
+    async () => {
+      const err = new Error('kg.sqlite not found at /tmp/kg.sqlite');
+      err.code = 'SQLITE_CANTOPEN';
+      throw err;
+    }
+  );
+
+  const result = await emitter.emitSupersededEvent({
+    subject: 'story-1',
+    predicate: 'story-spec',
+    priorObject: 'old',
+    newObject: 'new',
+    sourceEpic: 'kg-signal-revival',
+    sourceAgent: 'plan',
+  });
+
+  assert.deepEqual(result, { emitted: false, metadata: null });
   assert.deepEqual(emitter.getKgWritesCounterSnapshot(), { kg_writes_total: {} });
 });
 
