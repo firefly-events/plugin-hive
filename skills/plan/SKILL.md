@@ -86,6 +86,19 @@ See [`skills/hive/skills/planning-routing/SKILL.md`](../hive/skills/planning-rou
 
 ### Phase A: Research
 
+0. **Pre-flight: query prior decisions (S6.2).** Before dispatching the researcher, invoke `/hive:why` in free-form mode against the requirement topic to surface any prior KG decisions that should inform this plan. Treat this as audit-trail discovery, not blocking input:
+
+   ```bash
+   python3 -m hive.lib.kg_why "<requirement topic words>" --limit 10
+   ```
+
+   Three outcomes:
+   - **≥1 result returned:** capture the merged triples and add a `PRIOR DECISIONS` section to the design-discussion §0 prelude (rendered alongside the research brief in Phase B). The section lists each prior decision with subject, predicate, object, and provenance (`source_epic`, `source_agent`, `valid_from`). The design-discussion team reads these as constraints — prior commitments that the new plan should honor or explicitly supersede.
+   - **Zero results:** omit the PRIOR DECISIONS section entirely. No noise — silence means clean slate.
+   - **Helper failure (kg_why error, missing sqlite, etc.):** treat as zero results. Do NOT block planning. Continue to step 1.
+
+   This is the consumer side of the audit-trail north-star (north-star 2 in design-discussion §1). /hive:why is the precision query surface; this pre-flight is the planning-skill side that pulls retrospection into design-time.
+
 1. **Research the codebase.** `SendMessage` to the researcher to explore the target codebase — tech stack, architecture, existing patterns, relevant files. The researcher delivers raw findings (not a formatted brief). Use the researcher agent mindset — you need concrete file paths, not guesses.
 
    The researcher runs **context7 validation always-on** for any library/SDK/API in the requirement. Web research escalation is uncertainty-triggered (stale docs, missing coverage, conflicting info) — not scope-gated. Findings include a validation note with confidence level. If context7 is unavailable, the researcher proceeds codebase-only and notes the gap.
