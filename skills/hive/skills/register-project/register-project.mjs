@@ -155,6 +155,8 @@ function yamlQuote(value) {
   return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
+const KNOWN_REGISTRY_FIELDS = new Set(['name', 'path', 'registered_at']);
+
 function serializeRegistry(projects) {
   const lines = ['projects:'];
   for (const project of projects) {
@@ -162,6 +164,12 @@ function serializeRegistry(projects) {
     lines.push(`    path: ${yamlQuote(project.path)}`);
     if (project.registered_at) {
       lines.push(`    registered_at: ${yamlQuote(project.registered_at)}`);
+    }
+    for (const key of Object.keys(project)) {
+      if (KNOWN_REGISTRY_FIELDS.has(key)) continue;
+      const value = project[key];
+      if (value === undefined || value === null) continue;
+      lines.push(`    ${key}: ${yamlQuote(value)}`);
     }
   }
   lines.push('');

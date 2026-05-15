@@ -1247,6 +1247,8 @@ def _emit_phase_blocked(
     skip_info: dict[str, Any],
     source_epic: str | None,
 ) -> None:
+    import logging
+
     try:
         from hive.lib.kg_emit import emit_kg_event, sanitize_obj
 
@@ -1258,7 +1260,11 @@ def _emit_phase_blocked(
             source_agent="dag-executor",
         )
     except Exception:
-        pass
+        logging.getLogger(__name__).debug(
+            "phase_blocked KG emit failed for node %s",
+            node_id,
+            exc_info=True,
+        )
 
 
 def _emit_phase_failed(
@@ -1266,6 +1272,8 @@ def _emit_phase_failed(
     failure_info: dict[str, Any],
     source_epic: str | None,
 ) -> None:
+    import logging
+
     try:
         from hive.lib.kg_emit import emit_kg_event, sanitize_obj
 
@@ -1277,7 +1285,11 @@ def _emit_phase_failed(
             source_agent="dag-executor",
         )
     except Exception:
-        pass
+        logging.getLogger(__name__).debug(
+            "phase_failed KG emit failed for node %s",
+            node_id,
+            exc_info=True,
+        )
 
 
 def _record_final_completion(state):

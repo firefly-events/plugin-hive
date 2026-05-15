@@ -25,7 +25,8 @@ const wrapper = require(path.join(__dirname, '..', 'hive', 'lib', 'chromadb-wrap
 
 async function main() {
   const topic = process.argv[2];
-  const topK = process.argv[3] ? Number.parseInt(process.argv[3], 10) : 10;
+  const rawTopK = process.argv[3] ? Number.parseInt(process.argv[3], 10) : 10;
+  const topK = Number.isFinite(rawTopK) && rawTopK >= 1 ? rawTopK : 10;
 
   if (!topic) {
     process.stderr.write('Usage: kg-why-chroma.js <topic> [topK]\n');
@@ -39,7 +40,7 @@ async function main() {
     return;
   }
 
-  const results = await wrapper.query('decisions', topic, Number.isFinite(topK) ? topK : 10);
+  const results = await wrapper.query('decisions', topic, topK);
   process.stdout.write(JSON.stringify({ available: true, results }));
   process.stdout.write('\n');
 }

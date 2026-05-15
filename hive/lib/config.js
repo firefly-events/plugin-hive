@@ -29,7 +29,8 @@ function parseConfigText(raw) {
   } catch {}
 
   if (yaml) {
-    const parsed = yaml.load(raw);
+    const safeLoader = typeof yaml.safeLoad === 'function' ? yaml.safeLoad : yaml.load;
+    const parsed = safeLoader(raw);
     return parsed && typeof parsed === 'object' ? parsed : {};
   }
 

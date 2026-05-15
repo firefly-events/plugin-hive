@@ -72,7 +72,10 @@ def increment_counter(name: str, labels: dict[str, str], by: int = 1) -> int:
 def counter_value(name: str, labels: dict[str, str]) -> int:
     label_names = counter_labels(name)
     label_key = _label_key(name, label_names, labels)
-    return _counter_values[name][label_key]
+    bucket = _counter_values.get(name)
+    if bucket is None:
+        return 0
+    return bucket.get(label_key, 0)
 
 
 def set_gauge(name: str, value: float) -> float:

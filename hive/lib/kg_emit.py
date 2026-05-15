@@ -55,10 +55,10 @@ def emit_kg_event(
         "valid_until": None,
     }
 
+    db_path = Path(os.environ.get("HIVE_KG_SQLITE_PATH", DEFAULT_KG_SQLITE_PATH))
+    if not db_path.exists():
+        return {"emitted": False, "metadata": None}
     try:
-        db_path = Path(os.environ.get("HIVE_KG_SQLITE_PATH", DEFAULT_KG_SQLITE_PATH))
-        if not db_path.exists():
-            return {"emitted": False, "metadata": None}
         with sqlite3.connect(str(db_path)) as conn:
             conn.execute(
                 """
@@ -69,8 +69,10 @@ def emit_kg_event(
                 (subject, predicate, obj, valid_from, source_epic, source_agent),
             )
             conn.commit()
-    except Exception:
-        return {"emitted": False, "metadata": None}
+    except sqlite3.OperationalError as exc:
+        if "no such table" in str(exc).lower():
+            return {"emitted": False, "metadata": None}
+        raise
 
     try:
         _increment_kg_writes_counter(predicate)
