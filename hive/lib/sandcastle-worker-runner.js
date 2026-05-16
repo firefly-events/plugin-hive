@@ -47,6 +47,10 @@ function getDefaultOutputSchema() {
 
 const DEFAULT_IMAGE = 'sandcastle:hive';
 const DEFAULT_MODEL = 'gpt-5.1-codex';
+// Must match the literal `<result>…</result>` block in the worker prompt
+// (.sandcastle/prompts/worker-issue-pickup.md). Sandcastle scans the
+// rendered prompt for the tag and errors if it isn't referenced.
+const OUTPUT_TAG = 'result';
 // Sandcastle constraint: when `output: <Zod schema>` is set (structured
 // output), maxIterations must be 1. Sandcastle's "iteration" is a
 // sandbox-level retry of the whole prompt — not the agent's internal
@@ -148,7 +152,20 @@ async function runOnce(opts) {
   // is never created. We still pass a placeholder so sandcastle has a value.
   const branchName = forceIssue ? `agent/issue-${forceIssue}` : 'agent/issue-pickup';
 
-  const outputSchema = _deps.outputSchema || getDefaultOutputSchema();
+  // Sandcastle expects an OutputObjectDefinition from `Output.object({ tag,
+  // schema })`. The test seam still accepts a bare schema or pre-built
+  // definition via `_deps.outputDefinition`; only the live path needs the
+  // wrapping. The `tag` value MUST match the `<result>` block emitted by
+  // .sandcastle/prompts/worker-issue-pickup.md (sandcastle parses prompt
+  // text to confirm the tag is referenced).
+  let outputDefinition;
+  if (_deps.outputDefinition) {
+    outputDefinition = _deps.outputDefinition;
+  } else {
+    const sc = await loadSandcastle();
+    const schema = _deps.outputSchema || getDefaultOutputSchema();
+    outputDefinition = sc.Output.object({ tag: OUTPUT_TAG, schema });
+  }
 
   const runArgs = {
     agent: codex(modelTag),
@@ -157,7 +174,7 @@ async function runOnce(opts) {
     promptArgs: { FORCE_ISSUE: forceIssue },
     branchStrategy: { type: 'branch', branch: branchName },
     maxIterations,
-    output: outputSchema,
+    output: outputDefinition,
   };
 
   const result = await run(runArgs);

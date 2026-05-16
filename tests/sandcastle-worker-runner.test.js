@@ -64,9 +64,9 @@ function makeDeps(overrides = {}) {
           },
         };
 
-  // Sentinel for the Zod schema — the runner accepts `_deps.outputSchema`
+  // Sentinel for the Zod schema — the runner accepts `_deps.outputDefinition`
   // to bypass real schema construction when zod isn't installed at root.
-  const outputSchemaSentinel = overrides.outputSchema || { _sentinel: 'schema' };
+  const outputDefinitionSentinel = overrides.outputDefinition || { _sentinel: 'schema' };
 
   return {
     run: async (args) => {
@@ -81,12 +81,12 @@ function makeDeps(overrides = {}) {
       capturedDockerArgs.push(dockerOpts);
       return { _kind: 'docker', dockerOpts };
     },
-    outputSchema: outputSchemaSentinel,
+    outputDefinition: outputDefinitionSentinel,
     _captured: {
       capturedRunArgs,
       capturedClaudeArgs,
       capturedDockerArgs,
-      outputSchemaSentinel,
+      outputDefinitionSentinel,
     },
   };
 }
@@ -170,7 +170,7 @@ test('runOnce passes the injected output schema through as the Output.object inp
   const deps = makeDeps();
   await runOnce({ issueNumber: 7, _deps: deps });
   const [args] = deps._captured.capturedRunArgs;
-  assert.strictEqual(args.output, deps._captured.outputSchemaSentinel);
+  assert.strictEqual(args.output, deps._captured.outputDefinitionSentinel);
 });
 
 // ---------------------------------------------------------------------------
