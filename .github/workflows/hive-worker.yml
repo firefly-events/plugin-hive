@@ -67,6 +67,35 @@ jobs:
         # publish workflow.
         run: docker build -t sandcastle:hive .pHive/spikes/sandcastle/
 
+      - name: Materialize codex auth.json
+        # Codex CLI ≥ 0.129 ignores bare OPENAI_API_KEY env and requires the
+        # auth.json file mounted at /home/agent/.codex/auth.json inside the
+        # sandcastle container. The sandcastle codex() provider auto-mounts
+        # .sandcastle/codex-config/auth.json on the host into that location.
+        # We write the secret's contents to that host path here.
+        #
+        # Secret shape: CODEX_AUTH_JSON contains the full auth.json file
+        # contents (the maintainer's local ~/.codex/auth.json after
+        # `codex login`, which includes OPENAI_API_KEY plus the OAuth
+        # refresh tokens for subscription-backed access). Stored as a
+        # plain (multiline) GitHub Actions secret.
+        env:
+          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+        run: |
+          if [ -z "$CODEX_AUTH_JSON" ]; then
+            echo "::error::CODEX_AUTH_JSON secret is not configured on this repository."
+            echo "::error::Run 'gh secret set CODEX_AUTH_JSON --repo ${GITHUB_REPOSITORY} < ~/.codex/auth.json'"
+            exit 1
+          fi
+          mkdir -p .sandcastle/codex-config
+          printf '%s' "$CODEX_AUTH_JSON" > .sandcastle/codex-config/auth.json
+          chmod 600 .sandcastle/codex-config/auth.json
+          # Sanity check: must be JSON-parseable.
+          if ! jq -e . .sandcastle/codex-config/auth.json >/dev/null; then
+            echo "::error::CODEX_AUTH_JSON secret is not valid JSON."
+            exit 1
+          fi
+
       - name: Run worker
         id: worker
         env:

@@ -8,7 +8,7 @@
  *
  * Mocking: @ai-hero/sandcastle is NOT installed at the repo root (no root
  * package.json deps; sandcastle is per-consumer BYO). All tests inject a
- * `_deps` object containing fakes for `run`, `claudeCode`, and `docker`.
+ * `_deps` object containing fakes for `run`, `codex`, and `docker`.
  * This is documented as a test seam in sandcastle-worker-runner.js.
  *
  * Covers:
@@ -20,7 +20,7 @@
  *  AC-6 runOnce forwards promptArgs.FORCE_ISSUE as string
  *  AC-7 runOnce returns result.output verbatim
  *  AC-8 runOnce throws when sandcastle returns no output
- *  AC-9 imageName + modelTag propagate to docker() + claudeCode()
+ *  AC-9 imageName + modelTag propagate to docker() + codex()
  */
 
 const { test } = require('node:test');
@@ -41,7 +41,7 @@ function loadModule() {
 }
 
 /**
- * Build a _deps with capturing fakes for run / claudeCode / docker.
+ * Build a _deps with capturing fakes for run / codex / docker.
  * @param {object} [overrides]
  * @param {object} [overrides.runResult]  what fake run() resolves to
  */
@@ -73,9 +73,9 @@ function makeDeps(overrides = {}) {
       capturedRunArgs.push(args);
       return runResult;
     },
-    claudeCode: (modelTag) => {
+    codex: (modelTag) => {
       capturedClaudeArgs.push(modelTag);
-      return { _kind: 'claudeCode', modelTag };
+      return { _kind: 'codex', modelTag };
     },
     docker: (dockerOpts) => {
       capturedDockerArgs.push(dockerOpts);
@@ -226,24 +226,24 @@ test('runOnce throws when sandcastle returns no structured output', async () => 
 // AC-9: imageName + modelTag propagate
 // ---------------------------------------------------------------------------
 
-test('runOnce propagates imageName to docker() and modelTag to claudeCode()', async () => {
+test('runOnce propagates imageName to docker() and modelTag to codex()', async () => {
   const { runOnce } = loadModule();
   const deps = makeDeps();
   await runOnce({
     issueNumber: 1,
     imageName: 'sandcastle:custom',
-    modelTag: 'claude-opus-4-7-test',
+    modelTag: 'gpt-5.1-codex-test',
     _deps: deps,
   });
   assert.deepEqual(deps._captured.capturedDockerArgs, [
     { imageName: 'sandcastle:custom' },
   ]);
   assert.deepEqual(deps._captured.capturedClaudeArgs, [
-    'claude-opus-4-7-test',
+    'gpt-5.1-codex-test',
   ]);
 });
 
-test('runOnce defaults imageName to sandcastle:hive and modelTag to claude-opus-4-7', async () => {
+test('runOnce defaults imageName to sandcastle:hive and modelTag to gpt-5.1-codex', async () => {
   const { runOnce, _internal } = loadModule();
   const deps = makeDeps();
   await runOnce({ issueNumber: 1, _deps: deps });

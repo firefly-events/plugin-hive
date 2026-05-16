@@ -11,7 +11,10 @@
  *
  * Sandcastle primitives used (no custom dispatcher logic):
  *   - run({ promptFile, output, branchStrategy, maxIterations })
- *   - claudeCode(modelTag) agent provider
+ *   - codex(modelTag) agent provider — Codex CLI ≥ 0.129 requires the
+ *     `auth.json` file mounted at `/home/agent/.codex/auth.json` inside
+ *     the container. The GH Actions workflow materializes that file from
+ *     the CODEX_AUTH_JSON secret before invoking the runner.
  *   - docker({ imageName }) sandbox provider
  *   - promptArgs { FORCE_ISSUE } for {{...}} substitution
  *   - branchStrategy: { type:"branch", branch:"agent/issue-<n>" }
@@ -21,7 +24,7 @@
  * adopted sandcastle. We `require()` lazily and surface a clear error
  * otherwise. Mirrors the BYO pattern in hive/lib/external/github-issues-adapter.js.
  *
- * Test seam: runOnce accepts a `_deps` object replacing run / claudeCode /
+ * Test seam: runOnce accepts a `_deps` object replacing run / codex /
  * docker so unit tests can verify the run() call args without booting a
  * container. Not part of public API.
  *
@@ -43,7 +46,7 @@ function getDefaultOutputSchema() {
 }
 
 const DEFAULT_IMAGE = 'sandcastle:hive';
-const DEFAULT_MODEL = 'claude-opus-4-7';
+const DEFAULT_MODEL = 'gpt-5.1-codex';
 const DEFAULT_MAX_ITERATIONS = 5;
 const PROMPT_FILE = '.sandcastle/prompts/worker-issue-pickup.md';
 
@@ -59,8 +62,8 @@ function loadDocker() {
 
 function getSandcastleDeps(_deps) {
   const deps = _deps || {};
-  if (deps.run && deps.claudeCode && deps.docker) {
-    return { run: deps.run, claudeCode: deps.claudeCode, docker: deps.docker };
+  if (deps.run && deps.codex && deps.docker) {
+    return { run: deps.run, codex: deps.codex, docker: deps.docker };
   }
   let sc;
   try {
@@ -83,7 +86,7 @@ function getSandcastleDeps(_deps) {
   }
   return {
     run: deps.run || sc.run,
-    claudeCode: deps.claudeCode || sc.claudeCode,
+    codex: deps.codex || sc.codex,
     docker: dockerFactory,
   };
 }
@@ -94,7 +97,7 @@ function getSandcastleDeps(_deps) {
  * @param {object}  [opts]
  * @param {number}  [opts.issueNumber]   force a specific issue (manual path)
  * @param {string}  [opts.imageName]     docker image; default sandcastle:hive
- * @param {string}  [opts.modelTag]      claude model; default claude-opus-4-7
+ * @param {string}  [opts.modelTag]      codex model; default gpt-5.1-codex
  * @param {number}  [opts.maxIterations] default 5
  * @param {object}  [opts._deps]         test seam
  * @returns {Promise<{
@@ -109,7 +112,7 @@ function getSandcastleDeps(_deps) {
 async function runOnce(opts) {
   const options = opts || {};
   const _deps = options._deps || {};
-  const { run, claudeCode, docker } = getSandcastleDeps(_deps);
+  const { run, codex, docker } = getSandcastleDeps(_deps);
 
   const imageName = options.imageName || DEFAULT_IMAGE;
   const modelTag = options.modelTag || DEFAULT_MODEL;
@@ -131,7 +134,7 @@ async function runOnce(opts) {
   const outputSchema = _deps.outputSchema || getDefaultOutputSchema();
 
   const runArgs = {
-    agent: claudeCode(modelTag),
+    agent: codex(modelTag),
     sandbox: docker({ imageName }),
     promptFile: PROMPT_FILE,
     promptArgs: { FORCE_ISSUE: forceIssue },
