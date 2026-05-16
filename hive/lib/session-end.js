@@ -29,12 +29,20 @@ const LATENCY_THRESHOLD_MS = 30000; // 30 seconds
  * @param {string} options.epicId - current epic context for KG triple source_epic
  * @param {string[]} options.promotedSlugs - slugs of insights promoted in Phase A
  * @param {Array<{subject, predicate, object, source_agent}>} options.triples - KG triples to write
+ * @param {Array<{subject, predicate, prior_object, new_object, source_agent}>} [options.supersededMemories=[]] - memory replacements promoted in Phase A
  * @param {boolean} [options.skipCompile=false] - skip compile() (for pre-shutdown hard shutdown)
  * @returns {Promise<{elapsed: number, kgError: Error|null, chromadbWarning: string|null}>}
  *   `chromadbWarning` is a `; `-joined string of all warnings raised during the
  *   ChromaDB phase (or null if none). All warnings are also `console.warn`'d.
  */
-async function runSessionEnd({ agentName, epicId, promotedSlugs = [], triples = [], skipCompile = false }) {
+async function runSessionEnd({
+  agentName,
+  epicId,
+  promotedSlugs = [],
+  triples = [],
+  supersededMemories = [],
+  skipCompile = false,
+}) {
   const startMs = Date.now();
   let kgError = null;
   const chromadbWarnings = [];
@@ -55,6 +63,33 @@ async function runSessionEnd({ agentName, epicId, promotedSlugs = [], triples = 
       kgError = err;
       console.error(`[session-end] kg_write() failed: ${err.message}`);
       // Surface but do not rethrow — proceed to Phase C
+    }
+  }
+
+  if (supersededMemories.length > 0) {
+    let emitSupersededEvent;
+    try {
+      ({ emitSupersededEvent } = require('./kg-emit'));
+    } catch (err) {
+      kgError = err;
+      console.error(`[session-end] kg-emit load failed: ${err.message}`);
+    }
+    if (emitSupersededEvent) {
+      for (const replacement of supersededMemories) {
+        try {
+          await emitSupersededEvent({
+            subject: replacement.subject || agentName,
+            predicate: replacement.predicate || 'memory',
+            priorObject: replacement.prior_object,
+            newObject: replacement.new_object,
+            sourceEpic: epicId,
+            sourceAgent: replacement.source_agent || 'session-end',
+          });
+        } catch (err) {
+          kgError = err;
+          console.error(`[session-end] kg_supersede() failed: ${err.message}`);
+        }
+      }
     }
   }
 
@@ -188,6 +223,66 @@ async function kgWrite(triples, sourceEpic, sourceAgent) {
 }
 
 /**
+ * Mark one prior KG triple historical and insert one superseded provenance edge.
+ */
+async function kgSupersede(subject, predicate, priorObject, newObject, sourceEpic, sourceAgent) {
+  let sqlite3;
+  try {
+    sqlite3 = require('better-sqlite3');
+  } catch {
+    throw new Error('better-sqlite3 not available — cannot write KG triples');
+  }
+
+  let db;
+  try {
+    if (!fs.existsSync(KG_SQLITE_PATH)) {
+      const err = new Error(`kg.sqlite not found at ${KG_SQLITE_PATH}`);
+      err.code = 'SQLITE_CANTOPEN';
+      throw err;
+    }
+    db = sqlite3(KG_SQLITE_PATH);
+
+    const hasUniqueIdx = db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_unique_triple'")
+      .get();
+    if (!hasUniqueIdx) {
+      throw new Error(
+        'Missing required index idx_unique_triple — run kickoff bootstrap before kg_write(). ' +
+        'Without it, INSERT OR IGNORE cannot enforce uniqueness across re-runs.'
+      );
+    }
+
+    const validPredicates = new Set(
+      db.prepare('SELECT predicate FROM predicates').all().map(r => r.predicate)
+    );
+    if (!validPredicates.has('superseded')) {
+      throw new Error('unknown predicate "superseded" — must be present in predicates table');
+    }
+
+    const updatePrior = db.prepare(
+      'UPDATE triples SET valid_until = ? WHERE subject = ? AND predicate = ? AND object = ? AND valid_until IS NULL'
+    );
+    const insertSuperseded = db.prepare(
+      'INSERT OR IGNORE INTO triples (subject, predicate, object, valid_from, source_epic, source_agent) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+
+    let updated = 0;
+    const writeAll = db.transaction(() => {
+      const now = new Date().toISOString();
+      updated = updatePrior.run(now, subject, predicate, priorObject).changes;
+      if (updated > 0) {
+        insertSuperseded.run(subject, 'superseded', `${priorObject}->${newObject}`, now, sourceEpic, sourceAgent);
+      }
+    });
+
+    writeAll();
+    return { updated };
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
  * Rebuild memory wiki from agent memory directories.
  * Stub — actual implementation is in the compile() MemoryStore method.
  */
@@ -200,4 +295,4 @@ async function runCompile(memoriesBase) {
   console.log(`[session-end] compile() triggered for ${memoriesBase}`);
 }
 
-module.exports = { runSessionEnd };
+module.exports = { runSessionEnd, kgWrite, kgSupersede };

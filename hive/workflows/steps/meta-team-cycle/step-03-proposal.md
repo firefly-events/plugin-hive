@@ -46,6 +46,21 @@ Review each finding from step 2:
 ### 2. Group related findings
 Some findings address the same root cause. Group them into single proposals where the implementation naturally covers multiple findings (e.g., "create missing reference doc" may resolve both a MISSING_FILE finding and a dangling cross-reference).
 
+If a grouped proposal deliberately replaces a prior proposal for the same root cause, emit `superseded` before recording the replacement. Use `subject` as the epic id or proposal id, `predicate` as `proposal`, `prior-object` as the replaced proposal id, `new-object` as the replacement proposal id, and `source-agent` as `meta-optimize`:
+
+```bash
+python3 -m hive.lib.kg_emit_cli \
+  --mode supersede \
+  --subject "{epic_id_or_proposal_id}" \
+  --predicate "proposal" \
+  --prior-object "{prior_proposal_id}" \
+  --new-object "{new_proposal_id}" \
+  --source-epic "{epic_id}" \
+  --source-agent "meta-optimize"
+```
+
+The helper sets `valid_until` on the prior `proposal` triple when present and inserts exactly one `superseded` provenance edge.
+
 ### 2b. Merge external-research candidates into the eligible pool
 
 Step `external-research` (step-02b) supplies an `external_research_candidates`
@@ -86,8 +101,43 @@ step-02 shape, NOT the step-02b candidate shape). Before ranking:
   MUST accept this prefix alongside `proposal-{N}` (internal) and
   `external-proposal-{N}` (external). The `discovery_source` field is the
   authoritative feed identifier, not the ID prefix.
+- Cross-project hard tag: when a kg finding's `tag` is
+  `cross_project_signal`, carry the `[cross-project: <name>]` prefix forward
+  from the finding description into the rendered proposal `description` and
+  `rationale` where applicable. If the finding description already starts with
+  `[cross-project: <name>]`, preserve that exact prefix and do not add a second
+  one.
 - Absence-graceful: if `kg-findings.yaml` is missing or empty, fall through
   to existing behavior with no error.
+- Observability: increment `kg_signal_proposals_total` once for each kg finding
+  that enters the proposal pool, after de-duplication has decided it remains
+  represented in the pool:
+
+```bash
+python3 -m hive.lib.metric_increment_cli \
+  --counter kg_signal_proposals_total \
+  --label cycle_id="{cycle_id}" \
+  --by 1
+```
+- Dedup miss reason: after de-duplication, if the `kg-findings.yaml` input count
+  was non-zero and every kg finding was removed by the step-02 merge, do not
+  mutate step-02c's already-written output. Emit the step-03 summary line
+  `miss_reason=dedup_eviction` so the empty downstream kg contribution is
+  attributable to the merge site that caused it.
+
+Rendered cross-project proposal example:
+
+```yaml
+id: proposal-2
+title: Address repeated create-event phase failures
+discovery_source: kg_signal
+addresses_findings: [kg-finding-1]
+description: "[cross-project: shindig] 3 phase_failed triples in epic create-event-enhancements within 30d window"
+rationale: |
+  [cross-project: shindig] KG signal shows repeated phase_failed triples from
+  the source project. Preserve the prefix so reviewers can identify the
+  cross-project provenance in proposal review.
+```
 
 ### 3. Rank proposals
 Score each proposal on three dimensions (1–5 each):

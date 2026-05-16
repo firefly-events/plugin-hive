@@ -14,7 +14,7 @@ rg "Task for ui-designer|Spawn a subagent with the full ui-designer persona and 
 
 Expected: exit code 1 from `rg`, zero matches.
 
-> **Regex note.** The earlier draft of this gate matched only on `Spawn a subagent with the full ui-designer persona`, which collides with the NEW load → cite → inject → spawn envelope phrasing (e.g., `Spawn a subagent with the full ui-designer persona (\`hive/agents/ui-designer.md\`) and the rendered prompt body.`). The distinguishing suffix of the OLD inline-task header was `and this task:` — the gate above anchors on that.
+> **Regex note.** The earlier draft of this gate matched only on `Spawn a subagent with the full ui-designer persona`, which collides with the NEW load → cite → inject → spawn envelope phrasing (e.g., ``Spawn a subagent with the full ui-designer persona (`hive/agents/ui-designer.md`) and the rendered prompt body.``). The distinguishing suffix of the OLD inline-task header was `and this task:` — the gate above anchors on that.
 
 ### 2. Direct SKILLs cite their prompt files
 

@@ -17,6 +17,7 @@
  * Usage:
  *   node scripts/kg-bootstrap-from-projects.js              # dry-run preview
  *   node scripts/kg-bootstrap-from-projects.js --apply      # actually import
+ *   node scripts/kg-bootstrap-from-projects.js --since 2026-04-28
  *   HIVE_PROJECTS_REGISTRY=/tmp/test.yaml node scripts/kg-bootstrap-from-projects.js
  *
  * Registry schema documented at hive/references/system-config.md.
@@ -45,6 +46,38 @@ const REGISTRY_PATH = process.env.HIVE_PROJECTS_REGISTRY || DEFAULT_REGISTRY_PAT
 const APPLY = process.argv.includes('--apply');
 const DRY_RUN = !APPLY;
 const IMPORT_SCRIPT = path.join(__dirname, 'kg-import-cycle-state.js');
+const DEFAULT_SINCE = '2026-04-28';
+const LARGE_IMPORT_THRESHOLD = parsePositiveIntEnv('BOOTSTRAP_LARGE_IMPORT_THRESHOLD', 10000);
+const SOFT_WARN_THRESHOLD = parsePositiveIntEnv('BOOTSTRAP_SOFT_WARN_THRESHOLD', 1000);
+const YES_LARGE_IMPORT = process.argv.includes('--yes-large-import');
+
+function argvValue(name) {
+  const i = process.argv.indexOf(name);
+  if (i === -1 || i === process.argv.length - 1) return null;
+  return process.argv[i + 1];
+}
+
+function parsePositiveIntEnv(name, fallback) {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function parseSinceDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    console.error(`Error: Invalid --since '${value}'. Expected YYYY-MM-DD.`);
+    process.exit(1);
+  }
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    console.error(`Error: Invalid --since '${value}'. Expected a real YYYY-MM-DD date.`);
+    process.exit(1);
+  }
+  return value;
+}
+
+const SINCE = parseSinceDate(argvValue('--since') || DEFAULT_SINCE);
 
 /**
  * Minimal fallback YAML parser for the projects registry.
@@ -164,30 +197,62 @@ function describeStatus(project) {
   return { ok: true, cycleDir, yamlCount: yamls.length };
 }
 
-function runImportForProject(project, status) {
+function parseDryRunSummary(output) {
+  const m = output.match(/WOULD INSERT (\d+) triples \((\d+) skipped pre---since\) -- DRY RUN/);
+  if (!m) return null;
+  return {
+    triples: m ? Number.parseInt(m[1], 10) : 0,
+    skippedSince: m ? Number.parseInt(m[2], 10) : 0
+  };
+}
+
+function runImportForProject(project, status, options = {}) {
   const args = [
     IMPORT_SCRIPT,
     '--cycle-state-dir', status.cycleDir,
-    '--source-epic-prefix', project.name
+    '--source-epic-prefix', project.name,
+    '--since', SINCE
   ];
-  if (DRY_RUN) args.push('--dry-run');
+  if (options.dryRun || DRY_RUN) args.push('--dry-run');
+  if (options.summaryOnly) args.push('--summary-only');
 
   // We surface the child's stdio inline so per-project plans / summaries are
   // visible to the user. spawnSync with stdio: 'inherit' keeps ordering tidy.
   // Use process.execPath so the child runs under the SAME Node binary as the
   // parent — version managers (nvm, fnm) and custom installs do not always
   // resolve `node` from PATH to the same interpreter.
-  const result = spawnSync(process.execPath, args, { stdio: 'inherit' });
+  const result = spawnSync(process.execPath, args, {
+    encoding: 'utf8',
+    stdio: options.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit'
+  });
+  if (options.capture) {
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.stderr) process.stderr.write(result.stderr);
+  }
   return {
     exitCode: result.status,
-    error: result.error ? String(result.error.message || result.error) : null
+    error: result.error ? String(result.error.message || result.error) : null,
+    stdout: result.stdout || '',
+    stderr: result.stderr || ''
   };
+}
+
+function promptLargeImport(projectedTriples) {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return false;
+  fs.writeSync(
+    process.stdout.fd,
+    `Projected import is ${projectedTriples} triples, above threshold ${LARGE_IMPORT_THRESHOLD}. Continue? [y/N] `
+  );
+  const buf = Buffer.alloc(16);
+  const n = fs.readSync(process.stdin.fd, buf, 0, buf.length, null);
+  return /^y(es)?$/i.test(buf.toString('utf8', 0, n).trim());
 }
 
 function main() {
   console.log('=== KG Bootstrap From Projects ===');
   console.log(`Registry:    ${REGISTRY_PATH}${REGISTRY_PATH === DEFAULT_REGISTRY_PATH ? '' : ' (HIVE_PROJECTS_REGISTRY override)'}`);
   console.log(`Mode:        ${DRY_RUN ? 'dry-run (default — pass --apply to write)' : 'apply (writing to kg.sqlite)'}`);
+  console.log(`Since:       ${SINCE}`);
   if (usingFallbackYaml) console.log('YAML parser: fallback (install js-yaml for full coverage)');
   console.log('');
 
@@ -203,8 +268,11 @@ function main() {
     skipped: 0,
     succeeded: 0,
     failed: 0,
+    projectedTriples: 0,
+    skippedSince: 0,
     skipReasons: {}
   };
+  const eligible = [];
 
   for (const project of projects) {
     console.log(`--- ${project.name} (${project.path}) ---`);
@@ -219,9 +287,23 @@ function main() {
     summary.eligible++;
     console.log(`  cycle-state dir: ${status.cycleDir}`);
     console.log(`  yaml files:      ${status.yamlCount}`);
-    const result = runImportForProject(project, status);
+    const result = runImportForProject(project, status, {
+      dryRun: true,
+      summaryOnly: APPLY,
+      capture: true
+    });
+    const projected = parseDryRunSummary(result.stdout);
     if (result.exitCode === 0) {
+      if (!projected) {
+        summary.failed++;
+        console.warn(`  WARN: import for ${project.name} did not emit a dry-run projection summary`);
+        console.log('');
+        continue;
+      }
+      summary.projectedTriples += projected.triples;
+      summary.skippedSince += projected.skippedSince;
       summary.succeeded++;
+      eligible.push({ project, status });
     } else {
       summary.failed++;
       console.warn(`  WARN: import for ${project.name} exited with code ${result.exitCode}${result.error ? ' (' + result.error + ')' : ''}`);
@@ -229,16 +311,54 @@ function main() {
     console.log('');
   }
 
+  if (summary.projectedTriples >= SOFT_WARN_THRESHOLD && summary.projectedTriples <= LARGE_IMPORT_THRESHOLD) {
+    console.warn(
+      `WARN: projected import is ${summary.projectedTriples} triples; review --dry-run output before --apply if this is unexpected.`
+    );
+  }
+
+  if (APPLY && summary.failed === 0) {
+    if (summary.projectedTriples > LARGE_IMPORT_THRESHOLD && !YES_LARGE_IMPORT && !promptLargeImport(summary.projectedTriples)) {
+      console.error(
+        `Error: projected import is ${summary.projectedTriples} triples, above BOOTSTRAP_LARGE_IMPORT_THRESHOLD=${LARGE_IMPORT_THRESHOLD}. ` +
+        'Re-run with --yes-large-import to confirm.'
+      );
+      process.exit(1);
+    }
+
+    summary.succeeded = 0;
+    summary.failed = 0;
+    for (const { project, status } of eligible) {
+      console.log(`--- applying ${project.name} ---`);
+      const result = runImportForProject(project, status);
+      if (result.exitCode === 0) {
+        summary.succeeded++;
+      } else {
+        summary.failed++;
+        console.warn(`  WARN: import for ${project.name} exited with code ${result.exitCode}${result.error ? ' (' + result.error + ')' : ''}`);
+      }
+      console.log('');
+    }
+  }
+
   console.log('=== Aggregate Summary ===');
   console.log(`Mode:           ${DRY_RUN ? 'dry-run' : 'apply'}`);
+  console.log(`Since:          ${SINCE}`);
   console.log(`Registered:     ${summary.registered}`);
   console.log(`Eligible:       ${summary.eligible}`);
   console.log(`Skipped:        ${summary.skipped}`);
   for (const [reason, count] of Object.entries(summary.skipReasons)) {
     console.log(`  - ${reason}: ${count}`);
   }
+  console.log(`Projected:      ${summary.projectedTriples}`);
+  console.log(`Skipped pre---since: ${summary.skippedSince}`);
   console.log(`Succeeded:      ${summary.succeeded}`);
   console.log(`Failed:         ${summary.failed}`);
+  if (DRY_RUN) {
+    console.log(`WOULD INSERT ${summary.projectedTriples} triples (${summary.skippedSince} skipped pre---since) -- DRY RUN`);
+  } else {
+    console.log(`Projected before apply: ${summary.projectedTriples} triples (${summary.skippedSince} skipped pre---since)`);
+  }
 
   if (DRY_RUN) {
     console.log('');

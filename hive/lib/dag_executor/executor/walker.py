@@ -58,6 +58,9 @@ from .telemetry import Telemetry
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
+_PHASE_BLOCKED_TRIGGER_RULE_SKIP = "trigger-rule-skip"
+_PHASE_BLOCKED_UPSTREAM_FAILED = "upstream-failed"
+_PHASE_BLOCKED_UPSTREAM_SKIPPED = "upstream-skipped"
 
 
 def _normalise_scheduler_flag(raw: Any) -> bool:
@@ -606,14 +609,15 @@ class Walker:
         node = graph.nodes[node_id]
 
         if node.skip_when:
+            skip_info = {"reason": "skip_when present (hde-3a evaluation pending)"}
             telemetry.emit(
                 "node_skipped",
                 node.id,
-                {"reason": "skip_when present (hde-3a evaluation pending)"},
+                skip_info,
             )
             skipped.add(node_id)
             node_statuses[node_id] = NodeStatus.SKIPPED
-            state = _record_skipped(state, node_id)
+            state = _record_skipped(state, node_id, skip_info, source_epic=_source_epic(ctx))
             save_state(state)
             return state, True
 
@@ -623,21 +627,23 @@ class Walker:
         # outputs the predicate could meaningfully reference.
         decision = _trigger_rule_decision(node, node_statuses, telemetry)
         if decision == ActivationDecision.SKIP:
+            skip_info = _trigger_rule_skip_info(node, node_statuses)
             skipped.add(node_id)
             node_statuses[node_id] = NodeStatus.SKIPPED
-            state = _record_skipped(state, node_id)
+            state = _record_skipped(state, node_id, skip_info, source_epic=_source_epic(ctx))
             save_state(state)
             return state, True
 
         if not _evaluate_when_predicate(node, materialised, telemetry):
+            skip_info = {"reason": "when_predicate_false"}
             telemetry.emit(
                 "node_skipped",
                 node.id,
-                {"reason": "when_predicate_false"},
+                skip_info,
             )
             skipped.add(node_id)
             node_statuses[node_id] = NodeStatus.SKIPPED
-            state = _record_skipped(state, node_id)
+            state = _record_skipped(state, node_id, skip_info, source_epic=_source_epic(ctx))
             save_state(state)
             return state, True
 
@@ -694,6 +700,7 @@ class Walker:
                 state,
                 node_id,
                 {"node_id": node_id, "error_class": type(exc).__name__, "message": str(exc)},
+                source_epic=_source_epic(ctx),
             )
             save_state(state)
             raise
@@ -708,6 +715,7 @@ class Walker:
                 state,
                 node_id,
                 {"node_id": node_id, "error_class": type(exc).__name__, "message": str(exc)},
+                source_epic=_source_epic(ctx),
             )
             save_state(state)
             if node.optional:
@@ -774,34 +782,37 @@ class Walker:
             node = graph.nodes[node_id]
 
             if node.skip_when:
+                skip_info = {"reason": "skip_when present (hde-3a evaluation pending)"}
                 telemetry.emit(
                     "node_skipped",
                     node.id,
-                    {"reason": "skip_when present (hde-3a evaluation pending)"},
+                    skip_info,
                 )
                 skipped.add(node_id)
                 node_statuses[node_id] = NodeStatus.SKIPPED
-                state = _record_skipped(state, node_id)
+                state = _record_skipped(state, node_id, skip_info, source_epic=_source_epic(ctx))
                 save_state(state)
                 continue
 
             decision = _trigger_rule_decision(node, node_statuses, telemetry)
             if decision == ActivationDecision.SKIP:
+                skip_info = _trigger_rule_skip_info(node, node_statuses)
                 skipped.add(node_id)
                 node_statuses[node_id] = NodeStatus.SKIPPED
-                state = _record_skipped(state, node_id)
+                state = _record_skipped(state, node_id, skip_info, source_epic=_source_epic(ctx))
                 save_state(state)
                 continue
 
             if not _evaluate_when_predicate(node, materialised, telemetry):
+                skip_info = {"reason": "when_predicate_false"}
                 telemetry.emit(
                     "node_skipped",
                     node.id,
-                    {"reason": "when_predicate_false"},
+                    skip_info,
                 )
                 skipped.add(node_id)
                 node_statuses[node_id] = NodeStatus.SKIPPED
-                state = _record_skipped(state, node_id)
+                state = _record_skipped(state, node_id, skip_info, source_epic=_source_epic(ctx))
                 save_state(state)
                 continue
 
@@ -865,7 +876,7 @@ class Walker:
             telemetry.emit("node_failed", node.id, payload)
             node_statuses[node_id] = NodeStatus.SKIPPED
             skipped.add(node_id)
-            state = _record_skipped(state, node_id)
+            state = _record_skipped(state, node_id, payload, source_epic=_source_epic(ctx))
             save_state(state)
 
         return state
@@ -922,33 +933,39 @@ class Walker:
             node = graph.nodes[node_id]
 
             if node.skip_when:
+                skip_info = {"reason": "skip_when present (hde-3a evaluation pending)"}
                 telemetry.emit(
                     "node_skipped",
                     node.id,
-                    {"reason": "skip_when present (hde-3a evaluation pending)"},
+                    skip_info,
                 )
                 node_statuses[node_id] = NodeStatus.SKIPPED
                 skipped_set.add(node_id)
+                _emit_phase_blocked(node_id, skip_info, _source_epic(ctx))
                 state = set_node_status(state, node_id, NodeStatus.SKIPPED)
                 save(state, root=runs_root)
                 continue
 
             decision = _trigger_rule_decision(node, node_statuses, telemetry)
             if decision == ActivationDecision.SKIP:
+                skip_info = _trigger_rule_skip_info(node, node_statuses)
                 node_statuses[node_id] = NodeStatus.SKIPPED
                 skipped_set.add(node_id)
+                _emit_phase_blocked(node_id, skip_info, _source_epic(ctx))
                 state = set_node_status(state, node_id, NodeStatus.SKIPPED)
                 save(state, root=runs_root)
                 continue
 
             if not _evaluate_when_predicate(node, materialised, telemetry):
+                skip_info = {"reason": "when_predicate_false"}
                 telemetry.emit(
                     "node_skipped",
                     node.id,
-                    {"reason": "when_predicate_false"},
+                    skip_info,
                 )
                 node_statuses[node_id] = NodeStatus.SKIPPED
                 skipped_set.add(node_id)
+                _emit_phase_blocked(node_id, skip_info, _source_epic(ctx))
                 state = set_node_status(state, node_id, NodeStatus.SKIPPED)
                 save(state, root=runs_root)
                 continue
@@ -1002,6 +1019,7 @@ class Walker:
                     state,
                     node_id,
                     {"node_id": node_id, "error_class": type(exc).__name__, "message": str(exc)},
+                    source_epic=_source_epic(ctx),
                 )
                 save(state, root=runs_root)
                 raise
@@ -1016,6 +1034,7 @@ class Walker:
                     state,
                     node_id,
                     {"node_id": node_id, "error_class": type(exc).__name__, "message": str(exc)},
+                    source_epic=_source_epic(ctx),
                 )
                 save(state, root=runs_root)
                 if node.optional:
@@ -1118,7 +1137,14 @@ def _record_pause_resumed(state):
     return set_status(state, RunStatus.RUNNING)
 
 
-def _record_skipped(state, node_id: str):
+def _record_skipped(
+    state,
+    node_id: str,
+    skip_info: dict[str, Any] | None = None,
+    *,
+    source_epic: str | None = None,
+):
+    _emit_phase_blocked(node_id, skip_info or {}, source_epic)
     if state is None:
         return None
     from hive.lib.dag_executor.run_state import NodeStatus, set_node_status
@@ -1162,13 +1188,108 @@ def _record_optional_failure(state, node_id: str):
     return set_node_status(state, node_id, NodeStatus.FAILED)
 
 
-def _record_failure(state, node_id: str, failure_info: dict[str, Any]):
+def _record_failure(
+    state,
+    node_id: str,
+    failure_info: dict[str, Any],
+    *,
+    source_epic: str | None = None,
+):
     if state is None:
+        _emit_phase_failed(node_id, failure_info, source_epic)
         return None
     from hive.lib.dag_executor.run_state import NodeStatus, mark_failed, set_node_status
 
     state = set_node_status(state, node_id, NodeStatus.FAILED)
+    _emit_phase_failed(node_id, failure_info, source_epic)
     return mark_failed(state, failure_info)
+
+
+def _source_epic(ctx: dict[str, Any]) -> str:
+    for key in ("epic_id", "source_epic", "epic"):
+        value = ctx.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return "unknown"
+
+
+def _trigger_rule_skip_info(node: Node, node_statuses: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "reason": "trigger_rule:none_failed_min_one_success",
+        "upstream_statuses": {
+            upstream_id: (
+                status.value if hasattr(status, "value") else str(status)
+            )
+            for upstream_id in node.depends_on
+            for status in [node_statuses.get(upstream_id)]
+        },
+    }
+
+
+def _phase_blocked_slug(skip_info: dict[str, Any]) -> str:
+    reason = str(skip_info.get("skip_reason") or skip_info.get("reason") or "").lower()
+    statuses = skip_info.get("upstream_statuses")
+    if isinstance(statuses, dict):
+        values = {str(value).lower() for value in statuses.values()}
+        if "failed" in values:
+            return _PHASE_BLOCKED_UPSTREAM_FAILED
+        if "skipped" in values:
+            return _PHASE_BLOCKED_UPSTREAM_SKIPPED
+    if "failed" in reason or "exception" in reason:
+        return _PHASE_BLOCKED_UPSTREAM_FAILED
+    if "skipped" in reason:
+        return _PHASE_BLOCKED_UPSTREAM_SKIPPED
+    return _PHASE_BLOCKED_TRIGGER_RULE_SKIP
+
+
+def _emit_phase_blocked(
+    node_id: str,
+    skip_info: dict[str, Any],
+    source_epic: str | None,
+) -> None:
+    import logging
+
+    try:
+        from hive.lib.kg_emit import emit_kg_event, sanitize_obj
+
+        emit_kg_event(
+            subject=node_id,
+            predicate="phase_blocked",
+            obj=sanitize_obj(_phase_blocked_slug(skip_info)),
+            source_epic=source_epic or "unknown",
+            source_agent="dag-executor",
+        )
+    except Exception:
+        logging.getLogger(__name__).debug(
+            "phase_blocked KG emit failed for node %s",
+            node_id,
+            exc_info=True,
+        )
+
+
+def _emit_phase_failed(
+    node_id: str,
+    failure_info: dict[str, Any],
+    source_epic: str | None,
+) -> None:
+    import logging
+
+    try:
+        from hive.lib.kg_emit import emit_kg_event, sanitize_obj
+
+        emit_kg_event(
+            subject=node_id,
+            predicate="phase_failed",
+            obj=sanitize_obj(failure_info.get("message", "")),
+            source_epic=source_epic or "unknown",
+            source_agent="dag-executor",
+        )
+    except Exception:
+        logging.getLogger(__name__).debug(
+            "phase_failed KG emit failed for node %s",
+            node_id,
+            exc_info=True,
+        )
 
 
 def _record_final_completion(state):

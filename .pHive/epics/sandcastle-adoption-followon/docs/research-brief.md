@@ -21,7 +21,7 @@ The follow-on scope comes from the Sandcastle spike HYBRID decision table in `.p
 | Primitive | Decision | Coupling |
 |---|---|---|
 | `SandboxProvider` | ADOPT (follow-on), gated on §5 surprises | root of stack |
-| `branchStrategy: head|merge-to-head|branch` | ADOPT IF #7 | requires `SandboxProvider` |
+| `branchStrategy: head / merge-to-head / branch` | ADOPT IF #7 | requires `SandboxProvider` |
 | `createWorktree()` + `wt.run()` | ADOPT IF #7 | implementation path for `branchStrategy: branch` |
 | `createSandbox()` long-lived | CONSIDER IF #7 | warm-sandbox performance option |
 | `hooks.host.*` | ADOPT IF #7 | container-lifecycle hooks, not PreToolUse replacement |

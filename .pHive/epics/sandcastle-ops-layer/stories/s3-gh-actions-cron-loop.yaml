@@ -1,0 +1,256 @@
+id: s3-gh-actions-cron-loop
+epic: sandcastle-ops-layer
+title: GH Actions cron workflow + token-budget gate
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s2-sandcastle-worker-prompt]
+
+description: |
+  Close the loop. A GitHub Actions workflow on a 15-minute cron invokes the
+  sandcastle worker (S2) which picks up labeled issues (S1) and ships them
+  autonomously. A pre-flight token-budget gate reads today's spend from the
+  existing .pHive/metrics/events/ stream and aborts the run if over budget.
+
+  This is the third and final piece — once it ships, the autonomous loop is
+  closed end-to-end: /plan publishes issues, cron triggers worker, worker
+  picks issue, opens PR, comments back. No custom dispatcher, no daemon, no
+  branch-lease logic — sandcastle and GH Actions own all the heavy lifting.
+
+  OPT-IN CONTRACT (hard constraint): The workflow ships in plugin-hive's own
+  .github/workflows/ for maintainer use ONLY. It does NOT auto-deploy to
+  consumer repos via the Claude Code plugin distribution (plugins distribute
+  via .claude-plugin/, not via .github/). Consumers who want autonomous
+  execution copy the workflow into their own repo, configure secrets, and
+  wire their sandcastle adoption. The README + sandcastle-ops-loop.md doc
+  must be explicit that this workflow is REFERENCE not DEFAULT.
+
+acceptance_criteria:
+  - "Given the workflow file is committed, when 15 minutes elapse, then the cron schedule fires a hive-worker job"
+  - "Given the workflow is triggered (cron or workflow_dispatch), when budget gate runs, then it sums today's input+output tokens × per-model cost from .pHive/metrics/events/stop-*.jsonl and exits non-zero if over hive.config.yaml.token_budget_limits.daily"
+  - "Given the budget gate passes, when the worker runs, then sandcastle is invoked with the S2 prompt and a 45-minute job timeout"
+  - "Given the worker returns Output.object successfully, when the workflow concludes, then the structured result is uploaded as a job artifact and surfaced in the workflow run summary"
+  - "Given two cron firings overlap, when the second triggers, then the concurrency group hive-worker queues it (cancel-in-progress: false) so they run serially"
+  - "Given the workflow is dispatched manually with an issue_number input, when it runs, then the worker scopes pickup to that issue only"
+
+steps:
+  - id: research
+    description: |
+      Read .pHive/metrics/metrics-event.schema.md to confirm stop-event row
+      shape (input_tokens, output_tokens, model). Read hive.config.yaml's
+      token_budget_limits block. Survey existing .github/workflows/ for
+      permissions block and action versions in use.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Three artifacts:
+
+      1. `.github/workflows/hive-worker.yml`:
+         name: Hive Worker
+         on:
+           schedule: [{ cron: '*/15 * * * *' }]   # every 15 min
+           workflow_dispatch:
+             inputs:
+               issue_number: { type: string, required: false, description: 'Pin to one issue' }
+         permissions:
+           issues: write
+           pull-requests: write
+           contents: write
+         concurrency:
+           group: hive-worker
+           cancel-in-progress: false
+         jobs:
+           worker:
+             runs-on: ubuntu-latest
+             timeout-minutes: 45
+             steps:
+               - uses: actions/checkout@v4
+                 with: { ref: dev/hive-2.0, fetch-depth: 0 }
+               - uses: actions/setup-node@v4
+                 with: { node-version: '20' }
+               - run: npm ci
+               - name: Budget gate
+                 run: node hive/lib/budget-gate.js
+               - name: Build sandcastle image
+                 run: docker build -t sandcastle:hive-worker .pHive/spikes/sandcastle/
+               - name: Run worker
+                 id: worker
+                 env: { GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+                 run: node hive/lib/sandcastle-worker-runner.js ${{ inputs.issue_number }} > result.json
+               - uses: actions/upload-artifact@v4
+                 with: { name: worker-result, path: result.json }
+               - name: Summarize
+                 if: always()
+                 run: cat result.json >> $GITHUB_STEP_SUMMARY
+
+      2. `hive/lib/budget-gate.js`:
+         Read all .pHive/metrics/events/stop-*.jsonl created since UTC midnight.
+         For each row: input_tokens + output_tokens, multiply by per-model
+         cost from a small inline rate-card constant (claude-opus-4-7,
+         claude-sonnet-4-6, claude-haiku-4-5). Sum to daily_spend_usd.
+         Read hive.config.yaml.token_budget_limits.daily (number, dollars).
+         If sum >= limit, console.error + process.exit(1) with remaining
+         budget message. Else exit 0.
+         CLI entry-point; importable as { computeDailySpend, gate }.
+
+      3. `tests/budget-gate.test.js`:
+         Cases:
+           - empty events dir → spend=0, gate passes
+           - mixed-model events → correct weighted sum
+           - over-limit → exit 1 + error message
+           - malformed JSONL row → skipped with warn, run continues
+           - rate-card missing model → falls back to opus rate (conservative) and warns
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Run tests/budget-gate.test.js locally. Smoke-test the workflow via
+      `act` (or push a temporary branch + workflow_dispatch and observe one
+      run). Verify: concurrency serializes, permissions sufficient, artifact
+      upload works, step summary contains worker JSON, manual dispatch with
+      issue_number scopes correctly.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Verify: workflow permissions are minimum-required and explicit; cron
+      offset chosen sensibly (15-min default); no secrets logged; budget
+      gate failure surface clear; sandcastle image build cached or
+      reasonable build time; manual-dispatch path doesn't bypass budget gate.
+      Final cross-cutting checklist: docs updated, version bumped (this is the
+      epic-close commit), CHANGELOG entry written.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: |
+      LAST commit on dev/hive-2.0 epic branch. Bump version (minor) per
+      cross-cutting.versioning. Files in this commit: workflow + budget-gate
+      + test + version bump in .claude-plugin/plugin.json,
+      .claude-plugin/marketplace.json + README badge + CHANGELOG entry under
+      a new dated section listing all three stories' consumer-visible adds.
+      Commit message:
+        "feat(sandcastle-ops): GH Actions cron + budget gate (closes ops loop)
+         + bump 1.4.0 → 1.5.0"
+      Open PR against dev/hive-2.0. Tag the epic for promotion to main per
+      stacked-PR convention.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [yaml, javascript-cjs]
+    ci: [github-actions]
+  key_files:
+    - path: .github/workflows/ci.yml
+      purpose: shape reference for permissions, action versions, runner choice
+    - path: hive/lib/sandcastle-worker-runner.js
+      purpose: invoked from the workflow's run-worker step (built in S2)
+    - path: hive.config.yaml
+      purpose: token_budget_limits.daily read by budget-gate
+    - path: .pHive/metrics/events/
+      purpose: stop-*.jsonl rows read by budget-gate
+    - path: .pHive/metrics/metrics-event.schema.md
+      purpose: event row shape contract
+
+files_to_modify:
+  - file: .github/workflows/hive-worker.yml
+    change: NEW — cron workflow
+  - file: hive/lib/budget-gate.js
+    change: NEW — pre-flight budget gate
+  - file: tests/budget-gate.test.js
+    change: NEW — gate tests
+  - file: .claude-plugin/plugin.json
+    change: bump version (minor)
+  - file: .claude-plugin/marketplace.json
+    change: bump version to match plugin.json
+  - file: README.md
+    change: update version badge
+  - file: CHANGELOG.md
+    change: new dated section with bullets for S1+S2+S3
+
+code_examples:
+  - title: Token-budget gate sketch
+    file: hive/lib/budget-gate.js
+    snippet: |
+      const RATES_PER_MTOK = {
+        'claude-opus-4-7':   { in: 15.0, out: 75.0 },
+        'claude-sonnet-4-6': { in:  3.0, out: 15.0 },
+        'claude-haiku-4-5':  { in:  1.0, out:  5.0 },
+      };
+      function rowCost(row) {
+        const r = RATES_PER_MTOK[row.model] || RATES_PER_MTOK['claude-opus-4-7'];
+        return (row.input_tokens * r.in + row.output_tokens * r.out) / 1_000_000;
+      }
+
+design_decisions:
+  - decision: Build sandcastle image in-workflow rather than pulling from a registry
+    rationale: v1 keeps infra surface zero; if cold-build cost becomes material, registry caching is a follow-on
+  - decision: Use $GITHUB_STEP_SUMMARY for run visibility instead of slack/email
+    rationale: native GH surface; no new integrations; humans can subscribe to workflow runs
+  - decision: Manual dispatch goes through the same budget gate
+    rationale: budget protection should not have a bypass; emergency override = manually edit the config in a separate PR
+  - decision: Inline rate-card constant in budget-gate.js
+    rationale: rates change rarely; one file to update; alternative (config file) adds substrate without v1 value
+
+cross_cutting:
+  - concern: documentation
+    action: |
+      Update README to mention the autonomous worker loop. Add new
+      hive/references/sandcastle-ops-loop.md (or extend
+      sandcastle-adoption-guide.md section 3) describing the end-to-end
+      flow: /plan → issues → cron → worker → PR → review.
+  - concern: versioning
+    action: |
+      THIS story owns the bump commit per cross-cutting rule
+      (last commit on epic branch). Minor bump: 1.4.0 → 1.5.0.
+      CHANGELOG entry covers all three stories' consumer-visible adds.
+  - concern: metrics
+    applies: true
+    metric:
+      name: autonomous_stories_closed
+      direction: up
+      baseline: 0
+      target: 3
+      window: "14d post-merge"
+      source:
+        kind: events
+        carrier: gh_issue_close_events
+      verify_at: epic-close + 14d
+      justification: >
+        This story ships the closed loop; observable outcome is the count of
+        hive:story-labeled issues closed via PR opened by the autonomous worker
+        in the 14 days after merge. Three is the floor for "the loop ran end-to-end
+        more than once" — not an aspirational throughput target. Tune up after
+        first observation window if signal is sound.
+
+risks:
+  - severity: medium
+    description: GH Actions runners can't build sandcastle image (Docker version, network restrictions)
+    mitigation: Spike on a feature branch BEFORE story closes; if blocked, fall back to pre-built image in GHCR with a separate publish workflow
+  - severity: medium
+    description: Budget rate-card drifts vs. actual API pricing
+    mitigation: Inline constants with a comment; documented as a known-stale source; budget is approximate by design
+  - severity: low
+    description: 15-min cron too aggressive; quota burns; or too slow; loop feels dead
+    mitigation: Configurable via workflow_dispatch; first-week observation tunes cadence
+  - severity: medium
+    description: A worker failure mode that doesn't comment back leaves an issue stuck in hive:in-flight
+    mitigation: "Workflow's `if: always()` step labels the issue hive:failed if worker exited non-zero without status='shipped'"
+
+references:
+  - path: .pHive/research-drafts/2026-05-15-sandcastle-ops-layer-plan.md
+    relevant_excerpt: |
+      ### S3 — Loop trigger
+      GitHub Actions workflow .github/workflows/hive-worker.yml
+      Schedule: every 15 minutes via cron + workflow_dispatch
+      Concurrency group hive-worker with cancel-in-progress: false (serial by default)
+      Token budget gate: query daily-spend before spawning
+  - path: .pHive/cross-cutting-concerns.yaml
+    relevant_excerpt: |
+      Bump commit is the LAST commit on the epic branch (so the version reflects the full landed state, not a partial)
+      If applies:true and source.kind=events: instrumentation emits rows conforming to .pHive/metrics/metrics-event.schema.md

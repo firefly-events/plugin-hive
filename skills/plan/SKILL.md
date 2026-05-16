@@ -86,6 +86,19 @@ See [`skills/hive/skills/planning-routing/SKILL.md`](../hive/skills/planning-rou
 
 ### Phase A: Research
 
+0. **Pre-flight: query prior decisions (S6.2).** Before dispatching the researcher, invoke `/hive:why` in free-form mode against the requirement topic to surface any prior KG decisions that should inform this plan. Treat this as audit-trail discovery, not blocking input:
+
+   ```bash
+   python3 -m hive.lib.kg_why "<requirement topic words>" --limit 10
+   ```
+
+   Three outcomes:
+   - **≥1 result returned:** capture the merged triples and add a `PRIOR DECISIONS` section to the design-discussion §0 prelude (rendered alongside the research brief in Phase B). The section lists each prior decision with subject, predicate, object, and provenance (`source_epic`, `source_agent`, `valid_from`). The design-discussion team reads these as constraints — prior commitments that the new plan should honor or explicitly supersede.
+   - **Zero results:** omit the PRIOR DECISIONS section entirely. No noise — silence means clean slate.
+   - **Helper failure (kg_why error, missing sqlite, etc.):** treat as zero results. Do NOT block planning. Continue to step 1.
+
+   This is the consumer side of the audit-trail north-star (north-star 2 in design-discussion §1). /hive:why is the precision query surface; this pre-flight is the planning-skill side that pulls retrospection into design-time.
+
 1. **Research the codebase.** `SendMessage` to the researcher to explore the target codebase — tech stack, architecture, existing patterns, relevant files. The researcher delivers raw findings (not a formatted brief). Use the researcher agent mindset — you need concrete file paths, not guesses.
 
    The researcher runs **context7 validation always-on** for any library/SDK/API in the requirement. Web research escalation is uncertainty-triggered (stale docs, missing coverage, conflicting info) — not scope-gated. Findings include a validation note with confidence level. If context7 is unavailable, the researcher proceeds codebase-only and notes the gap.
@@ -175,6 +188,19 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Incorporate feedback into the planning context before proceeding.
 
+    **S2.1 seam 3 — waiting-on-user `phase_blocked` emission.** Before presenting the document and pausing for input, emit one `phase_blocked` triple keyed to this gate. The emit is fire-and-forget (CLI swallows knob==off + missing-sqlite; do NOT branch on its exit code):
+
+    ```bash
+    python3 -m hive.lib.kg_emit_cli \
+      --subject "{epic_id}" \
+      --predicate "phase_blocked" \
+      --object "waiting-user-input-structured-outline-sign-off" \
+      --source-epic "{epic_id}" \
+      --source-agent "orchestrator"
+    ```
+
+    Apply the same pattern at the two other waiting-on-user pauses in /plan: design-discussion review (Phase B) gate uses `--object "waiting-user-input-design-discussion"`, and H/V plan review gate uses `--object "waiting-user-input-hv-plan-review"`. Gate-name slugs are kebab-stable so /meta-optimize can group by gate. Add no new error handling — the CLI is silent on failure by design.
+
 ### Phase C: Story Decomposition
 
 10c. **Resolve methodology.** Before decomposing stories, determine the development methodology with strict 4-tier precedence:
@@ -235,6 +261,26 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     ```
 
 13. **Write detailed story files.** For each story, produce an individual YAML file in `.pHive/epics/{epic-id}/stories/{story-id}.yaml`. Stories are the primary artifact — they're what agents read when executing. They must contain enough context for an agent to work autonomously without reading the full epic or other stories.
+
+    **New-write vs overwrite rule:** Before writing each story YAML, check whether `.pHive/epics/{epic-id}/stories/{story-id}.yaml` already exists.
+
+    - If it does not exist, write the new story normally.
+    - If it exists, treat the write as a supersession. Compute a short content hash for the existing file and for the replacement content, emit `superseded`, then overwrite the file. The emit is fire-and-forget (CLI swallows knob==off + missing-sqlite; do NOT branch on its exit code):
+
+      ```bash
+      old_hash="$(git hash-object ".pHive/epics/{epic-id}/stories/{story-id}.yaml" | cut -c1-12)"
+      new_hash="$(printf '%s' "$replacement_story_yaml" | git hash-object --stdin | cut -c1-12)"
+      python3 -m hive.lib.kg_emit_cli \
+        --mode supersede \
+        --subject "{story-id}" \
+        --predicate "story-spec" \
+        --prior-object "$old_hash" \
+        --object "$new_hash" \
+        --source-epic "{epic-id}" \
+        --source-agent "plan"
+      ```
+
+      The supersession edge is `old story id/hash -> new story id/hash` at the `story-spec` predicate; the helper also sets `valid_until` on the prior `story-spec` triple when present.
 
     **Self-containment rule:** Stories must work identically whether read from local disk or pulled from an external tracker (e.g., Linear). To achieve this, **inline relevant context snippets** alongside file references:
 
@@ -438,6 +484,51 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     After the loop, write `tracker_id` and `tracker_url` back into each
     story YAML when populated so downstream skills (execute, review) can
     correlate runs to tracker records.
+
+19a. **Sandcastle-ops label pass (opt-in, additive).** Only runs when
+    `task_tracking.adapter === "github"`. For any other value (null, "linear",
+    unset, etc.) this step is a strict no-op — no GH calls, no logging beyond
+    a single skip line, no errors. This is the OUTBOUND half of the sandcastle
+    ops loop (epic `sandcastle-ops-layer`, story `s1-github-issues-adapter`)
+    — issues already created in step 19 receive the hive:* label namespace
+    so an autonomous worker can pick them up via
+    `gh issue list --label hive:ready --state open`.
+
+    **Label-existing only — does NOT create issues.** Step 19 (Epic C ABI
+    `createStory`) is the single creation point for GitHub issues. This step
+    reads each story's `tracker_id` (format `<owner>/<repo>#<number>`, set by
+    step 19) and calls `gh issue edit <n> --add-label <hive:*>` to add the
+    sandcastle namespace (`hive:ready`, `hive:epic:<epic-id>`,
+    `hive:story:<story-id>`, `hive:blocked-by:<dep>`). Stories that lack
+    `tracker_id` (because step 19 errored or was a no-op for that story) are
+    skipped with reason `no_tracker_id` — the adapter never falls back to
+    creating issues. Idempotent on re-run via `external_id` in the story YAML.
+
+    After labeling, the adapter writes `external_id: <issue-number>` (bare
+    integer) back into the story YAML alongside the existing slash-encoded
+    `tracker_id`. The worker queries by label and round-trips via
+    `hive:story:<id>` → story YAML, where `external_id` is the cross-reference.
+
+    ```javascript
+    const { publishStoriesToIssues } = require('hive/lib/external/github-issues-adapter.js');
+
+    if (config.task_tracking && config.task_tracking.adapter === 'github') {
+      const { labeled, skipped, errors } = await publishStoriesToIssues({
+        epicId,
+        storyIds: stories.map((s) => s.id),
+        config: config.task_tracking,
+      });
+      for (const c of labeled) console.log(`[sandcastle-ops] labeled ${c.id} → #${c.issue_number}`);
+      for (const s of skipped) console.log(`[sandcastle-ops] skipped ${s.id} (${s.reason})`);
+      for (const e of errors)  console.error(`[sandcastle-ops] FAILED ${e.id}: ${e.error}`);
+    }
+    ```
+
+    Failure handling: a mid-batch gh CLI failure (auth, rate limit, network)
+    surfaces in the `errors` array. Stories labeled before the failure have
+    their `external_id` already written to disk, so a re-run picks up where
+    it left off. Planning continues either way — sandcastle adoption is
+    optional, and a failed label pass is not a failed plan.
 
 20. **Post-run audit.** After step 19 completes (whether user confirmed or aborted in step 18, and whether Phase D published or was a no-op), run the in-process audit per `hive/references/gate-lift-telemetry.md`:
 

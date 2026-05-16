@@ -1,0 +1,113 @@
+name: Hive Worker
+
+# Reference / maintainer-only workflow. Closes the sandcastle-ops autonomous
+# execution loop (see hive/references/sandcastle-ops-loop.md).
+#
+# OPT-IN CONTRACT: this workflow ships in plugin-hive's repo for the
+# maintainer's own use. It does NOT auto-deploy to consumer repos — Claude
+# Code plugins distribute via `.claude-plugin/`, not `.github/`. Consumers
+# who want autonomous execution copy this file into their own repo,
+# configure `external_task_tracking.adapter: github`, adopt sandcastle,
+# and tune the cron cadence to their token budget.
+#
+# Trigger surface:
+#   - cron every 15 minutes (default cadence; tunable post-observation)
+#   - workflow_dispatch with optional `issue_number` to pin pickup to one issue
+#
+# No `on: push` — this loop must not run on every commit.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Pin worker pickup to a single issue (optional)'
+        type: string
+        required: false
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: write
+
+concurrency:
+  group: hive-worker
+  cancel-in-progress: false
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: dev/hive-2.0
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Budget gate (pre-flight)
+        # Reads today's spend from .pHive/metrics/events/stop-*.jsonl, sums
+        # per-model token cost, and exits non-zero if daily limit is exceeded.
+        # Manual dispatch is intentionally subject to the same gate — emergency
+        # override = edit hive.config.yaml in a separate PR.
+        run: node hive/lib/budget-gate.js
+
+      - name: Build sandcastle image
+        # v1: build in-workflow to keep infra surface zero. If cold-build cost
+        # becomes material, swap for a pre-built image in GHCR + a separate
+        # publish workflow.
+        run: docker build -t sandcastle:hive .pHive/spikes/sandcastle/
+
+      - name: Run worker
+        id: worker
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+        run: |
+          node hive/lib/sandcastle-worker-runner.js "${ISSUE_NUMBER}" > result.json
+
+      - name: Upload worker result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-result
+          path: result.json
+
+      - name: Summarize result
+        if: always()
+        run: |
+          if [ -f result.json ]; then
+            echo '### Hive Worker result' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat result.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '### Hive Worker — no result.json produced' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Stuck-in-flight safety net
+        # Final guard: if the worker crashed without producing a `shipped`
+        # status, label the issue `hive:failed` so a human can pick it up.
+        # Covers the rare case where the runner exited non-zero before the
+        # worker could comment back. No-op when no issue_number input was
+        # provided AND no failed-but-known issue can be inferred.
+        if: always() && failure() && inputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+        run: |
+          set +e
+          status=$(jq -r '.status // ""' result.json 2>/dev/null)
+          if [ "$status" != "shipped" ]; then
+            echo "Worker did not ship; labeling issue #${ISSUE_NUMBER} as hive:failed"
+            gh issue edit "${ISSUE_NUMBER}" --add-label "hive:failed" || true
+          fi

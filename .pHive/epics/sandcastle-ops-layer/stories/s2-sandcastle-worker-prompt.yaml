@@ -1,0 +1,217 @@
+id: s2-sandcastle-worker-prompt
+epic: sandcastle-ops-layer
+title: Sandcastle worker prompt + Zod result schema
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s1-github-issues-adapter]
+
+description: |
+  Ship the worker contract — a sandcastle prompt template that uses
+  sandcastle's native `!`command`` syntax to pull open hive-labeled issues at
+  prompt-render time, pick the highest-priority unblocked one, execute it via
+  the existing /hive:execute workflow, and emit a Zod-validated structured
+  result via Output.object().
+
+  This is the INBOUND half of the ops loop. Combined with S1's labeled issues
+  and S3's cron trigger, sandcastle becomes a self-pickup worker — no custom
+  dispatcher needed. Lean on sandcastle's native primitives wherever possible.
+
+  Sandcastle primitives used (no rewrite, no wrapper logic):
+    - prompt `!`command`` rendering        — gh issue list at runtime
+    - completionSignal "<promise>COMPLETE</promise>" — default; agent emits when done
+    - branchStrategy: { type: "branch", branch: "agent/issue-<n>" } — per-issue branch
+    - Output.object(zodSchema)              — typed result back to caller
+    - maxIterations: 5                      — bounds runaway
+
+acceptance_criteria:
+  - "Given a sandcastle run is invoked with this prompt, when open hive:ready issues exist, then the worker picks the lowest-numbered issue with no open hive:blocked-by:* dependencies and labels it hive:in-flight"
+  - "Given the worker successfully completes a story, when it returns, then it opens a PR with 'Closes #<n>' against dev/hive-2.0, comments the PR link on the issue, and the Output.object result has status='shipped' with pr_number set"
+  - "Given the worker hits an unrecoverable failure, when it returns, then it comments a redacted failure summary on the issue, labels the issue hive:failed, and the Output.object result has status='failed' with reason populated — the worker does NOT retry"
+  - "Given no hive:ready issues exist or all are blocked, when the worker renders the prompt, then it emits status='idle' and exits without modifying any state"
+  - "Given the Zod schema parses the structured result, when the caller invokes parse(), then valid shapes pass and invalid shapes throw with field-level errors"
+  - "Given the worker is invoked manually via the runner helper, when the run completes, then the result is printed to stdout as JSON for CI consumption"
+
+steps:
+  - id: research
+    description: |
+      Re-read .pHive/spikes/sandcastle/research-findings.md sections 2.1 (run),
+      2.9 (Output.object), 2.10 (completionSignal), 2.7 (hooks). Verify the
+      shipped .sandcastle/prompt.md `!`command`` syntax. Confirm hive/lib/
+      module conventions (CJS, no top-level await).
+    agent: researcher
+
+  - id: implement
+    description: |
+      Three files:
+
+      1. `.sandcastle/prompts/worker-issue-pickup.md` — the worker prompt.
+         Structure:
+           # Context
+             - !`gh issue list --state open --label hive:ready --json number,title,body,labels`
+             - !`gh pr list --state merged --limit 5 --json number,title,mergedAt`
+             - !`git rev-parse --abbrev-ref HEAD`
+           # Task
+             1. Filter out issues with any hive:blocked-by:* label pointing to still-open issues
+             2. Pick lowest issue#; if hive:priority:* labels present, prefer highest priority
+             3. Read story YAML at .pHive/epics/<epic>/stories/<story>.yaml (path derivable from hive:epic + hive:story labels)
+             4. Claim: gh issue edit --add-label hive:in-flight --remove-label hive:ready
+             5. Execute via /hive:execute on that story (existing skill)
+             6. One commit per story (hive convention)
+             7. gh pr create --base dev/hive-2.0 --body "Closes #<n>"
+             8. gh issue comment <n> --body "PR: #<pr>"
+             9. Emit <promise>COMPLETE</promise>
+           # Failure
+             - Comment redacted error on issue
+             - gh issue edit --add-label hive:failed --remove-label hive:in-flight
+             - Emit <promise>COMPLETE</promise> anyway (no retry; human reviews)
+
+      2. `hive/lib/sandcastle-worker-schema.js` — Zod schema:
+           const ResultSchema = z.object({
+             issue_number: z.number().int().positive().nullable(),
+             pr_number: z.number().int().positive().nullable(),
+             status: z.enum(["shipped", "failed", "idle"]),
+             reason: z.string().optional(),
+             branch: z.string().optional(),
+             duration_seconds: z.number().optional(),
+           });
+
+      3. `hive/lib/sandcastle-worker-runner.js` — thin wrapper:
+           const { run, claudeCode } = require('@ai-hero/sandcastle');
+           const { docker } = require('@ai-hero/sandcastle/sandboxes/docker');
+           module.exports.runOnce = async ({ issueNumber }) => {
+             const result = await run({
+               agent: claudeCode('claude-opus-4-7'),
+               sandbox: docker({ imageName: 'sandcastle:hive-worker' }),
+               promptFile: '.sandcastle/prompts/worker-issue-pickup.md',
+               promptArgs: { FORCE_ISSUE: issueNumber || '' },
+               branchStrategy: { type: 'branch', branch: 'agent/issue-{{ISSUE}}' },
+               maxIterations: 5,
+               output: ResultSchema,
+             });
+             return result.object;
+           };
+         CLI entry: `node hive/lib/sandcastle-worker-runner.js [<issue#>]` prints JSON.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Three test surfaces:
+      1. tests/sandcastle-worker-schema.test.js — schema accept/reject cases (valid shipped, valid failed, valid idle, missing status, wrong type)
+      2. tests/sandcastle-worker-prompt.test.js — string-level assertions on the prompt template (label namespace, completion signal, claim/failure flow ordering)
+      3. tests/sandcastle-worker-runner.test.js — mock @ai-hero/sandcastle.run; verify branchStrategy + maxIterations + promptFile passed correctly
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Verify: prompt instructs filter-then-claim order (filter first to avoid
+      claiming a blocked issue); failure path always emits COMPLETE (else
+      sandcastle hangs to maxIterations); no secrets in prompt; redaction
+      reference present (hive/lib/sandcastle-log-redaction.js); branchStrategy
+      placeholder substitution works; docs updated.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: |
+      Commit on dev/hive-2.0 epic branch:
+      "feat(sandcastle-ops): worker prompt + Zod result schema + runner".
+      One commit.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    languages: [javascript-cjs, markdown]
+    libs: ["@ai-hero/sandcastle", "zod"]
+  key_files:
+    - path: hive/lib/sandcastle-provider.js
+      purpose: existing sandcastle integration; consult for require()/run() shape
+    - path: hive/lib/sandcastle-log-redaction.js
+      purpose: log redaction already wired; worker output passes through this
+    - path: .sandcastle/prompt.md
+      purpose: shipped sandcastle prompt template; `!`command`` syntax reference
+    - path: hive/references/sandcastle-adoption-guide.md
+      purpose: section 3 (routing), section 5 (branch strategy)
+
+files_to_modify:
+  - file: .sandcastle/prompts/worker-issue-pickup.md
+    change: NEW — the worker prompt
+  - file: hive/lib/sandcastle-worker-schema.js
+    change: NEW — Zod schema for Output.object
+  - file: hive/lib/sandcastle-worker-runner.js
+    change: NEW — runner wrapper + CLI entry
+  - file: tests/sandcastle-worker-schema.test.js
+    change: NEW
+  - file: tests/sandcastle-worker-prompt.test.js
+    change: NEW
+  - file: tests/sandcastle-worker-runner.test.js
+    change: NEW
+  - file: package.json
+    change: confirm zod is in deps (sandcastle already declares it as peer); add if missing
+
+code_examples:
+  - title: Sandcastle Output.object() pattern from spike findings
+    file: .pHive/spikes/sandcastle/research-findings.md
+    snippet: |
+      // Standard Schema (Zod) — Output.object validates result.object
+      const result = await run({
+        agent: claudeCode("claude-opus-4-7"),
+        sandbox: docker({ imageName: "sandcastle:hive-worker" }),
+        promptFile: ".sandcastle/prompts/worker-issue-pickup.md",
+        output: z.object({ issue_number: z.number(), status: z.enum([...]) }),
+      });
+      // result.object is typed and validated
+
+design_decisions:
+  - decision: Worker re-reads story YAML at runtime (`!`cat .pHive/...``), does not trust issue body
+    rationale: Issue body is a snapshot at create time; YAML can update post-publish; runtime re-read avoids drift
+  - decision: Failure path always emits COMPLETE
+    rationale: If the agent throws without emitting completion signal, sandcastle iterates to maxIterations burning quota; explicit COMPLETE on failure bounds spend
+  - decision: No retry inside the worker
+    rationale: Human-on-first-fail policy locked in design discussion; retry logic adds state without clear value
+  - decision: branchStrategy="branch" not "merge-to-head"
+    rationale: One PR per story; merge happens via PR review path, not sandcastle auto-merge
+
+cross_cutting:
+  - concern: documentation
+    action: |
+      Add hive/references/sandcastle-worker-contract.md documenting prompt
+      structure, Zod schema, runner CLI, and the labels namespace. Cross-link
+      from sandcastle-adoption-guide.md.
+  - concern: versioning
+    action: |
+      Contributes to the minor bump owned by S3's integrate step. Worker
+      prompt and runner ARE consumer-visible (shipped in repo).
+  - concern: metrics
+    applies: false
+    justification: >
+      Substrate — no observable outcome until S3 wires the cron. Worker
+      correctness verified by unit + runner tests.
+
+risks:
+  - severity: medium
+    description: Prompt instruction is ambiguous and agent picks a blocked or in-flight issue
+    mitigation: Filter step explicit and ordered first; prompt review by reviewer step
+  - severity: low
+    description: Sandcastle Output.object validation fails silently leaving caller without a result
+    mitigation: Spike confirmed schema mismatch throws on the caller side; test covers
+  - severity: medium
+    description: maxIterations=5 too restrictive for complex stories
+    mitigation: Tune via flag; failures fall to human-on-first-fail anyway; 5 is a starting point
+
+references:
+  - path: .pHive/research-drafts/2026-05-15-sandcastle-ops-layer-plan.md
+    relevant_excerpt: |
+      ### S2 — Sandcastle Worker Prompt
+      .sandcastle/prompts/worker-issue-pickup.md
+      Worker re-reads YAML inside sandbox at runtime — always sees latest
+      Caller passes Zod-validated structured result
+  - path: .pHive/spikes/sandcastle/research-findings.md
+    relevant_excerpt: |
+      2.9 Output.object() / Output.string() — Standard-Schema-compliant validator
+      2.10 completionSignal — default "<promise>COMPLETE</promise>"; caller-owned
+      2.8 Branch strategies — branch | head | merge-to-head

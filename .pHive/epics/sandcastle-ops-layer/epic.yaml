@@ -1,0 +1,43 @@
+name: sandcastle-ops-layer
+title: Sandcastle Ops Layer
+description: >
+  Close the autonomous-execution loop on top of the shipped sandcastle runtime.
+  Three integrations — story-to-issue publisher, sandcastle worker prompt with
+  Zod result schema, and GH Actions cron with token-budget gate — wire planned
+  stories into automated pickup and execution. Sandcastle owns the sandbox,
+  branching, session capture; this epic owns the publish/pickup/loop layer.
+
+  OPT-IN BY DESIGN — Sandcastle integration is optional. The entire loop
+  activates only when the consumer sets external_task_tracking.adapter=github
+  in their hive.config.yaml AND adopts sandcastle. With the adapter unset:
+   - /plan keeps writing stories to .pHive/epics/ ONLY (no GH issues)
+   - the worker prompt is dormant code in the repo
+   - the GH Actions workflow ships maintainer-side; consumers wire their own
+  Zero-config consumers see ZERO behavior change from this epic. Adoption is
+  a config flag flip + sandcastle setup, never a default-on shipped change.
+target_codebase: /Users/don/Documents/plugin-hive
+base_branch: dev/hive-2.0
+methodology: classic
+
+versioning:
+  bump: minor
+  rationale: >
+    Consumer-visible additions — new external_task_tracking.adapter=github option,
+    new .github workflow shipped in repo, new .sandcastle/prompts/ template.
+    Additive; no breaking changes.
+
+stories:
+  - id: s1-github-issues-adapter
+    title: GitHub Issues adapter + /plan post-step
+    complexity: medium
+    depends_on: []
+
+  - id: s2-sandcastle-worker-prompt
+    title: Sandcastle worker prompt + Zod result schema
+    complexity: medium
+    depends_on: [s1-github-issues-adapter]
+
+  - id: s3-gh-actions-cron-loop
+    title: GH Actions cron workflow + token-budget gate
+    complexity: medium
+    depends_on: [s2-sandcastle-worker-prompt]

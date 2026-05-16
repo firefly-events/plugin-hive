@@ -43,6 +43,13 @@ paths:
 metrics:
   enabled: false              # opt-in only; no <state_dir>/metrics/events/*.jsonl writes when false
 
+# KG lifecycle emission granularity.
+# phase: emit lifecycle KG triples at phase boundaries (default, low volume).
+# story: emit at story boundaries.
+# step: emit at individual workflow steps (highest volume).
+# off: disable lifecycle KG emission without disabling KG reads/imports.
+emit_lifecycle_at: phase
+
 # Quality gate thresholds
 quality_gates:
   auto_pass_threshold: 0.9
@@ -63,6 +70,12 @@ tokens:
   per_session_limit: 1000000   # CWC 2026-05-06 doubled Opus quotas; unset -> 1000000 keeps session-mode budgets aligned with the doubled per-story Opus cap
   per_epic_limit: 2000000
   warning_threshold: 0.8
+  # Daily USD spend cap read by the autonomous-worker pre-flight gate at
+  # hive/lib/budget-gate.js (see hive/references/sandcastle-ops-loop.md).
+  # Unset → gate effectively disabled (limit defaults to Infinity).
+  # Only applies when the maintainer-only .github/workflows/hive-worker.yml
+  # is in use; default consumers see zero behavior change.
+  # daily_usd_limit: 50
 
 # Context window management
 context_window:
@@ -94,6 +107,22 @@ task_tracking:
   # Runtime context — passed at invoke time (not at load time):
   team_value: null             # github: owner; linear: team key (e.g., "ACME")
   project_value: null          # github: repo;  linear: project name
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sandcastle ops layer (Epic sandcastle-ops-layer, story s1) — additive,
+  # opt-in. When `adapter: github`, /plan Phase D publishes story YAMLs as
+  # labeled GitHub Issues so an autonomous worker can pick them up. Default
+  # consumers (adapter: null or other) see ZERO behavior change.
+  #
+  # github_owner / github_repo override team_value / project_value when the
+  # caller wants to publish to a different owner/repo than the dispatch ABI
+  # default. Leave null to fall through to team_value / project_value.
+  #
+  # label_prefix is the namespace for hive:ready, hive:blocked-by:<id>, etc.
+  # Default "hive" matches sandcastle-ops-layer spec.
+  github_owner: null
+  github_repo: null
+  label_prefix: "hive"
+  # ─────────────────────────────────────────────────────────────────────────
   # Adapter-specific sub-config (propagated to env if non-null):
   github:
     token: null                # falls through to GITHUB_TOKEN env / `gh auth token`
