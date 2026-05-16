@@ -13,7 +13,7 @@
  *
  * Covers:
  *  AC-1 runOnce passes the correct promptFile to run()
- *  AC-2 runOnce sets maxIterations default 5
+ *  AC-2 runOnce sets maxIterations default 1 (sandcastle structured-output constraint)
  *  AC-3 runOnce sets branchStrategy with substituted issue number when forced
  *  AC-4 runOnce sets branchStrategy.branch="agent/issue-pickup" when idle
  *  AC-5 runOnce passes ResultSchema as `output`
@@ -108,15 +108,24 @@ test('runOnce passes the worker prompt file path to sandcastle.run', async () =>
 // AC-2: maxIterations default
 // ---------------------------------------------------------------------------
 
-test('runOnce defaults maxIterations to 5', async () => {
+test('runOnce defaults maxIterations to 1 (sandcastle structured-output constraint)', async () => {
   const { runOnce } = loadModule();
   const deps = makeDeps();
   await runOnce({ issueNumber: 1, _deps: deps });
   const [args] = deps._captured.capturedRunArgs;
-  assert.equal(args.maxIterations, 5);
+  assert.equal(args.maxIterations, 1);
 });
 
-test('runOnce honors explicit maxIterations override', async () => {
+test('runOnce rejects maxIterations !== 1 (structured-output constraint)', async () => {
+  const { runOnce } = loadModule();
+  const deps = makeDeps();
+  await assert.rejects(
+    () => runOnce({ issueNumber: 1, maxIterations: 3, _deps: deps }),
+    /maxIterations must be 1/i
+  );
+});
+
+test('runOnce accepts explicit maxIterations === 1', async () => {
   const { runOnce } = loadModule();
   const deps = makeDeps();
   await runOnce({ issueNumber: 1, maxIterations: 1, _deps: deps });
