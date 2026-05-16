@@ -47,7 +47,13 @@ function getDefaultOutputSchema() {
 
 const DEFAULT_IMAGE = 'sandcastle:hive';
 const DEFAULT_MODEL = 'gpt-5.1-codex';
-const DEFAULT_MAX_ITERATIONS = 5;
+// Sandcastle constraint: when `output: <Zod schema>` is set (structured
+// output), maxIterations must be 1. Sandcastle's "iteration" is a
+// sandbox-level retry of the whole prompt — not the agent's internal
+// reasoning steps. The agent (codex) iterates freely inside that single
+// run via bash/edit tool calls; sandcastle only retries if the structured
+// output fails validation, which structured-output mode disallows.
+const DEFAULT_MAX_ITERATIONS = 1;
 const PROMPT_FILE = '.sandcastle/prompts/worker-issue-pickup.md';
 
 // @ai-hero/sandcastle is `"type": "module"` (ESM-only) and its `exports` map
@@ -102,7 +108,7 @@ async function getSandcastleDeps(_deps) {
  * @param {number}  [opts.issueNumber]   force a specific issue (manual path)
  * @param {string}  [opts.imageName]     docker image; default sandcastle:hive
  * @param {string}  [opts.modelTag]      codex model; default gpt-5.1-codex
- * @param {number}  [opts.maxIterations] default 5
+ * @param {number}  [opts.maxIterations] default 1 (sandcastle constraint)
  * @param {object}  [opts._deps]         test seam
  * @returns {Promise<{
  *   issue_number: number|null,
