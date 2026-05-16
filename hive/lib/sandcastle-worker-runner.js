@@ -51,6 +51,13 @@ const DEFAULT_MODEL = 'gpt-5.1-codex';
 // (.sandcastle/prompts/worker-issue-pickup.md). Sandcastle scans the
 // rendered prompt for the tag and errors if it isn't referenced.
 const OUTPUT_TAG = 'result';
+// The sandcastle:hive Dockerfile (built inline by the workflow) hard-codes
+// the agent user at UID/GID 1000. Sandcastle's docker provider defaults
+// containerUid to the HOST UID (1001 on GitHub-hosted ubuntu runners),
+// which causes "UID mismatch" at sandbox-create time. Pin to 1000 so the
+// runtime --user flag matches what's baked into the image.
+const CONTAINER_UID = 1000;
+const CONTAINER_GID = 1000;
 // Sandcastle constraint: when `output: <Zod schema>` is set (structured
 // output), maxIterations must be 1. Sandcastle's "iteration" is a
 // sandbox-level retry of the whole prompt — not the agent's internal
@@ -169,7 +176,7 @@ async function runOnce(opts) {
 
   const runArgs = {
     agent: codex(modelTag),
-    sandbox: docker({ imageName }),
+    sandbox: docker({ imageName, containerUid: CONTAINER_UID, containerGid: CONTAINER_GID }),
     promptFile: PROMPT_FILE,
     promptArgs: { FORCE_ISSUE: forceIssue },
     branchStrategy: { type: 'branch', branch: branchName },
