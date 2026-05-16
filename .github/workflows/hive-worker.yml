@@ -51,8 +51,13 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install host-side runner deps (BYO)
+        # plugin-hive treats root package.json as opt-in BYO (see
+        # feedback_byo_enhancements_no_root_deps). Install only what the
+        # host-side sandcastle-worker-runner.js actually needs via
+        # `npm install --no-save`. The codex CLI + everything else
+        # (claude/codex auth surface) lives INSIDE the sandcastle image.
+        run: npm install --no-save @ai-hero/sandcastle zod
 
       - name: Budget gate (pre-flight)
         # Reads today's spend from .pHive/metrics/events/stop-*.jsonl, sums
