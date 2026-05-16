@@ -222,6 +222,15 @@ async function publishStoriesToIssues(opts) {
   }
 
   const labelPrefix = config.label_prefix || DEFAULT_LABEL_PREFIX;
+  // Repo enforcement is opt-in: only checked when config provides
+  // task_tracking.github_owner (or team_value) + github_repo (or project_value).
+  // Without those, the adapter trusts the tracker_id owner/repo directly.
+  let allowedRepo = null;
+  try {
+    allowedRepo = ghRepoArgs(config);
+  } catch {
+    allowedRepo = null;
+  }
 
   for (const storyId of storyIds) {
     const storyPath = resolveStoryPath(epicId, storyId, _deps);
@@ -251,6 +260,16 @@ async function publishStoriesToIssues(opts) {
       // Step 19 didn't (or couldn't) create an issue for this story. The
       // sandcastle layer never creates — skip and let humans investigate.
       skipped.push({ id: storyId, reason: 'no_tracker_id' });
+      continue;
+    }
+
+    if (allowedRepo && (parsed.owner !== allowedRepo.owner || parsed.repo !== allowedRepo.repo)) {
+      skipped.push({
+        id: storyId,
+        reason: 'unexpected_repo',
+        tracker_repo: `${parsed.owner}/${parsed.repo}`,
+        allowed_repo: allowedRepo.flag,
+      });
       continue;
     }
 
@@ -363,11 +382,13 @@ async function sweepBlockedByLabels(opts) {
       const parentStoryId = blockedLabel.slice(blockedByPrefix.length);
       let parentState = parentStateCache.get(parentStoryId);
       if (!parentState) {
-        // Find the parent issue by hive:story:<id> label.
+        // Find the parent issue by hive:story:<id> label, scoped to the
+        // current epic to avoid story-ID collisions across epics.
         const findArgs = [
           'issue', 'list',
           '--repo', repo.flag,
           '--label', `${labelPrefix}:story:${parentStoryId}`,
+          '--label', epicLabel,
           '--state', 'all',
           '--json', 'number,state',
           '--limit', '5',

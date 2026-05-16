@@ -275,7 +275,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
         --subject "{story-id}" \
         --predicate "story-spec" \
         --prior-object "$old_hash" \
-        --new-object "$new_hash" \
+        --object "$new_hash" \
         --source-epic "{epic-id}" \
         --source-agent "plan"
       ```

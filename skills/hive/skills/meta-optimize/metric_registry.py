@@ -61,6 +61,8 @@ def gauge_labels(name: str) -> tuple[str, ...]:
 
 
 def increment_counter(name: str, labels: dict[str, str], by: int = 1) -> int:
+    if isinstance(by, bool) or not isinstance(by, int):
+        raise TypeError("counter increments must be integers")
     if by < 0:
         raise ValueError("counter increments must be non-negative")
     label_names = counter_labels(name)

@@ -21,7 +21,7 @@
 
 ## Open hive:ready issues (lowest-numbered first)
 
-!`gh issue list --state open --label hive:ready --json number,title,labels,body --jq 'sort_by(.number) | .[] | "#\(.number) | \(.title) | labels=\([.labels[].name] | join(","))"' --limit 50`
+!`gh issue list --state open --label hive:ready --json number,title,labels,body --jq 'sort_by(.number) | .[] | "#\(.number) | \(.title) | labels=\([.labels[].name] | join(","))"' --limit 9999`
 
 ## Forced issue (manual invocation only)
 

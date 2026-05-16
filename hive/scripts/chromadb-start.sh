@@ -61,7 +61,10 @@ fast_exit_if_running() {
     return 0
   fi
 
-  if [[ -n "$pid" ]] && is_pid_alive "$pid" && [[ -f "$PORT_FILE" ]]; then
+  if [[ -n "$pid" ]] && is_pid_alive "$pid"; then
+    if [[ ! -f "$PORT_FILE" ]]; then
+      warn "chroma pid $pid alive but $PORT_FILE missing; not spawning duplicate"
+    fi
     printf 'already running\n'
     return 0
   fi

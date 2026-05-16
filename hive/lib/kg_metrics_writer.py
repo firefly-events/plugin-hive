@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -86,9 +87,14 @@ def flush_cycle(
         "miss_reason": resolved_miss_reason,
     }
 
-    output_dir = Path(metrics_dir)
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", cycle_id):
+        raise ValueError(f"cycle_id contains invalid characters: {cycle_id!r}")
+
+    output_dir = Path(metrics_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"{cycle_id}.jsonl"
+    output_path = (output_dir / f"{cycle_id}.jsonl").resolve()
+    if output_dir not in output_path.parents:
+        raise ValueError(f"cycle_id resolves outside metrics_dir: {cycle_id!r}")
 
     rows = [*_buffered_rows.get(cycle_id, []), summary_row]
     existing_keys = _existing_row_keys(output_path)

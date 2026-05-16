@@ -65,14 +65,15 @@ jobs:
         # v1: build in-workflow to keep infra surface zero. If cold-build cost
         # becomes material, swap for a pre-built image in GHCR + a separate
         # publish workflow.
-        run: docker build -t sandcastle:hive-worker .pHive/spikes/sandcastle/
+        run: docker build -t sandcastle:hive .pHive/spikes/sandcastle/
 
       - name: Run worker
         id: worker
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
         run: |
-          node hive/lib/sandcastle-worker-runner.js ${{ inputs.issue_number }} > result.json
+          node hive/lib/sandcastle-worker-runner.js "${ISSUE_NUMBER}" > result.json
 
       - name: Upload worker result
         if: always()
@@ -102,10 +103,11 @@ jobs:
         if: always() && failure() && inputs.issue_number != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
         run: |
           set +e
           status=$(jq -r '.status // ""' result.json 2>/dev/null)
           if [ "$status" != "shipped" ]; then
-            echo "Worker did not ship; labeling issue #${{ inputs.issue_number }} as hive:failed"
-            gh issue edit "${{ inputs.issue_number }}" --add-label "hive:failed" || true
+            echo "Worker did not ship; labeling issue #${ISSUE_NUMBER} as hive:failed"
+            gh issue edit "${ISSUE_NUMBER}" --add-label "hive:failed" || true
           fi

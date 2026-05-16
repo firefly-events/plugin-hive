@@ -107,6 +107,8 @@ def emit_superseded(
     if EMIT_LIFECYCLE_AT == "off":
         return {"emitted": False, "metadata": None}
 
+    prior_obj_raw = "" if prior_object is None else str(prior_object)
+    new_obj_raw = "" if new_object is None else str(new_object)
     prior_obj = sanitize_obj(prior_object)
     new_obj = sanitize_obj(new_object)
     superseded_obj = f"{prior_obj}->{new_obj}"
@@ -137,10 +139,10 @@ def emit_superseded(
                    SET valid_until = ?
                  WHERE subject = ?
                    AND predicate = ?
-                   AND object = ?
+                   AND object IN (?, ?)
                    AND valid_until IS NULL
                 """,
-                (valid_from, subject, predicate, prior_obj),
+                (valid_from, subject, predicate, prior_obj_raw, prior_obj),
             )
             conn.execute(
                 """

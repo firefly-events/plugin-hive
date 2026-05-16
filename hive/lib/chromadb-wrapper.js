@@ -88,8 +88,12 @@ async function isAvailable(host = DEFAULT_HOST, port = RESOLVED_PORT) {
           return;
         }
         if (!bootstrapDone) {
-          bootstrapDone = true;
-          ensureDecisionsCollection(host, port).then(() => resolve(true));
+          ensureDecisionsCollection(host, port)
+            .then(() => { bootstrapDone = true; resolve(true); })
+            .catch((err) => {
+              console.warn(`[chromadb] decisions bootstrap failed; will retry on next heartbeat: ${err.message}`);
+              resolve(true);
+            });
           return;
         }
         resolve(true);

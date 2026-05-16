@@ -76,7 +76,8 @@ function utcMidnightToday(now = new Date()) {
 function isTodayUtc(isoTimestamp, midnightMs) {
   const t = Date.parse(isoTimestamp);
   if (Number.isNaN(t)) return false;
-  return t >= midnightMs;
+  const nextMidnightMs = midnightMs + 24 * 60 * 60 * 1000;
+  return t >= midnightMs && t < nextMidnightMs;
 }
 
 function computeDailySpend(_deps = {}) {
@@ -152,7 +153,12 @@ function readDailyLimit(_deps = {}) {
     if (inTokens && /^\S/.test(raw)) inTokens = false; // top-level key change
     if (inTokens) {
       const m = raw.match(/^\s{2}daily_usd_limit:\s*([0-9.]+)\s*(#.*)?$/);
-      if (m) return Number(m[1]);
+      if (m) {
+        const parsed = Number(m[1]);
+        if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+        warn('[budget-gate] invalid tokens.daily_usd_limit; limit=Infinity (gate disabled)');
+        return Infinity;
+      }
     }
   }
   warn('[budget-gate] tokens.daily_usd_limit not set in hive.config.yaml; limit=Infinity (gate disabled)');
