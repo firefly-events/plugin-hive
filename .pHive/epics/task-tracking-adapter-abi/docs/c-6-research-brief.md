@@ -358,4 +358,4 @@ telemetry. Three deliverables remain:
   story.
 
 No dispatch code changes. No new tests beyond markdown structural checks
-+ banner-consistency grep. Story stays methodology: classic, complexity: low.
+and banner-consistency grep. Story stays methodology: classic, complexity: low.

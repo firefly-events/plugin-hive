@@ -134,7 +134,7 @@ The execution-mode routing layer adds Sandcastle as a new opt-in `/execute` mode
 | Status | File | Purpose |
 |---|---|---|
 | New | `skills/hive/skills/execute-mode-sandcastle/SKILL.md` | Sandcastle execution mode body and lifecycle contract. |
-| Touched | `skills/hive/skills/execute-dispatch/SKILL.md:16` | Adds `sandcastle` to `mode_decision`, currently `sessions | team | team-cmux | sequential`. |
+| Touched | `skills/hive/skills/execute-dispatch/SKILL.md:16` | Adds `sandcastle` to `mode_decision`, currently `sessions / team / team-cmux / sequential`. |
 | Touched | `skills/hive/skills/execute-dispatch/SKILL.md:44` | Extends `field_sources` with `execution_mode` attribution. |
 | Touched | `skills/execute/SKILL.md:143` | Adds the hidden caller switch case for `sandcastle`. |
 
