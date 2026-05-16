@@ -11,7 +11,7 @@
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-2.1.0-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
@@ -336,6 +336,10 @@ For full operational detail, see [docs/operations-guide.md](docs/operations-guid
 | **Jira** | Task tracking adapter | Set `task_tracker: jira` in `hive/hive.config.yaml` |
 
 Enable integrations in `hive/hive.config.yaml`. All integrations are optional — Hive works without any of them.
+
+### Autonomous worker loop (reference, maintainer-only)
+
+For consumers who want unattended execution: combine the GitHub Issues task-tracker adapter with sandcastle adoption and a GitHub Actions cron workflow to close the `/plan` → labeled issue → worker → PR loop end-to-end. Reference workflow ships at `.github/workflows/hive-worker.yml` (in plugin-hive's own repo only — plugins distribute via `.claude-plugin/`, not `.github/`). Pre-flight gate at `hive/lib/budget-gate.js` aborts the run when `tokens.daily_usd_limit` is exceeded. See [`hive/references/sandcastle-ops-loop.md`](hive/references/sandcastle-ops-loop.md) for the full opt-in checklist, constraints, and failure modes.
 
 ---
 

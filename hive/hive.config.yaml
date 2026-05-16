@@ -70,6 +70,12 @@ tokens:
   per_session_limit: 1000000   # CWC 2026-05-06 doubled Opus quotas; unset -> 1000000 keeps session-mode budgets aligned with the doubled per-story Opus cap
   per_epic_limit: 2000000
   warning_threshold: 0.8
+  # Daily USD spend cap read by the autonomous-worker pre-flight gate at
+  # hive/lib/budget-gate.js (see hive/references/sandcastle-ops-loop.md).
+  # Unset → gate effectively disabled (limit defaults to Infinity).
+  # Only applies when the maintainer-only .github/workflows/hive-worker.yml
+  # is in use; default consumers see zero behavior change.
+  # daily_usd_limit: 50
 
 # Context window management
 context_window:

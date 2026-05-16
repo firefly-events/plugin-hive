@@ -32,6 +32,25 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - KG signal revival S4.1: `/hive:register-project` skill, registry helper, and quoted path-with-space fixture for cross-project KG bootstrap registration.
 - KG signal revival S3.1: ChromaDB sidecar lifecycle scripts, fire-and-forget SessionStart hook, operations guide, and bash lifecycle tests.
 
+## [2.1.0] - 2026-05-15
+
+**Sandcastle ops layer — autonomous-execution loop on top of sandcastle (opt-in).**
+
+Closes the cron → worker → PR → review loop by composing three things that already existed (`/plan`, sandcastle, GitHub Actions) rather than building a new dispatcher. All opt-in via `external_task_tracking.adapter: github` + sandcastle adoption + a maintainer-only workflow in plugin-hive's own `.github/`. Zero behavior change for default consumers.
+
+### Added
+
+- **S1 — GitHub Issues label-pass adapter + `/plan` step 19a** (`hive/lib/external/github-issues-adapter.js`). Story-YAML → `gh issue create` with `hive:story` + `hive:ready` labels; idempotent on `slug` body marker. Wired into `skills/plan/SKILL.md` step 19a as the consumer-visible publish seam when `external_task_tracking.adapter: github`. Adapter is BYO `octokit` — no root dependency added.
+- **S2 — Sandcastle worker prompt + Zod result schema + runner** (`.sandcastle/prompts/worker-issue-pickup.md`, `hive/lib/sandcastle-worker-schema.js`, `hive/lib/sandcastle-worker-runner.js`). Worker reads `hive:ready` issues, picks the oldest, re-reads canonical story YAML from disk (issue body is snapshot only), implements, opens PR, comments back. `Output.object()` typed via Zod so `result.json` is contract-checked. Test seam exposed via `_deps` for unit testing without booting a container.
+- **S3 — GH Actions cron workflow + token-budget gate** (`.github/workflows/hive-worker.yml`, `hive/lib/budget-gate.js`, `tests/budget-gate.test.js`). 15-minute cron + `workflow_dispatch` with optional `issue_number` input; `concurrency: hive-worker, cancel-in-progress: false` serializes runs. Pre-flight `node hive/lib/budget-gate.js` sums today's spend from `.pHive/metrics/events/stop-*.jsonl` (per-model rate-card, opus fallback for unknown models, malformed-row tolerant) and aborts the run when over `tokens.daily_usd_limit`. Stuck-in-flight safety net labels the issue `hive:failed` when the worker exits non-zero without `status: shipped`. Workflow is REFERENCE/maintainer-only — consumers copy it into their own repo (plugins distribute via `.claude-plugin/`, not `.github/`).
+- **New reference doc** `hive/references/sandcastle-ops-loop.md` — end-to-end flow, opt-in instructions, constraints, config keys.
+
+### Notes
+
+- Pricing rate-card in `hive/lib/budget-gate.js` is intentionally inline so rate drift shows up in diffs; verify against Anthropic's current pricing before relying on absolute spend numbers.
+- 15-minute cron cadence is a default, not a load-tested number — tune via the workflow's `cron:` field after the first observation window.
+- Metrics contract: `autonomous_stories_closed` (target 3, window 14d post-merge, source `gh_issue_close_events`) per the S3 story metric block. Verifiable at epic-close + 14d.
+
 ## [2.0.0] - 2026-05-12
 
 **Hive 2.0 milestone.** Cut from `dev/hive-2.0`. Bundles CWC 2026 A-group + Epic A (catalog hygiene + 3 mattpocock-aligned borrows) + Epic B (structural refactor + gate-lift) + Epic C (Task-Tracking Adapter ABI) as the 2.0 cut-line, with Epic D (Sandcastle adoption follow-on) and Epic F (UI cluster extract-config deeper) riding parallel.
