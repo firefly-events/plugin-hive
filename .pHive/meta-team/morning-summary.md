@@ -1,17 +1,20 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-05-15 | **Date:** 2026-05-15 | **Verdict:** PASSED
+**Cycle:** meta-2026-05-16 | **Date:** 2026-05-16 | **Verdict:** PASSED
 
 ---
 
 ## What Changed Tonight
 
-- No changes promoted this cycle. See "What Was Found" below.
+- **`hive/GUIDE.md`** — Corrected wrong config file path in the Configuration section: changed `skills/hive/hive.config.yaml` → `hive/hive.config.yaml` (the referenced file didn't exist; the actual shipped config is at `hive/hive.config.yaml`)
+- **`hive/references/agent-config-schema.md`** — Updated model ID table: Opus `claude-opus-4-6` → `claude-opus-4-7`; Haiku `claude-haiku-4-5` → `claude-haiku-4-5-20251001` (matching the actual API model ID recorded in token-capture-feasibility.md)
+- **`hive/agents/orchestrator.md`** — Updated model tier table with same corrected model IDs: `claude-opus-4-7` and `claude-haiku-4-5-20251001`
+- **`hive/GUIDE.md`** — Updated Agent Roster table with same corrected model IDs
 
 ---
 
 ## What Was Found (Not Fixed This Cycle)
 
-- **STUB_DOC** `hive/references/hive-cloud-roadmap.md` — 13-line placeholder stub for the deferred Hive Cloud epic _(reason: out_of_scope — intentional forward-reference placeholder; expanding would be speculative without the Hive Cloud epic active; also flagged in meta-2026-05-11 and meta-2026-05-12)_
+- **STUB_DOC** `hive/references/hive-cloud-roadmap.md` — 13-line placeholder for the deferred Hive Cloud epic _(reason: out_of_scope — intentional forward-reference placeholder; also flagged in meta-2026-05-11, -12, -14, -15)_
 
 ---
 
@@ -25,10 +28,10 @@
 
 | Metric | Count |
 |--------|-------|
-| Findings identified | 1 |
-| Proposals generated | 0 |
-| Changes promoted | 0 |
+| Findings identified | 3 |
+| Proposals generated | 2 |
+| Changes promoted | 2 (4 file edits total) |
 | Changes reverted | 0 |
 | Flagged for human | 0 |
 
-**Next cycle priority:** The `hive-cloud-roadmap.md` stub will remain out-of-scope until the Hive Cloud epic is activated. Consider activating the backlog fallback (candidates mmo-2026-04-21-002 or mmo-2026-04-21-003 remain pending) in a future cycle where analysis again finds zero in-scope findings.
+**Next cycle priority:** The `hive-cloud-roadmap.md` stub continues to be the only remaining out-of-scope finding. All three SCHEMA_INCONSISTENCY findings from this cycle were fully addressed.

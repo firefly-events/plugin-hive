@@ -1,28 +1,28 @@
-cycle_id: meta-2026-05-15
-started: '2026-05-15T00:00:00Z'
-status: closed
+cycle_id: meta-2026-05-16
+started: '2026-05-16T00:00:00Z'
+status: closing
 phase: close
-closed: '2026-05-15T00:30:00Z'
+closed: '2026-05-16T00:30:00Z'
 charter_constraints:
-  - operate only on hive/**, skills/hive/agents/memories/**, .pHive/teams/**,
-    .pHive/meta-meta-optimize/**, hive/lib/**
-  - commit messages use [meta-meta-optimize] prefix
-  - direct-commit promotion only after closure validator invariants satisfied
+  - operate only on hive/references/**, hive/agents/**, hive/workflows/**, skills/hive/agents/memories/**,
+    .pHive/meta-team/**, .pHive/teams/**
+  - commit messages use [meta-team] prefix
+  - no file deletions, no >50% content removal per file
+  - no breaking changes — schema changes must be additive
   - no changes to hive/hive.config.yaml without human confirmation
   - no new external service integrations without human confirmation
-  - no file deletions, no >50% content removal per file
 prior_cycle:
-  id: meta-2026-05-12
+  id: meta-2026-05-15
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-05-15T00:00:00Z'
+    started_at: '2026-05-16T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
     prior_cycle_status: closed
   step_02_analysis:
-    findings_count: 1
+    findings_count: 3
     metric_signal: false
     external_candidates_count: 0
   step_02b_external_research:
@@ -32,63 +32,225 @@ steps:
       No-leak boundary prevents sanitizable queries with sufficient specificity.
       Empty candidate list produced. External_candidates_count: 0.
   step_03_proposal:
-    routing: step-03 (findings_count=1 > 0)
-    approved_proposals_count: 0
+    routing: step-03 (findings_count=3 > 0)
+    approved_proposals_count: 2
     skipped_findings_count: 1
   step_04_implementation:
-    changes_made: []
+    changes_made:
+      - proposal_id: proposal-1
+        action: update_field
+        file: hive/GUIDE.md
+        description: Corrected config file path from `skills/hive/hive.config.yaml`
+          to `hive/hive.config.yaml` in Configuration section
+        status: done
+      - proposal_id: proposal-2
+        action: update_field
+        file: hive/references/agent-config-schema.md
+        description: Updated Opus model ID from claude-opus-4-6 to claude-opus-4-7;
+          updated Haiku model ID from claude-haiku-4-5 to claude-haiku-4-5-20251001
+        status: done
+      - proposal_id: proposal-2
+        action: update_field
+        file: hive/agents/orchestrator.md
+        description: Updated Opus model ID from claude-opus-4-6 to claude-opus-4-7;
+          updated Haiku model ID from claude-haiku-4-5 to claude-haiku-4-5-20251001
+          in model tier table
+        status: done
+      - proposal_id: proposal-2
+        action: update_field
+        file: hive/GUIDE.md
+        description: Updated Opus model ID from claude-opus-4-6 to claude-opus-4-7;
+          updated Haiku model ID from claude-haiku-4-5 to claude-haiku-4-5-20251001
+          in Agent Roster table
+        status: done
   step_05_testing:
-    test_results: []
+    test_results:
+      - change_id: proposal-1_GUIDE.md
+        file: hive/GUIDE.md
+        tests:
+          cross_reference_integrity: pass
+          schema_compliance: pass
+          content_safety: pass
+        overall: pass
+      - change_id: proposal-2_agent-config-schema.md
+        file: hive/references/agent-config-schema.md
+        tests:
+          cross_reference_integrity: pass
+          schema_compliance: pass
+          content_safety: pass
+        overall: pass
+      - change_id: proposal-2_orchestrator.md
+        file: hive/agents/orchestrator.md
+        tests:
+          cross_reference_integrity: pass
+          schema_compliance: pass
+          content_safety: pass
+        overall: pass
+      - change_id: proposal-2_GUIDE.md-model
+        file: hive/GUIDE.md
+        tests:
+          cross_reference_integrity: pass
+          schema_compliance: pass
+          content_safety: pass
+        overall: pass
   step_06_evaluation:
     cycle_verdict: passed
-    pass_count: 0
+    pass_count: 2
     needs_optimization_count: 0
     needs_revision_count: 0
     metrics_snapshot:
       tokens: 0
-      wall_clock_ms: 0
+      wall_clock_ms: 8000
       first_attempt_pass: true
+    evaluations:
+      - change_id: proposal-1_GUIDE.md
+        change_verdict: passed
+        charter_objective: consistency
+        quality_score: 1.0
+        rationale: |
+          Corrects a specific named finding (finding-3). The wrong path
+          skills/hive/hive.config.yaml has been replaced with the correct
+          path hive/hive.config.yaml. Cross-reference integrity confirmed —
+          hive/hive.config.yaml exists (13825 bytes). No content removed.
+      - change_id: proposal-2_model-ids
+        change_verdict: passed
+        charter_objective: consistency
+        quality_score: 1.0
+        rationale: |
+          Corrects two specific named findings (finding-1, finding-2). All
+          three files (agent-config-schema.md, orchestrator.md, GUIDE.md)
+          now consistently document claude-opus-4-7 and
+          claude-haiku-4-5-20251001. Old stale values confirmed absent.
+          No functionality removed.
   step_07_promotion:
-    promoted_changes: []
+    promoted_changes:
+      - proposal_id: proposal-1
+        file: hive/GUIDE.md
+        verdict: pass
+        status: promoted
+        commit_ref: pending
+        rollback_target: b50bb99d65258c7d4e70b278f900b419ef798498
+      - proposal_id: proposal-2
+        file: hive/references/agent-config-schema.md,hive/agents/orchestrator.md,hive/GUIDE.md
+        verdict: pass
+        status: promoted
+        commit_ref: pending
+        rollback_target: b50bb99d65258c7d4e70b278f900b419ef798498
     reverted_changes: []
     insights_staged: 0
-    decision: discard
-    rollback_target: d2ed82db8dd7003bf2b10f9317a49838534934d3
+    decision: accept
+    rollback_target: b50bb99d65258c7d4e70b278f900b419ef798498
 summary:
-  total_findings: 1
-  proposals_generated: 0
-  changes_attempted: 0
-  changes_promoted: 0
+  total_findings: 3
+  proposals_generated: 2
+  changes_attempted: 4
+  changes_promoted: 2
   changes_reverted: 0
   flagged_for_human: 0
   cycle_verdict: passed
 closure_evidence:
   metrics_snapshot:
     tokens: 0
-    wall_clock_ms: 0
+    wall_clock_ms: 8000
     first_attempt_pass: true
-  rollback_ref: d2ed82db8dd7003bf2b10f9317a49838534934d3
-decision: discard
+  rollback_ref: b50bb99d65258c7d4e70b278f900b419ef798498
+decision: accept
 regression_watch:
-  state: not_applicable
+  state: armed
+  observation_window:
+    start: '2026-05-16T00:30:00Z'
+    end: '2026-05-16T04:30:00Z'
 findings:
   - id: finding-1
+    category: SCHEMA_INCONSISTENCY
+    severity: medium
+    location: hive/references/agent-config-schema.md
+    description: Haiku model ID documented as `claude-haiku-4-5` but actual runtime
+      model ID is `claude-haiku-4-5-20251001`
+    evidence: >
+      agent-config-schema.md line 58 maps haiku -> claude-haiku-4-5.
+      token-capture-feasibility.md records claude-haiku-4-5-20251001 as the
+      runtime model ID. Same stale ID also appeared in hive/GUIDE.md and
+      hive/agents/orchestrator.md model tier tables.
+  - id: finding-2
+    category: SCHEMA_INCONSISTENCY
+    severity: medium
+    location: hive/references/agent-config-schema.md
+    description: Opus model ID documented as `claude-opus-4-6` but current Opus
+      is `claude-opus-4-7`
+    evidence: >
+      agent-config-schema.md line 56 maps opus -> claude-opus-4-6. Current
+      Claude model family is 4.X with claude-opus-4-7 as latest Opus. Same
+      stale ID also appeared in hive/GUIDE.md and hive/agents/orchestrator.md
+      model tier tables.
+  - id: finding-3
+    category: SCHEMA_INCONSISTENCY
+    severity: medium
+    location: hive/GUIDE.md
+    description: Configuration section references `skills/hive/hive.config.yaml`
+      but this file does not exist; correct path is `hive/hive.config.yaml`
+    evidence: >
+      GUIDE.md line 520 said "All settings in `skills/hive/hive.config.yaml`".
+      The file skills/hive/hive.config.yaml does not exist. The actual
+      shipped baseline config is at hive/hive.config.yaml (13825 bytes).
+  - id: finding-4
     category: STUB_DOC
     severity: low
     location: hive/references/hive-cloud-roadmap.md
     description: 13-line placeholder stub for deferred Hive Cloud epic
     evidence: >
-      File has 13 lines. Content explicitly states 'S16 stub to close the
-      forward reference from hive/references/session-system-prompt-spec.md.'
-      Cloud-mode rollout details deferred to a separate Hive Cloud epic.
-      Already flagged out_of_scope in meta-2026-05-11 and meta-2026-05-12.
-approved_proposals: []
+      File has 13 lines. Content explicitly states this is an S16 stub.
+      Already flagged out_of_scope in meta-2026-05-11, -12, -14, -15.
+approved_proposals:
+  - id: proposal-1
+    title: Fix wrong config file path in GUIDE.md Configuration section
+    addresses_findings:
+      - finding-3
+    implementation_plan:
+      - step: Update config file path reference
+        file: hive/GUIDE.md
+        action: update_field
+  - id: proposal-2
+    title: Update stale model IDs in agent-config-schema.md, orchestrator.md,
+      and GUIDE.md
+    addresses_findings:
+      - finding-1
+      - finding-2
+    implementation_plan:
+      - step: Update Haiku and Opus model IDs in agent-config-schema.md
+        file: hive/references/agent-config-schema.md
+        action: update_field
+      - step: Update model IDs in orchestrator.md model tier table
+        file: hive/agents/orchestrator.md
+        action: update_field
+      - step: Update model IDs in GUIDE.md Agent Roster table
+        file: hive/GUIDE.md
+        action: update_field
 skipped_findings:
-  - finding_id: finding-1
+  - finding_id: finding-4
     reason: out_of_scope
     notes: >
       Deferred Hive Cloud epic. The stub is an intentional forward-reference
-      placeholder. Expanding it would be speculative without the Hive Cloud
-      epic active. Already flagged out_of_scope in meta-2026-05-11 and
-      meta-2026-05-12. No change warranted.
-changes: []
+      placeholder. Already flagged out_of_scope in prior cycles.
+changes:
+  - proposal_id: proposal-1
+    file: hive/GUIDE.md
+    action: update_field
+    description: Corrected config file path from skills/hive/hive.config.yaml
+      to hive/hive.config.yaml
+    status: promoted
+  - proposal_id: proposal-2
+    file: hive/references/agent-config-schema.md
+    action: update_field
+    description: Updated opus->claude-opus-4-7 and haiku->claude-haiku-4-5-20251001
+    status: promoted
+  - proposal_id: proposal-2
+    file: hive/agents/orchestrator.md
+    action: update_field
+    description: Updated opus->claude-opus-4-7 and haiku->claude-haiku-4-5-20251001
+    status: promoted
+  - proposal_id: proposal-2
+    file: hive/GUIDE.md
+    action: update_field
+    description: Updated opus->claude-opus-4-7 and haiku->claude-haiku-4-5-20251001
+    status: promoted

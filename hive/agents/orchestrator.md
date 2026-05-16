@@ -170,9 +170,9 @@ Match the model to the job. Not every agent needs Opus — use the cheapest mode
 
 | Tier | Model | Agents | When |
 |------|-------|--------|------|
-| **Opus** | claude-opus-4-6 | orchestrator, team-lead, architect, analyst, tpm | Complex reasoning, coordination, architecture, requirements, cross-system planning |
+| **Opus** | claude-opus-4-7 | orchestrator, team-lead, architect, analyst, tpm | Complex reasoning, coordination, architecture, requirements, cross-system planning |
 | **Sonnet** | claude-sonnet-4-6 | researcher, technical-writer, frontend-developer, backend-developer, tester, reviewer, pair-programmer, peer-validator, ui-designer, test-scout, test-architect, test-inspector, test-sentinel | Analytical work, implementation, review, writing, test design |
-| **Haiku** | claude-haiku-4-5 | test-worker | Fast mechanical execution (running tests, collecting results) |
+| **Haiku** | claude-haiku-4-5-20251001 | test-worker | Fast mechanical execution (running tests, collecting results) |
 
 When spawning agents via the Agent tool, set the `model` parameter to match the tier:
 - `model: "opus"` for heavy reasoning
