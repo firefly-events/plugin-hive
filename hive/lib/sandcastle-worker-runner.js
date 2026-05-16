@@ -50,24 +50,28 @@ const DEFAULT_MODEL = 'gpt-5.1-codex';
 const DEFAULT_MAX_ITERATIONS = 5;
 const PROMPT_FILE = '.sandcastle/prompts/worker-issue-pickup.md';
 
-function loadSandcastle() {
-  // eslint-disable-next-line import/no-extraneous-dependencies, global-require
-  return require('@ai-hero/sandcastle');
+// @ai-hero/sandcastle is `"type": "module"` (ESM-only) and its `exports` map
+// has only an `import` condition for the root entry. A bare `require()` from
+// this CJS module fails with "No 'exports' main defined". Use dynamic
+// `import()` instead — supported in CJS since Node 12.20 and returns the
+// ESM namespace object directly.
+async function loadSandcastle() {
+  return import('@ai-hero/sandcastle');
 }
 
-function loadDocker() {
-  // eslint-disable-next-line import/no-extraneous-dependencies, global-require
-  return require('@ai-hero/sandcastle/sandboxes/docker').docker;
+async function loadDocker() {
+  const mod = await import('@ai-hero/sandcastle/sandboxes/docker');
+  return mod.docker;
 }
 
-function getSandcastleDeps(_deps) {
+async function getSandcastleDeps(_deps) {
   const deps = _deps || {};
   if (deps.run && deps.codex && deps.docker) {
     return { run: deps.run, codex: deps.codex, docker: deps.docker };
   }
   let sc;
   try {
-    sc = loadSandcastle();
+    sc = await loadSandcastle();
   } catch (err) {
     throw new Error(
       '[sandcastle-worker-runner] @ai-hero/sandcastle not installed — ' +
@@ -77,7 +81,7 @@ function getSandcastleDeps(_deps) {
   }
   let dockerFactory;
   try {
-    dockerFactory = deps.docker || loadDocker();
+    dockerFactory = deps.docker || (await loadDocker());
   } catch (err) {
     throw new Error(
       '[sandcastle-worker-runner] @ai-hero/sandcastle/sandboxes/docker not available: ' +
@@ -112,7 +116,7 @@ function getSandcastleDeps(_deps) {
 async function runOnce(opts) {
   const options = opts || {};
   const _deps = options._deps || {};
-  const { run, codex, docker } = getSandcastleDeps(_deps);
+  const { run, codex, docker } = await getSandcastleDeps(_deps);
 
   const imageName = options.imageName || DEFAULT_IMAGE;
   const modelTag = options.modelTag || DEFAULT_MODEL;
