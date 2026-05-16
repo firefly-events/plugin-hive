@@ -63,7 +63,9 @@ A consumer wiring this in their own repo needs all of:
 1. **Adapter wiring** — set `external_task_tracking.adapter: github` in `hive.config.yaml` (Epic C). This makes `/plan` step 19a publish stories to GH Issues with `hive:story` + `hive:ready` labels.
 2. **Sandcastle adoption** — install `@ai-hero/sandcastle` per [`sandcastle-adoption-guide.md`](sandcastle-adoption-guide.md) (Epic D). The worker runner at `hive/lib/sandcastle-worker-runner.js` lazily requires it.
 3. **Copy the workflow** — copy `.github/workflows/hive-worker.yml` from plugin-hive into your repo. Plugin distribution does NOT auto-deploy GitHub workflows.
-4. **Configure secrets / permissions** — `GITHUB_TOKEN` is sufficient for the built-in scopes (`issues: write`, `pull-requests: write`, `contents: write`). The workflow does not require additional secrets at v1.
+4. **Configure secrets / permissions** — two secrets required at v1:
+   - `GITHUB_TOKEN` (built-in) covers the workflow scopes (`issues: write`, `pull-requests: write`, `contents: write`).
+   - `CODEX_AUTH_JSON` (manual) — full contents of your local `~/.codex/auth.json` after running `codex login`. The runner uses `codex(modelTag)` and Codex CLI ≥ 0.129 ignores bare `OPENAI_API_KEY` env vars — it requires the mounted `auth.json` file. The workflow's "Materialize codex auth.json" step writes the secret to `.sandcastle/codex-config/auth.json` (mode 600) before invoking the runner; the sandcastle codex() provider auto-mounts it into the container at `/home/agent/.codex/auth.json`. Set with: `gh secret set CODEX_AUTH_JSON --repo <owner>/<repo> < ~/.codex/auth.json`.
 5. **Set budget limit** — add `tokens.daily_usd_limit: <usd>` under `tokens:` in `hive.config.yaml`. Unset → gate disabled (Infinity).
 6. **Pick a cadence** — default is `cron: '*/15 * * * *'`. Tune after observation.
 
