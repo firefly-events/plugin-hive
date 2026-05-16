@@ -240,7 +240,7 @@ risks:
     mitigation: Configurable via workflow_dispatch; first-week observation tunes cadence
   - severity: medium
     description: A worker failure mode that doesn't comment back leaves an issue stuck in hive:in-flight
-    mitigation: Workflow's `if: always()` step labels the issue hive:failed if worker exited non-zero without status='shipped'
+    mitigation: "Workflow's `if: always()` step labels the issue hive:failed if worker exited non-zero without status='shipped'"
 
 references:
   - path: .pHive/research-drafts/2026-05-15-sandcastle-ops-layer-plan.md
