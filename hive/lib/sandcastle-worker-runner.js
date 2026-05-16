@@ -14,7 +14,7 @@
  *   - codex(modelTag) agent provider — Codex CLI ≥ 0.129 requires the
  *     `auth.json` file mounted at `/home/agent/.codex/auth.json` inside
  *     the container. The GH Actions workflow materializes that file from
- *     the OPENAI_API_KEY secret before invoking the runner.
+ *     the CODEX_AUTH_JSON secret before invoking the runner.
  *   - docker({ imageName }) sandbox provider
  *   - promptArgs { FORCE_ISSUE } for {{...}} substitution
  *   - branchStrategy: { type:"branch", branch:"agent/issue-<n>" }

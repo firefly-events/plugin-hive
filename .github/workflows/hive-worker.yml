@@ -84,7 +84,7 @@ jobs:
         run: |
           if [ -z "$CODEX_AUTH_JSON" ]; then
             echo "::error::CODEX_AUTH_JSON secret is not configured on this repository."
-            echo "::error::Run 'gh secret set CODEX_AUTH_JSON --repo firefly-events/plugin-hive < ~/.codex/auth.json'"
+            echo "::error::Run 'gh secret set CODEX_AUTH_JSON --repo ${GITHUB_REPOSITORY} < ~/.codex/auth.json'"
             exit 1
           fi
           mkdir -p .sandcastle/codex-config
