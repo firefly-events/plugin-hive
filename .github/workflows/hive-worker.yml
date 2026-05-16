@@ -43,7 +43,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: dev/hive-2.0
+          ref: main
           fetch-depth: 0
 
       - name: Setup Node

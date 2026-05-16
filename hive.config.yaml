@@ -81,11 +81,11 @@ context_window:
 #       api_key: null                # falls through to LINEAR_API_KEY env
 #       team: ACME                   # falls through to LINEAR_TEAM env
 task_tracking:
-  adapter: null
+  adapter: github
   adapter_timeout_ms: 30000
   gate_mode: warning
-  team_value: null
-  project_value: null
+  team_value: firefly-events
+  project_value: plugin-hive
   # GitHub Issues adapter (sandcastle-ops-layer s1) — extends task_tracking
   # with labeled-issue publish + dependency-sweep. Wired into Phase D of
   # skills/plan/SKILL.md and gated on `adapter == "github"`. Default consumers
