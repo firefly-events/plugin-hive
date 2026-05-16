@@ -103,4 +103,3 @@ references:
       Owns `auth.json` mount semantics, container image expectations,
       podman-rootless prerequisites.
       Files touched: none of the existing dispatch paths.
-

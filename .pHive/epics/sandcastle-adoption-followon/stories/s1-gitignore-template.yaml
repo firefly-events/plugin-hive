@@ -91,4 +91,3 @@ references:
       The Sandcastle file logger writes the full `podman run` argv,
       including `-e OPENAI_API_KEY=<value>`, to `.sandcastle/logs/<name>.log`.
       This is a real key-leak hazard if the log directory is committed.
-
