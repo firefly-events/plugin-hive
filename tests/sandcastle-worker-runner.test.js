@@ -116,12 +116,21 @@ test('runOnce defaults maxIterations to 1 (sandcastle structured-output constrai
   assert.equal(args.maxIterations, 1);
 });
 
-test('runOnce honors explicit maxIterations override', async () => {
+test('runOnce rejects maxIterations !== 1 (structured-output constraint)', async () => {
   const { runOnce } = loadModule();
   const deps = makeDeps();
-  await runOnce({ issueNumber: 1, maxIterations: 3, _deps: deps });
+  await assert.rejects(
+    () => runOnce({ issueNumber: 1, maxIterations: 3, _deps: deps }),
+    /maxIterations must be 1/i
+  );
+});
+
+test('runOnce accepts explicit maxIterations === 1', async () => {
+  const { runOnce } = loadModule();
+  const deps = makeDeps();
+  await runOnce({ issueNumber: 1, maxIterations: 1, _deps: deps });
   const [args] = deps._captured.capturedRunArgs;
-  assert.equal(args.maxIterations, 3);
+  assert.equal(args.maxIterations, 1);
 });
 
 // ---------------------------------------------------------------------------

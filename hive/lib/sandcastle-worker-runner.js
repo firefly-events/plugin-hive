@@ -129,6 +129,13 @@ async function runOnce(opts) {
   const maxIterations = typeof options.maxIterations === 'number'
     ? options.maxIterations
     : DEFAULT_MAX_ITERATIONS;
+  if (maxIterations !== 1) {
+    throw new Error(
+      '[sandcastle-worker-runner] maxIterations must be 1 — sandcastle ' +
+      'structured output (Output.object) is a one-shot operation per ' +
+      `ADR 0010 (got ${maxIterations}).`
+    );
+  }
 
   const forceIssue =
     typeof options.issueNumber === 'number' && options.issueNumber > 0
