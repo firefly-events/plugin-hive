@@ -152,7 +152,8 @@ def explain_why(
         )
 
     recent = query_recent_triples(db_path)
-    lines = [f"No decisions found matching {topic}."]
+    topic_label = f"'{topic}'" if topic else "the requested query"
+    lines = [f"No decisions found matching {topic_label}."]
     if recent:
         lines.append("Recent triples:")
         lines.append(render_triples(recent))
