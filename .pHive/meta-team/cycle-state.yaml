@@ -1,6 +1,6 @@
 cycle_id: meta-2026-05-16
 started: '2026-05-16T00:00:00Z'
-status: closing
+status: closed
 phase: close
 closed: '2026-05-16T00:30:00Z'
 charter_constraints:
@@ -128,13 +128,13 @@ steps:
         file: hive/GUIDE.md
         verdict: pass
         status: promoted
-        commit_ref: pending
+        commit_ref: a5024c847ac3128d077b3c58b06a7dd58b7b5863
         rollback_target: b50bb99d65258c7d4e70b278f900b419ef798498
       - proposal_id: proposal-2
         file: hive/references/agent-config-schema.md,hive/agents/orchestrator.md,hive/GUIDE.md
         verdict: pass
         status: promoted
-        commit_ref: pending
+        commit_ref: a5024c847ac3128d077b3c58b06a7dd58b7b5863
         rollback_target: b50bb99d65258c7d4e70b278f900b419ef798498
     reverted_changes: []
     insights_staged: 0
