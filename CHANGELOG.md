@@ -51,6 +51,19 @@ Closes the cron → worker → PR → review loop by composing three things that
 - 15-minute cron cadence is a default, not a load-tested number — tune via the workflow's `cron:` field after the first observation window.
 - Metrics contract: `autonomous_stories_closed` (target 3, window 14d post-merge, source `gh_issue_close_events`) per the S3 story metric block. Verifiable at epic-close + 14d.
 
+## [2.0.1] - 2026-05-15
+
+**Patch release.** Merges three nightly `meta-meta-optimize` cycle ledger appends (2026-05-13, -14, -15) into `main`. No code or workflow changes — operational state only.
+
+### Added
+
+- `.pHive/meta-team/ledger.yaml` — 3 new cycle entries (meta-2026-05-13, -14, -15). Cycle meta-2026-05-13 promoted 1 SCHEMA_INCONSISTENCY fix to `step-03-proposal.md` (NEXT STEP pointer correction); meta-2026-05-14 and meta-2026-05-15 closed as discard cycles (hive-cloud-roadmap.md STUB_DOC repeatedly flagged out_of_scope pending Hive Cloud epic activation).
+
+### Changed
+
+- `.pHive/meta-team/cycle-state.yaml`, `.pHive/meta-team/morning-summary.md` — rolled forward through nightly cycles.
+- `hive/workflows/steps/meta-team-cycle/step-03-proposal.md` — NEXT STEP pointer corrected from `step-04-implementation.md` to `step-03c-metric-declaration.md` per meta-2026-05-13 finding.
+
 ## [2.0.0] - 2026-05-12
 
 **Hive 2.0 milestone.** Cut from `dev/hive-2.0`. Bundles CWC 2026 A-group + Epic A (catalog hygiene + 3 mattpocock-aligned borrows) + Epic B (structural refactor + gate-lift) + Epic C (Task-Tracking Adapter ABI) as the 2.0 cut-line, with Epic D (Sandcastle adoption follow-on) and Epic F (UI cluster extract-config deeper) riding parallel.
@@ -561,7 +574,8 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/firefly-events/plugin-hive/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/firefly-events/plugin-hive/compare/v1.3.0...v2.0.0
 [1.3.0]: https://github.com/firefly-events/plugin-hive/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/firefly-events/plugin-hive/compare/v1.2.1...v1.2.2
