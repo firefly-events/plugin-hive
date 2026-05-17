@@ -77,11 +77,22 @@ jobs:
           cat > "$BUILD_DIR/Dockerfile" <<'DOCKERFILE'
           FROM node:22-bookworm
 
-          RUN apt-get update && apt-get install -y \
-            git \
-            curl \
-            jq \
-            && rm -rf /var/lib/apt/lists/*
+          # Worker prompt runs `gh issue list / edit / create` inside the
+          # container, so gh CLI is required. Install via GitHub's official
+          # apt repo (gh isn't in stock debian repos).
+          RUN apt-get update && apt-get install -y --no-install-recommends \
+                git \
+                curl \
+                jq \
+                ca-certificates \
+              && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+                  -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+              && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+              && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+                  > /etc/apt/sources.list.d/github-cli.list \
+              && apt-get update \
+              && apt-get install -y --no-install-recommends gh \
+              && rm -rf /var/lib/apt/lists/*
 
           ARG AGENT_UID=1000
           ARG AGENT_GID=1000
