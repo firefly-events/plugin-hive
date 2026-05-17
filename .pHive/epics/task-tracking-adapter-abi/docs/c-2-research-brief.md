@@ -40,7 +40,7 @@ Only one error code is demonstrated in the sketch (`NOT_FOUND`). The example ada
 |----------------|----------------------------------------------------------|----------------------------------------------------------|
 | `capabilities` | `{}`                                                     | `{hierarchy, supports_parent_link, metadata:{team_field,project_field}}` |
 | `createStory`  | `{title, body, parent_id?, labels?, team_field?, project_field?}` | `{id, url}`                                  |
-| `updateStatus` | `{id, status: "open|in_progress|done|cancelled"}`        | `{ok: true}`                                             |
+| `updateStatus` | `{id, status: "open\|in_progress\|done\|cancelled"}`     | `{ok: true}`                                             |
 | `listOpen`     | `{limit:50, team_field?, project_field?}`                | `{stories:[{id,title,status,url}]}`                      |
 | `getStory`     | `{id}`                                                   | `{id,title,body,status,labels,parent_id,url}`            |
 | `addComment`   | NOT IN SKETCH — present in prose-runbook only            | (pending c-2 definition)                                 |
