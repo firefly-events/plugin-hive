@@ -1,9 +1,7 @@
 # Context
 
 <!--
-  Sandcastle worker prompt — sandcastle-ops-layer / s2-sandcastle-worker-prompt.
-  Each !`command` block runs inside the sandbox AT PROMPT-RENDER TIME.
-  Stdout becomes the literal context the agent sees.
+  Sandcastle worker prompt — sandcastle-ops-layer.
 
   Label namespace (owned by S1 github-issues-adapter):
     hive:ready                  — published, unblocked, available for pickup
@@ -11,17 +9,21 @@
     hive:failed                 — worker failed; needs human review
     hive:shipped                — worker opened a PR successfully
     hive:epic:<epic-id>         — epic membership
-    hive:story:<story-id>       — story identity (round-trip to YAML)
+    hive:story:<story-id>       — story identity (round-trips to YAML)
     hive:blocked-by:<story-id>  — open dependency
 
   promptArgs:
     FORCE_ISSUE — optional bare integer; if set, the runner is forcing a
                   specific issue (manual invocation). Empty string in cron path.
 
-  Runtime: codex (gpt-5.4 family). This prompt is intentionally codex-native
-  — it does NOT invoke /hive:execute (a Claude Code skill that codex can't
-  resolve). The work is described inline so codex executes it directly via
-  bash/edit tools.
+  Runtime: Claude Code inside a sandcastle container. The container has the
+  Claude CLI installed (css-2) and an authenticated CLAUDE_CODE_OAUTH_TOKEN
+  forwarded by the workflow (css-3), so the worker can resolve and invoke
+  the `/hive:execute` skill. Implementation work — read story, plan, edit,
+  test, commit — is delegated to that skill, which handles methodology
+  routing (TDD vs classic vs BDD) and agent_backends routing. This prompt
+  only owns the issue lifecycle: claim → delegate → ship → label flip →
+  result emit.
 -->
 
 ## Open hive:ready issues (lowest-numbered first)
@@ -32,20 +34,15 @@
 
 FORCE_ISSUE = "{{FORCE_ISSUE}}"
 
-## Recent merged PRs against main
-
-!`gh pr list --state merged --base main --json number,title,mergedAt --limit 10 --jq '.[] | "#\(.number) \(.mergedAt) \(.title)"'`
-
 ## Current branch
 
 !`git rev-parse --abbrev-ref HEAD`
 
 # Task
 
-You are an autonomous hive worker. Pick **one** open `hive:ready` issue, ship
-it as a PR against `main`, and emit a structured result. The plan-then-execute
-flow is inlined below — you do not need (and must not try) to invoke any
-slash command.
+You are an autonomous hive worker running inside a sandcastle container.
+Pick **one** open `hive:ready` issue, delegate the work to `/hive:execute`,
+ship the result as a PR against `main`, and emit a structured result.
 
 Execute steps in order. Do not skip, reorder, or improvise.
 
@@ -65,8 +62,7 @@ Otherwise, from the open `hive:ready` list above:
 
 1. Discard any issue whose labels contain a `hive:blocked-by:<id>` entry.
 2. From what remains, pick the **lowest-numbered** issue.
-3. If nothing remains, emit the structured result inside a `<result>` tag and
-   then the completion signal:
+3. If nothing remains, emit:
 
    ```
    <result>{"issue_number": null, "pr_number": null, "status": "idle", "reason": "no_ready_issues"}</result>
@@ -83,59 +79,53 @@ Call your chosen issue `<N>` for the rest of this prompt.
 gh issue edit <N> --remove-label hive:ready --add-label hive:in-flight
 ```
 
-## Step 3 — Locate the story YAML
+## Step 3 — Resolve the story YAML
 
-The issue carries a `hive:story:<story-id>` label. Extract that story-id, then
-find the YAML file that matches it. Story YAML lives at
+The issue carries a `hive:story:<story-id>` label. Extract the story-id and
+resolve it to the YAML file on disk. Story YAML lives at
 `.pHive/epics/<epic-id>/stories/<story-id>.yaml`.
 
 ```bash
 STORY_ID=$(gh issue view <N> --json labels --jq '.labels[].name | select(startswith("hive:story:")) | sub("^hive:story:"; "")')
 STORY_PATH=$(find .pHive/epics -name "${STORY_ID}.yaml" -type f | head -1)
 test -f "$STORY_PATH" || { echo "story YAML not found for $STORY_ID"; exit 1; }
-cat "$STORY_PATH"
 ```
 
-Read the full story YAML — the `description`, `acceptance_criteria`,
-`files_to_modify`, `code_examples`, and `cross_cutting` sections describe
-exactly what to build. **Trust the YAML, not the issue body.**
+`/hive:execute` re-reads this path itself — the worker does not need to
+parse it. **Trust the YAML, not the issue body.**
 
-## Step 4 — Implement the story
+## Step 4 — Delegate implementation to /hive:execute
 
 You are already on branch `agent/issue-<N>` (sandcastle's branchStrategy
 placed you there — verify with `git rev-parse --abbrev-ref HEAD`).
 
-Implement the story directly:
+Invoke the skill with the resolved story-id:
 
-1. Re-read every file referenced in the story's `key_files`, `files_to_modify`,
-   `code_examples.file`, and `references.path` before making any edits.
-2. Make the minimum changes that satisfy every line in `acceptance_criteria`.
-   Honor any `cross_cutting` entries on the story.
-3. Keep the diff focused — do not refactor adjacent code, add unrelated
-   improvements, or expand scope beyond what the story spec demands.
-4. If the story declares tests (the `steps` array contains a `test` or
-   `test-spec` step), run the project's test command and verify pass before
-   committing. The repo has no root `package.json`; for plugin-hive itself,
-   tests live under `tests/` and run via `node --test`.
-
-Commit on `agent/issue-<N>` with a Conventional Commits message that
-references issue `#<N>`:
-
-```bash
-git add -A
-git commit -m "<type>(<scope>): <one-line summary>
-
-<longer body if needed>
-
-Refs #<N>"
+```
+/hive:execute ${STORY_ID}
 ```
 
-If multiple coherent commits are appropriate, that's fine — keep each focused
-and conventional.
+The skill spawns the appropriate team for the story's `methodology`:
+TDD adds a test-spec step before implementation; classic and BDD follow
+their own phase ordering. Each role is routed to the LLM backend declared
+in the project's agent_backends config (cross-LLM verification — orchestrator
+Claude + developer/researcher backends per policy). The skill commits each
+phase on the current branch.
+
+Do not perform implementation work yourself. The worker's job is the issue
+lifecycle, not the work. After the skill returns, verify the branch carries
+new commits beyond `main`:
+
+```bash
+git log --oneline main..HEAD
+```
+
+If the output is empty, `/hive:execute` produced no work — fall through to
+Step 6 (failure path).
 
 ## Step 5 — Ship (success path)
 
-When the work is complete, tests pass, and commits exist locally on
+When `/hive:execute` returned and commits exist locally on
 `agent/issue-<N>`:
 
 **First** — push the branch explicitly. Do not rely on `gh pr create`'s
@@ -184,8 +174,7 @@ gh issue comment <N> --body "Shipped via PR #<P>."
 gh issue edit <N> --remove-label hive:in-flight --add-label hive:shipped
 ```
 
-Emit the structured result inside a `<result>` tag and then the completion
-signal:
+Emit:
 
 ```
 <result>{"issue_number": <N>, "pr_number": <P>, "status": "shipped", "branch": "agent/issue-<N>"}</result>
@@ -194,17 +183,16 @@ signal:
 
 ## Step 6 — Failure path
 
-If at any point the work cannot be completed (tests fail unrecoverably,
-acceptance criteria can't be met, story YAML missing, the work is out of
-scope for autonomous execution, etc.):
+If at any point the work cannot be completed (`/hive:execute` produced no
+commits, the skill reported unrecoverable failure, the story YAML is
+missing, the work is out of scope for autonomous execution, etc.):
 
 ```bash
 gh issue comment <N> --body "<redacted one-paragraph failure summary; no secrets, no tokens, no full stack traces>"
 gh issue edit <N> --remove-label hive:in-flight --add-label hive:failed
 ```
 
-Emit the structured result inside a `<result>` tag and then the completion
-signal:
+Emit:
 
 ```
 <result>{"issue_number": <N>, "pr_number": null, "status": "failed", "reason": "<one-line cause>"}</result>

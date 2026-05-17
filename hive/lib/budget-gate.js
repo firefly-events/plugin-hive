@@ -45,9 +45,10 @@ const path = require('node:path');
 // intentionally inline so it shows up in diffs when rates change.
 // Source: Anthropic pricing page; verify before relying on absolute numbers.
 const RATES_PER_MTOK = {
-  'claude-opus-4-7':   { in: 15.0, out: 75.0 },
-  'claude-sonnet-4-6': { in:  3.0, out: 15.0 },
-  'claude-haiku-4-5':  { in:  1.0, out:  5.0 },
+  'claude-opus-4-7':          { in: 15.0, out: 75.0 },
+  'claude-sonnet-4-6':        { in:  3.0, out: 15.0 },
+  'claude-haiku-4-5-20251001': { in:  1.0, out:  5.0 },
+  'claude-haiku-4-5':          { in:  1.0, out:  5.0 },
 };
 
 const FALLBACK_MODEL = 'claude-opus-4-7';
