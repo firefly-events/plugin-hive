@@ -242,7 +242,7 @@ test('runOnce propagates imageName to docker() and modelTag to codex()', async (
   await runOnce({
     issueNumber: 1,
     imageName: 'sandcastle:custom',
-    modelTag: 'gpt-5.1-codex-test',
+    modelTag: 'gpt-5.4-test',
     _deps: deps,
   });
   assert.deepEqual(deps._captured.capturedDockerArgs, [
@@ -259,11 +259,11 @@ test('runOnce propagates imageName to docker() and modelTag to codex()', async (
     },
   ]);
   assert.deepEqual(deps._captured.capturedClaudeArgs, [
-    'gpt-5.1-codex-test',
+    'gpt-5.4-test',
   ]);
 });
 
-test('runOnce defaults imageName to sandcastle:hive and modelTag to gpt-5.1-codex', async () => {
+test('runOnce defaults imageName to sandcastle:hive and modelTag to gpt-5.4', async () => {
   const { runOnce, _internal } = loadModule();
   const deps = makeDeps();
   await runOnce({ issueNumber: 1, _deps: deps });
