@@ -1,0 +1,76 @@
+id: mhg-5-silent-kickoff-pass
+epic: meta-hive-grooming-may2026
+title: Silent kickoff-gate output on pass across all skills
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  Every Hive skill (plan, execute, test, standup, review, status) opens
+  with a "Kickoff Gate" check. Today the gate emits chatter on the pass
+  path too — wasted tokens, noisy UX. Make it silent on pass: only
+  surface output when the gate FAILS (so the user gets the actionable
+  "run /hive:kickoff first" guidance).
+
+  Confirmed touch list (6 skills):
+    - skills/plan/SKILL.md
+    - skills/execute/SKILL.md
+    - skills/test/SKILL.md
+    - skills/standup/SKILL.md
+    - skills/review/SKILL.md
+    - skills/status/SKILL.md
+
+  This is a wording-only change. The gate logic stays identical; only
+  the on-pass output is suppressed. Verify each file uses the same
+  pattern; if any has a divergent kickoff section, normalize.
+
+  Note: skills/plan/SKILL.md kickoff section already says "If all checks
+  pass, proceed silently" — but other files may not. Audit and
+  standardize.
+
+acceptance_criteria:
+  - "Given the kickoff gate is added/updated, when all preconditions pass, then no kickoff-related text is emitted to the user."
+  - "Given any precondition fails, when the gate stops, then the failure message + remediation pointer to /hive:kickoff is shown verbatim as today."
+  - "Given all 6 listed skills are inspected, when their Kickoff Gate sections are diff'd, then the on-pass behavior is identical (silent) and the on-fail message is consistent."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Diff the Kickoff Gate sections across the 6 skill files. Report
+      the pattern variants and which need a wording change to go silent
+      on pass.
+  - id: implement
+    agent: developer
+    description: Update all 6 skill files for silent-on-pass + consistent on-fail.
+    depends_on: [research]
+  - id: review
+    agent: reviewer
+    description: Verify wording is consistent across all 6 files.
+    depends_on: [implement]
+  - id: integrate
+    agent: developer
+    description: Commit on feat/meta-hive-grooming-may2026 branch.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Already silent — reference pattern.
+    - path: skills/execute/SKILL.md
+      purpose: Audit + update.
+    - path: skills/test/SKILL.md
+      purpose: Audit + update.
+    - path: skills/standup/SKILL.md
+      purpose: Audit + update.
+    - path: skills/review/SKILL.md
+      purpose: Audit + update.
+    - path: skills/status/SKILL.md
+      purpose: Audit + update.
+
+risks:
+  - severity: low
+    description: Silent pass may make the user wonder if the skill ran the check.
+    mitigation: Acceptable trade — failure message still loud; no observability loss for the failure path.

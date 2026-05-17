@@ -1,0 +1,45 @@
+name: meta-hive-grooming-may2026
+title: Meta-Hive Grooming Batch — May 2026
+description: |
+  Seven independent grooming items raised by the maintainer on 2026-05-04 to
+  improve Hive's product surface: brownfield-maturity-aware meta metrics,
+  README discoverability, planning-flow branch hygiene, design skill
+  promotion, kickoff-gate verbosity, ui-designer logo capability gap, and
+  agent model-tier rebalance.
+
+  Each story is independent (no depends_on). Pickable in any order.
+  Methodology: classic. Most are single-file or small-multi-file edits to
+  hive itself.
+
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+
+stories:
+  - id: mhg-1-brownfield-maturity-metrics
+    title: Brownfield-maturity-aware metric recommendations in meta-hive
+    complexity: medium
+    depends_on: []
+  - id: mhg-2-readme-toc
+    title: Add table of contents to README
+    complexity: low
+    depends_on: []
+  - id: mhg-3-branch-first-planning-step
+    title: Create feat branch as first planning-skill step
+    complexity: medium
+    depends_on: []
+  - id: mhg-4-design-skill-greenfield-and-toplevel
+    title: Make design system optional in greenfield path + audit /design top-level invocability
+    complexity: medium
+    depends_on: []
+  - id: mhg-5-silent-kickoff-pass
+    title: Silent kickoff-gate output on pass across all skills
+    complexity: low
+    depends_on: []
+  - id: mhg-6-ui-logo-capability-investigation
+    title: Investigate better logo-generation approach for ui-designer
+    complexity: medium
+    depends_on: []
+  - id: mhg-7-agent-model-tier-rebalance
+    title: Rebalance agent model tiers — only orchestrator on opus
+    complexity: medium
+    depends_on: []

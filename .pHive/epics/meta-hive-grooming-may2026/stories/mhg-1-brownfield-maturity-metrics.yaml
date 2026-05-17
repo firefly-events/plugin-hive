@@ -1,0 +1,84 @@
+id: mhg-1-brownfield-maturity-metrics
+epic: meta-hive-grooming-may2026
+title: Brownfield-maturity-aware metric recommendations in meta-hive
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Meta-hive (`/meta-optimize`) currently recommends the same metrics
+  regardless of project state. Greenfield and immature projects have no
+  signal — recommendations are noise at best, misleading at worst. The
+  maintainer flagged that meta-hive is most useful for established
+  brownfield projects.
+
+  Add project-maturity awareness to metric recommendation:
+    1. Capture `project_maturity` during kickoff (greenfield | early |
+       established | mature). Surface it in `.pHive/project-profile.yaml`.
+    2. Filter or gate the metric registry by maturity in the meta-optimize
+       skill. Greenfield/early projects get a reduced recommendation set
+       (or an explicit "metrics not yet meaningful — gather signal first"
+       message). Established/mature get the full set.
+    3. Document the maturity classification heuristic so kickoff and humans
+       can apply it consistently.
+
+acceptance_criteria:
+  - "Given a kickoff run on a new project, when project_maturity is asked, then the user picks one of {greenfield, early, established, mature} and the choice persists to .pHive/project-profile.yaml."
+  - "Given a project with project_maturity=greenfield, when /meta-optimize runs, then the recommended metric set is reduced or replaced with a 'gather signal first' guidance message."
+  - "Given a project with project_maturity=established or mature, when /meta-optimize runs, then the full metric registry is recommended as today."
+  - "Given an existing kickoff'd project missing project_maturity, when /meta-optimize runs, then the user is prompted once to classify and the value is persisted."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read `skills/hive/skills/meta-optimize/SKILL.md`,
+      `skills/hive/skills/meta-optimize/metric_registry.py`, and the
+      kickoff skill at `skills/kickoff/SKILL.md`. Identify exact
+      injection points for the maturity field and the metric-filter
+      gate. Report back the touch list.
+  - id: implement
+    agent: developer
+    description: |
+      Add project_maturity field to project-profile.yaml schema + kickoff
+      prompt. Add maturity-aware filter in meta-optimize. Document the
+      classification heuristic.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Verify all four AC paths. Hand-test kickoff (no automated suite for
+      it). Programmatic test for metric_registry filter behavior.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: Review for consumer-neutrality, schema-versioning, and packaging boundary.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit on feat/meta-hive-grooming-may2026 branch.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/meta-optimize/SKILL.md
+      purpose: Public meta-optimize entry; gate sits here.
+    - path: skills/hive/skills/meta-optimize/metric_registry.py
+      purpose: Metric registry to filter by maturity.
+    - path: skills/kickoff/SKILL.md
+      purpose: Asks project profile fields; add maturity prompt here.
+    - path: .pHive/project-profile.yaml
+      purpose: Persists captured kickoff fields.
+
+risks:
+  - severity: low
+    description: Maturity is subjective; users may misclassify.
+    mitigation: Provide clear heuristic (lines of code, age in months, test coverage, deployed-to-prod boolean).
+
+references:
+  - path: skills/hive/skills/meta-optimize/SKILL.md
+    relevant_excerpt: |
+      Kickoff metrics opt-in is explicit and defaults OFF. If metrics are OFF,
+      inform the user and stop, or continue only in backlog-backed mode...
