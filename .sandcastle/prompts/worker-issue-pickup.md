@@ -164,12 +164,18 @@ If `gh pr create` fails with a permission error (e.g. "GitHub Actions
 is not permitted to create or approve pull requests"), the branch is
 ALREADY on remote from the push above — treat this as a partial-ship:
 emit the structured `failed` result but include `branch` so a human can
-open the PR manually from `agent/issue-<N>`:
+open the PR manually from `agent/issue-<N>`.
+
+Before emitting, sanitize the captured error string to a single line
+with no double-quotes or backslashes (e.g., replace `\n` / `\r` with
+spaces and strip `"` / `\\`) so it doesn't break the `<result>` JSON.
 
 ```
-<result>{"issue_number": <N>, "pr_number": null, "status": "failed", "reason": "pr_create_blocked: <error>", "branch": "agent/issue-<N>"}</result>
+<result>{"issue_number": <N>, "pr_number": null, "status": "failed", "reason": "pr_create_blocked: <sanitized_one_line_error>", "branch": "agent/issue-<N>"}</result>
 <promise>COMPLETE</promise>
 ```
+
+Stop. Do not continue to the PR-success steps that follow.
 
 Capture the PR number from stdout — call it `<P>`. Then:
 
