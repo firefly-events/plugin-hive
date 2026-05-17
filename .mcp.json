@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "openai-image": {
+      "command": "node",
+      "args": [
+        "hive/lib/openai-image-mcp-server.js"
+      ]
+    }
+  }
+}
