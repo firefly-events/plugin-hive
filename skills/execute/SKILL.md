@@ -17,6 +17,8 @@ All state paths in this skill are written as `${HIVE_STATE_DIR}/...`. Resolve `H
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — kickoff gate (initialization check) + persona / config / memory loading. The kickoff gate's `${HIVE_STATE_DIR}/project-profile.yaml` reference resolves via the section above.
 
+If the kickoff checks pass, proceed silently. Only surface kickoff-related output when a kickoff check fails and the selected gate behavior below requires a warning or stop.
+
 ## Delegation Rules (MANDATORY)
 
 **The orchestrator is a coordinator, not an implementor.** The orchestrator MUST NOT:

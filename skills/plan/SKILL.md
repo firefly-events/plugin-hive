@@ -39,7 +39,7 @@ Reads `.pHive/triage/queue.yaml` and decomposes one item (the triage entry whose
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — state-directory note, kickoff gate, persona / config / memory loading. This skill consults routing keys (`agent_backends`, `model_overrides`, `planning.collaborative_review`) so also follow the **Root-first config precedence** subsection of the prelude.
 
-**Kickoff gate override — gate_mode aware.** Read `paths.gate_mode` from the root `hive.config.yaml` (consumer override layer; falls back to `hive/hive.config.yaml`; default `warning`). When `gate_mode: hard`, the prelude's hard-stop applies byte-equivalently. When `gate_mode: warning`, the hard-stop is replaced by warn-and-proceed with sane defaults:
+**Kickoff gate override — gate_mode aware.** If the kickoff checks pass, proceed silently. Read `paths.gate_mode` from the root `hive.config.yaml` (consumer override layer; falls back to `hive/hive.config.yaml`; default `warning`). When `gate_mode: hard`, the prelude's hard-stop applies byte-equivalently. When `gate_mode: warning`, the hard-stop is replaced by warn-and-proceed with sane defaults:
 
 1. Emit the warning below (verbatim) when `.pHive/project-profile.yaml` is missing or its `tech_stack` field is empty/null:
 
