@@ -46,7 +46,13 @@ function getDefaultOutputSchema() {
 }
 
 const DEFAULT_IMAGE = 'sandcastle:hive';
-const DEFAULT_MODEL = 'gpt-5.1-codex';
+const DEFAULT_MODEL = 'gpt-5.4';
+// Default sandcastle idleTimeout is 600s. Codex on a non-trivial story
+// (read context → plan → edit → test → commit → PR) routinely thinks
+// quietly for >60s between stdout bursts. Bump to 1800s (30 min) to
+// avoid killing the agent mid-task. The job-level 45-min timeout in the
+// workflow remains the hard ceiling.
+const DEFAULT_IDLE_TIMEOUT_S = 1800;
 // Must match the literal `<result>…</result>` block in the worker prompt
 // (.sandcastle/prompts/worker-issue-pickup.md). Sandcastle scans the
 // rendered prompt for the tag and errors if it isn't referenced.
@@ -148,6 +154,9 @@ async function runOnce(opts) {
 
   const imageName = options.imageName || DEFAULT_IMAGE;
   const modelTag = options.modelTag || DEFAULT_MODEL;
+  const idleTimeoutSeconds = typeof options.idleTimeoutSeconds === 'number'
+    ? options.idleTimeoutSeconds
+    : DEFAULT_IDLE_TIMEOUT_S;
   const maxIterations = typeof options.maxIterations === 'number'
     ? options.maxIterations
     : DEFAULT_MAX_ITERATIONS;
@@ -213,6 +222,7 @@ async function runOnce(opts) {
     promptArgs: { FORCE_ISSUE: forceIssue },
     branchStrategy: { type: 'branch', branch: branchName },
     maxIterations,
+    idleTimeoutSeconds,
     output: outputDefinition,
   };
 

@@ -19,7 +19,7 @@
  *  AC-5  COMPLETE emitted on idle path
  *  AC-6  {{FORCE_ISSUE}} placeholder present
  *  AC-7  /hive:execute referenced as the worker's executor
- *  AC-8  gh pr create --base dev/hive-2.0
+ *  AC-8  gh pr create --base main
  *  AC-9  branch naming convention: agent/issue-<N>
  *  AC-10 Re-read story YAML at runtime (not trusting issue body)
  */
@@ -141,12 +141,12 @@ test('prompt routes story execution through /hive:execute skill', () => {
 // AC-8: gh pr create --base dev/hive-2.0
 // ---------------------------------------------------------------------------
 
-test('prompt opens PR against dev/hive-2.0 (hive 2.0 stacked-PR branching)', () => {
+test('prompt opens PR against main (sandcastle-ops shipped on main; dev/hive-2.0 is stale)', () => {
   const text = loadPrompt();
   assert.match(
     text,
-    /gh pr create[\s\S]*--base dev\/hive-2\.0/,
-    'PR must target dev/hive-2.0 per Hive 2.0 stacked-PR branching policy'
+    /gh pr create[\s\S]*--base main/,
+    'PR must target main (workflow checks out main; dev/hive-2.0 was the 2.0 integration branch and is stale)'
   );
   assert.match(
     text,
@@ -179,9 +179,17 @@ test('prompt re-reads story YAML at runtime instead of trusting issue body', () 
     /\.pHive\/epics\/.*stories.*\.yaml/,
     'worker must look up the story YAML on disk'
   );
+  // Story lookup is via the hive:story:<id> label, not the external_id
+  // field. The label gives us the canonical story-id, then a find on the
+  // YAML filename resolves to the exact path.
   assert.match(
     text,
-    /external_id/,
-    'worker matches the issue number against story external_id, not body'
+    /hive:story:/,
+    'worker resolves story-id from the hive:story:<id> label'
+  );
+  assert.match(
+    text,
+    /find\s+\.pHive\/epics/,
+    'worker uses find on .pHive/epics to locate the story YAML by filename'
   );
 });
