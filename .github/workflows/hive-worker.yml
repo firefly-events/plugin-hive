@@ -36,7 +36,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Preflight: short-circuit when the queue is empty so the cron path doesn't
+  # spin a container, boot Claude CLI, and burn subscription quota on a noop.
+  # Manual dispatch with an explicit `issue_number` bypasses the check (force-
+  # run path). This job is cheap — gh CLI is preinstalled on the runner, so
+  # the only cost is a runner-start (~10s) + a single REST list call.
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      has_work: ${{ steps.check.outputs.has_work }}
+    steps:
+      - name: Check hive:ready queue (or honor manual force)
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE_ISSUE: ${{ inputs.issue_number }}
+        run: |
+          if [ -n "$FORCE_ISSUE" ]; then
+            echo "Manual dispatch with issue_number=$FORCE_ISSUE — bypassing queue check."
+            echo "has_work=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          count=$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --label hive:ready \
+            --json number \
+            --jq 'length')
+          echo "hive:ready queue size: $count"
+          if [ "$count" -gt 0 ]; then
+            echo "has_work=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_work=false" >> "$GITHUB_OUTPUT"
+            echo "Queue empty; worker job will be skipped."
+            echo '### Hive Worker — queue empty, skipped' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   worker:
+    needs: preflight
+    if: needs.preflight.outputs.has_work == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
