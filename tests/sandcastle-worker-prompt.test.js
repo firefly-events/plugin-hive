@@ -125,7 +125,7 @@ test('prompt declares the {{FORCE_ISSUE}} sandcastle promptArgs substitution', (
 });
 
 // ---------------------------------------------------------------------------
-// AC-7: /hive:execute referenced
+// AC-7: /hive:execute invoked (not just mentioned in a comment)
 // ---------------------------------------------------------------------------
 
 test('prompt routes story execution through /hive:execute skill', () => {
@@ -134,6 +134,16 @@ test('prompt routes story execution through /hive:execute skill', () => {
     text,
     /\/hive:execute/,
     'prompt must defer to the /hive:execute skill (no custom executor)'
+  );
+  // The old codex-shaped prompt mentioned /hive:execute only inside an HTML
+  // comment ("Runtime: codex … does NOT invoke /hive:execute"). Strip
+  // comments and re-check: the Claude-shaped prompt must invoke the skill
+  // from a body directive, not just acknowledge it.
+  const withoutComments = text.replace(/<!--[\s\S]*?-->/g, '');
+  assert.match(
+    withoutComments,
+    /\/hive:execute/,
+    'prompt must invoke /hive:execute from a body directive (not only in a comment)'
   );
 });
 
