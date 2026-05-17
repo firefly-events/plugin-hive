@@ -178,6 +178,24 @@ jobs:
           name: worker-result
           path: result.json
 
+      - name: Upload sandcastle logs
+        # Codex's full reasoning + tool-call transcript lives in
+        # `.sandcastle/logs/agent-issue-<N>.log` on the runner host
+        # (sandcastle writes this via its file-mode LoggingOption).
+        # This dies with the runner if we don't upload it as an
+        # artifact. Keep it for post-run debugging — agent quality
+        # iteration depends on being able to read what codex
+        # actually did.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandcastle-logs
+          path: |
+            .sandcastle/logs/
+            .sandcastle/worktrees/
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Summarize result
         if: always()
         run: |
