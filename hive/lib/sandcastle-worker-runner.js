@@ -11,10 +11,9 @@
  *
  * Sandcastle primitives used (no custom dispatcher logic):
  *   - run({ promptFile, output, branchStrategy, maxIterations })
- *   - codex(modelTag) agent provider — Codex CLI ≥ 0.129 requires the
- *     `auth.json` file mounted at `/home/agent/.codex/auth.json` inside
- *     the container. The GH Actions workflow materializes that file from
- *     the CODEX_AUTH_JSON secret before invoking the runner.
+ *   - claudeCode(modelTag) agent provider — Claude Code runs in-container
+ *     once the CLI is installed and the OAuth token is forwarded by the
+ *     surrounding workflow stories.
  *   - docker({ imageName }) sandbox provider
  *   - promptArgs { FORCE_ISSUE } for {{...}} substitution
  *   - branchStrategy: { type:"branch", branch:"agent/issue-<n>" }
@@ -24,7 +23,7 @@
  * adopted sandcastle. We `require()` lazily and surface a clear error
  * otherwise. Mirrors the BYO pattern in hive/lib/external/github-issues-adapter.js.
  *
- * Test seam: runOnce accepts a `_deps` object replacing run / codex /
+ * Test seam: runOnce accepts a `_deps` object replacing run / claudeCode /
  * docker so unit tests can verify the run() call args without booting a
  * container. Not part of public API.
  *
@@ -46,8 +45,8 @@ function getDefaultOutputSchema() {
 }
 
 const DEFAULT_IMAGE = 'sandcastle:hive';
-const DEFAULT_MODEL = 'gpt-5.4';
-// Default sandcastle idleTimeout is 600s. Codex on a non-trivial story
+const DEFAULT_MODEL = 'claude-opus-4-7';
+// Default sandcastle idleTimeout is 600s. Claude Code on a non-trivial story
 // (read context → plan → edit → test → commit → PR) routinely thinks
 // quietly for >60s between stdout bursts. Bump to 1800s (30 min) to
 // avoid killing the agent mid-task. The job-level 45-min timeout in the
@@ -85,7 +84,7 @@ function buildContainerEnv(_deps) {
 // Sandcastle constraint: when `output: <Zod schema>` is set (structured
 // output), maxIterations must be 1. Sandcastle's "iteration" is a
 // sandbox-level retry of the whole prompt — not the agent's internal
-// reasoning steps. The agent (codex) iterates freely inside that single
+// reasoning steps. The agent (Claude Code) iterates freely inside that single
 // run via bash/edit tool calls; sandcastle only retries if the structured
 // output fails validation, which structured-output mode disallows.
 const DEFAULT_MAX_ITERATIONS = 1;
@@ -107,8 +106,8 @@ async function loadDocker() {
 
 async function getSandcastleDeps(_deps) {
   const deps = _deps || {};
-  if (deps.run && deps.codex && deps.docker) {
-    return { run: deps.run, codex: deps.codex, docker: deps.docker };
+  if (deps.run && deps.claudeCode && deps.docker) {
+    return { run: deps.run, claudeCode: deps.claudeCode, docker: deps.docker };
   }
   let sc;
   try {
@@ -131,7 +130,7 @@ async function getSandcastleDeps(_deps) {
   }
   return {
     run: deps.run || sc.run,
-    codex: deps.codex || sc.codex,
+    claudeCode: deps.claudeCode || sc.claudeCode,
     docker: dockerFactory,
   };
 }
@@ -142,7 +141,7 @@ async function getSandcastleDeps(_deps) {
  * @param {object}  [opts]
  * @param {number}  [opts.issueNumber]   force a specific issue (manual path)
  * @param {string}  [opts.imageName]     docker image; default sandcastle:hive
- * @param {string}  [opts.modelTag]      codex model; default gpt-5.1-codex
+ * @param {string}  [opts.modelTag]      Claude model; default claude-opus-4-7
  * @param {number}  [opts.maxIterations] default 1 (sandcastle constraint)
  * @param {object}  [opts._deps]         test seam
  * @returns {Promise<{
@@ -157,7 +156,7 @@ async function getSandcastleDeps(_deps) {
 async function runOnce(opts) {
   const options = opts || {};
   const _deps = options._deps || {};
-  const { run, codex, docker } = await getSandcastleDeps(_deps);
+  const { run, claudeCode, docker } = await getSandcastleDeps(_deps);
 
   const imageName = options.imageName || DEFAULT_IMAGE;
   const modelTag = options.modelTag || DEFAULT_MODEL;
@@ -204,19 +203,16 @@ async function runOnce(opts) {
   }
 
   const runArgs = {
-    agent: codex(modelTag),
+    agent: claudeCode(modelTag),
     sandbox: docker({
       imageName,
       // Forward the host's GH_TOKEN to the container so the gh CLI inside
       // can auth — the worker prompt runs `gh issue list / edit / create`
       // at prompt-render time.
       env: buildContainerEnv(_deps),
-      // Mount codex's auth.json into the container. The workflow's
-      // "Materialize codex auth.json" step writes the CODEX_AUTH_JSON
-      // secret to ./.sandcastle/codex-config/auth.json on the host.
-      // Codex CLI reads ~/.codex/auth.json inside the container, which
-      // for the agent user resolves to /home/agent/.codex/auth.json.
-      // Mounted read-only — the worker never needs to write to it.
+      // Temporary legacy mount retained while the Claude Code lane is
+      // completed by follow-on infra stories. The default agent is now
+      // claudeCode(); this mount is inert for that path.
       mounts: [
         {
           hostPath: '.sandcastle/codex-config/auth.json',
