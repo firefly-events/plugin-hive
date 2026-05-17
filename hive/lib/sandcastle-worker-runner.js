@@ -58,6 +58,17 @@ const OUTPUT_TAG = 'result';
 // runtime --user flag matches what's baked into the image.
 const CONTAINER_UID = 1000;
 const CONTAINER_GID = 1000;
+
+// Env vars forwarded from the host into the sandcastle container. Test seam:
+// `_deps.containerEnv` overrides the host env lookup so unit tests can pin
+// the captured value.
+function buildContainerEnv(_deps) {
+  const deps = _deps || {};
+  if (deps.containerEnv) return deps.containerEnv;
+  const env = {};
+  if (process.env.GH_TOKEN) env.GH_TOKEN = process.env.GH_TOKEN;
+  return env;
+}
 // Sandcastle constraint: when `output: <Zod schema>` is set (structured
 // output), maxIterations must be 1. Sandcastle's "iteration" is a
 // sandbox-level retry of the whole prompt — not the agent's internal
@@ -176,7 +187,17 @@ async function runOnce(opts) {
 
   const runArgs = {
     agent: codex(modelTag),
-    sandbox: docker({ imageName, containerUid: CONTAINER_UID, containerGid: CONTAINER_GID }),
+    sandbox: docker({
+      imageName,
+      containerUid: CONTAINER_UID,
+      containerGid: CONTAINER_GID,
+      // Forward the host's GH_TOKEN to the container so the gh CLI inside
+      // can auth — the worker prompt runs `gh issue list / edit / create`
+      // at prompt-render time. Codex auth is handled separately via the
+      // mounted ~/.codex/auth.json (see workflow's "Materialize codex
+      // auth.json" step + sandcastle codex() provider's auto-mount).
+      env: buildContainerEnv(_deps),
+    }),
     promptFile: PROMPT_FILE,
     promptArgs: { FORCE_ISSUE: forceIssue },
     branchStrategy: { type: 'branch', branch: branchName },
