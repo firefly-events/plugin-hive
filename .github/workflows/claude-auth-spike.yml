@@ -41,22 +41,29 @@ jobs:
           ref: main
 
       - name: Materialize Claude auth
+        # CLAUDE_AUTH_JSON is stored as `gzip -c ~/.claude.json | base64`
+        # because raw ~/.claude.json (~86KB) exceeds GH's 64KB secret cap.
+        # Decode + decompress here.
         env:
           CLAUDE_AUTH_JSON: ${{ secrets.CLAUDE_AUTH_JSON }}
         run: |
           if [ -z "$CLAUDE_AUTH_JSON" ]; then
             echo "::error::CLAUDE_AUTH_JSON secret is not configured."
-            echo "::error::Run 'gh secret set CLAUDE_AUTH_JSON --repo ${GITHUB_REPOSITORY} < ~/.claude.json'"
+            echo "::error::Run 'gzip -c ~/.claude.json | base64 | gh secret set CLAUDE_AUTH_JSON --repo ${GITHUB_REPOSITORY}'"
             exit 1
           fi
           mkdir -p /tmp/claude-mount
-          printf '%s' "$CLAUDE_AUTH_JSON" > /tmp/claude-mount/.claude.json
-          chmod 644 /tmp/claude-mount/.claude.json
-          if ! jq -e . /tmp/claude-mount/.claude.json >/dev/null; then
-            echo "::error::CLAUDE_AUTH_JSON secret is not valid JSON."
+          if ! printf '%s' "$CLAUDE_AUTH_JSON" | base64 -d | gunzip > /tmp/claude-mount/.claude.json 2>/tmp/decode-err; then
+            echo "::error::Failed to base64-decode + gunzip CLAUDE_AUTH_JSON:"
+            cat /tmp/decode-err
             exit 1
           fi
-          echo "Auth file ready ($(wc -c < /tmp/claude-mount/.claude.json) bytes)"
+          chmod 644 /tmp/claude-mount/.claude.json
+          if ! jq -e . /tmp/claude-mount/.claude.json >/dev/null; then
+            echo "::error::Decoded CLAUDE_AUTH_JSON is not valid JSON."
+            exit 1
+          fi
+          echo "Auth file ready ($(wc -c < /tmp/claude-mount/.claude.json) bytes after decompression)"
 
       - name: Build minimal claude-code image
         run: |
