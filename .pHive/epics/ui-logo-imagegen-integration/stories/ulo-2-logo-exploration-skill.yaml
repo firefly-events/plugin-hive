@@ -88,7 +88,7 @@ risks:
     mitigation: Start with simple grid layout. Polish later — the artifact is for human review, not production publishing.
   - severity: low
     description: Selection step blocks indefinitely if user forgets to create selected.yaml
-    mitigation: Document the contract clearly in the skill body. Optional: emit a reminder if the timestamp dir is >24h old with no selected.yaml.
+    mitigation: "Document the contract clearly in the skill body. Optional — emit a reminder if the timestamp dir is >24h old with no selected.yaml."
 
 references:
   - path: .pHive/research/ui-logo-approach-may2026.md
