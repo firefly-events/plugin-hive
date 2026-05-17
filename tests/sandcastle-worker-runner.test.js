@@ -246,7 +246,17 @@ test('runOnce propagates imageName to docker() and modelTag to codex()', async (
     _deps: deps,
   });
   assert.deepEqual(deps._captured.capturedDockerArgs, [
-    { imageName: 'sandcastle:custom', containerUid: 1000, containerGid: 1000, env: {} },
+    {
+      imageName: 'sandcastle:custom',
+      containerUid: 1000,
+      containerGid: 1000,
+      env: {},
+      mounts: [{
+        hostPath: '.sandcastle/codex-config/auth.json',
+        sandboxPath: '/home/agent/.codex/auth.json',
+        readonly: true,
+      }],
+    },
   ]);
   assert.deepEqual(deps._captured.capturedClaudeArgs, [
     'gpt-5.1-codex-test',
@@ -258,7 +268,17 @@ test('runOnce defaults imageName to sandcastle:hive and modelTag to gpt-5.1-code
   const deps = makeDeps();
   await runOnce({ issueNumber: 1, _deps: deps });
   assert.deepEqual(deps._captured.capturedDockerArgs, [
-    { imageName: _internal.DEFAULT_IMAGE, containerUid: 1000, containerGid: 1000, env: {} },
+    {
+      imageName: _internal.DEFAULT_IMAGE,
+      containerUid: 1000,
+      containerGid: 1000,
+      env: {},
+      mounts: [{
+        hostPath: '.sandcastle/codex-config/auth.json',
+        sandboxPath: '/home/agent/.codex/auth.json',
+        readonly: true,
+      }],
+    },
   ]);
   assert.deepEqual(deps._captured.capturedClaudeArgs, [_internal.DEFAULT_MODEL]);
 });
