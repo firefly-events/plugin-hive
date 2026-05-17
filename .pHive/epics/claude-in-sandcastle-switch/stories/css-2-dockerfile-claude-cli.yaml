@@ -1,0 +1,77 @@
+id: css-2-dockerfile-claude-cli
+epic: claude-in-sandcastle-switch
+title: Install @anthropic-ai/claude-code in sandcastle image
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  Inline Dockerfile in `.github/workflows/hive-worker.yml` currently
+  installs `@openai/codex` globally. Add `@anthropic-ai/claude-code`
+  alongside (don't remove codex — hybrid routing in a future story may
+  spawn codex sub-agents via Claude's TeamCreate per
+  `feedback_codex_general_backend`).
+
+  Verified working pattern from claude-auth-spike's inline Dockerfile:
+
+    RUN npm install -g @anthropic-ai/claude-code
+
+  No version pin (matches existing codex install pattern). Add a pin
+  once the loop has run cleanly a few times.
+
+  Container image gets ~30MB larger. Build time goes up ~15s for the
+  extra npm install. Both acceptable.
+
+acceptance_criteria:
+  - "Given the workflow runs, when the image build step completes, then `claude --version` exits 0 inside the container."
+  - "Given the existing `@openai/codex` install is preserved, when `codex --version` runs in the container, then it also exits 0 (no regression for code paths that may still spawn codex)."
+  - "Given the image build, when measured, then total build time increase is under 60s vs. pre-change baseline."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read the inline Dockerfile in .github/workflows/hive-worker.yml
+      (under `Build sandcastle image` step). Confirm the claude-auth-spike
+      workflow's working install pattern.
+  - id: implement
+    agent: developer
+    description: |
+      Add `RUN npm install -g @anthropic-ai/claude-code` immediately
+      after the existing `RUN npm install -g @openai/codex` line.
+    depends_on: [research]
+  - id: review
+    agent: reviewer
+    description: Verify both installs are present + ordered correctly + no regression.
+    depends_on: [implement]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .github/workflows/hive-worker.yml
+      purpose: Inline Dockerfile lives in the `Build sandcastle image` step heredoc.
+    - path: .github/workflows/claude-auth-spike.yml
+      purpose: Proven working `RUN npm install -g @anthropic-ai/claude-code` pattern.
+
+files_to_modify:
+  - file: .github/workflows/hive-worker.yml
+    change: Add Claude Code install line in inline Dockerfile after codex install
+
+design_decisions:
+  - decision: Both CLIs installed (claude + codex), not claude-only
+    rationale: Hybrid routing (claude orchestrates, codex handles dev/research sub-agents per existing agent_backends policy) needs both available. Single-CLI image = couples to non-hybrid forever.
+
+risks:
+  - severity: low
+    description: Image build time + size grow
+    mitigation: Both impacts are minor (~15s, ~30MB). Reassess if combined build exceeds 3 minutes.
+
+references:
+  - path: .github/workflows/claude-auth-spike.yml
+    relevant_excerpt: |
+      RUN npm install -g @anthropic-ai/claude-code

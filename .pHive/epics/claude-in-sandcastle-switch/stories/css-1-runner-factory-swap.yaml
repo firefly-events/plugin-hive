@@ -1,0 +1,81 @@
+id: css-1-runner-factory-swap
+epic: claude-in-sandcastle-switch
+title: Swap sandcastle runner from codex() to claudeCode()
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  In `hive/lib/sandcastle-worker-runner.js`, swap the agent factory from
+  `codex(modelTag)` to `claudeCode(modelTag)`. Update DEFAULT_MODEL from
+  `gpt-5.4` to a current Claude Opus tag (e.g. `claude-opus-4-7`).
+  Update jsdoc + inline notes that mention "codex" to reflect the new
+  default agent.
+
+  This is one of three coordinated atomic infra changes (css-1/2/3) that
+  together enable claudeCode to actually run in-container. None of them
+  break anything until css-4 lands the prompt rewrite, because the worker
+  prompt is currently codex-shaped and won't break just because the
+  factory changed (worker prompt itself doesn't change here).
+
+  Test seam (`_deps.codex` → `_deps.claudeCode`) needs the rename in
+  tests too.
+
+acceptance_criteria:
+  - "Given the runner is loaded, when it calls the agent factory, then it invokes `claudeCode(modelTag)` not `codex(modelTag)`."
+  - "Given no modelTag override is passed, when runOnce runs, then it uses DEFAULT_MODEL = `claude-opus-4-7` (or current latest)."
+  - "Given the 13 runner tests, when run, then they all pass with the renamed test seam (_deps.claudeCode)."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read hive/lib/sandcastle-worker-runner.js for the current codex()
+      call site + DEFAULT_MODEL constant. Read tests/sandcastle-worker-runner.test.js
+      for test seam references that need renaming.
+  - id: implement
+    agent: developer
+    description: |
+      replace_all `codex` → `claudeCode` in runner. Update DEFAULT_MODEL.
+      Update jsdoc + inline notes referencing codex CLI. Rename test seam.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: Run node --test tests/sandcastle-worker-runner.test.js; all 13 pass.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: Verify no codex references remain in non-comment code paths.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/sandcastle-worker-runner.js
+      purpose: The runner being edited; factory call + DEFAULT_MODEL live here.
+    - path: tests/sandcastle-worker-runner.test.js
+      purpose: Test seam references (`_deps.codex`) need rename.
+
+files_to_modify:
+  - file: hive/lib/sandcastle-worker-runner.js
+    change: codex → claudeCode (replace_all); DEFAULT_MODEL → claude-opus-4-7
+  - file: tests/sandcastle-worker-runner.test.js
+    change: same replace_all for test seam consistency
+
+design_decisions:
+  - decision: claude-opus-4-7 as default model
+    rationale: Most capable Claude for full team orchestration. Hybrid routing (claude for orchestration, codex via agent_backends for sub-roles) is a separate concern.
+
+risks:
+  - severity: low
+    description: Runner will be broken in production until css-2 (claude CLI installed) + css-3 (token forwarded) land
+    mitigation: Lands behind feature flag? Or just coordinate merge timing — all 3 infra stories should merge close together. css-4 (prompt rewrite) is the actual user-facing switchpoint.
+
+references:
+  - path: .pHive/research/ui-logo-approach-may2026.md
+    relevant_excerpt: Not directly — see spike PR #114 + run 25982110989 for the OAuth verification this story builds on.
