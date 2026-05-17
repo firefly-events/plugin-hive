@@ -74,7 +74,16 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 ### Phase 0: Assemble Planning Team
 
-0. **Assemble and route the planning team.** Invoke the **planning-routing** skill (atomic; `skills/hive/skills/planning-routing/SKILL.md`) — this is an **external call**, NOT inline prose copied from the routing skill.
+0. **Resolve the epic branch before any planning docs are written.** After the skill preamble has run and `{epic-id}` has been resolved from the user input, ensure planning happens on `feat/{epic-id}` before continuing:
+
+   - Check the working tree first. If there are uncommitted changes, stop immediately with guidance to commit or stash before re-running `/hive:plan`. Do not create, switch, or write anything while the tree is dirty.
+   - Read the current branch name.
+   - If already on `feat/{epic-id}`, do nothing and continue.
+   - If on a different `feat/*` branch, prompt the user for confirmation before switching to `feat/{epic-id}`.
+   - If `feat/{epic-id}` already exists locally, check it out. Otherwise create it from the current HEAD and switch to it.
+   - Only after `feat/{epic-id}` is active may the skill write planning artifacts such as the research brief, design discussion, H/V plans, structured outline, or story YAMLs.
+
+1. **Assemble and route the planning team.** Invoke the **planning-routing** skill (atomic; `skills/hive/skills/planning-routing/SKILL.md`) — this is an **external call**, NOT inline prose copied from the routing skill.
 
 Pass three inputs: `assembled_personas` (core planning personas plus conditional architect/ui-designer selected from the requirement), the root-first `agent_backends` map (empty map if absent per [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)), and `requirement_summary`.
 
@@ -569,9 +578,9 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 ### Flow Summary
 
 ```
-Small:   team assembly → research → brief → design discussion → team review → feedback → stories → confirm
-Medium:  team assembly → research → brief → design discussion → team review → feedback → H scan → V slice plan → team review → feedback → stories → confirm
-Large:   team assembly → research → brief → design discussion → team review → feedback → H scan → V slice plan → team review → feedback → structured outline → team review → sign-off → stories → confirm
+Small:   branch setup → team assembly → research → brief → design discussion → team review → feedback → stories → confirm
+Medium:  branch setup → team assembly → research → brief → design discussion → team review → feedback → H scan → V slice plan → team review → feedback → stories → confirm
+Large:   branch setup → team assembly → research → brief → design discussion → team review → feedback → H scan → V slice plan → team review → feedback → structured outline → team review → sign-off → stories → confirm
 ```
 
 ## Collaborative Review Gate
