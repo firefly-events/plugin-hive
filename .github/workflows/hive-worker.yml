@@ -111,6 +111,7 @@ jobs:
               usermod -u "$AGENT_UID" -g "$AGENT_GID" -d /home/agent -m -l agent node
 
           RUN npm install -g @openai/codex
+          RUN npm install -g @anthropic-ai/claude-code
 
           USER ${AGENT_UID}:${AGENT_GID}
 
@@ -163,10 +164,26 @@ jobs:
             exit 1
           fi
 
+      - name: Verify Claude OAuth token secret
+        # The in-container Claude CLI authenticates via the
+        # CLAUDE_CODE_OAUTH_TOKEN env var (subscription-backed OAuth, no
+        # auth.json mount needed). Fail loudly here with a copy-pasteable
+        # setup hint so operators don't get a confusing 401 deep inside
+        # the worker run. Mirrors the codex auth verify pattern above.
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN secret is not configured on this repository."
+            echo "::error::Run 'gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo ${GITHUB_REPOSITORY} < /path/to/token'"
+            exit 1
+          fi
+
       - name: Run worker
         id: worker
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           ISSUE_NUMBER: ${{ inputs.issue_number }}
         run: |
           node hive/lib/sandcastle-worker-runner.js "${ISSUE_NUMBER}" > result.json

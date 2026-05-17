@@ -80,6 +80,7 @@ function buildContainerEnv(_deps) {
   if (deps.containerEnv) return deps.containerEnv;
   const env = {};
   if (process.env.GH_TOKEN) env.GH_TOKEN = process.env.GH_TOKEN;
+  if (process.env.CLAUDE_CODE_OAUTH_TOKEN) env.CLAUDE_CODE_OAUTH_TOKEN = process.env.CLAUDE_CODE_OAUTH_TOKEN;
   return env;
 }
 // Sandcastle constraint: when `output: <Zod schema>` is set (structured
