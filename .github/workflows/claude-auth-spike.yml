@@ -1,8 +1,9 @@
 name: Claude Auth Spike
 
-# 30-min feasibility spike: can we run Claude Code in a GH-Actions docker
-# container using the maintainer's claude.ai SUBSCRIPTION OAuth (via the
-# ~/.claude.json artifact), instead of paying per-token via ANTHROPIC_API_KEY?
+# Feasibility spike: can we run Claude Code in a GH-Actions docker
+# container using the maintainer's claude.ai SUBSCRIPTION OAuth via
+# the long-lived headless token (CLAUDE_CODE_OAUTH_TOKEN) generated
+# locally by `claude setup-token`?
 #
 # Why this matters:
 #   - Current sandcastle worker uses codex via subscription OAuth (cheap)
@@ -11,10 +12,15 @@ name: Claude Auth Spike
 #   - Per-token API billing on Claude makes overnight cron runs expensive
 #   - Subscription OAuth would preserve the cost profile we have today
 #
-# Unknown: Claude OAuth tokens may be device/IP-bound. This spike tests
-# whether a maintainer's local ~/.claude.json works from a GitHub-hosted
-# ubuntu runner. If yes → green-light the full claude-in-sandcastle epic.
-# If no (401/403) → fall back path is ANTHROPIC_API_KEY.
+# Prior attempt copied ~/.claude.json into the container — that file
+# only carries account metadata; the actual credential lives in the
+# host OS keychain and is not portable. `claude setup-token` produces
+# a long-lived OAuth token (sk-ant-oat01-...) that IS portable via
+# env var (CLAUDE_CODE_OAUTH_TOKEN). This spike tests that path.
+#
+# If the run shows a meaningful response and exits 0 → green-light the
+# full claude-in-sandcastle epic. If 401/403 → fall back to
+# ANTHROPIC_API_KEY (pay-per-token).
 #
 # Manual trigger only. No cron, no PRs auto-fired from this.
 
@@ -40,30 +46,17 @@ jobs:
         with:
           ref: main
 
-      - name: Materialize Claude auth
-        # CLAUDE_AUTH_JSON is stored as `gzip -c ~/.claude.json | base64`
-        # because raw ~/.claude.json (~86KB) exceeds GH's 64KB secret cap.
-        # Decode + decompress here.
+      - name: Verify Claude OAuth token secret
         env:
-          CLAUDE_AUTH_JSON: ${{ secrets.CLAUDE_AUTH_JSON }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
-          if [ -z "$CLAUDE_AUTH_JSON" ]; then
-            echo "::error::CLAUDE_AUTH_JSON secret is not configured."
-            echo "::error::Run 'gzip -c ~/.claude.json | base64 | gh secret set CLAUDE_AUTH_JSON --repo ${GITHUB_REPOSITORY}'"
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN secret is not configured."
+            echo "::error::Run 'claude setup-token' locally, then:"
+            echo "::error::  gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo ${GITHUB_REPOSITORY} --body '<token>'"
             exit 1
           fi
-          mkdir -p /tmp/claude-mount
-          if ! printf '%s' "$CLAUDE_AUTH_JSON" | base64 -d | gunzip > /tmp/claude-mount/.claude.json 2>/tmp/decode-err; then
-            echo "::error::Failed to base64-decode + gunzip CLAUDE_AUTH_JSON:"
-            cat /tmp/decode-err
-            exit 1
-          fi
-          chmod 644 /tmp/claude-mount/.claude.json
-          if ! jq -e . /tmp/claude-mount/.claude.json >/dev/null; then
-            echo "::error::Decoded CLAUDE_AUTH_JSON is not valid JSON."
-            exit 1
-          fi
-          echo "Auth file ready ($(wc -c < /tmp/claude-mount/.claude.json) bytes after decompression)"
+          echo "Token secret present (${#CLAUDE_CODE_OAUTH_TOKEN} chars)"
 
       - name: Build minimal claude-code image
         run: |
@@ -94,35 +87,32 @@ jobs:
             --build-arg AGENT_GID="$(id -g)" \
             -t claude-spike:latest "$BUILD_DIR"
 
-      - name: Run claude --print with subscription OAuth
+      - name: Run claude --print with OAuth token env
         id: claude
         env:
           PROMPT: ${{ inputs.prompt }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           set +e
-          # Start container detached, mount the auth file, then exec
-          # `claude --print` against the configured prompt.
-          CID=$(docker run -d --rm \
-            -v /tmp/claude-mount/.claude.json:/home/agent/.claude.json:ro \
-            claude-spike:latest)
+          # Start container detached. No file mount — auth is purely
+          # via env var passed into the exec step below.
+          CID=$(docker run -d --rm claude-spike:latest)
           echo "container: $CID"
 
-          # Verify claude CLI present
+          # Sanity checks
           docker exec "$CID" which claude
           docker exec "$CID" claude --version || true
 
-          # Verify the auth file landed
-          docker exec "$CID" ls -la /home/agent/.claude.json
-          docker exec "$CID" jq 'keys' /home/agent/.claude.json | head -20
-
-          # The actual auth test — non-interactive --print mode.
-          # Pipe the prompt to the container's stdin (`-i`). Capture
-          # stdout, stderr, exit code separately so we can tell auth
-          # failures apart from response content.
+          # Pipe the prompt to claude --print, with the OAuth token
+          # forwarded as env. Capture stdout/stderr/exit separately
+          # so we can tell auth failures apart from response content.
           OUTPUT_FILE=/tmp/claude-out.txt
           ERR_FILE=/tmp/claude-err.txt
-          printf '%s' "$PROMPT" | docker exec -i "$CID" claude --print \
-            > "$OUTPUT_FILE" 2> "$ERR_FILE"
+          printf '%s' "$PROMPT" \
+            | docker exec -i \
+                -e CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN" \
+                "$CID" claude --print \
+                > "$OUTPUT_FILE" 2> "$ERR_FILE"
           EXIT=$?
 
           echo "=== exit code ==="
@@ -155,12 +145,11 @@ jobs:
             echo '```'
             echo ''
             if [ "$EXIT" = "0" ]; then
-              echo '✅ **VERDICT:** subscription OAuth works on GitHub-hosted runner.'
-              echo 'Green-light the claude-in-sandcastle epic.'
+              echo '✅ **VERDICT:** CLAUDE_CODE_OAUTH_TOKEN works on GitHub-hosted runner.'
+              echo 'Green-light the claude-in-sandcastle epic — Claude as in-container agent with subscription cost profile.'
             else
-              echo '❌ **VERDICT:** subscription OAuth failed.'
-              echo 'Inspect stderr above. Likely causes: device-binding, expired token,'
-              echo 'or region restriction. Fall back to ANTHROPIC_API_KEY for the full epic.'
+              echo '❌ **VERDICT:** OAuth token rejected. Inspect stderr above.'
+              echo 'Fall back to ANTHROPIC_API_KEY (per-token billing).'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
