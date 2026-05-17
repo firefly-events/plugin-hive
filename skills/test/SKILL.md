@@ -13,7 +13,7 @@ Run the test swarm pipeline on a story, PR, or the current codebase.
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — kickoff gate (initialization check) + persona / config / memory loading.
 
-**Kickoff gate override — warn, don't block.** This skill is read-only-shaped. On a fresh repo without `.pHive/project-profile.yaml`, emit the warning below and proceed with sane defaults instead of stopping. The hard-stop in the prelude does NOT apply here.
+**Kickoff gate override — warn, don't block.** If the kickoff checks pass, proceed silently. This skill is read-only-shaped. On a fresh repo without `.pHive/project-profile.yaml`, emit the warning below and proceed with sane defaults instead of stopping. The hard-stop in the prelude does NOT apply here.
 
 > Warning: Hive not initialized for this project. Run `/hive:kickoff` for full context. Proceeding with defaults.
 
