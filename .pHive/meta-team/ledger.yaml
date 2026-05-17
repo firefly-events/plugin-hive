@@ -1,3 +1,28 @@
+- experiment_id: meta-2026-05-17
+  date: '2026-05-17'
+  started: '2026-05-17T00:00:00Z'
+  closed: '2026-05-17T00:30:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 2
+  top_changes:
+    - "hive/lib/budget-gate.js: added claude-haiku-4-5-20251001 to RATES_PER_MTOK so haiku events resolve to haiku rates instead of falling back to opus rates"
+  commit: 09ef854171963a33f109a516a91a2721eee965e7
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 587e71de34424f82661eb4a616c97874d6c1242f
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-05-17. Analysis found 2 findings: (1) SCHEMA_INCONSISTENCY
+    in hive/lib/budget-gate.js — RATES_PER_MTOK used claude-haiku-4-5 as key but
+    runtime model ID is claude-haiku-4-5-20251001; when events log the full model ID
+    the budget gate falls back to opus rates (15x over-count). Fixed by adding
+    claude-haiku-4-5-20251001 key with identical rates, retaining old key for backward
+    compatibility. (2) STUB_DOC hive/references/hive-cloud-roadmap.md continuing
+    out_of_scope. Closure validator passed. Regression watch armed for 4-hour window.
 - experiment_id: meta-2026-05-16
   date: '2026-05-16'
   started: '2026-05-16T00:00:00Z'

@@ -1,20 +1,17 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-05-16 | **Date:** 2026-05-16 | **Verdict:** PASSED
+**Cycle:** meta-2026-05-17 | **Date:** 2026-05-17 | **Verdict:** PASSED
 
 ---
 
 ## What Changed Tonight
 
-- **`hive/GUIDE.md`** — Corrected wrong config file path in the Configuration section: changed `skills/hive/hive.config.yaml` → `hive/hive.config.yaml` (the referenced file didn't exist; the actual shipped config is at `hive/hive.config.yaml`)
-- **`hive/references/agent-config-schema.md`** — Updated model ID table: Opus `claude-opus-4-6` → `claude-opus-4-7`; Haiku `claude-haiku-4-5` → `claude-haiku-4-5-20251001` (matching the actual API model ID recorded in token-capture-feasibility.md)
-- **`hive/agents/orchestrator.md`** — Updated model tier table with same corrected model IDs: `claude-opus-4-7` and `claude-haiku-4-5-20251001`
-- **`hive/GUIDE.md`** — Updated Agent Roster table with same corrected model IDs
+- **`hive/lib/budget-gate.js`** — Added `claude-haiku-4-5-20251001` to `RATES_PER_MTOK` rate-card so haiku model events resolve to haiku rates instead of falling back to opus rates (15× over-count). Old short key `claude-haiku-4-5` retained for backward compatibility with any events logged before the API model ID stabilised.
 
 ---
 
 ## What Was Found (Not Fixed This Cycle)
 
-- **STUB_DOC** `hive/references/hive-cloud-roadmap.md` — 13-line placeholder for the deferred Hive Cloud epic _(reason: out_of_scope — intentional forward-reference placeholder; also flagged in meta-2026-05-11, -12, -14, -15)_
+- **STUB_DOC** `hive/references/hive-cloud-roadmap.md` — 13-line placeholder for the deferred Hive Cloud epic _(reason: out_of_scope — intentional forward-reference placeholder; flagged out_of_scope in meta-2026-05-11, -12, -14, -15, -16 as well)_
 
 ---
 
@@ -28,10 +25,12 @@
 
 | Metric | Count |
 |--------|-------|
-| Findings identified | 3 |
-| Proposals generated | 2 |
-| Changes promoted | 2 (4 file edits total) |
+| Findings identified | 2 |
+| Proposals generated | 1 |
+| Changes promoted | 1 |
 | Changes reverted | 0 |
 | Flagged for human | 0 |
 
-**Next cycle priority:** The `hive-cloud-roadmap.md` stub continues to be the only remaining out-of-scope finding. All three SCHEMA_INCONSISTENCY findings from this cycle were fully addressed.
+**Next cycle priority:** `hive/references/hive-cloud-roadmap.md` STUB_DOC has been flagged out_of_scope for 6+ consecutive cycles — consider adding a permanent ignore annotation to the queue entry or accepting the stub as a stable out-of-scope fixture.
+
+kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.0 miss_reason=empty_kg
