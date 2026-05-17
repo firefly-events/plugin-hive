@@ -193,10 +193,21 @@ async function runOnce(opts) {
       containerGid: CONTAINER_GID,
       // Forward the host's GH_TOKEN to the container so the gh CLI inside
       // can auth — the worker prompt runs `gh issue list / edit / create`
-      // at prompt-render time. Codex auth is handled separately via the
-      // mounted ~/.codex/auth.json (see workflow's "Materialize codex
-      // auth.json" step + sandcastle codex() provider's auto-mount).
+      // at prompt-render time.
       env: buildContainerEnv(_deps),
+      // Mount codex's auth.json into the container. The workflow's
+      // "Materialize codex auth.json" step writes the CODEX_AUTH_JSON
+      // secret to ./.sandcastle/codex-config/auth.json on the host.
+      // Codex CLI reads ~/.codex/auth.json inside the container, which
+      // for the agent user resolves to /home/agent/.codex/auth.json.
+      // Mounted read-only — the worker never needs to write to it.
+      mounts: [
+        {
+          hostPath: '.sandcastle/codex-config/auth.json',
+          sandboxPath: '/home/agent/.codex/auth.json',
+          readonly: true,
+        },
+      ],
     }),
     promptFile: PROMPT_FILE,
     promptArgs: { FORCE_ISSUE: forceIssue },
