@@ -116,6 +116,15 @@ __pycache__/
 # upstream-watch: durable upstream blocker records tracked at maintainer level.
 !.pHive/upstream-watch/
 !.pHive/upstream-watch/**
+# Logo exploration artifacts (story ulo-4-artifact-conventions).
+# Track the logo-explorations dir structure so prompts.md / contact-sheet.html
+# / selected.yaml stay reviewable in git; ignore the PNG candidates (large
+# binaries, regeneratable from prompts.md).
+!.pHive/brand/
+.pHive/brand/*
+!.pHive/brand/logo-explorations/
+!.pHive/brand/logo-explorations/**
+.pHive/brand/logo-explorations/**/*.png
 
 # Local dev — better-sqlite3 transient install for kg bootstrap (BYO enhancement)
 node_modules/
