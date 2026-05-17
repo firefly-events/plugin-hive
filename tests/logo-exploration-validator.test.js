@@ -83,6 +83,27 @@ test('no direction-<N>/ subdirectories is a hard failure', () => {
   assert.ok(result.errors.some((e) => /no direction-<N>\/ subdirectories/.test(e)));
 });
 
+test('direction-0 is rejected — directions must be 1-indexed', () => {
+  const root = makeTempRoot();
+  const dir = path.join(root, '20260517T143022Z');
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir, 'contact-sheet.html'), '');
+  fs.writeFileSync(path.join(dir, 'prompts.md'), '');
+  const ddir = path.join(dir, 'direction-0');
+  fs.mkdirSync(ddir);
+  fs.writeFileSync(path.join(ddir, '0.png'), 'png');
+  const result = validator.validateExplorationDir(dir);
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /no direction-<N>\/ subdirectories/.test(e)),
+    `errors: ${JSON.stringify(result.errors)}`
+  );
+  assert.ok(
+    result.warnings.some((w) => /unexpected entry: direction-0/.test(w)),
+    `warnings: ${JSON.stringify(result.warnings)}`
+  );
+});
+
 test('non-existent directory returns a clear error, not a throw', () => {
   const root = makeTempRoot();
   const result = validator.validateExplorationDir(path.join(root, 'does-not-exist'));

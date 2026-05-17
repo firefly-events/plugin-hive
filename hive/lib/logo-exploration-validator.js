@@ -11,7 +11,7 @@ try {
 }
 
 const REQUIRED_FILES = ['contact-sheet.html', 'prompts.md'];
-const DIRECTION_DIR_RE = /^direction-(\d+)$/;
+const DIRECTION_DIR_RE = /^direction-([1-9]\d*)$/;
 const CANDIDATE_FILE_RE = /^(\d+)\.png$/;
 const TIMESTAMP_RE = /^[0-9]{8}T[0-9]{6}Z$/;
 const KNOWN_TOP_LEVEL_ENTRIES = new Set([
@@ -50,7 +50,13 @@ function validateExplorationDir(dirPath) {
     );
   }
 
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  let entries;
+  try {
+    entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  } catch (err) {
+    errors.push(`unable to read directory ${dirPath}: ${err.message}`);
+    return { valid: false, errors, warnings };
+  }
   const entryByName = new Map(entries.map((e) => [e.name, e]));
 
   for (const required of REQUIRED_FILES) {

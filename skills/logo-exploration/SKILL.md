@@ -1,6 +1,6 @@
 ---
 name: logo-exploration
-description: Generate 8-12 image-backed logo candidates across 2-3 concept directions via the openai-image MCP tool, render a contact-sheet for human review, and (with --refine) iterate the selected mark. Produces .pHive/brand/logo-explorations/<timestamp>/.
+description: Generate image-backed logo candidates across 2-3 concept directions via the openai-image MCP tool, render a contact-sheet for human review, and (with --refine) iterate the selected mark. Produces .pHive/brand/logo-explorations/<timestamp>/.
 ---
 
 # Hive Logo Exploration
@@ -12,7 +12,7 @@ Atomic skill that orchestrates the hybrid logo flow: brand brief in → image-ba
 - `--brief <path>` — path to a brand brief YAML (defaults to `.pHive/brand/brand-system.yaml`)
 - `--directions "<dir1>|<dir2>|<dir3>"` — 2-3 concept directions, pipe-separated (overrides brief-derived directions)
 - `--refine <timestamp>` — refinement mode: read `selected.yaml` in the named exploration dir and produce 2-3 edit variants
-- `--variants <N>` — candidates per direction (default 4; openai-image tool clamps to 4-8 for generate, 2-3 for edit)
+- `--variants <N>` — candidates per direction (default 4; openai-image tool clamps to 4-8 for generate, 2-3 for edit). Total candidates = `directions × variants` (range 8-24).
 
 If `$ARGUMENTS` is empty, the skill runs the first-pass flow against the default brief path.
 
@@ -33,14 +33,14 @@ A populated timestamp directory under `.pHive/brand/logo-explorations/` followin
   contact-sheet.html          # human review surface
   prompts.md                  # exact prompts used (provenance)
   direction-1/
-    1.png 2.png 3.png 4.png   # 4 candidates for direction 1
+    0.png 1.png 2.png 3.png   # 4 candidates for direction 1 (0-indexed)
   direction-2/
-    1.png 2.png 3.png 4.png
+    0.png 1.png 2.png 3.png
   [direction-3/ ...]
   selected.yaml               # written by HUMAN after review
-                              # shape: { direction: <N>, candidate: <N>, notes: "" }
+                              # shape: { direction: <N>, candidate: <i>, notes: "" }
   edits/                      # populated only by --refine runs
-    direction-<N>-candidate-<N>-edit-<N>.png
+    direction-<D>-candidate-<C>-edit-<N>.png
 ```
 
 Timestamp format: ISO-8601 UTC compact, e.g., `20260517T143022Z` (matches `date -u +%Y%m%dT%H%M%SZ`).
@@ -53,7 +53,7 @@ The skill echoes the contact-sheet path on completion. It does NOT vectorize, pa
 
 Parse `--brief` from `$ARGUMENTS`; default to `.pHive/brand/brand-system.yaml`. Read the file. If it does not exist or is empty, abort with **exactly**:
 
-> no brand brief found — run /brand-system first or pass --brief <path>
+> no brand brief found — run /brand-system first or pass `--brief <path>`
 
 The brief is consumed verbatim as the `brand_brief` argument to the MCP tool — pass the relevant `personality`, `colors.primary.usage`, and any narrative text. Trim to a focused paragraph (the OpenAI prompt template will frame it).
 
@@ -87,10 +87,10 @@ For each resolved direction `N` (1-indexed):
    - `concept_direction`: the direction string
    - `output_dir`: `"${EXPLORATION_DIR}/direction-${N}"`
    - `variants`: from `--variants` if set, else 4
-3. The tool returns an `images` array of `{ kind: "file", value: <path> }` entries and the literal `prompt` string. Rename the decoded PNGs to `1.png`, `2.png`, … (the tool writes `generate-<runid>-N.png` by default — normalize to sequential indices for the contact-sheet).
+3. The tool returns an `images` array of `{ kind: "file", value: <path> }` entries and the literal `prompt` string. Rename the decoded PNGs to `0.png`, `1.png`, … (0-indexed; the tool writes `generate-<runid>-N.png` by default — normalize to sequential indices for the contact-sheet, matching the [artifact contract](../../hive/references/logo-exploration-artifacts.md)).
 4. Capture `prompt` for the provenance file in step 6.
 
-Total candidate count must land in 8-12 (2-3 directions × 4 default variants). If any per-direction generation fails, fail the whole run — do not ship a partial contact-sheet.
+Total candidate count = `directions × variants` (defaults to 8-12 with 2-3 directions × 4 variants; can range up to 24 if `--variants 8`). If any per-direction generation fails, fail the whole run — do not ship a partial contact-sheet.
 
 **MCP tool ergonomics.** The openai-image server is wired in `.mcp.json` and exposes `generate_logo_concepts` + `edit_logo_concept` (see `hive/lib/openai-image-mcp-server.js`). Both tools error early on missing `OPENAI_API_KEY` and surface `403` as "API access may require a verified OpenAI organization" — propagate these messages verbatim to the user.
 
@@ -101,7 +101,7 @@ Write `${EXPLORATION_DIR}/contact-sheet.html` with:
 - `<h1>` showing the project name + timestamp
 - A brief-excerpt block (first ~400 chars of the brand brief, in a `<pre>` for readability)
 - One `<section>` per direction with `<h2>direction-N — &lt;label&gt;</h2>`
-- A CSS grid (4 columns) inside each section, each cell `<img src="direction-N/M.png">` with a small caption (`M`)
+- A CSS grid (4 columns) inside each section, each cell `<img src="direction-N/i.png">` with a small caption (`i`, 0-indexed)
 - A footer noting: timestamp, total candidate count, "next: edit `selected.yaml` to pick a winner, then re-run `/logo-exploration --refine <timestamp>`"
 
 Inline minimal CSS — no external deps. Use relative image paths so the file opens correctly from disk.
@@ -171,7 +171,7 @@ The skill exits here on a first-pass run. Selection is durable on the filesystem
 
 When invoked with `--refine <TS>`:
 
-1. Resolve `EXPLORATION_DIR=".pHive/brand/logo-explorations/${TS}"`. If absent, abort with "exploration dir not found: <path>".
+1. Resolve `EXPLORATION_DIR=".pHive/brand/logo-explorations/${TS}"`. If absent, abort with `exploration dir not found: <path>`.
 2. Read `${EXPLORATION_DIR}/selected.yaml`. Required shape: `{ direction: <int>, candidate: <int>, notes: <string> }`. If missing or malformed, abort with the shape spec and an example.
 3. Resolve the source image: `${EXPLORATION_DIR}/direction-<direction>/<candidate>.png`. If missing, abort.
 4. Synthesize an `edit_instruction` from `notes` (if non-empty) plus a default ("Refine the selected mark — tighten geometry, improve balance, maintain identity"). Surface the final instruction so the human sees what was sent.
@@ -182,7 +182,7 @@ When invoked with `--refine <TS>`:
    - `output_dir`: `"${EXPLORATION_DIR}/edits"`
    - `variants`: 3 (clamped 2-3 by the tool)
 7. Rename outputs to `direction-<direction>-candidate-<candidate>-edit-<N>.png` for traceability.
-8. Append a new `<section>` to `contact-sheet.html` titled "Edits of direction-<N> candidate-<N>" containing the new variants. Also append a "Refined on <TS>" entry to `prompts.md` with the literal edit prompt the tool returned.
+8. Append a new `<section>` to `contact-sheet.html` titled `Edits of direction-<D> candidate-<C>` containing the new variants. Also append a `Refined on <TS>` entry to `prompts.md` with the literal edit prompt the tool returned.
 9. Print the edit count + paths.
 
 ## What this skill is NOT

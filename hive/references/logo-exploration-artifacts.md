@@ -59,7 +59,7 @@ Generators MUST use UTC. Consumers MAY assume the directory name matches
       <N>.png                   # 4 candidates per direction (file names 0..3.png)
     selected.yaml               # written by human after review (OPTIONAL until selection)
     edits/                      # populated only by --refine runs (OPTIONAL)
-      <selected-candidate>-edit-<N>.png
+      direction-<D>-candidate-<C>-edit-<N>.png
 ```
 
 A directory is **complete** once `contact-sheet.html`, `prompts.md`, and at
@@ -75,7 +75,7 @@ are added later in the lifecycle and their absence is not an error.
 | `direction-<N>/` | One subdirectory per concept direction in the brand brief. `<N>` is a 1-indexed integer matching the direction's position in the brief. | `/logo-exploration` |
 | `direction-<N>/<i>.png` | Logo candidate raster, `<i>` is 0-indexed in `[0..3]`. Four candidates per direction per the `generate_logo_concepts` MCP tool contract. | `/logo-exploration` (via `hive/lib/openai-image-mcp-server.js`) |
 | `selected.yaml` | Human-authored selection record (schema below). Absent until a human picks a winner. | Human reviewer |
-| `edits/` | Refinement outputs from `/logo-exploration --refine`. Each filename encodes which selected candidate was the basis (`<direction>-<candidate>-edit-<N>.png`, e.g. `2-1-edit-0.png` for candidate `1.png` from `direction-2/`). | `/logo-exploration --refine` |
+| `edits/` | Refinement outputs from `/logo-exploration --refine`. Each filename encodes which selected candidate was the basis: `direction-<D>-candidate-<C>-edit-<N>.png` (e.g. `direction-2-candidate-1-edit-0.png` for candidate `1.png` from `direction-2/`). | `/logo-exploration --refine` |
 
 Anything not listed above is unexpected; the validator surfaces it as a
 warning so consumers can decide whether to fail or proceed.
