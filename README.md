@@ -16,6 +16,7 @@ A Claude Code plugin that turns your project into a coordinated swarm of AI spec
 
 ---
 
+<!-- Keep this manual TOC in sync if section headings are added or renamed. -->
 ## Contents
 
 - [Inspirations](#inspirations)
