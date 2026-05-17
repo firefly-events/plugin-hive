@@ -1,0 +1,111 @@
+id: ulo-1-openai-image-tool
+epic: ui-logo-imagegen-integration
+title: OpenAI GPT Image MCP wrapper + prompt templates
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Build the thin integration layer between Hive and OpenAI's GPT Image
+  models (gpt-image-2 family). This is the foundational tool that the
+  /logo-exploration skill (ulo-2) will call. Two acceptable surfaces:
+
+  1. **MCP server** (preferred when consumers want declarative `.mcp.json`
+     wiring): a stdio MCP server exposing `generate_logo_concepts` and
+     `edit_logo_concept` tools backed by the OpenAI Image API.
+  2. **CLI wrapper** (fallback for simpler integrations): a Node script
+     at `hive/lib/openai-image-cli.js` that accepts prompt + reference
+     inputs on argv/stdin and writes outputs to a path. Skill invokes it
+     via `!`shell``.
+
+  Pick MCP-server-first because it lines up with how plugin-hive
+  distributes integrations (`.mcp.json` already loads context7, posthog,
+  firecrawl). CLI fallback only if MCP path hits a blocker.
+
+  Prompt templates live alongside the wrapper: a `generate_logo_concepts`
+  template takes brand brief + concept direction, returns 4 image
+  candidates; an `edit_logo_concept` template takes an existing image
+  + delta instruction, returns 2-3 edit variants.
+
+acceptance_criteria:
+  - "Given OPENAI_API_KEY is set in env, when the wrapper's generate tool is invoked with a brand brief + concept direction, then it returns ≥4 image URLs (or file paths if writing to disk) without error."
+  - "Given an existing logo image and an edit instruction, when the edit tool is invoked, then it returns 2-3 edited variants in the same format."
+  - "Given OPENAI_API_KEY is unset, when either tool is invoked, then it returns a clear 'missing OPENAI_API_KEY' error (not a 401 trace)."
+  - "Given the wrapper is loaded via .mcp.json, when /reload-plugins runs, then the new tools appear in the MCP tool list with the names declared."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read the OpenAI image-generation docs (developers.openai.com/api/docs/guides/image-generation)
+      to confirm current API shape for gpt-image-2 generation + edit.
+      Inspect plugin-hive's existing MCP integrations (.mcp.json, any
+      stdio MCP servers under hive/lib/) for the right wiring pattern.
+  - id: implement
+    agent: developer
+    description: |
+      Build the MCP server at hive/lib/openai-image-mcp-server.js (stdio
+      transport, MCP protocol). Two tools: generate_logo_concepts,
+      edit_logo_concept. Wire into .mcp.json. Read API key from env.
+      Include the two prompt templates inline in the server (or factored
+      into hive/lib/openai-image-prompts.js if it cleans up nicely).
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Add tests/openai-image-mcp-server.test.js. Mock the OpenAI client.
+      Cover: tool schema correctness, missing-API-key error path, prompt
+      template variable substitution, output shape. Do NOT make real API
+      calls in tests.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: Verify code follows hive/lib BYO-dep pattern (no root package.json mutation).
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push on the agent branch.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .mcp.json
+      purpose: Where the new MCP server gets wired (additive entry).
+    - path: hive/lib/sandcastle-provider.js
+      purpose: Example of an existing hive/lib integration with BYO deps.
+    - path: hive/references/sandcastle-adoption-guide.md
+      purpose: BYO-dep convention reference (npm install --no-save pattern).
+
+files_to_modify:
+  - file: hive/lib/openai-image-mcp-server.js
+    change: NEW — stdio MCP server
+  - file: .mcp.json
+    change: Add `openai-image` server entry pointing at hive/lib/openai-image-mcp-server.js
+  - file: tests/openai-image-mcp-server.test.js
+    change: NEW — mocked-client unit tests
+
+design_decisions:
+  - decision: MCP server, not CLI wrapper
+    rationale: Lines up with how plugin-hive distributes integrations (.mcp.json convention). Composable with Claude Code's MCP tool surface.
+  - decision: No root package.json — BYO via npm install --no-save inside MCP server
+    rationale: feedback_byo_enhancements_no_root_deps. Consumers opt in to the OpenAI SDK install.
+  - decision: API key via env (OPENAI_API_KEY), not config file
+    rationale: Standard OpenAI SDK convention. Avoids new secret-management surface in Hive.
+
+risks:
+  - severity: medium
+    description: gpt-image-2 may require OpenAI org verification, blocking some consumers
+    mitigation: Document the verification requirement in the MCP server's README section. Surface a clear error message ("API access requires verified org") when 403s are returned.
+  - severity: low
+    description: Output format (URL vs base64 vs file path) may vary by API mode
+    mitigation: Normalize to file paths in the tool response by streaming URLs to a configurable output dir.
+
+references:
+  - path: .pHive/research/ui-logo-approach-may2026.md
+    relevant_excerpt: |
+      ### Recommended path
+      Adopt **Hybrid + OpenAI GPT Image first**.
+      - Add a new dedicated logo-generation tool stage using **OpenAI GPT Image**.
+      - exposed to Hive through either: an MCP server, or a thin CLI wrapper

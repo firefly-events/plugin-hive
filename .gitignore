@@ -45,6 +45,8 @@ state/
 !.pHive/epics/sandcastle-ops-layer/**
 !.pHive/epics/meta-hive-grooming-may2026/
 !.pHive/epics/meta-hive-grooming-may2026/**
+!.pHive/epics/ui-logo-imagegen-integration/
+!.pHive/epics/ui-logo-imagegen-integration/**
 # Per-epic cycle-state lives under .pHive/cycle-state/; only the
 # meta-improvement-system entry is tracked at this time (same maintainer-
 # infrastructure rationale as the epics/ and episodes/ subtrees above).

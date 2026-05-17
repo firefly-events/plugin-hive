@@ -1,0 +1,94 @@
+id: ulo-3-brand-system-handoff
+epic: ui-logo-imagegen-integration
+title: brand-system skill delegates logo step to /logo-exploration
+status: pending
+complexity: low
+methodology: classic
+depends_on: [ulo-2-logo-exploration-skill]
+
+description: |
+  Today `skills/brand-system/SKILL.md` asks ui-designer to produce 3-5
+  inline SVG logo concepts inside .pHive/brand/brand-guide.html. That
+  step is what the recommendation doc identifies as broken.
+
+  Replace that step with a handoff: brand-system produces the brand
+  foundation (colors, typography, spacing, named concept directions),
+  THEN invokes the /logo-exploration skill (ulo-2) to do the actual
+  logo generation. The brand-guide.html links to the most-recent
+  contact-sheet under .pHive/brand/logo-explorations/ instead of
+  embedding inline SVG.
+
+  Scope is narrow: edit skills/brand-system/SKILL.md + the upstream
+  ui-prompt reference at hive/references/ui-prompts/brand-system.md to
+  reflect the new contract. Do NOT touch the brand-system YAML schema
+  (no new fields needed — concept directions already exist there).
+
+acceptance_criteria:
+  - "Given skills/brand-system/SKILL.md is read, when the logo step is reached, then it invokes /logo-exploration as an external call (with the concept directions from the brief), not inline SVG generation."
+  - "Given a brand-system run completes, when brand-guide.html is opened, then the Logo section links to the latest .pHive/brand/logo-explorations/<timestamp>/contact-sheet.html, not inline SVG."
+  - "Given /logo-exploration is unavailable (e.g. consumer hasn't opted in to the OpenAI integration), when brand-system runs, then it falls back to today's inline-SVG behavior with a clear notice that the dedicated path is available."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read skills/brand-system/SKILL.md (full) and the upstream prompt
+      reference at hive/references/ui-prompts/brand-system.md. Identify
+      the exact logo step + its surrounding contract. Note any places
+      that reference inline-SVG output downstream (so we don't break
+      consumers of the output shape).
+  - id: implement
+    agent: developer
+    description: |
+      Edit the logo step to (a) keep concept-direction generation in
+      brand-system, (b) external-call /logo-exploration with those
+      directions, (c) update brand-guide.html template to link to
+      contact-sheet.html. Preserve fallback when /logo-exploration is
+      unavailable. Update the upstream ui-prompt reference to match.
+    depends_on: [research]
+  - id: review
+    agent: reviewer
+    description: |
+      Verify the fallback path still produces a working brand-guide for
+      consumers who haven't opted in. Verify the handoff doesn't break
+      design-system (downstream consumer of brand-system).
+    depends_on: [implement]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/brand-system/SKILL.md
+      purpose: The skill being edited.
+    - path: hive/references/ui-prompts/brand-system.md
+      purpose: The upstream prompt reference; logo concept count + format defined here.
+    - path: skills/design-system/SKILL.md
+      purpose: Downstream consumer of brand-system output — check for output-shape coupling.
+    - path: hive/references/html-preview-format.md
+      purpose: HTML preview format reference (image refs vs inline SVG).
+
+files_to_modify:
+  - file: skills/brand-system/SKILL.md
+    change: Replace inline-SVG logo step with /logo-exploration external call + fallback
+  - file: hive/references/ui-prompts/brand-system.md
+    change: Update logo section to reflect handoff contract
+
+design_decisions:
+  - decision: Keep fallback path (inline SVG) when /logo-exploration not available
+    rationale: Default consumers haven't installed the OpenAI MCP. Don't break their brand-system run.
+  - decision: brand-system still owns "concept directions" generation
+    rationale: That's identity strategy (Hive's strength); image gen is a separate concern (image model's strength).
+
+risks:
+  - severity: medium
+    description: design-system or downstream skills may parse the brand-guide.html and break on the new image-ref format
+    mitigation: Check those skills first (research step). If parsing exists, add a parallel artifact pointer (e.g. brand-system.yaml.logo_artifact_path) so downstreams have a stable surface.
+
+references:
+  - path: .pHive/research/ui-logo-approach-may2026.md
+    relevant_excerpt: |
+      Update the brand-system flow so the HTML guide can embed generated
+      explorations and record the chosen direction.
