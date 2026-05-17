@@ -118,7 +118,15 @@ jobs:
 
           ENTRYPOINT ["sleep", "infinity"]
           DOCKERFILE
-          docker build -t sandcastle:hive "$BUILD_DIR"
+          # Build with AGENT_UID/AGENT_GID matching the runner user so the
+          # in-container agent can read AND WRITE the bind-mounted worktree.
+          # If the image bakes UID 1000 but the runner is 1001, the agent
+          # cannot edit any files (which broke smoke #11 on a README ToC
+          # story even though the agent correctly read the YAML).
+          docker build \
+            --build-arg AGENT_UID="$(id -u)" \
+            --build-arg AGENT_GID="$(id -g)" \
+            -t sandcastle:hive "$BUILD_DIR"
 
       - name: Materialize codex auth.json
         # Codex CLI ≥ 0.129 ignores bare OPENAI_API_KEY env and requires the

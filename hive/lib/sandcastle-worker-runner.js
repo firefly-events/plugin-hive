@@ -57,13 +57,20 @@ const DEFAULT_IDLE_TIMEOUT_S = 1800;
 // (.sandcastle/prompts/worker-issue-pickup.md). Sandcastle scans the
 // rendered prompt for the tag and errors if it isn't referenced.
 const OUTPUT_TAG = 'result';
-// The sandcastle:hive Dockerfile (built inline by the workflow) hard-codes
-// the agent user at UID/GID 1000. Sandcastle's docker provider defaults
-// containerUid to the HOST UID (1001 on GitHub-hosted ubuntu runners),
-// which causes "UID mismatch" at sandbox-create time. Pin to 1000 so the
-// runtime --user flag matches what's baked into the image.
-const CONTAINER_UID = 1000;
-const CONTAINER_GID = 1000;
+// containerUid/Gid intentionally NOT pinned. We rebuilt the policy so the
+// workflow now builds the image with AGENT_UID=$(id -u) AGENT_GID=$(id -g),
+// which means the in-container agent always matches the host runner user.
+// Sandcastle's docker provider defaults containerUid to process.getuid(),
+// so leaving it unset is the right answer:
+//
+// - In CI: image built as runner UID, sandcastle uses runner UID → write
+//   access to the bind-mounted worktree works.
+// - Locally: image built as local UID, sandcastle uses local UID → same.
+//
+// Earlier we pinned to 1000 to silence sandcastle's "UID mismatch"
+// preflight, but that introduced the inverse problem on the runner:
+// container UID 1000 couldn't write to files owned by runner UID 1001.
+// The build-arg fix is the canonical resolution.
 
 // Env vars forwarded from the host into the sandcastle container. Test seam:
 // `_deps.containerEnv` overrides the host env lookup so unit tests can pin
@@ -200,8 +207,6 @@ async function runOnce(opts) {
     agent: codex(modelTag),
     sandbox: docker({
       imageName,
-      containerUid: CONTAINER_UID,
-      containerGid: CONTAINER_GID,
       // Forward the host's GH_TOKEN to the container so the gh CLI inside
       // can auth — the worker prompt runs `gh issue list / edit / create`
       // at prompt-render time.

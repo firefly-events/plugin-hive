@@ -248,8 +248,6 @@ test('runOnce propagates imageName to docker() and modelTag to codex()', async (
   assert.deepEqual(deps._captured.capturedDockerArgs, [
     {
       imageName: 'sandcastle:custom',
-      containerUid: 1000,
-      containerGid: 1000,
       env: {},
       mounts: [{
         hostPath: '.sandcastle/codex-config/auth.json',
@@ -270,8 +268,6 @@ test('runOnce defaults imageName to sandcastle:hive and modelTag to gpt-5.4', as
   assert.deepEqual(deps._captured.capturedDockerArgs, [
     {
       imageName: _internal.DEFAULT_IMAGE,
-      containerUid: 1000,
-      containerGid: 1000,
       env: {},
       mounts: [{
         hostPath: '.sandcastle/codex-config/auth.json',
