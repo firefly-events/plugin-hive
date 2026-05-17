@@ -1,0 +1,84 @@
+id: mhg-6-ui-logo-capability-investigation
+epic: meta-hive-grooming-may2026
+title: Investigate better logo-generation approach for ui-designer
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Maintainer feedback: ui-designer's logo capabilities are poor. The
+  current approach (model-driven SVG/ASCII or model-described concepts)
+  doesn't produce production-grade logos. Surface area: Hive's brand-
+  system + design-system skills currently lean on ui-designer for logo
+  output during onboarding/brand foundation.
+
+  This is an INVESTIGATION-ONLY story. Output = recommendation
+  document at `.pHive/research/ui-logo-approach-may2026.md`.
+  Implementation deferred to a follow-on story once the recommendation
+  is endorsed.
+
+  Investigation scope:
+    1. What does ui-designer currently produce for logos? (read
+       hive/agents/ui-designer.md + brand-system skill output)
+    2. What's the gap? (concrete examples of current failure modes —
+       use the recent OSS rollout brand work, concept 4 logo selection)
+    3. Alternatives to evaluate:
+       - Delegating to dedicated image-gen tools (DALL-E, Midjourney
+         via API, FLUX, etc.) via MCP server
+       - Prompt-driven Frame0 / Figma-plugin pipelines
+       - Hybrid: model produces brief + concept, hands off to external
+         designer or image gen
+       - Out-of-scope: building our own image gen
+    4. Recommendation: which path, why, what new MCP/tool integration
+       would be needed, what the UX shift looks like.
+
+acceptance_criteria:
+  - "Given the investigation completes, when the recommendation doc is opened, then it contains: current capability description, concrete failure examples, alternatives evaluated, and a single recommended path with rationale."
+  - "Given the recommendation includes a tool/integration dep, when read, then the doc names the specific tool, its access model (API key, MCP server, CLI), and rough effort estimate."
+  - "Given the recommendation is reviewed, when the maintainer endorses, then a follow-on implementation story is opened citing this doc."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read hive/agents/ui-designer.md, skills/brand-system/SKILL.md,
+      skills/design-system/SKILL.md. Survey the recent OSS rollout
+      brand work in .pHive/brand/ for logo artifacts and pain notes.
+      Web research on image-gen options for logos circa 2026.
+  - id: write-recommendation
+    agent: technical-writer
+    description: |
+      Synthesize research into a recommendation doc at
+      .pHive/research/ui-logo-approach-may2026.md. Cover the 4
+      investigation scope items.
+    depends_on: [research]
+  - id: review
+    agent: reviewer
+    description: Sanity-check feasibility, consumer-neutrality, no over-commitment.
+    depends_on: [write-recommendation]
+  - id: integrate
+    agent: developer
+    description: Commit on feat/meta-hive-grooming-may2026 branch.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/agents/ui-designer.md
+      purpose: Current persona + capability scope.
+    - path: skills/brand-system/SKILL.md
+      purpose: Where logo asks originate.
+    - path: skills/design-system/SKILL.md
+      purpose: Brand-system downstream consumer.
+
+risks:
+  - severity: low
+    description: Investigation may recommend a tool we can't easily integrate (paid API, license terms).
+    mitigation: Doc must include a fallback/no-cost option even if not the primary recommendation.
+
+references:
+  - path: ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_oss_rollout_brand.md
+    relevant_excerpt: |
+      2026-04-30: brand renamed pHive→Hive, concept 4 logo locked,
+      favicon set + README hero shipped; awaits design-system + social cards
