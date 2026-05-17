@@ -142,7 +142,13 @@ jobs:
           fi
           mkdir -p .sandcastle/codex-config
           printf '%s' "$CODEX_AUTH_JSON" > .sandcastle/codex-config/auth.json
-          chmod 600 .sandcastle/codex-config/auth.json
+          # The container runs as agent user (UID 1000), but the GH Actions
+          # runner is UID 1001. A 600-mode file written by 1001 is
+          # unreadable to 1000. Set 644 so the in-container user can read.
+          # Safe here — this runner is ephemeral and has no other users.
+          # In a non-ephemeral environment, prefer `chown 1000:1000` over
+          # widening perms.
+          chmod 644 .sandcastle/codex-config/auth.json
           # Sanity check: must be JSON-parseable.
           if ! jq -e . .sandcastle/codex-config/auth.json >/dev/null; then
             echo "::error::CODEX_AUTH_JSON secret is not valid JSON."
