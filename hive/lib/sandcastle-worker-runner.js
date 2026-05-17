@@ -154,9 +154,11 @@ async function runOnce(opts) {
 
   const imageName = options.imageName || DEFAULT_IMAGE;
   const modelTag = options.modelTag || DEFAULT_MODEL;
-  const idleTimeoutSeconds = typeof options.idleTimeoutSeconds === 'number'
-    ? options.idleTimeoutSeconds
-    : DEFAULT_IDLE_TIMEOUT_S;
+  // Reject NaN/Infinity/non-positive — sandcastle would throw or hang.
+  const idleTimeoutSeconds =
+    Number.isFinite(options.idleTimeoutSeconds) && options.idleTimeoutSeconds > 0
+      ? Math.floor(options.idleTimeoutSeconds)
+      : DEFAULT_IDLE_TIMEOUT_S;
   const maxIterations = typeof options.maxIterations === 'number'
     ? options.maxIterations
     : DEFAULT_MAX_ITERATIONS;

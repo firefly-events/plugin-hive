@@ -119,7 +119,7 @@ Implement the story directly:
    tests live under `tests/` and run via `node --test`.
 
 Commit on `agent/issue-<N>` with a Conventional Commits message that
-references issue #<N>:
+references issue `#<N>`:
 
 ```bash
 git add -A
