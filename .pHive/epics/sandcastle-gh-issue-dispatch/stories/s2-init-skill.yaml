@@ -211,7 +211,7 @@ risks:
     mitigation: Prereq check is the FIRST operation; zero writes before stat passes. Remediation message names the exact command to run first.
   - severity: low
     description: Sandcastle version pin read from package.json may miss with pnpm/yarn workspace hoisting
-    mitigation: Fallback path: try `npm ls @ai-hero/sandcastle --json --depth=0`. Final fallback: record `"unknown"` with a warning.
+    mitigation: 'Fallback path: try `npm ls @ai-hero/sandcastle --json --depth=0`. Final fallback: record `"unknown"` with a warning.'
   - severity: low
     description: Re-run on a partially-scaffolded repo (no manifest but workflow file already exists from earlier hand-edit) silently overwrites user changes
     mitigation: When manifest is absent BUT any managed-file path already exists, refuse without `--force-recover` flag and print which file conflicts.

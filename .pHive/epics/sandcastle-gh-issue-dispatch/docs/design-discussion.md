@@ -196,9 +196,9 @@ Documentation:
 | Inner Hive ignores `HIVE_EXECUTION_MODE=team` and nests sandcastles | medium | Bridge sets env before sandcastle.run(); inner Hive inherits. Test reads agent stdout for "execution mode" log line; bridge prompt also explicitly states "do not spawn additional sandcastles". |
 | Anthropic key leak via logs | high | Workflow uses secrets, never echoes. Existing `sandcastle-log-redaction.js` covers in-sandbox stdout. |
 | Runner missing Docker → sandcastle Docker provider fails | medium | `ubuntu-latest` ships Docker preinstalled. Runbook (s3) covers Podman/self-hosted fallback. |
-| PR auto-creation conflicts with consumer branch protection | medium | PR `|| true`; label transitions and comment still fire on PR-create failure. |
+| PR auto-creation conflicts with consumer branch protection | medium | PR `\|\| true`; label transitions and comment still fire on PR-create failure. |
 | Cost runaway from rapid `hive:ready` spam | medium | `maxIterations: 5`, `idleTimeoutSeconds: 600`, `timeout-minutes: 60`, concurrency dedupes per issue. |
-| Public repos — anyone with triage perm can fire agents | high | Runbook documents label permission lockdown via repo settings. Future hardening: `if: github.event.sender.permission == 'admin' || 'write'`. |
+| Public repos — anyone with triage perm can fire agents | high | Runbook documents label permission lockdown via repo settings. Future hardening: `if: github.event.sender.permission == 'admin' \|\| 'write'`. |
 | Sandcastle version drift breaks bridge's API contract | low | Manifest records sandcastle pin at scaffold time. Skill emits a warning when consumer's installed version doesn't match the manifest pin on re-runs. |
 
 ## Dependencies

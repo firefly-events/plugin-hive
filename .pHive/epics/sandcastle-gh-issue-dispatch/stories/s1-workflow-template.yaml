@@ -174,12 +174,12 @@ design_decisions:
   - decision: Two files, not one — workflow YAML + .mts bridge
     rationale: YAML is GH-native, bridge is sandcastle-native. Splitting keeps each file legible in its own domain. YAML stays minimal (no inline JS-via-shell); .mts gets typecheck coverage.
   - decision: Bridge lives in `.github/scripts/`, NOT `.sandcastle/`
-    rationale: `.sandcastle/` is sandcastle init's domain. Hive-owned files going there would collide and confuse ownership. `.github/scripts/` is workflow-adjacent and clearly Hive-managed.
+    rationale: "`.sandcastle/` is sandcastle init's domain. Hive-owned files going there would collide and confuse ownership. `.github/scripts/` is workflow-adjacent and clearly Hive-managed."
   - decision: Hardcode `hive:ready` (no `--label` arg)
-    rationale: `hive:ready` is the existing canonical convention with a full state machine (`in-flight`/`shipped`/`failed`). Allowing label override would fragment the convention and break the state machine. If consumers need a different label, that's a fork of the skill, not a config flag.
+    rationale: "`hive:ready` is the existing canonical convention with a full state machine (`in-flight`/`shipped`/`failed`). Allowing label override would fragment the convention and break the state machine. If consumers need a different label, that's a fork of the skill, not a config flag."
   - decision: Workflow YAML handles label state transitions, not the bridge
-    rationale: Atomic with the GH job lifecycle. If the bridge crashes mid-run, the `if: failure()` step still fires and transitions `hive:in-flight` → `hive:failed`. Having the bridge handle this would lose the failure case when the bridge process itself dies.
-  - decision: `HIVE_EXECUTION_MODE=team` (no nested sandcastle)
+    rationale: "Atomic with the GH job lifecycle. If the bridge crashes mid-run, the `if: failure()` step still fires and transitions `hive:in-flight` → `hive:failed`. Having the bridge handle this would lose the failure case when the bridge process itself dies."
+  - decision: "`HIVE_EXECUTION_MODE=team` (no nested sandcastle)"
     rationale: Outer sandcastle is already the isolation boundary. Nesting requires DinD or sibling-container access — high complexity, low return. `team` mode runs parallel agents as subprocesses within the same container.
   - decision: PR creation `|| true` and conditional on remote branch existing
     rationale: Hive may complete /execute with zero commits (no actionable work, idle timeout). Pre-checking remote branch + soft-failing PR creation lets the label transition + comment still fire cleanly.
@@ -206,19 +206,19 @@ metric:
 risks:
   - severity: high
     description: Workflow runs without label filter — every `labeled` event fires it
-    mitigation: Triple-guard — `on: issues:[labeled]` only (not `[opened,...]`), step-level `if: github.event.label.name == 'hive:ready'`, AND per-issue `concurrency.group`. Smoke test: label with a different `hive:*` label and verify no run.
+    mitigation: "Triple-guard — `on: issues:[labeled]` only (not `[opened,...]`), step-level `if: github.event.label.name == 'hive:ready'`, AND per-issue `concurrency.group`. Smoke test: label with a different `hive:*` label and verify no run."
   - severity: high
     description: Bridge crash leaves label stuck at `hive:in-flight`
-    mitigation: Failure step uses `if: failure()` — fires even when the bridge step exits non-zero. Tested explicitly by intentionally failing the bridge (missing key, kill signal).
+    mitigation: "Failure step uses `if: failure()` — fires even when the bridge step exits non-zero. Tested explicitly by intentionally failing the bridge (missing key, kill signal)."
   - severity: high
     description: Public-repo abuse — anyone with triage perm can fire agent runs
-    mitigation: Runbook (s3) documents that label permission must be locked to maintainers via repo settings. Future hardening (out of scope): `if: github.event.sender.permission == 'admin' || 'write'`.
+    mitigation: "Runbook (s3) documents that label permission must be locked to maintainers via repo settings. Future hardening (out of scope): `if: github.event.sender.permission == 'admin' || 'write'`."
   - severity: medium
     description: Inner Hive ignores `HIVE_EXECUTION_MODE=team` and spawns nested sandcastles
     mitigation: Bridge step sets the env var BEFORE invoking sandcastle.run(); the inner Hive (Claude Code in container) inherits it. Test in s1 by reading agent stdout for "execution mode" log line. If inner Hive doesn't honor the override, add explicit prompt-level instruction.
   - severity: medium
     description: Concurrent labels on same issue race-condition the state machine
-    mitigation: `concurrency.group: hive-issue-${{ github.event.issue.number }}` queues second invocation behind first; `cancel-in-progress: false` preserves the in-flight run.
+    mitigation: "`concurrency.group: hive-issue-${{ github.event.issue.number }}` queues second invocation behind first; `cancel-in-progress: false` preserves the in-flight run."
 
 references:
   - path: .pHive/epics/sandcastle-gh-issue-dispatch/docs/design-discussion.md
