@@ -1,36 +1,34 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-05-17 | **Date:** 2026-05-17 | **Verdict:** PASSED
+**Cycle:** meta-2026-05-18 | **Date:** 2026-05-18 | **Verdict:** PASSED
 
 ---
 
-## What Changed Tonight
+## What Changed
 
-- **`hive/lib/budget-gate.js`** — Added `claude-haiku-4-5-20251001` to `RATES_PER_MTOK` rate-card so haiku model events resolve to haiku rates instead of falling back to opus rates (15× over-count). Old short key `claude-haiku-4-5` retained for backward compatibility with any events logged before the API model ID stabilised.
-
----
+- **`hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md`** — Normalized
+  step title from `# Step 3b: Backlog Fallback` to `# Step 03b: Backlog Fallback`.
+  Fixes SCHEMA_INCONSISTENCY: peer sub-step files step-02b, step-02c, and step-03c
+  all use zero-padded step numbers; step-03b was the only outlier. Purely cosmetic
+  title alignment — no behavioral or schema change.
 
 ## What Was Found (Not Fixed This Cycle)
 
-- **STUB_DOC** `hive/references/hive-cloud-roadmap.md` — 13-line placeholder for the deferred Hive Cloud epic _(reason: out_of_scope — intentional forward-reference placeholder; flagged out_of_scope in meta-2026-05-11, -12, -14, -15, -16 as well)_
+- **`hive/references/hive-cloud-roadmap.md`** (STUB_DOC, low severity) — 13-line
+  placeholder for the deferred Hive Cloud epic (S16 forward-reference stub). Continuing
+  out_of_scope until the Hive Cloud epic activates. This is the seventh consecutive
+  cycle where this finding has been flagged and deferred.
 
----
+## Metrics
 
-## Flagged for Human Review
+- Findings: 2 | Proposals: 1 | Promoted: 1 | Reverted: 0
+- Commit: `fb9917f58d2e29cc4dcc6db9110e4e6b3cdf51be`
+- Rollback ref: `1afd069240d9da557763688ca63f08b1fbb0891d`
+- Next cycle priority: hive-cloud-roadmap.md stub remains out_of_scope; verify
+  step_file.title_format_consistency metric (all sub-step files now zero-padded)
 
-- Nothing requires your attention.
+## Regression Watch
 
----
+- State: **armed**
+- Window: 2026-05-18T00:30:00Z → 2026-05-18T04:30:00Z
 
-## Cycle Metrics
-
-| Metric | Count |
-|--------|-------|
-| Findings identified | 2 |
-| Proposals generated | 1 |
-| Changes promoted | 1 |
-| Changes reverted | 0 |
-| Flagged for human | 0 |
-
-**Next cycle priority:** `hive/references/hive-cloud-roadmap.md` STUB_DOC has been flagged out_of_scope for 6+ consecutive cycles — consider adding a permanent ignore annotation to the queue entry or accepting the stub as a stable out-of-scope fixture.
-
-kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.0 miss_reason=empty_kg
+kg-signal: findings=0 proposals=0 hit_rate_5cycle=0 miss_reason=empty_kg
