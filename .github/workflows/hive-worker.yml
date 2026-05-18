@@ -111,8 +111,16 @@ jobs:
         # gitignored (maintainer-local spike), so we materialize it here.
         # If cold-build cost becomes material, swap for a pre-built image
         # in GHCR + a separate publish workflow.
+        #
+        # css-5: copy the repo into the build context as `plugin-source/`
+        # so the Dockerfile can install plugin-hive into the agent user's
+        # ~/.claude/plugins/ cache. Without this, the in-container Claude
+        # CLI starts with an empty plugin set and `/hive:execute` (and
+        # every plugin-hive skill) fails to resolve.
         run: |
           BUILD_DIR=$(mktemp -d)
+          rsync -a --exclude='.git' --exclude='node_modules' --exclude='.sandcastle' \
+                ./ "$BUILD_DIR/plugin-source/"
           cat > "$BUILD_DIR/Dockerfile" <<'DOCKERFILE'
           FROM node:22-bookworm
 
@@ -152,6 +160,24 @@ jobs:
           RUN npm install -g @openai/codex
           RUN npm install -g @anthropic-ai/claude-code
 
+          # css-5: install plugin-hive into the agent user's plugin cache so
+          # `/hive:execute` (and every plugin-hive skill) is registered when
+          # the in-container Claude CLI starts. The cache path mirrors what
+          # `claude plugin install` writes on the host:
+          #   ~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/
+          # We also write installed_plugins.json + known_marketplaces.json so
+          # the CLI's plugin loader picks the source up at start-up.
+          COPY plugin-source /opt/plugin-source
+          RUN set -eux; \
+              VERSION=$(jq -er '.version | strings | select(length > 0)' /opt/plugin-source/.claude-plugin/plugin.json); \
+              CACHE_DIR="/home/agent/.claude/plugins/cache/plugin-hive/plugin-hive/${VERSION}"; \
+              mkdir -p "$CACHE_DIR" /home/agent/.claude/plugins; \
+              cp -a /opt/plugin-source/. "$CACHE_DIR/"; \
+              printf '{"version":2,"plugins":{"plugin-hive@plugin-hive":[{"scope":"user","installPath":"%s","version":"%s","installedAt":"2026-01-01T00:00:00.000Z","lastUpdated":"2026-01-01T00:00:00.000Z"}]}}\n' "$CACHE_DIR" "$VERSION" > /home/agent/.claude/plugins/installed_plugins.json; \
+              printf '{"version":1,"marketplaces":{"plugin-hive":{"trusted":true,"source":"local-baked","addedAt":"2026-01-01T00:00:00.000Z"}}}\n' > /home/agent/.claude/plugins/known_marketplaces.json; \
+              chown -R "$AGENT_UID:$AGENT_GID" /home/agent/.claude; \
+              rm -rf /opt/plugin-source
+
           USER ${AGENT_UID}:${AGENT_GID}
 
           WORKDIR /home/agent
@@ -167,6 +193,30 @@ jobs:
             --build-arg AGENT_UID="$(id -u)" \
             --build-arg AGENT_GID="$(id -g)" \
             -t sandcastle:hive "$BUILD_DIR"
+
+      - name: Smoke test — plugin cache + /hive:execute discoverable
+        # css-5: post-build assertion that the baked plugin cache layout
+        # is what the in-container Claude CLI's plugin loader expects.
+        # If the @anthropic-ai/claude-code package changes its discovery
+        # mechanism, this step fails fast at build time rather than
+        # silently letting every worker run emit "skill not registered".
+        run: |
+          docker run --rm sandcastle:hive bash -c '
+            set -eux
+            # Plugin cache dir exists with the expected nesting depth
+            CACHE_BASE="$HOME/.claude/plugins/cache/plugin-hive/plugin-hive"
+            test -d "$CACHE_BASE"
+            VERSION_DIR=$(ls "$CACHE_BASE")
+            test -n "$VERSION_DIR"
+            # SKILL.md for /hive:execute is reachable via the install path
+            test -f "$CACHE_BASE/$VERSION_DIR/skills/execute/SKILL.md"
+            # Registry files exist and are valid JSON
+            jq -e . "$HOME/.claude/plugins/installed_plugins.json" >/dev/null
+            jq -e . "$HOME/.claude/plugins/known_marketplaces.json" >/dev/null
+            # Claude CLI itself starts cleanly (auth-independent --help path)
+            claude --help >/dev/null
+            echo "[smoke] plugin cache + claude CLI OK (version=$VERSION_DIR)"
+          '
 
       - name: Materialize codex auth.json
         # Codex CLI ≥ 0.129 ignores bare OPENAI_API_KEY env and requires the
