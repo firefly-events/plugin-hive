@@ -166,20 +166,20 @@ You MUST enforce time and attempt limits. Check these before starting each step,
 
 ## Model tier routing
 
-Match the model to the job. Not every agent needs Opus — use the cheapest model that can do the work well. Check `hive.config.yaml` for tier assignments, but the defaults are:
+Match the model to the job. Not every agent needs Opus — use the cheapest model that can do the work well. Planning and process discipline carry most of the load, so the downstream roster runs on Sonnet by default; only the orchestrator stays on Opus. Check `hive.config.yaml` for tier assignments, but the defaults are:
 
 | Tier | Model | Agents | When |
 |------|-------|--------|------|
-| **Opus** | claude-opus-4-7 | orchestrator, team-lead, architect, analyst, tpm | Complex reasoning, coordination, architecture, requirements, cross-system planning |
-| **Sonnet** | claude-sonnet-4-6 | researcher, technical-writer, frontend-developer, backend-developer, tester, reviewer, pair-programmer, peer-validator, ui-designer, test-scout, test-architect, test-inspector, test-sentinel | Analytical work, implementation, review, writing, test design |
-| **Haiku** | claude-haiku-4-5-20251001 | test-worker | Fast mechanical execution (running tests, collecting results) |
+| **Opus** | claude-opus-4-7 | orchestrator | Top-level coordination — methodology routing, escalation handling, cross-team sequencing |
+| **Sonnet** | claude-sonnet-4-6 | team-lead, architect, analyst, tpm, researcher, technical-writer, frontend-developer, backend-developer, tester, reviewer, pair-programmer, peer-validator, ui-designer, test-scout, test-architect, test-inspector, test-sentinel (and other roster personas) | Planning, analytical work, implementation, review, writing, test design — and all research/exploration personas (never demote these to Haiku) |
+| **Haiku** | claude-haiku-4-5-20251001 | test-worker | Fast mechanical execution (running tests, collecting results). Never use Haiku for research/exploration personas — they need Sonnet at minimum. |
 
 When spawning agents via the Agent tool, set the `model` parameter to match the tier:
-- `model: "opus"` for heavy reasoning
-- `model: "sonnet"` for standard work
-- `model: "haiku"` for fast execution
+- `model: "opus"` for the orchestrator only
+- `model: "sonnet"` for standard work (default for everyone else)
+- `model: "haiku"` for purely mechanical execution
 
-**Override per project:** If a project is unusually complex, promote agents via `model_overrides` in config. For example, promote `researcher` to Opus for a project requiring deep architectural understanding.
+**Override per project:** If a project is unusually complex, PROMOTE specific agents via `model_overrides` in `hive.config.yaml` — e.g., promote `architect` or `analyst` to Opus for a project requiring deep architectural reasoning. Promotion is opt-in; the defaults stay lean.
 
 **Cost awareness:** Opus is ~5x the cost of Sonnet, Sonnet is ~5x Haiku. Default to the lowest tier that produces quality output. Promote only when the task demands it.
 

@@ -140,16 +140,19 @@ task_tracking:
   branch_prefix: "acme"
 
 # Model tier routing
-# Assigns the right model to the right job. Orchestrator and complex reasoning
-# get Opus. Analytical/implementation work gets Sonnet. Fast execution gets Haiku.
+# Only the orchestrator runs on Opus by default — planning + process
+# discipline carry most of the load, so the downstream roster is on Sonnet.
+# Haiku is reserved for purely mechanical execution. Research/exploration
+# personas (researcher, technical-writer, etc.) MUST stay on Sonnet at
+# minimum — never demote them to Haiku.
 model_tiers:
-  opus:                          # heavy reasoning, coordination, complex decisions
+  opus:                          # top-level coordination only
     - orchestrator
+  sonnet:                        # planning, analytical, implementation, review, writing, test design
     - team-lead
     - architect
     - analyst
     - tpm
-  sonnet:                        # analytical, implementation, review
     - researcher
     - developer                    # still referenced by workflows; use frontend/backend-developer for new work
     - frontend-developer
@@ -164,14 +167,18 @@ model_tiers:
     - test-architect
     - test-inspector
     - test-sentinel
-  haiku:                         # fast execution, mechanical tasks
+  haiku:                         # fast mechanical execution (never research/exploration)
     - test-worker
 
-# Override a specific agent's model (takes precedence over tier)
+# PROMOTE specific personas above their default tier. The defaults above are
+# intentionally lean (Sonnet for the roster, Opus for the orchestrator only);
+# use this map to opt a persona UP for projects that genuinely need the extra
+# horsepower. Never demote below the default — research/exploration personas
+# in particular must stay on Sonnet at minimum.
 model_overrides:
-  reviewer: opus               # story-zero wiring preserved; reviewer remains on Opus
-  peer-validator: opus         # story-zero wiring preserved; peer-validator remains on Opus
-  # example: researcher: opus    # promote researcher to opus for complex projects
+  reviewer: opus               # promoted: Opus 4.7 reviews Codex-produced work as the cross-LLM verification gate
+  peer-validator: opus         # promoted: runs alongside reviewer — same cross-LLM gate, same tier
+  # example: architect: opus     # promote architect to Opus for architecturally complex projects
 
 # Circuit breakers — prevent wasted time and tokens
 circuit_breakers:

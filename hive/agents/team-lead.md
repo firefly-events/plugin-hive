@@ -1,7 +1,7 @@
 ---
 name: team-lead
 description: "Per-team coordinator. Receives story assignments, evaluates staffing, manages execution through completion."
-model: opus
+model: sonnet
 color: red
 knowledge:
   - path: ~/.claude/hive/memories/team-lead/
