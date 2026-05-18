@@ -33,13 +33,16 @@ captures the rationale.
 ## 1. Install the dispatch surface
 
 The skill assumes Sandcastle is already initialized in the target repo
-(`.sandcastle/Dockerfile` present). It only layers the GitHub-event-trigger
-glue on top.
+(`.sandcastle/Dockerfile` or `.sandcastle/Containerfile` present). It
+only layers the GitHub-event-trigger glue on top.
 
 1. **Initialize Sandcastle first.** Run `npx sandcastle init` in the
    consumer repo and pick provider (Docker / Podman / Vercel), template,
    and backlog manager. `/hive:sandcastle-gh-init` exits `2` with a
-   remediation message if `.sandcastle/Dockerfile` is absent.
+   remediation message if neither `.sandcastle/Dockerfile` nor
+   `.sandcastle/Containerfile` is present. Sandcastle 0.5.x ships a
+   Podman-style `Containerfile`; older / Docker-native installs ship
+   `Dockerfile`. Either satisfies the prereq.
 2. **Authenticate `gh`.** The skill probes `gh auth status` before
    writing. Run `gh auth login` if not authenticated.
 3. **Run the skill.**

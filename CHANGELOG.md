@@ -33,6 +33,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - KG signal revival S4.1: `/hive:register-project` skill, registry helper, and quoted path-with-space fixture for cross-project KG bootstrap registration.
 - KG signal revival S3.1: ChromaDB sidecar lifecycle scripts, fire-and-forget SessionStart hook, operations guide, and bash lifecycle tests.
 
+## [2.3.2] - 2026-05-18
+
+### Fixed
+
+- **`/hive:sandcastle-gh-init` prereq accepts `.sandcastle/Containerfile`** in addition to `.sandcastle/Dockerfile`. Sandcastle 0.5.x ships a Podman-style `Containerfile` by default, so the previous Dockerfile-only check rejected validly-initialized repos with a misleading `Sandcastle is not initialized` exit-2. Both names are valid OCI build files; either now satisfies the prereq. Affects `scaffold.mjs` prereq check, `SKILL.md` prereq doc, runbook section 1, and adds a new `AC-1b` test that seeds `.sandcastle/Containerfile` and asserts the scaffold completes. Closes #171.
+
 ## [2.3.1] - 2026-05-18
 
 ### Fixed

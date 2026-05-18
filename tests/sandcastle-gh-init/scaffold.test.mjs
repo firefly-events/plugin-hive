@@ -33,8 +33,6 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const SCAFFOLD = path.join(
   REPO_ROOT,
   'skills',
-  'hive',
-  'skills',
   'sandcastle-gh-init',
   'scaffold.mjs',
 );
@@ -61,11 +59,14 @@ function makeTmpDir(label) {
   return dir;
 }
 
-function seedRepo(cwd, { withDockerfile = true } = {}) {
+function seedRepo(
+  cwd,
+  { withDockerfile = true, containerFileName = 'Dockerfile' } = {},
+) {
   if (withDockerfile) {
     fs.mkdirSync(path.join(cwd, '.sandcastle'), { recursive: true });
     fs.writeFileSync(
-      path.join(cwd, '.sandcastle', 'Dockerfile'),
+      path.join(cwd, '.sandcastle', containerFileName),
       'FROM node:22\n',
     );
   }
@@ -167,6 +168,25 @@ test('AC-1 missing .sandcastle/Dockerfile exits 2 with remediation and writes no
   assert.deepEqual(after, before, 'no files should have been written');
   for (const f of MANAGED) {
     assert.ok(!fs.existsSync(path.join(cwd, f)), `${f} should not exist`);
+  }
+});
+
+test('AC-1b prereq satisfied by .sandcastle/Containerfile (Podman default) — no exit-2', () => {
+  const cwd = makeTmpDir('containerfile-prereq');
+  seedRepo(cwd, { containerFileName: 'Containerfile' });
+  const ghBin = writeFakeGh(path.join(cwd, '.bin'));
+  const result = runScaffold(cwd, [], { ghBin });
+  assert.notEqual(
+    result.status,
+    2,
+    `Containerfile must satisfy prereq; stderr was: ${result.stderr}`,
+  );
+  assert.equal(result.status, 0, `stderr was: ${result.stderr}`);
+  for (const f of MANAGED) {
+    assert.ok(
+      fs.existsSync(path.join(cwd, f)),
+      `${f} should exist after Containerfile-based init`,
+    );
   }
 });
 
