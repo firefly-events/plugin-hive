@@ -168,19 +168,25 @@ jobs:
 
           # css-5: install plugin-hive into the agent user's plugin cache so
           # `/hive:execute` (and every plugin-hive skill) is registered when
-          # the in-container Claude CLI starts. The cache path mirrors what
-          # `claude plugin install` writes on the host:
-          #   ~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/
-          # We also write installed_plugins.json + known_marketplaces.json so
-          # the CLI's plugin loader picks the source up at start-up.
+          # the in-container Claude CLI starts. Mirror what `claude plugin
+          # install` writes on the host:
+          #   ~/.claude/plugins/marketplaces/<marketplace>/        — marketplace defn
+          #   ~/.claude/plugins/cache/<marketplace>/<plugin>/<ver>/ — installed plugin
+          # css-7: known_marketplaces.json is a FLAT MAP (no version wrapper,
+          # no `marketplaces:` key). Worker on #142 reported the old v1 shape
+          # was rejected by the CLI ("Plugin plugin-hive not found in
+          # marketplace plugin-hive"). Match the actual host schema, and
+          # ALSO bake the marketplaces dir so the source resolves.
           COPY plugin-source /opt/plugin-source
           RUN set -eux; \
               VERSION=$(jq -er '.version | strings | select(length > 0)' /opt/plugin-source/.claude-plugin/plugin.json); \
+              MARKET_DIR="/home/agent/.claude/plugins/marketplaces/plugin-hive"; \
               CACHE_DIR="/home/agent/.claude/plugins/cache/plugin-hive/plugin-hive/${VERSION}"; \
-              mkdir -p "$CACHE_DIR" /home/agent/.claude/plugins; \
+              mkdir -p "$MARKET_DIR" "$CACHE_DIR" /home/agent/.claude/plugins; \
+              cp -a /opt/plugin-source/. "$MARKET_DIR/"; \
               cp -a /opt/plugin-source/. "$CACHE_DIR/"; \
               printf '{"version":2,"plugins":{"plugin-hive@plugin-hive":[{"scope":"user","installPath":"%s","version":"%s","installedAt":"2026-01-01T00:00:00.000Z","lastUpdated":"2026-01-01T00:00:00.000Z"}]}}\n' "$CACHE_DIR" "$VERSION" > /home/agent/.claude/plugins/installed_plugins.json; \
-              printf '{"version":1,"marketplaces":{"plugin-hive":{"trusted":true,"source":"local-baked","addedAt":"2026-01-01T00:00:00.000Z"}}}\n' > /home/agent/.claude/plugins/known_marketplaces.json; \
+              printf '{"plugin-hive":{"source":{"source":"local","path":"%s"},"installLocation":"%s","lastUpdated":"2026-01-01T00:00:00.000Z"}}\n' "$MARKET_DIR" "$MARKET_DIR" > /home/agent/.claude/plugins/known_marketplaces.json; \
               chown -R "$AGENT_UID:$AGENT_GID" /home/agent/.claude; \
               rm -rf /opt/plugin-source
 
@@ -216,12 +222,22 @@ jobs:
             test -n "$VERSION_DIR"
             # SKILL.md for /hive:execute is reachable via the install path
             test -f "$CACHE_BASE/$VERSION_DIR/skills/execute/SKILL.md"
+            # css-7: marketplaces dir also baked + marketplace.json present
+            MARKET_DIR="$HOME/.claude/plugins/marketplaces/plugin-hive"
+            test -f "$MARKET_DIR/.claude-plugin/marketplace.json"
             # Registry files exist and are valid JSON
             jq -e . "$HOME/.claude/plugins/installed_plugins.json" >/dev/null
             jq -e . "$HOME/.claude/plugins/known_marketplaces.json" >/dev/null
+            # css-7: known_marketplaces.json must use the flat-map schema
+            # (no `version` wrapper, no `marketplaces:` key) — see #142
+            # worker failure comment. The CLI rejects v1.
+            KM="$HOME/.claude/plugins/known_marketplaces.json"
+            ! jq -e ".version" "$KM" >/dev/null 2>&1
+            jq -e ".[\"plugin-hive\"].source" "$KM" >/dev/null
+            jq -e ".[\"plugin-hive\"].installLocation" "$KM" >/dev/null
             # Claude CLI itself starts cleanly (auth-independent --help path)
             claude --help >/dev/null
-            echo "[smoke] plugin cache + claude CLI OK (version=$VERSION_DIR)"
+            echo "[smoke] plugin cache + marketplace + claude CLI OK (version=$VERSION_DIR)"
           '
 
       - name: Materialize codex auth.json
