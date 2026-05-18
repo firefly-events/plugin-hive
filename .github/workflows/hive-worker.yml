@@ -177,6 +177,11 @@ jobs:
           # was rejected by the CLI ("Plugin plugin-hive not found in
           # marketplace plugin-hive"). Match the actual host schema, and
           # ALSO bake the marketplaces dir so the source resolves.
+          # css-8: even with cache + marketplace present, the CLI doesn't
+          # surface plugin skills (/hive:execute) unless the plugin is
+          # listed in settings.json `enabledPlugins`. Worker on #157
+          # surfaced this: "Unknown skill" for all variants. Write a
+          # minimal settings.json that enables plugin-hive at user scope.
           COPY plugin-source /opt/plugin-source
           RUN set -eux; \
               VERSION=$(jq -er '.version | strings | select(length > 0)' /opt/plugin-source/.claude-plugin/plugin.json); \
@@ -187,6 +192,7 @@ jobs:
               cp -a /opt/plugin-source/. "$CACHE_DIR/"; \
               printf '{"version":2,"plugins":{"plugin-hive@plugin-hive":[{"scope":"user","installPath":"%s","version":"%s","installedAt":"2026-01-01T00:00:00.000Z","lastUpdated":"2026-01-01T00:00:00.000Z"}]}}\n' "$CACHE_DIR" "$VERSION" > /home/agent/.claude/plugins/installed_plugins.json; \
               printf '{"plugin-hive":{"source":{"source":"local","path":"%s"},"installLocation":"%s","lastUpdated":"2026-01-01T00:00:00.000Z"}}\n' "$MARKET_DIR" "$MARKET_DIR" > /home/agent/.claude/plugins/known_marketplaces.json; \
+              printf '{"enabledPlugins":{"plugin-hive@plugin-hive":true}}\n' > /home/agent/.claude/settings.json; \
               chown -R "$AGENT_UID:$AGENT_GID" /home/agent/.claude; \
               rm -rf /opt/plugin-source
 
@@ -235,6 +241,8 @@ jobs:
             ! jq -e ".version" "$KM" >/dev/null 2>&1
             jq -e ".[\"plugin-hive\"].source" "$KM" >/dev/null
             jq -e ".[\"plugin-hive\"].installLocation" "$KM" >/dev/null
+            # css-8: settings.json must enable the plugin or skills wont load
+            jq -e ".enabledPlugins[\"plugin-hive@plugin-hive\"]" "$HOME/.claude/settings.json" >/dev/null
             # Claude CLI itself starts cleanly (auth-independent --help path)
             claude --help >/dev/null
             echo "[smoke] plugin cache + marketplace + claude CLI OK (version=$VERSION_DIR)"
