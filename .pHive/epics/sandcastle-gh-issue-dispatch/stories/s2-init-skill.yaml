@@ -1,0 +1,230 @@
+id: s2-init-skill
+epic: sandcastle-gh-issue-dispatch
+tracker_id: "158"
+tracker_url: "https://github.com/firefly-events/plugin-hive/issues/158"
+title: Build the /hive:sandcastle-gh-init scaffolding skill
+status: pending
+complexity: low
+methodology: classic
+depends_on: [s1-workflow-template]
+
+description: |
+  Author a new public Hive skill that layers GH-event-trigger glue on top
+  of an already-initialized Sandcastle setup. Sandcastle init is OUT OF
+  SCOPE — users run `npx sandcastle init` themselves first to choose
+  provider (Docker/Podman/Vercel), template, and backlog manager.
+
+  This skill does exactly four things:
+
+    1. Prereq-checks `.sandcastle/Dockerfile` exists (proxy for
+       "sandcastle init has run"). Fails fast with remediation message
+       if absent. Zero files written before this check passes.
+    2. Renders `assets/hive-dispatch.yml.tpl` (from s1-workflow-template)
+       into `.github/workflows/hive-dispatch.yml` with chosen args
+       substituted (runner, secret mode).
+    3. Renders `assets/sandcastle-hive-bridge.mts.tpl` into
+       `.github/scripts/sandcastle-hive-bridge.mts`.
+    4. Writes `.hive-dispatch/manifest.yaml` recording: sandcastle
+       version pin (read from consumer's package.json), scaffold
+       timestamp, chosen args, list of managed files for idempotent
+       re-runs.
+
+  The skill DOES NOT create the trigger label — `hive:ready` /
+  `hive:in-flight` / `hive:shipped` / `hive:failed` are existing
+  canonical labels on firefly-events/plugin-hive. The skill verifies
+  their presence and emits a warning + remediation if any are missing
+  (consumer can create them via `gh label create` themselves).
+
+  Skill lives at `skills/hive/skills/sandcastle-gh-init/SKILL.md` and
+  is invocable as `/hive:sandcastle-gh-init [--runner ubuntu-latest|self-hosted]
+  [--secret-mode anthropic|openai]`. No `--label` arg, no `--template`
+  arg — both choices belong upstream (label = Hive convention,
+  template = sandcastle init).
+
+acceptance_criteria:
+  - "Given a repo with NO `.sandcastle/Dockerfile` present, when `/hive:sandcastle-gh-init` runs, then it exits non-zero with remediation message naming `npx sandcastle init` as the missing prereq and writes ZERO files."
+  - "Given a repo with `.sandcastle/Dockerfile` present, when `/hive:sandcastle-gh-init` runs with defaults, then `.github/workflows/hive-dispatch.yml`, `.github/scripts/sandcastle-hive-bridge.mts`, and `.hive-dispatch/manifest.yaml` all exist after the run."
+  - "Given a repo where `.hive-dispatch/manifest.yaml` already exists from a prior run, when the skill re-runs with the same args, then only files listed in `manifest.managed_files` are rewritten; user-owned files (anything in `.sandcastle/`, anything outside `manifest.managed_files`) are never touched."
+  - "Given the skill runs with `--secret-mode openai`, when the workflow file is written, then the env block in `.github/workflows/hive-dispatch.yml` references `OPENAI_API_KEY` not `ANTHROPIC_API_KEY`."
+  - "Given the repo is missing any of the four canonical labels (`hive:ready`, `hive:in-flight`, `hive:shipped`, `hive:failed`), when the skill runs, then it warns (does NOT block) and prints `gh label create` commands the user can copy-paste to remediate."
+  - "Given the user lacks `gh` CLI or is not authenticated, when the skill runs, then it fails fast with a clear error before any writes."
+  - "Given the skill writes files, when files are written, then a single git commit is created on the current branch with message `chore(hive): wire github-issue dispatch via sandcastle` listing every created file."
+
+steps:
+  - id: research
+    description: |
+      Inventory existing public skills (skills/kickoff, skills/hive/skills/register-project)
+      for: (a) skill YAML frontmatter conventions, (b) arg-parsing patterns
+      Hive uses for slash-command args, (c) error-handling/exit conventions.
+      Verify the canonical label names from `gh label list` on
+      firefly-events/plugin-hive (already confirmed `hive:ready`,
+      `hive:in-flight`, `hive:shipped`, `hive:failed` exist).
+    agent: researcher
+  - id: implement
+    description: |
+      Build skill at `skills/hive/skills/sandcastle-gh-init/SKILL.md`
+      with six-section structure: Purpose, Prereqs, Args, Process,
+      Outputs, Failure modes. Process section drives a Node helper at
+      `skills/hive/skills/sandcastle-gh-init/scaffold.mjs` that:
+
+      - **Prereq check FIRST**: stat `.sandcastle/Dockerfile`. If absent,
+        print remediation message and exit 2. Remediation text:
+        `"Sandcastle is not initialized in this repo. Run 'npx sandcastle init',
+        choose your provider/template/backlog, then re-run /hive:sandcastle-gh-init."`
+      - Check `gh auth status`; fail with clear message if unauthenticated.
+      - Verify the four canonical labels exist via `gh label list --json name`;
+        warn (non-blocking) and print remediation `gh label create` commands
+        for any missing.
+      - Parse args (`--runner`, `--secret-mode`).
+      - Stat `.hive-dispatch/manifest.yaml`. If present, treat as re-run:
+        read `managed_files`, rewrite only those paths.
+      - Read `assets/hive-dispatch.yml.tpl` (from s1), substitute
+        placeholders, write to `.github/workflows/hive-dispatch.yml`.
+      - Read `assets/sandcastle-hive-bridge.mts.tpl` (from s1), substitute
+        placeholders, write to `.github/scripts/sandcastle-hive-bridge.mts`.
+      - Read sandcastle version from consumer's
+        `node_modules/@ai-hero/sandcastle/package.json` (fallback paths
+        per risk: `npm ls --json --depth=0`).
+      - Write `.hive-dispatch/manifest.yaml`.
+      - `git add` the three files; commit with
+        `git commit -m "chore(hive): wire github-issue dispatch via sandcastle"`.
+
+      Use Node stdlib + `gh` CLI only. No new npm deps.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Fixture tests under `tests/sandcastle-gh-init/`:
+      (a) missing-prereq → exit 2 + remediation message + ZERO files written
+      (b) prereq-met fresh case → all 3 artifacts created + single commit
+      (c) re-run idempotency → user-owned files (e.g., a custom .github/scripts/other.mjs)
+          untouched; only `managed_files` rewritten
+      (d) `--secret-mode openai` → workflow env block contains `OPENAI_API_KEY`
+      (e) missing `gh` auth → fail fast before any writes
+      (f) missing one canonical label → warn + remediation printed, files
+          still written, exit 0
+      (g) sandcastle pin extraction → manifest `sandcastle_pin` matches
+          version from `node_modules/@ai-hero/sandcastle/package.json`
+
+      Use tmp directories per fixture. Run via `bun test tests/sandcastle-gh-init/`.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Review: (a) idempotency logic — no double-writes; (b) no shell
+      injection via unescaped args (`child_process.execFile` array-form
+      for all `gh` + `git` invocations); (c) error messages name the
+      missing prereq explicitly, not just "failed"; (d) commit message
+      uses Conventional Commits; (e) skill frontmatter follows existing
+      public-skill conventions; (f) missing-label path is a warning, not
+      a hard block (consumers may add labels later).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to the epic branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive-ui-f
+  tech_stack:
+    - node
+    - bash
+    - yaml
+    - markdown
+  key_files:
+    - path: skills/kickoff/SKILL.md
+      purpose: Reference for public-skill structure, frontmatter, and process layout.
+    - path: skills/hive/skills/register-project/SKILL.md
+      purpose: Closest precedent for a skill that writes config files into a consumer repo.
+    - path: skills/hive/skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl
+      purpose: Workflow template shipped by s1; this skill renders + writes it into consumer repos.
+    - path: skills/hive/skills/sandcastle-gh-init/assets/sandcastle-hive-bridge.mts.tpl
+      purpose: Bridge template shipped by s1; this skill renders + writes it into consumer repos.
+    - path: hive.config.yaml
+      purpose: Confirms test_runner is `bun`; tests use `bun test`.
+
+files_to_modify:
+  - file: skills/hive/skills/sandcastle-gh-init/SKILL.md
+    change: create — public skill definition
+  - file: skills/hive/skills/sandcastle-gh-init/scaffold.mjs
+    change: create — Node helper invoked by the skill
+  - file: tests/sandcastle-gh-init/scaffold.test.mjs
+    change: create — fixture-based test suite
+  - file: tests/sandcastle-gh-init/fixtures/.gitkeep
+    change: create — fixture root
+
+code_examples:
+  - title: Public-skill frontmatter pattern
+    file: skills/kickoff/SKILL.md
+    snippet: |
+      ---
+      name: kickoff
+      description: Initialize Hive for a new or existing project.
+      ---
+
+  - title: Manifest shape (proposed)
+    file: skills/hive/skills/sandcastle-gh-init/scaffold.mjs
+    snippet: |
+      // .hive-dispatch/manifest.yaml:
+      //   version: 1
+      //   sandcastle_pin: "0.5.x"
+      //   runner: ubuntu-latest
+      //   secret_mode: anthropic
+      //   created_at: "ISO-8601"
+      //   managed_files:
+      //     - .github/workflows/hive-dispatch.yml
+      //     - .github/scripts/sandcastle-hive-bridge.mts
+      //     - .hive-dispatch/manifest.yaml
+      //
+      // NOTE: .sandcastle/ paths intentionally absent — that directory
+      // is sandcastle init's domain, untouched by this skill.
+
+design_decisions:
+  - decision: Sandcastle init is a PREREQUISITE, not embedded
+    rationale: Choosing provider/template/backlog is the user's decision and exposes the upstream sandcastle UX. Hive owns GH-trigger glue, sandcastle owns its own scaffold. Failing fast keeps the boundary clean.
+  - decision: Managed files live in `.github/`, NOT `.sandcastle/`
+    rationale: Cleaner ownership. `.sandcastle/` stays sandcastle's domain forever; consumer can re-run `sandcastle init` without colliding with Hive's files. `.github/scripts/` is the conventional location for workflow-helper scripts anyway.
+  - decision: Manifest at `.hive-dispatch/manifest.yaml`, not under `.sandcastle/` or `.hive/`
+    rationale: Distinct top-level directory signals Hive-managed event-dispatch state. Avoids polluting either `.sandcastle/` (sandcastle's domain) or anything that might collide with future Hive state directories.
+  - decision: No label creation by the skill
+    rationale: Labels are the existing canonical convention (already on the repo). Creating them would risk overwriting maintainer-tuned colors/descriptions. Warn-only path lets consumers manage label lifecycle.
+  - decision: Hardcoded `hive:ready` trigger label
+    rationale: Same as s1 — the existing convention has a full state machine. No override flag.
+  - decision: Two-file skill split (SKILL.md prose + scaffold.mjs logic)
+    rationale: Matches `register-project` pattern. Markdown is the human-readable contract; .mjs is the imperative scaffolder.
+
+cross_cutting:
+  - concern: documentation
+    action: "No README/runbook updates in this story — s3-docs-version-bump owns external docs. This story produces SKILL.md (the contract) but does not modify hive/references/ or top-level README."
+
+metric:
+  applies: false
+  justification: "Scaffolding skill — success is one-shot file generation matching a snapshot test, not a continuous metric. Adoption-rate metrics (consumer repos with `.hive-dispatch/manifest.yaml` committed) live outside this repo and cannot be observed without telemetry the skill does not emit."
+
+risks:
+  - severity: medium
+    description: Shell injection via unescaped args
+    mitigation: All `gh` / `git` invocations use `child_process.execFile` array form. No `exec` with string interpolation. Tested in `review` step.
+  - severity: medium
+    description: User runs skill without prereq → confusing partial state
+    mitigation: Prereq check is the FIRST operation; zero writes before stat passes. Remediation message names the exact command to run first.
+  - severity: low
+    description: Sandcastle version pin read from package.json may miss with pnpm/yarn workspace hoisting
+    mitigation: 'Fallback path: try `npm ls @ai-hero/sandcastle --json --depth=0`. Final fallback: record `"unknown"` with a warning.'
+  - severity: low
+    description: Re-run on a partially-scaffolded repo (no manifest but workflow file already exists from earlier hand-edit) silently overwrites user changes
+    mitigation: When manifest is absent BUT any managed-file path already exists, refuse without `--force-recover` flag and print which file conflicts.
+
+references:
+  - path: .pHive/epics/sandcastle-gh-issue-dispatch/docs/design-discussion.md
+    relevant_excerpt: |
+      ### 1. New public skill: `/hive:sandcastle-gh-init`
+      Sandcastle init is a prerequisite, NOT a wrapped call. The user runs
+      `npx sandcastle init` themselves first... The skill does exactly four
+      things: prereq-check, render workflow, render bridge, write manifest.
+  - path: .pHive/epics/sandcastle-gh-issue-dispatch/docs/research-brief.md
+    relevant_excerpt: |
+      ### Existing public skills (sibling examples)
+      - `skills/kickoff/` — initialization skill for new projects.
+      - `skills/hive/skills/register-project/` — writes config into consumer repo.
