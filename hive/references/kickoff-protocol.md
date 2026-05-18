@@ -557,7 +557,7 @@ When Phase 2b-iv runs on a project that already has `.pHive/cross-cutting-concer
 |-----------|------------|----------------|
 | 2b-i Integration Preflight | project-profile.yaml | `integrations` |
 | 2b-ii Developer Discovery | hive.config.yaml | `developer` |
-| 2b-iii Code Quality & Linter Detection | project-profile.yaml | `code_quality` (linters, formatters, pre_commit, code_snippets, test_first_signals), `project_maturity` |
+| 2b-iii Code Quality & Linter Detection | project-profile.yaml | `code_quality` (linters, formatters, pre_commit, code_snippets, test_first_signals), `project_maturity` (see [`project-profile.md`](project-profile.md)) |
 | 2b-iv Cross-Cutting Concern Auto-Generation | .pHive/cross-cutting-concerns.yaml | `concerns` |
 
 ---

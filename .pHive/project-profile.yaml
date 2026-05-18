@@ -12,6 +12,11 @@ runtime: node
 test_runner: bun
 linter: null
 typecheck: null
+# project_maturity — one of {greenfield, early, established, mature}.
+# Read by hive/lib/project_maturity.py::resolve_maturity(). When absent or
+# when `placeholder: true`, the helper defaults to 'early'. See
+# hive/references/project-profile.md for the classification heuristic.
+project_maturity: established
 notes: |
   Placeholder profile written by /execute kickoff-gate (gate_mode: warning, Slice 1
   policy). Generated 2026-05-14 during kg-signal-revival execute. Replace with a full
