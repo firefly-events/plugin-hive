@@ -1,4 +1,7 @@
 id: ed-1-maturity-helper
+external_id: 135
+tracker_id: "firefly-events/plugin-hive#135"
+tracker_url: https://github.com/firefly-events/plugin-hive/issues/135
 epic: exec-discipline-may2026
 title: Project-maturity helper + project-profile field
 status: pending

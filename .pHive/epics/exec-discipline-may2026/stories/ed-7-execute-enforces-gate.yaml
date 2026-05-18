@@ -1,4 +1,7 @@
 id: ed-7-execute-enforces-gate
+external_id: 141
+tracker_id: "firefly-events/plugin-hive#141"
+tracker_url: https://github.com/firefly-events/plugin-hive/issues/141
 epic: exec-discipline-may2026
 title: /execute refuses parallel dispatch without rationale + audits existing call sites
 status: pending

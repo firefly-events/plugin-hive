@@ -1,4 +1,7 @@
 id: se-4-signal-mining
+external_id: 145
+tracker_id: "firefly-events/plugin-hive#145"
+tracker_url: https://github.com/firefly-events/plugin-hive/issues/145
 epic: skill-ergo-may2026
 title: Skill-candidate signal mining — extract recurring patterns
 status: pending

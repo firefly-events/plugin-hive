@@ -1,4 +1,7 @@
 id: ed-3-drift-metric-emit
+external_id: 137
+tracker_id: "firefly-events/plugin-hive#137"
+tracker_url: https://github.com/firefly-events/plugin-hive/issues/137
 epic: exec-discipline-may2026
 title: scope-drift-score metric type + emit at phase boundaries
 status: pending
