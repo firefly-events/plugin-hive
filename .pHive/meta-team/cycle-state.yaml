@@ -1,8 +1,8 @@
-cycle_id: meta-2026-05-17
-started: '2026-05-17T00:00:00Z'
+cycle_id: meta-2026-05-18
+started: '2026-05-18T00:00:00Z'
 status: closed
 phase: close
-closed: '2026-05-17T00:30:00Z'
+closed: '2026-05-18T00:30:00Z'
 charter_constraints:
   - operate only on hive/references/**, hive/agents/**, hive/workflows/**, hive/lib/**,
     skills/hive/agents/memories/**, .pHive/meta-team/**, .pHive/teams/**
@@ -12,11 +12,11 @@ charter_constraints:
   - no changes to hive/hive.config.yaml without human confirmation
   - no new external service integrations without human confirmation
 prior_cycle:
-  id: meta-2026-05-16
+  id: meta-2026-05-17
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-05-17T00:00:00Z'
+    started_at: '2026-05-18T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
@@ -28,9 +28,9 @@ steps:
   step_02b_external_research:
     external_research_candidates_count: 0
     summary: >
-      External research skipped — no-leak boundary prevents sanitizable queries with
-      sufficient specificity in this sandboxed nightly context. No provider queries
-      issued. external_candidates_count: 0.
+      External research skipped — sandboxed nightly context; no-leak boundary
+      prevents sanitizable queries with sufficient specificity. No provider
+      queries issued. external_candidates_count: 0.
   step_02c_kg_signal:
     kg_findings_count: 0
     summary: kg.sqlite absent — skipping. kg_signal findings=0 miss_reason=empty_kg
@@ -44,17 +44,17 @@ steps:
   step_04_implementation:
     changes_made:
       - proposal_id: proposal-1
-        action: add_entry
-        file: hive/lib/budget-gate.js
+        action: update_field
+        file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
         description: >
-          Added claude-haiku-4-5-20251001 key to RATES_PER_MTOK with same rates as
-          claude-haiku-4-5; retained old key for backward compatibility with events
-          logged before the runtime model ID stabilised.
+          Updated title from "# Step 3b: Backlog Fallback" to
+          "# Step 03b: Backlog Fallback" — normalizes zero-padded format
+          consistent with peer sub-step files step-02b, step-02c, step-03c.
         status: done
   step_05_testing:
     test_results:
-      - change_id: proposal-1_budget-gate.js
-        file: hive/lib/budget-gate.js
+      - change_id: proposal-1_step-03b-backlog-fallback.md
+        file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
         tests:
           cross_reference_integrity: pass
           schema_compliance: pass
@@ -70,27 +70,27 @@ steps:
       wall_clock_ms: 5000
       first_attempt_pass: true
     evaluations:
-      - change_id: proposal-1_budget-gate.js
+      - change_id: proposal-1_step-03b-backlog-fallback.md
         change_verdict: passed
         charter_objective: consistency
         quality_score: 1.0
         rationale: |
-          Addresses finding-1 (SCHEMA_INCONSISTENCY): adds claude-haiku-4-5-20251001 as
-          a first-class rate-card key, matching the runtime model ID emitted by the API.
-          Change is additive — old key retained for backward compatibility. No
-          cross-references broken, no content removed, content safety passed.
+          Addresses finding-1 (SCHEMA_INCONSISTENCY): normalizes step-03b title
+          to zero-padded format matching peer sub-step files. Additive change
+          (title renaming only). No cross-references broken, no content removed,
+          all tests pass.
   step_07_promotion:
     promoted_changes:
       - proposal_id: proposal-1
-        file: hive/lib/budget-gate.js
+        file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
         verdict: pass
         status: promoted
-        commit_ref: 09ef854171963a33f109a516a91a2721eee965e7
-        rollback_target: 587e71de34424f82661eb4a616c97874d6c1242f
+        commit_ref: fb9917f58d2e29cc4dcc6db9110e4e6b3cdf51be
+        rollback_target: 1afd069240d9da557763688ca63f08b1fbb0891d
     reverted_changes: []
     insights_staged: 0
     decision: accept
-    rollback_target: 587e71de34424f82661eb4a616c97874d6c1242f
+    rollback_target: 1afd069240d9da557763688ca63f08b1fbb0891d
 summary:
   total_findings: 2
   proposals_generated: 1
@@ -100,29 +100,31 @@ summary:
   flagged_for_human: 0
   cycle_verdict: passed
 closure_evidence:
-  commit_ref: 09ef854171963a33f109a516a91a2721eee965e7
+  commit_ref: fb9917f58d2e29cc4dcc6db9110e4e6b3cdf51be
   metrics_snapshot:
     tokens: 0
     wall_clock_ms: 5000
     first_attempt_pass: true
-  rollback_ref: 587e71de34424f82661eb4a616c97874d6c1242f
+  rollback_ref: 1afd069240d9da557763688ca63f08b1fbb0891d
 decision: accept
 regression_watch:
   state: armed
   observation_window:
-    start: '2026-05-17T00:30:00Z'
-    end: '2026-05-17T04:30:00Z'
+    start: '2026-05-18T00:30:00Z'
+    end: '2026-05-18T04:30:00Z'
 findings:
   - id: finding-1
     category: SCHEMA_INCONSISTENCY
-    severity: medium
-    location: hive/lib/budget-gate.js
-    description: Haiku rate-card key is `claude-haiku-4-5` but runtime model ID is `claude-haiku-4-5-20251001`
+    severity: low
+    location: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+    description: >
+      Title uses non-zero-padded step number "# Step 3b: Backlog Fallback" while
+      peer sub-step files use zero-padded format — step-02b uses "# Step 02b:",
+      step-02c uses "# Step 02c:", step-03c uses "# Step 03c:".
     evidence: >
-      budget-gate.js line 50 maps haiku to claude-haiku-4-5 in RATES_PER_MTOK.
-      orchestrator.md and agent-config-schema.md confirm the runtime model ID is
-      claude-haiku-4-5-20251001. When events log the full model ID, rateLookup
-      falls back to opus rates (15x over-counting spend).
+      step-03b-backlog-fallback.md line 1: "# Step 3b: Backlog Fallback".
+      Peer files: step-02b "# Step 02b:", step-02c "# Step 02c:",
+      step-03c "# Step 03c:". step-file-schema.md title spec: "# Step {N}: {Name}".
   - id: finding-2
     category: STUB_DOC
     severity: low
@@ -130,54 +132,58 @@ findings:
     description: 13-line placeholder stub for deferred Hive Cloud epic
     evidence: >
       File has 13 lines. Content explicitly states this is an S16 stub.
-      Already flagged out_of_scope in meta-2026-05-11, -12, -14, -15.
+      Already flagged out_of_scope in meta-2026-05-11, -12, -14, -15, -17.
 approved_proposals:
   - id: proposal-1
-    title: Add claude-haiku-4-5-20251001 key to RATES_PER_MTOK in budget-gate.js
+    title: Normalize step-03b title to zero-padded format for consistency with peer sub-steps
     discovery_source: internal_audit
     addresses_findings:
       - finding-1
-    impact_score: 3
+    impact_score: 2
     risk_score: 1
     effort_score: 1
-    priority_score: 15
+    priority_score: 10
     charter_objective: consistency
     metric:
       applies: true
-      name: budget_gate.haiku_rate_lookup_accuracy
+      name: step_file.title_format_consistency
       direction: up
       unit: ratio
-      baseline: 0.0
+      baseline: 0.75
       target: 1.0
-      window: next-3-cycles
+      window: next-1-cycle
       source:
         kind: manual
-        ref: verify rateLookup(claude-haiku-4-5-20251001) returns haiku rate not opus rate
-      verify_at: first cycle post-merge
+        ref: >
+          verify grep "^# Step" hive/workflows/steps/meta-team-cycle/*.md shows
+          uniform zero-padded format across all sub-step files (02b, 02c, 03b, 03c)
+      verify_at: next cycle post-merge
       owner: developer
     implementation_plan:
-      - step: Add claude-haiku-4-5-20251001 entry to RATES_PER_MTOK with same rates as claude-haiku-4-5
-        file: hive/lib/budget-gate.js
-        action: add_entry
+      - step: >
+          Update title line in step-03b-backlog-fallback.md from
+          "# Step 3b: Backlog Fallback" to "# Step 03b: Backlog Fallback"
+        file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+        action: update_field
     rationale: |
-      The budget gate RATES_PER_MTOK used claude-haiku-4-5 as the haiku key. The
-      actual runtime model ID logged by API calls is claude-haiku-4-5-20251001.
-      When the gate processes events with the full model ID, rateLookup falls back
-      to opus rates (15x more expensive), over-counting spend. Adding the full model
-      ID key with identical rates fixes the lookup; old key retained for backward
-      compatibility.
+      The sub-step files step-02b, step-02c, and step-03c all use zero-padded
+      step numbers in their titles (02b, 02c, 03c). step-03b used "3b" without
+      the leading zero, breaking the consistent naming pattern. Normalizing to
+      "03b" aligns the title format with the peer sub-step convention.
     risk_notes: |
-      Purely additive: new key added alongside existing key. No deletion, no
-      surrounding code changes. Old key remains for backward compatibility.
+      Single-line title update. No behavioral impact. No runtime code or
+      cross-references depend on the step file's title text. Revert is
+      a one-line change.
 skipped_findings:
   - finding_id: finding-2
     reason: out_of_scope
     notes: >
-      Deferred Hive Cloud epic. Already flagged out_of_scope in meta-2026-05-11,
-      -12, -14, -15. Expanding stub is premature without the epic active.
+      Deferred Hive Cloud epic (S16 placeholder). Already flagged out_of_scope
+      in meta-2026-05-11, -12, -14, -15, -17. Expanding stub is premature
+      without the epic active.
 changes:
   - proposal_id: proposal-1
-    file: hive/lib/budget-gate.js
-    action: add_entry
-    description: Added claude-haiku-4-5-20251001 to RATES_PER_MTOK, retained old key
+    file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+    action: update_field
+    description: 'Normalized title to "# Step 03b: Backlog Fallback"'
     status: promoted
