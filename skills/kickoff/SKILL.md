@@ -23,4 +23,11 @@ For a brownfield re-kickoff where `hive/hive.config.yaml` already has `metrics.e
 - If the user keeps the existing value, preserve it exactly and do not write `hive/hive.config.yaml`.
 - If the user explicitly changes it, write only the new value to `metrics.enabled` using the kickoff protocol's existing config write pattern.
 
+Also capture `project_maturity` on every kickoff (fresh or re-kickoff) and persist it to `.pHive/project-profile.yaml`:
+- Ask the user to classify the project as one of `{greenfield, early, established, mature}`.
+- Show the heuristic from `hive/references/project-maturity-heuristic.md` (deployed-to-prod, LOC, test coverage, age) inline so the answer is grounded.
+- Persist the chosen value to `.pHive/project-profile.yaml` at `project_maturity`.
+- On re-kickoff, show the existing value and ask whether to change it (same change-prompt pattern as `metrics.enabled`); preserve unless the user explicitly changes it.
+- Maturity-aware skills (today: `/meta-optimize`) read this field to decide whether metric-driven recommendations are meaningful or whether to fall back to a "gather signal first" guidance message.
+
 **Instructions:** Read `hive/references/kickoff-protocol.md` for the full protocol. Shared resources are in `hive/`.

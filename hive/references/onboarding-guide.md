@@ -96,3 +96,8 @@ Kickoff Phase 2b adds three sub-phases that populate extended schema sections. T
 | `developer` | hive.config.yaml | Phase 2b-ii | `{pr_style: null, commit_granularity: null, review_depth: null, notes: null}` |
 
 These sections do not affect existing kickoff behavior. They are placeholder contracts consumed by downstream stories (integration-preflight, developer-discovery, cross-cutting-concerns).
+
+`project_maturity` is consumed by `/meta-optimize`: greenfield/early projects
+fall back to a "gather signal first" guidance message instead of running the
+metric-driven branch. See [`project-maturity-heuristic.md`](project-maturity-heuristic.md)
+for the four-level classification.

@@ -19,3 +19,8 @@ notes: |
 gate_mode_active: warning
 generated_by: /plugin-hive:execute
 generated_at: "2026-05-14T00:30:00Z"
+
+# Project maturity classification — see hive/references/project-maturity-heuristic.md.
+# plugin-hive: shipped to prod (consumed by Firefly Events + others), broad test
+# suite, >18 months of multi-contributor history → mature.
+project_maturity: mature

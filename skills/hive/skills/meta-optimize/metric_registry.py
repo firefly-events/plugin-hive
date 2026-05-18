@@ -133,6 +133,66 @@ def _kg_signal_proposal_count(entry: dict[str, Any]) -> int:
         return 0
 
 
+MATURITY_LEVELS = frozenset({"greenfield", "early", "established", "mature"})
+
+# Levels at which meta-optimize withholds the metric-driven branch and falls
+# back to the "gather signal first" guidance message. See
+# hive/references/project-maturity-heuristic.md.
+_LOW_SIGNAL_MATURITY = frozenset({"greenfield", "early"})
+
+
+def is_known_maturity(level: str | None) -> bool:
+    return isinstance(level, str) and level in MATURITY_LEVELS
+
+
+def filter_by_maturity(
+    metrics: dict[str, Any] | Iterable[str],
+    maturity: str | None,
+) -> dict[str, Any]:
+    """Gate a metric recommendation set by project maturity.
+
+    Returns a dict with two keys:
+
+    - ``recommended`` — the (possibly reduced) recommendation set. For
+      ``established`` and ``mature``, this is the input unchanged. For
+      ``greenfield`` and ``early``, this is an empty dict (no metrics
+      recommended).
+    - ``guidance`` — ``None`` for established/mature; a single-string guidance
+      message for greenfield/early. ``None`` when maturity is unknown — the
+      caller is expected to re-prompt for the value rather than guess.
+
+    The function preserves caller iteration order for established/mature
+    when ``metrics`` is a dict, and converts an iterable-of-names into a
+    dict with ``True`` values so callers can pass either shape.
+    """
+    if isinstance(metrics, dict):
+        full = dict(metrics)
+    else:
+        full = {name: True for name in metrics if isinstance(name, str) and name}
+
+    if not is_known_maturity(maturity):
+        # Unknown / missing: caller must re-prompt. Return the full set
+        # unchanged with no guidance — withholding the metric set on an
+        # unknown value would surprise existing callers, but we DO signal
+        # "unknown" by leaving guidance None.
+        return {"recommended": full, "guidance": None, "maturity": maturity}
+
+    if maturity in _LOW_SIGNAL_MATURITY:
+        return {
+            "recommended": {},
+            "guidance": (
+                "Meta-optimize is most useful for established brownfield projects. "
+                f"Your project is classified as '{maturity}' — metrics will not yet "
+                "carry meaningful signal across cycles. Gather signal first (ship a "
+                "few features, add tests, deploy to production) and re-classify "
+                "with /kickoff when ready."
+            ),
+            "maturity": maturity,
+        }
+
+    return {"recommended": full, "guidance": None, "maturity": maturity}
+
+
 def normalize_dimensions(raw_metrics: list[dict[str, Any]] | dict[str, Any]) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
     skipped: set[str] = set()

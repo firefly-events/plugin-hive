@@ -32,6 +32,30 @@ Before starting, verify all of the following:
 
 If the target is dirty, not a git repo, or unresolved, stop before boot and do not start the cycle.
 
+## Project Maturity Gate
+
+Meta-optimize is most useful for established brownfield projects. Greenfield
+and early projects don't yet have stable signal to compare cycles against —
+running the full metric-driven recommendation flow against them produces
+noise at best, misleading guidance at worst.
+
+Read `project_maturity` from `{HIVE_TARGET_PROJECT}/.pHive/project-profile.yaml`
+before entering Step 1 Boot. The field is captured by `/kickoff` Phase 2b-iii
+(see `hive/references/kickoff-protocol.md` and
+`hive/references/project-maturity-heuristic.md`). Apply this routing:
+
+| Value | Behavior |
+|-------|----------|
+| `mature` or `established` | Proceed with the full live cycle as described below. |
+| `greenfield` or `early` | Stop after preconditions with the guidance message: `Meta-optimize is most useful for established brownfield projects. Your project is classified as '{value}' — metrics will not yet carry meaningful signal across cycles. Gather signal first (ship a few features, add tests, deploy to production) and re-classify with /kickoff when ready. You can still run /meta-optimize in backlog-backed mode by populating .pHive/meta-team/queue-meta-optimize.yaml.` Do NOT enter the metric-driven branch. The user may still invoke the backlog-backed branch explicitly by populating the consumer backlog. |
+| missing, `null`, `not_detected`, or any other value | Prompt the user once to classify (same four-level menu as kickoff Phase 2b-iii Step 5). Persist the chosen value to `{HIVE_TARGET_PROJECT}/.pHive/project-profile.yaml` at `project_maturity` and re-apply this gate with the new value. |
+
+This gate is non-bypassable for greenfield/early — the cost of false-signal
+recommendations is high enough that "no recommendation" is the correct
+default. The `metric_registry.filter_by_maturity()` helper in
+`skills/hive/skills/meta-optimize/metric_registry.py` is the programmatic
+surface for the same policy (used by tests and downstream gating).
+
 ## Worktree Isolation
 
 Worktree isolation is the default public path.

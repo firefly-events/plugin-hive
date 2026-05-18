@@ -453,7 +453,61 @@ code_quality:
     test_absence: false
 ```
 
-##### Step 5: Idempotent Merge Logic
+##### Step 5: Project Maturity Elicitation
+
+Capture `project_maturity` and write it to `project-profile.yaml` at the top
+level (NOT under `code_quality`). The full heuristic lives in
+[`project-maturity-heuristic.md`](project-maturity-heuristic.md) — read it
+once and reuse the wording below.
+
+**Allowed values:** `greenfield`, `early`, `established`, `mature`. Anything
+else is rejected and the prompt is re-asked once before falling back to
+`not_detected`.
+
+**Fresh kickoff path** (field absent or `not_detected`):
+
+1. Auto-suggest a level from the signals already gathered in this phase:
+   - `test_absence: true` AND fewer than ~10 source files → suggest `greenfield`
+   - `test_absence: true` OR no `co_located_tests` AND no `test_runner_in_precommit` → suggest `early`
+   - linters detected AND tests present AND no obvious "fresh repo" signal → suggest `established`
+   - linters + tests + `test_runner_in_precommit: true` + git log shows >12 months of contributors → suggest `mature`
+2. Present the suggestion alongside the four-level menu:
+
+   ```
+   Classify project maturity (suggested: {auto_suggested_level}):
+     1. greenfield  — no code yet / scaffolding only
+     2. early       — code exists, not deployed to prod, limited tests
+     3. established — shipped to prod, has tests, regular activity
+     4. mature      — >6 months in prod, ≥40% coverage, multi-contributor
+
+   See hive/references/project-maturity-heuristic.md for the full heuristic.
+   Enter 1-4 or press Enter to accept the suggestion.
+   ```
+
+3. Validate the answer against the four-level enum. On invalid input, show
+   the menu once more; on the second invalid answer, fall back to
+   `not_detected` and continue.
+4. Persist the chosen value to `project-profile.yaml`:
+
+   ```yaml
+   project_maturity: established
+   ```
+
+**Re-kickoff preservation path** (field already present and not `not_detected`):
+
+1. Read and show the existing value: `Project maturity is currently set to {value}.`
+2. Ask: `Do you want to change project maturity from its current setting?`
+3. If the user keeps it, preserve as-is — do not write the field.
+4. If the user explicitly changes it, prompt for the new value using the
+   fresh-kickoff menu and persist.
+
+**Why this matters:** maturity-aware skills (today: `/meta-optimize`) read
+`project_maturity` to decide whether metric-driven recommendations carry
+signal. Greenfield/early projects get a reduced or replaced recommendation
+set (a "gather signal first" guidance message); established/mature projects
+get the full metric registry.
+
+##### Step 6: Idempotent Merge Logic
 
 When Phase 2b-iii runs on a project that already has `code_quality` data:
 
@@ -463,6 +517,7 @@ When Phase 2b-iii runs on a project that already has `code_quality` data:
 4. **Never remove** — entries in the existing file that are NOT re-detected are kept (user may have added them manually)
 5. **Same logic** applies to `formatters[]`, `pre_commit.hooks[]`, and `code_snippets[]` (match snippets by `path`)
 6. **Scalar fields** (`pre_commit.framework`, `test_first_signals.*`) — overwrite with latest detection, unless existing value was manually changed (check for a `# manual` comment annotation)
+7. **`project_maturity`** — preserve the existing value unless the user explicitly changes it via the Step 5 re-kickoff preservation path
 
 This ensures `kickoff` can be re-run safely without losing manual curation.
 
