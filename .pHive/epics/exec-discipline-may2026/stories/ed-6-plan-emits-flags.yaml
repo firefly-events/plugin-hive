@@ -53,7 +53,7 @@ files_to_modify:
   - file: skills/plan/SKILL.md
     change: Update step 13 with parallel flag emission rules + worked example
   - file: hive/references/agent-ready-checklist.md
-    change: Add check that parallel_allowed: true stories carry valid rationale
+    change: "Add check that parallel_allowed: true stories carry valid rationale"
 
 design_decisions:
   - decision: bounded-slice requires non-empty files_to_modify

@@ -33,7 +33,7 @@ steps:
     description: Read the three skill descriptions in full; identify overlap phrases
     agent: researcher
   - id: implement
-    description: Update descriptions; add disambiguation note to each ("Not this skill: see ..." line) if helpful
+    description: 'Update descriptions; add disambiguation note to each ("Not this skill — see ..." line) if helpful'
     agent: technical-writer
     depends_on: [research]
   - id: review
