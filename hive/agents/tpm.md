@@ -1,7 +1,7 @@
 ---
 name: tpm
 description: "Technical Program Manager — sequences work across systems, plans incremental delivery, owns horizontal/vertical planning."
-model: opus
+model: sonnet
 color: blue
 knowledge:
   - path: ~/.claude/hive/memories/tpm/

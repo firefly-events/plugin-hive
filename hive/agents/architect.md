@@ -1,7 +1,7 @@
 ---
 name: architect
 description: "Designs technical solutions with rationale for every decision. Spawned for architecture and technology evaluation."
-model: opus
+model: sonnet
 color: blue
 knowledge:
   - path: ~/.claude/hive/memories/architect/
