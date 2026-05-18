@@ -70,7 +70,7 @@ There is intentionally **no `--label` flag** (the trigger label
 The slash command invokes `scaffold.mjs`:
 
 ```bash
-node skills/hive/skills/sandcastle-gh-init/scaffold.mjs \
+node skills/sandcastle-gh-init/scaffold.mjs \
   [--runner ubuntu-latest|self-hosted] \
   [--secret-mode anthropic|openai] \
   [--force-recover]

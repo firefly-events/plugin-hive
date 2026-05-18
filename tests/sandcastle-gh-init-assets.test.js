@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Tests for skills/hive/skills/sandcastle-gh-init/assets/
+ * Tests for skills/sandcastle-gh-init/assets/
  *
  * Story: s1-workflow-template (sandcastle-gh-issue-dispatch)
  * Run:   node --test tests/sandcastle-gh-init-assets.test.js
