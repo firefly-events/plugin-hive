@@ -201,7 +201,7 @@ jobs:
         # mechanism, this step fails fast at build time rather than
         # silently letting every worker run emit "skill not registered".
         run: |
-          docker run --rm sandcastle:hive bash -c '
+          docker run --rm --entrypoint bash sandcastle:hive -c '
             set -eux
             # Plugin cache dir exists with the expected nesting depth
             CACHE_BASE="$HOME/.claude/plugins/cache/plugin-hive/plugin-hive"
