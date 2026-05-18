@@ -1,0 +1,46 @@
+name: skill-ergo-may2026
+title: Skill ergonomics — /design, /write-skill, /find-skills
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+methodology_rationale: |
+  Auto-detect would resolve tdd. Overridden to classic — substrate edits
+  to skill prompts + new SKILL.md scaffolding; test-first doesn't apply
+  uniformly. Helper-code stories (mining, ranking) still get tests in
+  the classic 'test' step.
+
+description: |
+  Skill catalog surface improvements: promote /design to top-level for
+  ad-hoc UI work (#134), add /write-skill skill that scaffolds new
+  skills from a brief (new — user-confirmed), add /find-skills that
+  mines signals and proposes candidates (#133). Depends on Epic A's
+  maturity helper for the greenfield/early skip gate.
+
+source_issues:
+  - "133"
+  - "134"
+  - "new — /write-skill (user-confirmed dep for #133)"
+
+depends_on_epic:
+  - exec-discipline-may2026  # maturity-helper consumed by se-4
+
+stories:
+  - id: se-1-write-skill
+    title: New /write-skill skill — scaffold SKILL.md from a brief
+    complexity: medium
+    depends_on: []
+  - id: se-2-design-top-level
+    title: New top-level /design skill for UI/wireframe design ceremony
+    complexity: medium
+    depends_on: []
+  - id: se-3-skill-disambiguation
+    title: Disambiguate /design vs /design-review vs /design-system descriptions
+    complexity: low
+    depends_on: [se-2-design-top-level]
+  - id: se-4-signal-mining
+    title: Skill-candidate signal mining — extract recurring patterns
+    complexity: medium
+    depends_on: [ed-1-maturity-helper]   # cross-epic dependency
+  - id: se-5-candidate-ranking-handoff
+    title: /find-skills — rank candidates, output yaml, hand off to /write-skill
+    complexity: medium
+    depends_on: [se-1-write-skill, se-4-signal-mining]

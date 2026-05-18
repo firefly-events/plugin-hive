@@ -1,0 +1,74 @@
+id: ed-2-handoff-schema
+external_id: 136
+tracker_id: "firefly-events/plugin-hive#136"
+tracker_url: https://github.com/firefly-events/plugin-hive/issues/136
+epic: exec-discipline-may2026
+title: Extend handoff + cycle-state schemas with scope-drift fields
+status: pending
+complexity: low
+methodology: classic
+depends_on: [ed-1-maturity-helper]
+
+description: |
+  Add `expected_scope`, `delivered_scope`, and `delta_reasons[]` fields to
+  the cross-swarm handoff schema and per-phase records inside
+  cycle-state. These are the data shape that ed-3 (drift emit) consumes.
+
+  Reasons enum: rescope, scope-creep, deferred, blocked, misunderstood-ac,
+  out-of-band-work. Open for additive growth.
+
+acceptance_criteria:
+  - "Given hive/references/cross-swarm-handoff.md, when the schema is updated, then expected_scope (list[str]), delivered_scope (list[str]), and delta_reasons (list[enum]) are present with examples."
+  - "Given hive/references/cycle-state-schema.md, when updated, then per-phase records include the same three fields, optional on initial write, required before phase exit."
+  - "Given the existing reference docs, when schema changes land, then no example block references stale field shapes."
+
+steps:
+  - id: research
+    description: Read both reference docs in full; identify all example blocks needing update
+    agent: researcher
+  - id: implement
+    description: Update both reference docs with new fields + delta_reasons enum + at least one example each
+    agent: technical-writer
+    depends_on: [research]
+  - id: review
+    description: Verify schema docs are internally consistent and the enum is named identically in both files
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit and push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/references/cross-swarm-handoff.md
+      purpose: Primary schema doc for handoffs between swarms/phases
+    - path: hive/references/cycle-state-schema.md
+      purpose: Per-epic cycle state with decisions/escalations; phase records live here
+
+files_to_modify:
+  - file: hive/references/cross-swarm-handoff.md
+    change: Add expected_scope, delivered_scope, delta_reasons[] fields + delta_reasons enum table
+  - file: hive/references/cycle-state-schema.md
+    change: Add the same three fields to per-phase records
+
+design_decisions:
+  - decision: delta_reasons is an enum list, not free-form text
+    rationale: Aggregable across runs; free-form would defeat the metric purpose
+  - decision: Fields are optional on initial write, required before phase exit
+    rationale: Lets upstream phase declare expected before any work begins; downstream fills in delivered
+
+cross_cutting:
+  - concern: documentation
+    action: Update any skill SKILL.md files that reference handoff schema (search "expected_scope" globally after edit)
+
+metric:
+  applies: false
+  justification: |
+    Schema-doc story — tested by ed-3 (emit) consuming the schema. Pure substrate change with no runtime behavior.
+
+risks:
+  - severity: low
+    description: delta_reasons enum may need expansion mid-flight
+    mitigation: Note in schema doc that enum is additive; new values land in a follow-up patch story

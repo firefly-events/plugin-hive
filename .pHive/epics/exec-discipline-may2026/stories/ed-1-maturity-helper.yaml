@@ -1,0 +1,83 @@
+id: ed-1-maturity-helper
+external_id: 135
+tracker_id: "firefly-events/plugin-hive#135"
+tracker_url: https://github.com/firefly-events/plugin-hive/issues/135
+epic: exec-discipline-may2026
+title: Project-maturity helper + project-profile field
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  Add a single source of truth for project maturity classification. New helper
+  module `hive/lib/project_maturity.py` reads `project_maturity` from
+  `.pHive/project-profile.yaml` and returns one of {greenfield, early,
+  established, mature}. Defaults to `early` when profile is placeholder
+  (matches today's gate_mode: warning posture).
+
+  Downstream consumers: drift-score (ed-3), candidate-detect (se-4), and a
+  future #80 retry. Single helper avoids replicating the classification
+  inline in every consumer.
+
+acceptance_criteria:
+  - "Given a project-profile.yaml with project_maturity: established, when resolve_maturity() is called, then it returns 'established'."
+  - "Given a placeholder project-profile.yaml (placeholder: true), when resolve_maturity() is called, then it returns 'early' with no error."
+  - "Given a missing project-profile.yaml, when resolve_maturity() is called, then it returns 'early' with a logged warning (no crash)."
+  - "Given an invalid project_maturity value, when resolve_maturity() is called, then it raises ValueError naming the allowed set."
+
+steps:
+  - id: research
+    description: Confirm project-profile.yaml schema location and existing fields
+    agent: researcher
+  - id: implement
+    description: Write hive/lib/project_maturity.py with resolve_maturity() + classification helper
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Add tests/project-maturity-helper.test.js (or .py) covering 4 AC cases
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review helper + tests for convention compliance
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack: {language: python, runtime: node, test_runner: bun}
+  key_files:
+    - path: .pHive/project-profile.yaml
+      purpose: Field add target; helper reads from here
+    - path: hive/lib/metrics/core.py
+      purpose: Reference style for new helper module under hive/lib/
+
+files_to_modify:
+  - file: hive/lib/project_maturity.py
+    change: NEW — helper module with resolve_maturity()
+  - file: .pHive/project-profile.yaml
+    change: Add project_maturity field (with default 'early' when absent)
+  - file: tests/project-maturity-helper.test.js
+    change: NEW — covers 4 acceptance criteria
+
+design_decisions:
+  - decision: Default 'early' on placeholder profile
+    rationale: Most conservative — won't trigger skip-gates for new projects that haven't kickoff'd; matches gate_mode warning posture
+
+cross_cutting:
+  - concern: documentation
+    action: Document project_maturity field in hive/references/project-profile.md (create if absent); link from hive/references/kickoff-flow.md
+
+metric:
+  applies: false
+  justification: |
+    Pure-substrate helper — no observable surface change until consumers (ed-3, se-4) wire it in. Verified indirectly via consumer story metrics.
+
+risks:
+  - severity: low
+    description: Existing project-profile.yaml files don't have project_maturity field
+    mitigation: Helper treats missing field as 'early' default — backward compat

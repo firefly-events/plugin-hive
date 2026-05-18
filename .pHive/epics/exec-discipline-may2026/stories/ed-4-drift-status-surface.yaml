@@ -1,0 +1,76 @@
+id: ed-4-drift-status-surface
+external_id: 138
+tracker_id: "firefly-events/plugin-hive#138"
+tracker_url: https://github.com/firefly-events/plugin-hive/issues/138
+epic: exec-discipline-may2026
+title: Surface drift trend in /hive:status
+status: pending
+complexity: low
+methodology: classic
+depends_on: [ed-3-drift-metric-emit]
+
+description: |
+  Read scope_drift_score events from `.pHive/metrics/events/*.jsonl` and add
+  a "Drift trend (last 5 runs)" section to /hive:status output. Show one
+  line per run with run_id, timestamp, count by bucket. No new emit logic —
+  this story is read-side only.
+
+acceptance_criteria:
+  - "Given 5 recent runs with drift events, when /hive:status runs, then a 'Drift trend' section lists each run with bucketed counts."
+  - "Given 0 recent runs with drift events (e.g., greenfield), when /hive:status runs, then the Drift trend section is omitted (silent on absence)."
+  - "Given a malformed event row, when /hive:status runs, then the row is skipped with a one-line warning, no crash."
+
+steps:
+  - id: research
+    description: Read skills/status (or /hive:status equivalent) to find output template
+    agent: researcher
+  - id: implement
+    description: Add reader + Drift trend formatter to status output
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: tests/status-drift-surface.test.js with fixture events
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify silent-on-absence and malformed-row handling
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/status/SKILL.md
+      purpose: Status command output template; new section lands here
+    - path: hive/lib/scope_drift.py
+      purpose: Reuse bucket labels from ed-3
+
+files_to_modify:
+  - file: skills/status/SKILL.md
+    change: Add Drift trend section to output template
+  - file: hive/lib/scope_drift_reader.py
+    change: NEW — reads recent JSONL events, groups by run_id, returns trend rows
+  - file: tests/status-drift-surface.test.js
+    change: NEW — fixtures + assertions
+
+design_decisions:
+  - decision: Silent-on-absence (no section if zero events)
+    rationale: Greenfield projects shouldn't see empty placeholder noise; matches gate_mode warning posture
+
+cross_cutting:
+  - concern: documentation
+    action: Mention Drift trend section in README + /hive:status skill description
+
+metric:
+  applies: false
+  justification: |
+    Read-side surfacing — verified by tests, not by metric. The substrate metric is owned by ed-3 (emit coverage).
+
+risks:
+  - severity: low
+    description: Reader scans potentially many JSONL files
+    mitigation: Cap at last 5 runs by mtime; document limit
