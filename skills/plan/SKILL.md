@@ -83,6 +83,35 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
    - If `feat/{epic-id}` already exists locally, check it out. Otherwise create it from the current HEAD and switch to it.
    - Only after `feat/{epic-id}` is active may the skill write planning artifacts such as the research brief, design discussion, H/V plans, structured outline, or story YAMLs.
 
+0a. **Working-tree must match the configured tracker repo.** Before any planning artifact is written, verify that the current working directory is a checkout of the same repo configured in `task_tracking.repo`. The hive worker contract ("Trust the YAML, not the issue body") requires story YAMLs to land on disk in the repo where the issues will be filed. Planning in a sibling clone and filing issues against a different repo's URL is the failure mode that orphaned epic `sandcastle-gh-issue-dispatch` (issues #157-#159 in firefly-events/plugin-hive, files in `plugin-hive-ui-f`; worker failed with "epic dir does not exist").
+
+    Check:
+
+    ```bash
+    if [ -n "$(jq -r '.task_tracking.repo // empty' hive.config.yaml 2>/dev/null)" ]; then
+      configured_repo=$(jq -r '.task_tracking.repo' hive.config.yaml)
+      cwd_remote=$(git config --get remote.origin.url | sed -E 's|.*[:/]([^/]+/[^/.]+)(\.git)?$|\1|')
+      if [ "$cwd_remote" != "$configured_repo" ]; then
+        echo "WARN: cwd=$cwd_remote but task_tracking.repo=$configured_repo"
+        echo "Planning here will write story YAMLs to the wrong repo. Stop and re-run from the right checkout, or update task_tracking.repo."
+        exit 1
+      fi
+    fi
+    ```
+
+    Hard-stop on mismatch (no warn-and-proceed). The blast radius of a wrong-repo plan run is high (orphaned issues, drift between tracker and disk) and the fix is cheap (switch cwd).
+
+0b. **Allowlist the new epic dir in `.gitignore` before writing into it.** The repo blanket-ignores `.pHive/epics/*` with explicit per-epic allowlist entries (see lines following `!.pHive/epics/`). New epic dirs written without an allowlist entry are silently untracked — the worker checkout on `main` then can't see them, even though the local working tree shows them as present. This is the same root cause as orphaned `sandcastle-gh-issue-dispatch`.
+
+    Before the first write under `.pHive/epics/{epic-id}/`, append (idempotent — skip if already present):
+
+    ```
+    !.pHive/epics/{epic-id}/
+    !.pHive/epics/{epic-id}/**
+    ```
+
+    Place the new entries immediately after the last existing `!.pHive/epics/<name>/**` line in `.gitignore`. Commit `.gitignore` together with the first epic artifact so the dir is tracked from inception.
+
 1. **Assemble and route the planning team.** Invoke the **planning-routing** skill (atomic; `skills/hive/skills/planning-routing/SKILL.md`) — this is an **external call**, NOT inline prose copied from the routing skill.
 
 Pass three inputs: `assembled_personas` (core planning personas plus conditional architect/ui-designer selected from the requirement), the root-first `agent_backends` map (empty map if absent per [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)), and `requirement_summary`.
