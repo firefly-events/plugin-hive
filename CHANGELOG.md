@@ -33,6 +33,26 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - KG signal revival S4.1: `/hive:register-project` skill, registry helper, and quoted path-with-space fixture for cross-project KG bootstrap registration.
 - KG signal revival S3.1: ChromaDB sidecar lifecycle scripts, fire-and-forget SessionStart hook, operations guide, and bash lifecycle tests.
 
+## [2.3.0] - 2026-05-18
+
+**Event-driven autonomous dispatch — `hive:ready` label fires `/hive:execute` inside Sandcastle.**
+
+Replaces the 15-minute cron polling cadence introduced in 2.1.0 with a label-trigger workflow. Labeling an issue `hive:ready` immediately fires a GitHub Actions run that executes the story inside a Sandcastle container, opens a PR, and flips the canonical label state machine. Reuses the existing `hive:ready` / `hive:in-flight` / `hive:shipped` / `hive:failed` labels — no schema or label changes — so the cron loop and event-driven dispatch can coexist on the same repo.
+
+### Added
+
+- **New public skill `/hive:sandcastle-gh-init`** (`skills/hive/skills/sandcastle-gh-init/`). Scaffolds GitHub Actions event-trigger glue on top of an already-initialized `.sandcastle/` setup. Drops three managed files into the consumer repo via a single `chore(hive): wire github-issue dispatch via sandcastle` commit. Args: `--runner ubuntu-latest|self-hosted`, `--secret-mode anthropic|openai`, `--force-recover`. Refuses to write if `.sandcastle/Dockerfile` is absent (run `npx sandcastle init` first); warns non-blocking on missing canonical labels and prints copy-pasteable `gh label create` commands. Uses `child_process.execFile` array-form invocations throughout — user-supplied args cannot smuggle shell metacharacters.
+- **New workflow template** `.github/workflows/hive-dispatch.yml` (shipped as a skill asset at `skills/hive/skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl`). Triple-guards the dispatch trigger via `on: issues:[labeled]` + step-level `if: github.event.label.name == 'hive:ready'` + per-issue `concurrency.group`. Workflow YAML owns every label transition (`if: failure()` covers bridge crashes — load-bearing invariant that prevents stuck `hive:in-flight` labels). Sets `HIVE_EXECUTION_MODE: team` to prevent nested sandcastles in the inner Hive run.
+- **New bridge script** `.github/scripts/sandcastle-hive-bridge.mts` (shipped at `skills/hive/skills/sandcastle-gh-init/assets/sandcastle-hive-bridge.mts.tpl`). Thin `sandcastle.run()` wrapper invoking `claudeCode("claude-opus-4-7")` with the docker sandbox factory, branch strategy `agent/issue-<n>`, `maxIterations: 5`, `idleTimeoutSeconds: 600`. Prompt body explicitly instructs the inner Hive not to invoke `/hive:plan` (human's responsibility) and not to spawn nested sandcastles.
+- **New maintainer runbook** [`hive/references/sandcastle-gh-dispatch.md`](hive/references/sandcastle-gh-dispatch.md). Seven numbered procedures: install the dispatch surface, label state machine, secret rotation, runner switch (Podman/self-hosted), public-repo label-permission lockdown, future-labels extension point (where to wire `hive:plan` / `hive:test` / `hive:review` when scoped), and stuck `hive:in-flight` label debugging (workflow run inspection, sandcastle container logs, common bridge failures).
+- **Reuse of existing label state machine.** The four canonical labels — `hive:ready`, `hive:in-flight`, `hive:shipped`, `hive:failed` — are unchanged from 2.1.0. No new labels introduced. Topic labels (`hive:epic:<id>`, `hive:story:<id>`, `hive:blocked-by:<id>`) coexist and are orthogonal.
+
+### Notes
+
+- The cron-based loop from 2.1.0 (`.github/workflows/hive-worker.yml` + `hive/lib/budget-gate.js`) is unchanged and continues to ship. Event-driven dispatch is an additional surface, not a replacement — consumers can adopt either or both.
+- `HIVE_EXECUTION_MODE: team` is the single-isolation-layer guard: the outer Sandcastle container is the isolation boundary; the inner Hive must not nest another one.
+- Plugin version bumped 2.2.0 → 2.3.0 (consumer-visible new skill).
+
 ## [2.1.0] - 2026-05-15
 
 **Sandcastle ops layer — autonomous-execution loop on top of sandcastle (opt-in).**
@@ -575,7 +595,8 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/firefly-events/plugin-hive/compare/v2.1.0...v2.3.0
 [2.0.1]: https://github.com/firefly-events/plugin-hive/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/firefly-events/plugin-hive/compare/v1.3.0...v2.0.0
 [1.3.0]: https://github.com/firefly-events/plugin-hive/compare/v1.2.2...v1.3.0

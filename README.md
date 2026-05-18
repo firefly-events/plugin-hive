@@ -11,7 +11,7 @@
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.1.0-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-2.3.0-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
@@ -342,6 +342,10 @@ Enable integrations in `hive/hive.config.yaml`. All integrations are optional �
 ### Autonomous worker loop (reference, maintainer-only)
 
 For consumers who want unattended execution: combine the GitHub Issues task-tracker adapter with sandcastle adoption and a GitHub Actions cron workflow to close the `/plan` → labeled issue → worker → PR loop end-to-end. Reference workflow ships at `.github/workflows/hive-worker.yml` (in plugin-hive's own repo only — plugins distribute via `.claude-plugin/`, not `.github/`). Pre-flight gate at `hive/lib/budget-gate.js` aborts the run when `tokens.daily_usd_limit` is exceeded. See [`hive/references/sandcastle-ops-loop.md`](hive/references/sandcastle-ops-loop.md) for the full opt-in checklist, constraints, and failure modes.
+
+### Unattended mode — event-driven dispatch
+
+`/hive:sandcastle-gh-init` scaffolds an event-driven alternative to the cron loop above. Run it after `npx sandcastle init` and the skill drops `.github/workflows/hive-dispatch.yml` + a bridge script into your repo. Labeling any issue `hive:ready` then fires `/hive:execute` inside a Sandcastle container, opens a PR, and flips the canonical label state machine (`hive:ready` → `hive:in-flight` → `hive:shipped` | `hive:failed`). See [`hive/references/sandcastle-gh-dispatch.md`](hive/references/sandcastle-gh-dispatch.md) for the maintainer runbook — install, secret rotation, runner choice, public-repo lockdown, and stuck-label debugging.
 
 ---
 
