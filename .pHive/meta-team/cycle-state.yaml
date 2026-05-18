@@ -185,5 +185,5 @@ changes:
   - proposal_id: proposal-1
     file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
     action: update_field
-    description: Normalized title to "# Step 03b: Backlog Fallback"
+    description: 'Normalized title to "# Step 03b: Backlog Fallback"'
     status: promoted
