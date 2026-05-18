@@ -1,7 +1,7 @@
 # Sandcastle GitHub-Issue Dispatch — Maintainer Runbook
 
 **Epic:** `sandcastle-gh-issue-dispatch`
-**Skill:** [`/hive:sandcastle-gh-init`](../../skills/hive/skills/sandcastle-gh-init/SKILL.md)
+**Skill:** [`/hive:sandcastle-gh-init`](../../skills/sandcastle-gh-init/SKILL.md)
 **Version introduced:** 2.3.0
 **Related:** [`sandcastle-ops-loop.md`](sandcastle-ops-loop.md) (cron-based predecessor), [`sandcastle-adoption-guide.md`](sandcastle-adoption-guide.md)
 
@@ -249,7 +249,7 @@ When extending:
    the idempotent re-run allowlist. Add the new bridge script + any new
    workflow file so re-running `/hive:sandcastle-gh-init` doesn't strand
    the new route. The scaffold helper at
-   [`scaffold.mjs`](../../skills/hive/skills/sandcastle-gh-init/scaffold.mjs)
+   [`scaffold.mjs`](../../skills/sandcastle-gh-init/scaffold.mjs)
    is the source of truth for the allowlist; extend it in lockstep.
 4. **Update the state machine.** Each new label needs its own
    in-flight / success / failure transitions OR an explicit decision to
@@ -355,7 +355,7 @@ than a recurring incident.
 
 ## See also
 
-- [`/hive:sandcastle-gh-init` SKILL.md](../../skills/hive/skills/sandcastle-gh-init/SKILL.md) — the scaffolding skill itself.
+- [`/hive:sandcastle-gh-init` SKILL.md](../../skills/sandcastle-gh-init/SKILL.md) — the scaffolding skill itself.
 - [`sandcastle-ops-loop.md`](sandcastle-ops-loop.md) — the cron-based predecessor (2.1.0). Event-driven dispatch replaces the polling cadence; both surfaces can coexist.
 - [`sandcastle-adoption-guide.md`](sandcastle-adoption-guide.md) — Sandcastle adoption checklist; prerequisite for this skill.
 - [Epic design discussion](../../.pHive/epics/sandcastle-gh-issue-dispatch/docs/design-discussion.md) — open questions and rationale captured at planning time.

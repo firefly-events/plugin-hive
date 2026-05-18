@@ -52,7 +52,7 @@ const PREREQ_REMEDIATION =
 
 function usage() {
   return [
-    'Usage: node skills/hive/skills/sandcastle-gh-init/scaffold.mjs',
+    'Usage: node skills/sandcastle-gh-init/scaffold.mjs',
     '         [--runner ubuntu-latest|self-hosted]',
     '         [--secret-mode anthropic|openai]',
     '         [--force-recover]',

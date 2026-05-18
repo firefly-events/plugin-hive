@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Fixture tests for skills/hive/skills/sandcastle-gh-init/scaffold.mjs
+ * Fixture tests for skills/sandcastle-gh-init/scaffold.mjs
  *
  * Story: s2-init-skill (sandcastle-gh-issue-dispatch).
  * Run:   node --test tests/sandcastle-gh-init/scaffold.test.mjs
