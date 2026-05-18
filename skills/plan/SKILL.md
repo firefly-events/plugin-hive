@@ -411,7 +411,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories.
 
-16. **Detect UI stories.** After generating stories and before presenting for confirmation, scan each story for UI work indicators. See the UI Step Detection section below.
+16. **Detect UI stories — delegate to `/design` (atomic external call).** After generating stories and before presenting for confirmation, scan each story for UI work indicators. When a story matches, invoke the **design** skill (atomic; `skills/design/SKILL.md`) — this is an **external Skill call**, NOT inline wireframe-ceremony prose copied into this skill. See the UI Step Detection section below for the detection keywords, the delegation invocation shape, and the blocking-gate contract.
 
 17. **Run agent-ready checklist.** Validate each story against the 9-point checklist in `hive/references/agent-ready-checklist.md` (including check #9: cross-cutting concerns). Flag stories that fail checks in the confirmation output.
 
@@ -686,49 +686,29 @@ A collaborative review gate runs before every user-facing document presentation.
 
 ## UI Step Detection
 
-After generating stories, scan each story's description and acceptance criteria for keywords indicating net-new UI work. If detected, the UI designer agent should be involved during planning to produce wireframes before execution begins.
+Scan each story's description and acceptance criteria for UI keywords (case-insensitive): screen | view | page | modal | dialog | sheet | drawer | button | form | input | component | widget | card | list item | redesign | layout | visual | UI | UX | mockup | wireframe | marketing | landing page | banner | app store. When a story matches, delegate the wireframe ceremony to `/design` via an atomic Skill call — `/plan` does NOT inline the wireframe protocol, the touchpoints, or the persona dispatch.
 
-**Detection keywords** (case-insensitive):
-- Screen terms: "screen", "view", "page", "modal", "dialog", "sheet", "bottom sheet", "drawer"
-- Component terms: "button", "form", "input", "component", "widget", "card", "list item"
-- Design terms: "redesign", "layout", "visual", "UI", "UX", "mockup", "wireframe"
-- Marketing terms: "marketing", "landing page", "ad creative", "banner", "promotional", "app store"
+**Delegation (atomic external call to `/design`).** Invoke the **design** skill (`skills/design/SKILL.md`) once per matched story. Pass the story's brief plus `--from-plan` and the story ID; `/design` runs the wireframe-protocol touchpoints (see `hive/references/wireframe-protocol.md`), emits a `.pHive/design/<topic>/` directory, and registers a handoff entry in `.pHive/design/index.yaml`. The blocking-gate contract still holds: stories with a `/design` delegation MUST NOT proceed to execution until the design handoff entry exists.
 
-**When keywords match:**
+For each matched story, write a `ui-design` step that records the `/design` delegation (the executor reads this to confirm the wireframes were produced before dispatching `implement`):
 
-1. Add a `ui-design` step to the story, after `research` and before `implement`:
-   ```yaml
-   - id: ui-design
-     description: |
-       Create wireframes for the UI components described in this story.
-       Follow the wireframe workflow in agents/ui-designer.md and the
-       approval protocol in references/wireframe-protocol.md.
-     agent: ui-designer
-     depends_on: [research]
-   ```
+```yaml
+- id: ui-design
+  description: Delegate to /design for wireframes (atomic external call; see skills/design/SKILL.md).
+  agent: ui-designer
+  delegates_to: design       # atomic Skill call, not inline prose
+  depends_on: [research]
+- id: implement
+  depends_on: [ui-design]
+  inputs:
+    - source: step_output
+      step: ui-design
+      key: wireframe_brief
+```
 
-2. Update the `implement` step to depend on `ui-design` and receive wireframe context:
-   ```yaml
-   - id: implement
-     depends_on: [ui-design]
-     inputs:
-       - source: step_output
-         step: ui-design
-         key: wireframe_brief
-   ```
+Mark UI stories in the plan confirmation output (e.g., `event-detail — Redesign Event Detail View [4 steps, /design delegated]`). Edge cases — false positives on backend "button" usage and purely-visual stories that skip implement/test — are user-resolved at the confirmation gate, same as before.
 
-3. In the plan confirmation output, mark UI stories:
-   ```
-   Stories:
-     · cache-strategy — Design Redis Caching [3 steps]
-     · event-detail — Redesign Event Detail View [4 steps, includes UI design]
-   ```
-
-4. **BLOCKING GATE:** Stories with `ui-design` steps MUST NOT proceed to execution until wireframes are approved. The planning phase blocks on the wireframe touchpoints (see `hive/references/wireframe-protocol.md`).
-
-**Edge cases:**
-- A story mentioning "button" in a backend context may false-positive. Acceptable — the user reviews and can remove the step.
-- Purely visual stories may only need: research → ui-design → review (skip implement and test).
+**Atomic boundary.** If the wireframe ceremony, the wireframe-protocol touchpoints, or the ui-designer dispatch ever appears as inline prose inside this skill, that is a regression. `/plan`'s job at step 16 is to detect UI work and delegate; `/design` owns the ceremony end-to-end.
 
 ## Story File Format
 

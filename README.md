@@ -125,15 +125,16 @@ Structured code review covering correctness, security, conventions, and domain c
 
 ## UI Team Skills
 
-Five dedicated skills for design work — brand identity, design tokens, implementation audits, and design review ceremonies:
+Six dedicated skills for design work — brand identity, wireframe ceremonies, design tokens, implementation audits, and design review:
 
 | Skill | Command | Purpose | Requires |
 |-------|---------|---------|---------|
 | **Brand System** | `/hive:brand-system` | Establish brand identity: colors (HEX/RGB/CMYK/PMS), typography, spacing. Produces `.pHive/brand/brand-system.yaml` + visual guide PNG via Frame0. | — |
+| **Design** | `/hive:design` | Top-level UI design ceremony — wireframe a screen, component, flow, or marketing surface. Callable standalone or atomically from `/plan`. Produces wireframes under `.pHive/design/<topic>/` and a handoff record in `.pHive/design/index.yaml`. | — (brand-system preferred but optional) |
 | **Design System** | `/hive:design-system` | Convert brand system into W3C Design Token JSON for frontend tooling (Tailwind, Figma, Style Dictionary). | `/hive:brand-system` first |
 | **Polish Audit** | `/hive:polish-audit` | Animation and motion opportunity pass — identifies micro-interactions, loading states, and delight improvements. | `/hive:design-review --artifact-target implementation` first |
-| **Visual QA** | `/hive:visual-qa` | Post-implementation fidelity check — compares design briefs and wireframe PNGs against the actual implementation. | `/hive:ui-design` on a story first |
-| **Design Review** | `/hive:design-review` | Target-aware design or implementation review — domain critiques from accessibility and animations specialists, synthesized by ui-designer. Supports `--artifact-target {design\|implementation}`, `--skip accessibility`, and `--skip animations`. | `/hive:ui-design`, `/hive:brand-system`, or implementation artifacts |
+| **Visual QA** | `/hive:visual-qa` | Post-implementation fidelity check — compares design briefs and wireframe PNGs against the actual implementation. | `/hive:design` on a story first |
+| **Design Review** | `/hive:design-review` | Target-aware design or implementation review — domain critiques from accessibility and animations specialists, synthesized by ui-designer. Supports `--artifact-target {design\|implementation}`, `--skip accessibility`, and `--skip animations`. | `/hive:design`, `/hive:brand-system`, or implementation artifacts |
 
 ### Migration
 
@@ -145,8 +146,8 @@ Five dedicated skills for design work — brand identity, design tokens, impleme
 ```
 /hive:brand-system → /hive:design-system
 /hive:kickoff → /hive:design-review --artifact-target implementation → /hive:polish-audit
-/hive:ui-design → /hive:visual-qa
-/hive:ui-design or /hive:brand-system → /hive:design-review
+/hive:design → /hive:visual-qa
+/hive:design or /hive:brand-system → /hive:design-review
 ```
 
 ---

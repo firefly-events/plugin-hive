@@ -1,10 +1,19 @@
 # Wireframe Approval Protocol
 
-This document defines the human-in-the-loop approval flow for wireframes produced during the planning phase. The UI designer agent creates wireframes; this protocol governs how the user reviews and approves them before they're embedded in story specs.
+This document defines the human-in-the-loop approval flow for wireframes. The UI designer agent creates wireframes; this protocol governs how the user reviews and approves them before they're embedded in story specs or design briefs.
+
+## Canonical entry point
+
+`/hive:design` is the canonical entry point that runs this protocol. It is callable two ways:
+
+- **Standalone** — for ad-hoc UI exploration, mid-execution redesigns, and polish passes. No prior planning state is required.
+- **/plan-delegated** — `/plan` Phase C step 16 (UI detection) invokes `/design` via an atomic external Skill call when a story matches the UI-keyword detection. `/plan` does NOT inline the wireframe ceremony.
+
+See [`skills/design/SKILL.md`](../../skills/design/SKILL.md) for the full skill contract. This document defines the touchpoint protocol that skill applies.
 
 ## When This Runs
 
-During `/hive:plan`, when a story involves net-new UI work. The UI designer agent runs as a planning-phase agent alongside the analyst and architect. Wireframes are produced and approved **before** stories are finalized — by execution time, developers already have the approved design context.
+Whenever `/hive:design` runs — either standalone or delegated from `/hive:plan` during planning of a net-new UI story. The UI designer agent runs through the touchpoints below; wireframes are produced and approved **before** stories are finalized so by execution time developers already have the approved design context.
 
 ## Rendition Support
 
