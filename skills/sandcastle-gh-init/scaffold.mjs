@@ -45,10 +45,15 @@ const MANAGED_FILES = [
   '.hive-dispatch/manifest.yaml',
 ];
 
-const PREREQ_DOCKERFILE = '.sandcastle/Dockerfile';
+const PREREQ_CONTAINER_FILES = [
+  '.sandcastle/Dockerfile',
+  '.sandcastle/Containerfile',
+];
 const PREREQ_REMEDIATION =
   "Sandcastle is not initialized in this repo. Run 'npx sandcastle init', " +
-  'choose your provider/template/backlog, then re-run /hive:sandcastle-gh-init.';
+  'choose your provider/template/backlog, then re-run /hive:sandcastle-gh-init. ' +
+  '(Looks for .sandcastle/Dockerfile or .sandcastle/Containerfile — sandcastle ' +
+  '0.5.x ships a Podman-style Containerfile by default.)';
 
 function usage() {
   return [
@@ -120,8 +125,10 @@ function parseArgs(argv) {
 }
 
 function checkPrereqs(cwd) {
-  const dockerfile = path.join(cwd, PREREQ_DOCKERFILE);
-  if (!fs.existsSync(dockerfile)) {
+  const found = PREREQ_CONTAINER_FILES.some((rel) =>
+    fs.existsSync(path.join(cwd, rel)),
+  );
+  if (!found) {
     process.stderr.write(`${PREREQ_REMEDIATION}\n`);
     process.exit(2);
   }

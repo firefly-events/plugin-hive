@@ -35,10 +35,13 @@ nothing about sandcastle's own scaffold — so that:
 The skill performs four prereq checks before writing anything. The first
 that fails stops the run with zero files written:
 
-1. **Sandcastle is initialized.** `.sandcastle/Dockerfile` must exist.
-   Sandcastle init is out of scope here — run `npx sandcastle init` first
-   to pick provider, template, and backlog manager. Failure exits `2` with
-   the verbatim remediation message naming `npx sandcastle init`.
+1. **Sandcastle is initialized.** Either `.sandcastle/Dockerfile` or
+   `.sandcastle/Containerfile` must exist (sandcastle 0.5.x ships a
+   Podman-style `Containerfile` by default; older / Docker-native installs
+   ship `Dockerfile`). Sandcastle init is out of scope here — run
+   `npx sandcastle init` first to pick provider, template, and backlog
+   manager. Failure exits `2` with the verbatim remediation message
+   naming `npx sandcastle init`.
 2. **`gh` CLI is installed and authenticated.** The skill runs
    `gh auth status`; if `gh` is missing or auth fails, the skill exits
    non-zero before any writes.
@@ -114,7 +117,7 @@ The single resulting git commit lists exactly the three managed paths.
 
 | Symptom | Exit | Cause / fix |
 |---|---|---|
-| `Sandcastle is not initialized in this repo. Run 'npx sandcastle init'...` | `2` | `.sandcastle/Dockerfile` is missing. Run `npx sandcastle init` first. |
+| `Sandcastle is not initialized in this repo. Run 'npx sandcastle init'...` | `2` | Neither `.sandcastle/Dockerfile` nor `.sandcastle/Containerfile` is present. Run `npx sandcastle init` first. |
 | `gh CLI is required but was not found on PATH` | `1` | Install GitHub CLI from <https://cli.github.com/>. |
 | `gh auth status failed` | `1` | Run `gh auth login` and re-run. |
 | `WARN: the following canonical Hive labels are missing...` | `0` (warn-only) | Copy-paste the printed `gh label create` commands; not blocking. |
