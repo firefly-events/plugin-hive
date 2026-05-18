@@ -1,0 +1,101 @@
+id: se-1-write-skill
+epic: skill-ergo-may2026
+title: New /write-skill skill — scaffold SKILL.md from a brief
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Add new top-level skill `skills/write-skill/SKILL.md` with `name:
+  write-skill` frontmatter. Takes a brief (problem statement + trigger
+  phrases + scope hint) and emits a `skills/<kebab-name>/SKILL.md` file
+  scaffolded against the standard skill template (frontmatter, description,
+  process, references). Asks targeted clarifying questions inline for
+  fields the brief omits (e.g., what tools the skill needs, single-shot
+  vs multi-turn).
+
+  Hand-off target for se-5 (skill-candidate-detect). User answer #1
+  confirms: add as part of this epic.
+
+  Scope cap: SCAFFOLD ONLY. Does not run the new skill, does not index the
+  skill into any catalog, does not auto-commit. Output is one new
+  SKILL.md file the user can iterate on.
+
+acceptance_criteria:
+  - "Given a brief with name + problem + 2 trigger phrases, when /write-skill runs, then skills/<kebab-name>/SKILL.md exists with all required frontmatter fields populated and a process section seeded from the brief."
+  - "Given a brief missing the trigger phrases, when /write-skill runs, then it asks for triggers inline (numbered question) and waits for response before writing."
+  - "Given a name that collides with an existing skills/<name>/ dir, when /write-skill runs, then it warns and offers either rename or overwrite (default: rename)."
+  - "Given the produced SKILL.md, when scanned by the skill registry pattern (lowercase name in frontmatter), then it loads cleanly without error."
+
+steps:
+  - id: research
+    description: Read 3 existing top-level SKILL.md files (plan, execute, standup) to extract the canonical template shape
+    agent: researcher
+  - id: implement
+    description: Write skills/write-skill/SKILL.md + skills/write-skill/template.md (canonical scaffold)
+    agent: technical-writer
+    depends_on: [research]
+  - id: test
+    description: tests/write-skill-scaffold.test.js — invoke with 3 fixture briefs, assert output structure
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify scope cap (scaffold only) is preserved; no auto-indexing or auto-commit leaked in
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Reference shape for top-level skill frontmatter
+    - path: skills/standup/SKILL.md
+      purpose: Compact top-level skill reference
+    - path: skills/grill/SKILL.md
+      purpose: Atomic skill pattern — same shape /write-skill targets
+
+files_to_modify:
+  - file: skills/write-skill/SKILL.md
+    change: NEW — top-level skill that scaffolds new skills
+  - file: skills/write-skill/template.md
+    change: NEW — canonical SKILL.md template the scaffold writes
+  - file: tests/write-skill-scaffold.test.js
+    change: NEW — fixture-based scaffold tests
+
+design_decisions:
+  - decision: Scaffold only — no auto-indexing, no auto-commit
+    rationale: Prevents scope creep; keeps the skill atomic and re-runnable
+  - decision: Inline clarifying questions, not a flag-driven CLI
+    rationale: Matches the conversational invocation pattern across the rest of the hive skill catalog
+
+cross_cutting:
+  - concern: documentation
+    action: README — mention /write-skill in the skill catalog list; cross-link from /find-skills (se-5) once landed
+  - concern: versioning
+    action: Consumer-visible new skill — bump minor version per semver
+
+metric:
+  applies: true
+  name: write_skill_first_attempt_success
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 0.80
+  window: next-3-cycles
+  source:
+    kind: manual
+    ref: "Track scaffold runs where user accepts output without manual fixes vs runs that require post-scaffold rewrite"
+  verify_at: 2026-07-01T00:00:00Z
+  owner: reviewer
+  notes: |
+    Quality proxy — if scaffold needs heavy rewrite, the template is wrong. Target 80% means user can ship scaffold output with minor edits.
+
+risks:
+  - severity: medium
+    description: Template is too rigid; new skills don't fit the shape
+    mitigation: Template includes commented-out optional sections; review feedback iterates

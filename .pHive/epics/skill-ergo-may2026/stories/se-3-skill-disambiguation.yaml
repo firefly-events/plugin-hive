@@ -1,0 +1,90 @@
+id: se-3-skill-disambiguation
+epic: skill-ergo-may2026
+title: Disambiguate /design vs /design-review vs /design-system descriptions
+status: pending
+complexity: low
+methodology: classic
+depends_on: [se-2-design-top-level]
+
+description: |
+  Update skill descriptions for design-review and design-system so that
+  user invocations of /design route to the new top-level skill (se-2) and
+  do NOT collide with the two existing skills.
+
+  Concrete edits:
+  - design-review description: lead with "Review existing UI designs and
+    implementations against a brief..." (NOT "design...")
+  - design-system description: lead with "Convert brand-system YAML into
+    W3C tokens..." (already specific; verify no overlap)
+  - /design description (se-2 output): lead with "Design UI screens,
+    components, or flows..." (verb-led, unambiguous)
+
+acceptance_criteria:
+  - "Given the three skill descriptions, when read by a user-skill-trigger pattern matcher, then a user request 'design the event detail screen' matches /design only."
+  - "Given the three skill descriptions, when read, then a user request 'review the wireframes' matches /design-review only."
+  - "Given the three skill descriptions, when read, then a user request 'set up the brand system' matches /brand-system, not /design or /design-system."
+  - "Given the disambiguation pass, when complete, then no description contains a trigger phrase already claimed by another skill in the same family."
+
+steps:
+  - id: research
+    description: Read the three skill descriptions in full; identify overlap phrases
+    agent: researcher
+  - id: implement
+    description: Update descriptions; add disambiguation note to each ("Not this skill: see ..." line) if helpful
+    agent: technical-writer
+    depends_on: [research]
+  - id: review
+    description: Run mental routing test against 6 sample user phrases; verify each lands on intended skill
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit and push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/design/SKILL.md
+      purpose: New top-level skill from se-2 — description must be most specific
+    - path: skills/design-review/SKILL.md
+      purpose: Existing review skill — description trims design-prefix phrases
+    - path: skills/design-system/SKILL.md
+      purpose: Existing tokens skill — verify no overlap
+
+files_to_modify:
+  - file: skills/design/SKILL.md
+    change: Verb-led description; explicit disambiguation note
+  - file: skills/design-review/SKILL.md
+    change: Description leads with Review verb; remove ambiguous design-prefix
+  - file: skills/design-system/SKILL.md
+    change: Verify and tighten if needed
+
+design_decisions:
+  - decision: Verb-led descriptions across all three
+    rationale: Verb is the strongest disambiguation signal in skill trigger matching
+
+cross_cutting:
+  - concern: documentation
+    action: Update README skill catalog list with corrected one-line summaries
+
+metric:
+  applies: true
+  name: design_skill_routing_correctness
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 1.0
+  window: integrate
+  source:
+    kind: manual
+    ref: "Run 6-phrase mental routing test (3 design, 2 review, 1 system); count correct routings"
+  verify_at: review
+  owner: reviewer
+  notes: |
+    Hard gate — if any of 6 test phrases routes wrong, se-3 is not done.
+
+risks:
+  - severity: low
+    description: Auto-trigger matcher uses semantic embedding, not phrase-match — description tweaks may not be enough
+    mitigation: Test step exercises real phrases; if routing fails, escalate to richer trigger phrases in se-2's frontmatter

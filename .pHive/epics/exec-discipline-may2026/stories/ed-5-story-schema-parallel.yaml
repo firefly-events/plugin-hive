@@ -1,0 +1,68 @@
+id: ed-5-story-schema-parallel
+epic: exec-discipline-may2026
+title: Story YAML schema — parallel_allowed + parallel_rationale fields
+status: pending
+complexity: low
+methodology: classic
+depends_on: [ed-1-maturity-helper]
+
+description: |
+  Add two new optional top-level fields to the story YAML schema:
+  - `parallel_allowed: bool` (default false when omitted)
+  - `parallel_rationale: variation|read-only|bounded-slice` (required if parallel_allowed=true)
+
+  Update `hive/references/story-yaml-schema.md` with field definitions,
+  the rationale enum, and examples for each allowed rationale.
+
+acceptance_criteria:
+  - "Given hive/references/story-yaml-schema.md, when updated, then both fields are documented with type, default, and required-when rules."
+  - "Given parallel_allowed: true and no parallel_rationale, when a validator inspects the YAML, then this is treated as malformed."
+  - "Given parallel_allowed: false (or omitted), when validated, then parallel_rationale is ignored if present (warned, not fatal)."
+  - "Given schema doc, when read, then it includes one example each for variation, read-only, bounded-slice."
+
+steps:
+  - id: research
+    description: Read current story-yaml-schema.md; identify section where new fields land
+    agent: researcher
+  - id: implement
+    description: Update schema doc with new fields + examples
+    agent: technical-writer
+    depends_on: [research]
+  - id: review
+    description: Verify schema doc is internally consistent and examples are realistic
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit and push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/references/story-yaml-schema.md
+      purpose: Primary schema doc for story files
+
+files_to_modify:
+  - file: hive/references/story-yaml-schema.md
+    change: Add parallel_allowed + parallel_rationale fields + enum table + 3 examples
+
+design_decisions:
+  - decision: Default omit = serial
+    rationale: Safest default; matches user-flagged direction
+  - decision: parallel_rationale is enum, not free-form
+    rationale: Lint-able by ed-7; free-form would defeat the gate
+
+cross_cutting:
+  - concern: documentation
+    action: Note new fields in any planning skill SKILL.md (skills/plan/SKILL.md story-write section)
+
+metric:
+  applies: false
+  justification: |
+    Schema-doc story — tested by ed-6 (plan emits) and ed-7 (execute enforces) consuming the schema.
+
+risks:
+  - severity: low
+    description: Existing stories don't have the fields
+    mitigation: Default omit = serial; backward compat preserved

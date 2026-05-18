@@ -1,0 +1,120 @@
+id: ed-3-drift-metric-emit
+epic: exec-discipline-may2026
+title: scope-drift-score metric type + emit at phase boundaries
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [ed-1-maturity-helper, ed-2-handoff-schema]
+
+description: |
+  Register new metric type `scope_drift_score` in hive/lib/metrics/core.py.
+  Write helper `hive/lib/scope_drift.py` that takes expected_scope[] +
+  delivered_scope[] + delta_reasons[] and returns one of
+  {none, minor, major, divergent} (bucketed v1 per user direction).
+
+  Wire emit at every phase boundary in /plan (after each Phase A/B/B2/B3/C
+  completes), /execute (after each story phase completes), /review (after
+  review completes), /standup (after standup completes). Emit is a single
+  JSONL row via the existing core.py writer — no new emit path.
+
+  Maturity gate: skip emit when project_maturity ∈ {greenfield, early} per
+  ed-1 helper. Log skip-with-reason once per run for visibility.
+
+acceptance_criteria:
+  - "Given an established project, when /plan completes Phase A, then exactly one scope_drift_score event is appended to .pHive/metrics/events/<run-id>.jsonl with bucketed value."
+  - "Given a greenfield project, when /plan runs, then no scope_drift_score events are emitted and a skip-log line is printed once."
+  - "Given expected_scope=[a,b,c] and delivered_scope=[a,b], when score is computed, then value=minor (one item dropped, no scope-creep)."
+  - "Given expected_scope=[a] and delivered_scope=[a,b,c,d], when score is computed, then value=major (scope-creep ≥ 2x)."
+  - "Given delta_reasons=[blocked], when score is computed, then value never exceeds minor (blocked is acknowledged, not divergence)."
+
+steps:
+  - id: research
+    description: Read core.py event writer + REQUIRED_EVENT_FIELDS; confirm dimensions field accepts arbitrary keys
+    agent: researcher
+  - id: implement
+    description: Register metric type; write scope_drift.py; wire emits in /plan + /execute + /review + /standup
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: tests/scope-drift.test.js covering 5 AC cases + maturity-gate skip path
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify emit sites are at phase boundaries only (no per-step noise) and the helper is referenced from a single import
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/metrics/core.py
+      purpose: EVENT_METRIC_TYPES registry — register scope_drift_score here
+    - path: hive/lib/project_maturity.py
+      purpose: From ed-1 — gate the emit
+    - path: skills/plan/SKILL.md
+      purpose: Phase boundary anchor points for emit
+    - path: skills/execute/SKILL.md
+      purpose: Story-phase emit points
+
+files_to_modify:
+  - file: hive/lib/metrics/core.py
+    change: Add scope_drift_score to EVENT_METRIC_TYPES
+  - file: hive/lib/scope_drift.py
+    change: NEW — bucketed scoring helper
+  - file: skills/plan/SKILL.md
+    change: Add emit calls at Phase A/B/B2/B3/C boundaries
+  - file: skills/execute/SKILL.md
+    change: Add emit calls at per-story phase boundaries
+  - file: skills/review/SKILL.md
+    change: Add emit at review completion
+  - file: skills/standup/SKILL.md
+    change: Add emit at standup completion
+  - file: tests/scope-drift.test.js
+    change: NEW — 5 AC cases + skip-path
+
+code_examples:
+  - title: Existing metric event emit pattern
+    file: hive/lib/metrics/core.py
+    snippet: |
+      # Reference for event row shape; emit appends to .pHive/metrics/events/<run-id>.jsonl
+      REQUIRED_EVENT_FIELDS = [
+          "event_id", "timestamp", "run_id", "metric_type",
+          "value", "unit", "dimensions", "source",
+      ]
+
+design_decisions:
+  - decision: Bucketed values, NOT normalized 0-1, in v1
+    rationale: User-confirmed; bucketed is easier to grade and read; 0-1 can land later additively
+  - decision: Helper named scope_drift not drift
+    rationale: Disambiguate from context-drift used elsewhere in repo (per grill risk signal)
+  - decision: Maturity gate skips emit entirely (not emits with value=null)
+    rationale: Cleaner aggregation; greenfield projects produce zero rows, not noise rows
+
+cross_cutting:
+  - concern: documentation
+    action: Add scope_drift section to hive/references/metrics-event.schema.md; mention in /hive:status output description
+
+metric:
+  applies: true
+  name: scope_drift_emit_coverage
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 1.0
+  window: next-3-cycles
+  source:
+    kind: events
+    ref: ".pHive/metrics/events/*.jsonl"
+  verify_at: integrate
+  owner: reviewer
+  notes: |
+    Coverage = (phase boundaries that emitted scope_drift_score) / (total phase boundaries observed). Target: 1.0 on established projects, 0.0 on greenfield (both intentional).
+
+risks:
+  - severity: medium
+    description: Phase boundary identification varies between skills (some skills have 4 phases, some have 7)
+    mitigation: Helper exposes phase_label as a dimension — caller passes own label
