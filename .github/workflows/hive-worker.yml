@@ -111,8 +111,16 @@ jobs:
         # gitignored (maintainer-local spike), so we materialize it here.
         # If cold-build cost becomes material, swap for a pre-built image
         # in GHCR + a separate publish workflow.
+        #
+        # css-5: copy the repo into the build context as `plugin-source/`
+        # so the Dockerfile can install plugin-hive into the agent user's
+        # ~/.claude/plugins/ cache. Without this, the in-container Claude
+        # CLI starts with an empty plugin set and `/hive:execute` (and
+        # every plugin-hive skill) fails to resolve.
         run: |
           BUILD_DIR=$(mktemp -d)
+          rsync -a --exclude='.git' --exclude='node_modules' --exclude='.sandcastle' \
+                ./ "$BUILD_DIR/plugin-source/"
           cat > "$BUILD_DIR/Dockerfile" <<'DOCKERFILE'
           FROM node:22-bookworm
 
@@ -151,6 +159,24 @@ jobs:
 
           RUN npm install -g @openai/codex
           RUN npm install -g @anthropic-ai/claude-code
+
+          # css-5: install plugin-hive into the agent user's plugin cache so
+          # `/hive:execute` (and every plugin-hive skill) is registered when
+          # the in-container Claude CLI starts. The cache path mirrors what
+          # `claude plugin install` writes on the host:
+          #   ~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/
+          # We also write installed_plugins.json + known_marketplaces.json so
+          # the CLI's plugin loader picks the source up at start-up.
+          COPY plugin-source /opt/plugin-source
+          RUN set -eux; \
+              VERSION=$(jq -r .version /opt/plugin-source/.claude-plugin/plugin.json); \
+              CACHE_DIR="/home/agent/.claude/plugins/cache/plugin-hive/plugin-hive/${VERSION}"; \
+              mkdir -p "$CACHE_DIR" /home/agent/.claude/plugins; \
+              cp -a /opt/plugin-source/. "$CACHE_DIR/"; \
+              printf '{"version":2,"plugins":{"plugin-hive@plugin-hive":[{"scope":"user","installPath":"%s","version":"%s","installedAt":"2026-01-01T00:00:00.000Z","lastUpdated":"2026-01-01T00:00:00.000Z"}]}}\n' "$CACHE_DIR" "$VERSION" > /home/agent/.claude/plugins/installed_plugins.json; \
+              printf '{"version":1,"marketplaces":{"plugin-hive":{"trusted":true,"source":"local-baked","addedAt":"2026-01-01T00:00:00.000Z"}}}\n' > /home/agent/.claude/plugins/known_marketplaces.json; \
+              chown -R "$AGENT_UID:$AGENT_GID" /home/agent/.claude; \
+              rm -rf /opt/plugin-source
 
           USER ${AGENT_UID}:${AGENT_GID}
 
