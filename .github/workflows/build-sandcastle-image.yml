@@ -1,0 +1,199 @@
+name: Build sandcastle image
+
+# gi-1-build-publish-workflow: build the sandcastle container image and
+# push to GHCR at `ghcr.io/firefly-events/sandcastle` with both `:latest`
+# and `:sha-<short-sha>` tags. Downstream (gi-2) the hive-dispatch
+# workflow swaps its in-line `docker build` for a `docker pull` of
+# this image — cuts dispatch cold-start from ~4 min (local build) to
+# ~20 s (warm GHCR pull).
+#
+# The Dockerfile baked here is the "rich" variant mirrored from
+# `.github/workflows/hive-worker.yml` (codex + claude-code + plugin-
+# source cache + plugin-hive marketplace shims). The lean
+# `.sandcastle/Containerfile` shipped in this repo lacks `codex` and
+# `plugin-source`, so this workflow inlines the rich Dockerfile into a
+# temp build context rather than pointing build-push-action at the
+# Containerfile directly. Reconciling the two is tracked as a
+# follow-on (see deviations in gi-1 PR description).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .sandcastle/**
+  workflow_dispatch: {}
+  schedule:
+    # Sunday 04:17 UTC — weekly refresh that catches base-image CVE
+    # fixes even when `.sandcastle/**` has not changed. Off-the-hour
+    # minute (:17) avoids the every-job-on-the-hour rush.
+    - cron: 17 4 * * 0
+
+permissions:
+  contents: read
+  packages: write    # required for `docker push` to GHCR via GITHUB_TOKEN
+
+env:
+  IMAGE: ghcr.io/firefly-events/sandcastle
+
+jobs:
+  build-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        # Full checkout (not sparse): the rich Dockerfile rsyncs the
+        # entire repo into the build context as `plugin-source/` so the
+        # plugin-hive marketplace shim layers (see hive-worker.yml
+        # css-5/-7/-8) can install plugin-hive into the agent user's
+        # `~/.claude/plugins/` cache during `docker build`. Sparse on
+        # `.sandcastle/**` would break that copy. Flagged in gi-1 PR.
+        uses: actions/checkout@v4
+
+      - name: Resolve short sha
+        id: short
+        # `${{ github.sha }}` is the full 40-char sha; downstream tag
+        # references want a 7-char truncation. Emitted as a step output
+        # so the build-push-action's `tags:` input can interpolate it.
+        run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare build context
+        id: prep
+        # Mirrors the inline Dockerfile pattern from
+        # `.github/workflows/hive-worker.yml` (lines 108-214):
+        #   1. rsync the repo into BUILD_DIR/plugin-source/ (excluding
+        #      .git, node_modules, .sandcastle to keep the build context
+        #      small — those are not needed inside the image).
+        #   2. Emit a Dockerfile that installs the same package set as
+        #      hive-worker bakes: git, curl, jq, ca-certificates,
+        #      python3, python3-yaml, gh, @openai/codex,
+        #      @anthropic-ai/claude-code, and the plugin-hive marketplace
+        #      shims.
+        # Outputs `dir` so the build-push-action below knows where to
+        # find the context + Dockerfile.
+        run: |
+          set -euo pipefail
+          BUILD_DIR=$(mktemp -d)
+          rsync -a \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.sandcastle' \
+            ./ "$BUILD_DIR/plugin-source/"
+          cat > "$BUILD_DIR/Dockerfile" <<'DOCKERFILE'
+          FROM node:22-bookworm
+
+          # Worker prompt runs `gh issue list / edit / create` inside
+          # the container, so gh CLI is required. python3 + python3-yaml
+          # are needed by helper scripts under tests/ that load story
+          # YAML during `node --test` (issue #85 root cause).
+          RUN apt-get update && apt-get install -y --no-install-recommends \
+                git \
+                curl \
+                jq \
+                ca-certificates \
+                python3 \
+                python3-yaml \
+              && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+                  -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+              && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+              && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+                  > /etc/apt/sources.list.d/github-cli.list \
+              && apt-get update \
+              && apt-get install -y --no-install-recommends gh \
+              && rm -rf /var/lib/apt/lists/*
+
+          ARG AGENT_UID=1000
+          ARG AGENT_GID=1000
+
+          # Robust UID/GID alignment — handles the case where the
+          # requested GID is already used by another group in the base
+          # image (e.g. macOS staff=20 collides with debian dialout).
+          RUN set -eux; \
+              if getent group "$AGENT_GID" >/dev/null && [ "$(getent group "$AGENT_GID" | cut -d: -f1)" != "node" ]; then \
+                  groupdel "$(getent group "$AGENT_GID" | cut -d: -f1)"; \
+              fi; \
+              if getent passwd "$AGENT_UID" >/dev/null && [ "$(getent passwd "$AGENT_UID" | cut -d: -f1)" != "node" ]; then \
+                  userdel "$(getent passwd "$AGENT_UID" | cut -d: -f1)"; \
+              fi; \
+              groupmod -g "$AGENT_GID" node; \
+              usermod -u "$AGENT_UID" -g "$AGENT_GID" -d /home/agent -m -l agent node
+
+          RUN npm install -g @openai/codex
+          RUN npm install -g @anthropic-ai/claude-code
+
+          # Bake the plugin-hive marketplace + cache + settings.json so
+          # in-container `claude` discovers /hive:execute on first run.
+          # Layout mirrors what `claude plugin install` writes on the host
+          # (see hive-worker.yml css-5/-7/-8 for the discovery history).
+          COPY plugin-source /opt/plugin-source
+          RUN set -eux; \
+              VERSION=$(jq -er '.version | strings | select(length > 0)' /opt/plugin-source/.claude-plugin/plugin.json); \
+              MARKET_DIR="/home/agent/.claude/plugins/marketplaces/plugin-hive"; \
+              CACHE_DIR="/home/agent/.claude/plugins/cache/plugin-hive/plugin-hive/${VERSION}"; \
+              mkdir -p "$MARKET_DIR" "$CACHE_DIR" /home/agent/.claude/plugins; \
+              cp -a /opt/plugin-source/. "$MARKET_DIR/"; \
+              cp -a /opt/plugin-source/. "$CACHE_DIR/"; \
+              printf '{"version":2,"plugins":{"plugin-hive@plugin-hive":[{"scope":"user","installPath":"%s","version":"%s","installedAt":"2026-01-01T00:00:00.000Z","lastUpdated":"2026-01-01T00:00:00.000Z"}]}}\n' "$CACHE_DIR" "$VERSION" > /home/agent/.claude/plugins/installed_plugins.json; \
+              printf '{"plugin-hive":{"source":{"source":"local","path":"%s"},"installLocation":"%s","lastUpdated":"2026-01-01T00:00:00.000Z"}}\n' "$MARKET_DIR" "$MARKET_DIR" > /home/agent/.claude/plugins/known_marketplaces.json; \
+              printf '{"enabledPlugins":{"plugin-hive@plugin-hive":true}}\n' > /home/agent/.claude/settings.json; \
+              chown -R "$AGENT_UID:$AGENT_GID" /home/agent/.claude; \
+              rm -rf /opt/plugin-source
+
+          USER ${AGENT_UID}:${AGENT_GID}
+
+          WORKDIR /home/agent
+
+          ENTRYPOINT ["sleep", "infinity"]
+          DOCKERFILE
+          echo "dir=$BUILD_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        # Required by docker/build-push-action for BuildKit + GHA cache.
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + push (with GHA cache)
+        # `cache-from: type=gha` + `cache-to: type=gha,mode=max` make
+        # cross-run builds reuse the BuildKit layer cache — the
+        # apt-get / npm install layers don't re-run when unchanged,
+        # which is what brings the dispatch-side pull-only cost down to
+        # ~20 s (vs the ~4 min cold local-build).
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ steps.prep.outputs.dir }}
+          file: ${{ steps.prep.outputs.dir }}/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:sha-${{ steps.short.outputs.sha }}
+          build-args: |
+            AGENT_UID=1000
+            AGENT_GID=1000
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test pushed image
+        # Pulls the freshly-pushed :sha-<short-sha> tag (rather than
+        # :latest) so the assertion is bound to *this* commit's build,
+        # not whatever else happens to be :latest at smoke-time.
+        # `which claude && which codex && claude --version` is the
+        # gi-1 acceptance criterion #3 — if any of the three binaries
+        # is missing or `claude --version` exits non-zero, this step
+        # fails the workflow. The image is already pushed (immutable),
+        # so the rollback target is the previous `:sha-<short-sha>` tag
+        # — re-point `:latest` manually via:
+        #   gh api -X DELETE /orgs/firefly-events/packages/container/sandcastle/versions/<id>
+        # or `docker buildx imagetools create` against the prior sha.
+        env:
+          SMOKE_TAG: ${{ env.IMAGE }}:sha-${{ steps.short.outputs.sha }}
+        run: |
+          set -euo pipefail
+          docker pull "$SMOKE_TAG"
+          docker run --rm "$SMOKE_TAG" \
+            bash -c 'which claude && which codex && claude --version'
