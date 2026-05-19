@@ -205,6 +205,14 @@ external_models:
       - adversarial-review      # run after Claude review, before optimize/integrate
     # companion_path is auto-detected from the codex plugin if installed
 
+# Git workflow settings (per-epic-branch-pr-flow epic, story pe-1)
+# Resolved by `hive/lib/git_flow.mjs` (`resolveGitFlow`). Uncomment to override
+# the plugin defaults shipped at `hive/hive.config.yaml`.
+#
+# git_flow:
+#   default_pr_base: auto         # auto | <branch-name>; "auto" = develop if origin/develop exists, else main
+#   branch_strategy: per-epic     # per-epic | per-story (back-compat for in-flight epics)
+
 # Execution defaults
 execution:
   default_methodology: classic

@@ -272,6 +272,21 @@ meta_optimize:
 dreaming:
   timeout_hours: 12            # overnight replay window; keeps capability-skip bounded for daily routines
 
+# Git workflow settings (per-epic-branch-pr-flow epic, story pe-1)
+# Controls how Hive epics branch + open PRs. Resolved by
+# `hive/lib/git_flow.mjs` (`resolveGitFlow`).
+#
+# default_pr_base:
+#   auto                — develop if origin/develop exists, else main (default)
+#   <branch-name>       — pin to a specific base (e.g., main, develop, dev/foo)
+#
+# branch_strategy:
+#   per-epic            — one branch per epic (one PR aggregating all stories) [default]
+#   per-story           — one branch per story (back-compat for in-flight epics)
+git_flow:
+  default_pr_base: auto
+  branch_strategy: per-epic
+
 # Planning settings
 planning:
   collaborative_review: true   # set to false to skip collaborative review gates
