@@ -57,6 +57,8 @@ state/
 !.pHive/epics/skill-ergo-may2026/**
 !.pHive/epics/per-epic-branch-pr-flow/
 !.pHive/epics/per-epic-branch-pr-flow/**
+!.pHive/epics/ghcr-sandcastle-image/
+!.pHive/epics/ghcr-sandcastle-image/**
 # Per-epic cycle-state lives under .pHive/cycle-state/; only the
 # meta-improvement-system entry is tracked at this time (same maintainer-
 # infrastructure rationale as the epics/ and episodes/ subtrees above).

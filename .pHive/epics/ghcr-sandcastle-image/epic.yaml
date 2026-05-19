@@ -1,0 +1,27 @@
+name: ghcr-sandcastle-image
+title: GHCR sandcastle image — build once, pull many
+description: |
+  Pre-build the sandcastle container image once on `.sandcastle/**` change (plus weekly),
+  push to GHCR (`ghcr.io/firefly-events/sandcastle`), and have `Hive dispatch` pull instead
+  of build. Eliminates ~3-5 min build cost per run and removes duplicated build steps
+  between cron Hive Worker and event Hive dispatch.
+target_codebase: /Users/don/Documents/plugin-hive-ui-f
+methodology: classic
+
+git_flow:
+  base_branch: main
+  branch_strategy: per-epic
+
+stories:
+  - id: gi-1-build-publish-workflow
+    title: New build-sandcastle-image.yml workflow — build + push to GHCR
+    complexity: medium
+    depends_on: []
+  - id: gi-2-dispatch-uses-ghcr
+    title: Hive dispatch — pull from GHCR with local-build fallback
+    complexity: medium
+    depends_on: [gi-1-build-publish-workflow]
+  - id: gi-3-docs-version-bump
+    title: README + runbook + CHANGELOG + bump 2.5.0
+    complexity: low
+    depends_on: [gi-2-dispatch-uses-ghcr]
