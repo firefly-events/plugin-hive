@@ -15,19 +15,21 @@ Run this checklist against every story before saving during `/hive:plan`. Flag f
 | 7 | **Reference implementation** | Is there an existing file or pattern to follow? Agents produce better code when they have a concrete example. |
 | 8 | **Binary success criteria** | Are acceptance criteria pass/fail, not subjective? "Tests pass" not "code is clean." |
 | 9 | **Cross-cutting concerns** | Are all applicable concerns from `cross-cutting-concerns.yaml` identified in the story's `cross_cutting` section? Are actions specific (not just "handle caching" but "cache in-memory, 5min TTL, invalidate on mutation")? |
+| 10 | **Parallel-rationale validity** | If the story carries `parallel_allowed: true`, does `parallel_rationale` resolve to exactly one of `variation`, `read-only`, `bounded-slice`? When `parallel_rationale: bounded-slice`, is `files_to_modify:` present and non-empty (the touch-set the `/execute` disjointness lint reads)? Serial stories (no `parallel_allowed`) pass this check trivially — the field group is opt-in. See [`story-yaml-schema.md`](story-yaml-schema.md) §4. |
 
 ## How to Apply
 
 During `/hive:plan`, after generating stories and before presenting for confirmation:
 
-1. For each story, evaluate all 8 checks
+1. For each story, evaluate all 10 checks
 2. Mark passing checks with checkmark, failing with X
 3. In the confirmation output, flag stories with failures:
 
 ```
 Stories:
-  · cache-strategy — Design Redis Caching [8/8 checks passed]
-  · event-detail — Redesign Event Detail View [6/8 — missing: exact file paths, verification commands]
+  · cache-strategy — Design Redis Caching [10/10 checks passed]
+  · event-detail — Redesign Event Detail View [8/10 — missing: exact file paths, verification commands]
+  · ui-variant-header — Variation Refactor [9/10 — parallel_rationale=bounded-slice but files_to_modify is empty]
 ```
 
 4. The user can approve with known gaps (acceptable for planning-heavy stories) or ask to fix them
