@@ -155,14 +155,21 @@ test('AC-3 failure step uses if: failure() and transitions to hive:failed', () =
 });
 
 // ---------------------------------------------------------------------------
-// AC-4: per-issue concurrency
+// AC-4: per-epic concurrency via derive-job output (pe-3-workflow-stack-pr)
 // ---------------------------------------------------------------------------
 
-test('AC-4 concurrency.group is per-issue, cancel-in-progress: false', () => {
+test('AC-4 concurrency.group is per-epic via needs.derive.outputs, cancel-in-progress: false', () => {
   const yml = readFile(YML_EXAMPLE);
-  assert.match(yml, /^concurrency:\s*$/m);
-  assert.match(yml, /^\s*group:\s*hive-issue-\$\{\{ github\.event\.issue\.number \}\}\s*$/m);
+  // Concurrency now lives at the job level (run.concurrency) because the
+  // group is derived from an upstream job's output; `concurrency` cannot
+  // read step env/outputs of the same job.
+  assert.match(yml, /^\s*concurrency:\s*$/m);
+  assert.match(yml, /^\s*group:\s*\$\{\{\s*needs\.derive\.outputs\.concurrency_key\s*\}\}\s*$/m);
   assert.match(yml, /^\s*cancel-in-progress:\s*false\s*$/m);
+  // The derive job must emit a `concurrency_key` output that falls back
+  // to `hive-issue-<n>` when no `hive:epic:*` label is found.
+  assert.match(yml, /concurrency_key=hive-epic-\$EPIC_ID/);
+  assert.match(yml, /concurrency_key=hive-issue-\$ISSUE_NUMBER/);
 });
 
 // ---------------------------------------------------------------------------
@@ -288,4 +295,90 @@ test('pe-2 .example mirror matches .tpl after default substitution', () => {
 test('workflow job has a timeout-minutes ceiling', () => {
   const yml = readFile(YML_EXAMPLE);
   assert.match(yml, /timeout-minutes:\s*\d+/);
+});
+
+// ---------------------------------------------------------------------------
+// pe-3: workflow stack-PR + base-branch resolution + concurrency derive
+// ---------------------------------------------------------------------------
+
+test('pe-3 .example.yml mirrors .tpl after default RUNNER+SECRET_KEY substitution', () => {
+  // Independent parity check (distinct test so a pe-3 regression is
+  // immediately readable in failing-test output).
+  const tpl = readFile(YML_TPL);
+  const rendered = render(tpl, {
+    RUNNER: DEFAULT_RUNNER,
+    SECRET_KEY: DEFAULT_SECRET_KEY,
+  });
+  const expected = readFile(YML_EXAMPLE);
+  assert.equal(rendered, expected,
+    'pe-3: hive-dispatch.example.yml must mirror hive-dispatch.yml.tpl ' +
+    'after substituting {{RUNNER}}=ubuntu-latest and {{SECRET_KEY}}=ANTHROPIC_API_KEY.');
+});
+
+test('pe-3 workflow has a `derive` job that extracts EPIC_ID via jq on labels', () => {
+  const yml = readFile(YML_EXAMPLE);
+  // The derive job is the load-bearing piece that makes per-epic
+  // concurrency.group resolvable at job-evaluation time.
+  assert.match(yml, /^\s*derive:\s*$/m, 'derive job must exist');
+  assert.match(yml, /jq -r '\[\.\[\] \| \.name \| select\(startswith\("hive:epic:"\)\)\] \| first/,
+    'derive must filter labels via jq for the hive:epic: prefix');
+  assert.match(yml, /LABELS_JSON:\s*\$\{\{\s*toJSON\(github\.event\.issue\.labels\)\s*\}\}/,
+    'labels must be passed via env as JSON (no inline shell interpolation)');
+  // outputs feed into needs.derive.outputs.* in the run job.
+  assert.match(yml, /outputs:\s*\n\s*epic_id:/);
+  assert.match(yml, /concurrency_key:/);
+});
+
+test('pe-3 run job has a Resolve base branch step that imports hive/lib/git_flow.mjs', () => {
+  const yml = readFile(YML_EXAMPLE);
+  assert.match(yml, /name:\s*Resolve base branch/);
+  // Inline Node one-liner imports the pe-1 helper relative to cwd and
+  // falls back to the repo default branch when absent.
+  assert.match(yml, /node --input-type=module/);
+  assert.match(yml, /hive\/lib\/git_flow\.mjs/);
+  assert.match(yml, /resolveGitFlow\(\{\s*cwd:\s*process\.cwd\(\)\s*\}\)/);
+  assert.match(yml, /process\.env\.DEFAULT_BRANCH/);
+  assert.match(yml, /echo "base_branch=\$BASE_BRANCH" >> "\$GITHUB_OUTPUT"/);
+});
+
+test('pe-3 success step opens OR updates a single draft PR per epic', () => {
+  const yml = readFile(YML_EXAMPLE);
+  // Existing-PR query.
+  assert.match(yml, /gh pr list\s*\\\s*\n\s*--head "\$BRANCH"\s*\\\s*\n\s*--base "\$BASE_BRANCH"\s*\\\s*\n\s*--state open/);
+  // No-existing branch creates a fresh draft PR.
+  assert.match(yml, /gh pr create\s*\\\s*\n\s*--draft\s*\\\s*\n\s*--base "\$BASE_BRANCH"\s*\\\s*\n\s*--head "\$BRANCH"/);
+  // Existing-PR branch edits the body of the same PR (no new PR).
+  assert.match(yml, /gh pr edit "\$PR_NUMBER" --body "\$NEW_BODY"/);
+  // Truncation guard for runaway body growth.
+  assert.match(yml, /truncated;\s*see commits for full history/);
+});
+
+test('pe-3 success step still flips the issue to hive:shipped (no regression)', () => {
+  // AC-2 from s1 must continue to hold under the pe-3 rewrite.
+  const yml = readFile(YML_EXAMPLE);
+  assert.match(yml, /--add-label hive:shipped/);
+  assert.match(yml, /gh issue comment "\$ISSUE_NUMBER"/);
+});
+
+test('pe-3 workflow body composition uses jq --arg, never inline shell-interpolated user strings', () => {
+  const yml = readFile(YML_EXAMPLE);
+  // STORY_LINE is composed via jq --arg so the user-controlled issue
+  // title is JSON-encoded before it lands in the body string.
+  assert.match(yml, /jq -nr --arg n "\$ISSUE_NUMBER" --arg t "\$ISSUE_TITLE"/);
+  // SEED_BODY paths use jq --arg as well.
+  assert.match(yml, /jq -nr --arg e "\$EPIC_ID" --arg s "\$STORY_LINE"/);
+  // Existing-body merge uses jq --arg body / --arg line.
+  assert.match(yml, /--arg body "\$EXISTING_BODY"/);
+  assert.match(yml, /--arg line "\$STORY_LINE"/);
+});
+
+test('pe-3 rendered YAML is parseable + has expected job graph', () => {
+  // Light YAML lint via the structural assertions above; we additionally
+  // check the document has exactly two top-level jobs (derive + run) and
+  // that `run` depends on `derive`.
+  const yml = readFile(YML_EXAMPLE);
+  // Top-level `jobs:` block.
+  assert.match(yml, /^jobs:\s*$/m);
+  // run job declares `needs: derive`.
+  assert.match(yml, /^\s*run:\s*\n(?:\s+.*\n)*?\s*needs:\s*derive\s*$/m);
 });

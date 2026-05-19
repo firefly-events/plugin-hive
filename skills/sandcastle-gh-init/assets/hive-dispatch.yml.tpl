@@ -10,6 +10,16 @@ name: Hive dispatch
 # inside the sandcastle prompt context, preventing the inner Hive from
 # spawning more sandcastles (no nested isolation, no DinD).
 #
+# Per-epic concurrency + stacked-PR (pe-3-workflow-stack-pr):
+#   - The first job `derive` extracts `epic_id` from the issue labels and
+#     emits a `concurrency_key`. The `run` job consumes it via `needs.*`
+#     so GH Actions resolves the group *before* the heavy job starts.
+#     (`concurrency.group` cannot read step-level env or step outputs of
+#     the same job, so the derivation has to live in an upstream job.)
+#   - After the bridge run, an open draft PR on `feat/<epic-id>` is
+#     either created (first story of the epic) or its body is updated
+#     in place (subsequent stories), keeping one PR per epic.
+#
 # Scaffolded by `/hive:sandcastle-gh-init`. Re-runnable; edits land in
 # `.hive-dispatch/manifest.yaml`.
 
@@ -22,22 +32,57 @@ permissions:
   issues: write
   pull-requests: write
 
-concurrency:
-  # Per-issue group: two `hive:ready` labels on the same issue queue,
-  # never double-run. `cancel-in-progress: false` preserves the active
-  # job — the second label simply waits.
-  group: hive-issue-${{ github.event.issue.number }}
-  cancel-in-progress: false
-
 jobs:
+  # ─────────────────────────────────────────────────────────────────────
+  # Tiny upstream job: extract epic_id and compose the concurrency key.
+  # Lives in its own job because GH Actions evaluates `concurrency.group`
+  # before steps run, so step env / step outputs of the consuming job
+  # are not available. `needs.derive.outputs.*` IS available.
+  # ─────────────────────────────────────────────────────────────────────
+  derive:
+    if: github.event.label.name == 'hive:ready'
+    runs-on: {{RUNNER}}
+    timeout-minutes: 2
+    outputs:
+      epic_id: ${{ steps.epic.outputs.epic_id }}
+      concurrency_key: ${{ steps.epic.outputs.concurrency_key }}
+    steps:
+      - name: Derive EPIC_ID from issue labels
+        id: epic
+        env:
+          # Pass the labels array as JSON via env so the label payload
+          # (user-controlled) never reaches a shell word.
+          LABELS_JSON: ${{ toJSON(github.event.issue.labels) }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          EPIC_ID=$(printf '%s' "$LABELS_JSON" \
+            | jq -r '[.[] | .name | select(startswith("hive:epic:"))] | first // ""' \
+            | sed 's/^hive:epic://')
+          if [ -n "$EPIC_ID" ]; then
+            echo "epic_id=$EPIC_ID" >> "$GITHUB_OUTPUT"
+            echo "concurrency_key=hive-epic-$EPIC_ID" >> "$GITHUB_OUTPUT"
+          else
+            echo "epic_id=" >> "$GITHUB_OUTPUT"
+            echo "concurrency_key=hive-issue-$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+          fi
+
   run:
+    needs: derive
     # Step-level guard: GitHub `on:` cannot pre-filter by label name, so
-    # the label gate lives here. Combined with `issues:[labeled]` above
-    # and the per-issue concurrency group, this is the triple-guard
-    # against accidental fires on other `hive:*` labels.
+    # the label gate also lives here. Combined with `issues:[labeled]`
+    # above and the needs.derive concurrency group, this is the
+    # triple-guard against accidental fires on other `hive:*` labels.
     if: github.event.label.name == 'hive:ready'
     runs-on: {{RUNNER}}
     timeout-minutes: 60
+    concurrency:
+      # pe-3: per-epic group when the issue carries `hive:epic:*`; falls
+      # back to the legacy per-issue group otherwise. `cancel-in-progress:
+      # false` queues subsequent stories instead of cancelling the active
+      # one — load-bearing for the stacked-PR invariant.
+      group: ${{ needs.derive.outputs.concurrency_key }}
+      cancel-in-progress: false
 
     steps:
       - name: Claim issue
@@ -61,6 +106,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Resolve base branch
+        id: base
+        env:
+          # Inline JS one-liner that imports the pe-1 helper (when
+          # vendored) and prints the resolved base_branch. Falls back to
+          # the repo's default branch when the helper is absent so
+          # non-Hive consumers see no behavior change.
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          BASE_BRANCH=$(node --input-type=module -e "
+            try {
+              const m = await import(process.cwd() + '/hive/lib/git_flow.mjs');
+              const out = m.resolveGitFlow({ cwd: process.cwd() });
+              process.stdout.write(out.base_branch || process.env.DEFAULT_BRANCH);
+            } catch {
+              process.stdout.write(process.env.DEFAULT_BRANCH);
+            }
+          ")
+          echo "base_branch=$BASE_BRANCH" >> "$GITHUB_OUTPUT"
+
       - name: Run Hive via sandcastle bridge
         env:
           {{SECRET_KEY}}: ${{ secrets.{{SECRET_KEY}} }}
@@ -71,23 +137,83 @@ jobs:
           HIVE_EXECUTION_MODE: team
         run: npx tsx .github/scripts/sandcastle-hive-bridge.mts
 
-      - name: On success — ship + label
+      - name: On success — open or update stacked PR + label
         if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          EPIC_ID: ${{ needs.derive.outputs.epic_id }}
+          BASE_BRANCH: ${{ steps.base.outputs.base_branch }}
+          # ISSUE_TITLE flows into the body via jq's --arg, never
+          # interpolated into a shell word.
+          ISSUE_TITLE: ${{ github.event.issue.title }}
         run: |
-          BRANCH="agent/issue-${ISSUE_NUMBER}"
-          # Hive may complete /execute with zero commits (idle timeout,
-          # no actionable work). Pre-check the remote branch + soft-fail
-          # PR creation so the label transition + comment still fire.
-          if git ls-remote --exit-code --heads origin "$BRANCH"; then
-            gh pr create \
-              --base "${{ github.event.repository.default_branch }}" \
-              --head "$BRANCH" \
-              --title "Hive: #${ISSUE_NUMBER}" \
-              --body "Automated /hive:execute run for #${ISSUE_NUMBER}." || true
+          set -euo pipefail
+          if [ -n "$EPIC_ID" ]; then
+            BRANCH="feat/$EPIC_ID"
+          else
+            BRANCH="agent/issue-${ISSUE_NUMBER}"
           fi
+
+          # Pre-check the remote branch — Hive may complete /execute with
+          # zero commits (idle timeout). Skip PR open-or-update in that
+          # case so the label transition + comment still fire.
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            # Compose the new story line via jq (-n + --arg) so the
+            # issue title (user-controlled) is JSON-encoded and never
+            # smuggles shell metacharacters into the body.
+            STORY_LINE=$(jq -nr --arg n "$ISSUE_NUMBER" --arg t "$ISSUE_TITLE" \
+              '"- 🟡 #" + $n + ": " + $t')
+
+            EXISTING=$(gh pr list \
+              --head "$BRANCH" \
+              --base "$BASE_BRANCH" \
+              --state open \
+              --json number,body \
+              --jq '.[0] // empty')
+
+            if [ -z "$EXISTING" ]; then
+              # First story of this epic (or non-epic fallback): open a
+              # fresh draft PR seeded with the story line.
+              if [ -n "$EPIC_ID" ]; then
+                TITLE="[epic] $EPIC_ID"
+                SEED_BODY=$(jq -nr --arg e "$EPIC_ID" --arg s "$STORY_LINE" \
+                  '"Stacked PR for epic `" + $e + "`. One PR per epic; stories appended below as they ship.\n\n## Stories\n\n" + $s')
+              else
+                TITLE="Hive: #${ISSUE_NUMBER}"
+                SEED_BODY=$(jq -nr --arg s "$STORY_LINE" \
+                  '"Automated /hive:execute run.\n\n## Stories\n\n" + $s')
+              fi
+              gh pr create \
+                --draft \
+                --base "$BASE_BRANCH" \
+                --head "$BRANCH" \
+                --title "$TITLE" \
+                --body "$SEED_BODY" || true
+            else
+              # Existing open PR: append the new story line, truncate
+              # at 25 story entries with a "see commits" pointer
+              # (mitigates the unbounded-growth risk in pe-3 risks).
+              PR_NUMBER=$(printf '%s' "$EXISTING" | jq -r '.number')
+              EXISTING_BODY=$(printf '%s' "$EXISTING" | jq -r '.body // ""')
+              NEW_BODY=$(jq -nr \
+                --arg body "$EXISTING_BODY" \
+                --arg line "$STORY_LINE" \
+                '
+                  ($body + "\n" + $line)
+                  | split("\n")
+                  | . as $all
+                  | ([$all[] | select(startswith("- "))]) as $lines
+                  | ($all | map(select(startswith("- ") | not))) as $header
+                  | if ($lines | length) > 25
+                    then ($header | join("\n")) + "\n" + ($lines[0:25] | join("\n")) + "\n- _…older story lines truncated; see commits for full history._"
+                    else ($header | join("\n")) + "\n" + ($lines | join("\n"))
+                    end
+                ')
+              gh pr edit "$PR_NUMBER" --body "$NEW_BODY"
+            fi
+          fi
+
           gh issue edit "$ISSUE_NUMBER" \
             --remove-label hive:in-flight \
             --add-label hive:shipped

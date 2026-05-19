@@ -83,6 +83,36 @@ node skills/sandcastle-gh-init/scaffold.mjs \
 
 1. Renders `assets/hive-dispatch.yml.tpl` -> `.github/workflows/hive-dispatch.yml`
    with the chosen `RUNNER` and `SECRET_KEY` substituted.
+   The rendered workflow follows the per-epic-branch-pr-flow model
+   (story pe-3):
+   - **Two-job graph.** A tiny `derive` job extracts `EPIC_ID` from the
+     issue labels via `jq` (no shell interpolation — labels arrive as
+     `toJSON()` env) and emits a `concurrency_key` output. The heavy
+     `run` job declares `needs: derive` and sets its
+     `concurrency.group` to `${{ needs.derive.outputs.concurrency_key }}`,
+     which is `hive-epic-<id>` when an epic label is present and
+     `hive-issue-<n>` otherwise. The split into two jobs is required
+     because GitHub Actions evaluates `concurrency.group` before any
+     step in the consuming job runs, so step env or step outputs of the
+     same job are not available.
+   - **`Resolve base branch` step.** A Node one-liner inside the `run`
+     job dynamically imports `hive/lib/git_flow.mjs` (vendored from
+     plugin-hive's pe-1 helper) and prints the resolved `base_branch`,
+     stored as `steps.base.outputs.base_branch`. Falls back to
+     `github.event.repository.default_branch` when the helper module is
+     absent so non-Hive consumers see no behavior change.
+   - **PR open-or-update.** After a successful bridge run, the workflow
+     queries for an existing open draft PR with `head: feat/<epic-id>`
+     and `base: <resolved-base>`. When absent it opens a fresh
+     `--draft` PR seeded with the first story line; when present it
+     edits the existing PR body to append the new story line. Both
+     paths use `jq -nr --arg` for body composition so the user-
+     controlled issue title is JSON-encoded and never reaches a shell
+     word. The body is capped at 25 story entries with a "see commits"
+     pointer to bound growth (pe-3 risks mitigation).
+   - **Failure path unchanged.** `if: failure()` still flips the issue
+     to `hive:failed` so a crashed bridge can never leave an issue
+     stuck in `hive:in-flight`.
 2. Renders `assets/sandcastle-hive-bridge.mts.tpl` -> `.github/scripts/sandcastle-hive-bridge.mts`
    with the same `SECRET_KEY` substituted.
    The rendered bridge derives its sandcastle branch name at run time:
@@ -124,6 +154,14 @@ cannot smuggle shell metacharacters into the command line.
 | `.github/scripts/sandcastle-hive-bridge.mts` | Hive-managed | Rewritten on every successful run. |
 | `.hive-dispatch/manifest.yaml` | Hive-managed | Rewritten on every successful run. |
 | `.sandcastle/**` | Sandcastle-managed | **Never touched.** |
+
+**Runtime artifacts (created by the rendered workflow, not by this skill):**
+
+| Artifact | Created when | Update behavior |
+|---|---|---|
+| Branch `feat/<epic-id>` | First story of an epic ships | Subsequent stories of the same epic push to the same branch (per pe-2 bridge). |
+| Branch `agent/issue-<n>` | Story ships with no `hive:epic:*` label | Legacy one-branch-per-issue fallback. |
+| Draft PR titled `[epic] <epic-id>` | First story of the epic completes | Second-and-later stories of the same epic *update* the existing PR's body in place rather than opening a new PR (per pe-3 stack-PR rule). The body is capped at 25 story entries. |
 | Anything else | User | **Never touched.** |
 
 The single resulting git commit lists exactly the three managed paths.
