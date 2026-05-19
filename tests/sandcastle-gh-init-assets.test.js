@@ -257,7 +257,7 @@ test('bridge imports run + claudeCode from @ai-hero/sandcastle and docker sandbo
 test('bridge invokes run() with derived branch and cost controls (pe-2)', () => {
   const mts = readFile(MTS_EXAMPLE);
   assert.match(mts, /agent: claudeCode\("claude-opus-4-7"\)/);
-  assert.match(mts, /sandbox: docker\(\)/);
+  assert.match(mts, /sandbox: docker\(\{ imageName: "sandcastle:hive" \}\)/);
   assert.match(mts, /branchStrategy: \{ type: "branch", branch \}/);
   assert.match(mts, /maxIterations:\s*5/);
   assert.match(mts, /idleTimeoutSeconds:\s*600/);

@@ -73,7 +73,12 @@ const prompt = [
 
 const result = await run({
   agent: claudeCode("claude-opus-4-7"),
-  sandbox: docker(),
+  // Explicit imageName matches the workflow's GHCR pull retag
+  // (sandcastle:hive). Without this, sandcastle defaults to
+  // `sandcastle:<cwd-basename>` = `sandcastle:plugin-hive`, which the
+  // workflow never builds/retags → run fails with
+  // "Image 'sandcastle:plugin-hive' not found locally".
+  sandbox: docker({ imageName: "sandcastle:hive" }),
   branchStrategy: { type: "branch", branch },
   prompt,
   maxIterations: 5,
