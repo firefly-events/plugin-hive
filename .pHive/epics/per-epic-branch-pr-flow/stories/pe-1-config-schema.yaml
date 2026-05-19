@@ -101,7 +101,9 @@ metric:
 risks:
   - severity: low
     description: Consumer has `origin/develop` for unrelated reasons (e.g., GitFlow legacy) but wants `main` as base.
-    mitigation: Consumer sets `default_pr_base: main` explicitly. `auto` is only the default when the field is absent.
+    mitigation: |
+      Consumer sets `default_pr_base: main` explicitly. `auto` is only the default
+      when the field is absent.
 
 references:
   - path: hive/references/skill-prelude.md
