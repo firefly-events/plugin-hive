@@ -68,6 +68,11 @@ state/
 !.pHive/cycle-state/ui-cluster-extract-config-deeper.yaml
 !.pHive/cycle-state/sandcastle-adoption-followon.yaml
 !.pHive/cycle-state/kg-signal-revival.yaml
+!.pHive/cycle-state/skill-ergo-may2026.yaml
+# /find-skills (se-5) writes ranked candidates here; track the dir marker so
+# consumer projects ship with an initialized output location.
+!.pHive/meta/
+!.pHive/meta/.gitkeep
 # Specialist-phase audit trail for the Sandcastle adoption work (security plan-audit
 # verdict + re-audit, performance post-run audit). Tracked as decision provenance for
 # the major-severity pre-exec gate resolution + minor post-run informational audit.

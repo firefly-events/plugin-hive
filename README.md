@@ -224,6 +224,25 @@ For the detailed operating contract, see
 [`skills/hive/skills/meta-optimize/SKILL.md`](skills/hive/skills/meta-optimize/SKILL.md)
 and [`hive/references/meta-optimize-contract.md`](hive/references/meta-optimize-contract.md).
 
+### Skill discovery and authoring
+
+Two paired top-level skills close the meta-loop on skill catalog growth:
+
+- [`/find-skills`](skills/find-skills/SKILL.md) — mines recurring patterns from
+  metrics, KG triples, git history, and cycle-state escalations (via
+  [`hive.lib.skill_candidate_mine`](hive/lib/skill_candidate_mine.py)), ranks
+  them by `occurrence_count × recency_factor × distinctness`, filters below
+  threshold, and writes ranked candidates to `.pHive/meta/skill-candidates.yaml`.
+  Operator picks a candidate; `/find-skills` hands off to `/write-skill` via an
+  atomic `Skill` call.
+- [`/write-skill`](skills/write-skill/SKILL.md) — scaffolds
+  `skills/<kebab-name>/SKILL.md` from a brief (name, problem, triggers, scope).
+  Asks clarifying questions inline for any missing field. Scaffold only — no
+  indexing, no commit, no run.
+
+Together they form the discover-then-author half of the meta-loop;
+`/meta-optimize` above is the run-experiments half.
+
 ---
 
 ## Memory architecture
