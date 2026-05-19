@@ -32,6 +32,9 @@ The session-end window has three phases with strict ordering:
    Session-end is still considered complete, but the error is reported to the caller.
 
 ### Phase C: Wiki Compile + ChromaDB Index (Parallel, After B)
+
+> **Parallel-call-site annotation (audit pass):** `parallel_rationale: read-only` — `compile()` and `chromadb.index()` both write to derived caches (memory-wiki, ChromaDB index) under `~/.claude/hive/` and `.pHive/`; neither touches production code or another story's output. Out-of-scope for the `ed-7` story-level fan-out gate; catalogued in [`hive/references/parallel-call-sites.md`](../../../../hive/references/parallel-call-sites.md) §3 (`session-end:compile-and-index`).
+
 7. Fire `compile()` and `chromadb.index()` concurrently using `Promise.all` or equivalent.
 8. `compile()`: rebuild `~/.claude/hive/memory-wiki/` from promoted memories.
 9. `chromadb.index()`: index promoted documents via `hive/lib/chromadb-wrapper.js`.

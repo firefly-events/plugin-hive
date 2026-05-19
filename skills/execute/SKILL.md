@@ -125,6 +125,8 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
 4a. **Pre-exec phase loop.** If `pre_exec[]` is empty, skip this step entirely — zero behavior change for escalation-free epics.
 
+   > **Parallel-call-site annotation (audit pass):** `parallel_rationale: bounded-slice` — each specialist team writes to a declared phase-output directory at `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/`. The loop iterates triggers sequentially (one `TeamCreate` per trigger), so this is *not* story-level fan-out and is out-of-scope for the `ed-7` parallel gate; catalogued in [`hive/references/parallel-call-sites.md`](../../hive/references/parallel-call-sites.md) §3 (`execute:specialist-phases`). The annotation also applies to the symmetric post-exec loop in step 7a below.
+
    For each trigger in `pre_exec[]`, ordered by `raised_at` ASC (severity DESC as tiebreak), look up the trigger's catalog entry in `hive/references/specialist-triggers.md` (loaded in step 2b) to resolve `responds_with.id` and `workflow` fields. Then apply the three-condition branch:
 
    **Prerequisite — team_memory_path validation:** Before spawning, verify the team config's `team_memory_path` directory exists on disk. If it does not, emit an actionable error — e.g., `[error] pre-exec: team_memory_path "${HIVE_STATE_DIR}/team-memories/security-team/" does not exist — create it before running specialist phases` — skip the trigger, and continue. Do not crash execute.
@@ -142,7 +144,11 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
    > **v1 note:** v1 routing handles `workflow`-based catalog entries only. A catalog entry with `skill: <path>` (allowed by catalog schema but unused in v1) is not reached by condition (i) and falls to condition (ii) or (iii). Skill-based routing is a Phase 6 extension point.
 
-5. **Choose execution mode.** Invoke `skills/hive/skills/execute-dispatch/SKILL.md` with env, parsed root `hive.config.yaml`, parsed consumer `${HIVE_STATE_DIR}/hive.config.yaml`, parsed graduation registry, `workflow_name`, and `$ARGUMENTS`; consume `mode_decision`, `mode_reason`, `runner_path`, and `runner_reason`. Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d.
+5. **Choose execution mode.** Invoke `skills/hive/skills/execute-dispatch/SKILL.md` with env, parsed root `hive.config.yaml`, parsed consumer `${HIVE_STATE_DIR}/hive.config.yaml`, parsed graduation registry, `workflow_name`, `$ARGUMENTS`, and `unblocked_stories[]` — the depth-0 ready stories from the topological sort in step 4. Each story payload includes `id`, `parallel_allowed`, `parallel_rationale`, and (for `bounded-slice` rationale) `files_to_modify[]`. Consume `mode_decision`, `mode_reason`, `gate_violations[]`, `runner_path`, and `runner_reason`.
+
+   When `gate_violations[]` is non-empty, the dispatch has been downgraded to `sequential` by the parallel-dispatch gate (`ed-7`). Surface the warning to stdout naming every offending story ID and the reason recorded by the gate (the structured format is documented in `execute-dispatch/SKILL.md` Step 1.5). Do not re-implement the gate logic here — the dispatch skill is the single boundary for this decision per the parallel-call-sites registry (`hive/references/parallel-call-sites.md`).
+
+   Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d.
 5pre. **Executor cutover routing.** Use only the returned `runner_path` and `runner_reason`; do not re-evaluate the cutover tree here. If `runner_path == hive-dag`, call `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`; otherwise continue on the orchestrator-narrated path. Single dispatch point: this skill call is the only `/execute` policy boundary for executor-vs-orchestrator routing.
 
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.

@@ -46,6 +46,8 @@ ALL test artifacts go to `.pHive/test-artifacts/{epic-id}/{story-id}/`:
 
 ## Known Limitations
 
+> **Parallel-call-site annotation (audit pass):** `parallel_rationale: variation` — platform workers (web/iOS/Android) run the same test spec against disjoint platform targets; the workflow runner serializes Maestro (port 7001) but unit/integration suites parallelize freely. Out-of-scope for the `ed-7` story-level fan-out gate (workflow-internal parallelism, not story dispatch); catalogued in [`hive/references/parallel-call-sites.md`](../../hive/references/parallel-call-sites.md) §3 (`test-swarm:platform-workers`).
+
 - **Maestro port 7001:** Single driver — iOS and Android must serialize, cannot run in parallel. Unit/integration tests can still parallel.
 - **testId render visibility:** A testId in source doesn't guarantee the component is visible. The architect step verifies render visibility to catch layout anti-patterns.
 
