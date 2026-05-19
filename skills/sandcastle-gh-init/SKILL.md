@@ -13,8 +13,9 @@ flips the canonical label state machine
 (`hive:ready` -> `hive:in-flight` -> `hive:shipped` | `hive:failed`).
 
 **Input:** `$ARGUMENTS` may contain `--runner ubuntu-latest|self-hosted`
-and `--secret-mode anthropic|openai`. Both have safe defaults
-(`ubuntu-latest` + `anthropic`).
+and `--secret-mode claude-oauth|anthropic-api|openai`. Both have safe
+defaults (`ubuntu-latest` + `claude-oauth` — subscription OAuth via
+`claude setup-token`, no per-token billing).
 
 ## Purpose
 
@@ -60,7 +61,7 @@ that fails stops the run with zero files written:
 | Flag | Default | Allowed values | Notes |
 |---|---|---|---|
 | `--runner` | `ubuntu-latest` | `ubuntu-latest`, `self-hosted` | Substituted into `runs-on:` in the workflow. |
-| `--secret-mode` | `anthropic` | `anthropic`, `openai` | Selects which API-key secret name (`ANTHROPIC_API_KEY` or `OPENAI_API_KEY`) the workflow + bridge reference. |
+| `--secret-mode` | `claude-oauth` | `claude-oauth`, `anthropic-api`, `openai` | Selects which auth secret the workflow + bridge reference. `claude-oauth` → `CLAUDE_CODE_OAUTH_TOKEN` (subscription OAuth via `claude setup-token`, no per-token billing — the new default). `anthropic-api` → `ANTHROPIC_API_KEY` (legacy pay-per-token API path). `openai` → `OPENAI_API_KEY`. The deprecated alias `anthropic` is still accepted and maps to `anthropic-api`. |
 | `--force-recover` | off | — | Overwrite managed files when manifest is absent. Only set after inspecting the conflicts. |
 
 There is intentionally **no `--label` flag** (the trigger label
@@ -75,7 +76,7 @@ The slash command invokes `scaffold.mjs`:
 ```bash
 node skills/sandcastle-gh-init/scaffold.mjs \
   [--runner ubuntu-latest|self-hosted] \
-  [--secret-mode anthropic|openai] \
+  [--secret-mode claude-oauth|anthropic-api|openai] \
   [--force-recover]
 ```
 

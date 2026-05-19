@@ -9,9 +9,13 @@
  *
  * Asset shape:
  *   hive-dispatch.yml.tpl              -- {{RUNNER}} + {{SECRET_KEY}} placeholders
- *   hive-dispatch.example.yml          -- rendered with defaults (ubuntu-latest, ANTHROPIC_API_KEY)
+ *   hive-dispatch.example.yml          -- rendered with defaults (ubuntu-latest, CLAUDE_CODE_OAUTH_TOKEN)
  *   sandcastle-hive-bridge.mts.tpl     -- {{SECRET_KEY}} placeholder
- *   sandcastle-hive-bridge.example.mts -- rendered with default (ANTHROPIC_API_KEY)
+ *   sandcastle-hive-bridge.example.mts -- rendered with default (CLAUDE_CODE_OAUTH_TOKEN)
+ *
+ * 2.4.2 secret-mode default: claude-oauth (subscription OAuth via
+ * `claude setup-token`, no per-token billing). Legacy modes
+ * `anthropic-api` and `openai` remain available via --secret-mode.
  *
  * Snapshot rule: rendering each .tpl with default substitutions MUST match
  * the corresponding .example file byte-for-byte. Regenerate by exporting
@@ -51,7 +55,7 @@ const MTS_TPL = path.join(ASSETS, 'sandcastle-hive-bridge.mts.tpl');
 const MTS_EXAMPLE = path.join(ASSETS, 'sandcastle-hive-bridge.example.mts');
 
 const DEFAULT_RUNNER = 'ubuntu-latest';
-const DEFAULT_SECRET_KEY = 'ANTHROPIC_API_KEY';
+const DEFAULT_SECRET_KEY = 'CLAUDE_CODE_OAUTH_TOKEN';
 
 function render(tpl, substitutions) {
   let out = tpl;
@@ -227,9 +231,12 @@ test('AC-7 bridge never shells out (no child_process, no exec)', () => {
 // AC-8: missing-key handling
 // ---------------------------------------------------------------------------
 
-test('AC-8 bridge fails loudly when the API key env is missing', () => {
+test('AC-8 bridge fails loudly when the auth secret env is missing', () => {
   const mts = readFile(MTS_EXAMPLE);
-  assert.match(mts, /process\.env\["ANTHROPIC_API_KEY"\]/);
+  // 2.4.2: default secret is CLAUDE_CODE_OAUTH_TOKEN (subscription OAuth).
+  // The {{SECRET_KEY}} placeholder substitution determines which env var
+  // the bridge presence-checks; this test pins the default-rendered shape.
+  assert.match(mts, /process\.env\["CLAUDE_CODE_OAUTH_TOKEN"\]/);
   assert.match(mts, /is not set/);
   assert.match(mts, /process\.exit\(1\)/);
 });
@@ -285,7 +292,7 @@ test('pe-2 .example mirror matches .tpl after default substitution', () => {
   const expected = readFile(MTS_EXAMPLE);
   assert.equal(rendered, expected,
     'pe-2: sandcastle-hive-bridge.example.mts must mirror the .tpl ' +
-    'after substituting {{SECRET_KEY}} with the default ANTHROPIC_API_KEY.');
+    'after substituting {{SECRET_KEY}} with the default CLAUDE_CODE_OAUTH_TOKEN.');
 });
 
 // ---------------------------------------------------------------------------
@@ -312,7 +319,7 @@ test('pe-3 .example.yml mirrors .tpl after default RUNNER+SECRET_KEY substitutio
   const expected = readFile(YML_EXAMPLE);
   assert.equal(rendered, expected,
     'pe-3: hive-dispatch.example.yml must mirror hive-dispatch.yml.tpl ' +
-    'after substituting {{RUNNER}}=ubuntu-latest and {{SECRET_KEY}}=ANTHROPIC_API_KEY.');
+    'after substituting {{RUNNER}}=ubuntu-latest and {{SECRET_KEY}}=CLAUDE_CODE_OAUTH_TOKEN.');
 });
 
 test('pe-3 workflow has a `derive` job that extracts EPIC_ID via jq on labels', () => {

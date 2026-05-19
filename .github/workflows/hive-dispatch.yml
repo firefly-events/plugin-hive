@@ -76,7 +76,12 @@ jobs:
 
       - name: Run Hive via sandcastle bridge
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Subscription OAuth — no per-token billing. `claude` CLI
+          # inside the sandcastle container reads this env var directly
+          # (verified by .github/workflows/claude-auth-spike.yml on
+          # 2026-05-17). Generate via `claude setup-token` locally then
+          # `gh secret set CLAUDE_CODE_OAUTH_TOKEN`.
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           # Prevent the inner Hive from spawning more sandcastles. The
