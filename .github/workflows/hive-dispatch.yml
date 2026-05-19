@@ -150,10 +150,11 @@ jobs:
             --body "Hive execute completed — see PR from \`$BRANCH\`."
 
       - name: On failure — label + comment
-        # `if: failure()` fires even when the bridge step exits non-zero
-        # (missing key, agent crash, timeout). This is the load-bearing
-        # invariant that prevents stuck `hive:in-flight` labels.
-        if: failure()
+        # `if: failure() || cancelled()` fires on bridge non-zero exit
+        # (missing key, agent crash) AND on job-level cancellation
+        # (timeout-minutes hit, manual cancel). Both leave the issue in
+        # `hive:in-flight` otherwise — load-bearing for label hygiene.
+        if: failure() || cancelled()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}

@@ -27,6 +27,8 @@
 
 import { run, claudeCode } from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
+import { spawn } from "node:child_process";
+import { existsSync, mkdirSync } from "node:fs";
 
 const issueNumberRaw = process.env.ISSUE_NUMBER;
 if (!issueNumberRaw || !/^\d+$/.test(issueNumberRaw)) {
@@ -52,6 +54,21 @@ if (!process.env["CLAUDE_CODE_OAUTH_TOKEN"]) {
 }
 
 const branch = `agent/issue-${issueNumber}`;
+
+// Stream the sandcastle agent log to the job stdout so workflow timeouts
+// produce a usable post-mortem instead of a silent 60-min hang. The log
+// path is created by sandcastle when the agent boots; pre-create the
+// directory and `tail -F` (retry on missing) so we attach as soon as
+// sandcastle writes the first byte.
+const agentLogDir = ".sandcastle/logs";
+const agentLogPath = `${agentLogDir}/agent-issue-${issueNumber}.log`;
+if (!existsSync(agentLogDir)) {
+  mkdirSync(agentLogDir, { recursive: true });
+}
+const tail = spawn("tail", ["-n", "+1", "-F", agentLogPath], {
+  stdio: ["ignore", "inherit", "inherit"],
+});
+tail.unref();
 
 // Prompt delegates to /hive:execute. The inner Claude Code (with the
 // plugin-hive plugin loaded inside the sandcastle container image)
@@ -103,8 +120,13 @@ const result = await run({
   }),
   branchStrategy: { type: "branch", branch },
   prompt,
-  maxIterations: 5,
-  idleTimeoutSeconds: 600,
+  // Mirror hive/lib/sandcastle-worker-runner.js (the cron path that
+  // ships reliably): single iteration, 30-min idle. Iterations are
+  // sandbox-level prompt retries — useful only with structured output
+  // validation, which the bridge does not configure. 600s idle was too
+  // tight for Claude Code thinking quietly between tool calls.
+  maxIterations: 1,
+  idleTimeoutSeconds: 1800,
 });
 
 // Structured one-line result for the workflow to parse / surface in the
