@@ -33,6 +33,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - KG signal revival S4.1: `/hive:register-project` skill, registry helper, and quoted path-with-space fixture for cross-project KG bootstrap registration.
 - KG signal revival S3.1: ChromaDB sidecar lifecycle scripts, fire-and-forget SessionStart hook, operations guide, and bash lifecycle tests.
 
+## [2.4.1] - 2026-05-19
+
+### Fixed
+
+- **`Hive dispatch` workflow no longer crashes on bare repos.** The `Install dependencies` step in `hive-dispatch.yml` (both the in-repo workflow and the scaffolder template + .example mirror) used `npm ci`, which requires a `package-lock.json`. Plugin-hive itself (and any consumer following the BYO-deps pattern) ships no lockfile, so the step exited non-zero before the bridge could start, leaving labeled issues stuck (issue #137 hit this on 2026-05-19). Replaced with a three-case conditional: lockfile present → `npm ci`; `package.json` only → `npm install --no-save`; no `package.json` → `npm install --no-save --no-package-lock @ai-hero/sandcastle` (bare-repo transient). Re-enable the workflow via `gh workflow enable "Hive dispatch"` once this patch is live.
+
 ## [2.4.0] - 2026-05-19
 
 **Per-epic branch + stacked-PR dispatch — `feat/<epic-id>` against configurable base, one PR per epic.**
