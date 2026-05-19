@@ -108,7 +108,8 @@ metric:
 
 risks:
   - severity: medium
-    description: GHCR auth fails on first push (`packages: write` permission missing).
+    description: |
+      GHCR auth fails on first push (`packages: write` permission missing).
     mitigation: |
       Include the permissions block verbatim in the workflow file. Document in
       gi-3's runbook subsection.
