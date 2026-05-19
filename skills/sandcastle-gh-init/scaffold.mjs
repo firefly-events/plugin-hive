@@ -124,8 +124,10 @@ function parseArgs(argv) {
             "Use --secret-mode anthropic-api (per-token API billing) or " +
             "--secret-mode claude-oauth (subscription OAuth, the new default).",
         );
+        out.secretMode = 'anthropic-api';
+      } else {
+        out.secretMode = value;
       }
-      out.secretMode = value;
       continue;
     }
     if (arg === '--force-recover') {

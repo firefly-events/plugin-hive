@@ -75,7 +75,7 @@ only layers the GitHub-event-trigger glue on top.
    workflow scopes (`issues: write`, `pull-requests: write`,
    `contents: write`).
 
-   ### 4.1 Generating the Claude OAuth token
+### 4.1 Generating the Claude OAuth token
 
    The default mode uses a long-lived **headless OAuth token** that
    bills against the maintainer's Claude subscription — no per-token
