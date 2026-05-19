@@ -22,12 +22,13 @@ captures the rationale.
 1. [Install the dispatch surface](#1-install-the-dispatch-surface)
 2. [Label state machine](#2-label-state-machine)
 3. [Branching model](#3-branching-model)
-4. [Rotate the agent secret](#4-rotate-the-agent-secret)
-5. [Switch the workflow runner](#5-switch-the-workflow-runner)
-6. [Lock label permissions on a public repo](#6-lock-label-permissions-on-a-public-repo)
-7. [Future-labels extension point](#7-future-labels-extension-point)
-8. [Debug a stuck `hive:in-flight` label](#8-debug-a-stuck-hivein-flight-label)
-9. [Workflow vs bridge ownership](#workflow-vs-bridge-ownership)
+4. [Image distribution](#4-image-distribution)
+5. [Rotate the agent secret](#5-rotate-the-agent-secret)
+6. [Switch the workflow runner](#6-switch-the-workflow-runner)
+7. [Lock label permissions on a public repo](#7-lock-label-permissions-on-a-public-repo)
+8. [Future-labels extension point](#8-future-labels-extension-point)
+9. [Debug a stuck `hive:in-flight` label](#9-debug-a-stuck-hivein-flight-label)
+10. [Workflow vs bridge ownership](#workflow-vs-bridge-ownership)
 
 ---
 
@@ -80,7 +81,7 @@ only layers the GitHub-event-trigger glue on top.
    The default mode uses a long-lived **headless OAuth token** that
    bills against the maintainer's Claude subscription — no per-token
    API charges. Generate it once on your local machine and rotate it on
-   the same cadence as any other long-lived credential (see §4
+   the same cadence as any other long-lived credential (see §5
    *Rotation procedure*).
 
    ```bash
@@ -225,7 +226,100 @@ The client-side filter excludes any epic-tracker issue that carries only the `hi
 
 ---
 
-## 4. Rotate the agent secret
+## 4. Image distribution
+
+*Added in 2.5.0 (ghcr-sandcastle-image epic, stories gi-1 through gi-3).*
+
+Dispatch runs now consume a pre-built sandcastle container image from GitHub Container Registry instead of building inside each dispatch job. Cold-start drops from ~4 min (local build) to ~20 s (warm pull). This section is the maintainer reference for how the image gets there, how dispatch consumes it, and how to roll back.
+
+### 4.1 Default behavior
+
+When `Hive dispatch` runs, the `Pull sandcastle image (with local-build fallback)` step:
+
+1. Reads `IMAGE_REF` from `workflow_dispatch.inputs.image_ref` (manual override) or the baked default `ghcr.io/firefly-events/sandcastle:latest`.
+2. Runs `docker pull "${IMAGE_REF}"`. On success, retags the pulled image as `sandcastle:hive` so the bridge's `@ai-hero/sandcastle` `docker()` lookup finds it under the expected name.
+3. On failure (image not yet in the registry, transient GHCR outage, private-image auth gap), the step falls back to an in-workflow `docker build` against `.sandcastle/Containerfile` with the same `AGENT_UID`/`AGENT_GID` build-args used by the cron worker.
+
+The bridge contract is unchanged — the only difference downstream of `sandcastle:hive` is that the image was pulled, not built locally.
+
+### 4.2 Override knob
+
+Manual `workflow_dispatch` accepts an `image_ref` input (default `ghcr.io/firefly-events/sandcastle:latest`). Pin a specific `:sha-<7>` tag to roll back or test a candidate image:
+
+```bash
+gh workflow run hive-dispatch.yml \
+  --field image_ref=ghcr.io/firefly-events/sandcastle:sha-1a2b3c4
+```
+
+For label-triggered runs (`issues: [labeled]`), `inputs.image_ref` is unset and the default `:latest` applies. No code path is exposed to user-controlled label content, so a crafted label cannot influence which image is pulled.
+
+### 4.3 Fallback (local build)
+
+The fallback fires **only** on a non-zero `docker pull` exit. It builds from `.sandcastle/Containerfile` directly, using the runner-user's UID/GID for bind-mount alignment:
+
+```bash
+docker build \
+  --build-arg AGENT_UID="$(id -u)" \
+  --build-arg AGENT_GID="$(id -g)" \
+  -t sandcastle:hive .sandcastle
+```
+
+The fallback exists for three concrete scenarios:
+
+- **Fresh consumer bootstrap.** Image not yet in the registry — first `build-sandcastle-image.yml` run hasn't completed.
+- **Transient GHCR outage.** Pull fails, registry recovers in minutes. Local build keeps dispatch unblocked.
+- **Private-image auth gap.** Maintainer flipped the package private without adding `docker login` to dispatch — see §4.6.
+
+A successful fallback emits a `::warning::` annotation in the run log so the operator notices the slow path.
+
+### 4.4 First-time setup
+
+After enabling the dispatch workflow on a new repo, manually trigger the build workflow once so `:latest` exists before the first label fires:
+
+```bash
+gh workflow run build-sandcastle-image.yml --repo <owner>/<repo>
+gh run watch                                # wait for it to finish (~4 min cold)
+gh api /orgs/<owner>/packages/container/sandcastle/versions   # verify both tags landed
+```
+
+Without this step, the first label-driven dispatch run will hit the fallback (local build) — functionally correct but loses the cold-start benefit.
+
+### 4.5 Image rebuild cadence
+
+`build-sandcastle-image.yml` (`.github/workflows/build-sandcastle-image.yml`, gi-1) triggers on:
+
+| Trigger | When | Why |
+|---|---|---|
+| `push` to `main` with `paths: ['.sandcastle/**']` | Any change to `.sandcastle/Containerfile`, `.sandcastle/prompt.md`, etc. | Pick up Containerfile edits immediately. |
+| `workflow_dispatch` | Manual override | Rebuild without changing `.sandcastle/**` (e.g. base-image security advisory). |
+| `schedule: '17 4 * * 0'` | Sunday 04:17 UTC | Weekly refresh that catches Debian base-image CVE fixes even when `.sandcastle/**` is unchanged. |
+
+Every run pushes both `:latest` (moving tag) and `:sha-<7>` (immutable tag bound to the commit that triggered the run). The smoke step (`which claude && which codex && claude --version`) gates publish — a broken image marks the run failed and leaves the prior `:latest` in place for dispatch to keep pulling. Roll back manually by re-pointing `:latest` at the prior `:sha-<7>` via `docker buildx imagetools create`.
+
+### 4.6 Image visibility
+
+The image starts **public** so dispatch runs (including in forks) need no `docker login` step:
+
+```bash
+gh api -X PATCH /orgs/firefly-events/packages/container/sandcastle \
+  --field visibility=public
+```
+
+If you flip the package private, add a `docker/login-action@v3` step before the pull in `hive-dispatch.yml`:
+
+```yaml
+- uses: docker/login-action@v3
+  with:
+    registry: ghcr.io
+    username: ${{ github.actor }}
+    password: ${{ secrets.GITHUB_TOKEN }}
+```
+
+The dispatch workflow's `permissions` block already has `packages: read` implicit (any token can read the same-org GHCR namespace it has access to). Cross-org pulls would need a PAT with `read:packages` and an explicit secret.
+
+---
+
+## 5. Rotate the agent secret
 
 The dispatch workflow reads one of three auth secrets, depending on
 `--secret-mode`:
@@ -276,7 +370,7 @@ secrets when the job pins an environment.
 
 ---
 
-## 5. Switch the workflow runner
+## 6. Switch the workflow runner
 
 The skill scaffolds `runs-on: ubuntu-latest` by default. Two upgrade
 paths:
@@ -315,7 +409,7 @@ manifest extension if you need it to survive scaffolding.
 
 ---
 
-## 6. Lock label permissions on a public repo
+## 7. Lock label permissions on a public repo
 
 **`hive:ready` is a remote-code-execution trigger on a public repo.** Any
 contributor with `triage` permission or above can apply a label, which
@@ -363,7 +457,7 @@ API budget. Lock this down before merging the workflow.
 
 ---
 
-## 7. Future-labels extension point
+## 8. Future-labels extension point
 
 The v1 scope ships exactly one dispatch route: `hive:ready` →
 `/hive:execute`. Future labels (`hive:plan`, `hive:test`, `hive:review`)
@@ -402,7 +496,7 @@ new skill flags.
 
 ---
 
-## 8. Debug a stuck `hive:in-flight` label
+## 9. Debug a stuck `hive:in-flight` label
 
 If `if: failure()` is doing its job, an issue should never stay in
 `hive:in-flight` after the workflow run terminates. When you do see one,
@@ -430,7 +524,7 @@ work through this list in order:
      Inspect the iteration logs for a stuck phase (often a failing test
      gate); fix the story spec.
    - Auth errors (`401`, `403`) — the API-key secret is missing or
-     revoked. See [§4 Rotate the agent secret](#4-rotate-the-agent-secret).
+     revoked. See [§5 Rotate the agent secret](#5-rotate-the-agent-secret).
    - `HIVE_EXECUTION_MODE: team` ignored — inner Hive tried to spawn a
      nested sandcastle. File a Hive bug; the bridge sets the env var
      correctly and the inner orchestrator should honor it.

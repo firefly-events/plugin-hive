@@ -122,6 +122,28 @@ node skills/sandcastle-gh-init/scaffold.mjs \
      otherwise it logs the in-progress count. A 0/0 result is treated
      as a label-propagation anomaly and does NOT promote — no
      false-positive ready flips.
+   - **Pre-built image pull with local-build fallback (gi-2).** Between
+     `Install dependencies` and `Resolve base branch`, a
+     `Pull sandcastle image (with local-build fallback)` step runs
+     `docker pull ${IMAGE_REF}` (default
+     `ghcr.io/firefly-events/sandcastle:latest`, published by
+     `.github/workflows/build-sandcastle-image.yml`, gi-1) and retags
+     the pulled image as `sandcastle:hive` so the bridge's
+     `@ai-hero/sandcastle` `docker()` lookup finds it. If the pull
+     fails (image not yet published, transient GHCR outage, private-
+     image auth gap), the step falls back to an in-workflow
+     `docker build` against `.sandcastle/Containerfile` with the same
+     `AGENT_UID`/`AGENT_GID` build-args used by the cron worker. The
+     pre-built path drops cold-start from ~4 min (local build) to
+     ~20 s (warm pull) — see the `dispatch_build_seconds_p50` metric
+     declared on gi-1.
+   - **Image reference.** The `IMAGE_REF` env var is a hard-coded
+     default (`ghcr.io/firefly-events/sandcastle:latest`). An earlier
+     draft exposed it as a `workflow_dispatch.inputs.image_ref`
+     override, but the dispatch job's `if: github.event.label.name ==
+     'hive:ready'` guard skips the entire run under `workflow_dispatch`
+     — the input was unreachable. A proper override that handles both
+     event types is a follow-up epic.
 2. Renders `assets/sandcastle-hive-bridge.mts.tpl` -> `.github/scripts/sandcastle-hive-bridge.mts`
    with the same `SECRET_KEY` substituted.
    The rendered bridge derives its sandcastle branch name at run time:
@@ -171,6 +193,7 @@ cannot smuggle shell metacharacters into the command line.
 | Branch `feat/<epic-id>` | First story of an epic ships | Subsequent stories of the same epic push to the same branch (per pe-2 bridge). |
 | Branch `agent/issue-<n>` | Story ships with no `hive:epic:*` label | Legacy one-branch-per-issue fallback. |
 | Draft PR titled `[epic] <epic-id>` | First story of the epic completes | Second-and-later stories of the same epic *update* the existing PR's body in place rather than opening a new PR (per pe-3 stack-PR rule). The body is capped at 25 story entries. |
+| Local docker tag `sandcastle:hive` | Every dispatch run | Pulled from `ghcr.io/firefly-events/sandcastle:latest` and retagged on each run (per gi-2). Falls back to in-workflow `docker build` from `.sandcastle/Containerfile` when the pull fails. |
 | Anything else | User | **Never touched.** |
 
 The single resulting git commit lists exactly the three managed paths.

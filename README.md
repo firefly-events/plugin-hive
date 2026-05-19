@@ -11,7 +11,7 @@
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.4.2-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-2.5.0-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
@@ -348,6 +348,8 @@ For consumers who want unattended execution: combine the GitHub Issues task-trac
 `/hive:sandcastle-gh-init` scaffolds an event-driven alternative to the cron loop above. Run it after `npx sandcastle init` and the skill drops `.github/workflows/hive-dispatch.yml` + a bridge script into your repo. Labeling any issue `hive:ready` then fires `/hive:execute` inside a Sandcastle container, opens a PR, and flips the canonical label state machine (`hive:ready` → `hive:in-flight` → `hive:shipped` | `hive:failed`). See [`hive/references/sandcastle-gh-dispatch.md`](hive/references/sandcastle-gh-dispatch.md) for the maintainer runbook — install, secret rotation, runner choice, public-repo lockdown, and stuck-label debugging.
 
 **Per-epic branch + base-branch config (2.4.0).** Story-issues carrying a `hive:epic:<id>` label are stacked onto a single `feat/<epic-id>` branch and produce one draft PR per epic (instead of one branch + PR per issue). The PR opens on the first story of the epic, gets its body updated as subsequent stories ship, and promotes from draft to ready-for-review when the last story flips `hive:shipped`. The base branch is auto-resolved (`develop` if `origin/develop` exists, else `main`) and can be pinned via a new `git_flow.default_pr_base` knob in `hive.config.yaml`; setting `branch_strategy: per-story` restores the legacy one-branch-per-issue path for in-flight epics. See the Branching model section in [`hive/references/sandcastle-gh-dispatch.md`](hive/references/sandcastle-gh-dispatch.md#3-branching-model) for the full surface (overrides, concurrency, PR lifecycle).
+
+**Pre-built GHCR image (2.5.0).** Dispatch now pulls a pre-built sandcastle container from `ghcr.io/firefly-events/sandcastle:latest` (published by `.github/workflows/build-sandcastle-image.yml` on every `.sandcastle/**` push + weekly cron) instead of building inside each dispatch run — cuts cold-start from ~4 min to ~20 s. A `workflow_dispatch` input `image_ref` pins a specific `:sha-<7>` tag for rollback testing, and a local-build fallback fires automatically if the pull fails. See the Image distribution section in [`hive/references/sandcastle-gh-dispatch.md`](hive/references/sandcastle-gh-dispatch.md#4-image-distribution) for the full surface.
 
 ---
 

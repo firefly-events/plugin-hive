@@ -119,6 +119,47 @@ jobs:
             npm install --no-save --no-package-lock @ai-hero/sandcastle
           fi
 
+      - name: Pull sandcastle image (with local-build fallback)
+        # gi-2-dispatch-uses-ghcr: prefer the pre-built image from GHCR
+        # over an in-workflow `docker build`. Cold-start drops from ~4 min
+        # (local build) to ~20 s (warm pull). The image was published by
+        # `.github/workflows/build-sandcastle-image.yml` (gi-1) and is
+        # tagged `:latest` + `:sha-<short-sha>` per push to main.
+        #
+        # Fallback: if `docker pull` returns non-zero (image not yet in
+        # GHCR after a fresh repo bootstrap, transient registry outage,
+        # private-image auth gap), `docker build` rebuilds locally from
+        # `.sandcastle/Containerfile` so dispatch keeps working — the
+        # `|| true` swallow lives ONLY in the `if`-branch test, not on
+        # the build itself, so a failed local build still fails the step.
+        #
+        # The retag to `sandcastle:hive` preserves the bridge contract:
+        # `.github/scripts/sandcastle-hive-bridge.mts` references the
+        # `sandcastle:hive` literal via `@ai-hero/sandcastle`'s `docker()`
+        # default image-name lookup, so both paths converge on the same
+        # local tag.
+        #
+        # IMAGE_REF is a hard-coded default. A `workflow_dispatch` input
+        # was considered but is unreachable under this workflow's trigger
+        # surface: the `run` job is gated on `github.event.label.name ==
+        # 'hive:ready'`, which is unset under `workflow_dispatch` and
+        # would skip the entire run. Override is tracked as a follow-up
+        # epic that properly handles both event types. Shell-quote the
+        # var on every reference for defense in depth.
+        env:
+          IMAGE_REF: ghcr.io/firefly-events/sandcastle:latest
+        run: |
+          if docker pull "${IMAGE_REF}"; then
+            docker tag "${IMAGE_REF}" sandcastle:hive
+            echo "Used pre-built image from ${IMAGE_REF}"
+          else
+            echo "::warning::Pull from ${IMAGE_REF} failed — building locally as fallback."
+            docker build \
+              --build-arg AGENT_UID="$(id -u)" \
+              --build-arg AGENT_GID="$(id -g)" \
+              -t sandcastle:hive .sandcastle
+          fi
+
       - name: Resolve base branch
         id: base
         env:
