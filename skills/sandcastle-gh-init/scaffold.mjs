@@ -33,8 +33,20 @@ const CANONICAL_LABELS = [
 ];
 
 const VALID_RUNNERS = new Set(['ubuntu-latest', 'self-hosted']);
-const VALID_SECRET_MODES = new Set(['anthropic', 'openai']);
+// `claude-oauth` is the new default (subscription OAuth via
+// CLAUDE_CODE_OAUTH_TOKEN — no per-token billing). `anthropic-api` is
+// the legacy pay-per-token path. `anthropic` is a back-compat alias
+// for `anthropic-api` so consumers running `--secret-mode anthropic`
+// don't break across the rename.
+const VALID_SECRET_MODES = new Set([
+  'claude-oauth',
+  'anthropic-api',
+  'anthropic',
+  'openai',
+]);
 const SECRET_MODE_TO_KEY = {
+  'claude-oauth': 'CLAUDE_CODE_OAUTH_TOKEN',
+  'anthropic-api': 'ANTHROPIC_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
   openai: 'OPENAI_API_KEY',
 };
@@ -59,7 +71,7 @@ function usage() {
   return [
     'Usage: node skills/sandcastle-gh-init/scaffold.mjs',
     '         [--runner ubuntu-latest|self-hosted]',
-    '         [--secret-mode anthropic|openai]',
+    '         [--secret-mode claude-oauth|anthropic-api|openai]',
     '         [--force-recover]',
     '         [--cwd <path>]',
   ].join('\n');
@@ -77,7 +89,7 @@ function warn(message) {
 function parseArgs(argv) {
   const out = {
     runner: 'ubuntu-latest',
-    secretMode: 'anthropic',
+    secretMode: 'claude-oauth',
     forceRecover: false,
     cwd: null,
   };
@@ -106,7 +118,16 @@ function parseArgs(argv) {
           `invalid --secret-mode '${value}'. Allowed: ${[...VALID_SECRET_MODES].join(', ')}.`,
         );
       }
-      out.secretMode = value;
+      if (value === 'anthropic') {
+        warn(
+          "--secret-mode 'anthropic' is a deprecated alias for 'anthropic-api'. " +
+            "Use --secret-mode anthropic-api (per-token API billing) or " +
+            "--secret-mode claude-oauth (subscription OAuth, the new default).",
+        );
+        out.secretMode = 'anthropic-api';
+      } else {
+        out.secretMode = value;
+      }
       continue;
     }
     if (arg === '--force-recover') {

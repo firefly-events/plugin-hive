@@ -429,3 +429,105 @@ test('partial scaffold (no manifest, workflow present) refuses without --force-r
     /Hive dispatch/,
   );
 });
+
+// ---------------------------------------------------------------------------
+// 2.4.2 — Claude OAuth migration (claude-oauth as new default)
+// ---------------------------------------------------------------------------
+
+test('2.4.2: --secret-mode defaults to claude-oauth and writes CLAUDE_CODE_OAUTH_TOKEN', () => {
+  // No --secret-mode flag — scaffold.mjs must default to claude-oauth and
+  // render both the workflow + bridge with CLAUDE_CODE_OAUTH_TOKEN.
+  const cwd = makeTmpDir('default-claude-oauth');
+  seedRepo(cwd);
+  const ghBin = writeFakeGh(path.join(cwd, '.bin'));
+  const result = runScaffold(cwd, [], { ghBin });
+  assert.equal(result.status, 0, `stderr: ${result.stderr}`);
+
+  const yml = fs.readFileSync(
+    path.join(cwd, '.github/workflows/hive-dispatch.yml'),
+    'utf8',
+  );
+  assert.match(
+    yml,
+    /CLAUDE_CODE_OAUTH_TOKEN:\s*\$\{\{\s*secrets\.CLAUDE_CODE_OAUTH_TOKEN\s*\}\}/,
+    'workflow env must reference CLAUDE_CODE_OAUTH_TOKEN by default',
+  );
+  assert.ok(
+    !/ANTHROPIC_API_KEY:\s*\$\{\{/.test(yml),
+    'default-mode workflow must NOT reference ANTHROPIC_API_KEY',
+  );
+
+  const bridge = fs.readFileSync(
+    path.join(cwd, '.github/scripts/sandcastle-hive-bridge.mts'),
+    'utf8',
+  );
+  assert.match(
+    bridge,
+    /process\.env\["CLAUDE_CODE_OAUTH_TOKEN"\]/,
+    'bridge must presence-check CLAUDE_CODE_OAUTH_TOKEN by default',
+  );
+
+  // Stdout next-steps banner must point users at the OAuth secret.
+  assert.match(
+    result.stdout,
+    /CLAUDE_CODE_OAUTH_TOKEN/,
+    'scaffold output should name the new default secret in the next-steps banner',
+  );
+
+  // Manifest records the secret_mode for re-run idempotency.
+  const manifest = fs.readFileSync(
+    path.join(cwd, '.hive-dispatch/manifest.yaml'),
+    'utf8',
+  );
+  assert.match(manifest, /secret_mode:\s*claude-oauth/);
+});
+
+test('2.4.2: --secret-mode anthropic-api still writes ANTHROPIC_API_KEY (legacy path preserved)', () => {
+  const cwd = makeTmpDir('anthropic-api-mode');
+  seedRepo(cwd);
+  const ghBin = writeFakeGh(path.join(cwd, '.bin'));
+  const result = runScaffold(cwd, ['--secret-mode', 'anthropic-api'], { ghBin });
+  assert.equal(result.status, 0, `stderr: ${result.stderr}`);
+
+  const yml = fs.readFileSync(
+    path.join(cwd, '.github/workflows/hive-dispatch.yml'),
+    'utf8',
+  );
+  assert.match(yml, /ANTHROPIC_API_KEY:\s*\$\{\{\s*secrets\.ANTHROPIC_API_KEY\s*\}\}/);
+  assert.ok(
+    !/CLAUDE_CODE_OAUTH_TOKEN:\s*\$\{\{/.test(yml),
+    'anthropic-api workflow must NOT reference CLAUDE_CODE_OAUTH_TOKEN',
+  );
+
+  const bridge = fs.readFileSync(
+    path.join(cwd, '.github/scripts/sandcastle-hive-bridge.mts'),
+    'utf8',
+  );
+  assert.match(bridge, /process\.env\["ANTHROPIC_API_KEY"\]/);
+});
+
+test('2.4.2: --secret-mode anthropic is a deprecated alias for anthropic-api', () => {
+  // Back-compat for consumers running the old flag value. The alias
+  // resolves to ANTHROPIC_API_KEY and emits a one-line deprecation
+  // warning on stderr.
+  const cwd = makeTmpDir('anthropic-legacy-alias');
+  seedRepo(cwd);
+  const ghBin = writeFakeGh(path.join(cwd, '.bin'));
+  const result = runScaffold(cwd, ['--secret-mode', 'anthropic'], { ghBin });
+  assert.equal(result.status, 0, `stderr: ${result.stderr}`);
+
+  // Renders the same content as anthropic-api.
+  const yml = fs.readFileSync(
+    path.join(cwd, '.github/workflows/hive-dispatch.yml'),
+    'utf8',
+  );
+  assert.match(yml, /ANTHROPIC_API_KEY/);
+
+  // Deprecation warning on stderr.
+  assert.match(
+    result.stderr,
+    /deprecated alias/i,
+    `expected deprecation warning naming the legacy alias; got: ${result.stderr}`,
+  );
+  assert.match(result.stderr, /anthropic-api/);
+});

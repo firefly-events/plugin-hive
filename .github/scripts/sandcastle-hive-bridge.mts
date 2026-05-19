@@ -18,9 +18,11 @@
  * `hive:failed`) are NOT this bridge's job — the workflow YAML owns
  * them so they survive bridge crashes via `if: failure()`.
  *
- * Scaffolded by `/hive:sandcastle-gh-init`. The `ANTHROPIC_API_KEY`
- * placeholder is substituted to either `ANTHROPIC_API_KEY` (default)
- * or `OPENAI_API_KEY` (`--secret-mode openai`).
+ * Scaffolded by `/hive:sandcastle-gh-init`. The auth secret is
+ * `CLAUDE_CODE_OAUTH_TOKEN` (subscription OAuth via `claude setup-token`;
+ * the new default). Legacy modes available via re-scaffold:
+ * `--secret-mode anthropic-api` (ANTHROPIC_API_KEY, pay-per-token) or
+ * `--secret-mode openai` (OPENAI_API_KEY).
  */
 
 import { run, claudeCode } from "@ai-hero/sandcastle";
@@ -39,11 +41,12 @@ const issueNumber: string = issueNumberRaw;
 // has no way to recover from this — better to short-circuit here with a
 // readable error than to hand the agent an unauthenticated client and
 // debug a 401 deep in the run.
-if (!process.env["ANTHROPIC_API_KEY"]) {
+if (!process.env["CLAUDE_CODE_OAUTH_TOKEN"]) {
   console.error(
-    "[sandcastle-hive-bridge] ANTHROPIC_API_KEY env var is not set. " +
-      "Configure the secret on the repository (Settings -> Secrets -> Actions) " +
-      "and reference it in `.github/workflows/hive-dispatch.yml`.",
+    "[sandcastle-hive-bridge] CLAUDE_CODE_OAUTH_TOKEN env var is not set. " +
+      "Generate via `claude setup-token` then configure the secret on the " +
+      "repository (Settings -> Secrets -> Actions) and reference it in " +
+      "`.github/workflows/hive-dispatch.yml`.",
   );
   process.exit(1);
 }

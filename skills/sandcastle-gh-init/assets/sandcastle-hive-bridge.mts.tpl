@@ -23,8 +23,24 @@
  * them so they survive bridge crashes via `if: failure()`.
  *
  * Scaffolded by `/hive:sandcastle-gh-init`. The `{{SECRET_KEY}}`
- * placeholder is substituted to either `ANTHROPIC_API_KEY` (default)
- * or `OPENAI_API_KEY` (`--secret-mode openai`).
+ * placeholder is substituted to one of:
+ *   - `CLAUDE_CODE_OAUTH_TOKEN`  — `--secret-mode claude-oauth` (default).
+ *     Long-lived headless OAuth token from `claude setup-token`;
+ *     billed against the maintainer's Claude subscription. Read directly
+ *     by the `claude` CLI inside the sandcastle container — no file
+ *     mount or aliasing required (verified by the
+ *     `.github/workflows/claude-auth-spike.yml` smoke test, 2026-05-17).
+ *   - `ANTHROPIC_API_KEY`        — `--secret-mode anthropic-api`
+ *     (legacy per-token API billing path; back-compat for consumers who
+ *     already wired the API-key secret).
+ *   - `OPENAI_API_KEY`           — `--secret-mode openai`.
+ *
+ * `@ai-hero/sandcastle`'s `claudeCode()` provider does NOT hardcode an
+ * auth env var name; it forwards whatever `env` the caller passes (and
+ * what `process.env` carries) into the container, and the `claude` CLI
+ * itself decides which credential to use at request time. So this
+ * bridge just env-presence-checks the configured secret and lets
+ * sandcastle's launch-time env merge do the rest.
  */
 
 import { run, claudeCode } from "@ai-hero/sandcastle";

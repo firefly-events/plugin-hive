@@ -49,9 +49,10 @@ only layers the GitHub-event-trigger glue on top.
 3. **Run the skill.**
 
    ```bash
-   /hive:sandcastle-gh-init                       # ubuntu-latest + anthropic
-   /hive:sandcastle-gh-init --runner self-hosted  # custom runner
-   /hive:sandcastle-gh-init --secret-mode openai  # OPENAI_API_KEY instead
+   /hive:sandcastle-gh-init                            # ubuntu-latest + claude-oauth (default)
+   /hive:sandcastle-gh-init --runner self-hosted       # custom runner
+   /hive:sandcastle-gh-init --secret-mode anthropic-api  # legacy ANTHROPIC_API_KEY (pay-per-token)
+   /hive:sandcastle-gh-init --secret-mode openai       # OPENAI_API_KEY instead
    ```
 
    Outputs:
@@ -62,16 +63,54 @@ only layers the GitHub-event-trigger glue on top.
    The skill stages and commits these three files as a single
    `chore(hive): wire github-issue dispatch via sandcastle` commit on the
    current branch. Nothing under `.sandcastle/` is touched.
-4. **Set the API-key secret.** Per the skill's `--secret-mode` choice:
+4. **Set the auth secret.** Per the skill's `--secret-mode` choice:
 
    ```bash
-   gh secret set ANTHROPIC_API_KEY    # default
-   gh secret set OPENAI_API_KEY       # --secret-mode openai
+   gh secret set CLAUDE_CODE_OAUTH_TOKEN   # default (claude-oauth) — see §4.1
+   gh secret set ANTHROPIC_API_KEY         # --secret-mode anthropic-api
+   gh secret set OPENAI_API_KEY            # --secret-mode openai
    ```
 
    `GITHUB_TOKEN` is provided automatically by Actions and covers the
    workflow scopes (`issues: write`, `pull-requests: write`,
    `contents: write`).
+
+### 4.1 Generating the Claude OAuth token
+
+   The default mode uses a long-lived **headless OAuth token** that
+   bills against the maintainer's Claude subscription — no per-token
+   API charges. Generate it once on your local machine and rotate it on
+   the same cadence as any other long-lived credential (see §4
+   *Rotation procedure*).
+
+   ```bash
+   # 1. Generate the long-lived OAuth token on your local machine.
+   #    `claude` will open a browser tab to authenticate against your
+   #    claude.ai account, then print a token of the form sk-ant-oat01-…
+   claude setup-token
+
+   # 2. Paste the token into the GitHub repo secret. The token never
+   #    touches your shell history if you let gh prompt for stdin:
+   gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo>
+   ```
+
+   Verified by `.github/workflows/claude-auth-spike.yml` on 2026-05-17.
+   The `claude` CLI inside the sandcastle container reads
+   `CLAUDE_CODE_OAUTH_TOKEN` directly — no file mount, no aliasing,
+   nothing else to configure. `@ai-hero/sandcastle`'s `claudeCode()`
+   provider forwards the workflow-step env into the container at
+   launch time, and the credential lookup happens entirely inside the
+   `claude` CLI.
+
+   **Cost profile.** Per-token Claude API billing is replaced by your
+   existing Claude subscription. The token has the same usage cap as a
+   logged-in interactive session.
+
+   **Back-compat.** Existing consumers running `--secret-mode anthropic`
+   continue to work — that flag is a deprecated alias for
+   `anthropic-api`. To migrate to OAuth, re-run `/hive:sandcastle-gh-init`
+   without `--secret-mode` (or with `--secret-mode claude-oauth`), set
+   the new secret, and remove the old `ANTHROPIC_API_KEY` repo secret.
 5. **Verify canonical labels exist.** The skill warns (non-blocking) if
    any of `hive:ready`, `hive:in-flight`, `hive:shipped`, `hive:failed`
    are missing and prints copy-pasteable `gh label create` commands. Run
@@ -188,28 +227,43 @@ The client-side filter excludes any epic-tracker issue that carries only the `hi
 
 ## 4. Rotate the agent secret
 
-The dispatch workflow reads `ANTHROPIC_API_KEY` (default) or
-`OPENAI_API_KEY` (with `--secret-mode openai`) from repo secrets. The
-bridge passes it into the Sandcastle container at run time; the existing
-[`sandcastle-log-redaction.js`](../../hive/lib/sandcastle-log-redaction.js)
+The dispatch workflow reads one of three auth secrets, depending on
+`--secret-mode`:
+
+| `--secret-mode` | Secret name | Source |
+|---|---|---|
+| `claude-oauth` (default) | `CLAUDE_CODE_OAUTH_TOKEN` | `claude setup-token` — long-lived OAuth bound to your Claude subscription |
+| `anthropic-api` | `ANTHROPIC_API_KEY` | Anthropic Console — per-token API billing |
+| `openai` | `OPENAI_API_KEY` | OpenAI Platform — per-token API billing |
+
+The bridge passes the configured secret into the Sandcastle container at
+run time; the existing [`sandcastle-log-redaction.js`](../../hive/lib/sandcastle-log-redaction.js)
 strips it from sandbox stdout.
 
 ### Rotation procedure
 
-1. Mint the new key in the provider dashboard (Anthropic Console or
-   OpenAI Platform).
+1. Mint the new credential:
+   - `claude-oauth`: run `claude setup-token` locally (re-issuing
+     invalidates the previous token).
+   - `anthropic-api`: create a new key in the Anthropic Console.
+   - `openai`: create a new key in the OpenAI Platform.
 2. Update the GitHub secret:
 
    ```bash
-   gh secret set ANTHROPIC_API_KEY    # paste new value at prompt
+   gh secret set CLAUDE_CODE_OAUTH_TOKEN   # claude-oauth (default)
+   gh secret set ANTHROPIC_API_KEY         # anthropic-api
+   gh secret set OPENAI_API_KEY            # openai
    ```
 
    The change is atomic — the next workflow run reads the new value; any
    in-flight run still holds the old value in its environment.
 3. Wait for any in-flight runs to complete (watch the `hive:in-flight`
-   labels), then revoke the old key in the provider dashboard. Do not
-   revoke before in-flight drains, or queued runs will fail with auth
-   errors after the next cron / label event.
+   labels), then revoke the old credential at its source. For
+   `claude-oauth`, the new `claude setup-token` invocation already
+   superseded the prior token — no separate revocation step. For
+   `anthropic-api` / `openai`, revoke via the provider dashboard. Do
+   not revoke before in-flight drains, or queued runs will fail with
+   auth errors after the next label event.
 4. Smoke test by labeling a low-stakes issue `hive:ready` and confirming
    the workflow succeeds end-to-end.
 
