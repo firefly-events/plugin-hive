@@ -26,12 +26,6 @@ name: Hive dispatch
 on:
   issues:
     types: [labeled]
-  workflow_dispatch:
-    inputs:
-      image_ref:
-        description: Sandcastle image to pull (default ghcr.io/firefly-events/sandcastle:latest)
-        required: false
-        default: ghcr.io/firefly-events/sandcastle:latest
 
 permissions:
   contents: write
@@ -145,12 +139,15 @@ jobs:
         # default image-name lookup, so both paths converge on the same
         # local tag.
         #
-        # IMAGE_REF is interpolated from `workflow_dispatch.inputs` (when
-        # the workflow was manually triggered with an override) or the
-        # baked default. Shell-quote the var on every reference so a
-        # crafted input cannot smuggle metacharacters.
+        # IMAGE_REF is a hard-coded default. A `workflow_dispatch` input
+        # was considered but is unreachable under this workflow's trigger
+        # surface: the `run` job is gated on `github.event.label.name ==
+        # 'hive:ready'`, which is unset under `workflow_dispatch` and
+        # would skip the entire run. Override is tracked as a follow-up
+        # epic that properly handles both event types. Shell-quote the
+        # var on every reference for defense in depth.
         env:
-          IMAGE_REF: ${{ github.event.inputs.image_ref || 'ghcr.io/firefly-events/sandcastle:latest' }}
+          IMAGE_REF: ghcr.io/firefly-events/sandcastle:latest
         run: |
           if docker pull "${IMAGE_REF}"; then
             docker tag "${IMAGE_REF}" sandcastle:hive

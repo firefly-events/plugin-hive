@@ -480,21 +480,30 @@ test('pe-4 promote step: 0/0 anomaly does NOT promote, equal counts call `gh pr 
 // gi-2: dispatch pulls from GHCR with local-build fallback
 // ---------------------------------------------------------------------------
 
-test('gi-2 workflow has a `Pull sandcastle image` step with the IMAGE_REF env override', () => {
+test('gi-2 workflow has a `Pull sandcastle image` step with a hard-coded IMAGE_REF (CodeRabbit F3)', () => {
   const yml = readFile(YML_EXAMPLE);
   // Step name (matches the .tpl + team-lead-mandated heading).
   assert.match(yml, /name:\s*Pull sandcastle image \(with local-build fallback\)/);
-  // `workflow_dispatch.inputs.image_ref` is declared in the header so the
-  // override knob is wired end-to-end.
+  // IMAGE_REF is now a hard-coded default. The earlier
+  // `workflow_dispatch.inputs.image_ref` override was removed because
+  // the job's `if: github.event.label.name == 'hive:ready'` guard
+  // skips the run under `workflow_dispatch` (no label event), making
+  // the input unreachable.
   assert.match(
     yml,
-    /workflow_dispatch:\s*\n\s*inputs:\s*\n\s*image_ref:/,
-    'workflow_dispatch.inputs.image_ref must be declared in the workflow header',
+    /IMAGE_REF:\s*ghcr\.io\/firefly-events\/sandcastle:latest/,
+    'IMAGE_REF must be a hard-coded default after F3 fix',
   );
-  // The step env reads inputs.image_ref with the GHCR default fallback.
-  assert.match(
-    yml,
-    /IMAGE_REF:\s*\$\{\{\s*github\.event\.inputs\.image_ref\s*\|\|\s*'ghcr\.io\/firefly-events\/sandcastle:latest'\s*\}\}/,
+  // Regression guards — both the removed input declaration and the
+  // removed interpolation must NOT come back without revisiting the
+  // hive:ready-label-only trigger surface.
+  assert.ok(
+    !/workflow_dispatch:\s*\n\s*inputs:\s*\n\s*image_ref:/.test(yml),
+    'workflow_dispatch.inputs.image_ref must NOT be re-introduced (CodeRabbit F3)',
+  );
+  assert.ok(
+    !/github\.event\.inputs\.image_ref/.test(yml),
+    'IMAGE_REF must NOT interpolate from github.event.inputs.image_ref (CodeRabbit F3)',
   );
 });
 

@@ -190,10 +190,20 @@ jobs:
         # — re-point `:latest` manually via:
         #   gh api -X DELETE /orgs/firefly-events/packages/container/sandcastle/versions/<id>
         # or `docker buildx imagetools create` against the prior sha.
+        #
+        # `--entrypoint bash` is REQUIRED: the image bakes
+        # `ENTRYPOINT ["sleep", "infinity"]` (verified against
+        # `.sandcastle/Containerfile:39` + the inline Dockerfile above)
+        # so the cron worker can attach into a long-lived container.
+        # Without the override, `docker run <image> bash -c '...'` passes
+        # `bash -c '...'` as ARGS to sleep, which ignores them and exits
+        # cleanly — the smoke step would pass-by-default without actually
+        # running the binary checks. Overriding to `bash` then passing
+        # `-c '...'` runs the inline shell command as designed.
         env:
           SMOKE_TAG: ${{ env.IMAGE }}:sha-${{ steps.short.outputs.sha }}
         run: |
           set -euo pipefail
           docker pull "$SMOKE_TAG"
-          docker run --rm "$SMOKE_TAG" \
-            bash -c 'which claude && which codex && claude --version'
+          docker run --rm --entrypoint bash "$SMOKE_TAG" \
+            -c 'set -e; which claude; which codex; claude --version'

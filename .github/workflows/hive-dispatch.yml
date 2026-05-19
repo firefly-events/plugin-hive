@@ -16,12 +16,6 @@ name: Hive dispatch
 on:
   issues:
     types: [labeled]
-  workflow_dispatch:
-    inputs:
-      image_ref:
-        description: Sandcastle image to pull (default ghcr.io/firefly-events/sandcastle:latest)
-        required: false
-        default: ghcr.io/firefly-events/sandcastle:latest
 
 permissions:
   contents: write
@@ -89,7 +83,12 @@ jobs:
         # lookup finds it. Falls back to a local build if the pull fails
         # (image not yet published, transient GHCR outage, etc.).
         env:
-          IMAGE_REF: ${{ github.event.inputs.image_ref || 'ghcr.io/firefly-events/sandcastle:latest' }}
+          # CodeRabbit F2: hard-coded default. `workflow_dispatch.inputs.
+          # image_ref` was removed because the job's
+          # `if: github.event.label.name == 'hive:ready'` guard skips the
+          # entire run under workflow_dispatch (no label event), making
+          # the input unreachable. Override is a follow-up epic.
+          IMAGE_REF: ghcr.io/firefly-events/sandcastle:latest
         run: |
           if docker pull "${IMAGE_REF}"; then
             docker tag "${IMAGE_REF}" sandcastle:hive

@@ -137,14 +137,13 @@ node skills/sandcastle-gh-init/scaffold.mjs \
      pre-built path drops cold-start from ~4 min (local build) to
      ~20 s (warm pull) — see the `dispatch_build_seconds_p50` metric
      declared on gi-1.
-   - **Manual override knob.** The workflow also accepts
-     `workflow_dispatch.inputs.image_ref` so a maintainer can pin a
-     specific image (e.g. `ghcr.io/firefly-events/sandcastle:sha-<7>`)
-     when manually firing a run for rollback testing. The bake-time
-     default is `ghcr.io/firefly-events/sandcastle:latest`; the input
-     is JSON-encoded by GitHub Actions when interpolated, and the
-     run-script shell-quotes `"${IMAGE_REF}"` on every reference so a
-     crafted input cannot smuggle metacharacters.
+   - **Image reference.** The `IMAGE_REF` env var is a hard-coded
+     default (`ghcr.io/firefly-events/sandcastle:latest`). An earlier
+     draft exposed it as a `workflow_dispatch.inputs.image_ref`
+     override, but the dispatch job's `if: github.event.label.name ==
+     'hive:ready'` guard skips the entire run under `workflow_dispatch`
+     — the input was unreachable. A proper override that handles both
+     event types is a follow-up epic.
 2. Renders `assets/sandcastle-hive-bridge.mts.tpl` -> `.github/scripts/sandcastle-hive-bridge.mts`
    with the same `SECRET_KEY` substituted.
    The rendered bridge derives its sandcastle branch name at run time:
@@ -194,7 +193,7 @@ cannot smuggle shell metacharacters into the command line.
 | Branch `feat/<epic-id>` | First story of an epic ships | Subsequent stories of the same epic push to the same branch (per pe-2 bridge). |
 | Branch `agent/issue-<n>` | Story ships with no `hive:epic:*` label | Legacy one-branch-per-issue fallback. |
 | Draft PR titled `[epic] <epic-id>` | First story of the epic completes | Second-and-later stories of the same epic *update* the existing PR's body in place rather than opening a new PR (per pe-3 stack-PR rule). The body is capped at 25 story entries. |
-| Local docker tag `sandcastle:hive` | Every dispatch run | Pulled from `ghcr.io/firefly-events/sandcastle:latest` and retagged on each run (per gi-2). Override via `workflow_dispatch.inputs.image_ref` to pin a specific `:sha-<7>` tag for rollback testing. Falls back to in-workflow `docker build` from `.sandcastle/Containerfile` when the pull fails. |
+| Local docker tag `sandcastle:hive` | Every dispatch run | Pulled from `ghcr.io/firefly-events/sandcastle:latest` and retagged on each run (per gi-2). Falls back to in-workflow `docker build` from `.sandcastle/Containerfile` when the pull fails. |
 | Anything else | User | **Never touched.** |
 
 The single resulting git commit lists exactly the three managed paths.
