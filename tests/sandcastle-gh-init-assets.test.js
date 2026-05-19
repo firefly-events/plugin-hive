@@ -372,6 +372,41 @@ test('pe-3 workflow body composition uses jq --arg, never inline shell-interpola
   assert.match(yml, /--arg line "\$STORY_LINE"/);
 });
 
+test('CodeRabbit Finding 2: `gh pr create` must fail loudly (no `|| true` swallow)', () => {
+  // A failed `gh pr create` MUST fail the step — swallowing it would
+  // let the workflow continue past PR creation and flip the issue to
+  // `hive:shipped` with no PR on disk. Regression guard.
+  const yml = readFile(YML_EXAMPLE);
+  // Find the gh pr create invocation block and confirm it does NOT
+  // end with `|| true`. (The promote step's `gh pr ready ... || true`
+  // is intentional and lives elsewhere.)
+  const createBlock = yml.match(/gh pr create[\s\S]*?--body "\$SEED_BODY"(\s*\\\s*\n\s*[^\n]+)?/);
+  assert.ok(createBlock, 'gh pr create block must be present');
+  assert.ok(
+    !/\|\|\s*true/.test(createBlock[0]),
+    `gh pr create block must NOT end with '|| true'; got: ${createBlock[0]}`,
+  );
+});
+
+test('CodeRabbit Finding 3: bridge validates epicId allowlist before constructing branch', () => {
+  const mts = readFile(MTS_EXAMPLE);
+  // Strict allowlist regex matching sandcastle's branch-name rules.
+  assert.match(
+    mts,
+    /\/\^\[a-zA-Z0-9\._-\]\+\$\/\.test\(epicId\)/,
+    'bridge must regex-validate epicId against [A-Za-z0-9._-]',
+  );
+  // The validation must hard-fail (process.exit) on a non-match.
+  assert.match(mts, /process\.exit\(2\)/);
+  // Validation must run BEFORE the branch construction site.
+  const validationIdx = mts.search(/\/\^\[a-zA-Z0-9\._-\]\+\$\/\.test\(epicId\)/);
+  const branchIdx = mts.search(/branch\s*=\s*`feat\/\$\{epicId\}`/);
+  assert.ok(
+    validationIdx > 0 && branchIdx > 0 && validationIdx < branchIdx,
+    `validation must precede branch construction; got validation=${validationIdx} branch=${branchIdx}`,
+  );
+});
+
 test('pe-3 rendered YAML is parseable + has expected job graph', () => {
   // Light YAML lint via the structural assertions above; we additionally
   // check the document has exactly two top-level jobs (derive + run) and
@@ -394,19 +429,33 @@ test('pe-4 workflow has a `Promote PR to ready if last story` step gated on epic
   assert.match(yml, /if:\s*success\(\)\s*&&\s*needs\.derive\.outputs\.epic_id\s*!=\s*''/);
 });
 
-test('pe-4 promote step issues two `gh issue list` count queries with correct label scoping', () => {
+test('pe-4 promote step issues two `gh issue list` count queries with client-side jq filter (CodeRabbit Finding 1)', () => {
   const yml = readFile(YML_EXAMPLE);
-  // Total query — `hive:story:*` filter excludes any epic-tracker issue.
+  // Total query — single exact `--label hive:epic:<id>` on the CLI;
+  // `hive:story:` filter lives in jq client-side because gh does NOT
+  // support label wildcards. `--json number,labels` exposes the labels
+  // array to jq.
   assert.match(
     yml,
-    /gh issue list\s*\\\s*\n\s*--label "hive:epic:\$\{EPIC_ID\}"\s*\\\s*\n\s*--label "hive:story:\*"\s*\\\s*\n\s*--state all/,
+    /gh issue list\s*\\\s*\n\s*--label "hive:epic:\$\{EPIC_ID\}"\s*\\\s*\n\s*--state all\s*\\\s*\n\s*-L 500\s*\\\s*\n\s*--json number,labels/,
   );
-  // Shipped query — `hive:shipped` + state closed.
+  // Shipped query — `hive:shipped` is an exact label so it stays on
+  // the CLI; the `hive:story:` filter still lives in jq.
   assert.match(
     yml,
-    /gh issue list\s*\\\s*\n\s*--label "hive:epic:\$\{EPIC_ID\}"\s*\\\s*\n\s*--label "hive:shipped"\s*\\\s*\n\s*--state closed/,
+    /gh issue list\s*\\\s*\n\s*--label "hive:epic:\$\{EPIC_ID\}"\s*\\\s*\n\s*--label "hive:shipped"\s*\\\s*\n\s*--state closed\s*\\\s*\n\s*-L 500\s*\\\s*\n\s*--json number,labels/,
   );
-  assert.match(yml, /--json number -q '\. \| length'/);
+  // Client-side jq filter pattern — same exact shape in both queries.
+  assert.match(
+    yml,
+    /-q '\[\.\[\] \| select\(\.labels\[\]\.name \| startswith\("hive:story:"\)\)\] \| length'/,
+  );
+  // Regression guard — the buggy `--label "hive:story:*"` wildcard
+  // form must NOT come back.
+  assert.ok(
+    !/--label "hive:story:\*"/.test(yml),
+    'gh CLI does not support label wildcards; --label "hive:story:*" must NOT appear',
+  );
 });
 
 test('pe-4 promote step: 0/0 anomaly does NOT promote, equal counts call `gh pr ready`', () => {

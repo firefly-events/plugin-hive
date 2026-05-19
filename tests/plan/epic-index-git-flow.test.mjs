@@ -115,7 +115,7 @@ test('AC3 story-yaml-schema.md §5 carries the canonical epic.yaml template + gi
   const fiveSlice = schemaDoc.split(/##\s+5\.\s+Epic index/)[1] || '';
   assert.match(fiveSlice, /name:\s*<epic-id>/);
   assert.match(fiveSlice, /title:\s*<human title>/);
-  assert.match(fiveSlice, /methodology:\s*<classic\|bmad>/);
+  assert.match(fiveSlice, /methodology:\s*<classic\|tdd\|bdd>/);
   assert.match(fiveSlice, /git_flow:/);
   assert.match(fiveSlice, /base_branch:\s*<resolved>/);
   assert.match(fiveSlice, /branch_strategy:\s*<resolved>/);
@@ -232,7 +232,7 @@ test('AC2 the §5 canonical template renders into valid YAML when stub values ar
     .replace(/<epic-id>/g, 'demo-epic')
     .replace(/<human title>/g, 'Demo epic')
     .replace(/<abs path>/g, '/tmp/repo')
-    .replace(/<classic\|bmad>/g, 'classic')
+    .replace(/<classic\|tdd\|bdd>/g, 'classic')
     .replace(/<resolved>/, 'develop')
     .replace(/<resolved>/, 'per-epic')
     .replace(/<gh-issue-number>/g, '123')

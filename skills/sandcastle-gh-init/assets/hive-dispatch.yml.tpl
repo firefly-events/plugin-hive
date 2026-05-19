@@ -184,12 +184,18 @@ jobs:
                 SEED_BODY=$(jq -nr --arg s "$STORY_LINE" \
                   '"Automated /hive:execute run.\n\n## Stories\n\n" + $s')
               fi
+              # No `|| true` here — a failed `gh pr create` MUST fail
+              # the step. Swallowing the error would let the workflow
+              # continue and flip the issue to `hive:shipped` (below)
+              # with no PR on disk. The if: failure() step then takes
+              # over and labels the issue `hive:failed` instead — the
+              # correct outcome when PR creation is the blocker.
               gh pr create \
                 --draft \
                 --base "$BASE_BRANCH" \
                 --head "$BRANCH" \
                 --title "$TITLE" \
-                --body "$SEED_BODY" || true
+                --body "$SEED_BODY"
             else
               # Existing open PR: append the new story line, truncate
               # at 25 story entries with a "see commits" pointer
@@ -222,11 +228,13 @@ jobs:
 
       - name: Promote PR to ready if last story
         # pe-4: count epic stories vs shipped; flip draft -> ready on the
-        # last one. Story issues carry both `hive:epic:<id>` AND
-        # `hive:story:*`, so the `--label hive:story:*` filter excludes
-        # any epic-tracker issue (which has only `hive:epic:<id>`). A
-        # 0/0 result is treated as an anomaly (labels not propagated yet)
-        # and does NOT promote — keeps false-positives at zero.
+        # last one. Story issues carry both `hive:epic:<id>` AND a
+        # `hive:story:*` label. `gh issue list --label` only matches
+        # exact label names — wildcards are NOT supported — so we
+        # filter the `hive:story:` prefix CLIENT-SIDE via jq on the
+        # `labels` array. A 0/0 result is treated as an anomaly (labels
+        # not propagated yet) and does NOT promote — keeps false-
+        # positives at zero.
         if: success() && needs.derive.outputs.epic_id != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -235,16 +243,17 @@ jobs:
           set -euo pipefail
           total=$(gh issue list \
             --label "hive:epic:${EPIC_ID}" \
-            --label "hive:story:*" \
             --state all \
             -L 500 \
-            --json number -q '. | length')
+            --json number,labels \
+            -q '[.[] | select(.labels[].name | startswith("hive:story:"))] | length')
           shipped=$(gh issue list \
             --label "hive:epic:${EPIC_ID}" \
             --label "hive:shipped" \
             --state closed \
             -L 500 \
-            --json number -q '. | length')
+            --json number,labels \
+            -q '[.[] | select(.labels[].name | startswith("hive:story:"))] | length')
           if [ "$total" = "0" ]; then
             echo "Epic ${EPIC_ID}: 0/0 — labels not propagated, NOT promoting"
             exit 0

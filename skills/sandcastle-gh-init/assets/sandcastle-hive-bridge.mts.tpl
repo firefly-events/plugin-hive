@@ -103,6 +103,22 @@ const epicId: string | undefined = labels
   .find((l) => l.startsWith("hive:epic:"))
   ?.slice("hive:epic:".length);
 
+// Validate epicId against the same allowlist sandcastle uses for
+// branchStrategy. The label is user-controlled (maintainers may create
+// arbitrary `hive:epic:*` labels), so before pasting it into a branch
+// name we hard-fail on anything outside [A-Za-z0-9._-]. Refusing here
+// is the right outcome: a malformed epic label is operator error and
+// the workflow's `if: failure()` path then flips the issue to
+// `hive:failed` for human triage.
+if (epicId !== undefined && !/^[a-zA-Z0-9._-]+$/.test(epicId)) {
+  console.error(
+    `[sandcastle-hive-bridge] hive:epic:${epicId} label contains characters ` +
+      `outside the allowlist [A-Za-z0-9._-]; refusing to construct branch name. ` +
+      `Rename the label and re-trigger.`,
+  );
+  process.exit(2);
+}
+
 // Resolve branch_strategy from the consumer repo's hive config. The
 // helper is part of plugin-hive and only present when the consumer has
 // vendored it; absence is normal and defaults to per-epic semantics so

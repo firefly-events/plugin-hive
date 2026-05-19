@@ -457,7 +457,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     name: <epic-id>
     title: <epic title>
     target_codebase: <abs path>
-    methodology: <classic|bmad>
+    methodology: <classic|tdd|bdd>
 
     git_flow:
       base_branch: <resolved>          # from Phase A 0a — `develop` if origin/develop existed at plan time, else `main`, else the explicit override

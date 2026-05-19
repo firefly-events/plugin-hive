@@ -268,7 +268,7 @@ need before opening any individual story YAML.
 name: <epic-id>                  # kebab-case identifier; matches dir name
 title: <human title>
 target_codebase: <abs path>      # absolute path to the codebase /plan targeted
-methodology: <classic|bmad>      # selected in /plan; can be overridden per-story
+methodology: <classic|tdd|bdd>   # selected in /plan; can be overridden per-story
 
 # pe-5: pinned at plan time from `hive/lib/git_flow.mjs` (pe-1). The
 # sandcastle bridge (pe-2) and dispatch workflow (pe-3) prefer these

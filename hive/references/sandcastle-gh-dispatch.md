@@ -174,7 +174,15 @@ The derivation lives in a tiny upstream `derive` job because GitHub Actions eval
 | Each subsequent story ships | workflow edits PR body (`gh pr edit "$PR_NUMBER" --body "$NEW_BODY"`) | Draft (still) |
 | Last story of epic ships | promote step counts shipped vs total; on parity calls `gh pr ready "feat/<epic-id>"` | Ready |
 
-The promotion gate is `(shipped_count == total_count)` where `total_count = gh issue list --label "hive:epic:<id>" --label "hive:story:*" --state all` (the `hive:story:*` filter excludes any epic-tracker issue). A `0/0` result is treated as a label-propagation anomaly and does **not** promote — keeps the false-positive ready-flip rate at zero.
+The promotion gate is `(shipped_count == total_count)`. Both counts use `gh issue list --label "hive:epic:<id>"` — the only labels `gh` matches are exact strings, wildcards are NOT supported, so the `hive:story:` filter must run client-side via jq:
+
+```bash
+total=$(gh issue list --label "hive:epic:${EPIC_ID}" --state all -L 500 \
+  --json number,labels \
+  -q '[.[] | select(.labels[].name | startswith("hive:story:"))] | length')
+```
+
+The client-side filter excludes any epic-tracker issue that carries only the `hive:epic:*` label. A `0/0` result is treated as a label-propagation anomaly and does **not** promote — keeps the false-positive ready-flip rate at zero.
 
 ---
 
