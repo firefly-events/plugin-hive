@@ -25,10 +25,10 @@ classification (per `hive/lib/project_maturity.py`, story `ed-1`) is
 
 | Source                          | Path                                     | Signature shape                       |
 |---------------------------------|------------------------------------------|---------------------------------------|
-| Metric events                   | `.pHive/metrics/events/*.jsonl`          | `event:{agent}|{metric_type}|{phase}` |
-| KG triples (silent on absence)  | `.pHive/kg.sqlite` table `triples`       | `kg:{predicate}|{subject_namespace}`  |
+| Metric events                   | `.pHive/metrics/events/*.jsonl`          | `event:{agent}` / `{metric_type}` / `{phase}` |
+| KG triples (silent on absence)  | `.pHive/kg.sqlite` table `triples`       | `kg:{predicate}` / `{subject_namespace}`  |
 | Conventional-commit subjects    | `git log -200 --no-merges`               | `commit:{type}({scope})`              |
-| Cycle-state escalations         | `.pHive/cycle-state/*.yaml`              | `escalation:{trigger}|{placement}|{severity}` |
+| Cycle-state escalations         | `.pHive/cycle-state/*.yaml`              | `escalation:{trigger}` / `{placement}` / `{severity}` |
 
 Only patterns with **occurrence_count ≥ 2** are returned. Singletons are
 noise for downstream ranking.

@@ -142,11 +142,19 @@ jobs:
           # the fallback title to the issue title so reviewers see real
           # context instead of "Hive: #N".
           if git ls-remote --exit-code --heads origin "$BRANCH"; then
-            ISSUE_TITLE=$(gh issue view "$ISSUE_NUMBER" --json title -q .title)
+            # Fetch issue title for fallback PR title. `|| echo Hive`
+            # keeps the command well-formed if gh fails (rate limit,
+            # transient network) — better than an empty `(...) (#N)`.
+            ISSUE_TITLE=$(gh issue view "$ISSUE_NUMBER" --json title -q .title 2>/dev/null || echo "Hive")
+            # Strip characters that the shell would otherwise interpret
+            # inside the double-quoted --title arg below (backticks,
+            # $, control chars, newlines). Issue titles are user-
+            # controlled so this is the injection boundary.
+            SAFE_TITLE=$(printf '%s' "$ISSUE_TITLE" | tr -d '`$\n\r')
             gh pr create \
               --base "${{ github.event.repository.default_branch }}" \
               --head "$BRANCH" \
-              --title "${ISSUE_TITLE} (#${ISSUE_NUMBER})" \
+              --title "${SAFE_TITLE} (#${ISSUE_NUMBER})" \
               --body "Automated /hive:execute run for #${ISSUE_NUMBER}." || true
           fi
           gh issue edit "$ISSUE_NUMBER" \

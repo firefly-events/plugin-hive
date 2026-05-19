@@ -123,7 +123,7 @@ Fix by editing planning emission (/plan Phase C step 13) or correcting the story
 If `gate_violations[]` is empty after all four checks: the mode resolved in Step 1 stands. Do not modify `mode_decision` or `mode_reason`. The empty `gate_violations[]` is still returned so callers can branch unconditionally on its length.
 
 > **Telemetry note:** the gate's pass/refuse outcome is captured by the orchestrator's post-run audit (see [`hive/references/gate-lift-telemetry.md`](../../../hive/references/gate-lift-telemetry.md)) via the `gate_violations[]` field on the dispatch return; no separate event emission lives in this skill.
-
+>
 > **Scope reminder:** the gate inspects only the depth-0 `unblocked_stories[]` set passed to this skill call. Stories at later dependency depths are gated on their own subsequent dispatch tick when `/execute` re-enters this skill for the next peer set. See [`hive/references/parallel-call-sites.md`](../../../hive/references/parallel-call-sites.md) for the catalog of dispatch points subject to this gate.
 
 ### Step 2: Resolve Runner Path
