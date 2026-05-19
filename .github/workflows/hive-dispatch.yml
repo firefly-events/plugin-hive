@@ -136,11 +136,17 @@ jobs:
           # Hive may complete /execute with zero commits (idle timeout,
           # no actionable work). Pre-check the remote branch + soft-fail
           # PR creation so the label transition + comment still fire.
+          #
+          # This branch only runs when the agent did NOT open its own PR
+          # (the agent path uses a conventional-commit title). Default
+          # the fallback title to the issue title so reviewers see real
+          # context instead of "Hive: #N".
           if git ls-remote --exit-code --heads origin "$BRANCH"; then
+            ISSUE_TITLE=$(gh issue view "$ISSUE_NUMBER" --json title -q .title)
             gh pr create \
               --base "${{ github.event.repository.default_branch }}" \
               --head "$BRANCH" \
-              --title "Hive: #${ISSUE_NUMBER}" \
+              --title "${ISSUE_TITLE} (#${ISSUE_NUMBER})" \
               --body "Automated /hive:execute run for #${ISSUE_NUMBER}." || true
           fi
           gh issue edit "$ISSUE_NUMBER" \

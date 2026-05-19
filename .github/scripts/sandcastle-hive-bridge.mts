@@ -84,6 +84,7 @@ const prompt = [
   `Run /hive:execute on issue #${issueNumber} in this repository.`,
   `Read the issue body via \`gh issue view ${issueNumber}\` to discover the epic and stories.`,
   `Commit all work to branch ${branch}.`,
+  `After committing, open a pull request yourself via \`gh pr create\` with a Conventional-Commits title (feat/fix/docs/chore/refactor) summarising the change and referencing #${issueNumber} (e.g. \`feat(scope): one-line summary (closes #${issueNumber})\`). The workflow has a fallback PR-create step but its title is generic ("issue title (#N)") — yours will be more useful to reviewers.`,
   `Do NOT invoke /hive:plan — that has already been done by the human.`,
   `Do NOT spawn additional sandcastles. HIVE_EXECUTION_MODE=team is set; honor it.`,
 ].join(" ");
