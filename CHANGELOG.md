@@ -33,6 +33,21 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - KG signal revival S4.1: `/hive:register-project` skill, registry helper, and quoted path-with-space fixture for cross-project KG bootstrap registration.
 - KG signal revival S3.1: ChromaDB sidecar lifecycle scripts, fire-and-forget SessionStart hook, operations guide, and bash lifecycle tests.
 
+## [2.4.0] - 2026-05-19
+
+**Per-epic branch + stacked-PR dispatch — `feat/<epic-id>` against configurable base, one PR per epic.**
+
+The sandcastle-gh-dispatch surface (added in 2.3.0 / refined in 2.3.1 + 2.3.2) now stacks stories of the same epic onto a single branch and produces one PR per epic — instead of the legacy one-branch-per-issue + one-PR-per-issue path. Aligns with the established `feedback_git_flow_per_epic.md` policy memory.
+
+### Added
+
+- **`git_flow` config block + `resolveGitFlow` helper (pe-1).** New top-level block in `hive.config.yaml` with `default_pr_base: auto` (auto = `develop` if `origin/develop` exists, else `main`) and `branch_strategy: per-epic` (the new default; `per-story` is retained for back-compat). Resolution helper lives at `hive/lib/git_flow.mjs`; read root-first per `hive/references/skill-prelude.md`, with array-form `execFileSync` only (no shell interpolation). Returns `{ base_branch, branch_strategy, source }`.
+- **Sandcastle bridge derives branch from `hive:epic:` label (pe-2).** `skills/sandcastle-gh-init/assets/sandcastle-hive-bridge.mts.tpl` now fetches issue labels via the GitHub REST API (no `child_process`), looks for a `hive:epic:<id>` label, and dynamically imports `hive/lib/git_flow.mjs` to read the resolved `branch_strategy`. Branch becomes `feat/<epic-id>` when epic-labeled + `per-epic`; falls back to `agent/issue-<n>` otherwise. Structured stdout result now also reports `epicId` and `branchStrategy` for downstream verification.
+- **Dispatch workflow gains per-epic concurrency + PR open-or-update (pe-3).** `skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl` restructured into a two-job graph: an upstream `derive` job extracts `EPIC_ID` from `${{ toJSON(github.event.issue.labels) }}` via `jq` (label payload never reaches a shell word), and the heavy `run` job declares `needs: derive` and reads `concurrency.group: ${{ needs.derive.outputs.concurrency_key }}` (resolves to `hive-epic-<id>` for epic stories, `hive-issue-<n>` for non-epic fallback). A new `Resolve base branch` step imports the pe-1 helper at runtime. The success step now queries for an existing open PR on `feat/<epic-id>` and either creates a fresh `--draft` PR (first story) or `gh pr edit --body` the existing one (later stories), composing bodies via `jq -nr --arg` so user-controlled issue titles are JSON-encoded; bodies are truncated at 25 story entries with a "see commits" pointer.
+- **Draft PR promotes to ready on last story (pe-4).** New `Promote PR to ready if last story` workflow step counts `hive:epic:<id>` + `hive:story:*` story issues (`hive:story:*` filter excludes any epic-tracker issue) against `hive:epic:<id>` + `hive:shipped` + state-closed shipped issues; on parity it calls `gh pr ready "feat/<epic-id>"`. A `0/0` count is treated as a label-propagation anomaly and does NOT promote — zero false-positive ready flips. Step is gated on `success() && needs.derive.outputs.epic_id != ''` so non-epic runs never attempt promotion.
+- **`/plan` pins resolved `git_flow` on `epic.yaml` (pe-5).** Phase A gains a new step `0a. Pre-flight: resolve git_flow (pe-5)` that calls `resolveGitFlow({ cwd })` immediately after the kickoff gate and persists the result on the planning context as `${git_flow_resolution}`. Phase C step 15's emitted `epic.yaml` now includes a top-level `git_flow:` block with both `base_branch` and `branch_strategy` resolved at plan time (pinning ensures downstream dispatch runs use the same value even if config drifts). Re-plan is idempotent — existing blocks update in place, missing ones insert after `methodology:`. Schema documented in new `hive/references/story-yaml-schema.md` §5 "Epic index (`epic.yaml`)" with field table, pinning rationale, and back-compat note.
+- **Runbook documentation (pe-6).** New "Branching model" section (§3) in `hive/references/sandcastle-gh-dispatch.md` documenting default behavior, the override knob, the `per-story` back-compat path, concurrency semantics (epic-scoped), and PR lifecycle (draft → ready on last shipped). README "Unattended mode" section gains a per-epic flow paragraph linking to the new runbook section.
+
 ## [2.3.2] - 2026-05-18
 
 ### Fixed
@@ -607,7 +622,8 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/firefly-events/plugin-hive/compare/v2.3.2...v2.4.0
 [2.3.0]: https://github.com/firefly-events/plugin-hive/compare/v2.1.0...v2.3.0
 [2.0.1]: https://github.com/firefly-events/plugin-hive/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/firefly-events/plugin-hive/compare/v1.3.0...v2.0.0

@@ -21,12 +21,13 @@ captures the rationale.
 
 1. [Install the dispatch surface](#1-install-the-dispatch-surface)
 2. [Label state machine](#2-label-state-machine)
-3. [Rotate the agent secret](#3-rotate-the-agent-secret)
-4. [Switch the workflow runner](#4-switch-the-workflow-runner)
-5. [Lock label permissions on a public repo](#5-lock-label-permissions-on-a-public-repo)
-6. [Future-labels extension point](#6-future-labels-extension-point)
-7. [Debug a stuck `hive:in-flight` label](#7-debug-a-stuck-hivein-flight-label)
-8. [Workflow vs bridge ownership](#workflow-vs-bridge-ownership)
+3. [Branching model](#3-branching-model)
+4. [Rotate the agent secret](#4-rotate-the-agent-secret)
+5. [Switch the workflow runner](#5-switch-the-workflow-runner)
+6. [Lock label permissions on a public repo](#6-lock-label-permissions-on-a-public-repo)
+7. [Future-labels extension point](#7-future-labels-extension-point)
+8. [Debug a stuck `hive:in-flight` label](#8-debug-a-stuck-hivein-flight-label)
+9. [Workflow vs bridge ownership](#workflow-vs-bridge-ownership)
 
 ---
 
@@ -106,7 +107,86 @@ labels — including the worker setting `hive:in-flight` — no-ops at the
 
 ---
 
-## 3. Rotate the agent secret
+## 3. Branching model
+
+*Added in 2.4.0 (per-epic-branch-pr-flow epic, stories pe-1 through pe-5).*
+
+The dispatch workflow + bridge stack stories of the same epic onto a single branch and produce one PR per epic — instead of the legacy one-branch-per-issue + one-PR-per-issue path. This section is the maintainer reference for how that resolution works, where the overrides live, and how to fall back when an in-flight epic predates the change.
+
+### 3.1 Default behavior
+
+When a `hive:ready` issue carries a `hive:epic:<epic-id>` label:
+
+- **Branch.** The bridge derives `branch = feat/<epic-id>` (instead of `agent/issue-<n>`). The first story of the epic creates the branch; later stories push to the same branch.
+- **Base.** `resolveGitFlow({ cwd })` (`hive/lib/git_flow.mjs`) is called at dispatch time. With `default_pr_base: auto` (the shipped default), the helper probes `git rev-parse --verify origin/develop` and returns `develop` on success, `main` otherwise.
+- **PR.** The workflow opens a `--draft` PR on the first story (title `[epic] <epic-id>`) and *edits the same PR's body* on subsequent stories — no second PR is created. The body is capped at 25 story entries with a "see commits" pointer.
+- **Promotion.** When the last `hive:story:*` issue of the epic flips to `hive:shipped`, the workflow calls `gh pr ready "feat/<epic-id>"`, moving the PR out of draft.
+
+Issues without a `hive:epic:*` label keep the legacy `agent/issue-<n>` branch + one-shot PR path. No behavior change for non-epic issues.
+
+### 3.2 Override knob
+
+Pin the resolution explicitly via the root `hive.config.yaml`:
+
+```yaml
+git_flow:
+  default_pr_base: auto         # auto | <branch-name>; "auto" = develop if origin/develop exists, else main
+  branch_strategy: per-epic     # per-epic | per-story (back-compat)
+```
+
+Examples:
+
+- `default_pr_base: develop` forces every epic PR's base to `develop`, even if the repo also has `main`.
+- `default_pr_base: main` pins to `main` and skips the `origin/develop` probe.
+- `default_pr_base: dev/hive-2.0` lets you point all epic PRs at an integration branch for a milestone.
+
+The bridge prefers a pinned value in the epic's `.pHive/epics/<epic-id>/epic.yaml` (emitted by `/plan` Phase A 0a — see `hive/references/story-yaml-schema.md` §5) over the live config, so a config drift mid-epic does not retroactively shift the branching target.
+
+### 3.3 Back-compat — `branch_strategy: per-story`
+
+In-flight epics that started before 2.4.0 may have already opened `agent/issue-<n>` branches and one-PR-per-issue. Switching them to per-epic mid-flight would orphan those branches. Set `branch_strategy: per-story` to restore the legacy path:
+
+```yaml
+git_flow:
+  branch_strategy: per-story
+```
+
+In this mode the bridge emits a one-line warning when it encounters a `hive:epic:*` label (so reviewers can see the epic intent was acknowledged but bypassed) and falls back to `agent/issue-<n>` for every story.
+
+### 3.4 Concurrency semantics
+
+The workflow's job-level `concurrency.group` is **epic-scoped, not issue-scoped**:
+
+| Issue carries | `concurrency.group` resolves to |
+|---|---|
+| `hive:epic:<id>` | `hive-epic-<id>` |
+| no `hive:epic:*` label | `hive-issue-<n>` (legacy fallback) |
+
+`cancel-in-progress: false` queues subsequent stories of the same epic instead of cancelling the active one — load-bearing for the stacked-PR invariant (two concurrent stories of the same epic racing the branch checkout would corrupt the stacked commits).
+
+The derivation lives in a tiny upstream `derive` job because GitHub Actions evaluates `concurrency.group` before the consuming job's steps run, so step env/outputs of the same job are unavailable there. The heavy `run` job declares `needs: derive` and reads `${{ needs.derive.outputs.concurrency_key }}`.
+
+### 3.5 PR lifecycle
+
+| Phase | Event | PR state |
+|---|---|---|
+| First story of epic ships | bridge pushes `feat/<epic-id>`; workflow opens `--draft` PR | Draft |
+| Each subsequent story ships | workflow edits PR body (`gh pr edit "$PR_NUMBER" --body "$NEW_BODY"`) | Draft (still) |
+| Last story of epic ships | promote step counts shipped vs total; on parity calls `gh pr ready "feat/<epic-id>"` | Ready |
+
+The promotion gate is `(shipped_count == total_count)`. Both counts use `gh issue list --label "hive:epic:<id>"` — the only labels `gh` matches are exact strings, wildcards are NOT supported, so the `hive:story:` filter must run client-side via jq:
+
+```bash
+total=$(gh issue list --label "hive:epic:${EPIC_ID}" --state all -L 500 \
+  --json number,labels \
+  -q '[.[] | select(.labels[].name | startswith("hive:story:"))] | length')
+```
+
+The client-side filter excludes any epic-tracker issue that carries only the `hive:epic:*` label. A `0/0` result is treated as a label-propagation anomaly and does **not** promote — keeps the false-positive ready-flip rate at zero.
+
+---
+
+## 4. Rotate the agent secret
 
 The dispatch workflow reads `ANTHROPIC_API_KEY` (default) or
 `OPENAI_API_KEY` (with `--secret-mode openai`) from repo secrets. The
@@ -142,7 +222,7 @@ secrets when the job pins an environment.
 
 ---
 
-## 4. Switch the workflow runner
+## 5. Switch the workflow runner
 
 The skill scaffolds `runs-on: ubuntu-latest` by default. Two upgrade
 paths:
@@ -181,7 +261,7 @@ manifest extension if you need it to survive scaffolding.
 
 ---
 
-## 5. Lock label permissions on a public repo
+## 6. Lock label permissions on a public repo
 
 **`hive:ready` is a remote-code-execution trigger on a public repo.** Any
 contributor with `triage` permission or above can apply a label, which
@@ -229,7 +309,7 @@ API budget. Lock this down before merging the workflow.
 
 ---
 
-## 6. Future-labels extension point
+## 7. Future-labels extension point
 
 The v1 scope ships exactly one dispatch route: `hive:ready` →
 `/hive:execute`. Future labels (`hive:plan`, `hive:test`, `hive:review`)
@@ -268,7 +348,7 @@ new skill flags.
 
 ---
 
-## 7. Debug a stuck `hive:in-flight` label
+## 8. Debug a stuck `hive:in-flight` label
 
 If `if: failure()` is doing its job, an issue should never stay in
 `hive:in-flight` after the workflow run terminates. When you do see one,
@@ -296,7 +376,7 @@ work through this list in order:
      Inspect the iteration logs for a stuck phase (often a failing test
      gate); fix the story spec.
    - Auth errors (`401`, `403`) — the API-key secret is missing or
-     revoked. See [§3 Rotate the agent secret](#3-rotate-the-agent-secret).
+     revoked. See [§4 Rotate the agent secret](#4-rotate-the-agent-secret).
    - `HIVE_EXECUTION_MODE: team` ignored — inner Hive tried to spawn a
      nested sandcastle. File a Hive bug; the bridge sets the env var
      correctly and the inner orchestrator should honor it.

@@ -124,6 +124,19 @@ See [`skills/hive/skills/planning-routing/SKILL.md`](../hive/skills/planning-rou
 
 ### Phase A: Research
 
+0a. **Pre-flight: resolve git_flow (pe-5).** Immediately after the kickoff gate passes (and before any researcher / writer dispatch), call `resolveGitFlow({ cwd })` from `hive/lib/git_flow.mjs` (pe-1) and store the result on the planning context as `${git_flow_resolution}`. The two fields you persist downstream are `base_branch` and `branch_strategy`:
+
+   ```bash
+   node --input-type=module -e "
+     import('./hive/lib/git_flow.mjs').then(m => {
+       const r = m.resolveGitFlow({ cwd: process.cwd() });
+       process.stdout.write(JSON.stringify(r));
+     });
+   "
+   ```
+
+   The resolution is pinned at plan time — even if `hive.config.yaml` drifts later, every downstream sandcastle dispatch for this epic uses the value captured here (see step 15 below). On import failure (helper not vendored), fall back to `{ base_branch: 'main', branch_strategy: 'per-epic' }` and add a one-line note to the design discussion §0 prelude so reviewers know the helper was unavailable.
+
 0. **Pre-flight: query prior decisions (S6.2).** Before dispatching the researcher, invoke `/hive:why` in free-form mode against the requirement topic to surface any prior KG decisions that should inform this plan. Treat this as audit-trail discovery, not blocking input:
 
    ```bash
@@ -438,7 +451,31 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Stories that fail the gate are flagged in the step 18 confirmation output alongside `agent-ready-checklist` failures; the user can approve with known gaps or ask to fix them before proceeding.
 
-15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories.
+15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories. The emitted YAML MUST include the `git_flow:` block populated from the `${git_flow_resolution}` value captured in Phase A step 0a (pe-5):
+
+    ```yaml
+    name: <epic-id>
+    title: <epic title>
+    target_codebase: <abs path>
+    methodology: <classic|tdd|bdd>
+
+    git_flow:
+      base_branch: <resolved>          # from Phase A 0a — `develop` if origin/develop existed at plan time, else `main`, else the explicit override
+      branch_strategy: <resolved>      # per-epic (default) | per-story (back-compat)
+
+    stories:
+      - id: <story-id>
+        title: <story title>
+        complexity: <low|medium|high>
+        depends_on: [<story-ids>]
+    ```
+
+    **Idempotency on re-plan.** If `epic.yaml` already exists for this epic:
+      - if it already has a `git_flow:` block, update the two field values in place (do NOT duplicate the block);
+      - if it does not, insert a fresh `git_flow:` block immediately after `methodology:` (the canonical position above).
+      - all other fields not owned by /plan (e.g. `source_issue`, `description`, free-form notes) are preserved untouched.
+
+    Schema reference: `hive/references/story-yaml-schema.md` §5 "Epic index (`epic.yaml`)" documents the canonical block shape.
 
 16. **Detect UI stories — delegate to `/design` (atomic external call).** After generating stories and before presenting for confirmation, scan each story for UI work indicators. When a story matches, invoke the **design** skill (atomic; `skills/design/SKILL.md`) — this is an **external Skill call**, NOT inline wireframe-ceremony prose copied into this skill. See the UI Step Detection section below for the detection keywords, the delegation invocation shape, and the blocking-gate contract.
 

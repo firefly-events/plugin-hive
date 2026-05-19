@@ -9,10 +9,14 @@
  * Responsibilities:
  *   1. Validate ISSUE_NUMBER + the API key env are present (clear error
  *      on absence — never silent).
- *   2. Build a prompt that delegates to `/hive:execute` against the
+ *   2. Resolve the branch name: when the issue carries a
+ *      `hive:epic:<epic-id>` label AND the repo's resolved
+ *      `branch_strategy` (from `hive/lib/git_flow.mjs`) is `per-epic`,
+ *      use `feat/<epic-id>`; otherwise fall back to `agent/issue-<n>`.
+ *   3. Build a prompt that delegates to `/hive:execute` against the
  *      labeled issue.
- *   3. Invoke `sandcastle.run({ ... })` with a per-issue branch.
- *   4. Emit a structured result line for the workflow to capture.
+ *   4. Invoke `sandcastle.run({ ... })` with the resolved branch.
+ *   5. Emit a structured result line for the workflow to capture.
  *
  * Label state transitions (`hive:in-flight` -> `hive:shipped` |
  * `hive:failed`) are NOT this bridge's job — the workflow YAML owns
@@ -25,6 +29,7 @@
 
 import { run, claudeCode } from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
+import path from "node:path";
 
 const issueNumberRaw = process.env.ISSUE_NUMBER;
 if (!issueNumberRaw || !/^\d+$/.test(issueNumberRaw)) {
@@ -48,7 +53,104 @@ if (!process.env["{{SECRET_KEY}}"]) {
   process.exit(1);
 }
 
-const branch = `agent/issue-${issueNumber}`;
+const repoRoot: string = process.cwd();
+
+// Fetch the issue's labels via the GitHub REST API. We deliberately do
+// not shell out to `gh` — AC-7 in `tests/sandcastle-gh-init-assets.test.js`
+// enforces the no-subprocess rule for the bridge. GH_TOKEN +
+// GITHUB_REPOSITORY are injected by the workflow / GitHub Actions runtime.
+async function fetchIssueLabels(): Promise<string[]> {
+  const repo: string | undefined = process.env.GITHUB_REPOSITORY;
+  const token: string | undefined = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+  if (!repo || !token) {
+    console.error(
+      "[sandcastle-hive-bridge] GITHUB_REPOSITORY or GH_TOKEN unset — cannot fetch labels; defaulting to no-epic branch derivation.",
+    );
+    return [];
+  }
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${repo}/issues/${issueNumber}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "User-Agent": "plugin-hive-sandcastle-bridge",
+        },
+      },
+    );
+    if (!res.ok) {
+      console.error(
+        `[sandcastle-hive-bridge] GitHub API returned ${res.status} fetching labels; defaulting to no-epic.`,
+      );
+      return [];
+    }
+    const body = (await res.json()) as { labels?: Array<{ name?: string } | string> };
+    const labels = Array.isArray(body.labels) ? body.labels : [];
+    return labels
+      .map((l) => (typeof l === "string" ? l : l?.name))
+      .filter((n): n is string => typeof n === "string" && n.length > 0);
+  } catch (err) {
+    console.error(
+      `[sandcastle-hive-bridge] label fetch failed (${(err as Error).message}); defaulting to no-epic.`,
+    );
+    return [];
+  }
+}
+
+const labels: string[] = await fetchIssueLabels();
+const epicId: string | undefined = labels
+  .find((l) => l.startsWith("hive:epic:"))
+  ?.slice("hive:epic:".length);
+
+// Validate epicId against the same allowlist sandcastle uses for
+// branchStrategy. The label is user-controlled (maintainers may create
+// arbitrary `hive:epic:*` labels), so before pasting it into a branch
+// name we hard-fail on anything outside [A-Za-z0-9._-]. Refusing here
+// is the right outcome: a malformed epic label is operator error and
+// the workflow's `if: failure()` path then flips the issue to
+// `hive:failed` for human triage.
+if (epicId !== undefined && !/^[a-zA-Z0-9._-]+$/.test(epicId)) {
+  console.error(
+    `[sandcastle-hive-bridge] hive:epic:${epicId} label contains characters ` +
+      `outside the allowlist [A-Za-z0-9._-]; refusing to construct branch name. ` +
+      `Rename the label and re-trigger.`,
+  );
+  process.exit(2);
+}
+
+// Resolve branch_strategy from the consumer repo's hive config. The
+// helper is part of plugin-hive and only present when the consumer has
+// vendored it; absence is normal and defaults to per-epic semantics so
+// epic-labeled issues continue to use feat/<epic-id>.
+async function resolveBranchStrategy(): Promise<"per-epic" | "per-story"> {
+  const helperPath = path.resolve(repoRoot, "hive/lib/git_flow.mjs");
+  try {
+    const mod = (await import(helperPath)) as {
+      resolveGitFlow?: (opts: { cwd: string }) => { branch_strategy?: string };
+    };
+    if (typeof mod.resolveGitFlow !== "function") return "per-epic";
+    const out = mod.resolveGitFlow({ cwd: repoRoot });
+    return out?.branch_strategy === "per-story" ? "per-story" : "per-epic";
+  } catch {
+    // hive/lib/git_flow.mjs not vendored in this repo — default to per-epic.
+    return "per-epic";
+  }
+}
+
+const branchStrategyMode = await resolveBranchStrategy();
+
+let branch: string;
+if (!epicId) {
+  branch = `agent/issue-${issueNumber}`;
+} else if (branchStrategyMode === "per-story") {
+  console.warn(
+    `[sandcastle-hive-bridge] branch_strategy=per-story configured; ignoring hive:epic:${epicId} label and using legacy agent/issue-${issueNumber} branch.`,
+  );
+  branch = `agent/issue-${issueNumber}`;
+} else {
+  branch = `feat/${epicId}`;
+}
 
 // Prompt delegates to /hive:execute. The inner Claude Code (with the
 // plugin-hive plugin loaded inside the sandcastle container image)
@@ -79,11 +181,14 @@ const result = await run({
 
 // Structured one-line result for the workflow to parse / surface in the
 // step summary. Keeps the bridge stdout shape stable for future
-// consumers (metrics, dashboards).
+// consumers (metrics, dashboards). `branchStrategyMode` + `epicId` are
+// included so post-run reviewers can verify the derivation.
 console.log(
   JSON.stringify({
     issueNumber,
     branch: result.branch,
+    epicId: epicId ?? null,
+    branchStrategy: branchStrategyMode,
     commitCount: result.commits.length,
     iterations: result.iterations.length,
     completionSignal: result.completionSignal,

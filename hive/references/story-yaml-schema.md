@@ -253,3 +253,61 @@ A story's `metric:` block is acceptable when:
   under `.pHive/metrics/experiments/`.
 - The metric is falsifiable from the declared source alone — a future
   reader does not need to re-read the story to decide pass/fail.
+
+## 5. Epic index (`epic.yaml`)
+
+Each epic carries a sibling index at `.pHive/epics/{epic-id}/epic.yaml`
+emitted by `/plan` step 15. The index is a lightweight pointer to the
+stories plus the small set of cross-story fields that downstream skills
+(`/execute`, the sandcastle bridge, the GH Actions dispatch workflow)
+need before opening any individual story YAML.
+
+### 5.1 Canonical template
+
+```yaml
+name: <epic-id>                  # kebab-case identifier; matches dir name
+title: <human title>
+target_codebase: <abs path>      # absolute path to the codebase /plan targeted
+methodology: <classic|tdd|bdd>   # selected in /plan; can be overridden per-story
+
+# pe-5: pinned at plan time from `hive/lib/git_flow.mjs` (pe-1). The
+# sandcastle bridge (pe-2) and dispatch workflow (pe-3) prefer these
+# pinned values over the live `hive.config.yaml`, so a config drift
+# after plan does not retroactively shift the epic's branching target.
+git_flow:
+  base_branch: <resolved>        # e.g. `develop` or `main` or `dev/hive-2.0`
+  branch_strategy: <resolved>    # `per-epic` (default) | `per-story`
+
+source_issue: <gh-issue-number>  # optional; tracker linkage
+
+stories:
+  - id: <story-id>
+    title: <story title>
+    complexity: <low|medium|high>
+    depends_on: [<story-ids>]
+```
+
+### 5.2 The `git_flow` block
+
+| Field | Type | Allowed values | Source |
+|---|---|---|---|
+| `base_branch` | string | any git branch name | resolved by `resolveGitFlow({ cwd })` at plan time |
+| `branch_strategy` | string | `per-epic` \| `per-story` | resolved by `resolveGitFlow({ cwd })` at plan time |
+
+**Pinning rationale.** `base_branch` and `branch_strategy` are resolved
+**once** during Phase A step 0a of `/plan` and persisted into
+`epic.yaml`. Subsequent dispatch runs (bridge + workflow) read the
+pinned values from `epic.yaml` in preference to the live config — so
+two stories of the same epic that ship a week apart land on the same
+base regardless of config edits in between.
+
+**Idempotency on re-plan.** If `epic.yaml` already exists when /plan
+re-emits it:
+- a `git_flow:` block that already exists has its two field values
+  updated in place (no duplication);
+- if absent, the block is inserted immediately after `methodology:`.
+
+**Back-compat.** Epics that pre-date pe-5 may have no `git_flow:` block.
+Downstream consumers fall back to the live `hive.config.yaml` for those
+epics; the bridge / workflow emit a one-line info log noting the
+fall-through.
