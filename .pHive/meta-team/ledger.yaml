@@ -1,3 +1,29 @@
+- experiment_id: meta-2026-05-19
+  date: '2026-05-19'
+  started: '2026-05-19T00:00:00Z'
+  closed: '2026-05-19T00:30:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 2
+  top_changes:
+    - "hive/lib/meta-experiment/README.md: added direct_commit_adapter and pr_promotion_adapter to Submodules list — makes the list consistent with the 8 modules actually present in the directory"
+  commit: 5bb98283691d1265f3be3870345168355c351b13
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 8000
+    first_attempt_pass: true
+  rollback_ref: 5672d56479e3935a63800e6d55606424b8fa38cd
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-05-19. Analysis found 2 findings: (1) SCHEMA_INCONSISTENCY
+    in hive/lib/meta-experiment/README.md — Submodules list omitted
+    direct_commit_adapter and pr_promotion_adapter; the README already had a full
+    ## DirectCommitAdapter (BL2.1) section but the top-level list was inconsistent.
+    Fixed by adding both entries to the Submodules list. (2) STUB_DOC
+    hive/references/hive-cloud-roadmap.md — continuing out_of_scope (S16 placeholder,
+    deferred Hive Cloud epic). Closure validator passed. Regression watch armed for
+    4-hour window.
 - experiment_id: meta-2026-05-18
   date: '2026-05-18'
   started: '2026-05-18T00:00:00Z'
