@@ -59,7 +59,20 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          # Three-case BYO install:
+          #   1) lockfile present     → npm ci (reproducible, fastest)
+          #   2) package.json only    → npm install --no-save
+          #   3) no package.json      → bare-repo: install sandcastle as a transient
+          #                             dep with no-save + no-package-lock so the
+          #                             repo tree stays untouched.
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          elif [ -f package.json ]; then
+            npm install --no-save
+          else
+            npm install --no-save --no-package-lock @ai-hero/sandcastle
+          fi
 
       - name: Run Hive via sandcastle bridge
         env:
