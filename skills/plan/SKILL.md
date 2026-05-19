@@ -428,6 +428,8 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Customize step descriptions per story as needed — these templates provide the ordering and agent assignments. For low-complexity stories, the `research` step may be skipped regardless of methodology.
 
+    **Parallel-dispatch opt-in (optional).** Stories default to serial dispatch. To mark a story safe for concurrent execution with its peers, emit two top-level fields per [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §4: `parallel_allowed: true` plus a `parallel_rationale` of `variation`, `read-only`, or `bounded-slice`. Omit both fields when in doubt — the default is serial. A `parallel_rationale` without `parallel_allowed: true` is ignored at validation time (warning, not failure); `parallel_allowed: true` without a valid rationale is malformed and rejected. This pair is what the `/execute` parallel-dispatch gate (ed-7) consumes — free-text "safe to parallelize" comments do not satisfy it.
+
 14. **Evaluate cross-cutting concerns per story.** For each story, evaluate each concern's `applies_when` condition. For applicable concerns, determine the specific action needed and add a `cross_cutting` section to the story YAML. See `hive/references/cross-cutting-concerns.md` for format and examples.
 
     **Concern routing.** Most concerns emit their per-story output into the generic `cross_cutting:` section as `{concern, action}` entries. A small number of concerns instead emit into a dedicated top-level field on the story YAML; the loop must route those concerns to their target field rather than to `cross_cutting:`. Currently the only such concern is `metrics`, which writes to a top-level `metric:` block per the shape in [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3. To add a new dedicated-field concern later, extend this routing table; do not hardcode metrics-specific logic elsewhere in the skill.
@@ -475,7 +477,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
       - if it does not, insert a fresh `git_flow:` block immediately after `methodology:` (the canonical position above).
       - all other fields not owned by /plan (e.g. `source_issue`, `description`, free-form notes) are preserved untouched.
 
-    Schema reference: `hive/references/story-yaml-schema.md` §5 "Epic index (`epic.yaml`)" documents the canonical block shape.
+    Schema reference: `hive/references/story-yaml-schema.md` §6 "Epic index (`epic.yaml`)" documents the canonical block shape.
 
 16. **Detect UI stories — delegate to `/design` (atomic external call).** After generating stories and before presenting for confirmation, scan each story for UI work indicators. When a story matches, invoke the **design** skill (atomic; `skills/design/SKILL.md`) — this is an **external Skill call**, NOT inline wireframe-ceremony prose copied into this skill. See the UI Step Detection section below for the detection keywords, the delegation invocation shape, and the blocking-gate contract.
 

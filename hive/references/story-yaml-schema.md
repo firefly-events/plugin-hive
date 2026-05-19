@@ -44,6 +44,8 @@ planning skill and team-lead guidance, not in this schema.
 | `risks`              | optional    | list of `{severity, description, mitigation}` |
 | `references`         | optional    | list of `{path, relevant_excerpt}`         |
 | `metric`             | **required from this schema forward** | see §3 |
+| `parallel_allowed`   | optional    | `true` (default: `false` when omitted)     |
+| `parallel_rationale` | conditional | `variation` \| `read-only` \| `bounded-slice` (required iff `parallel_allowed: true`) — see §4 |
 
 Authors must not invent new top-level keys to carry metric-shaped
 information. Anything metric-related goes inside `metric:`.
@@ -236,7 +238,102 @@ metric:
   justification: "Process-substrate; M-07 retro backfill measures whether the gate works."
 ```
 
-## 4. Review checklist (for /plan + /review)
+## 4. The `parallel_allowed` / `parallel_rationale` field group
+
+Per the default-serial parallel-dispatch contract (`exec-discipline-may2026`
+epic, capability #132), stories opt INTO parallelization explicitly rather
+than out of it. The two fields live at the story-YAML top level and
+conventionally slot in **after** `depends_on` and **before** `description`,
+so the dispatcher (and a human skimming the file) can decide concurrency
+without parsing the body.
+
+### 4.1 Shape
+
+```yaml
+parallel_allowed: true | false                              # optional; default false
+parallel_rationale: variation | read-only | bounded-slice   # required iff parallel_allowed: true
+```
+
+### 4.2 Field semantics
+
+#### 4.2.1 `parallel_allowed` (optional, default `false`)
+
+Boolean opt-in flag. A story with `parallel_allowed: true` MAY be
+dispatched concurrently with its dependency-graph peers; a story with
+`parallel_allowed: false` (or the field omitted entirely) MUST be
+dispatched serially even when no `depends_on` edges block it.
+
+The default is `false` so a planner who forgets the flag gets safe
+serial execution, not accidental concurrency. Defaulting to `true` would
+let an unconsidered story step on another story's writes without anyone
+having to think about it.
+
+#### 4.2.2 `parallel_rationale` (required iff `parallel_allowed: true`)
+
+Enumerated string capturing **why** parallel dispatch is safe for this
+specific story. The enum is bounded — free-form prose is rejected because
+the lint rule that consumes this field (`ed-7-execute-enforces-gate`)
+cannot decide safety from arbitrary justifications.
+
+| Value | Meaning |
+|---|---|
+| `variation`     | One of N near-identical stories that apply the same template to disjoint targets (e.g., the same refactor against N sibling modules). Each story's file set does not overlap any sibling's. |
+| `read-only`     | The story performs reads + analysis + reporting only — no writes to repo state. Multiple read-only stories can interleave freely. |
+| `bounded-slice` | The story writes to a narrow, declared slice of the codebase that does not overlap any concurrent story's slice. The slice boundary is set by `/plan` and audited by `/execute`; "shouldn't conflict" prose is not acceptable. |
+
+### 4.3 Required-when rules
+
+- **`parallel_allowed: true` + missing `parallel_rationale`**: the story
+  is **malformed**. Validators reject it.
+- **`parallel_allowed: true` + `parallel_rationale` not one of the three
+  enum values**: the story is **malformed**. Validators reject it.
+- **`parallel_allowed: false` (or omitted) + `parallel_rationale`
+  present**: the rationale is **ignored**. Validators emit a warning
+  (stale field), not a fatal error — a leftover rationale is a
+  documentation hygiene issue, not a correctness issue.
+
+### 4.4 Worked examples
+
+#### 4.4.1 `variation` — same refactor across sibling modules
+
+```yaml
+id: ui-cluster-extract-config-header
+depends_on: [ui-cluster-extract-config-base]
+parallel_allowed: true
+parallel_rationale: variation
+# One of 7 stories that apply the same "extract <Component>Config out of
+# <Component>.tsx" refactor. Each variation edits exactly one component
+# file; the seven file sets are disjoint, so all seven can land
+# concurrently.
+```
+
+#### 4.4.2 `read-only` — analysis-only story
+
+```yaml
+id: audit-skill-prompt-token-budgets
+depends_on: []
+parallel_allowed: true
+parallel_rationale: read-only
+# Reads every skill prompt under skills/, counts tokens, writes a
+# report to .pHive/audits/skill-token-budgets/. Touches no production
+# code, runtime config, or other story's output.
+```
+
+#### 4.4.3 `bounded-slice` — narrow declared write surface
+
+```yaml
+id: cmux-add-logging-hook
+depends_on: [cmux-pane-spawn-base]
+parallel_allowed: true
+parallel_rationale: bounded-slice
+files_to_modify:
+  - file: hive/lib/cmux/pane_hooks.mjs
+    change: register new "log" hook
+# Slice boundary: hive/lib/cmux/pane_hooks.mjs only. No other concurrent
+# story in this epic writes anywhere under hive/lib/cmux/.
+```
+
+## 5. Review checklist (for /plan + /review)
 
 A story's `metric:` block is acceptable when:
 
@@ -254,7 +351,18 @@ A story's `metric:` block is acceptable when:
 - The metric is falsifiable from the declared source alone — a future
   reader does not need to re-read the story to decide pass/fail.
 
-## 5. Epic index (`epic.yaml`)
+A story's `parallel_allowed` / `parallel_rationale` pair is acceptable when:
+
+- `parallel_allowed` is either absent, `false`, or `true` (no other
+  values; no string `"yes"`/`"no"`).
+- If `parallel_allowed: true`: `parallel_rationale` is present and is
+  exactly one of `variation`, `read-only`, `bounded-slice`. Any other
+  value, or missing rationale, is malformed.
+- If `parallel_allowed: false` or omitted: `parallel_rationale` is
+  ignored. A stale rationale here yields a warning (documentation
+  hygiene), not a failure.
+
+## 6. Epic index (`epic.yaml`)
 
 Each epic carries a sibling index at `.pHive/epics/{epic-id}/epic.yaml`
 emitted by `/plan` step 15. The index is a lightweight pointer to the
@@ -262,7 +370,7 @@ stories plus the small set of cross-story fields that downstream skills
 (`/execute`, the sandcastle bridge, the GH Actions dispatch workflow)
 need before opening any individual story YAML.
 
-### 5.1 Canonical template
+### 6.1 Canonical template
 
 ```yaml
 name: <epic-id>                  # kebab-case identifier; matches dir name
@@ -287,7 +395,7 @@ stories:
     depends_on: [<story-ids>]
 ```
 
-### 5.2 The `git_flow` block
+### 6.2 The `git_flow` block
 
 | Field | Type | Allowed values | Source |
 |---|---|---|---|
