@@ -112,3 +112,13 @@ If the file does not exist, check `.pHive/meta-team/ledger.yaml`:
   Meta-Team: Last cycle {cycle_id} on {date} — {verdict} ({N} changes promoted)
   ```
 - If neither file exists: omit the meta-team section entirely (meta-team has not been configured or run yet)
+
+### 9. Scope-drift surfacing
+
+`scope_drift_score` events (story `ed-3-drift-metric-emit`) live in the
+per-run JSONL at `.pHive/metrics/events/*.jsonl`. Trend surfacing in
+this skill is owned by the follow-up story `ed-4-drift-status-surface`;
+this skill currently references the metric only for discoverability —
+see [`hive/references/metrics-event.schema.md`](../../hive/references/metrics-event.schema.md)
+for the row shape, bucketing rules, and maturity gate that govern
+these events. Until `ed-4` lands, omit this as a rendered section.
