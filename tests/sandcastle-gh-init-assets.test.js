@@ -475,3 +475,59 @@ test('pe-4 promote step: 0/0 anomaly does NOT promote, equal counts call `gh pr 
   // Inequality branch logs the partial-completion count.
   assert.match(yml, /shipped; keeping draft/);
 });
+
+// ---------------------------------------------------------------------------
+// gi-2: dispatch pulls from GHCR with local-build fallback
+// ---------------------------------------------------------------------------
+
+test('gi-2 workflow has a `Pull sandcastle image` step with the IMAGE_REF env override', () => {
+  const yml = readFile(YML_EXAMPLE);
+  // Step name (matches the .tpl + team-lead-mandated heading).
+  assert.match(yml, /name:\s*Pull sandcastle image \(with local-build fallback\)/);
+  // `workflow_dispatch.inputs.image_ref` is declared in the header so the
+  // override knob is wired end-to-end.
+  assert.match(
+    yml,
+    /workflow_dispatch:\s*\n\s*inputs:\s*\n\s*image_ref:/,
+    'workflow_dispatch.inputs.image_ref must be declared in the workflow header',
+  );
+  // The step env reads inputs.image_ref with the GHCR default fallback.
+  assert.match(
+    yml,
+    /IMAGE_REF:\s*\$\{\{\s*github\.event\.inputs\.image_ref\s*\|\|\s*'ghcr\.io\/firefly-events\/sandcastle:latest'\s*\}\}/,
+  );
+});
+
+test('gi-2 pull step gates the local-build fallback on a non-zero `docker pull` exit', () => {
+  const yml = readFile(YML_EXAMPLE);
+  // The `if docker pull ... ; then ... else ... fi` shape — only the
+  // `else` arm runs when the pull returns non-zero. Use multiline-aware
+  // regex so the assertion is robust to comment/whitespace changes.
+  assert.match(
+    yml,
+    /if docker pull "\$\{IMAGE_REF\}";\s*then[\s\S]*?else[\s\S]*?docker build[\s\S]*?fi/,
+    'fallback `docker build` must live in the `else` arm gated by `docker pull` exit',
+  );
+  // The fallback build preserves the cron-worker UID/GID alignment so
+  // the bind-mounted worktree stays writable inside the container.
+  assert.match(yml, /--build-arg AGENT_UID="\$\(id -u\)"/);
+  assert.match(yml, /--build-arg AGENT_GID="\$\(id -g\)"/);
+  // ::warning:: annotation surfaces the fallback in the GH Actions UI.
+  assert.match(yml, /::warning::Pull from \$\{IMAGE_REF\} failed/);
+});
+
+test('gi-2 pull step retags to `sandcastle:hive` so the bridge contract is preserved', () => {
+  const yml = readFile(YML_EXAMPLE);
+  // Pull path retags the pulled image to the bridge's expected tag.
+  assert.match(
+    yml,
+    /docker tag "\$\{IMAGE_REF\}" sandcastle:hive/,
+    'pull path must retag the pulled image to sandcastle:hive',
+  );
+  // Fallback path builds directly to the same tag.
+  assert.match(
+    yml,
+    /docker build[\s\S]*?-t sandcastle:hive \.sandcastle/,
+    'fallback build path must tag the image as sandcastle:hive',
+  );
+});

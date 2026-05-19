@@ -16,6 +16,12 @@ name: Hive dispatch
 on:
   issues:
     types: [labeled]
+  workflow_dispatch:
+    inputs:
+      image_ref:
+        description: Sandcastle image to pull (default ghcr.io/firefly-events/sandcastle:latest)
+        required: false
+        default: ghcr.io/firefly-events/sandcastle:latest
 
 permissions:
   contents: write
@@ -72,6 +78,28 @@ jobs:
             npm install --no-save
           else
             npm install --no-save --no-package-lock @ai-hero/sandcastle
+          fi
+
+      - name: Pull sandcastle image (with local-build fallback)
+        # gi-2-dispatch-uses-ghcr: prefer the pre-built image from GHCR
+        # (published by .github/workflows/build-sandcastle-image.yml,
+        # gi-1) over an in-workflow `docker build`. Cold-start drops from
+        # ~4 min (local build) to ~20 s (warm pull). Retags to
+        # `sandcastle:hive` so the bridge's `@ai-hero/sandcastle` docker
+        # lookup finds it. Falls back to a local build if the pull fails
+        # (image not yet published, transient GHCR outage, etc.).
+        env:
+          IMAGE_REF: ${{ github.event.inputs.image_ref || 'ghcr.io/firefly-events/sandcastle:latest' }}
+        run: |
+          if docker pull "${IMAGE_REF}"; then
+            docker tag "${IMAGE_REF}" sandcastle:hive
+            echo "Used pre-built image from ${IMAGE_REF}"
+          else
+            echo "::warning::Pull from ${IMAGE_REF} failed — building locally as fallback."
+            docker build \
+              --build-arg AGENT_UID="$(id -u)" \
+              --build-arg AGENT_GID="$(id -g)" \
+              -t sandcastle:hive .sandcastle
           fi
 
       - name: Run Hive via sandcastle bridge
