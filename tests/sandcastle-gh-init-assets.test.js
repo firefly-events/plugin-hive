@@ -180,19 +180,22 @@ test('AC-4 concurrency.group is per-epic via needs.derive.outputs, cancel-in-pro
 // AC-5: minimal permissions block
 // ---------------------------------------------------------------------------
 
-test('AC-5 permissions block lists only contents/issues/pull-requests as write', () => {
+test('AC-5 permissions block: contents/issues/pull-requests write, packages read', () => {
   const yml = readFile(YML_EXAMPLE);
   const block = yml.match(/permissions:\s*\n((?:\s{2}\S.*\n)+)/);
   assert.ok(block, 'permissions block not found');
   const lines = block[1]
     .split('\n')
     .map(l => l.trim())
+    .filter(Boolean)
+    .map(l => l.replace(/\s*#.*$/, '').trim())
     .filter(Boolean);
   const parsed = Object.fromEntries(lines.map(l => l.split(':').map(s => s.trim())));
   assert.deepEqual(parsed, {
     contents: 'write',
     issues: 'write',
     'pull-requests': 'write',
+    packages: 'read',
   });
 });
 
