@@ -26,6 +26,11 @@ EVENT_METRIC_TYPES = {
     "fix_loop_iterations": ("number", "iterations"),
     "first_attempt_pass": ("bool", "bool"),
     "human_escalation": ("bool", "bool"),
+    # scope_drift_score (story ed-3-drift-metric-emit): bucketed v1.
+    # value is the ordinal 0..3 — 0=none, 1=minor, 2=major, 3=divergent.
+    # The bucket label travels in dimensions.bucket so it can be filtered
+    # without re-deriving from the ordinal. See hive/lib/scope_drift.py.
+    "scope_drift_score": ("number", "bucket"),
 }
 
 CREATE_REQUIRED_ENVELOPE_FIELDS = {

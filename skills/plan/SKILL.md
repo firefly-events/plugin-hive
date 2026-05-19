@@ -510,6 +510,8 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     ```
     ````
 
+18z. **Emit scope_drift_score (Phase C boundary).** After the user confirms the plan in step 18 (or the silent-confirm path resolves), call `emit_scope_drift(...)` with `phase_label='plan:phase-c'` before publishing to the tracker. The Phase C scope record covers story IDs / cross-cutting evaluation / metric blocks — see the **Scope-drift emit** section below.
+
 ### Phase D: Publishing stories to the task tracker
 
 19. **Publish each story to the configured tracker.** Only run after the user
@@ -881,6 +883,55 @@ All planning documents are written to `.pHive/epics/{epic-id}/docs/{document-typ
 
 Existing planning documents at the `.pHive/` root are not moved — this convention applies to new planning sessions going forward.
 
+## Scope-drift emit (decomposition boundary)
+
+Emit a single `scope_drift_score` event at the close of Phase C — the
+moment story decomposition is signed off. Earlier phase boundaries
+(A, B, B2, B3) intentionally do **not** emit: the upstream artifacts
+they produce (concern lists, design-discussion drafts, deep-dive
+expansions) are *expected* to churn during planning, and bucketing
+that churn as drift produces noise that buries the one signal that
+matters — did story decomposition preserve the agreed scope?
+
+The helper applies the maturity gate from story `ed-1-maturity-helper`
+— emits are skipped on greenfield/early projects and logged once per
+run.
+
+Use the Python module surface (no new CLI):
+
+```bash
+python3 -c "
+from hive.lib.scope_drift import emit_scope_drift
+emit_scope_drift(
+    run_id='{run-id}',                   # this /plan run identifier
+    phase_label='plan:phase-c',
+    expected_scope={list of items the design phase committed to},
+    delivered_scope={list of story IDs / cross-cutting items / metric blocks the decomposition actually produced},
+    delta_reasons={zero or more enum values from cycle-state-schema.md},
+    proposal_id='{epic-id}',             # planning is epic-scoped, not story-scoped
+    skill='plan',
+)
+"
+```
+
+`expected_scope` / `delivered_scope` / `delta_reasons` follow the
+schema documented in
+[`hive/references/cycle-state-schema.md`](../../hive/references/cycle-state-schema.md)
+§ Phase records — pull them from the Phase C `phase_records[]` entry
+on the cycle state. The helper buckets to one of `{none, minor, major,
+divergent}` (string label in `dimensions.bucket`; ordinal `0..3` in
+`value`). See
+[`.pHive/metrics/metrics-event.schema.md`](../../.pHive/metrics/metrics-event.schema.md)
+§4 for the registry entry.
+
+Emit point: **after step 14** (stories decomposed + validated, before
+Phase D publishes to the tracker).
+
+The emit is fire-and-forget — the helper raises only on
+`MetricsValidationError` (programming error), never on missing
+`project-profile.yaml` or absent ed-1 helper. Do not wrap with
+additional error handling.
+
 ## Key References
 
 - `hive/references/agent-ready-checklist.md` — 9-point story validation
@@ -896,3 +947,4 @@ Existing planning documents at the `.pHive/` root are not moved — this convent
 - `skills/hive/skills/agent-spawn/SKILL.md` — persona injection, memory loading, path resolution
 - `hive/references/document-templates/design-discussion.md` — ~200-line brain dump format
 - `hive/references/document-templates/structured-outline.md` — ~1000-line detailed plan with elicitation
+- `hive/lib/scope_drift.py` — scope-drift scoring + emit helper called at the Phase C (decomposition) boundary (see Scope-drift emit section above)
