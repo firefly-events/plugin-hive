@@ -33,6 +33,22 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - KG signal revival S4.1: `/hive:register-project` skill, registry helper, and quoted path-with-space fixture for cross-project KG bootstrap registration.
 - KG signal revival S3.1: ChromaDB sidecar lifecycle scripts, fire-and-forget SessionStart hook, operations guide, and bash lifecycle tests.
 
+## [2.5.0] - 2026-05-19
+
+**Pre-built sandcastle container image distributed via GHCR — dispatch cold-start drops from ~4 min to ~20 s.**
+
+The `Hive dispatch` workflow no longer builds the sandcastle container inside each run. A new `build-sandcastle-image.yml` workflow publishes the image to GitHub Container Registry on every `.sandcastle/**` push (plus a weekly cron for base-image CVE refresh), and dispatch pulls it on demand. A local-build fallback keeps dispatch unblocked when the image isn't yet published or GHCR is unreachable.
+
+### Added
+
+- **`build-sandcastle-image.yml` — new workflow at `.github/workflows/build-sandcastle-image.yml` (gi-1)** that builds the sandcastle container image (mirroring the cron `Hive Worker`'s proven local-build pattern: claude-code + codex + plugin-hive marketplace shims) and pushes both `:latest` and `:sha-<7>` tags to `ghcr.io/firefly-events/sandcastle`. Triggers on push to main with `paths: ['.sandcastle/**']`, `workflow_dispatch`, and a weekly cron (`'17 4 * * 0'`, Sunday 04:17 UTC) that refreshes the image to catch Debian base-image CVE fixes. Uses `docker/build-push-action@v5` with `cache-from: type=gha` + `cache-to: type=gha,mode=max` so cross-run builds reuse the BuildKit layer cache. A smoke step runs `which claude && which codex && claude --version` inside the freshly-pushed `:sha-<7>` image — non-zero exit fails the run and the immutable `:sha-<7>` tag serves as a rollback target. Requires `permissions: { contents: read, packages: write }`.
+
+### Changed
+
+- **`Hive dispatch` workflow now pulls from GHCR instead of building (gi-2).** The scaffolder template (`skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl`), its `.example.yml` mirror, and the in-repo `.github/workflows/hive-dispatch.yml` gained a new `Pull sandcastle image (with local-build fallback)` step between `Install dependencies` and `Resolve base branch`. The step runs `docker pull "${IMAGE_REF}"` (default `ghcr.io/firefly-events/sandcastle:latest`), retags the result as `sandcastle:hive` to preserve the bridge's `@ai-hero/sandcastle` `docker()` lookup contract, and falls back to an in-workflow `docker build .sandcastle` (with the same `AGENT_UID`/`AGENT_GID` build-args used by the cron worker) only when the pull returns non-zero. A new `workflow_dispatch.inputs.image_ref` knob lets maintainers pin a specific `:sha-<7>` tag for rollback testing. Net effect: dispatch cold-start drops from ~4 min (local build) to ~20 s (warm GHCR pull) for the normal path; the fallback preserves the legacy behavior with no regression.
+- **Runbook `hive/references/sandcastle-gh-dispatch.md` (gi-3)** gains a new §4 "Image distribution" section covering default behavior, the `image_ref` override knob, the local-build fallback, first-time setup (manually trigger `build-sandcastle-image.yml` once after enabling), image rebuild cadence (push to `.sandcastle/**` + weekly cron), and image visibility (public by default; private adds a `docker login` step). Sections 5-9 renumbered accordingly; internal cross-references updated.
+- **README "Unattended mode" section** gains a one-paragraph summary of the GHCR image flow with a deep-link to the new runbook section.
+
 ## [2.4.2] - 2026-05-19
 
 ### Changed
@@ -637,7 +653,8 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.4.2...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/firefly-events/plugin-hive/compare/v2.4.2...v2.5.0
 [2.4.2]: https://github.com/firefly-events/plugin-hive/compare/v2.4.1...v2.4.2
 [2.4.1]: https://github.com/firefly-events/plugin-hive/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/firefly-events/plugin-hive/compare/v2.3.2...v2.4.0
