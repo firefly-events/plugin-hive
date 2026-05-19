@@ -31,6 +31,7 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  packages: read       # pull pre-built sandcastle image from GHCR
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────
@@ -119,6 +120,14 @@ jobs:
             npm install --no-save --no-package-lock @ai-hero/sandcastle
           fi
 
+      - name: Log in to GHCR
+        # GHCR images default to private. GITHUB_TOKEN with `packages: read`
+        # auths the docker pull. Consumers can rotate to a PAT here if
+        # cross-org image sharing is needed.
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
       - name: Pull sandcastle image (with local-build fallback)
         # gi-2-dispatch-uses-ghcr: prefer the pre-built image from GHCR
         # over an in-workflow `docker build`. Cold-start drops from ~4 min
@@ -154,7 +163,9 @@ jobs:
             echo "Used pre-built image from ${IMAGE_REF}"
           else
             echo "::warning::Pull from ${IMAGE_REF} failed — building locally as fallback."
+            # Podman default — .sandcastle/Containerfile (not Dockerfile).
             docker build \
+              -f .sandcastle/Containerfile \
               --build-arg AGENT_UID="$(id -u)" \
               --build-arg AGENT_GID="$(id -g)" \
               -t sandcastle:hive .sandcastle
