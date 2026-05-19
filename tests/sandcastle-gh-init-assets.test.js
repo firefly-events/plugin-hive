@@ -382,3 +382,40 @@ test('pe-3 rendered YAML is parseable + has expected job graph', () => {
   // run job declares `needs: derive`.
   assert.match(yml, /^\s*run:\s*\n(?:\s+.*\n)*?\s*needs:\s*derive\s*$/m);
 });
+
+// ---------------------------------------------------------------------------
+// pe-4: last-story-of-epic detection — promote draft PR to ready
+// ---------------------------------------------------------------------------
+
+test('pe-4 workflow has a `Promote PR to ready if last story` step gated on epic_id presence', () => {
+  const yml = readFile(YML_EXAMPLE);
+  assert.match(yml, /name:\s*Promote PR to ready if last story/);
+  // Guarded on epic_id — non-epic fallback runs never attempt promotion.
+  assert.match(yml, /if:\s*success\(\)\s*&&\s*needs\.derive\.outputs\.epic_id\s*!=\s*''/);
+});
+
+test('pe-4 promote step issues two `gh issue list` count queries with correct label scoping', () => {
+  const yml = readFile(YML_EXAMPLE);
+  // Total query — `hive:story:*` filter excludes any epic-tracker issue.
+  assert.match(
+    yml,
+    /gh issue list\s*\\\s*\n\s*--label "hive:epic:\$\{EPIC_ID\}"\s*\\\s*\n\s*--label "hive:story:\*"\s*\\\s*\n\s*--state all/,
+  );
+  // Shipped query — `hive:shipped` + state closed.
+  assert.match(
+    yml,
+    /gh issue list\s*\\\s*\n\s*--label "hive:epic:\$\{EPIC_ID\}"\s*\\\s*\n\s*--label "hive:shipped"\s*\\\s*\n\s*--state closed/,
+  );
+  assert.match(yml, /--json number -q '\. \| length'/);
+});
+
+test('pe-4 promote step: 0/0 anomaly does NOT promote, equal counts call `gh pr ready`', () => {
+  const yml = readFile(YML_EXAMPLE);
+  // 0/0 anomaly guard short-circuits before promotion.
+  assert.match(yml, /if \[ "\$total" = "0" \];\s*then/);
+  assert.match(yml, /labels not propagated, NOT promoting/);
+  // Equality branch calls gh pr ready with the feat/<epic-id> branch.
+  assert.match(yml, /gh pr ready "feat\/\$\{EPIC_ID\}"\s*\|\|\s*true/);
+  // Inequality branch logs the partial-completion count.
+  assert.match(yml, /shipped; keeping draft/);
+});

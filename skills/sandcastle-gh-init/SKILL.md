@@ -113,6 +113,14 @@ node skills/sandcastle-gh-init/scaffold.mjs \
    - **Failure path unchanged.** `if: failure()` still flips the issue
      to `hive:failed` so a crashed bridge can never leave an issue
      stuck in `hive:in-flight`.
+   - **Promote-to-ready on last story (pe-4).** A dedicated
+     `Promote PR to ready if last story` step runs after the shipped
+     flip. It counts story-issues for the epic (`--label hive:story:*`
+     filter excludes any epic-tracker issue) and compares against the
+     shipped count; on parity it calls `gh pr ready "feat/<epic-id>"`,
+     otherwise it logs the in-progress count. A 0/0 result is treated
+     as a label-propagation anomaly and does NOT promote — no
+     false-positive ready flips.
 2. Renders `assets/sandcastle-hive-bridge.mts.tpl` -> `.github/scripts/sandcastle-hive-bridge.mts`
    with the same `SECRET_KEY` substituted.
    The rendered bridge derives its sandcastle branch name at run time:

@@ -220,6 +220,42 @@ jobs:
           gh issue comment "$ISSUE_NUMBER" \
             --body "Hive execute completed — see PR from \`$BRANCH\`."
 
+      - name: Promote PR to ready if last story
+        # pe-4: count epic stories vs shipped; flip draft -> ready on the
+        # last one. Story issues carry both `hive:epic:<id>` AND
+        # `hive:story:*`, so the `--label hive:story:*` filter excludes
+        # any epic-tracker issue (which has only `hive:epic:<id>`). A
+        # 0/0 result is treated as an anomaly (labels not propagated yet)
+        # and does NOT promote — keeps false-positives at zero.
+        if: success() && needs.derive.outputs.epic_id != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EPIC_ID: ${{ needs.derive.outputs.epic_id }}
+        run: |
+          set -euo pipefail
+          total=$(gh issue list \
+            --label "hive:epic:${EPIC_ID}" \
+            --label "hive:story:*" \
+            --state all \
+            -L 500 \
+            --json number -q '. | length')
+          shipped=$(gh issue list \
+            --label "hive:epic:${EPIC_ID}" \
+            --label "hive:shipped" \
+            --state closed \
+            -L 500 \
+            --json number -q '. | length')
+          if [ "$total" = "0" ]; then
+            echo "Epic ${EPIC_ID}: 0/0 — labels not propagated, NOT promoting"
+            exit 0
+          fi
+          if [ "$shipped" = "$total" ]; then
+            echo "Epic ${EPIC_ID}: ${shipped}/${total} shipped — promoting feat/${EPIC_ID} to ready"
+            gh pr ready "feat/${EPIC_ID}" || true
+          else
+            echo "Epic ${EPIC_ID}: ${shipped}/${total} shipped; keeping draft"
+          fi
+
       - name: On failure — label + comment
         # `if: failure()` fires even when the bridge step exits non-zero
         # (missing key, agent crash, timeout). This is the load-bearing
