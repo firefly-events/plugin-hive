@@ -1,6 +1,6 @@
 ---
 name: design
-description: Top-level UI design ceremony — wireframe a screen, component, flow, or marketing surface. Callable standalone or atomically from /plan. Composes brand-system, wireframe-protocol, ui-designer, hands off to /design-review.
+description: Design UI screens, components, flows, or marketing surfaces — wireframe + design-review handoff. Callable standalone or atomically from /plan. Composes brand-system, wireframe-protocol, ui-designer. Not for reviewing existing designs (use /design-review) or generating design tokens (use /design-system).
 ---
 
 # Hive Design
