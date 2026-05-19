@@ -201,6 +201,19 @@ const result = await run({
   // ubuntu-latest images → "UID mismatch" error.
   sandbox: docker({ imageName: "sandcastle:hive", containerUid: 1000 }),
   branchStrategy: { type: "branch", branch },
+  // Forward auth + gh CLI tokens into the container so the inner
+  // claude-code CLI sees CLAUDE_CODE_OAUTH_TOKEN (subscription OAuth)
+  // and the inner gh CLI sees GH_TOKEN. Mirrors hive/lib/sandcastle-
+  // worker-runner.js buildContainerEnv() (cron path). Without this,
+  // the inner agent crashes with "Not logged in · Please run /login".
+  env: {
+    ...(process.env.CLAUDE_CODE_OAUTH_TOKEN
+      ? { CLAUDE_CODE_OAUTH_TOKEN: process.env.CLAUDE_CODE_OAUTH_TOKEN }
+      : {}),
+    ...(process.env.GH_TOKEN
+      ? { GH_TOKEN: process.env.GH_TOKEN }
+      : {}),
+  },
   prompt,
   maxIterations: 5,
   idleTimeoutSeconds: 600,
