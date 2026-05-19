@@ -11,9 +11,9 @@ Atomic skill, NOT inline `/execute` prose. It resolves the pre-execution dispatc
 
 Call this skill once at the single `/execute` dispatch point where the caller has both the story execution context and the current workflow handoff context.
 
-**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, `HIVE_EXECUTION_MODE`, and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; and `arguments` containing the `--sequential` flag state plus dependency-depth summary.
+**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, `HIVE_EXECUTION_MODE`, and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; `arguments` containing the `--sequential` flag state plus dependency-depth summary; and `unblocked_stories[]` — the depth-0 ready stories at this dispatch tick, each carrying at minimum `id`, `parallel_allowed`, `parallel_rationale`, and (for `parallel_rationale: bounded-slice`) `files_to_modify[]` whose entries name the declared touch-set. Empty or single-element `unblocked_stories[]` is valid: the parallel-dispatch gate (Step 1.5) skips when there is no peer set to gate.
 
-**Outputs:** `mode_decision` enum `sessions | team | team-cmux | sequential | sandcastle`; `mode_reason` as a one-line string explaining the selected mode; `runner_path` enum `hive-dag | orchestrator-narrated`; `runner_reason` as a one-line string explaining the selected runner path; and `field_sources` map `{field_name: env|config|default}` covering `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor`, and `execution_mode` so callers can attribute every resolution.
+**Outputs:** `mode_decision` enum `sessions | team | team-cmux | sequential | sandcastle`; `mode_reason` as a one-line string explaining the selected mode; `runner_path` enum `hive-dag | orchestrator-narrated`; `runner_reason` as a one-line string explaining the selected runner path; `field_sources` map `{field_name: env|config|default}` covering `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor`, and `execution_mode` so callers can attribute every resolution; and `gate_violations[]` — a list of `{story_id, reason}` records emitted by Step 1.5 when the parallel-dispatch gate refuses fan-out. `gate_violations[]` is `[]` on healthy runs and on any `mode_decision` other than `team | team-cmux | sessions | sandcastle`.
 
 `field_sources.execution_mode` tracks the source of an explicit sandcastle override only: `env` when `HIVE_EXECUTION_MODE=sandcastle` wins, `config` when `execution.mode: sandcastle` from root `hive.config.yaml` wins, `default` when neither env nor config selects sandcastle (fall-through to the standard mode resolution chain). Unlike the four existing fields, `execution_mode=default` does NOT trigger the loud "fell to defaults" warning — default is the normal case for non-sandcastle runs. The `execution_mode={source}` token is always appended to the telemetry line regardless of source.
 
@@ -96,6 +96,36 @@ Evaluate in this order and stop at the first selected path:
 
 This preserves precedence: `sessions > team-cmux > team > sequential`.
 
+### Step 1.5: Parallel-Dispatch Gate (ed-7)
+
+**Precondition:** only reached when `mode_decision ∈ {team, team-cmux, sessions, sandcastle}` AND `unblocked_stories[]` has length > 1. When `mode_decision` is `sequential`, or when the peer set has fewer than two stories, skip this step entirely — there is no parallel fan-out to gate. The gate also runs when `mode_decision` is `sandcastle` because the sandcastle provider fans out one container per depth-0 story.
+
+The gate refuses parallel dispatch unless **every** story in `unblocked_stories[]` is properly annotated. Default-serial is the contract: a story without explicit opt-in MUST fall back to sequential dispatch. Initialize `gate_violations: []` and evaluate the following checks in order; record one record per offending story and continue (do NOT short-circuit on the first failure — the warning enumerates the full set so a single fix pass resolves all of them).
+
+1. **`parallel_allowed` opt-in check.** For each story whose `parallel_allowed` is absent, `false`, or any value other than the literal boolean `true`: append `{story_id, reason: "parallel_allowed-missing-or-false"}` to `gate_violations[]`. Stories with `parallel_allowed: false` are valid serial stories — they are listed here only because they appear in a fan-out set together with peers; the gate refuses to mix serial and parallel within one dispatch tick.
+
+2. **`parallel_rationale` shape check.** For each story where `parallel_allowed: true`, validate that `parallel_rationale` is present AND its value is exactly one of `variation`, `read-only`, `bounded-slice`. Any other value (missing, `null`, free-form string, typo) is **malformed**: append `{story_id, reason: "parallel_rationale-malformed"}` to `gate_violations[]`. Per [`story-yaml-schema.md`](../../../hive/references/story-yaml-schema.md) §4.3, missing or off-enum rationale is a hard validator-reject; a "parallel_allowed-without-rationale" story never reaches dispatch as if it were valid.
+
+3. **`bounded-slice` touch-set declaration check.** For each story with `parallel_rationale: bounded-slice`, validate that `files_to_modify` is present and non-empty AND every entry resolves to a non-empty string `file:` path. An empty list, missing field, or entries with no `file:` value is malformed for the bounded-slice rationale (only this rationale constrains the file set). Append `{story_id, reason: "bounded-slice-missing-files_to_modify"}`. Stories with `variation` or `read-only` rationale do NOT require a declared touch-set — the gate ignores `files_to_modify` for those rationales.
+
+4. **`bounded-slice` touch-set disjointness check.** Collect every `bounded-slice` story's declared `files_to_modify[*].file` values into per-story sets. Compute pairwise intersections across the bounded-slice subset. For every non-empty intersection, append one record per participating story: `{story_id, reason: "bounded-slice-overlap:<path1>,<path2>,...:<peer_id>"}`. The reason string names the overlapping paths and the peer story whose touch-set collides so the orchestrator's warning surfaces the exact conflict; if a path appears in three or more stories, each colliding pair generates its own record. Touch-set entries are compared as literal strings — the gate does NOT normalize paths (no symlink resolution, no glob expansion, no relative-vs-absolute coercion). Planners declaring `bounded-slice` must use the canonical path form `/plan` writes.
+
+If after all four checks `gate_violations[]` is non-empty: downgrade `mode_decision = sequential` and set `mode_reason = parallel-gate-refused`. Emit a structured warning to stdout that names every offending story ID and reason:
+
+```
+WARNING: parallel-dispatch gate refused — falling back to sequential. Offending stories:
+  - {story_id_1}: {reason_1}
+  - {story_id_2}: {reason_2}
+  ...
+Fix by editing planning emission (/plan Phase C step 13) or correcting the story YAML; see hive/references/parallel-call-sites.md and hive/references/story-yaml-schema.md §4.
+```
+
+If `gate_violations[]` is empty after all four checks: the mode resolved in Step 1 stands. Do not modify `mode_decision` or `mode_reason`. The empty `gate_violations[]` is still returned so callers can branch unconditionally on its length.
+
+> **Telemetry note:** the gate's pass/refuse outcome is captured by the orchestrator's post-run audit (see [`hive/references/gate-lift-telemetry.md`](../../../hive/references/gate-lift-telemetry.md)) via the `gate_violations[]` field on the dispatch return; no separate event emission lives in this skill.
+
+> **Scope reminder:** the gate inspects only the depth-0 `unblocked_stories[]` set passed to this skill call. Stories at later dependency depths are gated on their own subsequent dispatch tick when `/execute` re-enters this skill for the next peer set. See [`hive/references/parallel-call-sites.md`](../../../hive/references/parallel-call-sites.md) for the catalog of dispatch points subject to this gate.
+
 ### Step 2: Resolve Runner Path
 
 Evaluate the deterministic executor cutover as a five-stage decision tree. Default OFF: any miss returns `runner_path=orchestrator-narrated`.
@@ -116,4 +146,6 @@ When `runner_path=hive-dag`, the caller invokes `hive.lib.dag_executor.run_workf
 
 ## Single Dispatch Point
 
-This skill is the single dispatch point for `/execute` mode selection and executor-vs-orchestrator runner cutover. Callers must consume `mode_decision`, `mode_reason`, `runner_path`, and `runner_reason` from this skill instead of re-implementing the decision tree in another skill or workflow step. Other surfaces may use `hive.lib.dag_executor.executor_enabled_for(workflow_name)` only as the reader helper for the same runner gate, not as a separate policy layer.
+This skill is the single dispatch point for `/execute` mode selection, the parallel-dispatch gate (Step 1.5, `ed-7`), and the executor-vs-orchestrator runner cutover. Callers must consume `mode_decision`, `mode_reason`, `gate_violations[]`, `runner_path`, and `runner_reason` from this skill instead of re-implementing any of those decisions in another skill or workflow step. Other surfaces may use `hive.lib.dag_executor.executor_enabled_for(workflow_name)` only as the reader helper for the same runner gate, not as a separate policy layer.
+
+The parallel-dispatch gate is reachable from no other surface: any future skill that wants to fan stories out concurrently MUST do so through this dispatch point so the gate inspects its `unblocked_stories[]` set, and MUST add a row to [`hive/references/parallel-call-sites.md`](../../../hive/references/parallel-call-sites.md) §2 for the new dispatch shape.

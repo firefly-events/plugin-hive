@@ -160,6 +160,8 @@ See [`skills/hive/skills/planning-routing/SKILL.md`](../hive/skills/planning-rou
 
 ### Phase B: Design Discussion (always runs)
 
+> **Parallel-call-site annotation (audit pass):** `parallel_rationale: read-only` — the design-discussion team produces docs under `.pHive/epics/{id}/docs/`; no production code writes. Out-of-scope for the `ed-7` story-level fan-out gate (one team with N personas dispatched through [`planning-routing/SKILL.md`](../../skills/hive/skills/planning-routing/SKILL.md), not N independent stories); catalogued in [`hive/references/parallel-call-sites.md`](../../hive/references/parallel-call-sites.md) §3 (`plan:design-discussion-team`).
+
 4. **Produce design discussion (draft).** `SendMessage` to the technical writer with the `design-discussion` skill (`hive/references/document-templates/design-discussion.md`). Input: the research brief + the original user request. Output: a ~200-line design discussion document covering goal, proposed approach, risks, dependencies, open questions, and a scale assessment. Write the **draft** to `.pHive/epics/{epic-id}/docs/design-discussion.md` — Phase A2 (next step) grills it before the collaborative review gate.
 
 ### Phase A2: Adversarial Alignment (Grill)

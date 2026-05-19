@@ -2,6 +2,8 @@
 
 > `${HIVE_STATE_DIR}` resolves from `paths.state_dir` in the ROOT `hive.config.yaml` at runtime (not from the shipped baseline `hive/hive.config.yaml`). Default: `.pHive`.
 
+> **Parallel-dispatch gate (ed-7):** `TeamCreate` (this section) and the cmux variant (below) are two of the four in-scope dispatch points for the parallel gate. Each story listed in the prompt must already carry the `parallel_allowed: true` + `parallel_rationale ∈ {variation, read-only, bounded-slice}` pair emitted by `/plan` Phase C step 13, with `bounded-slice` stories declaring disjoint `files_to_modify[]`. The gate runs in `execute-dispatch` Step 1.5 *before* this section's prompt is generated — by the time you arrive here, the depth-0 `unblocked_stories[]` set has already been validated and `mode_decision` was downgraded to `sequential` on any violation. See [`hive/references/parallel-call-sites.md`](../../../hive/references/parallel-call-sites.md) §2 for the catalog of in-scope sites.
+
 Use the `TeamCreate` tool to spawn an agent team. Generate a natural-language team creation prompt that describes the epic and its tasks:
 
 ```
