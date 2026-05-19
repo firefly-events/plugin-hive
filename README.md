@@ -130,11 +130,11 @@ Six dedicated skills for design work — brand identity, wireframe ceremonies, d
 | Skill | Command | Purpose | Requires |
 |-------|---------|---------|---------|
 | **Brand System** | `/hive:brand-system` | Establish brand identity: colors (HEX/RGB/CMYK/PMS), typography, spacing. Produces `.pHive/brand/brand-system.yaml` + visual guide PNG via Frame0. | — |
-| **Design** | `/hive:design` | Top-level UI design ceremony — wireframe a screen, component, flow, or marketing surface. Callable standalone or atomically from `/plan`. Produces wireframes under `.pHive/design/<topic>/` and a handoff record in `.pHive/design/index.yaml`. | — (brand-system preferred but optional) |
-| **Design System** | `/hive:design-system` | Convert brand system into W3C Design Token JSON for frontend tooling (Tailwind, Figma, Style Dictionary). | `/hive:brand-system` first |
+| **Design** | `/hive:design` | Design UI screens, components, flows, or marketing surfaces — wireframe + design-review handoff. Callable standalone or atomically from `/plan`. Produces wireframes under `.pHive/design/<topic>/` and a handoff record in `.pHive/design/index.yaml`. Not for reviewing existing designs (use `/hive:design-review`) or generating tokens (use `/hive:design-system`). | — (brand-system preferred but optional) |
+| **Design System** | `/hive:design-system` | Generate W3C Design Token JSON from an existing brand-system YAML, for frontend tooling (Tailwind, Figma, Style Dictionary). Not for establishing a new brand identity (use `/hive:brand-system`). | `/hive:brand-system` first |
 | **Polish Audit** | `/hive:polish-audit` | Animation and motion opportunity pass — identifies micro-interactions, loading states, and delight improvements. | `/hive:design-review --artifact-target implementation` first |
 | **Visual QA** | `/hive:visual-qa` | Post-implementation fidelity check — compares design briefs and wireframe PNGs against the actual implementation. | `/hive:design` on a story first |
-| **Design Review** | `/hive:design-review` | Target-aware design or implementation review — domain critiques from accessibility and animations specialists, synthesized by ui-designer. Supports `--artifact-target {design\|implementation}`, `--skip accessibility`, and `--skip animations`. | `/hive:design`, `/hive:brand-system`, or implementation artifacts |
+| **Design Review** | `/hive:design-review` | Review existing UI designs and implementations against a brief — domain critiques from accessibility and animations specialists, synthesized by ui-designer. Supports `--artifact-target {design\|implementation}`, `--skip accessibility`, and `--skip animations`. Not for creating new designs (use `/hive:design`). | `/hive:design`, `/hive:brand-system`, or implementation artifacts |
 
 ### Migration
 

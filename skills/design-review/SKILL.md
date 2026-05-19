@@ -1,6 +1,6 @@
 ---
 name: design-review
-description: Target-aware UI review ceremony for design artifacts or implementation artifacts. Supports --artifact-target {design|implementation} plus --skip flags for optional participants.
+description: Review existing UI designs and implementations against a brief — structured critique of wireframes, brand artifacts, or running code. Supports --artifact-target {design|implementation} plus --skip flags for optional participants. Not for creating new designs (use /design).
 ---
 
 # Hive Design Review

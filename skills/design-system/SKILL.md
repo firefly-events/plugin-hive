@@ -1,6 +1,6 @@
 ---
 name: design-system
-description: Convert brand-system YAML into W3C Design Token JSON plus a visual HTML preview of the tokens in use. Gates on .pHive/brand/brand-system.yaml.
+description: Generate W3C Design Token JSON from an existing brand-system YAML, plus a visual HTML preview of the tokens in use. Gates on .pHive/brand/brand-system.yaml. Not for establishing a new brand identity (use /brand-system).
 ---
 
 # Hive Design System
