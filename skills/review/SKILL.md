@@ -85,9 +85,30 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
    - **needs_optimization** — No blockers, but improvements recommended
    - **needs_revision** — Critical issues that must be addressed before merge
 
+6. **Emit scope_drift_score (review completion).** After the verdict is rendered, call `hive/lib/scope_drift.py::emit_scope_drift(...)` once. `expected_scope` = the file list the review was scoped to (PR diff or branch diff); `delivered_scope` = the file list the reviewer actually evaluated (divergence signals scope narrowing). `delta_reasons` carries enum values from [cycle-state-schema.md](../../hive/references/cycle-state-schema.md) when scope was narrowed (e.g. `['deferred']`).
+
+   ```bash
+   python3 -c "
+   from hive.lib.scope_drift import emit_scope_drift
+   emit_scope_drift(
+       run_id='{review-run-id}',
+       phase_label='review:complete',
+       expected_scope={file paths in the diff},
+       delivered_scope={file paths the reviewer actually evaluated},
+       delta_reasons={[] when scope matched; else enum values},
+       proposal_id='{pr-number-or-branch}',
+       skill='review',
+       extra_dimensions={'verdict': '<passed|needs_optimization|needs_revision>'},
+   )
+   "
+   ```
+
+   The maturity gate from story `ed-1-maturity-helper` skips emit on greenfield/early projects and logs once per run. Fire-and-forget — no new error handling.
+
 ## Key References
 
 - `hive/agents/reviewer.md` — reviewer persona and verdict format
 - [code-review-integration.md](../../hive/references/code-review-integration.md) — Hive verdict mapping and ACR coexistence guidance
 - `hive/agents/researcher.md` — analysis persona
 - `hive/references/episode-schema.md` — episode record format
+- `hive/lib/scope_drift.py` — scope-drift scoring + emit helper called at review completion (see step 6 above)

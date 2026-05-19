@@ -155,6 +155,10 @@ The MVP event schema must represent these metric types and no extra registry sha
   - Expected `value` type: boolean
   - Expected `unit`: `bool`
   - Source note: emitted when a run records escalation to a human path.
+- `scope_drift_score`
+  - Expected `value` type: number (ordinal `0..3`)
+  - Expected `unit`: `bucket`
+  - Source note: emitted at phase boundaries by `hive/lib/scope_drift.py` (story `ed-3-drift-metric-emit`) from `/plan`, `/execute`, `/review`, and `/standup`. Scores a phase's `expected_scope` vs `delivered_scope` (and any `delta_reasons`) into one of four buckets — `none` (0), `minor` (1), `major` (2), `divergent` (3). The string bucket label travels in `dimensions.bucket`; the `value` field carries the ordinal so consumers that bucket-aggregate (sum, average) get useful arithmetic on the row set. Emits are skipped on `project_maturity ∈ {greenfield, early}` per story `ed-1-maturity-helper`. See [`../../hive/references/cycle-state-schema.md`](../../hive/references/cycle-state-schema.md) § Phase records for the scope-field shape the helper consumes, and [`../../hive/references/cross-swarm-handoff.md`](../../hive/references/cross-swarm-handoff.md) § `delta_reasons` enum for the enum values that cap or accent the score (`blocked` caps at `minor`).
 
 ## 5. Dimensions
 

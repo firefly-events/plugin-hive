@@ -158,6 +158,8 @@ See [`skills/hive/skills/planning-routing/SKILL.md`](../hive/skills/planning-rou
 
 3. **Load cross-cutting concerns.** Check for `.pHive/cross-cutting-concerns.yaml`. If found, load the concerns — they will be evaluated per-story later. See `hive/references/cross-cutting-concerns.md`.
 
+3z. **Emit scope_drift_score (Phase A boundary).** Call `hive/lib/scope_drift.py::emit_scope_drift(...)` with `phase_label='plan:phase-a'` and the phase's `expected_scope` / `delivered_scope` / `delta_reasons` from cycle state. See the **Scope-drift emit** section below for the invocation pattern. Skipped automatically when project_maturity ∈ {greenfield, early}.
+
 ### Phase B: Design Discussion (always runs)
 
 4. **Produce design discussion (draft).** `SendMessage` to the technical writer with the `design-discussion` skill (`hive/references/document-templates/design-discussion.md`). Input: the research brief + the original user request. Output: a ~200-line design discussion document covering goal, proposed approach, risks, dependencies, open questions, and a scale assessment. Write the **draft** to `.pHive/epics/{epic-id}/docs/design-discussion.md` — Phase A2 (next step) grills it before the collaborative review gate.
@@ -196,6 +198,8 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
    - **Medium** (multi-file, multiple layers, cross-stack): needs H/V planning to slice correctly → Phase B2 (unless `--fast`, which skips H/V entirely)
    - **Large** (multi-system, migration, long-horizon): needs full H/V + structured outline with elicitation → Phase B2 + B3
 
+5z. **Emit scope_drift_score (Phase B boundary).** After the routing decision is announced, call `emit_scope_drift(...)` with `phase_label='plan:phase-b'`. The Phase B record covers research-brief plus design-discussion deliverables — see the **Scope-drift emit** section below.
+
 ### Phase B2: Horizontal + Vertical Planning (medium and large scope)
 
 6. **TPM plans the delivery.** `SendMessage` to the TPM with the design discussion, user feedback, research brief, and any architect outputs. The TPM:
@@ -220,6 +224,8 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
    - Is the first slice thin enough to be a real proof of concept?
    - Does each slice produce a genuinely working state?
    - Are deferred items acceptable?
+
+8z. **Emit scope_drift_score (Phase B2 boundary).** Call `emit_scope_drift(...)` with `phase_label='plan:phase-b2'` once the H/V gate resolves (or auto-proceed fires for Medium). Skip when Phase B2 was bypassed (Small scope, or Medium + `--fast`) — there is no boundary to emit. See the **Scope-drift emit** section below.
 
 ### Phase B3: Structured Outline (large scope only)
 
@@ -251,6 +257,8 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     ```
 
     Apply the same pattern at the two other waiting-on-user pauses in /plan: design-discussion review (Phase B) gate uses `--object "waiting-user-input-design-discussion"`, and H/V plan review gate uses `--object "waiting-user-input-hv-plan-review"`. Gate-name slugs are kebab-stable so /meta-optimize can group by gate. Add no new error handling — the CLI is silent on failure by design.
+
+10z. **Emit scope_drift_score (Phase B3 boundary).** Once structured-outline sign-off is captured, call `emit_scope_drift(...)` with `phase_label='plan:phase-b3'`. Skip when Phase B3 was bypassed (Small or Medium scope) — only Large reaches this emit. See the **Scope-drift emit** section below.
 
 ### Phase C: Story Decomposition
 
@@ -509,6 +517,8 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
       event-detail --> e2e-tests
     ```
     ````
+
+18z. **Emit scope_drift_score (Phase C boundary).** After the user confirms the plan in step 18 (or the silent-confirm path resolves), call `emit_scope_drift(...)` with `phase_label='plan:phase-c'` before publishing to the tracker. The Phase C scope record covers story IDs / cross-cutting evaluation / metric blocks — see the **Scope-drift emit** section below.
 
 ### Phase D: Publishing stories to the task tracker
 
@@ -881,6 +891,53 @@ All planning documents are written to `.pHive/epics/{epic-id}/docs/{document-typ
 
 Existing planning documents at the `.pHive/` root are not moved — this convention applies to new planning sessions going forward.
 
+## Scope-drift emit (per-phase boundary)
+
+At the close of each named phase (A, B, B2, B3, C) emit one
+`scope_drift_score` event row via `hive/lib/scope_drift.py`. The helper
+applies the maturity gate from story `ed-1-maturity-helper` — emits are
+skipped on greenfield/early projects and logged once per run.
+
+Use the Python module surface (no new CLI):
+
+```bash
+python3 -c "
+from hive.lib.scope_drift import emit_scope_drift
+emit_scope_drift(
+    run_id='{run-id}',                   # this /plan run identifier
+    phase_label='plan:phase-{a|b|b2|b3|c}',
+    expected_scope={list of items the phase declared up-front},
+    delivered_scope={list of items the phase actually produced},
+    delta_reasons={zero or more enum values from cycle-state-schema.md},
+    proposal_id='{epic-id}',             # planning is epic-scoped, not story-scoped
+    skill='plan',
+)
+"
+```
+
+`expected_scope` / `delivered_scope` / `delta_reasons` follow the
+schema documented in
+[`hive/references/cycle-state-schema.md`](../../hive/references/cycle-state-schema.md)
+§ Phase records — pull them from the phase's `phase_records[]` entry on
+the cycle state. The helper buckets to one of `{none, minor, major,
+divergent}` (string label in `dimensions.bucket`; ordinal `0..3` in
+`value`). See
+[`.pHive/metrics/metrics-event.schema.md`](../../.pHive/metrics/metrics-event.schema.md)
+§4 for the registry entry.
+
+Concrete boundary points:
+
+- **End of Phase A** — after step 3 (cross-cutting concerns loaded). `phase_label='plan:phase-a'`.
+- **End of Phase B** — after step 5 (design-discussion presented + routing decision announced). `phase_label='plan:phase-b'`.
+- **End of Phase B2** — after step 8 (H/V gate resolved). `phase_label='plan:phase-b2'`. Skip when scope routed Small → emit nothing.
+- **End of Phase B3** — after step 10 (structured outline signed off). `phase_label='plan:phase-b3'`. Skip when scope routed Small or Medium.
+- **End of Phase C** — after step 14 (stories decomposed + validated, before Phase D publishes). `phase_label='plan:phase-c'`.
+
+The emit is fire-and-forget — the helper raises only on
+`MetricsValidationError` (programming error), never on missing
+`project-profile.yaml` or absent ed-1 helper. Do not wrap with
+additional error handling.
+
 ## Key References
 
 - `hive/references/agent-ready-checklist.md` — 9-point story validation
@@ -896,3 +953,4 @@ Existing planning documents at the `.pHive/` root are not moved — this convent
 - `skills/hive/skills/agent-spawn/SKILL.md` — persona injection, memory loading, path resolution
 - `hive/references/document-templates/design-discussion.md` — ~200-line brain dump format
 - `hive/references/document-templates/structured-outline.md` — ~1000-line detailed plan with elicitation
+- `hive/lib/scope_drift.py` — scope-drift scoring + emit helper called from each phase boundary (see Scope-drift emit section above)
