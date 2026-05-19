@@ -20,8 +20,8 @@ Source story: [`ed-3-drift-metric-emit`](../../.pHive/epics/exec-discipline-may2
 | `unit` | `bucket` |
 | `value` kind | `number` (ordinal 0..3 — see `hive/lib/scope_drift.BUCKETS`) |
 | `value` mapping | `0=none, 1=minor, 2=major, 3=divergent` |
-| `dimensions.bucket` | The human-readable label (same set: `none|minor|major|divergent`). Filter on this rather than re-deriving from the ordinal. |
-| `dimensions.phase_label` | Phase boundary identifier — e.g. `plan:phase-a`, `execute:story-research`, `review:complete`, `standup:complete`. |
+| `dimensions.bucket` | The human-readable label (same set: `none` / `minor` / `major` / `divergent`). Filter on this rather than re-deriving from the ordinal. |
+| `dimensions.phase_label` | Phase boundary identifier — one of `plan:phase-c`, `execute:story`, `review:complete` (the three retained emit sites — see § Emit sites). |
 | `dimensions.skill` | Originating skill: `plan` / `execute` / `review` / `standup`. |
 | `dimensions.delta_reasons` | Echo of the input `delta_reasons[]` enum (per `cycle-state-schema.md`). |
 | Required scope key | One of `story_id` or `proposal_id` (XOR — the metrics core validator enforces this). `emit_scope_drift` defaults `proposal_id` to `"runtime:" + phase_label` when neither is passed. |
