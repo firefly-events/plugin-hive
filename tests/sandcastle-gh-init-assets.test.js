@@ -33,11 +33,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+// Note: prior layout had `skills/hive/skills/sandcastle-gh-init/assets/`;
+// the assets now live under `skills/sandcastle-gh-init/assets/` (verified
+// 2026-05-18 via the only on-disk copy of `sandcastle-hive-bridge.mts.tpl`).
+// Fixing this stale path while in the file for pe-2 — flagged in report.
 const ASSETS = path.join(
   __dirname,
   '..',
-  'skills',
-  'hive',
   'skills',
   'sandcastle-gh-init',
   'assets'
@@ -235,14 +237,48 @@ test('bridge imports run + claudeCode from @ai-hero/sandcastle and docker sandbo
   assert.match(mts, /import \{ docker \} from "@ai-hero\/sandcastle\/sandboxes\/docker";/);
 });
 
-test('bridge invokes run() with branch agent/issue-<n> and cost controls', () => {
+test('bridge invokes run() with derived branch and cost controls (pe-2)', () => {
   const mts = readFile(MTS_EXAMPLE);
   assert.match(mts, /agent: claudeCode\("claude-opus-4-7"\)/);
   assert.match(mts, /sandbox: docker\(\)/);
   assert.match(mts, /branchStrategy: \{ type: "branch", branch \}/);
   assert.match(mts, /maxIterations:\s*5/);
   assert.match(mts, /idleTimeoutSeconds:\s*600/);
-  assert.match(mts, /const branch = `agent\/issue-\$\{issueNumber\}`;/);
+  // pe-2: branch is no longer a single hard-coded const — it is derived
+  // from the issue's hive:epic:<id> label + resolved branch_strategy.
+  // Verify both legs of the derivation are present literally.
+  assert.match(mts, /agent\/issue-\$\{issueNumber\}/);
+  assert.match(mts, /feat\/\$\{epicId\}/);
+});
+
+// ---------------------------------------------------------------------------
+// pe-2: epic-label-driven branch derivation
+// ---------------------------------------------------------------------------
+
+test('pe-2 bridge derives epicId from hive:epic:<id> label and imports resolveGitFlow dynamically', () => {
+  const mts = readFile(MTS_EXAMPLE);
+  // Epic id derivation from labels — matches the design-discussion excerpt.
+  assert.match(mts, /labels\s*\.find\(\(l\)\s*=>\s*l\.startsWith\("hive:epic:"\)\)/,
+    'bridge must derive epicId by scanning labels for "hive:epic:" prefix');
+  // Dynamic import of the pe-1 resolution helper, anchored at repoRoot.
+  assert.match(mts, /await import\(.*hive\/lib\/git_flow\.mjs.*\)/s,
+    'bridge must dynamically import hive/lib/git_flow.mjs (pe-1 helper)');
+  assert.match(mts, /path\.resolve\(repoRoot,\s*["']hive\/lib\/git_flow\.mjs["']\)/,
+    'helper path must be resolved from repoRoot, not hard-coded');
+  assert.match(mts, /resolveGitFlow\(\{\s*cwd:\s*repoRoot\s*\}\)/,
+    'bridge must call resolveGitFlow({ cwd: repoRoot })');
+});
+
+test('pe-2 .example mirror matches .tpl after default substitution', () => {
+  // Independent parity check from the snapshot test above — distinct
+  // assertion so a regression here is immediately readable in the
+  // failing-test name. Keeps the pe-2 AC4 contract auditable.
+  const tpl = readFile(MTS_TPL);
+  const rendered = render(tpl, { SECRET_KEY: DEFAULT_SECRET_KEY });
+  const expected = readFile(MTS_EXAMPLE);
+  assert.equal(rendered, expected,
+    'pe-2: sandcastle-hive-bridge.example.mts must mirror the .tpl ' +
+    'after substituting {{SECRET_KEY}} with the default ANTHROPIC_API_KEY.');
 });
 
 // ---------------------------------------------------------------------------

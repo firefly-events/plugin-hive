@@ -85,6 +85,21 @@ node skills/sandcastle-gh-init/scaffold.mjs \
    with the chosen `RUNNER` and `SECRET_KEY` substituted.
 2. Renders `assets/sandcastle-hive-bridge.mts.tpl` -> `.github/scripts/sandcastle-hive-bridge.mts`
    with the same `SECRET_KEY` substituted.
+   The rendered bridge derives its sandcastle branch name at run time:
+   - Fetches the issue's labels via the GitHub REST API (uses `GH_TOKEN`
+     and `GITHUB_REPOSITORY` — never shells out, preserving the AC-7
+     no-child_process invariant).
+   - Looks for a `hive:epic:<epic-id>` label and dynamically imports
+     `hive/lib/git_flow.mjs` (when vendored) to read the resolved
+     `branch_strategy`.
+   - When `branch_strategy: per-epic` (default per pe-1) and an epic
+     label is present, the branch is `feat/<epic-id>`. Otherwise — no
+     epic label, or `branch_strategy: per-story` configured — it falls
+     back to the legacy `agent/issue-<n>` form.
+   - When the helper module is absent (consumer has not vendored
+     plugin-hive's `hive/lib/`), the bridge defaults to `per-epic`
+     semantics so epic-labeled issues still consolidate onto
+     `feat/<epic-id>`.
 3. Reads the sandcastle version pin from
    `node_modules/@ai-hero/sandcastle/package.json`, with `npm ls
    @ai-hero/sandcastle --json --depth=0` as a fallback for hoisted layouts.
