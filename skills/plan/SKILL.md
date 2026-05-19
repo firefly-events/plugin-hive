@@ -428,7 +428,52 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Customize step descriptions per story as needed — these templates provide the ordering and agent assignments. For low-complexity stories, the `research` step may be skipped regardless of methodology.
 
-    **Parallel-dispatch opt-in (optional).** Stories default to serial dispatch. To mark a story safe for concurrent execution with its peers, emit two top-level fields per [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §4: `parallel_allowed: true` plus a `parallel_rationale` of `variation`, `read-only`, or `bounded-slice`. Omit both fields when in doubt — the default is serial. A `parallel_rationale` without `parallel_allowed: true` is ignored at validation time (warning, not failure); `parallel_allowed: true` without a valid rationale is malformed and rejected. This pair is what the `/execute` parallel-dispatch gate (ed-7) consumes — free-text "safe to parallelize" comments do not satisfy it.
+    **Parallel-dispatch flag emission.** Stories default to serial dispatch — **omit both fields = serial**. When you intend a story to run concurrently with its dependency-graph peers, emit the two top-level fields documented at [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §4: `parallel_allowed: true` plus a bounded `parallel_rationale`. Pick the rationale by what the story does, not by author preference:
+
+    | Story shape | Rationale to emit | Additional fields required |
+    |---|---|---|
+    | Research, audit, validation, or any other read-only work that writes only reports/analysis under `.pHive/` and does not touch production code, runtime config, or another story's outputs | `read-only` | — |
+    | One of N near-identical stories applying the same template to disjoint targets (UI A/B variants, sibling-module refactors, approach alternates) | `variation` | — |
+    | A story that writes to a narrow, explicitly declared slice of the codebase that does not overlap any concurrent story's slice | `bounded-slice` | non-empty `files_to_modify:` whose entries name the touch-set the `/execute` lint will check for disjointness |
+
+    Rules:
+    - **Default is omit.** When in doubt, emit neither field — serial is always safe; the parallel gate (`ed-7`) refuses to dispatch a story concurrently when the pair is absent. Do not pad serial stories with `parallel_allowed: false` — the omitted form is canonical.
+    - **`parallel_allowed: true` requires `parallel_rationale`** set to exactly one of `variation`, `read-only`, `bounded-slice`. Any other value (or missing rationale) is malformed and will be rejected by the validator.
+    - **`bounded-slice` is the only rationale that constrains the file set.** Stories emitting `parallel_rationale: bounded-slice` MUST carry a non-empty top-level `files_to_modify:` list whose entries name the slice — the disjointness lint in `ed-7-execute-enforces-gate` can only check the slice boundary against a declared touch-set. A `bounded-slice` story with empty or absent `files_to_modify:` is malformed.
+    - **Free-text justifications do not satisfy the gate.** Prose like "should be safe to run in parallel" in description/notes is invisible to the validator. The bounded enum is the contract; `/execute` consumes the pair and refuses dispatch when either is malformed.
+
+    **Worked example — three stories from a hypothetical epic of five.** The three independent stories below ship with the pair; two implicitly-serial siblings (a design-discussion follow-on and a final integration) carry neither field:
+
+    ```yaml
+    # 1. Read-only audit — analysis report only, touches no production code
+    id: audit-skill-prompt-token-budgets
+    depends_on: []
+    parallel_allowed: true
+    parallel_rationale: read-only
+    files_to_modify:
+      - file: .pHive/audits/skill-token-budgets/report.md
+        change: write the audit report
+    # ---
+    # 2. Variation refactor — one of seven sibling-module extractions
+    id: ui-cluster-extract-config-header
+    depends_on: [ui-cluster-extract-config-base]
+    parallel_allowed: true
+    parallel_rationale: variation
+    files_to_modify:
+      - file: src/components/ClusterHeader.tsx
+        change: extract ClusterHeaderConfig
+    # ---
+    # 3. Bounded-slice — narrow declared write surface, disjoint from peers
+    id: cmux-add-logging-hook
+    depends_on: [cmux-pane-spawn-base]
+    parallel_allowed: true
+    parallel_rationale: bounded-slice
+    files_to_modify:
+      - file: hive/lib/cmux/pane_hooks.mjs
+        change: register new "log" hook
+    ```
+
+    The fields slot in after `depends_on:` and before `description:` per schema §4. `files_to_modify:` keeps its conventional position alongside other context fields. Downstream, `/execute`'s parallel-dispatch gate (`ed-7-execute-enforces-gate`) reads the pair to decide concurrent-dispatch eligibility, and feeds `bounded-slice` stories' `files_to_modify:` touch-sets into the disjointness lint.
 
 14. **Evaluate cross-cutting concerns per story.** For each story, evaluate each concern's `applies_when` condition. For applicable concerns, determine the specific action needed and add a `cross_cutting` section to the story YAML. See `hive/references/cross-cutting-concerns.md` for format and examples.
 
@@ -501,16 +546,23 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
       x-99-thin-opt-out — metric.justification is one word ("N/A")
     ```
 
-    Example dependency graph:
+    **Parallel annotation on the dependency graph.** Stories that emitted `parallel_allowed: true` (per step 13) MUST be visually annotated on the rendered graph so the user can audit the parallel decisions alongside the dependency edges. Annotate using Mermaid node labels of the form `node-id["story-id ‖ <rationale>"]`, where `<rationale>` is the bounded enum value (`variation` | `read-only` | `bounded-slice`). The `‖` glyph (double vertical bar) is the visual marker for "parallel-eligible" and reads as "parallel to its peers." Serial stories (no `parallel_allowed: true`) render as plain node IDs — do not annotate them. The annotation is rendered output only; it does not change the underlying YAML.
+
+    Example dependency graph (mixing serial and parallel-eligible stories):
     ````
     ```mermaid
     graph LR
       cache-layer --> api-integration
-      cache-layer --> event-detail
+      cache-layer --> event-detail["event-detail ‖ variation"]
+      cache-layer --> mobile-detail["mobile-detail ‖ variation"]
+      audit-token-budgets["audit-token-budgets ‖ read-only"]
       api-integration --> e2e-tests
       event-detail --> e2e-tests
+      mobile-detail --> e2e-tests
     ```
     ````
+
+    In the example above, `event-detail` and `mobile-detail` are `variation` siblings of the same refactor template, `audit-token-budgets` is a standalone `read-only` story with no dependents, and the remaining nodes are serial.
 
 18z. **Emit scope_drift_score (Phase C boundary).** After the user confirms the plan in step 18 (or the silent-confirm path resolves), call `emit_scope_drift(...)` with `phase_label='plan:phase-c'` before publishing to the tracker. The Phase C scope record covers story IDs / cross-cutting evaluation / metric blocks — see the **Scope-drift emit** section below.
 
@@ -868,6 +920,7 @@ All diagrams in Hive output (dependency graphs, flow diagrams) use **Mermaid** s
 - Use `graph TD` (top-down) for hierarchical or flow diagrams
 - Arrow syntax: `story-a --> story-b` means story-b depends on story-a
 - Keep node IDs matching story IDs for consistency
+- For parallel-eligible stories (those that emit `parallel_allowed: true` in step 13), annotate the node label as `story-id["story-id ‖ <rationale>"]` where `<rationale>` is the bounded enum value (`variation` | `read-only` | `bounded-slice`). The `‖` glyph signals "parallel to its peers." Serial stories render with plain node IDs.
 
 ## Planning Document Paths
 
