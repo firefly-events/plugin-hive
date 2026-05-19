@@ -207,8 +207,8 @@ const result = await run({
   // worker-runner.js buildContainerEnv() (cron path). Without this,
   // the inner agent crashes with "Not logged in · Please run /login".
   env: {
-    ...(process.env.CLAUDE_CODE_OAUTH_TOKEN
-      ? { CLAUDE_CODE_OAUTH_TOKEN: process.env.CLAUDE_CODE_OAUTH_TOKEN }
+    ...(process.env["CLAUDE_CODE_OAUTH_TOKEN"]
+      ? { ["CLAUDE_CODE_OAUTH_TOKEN"]: process.env["CLAUDE_CODE_OAUTH_TOKEN"] }
       : {}),
     ...(process.env.GH_TOKEN
       ? { GH_TOKEN: process.env.GH_TOKEN }
