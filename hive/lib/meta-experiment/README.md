@@ -13,6 +13,8 @@ Submodules:
 - `baseline`
 - `compare` (shipped in L1.4)
 - `promotion_adapter`
+- `direct_commit_adapter`
+- `pr_promotion_adapter`
 - `rollback_watch`
 - `closure_validator`
 
