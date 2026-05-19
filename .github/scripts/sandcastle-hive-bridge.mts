@@ -78,7 +78,13 @@ const result = await run({
   // `sandcastle:<cwd-basename>` = `sandcastle:plugin-hive`, which the
   // workflow never builds/retags → run fails with
   // "Image 'sandcastle:plugin-hive' not found locally".
-  sandbox: docker({ imageName: "sandcastle:hive" }),
+  //
+  // containerUid pinned to 1000 so the pre-built GHCR image works on
+  // any runner regardless of the runtime `id -u` value. The image is
+  // built with AGENT_UID=1000 in build-sandcastle-image.yml; sandcastle
+  // defaults to matching runtime `id -u`, which can be 1001 on newer
+  // ubuntu-latest images → "UID mismatch" error.
+  sandbox: docker({ imageName: "sandcastle:hive", containerUid: 1000 }),
   branchStrategy: { type: "branch", branch },
   prompt,
   maxIterations: 5,
