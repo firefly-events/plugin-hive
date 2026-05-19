@@ -199,21 +199,23 @@ const result = await run({
   // built with AGENT_UID=1000 in build-sandcastle-image.yml; sandcastle
   // defaults to matching runtime `id -u`, which can be 1001 on newer
   // ubuntu-latest images → "UID mismatch" error.
-  sandbox: docker({ imageName: "sandcastle:hive", containerUid: 1000 }),
+  // Forward auth + gh CLI tokens via the SANDBOX provider's env (matches
+  // hive/lib/sandcastle-worker-runner.js cron pattern exactly — passing
+  // these via `run({ env })` failed at runtime). Without this the inner
+  // claude-code CLI crashes with "Not logged in · Please run /login".
+  sandbox: docker({
+    imageName: "sandcastle:hive",
+    containerUid: 1000,
+    env: {
+      ...(process.env["{{SECRET_KEY}}"]
+        ? { ["{{SECRET_KEY}}"]: process.env["{{SECRET_KEY}}"] }
+        : {}),
+      ...(process.env.GH_TOKEN
+        ? { GH_TOKEN: process.env.GH_TOKEN }
+        : {}),
+    },
+  }),
   branchStrategy: { type: "branch", branch },
-  // Forward auth + gh CLI tokens into the container so the inner
-  // claude-code CLI sees CLAUDE_CODE_OAUTH_TOKEN (subscription OAuth)
-  // and the inner gh CLI sees GH_TOKEN. Mirrors hive/lib/sandcastle-
-  // worker-runner.js buildContainerEnv() (cron path). Without this,
-  // the inner agent crashes with "Not logged in · Please run /login".
-  env: {
-    ...(process.env["{{SECRET_KEY}}"]
-      ? { ["{{SECRET_KEY}}"]: process.env["{{SECRET_KEY}}"] }
-      : {}),
-    ...(process.env.GH_TOKEN
-      ? { GH_TOKEN: process.env.GH_TOKEN }
-      : {}),
-  },
   prompt,
   maxIterations: 5,
   idleTimeoutSeconds: 600,
