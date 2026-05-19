@@ -180,7 +180,7 @@ Examples:
 - `default_pr_base: main` pins to `main` and skips the `origin/develop` probe.
 - `default_pr_base: dev/hive-2.0` lets you point all epic PRs at an integration branch for a milestone.
 
-The bridge prefers a pinned value in the epic's `.pHive/epics/<epic-id>/epic.yaml` (emitted by `/plan` Phase A 0a — see `hive/references/story-yaml-schema.md` §5) over the live config, so a config drift mid-epic does not retroactively shift the branching target.
+The bridge prefers a pinned value in the epic's `.pHive/epics/<epic-id>/epic.yaml` (emitted by `/plan` Phase A 0a — see `hive/references/story-yaml-schema.md` §6) over the live config, so a config drift mid-epic does not retroactively shift the branching target.
 
 ### 3.3 Back-compat — `branch_strategy: per-story`
 
