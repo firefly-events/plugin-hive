@@ -77,25 +77,6 @@ Failure modes:
 
 **Daily restart model:** The orchestrator starts fresh each day with a 1M context window. The standup phase compresses prior state into the new session via status markers, cycle state, and task tracker — not by resuming a prior conversation.
 
-**Scope-drift emit at standup completion.** After Phase 1 finishes (the report is presented and before Phase 2 begins), call `hive/lib/scope_drift.py::emit_scope_drift(...)` once for this ceremony. `expected_scope` is the set of surfacing categories Phase 1 declared (in-flight epics, open triage items, metric verdicts); `delivered_scope` is what the report actually rendered. Divergence typically means an upstream source was unreadable (parse_error stories, missing triage queue, etc.) — pass `delta_reasons=['blocked']` in that case so the bucket caps at `minor`.
-
-```bash
-python3 -c "
-from hive.lib.scope_drift import emit_scope_drift
-emit_scope_drift(
-    run_id='{ceremony-run-id}',
-    phase_label='standup:complete',
-    expected_scope={planned surfacing categories},
-    delivered_scope={categories actually rendered in the report},
-    delta_reasons={[] on healthy run; ['blocked'] when a source was unreadable},
-    proposal_id='daily-ceremony',
-    skill='standup',
-)
-"
-```
-
-The maturity gate from story `ed-1-maturity-helper` skips emit on greenfield/early projects and logs once per run. Fire-and-forget — no new error handling.
-
 ## Anthropic Routines (Recommended Scheduler)
 
 For scheduled daily ceremony runs, use Anthropic Routines as the recommended scheduler. Routines should own the cron schedule and webhook delivery, while Hive continues to run the same `daily-ceremony.workflow.yaml` described above.
@@ -127,4 +108,3 @@ This recommendation is additive only. Manual invocation via `/hive:standup` rema
 - `hive/agents/orchestrator.md` — orchestrator coordination guidance
 - [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3 — `metric:` block shape that the Metrics health section reads
 - [`skills/metrics-check/SKILL.md`](../metrics-check/SKILL.md) — verdict computation (the writer of the `metric.verdict:` sub-block Phase 1 surfaces)
-- `hive/lib/scope_drift.py` — scope-drift scoring + emit helper called at standup completion (see Phase 1 wrap-up above)

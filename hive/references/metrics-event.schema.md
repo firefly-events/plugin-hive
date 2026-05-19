@@ -55,17 +55,23 @@ rather than `null` rows, keeping aggregations clean.
 
 | Skill | Boundary | `phase_label` |
 |-------|----------|---------------|
-| `/plan` | Phase A complete | `plan:phase-a` |
-| `/plan` | Phase B complete | `plan:phase-b` |
-| `/plan` | Phase B2 complete (medium+large) | `plan:phase-b2` |
-| `/plan` | Phase B3 complete (large only) | `plan:phase-b3` |
-| `/plan` | Phase C complete | `plan:phase-c` |
-| `/execute` | Each story phase boundary | `execute:{phase}` |
+| `/plan` | Phase C complete (story decomposition) | `plan:phase-c` |
+| `/execute` | Story close (final phase boundary) | `execute:story` |
 | `/review` | Review verdict displayed | `review:complete` |
-| `/standup` | Standup phase wrap-up | `standup:complete` |
 
 See the **Scope-drift emit** section in each skill's `SKILL.md` for the
 exact invocation pattern.
+
+**Why so few?** Earlier drafts of `ed-3` wired emits at every named
+phase boundary (`plan:phase-{a,b,b2,b3,c}`, `execute:{research,
+implement, methodology}`, `standup:complete`) — ~46 events per epic.
+Most were structurally `none` or `minor`: planning phases A/B/B2/B3
+churn their artifacts as a *feature* of the methodology, and per-phase
+execution drift is dominated by single-story-level signal anyway. The
+retained sites are the three places where a divergence would change
+what a human or aggregator does next: decomposition fidelity (`/plan`
+Phase C), story delivery (`/execute` close), and review coverage
+(`/review` complete).
 
 ### Programmatic surface
 
@@ -79,7 +85,7 @@ result = compute_scope_drift(expected_scope, delivered_scope, delta_reasons)
 # Score + maturity-gated emit:
 event = emit_scope_drift(
     run_id="run-123",
-    phase_label="plan:phase-a",
+    phase_label="plan:phase-c",
     expected_scope=[...],
     delivered_scope=[...],
     delta_reasons=[...],

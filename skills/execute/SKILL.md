@@ -243,24 +243,27 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
    6. Silent on healthy runs (no stdout warning when zero heuristics fire) — YAML record still written with empty `nonsensical_defaults: []` for cross-run aggregation by `hive/scripts/gate-mode-audit.mjs`.
 
-## Scope-drift emit (per-story-phase boundary)
+## Scope-drift emit (per-story boundary)
 
-After each workflow phase finishes for a story (research, implement,
-test, review, integrate — exact list depends on the loaded
-methodology), emit one `scope_drift_score` event row via
-`hive/lib/scope_drift.py`. The emit is part of the same per-phase
-boundary work that writes the episode marker, and runs whether the
-phase was executed by a `Agent` step (sequential), a teammate pane
-(team), a session, or a sandcastle:
+Emit a single `scope_drift_score` event when a story completes (after
+the final workflow phase writes its episode marker, before /execute
+moves to the next story). Earlier per-phase emits — one per
+research/implement/test/review/integrate boundary — produce ~3× the
+event volume with almost no additional signal, because what matters
+for downstream consumers is whether the **story** delivered its
+acceptance criteria, not which intra-story phase shifted the scope.
+
+The emit runs whether the story was executed by a `Agent` step
+(sequential), a teammate pane (team), a session, or a sandcastle:
 
 ```bash
 python3 -c "
 from hive.lib.scope_drift import emit_scope_drift
 emit_scope_drift(
     run_id='{run-id}',                   # this /execute run
-    phase_label='execute:{phase-id}',    # e.g. execute:implement
-    expected_scope={list from the phase's plan input},
-    delivered_scope={list of items actually delivered by this phase},
+    phase_label='execute:story',
+    expected_scope={list from the story's acceptance criteria + planned files},
+    delivered_scope={list of items actually delivered when the story closed},
     delta_reasons={enum values from cycle-state-schema.md when they differ},
     story_id='{story-id}',
     skill='execute',
@@ -269,13 +272,14 @@ emit_scope_drift(
 ```
 
 `expected_scope` / `delivered_scope` / `delta_reasons` are sourced from
-the story's `phase_records[]` entry on the cycle state at
+the story's aggregated `phase_records[]` entries on the cycle state at
 `${HIVE_STATE_DIR}/cycle-state/{epic-id}.yaml`
 ([cycle-state-schema](../../hive/references/cycle-state-schema.md) §
-Phase records). When the phase exits cleanly with no drift,
-`expected_scope == delivered_scope` and `delta_reasons == []` — the
-helper buckets that to `none` (ordinal 0), which is the desired healthy
-default.
+Phase records) — collapse the per-phase lists into the story-level
+expected vs delivered sets. When the story exits cleanly with no
+drift, `expected_scope == delivered_scope` and `delta_reasons == []` —
+the helper buckets that to `none` (ordinal 0), which is the desired
+healthy default.
 
 The maturity gate from story `ed-1-maturity-helper` skips emit on
 greenfield/early projects and logs once per run. No new error handling
@@ -307,4 +311,4 @@ This is intentionally softer than the existing iteration-count breakers (`max_st
 - `skills/hive/skills/agent-spawn/SKILL.md` — Agent spawning with respawn continuation support
 - `hive/lib/dag_executor/__init__.py` — `executor_enabled_for(workflow_name)` and `run_workflow(...)` (consumer-side flag readers and the executor invocation surface from hde-9a)
 - `hive/references/workflow-schema.md#executor-cutover-additive--registry-gated` — schema-level note that cutover is additive and registry-gated
-- `hive/lib/scope_drift.py` — scope-drift scoring + emit helper called at each per-story phase boundary (see Scope-drift emit section above)
+- `hive/lib/scope_drift.py` — scope-drift scoring + emit helper called once per story at close (see Scope-drift emit section above)
