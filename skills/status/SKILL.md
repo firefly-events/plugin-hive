@@ -1,6 +1,6 @@
 ---
 name: status
-description: Check the status of active Hive workflow epics and stories.
+description: Check the status of active Hive workflow epics and stories, including a drift trend across the last 5 runs.
 ---
 
 # Hive Status
@@ -113,12 +113,35 @@ If the file does not exist, check `.pHive/meta-team/ledger.yaml`:
   ```
 - If neither file exists: omit the meta-team section entirely (meta-team has not been configured or run yet)
 
-### 9. Scope-drift surfacing
+### 9. Drift trend (last 5 runs)
 
 `scope_drift_score` events (story `ed-3-drift-metric-emit`) live in the
-per-run JSONL at `.pHive/metrics/events/*.jsonl`. Trend surfacing in
-this skill is owned by the follow-up story `ed-4-drift-status-surface`;
-this skill currently references the metric only for discoverability —
-see [`hive/references/metrics-event.schema.md`](../../hive/references/metrics-event.schema.md)
-for the row shape, bucketing rules, and maturity gate that govern
-these events. Until `ed-4` lands, omit this as a rendered section.
+per-run JSONL at `.pHive/metrics/events/*.jsonl`. Surface the trend by
+shelling out to the read-only helper from story
+`ed-4-drift-status-surface`:
+
+```
+python3 -m hive.lib.scope_drift_reader
+```
+
+Render the helper's stdout verbatim as a section after the meta-team
+block. Example:
+
+```
+---
+
+Drift trend (last 5 runs):
+  run-2026-05-19 2026-05-19T12:00:00Z [none=3, minor=1, major=0, divergent=0]
+  run-2026-05-18 2026-05-18T15:30:00Z [none=2, minor=2, major=1, divergent=0]
+  ...
+```
+
+**Silent on absence.** If the helper prints nothing (greenfield project,
+maturity gate skipped emit, or no events on disk), omit the section
+entirely — do not render an empty placeholder. Malformed JSONL rows
+are skipped with a one-line warning by the helper itself, so this skill
+does not need to handle parse errors.
+
+See [`hive/references/metrics-event.schema.md`](../../hive/references/metrics-event.schema.md)
+for row shape, bucketing rules, and the maturity gate that govern
+these events.

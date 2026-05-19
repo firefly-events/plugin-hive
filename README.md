@@ -121,6 +121,12 @@ Orchestrator loads your team, runs stories through the development workflow (res
 ```
 Structured code review covering correctness, security, conventions, and domain compliance. Optional Codex adversarial pass for a second-model perspective.
 
+**6. Check workflow status**
+```
+/hive:status
+```
+Shows active epics, story progress, and a **Drift trend (last 5 runs)** section summarizing `scope_drift_score` bucket counts when present. Silent on greenfield projects with no drift events yet.
+
 ---
 
 ## UI Team Skills
