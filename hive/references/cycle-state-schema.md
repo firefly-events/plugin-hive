@@ -178,6 +178,7 @@ When a planning swarm hands off to a dev swarm, the cycle state transfers as par
 | `linear` | object | Linear ticket ID mapping (see below) |
 | `escalations` | list | Specialist team escalation flags raised during planning. See specialist-triggers.md catalog for valid trigger IDs. |
 | `phase_records` | list | Per-phase boundary records carrying `expected_scope`, `delivered_scope`, and `delta_reasons`. See `Phase records — scope-drift fields` above. |
+| `autonomous_cycle` | object | Per-cycle bookkeeping written by the autonomous-cycle-loop runner. Foundation field — see `Autonomous cycle bookkeeping` below. |
 
 ## Linear Ticket Tracking
 
@@ -244,3 +245,44 @@ The DAG executor (epic `hive-dag-executor`, story `hde-5`) introduces a **second
 ### The two files do not mirror each other
 
 A node completing inside a single executor run writes to `run_state.yaml.node_statuses` and `run_state.yaml.output_graph` — the cycle state is unaffected. Conversely, a user-gate decision or escalation banked at planning time writes to `cycle-state.yaml` and never appears in any run_state. Code that needs to update both for the same data point is a sign of blurred ownership; route through the `hive.lib.dag_executor.run_state.store` narrow-mutation API for run-state writes and through the orchestrator's cycle-state writers for epic-level writes.
+
+## Autonomous cycle bookkeeping
+
+Per the `autonomous-cycle-loop` epic (story `s0-1-schema-and-config-bump`), the cycle state document may carry an optional `autonomous_cycle:` block that the loop runner uses to record cross-cycle bookkeeping. The block is **optional** and **additive** — pre-existing cycle states continue to validate without edits, and orchestrator writers must tolerate its absence on read.
+
+### Shape
+
+```yaml
+autonomous_cycle:
+  enabled: true | false        # true iff this cycle state was advanced by the loop runner
+                               # (mirrors autonomous_cycle_loop.enabled at the moment of write)
+  cycle_count: <int>           # how many full loop iterations have completed against this epic
+  last_cycle_at: "<ISO 8601>"  # timestamp of the most recent loop completion; absent before the
+                               # first cycle finishes
+  scenarios_run: [<scenario-id>, ...]
+                               # ordered list of test-scenario IDs replayed in the most recent
+                               # loop iteration; matches .pHive/test-scenarios/<id>.yaml per
+                               # test-scenario-schema.md
+  outcomes:                    # parallel to scenarios_run; same length, same order
+    - scenario_id: <scenario-id>
+      status: pass | fail | inconclusive | skipped
+      duration_seconds: <int>
+      reason: <string>         # optional; populated on fail / inconclusive
+```
+
+### Field semantics
+
+| Field | Type | Required when | Description |
+|-------|------|---------------|-------------|
+| `enabled` | bool | Always (within the block) | Snapshots `autonomous_cycle_loop.enabled` at write time. Lets a future reader tell apart "this epic ran the loop while it was off" from "this epic ran the loop while it was on." |
+| `cycle_count` | int | Always (within the block) | Monotonic; the runner increments at the end of each loop iteration before persisting. |
+| `last_cycle_at` | string | After first cycle | ISO 8601 timestamp. Absent on initial block creation; written after the runner's first complete pass. |
+| `scenarios_run` | `list[str]` | After first cycle | Scenario IDs in replay order. May be empty if the loop fired but found no scenarios under `autonomous_cycle_loop.test_scenarios_path`. |
+| `outcomes` | `list[object]` | After first cycle | One entry per `scenarios_run` entry, same index. `status` values map directly to the loop's reported terminal state; `reason` is required for `fail` and `inconclusive`. |
+
+### Foundation status
+
+This story (`s0-1-schema-and-config-bump`) ships the schema only. No writer emits the block yet — the loop runner that consumes
+`autonomous_cycle_loop.*` and writes this block lands in a later story of the `autonomous-cycle-loop` epic.
+
+Until the runner ships, the field is inert and orchestrator writers continue to omit it. Pre-existing cycle state files require no migration. Readers should treat absence as "no autonomous cycle has run against this epic," which is byte-equivalent to the prior behavior.

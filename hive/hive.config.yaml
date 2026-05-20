@@ -323,3 +323,20 @@ sessions:
   timeout_ms: 600000           # max session wall-time (10 min)
   stuck_timeout_ms: 90000      # SSE silence before stuck (90s; doubled for implement/test/optimize)
   max_retries: 3               # max stuck+retry cycles per story before user escalation
+
+# Autonomous cycle loop (epic: autonomous-cycle-loop, story s0-1 foundation)
+# Schema-only foundation block for a self-running development cycle that
+# replays planned test scenarios through Hive end-to-end inside sandcastles.
+# Additive — no consumer reads these knobs yet. Behavior arrives in later
+# stories of the epic; this block exists so downstream stories can land
+# without re-bumping the shipped baseline. Leaving every knob at its default
+# preserves prior behavior byte-equivalently.
+#
+# See:
+#   - hive/references/sandcastle-mode.md       (sandcastle_mode semantics)
+#   - hive/references/test-scenario-schema.md  (test scenario YAML shape)
+autonomous_cycle_loop:
+  enabled: false                              # opt-in toggle; default OFF preserves prior behavior
+  sandcastle_mode: shared                     # shared | dedicated — see sandcastle-mode.md
+  test_scenarios_path: .pHive/test-scenarios  # carrier dir for test-scenario YAMLs
+  max_cycles_per_run: 1                       # safety bound; 1 = single-cycle execution per invocation
