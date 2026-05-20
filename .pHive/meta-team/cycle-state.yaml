@@ -1,8 +1,8 @@
-cycle_id: meta-2026-05-18
-started: '2026-05-18T00:00:00Z'
+cycle_id: meta-2026-05-20
+started: '2026-05-20T00:00:00Z'
 status: closed
 phase: close
-closed: '2026-05-18T00:30:00Z'
+closed: '2026-05-20T00:30:00Z'
 charter_constraints:
   - operate only on hive/references/**, hive/agents/**, hive/workflows/**, hive/lib/**,
     skills/hive/agents/memories/**, .pHive/meta-team/**, .pHive/teams/**
@@ -12,11 +12,11 @@ charter_constraints:
   - no changes to hive/hive.config.yaml without human confirmation
   - no new external service integrations without human confirmation
 prior_cycle:
-  id: meta-2026-05-17
+  id: meta-2026-05-18
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-05-18T00:00:00Z'
+    started_at: '2026-05-20T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
@@ -33,7 +33,10 @@ steps:
       queries issued. external_candidates_count: 0.
   step_02c_kg_signal:
     kg_findings_count: 0
-    summary: kg.sqlite absent — skipping. kg_signal findings=0 miss_reason=empty_kg
+    summary: >
+      Step 02c runs via /meta-optimize SKILL routing only; skipped for
+      maintainer cycle. kg.sqlite absent. kg_signal findings=0
+      miss_reason=empty_kg.
   step_03_proposal:
     routing: step-03 (findings_count=2 > 0)
     approved_proposals_count: 1
@@ -45,16 +48,16 @@ steps:
     changes_made:
       - proposal_id: proposal-1
         action: update_field
-        file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+        file: hive/GUIDE.md
         description: >
-          Updated title from "# Step 3b: Backlog Fallback" to
-          "# Step 03b: Backlog Fallback" — normalizes zero-padded format
-          consistent with peer sub-step files step-02b, step-02c, step-03c.
+          Updated Model Tier Routing table: moved team-lead, architect, analyst,
+          tpm from the Opus row to the Sonnet row, matching their actual agent
+          file model fields and hive.config.yaml model_tiers configuration.
         status: done
   step_05_testing:
     test_results:
-      - change_id: proposal-1_step-03b-backlog-fallback.md
-        file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+      - change_id: proposal-1_hive-GUIDE.md
+        file: hive/GUIDE.md
         tests:
           cross_reference_integrity: pass
           schema_compliance: pass
@@ -70,27 +73,29 @@ steps:
       wall_clock_ms: 5000
       first_attempt_pass: true
     evaluations:
-      - change_id: proposal-1_step-03b-backlog-fallback.md
+      - change_id: proposal-1_hive-GUIDE.md
         change_verdict: passed
         charter_objective: consistency
         quality_score: 1.0
         rationale: |
-          Addresses finding-1 (SCHEMA_INCONSISTENCY): normalizes step-03b title
-          to zero-padded format matching peer sub-step files. Additive change
-          (title renaming only). No cross-references broken, no content removed,
-          all tests pass.
+          Addresses finding-1 (SCHEMA_INCONSISTENCY): corrects the Model Tier
+          Routing table to accurately reflect agent model fields. Table row
+          for Opus now matches hive.config.yaml (orchestrator only). Sonnet
+          row now lists team-lead, architect, analyst, tpm. Additive change
+          to table cell content. No cross-references broken, no content
+          removed, all tests pass.
   step_07_promotion:
     promoted_changes:
       - proposal_id: proposal-1
-        file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+        file: hive/GUIDE.md
         verdict: pass
         status: promoted
-        commit_ref: fb9917f58d2e29cc4dcc6db9110e4e6b3cdf51be
-        rollback_target: 1afd069240d9da557763688ca63f08b1fbb0891d
+        commit_ref: 271b4a8def8fff467a7aaeae55490a4d298d1961
+        rollback_target: 75e2bd263939bf0413cb657f39139f504ad569a3
     reverted_changes: []
     insights_staged: 0
     decision: accept
-    rollback_target: 1afd069240d9da557763688ca63f08b1fbb0891d
+    rollback_target: 75e2bd263939bf0413cb657f39139f504ad569a3
 summary:
   total_findings: 2
   proposals_generated: 1
@@ -100,42 +105,45 @@ summary:
   flagged_for_human: 0
   cycle_verdict: passed
 closure_evidence:
-  commit_ref: fb9917f58d2e29cc4dcc6db9110e4e6b3cdf51be
+  commit_ref: 271b4a8def8fff467a7aaeae55490a4d298d1961
   metrics_snapshot:
     tokens: 0
     wall_clock_ms: 5000
     first_attempt_pass: true
-  rollback_ref: 1afd069240d9da557763688ca63f08b1fbb0891d
+  rollback_ref: 75e2bd263939bf0413cb657f39139f504ad569a3
 decision: accept
 regression_watch:
   state: armed
   observation_window:
-    start: '2026-05-18T00:30:00Z'
-    end: '2026-05-18T04:30:00Z'
+    start: '2026-05-20T00:30:00Z'
+    end: '2026-05-20T04:30:00Z'
 findings:
   - id: finding-1
     category: SCHEMA_INCONSISTENCY
     severity: low
-    location: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+    location: hive/GUIDE.md
     description: >
-      Title uses non-zero-padded step number "# Step 3b: Backlog Fallback" while
-      peer sub-step files use zero-padded format — step-02b uses "# Step 02b:",
-      step-02c uses "# Step 02c:", step-03c uses "# Step 03c:".
+      Model Tier Routing table incorrectly listed team-lead, architect, analyst,
+      and tpm in the Opus tier row. All four agent files have model: sonnet, and
+      hive.config.yaml model_tiers.opus only lists orchestrator.
     evidence: >
-      step-03b-backlog-fallback.md line 1: "# Step 3b: Backlog Fallback".
-      Peer files: step-02b "# Step 02b:", step-02c "# Step 02c:",
-      step-03c "# Step 03c:". step-file-schema.md title spec: "# Step {N}: {Name}".
+      GUIDE.md line 178: "| **Opus** | claude-opus-4-7 | orchestrator,
+      team-lead, architect, analyst, tpm". But hive/agents/analyst.md ->
+      model: sonnet; hive/agents/architect.md -> model: sonnet;
+      hive/agents/tpm.md -> model: sonnet; hive/agents/team-lead.md ->
+      model: sonnet; hive/hive.config.yaml model_tiers.opus: [orchestrator].
   - id: finding-2
     category: STUB_DOC
     severity: low
     location: hive/references/hive-cloud-roadmap.md
-    description: 13-line placeholder stub for deferred Hive Cloud epic
+    description: 13-line placeholder stub for deferred Hive Cloud epic (S16)
     evidence: >
-      File has 13 lines. Content explicitly states this is an S16 stub.
-      Already flagged out_of_scope in meta-2026-05-11, -12, -14, -15, -17.
+      File has 13 lines. Content explicitly states this is an S16 forward-reference
+      placeholder. Already flagged out_of_scope in meta-2026-05-11 through
+      meta-2026-05-18.
 approved_proposals:
   - id: proposal-1
-    title: Normalize step-03b title to zero-padded format for consistency with peer sub-steps
+    title: Correct Model Tier Routing table in hive/GUIDE.md to match actual agent model fields
     discovery_source: internal_audit
     addresses_findings:
       - finding-1
@@ -145,45 +153,43 @@ approved_proposals:
     priority_score: 10
     charter_objective: consistency
     metric:
-      applies: true
-      name: step_file.title_format_consistency
-      direction: up
-      unit: ratio
-      baseline: 0.75
-      target: 1.0
-      window: next-1-cycle
-      source:
-        kind: manual
-        ref: >
-          verify grep "^# Step" hive/workflows/steps/meta-team-cycle/*.md shows
-          uniform zero-padded format across all sub-step files (02b, 02c, 03b, 03c)
-      verify_at: next cycle post-merge
-      owner: developer
+      applies: false
+      justification: >
+        Pure documentation accuracy fix — corrects misattributed tier values
+        in a reference table with no observable performance surface; the fix
+        aligns documentation to reflect reality rather than changing any
+        measurable system behaviour.
     implementation_plan:
       - step: >
-          Update title line in step-03b-backlog-fallback.md from
-          "# Step 3b: Backlog Fallback" to "# Step 03b: Backlog Fallback"
-        file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+          Update the Opus row in GUIDE.md Model Tier Routing table: remove
+          team-lead, architect, analyst, tpm from Opus row, keeping only
+          orchestrator.
+        file: hive/GUIDE.md
+        action: update_field
+      - step: >
+          Update the Sonnet row: add team-lead, architect, analyst, tpm to
+          the existing Sonnet agents list.
+        file: hive/GUIDE.md
         action: update_field
     rationale: |
-      The sub-step files step-02b, step-02c, and step-03c all use zero-padded
-      step numbers in their titles (02b, 02c, 03c). step-03b used "3b" without
-      the leading zero, breaking the consistent naming pattern. Normalizing to
-      "03b" aligns the title format with the peer sub-step convention.
+      The GUIDE.md "Model Tier Routing" table listed team-lead, architect, analyst,
+      and tpm as Opus-tier agents. However, their agent files all have model: sonnet
+      and hive.config.yaml model_tiers.opus only lists orchestrator. This
+      documentation gap misleads operators into overestimating Opus usage costs.
     risk_notes: |
-      Single-line title update. No behavioral impact. No runtime code or
-      cross-references depend on the step file's title text. Revert is
-      a one-line change.
+      Documentation-only change to a table in GUIDE.md. No runtime code,
+      workflow YAML, or agent file is modified. No cross-references depend on
+      the tier routing text. Revert is a two-row table edit.
 skipped_findings:
   - finding_id: finding-2
     reason: out_of_scope
     notes: >
       Deferred Hive Cloud epic (S16 placeholder). Already flagged out_of_scope
-      in meta-2026-05-11, -12, -14, -15, -17. Expanding stub is premature
-      without the epic active.
+      in meta-2026-05-11, -12, -14, -15, -16, -17, -18. Expanding stub is
+      premature without the epic active.
 changes:
   - proposal_id: proposal-1
-    file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+    file: hive/GUIDE.md
     action: update_field
-    description: 'Normalized title to "# Step 03b: Backlog Fallback"'
+    description: Corrected Model Tier Routing table — moved team-lead/architect/analyst/tpm to Sonnet row
     status: promoted
