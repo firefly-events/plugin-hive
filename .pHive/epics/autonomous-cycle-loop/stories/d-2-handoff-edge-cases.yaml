@@ -1,0 +1,70 @@
+id: d-2-handoff-edge-cases
+epic: autonomous-cycle-loop
+title: "D.2 — handoff timeout + no-PR fallback + KG triple"
+status: pending
+complexity: low
+methodology: classic
+depends_on: [d-1-handoff-dispatch-and-execute-wire]
+
+description: |
+  Harden the handoff dispatch with a default timeout, a no-PR fallback for
+  /review, and a KG phase_handoff triple emit so the audit trail captures
+  every handoff edge.
+
+acceptance_criteria:
+  - "Default timeout 1800s on each handoff target (configurable via hive.config.yaml → execution.terminal_handoff.timeout_seconds)."
+  - "On timeout: dispatch.mjs emits a phase_handoff_timeout JSONL event and returns {ok: false, reason: 'timeout', duration_ms}. /execute logs and continues — no stuck handoff blocks the next story."
+  - "/review handoff: when no PR exists for the branch, dispatch falls back to /review <branch> (git diff main..<branch>). No silent failure; the fallback is logged."
+  - "phase_handoff KG triple emitted on every handoff completion: subject=<story-id>, predicate=phase_handoff, object='<target_skill>:<verdict>' (verdict: pass | fail | inconclusive | timeout). Fire-and-forget per existing emit pattern (CLI swallows missing-sqlite)."
+  - "handoff_log[] row contains timeout_at when the row was a timeout."
+
+steps:
+  - id: research
+    description: Confirm the existing KG emit CLI surface; identify the cleanest place to insert the timeout wrap in dispatch.mjs.
+    agent: researcher
+  - id: implement
+    description: Add timeout wrap; add no-PR fallback; add the KG emit; add the config knob.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Force a slow /test handoff to fire the timeout path; verify event JSONL + log + cycle-state row. Verify no-PR fallback path. Verify the KG triple is emitted (or silently swallowed when sqlite is absent).
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm fire-and-forget semantics; confirm no new error handling paths beyond the timeout + fallback branches.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive-ui-f
+  key_files:
+    - path: hive/lib/handoff/dispatch.mjs
+      purpose: Timeout + fallback + KG emit added here
+    - path: hive/lib/kg_emit_cli.py
+      purpose: Existing emit CLI; no changes expected
+    - path: hive.config.yaml
+      purpose: execution.terminal_handoff.timeout_seconds knob added in S0
+
+cross_cutting:
+  - concern: documentation
+    action: Update execute skill markdown's handoff section to mention timeout + no-PR fallback + KG triple.
+  - concern: versioning
+    action: Patch bump rolled in with D-series ship; flagged here for the bump commit.
+
+metric:
+  applies: true
+  name: handoff.timeout_event_emit_rate
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 1.0
+  window: every handoff that exceeds timeout_seconds
+  source:
+    kind: events
+    ref: .pHive/metrics/events/phase-handoff-timeout-*.jsonl
+  verify_at: 2026-07-15T00:00:00Z
+  owner: tester

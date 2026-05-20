@@ -1,0 +1,67 @@
+id: b-2-dispatch-two-label-trigger
+epic: autonomous-cycle-loop
+title: "B.2 — hive-dispatch.yml two-label trigger + mode_decision"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s0-1-schema-and-config-bump]
+
+description: |
+  Extend the dispatch workflow to recognize a second trigger label `hive:plan`
+  alongside the existing `hive:ready`. The `derive` job emits a
+  `mode_decision: plan | execute` output. Ambiguous label sets (both labels on
+  the same issue) fail fast.
+
+acceptance_criteria:
+  - "`.github/workflows/hive-dispatch.yml` triggers on labeled issues with either hive:ready or hive:plan."
+  - "The `derive` job inspects github.event.label.name and emits mode_decision=plan or mode_decision=execute."
+  - "If an issue carries both hive:ready and hive:plan, derive fails with a clear error message naming the offending labels."
+  - "The same skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl is updated so re-scaffolding picks up the change."
+  - "Existing hive:ready (execute) flow is byte-equivalent; tests that pass today continue to pass."
+
+steps:
+  - id: research
+    description: Read current dispatch workflow, identify the derive job structure, identify how to safely add the second label and the ambiguity guard.
+    agent: researcher
+  - id: implement
+    description: Edit the workflow YAML + template; add label inspection + ambiguity guard.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Use act or a fixture repo to confirm hive:ready triggers execute, hive:plan triggers plan, both-labeled issue fails fast.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm tplt + .yml are in sync; confirm sandcastle-gh-init manifest still names the right files.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive-ui-f
+  key_files:
+    - path: .github/workflows/hive-dispatch.yml
+      purpose: Active dispatch glue
+    - path: skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl
+      purpose: Template for re-scaffolding; must stay in sync
+
+cross_cutting:
+  - concern: documentation
+    action: Update sandcastle-gh-init SKILL.md "Triggers" paragraph to list both labels.
+
+metric:
+  applies: true
+  name: dispatch.mode_decision_correctness
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 1.0
+  window: first 10 dispatch runs after B.2 ships
+  source:
+    kind: events
+    ref: ".github/workflows/hive-dispatch.yml job logs (action-cache)"
+  verify_at: b-3-bridge-plan-branch-and-pr
+  owner: tester

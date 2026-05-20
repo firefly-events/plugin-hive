@@ -1,0 +1,68 @@
+id: b-1-plan-sandcastle-mode
+epic: autonomous-cycle-loop
+title: "B.1 — /plan sandcastle_mode detection"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s0-1-schema-and-config-bump]
+
+description: |
+  Teach /plan to detect HIVE_SANDCASTLE_MODE=1 and convert every "present to
+  user" gate into "write artifact + emit log line + continue". The PR review
+  becomes the human gate when the skill runs inside sandcastle. No interactive
+  prompts may block the run.
+
+acceptance_criteria:
+  - "skills/plan/SKILL.md detects HIVE_SANDCASTLE_MODE=1 at skill start; sets a `sandcastle_mode: true` planning context flag."
+  - "When sandcastle_mode is true: Phase B sign-off, H/V gate, structured-outline sign-off, story confirmation gate, gap-presentation gates ALL write the artifact and emit a sandcastle_gate_skipped log line instead of prompting."
+  - "When sandcastle_mode is false (today's default): behavior is byte-equivalent."
+  - "The Phase D publish step is additionally gated on planning.publish_in_sandcastle (default false) — sandcastle runs produce files only on first cut."
+  - "Dirty-tree hard-stop (Phase 0) is preserved — sandcastle starts clean by construction."
+  - "Repo-match check (Phase 0a) is preserved — sandcastle runs in the configured repo by construction."
+
+steps:
+  - id: research
+    description: Enumerate every interactive gate in skills/plan/SKILL.md.
+    agent: researcher
+  - id: implement
+    description: Add sandcastle_mode detection + per-gate behavior switch.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Fixture run with HIVE_SANDCASTLE_MODE=1 produces all planning artifacts on disk without prompting; without the env var, behavior is unchanged.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm every gate has a sandcastle_mode branch; confirm log lines name the gate that was bypassed.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive-ui-f
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Skill markdown — the detection + per-gate branches live here
+    - path: hive/references/sandcastle-mode.md
+      purpose: Contract reference (written in S0)
+
+cross_cutting:
+  - concern: documentation
+    action: Add a short "Sandcastle mode" section to /plan skill markdown referencing sandcastle-mode.md.
+
+metric:
+  applies: true
+  name: plan.sandcastle_run_completes_without_prompt
+  direction: up
+  unit: boolean
+  baseline: false
+  target: true
+  window: any /plan invocation with HIVE_SANDCASTLE_MODE=1
+  source:
+    kind: events
+    ref: .pHive/metrics/events/plan-*.jsonl
+  verify_at: b-3-bridge-plan-branch-and-pr
+  owner: tester

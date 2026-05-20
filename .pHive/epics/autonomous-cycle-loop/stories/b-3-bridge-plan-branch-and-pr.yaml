@@ -1,0 +1,73 @@
+id: b-3-bridge-plan-branch-and-pr
+epic: autonomous-cycle-loop
+title: "B.3 — bridge mode_decision=plan branch + plan-output PR"
+status: pending
+complexity: high
+methodology: classic
+depends_on: [b-1-plan-sandcastle-mode, b-2-dispatch-two-label-trigger]
+
+description: |
+  When mode_decision=plan, the bridge invokes /plan inside the sandcastle
+  container with HIVE_SANDCASTLE_MODE=1 and the issue body as $ARGUMENTS. On
+  success the bridge opens a draft PR titled `[plan] <epic-id>` carrying only
+  the new `.pHive/epics/<epic-id>/` tree and the matching .gitignore allowlist
+  edit. On failure the issue transitions hive:plan -> hive:plan-failed.
+
+acceptance_criteria:
+  - "Bridge (.github/scripts/sandcastle-hive-bridge.mts) branches on mode_decision; mode_decision=plan invokes /plan inside the container with HIVE_SANDCASTLE_MODE=1."
+  - "On success: bridge commits the new .pHive/epics/<epic-id>/ tree and the .gitignore allowlist edit on a feat/plan-<epic-id> branch and opens a draft PR titled `[plan] <epic-id>`."
+  - "PR body includes the issue number with `Closes #N`, a summary lifted from design-discussion.md §1, and a list of decomposed story IDs."
+  - "On failure (bridge crash, /plan error, no epic-id resolvable): if: failure() || cancelled() transitions hive:plan -> hive:plan-failed with the run URL appended as an issue comment."
+  - "Re-running on the same issue (hive:plan re-applied after a failure) does not create a duplicate PR — the existing branch is reused."
+  - "tail -F agent log + cron-aligned single-iteration sandcastle invocation, matching the existing execute-mode bridge observability pattern."
+
+steps:
+  - id: research
+    description: Read the existing bridge for the execute path; identify reusable pieces (image pull, env setup, log tailing); design the plan branch to mirror it.
+    agent: researcher
+  - id: implement
+    description: Add the plan branch in the bridge; wire commit + branch + PR + failure-label flow.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Fixture issue labeled hive:plan in a sandbox repo; verify PR is opened with expected title + body + files; verify failure path applies hive:plan-failed.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm idempotence on re-run; confirm the bridge does not touch anything outside .pHive/epics/<epic-id>/ and .gitignore; confirm no nested sandcastle isolation.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive-ui-f
+  key_files:
+    - path: .github/scripts/sandcastle-hive-bridge.mts
+      purpose: Active bridge — mode_decision branch added here
+    - path: skills/sandcastle-gh-init/assets/sandcastle-hive-bridge.mts.tpl
+      purpose: Template counterpart; must stay in sync
+    - path: hive/references/sandcastle-mode.md
+      purpose: Env-var contract (S0)
+
+cross_cutting:
+  - concern: documentation
+    action: sandcastle-gh-init SKILL.md outputs table gains the new feat/plan-<epic-id> branch + `[plan] <epic-id>` PR rows.
+  - concern: versioning
+    action: Minor bump — first consumer-visible new dispatch mode lands with B.3.
+
+metric:
+  applies: true
+  name: sandcastle_plan.pr_opened_on_label
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 0.95
+  window: first 10 hive:plan label applications in production
+  source:
+    kind: events
+    ref: GitHub Actions run logs + gh pr list
+  verify_at: 2026-06-30T00:00:00Z
+  owner: tester

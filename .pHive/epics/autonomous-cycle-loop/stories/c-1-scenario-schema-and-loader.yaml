@@ -1,0 +1,72 @@
+id: c-1-scenario-schema-and-loader
+epic: autonomous-cycle-loop
+title: "C.1 — scenario schema + loader + executor step file"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s0-1-schema-and-config-bump]
+
+description: |
+  Implement the scenario YAML loader/validator and the simulated-manual step
+  file. Scenario lives at tests/scenarios/<topic>.yaml (or .pHive/scenarios/
+  fallback). The step file describes the executor protocol: spec-walk vs
+  implementation-walk, per-step pass/fail capture, overall verdict writeback.
+
+acceptance_criteria:
+  - "hive/lib/scenarios/load.mjs exports loadScenario(path) returning a parsed + validated scenario or throwing a structured error pointing at the first missing/invalid field."
+  - "Schema rejects: missing id, missing title, missing/empty steps[], step lacking either `action` or `expected`, mode not in (spec-walk, implementation-walk)."
+  - "Schema accepts: optional preconditions[], optional postconditions[], optional per-step actor."
+  - "hive/workflows/steps/test/simulated-manual.md exists; describes executor protocol (narrate each step, capture pass/fail, write overall verdict to cycle-state manual_verdict block)."
+  - "implementation-walk mode REFUSES to run until the story's `integrate` episode marker is present; emits a clear error pointing at the missing marker."
+  - "Fixture scenario at tests/scenarios/example.yaml passes the loader."
+
+steps:
+  - id: research
+    description: Confirm S0 documented the schema; identify the cycle-state writeback shape that matches manual_verdict in story-yaml-schema.md.
+    agent: researcher
+  - id: implement
+    description: Write loader + validator; write the step file.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Unit-test the loader (valid + invalid fixtures); fixture scenario passes; missing-step-field cases fail with the expected error path.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm tests/scenarios/.gitkeep is present so the consumer dir convention is discoverable; confirm no hard dep on .pHive/ paths.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive-ui-f
+  key_files:
+    - path: hive/lib/scenarios/load.mjs
+      purpose: New loader + validator
+    - path: hive/workflows/steps/test/simulated-manual.md
+      purpose: New step file (executor protocol)
+    - path: hive/references/test-scenario-schema.md
+      purpose: Reference doc from S0
+    - path: tests/scenarios/example.yaml
+      purpose: Fixture scenario
+
+cross_cutting:
+  - concern: documentation
+    action: Cross-link from test-scenario-schema.md to the loader and step file.
+
+metric:
+  applies: true
+  name: scenarios.loader_rejects_invalid_fixtures
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 1.0
+  window: all unit-test fixtures asserted in C.1 PR
+  source:
+    kind: events
+    ref: CI test output for hive/lib/scenarios/
+  verify_at: integrate
+  owner: tester
