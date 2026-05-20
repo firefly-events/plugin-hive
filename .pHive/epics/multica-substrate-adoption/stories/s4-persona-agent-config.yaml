@@ -1,0 +1,125 @@
+id: s4-persona-agent-config
+epic: multica-substrate-adoption
+title: Persona → Multica agent declarative config (execute-phase only)
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  Define the declarative schema and seed file for mapping plugin-hive's
+  execute-phase personas to Multica agent entities. /plan and /review
+  personas (researcher, technical-writer, tpm, architect, ui-designer)
+  are explicitly out of scope — they remain interactive on the user's
+  laptop.
+
+  In scope (execute-phase agents):
+  - developer
+  - tester
+  - reviewer
+
+  Schema (`.pHive/multica/agents.yaml`):
+
+      agents:
+        - name: developer
+          provider: claude
+          model: claude-sonnet-4-6
+          max_concurrent_tasks: 1
+          instructions: |
+            <persona instructions pulled from hive/agents/developer.md
+             or referenced inline>
+          custom_env: {}            # optional; for ANTHROPIC_BASE_URL etc.
+          custom_args: []           # optional; CLI passthrough flags
+          mcp_config: {}            # optional; MCP server list per agent
+          skills: []                # optional; list of plugin-hive skill IDs to attach
+          visibility: workspace
+
+  s3 (bootstrap) reads this file, calls Multica's POST /api/agents (or
+  PATCH on existing), and reconciles state. Drift = the bootstrap is
+  re-runnable until disk and Multica agree.
+
+  Schema versioning: top-level `schema_version: 1`. Future schema changes
+  bump the integer; bootstrap reads `schema_version` and refuses to apply
+  a higher version than it understands.
+
+  Instructions strategy: rather than inlining the full persona markdown
+  into agents.yaml (which would duplicate hive/agents/*.md), use a
+  `persona_ref:` field pointing at `hive/agents/developer.md` and let s3
+  read the referenced file at bootstrap time. agents.yaml stays small;
+  personas stay versioned in their canonical location.
+
+acceptance_criteria:
+  - "Given the seed file .pHive/multica/agents.yaml exists with 3 entries (developer/tester/reviewer), when js-yaml parses it, then the parse succeeds and each entry has required fields {name, provider, model, persona_ref}."
+  - "Given a persona_ref pointing at hive/agents/developer.md, when s3 bootstrap resolves it, then the instructions field of the corresponding Multica agent matches the markdown body verbatim."
+  - "Given an agents.yaml with schema_version: 2 (a hypothetical future version), when bootstrap reads it, then it refuses to apply with a clear error naming the schema version mismatch — bootstrap never silently degrades."
+  - "Given a persona_ref points at a missing file, when bootstrap resolves it, then the error names both the agent name and the missing path. No partial state is written."
+  - "Given the seed file is committed to develop, when contributors clone the repo, then the file is tracked (i.e., the .gitignore allowlist for .pHive/multica/ is in place)."
+
+steps:
+  - id: research
+    description: Read hive/agents/{developer,tester,reviewer}.md to extract the persona content that gets surfaced into Multica agent instructions; confirm Multica agent create payload shape from spike + s3 research
+    agent: researcher
+  - id: implement
+    description: Write .pHive/multica/agents.yaml seed file + hive/references/multica-agents-schema.md schema doc + .gitignore allowlist entry
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: tests/multica-agents-config.test.mjs — schema parse, persona_ref resolution, schema_version guard
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify schema doc is the canonical reference; verify no plan/review personas leaked into seed file
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/agents/developer.md
+      purpose: Source of truth for developer persona; persona_ref target
+    - path: hive/agents/tester.md
+      purpose: Source for tester persona
+    - path: hive/agents/reviewer.md
+      purpose: Source for reviewer persona
+    - path: hive.config.yaml
+      purpose: agent_backends already declares which backend each persona uses; agents.yaml should NOT duplicate that — backend routing stays in hive.config.yaml
+
+files_to_modify:
+  - file: .pHive/multica/agents.yaml
+    change: NEW — seed file (3 entries)
+  - file: hive/references/multica-agents-schema.md
+    change: NEW — canonical schema documentation with example
+  - file: .gitignore
+    change: Allowlist .pHive/multica/ so the seed file ships in version control
+  - file: tests/multica-agents-config.test.mjs
+    change: NEW — 5 AC cases
+
+design_decisions:
+  - decision: persona_ref instead of inlined instructions
+    rationale: hive/agents/*.md are the source of truth; duplicating into agents.yaml creates drift surface
+  - decision: Only execute-phase personas in this seed file
+    rationale: /plan and /review run interactively on the user's machine; their personas don't need Multica agent entities. Including them would imply Multica drives those skills — which we explicitly deferred.
+  - decision: schema_version: 1 with strict forward-compat rejection
+    rationale: Schema evolution is real; better to fail loud on version mismatch than silently mis-apply
+
+cross_cutting:
+  - concern: documentation
+    action: hive/references/multica-agents-schema.md is the canonical schema doc; cross-link from skills/multica-init/SKILL.md (s3)
+
+metric:
+  applies: false
+  justification: This story produces a static configuration schema and seed file. There is no behavioral metric attached — its correctness is structural (does s3 bootstrap consume the file without error) and is validated by AC #1 / AC #2.
+
+risks:
+  - severity: low
+    description: Drift between hive.config.yaml agent_backends and .pHive/multica/agents.yaml provider fields
+    mitigation: Schema doc explicitly notes that hive.config.yaml owns backend routing per persona; agents.yaml provider field documents what Multica should be told, not what plugin-hive routes internally. Tests assert no conflict on seed.
+
+references:
+  - path: hive/agents/developer.md
+    relevant_excerpt: |
+      (persona content — pulled verbatim into Multica agent instructions by s3)
