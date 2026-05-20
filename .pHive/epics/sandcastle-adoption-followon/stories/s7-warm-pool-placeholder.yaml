@@ -87,4 +87,3 @@ references:
       This is intentionally NOT a code story.
       A short architecture note lives next to provider docs explaining
       when/why a future story would adopt the warm-pool primitive.
-

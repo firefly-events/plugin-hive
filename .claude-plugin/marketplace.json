@@ -1,15 +1,15 @@
 {
   "name": "plugin-hive",
-  "description": "Hive — multi-agent workflow orchestration for Claude Code. Decomposes requirements into dependency-tracked stories, executes them through planning → development → testing → review pipelines with quality gates, agent memories, and extensible workflows.",
+  "description": "Hive \u2014 multi-agent workflow orchestration for Claude Code. Decomposes requirements into dependency-tracked stories, executes them through planning \u2192 development \u2192 testing \u2192 review pipelines with quality gates, agent memories, and extensible workflows.",
   "owner": {
     "name": "Firefly Events"
   },
-  "version": "2.0.0",
+  "version": "2.5.0",
   "plugins": [
     {
       "name": "plugin-hive",
       "source": "./",
-      "description": "Hive — multi-agent workflow orchestration for Claude Code. Decomposes requirements into dependency-tracked stories, executes them through planning → development → testing → review pipelines with quality gates, agent memories, and extensible workflows.",
+      "description": "Hive \u2014 multi-agent workflow orchestration for Claude Code. Decomposes requirements into dependency-tracked stories, executes them through planning \u2192 development \u2192 testing \u2192 review pipelines with quality gates, agent memories, and extensible workflows.",
       "category": "development",
       "tags": [
         "workflow",
@@ -21,7 +21,7 @@
         "code-review",
         "claude-code"
       ],
-      "version": "2.0.0"
+      "version": "2.5.0"
     }
   ]
 }

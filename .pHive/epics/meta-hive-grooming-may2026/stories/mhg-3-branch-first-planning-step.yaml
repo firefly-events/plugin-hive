@@ -1,0 +1,81 @@
+id: mhg-3-branch-first-planning-step
+epic: meta-hive-grooming-may2026
+title: Create feat branch as first planning-skill step
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Today the plan skill writes planning docs (research-brief,
+  design-discussion, H/V plans, structured outline, story YAMLs) onto
+  whatever branch the user happened to be on when invoking /hive:plan.
+  Per maintainer feedback memory `feedback_git_flow_per_epic.md`: branch
+  is `feat/<epic-id>` and each story is one commit on it. Branch creation
+  is currently implicit/late — easy to forget, easy to write planning
+  artifacts onto main by accident.
+
+  Move branch creation to the FIRST step of the plan skill, before any
+  doc is written. Order:
+    1. Kickoff gate
+    2. Persona + config load
+    3. Resolve epic-id (from user input slug, sanitized)
+    4. Create or check out `feat/{epic-id}` branch
+    5. Then proceed to research, design discussion, etc.
+
+  If the user is already on a branch matching `feat/{epic-id}`, no-op.
+  If they're on a different feature branch, prompt before switching.
+  If the working tree is dirty, stop with guidance.
+
+acceptance_criteria:
+  - "Given /hive:plan is invoked from main, when planning starts, then a feat/{epic-id} branch is created and checked out before any planning doc is written."
+  - "Given /hive:plan is invoked from feat/{epic-id} already, when planning starts, then no branch action occurs and planning proceeds."
+  - "Given /hive:plan is invoked from a different feature branch, when planning starts, then the user is prompted to confirm before switching branches."
+  - "Given /hive:plan is invoked with a dirty working tree, when planning starts, then the skill stops with guidance to commit/stash first."
+  - "Given the new step ordering, when the SKILL.md is read, then the branch step appears before Phase 0 team assembly (or as the first sub-step inside it)."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read `skills/plan/SKILL.md` start-to-finish. Identify the
+      earliest doc-write site. Inspect any existing branch-related
+      logic (grep for "git checkout", "feat/", "branch") in skills/.
+      Confirm the dirty-tree check pattern used elsewhere.
+  - id: implement
+    agent: developer
+    description: |
+      Insert the branch step at the right place in skills/plan/SKILL.md.
+      Update the Flow Summary section to reflect new ordering.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Hand-test all four AC scenarios with a throwaway local repo.
+      No automated suite for skills.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: Verify wording, prompt UX, kickoff-gate ordering preserved.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit on feat/meta-hive-grooming-may2026 branch.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Add branch step here.
+
+risks:
+  - severity: medium
+    description: Some users may invoke /hive:plan for ad-hoc planning without intent to commit (e.g., exploring decomposition). Forced branch creation is friction.
+    mitigation: Make branch step skippable via a flag (e.g., --no-branch) for that workflow, defaulting to on.
+
+references:
+  - path: ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/feedback_git_flow_per_epic.md
+    relevant_excerpt: |
+      branch is feat/<epic-id>; each story is one commit on it; per-story
+      branches fragment review

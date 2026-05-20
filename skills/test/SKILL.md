@@ -13,7 +13,7 @@ Run the test swarm pipeline on a story, PR, or the current codebase.
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — kickoff gate (initialization check) + persona / config / memory loading.
 
-**Kickoff gate override — warn, don't block.** This skill is read-only-shaped. On a fresh repo without `.pHive/project-profile.yaml`, emit the warning below and proceed with sane defaults instead of stopping. The hard-stop in the prelude does NOT apply here.
+**Kickoff gate override — warn, don't block.** If the kickoff checks pass, proceed silently. This skill is read-only-shaped. On a fresh repo without `.pHive/project-profile.yaml`, emit the warning below and proceed with sane defaults instead of stopping. The hard-stop in the prelude does NOT apply here.
 
 > Warning: Hive not initialized for this project. Run `/hive:kickoff` for full context. Proceeding with defaults.
 
@@ -45,6 +45,8 @@ ALL test artifacts go to `.pHive/test-artifacts/{epic-id}/{story-id}/`:
 **NEVER scatter artifacts in the project root.**
 
 ## Known Limitations
+
+> **Parallel-call-site annotation (audit pass):** `parallel_rationale: variation` — platform workers (web/iOS/Android) run the same test spec against disjoint platform targets; the workflow runner serializes Maestro (port 7001) but unit/integration suites parallelize freely. Out-of-scope for the `ed-7` story-level fan-out gate (workflow-internal parallelism, not story dispatch); catalogued in [`hive/references/parallel-call-sites.md`](../../hive/references/parallel-call-sites.md) §3 (`test-swarm:platform-workers`).
 
 - **Maestro port 7001:** Single driver — iOS and Android must serialize, cannot run in parallel. Unit/integration tests can still parallel.
 - **testId render visibility:** A testId in source doesn't guarantee the component is visible. The architect step verifies render visibility to catch layout anti-patterns.

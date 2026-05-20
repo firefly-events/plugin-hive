@@ -1,0 +1,137 @@
+id: pe-3-workflow-stack-pr
+epic: per-epic-branch-pr-flow
+title: Workflow template — concurrency per-epic + PR-stack-or-update
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [pe-1-config-schema, pe-2-bridge-epic-branch]
+
+description: |
+  The GH Actions dispatch workflow (`skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl`)
+  currently:
+    - Sets `concurrency: hive-issue-${issue.number}` (per-issue serialization)
+    - Calls `gh pr create` post-bridge-run, opening a fresh PR each time
+
+  This story rewrites those two surfaces:
+
+  1. **Concurrency:** derive `EPIC_ID` from `${{ github.event.issue.labels }}` at job
+     start (jq filter on `hive:epic:*`). Set `concurrency.group: hive-epic-${EPIC_ID}` so
+     concurrent stories of the same epic serialize on the shared branch. Falls back to
+     `hive-issue-${issue.number}` when no `hive:epic:*` label is present.
+
+  2. **PR open vs. update:**
+     - After the bridge run, query for an existing open PR with `head: feat/<epic-id>` and
+       `base: <resolved-base>` via `gh pr list --head feat/<epic-id> --json number,isDraft`.
+     - If exists: `gh pr edit <n> --body "$(combine existing body + new story line)"`. The
+       new line format is `- 🟡 <story-id>: <title>` for in-progress, `- ✅ <story-id>: <title>`
+       for shipped (set after the inner /hive:execute commit lands).
+     - If absent: `gh pr create --draft --base <resolved-base> --head feat/<epic-id>
+       --title "[epic] <epic-id>" --body "<seeded epic-summary body>"`.
+
+  3. **Resolved base branch:** workflow shells out to a tiny inline JS one-liner that
+     imports `hive/lib/git_flow.mjs` (from pe-1) and prints `base_branch`. Stored in the
+     `BASE_BRANCH` step output for downstream steps.
+
+  This story does NOT promote draft → ready — pe-4 owns that.
+
+acceptance_criteria:
+  - "Given two stories of the same epic flip to `hive:ready` within 30 seconds of each other, when the workflow fires, then the second run waits for the first via the `hive-epic-<id>` concurrency group (verifiable in GH Actions run timeline)."
+  - "Given the first story of an epic ships, when the workflow's `Open or update PR` step runs, then `gh pr create --draft --base <resolved-base> --head feat/<epic-id>` is invoked once, producing a single open draft PR."
+  - "Given the second story of the same epic ships and an open draft PR exists for `feat/<epic-id>`, when the workflow runs, then NO `gh pr create` is called and the existing PR's body is appended with the new story line."
+  - "Given the resolved `base_branch` is `develop`, when the workflow opens the PR, then `gh pr view --json baseRefName` returns `develop`."
+  - "Given an issue WITHOUT any `hive:epic:*` label flips to `hive:ready`, when the workflow runs, then the concurrency group falls back to `hive-issue-<n>` and the PR is opened against base as today (no regression)."
+
+steps:
+  - id: research
+    description: |
+      Read the current `hive-dispatch.yml.tpl` end-to-end + the `.example.yml` mirror.
+      Check `gh pr list --help` and `gh pr edit --help` for body-append idioms.
+      Identify the safe shell-injection-free way to compose the new PR body (use heredocs
+      + jq-encoded label values, never inline-interpolate user-controlled strings).
+    agent: researcher
+  - id: implement
+    description: |
+      1. Edit `skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl`:
+         - Add `Derive EPIC_ID` step (jq filter on labels)
+         - Update `concurrency.group` to use `EPIC_ID` with fallback
+         - Add `Resolve base branch` step calling a tiny Node one-liner
+         - Replace the `gh pr create` block with the open-or-update conditional
+      2. Regenerate `.example.yml` mirror.
+      3. Update the SKILL.md "Process" + "Outputs" sections to reflect the new flow.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Extend asset-substitution tests + add a fixture-based workflow YAML lint test that
+      parses the .tpl with stub substitutions (renderer in scaffold.mjs) and asserts:
+        - concurrency.group string contains `hive-epic-${{` (templating expression preserved)
+        - exactly one of `gh pr create` or `gh pr edit` appears in each branch of the conditional
+        - the resolved base branch substitution path is present
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify no shell-injection in the body composition. Verify the workflow still
+      passes GitHub's YAML validation (yamllint or `gh workflow view` post-deploy).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: One commit on `feat/per-epic-branch-pr-flow`.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive-ui-f
+  key_files:
+    - path: skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl
+      purpose: The GH Actions workflow template the scaffolder drops into consumer repos.
+    - path: skills/sandcastle-gh-init/assets/hive-dispatch.example.yml
+      purpose: Parity mirror.
+    - path: hive/lib/git_flow.mjs
+      purpose: From pe-1; consumed by the `Resolve base branch` step.
+
+files_to_modify:
+  - file: skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl
+    change: modify — concurrency, base-branch resolve, PR open-or-update
+  - file: skills/sandcastle-gh-init/assets/hive-dispatch.example.yml
+    change: modify — mirror
+  - file: skills/sandcastle-gh-init/SKILL.md
+    change: modify — describe new workflow behavior
+  - file: tests/sandcastle-gh-init-assets.test.js
+    change: modify — add lint + substitution assertions
+
+cross_cutting: []
+
+metric:
+  applies: true
+  name: prs_opened_per_epic
+  direction: down
+  unit: count
+  baseline: 6.0   # 6 stories in this epic = 6 PRs under old contract
+  target: 1.0     # one PR per epic
+  window: this-epic-and-next-2
+  source:
+    kind: sql
+    ref: "SELECT COUNT(DISTINCT pr_number) FROM gh_prs WHERE head_branch LIKE 'feat/<epic-id>'"
+  verify_at: integrate
+  owner: reviewer
+  justification: |
+    The whole point of this story is to collapse N-PRs-per-epic to 1. Direct, falsifiable.
+
+risks:
+  - severity: high
+    description: Concurrent runs of the same epic race the branch checkout despite concurrency group.
+    mitigation: |
+      Concurrency group with `cancel-in-progress: false` queues runs (not cancels). Verify
+      behavior with two-issue concurrent-label test in the test step.
+  - severity: medium
+    description: PR body grows unbounded across many stories.
+    mitigation: Truncate at 25 entries with a "see commits" pointer. Add to implement step.
+
+references:
+  - path: .pHive/epics/per-epic-branch-pr-flow/docs/design-discussion.md
+    relevant_excerpt: |
+      After bridge run, query for existing open PR with head `feat/<epic-id>` and base
+      `<resolved-base>`:
+        - **No existing PR:** `gh pr create --draft --base <base> --head feat/<epic-id>`
+        - **Existing open PR:** `gh pr edit --add-body` (append new story summary)

@@ -13,7 +13,7 @@
 
 ### git check-ignore
 ```
-.gitignore:70:.sandcastle/	.sandcastle/logs/fake.log
+.gitignore:70:.sandcastle/    .sandcastle/logs/fake.log
 ```
 Rule matched at line 70 of root `.gitignore`. Confirms `.sandcastle/` and all contents are ignored.
 

@@ -11,11 +11,12 @@
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-2.5.0-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
 
+<!-- Keep this manual TOC in sync if section headings are added or renamed. -->
 ## Contents
 
 - [Inspirations](#inspirations)
@@ -120,19 +121,26 @@ Orchestrator loads your team, runs stories through the development workflow (res
 ```
 Structured code review covering correctness, security, conventions, and domain compliance. Optional Codex adversarial pass for a second-model perspective.
 
+**6. Check workflow status**
+```
+/hive:status
+```
+Shows active epics, story progress, and a **Drift trend (last 5 runs)** section summarizing `scope_drift_score` bucket counts when present. Silent on greenfield projects with no drift events yet.
+
 ---
 
 ## UI Team Skills
 
-Five dedicated skills for design work — brand identity, design tokens, implementation audits, and design review ceremonies:
+Six dedicated skills for design work — brand identity, wireframe ceremonies, design tokens, implementation audits, and design review:
 
 | Skill | Command | Purpose | Requires |
 |-------|---------|---------|---------|
 | **Brand System** | `/hive:brand-system` | Establish brand identity: colors (HEX/RGB/CMYK/PMS), typography, spacing. Produces `.pHive/brand/brand-system.yaml` + visual guide PNG via Frame0. | — |
-| **Design System** | `/hive:design-system` | Convert brand system into W3C Design Token JSON for frontend tooling (Tailwind, Figma, Style Dictionary). | `/hive:brand-system` first |
+| **Design** | `/hive:design` | Design UI screens, components, flows, or marketing surfaces — wireframe + design-review handoff. Callable standalone or atomically from `/plan`. Produces wireframes under `.pHive/design/<topic>/` and a handoff record in `.pHive/design/index.yaml`. Not for reviewing existing designs (use `/hive:design-review`) or generating tokens (use `/hive:design-system`). | — (brand-system preferred but optional) |
+| **Design System** | `/hive:design-system` | Generate W3C Design Token JSON from an existing brand-system YAML, for frontend tooling (Tailwind, Figma, Style Dictionary). Not for establishing a new brand identity (use `/hive:brand-system`). | `/hive:brand-system` first |
 | **Polish Audit** | `/hive:polish-audit` | Animation and motion opportunity pass — identifies micro-interactions, loading states, and delight improvements. | `/hive:design-review --artifact-target implementation` first |
-| **Visual QA** | `/hive:visual-qa` | Post-implementation fidelity check — compares design briefs and wireframe PNGs against the actual implementation. | `/hive:ui-design` on a story first |
-| **Design Review** | `/hive:design-review` | Target-aware design or implementation review — domain critiques from accessibility and animations specialists, synthesized by ui-designer. Supports `--artifact-target {design\|implementation}`, `--skip accessibility`, and `--skip animations`. | `/hive:ui-design`, `/hive:brand-system`, or implementation artifacts |
+| **Visual QA** | `/hive:visual-qa` | Post-implementation fidelity check — compares design briefs and wireframe PNGs against the actual implementation. | `/hive:design` on a story first |
+| **Design Review** | `/hive:design-review` | Review existing UI designs and implementations against a brief — domain critiques from accessibility and animations specialists, synthesized by ui-designer. Supports `--artifact-target {design\|implementation}`, `--skip accessibility`, and `--skip animations`. Not for creating new designs (use `/hive:design`). | `/hive:design`, `/hive:brand-system`, or implementation artifacts |
 
 ### Migration
 
@@ -144,8 +152,8 @@ Five dedicated skills for design work — brand identity, design tokens, impleme
 ```
 /hive:brand-system → /hive:design-system
 /hive:kickoff → /hive:design-review --artifact-target implementation → /hive:polish-audit
-/hive:ui-design → /hive:visual-qa
-/hive:ui-design or /hive:brand-system → /hive:design-review
+/hive:design → /hive:visual-qa
+/hive:design or /hive:brand-system → /hive:design-review
 ```
 
 ---
@@ -215,6 +223,25 @@ consumer command surface.
 For the detailed operating contract, see
 [`skills/hive/skills/meta-optimize/SKILL.md`](skills/hive/skills/meta-optimize/SKILL.md)
 and [`hive/references/meta-optimize-contract.md`](hive/references/meta-optimize-contract.md).
+
+### Skill discovery and authoring
+
+Two paired top-level skills close the meta-loop on skill catalog growth:
+
+- [`/find-skills`](skills/find-skills/SKILL.md) — mines recurring patterns from
+  metrics, KG triples, git history, and cycle-state escalations (via
+  [`hive.lib.skill_candidate_mine`](hive/lib/skill_candidate_mine.py)), ranks
+  them by `occurrence_count × recency_factor × distinctness`, filters below
+  threshold, and writes ranked candidates to `.pHive/meta/skill-candidates.yaml`.
+  Operator picks a candidate; `/find-skills` hands off to `/write-skill` via an
+  atomic `Skill` call.
+- [`/write-skill`](skills/write-skill/SKILL.md) — scaffolds
+  `skills/<kebab-name>/SKILL.md` from a brief (name, problem, triggers, scope).
+  Asks clarifying questions inline for any missing field. Scaffold only — no
+  indexing, no commit, no run.
+
+Together they form the discover-then-author half of the meta-loop;
+`/meta-optimize` above is the run-experiments half.
 
 ---
 
@@ -336,6 +363,18 @@ For full operational detail, see [docs/operations-guide.md](docs/operations-guid
 | **Jira** | Task tracking adapter | Set `task_tracker: jira` in `hive/hive.config.yaml` |
 
 Enable integrations in `hive/hive.config.yaml`. All integrations are optional — Hive works without any of them.
+
+### Autonomous worker loop (reference, maintainer-only)
+
+For consumers who want unattended execution: combine the GitHub Issues task-tracker adapter with sandcastle adoption and a GitHub Actions cron workflow to close the `/plan` → labeled issue → worker → PR loop end-to-end. Reference workflow ships at `.github/workflows/hive-worker.yml` (in plugin-hive's own repo only — plugins distribute via `.claude-plugin/`, not `.github/`). Pre-flight gate at `hive/lib/budget-gate.js` aborts the run when `tokens.daily_usd_limit` is exceeded. See [`hive/references/sandcastle-ops-loop.md`](hive/references/sandcastle-ops-loop.md) for the full opt-in checklist, constraints, and failure modes.
+
+### Unattended mode — event-driven dispatch
+
+`/hive:sandcastle-gh-init` scaffolds an event-driven alternative to the cron loop above. Run it after `npx sandcastle init` and the skill drops `.github/workflows/hive-dispatch.yml` + a bridge script into your repo. Labeling any issue `hive:ready` then fires `/hive:execute` inside a Sandcastle container, opens a PR, and flips the canonical label state machine (`hive:ready` → `hive:in-flight` → `hive:shipped` | `hive:failed`). See [`hive/references/sandcastle-gh-dispatch.md`](hive/references/sandcastle-gh-dispatch.md) for the maintainer runbook — install, secret rotation, runner choice, public-repo lockdown, and stuck-label debugging.
+
+**Per-epic branch + base-branch config (2.4.0).** Story-issues carrying a `hive:epic:<id>` label are stacked onto a single `feat/<epic-id>` branch and produce one draft PR per epic (instead of one branch + PR per issue). The PR opens on the first story of the epic, gets its body updated as subsequent stories ship, and promotes from draft to ready-for-review when the last story flips `hive:shipped`. The base branch is auto-resolved (`develop` if `origin/develop` exists, else `main`) and can be pinned via a new `git_flow.default_pr_base` knob in `hive.config.yaml`; setting `branch_strategy: per-story` restores the legacy one-branch-per-issue path for in-flight epics. See the Branching model section in [`hive/references/sandcastle-gh-dispatch.md`](hive/references/sandcastle-gh-dispatch.md#3-branching-model) for the full surface (overrides, concurrency, PR lifecycle).
+
+**Pre-built GHCR image (2.5.0).** Dispatch now pulls a pre-built sandcastle container from `ghcr.io/firefly-events/sandcastle:latest` (published by `.github/workflows/build-sandcastle-image.yml` on every `.sandcastle/**` push + weekly cron) instead of building inside each dispatch run — cuts cold-start from ~4 min to ~20 s. A `workflow_dispatch` input `image_ref` pins a specific `:sha-<7>` tag for rollback testing, and a local-build fallback fires automatically if the pull fails. See the Image distribution section in [`hive/references/sandcastle-gh-dispatch.md`](hive/references/sandcastle-gh-dispatch.md#4-image-distribution) for the full surface.
 
 ---
 

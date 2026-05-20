@@ -1,0 +1,9 @@
+version: 1
+sandcastle_pin: unknown
+runner: ubuntu-latest
+secret_mode: anthropic
+created_at: "2026-05-19T00:22:57.418Z"
+managed_files:
+  - .github/workflows/hive-dispatch.yml
+  - .github/scripts/sandcastle-hive-bridge.mts
+  - .hive-dispatch/manifest.yaml

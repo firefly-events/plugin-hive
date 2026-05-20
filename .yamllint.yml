@@ -1,4 +1,11 @@
 extends: relaxed
+ignore: |
+  node_modules/
+  pytest-of-don/
+  ttd-fixture-*/
+  ttd-state-*/
+  chroma/
+  .pHive-test/
 rules:
   line-length: disable
   truthy:

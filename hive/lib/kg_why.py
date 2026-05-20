@@ -83,16 +83,19 @@ def query_kg(
     if not path.exists():
         return []
 
-    with sqlite3.connect(str(path)) as conn:
-        if strict:
-            if not predicate or not entity:
-                raise ValueError("--strict requires --predicate and --entity")
-            rows = conn.execute(STRICT_SQL_TEMPLATE, (predicate, entity, entity)).fetchall()
-        else:
-            if not topic:
-                return []
-            pattern = f"%{topic}%"
-            rows = conn.execute(FREEFORM_SQL_TEMPLATE, (pattern, pattern, pattern)).fetchall()
+    try:
+        with sqlite3.connect(str(path)) as conn:
+            if strict:
+                if not predicate or not entity:
+                    raise ValueError("--strict requires --predicate and --entity")
+                rows = conn.execute(STRICT_SQL_TEMPLATE, (predicate, entity, entity)).fetchall()
+            else:
+                if not topic:
+                    return []
+                pattern = f"%{topic}%"
+                rows = conn.execute(FREEFORM_SQL_TEMPLATE, (pattern, pattern, pattern)).fetchall()
+    except sqlite3.Error:
+        return []
 
     return [_row_to_triple(row, "kg") for row in rows]
 
@@ -101,8 +104,11 @@ def query_recent_triples(db_path: str | Path | None = None) -> list[WhyTriple]:
     path = Path(db_path).expanduser() if db_path is not None else default_db_path()
     if not path.exists():
         return []
-    with sqlite3.connect(str(path)) as conn:
-        rows = conn.execute(RECENT_SQL_TEMPLATE).fetchall()
+    try:
+        with sqlite3.connect(str(path)) as conn:
+            rows = conn.execute(RECENT_SQL_TEMPLATE).fetchall()
+    except sqlite3.Error:
+        return []
     return [_row_to_triple(row, "kg") for row in rows]
 
 
@@ -146,7 +152,8 @@ def explain_why(
         )
 
     recent = query_recent_triples(db_path)
-    lines = [f"No decisions found matching {topic}."]
+    topic_label = f"'{topic}'" if topic else "the requested query"
+    lines = [f"No decisions found matching {topic_label}."]
     if recent:
         lines.append("Recent triples:")
         lines.append(render_triples(recent))
@@ -329,16 +336,19 @@ def _triples_for_decision_key(
     path = Path(db_path).expanduser() if db_path is not None else default_db_path()
     if not path.exists():
         return []
-    with sqlite3.connect(str(path)) as conn:
-        rows = conn.execute(
-            """
-            SELECT subject, predicate, object, valid_from, valid_until, source_epic, source_agent
-            FROM triples
-            WHERE subject = ? OR object = ?
-            ORDER BY valid_from DESC
-            """,
-            (decision_key, decision_key),
-        ).fetchall()
+    try:
+        with sqlite3.connect(str(path)) as conn:
+            rows = conn.execute(
+                """
+                SELECT subject, predicate, object, valid_from, valid_until, source_epic, source_agent
+                FROM triples
+                WHERE subject = ? OR object = ?
+                ORDER BY valid_from DESC
+                """,
+                (decision_key, decision_key),
+            ).fetchall()
+    except sqlite3.Error:
+        return []
     return [_row_to_triple(row, "chromadb") for row in rows]
 
 

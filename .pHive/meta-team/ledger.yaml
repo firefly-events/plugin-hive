@@ -1,3 +1,150 @@
+- experiment_id: meta-2026-05-18
+  date: '2026-05-18'
+  started: '2026-05-18T00:00:00Z'
+  closed: '2026-05-18T00:30:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 2
+  top_changes:
+    - "hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md: normalized title from '# Step 3b: Backlog Fallback' to '# Step 03b: Backlog Fallback' for consistency with peer sub-step files"
+  commit: fb9917f58d2e29cc4dcc6db9110e4e6b3cdf51be
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 1afd069240d9da557763688ca63f08b1fbb0891d
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-05-18. Analysis found 2 findings: (1) SCHEMA_INCONSISTENCY
+    in step-03b-backlog-fallback.md — title used non-zero-padded "# Step 3b:" while
+    peer sub-step files (step-02b, step-02c, step-03c) all use zero-padded format
+    (02b, 02c, 03c). Fixed by updating the title to "# Step 03b: Backlog Fallback".
+    (2) STUB_DOC hive/references/hive-cloud-roadmap.md — continuing out_of_scope
+    (S16 placeholder, deferred Hive Cloud epic). Closure validator passed.
+    Regression watch armed for 4-hour window.
+- experiment_id: meta-2026-05-17
+  date: '2026-05-17'
+  started: '2026-05-17T00:00:00Z'
+  closed: '2026-05-17T00:30:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 2
+  top_changes:
+    - "hive/lib/budget-gate.js: added claude-haiku-4-5-20251001 to RATES_PER_MTOK so haiku events resolve to haiku rates instead of falling back to opus rates"
+  commit: 09ef854171963a33f109a516a91a2721eee965e7
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 587e71de34424f82661eb4a616c97874d6c1242f
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-05-17. Analysis found 2 findings: (1) SCHEMA_INCONSISTENCY
+    in hive/lib/budget-gate.js — RATES_PER_MTOK used claude-haiku-4-5 as key but
+    runtime model ID is claude-haiku-4-5-20251001; when events log the full model ID
+    the budget gate falls back to opus rates (15x over-count). Fixed by adding
+    claude-haiku-4-5-20251001 key with identical rates, retaining old key for backward
+    compatibility. (2) STUB_DOC hive/references/hive-cloud-roadmap.md continuing
+    out_of_scope. Closure validator passed. Regression watch armed for 4-hour window.
+- experiment_id: meta-2026-05-16
+  date: '2026-05-16'
+  started: '2026-05-16T00:00:00Z'
+  closed: '2026-05-16T00:30:00Z'
+  verdict: passed
+  changes_promoted: 2
+  changes_reverted: 0
+  findings_identified: 3
+  top_changes:
+    - "hive/GUIDE.md: corrected config file path from skills/hive/hive.config.yaml to hive/hive.config.yaml"
+    - "hive/references/agent-config-schema.md + hive/agents/orchestrator.md + hive/GUIDE.md: updated stale model IDs (claude-opus-4-6 -> claude-opus-4-7, claude-haiku-4-5 -> claude-haiku-4-5-20251001)"
+  commit: a5024c847ac3128d077b3c58b06a7dd58b7b5863
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 8000
+    first_attempt_pass: true
+  rollback_ref: b50bb99d65258c7d4e70b278f900b419ef798498
+  notes: |
+    Nightly cycle meta-2026-05-16. Analysis found 3 SCHEMA_INCONSISTENCY findings:
+    (1) GUIDE.md Configuration section referenced non-existent skills/hive/hive.config.yaml
+    (the actual file is hive/hive.config.yaml); (2) agent-config-schema.md, orchestrator.md,
+    and GUIDE.md all documented claude-opus-4-6 but current Opus model is claude-opus-4-7;
+    (3) same files documented claude-haiku-4-5 but the actual API model ID is
+    claude-haiku-4-5-20251001 (confirmed by token-capture-feasibility.md).
+    All three findings addressed. STUB_DOC hive-cloud-roadmap.md continuing out_of_scope.
+    Closure validator passed. Regression watch armed for 4-hour window.
+- experiment_id: meta-2026-05-13
+  date: '2026-05-13'
+  started: '2026-05-13T00:00:00Z'
+  closed: '2026-05-13T00:30:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 2
+  top_changes:
+    - "hive/workflows/steps/meta-team-cycle/step-03-proposal.md: corrected NEXT STEP to load step-03c-metric-declaration instead of step-04-implementation"
+  commit: cb34cfe70e29af92e697edc6f6ad8b8fb88ff992
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: d2ed82db8dd7003bf2b10f9317a49838534934d3
+  notes: |
+    Nightly cycle meta-2026-05-13. Analysis found 1 SCHEMA_INCONSISTENCY:
+    step-03-proposal.md NEXT STEP section pointed to step-04-implementation.md
+    but the live workflow routes through step-03c-metric-declaration first.
+    Fixed by updating the NEXT STEP pointer. STUB_DOC finding for
+    hive-cloud-roadmap.md skipped as out_of_scope (deferred Hive Cloud epic).
+    Closure validator passed. Regression watch armed for 4-hour window.
+- experiment_id: meta-2026-05-14
+  date: '2026-05-14'
+  started: '2026-05-14T00:00:00Z'
+  closed: '2026-05-14T00:30:00Z'
+  verdict: passed
+  changes_promoted: 0
+  changes_reverted: 0
+  findings_identified: 1
+  top_changes: []
+  commit: fbab7f0aab43fec37032381fcaf43d07de9a333b
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 0
+    first_attempt_pass: true
+  rollback_ref: d2ed82db8dd7003bf2b10f9317a49838534934d3
+  notes: |
+    Nightly cycle meta-2026-05-14. Analysis found 1 STUB_DOC finding:
+    hive/references/hive-cloud-roadmap.md (13 lines) is the S16 forward-reference
+    placeholder for the deferred Hive Cloud epic. Finding marked out_of_scope —
+    expanding this stub is premature without the Hive Cloud epic active.
+    This is the third consecutive discard cycle for this same finding (also in
+    meta-2026-05-11 and meta-2026-05-12). Zero proposals generated; zero changes
+    promoted. Cycle closes as discard. Closure validator passed (discard path;
+    rollback_ref and metrics_snapshot present). Regression watch: not_applicable.
+- experiment_id: meta-2026-05-15
+  date: '2026-05-15'
+  started: '2026-05-15T00:00:00Z'
+  closed: '2026-05-15T00:30:00Z'
+  verdict: passed
+  changes_promoted: 0
+  changes_reverted: 0
+  findings_identified: 1
+  top_changes: []
+  commit: f4c596817b662b151bdbf5fda0e50e3065f98a3f
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 0
+    first_attempt_pass: true
+  rollback_ref: d2ed82db8dd7003bf2b10f9317a49838534934d3
+  notes: |
+    Nightly cycle meta-2026-05-15. Analysis found 1 STUB_DOC finding:
+    hive/references/hive-cloud-roadmap.md (13 lines) is the S16 forward-reference
+    placeholder for the deferred Hive Cloud epic. Finding marked out_of_scope —
+    expanding this stub is premature without the Hive Cloud epic active.
+    Finding also flagged out_of_scope in meta-2026-05-11 and meta-2026-05-12.
+    Zero proposals generated; zero changes promoted. Cycle closes as discard.
+    Closure validator passed (discard path; rollback_ref and metrics_snapshot
+    present). Regression watch: not_applicable.
 - experiment_id: meta-2026-05-12
   date: '2026-05-12'
   started: '2026-05-12T00:00:00Z'

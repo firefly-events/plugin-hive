@@ -1,0 +1,78 @@
+id: mhg-4-design-skill-greenfield-and-toplevel
+epic: meta-hive-grooming-may2026
+title: Make design system optional in greenfield path + audit /design top-level invocability
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Two related sub-changes around design skills:
+
+  (a) **Optional path in greenfield kickoff/plan.** Greenfield projects
+      currently get steered toward brand-system + design-system as part
+      of the recommended setup. Not every greenfield needs full brand
+      foundation upfront — many devs want to skip and add later. Make
+      the design-system step optional in greenfield discovery: prompt
+      "set up brand + design system now, defer to later, or skip
+      entirely?".
+
+  (b) **Top-level command audit.** `/hive:design-system` and
+      `/hive:brand-system` already exist as top-level skills under
+      `skills/`. Verify they are invocable standalone (outside of
+      planning) without hidden gates that block. Document the
+      standalone usage. Consider a `/hive:design` umbrella alias if it
+      simplifies the mental model.
+
+  Goal: design work is a first-class entry point, not a planning-only
+  detour.
+
+acceptance_criteria:
+  - "Given a greenfield kickoff run, when the design-system step appears, then the user is offered three paths: set up now, defer, skip — and the choice persists."
+  - "Given /hive:design-system or /hive:brand-system is invoked outside of planning, when the skill executes, then it runs to completion without requiring an active epic context (or surfaces a clear precondition message)."
+  - "Given a user reads each skill's docs, when scanning for usage, then standalone invocation is documented."
+  - "Given the audit identifies a useful umbrella command, when the umbrella is implemented, then it routes to the underlying skill(s); if no umbrella is warranted, the audit doc records the rationale."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read `skills/design-system/SKILL.md`, `skills/brand-system/SKILL.md`,
+      and `skills/hive/skills/greenfield-discovery/SKILL.md`. Identify
+      every gate (brand-system gates on what? design-system gates on
+      what?). Map the greenfield-kickoff prompt path to find the
+      injection point for the optional choice.
+  - id: implement
+    agent: developer
+    description: |
+      (a) Add greenfield optional-path prompt + persistence.
+      (b) Audit + document standalone invocability. Implement umbrella
+      alias if recommended.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: Hand-test all AC paths with a throwaway greenfield project.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: Verify consumer neutrality, no maintainer-only paths leak.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit on feat/meta-hive-grooming-may2026 branch.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/design-system/SKILL.md
+      purpose: Standalone-invocability audit target.
+    - path: skills/brand-system/SKILL.md
+      purpose: Standalone-invocability audit target; brand-system gates design-system.
+    - path: skills/hive/skills/greenfield-discovery/SKILL.md
+      purpose: Greenfield path; insert optional-step prompt here.
+
+risks:
+  - severity: low
+    description: Umbrella aliases proliferate confusion if added without clear value.
+    mitigation: Default to "no umbrella", only add if research finds the existing two are awkward to remember.

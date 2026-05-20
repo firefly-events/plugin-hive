@@ -70,6 +70,12 @@ tokens:
   per_session_limit: 1000000   # CWC 2026-05-06 doubled Opus quotas; unset -> 1000000 keeps session-mode budgets aligned with the doubled per-story Opus cap
   per_epic_limit: 2000000
   warning_threshold: 0.8
+  # Daily USD spend cap read by the autonomous-worker pre-flight gate at
+  # hive/lib/budget-gate.js (see hive/references/sandcastle-ops-loop.md).
+  # Unset → gate effectively disabled (limit defaults to Infinity).
+  # Only applies when the maintainer-only .github/workflows/hive-worker.yml
+  # is in use; default consumers see zero behavior change.
+  # daily_usd_limit: 50
 
 # Context window management
 context_window:
@@ -101,6 +107,22 @@ task_tracking:
   # Runtime context — passed at invoke time (not at load time):
   team_value: null             # github: owner; linear: team key (e.g., "ACME")
   project_value: null          # github: repo;  linear: project name
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sandcastle ops layer (Epic sandcastle-ops-layer, story s1) — additive,
+  # opt-in. When `adapter: github`, /plan Phase D publishes story YAMLs as
+  # labeled GitHub Issues so an autonomous worker can pick them up. Default
+  # consumers (adapter: null or other) see ZERO behavior change.
+  #
+  # github_owner / github_repo override team_value / project_value when the
+  # caller wants to publish to a different owner/repo than the dispatch ABI
+  # default. Leave null to fall through to team_value / project_value.
+  #
+  # label_prefix is the namespace for hive:ready, hive:blocked-by:<id>, etc.
+  # Default "hive" matches sandcastle-ops-layer spec.
+  github_owner: null
+  github_repo: null
+  label_prefix: "hive"
+  # ─────────────────────────────────────────────────────────────────────────
   # Adapter-specific sub-config (propagated to env if non-null):
   github:
     token: null                # falls through to GITHUB_TOKEN env / `gh auth token`
@@ -118,16 +140,19 @@ task_tracking:
   branch_prefix: "acme"
 
 # Model tier routing
-# Assigns the right model to the right job. Orchestrator and complex reasoning
-# get Opus. Analytical/implementation work gets Sonnet. Fast execution gets Haiku.
+# Only the orchestrator runs on Opus by default — planning + process
+# discipline carry most of the load, so the downstream roster is on Sonnet.
+# Haiku is reserved for purely mechanical execution. Research/exploration
+# personas (researcher, technical-writer, etc.) MUST stay on Sonnet at
+# minimum — never demote them to Haiku.
 model_tiers:
-  opus:                          # heavy reasoning, coordination, complex decisions
+  opus:                          # top-level coordination only
     - orchestrator
+  sonnet:                        # planning, analytical, implementation, review, writing, test design
     - team-lead
     - architect
     - analyst
     - tpm
-  sonnet:                        # analytical, implementation, review
     - researcher
     - developer                    # still referenced by workflows; use frontend/backend-developer for new work
     - frontend-developer
@@ -142,14 +167,18 @@ model_tiers:
     - test-architect
     - test-inspector
     - test-sentinel
-  haiku:                         # fast execution, mechanical tasks
+  haiku:                         # fast mechanical execution (never research/exploration)
     - test-worker
 
-# Override a specific agent's model (takes precedence over tier)
+# PROMOTE specific personas above their default tier. The defaults above are
+# intentionally lean (Sonnet for the roster, Opus for the orchestrator only);
+# use this map to opt a persona UP for projects that genuinely need the extra
+# horsepower. Never demote below the default — research/exploration personas
+# in particular must stay on Sonnet at minimum.
 model_overrides:
-  reviewer: opus               # story-zero wiring preserved; reviewer remains on Opus
-  peer-validator: opus         # story-zero wiring preserved; peer-validator remains on Opus
-  # example: researcher: opus    # promote researcher to opus for complex projects
+  reviewer: opus               # promoted: Opus 4.7 reviews Codex-produced work as the cross-LLM verification gate
+  peer-validator: opus         # promoted: runs alongside reviewer — same cross-LLM gate, same tier
+  # example: architect: opus     # promote architect to Opus for architecturally complex projects
 
 # Circuit breakers — prevent wasted time and tokens
 circuit_breakers:
@@ -242,6 +271,21 @@ meta_optimize:
 # replay window rather than extending per-session session-end phases.
 dreaming:
   timeout_hours: 12            # overnight replay window; keeps capability-skip bounded for daily routines
+
+# Git workflow settings (per-epic-branch-pr-flow epic, story pe-1)
+# Controls how Hive epics branch + open PRs. Resolved by
+# `hive/lib/git_flow.mjs` (`resolveGitFlow`).
+#
+# default_pr_base:
+#   auto                — develop if origin/develop exists, else main (default)
+#   <branch-name>       — pin to a specific base (e.g., main, develop, dev/foo)
+#
+# branch_strategy:
+#   per-epic            — one branch per epic (one PR aggregating all stories) [default]
+#   per-story           — one branch per story (back-compat for in-flight epics)
+git_flow:
+  default_pr_base: auto
+  branch_strategy: per-epic
 
 # Planning settings
 planning:

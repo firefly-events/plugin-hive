@@ -1,0 +1,97 @@
+id: mhg-7-agent-model-tier-rebalance
+epic: meta-hive-grooming-may2026
+title: Rebalance agent model tiers — only orchestrator on opus
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Maintainer thesis: planning + processes are robust enough that the
+  downstream roster doesn't need opus horsepower. Today the orchestrator
+  persona's "Model tier routing" table assigns opus to orchestrator,
+  team-lead, architect, analyst, tpm. The maintainer wants only the
+  orchestrator on opus; everyone else should run on sonnet by default,
+  with haiku for mechanical work — but NEVER haiku for the tiny Explorer
+  agent (research/exploration personas must stay sonnet at minimum).
+
+  Existing memory: `feedback_no_haiku_agents.md` — "Haiku OK for small
+  tasks; never for Explorer/research agents". This story aligns the
+  rest of the routing with that rule.
+
+  Touch list:
+    1. Audit `hive/agents/*.md` frontmatter `model:` field — list every
+       persona's current tier.
+    2. Update each frontmatter:
+       - orchestrator → opus (unchanged)
+       - team-lead, architect, analyst, tpm → sonnet (downgrade from opus)
+       - researcher, technical-writer, frontend-developer, backend-developer,
+         tester, reviewer, pair-programmer, peer-validator, ui-designer,
+         test-scout, test-architect, test-inspector, test-sentinel → sonnet
+         (most already are)
+       - test-worker → haiku (unchanged — pure mechanical execution)
+    3. Update the Model tier routing table in `hive/agents/orchestrator.md`
+       to reflect new defaults.
+    4. Update `hive/hive.config.yaml` model_overrides comments/examples
+       so users see the new posture.
+    5. Verify no Explorer-style persona accidentally lands on haiku.
+
+acceptance_criteria:
+  - "Given hive/agents/*.md is scanned post-change, when the model: field is read, then orchestrator=opus, test-worker=haiku, all others=sonnet."
+  - "Given orchestrator.md Model tier routing section is read, when the table is checked, then opus tier lists only orchestrator and the table reflects the new policy."
+  - "Given hive/hive.config.yaml is read, when model_overrides examples/comments are checked, then they describe how to PROMOTE a persona (not document the old defaults)."
+  - "Given a research/exploration persona is on the team, when its tier is checked, then it is sonnet (never haiku)."
+  - "Given the change is shipped, when an existing project's epic runs, then it executes against the new defaults without config edits required."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Grep `model:` in hive/agents/*.md. Produce the current matrix.
+      Identify any persona NOT in the maintainer's plan above.
+  - id: implement
+    agent: developer
+    description: |
+      Apply frontmatter edits per the touch list. Update orchestrator.md
+      tier table. Update hive.config.yaml example comments.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Diff every modified file. Confirm matrix matches AC #1. Check
+      no-Haiku-for-Explorer constraint by listing every haiku persona.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Verify the maintainer's intent is faithfully captured: planning
+      robustness justifies downstream cost reduction; insight capture
+      agents (researcher, technical-writer) stay on sonnet not haiku.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit on feat/meta-hive-grooming-may2026 branch.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/agents/orchestrator.md
+      purpose: Tier routing table; this is the canonical source.
+    - path: hive/agents/
+      purpose: Per-persona frontmatter `model:` fields.
+    - path: hive/hive.config.yaml
+      purpose: model_overrides example comments.
+
+risks:
+  - severity: medium
+    description: Downgrading architect/tpm/analyst from opus to sonnet may degrade planning quality on complex epics.
+    mitigation: model_overrides supports per-project promotion; document the escape hatch prominently. If quality regresses observably on a future epic, promote back via override (not default).
+  - severity: low
+    description: Some non-roster agents (e.g., codex-rescue, plugin-dev:* sub-agents) may also have model fields.
+    mitigation: Story scope is hive/agents/ only — out-of-scope agents are not touched.
+
+references:
+  - path: ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/feedback_no_haiku_agents.md
+    relevant_excerpt: |
+      Haiku OK for small tasks; never for Explorer/research agents

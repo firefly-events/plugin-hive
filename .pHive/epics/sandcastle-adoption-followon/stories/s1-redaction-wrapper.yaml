@@ -103,4 +103,3 @@ references:
       Pre-story decisions (R-A, R-B) locked from architect review:
       dedicated `/hive:sandbox-setup` skill + in-Hive logger redaction wrapper.
       Both Tier-1 hard prereqs.
-

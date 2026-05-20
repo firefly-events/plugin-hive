@@ -1,4 +1,4 @@
-# Step 3b: Backlog Fallback
+# Step 03b: Backlog Fallback
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
 

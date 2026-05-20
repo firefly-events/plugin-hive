@@ -45,6 +45,31 @@ escalations:
     raised_by: architect             # agent persona name
     raised_at: "2026-04-11T09:15:00Z"  # ISO 8601; populated by orchestrator at extraction
 
+phase_records:
+  - phase: research
+    started_at: "2026-03-25T09:00:00Z"
+    completed_at: "2026-03-25T10:30:00Z"
+    expected_scope:
+      - "Read both reference docs in full"
+      - "Catalogue example blocks needing update"
+    delivered_scope:
+      - "Read both reference docs in full"
+      - "Catalogue example blocks needing update"
+    delta_reasons: []                # empty when delivered matches expected
+
+  - phase: implement
+    started_at: "2026-03-25T10:30:00Z"
+    completed_at: "2026-03-25T12:00:00Z"
+    expected_scope:
+      - "Add expected_scope/delivered_scope/delta_reasons to handoff schema"
+      - "Add the same three fields to per-phase records"
+      - "Document the delta_reasons enum identically in both files"
+    delivered_scope:
+      - "Added expected_scope/delivered_scope/delta_reasons to handoff schema"
+      - "Added phase_records with three fields to cycle-state-schema"
+    delta_reasons:
+      - deferred                     # enum docs sentence moved to a follow-up patch
+
 naming:
   product: my-app
   package: com.example.myapp
@@ -66,6 +91,44 @@ technology:
 ```
 
 `stories` field — required for `append` placement (empty list is invalid); informational for `pre-exec`/`post-exec` (empty list is valid — phase spawns regardless of story scope).
+
+### Phase records — scope-drift fields
+
+`phase_records[]` captures per-phase scope at boundary crossings.
+`expected_scope`, `delivered_scope`, and `delta_reasons` are the data
+shape the `scope_drift_score` metric (story `ed-3-drift-metric-emit`)
+consumes.
+
+| Field | Type | Required when | Description |
+|-------|------|---------------|-------------|
+| `phase` | string | Always | Phase label (`research`, `architecture`, `implement`, `review`, `test`, `integrate`, etc.). Must be unique within `phase_records[]`. |
+| `started_at` | string | Always | ISO 8601 timestamp when the phase began. |
+| `completed_at` | string | Before phase exit | ISO 8601 timestamp when the phase finished. Absent while the phase is in flight. |
+| `expected_scope` | `list[str]` | Before phase exit | Items the orchestrator declared the phase was expected to deliver. Free-text bullets — one item per logical unit (decision, deliverable, file group, etc.). |
+| `delivered_scope` | `list[str]` | Before phase exit | Items the phase actually delivered, at the same granularity as `expected_scope`. |
+| `delta_reasons` | `list[enum]` | Before phase exit whenever the two scope lists diverge | One or more enum values explaining *why* delivered differs from expected. Empty list when the two scopes match exactly. |
+
+All scope-drift fields are **optional on initial write** (the
+orchestrator may seed `expected_scope` at phase start and leave the
+other two empty) and **required before the phase record's
+`completed_at` is set** — i.e., the record must carry all three fields
+before the phase is considered exited.
+
+### `delta_reasons` enum
+
+Values are identical in [cross-swarm-handoff.md](cross-swarm-handoff.md).
+The enum is **additive** — new values may be introduced in a follow-up
+patch story without bumping any major schema version. Consumers MUST
+ignore unknown values gracefully rather than rejecting the document.
+
+| Value | Meaning |
+|-------|---------|
+| `rescope` | Phase was explicitly rescoped mid-flight by planner direction; expected_scope shifted before delivery. |
+| `scope-creep` | Phase delivered MORE than expected without an explicit rescope. |
+| `deferred` | Expected item was intentionally moved to a later phase or story. |
+| `blocked` | Expected item could not be delivered due to an external block (dependency unmet, infra unavailable); acknowledged drift, not silent loss. |
+| `misunderstood-ac` | Acceptance criterion was interpreted differently than authored; delivered work does not match author intent. |
+| `out-of-band-work` | Work landed that was not in any `expected_scope` (e.g., emergency fix during research). |
 
 ## How It Works
 
@@ -114,6 +177,7 @@ When a planning swarm hands off to a dev swarm, the cycle state transfers as par
 | `technology` | object | Technology stack decisions |
 | `linear` | object | Linear ticket ID mapping (see below) |
 | `escalations` | list | Specialist team escalation flags raised during planning. See specialist-triggers.md catalog for valid trigger IDs. |
+| `phase_records` | list | Per-phase boundary records carrying `expected_scope`, `delivered_scope`, and `delta_reasons`. See `Phase records — scope-drift fields` above. |
 
 ## Linear Ticket Tracking
 

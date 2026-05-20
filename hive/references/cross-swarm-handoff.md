@@ -45,10 +45,56 @@ constraints:
   - "Kotlin 2.0+ required"
   - "No new backend dependencies"
 
+expected_scope:
+  - "Event CRUD endpoints (create, read, update, delete)"
+  - "RSVP attach/detach flow"
+  - "Event-list pagination"
+
+delivered_scope:
+  - "Event CRUD endpoints (create, read, update, delete)"
+  - "RSVP attach/detach flow"
+
+delta_reasons:
+  - deferred                  # pagination pushed to next phase
+
 naming:
   product: my-app
   package: com.example.myapp
 ```
+
+### Scope-drift fields
+
+`expected_scope`, `delivered_scope`, and `delta_reasons` quantify how
+phase output compares to phase input. They are the data shape consumed by
+the `scope_drift_score` metric (story `ed-3-drift-metric-emit`).
+
+| Field | Type | Required when | Description |
+|-------|------|---------------|-------------|
+| `expected_scope` | `list[str]` | Before status flips to `consumed` | Items the source swarm declared they expected to deliver. Free-text bullets — one item per logical unit (endpoint, feature slice, decision, etc.). |
+| `delivered_scope` | `list[str]` | Before status flips to `consumed` | Items the target swarm acknowledges were actually delivered. Free-text bullets matching the `expected_scope` granularity. |
+| `delta_reasons` | `list[enum]` | Before status flips to `consumed` whenever the two scope lists diverge | One or more enum values explaining *why* delivered differs from expected. Empty list when the two scopes match exactly. |
+
+All three fields are **optional on initial write** (source swarm may
+create the handoff with `expected_scope` only and leave the other two
+empty) and **required before the handoff transitions to `consumed`** —
+the target swarm fills `delivered_scope` and any `delta_reasons` as part
+of consuming.
+
+### `delta_reasons` enum
+
+Values are identical in [cycle-state-schema.md](cycle-state-schema.md).
+The enum is **additive** — new values may be introduced in a follow-up
+patch story without bumping any major schema version. Consumers MUST
+ignore unknown values gracefully rather than rejecting the document.
+
+| Value | Meaning |
+|-------|---------|
+| `rescope` | Phase was explicitly rescoped mid-flight by planner direction; expected_scope shifted before delivery. |
+| `scope-creep` | Phase delivered MORE than expected without an explicit rescope. |
+| `deferred` | Expected item was intentionally moved to a later phase or story. |
+| `blocked` | Expected item could not be delivered due to an external block (dependency unmet, infra unavailable); acknowledged drift, not silent loss. |
+| `misunderstood-ac` | Acceptance criterion was interpreted differently than authored; delivered work does not match author intent. |
+| `out-of-band-work` | Work landed that was not in any `expected_scope` (e.g., emergency fix during research). |
 
 ## Status Lifecycle
 
@@ -60,7 +106,7 @@ pending → expired  → (cleanup)
 | Status | Meaning |
 |--------|---------|
 | `pending` | Handoff created, waiting for target swarm to pick up |
-| `consumed` | Target swarm acknowledged receipt and loaded context |
+| `consumed` | Target swarm acknowledged receipt, loaded context, and populated `delivered_scope` + any `delta_reasons` |
 | `expired` | Not consumed within expiration window |
 
 ## Storage
@@ -77,8 +123,9 @@ After a swarm completes (e.g., planning finishes all stories):
 
 1. Orchestrator packages: epic, stories, cycle state, wireframes, and any other artifacts
 2. Extracts key decisions and constraints from cycle state
-3. Writes handoff YAML to `.pHive/handoffs/`
-4. Status: `pending`
+3. Declares `expected_scope` — what the source swarm believes it is handing over
+4. Writes handoff YAML to `.pHive/handoffs/`
+5. Status: `pending`
 
 ### Consuming a Handoff (target swarm)
 
@@ -86,8 +133,9 @@ When the next swarm starts (e.g., dev swarm kicks off):
 
 1. Orchestrator checks `.pHive/handoffs/` for pending handoffs targeting this swarm
 2. Loads all artifacts and injects cycle state as constraints
-3. Updates handoff status to `consumed` with timestamp
-4. Proceeds with execution using the handed-off context
+3. Populates `delivered_scope` (what the target swarm acknowledges receiving) and, when it diverges from `expected_scope`, one or more `delta_reasons`
+4. Updates handoff status to `consumed` with timestamp
+5. Proceeds with execution using the handed-off context
 
 ### Chained Workflows
 

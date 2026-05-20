@@ -53,7 +53,7 @@ def parse_config_text(raw: str) -> dict[str, Any]:
 def parse_top_level_emit_lifecycle_at(raw: str) -> dict[str, Any]:
     for line in raw.splitlines():
         match = re.match(
-            r"^\s*emit_lifecycle_at:\s*(.+?)\s*(?:#.*)?$",
+            r"^emit_lifecycle_at:\s*(.+?)\s*(?:#.*)?$",
             line,
         )
         if match:

@@ -1,0 +1,100 @@
+id: css-3-workflow-token-passthrough
+epic: claude-in-sandcastle-switch
+title: Pass CLAUDE_CODE_OAUTH_TOKEN env into sandcastle container
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  Wire the maintainer's CLAUDE_CODE_OAUTH_TOKEN repo secret through the
+  workflow into the sandcastle container's env, mirroring the codex
+  auth approach (but env-only, no file mount — Claude doesn't need a
+  mounted credential file; the env var is the credential).
+
+  Two coordinated touch points:
+
+  1. `.github/workflows/hive-worker.yml` — Add a verify step (same shape
+     as Codex's verify) that asserts CLAUDE_CODE_OAUTH_TOKEN secret is
+     non-empty before the Build sandcastle image step. Surface a clear
+     setup-instruction error if unset.
+
+  2. `hive/lib/sandcastle-worker-runner.js` — Extend `buildContainerEnv()`
+     to also forward `process.env.CLAUDE_CODE_OAUTH_TOKEN` into the
+     docker container env map. The sandcastle docker provider already
+     accepts `env: { ... }` (we use it for GH_TOKEN already).
+
+  After this story lands, container starts with both GH_TOKEN and
+  CLAUDE_CODE_OAUTH_TOKEN available — but until css-1 (factory swap)
+  and css-4 (prompt rewrite) land, nothing in the container uses the
+  Claude token yet. Pure infra prep.
+
+acceptance_criteria:
+  - "Given CLAUDE_CODE_OAUTH_TOKEN is set on the repo, when the workflow runs, then the verify step exits 0 and the env var is present in the container at runtime."
+  - "Given CLAUDE_CODE_OAUTH_TOKEN is unset, when the workflow runs, then the verify step fails with a clear setup-hint message naming the gh secret set command."
+  - "Given the existing GH_TOKEN env passthrough, when CLAUDE_CODE_OAUTH_TOKEN is added, then GH_TOKEN still arrives in the container unchanged."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read the workflow's existing `Materialize codex auth.json` step
+      for the verify pattern. Read hive/lib/sandcastle-worker-runner.js
+      buildContainerEnv() to confirm the extension shape.
+  - id: implement
+    agent: developer
+    description: |
+      Add `Verify Claude OAuth token secret` workflow step (modeled on
+      the codex verify step). Extend buildContainerEnv to forward the
+      env var. Update test seam assertions for AC-9 captured env.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: Runner tests pass with new env field; verify a missing-secret path.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: Verify no token value leaks into logs (env shouldn't echo).
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .github/workflows/hive-worker.yml
+      purpose: Existing codex verify step is the pattern to mirror.
+    - path: hive/lib/sandcastle-worker-runner.js
+      purpose: buildContainerEnv() function lives here; extend it.
+    - path: .github/workflows/claude-auth-spike.yml
+      purpose: Verified pattern for verify-then-passthrough.
+
+files_to_modify:
+  - file: .github/workflows/hive-worker.yml
+    change: Add `Verify Claude OAuth token secret` step + add CLAUDE_CODE_OAUTH_TOKEN to Run worker env
+  - file: hive/lib/sandcastle-worker-runner.js
+    change: buildContainerEnv adds CLAUDE_CODE_OAUTH_TOKEN to forwarded env
+
+design_decisions:
+  - decision: Env-only, no mount
+    rationale: Claude CLI accepts CLAUDE_CODE_OAUTH_TOKEN directly via env; no need for a credential file. Simpler than codex which requires a mounted auth.json.
+  - decision: Verify step fails loudly when unset
+    rationale: Matches the codex auth verify pattern. Operator gets a copy-pasteable fix command in the error.
+
+risks:
+  - severity: low
+    description: Env var name typo or case mismatch → silent auth fail at runtime
+    mitigation: Verify step asserts non-empty; runner test asserts the env field is present in docker() call.
+
+references:
+  - path: .github/workflows/claude-auth-spike.yml
+    relevant_excerpt: |
+      env:
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      ...
+      printf '%s' "$PROMPT" \
+        | docker exec -i \
+            -e CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN" \
+            "$CID" claude --print

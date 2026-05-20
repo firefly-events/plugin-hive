@@ -94,4 +94,3 @@ references:
       The `claudeCode()` provider requires an API key,
       and Pro/Max subscription auth is unimplemented upstream.
       As of the 2026-05-08 spike, issue #191 remained open.
-

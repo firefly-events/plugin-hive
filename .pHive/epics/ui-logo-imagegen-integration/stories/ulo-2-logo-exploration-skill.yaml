@@ -1,0 +1,101 @@
+id: ulo-2-logo-exploration-skill
+epic: ui-logo-imagegen-integration
+title: New /logo-exploration skill orchestrating the hybrid flow
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [ulo-1-openai-image-tool]
+
+description: |
+  New atomic skill at `skills/logo-exploration/SKILL.md` that orchestrates
+  the hybrid logo flow:
+
+  1. Read brand brief from .pHive/brand/brand-system.yaml (or arg)
+  2. For each of 2-3 concept directions (from brief or arg), invoke
+     the openai-image MCP tool's `generate_logo_concepts` → 4 images
+     per direction (so 8-12 total candidates)
+  3. Save images under .pHive/brand/logo-explorations/<timestamp>/
+     per ulo-4 artifact contract
+  4. Render a contact-sheet HTML at
+     .pHive/brand/logo-explorations/<timestamp>/contact-sheet.html
+     showing all candidates side-by-side with concept-direction headers
+  5. Block on human selection (user picks a winning concept by editing
+     a `selected.yaml` in the timestamp dir)
+  6. Optionally: invoke `edit_logo_concept` for 2-3 edit variants of
+     the selected mark
+
+  Output: path to contact-sheet.html + the populated timestamp dir.
+  No vector-conversion or final asset packaging — those are downstream
+  (see ulo-5 docs).
+
+acceptance_criteria:
+  - "Given a brand brief with 2-3 concept directions, when /logo-exploration runs, then it produces .pHive/brand/logo-explorations/<timestamp>/contact-sheet.html with 8-12 logo candidates visible (4 per direction)."
+  - "Given the contact-sheet.html is opened in a browser, when the user reads it, then concept-direction headers, brief excerpt, generation timestamp, and prompts used are all visible."
+  - "Given the skill is invoked without a brand brief on disk and no arg, when it runs, then it errors clearly with 'no brand brief found — run /brand-system first or pass --brief <path>'."
+  - "Given the user creates .pHive/brand/logo-explorations/<timestamp>/selected.yaml naming a candidate, when /logo-exploration --refine <timestamp> runs, then it invokes edit_logo_concept and writes 2-3 edit variants alongside."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read existing atomic skills (skills/grill/SKILL.md, skills/hive/skills/why/SKILL.md)
+      for the skill structure pattern. Read .pHive/brand/brand-system.yaml schema
+      (or skills/brand-system/SKILL.md if YAML doesn't exist yet) for the brief shape.
+  - id: implement
+    agent: developer
+    description: |
+      Write skills/logo-exploration/SKILL.md following the atomic-skill pattern.
+      The skill body is mostly orchestration prose — bash invocations of the
+      openai-image MCP tools, HTML render via small inline template or via
+      hive/lib/logo-contact-sheet.js helper.
+    depends_on: [research]
+  - id: review
+    agent: reviewer
+    description: Validate skill structure + that human-in-the-loop selection step is clear.
+    depends_on: [implement]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/grill/SKILL.md
+      purpose: Atomic-skill structure reference (read this first)
+    - path: skills/hive/skills/why/SKILL.md
+      purpose: Another atomic-skill example, uses bash invocations
+    - path: skills/brand-system/SKILL.md
+      purpose: Upstream skill that will hand off to /logo-exploration (read for the handoff contract)
+
+files_to_modify:
+  - file: skills/logo-exploration/SKILL.md
+    change: NEW — atomic skill orchestrating the hybrid flow
+  - file: hive/lib/logo-contact-sheet.js
+    change: NEW (optional) — small helper that renders contact-sheet HTML if the SKILL.md inline approach gets unwieldy
+
+design_decisions:
+  - decision: Atomic skill, not a workflow phase
+    rationale: Lets brand-system, design-system, or maintainer invoke directly. Composable.
+  - decision: Human-in-the-loop selection via filesystem (selected.yaml), not a prompt gate
+    rationale: Selection often happens hours/days after generation — needs to survive across sessions. Filesystem is the right durable surface.
+  - decision: Refinement is opt-in via --refine flag
+    rationale: First-pass exploration is the common case; refinement is the exception. Don't default to extra API calls.
+
+risks:
+  - severity: medium
+    description: Contact-sheet HTML render quality may be poor (image sizing, layout)
+    mitigation: Start with simple grid layout. Polish later — the artifact is for human review, not production publishing.
+  - severity: low
+    description: Selection step blocks indefinitely if user forgets to create selected.yaml
+    mitigation: "Document the contract clearly in the skill body. Optional — emit a reminder if the timestamp dir is >24h old with no selected.yaml."
+
+references:
+  - path: .pHive/research/ui-logo-approach-may2026.md
+    relevant_excerpt: |
+      Recommended UX:
+      - "Run brand-system to produce brand foundation + concept directions."
+      - "Run logo exploration to generate image-backed concepts."
+      - "Review a contact sheet / HTML board."
+      - "Select a winner."
+      - "Run finalization story for vector cleanup and brand package assets."

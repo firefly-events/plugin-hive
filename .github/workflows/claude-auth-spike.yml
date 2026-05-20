@@ -1,0 +1,167 @@
+name: Claude Auth Spike
+
+# Feasibility spike: can we run Claude Code in a GH-Actions docker
+# container using the maintainer's claude.ai SUBSCRIPTION OAuth via
+# the long-lived headless token (CLAUDE_CODE_OAUTH_TOKEN) generated
+# locally by `claude setup-token`?
+#
+# Why this matters:
+#   - Current sandcastle worker uses codex via subscription OAuth (cheap)
+#   - Switching to Claude Code as the in-container agent unlocks TeamCreate,
+#     /hive:execute, the skill ecosystem, methodology workflows
+#   - Per-token API billing on Claude makes overnight cron runs expensive
+#   - Subscription OAuth would preserve the cost profile we have today
+#
+# Prior attempt copied ~/.claude.json into the container — that file
+# only carries account metadata; the actual credential lives in the
+# host OS keychain and is not portable. `claude setup-token` produces
+# a long-lived OAuth token (sk-ant-oat01-...) that IS portable via
+# env var (CLAUDE_CODE_OAUTH_TOKEN). This spike tests that path.
+#
+# If the run shows a meaningful response and exits 0 → green-light the
+# full claude-in-sandcastle epic. If 401/403 → fall back to
+# ANTHROPIC_API_KEY (pay-per-token).
+#
+# Manual trigger only. No cron, no PRs auto-fired from this.
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Prompt to send to Claude (default: "Reply with the single word OK")'
+        type: string
+        required: false
+        default: 'Reply with the single word OK'
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Verify Claude OAuth token secret
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN secret is not configured."
+            echo "::error::Run 'claude setup-token' locally, then:"
+            echo "::error::  gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo ${GITHUB_REPOSITORY} --body '<token>'"
+            exit 1
+          fi
+          echo "Token secret present (${#CLAUDE_CODE_OAUTH_TOKEN} chars)"
+
+      - name: Build minimal claude-code image
+        run: |
+          BUILD_DIR=$(mktemp -d)
+          cat > "$BUILD_DIR/Dockerfile" <<'DOCKERFILE'
+          FROM node:22-bookworm
+          RUN apt-get update && apt-get install -y --no-install-recommends \
+                git curl jq ca-certificates \
+              && rm -rf /var/lib/apt/lists/*
+          ARG AGENT_UID=1000
+          ARG AGENT_GID=1000
+          RUN set -eux; \
+              if getent group "$AGENT_GID" >/dev/null && [ "$(getent group "$AGENT_GID" | cut -d: -f1)" != "node" ]; then \
+                  groupdel "$(getent group "$AGENT_GID" | cut -d: -f1)"; \
+              fi; \
+              if getent passwd "$AGENT_UID" >/dev/null && [ "$(getent passwd "$AGENT_UID" | cut -d: -f1)" != "node" ]; then \
+                  userdel "$(getent passwd "$AGENT_UID" | cut -d: -f1)"; \
+              fi; \
+              groupmod -g "$AGENT_GID" node; \
+              usermod -u "$AGENT_UID" -g "$AGENT_GID" -d /home/agent -m -l agent node
+          RUN npm install -g @anthropic-ai/claude-code
+          USER ${AGENT_UID}:${AGENT_GID}
+          WORKDIR /home/agent
+          ENTRYPOINT ["sleep", "infinity"]
+          DOCKERFILE
+          docker build \
+            --build-arg AGENT_UID="$(id -u)" \
+            --build-arg AGENT_GID="$(id -g)" \
+            -t claude-spike:latest "$BUILD_DIR"
+
+      - name: Run claude --print with OAuth token env
+        id: claude
+        env:
+          PROMPT: ${{ inputs.prompt }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          set +e
+          # Start container detached. No file mount — auth is purely
+          # via env var passed into the exec step below.
+          CID=$(docker run -d --rm claude-spike:latest)
+          echo "container: $CID"
+
+          # Sanity checks
+          docker exec "$CID" which claude
+          docker exec "$CID" claude --version || true
+
+          # Pipe the prompt to claude --print, with the OAuth token
+          # forwarded as env. Capture stdout/stderr/exit separately
+          # so we can tell auth failures apart from response content.
+          OUTPUT_FILE=/tmp/claude-out.txt
+          ERR_FILE=/tmp/claude-err.txt
+          printf '%s' "$PROMPT" \
+            | docker exec -i \
+                -e CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN" \
+                "$CID" claude --print \
+                > "$OUTPUT_FILE" 2> "$ERR_FILE"
+          EXIT=$?
+
+          echo "=== exit code ==="
+          echo "$EXIT"
+          echo "=== stdout (first 500 chars) ==="
+          head -c 500 "$OUTPUT_FILE"
+          echo ""
+          echo "=== stderr (first 500 chars) ==="
+          head -c 500 "$ERR_FILE"
+          echo ""
+
+          docker rm -f "$CID" >/dev/null
+
+          # Surface in job summary
+          {
+            echo '### Claude Auth Spike Result'
+            echo ''
+            echo "**Exit code:** \`$EXIT\`"
+            echo ''
+            echo '**Stdout (first 500 chars):**'
+            echo '```'
+            head -c 500 "$OUTPUT_FILE"
+            echo ''
+            echo '```'
+            echo ''
+            echo '**Stderr (first 500 chars):**'
+            echo '```'
+            head -c 500 "$ERR_FILE"
+            echo ''
+            echo '```'
+            echo ''
+            if [ "$EXIT" = "0" ]; then
+              echo '✅ **VERDICT:** CLAUDE_CODE_OAUTH_TOKEN works on GitHub-hosted runner.'
+              echo 'Green-light the claude-in-sandcastle epic — Claude as in-container agent with subscription cost profile.'
+            else
+              echo '❌ **VERDICT:** OAuth token rejected. Inspect stderr above.'
+              echo 'Fall back to ANTHROPIC_API_KEY (per-token billing).'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit $EXIT
+
+      - name: Upload outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-auth-spike
+          path: |
+            /tmp/claude-out.txt
+            /tmp/claude-err.txt
+          if-no-files-found: ignore
+          retention-days: 14

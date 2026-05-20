@@ -11,10 +11,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- `/design` top-level skill (se-2): new UI/wireframe design ceremony at `skills/design/SKILL.md`. Composes brand-system, wireframe-protocol, ui-designer, and design-review. Callable standalone (for ad-hoc UI exploration, mid-execution redesigns, polish passes) or atomically from `/plan` Phase C step 16 via an external Skill call (not inline prose). Produces wireframes under `.pHive/design/<topic>/` and a handoff record in `.pHive/design/index.yaml` consumed by `/design-review`. `/plan`'s UI Step Detection section refactored to delegate to `/design` instead of inlining the wireframe ceremony. Plugin version bumped 2.1.0 → 2.2.0 (consumer-visible new skill).
 - KG signal revival follow-ups: `chromadb-wrapper.js query()` now returns per-hit `metadata` (predicate / source_epic / source_agent / valid_from per B0.2). New `scripts/kg-why-chroma.js` Node bridge plus `hive/lib/kg_why.py::_default_chromadb_query_fn()` wire S6.1 Phase B to the live sidecar when present; `HIVE_DISABLE_CHROMA_BRIDGE` env var disables the default for test isolation. `step-08-close.md` "Inputs available" now enumerates `kg_signal_findings_total`, `kg_signal_proposals_total`, `hit_rate_5cycle`, `miss_reason`, `cycle_report_path`, and `resolved_ledger_path` so the orchestrator threads telemetry placeholders through scope.
 - KG signal revival S6.3: secondary predicate wiring audit — all 5 candidate predicates (`phase_started`, `phase_complete`, `assigned_to`, `blocked_by`, `depends_on`) deferred per the anti-pattern guard (no current `/hive:why` surface names them by predicate). Story closes with audit doc as sole deliverable at `.pHive/epics/kg-signal-revival/docs/secondary-predicate-audit.md`. Re-audit triggers documented for follow-on epic.
 - KG signal revival S6.2: `/plan` pre-flight invokes `/hive:why` (free-form, --limit 10) against the requirement topic. Results materialize as a `PRIOR DECISIONS` section in design-discussion §0 when ≥1 triple returns; section is omitted entirely when zero results (no noise). Helper failure (missing sqlite, kg_why error) degrades silently — planning continues.
-- KG signal revival S6.1: `/hive:why` retrospection slash command. New skill at `skills/hive/skills/why/SKILL.md` with `--strict --predicate <name> --entity <id>` as primary usage (precision-first, KG-only Phase A) and free-form topic queries as documented fallback (merges Phase A + ChromaDB Phase B when available). Helper `hive/lib/kg_why.py` implements all three phases (KG query, semantic fallback, merge+dedupe+render). Degrades to SQLite-only when ChromaDB unavailable. Phase B live ChromaDB bridge deferred — `chromadb-wrapper.js query()` does not yet return metadata; tracked for follow-up.
+- KG signal revival S6.1: `/hive:why` retrospection slash command. New skill at `skills/hive/skills/why/SKILL.md` with `--strict --predicate <name> --entity <id>` as primary usage (precision-first, KG-only Phase A) and free-form topic queries as documented fallback (merges Phase A + ChromaDB Phase B when available). Helper `hive/lib/kg_why.py` implements all three phases (KG query, semantic fallback, merge+dedupe+render). Degrades to SQLite-only when ChromaDB unavailable. (Phase B live ChromaDB bridge subsequently wired via the S6.1 follow-up above, which made `chromadb-wrapper.js query()` return per-hit metadata.)
 - KG signal revival S5.3: per-cycle KG metrics JSONL stream + cycle-rollup line. `hive/lib/kg_metrics_writer.py` buffers `kg_write` events in memory keyed by cycle_id (resolved from `--cycle-id` or `HIVE_CYCLE_ID`/`HIVE_META_CYCLE_ID` env), flushes one JSONL file at `.pHive/metrics/kg/{cycle_id}.jsonl` per close with all per-event rows + one `cycle_summary` row, and appends a single greppable `kg-signal: findings=N proposals=M hit_rate_5cycle=R miss_reason=X` line to the morning summary. Writer is append-idempotent — re-running close for the same cycle_id does not duplicate rows. step-08-close.md wires the flush after the ledger append.
 - KG signal revival S5.2: miss-reason taxonomy at step-02c — new `hive/lib/kg_signal/miss_reason.py` discriminator returns one of `empty_kg` / `empty_predicate_filter` / `recency_cutoff` / `project_tag_cutoff` from query-time state. step-02c emits the field on empty cycles; step-03 fires `dedup_eviction` when its dedup logic empties a non-zero kg-finding candidate set. Buckets are mutually exclusive; field is absent when findings non-empty.
 - KG signal revival S5.1: KG-signal observability surface — `kg_signal_findings_total{cycle_id}`, `kg_signal_proposals_total{cycle_id}` counters and `hit_rate_5cycle` gauge registered in `metric_registry.py` (idempotent against double-registration). `kg_writes_total{predicate}` re-registration confirmed idempotent. New `python3 -m hive.lib.metric_increment_cli` shell entry point for prompt-driven increment from step-02c (findings emitted) and step-03 (proposal merge — hit-rate join site). `hit_rate_5cycle` computed at step-08 cycle close with edge-case correctness for <5 cycles.
@@ -31,6 +32,116 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - KG signal revival S1.1 foundation: `emit_lifecycle_at` knob, `emitKgEvent()` helper, and `kg_writes_total{predicate}` counter registration.
 - KG signal revival S4.1: `/hive:register-project` skill, registry helper, and quoted path-with-space fixture for cross-project KG bootstrap registration.
 - KG signal revival S3.1: ChromaDB sidecar lifecycle scripts, fire-and-forget SessionStart hook, operations guide, and bash lifecycle tests.
+
+## [2.5.0] - 2026-05-19
+
+**Pre-built sandcastle container image distributed via GHCR — dispatch cold-start drops from ~4 min to ~20 s.**
+
+The `Hive dispatch` workflow no longer builds the sandcastle container inside each run. A new `build-sandcastle-image.yml` workflow publishes the image to GitHub Container Registry on every `.sandcastle/**` push (plus a weekly cron for base-image CVE refresh), and dispatch pulls it on demand. A local-build fallback keeps dispatch unblocked when the image isn't yet published or GHCR is unreachable.
+
+### Added
+
+- **`build-sandcastle-image.yml` — new workflow at `.github/workflows/build-sandcastle-image.yml` (gi-1)** that builds the sandcastle container image (mirroring the cron `Hive Worker`'s proven local-build pattern: claude-code + codex + plugin-hive marketplace shims) and pushes both `:latest` and `:sha-<7>` tags to `ghcr.io/firefly-events/sandcastle`. Triggers on push to main with `paths: ['.sandcastle/**']`, `workflow_dispatch`, and a weekly cron (`'17 4 * * 0'`, Sunday 04:17 UTC) that refreshes the image to catch Debian base-image CVE fixes. Uses `docker/build-push-action@v5` with `cache-from: type=gha` + `cache-to: type=gha,mode=max` so cross-run builds reuse the BuildKit layer cache. A smoke step runs `which claude && which codex && claude --version` inside the freshly-pushed `:sha-<7>` image — non-zero exit fails the run and the immutable `:sha-<7>` tag serves as a rollback target. Requires `permissions: { contents: read, packages: write }`.
+
+### Changed
+
+- **`Hive dispatch` workflow now pulls from GHCR instead of building (gi-2).** The scaffolder template (`skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl`), its `.example.yml` mirror, and the in-repo `.github/workflows/hive-dispatch.yml` gained a new `Pull sandcastle image (with local-build fallback)` step between `Install dependencies` and `Resolve base branch`. The step runs `docker pull "${IMAGE_REF}"` (default `ghcr.io/firefly-events/sandcastle:latest`), retags the result as `sandcastle:hive` to preserve the bridge's `@ai-hero/sandcastle` `docker()` lookup contract, and falls back to an in-workflow `docker build .sandcastle` (with the same `AGENT_UID`/`AGENT_GID` build-args used by the cron worker) only when the pull returns non-zero. A new `workflow_dispatch.inputs.image_ref` knob lets maintainers pin a specific `:sha-<7>` tag for rollback testing. Net effect: dispatch cold-start drops from ~4 min (local build) to ~20 s (warm GHCR pull) for the normal path; the fallback preserves the legacy behavior with no regression.
+- **Runbook `hive/references/sandcastle-gh-dispatch.md` (gi-3)** gains a new §4 "Image distribution" section covering default behavior, the `image_ref` override knob, the local-build fallback, first-time setup (manually trigger `build-sandcastle-image.yml` once after enabling), image rebuild cadence (push to `.sandcastle/**` + weekly cron), and image visibility (public by default; private adds a `docker login` step). Sections 5-9 renumbered accordingly; internal cross-references updated.
+- **README "Unattended mode" section** gains a one-paragraph summary of the GHCR image flow with a deep-link to the new runbook section.
+
+## [2.4.2] - 2026-05-19
+
+### Changed
+
+- **`Hive dispatch` workflow + sandcastle bridge migrated to Claude OAuth (`CLAUDE_CODE_OAUTH_TOKEN`).** The default authentication path for `/hive:sandcastle-gh-init`-scaffolded workflows is now the long-lived headless OAuth token generated by `claude setup-token` — billed against the maintainer's Claude subscription, no per-token API charges. Proven by the `.github/workflows/claude-auth-spike.yml` smoke test on 2026-05-17. `@ai-hero/sandcastle`'s `claudeCode()` provider does not hardcode an auth env-var name; it forwards the workflow-step env into the container, and the `claude` CLI itself reads `CLAUDE_CODE_OAUTH_TOKEN` directly — no file mount or aliasing required.
+  - `--secret-mode` now accepts `claude-oauth` (the new default), `anthropic-api` (legacy pay-per-token), and `openai` (unchanged). The deprecated alias `anthropic` continues to work and resolves to `anthropic-api`, with a one-line deprecation warning on stderr so consumers can migrate.
+  - `.github/workflows/hive-dispatch.yml` (in-repo) + the rendered `.github/scripts/sandcastle-hive-bridge.mts` now reference `CLAUDE_CODE_OAUTH_TOKEN` instead of `ANTHROPIC_API_KEY`. The scaffolder template + .example mirrors emit the same default; existing consumers' rendered files keep working — but to migrate to OAuth they should re-run `/hive:sandcastle-gh-init`, set the new repo secret via `gh secret set CLAUDE_CODE_OAUTH_TOKEN`, and remove the old `ANTHROPIC_API_KEY` secret.
+  - Runbook `hive/references/sandcastle-gh-dispatch.md` §4 gains a new §4.1 "Generating the Claude OAuth token" subsection covering `claude setup-token` → `gh secret set` end-to-end. Rotation procedure updated to cover all three secret modes.
+
+## [2.4.1] - 2026-05-19
+
+### Fixed
+
+- **`Hive dispatch` workflow no longer crashes on bare repos.** The `Install dependencies` step in `hive-dispatch.yml` (both the in-repo workflow and the scaffolder template + .example mirror) used `npm ci`, which requires a `package-lock.json`. Plugin-hive itself (and any consumer following the BYO-deps pattern) ships no lockfile, so the step exited non-zero before the bridge could start, leaving labeled issues stuck (issue #137 hit this on 2026-05-19). Replaced with a three-case conditional: lockfile present → `npm ci`; `package.json` only → `npm install --no-save`; no `package.json` → `npm install --no-save --no-package-lock @ai-hero/sandcastle` (bare-repo transient). Re-enable the workflow via `gh workflow enable "Hive dispatch"` once this patch is live.
+
+## [2.4.0] - 2026-05-19
+
+**Per-epic branch + stacked-PR dispatch — `feat/<epic-id>` against configurable base, one PR per epic.**
+
+The sandcastle-gh-dispatch surface (added in 2.3.0 / refined in 2.3.1 + 2.3.2) now stacks stories of the same epic onto a single branch and produces one PR per epic — instead of the legacy one-branch-per-issue + one-PR-per-issue path. Aligns with the established `feedback_git_flow_per_epic.md` policy memory.
+
+### Added
+
+- **`git_flow` config block + `resolveGitFlow` helper (pe-1).** New top-level block in `hive.config.yaml` with `default_pr_base: auto` (auto = `develop` if `origin/develop` exists, else `main`) and `branch_strategy: per-epic` (the new default; `per-story` is retained for back-compat). Resolution helper lives at `hive/lib/git_flow.mjs`; read root-first per `hive/references/skill-prelude.md`, with array-form `execFileSync` only (no shell interpolation). Returns `{ base_branch, branch_strategy, source }`.
+- **Sandcastle bridge derives branch from `hive:epic:` label (pe-2).** `skills/sandcastle-gh-init/assets/sandcastle-hive-bridge.mts.tpl` now fetches issue labels via the GitHub REST API (no `child_process`), looks for a `hive:epic:<id>` label, and dynamically imports `hive/lib/git_flow.mjs` to read the resolved `branch_strategy`. Branch becomes `feat/<epic-id>` when epic-labeled + `per-epic`; falls back to `agent/issue-<n>` otherwise. Structured stdout result now also reports `epicId` and `branchStrategy` for downstream verification.
+- **Dispatch workflow gains per-epic concurrency + PR open-or-update (pe-3).** `skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl` restructured into a two-job graph: an upstream `derive` job extracts `EPIC_ID` from `${{ toJSON(github.event.issue.labels) }}` via `jq` (label payload never reaches a shell word), and the heavy `run` job declares `needs: derive` and reads `concurrency.group: ${{ needs.derive.outputs.concurrency_key }}` (resolves to `hive-epic-<id>` for epic stories, `hive-issue-<n>` for non-epic fallback). A new `Resolve base branch` step imports the pe-1 helper at runtime. The success step now queries for an existing open PR on `feat/<epic-id>` and either creates a fresh `--draft` PR (first story) or `gh pr edit --body` the existing one (later stories), composing bodies via `jq -nr --arg` so user-controlled issue titles are JSON-encoded; bodies are truncated at 25 story entries with a "see commits" pointer.
+- **Draft PR promotes to ready on last story (pe-4).** New `Promote PR to ready if last story` workflow step counts `hive:epic:<id>` + `hive:story:*` story issues (`hive:story:*` filter excludes any epic-tracker issue) against `hive:epic:<id>` + `hive:shipped` + state-closed shipped issues; on parity it calls `gh pr ready "feat/<epic-id>"`. A `0/0` count is treated as a label-propagation anomaly and does NOT promote — zero false-positive ready flips. Step is gated on `success() && needs.derive.outputs.epic_id != ''` so non-epic runs never attempt promotion.
+- **`/plan` pins resolved `git_flow` on `epic.yaml` (pe-5).** Phase A gains a new step `0a. Pre-flight: resolve git_flow (pe-5)` that calls `resolveGitFlow({ cwd })` immediately after the kickoff gate and persists the result on the planning context as `${git_flow_resolution}`. Phase C step 15's emitted `epic.yaml` now includes a top-level `git_flow:` block with both `base_branch` and `branch_strategy` resolved at plan time (pinning ensures downstream dispatch runs use the same value even if config drifts). Re-plan is idempotent — existing blocks update in place, missing ones insert after `methodology:`. Schema documented in new `hive/references/story-yaml-schema.md` §5 "Epic index (`epic.yaml`)" with field table, pinning rationale, and back-compat note.
+- **Runbook documentation (pe-6).** New "Branching model" section (§3) in `hive/references/sandcastle-gh-dispatch.md` documenting default behavior, the override knob, the `per-story` back-compat path, concurrency semantics (epic-scoped), and PR lifecycle (draft → ready on last shipped). README "Unattended mode" section gains a per-epic flow paragraph linking to the new runbook section.
+
+## [2.3.2] - 2026-05-18
+
+### Fixed
+
+- **`/hive:sandcastle-gh-init` prereq accepts `.sandcastle/Containerfile`** in addition to `.sandcastle/Dockerfile`. Sandcastle 0.5.x ships a Podman-style `Containerfile` by default, so the previous Dockerfile-only check rejected validly-initialized repos with a misleading `Sandcastle is not initialized` exit-2. Both names are valid OCI build files; either now satisfies the prereq. Affects `scaffold.mjs` prereq check, `SKILL.md` prereq doc, runbook section 1, and adds a new `AC-1b` test that seeds `.sandcastle/Containerfile` and asserts the scaffold completes. Closes #171.
+
+## [2.3.1] - 2026-05-18
+
+### Fixed
+
+- **Skill discovery path** for `/hive:sandcastle-gh-init` — moved from `skills/hive/skills/sandcastle-gh-init/` (atomic/internal nesting) to `skills/sandcastle-gh-init/` (top-level). Top-level layout is required for plugin discovery to register the user-facing slash command. Affects scaffold script path, SKILL.md self-references, tests, and the runbook. Plugin manifest version bumped 2.3.0 → 2.3.1.
+
+## [2.3.0] - 2026-05-18
+
+**Event-driven autonomous dispatch — `hive:ready` label fires `/hive:execute` inside Sandcastle.**
+
+Replaces the 15-minute cron polling cadence introduced in 2.1.0 with a label-trigger workflow. Labeling an issue `hive:ready` immediately fires a GitHub Actions run that executes the story inside a Sandcastle container, opens a PR, and flips the canonical label state machine. Reuses the existing `hive:ready` / `hive:in-flight` / `hive:shipped` / `hive:failed` labels — no schema or label changes — so the cron loop and event-driven dispatch can coexist on the same repo.
+
+### Added
+
+- **New public skill `/hive:sandcastle-gh-init`** (`skills/sandcastle-gh-init/`). Scaffolds GitHub Actions event-trigger glue on top of an already-initialized `.sandcastle/` setup. Drops three managed files into the consumer repo via a single `chore(hive): wire github-issue dispatch via sandcastle` commit. Args: `--runner ubuntu-latest|self-hosted`, `--secret-mode anthropic|openai`, `--force-recover`. Refuses to write if `.sandcastle/Dockerfile` is absent (run `npx sandcastle init` first); warns non-blocking on missing canonical labels and prints copy-pasteable `gh label create` commands. Uses `child_process.execFile` array-form invocations throughout — user-supplied args cannot smuggle shell metacharacters.
+- **New workflow template** `.github/workflows/hive-dispatch.yml` (shipped as a skill asset at `skills/sandcastle-gh-init/assets/hive-dispatch.yml.tpl`). Triple-guards the dispatch trigger via `on: issues:[labeled]` + step-level `if: github.event.label.name == 'hive:ready'` + per-issue `concurrency.group`. Workflow YAML owns every label transition (`if: failure()` covers bridge crashes — load-bearing invariant that prevents stuck `hive:in-flight` labels). Sets `HIVE_EXECUTION_MODE: team` to prevent nested sandcastles in the inner Hive run.
+- **New bridge script** `.github/scripts/sandcastle-hive-bridge.mts` (shipped at `skills/sandcastle-gh-init/assets/sandcastle-hive-bridge.mts.tpl`). Thin `sandcastle.run()` wrapper invoking `claudeCode("claude-opus-4-7")` with the docker sandbox factory, branch strategy `agent/issue-<n>`, `maxIterations: 5`, `idleTimeoutSeconds: 600`. Prompt body explicitly instructs the inner Hive not to invoke `/hive:plan` (human's responsibility) and not to spawn nested sandcastles.
+- **New maintainer runbook** [`hive/references/sandcastle-gh-dispatch.md`](hive/references/sandcastle-gh-dispatch.md). Seven numbered procedures: install the dispatch surface, label state machine, secret rotation, runner switch (Podman/self-hosted), public-repo label-permission lockdown, future-labels extension point (where to wire `hive:plan` / `hive:test` / `hive:review` when scoped), and stuck `hive:in-flight` label debugging (workflow run inspection, sandcastle container logs, common bridge failures).
+- **Reuse of existing label state machine.** The four canonical labels — `hive:ready`, `hive:in-flight`, `hive:shipped`, `hive:failed` — are unchanged from 2.1.0. No new labels introduced. Topic labels (`hive:epic:<id>`, `hive:story:<id>`, `hive:blocked-by:<id>`) coexist and are orthogonal.
+
+### Notes
+
+- The cron-based loop from 2.1.0 (`.github/workflows/hive-worker.yml` + `hive/lib/budget-gate.js`) is unchanged and continues to ship. Event-driven dispatch is an additional surface, not a replacement — consumers can adopt either or both.
+- `HIVE_EXECUTION_MODE: team` is the single-isolation-layer guard: the outer Sandcastle container is the isolation boundary; the inner Hive must not nest another one.
+- Plugin version bumped 2.2.0 → 2.3.0 (consumer-visible new skill).
+
+## [2.1.0] - 2026-05-15
+
+**Sandcastle ops layer — autonomous-execution loop on top of sandcastle (opt-in).**
+
+Closes the cron → worker → PR → review loop by composing three things that already existed (`/plan`, sandcastle, GitHub Actions) rather than building a new dispatcher. All opt-in via `external_task_tracking.adapter: github` + sandcastle adoption + a maintainer-only workflow in plugin-hive's own `.github/`. Zero behavior change for default consumers.
+
+### Added
+
+- **S1 — GitHub Issues label-pass adapter + `/plan` step 19a** (`hive/lib/external/github-issues-adapter.js`). Story-YAML → `gh issue create` with `hive:story` + `hive:ready` labels; idempotent on `slug` body marker. Wired into `skills/plan/SKILL.md` step 19a as the consumer-visible publish seam when `external_task_tracking.adapter: github`. Adapter is BYO `octokit` — no root dependency added.
+- **S2 — Sandcastle worker prompt + Zod result schema + runner** (`.sandcastle/prompts/worker-issue-pickup.md`, `hive/lib/sandcastle-worker-schema.js`, `hive/lib/sandcastle-worker-runner.js`). Worker reads `hive:ready` issues, picks the oldest, re-reads canonical story YAML from disk (issue body is snapshot only), implements, opens PR, comments back. `Output.object()` typed via Zod so `result.json` is contract-checked. Test seam exposed via `_deps` for unit testing without booting a container.
+- **S3 — GH Actions cron workflow + token-budget gate** (`.github/workflows/hive-worker.yml`, `hive/lib/budget-gate.js`, `tests/budget-gate.test.js`). 15-minute cron + `workflow_dispatch` with optional `issue_number` input; `concurrency: hive-worker, cancel-in-progress: false` serializes runs. Pre-flight `node hive/lib/budget-gate.js` sums today's spend from `.pHive/metrics/events/stop-*.jsonl` (per-model rate-card, opus fallback for unknown models, malformed-row tolerant) and aborts the run when over `tokens.daily_usd_limit`. Stuck-in-flight safety net labels the issue `hive:failed` when the worker exits non-zero without `status: shipped`. Workflow is REFERENCE/maintainer-only — consumers copy it into their own repo (plugins distribute via `.claude-plugin/`, not `.github/`).
+- **New reference doc** `hive/references/sandcastle-ops-loop.md` — end-to-end flow, opt-in instructions, constraints, config keys.
+
+### Notes
+
+- Pricing rate-card in `hive/lib/budget-gate.js` is intentionally inline so rate drift shows up in diffs; verify against Anthropic's current pricing before relying on absolute spend numbers.
+- 15-minute cron cadence is a default, not a load-tested number — tune via the workflow's `cron:` field after the first observation window.
+- Metrics contract: `autonomous_stories_closed` (target 3, window 14d post-merge, source `gh_issue_close_events`) per the S3 story metric block. Verifiable at epic-close + 14d.
+
+## [2.0.1] - 2026-05-15
+
+**Patch release.** Merges three nightly `meta-meta-optimize` cycle ledger appends (2026-05-13, -14, -15) into `main`. No code or workflow changes — operational state only.
+
+### Added
+
+- `.pHive/meta-team/ledger.yaml` — 3 new cycle entries (meta-2026-05-13, -14, -15). Cycle meta-2026-05-13 promoted 1 SCHEMA_INCONSISTENCY fix to `step-03-proposal.md` (NEXT STEP pointer correction); meta-2026-05-14 and meta-2026-05-15 closed as discard cycles (hive-cloud-roadmap.md STUB_DOC repeatedly flagged out_of_scope pending Hive Cloud epic activation).
+
+### Changed
+
+- `.pHive/meta-team/cycle-state.yaml`, `.pHive/meta-team/morning-summary.md` — rolled forward through nightly cycles.
+- `hive/workflows/steps/meta-team-cycle/step-03-proposal.md` — NEXT STEP pointer corrected from `step-04-implementation.md` to `step-03c-metric-declaration.md` per meta-2026-05-13 finding.
 
 ## [2.0.0] - 2026-05-12
 
@@ -542,7 +653,13 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/firefly-events/plugin-hive/compare/v2.4.2...v2.5.0
+[2.4.2]: https://github.com/firefly-events/plugin-hive/compare/v2.4.1...v2.4.2
+[2.4.1]: https://github.com/firefly-events/plugin-hive/compare/v2.4.0...v2.4.1
+[2.4.0]: https://github.com/firefly-events/plugin-hive/compare/v2.3.2...v2.4.0
+[2.3.0]: https://github.com/firefly-events/plugin-hive/compare/v2.1.0...v2.3.0
+[2.0.1]: https://github.com/firefly-events/plugin-hive/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/firefly-events/plugin-hive/compare/v1.3.0...v2.0.0
 [1.3.0]: https://github.com/firefly-events/plugin-hive/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/firefly-events/plugin-hive/compare/v1.2.1...v1.2.2

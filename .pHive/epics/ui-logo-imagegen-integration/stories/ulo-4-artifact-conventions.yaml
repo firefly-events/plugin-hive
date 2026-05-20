@@ -1,0 +1,105 @@
+id: ulo-4-artifact-conventions
+epic: ui-logo-imagegen-integration
+title: .pHive/brand/logo-explorations/ artifact contract
+status: pending
+complexity: low
+methodology: classic
+depends_on: [ulo-1-openai-image-tool]
+
+description: |
+  Define the on-disk artifact contract that ulo-2 (skill) writes and
+  ulo-3 (brand-system) consumes. Centralizing this in one place keeps
+  the wrapper, skill, and brand-system from each inventing their own
+  layout.
+
+  Contract:
+    .pHive/brand/logo-explorations/<UTC-timestamp>/
+      contact-sheet.html        # human review surface
+      prompts.md                # exact prompts used (provenance)
+      direction-<N>/            # one dir per concept direction
+        <N>.png                 # 4 candidates per direction
+      selected.yaml             # written by human after review
+                                # shape: {direction: <N>, candidate: <N>, notes: ""}
+      edits/                    # populated only by --refine runs
+        <selected-candidate>-edit-<N>.png
+
+  Timestamp format: ISO-8601 UTC compact (e.g., 20260517T143022Z).
+
+  Deliverable for this story:
+    1. A reference doc at hive/references/logo-exploration-artifacts.md
+       describing the layout + each file's purpose + the selected.yaml
+       schema
+    2. .gitignore entries: track the dir structure but exclude PNGs
+       (large binaries shouldn't bloat the repo; the doc tracks
+       provenance, the local PNGs are reproducible)
+    3. A small validator at hive/lib/logo-exploration-validator.js +
+       test that asserts a given timestamp dir conforms
+
+acceptance_criteria:
+  - "Given a reader opens hive/references/logo-exploration-artifacts.md, when they read it, then the directory layout, file purposes, and selected.yaml schema are unambiguous."
+  - "Given .pHive/brand/logo-explorations/<ts>/direction-1/0.png exists, when git status runs, then the PNG is gitignored but the timestamp dir itself is trackable (via .gitkeep or similar)."
+  - "Given a malformed timestamp dir (missing contact-sheet.html), when the validator runs, then it returns a clear list of missing files."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read the existing .pHive/brand/ layout (if any) for prior art.
+      Read .gitignore for the allowlist pattern used by other tracked
+      .pHive subtrees.
+  - id: implement
+    agent: developer
+    description: |
+      Write the reference doc, add .gitignore entries, write the
+      validator + tests.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: Unit-test the validator against valid + invalid fixture dirs.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: Validate the contract is consumable by both ulo-2 (write side) and ulo-3 (read side).
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .gitignore
+      purpose: Need to add new ignore + un-ignore lines following existing pattern (see lines 14-50)
+    - path: hive/references/README.md
+      purpose: Where the new reference doc gets listed (if there's an index)
+
+files_to_modify:
+  - file: hive/references/logo-exploration-artifacts.md
+    change: NEW — artifact contract reference
+  - file: .gitignore
+    change: Track .pHive/brand/logo-explorations/ structure, ignore PNG binaries
+  - file: hive/lib/logo-exploration-validator.js
+    change: NEW — dir structure validator
+  - file: tests/logo-exploration-validator.test.js
+    change: NEW — unit tests
+
+design_decisions:
+  - decision: Gitignore PNGs, track everything else
+    rationale: PNGs are large + regeneratable. The HTML/prompts/selected.yaml tell the story for future readers; binaries are cache.
+  - decision: ISO-8601 UTC compact timestamps
+    rationale: Sortable, no spaces, no colons (filesystem-friendly), unambiguous timezone.
+
+risks:
+  - severity: low
+    description: PNG count per exploration could spiral if --refine is run many times
+    mitigation: Validator can flag dirs with > N PNGs in a future iteration; not for v1.
+
+references:
+  - path: .pHive/research/ui-logo-approach-may2026.md
+    relevant_excerpt: |
+      Expected output artifacts:
+      - `.pHive/brand/logo-explorations/<timestamp>-contact-sheet.html`
+      - `.pHive/brand/logo-explorations/<timestamp>-*.png`
+      - `.pHive/brand/logo-explorations/<timestamp>-prompts.md`
+      - selection metadata appended into `.pHive/brand/brand-system.yaml` or adjacent YAML

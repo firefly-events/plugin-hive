@@ -47,7 +47,7 @@ findings_addressed:
 
 test_results:
   before: 129 passes across 5 files
-  after:  129 passes across 5 files
+  after: 129 passes across 5 files
   human-escalation: 24/24
   agent-spawn-emission: 24/24
   execute-boundaries: 39/39

@@ -67,20 +67,28 @@ async function runSessionEnd({
   }
 
   if (supersededMemories.length > 0) {
-    const { emitSupersededEvent } = require('./kg-emit');
-    for (const replacement of supersededMemories) {
-      try {
-        await emitSupersededEvent({
-          subject: replacement.subject || agentName,
-          predicate: replacement.predicate || 'memory',
-          priorObject: replacement.prior_object,
-          newObject: replacement.new_object,
-          sourceEpic: epicId,
-          sourceAgent: replacement.source_agent || 'session-end',
-        });
-      } catch (err) {
-        kgError = err;
-        console.error(`[session-end] kg_supersede() failed: ${err.message}`);
+    let emitSupersededEvent;
+    try {
+      ({ emitSupersededEvent } = require('./kg-emit'));
+    } catch (err) {
+      kgError = err;
+      console.error(`[session-end] kg-emit load failed: ${err.message}`);
+    }
+    if (emitSupersededEvent) {
+      for (const replacement of supersededMemories) {
+        try {
+          await emitSupersededEvent({
+            subject: replacement.subject || agentName,
+            predicate: replacement.predicate || 'memory',
+            priorObject: replacement.prior_object,
+            newObject: replacement.new_object,
+            sourceEpic: epicId,
+            sourceAgent: replacement.source_agent || 'session-end',
+          });
+        } catch (err) {
+          kgError = err;
+          console.error(`[session-end] kg_supersede() failed: ${err.message}`);
+        }
       }
     }
   }
@@ -262,7 +270,9 @@ async function kgSupersede(subject, predicate, priorObject, newObject, sourceEpi
     const writeAll = db.transaction(() => {
       const now = new Date().toISOString();
       updated = updatePrior.run(now, subject, predicate, priorObject).changes;
-      insertSuperseded.run(subject, 'superseded', `${priorObject}->${newObject}`, now, sourceEpic, sourceAgent);
+      if (updated > 0) {
+        insertSuperseded.run(subject, 'superseded', `${priorObject}->${newObject}`, now, sourceEpic, sourceAgent);
+      }
     });
 
     writeAll();

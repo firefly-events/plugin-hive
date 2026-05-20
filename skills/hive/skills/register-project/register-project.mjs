@@ -208,11 +208,12 @@ function assertNoDuplicates(projects, nextEntry) {
 
   for (const entry of projects) {
     const entryName = entry.name && String(entry.name).trim();
-    const entryPath = canonicalPathForExisting(entry);
-    if (!entryName || !entryPath) continue;
+    if (!entryName) continue;
 
     if (!seenNames.has(entryName)) seenNames.set(entryName, entry);
-    if (!seenPaths.has(entryPath)) seenPaths.set(entryPath, entry);
+
+    const entryPath = canonicalPathForExisting(entry);
+    if (entryPath && !seenPaths.has(entryPath)) seenPaths.set(entryPath, entry);
   }
 
   if (seenNames.has(nextEntry.name)) {

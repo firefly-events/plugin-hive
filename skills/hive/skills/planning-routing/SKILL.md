@@ -55,6 +55,8 @@ Apply this only to personas present in the assembled list. `ui-designer` is alwa
 
 ### Step 0.3: Spawn Across Two Paths
 
+> **Parallel-call-site annotation (audit pass):** `parallel_rationale: read-only` — the planning team produces design-discussion documents under `.pHive/epics/{id}/docs/`; no production code writes. Out-of-scope for the `ed-7` story-level fan-out gate (one team with N personas, not N independent stories); catalogued in [`hive/references/parallel-call-sites.md`](../../../../hive/references/parallel-call-sites.md) §3 (`planning-routing:mixed-team`).
+
 Use `routing_decisions` to assemble one conceptual planning team:
 
 - **Direct path (`TeamCreate`):** collect every persona routed `direct` and create them in one `TeamCreate` call. Use Step 0.4 and include only direct-routed personas in `## Team Members`.

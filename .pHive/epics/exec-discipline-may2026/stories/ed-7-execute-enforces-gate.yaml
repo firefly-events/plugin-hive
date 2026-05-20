@@ -1,0 +1,119 @@
+id: ed-7-execute-enforces-gate
+external_id: 141
+tracker_id: "firefly-events/plugin-hive#141"
+tracker_url: https://github.com/firefly-events/plugin-hive/issues/141
+epic: exec-discipline-may2026
+title: /execute refuses parallel dispatch without rationale + audits existing call sites
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [ed-5-story-schema-parallel, ed-6-plan-emits-flags]
+
+description: |
+  Two-part story:
+
+  1. **Gate enforcement.** Update skills/execute-dispatch/SKILL.md (and
+     skills/execute/SKILL.md if it owns the fan-out call) to refuse
+     parallel dispatch unless each story carries `parallel_allowed: true`
+     AND `parallel_rationale ∈ {variation, read-only, bounded-slice}`.
+     For `bounded-slice`, lint declared `files_to_modify` touch-sets
+     disjoint across the sibling story set before TeamCreate. On any
+     violation, fall back to serial with a warning that names the
+     offending story IDs.
+
+  2. **Audit pass.** Enumerate every current parallel call site in
+     /plan (research swarms), /standup (parallel reviews), /review
+     (parallel agent gates), and any other skill that uses
+     TeamCreate(parallel_teams=true) or Agent calls in parallel. Add
+     the explicit `parallel_rationale: read-only` annotation (or
+     equivalent in-skill documentation) so the new gate passes
+     cleanly without behavioral regression.
+
+acceptance_criteria:
+  - "Given 3 sibling stories with parallel_allowed: true + bounded-slice and disjoint files_to_modify, when /execute dispatches, then all 3 fan out as TeamCreates."
+  - "Given 2 sibling stories with bounded-slice but overlapping files_to_modify (e.g., both touch skills/plan/SKILL.md), when /execute inspects, then it falls back to serial with a warning naming both story IDs."
+  - "Given any story lacking parallel_rationale but with parallel_allowed: true, when /execute inspects, then it is treated as malformed (refuse + warn)."
+  - "Given existing /plan research swarm parallel call, when /execute runs the updated gate, then the call passes cleanly (audit pass annotated read-only)."
+  - "Given the audit results, when documented, then a list of every existing parallel call site lives in hive/references/parallel-call-sites.md (or equivalent)."
+
+steps:
+  - id: research
+    description: Enumerate every existing parallel call site (TeamCreate parallel_teams=true; Agent parallel dispatch) across all skills
+    agent: researcher
+  - id: implement
+    description: Add gate logic to execute-dispatch; touch-set disjointness lint; audit annotations across existing call sites; new reference doc
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: tests/execute-parallel-gate.test.js covering 4 gate cases + audit-pass case
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify no existing skill is silently downgraded by the new gate; review audit completeness
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/execute-dispatch/SKILL.md
+      purpose: Resolves parallel_teams flag; gate logic lands here
+    - path: skills/execute/SKILL.md
+      purpose: Owns TeamCreate fan-out call sites
+    - path: skills/plan/SKILL.md
+      purpose: Has parallel research swarm — audit target
+    - path: skills/standup/SKILL.md
+      purpose: Has parallel review gates — audit target
+
+files_to_modify:
+  - file: skills/execute-dispatch/SKILL.md
+    change: Add gate logic + touch-set disjointness lint
+  - file: skills/execute/SKILL.md
+    change: Wire gate into fan-out call sites
+  - file: hive/references/parallel-call-sites.md
+    change: NEW — audit registry of every parallel call site + rationale annotation
+  - file: tests/execute-parallel-gate.test.js
+    change: NEW — covers 5 AC cases
+
+design_decisions:
+  - decision: Violations fall back to serial with warning, not hard-fail
+    rationale: Gate is discipline, not blocking; user can override by fixing planning emission
+  - decision: Touch-set disjointness is a syntactic check on declared files_to_modify
+    rationale: Reality-divergence (R1 in design discussion) is a known gap — flagged in this story's risks; verification hook is follow-on
+  - decision: Audit produces a registry doc, not inline comments
+    rationale: Single source of truth; new parallel sites have a place to land
+
+cross_cutting:
+  - concern: documentation
+    action: New reference doc hive/references/parallel-call-sites.md; cross-link from skills/execute-dispatch/SKILL.md
+
+  - concern: versioning
+    action: Consumer-visible behavior change (gate refuses some dispatches that previously passed); bump minor version per semver
+
+metric:
+  applies: true
+  name: parallel_gate_refusal_rate
+  direction: down
+  unit: ratio
+  baseline: 0.0
+  target: 0.05
+  window: next-5-execute-runs
+  source:
+    kind: events
+    ref: ".pHive/metrics/events/<run-id>.jsonl — count rows with parallel_gate_refused=true vs parallel_dispatch_attempted=true"
+  verify_at: integrate
+  owner: reviewer
+  notes: |
+    After this story lands, refusal rate is high (audit pass cleans existing sites). Over the next 5 execute runs, target settles below 5% — meaning planning is reliably emitting rationale. If refusal rate stays high, planning emission (ed-6) is incomplete.
+
+risks:
+  - severity: high
+    description: Declared files_to_modify is often aspirational; gate passes but reality diverges (R1 from design discussion)
+    mitigation: Documented gap; post-implement verification hook deferred to v2 follow-on. ed-7 ships the gate; v2 closes the loop with actual-vs-declared check.
+  - severity: medium
+    description: Audit may miss a parallel call site, breaking that workflow silently
+    mitigation: Test fixture exercises every documented site; review step verifies test coverage

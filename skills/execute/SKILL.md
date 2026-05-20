@@ -17,6 +17,8 @@ All state paths in this skill are written as `${HIVE_STATE_DIR}/...`. Resolve `H
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — kickoff gate (initialization check) + persona / config / memory loading. The kickoff gate's `${HIVE_STATE_DIR}/project-profile.yaml` reference resolves via the section above.
 
+If the kickoff checks pass, proceed silently. Only surface kickoff-related output when a kickoff check fails and the selected gate behavior below requires a warning or stop.
+
 ## Delegation Rules (MANDATORY)
 
 **The orchestrator is a coordinator, not an implementor.** The orchestrator MUST NOT:
@@ -123,6 +125,8 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 4a. **Pre-exec phase loop.** If `pre_exec[]` is empty, skip this step entirely — zero behavior change for escalation-free epics.
 
+   > **Parallel-call-site annotation (audit pass):** `parallel_rationale: bounded-slice` — each specialist team writes to a declared phase-output directory at `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/`. The loop iterates triggers sequentially (one `TeamCreate` per trigger), so this is *not* story-level fan-out and is out-of-scope for the `ed-7` parallel gate; catalogued in [`hive/references/parallel-call-sites.md`](../../hive/references/parallel-call-sites.md) §3 (`execute:specialist-phases`). The annotation also applies to the symmetric post-exec loop in step 7a below.
+
    For each trigger in `pre_exec[]`, ordered by `raised_at` ASC (severity DESC as tiebreak), look up the trigger's catalog entry in `hive/references/specialist-triggers.md` (loaded in step 2b) to resolve `responds_with.id` and `workflow` fields. Then apply the three-condition branch:
 
    **Prerequisite — team_memory_path validation:** Before spawning, verify the team config's `team_memory_path` directory exists on disk. If it does not, emit an actionable error — e.g., `[error] pre-exec: team_memory_path "${HIVE_STATE_DIR}/team-memories/security-team/" does not exist — create it before running specialist phases` — skip the trigger, and continue. Do not crash execute.
@@ -140,7 +144,11 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
    > **v1 note:** v1 routing handles `workflow`-based catalog entries only. A catalog entry with `skill: <path>` (allowed by catalog schema but unused in v1) is not reached by condition (i) and falls to condition (ii) or (iii). Skill-based routing is a Phase 6 extension point.
 
-5. **Choose execution mode.** Invoke `skills/hive/skills/execute-dispatch/SKILL.md` with env, parsed root `hive.config.yaml`, parsed consumer `${HIVE_STATE_DIR}/hive.config.yaml`, parsed graduation registry, `workflow_name`, and `$ARGUMENTS`; consume `mode_decision`, `mode_reason`, `runner_path`, and `runner_reason`. Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d.
+5. **Choose execution mode.** Invoke `skills/hive/skills/execute-dispatch/SKILL.md` with env, parsed root `hive.config.yaml`, parsed consumer `${HIVE_STATE_DIR}/hive.config.yaml`, parsed graduation registry, `workflow_name`, `$ARGUMENTS`, and `unblocked_stories[]` — the depth-0 ready stories from the topological sort in step 4. Each story payload includes `id`, `parallel_allowed`, `parallel_rationale`, and (for `bounded-slice` rationale) `files_to_modify[]`. Consume `mode_decision`, `mode_reason`, `gate_violations[]`, `runner_path`, and `runner_reason`.
+
+   When `gate_violations[]` is non-empty, the dispatch has been downgraded to `sequential` by the parallel-dispatch gate (`ed-7`). Surface the warning to stdout naming every offending story ID and the reason recorded by the gate (the structured format is documented in `execute-dispatch/SKILL.md` Step 1.5). Do not re-implement the gate logic here — the dispatch skill is the single boundary for this decision per the parallel-call-sites registry (`hive/references/parallel-call-sites.md`).
+
+   Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d.
 5pre. **Executor cutover routing.** Use only the returned `runner_path` and `runner_reason`; do not re-evaluate the cutover tree here. If `runner_path == hive-dag`, call `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`; otherwise continue on the orchestrator-narrated path. Single dispatch point: this skill call is the only `/execute` policy boundary for executor-vs-orchestrator routing.
 
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
@@ -241,6 +249,48 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
    6. Silent on healthy runs (no stdout warning when zero heuristics fire) — YAML record still written with empty `nonsensical_defaults: []` for cross-run aggregation by `hive/scripts/gate-mode-audit.mjs`.
 
+## Scope-drift emit (per-story boundary)
+
+Emit a single `scope_drift_score` event when a story completes (after
+the final workflow phase writes its episode marker, before /execute
+moves to the next story). Earlier per-phase emits — one per
+research/implement/test/review/integrate boundary — produce ~3× the
+event volume with almost no additional signal, because what matters
+for downstream consumers is whether the **story** delivered its
+acceptance criteria, not which intra-story phase shifted the scope.
+
+The emit runs whether the story was executed by a `Agent` step
+(sequential), a teammate pane (team), a session, or a sandcastle:
+
+```bash
+python3 -c "
+from hive.lib.scope_drift import emit_scope_drift
+emit_scope_drift(
+    run_id='{run-id}',                   # this /execute run
+    phase_label='execute:story',
+    expected_scope={list from the story's acceptance criteria + planned files},
+    delivered_scope={list of items actually delivered when the story closed},
+    delta_reasons={enum values from cycle-state-schema.md when they differ},
+    story_id='{story-id}',
+    skill='execute',
+)
+"
+```
+
+`expected_scope` / `delivered_scope` / `delta_reasons` are sourced from
+the story's aggregated `phase_records[]` entries on the cycle state at
+`${HIVE_STATE_DIR}/cycle-state/{epic-id}.yaml`
+([cycle-state-schema](../../hive/references/cycle-state-schema.md) §
+Phase records) — collapse the per-phase lists into the story-level
+expected vs delivered sets. When the story exits cleanly with no
+drift, `expected_scope == delivered_scope` and `delta_reasons == []` —
+the helper buckets that to `none` (ordinal 0), which is the desired
+healthy default.
+
+The maturity gate from story `ed-1-maturity-helper` skips emit on
+greenfield/early projects and logs once per run. No new error handling
+— treat the call as fire-and-forget.
+
 ## Key References
 
 - **`references/team-execution.md`** — TeamCreate prompt template, sidecar injection, per-story commits, respawn monitoring
@@ -267,3 +317,4 @@ This is intentionally softer than the existing iteration-count breakers (`max_st
 - `skills/hive/skills/agent-spawn/SKILL.md` — Agent spawning with respawn continuation support
 - `hive/lib/dag_executor/__init__.py` — `executor_enabled_for(workflow_name)` and `run_workflow(...)` (consumer-side flag readers and the executor invocation surface from hde-9a)
 - `hive/references/workflow-schema.md#executor-cutover-additive--registry-gated` — schema-level note that cutover is additive and registry-gated
+- `hive/lib/scope_drift.py` — scope-drift scoring + emit helper called once per story at close (see Scope-drift emit section above)

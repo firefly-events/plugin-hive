@@ -1,0 +1,112 @@
+id: se-5-candidate-ranking-handoff
+external_id: 146
+tracker_id: "firefly-events/plugin-hive#146"
+tracker_url: https://github.com/firefly-events/plugin-hive/issues/146
+epic: skill-ergo-may2026
+title: /find-skills — rank candidates, output yaml, hand off to /write-skill
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [se-1-write-skill, se-4-signal-mining]
+
+description: |
+  New top-level skill `skills/find-skills/SKILL.md` (final naming
+  candidate; could land as /skill-candidates). Takes the observation list
+  from se-4, ranks by (occurrence_count × recency_factor × distinctness),
+  filters below a quality threshold, writes
+  `.pHive/meta/skill-candidates.yaml` with ranked candidates including
+  suggested skill name + trigger phrases + scope hint, and offers a
+  one-click hand-off to /write-skill (se-1).
+
+  Quality threshold: occurrence_count ≥ 3, distinctness ≥ 0.5
+  (heuristic — patterns too similar to existing skills score lower).
+
+  Output below threshold = empty file with one-line "no candidates met
+  threshold" note. NO noise emission.
+
+  Maturity gate inherited from se-4 (skip-with-log on greenfield/early).
+
+acceptance_criteria:
+  - "Given se-4 returns 10 observations of which 6 meet threshold, when /find-skills runs, then .pHive/meta/skill-candidates.yaml contains 6 ranked candidates with name + triggers + scope_hint fields."
+  - "Given se-4 returns 0 observations OR all below threshold, when /find-skills runs, then the yaml is empty with a 'no candidates met threshold' note and no noise rows."
+  - "Given the produced yaml, when user accepts a candidate, then /find-skills invokes /write-skill via Skill (atomic external call) with the candidate as brief."
+  - "Given a candidate hand-off, when /write-skill scaffolds, then the produced SKILL.md draft references the candidate's recent_examples (proves the chain wired)."
+
+steps:
+  - id: research
+    description: Confirm /write-skill (se-1) handoff contract; finalize candidate yaml shape
+    agent: researcher
+  - id: implement
+    description: Write skills/find-skills/SKILL.md + ranking helper; wire /write-skill hand-off as Skill call
+    agent: technical-writer
+    depends_on: [research]
+  - id: test
+    description: tests/find-skills-rank-handoff.test.js — covers ranking, threshold, empty-output, handoff
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify silent-on-empty + atomic boundary to /write-skill
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/write-skill/SKILL.md
+      purpose: From se-1 — handoff target
+    - path: hive/lib/skill_candidate_mine.py
+      purpose: From se-4 — observation source
+    - path: skills/meta-optimize/SKILL.md
+      purpose: Future composition target (out of scope for v1 — noted in deferred)
+
+files_to_modify:
+  - file: skills/find-skills/SKILL.md
+    change: NEW — top-level skill that ranks + writes yaml + hands off
+  - file: hive/lib/skill_candidate_rank.py
+    change: NEW — ranking helper
+  - file: .pHive/meta/.gitkeep
+    change: NEW — ensures output dir exists
+  - file: tests/find-skills-rank-handoff.test.js
+    change: NEW
+
+design_decisions:
+  - decision: Output yaml is empty (not absent) when no candidates
+    rationale: Tells the consumer "we ran, nothing met threshold" vs "we didn't run"
+  - decision: Hand-off to /write-skill is opt-in (user accepts a candidate), not auto
+    rationale: User-in-the-loop on skill creation; matches the "discovery" framing
+  - decision: Composition into /meta-optimize is deferred to follow-on cycle
+    rationale: /find-skills standalone first; integration after value proven
+
+cross_cutting:
+  - concern: documentation
+    action: README — add /find-skills + /write-skill pair to the meta-loop section; cross-link
+  - concern: versioning
+    action: Consumer-visible new skill — bump minor version per semver
+
+metric:
+  applies: true
+  name: find_skills_to_authored_conversion_rate
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 0.30
+  window: next-3-months
+  source:
+    kind: manual
+    ref: "Count (candidates that became /write-skill invocations resulting in a shipped SKILL.md) / (candidates surfaced)"
+  verify_at: 2026-08-31T00:00:00Z
+  owner: orchestrator
+  notes: |
+    True value-of-skill metric. 30% conversion is reasonable — most candidates won't merit skillification but ones that do should ship.
+
+risks:
+  - severity: medium
+    description: Ranking quality is noisy; user dismisses every candidate
+    mitigation: Threshold is tunable; review feedback iterates; if conversion stays at 0, mining (se-4) is the wrong source
+  - severity: low
+    description: .pHive/meta/ dir may not exist on consumer projects
+    mitigation: Story creates .gitkeep; mkdir at runtime if absent

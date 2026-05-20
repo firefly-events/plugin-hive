@@ -94,4 +94,3 @@ references:
       The hooks layer is intentionally minimal for V1.
       It wires exactly one Sandcastle lifecycle hook, `host.onWorktreeReady`,
       to invoke `copyToWorktree`.
-

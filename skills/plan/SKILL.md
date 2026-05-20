@@ -39,7 +39,7 @@ Reads `.pHive/triage/queue.yaml` and decomposes one item (the triage entry whose
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — state-directory note, kickoff gate, persona / config / memory loading. This skill consults routing keys (`agent_backends`, `model_overrides`, `planning.collaborative_review`) so also follow the **Root-first config precedence** subsection of the prelude.
 
-**Kickoff gate override — gate_mode aware.** Read `paths.gate_mode` from the root `hive.config.yaml` (consumer override layer; falls back to `hive/hive.config.yaml`; default `warning`). When `gate_mode: hard`, the prelude's hard-stop applies byte-equivalently. When `gate_mode: warning`, the hard-stop is replaced by warn-and-proceed with sane defaults:
+**Kickoff gate override — gate_mode aware.** If the kickoff checks pass, proceed silently. Read `paths.gate_mode` from the root `hive.config.yaml` (consumer override layer; falls back to `hive/hive.config.yaml`; default `warning`). When `gate_mode: hard`, the prelude's hard-stop applies byte-equivalently. When `gate_mode: warning`, the hard-stop is replaced by warn-and-proceed with sane defaults:
 
 1. Emit the warning below (verbatim) when `.pHive/project-profile.yaml` is missing or its `tech_stack` field is empty/null:
 
@@ -74,7 +74,45 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 ### Phase 0: Assemble Planning Team
 
-0. **Assemble and route the planning team.** Invoke the **planning-routing** skill (atomic; `skills/hive/skills/planning-routing/SKILL.md`) — this is an **external call**, NOT inline prose copied from the routing skill.
+0. **Resolve the epic branch before any planning docs are written.** After the skill preamble has run and `{epic-id}` has been resolved from the user input, ensure planning happens on `feat/{epic-id}` before continuing:
+
+   - Check the working tree first. If there are uncommitted changes, stop immediately with guidance to commit or stash before re-running `/hive:plan`. Do not create, switch, or write anything while the tree is dirty.
+   - Read the current branch name.
+   - If already on `feat/{epic-id}`, do nothing and continue.
+   - If on a different `feat/*` branch, prompt the user for confirmation before switching to `feat/{epic-id}`.
+   - If `feat/{epic-id}` already exists locally, check it out. Otherwise create it from the current HEAD and switch to it.
+   - Only after `feat/{epic-id}` is active may the skill write planning artifacts such as the research brief, design discussion, H/V plans, structured outline, or story YAMLs.
+
+0a. **Working-tree must match the configured tracker repo.** Before any planning artifact is written, verify that the current working directory is a checkout of the same repo configured in `task_tracking.repo`. The hive worker contract ("Trust the YAML, not the issue body") requires story YAMLs to land on disk in the repo where the issues will be filed. Planning in a sibling clone and filing issues against a different repo's URL is the failure mode that orphaned epic `sandcastle-gh-issue-dispatch` (issues #157-#159 in firefly-events/plugin-hive, files in `plugin-hive-ui-f`; worker failed with "epic dir does not exist").
+
+    Check:
+
+    ```bash
+    if [ -n "$(jq -r '.task_tracking.repo // empty' hive.config.yaml 2>/dev/null)" ]; then
+      configured_repo=$(jq -r '.task_tracking.repo' hive.config.yaml)
+      cwd_remote=$(git config --get remote.origin.url | sed -E 's|.*[:/]([^/]+/[^/.]+)(\.git)?$|\1|')
+      if [ "$cwd_remote" != "$configured_repo" ]; then
+        echo "WARN: cwd=$cwd_remote but task_tracking.repo=$configured_repo"
+        echo "Planning here will write story YAMLs to the wrong repo. Stop and re-run from the right checkout, or update task_tracking.repo."
+        exit 1
+      fi
+    fi
+    ```
+
+    Hard-stop on mismatch (no warn-and-proceed). The blast radius of a wrong-repo plan run is high (orphaned issues, drift between tracker and disk) and the fix is cheap (switch cwd).
+
+0b. **Allowlist the new epic dir in `.gitignore` before writing into it.** The repo blanket-ignores `.pHive/epics/*` with explicit per-epic allowlist entries (see lines following `!.pHive/epics/`). New epic dirs written without an allowlist entry are silently untracked — the worker checkout on `main` then can't see them, even though the local working tree shows them as present. This is the same root cause as orphaned `sandcastle-gh-issue-dispatch`.
+
+    Before the first write under `.pHive/epics/{epic-id}/`, append (idempotent — skip if already present):
+
+    ```
+    !.pHive/epics/{epic-id}/
+    !.pHive/epics/{epic-id}/**
+    ```
+
+    Place the new entries immediately after the last existing `!.pHive/epics/<name>/**` line in `.gitignore`. Commit `.gitignore` together with the first epic artifact so the dir is tracked from inception.
+
+1. **Assemble and route the planning team.** Invoke the **planning-routing** skill (atomic; `skills/hive/skills/planning-routing/SKILL.md`) — this is an **external call**, NOT inline prose copied from the routing skill.
 
 Pass three inputs: `assembled_personas` (core planning personas plus conditional architect/ui-designer selected from the requirement), the root-first `agent_backends` map (empty map if absent per [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)), and `requirement_summary`.
 
@@ -85,6 +123,19 @@ Continue Phase A using the returned active planning team handles and `routing_de
 See [`skills/hive/skills/planning-routing/SKILL.md`](../hive/skills/planning-routing/SKILL.md).
 
 ### Phase A: Research
+
+0a. **Pre-flight: resolve git_flow (pe-5).** Immediately after the kickoff gate passes (and before any researcher / writer dispatch), call `resolveGitFlow({ cwd })` from `hive/lib/git_flow.mjs` (pe-1) and store the result on the planning context as `${git_flow_resolution}`. The two fields you persist downstream are `base_branch` and `branch_strategy`:
+
+   ```bash
+   node --input-type=module -e "
+     import('./hive/lib/git_flow.mjs').then(m => {
+       const r = m.resolveGitFlow({ cwd: process.cwd() });
+       process.stdout.write(JSON.stringify(r));
+     });
+   "
+   ```
+
+   The resolution is pinned at plan time — even if `hive.config.yaml` drifts later, every downstream sandcastle dispatch for this epic uses the value captured here (see step 15 below). On import failure (helper not vendored), fall back to `{ base_branch: 'main', branch_strategy: 'per-epic' }` and add a one-line note to the design discussion §0 prelude so reviewers know the helper was unavailable.
 
 0. **Pre-flight: query prior decisions (S6.2).** Before dispatching the researcher, invoke `/hive:why` in free-form mode against the requirement topic to surface any prior KG decisions that should inform this plan. Treat this as audit-trail discovery, not blocking input:
 
@@ -108,6 +159,8 @@ See [`skills/hive/skills/planning-routing/SKILL.md`](../hive/skills/planning-rou
 3. **Load cross-cutting concerns.** Check for `.pHive/cross-cutting-concerns.yaml`. If found, load the concerns — they will be evaluated per-story later. See `hive/references/cross-cutting-concerns.md`.
 
 ### Phase B: Design Discussion (always runs)
+
+> **Parallel-call-site annotation (audit pass):** `parallel_rationale: read-only` — the design-discussion team produces docs under `.pHive/epics/{id}/docs/`; no production code writes. Out-of-scope for the `ed-7` story-level fan-out gate (one team with N personas dispatched through [`planning-routing/SKILL.md`](../../skills/hive/skills/planning-routing/SKILL.md), not N independent stories); catalogued in [`hive/references/parallel-call-sites.md`](../../hive/references/parallel-call-sites.md) §3 (`plan:design-discussion-team`).
 
 4. **Produce design discussion (draft).** `SendMessage` to the technical writer with the `design-discussion` skill (`hive/references/document-templates/design-discussion.md`). Input: the research brief + the original user request. Output: a ~200-line design discussion document covering goal, proposed approach, risks, dependencies, open questions, and a scale assessment. Write the **draft** to `.pHive/epics/{epic-id}/docs/design-discussion.md` — Phase A2 (next step) grills it before the collaborative review gate.
 
@@ -275,7 +328,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
         --subject "{story-id}" \
         --predicate "story-spec" \
         --prior-object "$old_hash" \
-        --new-object "$new_hash" \
+        --object "$new_hash" \
         --source-epic "{epic-id}" \
         --source-agent "plan"
       ```
@@ -377,6 +430,53 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Customize step descriptions per story as needed — these templates provide the ordering and agent assignments. For low-complexity stories, the `research` step may be skipped regardless of methodology.
 
+    **Parallel-dispatch flag emission.** Stories default to serial dispatch — **omit both fields = serial**. When you intend a story to run concurrently with its dependency-graph peers, emit the two top-level fields documented at [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §4: `parallel_allowed: true` plus a bounded `parallel_rationale`. Pick the rationale by what the story does, not by author preference:
+
+    | Story shape | Rationale to emit | Additional fields required |
+    |---|---|---|
+    | Research, audit, validation, or any other read-only work that writes only reports/analysis under `.pHive/` and does not touch production code, runtime config, or another story's outputs | `read-only` | — |
+    | One of N near-identical stories applying the same template to disjoint targets (UI A/B variants, sibling-module refactors, approach alternates) | `variation` | — |
+    | A story that writes to a narrow, explicitly declared slice of the codebase that does not overlap any concurrent story's slice | `bounded-slice` | non-empty `files_to_modify:` whose entries name the touch-set the `/execute` lint will check for disjointness |
+
+    Rules:
+    - **Default is omit.** When in doubt, emit neither field — serial is always safe; the parallel gate (`ed-7`) refuses to dispatch a story concurrently when the pair is absent. Do not pad serial stories with `parallel_allowed: false` — the omitted form is canonical.
+    - **`parallel_allowed: true` requires `parallel_rationale`** set to exactly one of `variation`, `read-only`, `bounded-slice`. Any other value (or missing rationale) is malformed and will be rejected by the validator.
+    - **`bounded-slice` is the only rationale that constrains the file set.** Stories emitting `parallel_rationale: bounded-slice` MUST carry a non-empty top-level `files_to_modify:` list whose entries name the slice — the disjointness lint in `ed-7-execute-enforces-gate` can only check the slice boundary against a declared touch-set. A `bounded-slice` story with empty or absent `files_to_modify:` is malformed.
+    - **Free-text justifications do not satisfy the gate.** Prose like "should be safe to run in parallel" in description/notes is invisible to the validator. The bounded enum is the contract; `/execute` consumes the pair and refuses dispatch when either is malformed.
+
+    **Worked example — three stories from a hypothetical epic of five.** The three independent stories below ship with the pair; two implicitly-serial siblings (a design-discussion follow-on and a final integration) carry neither field:
+
+    ```yaml
+    # 1. Read-only audit — analysis report only, touches no production code
+    id: audit-skill-prompt-token-budgets
+    depends_on: []
+    parallel_allowed: true
+    parallel_rationale: read-only
+    files_to_modify:
+      - file: .pHive/audits/skill-token-budgets/report.md
+        change: write the audit report
+    # ---
+    # 2. Variation refactor — one of seven sibling-module extractions
+    id: ui-cluster-extract-config-header
+    depends_on: [ui-cluster-extract-config-base]
+    parallel_allowed: true
+    parallel_rationale: variation
+    files_to_modify:
+      - file: src/components/ClusterHeader.tsx
+        change: extract ClusterHeaderConfig
+    # ---
+    # 3. Bounded-slice — narrow declared write surface, disjoint from peers
+    id: cmux-add-logging-hook
+    depends_on: [cmux-pane-spawn-base]
+    parallel_allowed: true
+    parallel_rationale: bounded-slice
+    files_to_modify:
+      - file: hive/lib/cmux/pane_hooks.mjs
+        change: register new "log" hook
+    ```
+
+    The fields slot in after `depends_on:` and before `description:` per schema §4. `files_to_modify:` keeps its conventional position alongside other context fields. Downstream, `/execute`'s parallel-dispatch gate (`ed-7-execute-enforces-gate`) reads the pair to decide concurrent-dispatch eligibility, and feeds `bounded-slice` stories' `files_to_modify:` touch-sets into the disjointness lint.
+
 14. **Evaluate cross-cutting concerns per story.** For each story, evaluate each concern's `applies_when` condition. For applicable concerns, determine the specific action needed and add a `cross_cutting` section to the story YAML. See `hive/references/cross-cutting-concerns.md` for format and examples.
 
     **Concern routing.** Most concerns emit their per-story output into the generic `cross_cutting:` section as `{concern, action}` entries. A small number of concerns instead emit into a dedicated top-level field on the story YAML; the loop must route those concerns to their target field rather than to `cross_cutting:`. Currently the only such concern is `metrics`, which writes to a top-level `metric:` block per the shape in [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3. To add a new dedicated-field concern later, extend this routing table; do not hardcode metrics-specific logic elsewhere in the skill.
@@ -400,9 +500,33 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Stories that fail the gate are flagged in the step 18 confirmation output alongside `agent-ready-checklist` failures; the user can approve with known gaps or ask to fix them before proceeding.
 
-15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories.
+15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories. The emitted YAML MUST include the `git_flow:` block populated from the `${git_flow_resolution}` value captured in Phase A step 0a (pe-5):
 
-16. **Detect UI stories.** After generating stories and before presenting for confirmation, scan each story for UI work indicators. See the UI Step Detection section below.
+    ```yaml
+    name: <epic-id>
+    title: <epic title>
+    target_codebase: <abs path>
+    methodology: <classic|tdd|bdd>
+
+    git_flow:
+      base_branch: <resolved>          # from Phase A 0a — `develop` if origin/develop existed at plan time, else `main`, else the explicit override
+      branch_strategy: <resolved>      # per-epic (default) | per-story (back-compat)
+
+    stories:
+      - id: <story-id>
+        title: <story title>
+        complexity: <low|medium|high>
+        depends_on: [<story-ids>]
+    ```
+
+    **Idempotency on re-plan.** If `epic.yaml` already exists for this epic:
+      - if it already has a `git_flow:` block, update the two field values in place (do NOT duplicate the block);
+      - if it does not, insert a fresh `git_flow:` block immediately after `methodology:` (the canonical position above).
+      - all other fields not owned by /plan (e.g. `source_issue`, `description`, free-form notes) are preserved untouched.
+
+    Schema reference: `hive/references/story-yaml-schema.md` §6 "Epic index (`epic.yaml`)" documents the canonical block shape.
+
+16. **Detect UI stories — delegate to `/design` (atomic external call).** After generating stories and before presenting for confirmation, scan each story for UI work indicators. When a story matches, invoke the **design** skill (atomic; `skills/design/SKILL.md`) — this is an **external Skill call**, NOT inline wireframe-ceremony prose copied into this skill. See the UI Step Detection section below for the detection keywords, the delegation invocation shape, and the blocking-gate contract.
 
 17. **Run agent-ready checklist.** Validate each story against the 9-point checklist in `hive/references/agent-ready-checklist.md` (including check #9: cross-cutting concerns). Flag stories that fail checks in the confirmation output.
 
@@ -424,16 +548,25 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
       x-99-thin-opt-out — metric.justification is one word ("N/A")
     ```
 
-    Example dependency graph:
+    **Parallel annotation on the dependency graph.** Stories that emitted `parallel_allowed: true` (per step 13) MUST be visually annotated on the rendered graph so the user can audit the parallel decisions alongside the dependency edges. Annotate using Mermaid node labels of the form `node-id["story-id ‖ <rationale>"]`, where `<rationale>` is the bounded enum value (`variation` | `read-only` | `bounded-slice`). The `‖` glyph (double vertical bar) is the visual marker for "parallel-eligible" and reads as "parallel to its peers." Serial stories (no `parallel_allowed: true`) render as plain node IDs — do not annotate them. The annotation is rendered output only; it does not change the underlying YAML.
+
+    Example dependency graph (mixing serial and parallel-eligible stories):
     ````
     ```mermaid
     graph LR
       cache-layer --> api-integration
-      cache-layer --> event-detail
+      cache-layer --> event-detail["event-detail ‖ variation"]
+      cache-layer --> mobile-detail["mobile-detail ‖ variation"]
+      audit-token-budgets["audit-token-budgets ‖ read-only"]
       api-integration --> e2e-tests
       event-detail --> e2e-tests
+      mobile-detail --> e2e-tests
     ```
     ````
+
+    In the example above, `event-detail` and `mobile-detail` are `variation` siblings of the same refactor template, `audit-token-budgets` is a standalone `read-only` story with no dependents, and the remaining nodes are serial.
+
+18z. **Emit scope_drift_score (Phase C boundary).** After the user confirms the plan in step 18 (or the silent-confirm path resolves), call `emit_scope_drift(...)` with `phase_label='plan:phase-c'` before publishing to the tracker. The Phase C scope record covers story IDs / cross-cutting evaluation / metric blocks — see the **Scope-drift emit** section below.
 
 ### Phase D: Publishing stories to the task tracker
 
@@ -485,6 +618,51 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     story YAML when populated so downstream skills (execute, review) can
     correlate runs to tracker records.
 
+19a. **Sandcastle-ops label pass (opt-in, additive).** Only runs when
+    `task_tracking.adapter === "github"`. For any other value (null, "linear",
+    unset, etc.) this step is a strict no-op — no GH calls, no logging beyond
+    a single skip line, no errors. This is the OUTBOUND half of the sandcastle
+    ops loop (epic `sandcastle-ops-layer`, story `s1-github-issues-adapter`)
+    — issues already created in step 19 receive the hive:* label namespace
+    so an autonomous worker can pick them up via
+    `gh issue list --label hive:ready --state open`.
+
+    **Label-existing only — does NOT create issues.** Step 19 (Epic C ABI
+    `createStory`) is the single creation point for GitHub issues. This step
+    reads each story's `tracker_id` (format `<owner>/<repo>#<number>`, set by
+    step 19) and calls `gh issue edit <n> --add-label <hive:*>` to add the
+    sandcastle namespace (`hive:ready`, `hive:epic:<epic-id>`,
+    `hive:story:<story-id>`, `hive:blocked-by:<dep>`). Stories that lack
+    `tracker_id` (because step 19 errored or was a no-op for that story) are
+    skipped with reason `no_tracker_id` — the adapter never falls back to
+    creating issues. Idempotent on re-run via `external_id` in the story YAML.
+
+    After labeling, the adapter writes `external_id: <issue-number>` (bare
+    integer) back into the story YAML alongside the existing slash-encoded
+    `tracker_id`. The worker queries by label and round-trips via
+    `hive:story:<id>` → story YAML, where `external_id` is the cross-reference.
+
+    ```javascript
+    const { publishStoriesToIssues } = require('hive/lib/external/github-issues-adapter.js');
+
+    if (config.task_tracking && config.task_tracking.adapter === 'github') {
+      const { labeled, skipped, errors } = await publishStoriesToIssues({
+        epicId,
+        storyIds: stories.map((s) => s.id),
+        config: config.task_tracking,
+      });
+      for (const c of labeled) console.log(`[sandcastle-ops] labeled ${c.id} → #${c.issue_number}`);
+      for (const s of skipped) console.log(`[sandcastle-ops] skipped ${s.id} (${s.reason})`);
+      for (const e of errors)  console.error(`[sandcastle-ops] FAILED ${e.id}: ${e.error}`);
+    }
+    ```
+
+    Failure handling: a mid-batch gh CLI failure (auth, rate limit, network)
+    surfaces in the `errors` array. Stories labeled before the failure have
+    their `external_id` already written to disk, so a re-run picks up where
+    it left off. Planning continues either way — sandcastle adoption is
+    optional, and a failed label pass is not a failed plan.
+
 20. **Post-run audit.** After step 19 completes (whether user confirmed or aborted in step 18, and whether Phase D published or was a no-op), run the in-process audit per `hive/references/gate-lift-telemetry.md`:
 
     1. Collect this run's resolved state:
@@ -524,9 +702,9 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 ### Flow Summary
 
 ```
-Small:   team assembly → research → brief → design discussion → team review → feedback → stories → confirm
-Medium:  team assembly → research → brief → design discussion → team review → feedback → H scan → V slice plan → team review → feedback → stories → confirm
-Large:   team assembly → research → brief → design discussion → team review → feedback → H scan → V slice plan → team review → feedback → structured outline → team review → sign-off → stories → confirm
+Small:   branch setup → team assembly → research → brief → design discussion → team review → feedback → stories → confirm
+Medium:  branch setup → team assembly → research → brief → design discussion → team review → feedback → H scan → V slice plan → team review → feedback → stories → confirm
+Large:   branch setup → team assembly → research → brief → design discussion → team review → feedback → H scan → V slice plan → team review → feedback → structured outline → team review → sign-off → stories → confirm
 ```
 
 ## Collaborative Review Gate
@@ -632,49 +810,29 @@ A collaborative review gate runs before every user-facing document presentation.
 
 ## UI Step Detection
 
-After generating stories, scan each story's description and acceptance criteria for keywords indicating net-new UI work. If detected, the UI designer agent should be involved during planning to produce wireframes before execution begins.
+Scan each story's description and acceptance criteria for UI keywords (case-insensitive): screen | view | page | modal | dialog | sheet | drawer | button | form | input | component | widget | card | list item | redesign | layout | visual | UI | UX | mockup | wireframe | marketing | landing page | banner | app store. When a story matches, delegate the wireframe ceremony to `/design` via an atomic Skill call — `/plan` does NOT inline the wireframe protocol, the touchpoints, or the persona dispatch.
 
-**Detection keywords** (case-insensitive):
-- Screen terms: "screen", "view", "page", "modal", "dialog", "sheet", "bottom sheet", "drawer"
-- Component terms: "button", "form", "input", "component", "widget", "card", "list item"
-- Design terms: "redesign", "layout", "visual", "UI", "UX", "mockup", "wireframe"
-- Marketing terms: "marketing", "landing page", "ad creative", "banner", "promotional", "app store"
+**Delegation (atomic external call to `/design`).** Invoke the **design** skill (`skills/design/SKILL.md`) once per matched story. Pass the story's brief plus `--from-plan` and the story ID; `/design` runs the wireframe-protocol touchpoints (see `hive/references/wireframe-protocol.md`), emits a `.pHive/design/<topic>/` directory, and registers a handoff entry in `.pHive/design/index.yaml`. The blocking-gate contract still holds: stories with a `/design` delegation MUST NOT proceed to execution until the design handoff entry exists.
 
-**When keywords match:**
+For each matched story, write a `ui-design` step that records the `/design` delegation (the executor reads this to confirm the wireframes were produced before dispatching `implement`):
 
-1. Add a `ui-design` step to the story, after `research` and before `implement`:
-   ```yaml
-   - id: ui-design
-     description: |
-       Create wireframes for the UI components described in this story.
-       Follow the wireframe workflow in agents/ui-designer.md and the
-       approval protocol in references/wireframe-protocol.md.
-     agent: ui-designer
-     depends_on: [research]
-   ```
+```yaml
+- id: ui-design
+  description: Delegate to /design for wireframes (atomic external call; see skills/design/SKILL.md).
+  agent: ui-designer
+  delegates_to: design       # atomic Skill call, not inline prose
+  depends_on: [research]
+- id: implement
+  depends_on: [ui-design]
+  inputs:
+    - source: step_output
+      step: ui-design
+      key: wireframe_brief
+```
 
-2. Update the `implement` step to depend on `ui-design` and receive wireframe context:
-   ```yaml
-   - id: implement
-     depends_on: [ui-design]
-     inputs:
-       - source: step_output
-         step: ui-design
-         key: wireframe_brief
-   ```
+Mark UI stories in the plan confirmation output (e.g., `event-detail — Redesign Event Detail View [4 steps, /design delegated]`). Edge cases — false positives on backend "button" usage and purely-visual stories that skip implement/test — are user-resolved at the confirmation gate, same as before.
 
-3. In the plan confirmation output, mark UI stories:
-   ```
-   Stories:
-     · cache-strategy — Design Redis Caching [3 steps]
-     · event-detail — Redesign Event Detail View [4 steps, includes UI design]
-   ```
-
-4. **BLOCKING GATE:** Stories with `ui-design` steps MUST NOT proceed to execution until wireframes are approved. The planning phase blocks on the wireframe touchpoints (see `hive/references/wireframe-protocol.md`).
-
-**Edge cases:**
-- A story mentioning "button" in a backend context may false-positive. Acceptable — the user reviews and can remove the step.
-- Purely visual stories may only need: research → ui-design → review (skip implement and test).
+**Atomic boundary.** If the wireframe ceremony, the wireframe-protocol touchpoints, or the ui-designer dispatch ever appears as inline prose inside this skill, that is a regression. `/plan`'s job at step 16 is to detect UI work and delegate; `/design` owns the ceremony end-to-end.
 
 ## Story File Format
 
@@ -764,6 +922,7 @@ All diagrams in Hive output (dependency graphs, flow diagrams) use **Mermaid** s
 - Use `graph TD` (top-down) for hierarchical or flow diagrams
 - Arrow syntax: `story-a --> story-b` means story-b depends on story-a
 - Keep node IDs matching story IDs for consistency
+- For parallel-eligible stories (those that emit `parallel_allowed: true` in step 13), annotate the node label as `story-id["story-id ‖ <rationale>"]` where `<rationale>` is the bounded enum value (`variation` | `read-only` | `bounded-slice`). The `‖` glyph signals "parallel to its peers." Serial stories render with plain node IDs.
 
 ## Planning Document Paths
 
@@ -781,6 +940,55 @@ All planning documents are written to `.pHive/epics/{epic-id}/docs/{document-typ
 
 Existing planning documents at the `.pHive/` root are not moved — this convention applies to new planning sessions going forward.
 
+## Scope-drift emit (decomposition boundary)
+
+Emit a single `scope_drift_score` event at the close of Phase C — the
+moment story decomposition is signed off. Earlier phase boundaries
+(A, B, B2, B3) intentionally do **not** emit: the upstream artifacts
+they produce (concern lists, design-discussion drafts, deep-dive
+expansions) are *expected* to churn during planning, and bucketing
+that churn as drift produces noise that buries the one signal that
+matters — did story decomposition preserve the agreed scope?
+
+The helper applies the maturity gate from story `ed-1-maturity-helper`
+— emits are skipped on greenfield/early projects and logged once per
+run.
+
+Use the Python module surface (no new CLI):
+
+```bash
+python3 -c "
+from hive.lib.scope_drift import emit_scope_drift
+emit_scope_drift(
+    run_id='{run-id}',                   # this /plan run identifier
+    phase_label='plan:phase-c',
+    expected_scope={list of items the design phase committed to},
+    delivered_scope={list of story IDs / cross-cutting items / metric blocks the decomposition actually produced},
+    delta_reasons={zero or more enum values from cycle-state-schema.md},
+    proposal_id='{epic-id}',             # planning is epic-scoped, not story-scoped
+    skill='plan',
+)
+"
+```
+
+`expected_scope` / `delivered_scope` / `delta_reasons` follow the
+schema documented in
+[`hive/references/cycle-state-schema.md`](../../hive/references/cycle-state-schema.md)
+§ Phase records — pull them from the Phase C `phase_records[]` entry
+on the cycle state. The helper buckets to one of `{none, minor, major,
+divergent}` (string label in `dimensions.bucket`; ordinal `0..3` in
+`value`). See
+[`.pHive/metrics/metrics-event.schema.md`](../../.pHive/metrics/metrics-event.schema.md)
+§4 for the registry entry.
+
+Emit point: **after step 14** (stories decomposed + validated, before
+Phase D publishes to the tracker).
+
+The emit is fire-and-forget — the helper raises only on
+`MetricsValidationError` (programming error), never on missing
+`project-profile.yaml` or absent ed-1 helper. Do not wrap with
+additional error handling.
+
 ## Key References
 
 - `hive/references/agent-ready-checklist.md` — 9-point story validation
@@ -796,3 +1004,4 @@ Existing planning documents at the `.pHive/` root are not moved — this convent
 - `skills/hive/skills/agent-spawn/SKILL.md` — persona injection, memory loading, path resolution
 - `hive/references/document-templates/design-discussion.md` — ~200-line brain dump format
 - `hive/references/document-templates/structured-outline.md` — ~1000-line detailed plan with elicitation
+- `hive/lib/scope_drift.py` — scope-drift scoring + emit helper called at the Phase C (decomposition) boundary (see Scope-drift emit section above)

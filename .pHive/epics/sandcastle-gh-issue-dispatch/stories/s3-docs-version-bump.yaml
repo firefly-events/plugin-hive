@@ -1,0 +1,197 @@
+id: s3-docs-version-bump
+epic: sandcastle-gh-issue-dispatch
+tracker_id: "159"
+tracker_url: "https://github.com/firefly-events/plugin-hive/issues/159"
+title: Maintainer runbook, README update, CHANGELOG entry, plugin version bump
+status: pending
+complexity: low
+methodology: classic
+depends_on: [s2-init-skill]
+
+description: |
+  Ship the consumer-facing surface for this epic:
+
+    1. New runbook at `hive/references/sandcastle-gh-dispatch.md` covering:
+       - Label state machine (`hive:ready` → `in-flight` → `shipped` | `failed`)
+       - Workflow vs bridge ownership boundaries
+       - Secret rotation (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY`)
+       - Runner choice (`ubuntu-latest` default; Podman/self-hosted upgrade path)
+       - Public-repo abuse prevention (locking label permission to maintainers)
+       - Future-labels extension point (where to add `hive:plan` / `hive:test`
+         / `hive:review` routes when those are scoped)
+       - Bridge debugging (reading sandcastle container logs, common failure modes)
+
+    2. README.md addition under the existing Sandcastle section pointing
+       to `/hive:sandcastle-gh-init` as the unattended-mode entry point.
+
+    3. CHANGELOG.md entry under a new version section documenting:
+       - New public skill `/hive:sandcastle-gh-init`
+       - New workflow template + bridge script (shipped as skill assets)
+       - New runbook
+       - Reuse of existing `hive:ready` / `in-flight` / `shipped` / `failed`
+         label state machine (no schema or label changes)
+
+    4. Plugin version bump in `.claude-plugin/plugin.json` and
+       `.claude-plugin/marketplace.json` per semver — **minor** (additive
+       consumer-visible feature). README version badge updated to match.
+
+  This is the LAST commit on the epic branch per the `versioning` cross-cutting
+  concern's implementation_checklist.
+
+acceptance_criteria:
+  - "Given the runbook exists at `hive/references/sandcastle-gh-dispatch.md`, when a maintainer reads it, then they can: (a) install the skill, (b) understand the `hive:ready` → `in-flight` → `shipped` | `failed` state machine, (c) rotate the secret, (d) switch runners, (e) lock label permissions on a public repo, (f) locate the future-labels extension point, (g) debug a stuck `hive:in-flight` label — each as a numbered procedure."
+  - "Given README.md is rendered on GitHub, when a reader scans the Sandcastle section, then `/hive:sandcastle-gh-init` is mentioned with a one-line description and a link to the new runbook."
+  - "Given CHANGELOG.md has a new dated section for the bumped version, when a reader scans it, then bullet entries name: the new public skill, the workflow template, the bridge script, the runbook doc, and explicitly note that the existing `hive:ready`/`in-flight`/`shipped`/`failed` labels are reused (no label changes)."
+  - "Given `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` are diffed against the prior version, when they are compared, then `version` matches a minor bump (X.Y+1.0) and the values in the two files are identical."
+  - "Given the README version badge is rendered, when its value is compared with `plugin.json.version`, then the strings match exactly."
+  - "Given the bump commit is on the epic branch, when `git log --oneline` is inspected, then this story's bump commit is the LAST commit on the epic branch (no further story commits follow)."
+
+steps:
+  - id: research
+    description: |
+      Read current `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`
+      to confirm current version. Read `hive/references/cross-cutting-concerns.yaml`
+      `versioning` concern's `implementation_checklist` line-by-line —
+      this story's review step verifies each line.
+      Read prior CHANGELOG.md entries to match formatting conventions.
+    agent: researcher
+  - id: implement
+    description: |
+      Author the four deliverables:
+
+      1. `hive/references/sandcastle-gh-dispatch.md` — runbook with the
+         numbered procedures from AC #1. Cross-link to skill SKILL.md and
+         the design-discussion.md.
+
+      2. README.md edit — add a "Unattended mode" subsection under the
+         existing Sandcastle section. One paragraph + link to runbook.
+
+      3. CHANGELOG.md — new section. Heading `## [X.Y+1.0] - <date>`.
+         Bullets per AC #3.
+
+      4. Bump `.claude-plugin/plugin.json.version` and
+         `.claude-plugin/marketplace.json.version` in lockstep. Update
+         README version badge URL.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Verify by automation where possible:
+      - JSON syntactic validity: `jq . .claude-plugin/plugin.json` exits 0.
+      - Version equality across the two JSON files + README badge: small
+        bun/node script that reads all three and asserts equal.
+      - Markdown linting on the runbook and CHANGELOG entry via existing
+        markdownlint config.
+      Manual verification of runbook readability and README placement is
+      acceptable for this story given doc-only scope.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Walk the `versioning` cross-cutting concern's implementation_checklist
+      line-by-line and confirm each:
+      - plugin.json version bumped per semver
+      - marketplace.json version matches plugin.json
+      - README badge matches
+      - CHANGELOG has new dated section with bullets
+      - Bump commit is LAST on epic branch (block merge if not)
+      - No breaking changes → no migration doc needed (confirm)
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: |
+      Commit. This commit MUST be the last on the epic branch per the
+      versioning concern checklist. If subsequent fixups become necessary,
+      land them in a follow-up epic, not this one.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive-ui-f
+  tech_stack:
+    - markdown
+    - json
+    - yaml
+  key_files:
+    - path: .claude-plugin/plugin.json
+      purpose: Source of truth for plugin version; bumped here.
+    - path: .claude-plugin/marketplace.json
+      purpose: Marketplace registration; version must mirror plugin.json.
+    - path: README.md
+      purpose: Top-level project README; version badge + Sandcastle section both touched.
+    - path: CHANGELOG.md
+      purpose: Conventional changelog; new dated section added.
+    - path: .pHive/cross-cutting-concerns.yaml
+      purpose: Authoritative checklist for the `versioning` concern — review step validates each line.
+    - path: skills/hive/skills/sandcastle-gh-init/SKILL.md
+      purpose: Skill being announced; runbook and README cross-link to it.
+
+files_to_modify:
+  - file: hive/references/sandcastle-gh-dispatch.md
+    change: create — maintainer runbook
+  - file: README.md
+    change: modify — Sandcastle section + version badge
+  - file: CHANGELOG.md
+    change: modify — new dated version section
+  - file: .claude-plugin/plugin.json
+    change: modify — version bump (minor)
+  - file: .claude-plugin/marketplace.json
+    change: modify — version mirror
+
+code_examples:
+  - title: Versioning concern implementation_checklist (canonical)
+    file: .pHive/cross-cutting-concerns.yaml
+    snippet: |
+      implementation_checklist:
+        - ".claude-plugin/plugin.json version bumped per semver"
+        - ".claude-plugin/marketplace.json version bumped to match plugin.json"
+        - "README.md version badge updated to match plugin.json"
+        - "CHANGELOG.md gains a new dated section for the new version ..."
+        - "Bump commit is the LAST commit on the epic branch"
+        - "If breaking change: migration notes added to CHANGELOG ..."
+
+design_decisions:
+  - decision: Minor (X.Y+1.0) bump, not patch
+    rationale: New public skill = additive consumer-visible feature. Patch is reserved for bug fixes / doc-only. This is more than that.
+  - decision: Single runbook in `hive/references/`, not split per topic
+    rationale: One-stop reference for maintainers. Three numbered procedures fit comfortably in one file (~150 lines).
+  - decision: No migration doc
+    rationale: No breaking changes. Existing sandcastle execution paths (internal `/hive:execute-mode-sandcastle`) untouched.
+
+cross_cutting:
+  - concern: documentation
+    action: "This story IS the docs story. Updates: README.md (Sandcastle section + version badge), hive/references/sandcastle-gh-dispatch.md (new runbook), CHANGELOG.md (new dated section). Skill SKILL.md was authored in s2; this story references it but does not modify it."
+  - concern: versioning
+    action: "Bump plugin.json + marketplace.json version (minor: X.Y+1.0). Update README badge. Add CHANGELOG dated section. THIS commit is the last on the epic branch."
+
+metric:
+  applies: false
+  justification: "Doc + version-bump story — no observable runtime behavior change. The new skill's metric is tracked in s1-workflow-template (label-to-PR latency); this story only documents and versions that work, so it has no independent number to move."
+
+risks:
+  - severity: medium
+    description: Version drift between plugin.json and marketplace.json
+    mitigation: Test step asserts equality; review step re-checks. Add to test script for future-proofing.
+  - severity: low
+    description: README badge URL format changes upstream (shields.io)
+    mitigation: Reuse existing badge URL pattern; only change the version segment.
+  - severity: low
+    description: CHANGELOG date format inconsistency
+    mitigation: Match the most recent entry's format exactly; do not invent new conventions here.
+
+references:
+  - path: .pHive/cross-cutting-concerns.yaml
+    relevant_excerpt: |
+      - id: versioning
+        ...
+        implementation_checklist:
+          - ".claude-plugin/plugin.json version bumped per semver"
+          - ".claude-plugin/marketplace.json version bumped to match plugin.json"
+          - "README.md version badge updated to match plugin.json"
+          - "CHANGELOG.md gains a new dated section for the new version with bullet entries for each consumer-visible change"
+          - "Bump commit is the LAST commit on the epic branch"
+  - path: .pHive/epics/sandcastle-gh-issue-dispatch/docs/design-discussion.md
+    relevant_excerpt: |
+      ## Open Questions
+      5. Plugin version bump level. This is an additive consumer-visible
+         feature (new public skill, new docs). → minor bump per semver.
