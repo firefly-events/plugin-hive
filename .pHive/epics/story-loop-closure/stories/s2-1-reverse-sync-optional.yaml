@@ -1,0 +1,91 @@
+id: s2-1-reverse-sync-optional
+epic: story-loop-closure
+title: "S2.1 — (optional) reverse sync: Multica cancelled → story YAML status: deferred"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s1-1-multica-issue-closer-module]
+
+description: |
+  Reverse direction of the loop. When an operator manually cancels a
+  Multica issue in the board UI, the matching story YAML should reflect
+  that — flip `status:` to `deferred` and add a `deferred:` block with
+  the timestamp + the Multica issue identifier as the source.
+
+  Sync is poll-based (no Multica webhook surface exists today): a small
+  script `hive/scripts/multica-reverse-sync.mjs` walks every episode
+  marker, fetches the issue status from Multica, and rewrites the story
+  YAML when a `cancelled` mismatch is found.
+
+  Wiring: invocable manually (`node hive/scripts/multica-reverse-sync.mjs`)
+  and optionally as a daily cron via GH Actions (`schedule: cron`).
+  Whether to wire the cron is the operator's call — story acceptance
+  covers the script + the optional workflow file but defaults the
+  workflow to disabled.
+
+  **Scope flag:** this is slice 2, optional. If complexity/value tradeoff
+  doesn't pencil out at execution time, this story can be deferred and
+  the loop still closes one-way (PR merge → done). Operator-side manual
+  cancel of a Multica issue without YAML sync is a tolerable
+  inconsistency for now.
+
+acceptance_criteria:
+  - "Script `hive/scripts/multica-reverse-sync.mjs` walks `.pHive/episodes/*/<story>/multica-run.yaml`, fetches each issue's current status, identifies `cancelled` issues, rewrites the story YAML's `status:` to `deferred` and appends a `deferred:` block with `{at: <ISO>, source: 'multica-cancelled', issue_identifier: PLU-N}`."
+  - "Script is idempotent — re-running on already-deferred stories is a no-op."
+  - "Script writes a one-line summary to stdout per pass: `<N> issues checked, <M> cancelled, <P> YAMLs patched, <Q> no-ops`."
+  - "Optional workflow at `.github/workflows/multica-reverse-sync.yml` runs the script daily (cron `27 6 * * *`) under the same `MULTICA_SERVER_URL` secret-gate from s1-3. Workflow is committed in this story but its `on: schedule:` block is commented out by default (operator opts in by uncommenting + setting the secret)."
+  - "Unit test against a fixture episodes dir + fake Multica responses verifies all four counter buckets (checked / cancelled / patched / no-op)."
+
+steps:
+  - id: research
+    description: Re-confirm Multica status vocabulary (cancelled vs canceled, etc.) + read `hive/lib/multica-issue-closer.mjs` for the auth path.
+    agent: researcher
+  - id: implement
+    description: Write the script + the (disabled-by-default) workflow YAML.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Fixture-test against a small temp episodes dir; mock the Multica API.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm idempotency + that the cron workflow is disabled in shipped form.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-issue-closer.mjs
+      purpose: auth-loading + httpJson pattern to reuse
+    - path: hive/lib/story-status.mjs
+      purpose: reference for the `deferred:` YAML block shape
+
+files_to_modify:
+  - file: hive/scripts/multica-reverse-sync.mjs
+    change: new script
+  - file: .github/workflows/multica-reverse-sync.yml
+    change: new workflow (cron disabled by default)
+
+design_decisions:
+  - decision: Disabled-by-default workflow
+    rationale: Reverse sync is an opt-in maintenance pass, not a release gate. Operators turn it on when they have a hosted Multica + want the reverse sync to run unattended.
+  - decision: Only sync the `cancelled` → `deferred` direction. Do NOT sync `done` → `completed` here — that direction is owned by the file-side reconcile workflow + the closer in s1-2.
+    rationale: Single-source-of-truth per direction. File-side wins on `completed`; this story handles only the asymmetric cancelled→deferred case the file-side cannot derive.
+
+risks:
+  - severity: low
+    description: Race — operator cancels in Multica WHILE /execute is mid-story; reverse sync flips YAML, then /execute writes a new marker that conflicts
+    mitigation: Reverse sync only patches stories whose `status:` is currently `pending` or `in_progress`. Stories with a fresh integrate marker since the last reverse-sync run are skipped (timestamp check).
+
+references:
+  - path: hive/lib/story-status.mjs
+    relevant_excerpt: |
+      // 1. deferred: block in YAML
+      if (storyText && hasYamlBlock(storyText, 'deferred')) {
+        return 'deferred';
+      }

@@ -184,3 +184,5 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/multica-integration-fixes/**
 !.pHive/episodes/multica-integration-fixes/
 !.pHive/episodes/multica-integration-fixes/**
+!.pHive/epics/story-loop-closure/
+!.pHive/epics/story-loop-closure/**
