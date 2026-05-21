@@ -16,8 +16,6 @@ domain:
     read: true
     write: true
     delete: false
-    write: false
-    delete: false
 ---
 
 # Backend Developer
