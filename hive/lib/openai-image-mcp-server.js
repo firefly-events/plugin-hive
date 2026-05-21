@@ -304,30 +304,26 @@ function toolListResult() {
 }
 
 function readMessages(onMessage) {
-  let buffer = Buffer.alloc(0);
+  let buffer = '';
+  process.stdin.setEncoding('utf8');
   process.stdin.on('data', (chunk) => {
-    buffer = Buffer.concat([buffer, chunk]);
-    while (true) {
-      const separator = buffer.indexOf('\r\n\r\n');
-      if (separator === -1) return;
-      const header = buffer.slice(0, separator).toString('utf8');
-      const match = /Content-Length:\s*(\d+)/i.exec(header);
-      if (!match) {
-        throw new Error('Missing Content-Length header');
+    buffer += chunk;
+    let newlineIndex;
+    while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, newlineIndex).replace(/\r$/, '');
+      buffer = buffer.slice(newlineIndex + 1);
+      if (!line.trim()) continue;
+      try {
+        onMessage(JSON.parse(line));
+      } catch (error) {
+        process.stderr.write(`Failed to parse JSON-RPC line: ${error && error.message ? error.message : String(error)}\n`);
       }
-      const length = Number(match[1]);
-      const bodyStart = separator + 4;
-      if (buffer.length < bodyStart + length) return;
-      const body = buffer.slice(bodyStart, bodyStart + length).toString('utf8');
-      buffer = buffer.slice(bodyStart + length);
-      onMessage(JSON.parse(body));
     }
   });
 }
 
 function writeMessage(message) {
-  const body = JSON.stringify(message);
-  process.stdout.write(`Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n${body}`);
+  process.stdout.write(`${JSON.stringify(message)}\n`);
 }
 
 async function handleRpcMessage(message) {
