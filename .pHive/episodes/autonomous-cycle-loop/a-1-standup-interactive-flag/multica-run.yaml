@@ -12,15 +12,3 @@ assignee_name: developer
 dispatched_at: "2026-05-21T16:18:03Z"
 brief_path: .pHive/episodes/autonomous-cycle-loop/a-1-standup-interactive-flag.brief.md
 poll_url: http://localhost:8080/api/v1/issues/96851bd4-c488-4f5d-8857-67408c4cb9eb
----
-# Multica dispatch — a-1-standup-interactive-flag
-
-Dispatched to Multica workspace `21c6d282-d6b4-4b25-8d0d-a85e96038416` (slug PLU) as issue `PLU-14`
-assigned to agent `developer`. Multica daemon owns the run; this marker tracks
-queued → running → completed|failed|cancelled lifecycle.
-
-Monitor:
-  multica issue view PLU-14
-  multica issue list --status in_progress
-
-Brief: `.pHive/episodes/autonomous-cycle-loop/a-1-standup-interactive-flag.brief.md`

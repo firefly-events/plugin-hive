@@ -57,7 +57,7 @@ signals (PR shipped, branch merged), conflict resolution.
 ### implement (developer)
 Build hive/lib/story-status with deriveStoryStatus(). Add the post-merge hook
 (CI step is simplest — runs on merge to main/develop, walks recent commits, finds
-story refs, updates YAMLs, commits the patch on a chore/status-reconcile-<date>
+story refs, updates YAMLs, commits the patch on a chore/status-reconcile-`<date>`
 branch + opens a PR). Add hive/scripts/story-status-backfill.mjs for one-shot
 backfill.
 
