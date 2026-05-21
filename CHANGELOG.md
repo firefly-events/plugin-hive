@@ -9,29 +9,26 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-05-21
+
 ### Added
 
-- `/design` top-level skill (se-2): new UI/wireframe design ceremony at `skills/design/SKILL.md`. Composes brand-system, wireframe-protocol, ui-designer, and design-review. Callable standalone (for ad-hoc UI exploration, mid-execution redesigns, polish passes) or atomically from `/plan` Phase C step 16 via an external Skill call (not inline prose). Produces wireframes under `.pHive/design/<topic>/` and a handoff record in `.pHive/design/index.yaml` consumed by `/design-review`. `/plan`'s UI Step Detection section refactored to delegate to `/design` instead of inlining the wireframe ceremony. Plugin version bumped 2.1.0 → 2.2.0 (consumer-visible new skill).
-- KG signal revival follow-ups: `chromadb-wrapper.js query()` now returns per-hit `metadata` (predicate / source_epic / source_agent / valid_from per B0.2). New `scripts/kg-why-chroma.js` Node bridge plus `hive/lib/kg_why.py::_default_chromadb_query_fn()` wire S6.1 Phase B to the live sidecar when present; `HIVE_DISABLE_CHROMA_BRIDGE` env var disables the default for test isolation. `step-08-close.md` "Inputs available" now enumerates `kg_signal_findings_total`, `kg_signal_proposals_total`, `hit_rate_5cycle`, `miss_reason`, `cycle_report_path`, and `resolved_ledger_path` so the orchestrator threads telemetry placeholders through scope.
-- KG signal revival S6.3: secondary predicate wiring audit — all 5 candidate predicates (`phase_started`, `phase_complete`, `assigned_to`, `blocked_by`, `depends_on`) deferred per the anti-pattern guard (no current `/hive:why` surface names them by predicate). Story closes with audit doc as sole deliverable at `.pHive/epics/kg-signal-revival/docs/secondary-predicate-audit.md`. Re-audit triggers documented for follow-on epic.
-- KG signal revival S6.2: `/plan` pre-flight invokes `/hive:why` (free-form, --limit 10) against the requirement topic. Results materialize as a `PRIOR DECISIONS` section in design-discussion §0 when ≥1 triple returns; section is omitted entirely when zero results (no noise). Helper failure (missing sqlite, kg_why error) degrades silently — planning continues.
-- KG signal revival S6.1: `/hive:why` retrospection slash command. New skill at `skills/hive/skills/why/SKILL.md` with `--strict --predicate <name> --entity <id>` as primary usage (precision-first, KG-only Phase A) and free-form topic queries as documented fallback (merges Phase A + ChromaDB Phase B when available). Helper `hive/lib/kg_why.py` implements all three phases (KG query, semantic fallback, merge+dedupe+render). Degrades to SQLite-only when ChromaDB unavailable. (Phase B live ChromaDB bridge subsequently wired via the S6.1 follow-up above, which made `chromadb-wrapper.js query()` return per-hit metadata.)
-- KG signal revival S5.3: per-cycle KG metrics JSONL stream + cycle-rollup line. `hive/lib/kg_metrics_writer.py` buffers `kg_write` events in memory keyed by cycle_id (resolved from `--cycle-id` or `HIVE_CYCLE_ID`/`HIVE_META_CYCLE_ID` env), flushes one JSONL file at `.pHive/metrics/kg/{cycle_id}.jsonl` per close with all per-event rows + one `cycle_summary` row, and appends a single greppable `kg-signal: findings=N proposals=M hit_rate_5cycle=R miss_reason=X` line to the morning summary. Writer is append-idempotent — re-running close for the same cycle_id does not duplicate rows. step-08-close.md wires the flush after the ledger append.
-- KG signal revival S5.2: miss-reason taxonomy at step-02c — new `hive/lib/kg_signal/miss_reason.py` discriminator returns one of `empty_kg` / `empty_predicate_filter` / `recency_cutoff` / `project_tag_cutoff` from query-time state. step-02c emits the field on empty cycles; step-03 fires `dedup_eviction` when its dedup logic empties a non-zero kg-finding candidate set. Buckets are mutually exclusive; field is absent when findings non-empty.
-- KG signal revival S5.1: KG-signal observability surface — `kg_signal_findings_total{cycle_id}`, `kg_signal_proposals_total{cycle_id}` counters and `hit_rate_5cycle` gauge registered in `metric_registry.py` (idempotent against double-registration). `kg_writes_total{predicate}` re-registration confirmed idempotent. New `python3 -m hive.lib.metric_increment_cli` shell entry point for prompt-driven increment from step-02c (findings emitted) and step-03 (proposal merge — hit-rate join site). `hit_rate_5cycle` computed at step-08 cycle close with edge-case correctness for <5 cycles.
-- KG signal revival S4.5: Nail Tech Assistant onboarded — quoted-path canary (path contains both space and intentional `Assitant` typo). `kg-bootstrap-from-projects.js --apply --since 2026-04-28` imported 6 triples under `nail-tech-assistant/epic-b-pinterest-integration` namespace. kg.sqlite total: 74 → 80. Wave S4 complete; registry now holds plugin-hive, shindig, signal-flayr, nail-tech-assistant. Execution notes at `.pHive/epics/kg-signal-revival/execution-notes/S4.5.md`.
-- KG signal revival S4.4: Signal Flayr (`ffe-social-engine` repo) onboarded to `~/.claude/hive/projects.yaml`. `kg-bootstrap-from-projects.js --apply --since 2026-04-28` imported 7 triples under `signal-flayr/security-hotfix-p0` namespace. kg.sqlite total: 67 → 74. Execution notes at `.pHive/epics/kg-signal-revival/execution-notes/S4.4.md`.
-- KG signal revival S4.3: Shindig Mobile onboarded to `~/.claude/hive/projects.yaml`. `kg-bootstrap-from-projects.js --apply --since 2026-04-28` imported 0 Shindig triples (all 8 of Shindig's decisions are pre-predicate-canon date) — registration + bootstrap mechanism is the documented deliverable per the story's risk note. Execution notes at `.pHive/epics/kg-signal-revival/execution-notes/S4.3.md`. `node_modules/` added to `.gitignore` (transient BYO `better-sqlite3` install).
-- KG signal revival S2.3: Act I exit gate verification — `hive/scripts/act-i-exit-gate-check.sh` runs the priority-predicate count after every `/meta-optimize` cycle (wired into `step-08-close.md`), emits a PASSED marker exactly once on the first non-zero transition, and closes the `S7-kg-signal-production-emission` outcome metric loop from the prior `kg-augmented-meta-signal` epic.
-- KG signal revival S2.2: `superseded` predicate emission across three replacement seams — `/plan` story-overwrite, `/meta-optimize` step-03 proposal replacement, and `session-end` insight promotion. New `emit_superseded()` + `emitSupersededEvent()` helpers atomically `UPDATE valid_until` on the prior triple and `INSERT` one provenance edge in a single sqlite transaction. `kg_emit_cli` gains `--mode supersede` for prompt-driven callers.
-- KG signal revival S2.1: `phase_blocked` predicate emission fanned out to three seams — DAG executor walker `_record_skipped` upstream-skip path (Python helper); escalation-backfill skill emits one triple per `(trigger, canonical-story-id)` pair at TPM escalation-raise; orchestrator waiting-on-user gates (plan structured-outline sign-off, design-discussion review, H/V plan review, daily-ceremony approve-plan) emit via a new `python3 -m hive.lib.kg_emit_cli` shell entry point that wraps `emit_kg_event` for prompt-driven callers.
-- KG signal revival S3.2: ChromaDB wrapper dynamic port resolution from `~/.claude/hive/chromadb.port`, idempotent `decisions` collection bootstrap, and B0.2 schema docs.
-- KG signal revival S4.2: bootstrap `--since` filtering, dry-run projection output, large-import guardrails, and legacy decision `set:` to `valid_from` handling.
-- KG signal revival S4.2b: cross-project KG findings and proposals now preserve the `[cross-project: <name>]` hard-tag contract in workflow docs.
-- KG signal revival S1.2: Python `emit_kg_event()` parity helper and DAG executor terminal failure emission for `phase_failed`.
-- KG signal revival S1.1 foundation: `emit_lifecycle_at` knob, `emitKgEvent()` helper, and `kg_writes_total{predicate}` counter registration.
-- KG signal revival S4.1: `/hive:register-project` skill, registry helper, and quoted path-with-space fixture for cross-project KG bootstrap registration.
-- KG signal revival S3.1: ChromaDB sidecar lifecycle scripts, fire-and-forget SessionStart hook, operations guide, and bash lifecycle tests.
+- `/hive:multica-init` bootstrap skill (s3).
+- Multica task-tracking adapter (s1).
+- Persona → Multica agent declarative config (s4).
+- `/plan` Phase D Multica dispatch wiring (s2).
+- `GUIDE.md` maintainer guide for the Multica execution model.
+
+### Changed
+
+- README setup pointer now leads with `/hive:multica-init`.
+- `hive.config.yaml` gains commented `# Multica (built-in):` example block.
+
+### Notes
+
+- Sandcastle + GH-Actions execution paths remain available but are scheduled for archival in follow-on cleanup epic `sandcastle-adoption-followon`.
+- No breaking changes in this release — minor bump (2.5.0 → 2.6.0).
+- Consumers do not need to take action unless they want to adopt the Multica substrate (run `/hive:multica-init`).
 
 ## [2.5.0] - 2026-05-19
 
