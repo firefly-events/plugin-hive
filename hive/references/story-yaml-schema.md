@@ -30,7 +30,7 @@ planning skill and team-lead guidance, not in this schema.
 | `id`                 | required    | `a-25-skill-prelude-extraction`            |
 | `epic`               | required    | `catalog-hygiene-and-borrows`              |
 | `title`              | required    | `Extract skill-prelude.md ...`             |
-| `status`             | advisory    | `pending` \| `in-progress` \| `done` — **derived status is authoritative; episode markers + git state win on conflict.** See `hive/lib/story-status.mjs`. Forward-stating intent (`deferred`, `blocked`) is still written here; the deriver respects those values. |
+| `status`             | advisory    | `pending` \| `in_progress` \| `completed` (derived) plus `deferred` \| `blocked` \| `failed` (forward-stated) — **derived status is authoritative; episode markers + git state win on conflict.** See `hive/lib/story-status.mjs`. The deriver currently reads `deferred` as a YAML block and respects it; other forward-stated values are advisory. |
 | `complexity`         | required    | `small` \| `medium` \| `large`             |
 | `methodology`        | required    | `classic` \| `tdd`                         |
 | `depends_on`         | required    | `[]` or list of story ids                  |
@@ -69,8 +69,8 @@ The deriver computes status from:
 6. Markers exist, final step not complete → `in_progress`
 
 The `status:` field is still writable for forward-stating intent (`deferred`,
-`blocked`) and planning scaffolding. The deriver gives it lower priority than
-episode markers + git state (per `episode-schema.md` §"Authoritative source order").
+`blocked`, `failed`) and planning scaffolding. The deriver gives it lower
+priority than episode markers + git state (per `episode-schema.md` §"Authoritative source order"). Currently only `deferred` is read by the deriver (as a YAML block) — the other forward-stated values are advisory.
 
 ## 8. The `terminal_handoff:` field group
 

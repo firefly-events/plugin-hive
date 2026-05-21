@@ -103,7 +103,9 @@ function getStorySteps(storyText) {
   const lines = after.split('\n').slice(1);
   for (const line of lines) {
     if (line.trim() && !line.match(/^\s/)) break;
-    const m = line.match(/^\s+id:\s+(.+)$/);
+    const m =
+      line.match(/^\s*-\s*id:\s+(.+)$/) ||
+      line.match(/^\s+id:\s+(.+)$/);
     if (m) steps.push(m[1].trim().replace(/^['"]|['"]$/g, ''));
   }
   return steps;
@@ -138,8 +140,10 @@ function isBranchMergedToMain(repoRoot, branchPattern) {
     const merged = execFileSync('git', [
       'branch', '-r', '--merged', 'origin/main',
     ], { cwd: repoRoot, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
-    const lines = merged.split('\n').map(l => l.trim());
-    return lines.some(l => l.includes(branchPattern));
+    const lines = merged.split('\n').map(l => l.trim().replace(/^origin\//, ''));
+    return lines.some(
+      name => name === branchPattern || name.endsWith(`/${branchPattern}`),
+    );
   } catch {
     return false;
   }
@@ -167,20 +171,24 @@ function isStoryBranchMerged(repoRoot, epic_id, story_id) {
  * @param {string} [opts.repo_root] - defaults to nearest ancestor with .pHive
  * @returns {'pending'|'in_progress'|'completed'|'deferred'|'blocked'|'failed'}
  */
-export function deriveStoryStatus({ epic_id, story_id, repo_root }) {
+export function deriveStoryStatus({ epic_id, story_id, repo_root, _visited }) {
   const repoRoot = repo_root || findRepoRoot(process.cwd());
   const storyText = readStoryYaml(repoRoot, epic_id, story_id);
+
+  // Cycle protection for the recursive depends_on walk below.
+  const visited = _visited || new Set();
+  const key = `${epic_id}::${story_id}`;
+  if (visited.has(key)) {
+    // Treat a re-entrance as not-completed so cycles don't false-positive
+    // dependency closure. The outer call still gets a deterministic answer
+    // on the first walk through each node.
+    return 'pending';
+  }
+  visited.add(key);
 
   // 1. deferred: block in YAML
   if (storyText && hasYamlBlock(storyText, 'deferred')) {
     return 'deferred';
-  }
-
-  // Pre-marker-era completions: YAML status=completed + shipped: block is accepted as evidence
-  // when there are no episode markers. This covers stories shipped before the marker system.
-  if (storyText && hasYamlBlock(storyText, 'shipped')) {
-    const yamlStatus = readYamlField(storyText, 'status');
-    if (yamlStatus === 'completed') return 'completed';
   }
 
   // Collect episode markers
@@ -206,12 +214,23 @@ export function deriveStoryStatus({ epic_id, story_id, repo_root }) {
     return 'completed';
   }
 
+  // Pre-marker-era completions: YAML status=completed + shipped: block is accepted
+  // as evidence ONLY when there are no episode markers. With markers present,
+  // marker-driven derivation above is authoritative — a later failed marker
+  // must not be masked by a stale YAML shipped block.
+  if (markers.length === 0 && storyText && hasYamlBlock(storyText, 'shipped')) {
+    const yamlStatus = readYamlField(storyText, 'status');
+    if (yamlStatus === 'completed') return 'completed';
+  }
+
   // 3. blocked — depends_on stories not completed
   if (storyText) {
     const deps = readYamlListField(storyText, 'depends_on');
     if (deps.length > 0) {
       const allDepsComplete = deps.every(dep => {
-        const depStatus = deriveStoryStatus({ epic_id, story_id: dep, repo_root: repoRoot });
+        const depStatus = deriveStoryStatus({
+          epic_id, story_id: dep, repo_root: repoRoot, _visited: visited,
+        });
         return depStatus === 'completed';
       });
       if (!allDepsComplete && markers.length === 0) return 'blocked';

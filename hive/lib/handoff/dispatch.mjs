@@ -174,6 +174,14 @@ function runSkill(skillArgs, timeoutMs, extractVerdict) {
     return { ok: false, verdict: 'timeout', rawOutput: child.stdout + child.stderr, reason: 'timeout', timedOut: true };
   }
   const rawOutput = child.stdout + (child.stderr ? `\n--- stderr ---\n${child.stderr}` : '');
+  if (child.exitCode !== 0) {
+    return {
+      ok: false,
+      verdict: 'error',
+      rawOutput,
+      reason: `claude exited with code ${child.exitCode}`,
+    };
+  }
   const verdict = extractVerdict(rawOutput);
   return { ok: true, verdict, rawOutput };
 }
@@ -273,7 +281,7 @@ export async function dispatchHandoff({
     if (testResult.timedOut) {
       const duration_ms = Date.now() - started;
       const timeout_at = new Date().toISOString();
-      emitTimeoutEvent(state_dir, story_id, 'both', duration_ms, timeout_at);
+      emitTimeoutEvent(state_dir, story_id, 'test', duration_ms, timeout_at);
       void emitPhaseHandoffTriple(story_id, 'test', 'timeout');
       return { ok: false, reason: 'timeout', duration_ms, timeout_at };
     }
@@ -297,7 +305,7 @@ export async function dispatchHandoff({
 
     if (reviewResult.timedOut) {
       const timeout_at = new Date().toISOString();
-      emitTimeoutEvent(state_dir, story_id, 'both', duration_ms, timeout_at);
+      emitTimeoutEvent(state_dir, story_id, 'review', duration_ms, timeout_at);
       void emitPhaseHandoffTriple(story_id, 'review', 'timeout');
       return { ok: false, reason: 'timeout', duration_ms, timeout_at };
     }
