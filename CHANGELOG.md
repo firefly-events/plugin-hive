@@ -9,6 +9,25 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-05-21
+
+### Added
+
+- Multica dispatch mode for `/execute`: `execution.mode: multica` or `HIVE_EXECUTION_MODE=multica` routes each story as a Multica issue assignment to the `developer` persona. The v1 contract is whole-story-to-one-agent, with one `multica-run.yaml` episode marker per story.
+- `skills/hive/skills/execute-mode-multica/SKILL.md` atomic dispatch sub-skill.
+- `hive/lib/multica-story-dispatch/` helper exports: `serializeStoryBrief`, `resolveAgentUuidByName`, `ensureIssueBriefMatches`, `dispatchStoryToAgent`, and `moveOutOfBacklogIfNeeded` from `index.mjs`; `pollTaskUntilTerminal` and `writeMulticaRunEpisode` from `episode-sync.mjs`.
+- `tests/smoke/multica-execute-mode.test.mjs` first dogfood smoke against the live Multica spike, gated on `/healthz`.
+
+### Changed
+
+- `skills/hive/skills/execute-dispatch/SKILL.md` adds `multica` to the `mode_decision` enum, documents override precedence, and recognizes the mode in Step 1.5 parallel-gate handling. `HIVE_EXECUTION_MODE` wins over config on conflict, and the existing Sandcastle branch remains unchanged at line level.
+
+### Notes
+
+- Additive opt-in only: default execution mode remains sequential and this is not a breaking change.
+- Sandcastle + GH-Actions paths remain available and are scheduled for archival in `sandcastle-adoption-followon`.
+- v1 scope is intentional: whole-story-to-one-agent, polling not SSE, fail-loud bootstrap precondition, and per-phase markers plus sidecar routing deferred to v2 work.
+
 ## [2.6.0] - 2026-05-21
 
 ### Added
