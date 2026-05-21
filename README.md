@@ -6,12 +6,12 @@
 
 # Hive
 
-> **A director's chair for the agentic SDLC — disciplined swarms, kickoff to ship.**
+> **Composable substrate for the agentic SDLC — user-directed, disciplined, kickoff to ship.**
 
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.5.0-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-2.7.0-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
@@ -91,41 +91,55 @@ Alternatively, run `/plugin` and use the **Discover** tab to browse and install 
 
 ## Quick Start
 
-**1. Initialize Hive for your project**
+**1. Bootstrap Multica**
+```
+/hive:multica-init
+```
+Bootstrap Multica as the execution substrate (one-time setup; idempotent on re-run).
+
+**2. Initialize Hive for your project**
 ```
 /hive:kickoff
 ```
 Hive discovers your codebase (brownfield) or sets up a new project (greenfield) and generates team configs.
 
-**2. Start the day**
+**3. Start the day**
 ```
 /hive:standup
 ```
 Reviews yesterday's work, active blockers, and human items. Surfaces continuations.
 
-**3. Plan a feature**
+**4. Plan a feature**
 ```
 /hive:plan
 ```
 Runs multi-phase planning: design discussion → horizontal scan → vertical slice plan → agent-ready stories. You review and steer at each gate.
 
-**4. Execute the plan**
+**5. Execute the plan**
 ```
 /hive:execute
 ```
 Orchestrator loads your team, runs stories through the development workflow (research → implement → test → review → integrate), and commits per story.
 
-**5. Review changes**
+**6. Review changes**
 ```
 /hive:review
 ```
 Structured code review covering correctness, security, conventions, and domain compliance. Optional Codex adversarial pass for a second-model perspective.
 
-**6. Check workflow status**
+**7. Check workflow status**
 ```
 /hive:status
 ```
 Shows active epics, story progress, and a **Drift trend (last 5 runs)** section summarizing `scope_drift_score` bucket counts when present. Silent on greenfield projects with no drift events yet.
+
+### How execution works
+
+`/hive:plan` and `/hive:review` still run interactively on your laptop, preserving the places where you inspect, steer, and approve the work. `/hive:execute` now routes implementation through Multica, the user-directed execution substrate used by the default path.
+
+The two human gates remain unchanged: one after planning, and one after review. The Sandcastle + GitHub Actions execution path remains available, but its previous primary-path framing is now legacy; it is scheduled for archival in the follow-on cleanup epic `sandcastle-adoption-followon`.
+
+**Multica dispatch (opt-in).** Set `execution.mode: multica` in hive.config.yaml or `HIVE_EXECUTION_MODE=multica` to route /execute through Multica agents. Each story dispatches as one assignment to the `developer` persona (declared in .pHive/multica/agents.yaml, bootstrapped via /hive:multica-init). One episode marker per story. Requires the spike daemon running and agents bootstrapped — fails loud otherwise.
 
 ---
 
@@ -223,6 +237,25 @@ consumer command surface.
 For the detailed operating contract, see
 [`skills/hive/skills/meta-optimize/SKILL.md`](skills/hive/skills/meta-optimize/SKILL.md)
 and [`hive/references/meta-optimize-contract.md`](hive/references/meta-optimize-contract.md).
+
+### Skill discovery and authoring
+
+Two paired top-level skills close the meta-loop on skill catalog growth:
+
+- [`/find-skills`](skills/find-skills/SKILL.md) — mines recurring patterns from
+  metrics, KG triples, git history, and cycle-state escalations (via
+  [`hive.lib.skill_candidate_mine`](hive/lib/skill_candidate_mine.py)), ranks
+  them by `occurrence_count × recency_factor × distinctness`, filters below
+  threshold, and writes ranked candidates to `.pHive/meta/skill-candidates.yaml`.
+  Operator picks a candidate; `/find-skills` hands off to `/write-skill` via an
+  atomic `Skill` call.
+- [`/write-skill`](skills/write-skill/SKILL.md) — scaffolds
+  `skills/<kebab-name>/SKILL.md` from a brief (name, problem, triggers, scope).
+  Asks clarifying questions inline for any missing field. Scaffold only — no
+  indexing, no commit, no run.
+
+Together they form the discover-then-author half of the meta-loop;
+`/meta-optimize` above is the run-experiments half.
 
 ---
 
@@ -347,11 +380,11 @@ Enable integrations in `hive/hive.config.yaml`. All integrations are optional �
 
 ### Autonomous worker loop (reference, maintainer-only)
 
-For consumers who want unattended execution: combine the GitHub Issues task-tracker adapter with sandcastle adoption and a GitHub Actions cron workflow to close the `/plan` → labeled issue → worker → PR loop end-to-end. Reference workflow ships at `.github/workflows/hive-worker.yml` (in plugin-hive's own repo only — plugins distribute via `.claude-plugin/`, not `.github/`). Pre-flight gate at `hive/lib/budget-gate.js` aborts the run when `tokens.daily_usd_limit` is exceeded. See [`hive/references/sandcastle-ops-loop.md`](hive/references/sandcastle-ops-loop.md) for the full opt-in checklist, constraints, and failure modes.
+For consumers who want the legacy unattended execution path: combine the GitHub Issues task-tracker adapter with sandcastle adoption and a GitHub Actions cron workflow to close the `/plan` → labeled issue → worker → PR loop end-to-end. Reference workflow ships at `.github/workflows/hive-worker.yml` (in plugin-hive's own repo only — plugins distribute via `.claude-plugin/`, not `.github/`). Pre-flight gate at `hive/lib/budget-gate.js` aborts the run when `tokens.daily_usd_limit` is exceeded. See [`hive/references/sandcastle-ops-loop.md`](hive/references/sandcastle-ops-loop.md) for the full opt-in checklist, constraints, and failure modes.
 
 ### Unattended mode — event-driven dispatch
 
-`/hive:sandcastle-gh-init` scaffolds an event-driven alternative to the cron loop above. Run it after `npx sandcastle init` and the skill drops `.github/workflows/hive-dispatch.yml` + a bridge script into your repo. Labeling any issue `hive:ready` then fires `/hive:execute` inside a Sandcastle container, opens a PR, and flips the canonical label state machine (`hive:ready` → `hive:in-flight` → `hive:shipped` | `hive:failed`). See [`hive/references/sandcastle-gh-dispatch.md`](hive/references/sandcastle-gh-dispatch.md) for the maintainer runbook — install, secret rotation, runner choice, public-repo lockdown, and stuck-label debugging.
+`/hive:sandcastle-gh-init` scaffolds the legacy event-driven alternative to the cron loop above. Run it after `npx sandcastle init` and the skill drops `.github/workflows/hive-dispatch.yml` + a bridge script into your repo. Labeling any issue `hive:ready` then fires `/hive:execute` inside a Sandcastle container, opens a PR, and flips the canonical label state machine (`hive:ready` → `hive:in-flight` → `hive:shipped` | `hive:failed`). See [`hive/references/sandcastle-gh-dispatch.md`](hive/references/sandcastle-gh-dispatch.md) for the maintainer runbook — install, secret rotation, runner choice, public-repo lockdown, and stuck-label debugging.
 
 **Per-epic branch + base-branch config (2.4.0).** Story-issues carrying a `hive:epic:<id>` label are stacked onto a single `feat/<epic-id>` branch and produce one draft PR per epic (instead of one branch + PR per issue). The PR opens on the first story of the epic, gets its body updated as subsequent stories ship, and promotes from draft to ready-for-review when the last story flips `hive:shipped`. The base branch is auto-resolved (`develop` if `origin/develop` exists, else `main`) and can be pinned via a new `git_flow.default_pr_base` knob in `hive.config.yaml`; setting `branch_strategy: per-story` restores the legacy one-branch-per-issue path for in-flight epics. See the Branching model section in [`hive/references/sandcastle-gh-dispatch.md`](hive/references/sandcastle-gh-dispatch.md#3-branching-model) for the full surface (overrides, concurrency, PR lifecycle).
 

@@ -576,7 +576,12 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Use the task-tracking dispatch module rather than vendor-specific calls.
     The dispatch surface handles `gate_mode`, telemetry, and error mapping;
-    do not branch on the adapter vendor (`github` vs `linear`) here.
+    do not branch on the adapter vendor (`github`, `linear`, or `multica`)
+    here. The Multica adapter follows the same `createStory` ABI and writes
+    `tracker_id` / `tracker_url` from `result.result.id` and
+    `result.result.url`, matching the existing GitHub and Linear flow.
+    For Multica `AUTH_FAILURE`, surface the adapter message and direct the
+    user to `/hive:multica-init` before retrying Phase D.
 
     ```typescript
     import { TaskTrackingDispatch } from "hive/lib/task-tracking-dispatch/index.ts";

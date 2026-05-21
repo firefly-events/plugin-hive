@@ -23,6 +23,7 @@
  */
 
 const path = require('node:path');
+const fs = require('node:fs');
 
 const { wrapSandcastleLogger } = require('./sandcastle-log-redaction.js');
 
@@ -83,8 +84,32 @@ const DEFAULT_SANDBOX_PATH = '/home/agent/.codex';
  */
 function runVersionPreflight(versionResolver) {
   const resolveVersion = versionResolver || function defaultVersionResolver() {
-    // eslint-disable-next-line import/no-extraneous-dependencies
-    return require('@ai-hero/sandcastle/package.json').version;
+    // @ai-hero/sandcastle ships ESM-only (no `require` key in its `exports`),
+    // so both `require('@ai-hero/sandcastle/package.json')` AND
+    // `require.resolve('@ai-hero/sandcastle')` fail with
+    // ERR_PACKAGE_PATH_NOT_EXPORTED on Node >= 22. Walk the filesystem for
+    // the package manifest the same way Node's resolver would, starting from
+    // process.cwd() (consumer install) and falling back to this module's
+    // location (plugin-bundled install).
+    const searchStarts = [process.cwd(), __dirname];
+    for (const start of searchStarts) {
+      let dir = path.resolve(start);
+      while (dir) {
+        const candidate = path.join(
+          dir, 'node_modules', '@ai-hero', 'sandcastle', 'package.json',
+        );
+        if (fs.existsSync(candidate)) {
+          return JSON.parse(fs.readFileSync(candidate, 'utf8')).version;
+        }
+        if (dir === path.parse(dir).root) break;
+        dir = path.dirname(dir);
+      }
+    }
+    throw new Error(
+      '[hive/sandcastle-provider] could not locate @ai-hero/sandcastle ' +
+      `package.json from cwd=${process.cwd()} or module=${__dirname}. ` +
+      `Install: npm install @ai-hero/sandcastle@"${SANDCASTLE_RANGE}"`,
+    );
   };
 
   const installed = resolveVersion();

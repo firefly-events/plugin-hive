@@ -80,16 +80,31 @@ context_window:
 #     linear:
 #       api_key: null                # falls through to LINEAR_API_KEY env
 #       team: ACME                   # falls through to LINEAR_TEAM env
+#
+#   # Multica (built-in):
+#   task_tracking:
+#     adapter: multica
+#     team_value: <multica-workspace-slug>   # e.g. plugin-hive
+#     project_value: null                    # not used by multica
+#     multica:
+#       server_url: null                     # falls through to ~/.multica/config.json server_url
+#       token: null                          # falls through to MULTICA_TOKEN env, then ~/.multica/config.json token
 task_tracking:
-  adapter: github
+  # Flipped 2026-05-21 github → multica per local-first direction (v2.6.0
+  # multica-substrate-adoption shipped; multica-execute-routing follow-on
+  # in flight). /plan Phase D now files stories as Multica issues in the
+  # local spike workspace. Override back to github (or null) if needed.
+  adapter: multica
   adapter_timeout_ms: 30000
   gate_mode: warning
-  team_value: firefly-events
-  project_value: plugin-hive
-  # GitHub Issues adapter (sandcastle-ops-layer s1) — extends task_tracking
-  # with labeled-issue publish + dependency-sweep. Wired into Phase D of
-  # skills/plan/SKILL.md and gated on `adapter == "github"`. Default consumers
-  # who do not opt in see zero behavior change.
+  team_value: plugin-hive        # Multica workspace slug
+  project_value: null            # not used by multica
+  multica:
+    server_url: null             # falls through to ~/.multica/config.json server_url
+    token: null                  # falls through to MULTICA_TOKEN env, then ~/.multica/config.json token
+  # GitHub Issues adapter (sandcastle-ops-layer s1) — labeled-issue publish
+  # + dependency-sweep. Wired into Phase D and gated on `adapter == "github"`.
+  # Retained as a fall-back; switch adapter:github above to re-activate.
   github_owner: null             # falls through to team_value when null
   github_repo: null              # falls through to project_value when null
   label_prefix: "hive"           # prefix for hive:ready / hive:blocked-by:<id> labels
@@ -221,3 +236,15 @@ execution:
   terminal_mux: cmux            # required for codex-backend panes
   interactive_panes: true       # visible agent conversation in cmux panes
   idle_timeout_seconds: 300     # 5-min idle reaper for persistent Codex panes
+
+# Autonomous cycle loop (epic: autonomous-cycle-loop, story s0-1 foundation)
+# Root-layer override surface for the same block declared in
+# `hive/hive.config.yaml`. Schema-only foundation — no consumer reads these
+# knobs yet. See hive/references/sandcastle-mode.md and
+# hive/references/test-scenario-schema.md for semantics. Defaults match the
+# shipped baseline; uncomment to override locally without forking the plugin.
+# autonomous_cycle_loop:
+#   enabled: false
+#   sandcastle_mode: shared       # shared | dedicated
+#   test_scenarios_path: .pHive/test-scenarios
+#   max_cycles_per_run: 1

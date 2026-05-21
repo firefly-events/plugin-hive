@@ -1,0 +1,188 @@
+id: s3-execute-mode-multica-skill
+epic: multica-execute-routing
+title: "skills/hive/skills/execute-mode-multica: per-story lifecycle (precondition → fetch → brief → dispatch → poll → cleanup)"
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+  - s1-dispatch-mode-wiring
+  - s2-story-translation-helper
+
+description: |
+  Build the atomic dispatch sub-skill that the dispatch resolver hands
+  off to when mode_decision == multica. Mirrors execute-mode-sandcastle
+  in shape, with the actual lifecycle adapted for Multica's task model.
+
+  The skill is invoked once per /execute run with the inputs:
+  - `workflow_path`: path to resolved workflow YAML
+  - `unblocked_stories[]`: depth-0 ready stories from topological sort
+  - `appends_map`: {story_id: [sidecar_agent_name, ...]} (v1: logged but
+    deferred to v2 — sidecar reviewers are NOT routed through Multica in
+    v1; see design discussion D1)
+  - `epic_handle`: epic identifier for episode marker paths
+  - `hive_config`: parsed root hive.config.yaml (for
+    execution.multica.* options and bootstrap server_url)
+
+  Per-story lifecycle (whole-story-to-one-Multica-agent v1 contract):
+
+  1. **Precondition check.** Call resolveAgentUuidByName(serverUrl,
+     token, workspaceId, 'developer'). On BOOTSTRAP_REQUIRED throw with
+     pointer to /hive:multica-init. Abort the whole dispatch — do not
+     fall back to sequential.
+
+  2. **Issue resolution.** If story.tracker_id is populated (Phase D
+     filed it), use s1 adapter getStory to fetch by tracker_id. If
+     missing/empty, use s1 adapter createStory to create one. Either
+     way, end up with {issueUuid, identifier}.
+
+  3. **Backlog kick.** Call moveOutOfBacklogIfNeeded to ensure the
+     issue is in `todo` (or other dispatchable state) before assignment.
+
+  4. **Brief write.** Call serializeStoryBrief(story) → markdown. Call
+     ensureIssueBriefMatches; if drift, PUT updates the description.
+
+  5. **Dispatch.** Call dispatchStoryToAgent(serverUrl, token,
+     workspaceId, issueUuid, developerAgentUuid). The PUT returns 200
+     with assignee_type/id populated. Multica internally enqueues the
+     task.
+
+  6. **Hand off to s4 episode-marker-sync.** s3 calls pollTaskUntilTerminal
+     (built in s4) with a callback that writes the appropriate Hive
+     episode markers as the Multica task progresses.
+
+  7. **Cleanup on terminal.** When the task reaches `completed`, write
+     status=passed episode marker. On `failed`/`cancelled`, write
+     status=failed marker with error details. Capture last N
+     /api/tasks/{id}/messages into the episode artifact.
+
+  8. **Sidecar logging.** For each story_id in appends_map, emit one
+     `[info] sidecar injection deferred to v2 multi-agent contract:
+     {story_id} → {agent_names}` log line. No Multica dispatch for
+     sidecars in v1.
+
+  Output: one episode marker per story at .pHive/episodes/<epic>/<story>/multica-run.yaml
+  (the helper writes per s4).
+
+  Parallel semantics: depth-0 stories dispatch in parallel (one issue +
+  assignment per story; Multica's task queue handles concurrency). Wait
+  for all parallel tasks to terminate before advancing the DAG to next
+  depth.
+
+acceptance_criteria:
+  - "Given execute-mode-multica is invoked with 1 unblocked story whose tracker_id is populated, when the skill runs end-to-end against a mock Multica server returning success for all calls, then exactly one PUT /api/issues call is made with assignee_type=agent, and one episode marker is written with status=passed."
+  - "Given the skill is invoked but GET /api/agents returns empty, when precondition runs, then the skill aborts with a clear error message naming /hive:multica-init and exit code 1 (no fallback to sequential)."
+  - "Given a story whose tracker_id is null and no existing Multica issue matches, when the skill runs, then s1 adapter's createStory is called once to produce a fresh issue, and dispatch uses the new issueUuid."
+  - "Given a story whose issue is in `backlog` status, when the skill runs, then moveOutOfBacklogIfNeeded is called (single PUT to set status=todo) BEFORE the assignment PUT, and the assignment then succeeds."
+  - "Given 3 depth-0 stories dispatched in parallel, when the mock Multica server returns success for all, then 3 issues are dispatched, 3 episode markers are written (one per story), and the skill waits for all 3 to terminate before returning."
+  - "Given the appends_map contains {story_id: ['reviewer']}, when the skill runs, then one log line per entry is emitted with `[info] sidecar injection deferred to v2` and NO Multica dispatch is made for the reviewer agent."
+  - "Given a story whose task terminates with status=`failed` and error=`out of memory`, when episode-marker-sync detects the terminal state, then the marker written has status=failed and notes contains the error string."
+
+steps:
+  - id: research
+    description: Read skills/hive/skills/execute-mode-sandcastle/SKILL.md fully to extract the section structure (Invocation Contract, Process, Precondition, Lifecycle, Cleanup). Also read execute-mode-team-cmux and execute-mode-session for the appends_map sidecar-injection patterns to deviate from (v1 defers; document the deviation).
+    agent: researcher
+  - id: implement
+    description: Write skills/hive/skills/execute-mode-multica/SKILL.md (~250 lines) following sandcastle's section structure. Embed the per-story lifecycle (8 phases above). Consume s1 adapter + s2 helper (multica-story-dispatch) + s4 episode sync. Reference hive_config.execution.multica.* for poll_interval_seconds default 5. Skill name `execute-mode-multica` for atomic invocation by the dispatch sub-skill.
+    agent: developer
+    depends_on:
+      - research
+  - id: test
+    description: Skill-level testing is integration-style (skill is consumed by /execute, not unit-tested in isolation). Write tests/multica-execute-mode-skill.test.mjs that exercises the orchestration loop programmatically via a small driver that imports the helper modules + mock Multica server. Cover the 7 AC cases.
+    agent: tester
+    depends_on:
+      - implement
+  - id: review
+    description: Verify the skill mirrors sandcastle's shape (atomic sub-skill, single responsibility). Verify the v1 contract is honored — one episode per story, sidecars deferred, fail-loud on missing agents. Verify the parallel-dispatch flow does not silently drop failures. Verify no per-Hive-phase markers are written (whole-story episode is v1 contract).
+    agent: reviewer
+    depends_on:
+      - test
+  - id: integrate
+    description: Commit on feat/multica-execute-routing branch
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: node
+    language: mjs
+  key_files:
+    - path: skills/hive/skills/execute-mode-sandcastle/SKILL.md
+      purpose: "Section structure + invocation contract pattern to mirror byte-for-byte where applicable"
+    - path: skills/hive/skills/execute-mode-team-cmux/SKILL.md
+      purpose: "Appends_map sidecar-injection pattern to deviate from (v1 defers, log only)"
+    - path: skills/hive/skills/execute-mode-session/SKILL.md
+      purpose: "Atomic sub-skill invocation contract second reference"
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: "Direct dependency (s2) — the 5 exported helpers this skill calls per story"
+    - path: hive/adapters/multica/index.ts
+      purpose: "Direct dependency (multica-substrate-adoption s1) — createStory/getStory called for issue resolution"
+    - path: hive/lib/multica-bootstrap/index.mjs
+      purpose: "Indirect dependency — read for the fail-loud bootstrap pointer message format"
+
+files_to_modify:
+  - file: skills/hive/skills/execute-mode-multica/SKILL.md
+    change: "NEW — atomic dispatch sub-skill (~250 lines, mirrors sandcastle structure)"
+  - file: tests/multica-execute-mode-skill.test.mjs
+    change: "NEW — 7 AC cases via mock server + driver"
+
+design_decisions:
+  - decision: "Whole-story-to-one-Multica-agent v1 contract (per design discussion D1)"
+    rationale: "Multica agents already run an internal multi-step loop. Carving up into per-Hive-phase markers would require synthetic boundaries that don't exist in Multica's model. Whole-story is the natural unit; per-phase routing is v2."
+  - decision: "Fail-loud on missing bootstrap (no auto-bootstrap, no silent fallback)"
+    rationale: "execution.mode: multica is explicit user intent. Silent fallback to sequential masks config drift. Failing loud points the user at /hive:multica-init."
+  - decision: "Parallel dispatch within a depth, serial across depths"
+    rationale: "Mirrors sandcastle's depth-0 fan-out semantics. Multica's task queue handles concurrency within a depth; the depth barrier preserves the dependency graph invariant."
+  - decision: "Sidecar injection deferred to v2 with log line"
+    rationale: "v1 contract is whole-story-to-one-agent. Sidecar reviewers would require multi-agent coordination through Multica's issue/comment surface — a v2 design space."
+  - decision: "Single episode marker per story (multica-run.yaml), not per Hive phase"
+    rationale: "Per D1 above. Audit trail comes from the last-N messages captured into the episode artifact."
+
+cross_cutting:
+  - concern: documentation
+    action: "Skill self-documents via SKILL.md; cross-link from README + GUIDE in s5"
+
+metric:
+  applies: true
+  name: multica.dispatch_terminal_success_rate
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 0.95
+  window: next-3-multica-execute-runs
+  source:
+    kind: events
+    ref: "Episode markers at .pHive/episodes/multica-execute-routing/*/multica-run.yaml — count status:passed / total terminal markers"
+  verify_at: integrate
+  owner: reviewer
+  notes: |
+    First dogfood of /execute via Multica. After s5 smoke and the next
+    several real /execute runs, success rate should be >=95%. Anything
+    less means dispatch flakiness — investigate poll cadence, timeout
+    settings, or Multica spike stability.
+
+risks:
+  - severity: high
+    description: "Multica task can hang indefinitely if the agent gets stuck — no max wall-clock timeout in v0.3.4 task model"
+    mitigation: "Skill imposes a configurable max wall-clock timeout per story (default 30 min via execution.multica.story_timeout_seconds). On timeout, calls cancellation endpoint and writes status=cancelled episode marker."
+  - severity: medium
+    description: "Multica spike API instability mid-run (daemon crash, network partition)"
+    mitigation: "Poll loop handles fetch errors as transient; structured TRANSPORT error after max_retries; cancel + write failed marker"
+  - severity: low
+    description: "Episode marker location collides with prior sandcastle run on same story"
+    mitigation: "Use multica-run.yaml suffix (not the generic *.yaml that sandcastle uses) to distinguish"
+
+references:
+  - path: skills/hive/skills/execute-mode-sandcastle/SKILL.md
+    relevant_excerpt: |
+      ## Invocation contract
+      Call this skill once per parent workflow when `mode_decision == sandcastle`.
+      Inputs: workflow_path, unblocked_stories[], epic_handle, hive_config.
+      Outputs: episode markers, per-story commits, closed worktrees.
+  - path: .pHive/epics/multica-execute-routing/docs/design-discussion.md
+    relevant_excerpt: |
+      D1: Whole-story-to-one-Multica-agent (v1 contract). The assigned agent
+      runs research+implement+test+review+integrate inside its own work_dir.
+      Hive writes ONE multica-run episode marker per story (`started →
+      in_progress → passed|failed|cancelled`).

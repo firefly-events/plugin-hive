@@ -175,8 +175,8 @@ Match the model to the job — not every agent needs Opus.
 
 | Tier | Model | Agents | Cost |
 |------|-------|--------|------|
-| **Opus** | claude-opus-4-7 | orchestrator, team-lead, architect, analyst, tpm | Highest — complex reasoning |
-| **Sonnet** | claude-sonnet-4-6 | researcher, technical-writer, frontend-developer, backend-developer, developer, tester, reviewer, pair-programmer, peer-validator, ui-designer, test-scout, test-architect, test-inspector, test-sentinel | Medium — analytical/implementation |
+| **Opus** | claude-opus-4-7 | orchestrator | Highest — complex reasoning |
+| **Sonnet** | claude-sonnet-4-6 | team-lead, architect, analyst, tpm, researcher, technical-writer, frontend-developer, backend-developer, developer, tester, reviewer, pair-programmer, peer-validator, ui-designer, test-scout, test-architect, test-inspector, test-sentinel | Medium — analytical/implementation |
 | **Haiku** | claude-haiku-4-5-20251001 | test-worker | Lowest — fast mechanical execution (consider bumping to Sonnet if context issues arise) |
 
 Configure in `hive.config.yaml`. Override per-agent with `model_overrides` for complex projects.

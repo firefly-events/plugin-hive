@@ -1,0 +1,123 @@
+id: s5-readme-guide-version
+epic: multica-substrate-adoption
+title: README + GUIDE updates + version bump for Multica substrate
+status: pending
+complexity: low
+methodology: classic
+depends_on: [s2-plan-phase-d-wiring, s3-multica-init-bootstrap]
+
+description: |
+  Document the new substrate and bump the plugin version to reflect the
+  consumer-visible substrate swap. Three deliverables:
+
+  1. **README.md updates.** New "How execution works" section explaining
+     that plugin-hive uses Multica as its task tracker + /execute dispatch
+     substrate. /plan and /review still run interactively on the user's
+     laptop. First-time setup pointer to `/hive:multica-init`. Brief
+     mention that GH-Issues-based execution + sandcastle layer are being
+     archived (link to follow-on cleanup epic).
+
+  2. **GUIDE.md updates.** Expand on the substrate change: per-task workdir
+     model, session resumption, per-(agent, issue) clones, North Star of
+     "post-plan + post-review" human gates with Multica handling everything
+     in between. Document the multica-substrate-adoption-epic as the
+     migration moment.
+
+  3. **Version bump.** Plugin version → 2.0.0 in `.claude-plugin/plugin.json`
+     and `.claude-plugin/marketplace.json`. README version badge updated.
+     CHANGELOG.md gets a 2.0.0 entry listing the substrate swap as a
+     headline breaking change (consumers must run /hive:multica-init or
+     stay on 1.x).
+
+  Hive 2.0 framing per existing memory: this fits the broader
+  "composable-substrate-user-directed" reframe. The Multica substrate
+  swap is the most concrete manifestation of that — plugin-hive is the
+  composable preset; Multica is the user-directed substrate.
+
+acceptance_criteria:
+  - "Given a new contributor reads README.md, when they reach the 'Setup' section, then they see /hive:multica-init named as the first step (or its equivalent) and a brief explanation of why."
+  - "Given GUIDE.md is rendered, when reader reaches the 'execution model' section, then they understand: (a) /plan and /review remain interactive on their laptop; (b) /execute runs through Multica; (c) per-task workdir + session resume; (d) two human gates (post-plan, post-review)."
+  - "Given .claude-plugin/plugin.json is read after this story integrates, when version is checked, then it reads '2.0.0' (not 1.x)."
+  - "Given .claude-plugin/marketplace.json is read, when version is checked, then it matches .claude-plugin/plugin.json (no drift)."
+  - "Given README.md is read, when version badge is parsed, then it reflects 2.0.0."
+  - "Given CHANGELOG.md is read, when 2.0.0 entry is present, then it names the Multica substrate swap as the headline change AND lists the breaking-change migration path (run /hive:multica-init, or pin to 1.x)."
+
+steps:
+  - id: research
+    description: Read current README.md + GUIDE.md to find existing 'how it runs' sections to update vs replace; identify version touch points (badge, plugin.json, marketplace.json, CHANGELOG.md format)
+    agent: researcher
+  - id: implement
+    description: Update README + GUIDE; bump versions in both manifests + badge; add CHANGELOG 2.0.0 entry
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: tests/multica-docs-version.test.mjs — asserts version parity across plugin.json/marketplace.json/README badge/CHANGELOG; asserts AC keywords present in README + GUIDE sections
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Read updated docs as a new contributor would; verify the Multica substrate framing is clear and consistent across README + GUIDE; verify no stale references to sandcastle-as-primary or GH-Issues-as-primary
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: README.md
+      purpose: Entry doc — must surface the substrate change
+    - path: GUIDE.md
+      purpose: Long-form doc — owns the execution-model explanation
+    - path: .claude-plugin/plugin.json
+      purpose: Plugin manifest — version field
+    - path: .claude-plugin/marketplace.json
+      purpose: Marketplace manifest — must match plugin.json version
+    - path: CHANGELOG.md
+      purpose: Release notes — 2.0.0 entry lands here
+
+files_to_modify:
+  - file: README.md
+    change: Update setup section to name /hive:multica-init; remove or update stale references to GH Actions + sandcastle as primary path; update version badge to 2.0.0
+  - file: GUIDE.md
+    change: Expand execution-model section; document per-task workdir, session resume, two human gates
+  - file: .claude-plugin/plugin.json
+    change: Bump version → 2.0.0
+  - file: .claude-plugin/marketplace.json
+    change: Bump version → 2.0.0 (must match plugin.json)
+  - file: CHANGELOG.md
+    change: Add 2.0.0 entry — Multica substrate swap as headline; migration path; link to follow-on cleanup epic
+  - file: tests/multica-docs-version.test.mjs
+    change: NEW — version parity + doc keyword presence
+
+design_decisions:
+  - decision: 2.0.0 not 1.x.y
+    rationale: Substrate swap is a breaking change for anyone who was running through GH-Actions-driven sandcastle. Semver demands a major bump
+  - decision: README points users at /hive:multica-init as first step
+    rationale: That skill is the single onboarding entrypoint. Multiple entrypoints fragment the new-user experience
+  - decision: Sandcastle teardown is named in CHANGELOG as 'coming in follow-on epic' rather than deleted now
+    rationale: User decided to preserve sandcastle on an archive branch; CHANGELOG honesty matters — don't claim it's gone when it's not
+
+cross_cutting:
+  - concern: documentation
+    action: This story IS the documentation pass. No additional doc work elsewhere needed for the substrate change.
+  - concern: versioning
+    action: 2.0.0 bump executed here. Three touch points must match — plugin.json, marketplace.json, README badge. CHANGELOG 2.0.0 entry lands.
+
+metric:
+  applies: false
+  justification: This story is documentation and version-marker work. Its correctness is verified structurally (version parity across files via AC #3-5) and content-wise (AC #1-2 + #6 require specific framing be present in the docs). No behavioral trend metric applies.
+
+risks:
+  - severity: low
+    description: Stale references to GH Actions / sandcastle in nooks of the docs may persist post-edit
+    mitigation: Review step explicitly scans for the strings; the docs test asserts on absence of specific stale phrases
+  - severity: low
+    description: Major version bump may surprise consumers who weren't watching
+    mitigation: CHANGELOG entry leads with migration path; README front-matter calls out the version transition
+
+references:
+  - path: .claude-plugin/plugin.json
+    relevant_excerpt: |
+      (current version field — replaced with 2.0.0)

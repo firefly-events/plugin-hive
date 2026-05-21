@@ -1,6 +1,6 @@
 // Hive-side task-tracking dispatch module.
 //
-// Loads built-in (github | linear) or custom-path adapters via direct ESM
+// Loads built-in (github | linear | multica) or custom-path adapters via direct ESM
 // dynamic import, caches the handle (per-process module-scoped Map keyed on
 // SHA-1(JSON.stringify({state_dir, adapter, sub-config}))), invokes ABI
 // methods, maps adapter errors to recoverable/terminal results, and emits
@@ -11,7 +11,8 @@
 //      `AdapterError` on failure — the `{result}`/`{error}` wire envelope is
 //      only added by `main()` for the CLI form. This module adapts to that.
 //   2. Adapters configure via env vars (GITHUB_TOKEN / gh auth token,
-//      LINEAR_API_KEY, LINEAR_TEAM). This module propagates sub-config to env
+//      LINEAR_API_KEY, LINEAR_TEAM, MULTICA_TOKEN, MULTICA_SERVER_URL).
+//      This module propagates sub-config to env
 //      before invocation, then probe-and-calls an `init` export if present
 //      (forward-compatible).
 //   3. ABI error codes (5): NOT_FOUND, AUTH_FAILURE, RATE_LIMIT,
@@ -26,7 +27,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 export type GateMode = "warning" | "hard";
 
 export interface TaskTrackingConfig {
-  adapter: "github" | "linear" | string | null; // string for custom path
+  adapter: "github" | "linear" | "multica" | string | null; // string for custom path
   adapter_timeout_ms?: number;
   gate_mode?: GateMode;
   team_value?: string | null;
@@ -34,6 +35,7 @@ export interface TaskTrackingConfig {
   // Adapter-specific keys propagated to env before invocation:
   github?: { token?: string | null };
   linear?: { api_key?: string | null; team?: string | null };
+  multica?: { server_url?: string | null; token?: string | null };
   // Project state dir (used in cache key + JSONL telemetry output dir):
   state_dir?: string;
 }
@@ -67,6 +69,7 @@ const DEFAULT_GATE_MODE: GateMode = "warning";
 const BUILTIN_ADAPTERS: Record<string, string> = {
   github: "../../adapters/github/index.ts",
   linear: "../../adapters/linear/index.ts",
+  multica: "../../adapters/multica/index.ts",
 };
 
 // Module-scoped cache: per-process, keyed by SHA-1 of normalized config.
@@ -429,6 +432,7 @@ function computeCacheKey(config: TaskTrackingConfig): string {
     adapter: config.adapter,
     github: config.github ?? null,
     linear: config.linear ?? null,
+    multica: config.multica ?? null,
   };
   return crypto.createHash("sha1").update(JSON.stringify(keyObj)).digest("hex");
 }
@@ -469,6 +473,18 @@ function propagateConfigToEnv(config: TaskTrackingConfig): void {
     process.env.LINEAR_TEAM = config.linear.team;
   } else {
     delete process.env.LINEAR_TEAM;
+  }
+  // Multica creds: same rule — set when present + adapter is multica; clear
+  // otherwise (covers explicit null/undefined and adapter-switch cases).
+  if (config.adapter === "multica" && config.multica?.token) {
+    process.env.MULTICA_TOKEN = config.multica.token;
+  } else {
+    delete process.env.MULTICA_TOKEN;
+  }
+  if (config.adapter === "multica" && config.multica?.server_url) {
+    process.env.MULTICA_SERVER_URL = config.multica.server_url;
+  } else {
+    delete process.env.MULTICA_SERVER_URL;
   }
 }
 

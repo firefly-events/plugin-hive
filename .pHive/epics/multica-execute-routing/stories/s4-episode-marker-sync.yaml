@@ -1,0 +1,207 @@
+id: s4-episode-marker-sync
+epic: multica-execute-routing
+title: "Episode marker sync — pollTaskUntilTerminal + state transitions + last-N messages capture"
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+  - s3-execute-mode-multica-skill
+
+description: |
+  Build the polling + episode-marker-writing helper that s3 (the mode
+  skill) calls per story. This is the bridge between Multica's task
+  state model and Hive's episode marker schema.
+
+  New file: hive/lib/multica-story-dispatch/episode-sync.mjs (placed
+  alongside the s2 helper module). Two exported async functions:
+
+  1. `pollTaskUntilTerminal(opts) → {final_status, runs, messages}` —
+     polls Multica's task surface until terminal. Options:
+     - serverUrl, token, workspaceId, issueUuid (target)
+     - pollIntervalMs (default 5000)
+     - maxWallClockMs (default 1_800_000 = 30 min; from
+       hive_config.execution.multica.story_timeout_seconds * 1000)
+     - onStateTransition (callback fn invoked when status changes)
+
+     Loop: every pollIntervalMs, call
+     `GET /api/issues/<UUID>/active-task?workspace_id=<UUID>`. If tasks
+     array is empty, also call `GET /api/issues/<UUID>/task-runs` for
+     history. Track current status; on change, invoke onStateTransition.
+     Stop when status ∈ {completed, failed, cancelled} OR maxWallClockMs
+     elapsed. On timeout, call cancellation endpoint
+     (POST /api/issues/<UUID>/tasks/<task_id>/cancel) then return
+     status=cancelled.
+
+  2. `writeMulticaRunEpisode(opts) → episode_path` — writes the Hive
+     episode marker at .pHive/episodes/<epic>/<story>/multica-run.yaml
+     per hive/references/episode-schema.md. Single marker per story (v1
+     contract — NOT per Hive workflow phase). Shape:
+
+     ```yaml
+     step: multica-run
+     story: <story-id>
+     epic: <epic-id>
+     agent: <multica-agent-name>  # e.g. "developer" or "spike-claude"
+     status: passed|failed|cancelled
+     started_at: <ISO>
+     completed_at: <ISO>
+     artifacts:
+       - .pHive/episodes/<epic>/<story>/multica-run.messages.jsonl
+     multica:
+       issue_id: <round-trip-key e.g. plugin-hive/PLU-42>
+       issue_uuid: <UUID>
+       task_id: <UUID>
+       agent_id: <UUID>
+       work_dir: <Multica-reported work_dir>
+       attempts: <int>
+     notes: <one line summary or error message>
+     ```
+
+     Also writes a sidecar file multica-run.messages.jsonl with the last
+     N messages from `GET /api/tasks/<task_id>/messages` (default N=200,
+     truncated from the end) for audit. JSONL one message per line.
+
+  State transition mapping (Multica → Hive episode status):
+  - Multica `queued`/`dispatched`/`running` → Hive (mid-flight, no
+    terminal marker yet; status=in_progress when starting, no marker
+    written until terminal)
+  - Multica `completed` → Hive `passed`
+  - Multica `failed` → Hive `failed`
+  - Multica `cancelled` → Hive `cancelled`
+  - Timeout (wall-clock exceeded with no Multica terminal) → Hive
+    `cancelled` with notes='timeout after Xs'
+
+  Polling is intentionally simple (HTTP poll, no SSE) per design
+  discussion D4. SSE/WebSocket consumption is v2.
+
+acceptance_criteria:
+  - "Given pollTaskUntilTerminal is called and the mock server returns task status `running` for 2 calls then `completed`, when the poll loop runs with pollIntervalMs=10, then it makes 3 active-task GETs total and returns final_status=completed."
+  - "Given pollTaskUntilTerminal is called and the mock returns `failed` with error='OOM', when the loop runs, then it returns final_status=failed and the runs array contains an entry with error='OOM'."
+  - "Given pollTaskUntilTerminal is called with maxWallClockMs=50 and the mock returns `running` indefinitely, when 50ms elapses, then the cancellation endpoint is called for the active task and the function returns final_status=cancelled."
+  - "Given onStateTransition callback is provided and the task transitions queued → running → completed, when the loop runs, then the callback is invoked exactly twice (queued→running and running→completed) with the new status."
+  - "Given writeMulticaRunEpisode is called with status=passed and full task metadata, when it writes, then the resulting YAML file at .pHive/episodes/<epic>/<story>/multica-run.yaml is parseable, contains all the schema fields, and the messages.jsonl sidecar is non-empty when /api/tasks/<id>/messages returned messages."
+  - "Given writeMulticaRunEpisode is called with messages > N=200, when the sidecar is written, then it contains exactly the last 200 messages (by seq) and the marker's notes contains 'truncated to 200 of <total>' indicator."
+  - "Given pollTaskUntilTerminal is called and a fetch fails transiently, when the loop runs, then the failure is treated as transient (no exception thrown) and the next poll proceeds; after 3 consecutive transient failures, a TRANSPORT error IS thrown with the underlying cause."
+
+steps:
+  - id: research
+    description: Read hive/references/episode-schema.md to lock the marker shape and required vs optional fields. Read hive/lib/multica-bootstrap/index.mjs for the fetch + timeout + sanitize patterns to reuse. Read s2 helper (hive/lib/multica-story-dispatch/index.mjs) to confirm fetch wrapper signature so episode-sync.mjs imports it instead of duplicating.
+    agent: researcher
+  - id: implement
+    description: Write hive/lib/multica-story-dispatch/episode-sync.mjs (~200 lines) exporting pollTaskUntilTerminal + writeMulticaRunEpisode. Imports fetch wrapper from index.mjs. Pure functions where possible; episode write does fs.mkdirSync + fs.writeFileSync.
+    agent: developer
+    depends_on:
+      - research
+  - id: test
+    description: Write tests/multica-episode-sync.test.mjs covering 7 AC cases. Mock Multica server (mirror s2 pattern). Use tmp dirs for episode writes. Verify YAML parse-roundtrip on written markers.
+    agent: tester
+    depends_on:
+      - implement
+  - id: review
+    description: Verify state transition mapping matches design D1 (whole-story episode, single marker per story). Verify timeout path actually calls cancellation endpoint (not just abandons the task). Verify messages.jsonl truncation preserves the LAST N (not the first N — first N would lose the most recent context). Verify episode schema fields all present.
+    agent: reviewer
+    depends_on:
+      - test
+  - id: integrate
+    description: Commit on feat/multica-execute-routing branch
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: node
+    language: mjs
+  key_files:
+    - path: hive/references/episode-schema.md
+      purpose: "Canonical episode marker schema — required vs optional fields, status enum, artifact path convention"
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: "Same-directory peer — episode-sync imports the fetch wrapper from here"
+    - path: hive/lib/multica-bootstrap/index.mjs
+      purpose: "Pattern reference for AbortSignal.timeout + sanitize + structured errors"
+    - path: .pHive/episodes/multica-substrate-adoption/s1-multica-adapter/integrate.yaml
+      purpose: "Example episode marker from prior epic — shape reference for the multica-run.yaml output"
+
+files_to_modify:
+  - file: hive/lib/multica-story-dispatch/episode-sync.mjs
+    change: "NEW — 2 exported functions (~200 lines)"
+  - file: tests/multica-episode-sync.test.mjs
+    change: "NEW — 7 AC cases via mock HTTP server + tmp dirs"
+
+code_examples:
+  - title: Multica task-runs response shape (from research)
+    file: .pHive/epics/multica-execute-routing/docs/research-findings.md
+    snippet: |
+      # GET /api/issues/<UUID>/task-runs?workspace_id=<UUID> →
+      # [{
+      #   "id": "<task-uuid>", "agent_id": "<UUID>", "runtime_id": "<UUID>",
+      #   "issue_id": "<UUID>", "workspace_id": "",  # note: empty per research line 307
+      #   "status": "running|completed|failed|cancelled|queued|dispatched",
+      #   "dispatched_at": "<ISO>", "started_at": "<ISO>", "completed_at": "<ISO|null>",
+      #   "result": {...} | null, "error": "..." | null,
+      #   "attempt": 1, "max_attempts": 2, "work_dir": "<path>", "kind": "direct"
+      # }]
+  - title: Messages stream shape (from research)
+    file: .pHive/epics/multica-execute-routing/docs/research-findings.md
+    snippet: |
+      # GET /api/tasks/<UUID>/messages?workspace_id=<UUID> →
+      # [{"task_id":"<UUID>","issue_id":"<UUID>","seq":1,"type":"text","content":"..."},
+      #  {"task_id":"<UUID>","issue_id":"<UUID>","seq":2,"type":"tool_use","tool":"Bash","input":{...}},
+      #  {"task_id":"<UUID>","issue_id":"<UUID>","seq":3,"type":"tool_result","tool":"Bash","output":"..."}]
+
+design_decisions:
+  - decision: "Single episode marker per story (v1 contract per D1)"
+    rationale: "Multica owns the full story; per-Hive-phase markers would be synthetic. The messages.jsonl sidecar provides audit detail."
+  - decision: "Polling, not SSE/WebSocket (per D4)"
+    rationale: "Spike v0.3.4 SSE stability unclear (research Q5). HTTP poll is the dumb-and-works baseline; SSE is v2."
+  - decision: "Last-N messages truncation (default 200)"
+    rationale: "Long-running Multica tasks can emit hundreds of messages. Last-N preserves recent context (where errors usually surface) without unbounded growth. Configurable via hive_config.execution.multica.messages_capture_max."
+  - decision: "Transient fetch failures tolerated (3 consecutive before throwing)"
+    rationale: "Spike daemon may have brief hiccups (restart, GC pause). Tight polling with low tolerance would generate false failures. 3-strike rule balances signal-vs-noise."
+  - decision: "Timeout actively cancels the task (not just abandons polling)"
+    rationale: "Leaving abandoned Multica tasks running consumes spike resources and could surprise on next poll. Explicit cancellation matches the user's intent (timeout = give up)."
+
+cross_cutting:
+  - concern: documentation
+    action: "JSDoc on both exported functions; section in hive/lib/multica-story-dispatch/README.md (created in s2, extended here) covering episode-sync"
+
+metric:
+  applies: true
+  name: multica.episode_marker_correctness
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 1.0
+  window: next-3-multica-execute-runs
+  source:
+    kind: events
+    ref: "After each /execute multica run, audit .pHive/episodes/<epic>/*/multica-run.yaml — count markers whose status matches the underlying Multica task terminal status / total markers"
+  verify_at: integrate
+  owner: reviewer
+  notes: |
+    Episode markers are the user-facing audit trail. Drift between Hive
+    marker and Multica reality = trust failure. 1.0 = no drift allowed.
+
+risks:
+  - severity: medium
+    description: "Cancellation endpoint may fail if task already terminated between last poll and cancel call"
+    mitigation: "Wrap cancel in try/catch; treat 404/409 as already-terminal; proceed to write final marker based on the polled terminal status"
+  - severity: low
+    description: "Messages stream pagination is seq-based; large messages arrays could exceed memory"
+    mitigation: "Stream by seq using ?since=<seq> if endpoint supports (probe in research); fall back to full fetch + slice-tail"
+  - severity: low
+    description: "AgentTaskResponse.workspace_id is empty string in API responses (research line 307)"
+    mitigation: "Episode marker uses the workspace_id from the caller's context (s3 skill knows it), not from the task response"
+
+references:
+  - path: hive/references/episode-schema.md
+    relevant_excerpt: |
+      Episode markers are limited to status and artifact paths (per the
+      episode schema). They are the audit trail — discovery of what ran,
+      succeeded/failed, and which artifacts it produced.
+  - path: .pHive/epics/multica-execute-routing/docs/research-findings.md
+    relevant_excerpt: |
+      Sufficiency for new mode: yes for dispatch, poll, output, and
+      cancellation. Missing: a dedicated explicit run endpoint with
+      per-run instructions.
