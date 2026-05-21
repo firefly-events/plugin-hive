@@ -64,3 +64,7 @@ stories:
     title: "D.2 — handoff timeout + no-PR fallback + KG triple"
     complexity: low
     depends_on: [d-1-handoff-dispatch-and-execute-wire]
+  - id: e-1-story-status-reconciliation
+    title: "E.1 — story status reconciliation (auto-close shipped stories)"
+    complexity: medium
+    depends_on: [s0-1-schema-and-config-bump]
