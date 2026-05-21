@@ -11,7 +11,7 @@
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.6.0-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-2.7.0-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
@@ -138,6 +138,8 @@ Shows active epics, story progress, and a **Drift trend (last 5 runs)** section 
 `/hive:plan` and `/hive:review` still run interactively on your laptop, preserving the places where you inspect, steer, and approve the work. `/hive:execute` now routes implementation through Multica, the user-directed execution substrate used by the default path.
 
 The two human gates remain unchanged: one after planning, and one after review. The Sandcastle + GitHub Actions execution path remains available, but its previous primary-path framing is now legacy; it is scheduled for archival in the follow-on cleanup epic `sandcastle-adoption-followon`.
+
+**Multica dispatch (opt-in).** Set `execution.mode: multica` in hive.config.yaml or `HIVE_EXECUTION_MODE=multica` to route /execute through Multica agents. Each story dispatches as one assignment to the `developer` persona (declared in .pHive/multica/agents.yaml, bootstrapped via /hive:multica-init). One episode marker per story. Requires the spike daemon running and agents bootstrapped — fails loud otherwise.
 
 ---
 

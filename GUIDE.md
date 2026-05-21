@@ -72,6 +72,14 @@ Earlier releases framed Sandcastle and GitHub Actions as the primary autonomous
 execution path. In 2.6.0, Multica becomes the execution substrate, while the
 older paths remain available as legacy options until their cleanup epic lands.
 
+### Multica execute mode (v1)
+
+v2.7.0 wires `/execute` to dispatch through Multica when `execution.mode: multica`. The v1 contract is whole-story-to-one-agent: the assigned developer runs the full classic workflow inside its own Multica work_dir, and Hive writes one `multica-run.yaml` episode marker per story (not per Hive workflow phase). Sidecar reviewer routing and per-phase markers are deferred to v2.
+
+Polling, not SSE — `pollTaskUntilTerminal` checks `/active-task` and `/task-runs` every 5s by default (configurable via `execution.multica.poll_interval_seconds`). Wall-clock timeout per story defaults to 30 min and actively cancels the Multica task on expiry. Last 200 task messages are captured into `multica-run.messages.jsonl` sidecar for audit.
+
+Bootstrap is mandatory before first run: `/hive:multica-init` reconciles `.pHive/multica/agents.yaml` against the workspace. The dispatch mode fails loud (fail-loud: exit 1, no fallback) if the developer agent is missing.
+
 ## First-time Setup
 
 Run:
