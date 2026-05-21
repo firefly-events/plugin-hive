@@ -30,7 +30,7 @@ planning skill and team-lead guidance, not in this schema.
 | `id`                 | required    | `a-25-skill-prelude-extraction`            |
 | `epic`               | required    | `catalog-hygiene-and-borrows`              |
 | `title`              | required    | `Extract skill-prelude.md ...`             |
-| `status`             | required    | `pending` \| `in-progress` \| `done`       |
+| `status`             | advisory    | `pending` \| `in-progress` \| `done` — **derived status is authoritative; episode markers + git state win on conflict.** See `hive/lib/story-status.mjs`. Forward-stating intent (`deferred`, `blocked`) is still written here; the deriver respects those values. |
 | `complexity`         | required    | `small` \| `medium` \| `large`             |
 | `methodology`        | required    | `classic` \| `tdd`                         |
 | `depends_on`         | required    | `[]` or list of story ids                  |
@@ -51,6 +51,25 @@ planning skill and team-lead guidance, not in this schema.
 
 Authors must not invent new top-level keys to carry metric-shaped
 information. Anything metric-related goes inside `metric:`.
+
+## 2a. Status field — advisory vs authoritative
+
+The `status:` field is **advisory**. Derived status from `hive/lib/story-status.mjs`
+(`deriveStoryStatus({ epic_id, story_id })`) is authoritative. Tools reading story
+state (`/hive:status`, planning consumers, meta-team feeds) MUST call the deriver,
+not read the raw YAML field.
+
+The deriver computes status from:
+1. `deferred:` block in YAML → `deferred`
+2. Episode markers with `status: failed|escalated` → `failed`
+3. `depends_on` stories not yet completed + no markers → `blocked`
+4. No markers → `pending`
+5. Final workflow step has marker `status: completed` → `completed`
+6. Markers exist, final step not complete → `in_progress`
+
+The `status:` field is still writable for forward-stating intent (`deferred`,
+`blocked`) and planning scaffolding. The deriver gives it lower priority than
+episode markers + git state (per `episode-schema.md` §"Authoritative source order").
 
 ## 8. The `terminal_handoff:` field group
 
