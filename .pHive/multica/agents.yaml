@@ -7,7 +7,7 @@ agents:
     persona_ref: hive/agents/developer.md
     custom_env: {}
     custom_args: []
-    mcp_config: {}
+    mcp_config: null
     skills: []
     visibility: workspace
   - name: tester
@@ -17,7 +17,7 @@ agents:
     persona_ref: hive/agents/tester.md
     custom_env: {}
     custom_args: []
-    mcp_config: {}
+    mcp_config: null
     skills: []
     visibility: workspace
   - name: reviewer
@@ -27,6 +27,6 @@ agents:
     persona_ref: hive/agents/reviewer.md
     custom_env: {}
     custom_args: []
-    mcp_config: {}
+    mcp_config: null
     skills: []
     visibility: workspace
