@@ -1,0 +1,72 @@
+id: s1-2-execute-integrate-hook
+epic: story-loop-closure
+title: "S1.2 — /execute integrate-step hook: close Multica issue after commit+push"
+status: pending
+complexity: low
+methodology: classic
+depends_on: [s1-1-multica-issue-closer-module]
+
+description: |
+  After the integrate step (commit + push to feature branch) lands, call
+  the closer with the current `{epic, story}` pair. Gated on
+  `task_tracking.adapter === 'multica'`. Best-effort; one warn line on
+  failure; never blocks /execute completion. This is the operator-side
+  trigger — fires immediately on local merge, no waiting for CI.
+
+acceptance_criteria:
+  - "`skills/execute/SKILL.md` or its referenced post-integrate step file adds a Multica close hook just after the integrate step's commit + push completes."
+  - "Hook reads `hive.config.yaml` `task_tracking.adapter`; runs only when value is `'multica'`. Other values (including null / unset) skip with a one-line `[gate_mode]` log."
+  - "Hook calls `closeStoryIssue({epic_id, story_id})` from `hive/lib/multica-issue-closer.mjs`."
+  - "On `ok: true, was_changed: true`: emit `[multica-closer] closed PLU-N (story_id=X)` log line."
+  - "On `ok: true, was_changed: false`: emit `[multica-closer] PLU-N already <reason> (story_id=X)` log line."
+  - "On `ok: false`: emit `[multica-closer] WARN <reason> for story_id=X — Multica board may be stale` log line; /execute continues to the next story regardless."
+  - "Hook does not run when the integrate step is a dry-run or when /execute is in --simulated-manual mode."
+
+steps:
+  - id: research
+    description: Read `skills/execute/SKILL.md` integrate-step section + handoff/dispatch.mjs to find the right insertion point (post-integrate, pre-handoff is the natural spot).
+    agent: researcher
+  - id: implement
+    description: Add the hook + the gate logic + the four log shapes.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Smoke test on a fixture epic with a real Multica issue (PLU-21 a-3 is still in_review locally — perfect target). Verify the log lines + verify PLU-21 flips to done.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm hook gating is correct + warn-only failure mode is honored.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/execute/SKILL.md
+      purpose: SKILL spec — find the integrate-step section
+    - path: hive/lib/handoff/dispatch.mjs
+      purpose: existing post-integrate dispatch logic (handoff to test/review). The closer hook lands adjacent.
+    - path: hive/lib/multica-issue-closer.mjs
+      purpose: the module built in s1-1; this story is the caller
+
+files_to_modify:
+  - file: skills/execute/SKILL.md
+    change: add the closer hook to the integrate-step section (or to a referenced step file)
+
+cross_cutting:
+  - concern: documentation
+    action: Note in the skill markdown that the closer is best-effort and never blocks /execute.
+
+risks:
+  - severity: low
+    description: Closer is called mid-/execute with no internet to the local daemon (e.g., user disconnected localhost)
+    mitigation: The closer's no-auth / transport-error branch returns warn-only; /execute continues.
+
+references:
+  - path: skills/execute/SKILL.md
+    relevant_excerpt: |
+      (read in research — current integrate section will be excerpted there)

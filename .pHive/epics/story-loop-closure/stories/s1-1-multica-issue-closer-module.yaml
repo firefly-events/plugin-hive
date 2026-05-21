@@ -1,0 +1,79 @@
+id: s1-1-multica-issue-closer-module
+epic: story-loop-closure
+title: "S1.1 — hive/lib/multica-issue-closer.mjs module"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s0-1-episode-marker-audit]
+
+description: |
+  Build the core closer module. Given a list of `{epic, story}` pairs, read
+  each episode marker, find the Multica issue by `issue_id`, PUT status
+  `done` via the Multica API. Idempotent (no-op on `done` / `cancelled`).
+  Best-effort (warn-only on transport / auth errors; never throws past the
+  caller). The module is pure logic — no CLI, no GH Action — so it can be
+  reused by both the operator-side integrate hook (s1-2) and the optional
+  CI workflow (s1-3).
+
+acceptance_criteria:
+  - "`hive/lib/multica-issue-closer.mjs` exports `closeStoryIssue({epic_id, story_id, repo_root})` and `closeStoryIssues(pairs)`."
+  - "Single-story closer reads `.pHive/episodes/<epic>/<story>/multica-run.yaml`, extracts `issue_id`. If marker absent → returns `{ok: false, reason: 'no_marker'}`."
+  - "Reads `~/.multica/config.json` for `server_url` + `token` + `workspace_id`. If absent → returns `{ok: false, reason: 'no_auth'}` with one warn line; never throws."
+  - "Fetches current issue status via `GET /api/issues/<id>?workspace_id=<wid>`. If status is `done` → returns `{ok: true, was_changed: false, reason: 'already_done'}`. If `cancelled` → returns `{ok: true, was_changed: false, reason: 'cancelled'}` (never resurrects)."
+  - "Otherwise PUTs `{status: 'done'}` and returns `{ok: true, was_changed: true, prior_status: <s>}`."
+  - "Bulk variant `closeStoryIssues(pairs)` returns `{closed: [...], skipped: [...], errors: [...]}`. Continues on per-story errors."
+  - "Module is pure ESM, no top-level side effects (no CLI parsing, no file writes outside what the close itself does)."
+  - "Unit test at `tests/hive-lib/multica-issue-closer.test.mjs` covers: marker-absent, no-auth, already-done, cancelled, happy-path, transport-error. Uses a fetch mock; no live Multica daemon required."
+
+steps:
+  - id: research
+    description: Read `hive/lib/multica-story-dispatch/index.mjs` for the auth-load + httpJson + token-redaction patterns; mirror them.
+    agent: researcher
+  - id: implement
+    description: Write the module + the bulk wrapper. Mirror dispatch.mjs's error envelope shape (`{code, message}`).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Author the unit test with a fetch mock; verify each return-shape branch.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm token redaction works on error paths; confirm bulk variant doesn't bail on first error.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: source of the httpJson / token-redaction / error-envelope patterns to reuse
+    - path: hive/lib/multica-bootstrap/index.mjs
+      purpose: source of the auth-loading pattern (reads ~/.multica/config.json)
+
+files_to_modify:
+  - file: hive/lib/multica-issue-closer.mjs
+    change: new ESM module
+  - file: tests/hive-lib/multica-issue-closer.test.mjs
+    change: new unit test
+
+design_decisions:
+  - decision: Best-effort, warn-only failures (no throws past the caller)
+    rationale: The closer is metadata maintenance. A daemon-down failure must not break /execute's integrate step or block a release.
+  - decision: Skip cancelled issues — never flip cancelled → done
+    rationale: A cancelled issue represents an operator deliberately closing it abnormally. The closer treats that signal as final.
+
+risks:
+  - severity: medium
+    description: Marker drift — issue reassigned to a different agent between dispatch + closer-run
+    mitigation: Pre-fetch the issue and validate `agent_id` still matches `assignee_id` in the marker; if not, skip with `{reason: 'agent_drift'}`.
+
+references:
+  - path: hive/lib/multica-story-dispatch/index.mjs
+    relevant_excerpt: |
+      Token redaction in sanitize(): replaces `mul_*`, `Bearer *`, `pat_*`
+      with `[redacted-token]`. Error envelope:
+      `{code, message: sanitize(message, token), hint?}`.
