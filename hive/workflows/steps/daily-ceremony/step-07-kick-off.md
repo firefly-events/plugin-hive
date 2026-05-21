@@ -18,8 +18,8 @@ Evaluate execution strategy, spawn teams or agents as appropriate, execute stori
 
 **Inputs available:**
 - Approved plan from step 6 (story IDs, execution order, parallel flag)
-- Story specs at `.pHive/epics/{epic-id}/stories/{story-id}.yaml`
-- Cycle state at `.pHive/cycle-state/{epic-id}.yaml`
+- Story specs at `state/epics/{epic-id}/stories/{story-id}.yaml`
+- Cycle state at `state/cycle-state/{epic-id}.yaml`
 - Development workflow at `workflows/development.classic.workflow.yaml` (or TDD variant)
 - Agent personas at `agents/{agent}.md`
 - Step files at `workflows/steps/{workflow-name}/` (if they exist for the development workflow)
@@ -70,7 +70,7 @@ Read the workflow YAML (e.g., `workflows/development.classic.workflow.yaml`). Id
 4. Capture the step output
 
 **c. Write episode markers after each step.**
-Write to `.pHive/episodes/{epic-id}/{story-id}/{step-id}.yaml` with all required fields:
+Write to `state/episodes/{epic-id}/{story-id}/{step-id}.yaml` with all required fields:
 - `step_id`, `story_id`, `epic_id`, `agent`, `status`, `timestamp`
 - `conclusions`, `decisions_made`, `artifacts_produced`, `context_for_next_phase`
 
@@ -87,6 +87,29 @@ If a story fails during execution:
 4. Continue executing independent stories that are not affected
 5. Include the failure in the session-end summary
 
+### 4b. Apply GitHub labels at execution start (when task_tracking.adapter === 'github')
+
+Read `hive.config.yaml`. If `task_tracking.adapter` is NOT `'github'`, skip this section:
+`[gate_mode] task_tracking.adapter is not 'github' — skipping GitHub label application`
+
+If it IS `'github'`, for each story about to be kicked off that has an `issue_number` in its
+spec, call `labelExistingIssue` to mark it in-flight:
+
+```bash
+node -e "
+const {labelExistingIssue} = require('./hive/lib/external/github-issues-adapter');
+console.log(JSON.stringify(labelExistingIssue({
+  issue_number: ISSUE_NUMBER,
+  labels: ['hive:ready', 'hive:story:STORY_ID']
+})));
+"
+```
+
+- On `{labeled: true}`: proceed with execution.
+- On `{labeled: false, reason: 'auth'}`: log a warning but do NOT block execution — GH labeling
+  is best-effort and must not halt local dev work.
+- Operation is idempotent — safe to call even if the label is already present.
+
 ### 5. Update cycle state
 After each story completes (or fails):
 - Record decisions made during execution in `cycle_state.decisions`
@@ -95,7 +118,7 @@ After each story completes (or fails):
 
 ### 6. Capture insights for session-end
 During execution, when agents encounter non-obvious patterns or pitfalls:
-- Write insights to `.pHive/insights/{epic-id}/{story-id}/` staging directory
+- Write insights to `state/insights/{epic-id}/{story-id}/` staging directory
 - Follow the staged insight format from `references/agent-memory-schema.md`
 - These will be evaluated in step 8
 
@@ -108,6 +131,9 @@ During execution, when agents encounter non-obvious patterns or pitfalls:
 - [ ] Failed stories handled gracefully — independent stories continue
 - [ ] Cycle state updated with decisions and statuses
 - [ ] Insights staged for session-end evaluation
+- [ ] GitHub adapter section skipped with log line when adapter !== 'github'
+- [ ] labelExistingIssue called for each GH-tracked story at execution start
+- [ ] GH auth failure logged as warning, NOT as execution blocker
 
 ## FAILURE MODES
 

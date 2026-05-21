@@ -19,8 +19,8 @@ Present available stories. User selects which to work on today. Validate selecti
 **Inputs available:**
 - Standup report from step 3 (story statuses, dependency graph)
 - State reconstruction from step 1 (full story list with statuses)
-- Epic index files at `.pHive/epics/{epic-id}/epic.yaml`
-- Story spec files at `.pHive/epics/{epic-id}/stories/{story-id}.yaml`
+- Epic index files at `state/epics/{epic-id}/epic.yaml`
+- Story spec files at `state/epics/{epic-id}/stories/{story-id}.yaml`
 
 **NOT available:**
 - Story validation results (produced in step 5)
@@ -38,7 +38,7 @@ From the standup data, identify stories that are:
 - Not blocked by incomplete dependencies
 - Not marked as `blocked` in cycle state
 
-For each available story, read its spec from `.pHive/epics/{epic-id}/stories/{story-id}.yaml` to get the title, description summary, and complexity.
+For each available story, read its spec from `state/epics/{epic-id}/stories/{story-id}.yaml` to get the title, description summary, and complexity.
 
 ### 2. Present available stories
 Format as a numbered selection list:
@@ -80,6 +80,49 @@ If the user describes new work not yet planned as stories:
 - Ask: "This needs planning first. Add a planning pass before execution?"
 - If yes, flag the new work for step 5 to handle via a compressed planning swarm
 
+### 4b. GitHub adapter actions (when task_tracking.adapter === 'github')
+
+Read `hive.config.yaml`. If `task_tracking.adapter` is NOT `'github'`, skip this section entirely and log:
+`[gate_mode] task_tracking.adapter is not 'github' — skipping GitHub issue actions`
+
+If it IS `'github'`, offer two additional actions after presenting the available story list:
+
+```
+### GitHub Actions (optional)
+- **assign-issue <N>** — label an existing GitHub issue #N with hive:ready (and
+  any hive:epic:* / hive:story:* labels you specify) to include it in today's work
+  without re-creating it.
+- **migrate-to-gh** — push one or more locally-planned stories to GitHub as new
+  issues (createStory + publishStoriesToIssues).
+```
+
+**issue-assign action** (`assign-issue <N>`):
+1. Ask which additional labels to apply (default: `hive:ready`).
+2. Run via `hive/lib/external/github-issues-adapter.js` → `labelExistingIssue`:
+   ```bash
+   node -e "
+   const {labelExistingIssue} = require('./hive/lib/external/github-issues-adapter');
+   console.log(JSON.stringify(labelExistingIssue({issue_number: N, labels: LABELS})));
+   "
+   ```
+3. On `{labeled: true}`: confirm to user and add the GH issue to the work context.
+4. On `{labeled: false, reason: 'auth'}`: surface auth error, prompt `gh auth login`.
+5. This is idempotent — running it again on an already-labeled issue is safe.
+
+**migrate-local-to-GH action** (`migrate-to-gh`):
+1. Present locally-planned stories that have no `issue_number` field.
+2. User selects which stories to publish.
+3. Run via `hive/lib/external/github-issues-adapter.js` → `publishStoriesToIssues`:
+   ```bash
+   node -e "
+   const {publishStoriesToIssues} = require('./hive/lib/external/github-issues-adapter');
+   const stories = STORIES_JSON;
+   console.log(JSON.stringify(publishStoriesToIssues(stories, {extraLabels: ['hive:ready']})));
+   "
+   ```
+4. Report created / skipped / errors. For each created issue, store `issue_number`
+   back into the story YAML at `state/epics/{epic-id}/stories/{story-id}.yaml`.
+
 ### 5. Produce today's work list
 Compile the validated selection into an ordered work list:
 ```
@@ -106,6 +149,9 @@ Wait for user confirmation before proceeding.
 - [ ] Dependency constraints validated for all selected stories
 - [ ] Work list ordered by dependency relationships
 - [ ] User confirmed the final work list
+- [ ] GitHub adapter actions skipped with log line when adapter !== 'github'
+- [ ] issue-assign action calls labelExistingIssue and surfaces auth errors
+- [ ] migrate-to-gh action calls publishStoriesToIssues and writes issue_number back to story YAML
 
 ## FAILURE MODES
 
@@ -113,6 +159,8 @@ Wait for user confirmation before proceeding.
 - Offering blocked stories — user selects them, execution fails on unmet dependencies
 - Not validating dependency chains — story starts but cannot complete because prerequisite is missing
 - Ignoring in-progress stories from previous sessions — work gets restarted from scratch instead of resumed
+- Running GitHub adapter actions when adapter !== 'github' — errors on non-GH projects
+- Silencing labelExistingIssue auth errors — user doesn't know GH integration is broken
 
 ## NEXT STEP
 
