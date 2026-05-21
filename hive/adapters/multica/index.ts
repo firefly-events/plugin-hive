@@ -226,13 +226,13 @@ function toAbiStory(issue: any): any {
   cacheIssue(issue);
   return {
     id: encodeStoryId(workspaceSlug, identifier),
+    identifier,
     title: issue?.title ?? "",
     body: issue?.description ?? issue?.body ?? "",
     status: issue?.status ?? "",
     labels: Array.isArray(issue?.labels) ? issue.labels : [],
     parent_id: issue?.parent_issue_id ?? null,
     url: synthesizeUrl(appUrl, workspaceSlug, identifier),
-    uuid: issue?.id,
   };
 }
 
