@@ -12,15 +12,3 @@ assignee_name: developer
 dispatched_at: "2026-05-21T16:18:03Z"
 brief_path: .pHive/episodes/autonomous-cycle-loop/d-1-handoff-dispatch-and-execute-wire.brief.md
 poll_url: http://localhost:8080/api/v1/issues/ed5245cf-ec35-4737-b903-3d7ec1efe294
----
-# Multica dispatch — d-1-handoff-dispatch-and-execute-wire
-
-Dispatched to Multica workspace `21c6d282-d6b4-4b25-8d0d-a85e96038416` (slug PLU) as issue `PLU-16`
-assigned to agent `developer`. Multica daemon owns the run; this marker tracks
-queued → running → completed|failed|cancelled lifecycle.
-
-Monitor:
-  multica issue view PLU-16
-  multica issue list --status in_progress
-
-Brief: `.pHive/episodes/autonomous-cycle-loop/d-1-handoff-dispatch-and-execute-wire.brief.md`

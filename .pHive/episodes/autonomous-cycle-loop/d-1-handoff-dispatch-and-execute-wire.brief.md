@@ -14,8 +14,8 @@ Default none preserves today's behavior.
 ## Acceptance Criteria
 
 - hive/lib/handoff/dispatch.mjs exports dispatchHandoff({story_id, target, branch, pr_number?}) returning {ok, verdict, evidence_ref, duration_ms} or {ok: false, reason}.
-- target: 'test' invokes /test --story <story-id> (or scenario path if simulated-manual concern is on the story).
-- target: 'review' invokes /review #<pr_number> when a PR exists, else /review <branch>.
+- target: 'test' invokes /test --story `<story-id>` (or scenario path if simulated-manual concern is on the story).
+- target: 'review' invokes /review #`<pr_number>` when a PR exists, else /review `<branch>`.
 - target: 'both' runs test first, then review with verdict from test available to review.
 - target: 'none' is a no-op.
 - skills/execute/SKILL.md adds a post-integrate step in the per-story loop reading story.terminal_handoff.next (or epic.execution.terminal_handoff_default).

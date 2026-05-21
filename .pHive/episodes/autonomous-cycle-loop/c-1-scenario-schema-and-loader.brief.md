@@ -8,7 +8,7 @@
 ## Description
 
 Implement the scenario YAML loader/validator and the simulated-manual step
-file. Scenario lives at tests/scenarios/<topic>.yaml (or .pHive/scenarios/
+file. Scenario lives at tests/scenarios/`<topic>`.yaml (or .pHive/scenarios/
 fallback). The step file describes the executor protocol: spec-walk vs
 implementation-walk, per-step pass/fail capture, overall verdict writeback.
 

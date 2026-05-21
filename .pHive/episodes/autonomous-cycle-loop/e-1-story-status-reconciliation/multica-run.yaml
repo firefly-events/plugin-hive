@@ -12,15 +12,3 @@ assignee_name: developer
 dispatched_at: "2026-05-21T16:18:03Z"
 brief_path: .pHive/episodes/autonomous-cycle-loop/e-1-story-status-reconciliation.brief.md
 poll_url: http://localhost:8080/api/v1/issues/39071d29-8fe6-4cc7-8a7c-8959bc899ca1
----
-# Multica dispatch — e-1-story-status-reconciliation
-
-Dispatched to Multica workspace `21c6d282-d6b4-4b25-8d0d-a85e96038416` (slug PLU) as issue `PLU-17`
-assigned to agent `developer`. Multica daemon owns the run; this marker tracks
-queued → running → completed|failed|cancelled lifecycle.
-
-Monitor:
-  multica issue view PLU-17
-  multica issue list --status in_progress
-
-Brief: `.pHive/episodes/autonomous-cycle-loop/e-1-story-status-reconciliation.brief.md`
