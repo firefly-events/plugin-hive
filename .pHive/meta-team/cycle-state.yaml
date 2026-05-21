@@ -1,8 +1,8 @@
-cycle_id: meta-2026-05-20
-started: '2026-05-20T00:00:00Z'
+cycle_id: meta-2026-05-21
+started: '2026-05-21T00:00:00Z'
 status: closed
 phase: close
-closed: '2026-05-20T00:30:00Z'
+closed: '2026-05-21T00:30:00Z'
 charter_constraints:
   - operate only on hive/references/**, hive/agents/**, hive/workflows/**, hive/lib/**,
     skills/hive/agents/memories/**, .pHive/meta-team/**, .pHive/teams/**
@@ -12,17 +12,17 @@ charter_constraints:
   - no changes to hive/hive.config.yaml without human confirmation
   - no new external service integrations without human confirmation
 prior_cycle:
-  id: meta-2026-05-18
+  id: meta-2026-05-20
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-05-20T00:00:00Z'
+    started_at: '2026-05-21T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
     prior_cycle_status: closed
   step_02_analysis:
-    findings_count: 2
+    findings_count: 3
     metric_signal: false
     external_candidates_count: 0
   step_02b_external_research:
@@ -38,9 +38,9 @@ steps:
       maintainer cycle. kg.sqlite absent. kg_signal findings=0
       miss_reason=empty_kg.
   step_03_proposal:
-    routing: step-03 (findings_count=2 > 0)
+    routing: step-03 (findings_count=3 > 0)
     approved_proposals_count: 1
-    skipped_findings_count: 1
+    skipped_findings_count: 2
   step_03c_metric_declaration:
     enriched_proposals_count: 1
     gate_failures: 0
@@ -48,16 +48,18 @@ steps:
     changes_made:
       - proposal_id: proposal-1
         action: update_field
-        file: hive/GUIDE.md
+        file: hive/agents/backend-developer.md
         description: >
-          Updated Model Tier Routing table: moved team-lead, architect, analyst,
-          tpm from the Opus row to the Sonnet row, matching their actual agent
-          file model fields and hive.config.yaml model_tiers configuration.
+          Removed duplicate write: false and delete: false fields (lines 19-20)
+          from the domain block. The duplicate fields overrode write: true with
+          write: false via YAML last-value-wins semantics, making backend-developer
+          effectively read-only despite the "Default: permissive" comment. Fix
+          restores intended write access consistent with frontend-developer.md.
         status: done
   step_05_testing:
     test_results:
-      - change_id: proposal-1_hive-GUIDE.md
-        file: hive/GUIDE.md
+      - change_id: proposal-1_hive-agents-backend-developer.md
+        file: hive/agents/backend-developer.md
         tests:
           cross_reference_integrity: pass
           schema_compliance: pass
@@ -73,31 +75,31 @@ steps:
       wall_clock_ms: 5000
       first_attempt_pass: true
     evaluations:
-      - change_id: proposal-1_hive-GUIDE.md
+      - change_id: proposal-1_hive-agents-backend-developer.md
         change_verdict: passed
         charter_objective: consistency
         quality_score: 1.0
         rationale: |
-          Addresses finding-1 (SCHEMA_INCONSISTENCY): corrects the Model Tier
-          Routing table to accurately reflect agent model fields. Table row
-          for Opus now matches hive.config.yaml (orchestrator only). Sonnet
-          row now lists team-lead, architect, analyst, tpm. Additive change
-          to table cell content. No cross-references broken, no content
-          removed, all tests pass.
+          Addresses finding-1 (SCHEMA_INCONSISTENCY): removes two duplicate YAML
+          fields that overrode write: true with write: false. YAML last-value-wins
+          semantics made the backend-developer agent unable to write files despite
+          the "Default: permissive" comment. Fix aligns backend-developer domain
+          block with frontend-developer.md canonical form. No cross-references
+          broken, no content removed, all tests pass.
   step_07_promotion:
     promoted_changes:
       - proposal_id: proposal-1
-        file: hive/GUIDE.md
+        file: hive/agents/backend-developer.md
         verdict: pass
         status: promoted
-        commit_ref: 271b4a8def8fff467a7aaeae55490a4d298d1961
-        rollback_target: 75e2bd263939bf0413cb657f39139f504ad569a3
+        commit_ref: 278628860f00353af5e773c8817bacf0944ebbaf
+        rollback_target: af0649fa3d8c62157e0148e2fd6673dacb3a6092
     reverted_changes: []
     insights_staged: 0
     decision: accept
-    rollback_target: 75e2bd263939bf0413cb657f39139f504ad569a3
+    rollback_target: af0649fa3d8c62157e0148e2fd6673dacb3a6092
 summary:
-  total_findings: 2
+  total_findings: 3
   proposals_generated: 1
   changes_attempted: 1
   changes_promoted: 1
@@ -105,91 +107,97 @@ summary:
   flagged_for_human: 0
   cycle_verdict: passed
 closure_evidence:
-  commit_ref: 271b4a8def8fff467a7aaeae55490a4d298d1961
+  commit_ref: 278628860f00353af5e773c8817bacf0944ebbaf
   metrics_snapshot:
     tokens: 0
     wall_clock_ms: 5000
     first_attempt_pass: true
-  rollback_ref: 75e2bd263939bf0413cb657f39139f504ad569a3
+  rollback_ref: af0649fa3d8c62157e0148e2fd6673dacb3a6092
 decision: accept
 regression_watch:
   state: armed
-  observation_window:
-    start: '2026-05-20T00:30:00Z'
-    end: '2026-05-20T04:30:00Z'
+  armed_at: '2026-05-21T00:30:00Z'
+observation_window:
+  start: '2026-05-21T00:30:00Z'
+  end: '2026-05-21T04:30:00Z'
 findings:
   - id: finding-1
     category: SCHEMA_INCONSISTENCY
-    severity: low
-    location: hive/GUIDE.md
+    severity: medium
+    location: hive/agents/backend-developer.md
     description: >
-      Model Tier Routing table incorrectly listed team-lead, architect, analyst,
-      and tpm in the Opus tier row. All four agent files have model: sonnet, and
-      hive.config.yaml model_tiers.opus only lists orchestrator.
+      Duplicate write and delete fields in domain block override the intended
+      permissive write access. YAML last-value-wins semantics make the effective
+      value write: false despite write: true appearing first.
     evidence: >
-      GUIDE.md line 178: "| **Opus** | claude-opus-4-7 | orchestrator,
-      team-lead, architect, analyst, tpm". But hive/agents/analyst.md ->
-      model: sonnet; hive/agents/architect.md -> model: sonnet;
-      hive/agents/tpm.md -> model: sonnet; hive/agents/team-lead.md ->
-      model: sonnet; hive/hive.config.yaml model_tiers.opus: [orchestrator].
+      Lines 17-20 in domain block: write: true (line 17), delete: false (line 18),
+      then write: false (line 19), delete: false (line 20). The duplicate
+      write: false overrides write: true. frontend-developer.md has the correct
+      single-entry form with no duplicate fields.
   - id: finding-2
     category: STUB_DOC
     severity: low
-    location: hive/references/hive-cloud-roadmap.md
-    description: 13-line placeholder stub for deferred Hive Cloud epic (S16)
+    location: hive/references/ui-prompts/design-system.md
+    description: 19-line prompt template below 30-line stub threshold
     evidence: >
-      File has 13 lines. Content explicitly states this is an S16 forward-reference
-      placeholder. Already flagged out_of_scope in meta-2026-05-11 through
-      meta-2026-05-18.
+      Line count: 19. Functional prompt template for W3C Design Token conversion.
+      Intentionally brief by design — shorter than peers (brand-system.md=42,
+      polish-audit.md=38) but operationally complete.
+  - id: finding-3
+    category: STUB_DOC
+    severity: low
+    location: hive/references/ui-prompts/design-review-design-critique.md
+    description: 11-line prompt template below 30-line stub threshold
+    evidence: >
+      Line count: 11. Functional prompt template for UI design critique review.
+      Intentionally brief — complete task directive in 11 lines.
 approved_proposals:
   - id: proposal-1
-    title: Correct Model Tier Routing table in hive/GUIDE.md to match actual agent model fields
+    title: Remove duplicate YAML domain fields in hive/agents/backend-developer.md
     discovery_source: internal_audit
     addresses_findings:
       - finding-1
-    impact_score: 2
+    impact_score: 3
     risk_score: 1
     effort_score: 1
-    priority_score: 10
+    priority_score: 15
     charter_objective: consistency
     metric:
       applies: false
       justification: >
-        Pure documentation accuracy fix — corrects misattributed tier values
-        in a reference table with no observable performance surface; the fix
-        aligns documentation to reflect reality rather than changing any
-        measurable system behaviour.
+        Schema correctness fix to agent frontmatter — corrects YAML field
+        duplication with no observable performance surface.
     implementation_plan:
       - step: >
-          Update the Opus row in GUIDE.md Model Tier Routing table: remove
-          team-lead, architect, analyst, tpm from Opus row, keeping only
-          orchestrator.
-        file: hive/GUIDE.md
-        action: update_field
-      - step: >
-          Update the Sonnet row: add team-lead, architect, analyst, tpm to
-          the existing Sonnet agents list.
-        file: hive/GUIDE.md
+          Remove lines 19-20 from hive/agents/backend-developer.md domain block
+          (the duplicate write: false and delete: false entries that override
+          the intended write: true and delete: false).
+        file: hive/agents/backend-developer.md
         action: update_field
     rationale: |
-      The GUIDE.md "Model Tier Routing" table listed team-lead, architect, analyst,
-      and tpm as Opus-tier agents. However, their agent files all have model: sonnet
-      and hive.config.yaml model_tiers.opus only lists orchestrator. This
-      documentation gap misleads operators into overestimating Opus usage costs.
+      backend-developer.md domain block has duplicate write and delete fields.
+      YAML parsers honour last-value-wins, making write: false the effective value
+      despite write: true appearing first and the "Default: permissive" comment.
+      This means the backend-developer agent cannot write files in contexts where
+      the domain block is consumed directly. frontend-developer.md has the correct
+      single-entry form.
     risk_notes: |
-      Documentation-only change to a table in GUIDE.md. No runtime code,
-      workflow YAML, or agent file is modified. No cross-references depend on
-      the tier routing text. Revert is a two-row table edit.
+      Removing two duplicate YAML lines from a frontmatter block. No cross-references
+      depend on this field. Revert is a two-line insert. Risk: none beyond typo.
 skipped_findings:
   - finding_id: finding-2
     reason: out_of_scope
     notes: >
-      Deferred Hive Cloud epic (S16 placeholder). Already flagged out_of_scope
-      in meta-2026-05-11, -12, -14, -15, -16, -17, -18. Expanding stub is
-      premature without the epic active.
+      Functional prompt template intentionally brief. Not a documentation stub —
+      the 30-line threshold is designed for reference docs, not prompt templates.
+  - finding_id: finding-3
+    reason: out_of_scope
+    notes: >
+      Functional prompt template intentionally brief. Content is operationally
+      complete for its purpose.
 changes:
   - proposal_id: proposal-1
-    file: hive/GUIDE.md
+    file: hive/agents/backend-developer.md
     action: update_field
-    description: Corrected Model Tier Routing table — moved team-lead/architect/analyst/tpm to Sonnet row
+    description: Removed duplicate write/delete domain fields — restored permissive write access
     status: promoted
