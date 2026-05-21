@@ -1,4 +1,5 @@
 import childProcess from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +9,7 @@ const DEFAULT_CONFIG_PATH = path.join(os.homedir(), '.multica', 'config.json');
 const DEFAULT_TOKEN_NAME = 'hive-bootstrap';
 const DEFAULT_WORKSPACE_NAME = 'plugin-hive';
 const DEFAULT_WORKSPACE_SLUG = 'plugin-hive';
+const HTTP_TIMEOUT_MS = 30000;
 const USER_AGENT = 'hive-multica-bootstrap/0.1.0';
 const RUNTIME_CACHE = new Map();
 function bootstrapError(code, message, hint) {
@@ -59,8 +61,16 @@ async function httpJson(serverUrl, apiPath, { method = 'GET', token, body } = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   let response;
   try {
-    response = await fetch(`${trimTrailingSlash(serverUrl)}${apiPath}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    response = await fetch(`${trimTrailingSlash(serverUrl)}${apiPath}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+    });
   } catch (error) {
+    if (error?.name === 'AbortError' || error?.name === 'TimeoutError') {
+      throw bootstrapError('TRANSPORT', 'Multica request timed out after 30s', `Check that Multica is running at ${trimTrailingSlash(serverUrl)}.`);
+    }
     throw bootstrapError('TRANSPORT', error?.message || 'Unable to reach Multica server', `Check that Multica is running at ${trimTrailingSlash(serverUrl)}.`);
   }
   const text = await response.text();
@@ -113,7 +123,10 @@ function diffAgent(existing, desired) {
   return changed;
 }
 async function getRuntimes(serverUrl, token, workspaceId) {
-  const cacheKey = `${trimTrailingSlash(serverUrl)}:${workspaceId}:${token ? 'auth' : 'anon'}`;
+  const tokenFingerprint = token
+    ? crypto.createHash('sha256').update(token).digest('hex').slice(0, 16)
+    : 'anon';
+  const cacheKey = `${trimTrailingSlash(serverUrl)}:${workspaceId}:${tokenFingerprint}`;
   if (RUNTIME_CACHE.has(cacheKey)) return RUNTIME_CACHE.get(cacheKey);
   const body = await httpJson(serverUrl, `/api/runtimes?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
   const runtimes = normalizeList(body, 'runtimes');

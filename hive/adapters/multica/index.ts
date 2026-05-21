@@ -237,7 +237,14 @@ function toAbiStory(issue: any): any {
 }
 
 async function resolveIssueUuid(id: string): Promise<string> {
-  const { identifier } = decodeStoryId(id);
+  const { workspaceSlug: idWorkspaceSlug, identifier } = decodeStoryId(id);
+  const { workspaceSlug: configuredWorkspaceSlug } = getSettings();
+  if (idWorkspaceSlug !== configuredWorkspaceSlug) {
+    throw new AdapterError(
+      "NOT_FOUND",
+      `Story '${id}' does not belong to configured workspace '${configuredWorkspaceSlug}'`,
+    );
+  }
   const cached = _issueUuidByIdentifier.get(identifier);
   if (cached) return cached;
 
@@ -328,7 +335,7 @@ async function addComment(params: any): Promise<any> {
     `/api/issues/${encodeURIComponent(issueUuid)}/comments?workspace_id=${encodeURIComponent(workspaceId)}`,
     { method: "POST", body: { content: body } },
   );
-  return { comment_id: String(comment?.id ?? comment?.comment_id ?? ""), ...comment };
+  return { ...comment, comment_id: String(comment?.id ?? comment?.comment_id ?? "") };
 }
 
 async function getStory(params: any): Promise<any> {

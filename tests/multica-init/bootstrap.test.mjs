@@ -116,6 +116,10 @@ test('AC2 CLI-missing: ensureCli requires consent before brew install', async (t
 test('AC3 auth-flow: ensureAuth mints PAT and persists tmp config only', async () => {
   const dir = tmpDir();
   const configPath = path.join(dir, 'config.json');
+  const prevEmail = process.env.MULTICA_EMAIL;
+  const prevDevCode = process.env.MULTICA_DEV_VERIFICATION_CODE;
+  delete process.env.MULTICA_EMAIL;
+  delete process.env.MULTICA_DEV_VERIFICATION_CODE;
   const calls = [];
   const { serverUrl, close } = await startMockServer((req, res, body) => {
     calls.push({ method: req.method, url: req.url, body });
@@ -158,6 +162,10 @@ test('AC3 auth-flow: ensureAuth mints PAT and persists tmp config only', async (
     assert.equal(config.server_url, serverUrl);
     assert.ok(!fs.existsSync(path.join(os.homedir(), '.multica', 'config.json.backup-from-test')));
   } finally {
+    if (prevEmail === undefined) delete process.env.MULTICA_EMAIL;
+    else process.env.MULTICA_EMAIL = prevEmail;
+    if (prevDevCode === undefined) delete process.env.MULTICA_DEV_VERIFICATION_CODE;
+    else process.env.MULTICA_DEV_VERIFICATION_CODE = prevDevCode;
     await close();
   }
 });

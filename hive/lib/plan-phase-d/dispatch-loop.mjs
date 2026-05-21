@@ -9,11 +9,12 @@ function storyParams(story) {
   };
 }
 
-function authFailureMessage(result) {
+function authFailureMessage(result, adapter) {
   const message = result?.message || "Task-tracking authentication failed.";
-  return message.includes("/hive:multica-init")
-    ? message
-    : `${message} Run /hive:multica-init to configure Multica credentials.`;
+  if (adapter === "multica" && !message.includes("/hive:multica-init")) {
+    return `${message} Run /hive:multica-init to configure Multica credentials.`;
+  }
+  return message;
 }
 
 function defaultSleep(ms) {
@@ -60,7 +61,7 @@ export async function runDispatchLoop({
       }
 
       if (result.code === "AUTH_FAILURE") {
-        const message = authFailureMessage(result);
+        const message = authFailureMessage(result, adapter);
         if (onAuthFailure) await onAuthFailure(message, { story, result });
         return { ok: false, aborted: true, code: "AUTH_FAILURE", message, published, warnings };
       }

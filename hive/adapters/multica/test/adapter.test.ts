@@ -8,7 +8,9 @@
 
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
+import * as fs from "node:fs";
 import * as http from "node:http";
+import * as os from "node:os";
 import * as cp from "node:child_process";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -258,16 +260,21 @@ describe("AC4: AUTH_FAILURE", () => {
   it("exits 1 with AUTH_FAILURE and stderr explanation when token absent", async () => {
     // Use a temporary HOME with no config.json so the adapter cannot fall back
     // to ~/.multica/config.json for credentials.
-    const tmpHome = "/tmp/multica-test-no-auth-home";
-    const result = await runAdapter(
-      { method: "createStory", params: { title: "T" } },
-      {
-        MULTICA_TOKEN: undefined,
-        MULTICA_SERVER_URL: serverUrl,
-        HOME: tmpHome,
-        USERPROFILE: tmpHome, // Windows compat guard
-      },
-    );
+    const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "multica-test-no-auth-"));
+    let result;
+    try {
+      result = await runAdapter(
+        { method: "createStory", params: { title: "T" } },
+        {
+          MULTICA_TOKEN: undefined,
+          MULTICA_SERVER_URL: serverUrl,
+          HOME: tmpHome,
+          USERPROFILE: tmpHome, // Windows compat guard
+        },
+      );
+    } finally {
+      fs.rmSync(tmpHome, { recursive: true, force: true });
+    }
 
     assert.strictEqual(result.exitCode, 1, `Expected exit 1, got ${result.exitCode}`);
 
@@ -293,11 +300,16 @@ describe("AC4: AUTH_FAILURE", () => {
 
     try {
       // Use tmpHome to block config.json fallback, ensuring fresh workspace lookup
-      const tmpHome = "/tmp/multica-test-401-home";
-      const result = await runAdapter(
-        { method: "createStory", params: { title: "T" } },
-        { MULTICA_TOKEN: "invalid-token", HOME: tmpHome, USERPROFILE: tmpHome },
-      );
+      const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "multica-test-no-auth-"));
+      let result;
+      try {
+        result = await runAdapter(
+          { method: "createStory", params: { title: "T" } },
+          { MULTICA_TOKEN: "invalid-token", HOME: tmpHome, USERPROFILE: tmpHome },
+        );
+      } finally {
+        fs.rmSync(tmpHome, { recursive: true, force: true });
+      }
 
       assert.strictEqual(result.exitCode, 1, `Expected exit 1, got ${result.exitCode}`);
       const parsed = JSON.parse(result.stdout);
@@ -342,11 +354,16 @@ describe("AC6: RATE_LIMIT", () => {
 
     try {
       // Use tmpHome to force a fresh workspace lookup via the mock server
-      const tmpHome = "/tmp/multica-test-rl1-home";
-      const result = await runAdapter(
-        { method: "createStory", params: { title: "T", body: "B", labels: [] } },
-        { HOME: tmpHome, USERPROFILE: tmpHome },
-      );
+      const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "multica-test-no-auth-"));
+      let result;
+      try {
+        result = await runAdapter(
+          { method: "createStory", params: { title: "T", body: "B", labels: [] } },
+          { HOME: tmpHome, USERPROFILE: tmpHome },
+        );
+      } finally {
+        fs.rmSync(tmpHome, { recursive: true, force: true });
+      }
 
       assert.strictEqual(result.exitCode, 1, `Expected exit 1, got ${result.exitCode}`);
 
@@ -375,11 +392,16 @@ describe("AC6: RATE_LIMIT", () => {
     };
 
     try {
-      const tmpHome = "/tmp/multica-test-rl2-home";
-      const result = await runAdapter(
-        { method: "createStory", params: { title: "T", body: "B", labels: [] } },
-        { HOME: tmpHome, USERPROFILE: tmpHome },
-      );
+      const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "multica-test-no-auth-"));
+      let result;
+      try {
+        result = await runAdapter(
+          { method: "createStory", params: { title: "T", body: "B", labels: [] } },
+          { HOME: tmpHome, USERPROFILE: tmpHome },
+        );
+      } finally {
+        fs.rmSync(tmpHome, { recursive: true, force: true });
+      }
 
       assert.strictEqual(result.exitCode, 1, `Expected exit 1, got ${result.exitCode}`);
 

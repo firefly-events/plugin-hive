@@ -40,9 +40,13 @@ export function parseAgentsConfig(yamlString) {
   const agents = [];
   let currentAgent = null;
 
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
     if (!line.trim()) {
       continue;
+    }
+
+    if (/^\s{6,}\S/.test(line)) {
+      throw new Error(`unsupported nested YAML in agents config at line ${index + 1}`);
     }
 
     const schemaMatch = line.match(/^schema_version:\s*(.+)$/);
@@ -87,7 +91,12 @@ export function parseAgentsConfig(yamlString) {
 }
 
 export function resolveAgentInstructions(agent, repoRoot) {
-  const personaPath = path.resolve(repoRoot, agent.persona_ref);
+  const resolvedRepoRoot = path.resolve(repoRoot);
+  const personaPath = path.resolve(resolvedRepoRoot, agent.persona_ref);
+  const rel = path.relative(resolvedRepoRoot, personaPath);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error(`agent ${agent.name} persona_ref must stay under repo root: ${agent.persona_ref}`);
+  }
 
   try {
     return fs.readFileSync(personaPath, 'utf8');
