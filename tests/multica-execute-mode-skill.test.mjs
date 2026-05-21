@@ -13,6 +13,10 @@ import {
   resolveAgentUuidByName,
   serializeStoryBrief,
 } from '../hive/lib/multica-story-dispatch/index.mjs';
+import {
+  pollTaskUntilTerminal,
+  writeMulticaRunEpisode,
+} from '../hive/lib/multica-story-dispatch/episode-sync.mjs';
 
 const TOKEN = 'mul_test';
 const WORKSPACE_ID = 'workspace-1';
@@ -122,9 +126,55 @@ async function startMockMultica({
         }
       }
 
-      if (req.method === 'GET' && url.pathname.startsWith('/api/tasks/')) {
-        const issueUuid = decodeURIComponent(url.pathname.split('/').pop());
-        sendJson(res, 200, terminalByIssueUuid[issueUuid] ?? { status: 'completed' });
+      const activeTaskMatch = url.pathname.match(/^\/api\/issues\/([^/]+)\/active-task$/);
+      if (req.method === 'GET' && activeTaskMatch) {
+        const issueUuid = decodeURIComponent(activeTaskMatch[1]);
+        const terminal = terminalByIssueUuid[issueUuid] ?? { status: 'completed' };
+        sendJson(res, 200, {
+          id: `task-${issueUuid}`,
+          status: terminal.status ?? 'completed',
+          notes: terminal.notes,
+          error: terminal.error,
+          agent_id: terminal.agent_id ?? 'agent-developer-1',
+          agent_name: terminal.agent_name ?? 'developer',
+          work_dir: terminal.work_dir ?? null,
+          attempts: terminal.attempts ?? 1,
+          started_at: terminal.started_at ?? '2026-05-21T00:00:00.000Z',
+          completed_at: terminal.completed_at ?? '2026-05-21T00:00:01.000Z',
+        });
+        return;
+      }
+
+      const taskRunsMatch = url.pathname.match(/^\/api\/issues\/([^/]+)\/task-runs$/);
+      if (req.method === 'GET' && taskRunsMatch) {
+        const issueUuid = decodeURIComponent(taskRunsMatch[1]);
+        const terminal = terminalByIssueUuid[issueUuid] ?? { status: 'completed' };
+        sendJson(res, 200, {
+          task_runs: [
+            {
+              id: `task-${issueUuid}`,
+              status: terminal.status ?? 'completed',
+              notes: terminal.notes,
+              error: terminal.error,
+              started_at: terminal.started_at ?? '2026-05-21T00:00:00.000Z',
+              completed_at: terminal.completed_at ?? '2026-05-21T00:00:01.000Z',
+            },
+          ],
+        });
+        return;
+      }
+
+      const messagesMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/messages$/);
+      if (req.method === 'GET' && messagesMatch) {
+        const taskId = decodeURIComponent(messagesMatch[1]);
+        const issueUuid = taskId.replace(/^task-/, '');
+        const terminal = terminalByIssueUuid[issueUuid] ?? {};
+        sendJson(res, 200, { messages: terminal.messages ?? [] });
+        return;
+      }
+
+      if (req.method === 'POST' && /^\/api\/issues\/[^/]+\/tasks\/[^/]+\/cancel$/.test(url.pathname)) {
+        sendJson(res, 200, { ok: true });
         return;
       }
 
@@ -238,54 +288,6 @@ async function createStoryViaAdapterShim({ serverUrl, token, workspaceId, worksp
   };
 }
 
-async function pollTaskUntilTerminalStub({
-  terminalByStoryId = {},
-  storyId,
-  issueUuid,
-  onStateTransition,
-}) {
-  onStateTransition?.('queued', 'running');
-  onStateTransition?.('running', terminalByStoryId[storyId]?.status ?? 'completed');
-  return {
-    issueUuid,
-    status: 'completed',
-    completed_at: new Date('2026-05-21T00:00:00.000Z').toISOString(),
-    messages: [],
-    ...(terminalByStoryId[storyId] ?? {}),
-  };
-}
-
-async function writeMulticaRunEpisodeStub({
-  hiveStateDir,
-  epicHandle,
-  storyId,
-  issueUuid,
-  identifier,
-  terminal,
-}) {
-  const dir = path.join(hiveStateDir, 'episodes', epicHandle, storyId);
-  await fs.mkdir(dir, { recursive: true });
-  const markerPath = path.join(dir, 'multica-run.yaml');
-  const messagesPath = path.join(dir, 'multica-run.messages.jsonl');
-  const status = terminal.status === 'completed' ? 'passed' : terminal.status;
-  const notes = terminal.error || terminal.notes || '';
-  const marker = [
-    `story_id: ${storyId}`,
-    `status: ${status}`,
-    `issue_uuid: ${issueUuid}`,
-    `identifier: ${identifier}`,
-    notes ? `notes: ${JSON.stringify(notes)}` : 'notes: ""',
-    '',
-  ].join('\n');
-  await fs.writeFile(markerPath, marker, 'utf8');
-  await fs.writeFile(
-    messagesPath,
-    (terminal.messages ?? []).map((message) => JSON.stringify(message)).join('\n'),
-    'utf8',
-  );
-  return { markerPath, messagesPath, status, notes };
-}
-
 async function executeModeMulticaDriver({
   serverUrl,
   token = TOKEN,
@@ -295,7 +297,6 @@ async function executeModeMulticaDriver({
   unblocked_stories = [],
   appends_map = {},
   hive_config = {},
-  terminalByStoryId = {},
   stderr = () => {},
 }) {
   const dispatched = [];
@@ -381,10 +382,7 @@ async function executeModeMulticaDriver({
         };
         dispatched.push(dispatchRecord);
 
-        stderr(
-          `[multica:${storyId}] s4 episode-marker-sync not yet implemented — would poll here`,
-        );
-        const terminal = await pollTaskUntilTerminalStub({
+        const terminal = await pollTaskUntilTerminal({
           serverUrl,
           token,
           workspaceId,
@@ -393,18 +391,18 @@ async function executeModeMulticaDriver({
           maxWallClockMs,
           pollIntervalMs,
           messagesCaptureMax,
-          terminalByStoryId,
           onStateTransition(prev, next) {
             stderr(`[multica:${storyId}] ${prev} → ${next}`);
           },
         });
-        const episode = await writeMulticaRunEpisodeStub({
+        const episode = await writeMulticaRunEpisode({
           hiveStateDir,
           epicHandle,
           storyId,
           issueUuid: issue.issueUuid,
           identifier: issue.identifier,
           terminal,
+          messagesCaptureMax,
         });
         episodes.push({ story_id: storyId, ...episode });
 
@@ -418,13 +416,13 @@ async function executeModeMulticaDriver({
         if (episode.status === 'passed') completed.push(terminalRecord);
         else failed.push(terminalRecord);
       } catch (error) {
-        const episode = await writeMulticaRunEpisodeStub({
+        const episode = await writeMulticaRunEpisode({
           hiveStateDir,
           epicHandle,
           storyId,
           issueUuid: 'unknown',
           identifier: 'unknown',
-          terminal: { status: 'failed', error: error?.message ?? String(error) },
+          terminal: { status: 'failed', notes: error?.message ?? String(error) },
         });
         episodes.push({ story_id: storyId, ...episode });
         failed.push({
@@ -611,13 +609,13 @@ test("AC7: failed terminal writes failed episode with Multica error notes", asyn
   const hiveStateDir = await createTempHiveState();
   const mock = await startMockMultica({
     issues: [{ id: 'issue-1', identifier: 'PLU-1' }],
+    terminalByIssueUuid: { 'issue-1': { status: 'failed', error: 'OOM' } },
   });
   try {
     const result = await executeModeMulticaDriver({
       serverUrl: mock.serverUrl,
       hiveStateDir,
       unblocked_stories: [story({ tracker_id: 'plugin-hive/PLU-1' })],
-      terminalByStoryId: { 'story-1': { status: 'failed', error: 'OOM' } },
     });
 
     assert.equal(result.failed.length, 1);
