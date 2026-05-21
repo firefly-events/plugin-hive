@@ -1,0 +1,46 @@
+name: multica-substrate-adoption
+title: Adopt Multica as the /execute substrate
+description: |
+  Replace the GH-Actions + sandcastle execution path with Multica
+  (multica-ai/multica) as the task tracker + agent dispatch substrate
+  for plugin-hive's /execute lane.
+
+  /plan and /review remain interactive on the maintainer's laptop.
+  Multica handles everything between the two human gates.
+
+  MVP scope only. Cleanup of legacy sandcastle + GH Actions ships in a
+  follow-on epic (sandcastle gets preserved on `archive/sandcastle`
+  branch, not deleted from develop until the follow-on epic).
+
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  - id: s1-multica-adapter
+    title: Multica task-tracking adapter (Hive ABI 1.0.0)
+    complexity: medium
+    depends_on: []
+
+  - id: s2-plan-phase-d-wiring
+    title: /plan Phase D writes Multica issues via dispatch
+    complexity: low
+    depends_on: [s1-multica-adapter]
+
+  - id: s3-multica-init-bootstrap
+    title: /hive:multica-init bootstrap skill (one-command Multica setup)
+    complexity: medium
+    depends_on: [s1-multica-adapter, s4-persona-agent-config]
+
+  - id: s4-persona-agent-config
+    title: Persona → Multica agent declarative config (execute-phase only)
+    complexity: low
+    depends_on: []
+
+  - id: s5-readme-guide-version
+    title: README + GUIDE updates + version bump for Multica substrate
+    complexity: low
+    depends_on: [s2-plan-phase-d-wiring, s3-multica-init-bootstrap]
