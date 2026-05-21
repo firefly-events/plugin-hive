@@ -55,14 +55,14 @@ const RE_BEARER = /(Authorization\s*:\s*Bearer\s+)([^\s"'`,\]}\n]+)/gi;
  * Form 3: JSON "key": "value" where key is a secrets-looking name.
  *
  * Key-name pattern accepts either underscore-separated or hyphen-separated
- * tail: `_key|_token|-key|-token`. With the /i flag this also covers
+ * tail: `_key|_token|_secret|-key|-token|-secret`. With the /i flag this also covers
  * `_Key`/`-Key`/`-KEY` etc. Matching keeps both separator forms so HTTP-
  * header-style names (X-API-Key, X-Auth-Token) emitted in JSON dumps are
  * caught alongside Python/JSON-snake-case names (api_key, openai_api_key).
  * Value must be a non-empty JSON string.
  */
 const RE_JSON_KV =
-  /("(?:[a-zA-Z0-9_-]*(?:[_-]key|[_-]token)|api[_-]?key|openai[_-]?api[_-]?key)")\s*:\s*"((?:\\.|[^"\\])*)"/gi;
+  /("(?:[a-zA-Z0-9_-]*(?:[_-]key|[_-]token|[_-]secret)|api[_-]?(?:key|secret)|openai[_-]?api[_-]?(?:key|secret))")\s*:\s*"((?:\\.|[^"\\])*)"/gi;
 
 /**
  * Form 4: Bare HTTP header line — `Header-Name: value`.

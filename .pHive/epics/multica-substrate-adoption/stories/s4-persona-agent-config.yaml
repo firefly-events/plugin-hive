@@ -103,7 +103,7 @@ design_decisions:
     rationale: hive/agents/*.md are the source of truth; duplicating into agents.yaml creates drift surface
   - decision: Only execute-phase personas in this seed file
     rationale: /plan and /review run interactively on the user's machine; their personas don't need Multica agent entities. Including them would imply Multica drives those skills — which we explicitly deferred.
-  - decision: schema_version: 1 with strict forward-compat rejection
+  - decision: "schema_version: 1 with strict forward-compat rejection"
     rationale: Schema evolution is real; better to fail loud on version mismatch than silently mis-apply
 
 cross_cutting:

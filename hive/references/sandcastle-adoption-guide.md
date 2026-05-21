@@ -155,7 +155,7 @@ Covered patterns:
 - **Argv form** — `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, any `*_TOKEN`, any `*_KEY`.
 - **Bearer form** — `Authorization: Bearer …` (case-insensitive on both `Authorization` and `Bearer`).
 - **JSON form** — keys ending in `_key`, `_token`, `-key`, `-token` (so both `openai_api_key` and `X-API-Key` are caught), plus the literal patterns `api_key`/`apiKey`/`openai_api_key`.
-- **HTTP-header-line form** — bare header lines (no JSON quotes) whose name ends in `-Key`, `-Token`, or `-Secret`: `X-API-Key`, `X-Auth-Token`, `X-Client-Secret`, `Api-Key`, etc. Anchored to line start so non-secret headers (`Content-Type`, `Host`, `User-Agent`) pass through unchanged. The Authorization-Bearer form is handled by its dedicated regex earlier in the pipeline, so the literal `Bearer ` prefix survives redaction.
+- **HTTP-header-line form** — bare header lines (no JSON quotes) whose name ends in `-Key`, `-Token`, or `-Secret`: `X-API-Key`, `X-Auth-Token`, `X-Client-Secret`, `Api-Key`, etc. Anchored to line start so non-secret headers (`Content-Type`, `Host`, `User-Agent`) pass through unchanged. The Authorization-Bearer form is handled by its dedicated regex earlier in the pipeline, so the literal `Bearer` prefix survives redaction.
 
 **V1 coverage gaps:**
 
