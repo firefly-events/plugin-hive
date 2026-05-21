@@ -28,12 +28,14 @@ If preflight throws, propagate the error to the caller immediately and abort the
 
 ## Provider construction
 
-Import and call `createSandcastleProvider` from `hive/lib/sandcastle-provider.js`:
+ESM consumers (the default for /execute Sandcastle mode) **must use the loader**, `hive/lib/sandcastle-provider-loader.mjs`. The loader pre-resolves the ESM-only `@ai-hero/sandcastle` deps and threads them into the CJS factory — without it, `createSandcastleProvider` falls through to `require('@ai-hero/sandcastle/sandboxes/podman')` and throws `ERR_PACKAGE_PATH_NOT_EXPORTED` because sandcastle's `exports` field has no `require` keys.
 
 ```js
-const { createSandcastleProvider } = require('hive/lib/sandcastle-provider');
-const { sandboxProvider, createWorktree } = createSandcastleProvider(options);
+import { createSandcastleProvider } from 'hive/lib/sandcastle-provider-loader.mjs';
+const { sandboxProvider, createWorktree } = await createSandcastleProvider(options);
 ```
+
+CJS consumers that already have their own ESM-aware bootstrap may call the underlying `hive/lib/sandcastle-provider.js` factory directly and inject `_deps.{podmanFactory, dockerFactory, createWorktreeFn}` themselves. This is the same seam the unit tests use; it is **not** the recommended path.
 
 **Default options (do not override without explicit need):**
 

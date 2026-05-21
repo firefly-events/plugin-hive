@@ -1,0 +1,32 @@
+schema_version: 1
+agents:
+  - name: developer
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/developer.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: {}
+    skills: []
+    visibility: workspace
+  - name: tester
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/tester.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: {}
+    skills: []
+    visibility: workspace
+  - name: reviewer
+    provider: claude
+    model: claude-opus-4-7
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/reviewer.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: {}
+    skills: []
+    visibility: workspace

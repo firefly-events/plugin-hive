@@ -122,25 +122,43 @@ branchStrategy: {
 
 Ownership is determined by who called `createWorktree`. See `skills/hive/skills/execute-mode-sandcastle/SKILL.md` §Worktree ownership for the full split rule.
 
+**Uncommitted-changes cleanup caveat (sandcastle 0.5.10):**
+
+`wt.close()` does **NOT** auto-remove a worktree that has uncommitted changes — sandcastle prints a warning of the form `Run succeeded but worktree has uncommitted changes at …` and leaves the worktree on disk. This is by design (preserves work for inspection), but consumers running batched or parallel sandbox jobs need an explicit cleanup step.
+
+Recommended pattern after a Sandcastle run that intentionally leaves uncommitted state:
+
+```bash
+git worktree remove --force .sandcastle/worktrees/<branch-name>
+git branch -D <branch-name>
+```
+
+If your story always commits its work before returning (which the standard execute-mode flow does), this caveat does not apply. The s4 merge-validation script encountered this because its prompt deliberately created a file without committing — the same pattern shows up in any "create-only" validation harness.
+
 ---
 
 ## 6. Log Redaction
 
 `hive/lib/sandcastle-log-redaction.js` wraps the Sandcastle logger before provider construction. This is why inline `SandboxProvider` construction is prohibited — the wrapper ensures redaction is installed before any Sandcastle startup log lines are emitted.
 
-**V1 coverage — three forms:**
+**V1 coverage — four forms:**
 
 | Form | Example input | Redacted output |
 |---|---|---|
 | Argv/env assignment | `OPENAI_API_KEY=sk-test` | `OPENAI_API_KEY=[REDACTED]` |
 | Bearer header | `Authorization: Bearer sk-test` | `Authorization: Bearer [REDACTED]` |
 | JSON key-value | `"api_key": "sk-test"` | `"api_key": "[REDACTED]"` |
+| HTTP header line | `X-API-Key: sk-test` | `X-API-Key: [REDACTED]` |
 
-Covered patterns: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, any `*_TOKEN`, any `*_KEY` in argv form; `Authorization: Bearer` (case-insensitive) in header form; JSON keys ending in `_key`, `_token`, or matching `api_key`/`apiKey`/`openai_api_key` style.
+Covered patterns:
 
-**V1 coverage gaps (moderate finding from impl-audit):**
+- **Argv form** — `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, any `*_TOKEN`, any `*_KEY`.
+- **Bearer form** — `Authorization: Bearer …` (case-insensitive on both `Authorization` and `Bearer`).
+- **JSON form** — keys ending in `_key`, `_token`, `-key`, `-token` (so both `openai_api_key` and `X-API-Key` are caught), plus the literal patterns `api_key`/`apiKey`/`openai_api_key`.
+- **HTTP-header-line form** — bare header lines (no JSON quotes) whose name ends in `-Key`, `-Token`, or `-Secret`: `X-API-Key`, `X-Auth-Token`, `X-Client-Secret`, `Api-Key`, etc. Anchored to line start so non-secret headers (`Content-Type`, `Host`, `User-Agent`) pass through unchanged. The Authorization-Bearer form is handled by its dedicated regex earlier in the pipeline, so the literal `Bearer` prefix survives redaction.
 
-- Hyphenated header names such as `X-API-KEY` are **NOT** caught by the current `\b`-anchored regex. Hyphens break word-boundary matching, so `X-API-KEY=value` passes through unredacted.
+**V1 coverage gaps:**
+
 - Base64-encoded secrets are out of scope for V1.
 - `printenv`/env-dump output is out of scope for V1. (This is also why `printenv` form is an anti-pattern for key delivery — see §1.)
 

@@ -80,6 +80,15 @@ context_window:
 #     linear:
 #       api_key: null                # falls through to LINEAR_API_KEY env
 #       team: ACME                   # falls through to LINEAR_TEAM env
+#
+#   # Multica (built-in):
+#   task_tracking:
+#     adapter: multica
+#     team_value: <multica-workspace-slug>   # e.g. plugin-hive
+#     project_value: null                    # not used by multica
+#     multica:
+#       server_url: null                     # falls through to ~/.multica/config.json server_url
+#       token: null                          # falls through to MULTICA_TOKEN env, then ~/.multica/config.json token
 task_tracking:
   adapter: github
   adapter_timeout_ms: 30000

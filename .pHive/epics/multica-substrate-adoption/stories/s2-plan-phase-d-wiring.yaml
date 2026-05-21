@@ -1,0 +1,126 @@
+id: s2-plan-phase-d-wiring
+epic: multica-substrate-adoption
+title: /plan Phase D writes Multica issues via dispatch
+status: pending
+complexity: low
+methodology: classic
+depends_on: [s1-multica-adapter]
+
+description: |
+  Wire the Multica adapter into /plan's Phase D so stories produced by /plan
+  are filed as Multica issues automatically. Three touches:
+
+  1. **Config recognition.** `hive.config.yaml` accepts
+     `task_tracking.adapter: multica` (alongside existing `github` / `linear`
+     / null). When set, /plan Phase D invokes the multica adapter via the
+     task-tracking-dispatch module.
+
+  2. **Round-trip persistence.** After `createStory` returns, write
+     `tracker_id: plugin-hive/PLU-N` and `tracker_url: http://localhost:3000/plugin-hive/issues/N`
+     back into each story YAML. Mirrors what Phase D step 19 already does
+     for github (see skills/plan/SKILL.md lines around `tracker_id`).
+
+  3. **No teardown of github path.** This story is additive — the github
+     path stays intact. The dispatch module already branches on
+     `task_tracking.adapter`. Updating the existing tests to cover the
+     multica branch is in scope.
+
+acceptance_criteria:
+  - "Given hive.config.yaml has `task_tracking.adapter: multica`, when /plan runs Phase D for an epic with N stories, then N Multica issues are created (one per story) and each story.yaml has tracker_id + tracker_url populated."
+  - "Given hive.config.yaml has `task_tracking.adapter: github`, when /plan runs Phase D, then behavior is unchanged from current — github issues created, no multica adapter touched."
+  - "Given hive.config.yaml has `task_tracking.adapter: null` (or unset), when /plan runs Phase D, then no issues filed, story YAMLs land on disk only (current no-op behavior)."
+  - "Given the multica adapter returns RATE_LIMIT, when /plan Phase D processes the batch, then it waits per retry_after_ms and retries; if persistent, it surfaces a warning to the user and continues with stories that were filed successfully."
+  - "Given the multica adapter returns AUTH_FAILURE, when /plan Phase D runs, then it surfaces a clear remediation message naming /hive:multica-init (s3) and aborts Phase D without writing partial state."
+
+steps:
+  - id: research
+    description: Read skills/plan/SKILL.md Phase D (steps 19-19a) + hive/lib/task-tracking-dispatch/index.ts to confirm where the adapter branch lives
+    agent: researcher
+  - id: implement
+    description: Add multica branch to dispatch; ensure /plan Phase D writes tracker_id/url for multica adapter responses; update hive.config.yaml example commentary
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: tests/plan/phase-d-multica-dispatch.test.mjs covering 5 AC cases against a mock dispatch adapter
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify github path unchanged (regression check); verify error messages name s3 by skill identifier
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Phase D step 19 owns the dispatch call to be extended
+    - path: hive/lib/task-tracking-dispatch/index.ts
+      purpose: Dispatch module — branches on task_tracking.adapter
+    - path: hive.config.yaml
+      purpose: Root config — task_tracking block accepts adapter value
+    - path: hive/adapters/multica/index.ts
+      purpose: Adapter produced by s1 — invoked from dispatch
+
+files_to_modify:
+  - file: hive/lib/task-tracking-dispatch/index.ts
+    change: Add multica branch alongside github/linear
+  - file: hive.config.yaml
+    change: "Add commented example showing `task_tracking.adapter: multica` configuration block"
+  - file: skills/plan/SKILL.md
+    change: Phase D step 19 commentary updated to mention multica path (no logic change — dispatch handles branching)
+  - file: tests/plan/phase-d-multica-dispatch.test.mjs
+    change: NEW — 5 AC cases
+
+code_examples:
+  - title: Existing dispatch pattern from skills/plan/SKILL.md Phase D
+    file: skills/plan/SKILL.md
+    snippet: |
+      import { TaskTrackingDispatch } from "hive/lib/task-tracking-dispatch/index.ts";
+      const dispatch = new TaskTrackingDispatch();
+      await dispatch.load(config.task_tracking);
+      for (const story of stories) {
+        const result = await dispatch.invoke("createStory", {...}, { skill_context: "plan" });
+        if (result.ok) { story.tracker_id = result.result.id; story.tracker_url = result.result.url; }
+      }
+
+design_decisions:
+  - decision: No changes to the dispatch ABI surface in this story
+    rationale: s1 already implements the ABI; this story is purely config + branch wiring
+  - decision: "Continue to support `task_tracking.adapter: null` no-op path"
+    rationale: Maintainers without Multica setup must still be able to run /plan locally and get story YAMLs on disk
+
+cross_cutting:
+  - concern: documentation
+    action: hive.config.yaml inline commentary + skills/plan/SKILL.md Phase D commentary updates; mention in README that /plan can now target Multica
+
+metric:
+  applies: true
+  name: plan.tracker_id_population_rate
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 1.0
+  window: next-1-plan-run-on-feat-multica-substrate-adoption
+  source:
+    kind: events
+    ref: "Story YAMLs in .pHive/epics/multica-substrate-adoption/stories/*.yaml — count files with non-empty tracker_id / total files"
+  verify_at: integrate
+  owner: reviewer
+  notes: |
+    First dogfood of /plan against Multica: after this story integrates, the next /plan run (e.g. cleanup follow-on epic planning) should populate tracker_id on every emitted story YAML. Anything less than 1.0 means the wiring leaks. Easy to measure by reading the story files post-run.
+
+risks:
+  - severity: low
+    description: Partial-batch failure (some stories filed, others rate-limited) leaves story YAMLs in inconsistent state
+    mitigation: Phase D writes tracker_id immediately per successful response (existing pattern); re-runs are idempotent if /plan supports it — verify
+
+references:
+  - path: skills/plan/SKILL.md
+    relevant_excerpt: |
+      Phase D — Publishing stories to the task tracker.
+      Only run after the user confirms the plan in step 18.
+      If task_tracking.adapter is unset, this phase is a no-op.
