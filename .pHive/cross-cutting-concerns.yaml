@@ -95,3 +95,31 @@ concerns:
       - "If applies:true and source.kind=envelope: an envelope file under .pHive/metrics/experiments/ is created or linked via envelope_id per .pHive/metrics/experiment-envelope.schema.md"
       - "verify_at set to a concrete point (story integrate step, epic close, or ISO-8601 timestamp) — not 'eventually'"
       - "Review confirms metric is falsifiable: a future reader can decide pass/fail from the declared source without re-reading the story"
+
+  - id: simulated-manual
+    name: Simulated Manual Testing
+    description: >
+      Stories with UI flows, external integrations, or perceptual outcomes that
+      cannot be reliably covered by automated tests require a simulated manual
+      test scenario. The scenario is declared in the story YAML and replayed by
+      `/test --simulated-manual` to produce a pass/fail/inconclusive verdict
+      written to the story's `manual_verdict` block.
+    applies_when: >
+      Story involves a UI flow, external service integration, or perceptual
+      outcome (visual correctness, layout, end-to-end user journey) where
+      automated unit/integration tests cannot fully assert correctness. Does
+      NOT apply to pure-substrate stories (schema docs, planner-prompt edits,
+      internal-only refactors with no observable surface).
+    planning_prompt: >
+      Does this story involve a UI flow, an external integration boundary, or
+      a perceptual outcome that requires human-judgment or end-to-end replay?
+      If yes, define a test scenario YAML under .pHive/test-scenarios/ per
+      test-scenario-schema.md and set manual_verdict.scenario_ref on the story
+      YAML to the scenario path. Describe the scenario: invocation kind
+      (skill|command|workflow), pre-conditions, and pass expectations.
+    implementation_checklist:
+      - "Test scenario YAML created at .pHive/test-scenarios/<scenario-id>.yaml per hive/references/test-scenario-schema.md"
+      - "story.manual_verdict.scenario_ref set to the scenario's repo-relative path"
+      - "A `scenario` step added to the story's workflow after the position required by the resolved methodology"
+      - "/test --simulated-manual <story-id> resolves scenario, runs invocation, evaluates expectations"
+      - "Verdict (pass | fail | inconclusive) written to story YAML manual_verdict block with timestamp"

@@ -48,6 +48,7 @@ planning skill and team-lead guidance, not in this schema.
 | `parallel_rationale` | conditional | `variation` \| `read-only` \| `bounded-slice` (required iff `parallel_allowed: true`) — see §4 |
 | `test_scenario`      | optional    | pointer into `.pHive/test-scenarios/` — see §7 |
 | `terminal_handoff`   | optional    | post-integrate dispatch config — see §8    |
+| `manual_verdict`     | optional    | simulated-manual test result — see §9      |
 
 Authors must not invent new top-level keys to carry metric-shaped
 information. Anything metric-related goes inside `metric:`.
@@ -111,6 +112,53 @@ terminal_handoff:
 # epic.yaml — opt every story in the epic into review
 execution:
   terminal_handoff_default: review
+```
+
+## 9. The `manual_verdict:` field group
+
+Added by story `c-2-test-simulated-manual-mode` in the `autonomous-cycle-loop` epic. Carries the result of a `/test --simulated-manual` run. The block is written by the test-worker after executing the linked scenario; `/plan` seeds a placeholder when the `simulated-manual` cross-cutting concern applies.
+
+### 9.1 Shape
+
+```yaml
+manual_verdict:
+  scenario_ref: <repo-relative path>   # path to .pHive/test-scenarios/<id>.yaml
+  verdict: pass | fail | inconclusive  # written by /test --simulated-manual
+  timestamp: <ISO 8601>                # when the verdict was rendered (null = not yet run)
+  agent: <agent-name>                  # persona that executed the scenario (null = not yet run)
+```
+
+### 9.2 Field semantics
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `scenario_ref` | string | — | Repo-relative path to the scenario YAML; must resolve to a file conforming to [`test-scenario-schema.md`](test-scenario-schema.md). Set at plan time; updated by the tester if the scenario file is renamed. |
+| `verdict` | enum \| null | `null` | The outcome of the last `/test --simulated-manual` run: `pass`, `fail`, or `inconclusive`. `null` = not yet run. |
+| `timestamp` | ISO 8601 \| null | `null` | Wall-clock time when the verdict was recorded. `null` = not yet run. |
+| `agent` | string \| null | `null` | Persona name that executed the scenario (e.g., `test-worker`). `null` = not yet run. |
+
+### 9.3 Lifecycle
+
+1. **Plan time:** `/plan` step 14 seeds `manual_verdict` with `scenario_ref` set to a placeholder path and `verdict: null` when the `simulated-manual` cross-cutting concern applies.
+2. **Scenario authoring:** The tester who executes the `scenario` step writes the real scenario YAML at `scenario_ref` per [`test-scenario-schema.md`](test-scenario-schema.md).
+3. **Verdict time:** `/test --simulated-manual <story-id>` reads `manual_verdict.scenario_ref`, executes the scenario, and writes the final `verdict`, `timestamp`, and `agent` into the block.
+
+### 9.4 Worked example
+
+```yaml
+# story YAML — seeded by /plan at planning time
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/c-2-test-simulated-manual-mode-manual.yaml
+  verdict: null
+  timestamp: null
+  agent: null
+
+# same story YAML — after /test --simulated-manual runs successfully
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/c-2-test-simulated-manual-mode-manual.yaml
+  verdict: pass
+  timestamp: "2026-05-21T20:45:00Z"
+  agent: test-worker
 ```
 
 ## 3. The `metric:` field group
