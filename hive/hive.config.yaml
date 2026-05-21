@@ -305,6 +305,10 @@ execution:
   # story YAML does not declare terminal_handoff.next. Enum: none | test | review | both.
   # Default 'none' preserves prior behavior byte-equivalently.
   terminal_handoff_default: none
+  # Terminal handoff per-invocation timeout (epic: autonomous-cycle-loop, story d-2).
+  # Consumer projects may override in their root hive.config.yaml.
+  terminal_handoff:
+    timeout_seconds: 1800  # 30 min per sub-invocation; dispatch.mjs reads this key
   # Optional maintainer-only execution tuning — consumers do NOT need these
   # keys. Uncomment in your root `hive.config.yaml` to override:
   #   terminal_mux: auto           # tmux | cmux | auto  (default: TeamCreate's built-in tmux)

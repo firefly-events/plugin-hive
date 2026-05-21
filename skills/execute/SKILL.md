@@ -230,7 +230,15 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
    - `target: 'both'` — runs test first, then review with the test verdict available to the reviewer.
    - `target: 'none'` — no-op; skip the log write entirely.
 
-   **handoff_log writeback.** Regardless of verdict (even on `ok: false`), append one row to `handoff_log[]` in `${HIVE_STATE_DIR}/cycle-state/{epic-id}.yaml`:
+   **Timeout handling.** When `result.ok === false && result.reason === 'timeout'`, log a warning and continue to the next story — a timeout must not block the rest of the epic:
+
+   ```
+   [warn] handoff: story={story_id} target={target} timed out after {duration_ms}ms — continuing to next story
+   ```
+
+   `dispatch.mjs` already emits a `phase_handoff_timeout` JSONL event and a `phase_handoff:<target>:timeout` KG triple at the moment of timeout; the executor only needs to write the log row and continue.
+
+   **handoff_log writeback.** Regardless of verdict (even on `ok: false`), append one row to `handoff_log[]` in `${HIVE_STATE_DIR}/cycle-state/{epic-id}.yaml`. Include `timeout_at` when the row is a timeout:
 
    ```yaml
    handoff_log:
@@ -238,9 +246,11 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
        target: <target>
        started_at: "<ISO 8601>"
        finished_at: "<ISO 8601>"
-       verdict: <result.verdict or "error">
+       verdict: <result.verdict or (result.reason === 'timeout' ? 'timeout' : 'error')>
        evidence_ref: <result.evidence_ref or "">
        duration_ms: <result.duration_ms or 0>
+       # timeout_at present only when verdict=timeout:
+       timeout_at: <result.timeout_at>   # omit field entirely when verdict ≠ timeout
    ```
 
    If the cycle state file does not yet have a `handoff_log:` key, create the list. Emit a debug trace after write:

@@ -249,10 +249,11 @@ handoff_log:
     target: test | review | both | none   # resolved target (never 'none' in practice — rows not written for none)
     started_at: "<ISO 8601>"     # when dispatchHandoff was called
     finished_at: "<ISO 8601>"    # when it returned
-    verdict: <string>            # passed | needs-revision | needs-optimization | failed | error | skipped
+    verdict: <string>            # passed | needs-revision | needs-optimization | failed | error | skipped | timeout
     evidence_ref: <string>       # path to .pHive/handoff-evidence/<story>-<target>-<ts>.md, or "" on error
     duration_ms: <int>           # wall-clock ms from start to finish
     skipped_reason: <string>     # present only when verdict=skipped; e.g. "no-integrate-episode"
+    timeout_at: "<ISO 8601>"     # present only when verdict=timeout; ISO 8601 timestamp when the timeout fired
 ```
 
 ### Field semantics
@@ -267,6 +268,7 @@ handoff_log:
 | `evidence_ref` | string | Always | Relative path from the project root to the evidence file, or `""` when evidence could not be written. |
 | `duration_ms` | int | Always | Rounded wall-clock duration. `0` for skipped rows. |
 | `skipped_reason` | string | When `verdict: skipped` | Short machine-readable reason. `"no-integrate-episode"` is the only defined value. |
+| `timeout_at` | string | When `verdict: timeout` | ISO 8601 timestamp recorded by `dispatch.mjs` at the moment the wall-clock timeout fired. A companion `phase_handoff_timeout` JSONL event is also written to `.pHive/metrics/events/`. |
 
 ### Verdict enum
 
@@ -276,8 +278,9 @@ handoff_log:
 | `needs-revision` | Review produced `needs-revision` or test produced `failed`. |
 | `needs-optimization` | Review produced `needs-optimization` and test (if run) passed. |
 | `failed` | Test skill reported explicit failures. |
-| `error` | Dispatch could not determine a verdict (timeout, spawn error, unrecognised output). |
+| `error` | Dispatch could not determine a verdict (spawn error, unrecognised output). |
 | `skipped` | Handoff was not attempted because the integrate episode marker was absent. |
+| `timeout` | The child process hit the wall-clock timeout. A `phase_handoff_timeout` JSONL event is emitted and `/execute` logs and continues — the timeout does not block the next story. |
 
 ## Linear Ticket Tracking
 
