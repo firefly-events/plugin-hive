@@ -46,6 +46,7 @@ planning skill and team-lead guidance, not in this schema.
 | `metric`             | **required from this schema forward** | see §3 |
 | `parallel_allowed`   | optional    | `true` (default: `false` when omitted)     |
 | `parallel_rationale` | conditional | `variation` \| `read-only` \| `bounded-slice` (required iff `parallel_allowed: true`) — see §4 |
+| `test_scenario`      | optional    | pointer into `.pHive/test-scenarios/` — see §7 |
 
 Authors must not invent new top-level keys to carry metric-shaped
 information. Anything metric-related goes inside `metric:`.
@@ -419,3 +420,68 @@ re-emits it:
 Downstream consumers fall back to the live `hive.config.yaml` for those
 epics; the bridge / workflow emit a one-line info log noting the
 fall-through.
+
+## 7. The `test_scenario` field group
+
+Per the `autonomous-cycle-loop` epic (story `s0-1-schema-and-config-bump`),
+a story MAY declare an optional link from itself to a replay scenario
+that the autonomous cycle loop can use as an end-to-end regression
+guard against the behavior the story ships. The field is **optional**
+and **additive** — pre-existing stories continue to validate without
+edits.
+
+### 7.1 Shape
+
+```yaml
+test_scenario:
+  id: <scenario-id>           # kebab-case; must resolve to
+                              # .pHive/test-scenarios/<scenario-id>.yaml
+                              # per test-scenario-schema.md
+  required: true | false      # optional, default false
+                              # true  → loop run FAILS if the scenario is missing
+                              # false → loop skips with an info log
+```
+
+### 7.2 Field semantics
+
+#### 7.2.1 `id`
+
+Kebab-case scenario identifier. Must resolve to a real scenario YAML at
+`.pHive/test-scenarios/<id>.yaml` (path overridable via
+`autonomous_cycle_loop.test_scenarios_path`; see
+[`sandcastle-mode.md`](sandcastle-mode.md)). The schema does not enforce
+existence at story-write time — the loop runner checks at replay time,
+and `required:` controls whether absence is fatal.
+
+#### 7.2.2 `required` (optional, default `false`)
+
+Whether the linked scenario must exist when the loop runs.
+
+- `false` (default): a missing scenario is a `[debug]` log line; the
+  loop continues. Use this when the scenario is aspirational, or when
+  the story ships substrate that does not yet have a scenario built
+  against it.
+- `true`: a missing scenario fails the loop run for this story. Use
+  this when the story explicitly co-ships a scenario that asserts the
+  story's behavior — losing the scenario silently would defeat the
+  guard.
+
+### 7.3 Foundation status
+
+This story (`s0-1-schema-and-config-bump`) ships the schema only. No
+consumer reads `test_scenario:` yet — the loop runner that consumes it
+lands in a later story of the `autonomous-cycle-loop` epic. Until the
+runner ships, the field is inert; authors may begin declaring it on new
+stories so the link is in place when the runner arrives.
+
+### 7.4 Worked example
+
+```yaml
+id: auto-loop-runner-walk-directory
+test_scenario:
+  id: standup-empty-queue
+  required: true
+# Stub: when this story's runner lands, it must keep the smoke-tier
+# standup-empty-queue scenario green. Marking required:true asserts the
+# scenario will exist as of the story's integrate phase.
+```
