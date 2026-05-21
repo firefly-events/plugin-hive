@@ -7,7 +7,13 @@ description: Run the daily ceremony — standup, planning, execution.
 
 Run the daily ceremony workflow: standup → planning → execution.
 
-**Input:** `$ARGUMENTS` optionally contains an epic ID to focus on.
+**Input:** `$ARGUMENTS` optionally contains an epic ID to focus on, plus the following flags:
+
+| Flag | Description |
+|------|-------------|
+| `--interactive` | Activates Phase 1.5 (Interactive Routing) between the standup report and planning. Lets the operator redirect or reprioritize before the planning short-list runs. |
+
+**Config knob:** `standup.interactive_default` in `hive.config.yaml` (default: `false`). When `true`, `--interactive` behavior is always active without passing the flag. The CLI flag takes precedence over the config value — passing `--interactive` enables Phase 1.5 regardless of the config setting.
 
 ## Skill Preamble
 
@@ -19,9 +25,19 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 ## Process
 
-Load `hive/workflows/daily-ceremony.workflow.yaml` and execute its three phases. Each phase has step files at `hive/workflows/steps/daily-ceremony/`.
+Load `hive/workflows/daily-ceremony.workflow.yaml` and execute its phases. Each phase has step files at `hive/workflows/steps/daily-ceremony/`.
+
+Parse `$ARGUMENTS` before loading the workflow:
+1. Extract any epic ID (non-flag token) to pass as focus context.
+2. Check for `--interactive` flag.
+3. Read `standup.interactive_default` from `hive.config.yaml` (consumer override layer wins over the shipped default of `false`).
+4. Set `args.interactive = (--interactive flag present) OR (standup.interactive_default == true)`.
+
+Pass `args.interactive` into the workflow loader so the `when:` gate on the `interactive-routing` step evaluates correctly.
 
 **Phase 1 — Standup:** Reconstruct state from previous sessions. Read status markers (`.pHive/episodes/`), cycle state (`.pHive/cycle-state/`), task tracker (pending human items), agent memories, the **triage queue** at `.pHive/triage/queue.yaml`, and **metrics health** across story-declared `metric:` blocks (per [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3). Surface open triage items (any entry whose `state` is not `closed`) alongside in-flight epics so the operator sees the intake backlog before selecting today's work. Surface OVERDUE and FAIL metric verdicts alongside the same context so claim-vs-reality gaps land in the operator's eye before they pick today's work. Present structured report to user.
+
+**Story status in cycle summaries — use derived status.** When surfacing in-flight epics or story counts, call `deriveStoryStatus({ epic_id, story_id })` from `hive/lib/story-status.mjs` instead of reading the raw YAML `status:` field. The YAML field lags reality (stale after PR merge); the deriver is authoritative. See `hive/references/story-yaml-schema.md §2a`.
 
 **Triage surfacing — read-only.** Phase 1 is the only point where standup touches triage. Surface open items as ceremony context — title, state, priority/severity if set, and entry id — so the operator can decide whether to hand off via `/hive:triage <id> --hand-off` (which routes to `/plan --from-triage`) or defer. Standup does NOT mutate the triage state machine; the triage skill remains the single writer of `queue.yaml`. If `.pHive/triage/queue.yaml` is missing, treat the surfacing as empty (no warning needed — triage is opt-in per its warning-only kickoff posture).
 
@@ -71,6 +87,8 @@ Failure modes:
 - A story YAML fails to parse: count it as a `parse_error` and increment a single rolled-up note at the end of the section (`Note: <N> story YAML files failed to parse — run /hive:status for details`). Do NOT abort phase 1.
 - `metric.verify_at` is `"eventually"`, `"someday"`, empty, or otherwise unparseable: skip the story from the OVERDUE bucket (it is the planning-time gate's job to reject these per M-03/M-01, not standup's job to flag them again). FAIL classification is unaffected.
 
+**Phase 1.5 — Interactive Routing (opt-in):** Activated when `args.interactive` is `true`. Runs the `interactive-routing` step (`step-interactive-routing.md`). The operator can redirect work, reprioritize epics, or inject new context before the planning short-list runs. When `args.interactive` is `false` (the default), this phase is skipped entirely — workflow behavior is byte-equivalent to pre-A.1.
+
 **Phase 2 — Planning:** User short-lists today's work. Evaluate whether items need new planning or are already storied. If new work, run a compressed planning swarm. Present plan with agent-ready checklist results. User approves.
 
 **Phase 3 — Execution:** Kick off dev team(s) for approved work. After completion, run session-end evaluation for insight promotion/discard.
@@ -94,6 +112,7 @@ This recommendation is additive only. Manual invocation via `/hive:standup` rema
 | Load state | `hive/workflows/steps/daily-ceremony/step-01-load-state.md` | Standup |
 | Load memories | `hive/workflows/steps/daily-ceremony/step-02-load-memories.md` | Standup |
 | Present standup | `hive/workflows/steps/daily-ceremony/step-03-present-standup.md` | Standup |
+| Interactive routing | `hive/workflows/steps/daily-ceremony/step-interactive-routing.md` | Interactive Routing (opt-in) |
 | Select work | `hive/workflows/steps/daily-ceremony/step-04-select-work.md` | Planning |
 | Validate stories | `hive/workflows/steps/daily-ceremony/step-05-validate-stories.md` | Planning |
 | Approve plan | `hive/workflows/steps/daily-ceremony/step-06-approve-plan.md` | Planning |

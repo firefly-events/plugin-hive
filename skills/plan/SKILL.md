@@ -479,7 +479,14 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 14. **Evaluate cross-cutting concerns per story.** For each story, evaluate each concern's `applies_when` condition. For applicable concerns, determine the specific action needed and add a `cross_cutting` section to the story YAML. See `hive/references/cross-cutting-concerns.md` for format and examples.
 
-    **Concern routing.** Most concerns emit their per-story output into the generic `cross_cutting:` section as `{concern, action}` entries. A small number of concerns instead emit into a dedicated top-level field on the story YAML; the loop must route those concerns to their target field rather than to `cross_cutting:`. Currently the only such concern is `metrics`, which writes to a top-level `metric:` block per the shape in [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3. To add a new dedicated-field concern later, extend this routing table; do not hardcode metrics-specific logic elsewhere in the skill.
+    **Concern routing.** Most concerns emit their per-story output into the generic `cross_cutting:` section as `{concern, action}` entries. A small number of concerns instead emit into a dedicated top-level field on the story YAML; the loop must route those concerns to their target field rather than to `cross_cutting:`. Currently dedicated-field concerns are:
+
+    | Concern `id` | Target field | Schema ref |
+    |---|---|---|
+    | `metrics` | top-level `metric:` block | [`story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3 |
+    | `simulated-manual` | `scenario` step injection + top-level `manual_verdict.scenario_ref` | [`story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §8 |
+
+    To add a new dedicated-field concern later, extend this routing table; do not hardcode concern-specific logic elsewhere in the skill.
 
     **Metrics concern (`id: metrics`) — per-story handling.** When the metrics concern is present in `.pHive/cross-cutting-concerns.yaml` (loaded at step 3), evaluate it for each story as follows:
 
@@ -491,6 +498,43 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
        - measured how (`metric.source.kind` + `metric.source.ref`, plus `metric.envelope_id` when `source.kind: envelope`)
     3. Emit a `metric:` block on the story YAML conforming to [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3.1, including `verify_at` (a concrete step id, epic milestone, or ISO-8601 timestamp — `"eventually"` is rejected) and `owner` (the agent role that performs the verification read).
     4. The metrics concern's `implementation_checklist` still flows through to execute via the generic concern-loop — its bullets reach the developer/reviewer alongside other concerns.
+
+    **Simulated-manual concern (`id: simulated-manual`) — per-story handling.** When the `simulated-manual` concern is present in `.pHive/cross-cutting-concerns.yaml` (loaded at step 3) and applies to a story, perform the following routing actions in addition to adding the generic `cross_cutting:` entry:
+
+    1. Apply the concern's `applies_when` clause to the story. Skip all actions below if it does not apply.
+    2. **Inject a `scenario` step** into the story's `steps:` list at the methodology-appropriate position:
+       - **BDD:** insert after the `behavior-spec` step (before `implement`)
+       - **Classic:** insert after the `implement` step (before `test`)
+       - **TDD:** insert after the `test-spec` step (before `implement`)
+
+       Step shape to inject:
+
+       ```yaml
+       - id: scenario
+         description: |
+           Author a simulated-manual test scenario YAML at
+           .pHive/test-scenarios/<scenario-id>.yaml per hive/references/test-scenario-schema.md.
+           Set manual_verdict.scenario_ref on this story YAML to the scenario path.
+           The scenario is replayed by /test --simulated-manual to produce the verdict.
+         agent: tester
+         depends_on: [<step-id of the immediately preceding step>]
+       ```
+
+       The `implement` step's `depends_on` must be updated to reference `scenario` (BDD/TDD) or the `test` step must reference `scenario` (classic) so execution order is preserved.
+
+    3. **Seed `manual_verdict.scenario_ref`** on the story YAML as a placeholder:
+
+       ```yaml
+       manual_verdict:
+         scenario_ref: .pHive/test-scenarios/<story-id>-manual.yaml
+         verdict: null       # written by /test --simulated-manual at execution time
+         timestamp: null
+         agent: null
+       ```
+
+       The tester who executes the `scenario` step replaces the placeholder path with the real scenario file they author.
+
+    4. The concern's `implementation_checklist` flows through to execute via the generic concern-loop — its bullets reach the developer/reviewer alongside other concerns.
 
 14a. **Metric review gate.** After step 14 has populated every story's `metric:` block, validate each block before proceeding:
 

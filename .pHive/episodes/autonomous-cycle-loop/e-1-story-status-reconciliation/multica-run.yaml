@@ -1,0 +1,26 @@
+---
+mode: multica
+status: queued
+story_id: e-1-story-status-reconciliation
+epic: autonomous-cycle-loop
+workspace_id: 21c6d282-d6b4-4b25-8d0d-a85e96038416
+issue_id: 39071d29-8fe6-4cc7-8a7c-8959bc899ca1
+issue_identifier: PLU-17
+assignee_id: d9946f9a-2747-49d4-b967-2590ffb5be43
+assignee_type: agent
+assignee_name: developer
+dispatched_at: "2026-05-21T16:18:03Z"
+brief_path: .pHive/episodes/autonomous-cycle-loop/e-1-story-status-reconciliation.brief.md
+poll_url: http://localhost:8080/api/v1/issues/39071d29-8fe6-4cc7-8a7c-8959bc899ca1
+---
+# Multica dispatch — e-1-story-status-reconciliation
+
+Dispatched to Multica workspace `21c6d282-d6b4-4b25-8d0d-a85e96038416` (slug PLU) as issue `PLU-17`
+assigned to agent `developer`. Multica daemon owns the run; this marker tracks
+queued → running → completed|failed|cancelled lifecycle.
+
+Monitor:
+  multica issue view PLU-17
+  multica issue list --status in_progress
+
+Brief: `.pHive/episodes/autonomous-cycle-loop/e-1-story-status-reconciliation.brief.md`

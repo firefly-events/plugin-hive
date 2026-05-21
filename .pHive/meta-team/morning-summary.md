@@ -1,36 +1,39 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-05-20 | **Date:** 2026-05-20 | **Verdict:** PASSED
+**Cycle:** meta-2026-05-21 | **Date:** 2026-05-21 | **Verdict:** passed
 
 ---
 
 ## What Changed
 
-- **`hive/GUIDE.md`** — Corrected Model Tier Routing table: moved `team-lead`,
-  `architect`, `analyst`, `tpm` from the Opus row to the Sonnet row.
-  Fixes SCHEMA_INCONSISTENCY: the previous table claimed those four agents used
-  Opus (`claude-opus-4-7`), but their agent files all have `model: sonnet` and
-  `hive.config.yaml model_tiers.opus` lists only `orchestrator`. The Opus row now
-  accurately shows only `orchestrator`. The Sonnet row now includes all agents that
-  actually run on the Sonnet tier. Documentation-only change; no behavioral impact.
+- **`hive/agents/backend-developer.md`** — Removed two duplicate YAML fields
+  (`write: false` and `delete: false`) from the domain block. Due to YAML
+  last-value-wins semantics, these duplicates overrode the intended `write: true`,
+  making the backend-developer agent effectively read-only in any context that
+  consumed the domain block directly. Fix restores the permissive configuration
+  documented by the "Default: permissive" comment and aligns with the canonical
+  form used in `frontend-developer.md`. Two-line deletion; no cross-references
+  broken; revert is a two-line re-insert.
 
 ## What Was Found (Not Fixed This Cycle)
 
-- **`hive/references/hive-cloud-roadmap.md`** (STUB_DOC, low severity) — 13-line
-  placeholder for the deferred Hive Cloud epic (S16 forward-reference stub).
-  Continuing out_of_scope until the Hive Cloud epic activates. This is the eighth
-  consecutive cycle where this finding has been flagged and deferred.
+- **`hive/references/ui-prompts/design-system.md`** (STUB_DOC, low) — 19-line
+  prompt template below 30-line threshold. Marked out_of_scope: functional prompt
+  template for W3C Design Token conversion; brevity is intentional.
+- **`hive/references/ui-prompts/design-review-design-critique.md`** (STUB_DOC, low)
+  — 11-line prompt template below 30-line threshold. Marked out_of_scope: functional
+  prompt template for UI design critique; complete task directive in 11 lines.
 
 ## Metrics
 
-- Findings: 2 | Proposals: 1 | Promoted: 1 | Reverted: 0
-- Commit: `271b4a8def8fff467a7aaeae55490a4d298d1961`
-- Rollback ref: `75e2bd263939bf0413cb657f39139f504ad569a3`
-- Next cycle priority: hive-cloud-roadmap.md stub remains out_of_scope; verify
-  Model Tier Routing table accuracy by checking agent files against GUIDE.md.
+- Findings: 3 | Proposals: 1 | Promoted: 1 | Reverted: 0
+- Commit: `278628860f00353af5e773c8817bacf0944ebbaf`
+- Rollback ref: `af0649fa3d8c62157e0148e2fd6673dacb3a6092`
+- Next cycle priority: the two ui-prompts STUB_DOC findings remain eligible if
+  higher-priority structural findings are absent; both are functionally complete.
 
 ## Regression Watch
 
 - State: **armed**
-- Window: 2026-05-20T00:30:00Z → 2026-05-20T04:30:00Z
+- Window: 2026-05-21T00:30:00Z → 2026-05-21T04:30:00Z
 
-kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.0 miss_reason=empty_kg
+kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.00 miss_reason=empty_kg

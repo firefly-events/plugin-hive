@@ -1,0 +1,10 @@
+step_id: integrate
+status: completed
+timestamp: "2026-05-21T20:00:00Z"
+artifacts:
+  - hive/lib/scenarios/load.mjs
+  - hive/workflows/steps/test/simulated-manual.md
+  - tests/scenarios/example.yaml
+  - tests/scenarios/.gitkeep
+  - tests/hive-lib/scenarios-load.test.mjs
+  - hive/references/test-scenario-schema.md

@@ -1,0 +1,70 @@
+id: a-2-standup-routing-step-and-heuristic
+epic: autonomous-cycle-loop
+title: "A.2 — interactive-routing step file + visibility heuristic"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [a-1-standup-interactive-flag]
+
+description: |
+  Implement the Phase 1.5 step: per open queue item (triage entries + epic
+  story candidates), present a routing prompt with a heuristic-driven
+  recommendation. Operator picks push-to-github | keep-local | defer. Cycle
+  state records routing_decisions[]; the GH push call surface is wired in A.3.
+
+acceptance_criteria:
+  - "hive/workflows/steps/daily-ceremony/interactive-routing.md exists; describes the per-item loop, the visibility heuristic inputs (UI work, external integration, security-sensitive paths, prior verdict history, metric.applies), and the operator confirmation contract."
+  - "Heuristic emits visibility: local | sandcastle | either with a confidence label low | medium | high; low confidence requires explicit operator override (no implicit default-yes)."
+  - "Routing pass writes a routing_decisions[] array to .pHive/cycle-state/<epic-id>.yaml per the S0 schema."
+  - "Operator can cap the routing prompt count (default 10 items per run) to avoid session drag."
+  - "Selecting keep-local on an item suppresses its re-surfacing in Phase 1 of the next standup run for 7 days (recorded in cycle-state with an expires_at)."
+  - "Heuristic confidence reasoning is printed alongside each prompt so the operator can challenge it."
+
+steps:
+  - id: research
+    description: Read the existing triage queue schema and standup Phase 1 surfacing logic; identify the inputs available per queue item.
+    agent: researcher
+  - id: implement
+    description: Write the step file; implement the heuristic; wire cycle-state writeback.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Fixture a project with 3 triage items (one UI work, one mechanical refactor, one ambiguous); verify heuristic outputs and that operator overrides are recorded.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify the cap is enforced; verify suppression respects the 7-day expiry.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive-ui-f
+  key_files:
+    - path: hive/workflows/steps/daily-ceremony/interactive-routing.md
+      purpose: New step file — described and implemented here
+    - path: .pHive/triage/queue.yaml
+      purpose: Read-only input — open triage entries
+    - path: .pHive/cycle-state/
+      purpose: Write target for routing_decisions[]
+
+cross_cutting:
+  - concern: documentation
+    action: Step file is itself the documentation; add a short paragraph in skills/standup/SKILL.md pointing at it.
+
+metric:
+  applies: true
+  name: standup.routing_decisions_recorded_per_interactive_run
+  direction: up
+  unit: count
+  baseline: 0
+  target: ">= 1"
+  window: per --interactive invocation with non-empty queue
+  source:
+    kind: sql
+    ref: "SELECT count(*) FROM cycle_state WHERE routing_decisions IS NOT NULL"
+  verify_at: integrate
+  owner: tester

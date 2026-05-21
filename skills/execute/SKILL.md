@@ -198,6 +198,67 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
    > **v1 note:** v1 routing handles `workflow`-based catalog entries only. A catalog entry with `skill: <path>` (allowed by catalog schema but unused in v1) is not reached by condition (i) and falls to condition (ii) or (iii). Skill-based routing is a Phase 6 extension point.
 
+7c. **Terminal handoff dispatch.** After the `integrate` workflow step completes for a story, dispatch any configured post-integrate handoff.
+
+   **Gate check — integrate episode marker required.** Before reading `terminal_handoff`, verify the integrate episode marker exists at `${HIVE_STATE_DIR}/episodes/{epic-id}/{story-id}/integrate.yaml`. If the marker is absent (integrate failed or was skipped):
+
+   ```
+   [warn] handoff: integrate episode marker missing for {story-id} — skipping handoff
+   ```
+
+   Write a `handoff_log` row to `${HIVE_STATE_DIR}/cycle-state/{epic-id}.yaml` with `skipped_reason: "no-integrate-episode"` and continue to the next story. Do not invoke `/test` or `/review`.
+
+   **Resolve target.** Read `story.terminal_handoff.next` from the story YAML. If the field is absent or null, fall back to `epic.execution.terminal_handoff_default` from the loaded epic YAML, then to the `execution.terminal_handoff_default` knob in the root `hive.config.yaml`. If all are absent, treat as `none`.
+
+   **Dispatch.** When target is not `none`:
+
+   ```javascript
+   import { dispatchHandoff } from 'hive/lib/handoff/dispatch.mjs';
+
+   const result = await dispatchHandoff({
+     story_id: story.id,
+     target,           // 'test' | 'review' | 'both'
+     branch,           // current story branch
+     pr_number,        // undefined when no PR exists
+     timeout_ms: (config.circuit_breakers?.story_timeout_minutes ?? 45) * 60 * 1000,
+     state_dir: HIVE_STATE_DIR,
+   });
+   ```
+
+   - `target: 'test'` — invokes `/test --story <story-id>` (or scenario path when a simulated-manual concern is on the story; read `story.test_scenario` if present and pass its path instead).
+   - `target: 'review'` — invokes `/review #<pr_number>` when `pr_number` is set, else `/review <branch>`.
+   - `target: 'both'` — runs test first, then review with the test verdict available to the reviewer.
+   - `target: 'none'` — no-op; skip the log write entirely.
+
+   **Timeout handling.** When `result.ok === false && result.reason === 'timeout'`, log a warning and continue to the next story — a timeout must not block the rest of the epic:
+
+   ```
+   [warn] handoff: story={story_id} target={target} timed out after {duration_ms}ms — continuing to next story
+   ```
+
+   `dispatch.mjs` already emits a `phase_handoff_timeout` JSONL event and a `phase_handoff:<target>:timeout` KG triple at the moment of timeout; the executor only needs to write the log row and continue.
+
+   **handoff_log writeback.** Regardless of verdict (even on `ok: false`), append one row to `handoff_log[]` in `${HIVE_STATE_DIR}/cycle-state/{epic-id}.yaml`. Include `timeout_at` when the row is a timeout:
+
+   ```yaml
+   handoff_log:
+     - story_id: <story_id>
+       target: <target>
+       started_at: "<ISO 8601>"
+       finished_at: "<ISO 8601>"
+       verdict: <result.verdict or (result.reason === 'timeout' ? 'timeout' : 'error')>
+       evidence_ref: <result.evidence_ref or "">
+       duration_ms: <result.duration_ms or 0>
+       # timeout_at present only when verdict=timeout:
+       timeout_at: <result.timeout_at>   # omit field entirely when verdict ≠ timeout
+   ```
+
+   If the cycle state file does not yet have a `handoff_log:` key, create the list. Emit a debug trace after write:
+
+   ```
+   [debug] handoff: story={story_id} target={target} verdict={verdict} duration={duration_ms}ms
+   ```
+
 7b. **Update story status in the task tracker.** When a story advances through a workflow phase that warrants an externally-visible status change (e.g., research → in-progress, review → in-review, integrate → done), call the dispatch module. This is a no-op when `task_tracking.adapter` is unset.
 
     Only stories with a populated `tracker_id` (written by `plan` Phase D) are eligible. The dispatch module owns gate_mode behavior, telemetry, and error mapping — do not branch on the adapter vendor here.

@@ -37,15 +37,22 @@ For each epic, read `.pHive/epics/{epic-id}/epic.yaml` to get:
 
 ### 3. Determine Story Status
 
-For each story in the epic, check `.pHive/episodes/{epic-id}/{story-id}/` for episode YAML files. Load the workflow definition (`hive/workflows/development.{methodology}.workflow.yaml`, default `classic`) to know the ordered list of steps.
+For each story in the epic, call `deriveStoryStatus({ epic_id, story_id })` from
+`hive/lib/story-status.mjs`. This function is the authoritative deriver — do NOT
+read story YAML `status:` fields directly (they lag reality; see
+`hive/references/story-yaml-schema.md §2a`).
 
-| Condition | Status | Symbol |
-|-----------|--------|--------|
-| No episode files exist for the story | **pending** | `·` |
-| Episodes exist but the last workflow step has no episode | **in-progress** | `⧖` |
-| The final workflow step has an episode with `status: completed` | **completed** | `✓` |
-| Any episode has `status: failed` or `status: escalated` | **failed** | `✗` |
-| All dependencies not yet completed | **blocked** (subset of pending) | `·` |
+The deriver checks episode markers, git state, and the story's `deferred:` block.
+Its return values map to display symbols as follows:
+
+| Derived status | Symbol |
+|----------------|--------|
+| `pending` | `·` |
+| `in_progress` | `⧖` |
+| `completed` | `✓` |
+| `failed` | `✗` |
+| `blocked` | `·` (with blocked note) |
+| `deferred` | `–` |
 
 For **in-progress** stories, identify the current phase from the last episode.
 For **blocked** stories, list which `depends_on` stories are not yet completed.

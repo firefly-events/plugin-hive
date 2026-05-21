@@ -1,0 +1,106 @@
+# E.1 — story status reconciliation (auto-close shipped stories)
+
+**Hive story id:** `e-1-story-status-reconciliation`
+**Epic:** `autonomous-cycle-loop`
+**Complexity:** medium
+**Methodology:** classic
+
+## Description
+
+Story YAMLs at `.pHive/epics/*/stories/*.yaml` carry a free-write `status:`
+field that consistently lags reality. The maintainer has flagged this
+multiple times — feedback_story_status_stale memory ("trust git+disk over
+YAML") was the workaround, not a fix. Stories ship via PR merge and the
+YAML stays `status: pending` forever; /hive:status, /standup, and audits
+read stale data.
+
+The execute SKILL.md already notes the right shape: episode markers under
+`.pHive/episodes/{epic}/{story}/*.yaml` are authoritative and story state
+should be DERIVED from the marker set. This story closes that loop:
+
+1. Introduce a derive-status function (`hive/lib/story-status.mjs` or .py)
+   that computes a story's effective status from its episode markers + git
+   state (PR shipped, branch merged, etc.).
+2. Wire a post-merge update path so when a PR is merged that closes a
+   story-tracked issue (or whose branch matches `agent/issue-N` or
+   `feat/<epic-id>` carrying a known story), the story YAML's `status:`
+   gets rewritten to `completed` with a `shipped:` block (pr, merged_at,
+   branch).
+3. Update /hive:status and /standup to call the deriver instead of reading
+   `status:` raw.
+4. Add a one-shot reconciliation script that scans existing epics, finds
+   stories whose `status:` disagrees with episode markers + git, and
+   patches them. Run once to clear the backlog.
+
+Out of scope for E.1: removing the `status:` field entirely (would break
+consumers; tackle in a follow-on if reconciliation proves stable).
+
+## Acceptance Criteria
+
+- `hive/lib/story-status` exposes `deriveStoryStatus({epic_id, story_id})` returning one of `pending|in_progress|completed|deferred|blocked` based on episode markers + git state + the YAML's `deferred:` block. Implementation note: prefer .mjs to match the d-1 handoff helper unless a Python consumer is concretely identified.
+- Post-merge hook (PostToolUse on git operations OR a CI step on PR merge to main/develop) updates the story YAML when a merge ships a story. The hook is idempotent and a no-op when the YAML is already current.
+- Stories ship via Multica or sandcastle paths still get reconciled — the hook is substrate-agnostic and keys on (PR title regex for story-id OR branch name OR closed issue's `hive:story:` label).
+- /hive:status surfaces derived status, not raw YAML. /standup uses derived status for cycle summaries.
+- One-shot reconciliation script `hive/scripts/story-status-backfill.mjs` scans every epic, prints a dry-run diff first, then on `--apply` rewrites stale YAMLs with the corrected status + shipped block.
+- Episode marker rule from execute SKILL.md remains authoritative — derived status is a projection, not a replacement. The free-write `status:` field stays writable for forward-stating intent (deferred, pending, etc.) but the deriver wins on conflict.
+
+## Workflow Steps (classic methodology)
+
+### research (researcher)
+Audit current `status:` field usage across .pHive/epics/*/stories/*.yaml — how
+many stories are stale (status=pending but episode markers say completed)? Read
+hive/references/episode-schema.md to confirm the marker shape, hive/references/cycle-state-schema.md
+for phase records, and the multica + sandcastle execute-mode skills to see how
+they write markers. Document the derive rules: marker priority order, git
+signals (PR shipped, branch merged), conflict resolution.
+
+### implement (developer)
+Build hive/lib/story-status with deriveStoryStatus(). Add the post-merge hook
+(CI step is simplest — runs on merge to main/develop, walks recent commits, finds
+story refs, updates YAMLs, commits the patch on a chore/status-reconcile-<date>
+branch + opens a PR). Add hive/scripts/story-status-backfill.mjs for one-shot
+backfill.
+
+### test (tester)
+Unit tests for deriveStoryStatus with fixtures (no markers → pending; implement+test+review+integrate
+markers → completed; deferred block present → deferred; partial markers + PR open → in_progress).
+Integration test for the post-merge hook against a fake merged-PR fixture.
+Dry-run the backfill script against the current repo state and verify the diff makes sense.
+
+### review (reviewer)
+Verify the deriver doesn't mutate YAMLs unprompted. Verify the post-merge hook idempotent.
+Verify status field still respected when set to forward-stating values (deferred, blocked) —
+derived status only overrides pending vs completed transitions.
+
+### integrate (developer)
+Run the backfill script with --apply to clear the existing stale backlog.
+Commit the result. Wire /hive:status and /standup to call the deriver.
+
+## Key Files
+
+- `hive/references/episode-schema.md` — Authoritative marker shape — deriver reads this
+- `hive/references/cycle-state-schema.md` — Phase records + handoff_log — secondary signal for in_progress
+- `hive/lib/story-status` — New library — deriveStoryStatus() lives here
+- `hive/scripts/story-status-backfill.mjs` — New one-shot reconciliation script
+- `skills/hive/skills/execute-mode-multica/SKILL.md` — Reference for how markers get written in multica path
+- `skills/hive/skills/execute-mode-sandcastle/SKILL.md` — Reference for how markers get written in sandcastle path
+
+## Cross-Cutting Concerns
+
+- **telemetry**: Emit kg triple on each backfill rewrite (predicate `story_status_reconciled`)
+so the KG records the gap closure. Counter for stale-stories-fixed per run.
+
+- **documentation**: Update hive/references/story-yaml-schema.md to mark the `status:` field as
+"advisory — derived status is authoritative; episode markers + git state win
+on conflict". Cross-reference the new deriver.
+
+
+## Metric
+
+Hourly cron or per-cycle scan emits a count of `stale_story_status` records
+(stories whose raw YAML status disagrees with deriveStoryStatus()). Target:
+after backfill and during steady-state operation, stale count stays ≤ 2
+across all epics. A growing count signals the post-merge hook regressed.
+
+---
+*Dispatched from Hive epic `autonomous-cycle-loop` via Multica execution mode. Run the full classic workflow (research → implement → test → review → integrate) inside this issue. Commit on epic branch `feat/autonomous-cycle-loop`; open a story PR when done.*

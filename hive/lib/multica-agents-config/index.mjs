@@ -15,6 +15,10 @@ function parseScalar(value) {
     return [];
   }
 
+  if (value === 'null' || value === '~') {
+    return null;
+  }
+
   if (/^\d+$/.test(value)) {
     return Number(value);
   }
@@ -27,7 +31,7 @@ function applyDefaults(agent) {
     max_concurrent_tasks: 1,
     custom_env: {},
     custom_args: [],
-    mcp_config: {},
+    mcp_config: null,
     skills: [],
     visibility: 'workspace',
     ...agent,

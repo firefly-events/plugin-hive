@@ -9,6 +9,11 @@
 - [`episode-schema.md`](episode-schema.md) — episode markers the loop reads to decide pass/fail per scenario
 - [`gate-lift-telemetry.md`](gate-lift-telemetry.md) — telemetry shape; the loop's per-scenario summary follows the same envelope
 
+**Simulated-manual testing (Slice C, story c-1):**
+
+- [`hive/lib/scenarios/load.mjs`](../../hive/lib/scenarios/load.mjs) — loader + validator for simulated-manual scenario YAMLs (`tests/scenarios/<topic>.yaml`)
+- [`hive/workflows/steps/test/simulated-manual.md`](../../hive/workflows/steps/test/simulated-manual.md) — executor protocol: step narration, pass/fail capture, cycle-state writeback
+
 ## 1. Purpose
 
 This reference fixes the canonical shape of a **test scenario YAML** under `.pHive/test-scenarios/<scenario-id>.yaml`. A test scenario is the smallest replayable unit the autonomous cycle loop drives: an invocation, the conditions that must hold before it, and the assertions that decide pass/fail after.
