@@ -13,9 +13,9 @@ Call this skill once at the single `/execute` dispatch point where the caller ha
 
 **Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, `HIVE_EXECUTION_MODE`, and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; `arguments` containing the `--sequential` flag state plus dependency-depth summary; and `unblocked_stories[]` — the depth-0 ready stories at this dispatch tick, each carrying at minimum `id`, `parallel_allowed`, `parallel_rationale`, and (for `parallel_rationale: bounded-slice`) `files_to_modify[]` whose entries name the declared touch-set. Empty or single-element `unblocked_stories[]` is valid: the parallel-dispatch gate (Step 1.5) skips when there is no peer set to gate.
 
-**Outputs:** `mode_decision` enum `sessions | team | team-cmux | sequential | sandcastle`; `mode_reason` as a one-line string explaining the selected mode; `runner_path` enum `hive-dag | orchestrator-narrated`; `runner_reason` as a one-line string explaining the selected runner path; `field_sources` map `{field_name: env|config|default}` covering `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor`, and `execution_mode` so callers can attribute every resolution; and `gate_violations[]` — a list of `{story_id, reason}` records emitted by Step 1.5 when the parallel-dispatch gate refuses fan-out. `gate_violations[]` is `[]` on healthy runs and on any `mode_decision` other than `team | team-cmux | sessions | sandcastle`.
+**Outputs:** `mode_decision` enum `sessions | team | team-cmux | sequential | sandcastle | multica`; `mode_reason` as a one-line string explaining the selected mode; `runner_path` enum `hive-dag | orchestrator-narrated`; `runner_reason` as a one-line string explaining the selected runner path; `field_sources` map `{field_name: env|config|default}` covering `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor`, and `execution_mode` so callers can attribute every resolution; and `gate_violations[]` — a list of `{story_id, reason}` records emitted by Step 1.5 when the parallel-dispatch gate refuses fan-out. `gate_violations[]` is `[]` on healthy runs and on any `mode_decision` other than `team | team-cmux | sessions | sandcastle | multica`.
 
-`field_sources.execution_mode` tracks the source of an explicit sandcastle override only: `env` when `HIVE_EXECUTION_MODE=sandcastle` wins, `config` when `execution.mode: sandcastle` from root `hive.config.yaml` wins, `default` when neither env nor config selects sandcastle (fall-through to the standard mode resolution chain). Unlike the four existing fields, `execution_mode=default` does NOT trigger the loud "fell to defaults" warning — default is the normal case for non-sandcastle runs. The `execution_mode={source}` token is always appended to the telemetry line regardless of source.
+`field_sources.execution_mode` tracks the source of an explicit override (sandcastle or multica): `env` when `HIVE_EXECUTION_MODE={sandcastle|multica}` wins, `config` when `execution.mode: {sandcastle|multica}` from root `hive.config.yaml` wins, `default` when neither env nor config selects an override (fall-through to the standard mode resolution chain). Unlike the four existing fields, `execution_mode=default` does NOT trigger the loud "fell to defaults" warning — default is the normal case for non-override runs. The `execution_mode={source}` token is always appended to the telemetry line regardless of source.
 
 **Side effects:** emit a structured warning only when consumer config sets `executor` to an unknown non-empty value, OR when any of the four tracked fields resolves to `default` (loud no-config warning + telemetry line). Missing consumer config, missing graduation registry, unset `executor`, false `executor_default`, and workflow-not-graduated remain normal fail-closed states and emit no warning for the runner gate itself.
 
@@ -67,6 +67,14 @@ For each tracked field, apply strict precedence: **env > config > default**. Rec
   - default: neither env nor config selects sandcastle → source `default` (fall-through to standard mode resolution)
   - When source is `env` or `config`: immediately set `mode_decision=sandcastle` and `mode_reason=execution-mode-override-{source}`. Skip Step 1 entirely. This takes precedence over sessions, team, and sequential.
   - `execution_mode=default` does NOT trigger the "fell to defaults" warning — it is the normal non-sandcastle path. Always include `execution_mode={source}` in the telemetry line.
+- `execution_mode` (continued): multica override
+  - env path: `env.HIVE_EXECUTION_MODE` equals exactly `multica` (case-sensitive) → source `env`; any other value is ignored (reserved for future modes)
+  - config path: root `hive.config.yaml execution.mode: multica` → source `config`
+  - default: neither env nor config selects multica → source `default` (fall-through to standard mode resolution OR sandcastle override if it fired earlier)
+  - When source is `env` or `config`: immediately set `mode_decision=multica` and `mode_reason=execution-mode-override-{source}`. Skip Step 1 entirely. This takes precedence over sessions, team, and sequential.
+  - `execution_mode=default` does NOT trigger the "fell to defaults" warning — it is the normal non-multica path.
+
+If both sandcastle and multica are set across env and config (for example env `HIVE_EXECUTION_MODE=sandcastle` with config `execution.mode: multica`, or env `HIVE_EXECUTION_MODE=multica` with config `execution.mode: sandcastle`), env wins over config per standard Hive precedence.
 
 When ANY of the four fields (`sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor`) resolves with source `default`, emit a loud warning before returning, enumerating each defaulted field and the override path:
 
@@ -82,7 +90,7 @@ Emit one printable inline telemetry line covering every field resolution:
 
 ### Step 1: Resolve Mode Decision
 
-**Precondition:** only reached when `field_sources.execution_mode=default` (Step 0 did not select sandcastle via env or config). When sandcastle was selected in Step 0, skip this step entirely.
+**Precondition:** only reached when `field_sources.execution_mode=default` (Step 0 did not select sandcastle or multica via env or config). When either override was selected in Step 0, skip this step entirely.
 
 Evaluate in this order and stop at the first selected path:
 
@@ -98,7 +106,7 @@ This preserves precedence: `sessions > team-cmux > team > sequential`.
 
 ### Step 1.5: Parallel-Dispatch Gate (ed-7)
 
-**Precondition:** only reached when `mode_decision ∈ {team, team-cmux, sessions, sandcastle}` AND `unblocked_stories[]` has length > 1. When `mode_decision` is `sequential`, or when the peer set has fewer than two stories, skip this step entirely — there is no parallel fan-out to gate. The gate also runs when `mode_decision` is `sandcastle` because the sandcastle provider fans out one container per depth-0 story.
+**Precondition:** only reached when `mode_decision ∈ {team, team-cmux, sessions, sandcastle, multica}` AND `unblocked_stories[]` has length > 1. When `mode_decision` is `sequential`, or when the peer set has fewer than two stories, skip this step entirely — there is no parallel fan-out to gate. The gate also runs when `mode_decision` is `sandcastle` or `multica` because the provider fans out one assignment per depth-0 story.
 
 The gate refuses parallel dispatch unless **every** story in `unblocked_stories[]` is properly annotated. Default-serial is the contract: a story without explicit opt-in MUST fall back to sequential dispatch. Initialize `gate_violations: []` and evaluate the following checks in order; record one record per offending story and continue (do NOT short-circuit on the first failure — the warning enumerates the full set so a single fix pass resolves all of them).
 
