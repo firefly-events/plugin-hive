@@ -47,9 +47,52 @@ planning skill and team-lead guidance, not in this schema.
 | `parallel_allowed`   | optional    | `true` (default: `false` when omitted)     |
 | `parallel_rationale` | conditional | `variation` \| `read-only` \| `bounded-slice` (required iff `parallel_allowed: true`) — see §4 |
 | `test_scenario`      | optional    | pointer into `.pHive/test-scenarios/` — see §7 |
+| `terminal_handoff`   | optional    | post-integrate dispatch config — see §8    |
 
 Authors must not invent new top-level keys to carry metric-shaped
 information. Anything metric-related goes inside `metric:`.
+
+## 8. The `terminal_handoff:` field group
+
+Added by story `d-1-handoff-dispatch-and-execute-wire`. Controls what `/execute` dispatches
+immediately after the story's `integrate` step writes its episode marker.
+
+### 8.1 Shape
+
+```yaml
+terminal_handoff:
+  next: none | test | review | both   # target for the post-integrate dispatch
+```
+
+### 8.2 Field semantics
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `next` | enum | `none` | What to invoke after integrate. `none` = no-op. `test` = `/test --story <id>`. `review` = `/review #<pr>` or `/review <branch>`. `both` = test first, then review. |
+
+### 8.3 Precedence
+
+`/execute` resolves the target using this cascade (first non-null wins):
+
+1. `story.terminal_handoff.next`
+2. `epic.execution.terminal_handoff_default` (in the loaded `epic.yaml`)
+3. `execution.terminal_handoff_default` in the root `hive.config.yaml` (default `none`)
+
+The default `none` at all levels preserves prior behavior byte-equivalently.
+
+### 8.4 Example
+
+```yaml
+# story YAML — opt this story into a post-integrate test run
+terminal_handoff:
+  next: test
+```
+
+```yaml
+# epic.yaml — opt every story in the epic into review
+execution:
+  terminal_handoff_default: review
+```
 
 ## 3. The `metric:` field group
 

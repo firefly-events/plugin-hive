@@ -178,7 +178,52 @@ When a planning swarm hands off to a dev swarm, the cycle state transfers as par
 | `linear` | object | Linear ticket ID mapping (see below) |
 | `escalations` | list | Specialist team escalation flags raised during planning. See specialist-triggers.md catalog for valid trigger IDs. |
 | `phase_records` | list | Per-phase boundary records carrying `expected_scope`, `delivered_scope`, and `delta_reasons`. See `Phase records — scope-drift fields` above. |
+| `handoff_log` | list | Per-story terminal handoff records written by `/execute` step 7c. See `Terminal handoff log` below. |
 | `autonomous_cycle` | object | Per-cycle bookkeeping written by the autonomous-cycle-loop runner. Foundation field — see `Autonomous cycle bookkeeping` below. |
+
+## Terminal handoff log
+
+Written by `/execute` step 7c (story `d-1-handoff-dispatch-and-execute-wire`) after each story's
+integrate step when `terminal_handoff.next` (or the epic/global default) is not `none`. One row
+per dispatched story regardless of verdict.
+
+### Shape
+
+```yaml
+handoff_log:
+  - story_id: <string>           # story that triggered the handoff
+    target: test | review | both | none   # resolved target (never 'none' in practice — rows not written for none)
+    started_at: "<ISO 8601>"     # when dispatchHandoff was called
+    finished_at: "<ISO 8601>"    # when it returned
+    verdict: <string>            # passed | needs-revision | needs-optimization | failed | error | skipped
+    evidence_ref: <string>       # path to .pHive/handoff-evidence/<story>-<target>-<ts>.md, or "" on error
+    duration_ms: <int>           # wall-clock ms from start to finish
+    skipped_reason: <string>     # present only when verdict=skipped; e.g. "no-integrate-episode"
+```
+
+### Field semantics
+
+| Field | Type | Required when | Description |
+|-------|------|---------------|-------------|
+| `story_id` | string | Always | Matches the story's `id` field in the story YAML. |
+| `target` | string | Always | The resolved `terminal_handoff.next` value that triggered dispatch. |
+| `started_at` | string | Always | ISO 8601 timestamp. Set by the orchestrator before calling `dispatchHandoff`. |
+| `finished_at` | string | Always | ISO 8601 timestamp. Set after `dispatchHandoff` returns. |
+| `verdict` | string | Always | Terminal verdict. `skipped` indicates the integrate episode marker was absent. |
+| `evidence_ref` | string | Always | Relative path from the project root to the evidence file, or `""` when evidence could not be written. |
+| `duration_ms` | int | Always | Rounded wall-clock duration. `0` for skipped rows. |
+| `skipped_reason` | string | When `verdict: skipped` | Short machine-readable reason. `"no-integrate-episode"` is the only defined value. |
+
+### Verdict enum
+
+| Value | Meaning |
+|-------|---------|
+| `passed` | All dispatched skills (test and/or review) produced a passing verdict. |
+| `needs-revision` | Review produced `needs-revision` or test produced `failed`. |
+| `needs-optimization` | Review produced `needs-optimization` and test (if run) passed. |
+| `failed` | Test skill reported explicit failures. |
+| `error` | Dispatch could not determine a verdict (timeout, spawn error, unrecognised output). |
+| `skipped` | Handoff was not attempted because the integrate episode marker was absent. |
 
 ## Linear Ticket Tracking
 

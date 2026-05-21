@@ -300,6 +300,11 @@ execution:
   parallel_teams: true
   max_retry_attempts: 2
   substrate: messages         # default caller-side Messages API substrate; sessions-cloud stays explicit opt-in
+  # Terminal handoff default (epic: autonomous-cycle-loop, story d-1).
+  # Controls what /execute dispatches after each story's integrate step when the
+  # story YAML does not declare terminal_handoff.next. Enum: none | test | review | both.
+  # Default 'none' preserves prior behavior byte-equivalently.
+  terminal_handoff_default: none
   # Optional maintainer-only execution tuning — consumers do NOT need these
   # keys. Uncomment in your root `hive.config.yaml` to override:
   #   terminal_mux: auto           # tmux | cmux | auto  (default: TeamCreate's built-in tmux)
