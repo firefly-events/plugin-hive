@@ -158,3 +158,5 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 
 !.pHive/epics/multica-substrate-adoption/
 !.pHive/epics/multica-substrate-adoption/**
+!.pHive/epics/multica-execute-routing/
+!.pHive/epics/multica-execute-routing/**
