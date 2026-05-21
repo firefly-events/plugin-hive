@@ -30,7 +30,7 @@ steps:
     agent: developer
     depends_on: [research]
   - id: test
-    description: Fixture story with terminal_handoff.next: test triggers /test invocation; same with review; with both runs test then review; with none nothing fires; integrate-failure skips handoff.
+    description: "Fixture story with terminal_handoff.next: test triggers /test invocation; same with review; with both runs test then review; with none nothing fires; integrate-failure skips handoff."
     agent: tester
     depends_on: [implement]
   - id: review
