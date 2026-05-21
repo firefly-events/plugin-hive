@@ -179,7 +179,61 @@ When a planning swarm hands off to a dev swarm, the cycle state transfers as par
 | `escalations` | list | Specialist team escalation flags raised during planning. See specialist-triggers.md catalog for valid trigger IDs. |
 | `phase_records` | list | Per-phase boundary records carrying `expected_scope`, `delivered_scope`, and `delta_reasons`. See `Phase records — scope-drift fields` above. |
 | `handoff_log` | list | Per-story terminal handoff records written by `/execute` step 7c. See `Terminal handoff log` below. |
+| `routing_decisions` | list | Per-item routing records written by `/standup --interactive` Phase 1.5. See `Interactive routing decisions` below. |
 | `autonomous_cycle` | object | Per-cycle bookkeeping written by the autonomous-cycle-loop runner. Foundation field — see `Autonomous cycle bookkeeping` below. |
+
+## Interactive routing decisions
+
+Written by `/standup --interactive` Phase 1.5 (story `a-2-standup-routing-step-and-heuristic`) after
+each interactive routing pass. One row per presented item regardless of route chosen. Prior rows are
+preserved across runs — the array is append-only; old entries are read to enforce the 7-day
+keep-local suppression window.
+
+### Shape
+
+```yaml
+routing_decisions:
+  - item_id: t-001                        # triage entry id or story id
+    item_type: triage                     # triage | story
+    route: keep-local                     # push-to-github | keep-local | defer
+    visibility: local                     # heuristic recommendation: local | sandcastle | either
+    confidence: high                      # low | medium | high
+    operator_override: false              # true when operator chose against heuristic recommendation
+    reasoning: "UI work — description contains 'component', 'screen'"
+    applied_at: "2026-05-21T10:30:00Z"   # ISO 8601
+    expires_at: "2026-05-28T10:30:00Z"   # present only when route=keep-local (applied_at + 7 days)
+```
+
+### Field semantics
+
+| Field | Type | Required when | Description |
+|-------|------|---------------|-------------|
+| `item_id` | string | Always | Stable identifier of the routed item. Matches `id` in triage queue or story YAML. |
+| `item_type` | string | Always | `triage` or `story`. |
+| `route` | string | Always | Operator-confirmed routing decision: `push-to-github`, `keep-local`, or `defer`. |
+| `visibility` | string | Always | Heuristic recommendation: `local`, `sandcastle`, or `either`. |
+| `confidence` | string | Always | Heuristic confidence: `low`, `medium`, or `high`. |
+| `operator_override` | bool | Always | `true` when the operator's choice differed from the heuristic recommendation. |
+| `reasoning` | string | Always | One-line heuristic reasoning citing the dominant signal(s). |
+| `applied_at` | string | Always | ISO 8601 timestamp when the decision was recorded. |
+| `expires_at` | string | When `route: keep-local` | ISO 8601 timestamp 7 days after `applied_at`. The next standup run suppresses this item until this timestamp passes. Absent for `push-to-github` and `defer` entries. |
+
+### Suppression semantics
+
+At the start of each `/standup --interactive` routing pass, the orchestrator checks
+`routing_decisions[]` for entries where `route: keep-local` and `expires_at > now`.
+Any matching `item_id` is excluded from the presented item list for that run.
+Once `expires_at` passes, the item surfaces again normally.
+
+The 7-day window is fixed at write time and is not extended by additional
+`keep-local` decisions on the same item unless the operator routes it again.
+
+### Write target
+
+Primary target: `.pHive/cycle-state/<focus-epic-id>.yaml`
+
+When no focus epic is passed and multiple epics are in-flight:
+`.pHive/cycle-state/_standup.yaml` (shared cross-epic routing log).
 
 ## Terminal handoff log
 
