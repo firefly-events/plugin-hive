@@ -1,0 +1,10 @@
+step_id: implement
+status: completed
+timestamp: "2026-05-21T17:00:00Z"
+artifacts:
+  - hive/lib/story-status.mjs
+  - hive/scripts/story-status-backfill.mjs
+  - .github/workflows/story-status-reconcile.yml
+  - hive/references/story-yaml-schema.md
+  - skills/status/SKILL.md
+  - skills/standup/SKILL.md

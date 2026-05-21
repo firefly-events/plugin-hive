@@ -30,7 +30,7 @@ planning skill and team-lead guidance, not in this schema.
 | `id`                 | required    | `a-25-skill-prelude-extraction`            |
 | `epic`               | required    | `catalog-hygiene-and-borrows`              |
 | `title`              | required    | `Extract skill-prelude.md ...`             |
-| `status`             | required    | `pending` \| `in-progress` \| `done`       |
+| `status`             | advisory    | `pending` \| `in_progress` \| `completed` (derived) plus `deferred` \| `blocked` \| `failed` (forward-stated) — **derived status is authoritative; episode markers + git state win on conflict.** See `hive/lib/story-status.mjs`. The deriver currently reads `deferred` as a YAML block and respects it; other forward-stated values are advisory. |
 | `complexity`         | required    | `small` \| `medium` \| `large`             |
 | `methodology`        | required    | `classic` \| `tdd`                         |
 | `depends_on`         | required    | `[]` or list of story ids                  |
@@ -47,9 +47,119 @@ planning skill and team-lead guidance, not in this schema.
 | `parallel_allowed`   | optional    | `true` (default: `false` when omitted)     |
 | `parallel_rationale` | conditional | `variation` \| `read-only` \| `bounded-slice` (required iff `parallel_allowed: true`) — see §4 |
 | `test_scenario`      | optional    | pointer into `.pHive/test-scenarios/` — see §7 |
+| `terminal_handoff`   | optional    | post-integrate dispatch config — see §8    |
+| `manual_verdict`     | optional    | simulated-manual test result — see §9      |
 
 Authors must not invent new top-level keys to carry metric-shaped
 information. Anything metric-related goes inside `metric:`.
+
+## 2a. Status field — advisory vs authoritative
+
+The `status:` field is **advisory**. Derived status from `hive/lib/story-status.mjs`
+(`deriveStoryStatus({ epic_id, story_id })`) is authoritative. Tools reading story
+state (`/hive:status`, planning consumers, meta-team feeds) MUST call the deriver,
+not read the raw YAML field.
+
+The deriver computes status from:
+1. `deferred:` block in YAML → `deferred`
+2. Episode markers with `status: failed|escalated` → `failed`
+3. `depends_on` stories not yet completed + no markers → `blocked`
+4. No markers → `pending`
+5. Final workflow step has marker `status: completed` → `completed`
+6. Markers exist, final step not complete → `in_progress`
+
+The `status:` field is still writable for forward-stating intent (`deferred`,
+`blocked`, `failed`) and planning scaffolding. The deriver gives it lower
+priority than episode markers + git state (per `episode-schema.md` §"Authoritative source order"). Currently only `deferred` is read by the deriver (as a YAML block) — the other forward-stated values are advisory.
+
+## 8. The `terminal_handoff:` field group
+
+Added by story `d-1-handoff-dispatch-and-execute-wire`. Controls what `/execute` dispatches
+immediately after the story's `integrate` step writes its episode marker.
+
+### 8.1 Shape
+
+```yaml
+terminal_handoff:
+  next: none | test | review | both   # target for the post-integrate dispatch
+```
+
+### 8.2 Field semantics
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `next` | enum | `none` | What to invoke after integrate. `none` = no-op. `test` = `/test --story <id>`. `review` = `/review #<pr>` or `/review <branch>`. `both` = test first, then review. |
+
+### 8.3 Precedence
+
+`/execute` resolves the target using this cascade (first non-null wins):
+
+1. `story.terminal_handoff.next`
+2. `epic.execution.terminal_handoff_default` (in the loaded `epic.yaml`)
+3. `execution.terminal_handoff_default` in the root `hive.config.yaml` (default `none`)
+
+The default `none` at all levels preserves prior behavior byte-equivalently.
+
+### 8.4 Example
+
+```yaml
+# story YAML — opt this story into a post-integrate test run
+terminal_handoff:
+  next: test
+```
+
+```yaml
+# epic.yaml — opt every story in the epic into review
+execution:
+  terminal_handoff_default: review
+```
+
+## 9. The `manual_verdict:` field group
+
+Added by story `c-2-test-simulated-manual-mode` in the `autonomous-cycle-loop` epic. Carries the result of a `/test --simulated-manual` run. The block is written by the test-worker after executing the linked scenario; `/plan` seeds a placeholder when the `simulated-manual` cross-cutting concern applies.
+
+### 9.1 Shape
+
+```yaml
+manual_verdict:
+  scenario_ref: <repo-relative path>   # path to .pHive/test-scenarios/<id>.yaml
+  verdict: pass | fail | inconclusive  # written by /test --simulated-manual
+  timestamp: <ISO 8601>                # when the verdict was rendered (null = not yet run)
+  agent: <agent-name>                  # persona that executed the scenario (null = not yet run)
+```
+
+### 9.2 Field semantics
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `scenario_ref` | string | — | Repo-relative path to the scenario YAML; must resolve to a file conforming to [`test-scenario-schema.md`](test-scenario-schema.md). Set at plan time; updated by the tester if the scenario file is renamed. |
+| `verdict` | enum \| null | `null` | The outcome of the last `/test --simulated-manual` run: `pass`, `fail`, or `inconclusive`. `null` = not yet run. |
+| `timestamp` | ISO 8601 \| null | `null` | Wall-clock time when the verdict was recorded. `null` = not yet run. |
+| `agent` | string \| null | `null` | Persona name that executed the scenario (e.g., `test-worker`). `null` = not yet run. |
+
+### 9.3 Lifecycle
+
+1. **Plan time:** `/plan` step 14 seeds `manual_verdict` with `scenario_ref` set to a placeholder path and `verdict: null` when the `simulated-manual` cross-cutting concern applies.
+2. **Scenario authoring:** The tester who executes the `scenario` step writes the real scenario YAML at `scenario_ref` per [`test-scenario-schema.md`](test-scenario-schema.md).
+3. **Verdict time:** `/test --simulated-manual <story-id>` reads `manual_verdict.scenario_ref`, executes the scenario, and writes the final `verdict`, `timestamp`, and `agent` into the block.
+
+### 9.4 Worked example
+
+```yaml
+# story YAML — seeded by /plan at planning time
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/c-2-test-simulated-manual-mode-manual.yaml
+  verdict: null
+  timestamp: null
+  agent: null
+
+# same story YAML — after /test --simulated-manual runs successfully
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/c-2-test-simulated-manual-mode-manual.yaml
+  verdict: pass
+  timestamp: "2026-05-21T20:45:00Z"
+  agent: test-worker
+```
 
 ## 3. The `metric:` field group
 

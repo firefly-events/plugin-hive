@@ -1,0 +1,70 @@
+id: a-3-adapter-label-existing-issue
+epic: autonomous-cycle-loop
+title: "A.3 — adapter helper labelExistingIssue + migrate-local wiring"
+status: pending
+complexity: low
+methodology: classic
+depends_on: [a-2-standup-routing-step-and-heuristic]
+
+description: |
+  Add `labelExistingIssue({issue_number, labels[]})` to the GitHub adapter so
+  the interactive standup can apply hive:ready (and any hive:epic:* /
+  hive:story:* the operator chooses) to an existing GH issue without
+  re-creating it. Reuse the existing `createStory` + `publishStoriesToIssues`
+  for the migrate-local-to-GH path.
+
+acceptance_criteria:
+  - "hive/lib/external/github-issues-adapter.js exposes labelExistingIssue(args) returning {labeled: true, issue_number} on success, {labeled: false, reason: 'auth'} or similar on failure."
+  - "The standup interactive flow calls labelExistingIssue for the issue-assign action and createStory + publishStoriesToIssues for the migrate-local-to-GH action."
+  - "Idempotent — re-running on an already-labeled issue is a no-op (no duplicate label, no error)."
+  - "task_tracking.adapter !== 'github' skips the GH branches with a clear log line (gate_mode warning behavior)."
+  - "Fixture test exercises a real (or recorded) gh CLI call against a sandbox repo."
+
+steps:
+  - id: research
+    description: Read the existing adapter surface; identify the gh CLI call shape for issue edit --add-label.
+    agent: researcher
+  - id: implement
+    description: Add the helper; wire interactive flow's push-to-github branch.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run the helper against a sandbox issue; verify labels appear; verify idempotence on re-run.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm no new ABI surface (just an additional helper export); confirm error mapping matches existing helpers.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive-ui-f
+  key_files:
+    - path: hive/lib/external/github-issues-adapter.js
+      purpose: Adapter implementation — new helper added here
+    - path: hive/lib/task-tracking-dispatch/index.ts
+      purpose: Dispatcher — verify no signature changes leak into the dispatch ABI
+    - path: hive/workflows/steps/daily-ceremony/interactive-routing.md
+      purpose: Step file that invokes the helper
+
+cross_cutting:
+  - concern: documentation
+    action: Adapter README (if present) notes the new helper; cross-link from sandcastle-ops doc.
+
+metric:
+  applies: true
+  name: adapter.label_existing_issue_success_rate
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 0.95
+  window: first 20 invocations across all interactive standup runs
+  source:
+    kind: events
+    ref: .pHive/metrics/events/adapter-*.jsonl
+  verify_at: 2026-06-15T00:00:00Z
+  owner: tester

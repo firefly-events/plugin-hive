@@ -45,11 +45,22 @@ steps:
     agent: orchestrator
     depends_on: [standup-load-memories]
 
+  # ── interactive-routing phase (Phase 1.5 — opt-in) ───────────────────
+  # Enabled when /standup is invoked with --interactive OR when
+  # standup.interactive_default: true is set in hive.config.yaml.
+  # When neither is set this step is skipped and the workflow is
+  # byte-equivalent to its pre-A.1 form.
+  - id: interactive-routing
+    step_file: hive/workflows/steps/daily-ceremony/step-interactive-routing.md
+    agent: orchestrator
+    depends_on: [standup-present-standup]
+    when: "args.interactive or config.standup.interactive_default"
+
   # ── planning phase ────────────────────────────────────────────────────
   - id: planning-select-work
     step_file: hive/workflows/steps/daily-ceremony/step-04-select-work.md
     agent: orchestrator
-    depends_on: [standup-present-standup]
+    depends_on: [standup-present-standup, "interactive-routing?"]
 
   - id: planning-validate-stories
     step_file: hive/workflows/steps/daily-ceremony/step-05-validate-stories.md

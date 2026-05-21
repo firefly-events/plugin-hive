@@ -1,0 +1,70 @@
+name: autonomous-cycle-loop
+title: Autonomous Cycle Loop — interactive standup, sandcastle planning, simulated manual testing, execute handoffs
+description: |
+  Make the SDLC cycle more self-directing: operator routes work in standup,
+  /plan runs inside sandcastle, /test gains a simulated-manual mode, /execute
+  chains into /test and/or /review automatically. Four independent vertical
+  slices on top of one schema/config foundation.
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+
+git_flow:
+  base_branch: main
+  branch_strategy: per-epic
+
+execution:
+  terminal_handoff_default: none
+
+# Phase D publication intentionally skipped per user direction on this epic.
+# Stories live only on disk; no tracker_id is populated.
+publish_phase: skipped
+
+stories:
+  - id: s0-1-schema-and-config-bump
+    title: "S0.1 — schema + config bump (foundation)"
+    complexity: medium
+    depends_on: []
+  - id: a-1-standup-interactive-flag
+    title: "A.1 — /standup --interactive flag + Phase 1.5 hook"
+    complexity: medium
+    depends_on: [s0-1-schema-and-config-bump]
+  - id: a-2-standup-routing-step-and-heuristic
+    title: "A.2 — interactive-routing step file + visibility heuristic"
+    complexity: medium
+    depends_on: [a-1-standup-interactive-flag]
+  - id: a-3-adapter-label-existing-issue
+    title: "A.3 — adapter helper labelExistingIssue + migrate-local wiring"
+    complexity: low
+    depends_on: [a-2-standup-routing-step-and-heuristic]
+  - id: b-1-plan-sandcastle-mode
+    title: "B.1 — /plan sandcastle_mode detection"
+    complexity: medium
+    depends_on: [s0-1-schema-and-config-bump]
+  - id: b-2-dispatch-two-label-trigger
+    title: "B.2 — hive-dispatch.yml two-label trigger + mode_decision"
+    complexity: medium
+    depends_on: [s0-1-schema-and-config-bump]
+  - id: b-3-bridge-plan-branch-and-pr
+    title: "B.3 — bridge mode_decision=plan branch + plan-output PR"
+    complexity: high
+    depends_on: [b-1-plan-sandcastle-mode, b-2-dispatch-two-label-trigger]
+  - id: c-1-scenario-schema-and-loader
+    title: "C.1 — scenario schema + loader + executor step file"
+    complexity: medium
+    depends_on: [s0-1-schema-and-config-bump]
+  - id: c-2-test-simulated-manual-mode
+    title: "C.2 — /test --simulated-manual + /plan concern wiring"
+    complexity: medium
+    depends_on: [c-1-scenario-schema-and-loader]
+  - id: d-1-handoff-dispatch-and-execute-wire
+    title: "D.1 — handoff dispatch helper + /execute post-integrate step"
+    complexity: medium
+    depends_on: [s0-1-schema-and-config-bump]
+  - id: d-2-handoff-edge-cases
+    title: "D.2 — handoff timeout + no-PR fallback + KG triple"
+    complexity: low
+    depends_on: [d-1-handoff-dispatch-and-execute-wire]
+  - id: e-1-story-status-reconciliation
+    title: "E.1 — story status reconciliation (auto-close shipped stories)"
+    complexity: medium
+    depends_on: [s0-1-schema-and-config-bump]

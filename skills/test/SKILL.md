@@ -9,6 +9,60 @@ Run the test swarm pipeline on a story, PR, or the current codebase.
 
 **Input:** `$ARGUMENTS` optionally contains a story ID, PR number, or "all" for full suite.
 
+## $ARGUMENTS
+
+Parse `$ARGUMENTS` as natural language. Flags are optional; all have defined defaults.
+
+**`--simulated-manual <story-id|scenario-file>`**
+
+Runs a simulated manual test against a single scenario instead of the full automated test swarm. The argument is either a story ID or a direct path to a scenario YAML.
+
+**Argument resolution:**
+
+1. **If the argument matches a story ID** (kebab-case, resolves to `.pHive/epics/{epic-id}/stories/{id}.yaml` under any epic):
+   - Read the story YAML and extract `manual_verdict.scenario_ref`.
+   - If `manual_verdict.scenario_ref` is absent or empty, fail immediately:
+     ```
+     Error: story '{id}' has no manual_verdict.scenario_ref. Add a scenario step
+     or point manual_verdict.scenario_ref at a .pHive/test-scenarios/*.yaml file.
+     ```
+   - Resolve the scenario file from the `scenario_ref` path (repo-relative).
+
+2. **If the argument is a file path** (contains `/` or ends in `.yaml`):
+   - Load the file directly via `hive/lib/scenarios/load.mjs` (`loadScenario`).
+   - The loader validates the simulated-manual scenario shape: `id` (kebab-case), `title`, `mode` (`spec-walk | implementation-walk`), and a non-empty `steps` array of `{ action, expected }` objects, plus optional `preconditions` / `postconditions` string arrays.
+
+**Executor step wiring:**
+
+After resolving the scenario, skip the standard swarm pipeline (steps 0–8) and run the simulated-manual executor instead (full contract in `hive/workflows/steps/test/simulated-manual.md`):
+
+1. Evaluate `preconditions` — if any fail, record `inconclusive` and stop.
+2. Walk `steps[]` in order, narrating each `action` against the spec (`spec-walk`) or the post-integrate implementation (`implementation-walk`); record per-step `outcome` from the declared `expected`.
+3. Evaluate `postconditions`.
+4. Compute overall verdict: `pass` (all steps + postconditions pass), `fail` (any step or postcondition failed), `inconclusive` (precondition failed → scenario skipped).
+
+Write the verdict to the story YAML's `manual_verdict` block per [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §8:
+
+```yaml
+manual_verdict:
+  scenario_ref: <resolved path>
+  verdict: pass | fail | inconclusive
+  timestamp: <ISO 8601>
+  agent: test-worker
+```
+
+The verdict block is merged into the story YAML in place — if a prior verdict exists it is overwritten; existing story fields are preserved.
+
+**Example invocations:**
+
+```bash
+# By story ID — resolves scenario_ref from story YAML
+/hive:test --simulated-manual c-2-test-simulated-manual-mode
+
+# By direct path — loads and validates scenario file directly
+/hive:test --simulated-manual .pHive/test-scenarios/plan-then-execute-trivial-epic.yaml
+```
+
 ## Skill Preamble
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — kickoff gate (initialization check) + persona / config / memory loading.
