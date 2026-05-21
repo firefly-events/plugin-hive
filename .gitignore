@@ -1,4 +1,6 @@
 .pHive/*
+!.pHive/multica/
+!.pHive/multica/*
 # Legacy state/ — ignored completely. Harness sessions running the pre-rename
 # Stop hook may briefly recreate state/interrupts/ files until the session
 # restarts. Keeping state/ ignored prevents those files from polluting PRs.
