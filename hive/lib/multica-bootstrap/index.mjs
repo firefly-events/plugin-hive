@@ -37,7 +37,8 @@ function readJsonFile(filePath) {
 }
 function writeJsonFile(filePath, payload) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`);
+  fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, { mode: 0o600 });
+  fs.chmodSync(filePath, 0o600);
 }
 function normalizeList(body, key) {
   if (Array.isArray(body)) return body;

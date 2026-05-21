@@ -134,6 +134,20 @@ test('json form — key ending in _TOKEN masked', () => {
   assert.match(result, /\[REDACTED\]/);
 });
 
+test('json form — header-style -Secret key masked', () => {
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine('{"X-Client-Secret":"client-secret-123"}');
+  assert.doesNotMatch(result, /client-secret-123/);
+  assert.match(result, /"X-Client-Secret":\s*"\[REDACTED\]"/);
+});
+
+test('json form — snake_case _secret key masked', () => {
+  const { redactSandcastleLogLine } = loadModule();
+  const result = redactSandcastleLogLine('{"client_secret":"snake-secret-123"}');
+  assert.doesNotMatch(result, /snake-secret-123/);
+  assert.match(result, /"client_secret":\s*"\[REDACTED\]"/);
+});
+
 test('json form — apiKey camelCase masked', () => {
   const { redactSandcastleLogLine } = loadModule();
   const result = redactSandcastleLogLine('"apiKey": "camel-secret-value"');

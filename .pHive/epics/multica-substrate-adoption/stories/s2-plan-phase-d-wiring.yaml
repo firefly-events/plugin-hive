@@ -69,7 +69,7 @@ files_to_modify:
   - file: hive/lib/task-tracking-dispatch/index.ts
     change: Add multica branch alongside github/linear
   - file: hive.config.yaml
-    change: Add commented example showing `task_tracking.adapter: multica` configuration block
+    change: "Add commented example showing `task_tracking.adapter: multica` configuration block"
   - file: skills/plan/SKILL.md
     change: Phase D step 19 commentary updated to mention multica path (no logic change — dispatch handles branching)
   - file: tests/plan/phase-d-multica-dispatch.test.mjs
@@ -90,7 +90,7 @@ code_examples:
 design_decisions:
   - decision: No changes to the dispatch ABI surface in this story
     rationale: s1 already implements the ABI; this story is purely config + branch wiring
-  - decision: Continue to support `task_tracking.adapter: null` no-op path
+  - decision: "Continue to support `task_tracking.adapter: null` no-op path"
     rationale: Maintainers without Multica setup must still be able to run /plan locally and get story YAMLs on disk
 
 cross_cutting:

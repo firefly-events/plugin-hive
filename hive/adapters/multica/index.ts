@@ -16,6 +16,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 const DEFAULT_WORKSPACE_SLUG = "plugin-hive";
+const HTTP_TIMEOUT_MS = 30000;
 const STATUS_VALUES = new Set([
   "todo",
   "in_progress",
@@ -68,7 +69,20 @@ export function __setFetch(f: typeof globalThis.fetch) {
 
 let _workspaceId: string | null = null;
 const _issueUuidByIdentifier = new Map<string, string>();
+let _cacheScopeKey: string | null = null;
+
+function ensureCacheScope(): void {
+  const { serverUrl, workspaceSlug } = getSettings();
+  const key = `${serverUrl}::${workspaceSlug}`;
+  if (_cacheScopeKey !== key) {
+    _cacheScopeKey = key;
+    _workspaceId = null;
+    _issueUuidByIdentifier.clear();
+  }
+}
+
 export function __resetCache() {
+  _cacheScopeKey = null;
   _workspaceId = null;
   _issueUuidByIdentifier.clear();
 }
@@ -158,8 +172,12 @@ async function multicaFetch(apiPath: string, init: { method?: string; body?: any
       method: init.method ?? "GET",
       headers,
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
     });
   } catch (e: any) {
+    if (e?.name === "AbortError" || e?.name === "TimeoutError") {
+      throw new AdapterError("TRANSPORT", "Multica request timed out after 30s");
+    }
     throw new AdapterError("TRANSPORT", sanitizeMessage(e?.message ?? String(e)));
   }
 
@@ -198,6 +216,7 @@ function mapHttpError(status: number, headers: Record<string, string>, body: any
 }
 
 async function getWorkspaceId(): Promise<string> {
+  ensureCacheScope();
   if (_workspaceId) return _workspaceId;
   const { workspaceId, workspaceSlug } = getSettings();
   if (workspaceId) {
@@ -215,6 +234,7 @@ async function getWorkspaceId(): Promise<string> {
 }
 
 function cacheIssue(issue: any): void {
+  ensureCacheScope();
   if (issue?.identifier && issue?.id) {
     _issueUuidByIdentifier.set(String(issue.identifier), String(issue.id));
   }
@@ -237,6 +257,7 @@ function toAbiStory(issue: any): any {
 }
 
 async function resolveIssueUuid(id: string): Promise<string> {
+  ensureCacheScope();
   const { workspaceSlug: idWorkspaceSlug, identifier } = decodeStoryId(id);
   const { workspaceSlug: configuredWorkspaceSlug } = getSettings();
   if (idWorkspaceSlug !== configuredWorkspaceSlug) {

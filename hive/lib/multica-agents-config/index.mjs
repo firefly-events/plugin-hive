@@ -92,14 +92,11 @@ export function parseAgentsConfig(yamlString) {
 
 export function resolveAgentInstructions(agent, repoRoot) {
   const resolvedRepoRoot = path.resolve(repoRoot);
+  const realRepoRoot = fs.realpathSync(resolvedRepoRoot);
   const personaPath = path.resolve(resolvedRepoRoot, agent.persona_ref);
-  const rel = path.relative(resolvedRepoRoot, personaPath);
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
-    throw new Error(`agent ${agent.name} persona_ref must stay under repo root: ${agent.persona_ref}`);
-  }
-
+  let realPersonaPath;
   try {
-    return fs.readFileSync(personaPath, 'utf8');
+    realPersonaPath = fs.realpathSync(personaPath);
   } catch (error) {
     if (error.code === 'ENOENT') {
       throw new Error(`agent ${agent.name} persona_ref not found: ${personaPath}`);
@@ -107,4 +104,11 @@ export function resolveAgentInstructions(agent, repoRoot) {
 
     throw error;
   }
+
+  const rel = path.relative(realRepoRoot, realPersonaPath);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error(`agent ${agent.name} persona_ref must stay under repo root: ${agent.persona_ref}`);
+  }
+
+  return fs.readFileSync(realPersonaPath, 'utf8');
 }
