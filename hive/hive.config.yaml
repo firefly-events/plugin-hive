@@ -340,3 +340,8 @@ autonomous_cycle_loop:
   sandcastle_mode: shared                     # shared | dedicated — see sandcastle-mode.md
   test_scenarios_path: .pHive/test-scenarios  # carrier dir for test-scenario YAMLs
   max_cycles_per_run: 1                       # safety bound; 1 = single-cycle execution per invocation
+
+# Standup skill settings (epic: autonomous-cycle-loop, story a-1)
+# Consumer override layer wins. Root layer sets the default for all consumers.
+standup:
+  interactive_default: false  # true: /standup behaves as if --interactive is always passed
