@@ -60,7 +60,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           DATE=$(date +%Y-%m-%d)
-          BRANCH="chore/status-reconcile-${DATE}"
+          BRANCH="chore/status-reconcile-${DATE}-${GITHUB_RUN_ID}"
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 

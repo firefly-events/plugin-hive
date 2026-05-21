@@ -63,6 +63,14 @@ export function loadScenario(filePath, { cwd = process.cwd(), epicId } = {}) {
 
 function validateSchema(doc, filePath) {
   requireString(doc, 'id', filePath);
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(doc.id.trim())) {
+    throw makeError(
+      'VALIDATION_ERROR',
+      `${filePath}: field 'id' must be kebab-case (lowercase letters/digits, hyphen-separated); got: ${JSON.stringify(doc.id)}`,
+      filePath,
+      'id',
+    );
+  }
   requireString(doc, 'title', filePath);
 
   if (!doc.mode || !VALID_MODES.has(doc.mode)) {
@@ -111,22 +119,27 @@ function validateSchema(doc, filePath) {
     }
   }
 
-  if (doc.preconditions !== undefined && !Array.isArray(doc.preconditions)) {
-    throw makeError(
-      'VALIDATION_ERROR',
-      `${filePath}: field 'preconditions' must be an array when present`,
-      filePath,
-      'preconditions',
-    );
-  }
-
-  if (doc.postconditions !== undefined && !Array.isArray(doc.postconditions)) {
-    throw makeError(
-      'VALIDATION_ERROR',
-      `${filePath}: field 'postconditions' must be an array when present`,
-      filePath,
-      'postconditions',
-    );
+  for (const arrField of ['preconditions', 'postconditions']) {
+    if (doc[arrField] === undefined) continue;
+    if (!Array.isArray(doc[arrField])) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: field '${arrField}' must be an array when present`,
+        filePath,
+        arrField,
+      );
+    }
+    for (let i = 0; i < doc[arrField].length; i++) {
+      const v = doc[arrField][i];
+      if (typeof v !== 'string' || !v.trim()) {
+        throw makeError(
+          'VALIDATION_ERROR',
+          `${filePath}: ${arrField}[${i}] must be a non-empty string`,
+          filePath,
+          `${arrField}[${i}]`,
+        );
+      }
+    }
   }
 }
 
@@ -147,8 +160,16 @@ function assertIntegrateMarker(doc, filePath, cwd, callerEpicId) {
   const storyId = doc.story;
   const epicId = callerEpicId || doc.epic;
   if (!storyId || !epicId) {
-    // No context to locate the marker — skip the check rather than false-fail.
-    return;
+    throw makeError(
+      'INTEGRATE_MARKER_MISSING',
+      [
+        `${filePath}: implementation-walk mode requires both 'story' and 'epic' context to locate the integrate marker.`,
+        `Got story=${JSON.stringify(storyId)}, epic=${JSON.stringify(epicId)} (caller epic_id: ${JSON.stringify(callerEpicId)}).`,
+        `Provide them on the scenario or pass --epic to the loader, or switch to mode: spec-walk.`,
+      ].join('\n'),
+      filePath,
+      'mode',
+    );
   }
 
   const markerPath = resolve(cwd, `.pHive/episodes/${epicId}/${storyId}/integrate.yaml`);

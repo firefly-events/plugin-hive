@@ -29,17 +29,17 @@ Runs a simulated manual test against a single scenario instead of the full autom
    - Resolve the scenario file from the `scenario_ref` path (repo-relative).
 
 2. **If the argument is a file path** (contains `/` or ends in `.yaml`):
-   - Load the file directly.
-   - Validate it against [`hive/references/test-scenario-schema.md`](../../hive/references/test-scenario-schema.md). Fail with a structured validation error if the YAML is malformed or missing required fields.
+   - Load the file directly via `hive/lib/scenarios/load.mjs` (`loadScenario`).
+   - The loader validates the simulated-manual scenario shape: `id` (kebab-case), `title`, `mode` (`spec-walk | implementation-walk`), and a non-empty `steps` array of `{ action, expected }` objects, plus optional `preconditions` / `postconditions` string arrays.
 
 **Executor step wiring:**
 
-After resolving the scenario, skip the standard swarm pipeline (steps 0–8) and run the simulated-manual executor instead:
+After resolving the scenario, skip the standard swarm pipeline (steps 0–8) and run the simulated-manual executor instead (full contract in `hive/workflows/steps/test/simulated-manual.md`):
 
-1. Evaluate `pre_conditions` — if any fail, record `inconclusive` and stop.
-2. Execute `invocation` per scenario kind (`skill | command | workflow`), capturing stdout/stderr.
-3. Evaluate `expectations` in declaration order — first failure terminates and records `fail`.
-4. If all expectations hold, record `pass`.
+1. Evaluate `preconditions` — if any fail, record `inconclusive` and stop.
+2. Walk `steps[]` in order, narrating each `action` against the spec (`spec-walk`) or the post-integrate implementation (`implementation-walk`); record per-step `outcome` from the declared `expected`.
+3. Evaluate `postconditions`.
+4. Compute overall verdict: `pass` (all steps + postconditions pass), `fail` (any step or postcondition failed), `inconclusive` (precondition failed → scenario skipped).
 
 Write the verdict to the story YAML's `manual_verdict` block per [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §8:
 

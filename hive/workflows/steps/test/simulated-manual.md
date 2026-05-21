@@ -19,7 +19,7 @@ Execute the scenario steps, capture outcomes, write the verdict.
 ## CONTEXT BOUNDARIES
 
 **Inputs available:**
-- Scenario file (`tests/scenarios/<topic>.yaml` or `.pHive/scenarios/` fallback)
+- Scenario file (`tests/scenarios/<topic>.yaml` or `.pHive/test-scenarios/` fallback)
 - Story spec (acceptance criteria, description, key files)
 - Implementation code (implementation-walk only; must be post-integrate)
 - Cycle-state at `.pHive/cycle-state/<epic-id>.yaml`
@@ -96,7 +96,7 @@ overall_verdict = 'inconclusive'  if any precondition failed (scenario skipped)
 
 ### 6. Write manual_verdict to cycle-state
 
-Append a `manual_verdict` block to `.pHive/cycle-state/<epic-id>.yaml`:
+Write (or replace) the `manual_verdict` block in `.pHive/cycle-state/<epic-id>.yaml`:
 
 ```yaml
 manual_verdict:

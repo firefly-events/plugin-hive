@@ -220,7 +220,10 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
      target,           // 'test' | 'review' | 'both'
      branch,           // current story branch
      pr_number,        // undefined when no PR exists
-     timeout_ms: (config.circuit_breakers?.story_timeout_minutes ?? 45) * 60 * 1000,
+     // Do NOT pass timeout_ms here — let dispatchHandoff resolve it from
+     // execution.terminal_handoff.timeout_seconds in hive.config.yaml.
+     // circuit_breakers.story_timeout_minutes is the orchestrator's outer
+     // circuit, not the handoff timeout.
      state_dir: HIVE_STATE_DIR,
    });
    ```

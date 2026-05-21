@@ -60,7 +60,7 @@ steps:
   - id: planning-select-work
     step_file: hive/workflows/steps/daily-ceremony/step-04-select-work.md
     agent: orchestrator
-    depends_on: [standup-present-standup, interactive-routing?]
+    depends_on: [standup-present-standup, "interactive-routing?"]
 
   - id: planning-validate-stories
     step_file: hive/workflows/steps/daily-ceremony/step-05-validate-stories.md
