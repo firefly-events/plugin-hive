@@ -1,7 +1,17 @@
 id: s0-1-schema-and-config-bump
 epic: autonomous-cycle-loop
 title: "S0.1 — schema + config bump (foundation)"
-status: pending
+status: completed
+shipped:
+  pr: 199
+  merged_at: "2026-05-21T03:28:53Z"
+  branch: agent/issue-198
+  note: |
+    Sandcastle worker initially mis-labeled #198 hive:failed; 5 retries found
+    work already complete and idle-stopped. Actual deliverable is PR #199,
+    merged 5/21 — 472 additions across 6 files: hive.config.yaml + hive/hive.config.yaml
+    knobs + sandcastle-mode.md + test-scenario-schema.md + updates to
+    story-yaml-schema.md and cycle-state-schema.md.
 complexity: medium
 methodology: classic
 depends_on: []

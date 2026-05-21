@@ -1,7 +1,13 @@
 id: b-3-bridge-plan-branch-and-pr
 epic: autonomous-cycle-loop
 title: "B.3 — bridge mode_decision=plan branch + plan-output PR"
-status: pending
+status: deferred
+deferred:
+  reason: |
+    Depends on b-1 and b-2; rests on sandcastle-hive-bridge.mts which is on
+    the archival path. Multica is the substrate going forward (PR #201, 5/21).
+    Revisit after sandcastle-adoption-followon decisions settle.
+  blocked_by: [b-1-plan-sandcastle-mode, b-2-dispatch-two-label-trigger, multica-substrate-adoption follow-on]
 complexity: high
 methodology: classic
 depends_on: [b-1-plan-sandcastle-mode, b-2-dispatch-two-label-trigger]

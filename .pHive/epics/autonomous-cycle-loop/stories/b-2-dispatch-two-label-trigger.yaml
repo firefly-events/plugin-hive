@@ -1,7 +1,13 @@
 id: b-2-dispatch-two-label-trigger
 epic: autonomous-cycle-loop
 title: "B.2 — hive-dispatch.yml two-label trigger + mode_decision"
-status: pending
+status: deferred
+deferred:
+  reason: |
+    Builds on .github/workflows/hive-dispatch.yml (sandcastle GH-Actions
+    dispatch), which is on the archival path now that Multica is the
+    substrate (PR #201, 5/21). Revisit after sandcastle-adoption-followon.
+  blocked_by: [multica-substrate-adoption follow-on, sandcastle archival decision]
 complexity: medium
 methodology: classic
 depends_on: [s0-1-schema-and-config-bump]

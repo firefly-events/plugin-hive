@@ -1,7 +1,15 @@
 id: b-1-plan-sandcastle-mode
 epic: autonomous-cycle-loop
 title: "B.1 — /plan sandcastle_mode detection"
-status: pending
+status: deferred
+deferred:
+  reason: |
+    Slice B premise (sandcastle GH-Actions dispatch for /plan) is on the
+    archival path. Multica adoption (PR #201, merged 5/21) supersedes sandcastle
+    as the primary substrate for /execute; /plan-in-substrate equivalent should
+    be reframed atop Multica rather than sandcastle. Revisit after
+    sandcastle-adoption-followon decisions settle.
+  blocked_by: [multica-substrate-adoption follow-on, sandcastle archival decision]
 complexity: medium
 methodology: classic
 depends_on: [s0-1-schema-and-config-bump]
