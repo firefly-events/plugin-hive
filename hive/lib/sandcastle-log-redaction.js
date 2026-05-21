@@ -43,7 +43,7 @@
 // ---------------------------------------------------------------------------
 
 /** Form 1: VAR_NAME=value (argv / env assignment form) */
-const RE_ARGV = /\b([A-Z0-9_]*(?:API_KEY|TOKEN|_KEY))=([^\s"'`]+)/gi;
+const RE_ARGV = /\b([A-Z0-9_]*(?:API_KEY|API_SECRET|TOKEN|_KEY|_SECRET))=([^\s"'`]+)/gi;
 
 /**
  * Form 2: Authorization: Bearer <token>
