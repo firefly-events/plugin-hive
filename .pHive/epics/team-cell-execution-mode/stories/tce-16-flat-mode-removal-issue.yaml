@@ -1,0 +1,102 @@
+id: tce-16-flat-mode-removal-issue
+epic: team-cell-execution-mode
+title: File follow-on issue tracking `execute-mode-multica-flat` removal
+status: pending
+complexity: low
+methodology: classic
+depends_on: [tce-15-parallel-run-smoke-epic]
+
+description: |
+  Slice 7 final third per outline §4.9 + hv-plan §2 Slice 7.
+  Verbatim slice goal fragment (outline §4.9): "Removal-track ticket
+  created for `execute-mode-multica-flat` (next release, per proposal
+  §Migration)."
+
+  This story is a deliberate FOLLOW-ON ISSUE FILE, NOT a code-change
+  story. Per proposal Migration line + hv-plan §1.9: "The renamed
+  `execute-mode-multica-flat` is deleted one release cycle after
+  flip." This story files the GitHub issue that tracks the removal —
+  the actual deletion happens in a separate, next-release-cycle epic.
+
+  Issue contract (deliverable):
+    - Title: "chore: remove execute-mode-multica-flat (next release)"
+    - Body must reference:
+        * tce-15 parallel-run validation
+        * proposal §Migration timeline ("one release cycle")
+        * skill path to delete: `skills/hive/skills/execute-mode-multica-flat/SKILL.md`
+        * flag default at this point (cell)
+        * removal of the flag shim once the legacy path is gone
+    - Labels: `chore`, `hive-2.x`, `tech-debt-after-release`
+    - Linked back to this epic for context.
+
+  NO code in this epic touches the removal itself. Closing this
+  story means: issue filed + linked + visible in the project tracker.
+
+  Vocabulary anchor (outline §10): the path being removed is
+  `execute-mode-multica-flat` (cell vs. flat mode language); no bare
+  `phase` or `session` in the issue body.
+
+acceptance_criteria:
+  - "Given the slice closes, when GitHub issues for this repo are queried, then a removal-track issue exists titled `chore: remove execute-mode-multica-flat (next release)` referencing tce-15, the proposal Migration line, and the skill path to delete."
+  - "Given a reader opens the filed issue, when they read the body, then it cross-links to this epic and to tce-15's parallel-run record."
+  - "Given the issue is labeled, when it is filtered by label, then `chore`, `hive-2.x`, and `tech-debt-after-release` are present."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Confirm tce-15 has merged and the parallel-run record is in
+      place. Read proposal §Migration line + hv-plan §1.9 for the
+      exact "one release cycle" wording.
+  - id: implement
+    agent: developer
+    description: |
+      File the GitHub issue via `gh issue create` with the title,
+      body, and labels per the issue contract above. Cross-link to
+      this epic and to tce-15.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      `gh issue list --label chore --label hive-2.x` returns the new
+      issue; body contains the required cross-links and skill path.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Confirm the issue body is unambiguous about WHAT is being
+      removed and WHEN; reject if the timeline reference is vague.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: No commits — issue-only deliverable. Story closes when issue is filed and verified.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/execute-mode-multica-flat/SKILL.md
+      purpose: Path that the filed issue tracks for removal.
+    - path: .pHive/dogfood/team-cell-mode-parallel-run.md
+      purpose: tce-15 parallel-run record — referenced from the issue body.
+
+files_to_modify: []
+
+design_decisions:
+  - decision: Removal is filed as a follow-on issue, NOT a story in this epic.
+    rationale: Outline §4.9 + hv-plan §1.9 + proposal §Migration — removal happens "one release cycle after flip"; bundling removal in this epic would short-circuit the migration safety window.
+  - decision: No code changes in this story.
+    rationale: Issue-filing is the entire deliverable; the actual deletion is a future epic's responsibility.
+
+risks:
+  - severity: low
+    description: The follow-on issue could be orphaned if not properly cross-linked.
+    mitigation: Reviewer step confirms cross-links to this epic + tce-15; labels make the issue filterable.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.9 Slice 7; §11 slice-7.2 (removal-track ticket)"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§1.9 Migration / parallel-run layer; §2 Slice 7"
+  - path: .pHive/proposals/team-cell-execution-mode.md
+    relevant_section: "§Migration"

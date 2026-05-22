@@ -1,0 +1,102 @@
+id: tce-10-dispatch-null-project-hardblock
+epic: team-cell-execution-mode
+title: F1 hard-block — dispatch refuses fan-out on null `project_id`
+status: pending
+complexity: low
+methodology: classic
+depends_on: [tce-9-execute-mode-multica-child-phases]
+
+description: |
+  Slice 4 final third per outline §4.6 + hv-plan §2 Slice 4.
+  Verbatim slice goal fragment (outline §4.6): "Wires F1 hard-block
+  (P1-confirmed — design §10 P1; hv-plan §0 P1): dispatch refuses to
+  fan out if `project_id` on the parent issue is null."
+
+  Per P1 resolution (outline §5.1; hv-plan §0 P1): hard-block on null
+  `project_id` STANDS. Rationale per design §10 P1 / hv-plan §0 P1:
+  "parallel-dispatch-gate precedent (ed-7) is a hard-block too; this
+  is an enforcement gate, not a kickoff gate." Warn-only is
+  documented as the relax-path for a future epic (NOT this one).
+
+  This story carries the F1 fix that the audit (audit §F1) flagged
+  as high-severity — the workspace was bound to the Nova36 clone in
+  one dispatch path. Hard-blocking on null project_id prevents the
+  same drift on the new cell-mode dispatch flow.
+
+  Hook point: before step 3 (child fan-out from tce-9), inspect the
+  parent's `project_id`; if null, abort dispatch with a clear error
+  pointing at the workspace binding. Document warn-only as a
+  configuration switch for a future epic in the skill's prose, but
+  do NOT implement the warn-only path here (per P1).
+
+  Vocabulary anchor (outline §10): the field is `project_id` on the
+  Multica parent issue; "team cell" parent / "workflow-phase" child.
+
+acceptance_criteria:
+  - "Given a parent issue created with null `project_id`, when child fan-out is attempted, then dispatch aborts with a clear error message before any child is created (outline §5.1; design §2.5 F1)."
+  - "Given a parent issue carries a valid `project_id`, when child fan-out runs, then no F1 block triggers and the per-workflow-phase children are dispatched normally."
+  - "Given the skill prose references warn-only as the relax-path, when a reader inspects the doc, then warn-only is clearly marked as future-epic scope (NOT implemented here per P1)."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Locate the cell-shell parent-creation step (tce-8) + child
+      fan-out step (tce-9). Identify the call site where `project_id`
+      can be inspected on the parent. Read audit §F1 + outline §5.1
+      for the failure mode being prevented.
+  - id: implement
+    agent: developer
+    description: |
+      Insert the F1 hard-block check before step 3 child fan-out;
+      emit a clear error referencing the workspace binding. Document
+      warn-only as future-epic relax-path in the skill prose.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Two-case test: (1) null project_id → dispatch aborts before any
+      child created; (2) valid project_id → fan-out proceeds normally.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Confirm hard-block remains the only behavior; warn-only path
+      is doc-only. Confirm error message is actionable (points to
+      workspace binding remediation).
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/execute-mode-multica/SKILL.md
+      purpose: Skill where F1 hook lands.
+    - path: .pHive/audits/multica-mode-audit-2026-05-22.md
+      purpose: F1 audit finding being closed.
+
+files_to_modify:
+  - file: skills/hive/skills/execute-mode-multica/SKILL.md
+    change: Add F1 hard-block hook before step 3 (child fan-out); document warn-only as future-epic relax-path.
+
+design_decisions:
+  - decision: Hard-block on null `project_id` stands; warn-only is doc-only future-epic relax-path.
+    rationale: P1 resolution per outline §5.1 + hv-plan §0 P1 — parallel-dispatch-gate precedent (ed-7) is hard-block; this is an enforcement gate, not a kickoff gate.
+
+risks:
+  - severity: low
+    description: False positive — a legitimate null project_id case could exist that this check rejects.
+    mitigation: Audit §F1 evidence shows the failure mode is real and high-severity; warn-only relax-path is documented for a future epic if false-positive evidence emerges.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.6 Slice 4; §5.1 Cell shape on Multica; §9 slice-4 assertions; §11 slice-4.2"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§0 P1; §1.5 Tracker layer; §2 Slice 4"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.5 F1; §10 P1"
+  - path: .pHive/audits/multica-mode-audit-2026-05-22.md
+    relevant_section: "§F1 stale workspace repo binding"

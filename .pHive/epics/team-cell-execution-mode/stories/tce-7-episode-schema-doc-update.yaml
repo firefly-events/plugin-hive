@@ -1,0 +1,97 @@
+id: tce-7-episode-schema-doc-update
+epic: team-cell-execution-mode
+title: Update episode marker schema doc — `artifacts:` is file-path-only
+status: pending
+complexity: low
+methodology: classic
+depends_on: [tce-6-write-episode-phase-param]
+
+description: |
+  Slice 3 second half per outline §4.5 + hv-plan §2 Slice 3.
+  Verbatim slice goal fragment (outline §4.5): "Episode marker schema
+  documentation updated to describe `artifacts:` list as
+  file-path-only per R2."
+
+  Per outline §5.3: marker `artifacts:` list per R2 (design §3 R2)
+  carries **file-path-only** entries — no marker-embedded prose. The
+  next workflow-phase's brief includes those file references
+  verbatim. This is the inter-phase context channel — there is no
+  persistent session memory across child issues (design §5 Q3 / Q4
+  recommend).
+
+  This story extends the reference doc that describes the episode
+  marker schema. The doc must now describe:
+    - The per-workflow-phase basename rule from tce-6 (H1).
+    - The marker location `.pHive/episodes/{epic}/{story}/{phase}.yaml`.
+    - The `artifacts:` list contract — file-path-only, no prose.
+    - Why prose is excluded (R2 mitigation: marker stays lean; the
+      next phase's brief is the prose carrier).
+
+  Vocabulary anchor (outline §10): marker doc uses
+  "workflow-phase" not bare "phase" outside §8 quotes.
+
+acceptance_criteria:
+  - "Given a reader opens `hive/references/episode-schema.md`, when they read the `artifacts:` field description, then it is unambiguous that entries are file paths only (no embedded prose) per R2."
+  - "Given the doc is read by V2-rule linting, when it is inspected, then no bare `phase` appears outside §8 quotes."
+  - "Given the doc describes per-workflow-phase basenames, when a developer cross-references it against tce-6, then the basename rule matches the H1 implementation."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Locate `hive/references/episode-schema.md` (or equivalent
+      schema doc); identify the section to extend; confirm R2's
+      file-path-only commitment in design §3 R2 + outline §5.3.
+  - id: implement
+    agent: technical-writer
+    description: |
+      Update the episode schema doc with: per-workflow-phase basename
+      rule, marker location, `artifacts:` file-path-only contract,
+      rationale (R2 mitigation).
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      V2-rule grep: scan the doc for bare `phase` outside §8 quotes
+      and fail if found. Verify the basename rule matches tce-6
+      implementation by example.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Confirm doc clarity; reject if `artifacts:` ambiguity persists
+      after the update.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/references/episode-schema.md
+      purpose: Schema doc to extend (research step confirms exact path).
+    - path: hive/lib/multica-story-dispatch/episode-sync.mjs
+      purpose: Implementation tce-6 lands; doc cross-references it.
+
+files_to_modify:
+  - file: hive/references/episode-schema.md
+    change: Add per-workflow-phase basename rule + `artifacts:` file-path-only contract + R2 rationale.
+
+design_decisions:
+  - decision: `artifacts:` carries file paths only — never prose.
+    rationale: R2 — "Phase output written to marker `artifacts:` as file paths only; next phase's brief includes those file refs verbatim. NO marker-embedded prose."
+
+risks:
+  - severity: medium
+    description: R2 — if the doc remains ambiguous, child briefs may inline prose into markers and the inter-phase context channel becomes brittle.
+    mitigation: Doc explicitly forbids prose; reviewer step rejects ambiguous wording.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.5 Slice 3; §5.3 Phase-marker shape; §6 R2; §11 slice-3.2"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§1.6 Episode marker layer; §2 Slice 3; §99 R2"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.3; §3 R2"

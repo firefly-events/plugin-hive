@@ -1,0 +1,97 @@
+id: tce-6-write-episode-phase-param
+epic: team-cell-execution-mode
+title: Extend writeMulticaRunEpisode with optional `phase` parameter
+status: pending
+complexity: low
+methodology: classic
+depends_on: [tce-5-cell-yaml-schema]
+
+description: |
+  Slice 3 first half per outline §4.5 + hv-plan §2 Slice 3.
+  Verbatim slice goal (outline §4.5): "Extend
+  `writeMulticaRunEpisode` to accept a `phase` parameter defaulting
+  to `null` for back-compat (hv-plan slice 3; design §10 H1). When
+  `phase != null`, marker basename is `{phase}.yaml`; when null,
+  basename stays `multica-run.yaml`."
+
+  Per H1 resolution (design §10 H1; grill H1): today's
+  `writeMulticaRunEpisode` produces one `multica-run.yaml` per task.
+  The parameter route was picked because it preserves the existing
+  skill contract — single-developer mode (if anyone still uses it
+  during migration) keeps the old filename via `phase: null`. This
+  is the back-compat lever for tce-14's parallel-run window.
+
+  Marker location per outline §5.3 + design §9 #3:
+  `.pHive/episodes/{epic}/{story}/{phase}.yaml`.
+
+  Vocabulary anchor (outline §10): the parameter name is `phase` in
+  the function signature for back-compat, but downstream docs and
+  consumers refer to its value as a `workflow-phase` (research /
+  implement / test / review / integrate).
+
+acceptance_criteria:
+  - "Given `writeMulticaRunEpisode({phase: 'research'})` is called, when the function runs, then `.pHive/episodes/{epic}/{story}/research.yaml` is written (outline §9 slice-3 assertions)."
+  - "Given `writeMulticaRunEpisode({})` is called (no `phase`), when the function runs, then `multica-run.yaml` is written at the legacy path (back-compat preserved)."
+  - "Given an old caller that did NOT previously pass `phase`, when its existing call site runs unchanged, then the resulting file basename matches the pre-change behavior (no regression)."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Locate `writeMulticaRunEpisode` in `hive/lib/multica-story-dispatch/`;
+      identify all current call sites; read outline §5.3 for the
+      marker shape contract.
+  - id: implement
+    agent: developer
+    description: |
+      Extend the function signature with `phase` (default `null`).
+      Implement filename derivation per the H1 rule.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Two test calls per outline §4.5: one without `phase` (legacy
+      basename), one with `phase: 'research'` (new basename). Verify
+      both produce expected files at expected paths.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Confirm no caller-side breakage; old callers continue to work
+      unchanged. Verify the parameter shape matches H1.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-story-dispatch/episode-sync.mjs
+      purpose: Likely host of `writeMulticaRunEpisode` (research step confirms).
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: Sibling dispatch module — read for context.
+
+files_to_modify:
+  - file: hive/lib/multica-story-dispatch/episode-sync.mjs
+    change: Extend `writeMulticaRunEpisode` signature with `phase` parameter (default `null`); derive basename per H1 rule.
+  - file: tests/multica-episode-sync.test.js
+    change: Add two test calls (legacy + per-phase) per outline §4.5 verification.
+
+design_decisions:
+  - decision: Parameter route (signature extension) chosen over a wrapper function.
+    rationale: H1 — "preserves the existing skill contract and single-developer mode keeps the old filename via `phase: null`."
+
+risks:
+  - severity: low
+    description: Caller-side regression if `phase` argument is accidentally passed in legacy code paths.
+    mitigation: Default `null`; tester asserts unchanged old callers.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.5 Slice 3; §5.3 Phase-marker shape; §9 slice-3 assertions; §11 slice-3.1"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§1.6 Episode marker layer; §2 Slice 3"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.3 step 3d; §10 H1"

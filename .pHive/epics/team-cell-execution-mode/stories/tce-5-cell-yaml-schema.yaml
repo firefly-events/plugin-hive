@@ -1,0 +1,107 @@
+id: tce-5-cell-yaml-schema
+epic: team-cell-execution-mode
+title: Declarative `hive/team-cells/execute-cell.yaml` roster spec
+status: pending
+complexity: low
+methodology: classic
+depends_on: [tce-4-cell-roster-resolver-lib]
+
+description: |
+  Slice 2 second half per outline §4.4 + hv-plan §2 Slice 2.
+  Verbatim slice goal (outline §4.4): "Ships
+  `hive/team-cells/execute-cell.yaml` (the execute cell roster spec
+  — design §2.2)."
+
+  Per outline §5.2 the cell YAML shape is:
+    - `cell: execute`
+    - `core: [researcher, developer, tester, reviewer]`
+    - `optional`: list of `{role, when: scope_signals.X,
+      replaces|appends_after: Y}`
+
+  Optional slots use either `replaces:` (swap a core role — e.g.
+  `backend-developer` replaces `developer` when `scope_signals.backend`)
+  or `appends_after:` (append after a phase — e.g. `security-reviewer`
+  appends after `review` when `scope_signals.security`). The
+  `peer-validator` slot is conditioned on
+  `planning.collaborative_review == true` (outline §5.2).
+
+  Vocabulary anchor (outline §10): the YAML uses `workflow-phase`
+  for cell-internal phases (research / implement / test / review /
+  integrate); the slot type is `role`, NOT `agent`; `core[]` is
+  the per-cell roster (NOT `core team` — that name is reserved for
+  the planning roster per design §8 #4).
+
+  Plan / review cell YAMLs are OUT of scope (outline §2 non-goals;
+  design §7) — only execute-cell.yaml is delivered here.
+
+acceptance_criteria:
+  - "Given `hive/team-cells/execute-cell.yaml` exists, when the cell-roster-resolver (tce-4) loads it, then it parses without error and produces a roster for a no-signal story containing only `core[]` roles."
+  - "Given the YAML carries an `optional` entry `{role: backend-developer, when: scope_signals.backend, replaces: developer}`, when a backend-tagged story is resolved, then `backend-developer` substitutes `developer` in the output."
+  - "Given the YAML is read by V2-rule linting, when the spec is inspected, then no bare `phase` appears outside §8 quotes (outline §10 V2)."
+  - "Given the YAML uses the `peer-validator` slot, when `planning.collaborative_review == true`, then peer-validator is appended after `review`."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read design §2.2 + outline §5.2 for the canonical YAML shape;
+      cross-reference signal predicates with story-spec field names
+      used by /plan today.
+  - id: implement
+    agent: developer
+    description: |
+      Author `hive/team-cells/execute-cell.yaml` per the §5.2 shape.
+      Inline the 4 optional slots from design §2.2 + outline §5.2:
+      backend-developer (replaces developer), frontend-developer
+      (replaces developer), security-reviewer (appends_after review),
+      peer-validator (appends_after review).
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Drive the cell-roster-resolver with representative story specs
+      (backend, frontend, security, peer-review, none) and assert the
+      output roster matches the expected slot composition.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Enforce the V2 vocabulary rule — reject any spec text using
+      bare `phase` outside §8-quoted prose. Confirm only the execute
+      cell is in scope (no plan/review YAMLs).
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/cell-roster-resolver/index.mjs
+      purpose: Consumer of this YAML (delivered by tce-4).
+    - path: hive.config.yaml
+      purpose: Reference for the `planning.collaborative_review` flag used by the peer-validator slot.
+
+files_to_modify:
+  - file: hive/team-cells/execute-cell.yaml
+    change: NEW — execute cell roster spec per outline §5.2.
+
+design_decisions:
+  - decision: Only the execute cell YAML ships here; plan / review cell YAMLs are explicitly deferred.
+    rationale: Outline §2 non-goals + design §7 — "session definition is only for execution"; plan / review cells are forward-link only.
+  - decision: Predicate fields reference `scope_signals.*` (story-spec) and `planning.collaborative_review` (config) — no other namespaces.
+    rationale: Outline §5.2 — keep the predicate surface narrow until a real new signal arrives.
+
+risks:
+  - severity: medium
+    description: V2 vocabulary violation — bare `phase` in the YAML would silently invalidate downstream V2-rule checks.
+    mitigation: Reviewer step explicitly checks for the bare-`phase` substring across §2-7 prose mirrored in the YAML.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.4 Slice 2; §5.2 Roster resolution / Cell YAML shape; §10 V2; §11 slice-2.3"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§1.4 Config layer; §2 Slice 2"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.2; §8 #2 / #4 / #5; §10 V2"

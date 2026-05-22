@@ -1,0 +1,112 @@
+id: tce-12-post-phase-push-verifier
+epic: team-cell-execution-mode
+title: Post-workflow-phase push-target verifier (H3 enforcement)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [tce-11-brief-footer-push-constraint]
+
+description: |
+  Slice 5 second half per outline §4.7 + hv-plan §2 Slice 5.
+  Verbatim slice goal (outline §4.7): "After each child terminates,
+  orchestrator inspects the agent's push target via
+  `git ls-remote origin agent/developer/{task_id}` against firefly
+  origin (hv-plan slice 5; design §10 H3). Orphan-branch push fails
+  the phase (`failed`, not `escalated`) and retries per
+  `max_step_retries`."
+
+  Per H3 resolution (outline §6 R3; design §10 H3): footer alone is
+  insufficient — audit §F4 already shows agents disobeyed the
+  constraint twice. The verifier is the enforcement; this story
+  closes the F4 audit gap.
+
+  Verifier location: `hive/lib/multica-story-dispatch/` (or sibling).
+  Hook point: per-workflow-phase termination handling in tce-9's step
+  3c→3d flow. Behavior:
+    1. After `pollTaskUntilTerminal` returns, run
+       `git ls-remote origin agent/developer/{task_id}` against the
+       firefly origin.
+    2. If the orphan-branch push exists → phase marked `failed`
+       (NOT `escalated`); retry per `max_step_retries`.
+    3. If no orphan push exists → continue to step 3d (marker write).
+
+  Vocabulary anchor (outline §10): "workflow-phase" termination /
+  enforcement; "team cell" agent context. The phase outcome label is
+  `failed`, NOT `escalated`, per H3.
+
+acceptance_criteria:
+  - "Given a child terminates after pushing to `agent/developer/{task_id}`, when the verifier runs, then the workflow-phase is marked `failed` and a retry is triggered per `max_step_retries` (outline §9 slice-5 assertions; H3)."
+  - "Given a child terminates with a clean push to `feat/{epic}` only, when the verifier runs, then no failure is recorded and the marker-write step (3d) proceeds normally."
+  - "Given the verifier fires, when its outcome is logged, then the phase outcome label is `failed`, NOT `escalated` (H3 explicit)."
+  - "Given F4 audit closure is asserted in tce-13, when the verifier is exercised in the audit-bundle test, then F4 is confirmed closed."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read tce-9 termination handling step 3c. Identify the
+      orphan-branch push pattern (`agent/developer/{task_id}`) used
+      by Multica daemon today. Read audit §F4 + outline §6 R3.
+  - id: implement
+    agent: developer
+    description: |
+      Add verifier function in `hive/lib/multica-story-dispatch/` (or
+      sibling). Wire it into tce-9's per-workflow-phase termination
+      handling between step 3c and 3d.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Fault-injection: force an agent to push to `agent/developer/<task>`
+      and assert the workflow-phase is marked `failed` and retried per
+      max_step_retries. Happy-path: push only to `feat/{epic}` →
+      verifier passes, marker writes normally.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Confirm `failed` (not `escalated`) is the outcome label.
+      Confirm the verifier runs after `pollTaskUntilTerminal` and
+      before `writeMulticaRunEpisode`.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: Likely host of the new verifier function.
+    - path: skills/hive/skills/execute-mode-multica/SKILL.md
+      purpose: Skill where the verifier is wired into the per-workflow-phase loop.
+    - path: .pHive/audits/multica-mode-audit-2026-05-22.md
+      purpose: F4 audit finding being closed.
+
+files_to_modify:
+  - file: hive/lib/multica-story-dispatch/index.mjs
+    change: Add `verifyPushTarget(taskId, epicId)` function using `git ls-remote origin agent/developer/{task_id}`.
+  - file: skills/hive/skills/execute-mode-multica/SKILL.md
+    change: Wire verifier into step 3c→3d termination handling.
+
+design_decisions:
+  - decision: Outcome label on orphan-push detection is `failed`, NOT `escalated`.
+    rationale: H3 — failure triggers retry per `max_step_retries`; escalation has different semantics in the U2 table.
+  - decision: Verifier uses `git ls-remote` rather than a daemon-side hook.
+    rationale: hv-plan §1.7 / outline §4.7 — out-of-band verification keeps the check independent of daemon state.
+
+risks:
+  - severity: medium
+    description: R3 contingency — if verifier false-positives on legitimate `agent/<role>/<task>` patterns, the verifier may need an allow-list.
+    mitigation: Per outline §6 R3 contingency, add allow-list to verifier config rather than weakening the rule.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.7 Slice 5; §6 R3; §9 slice-5 assertions; §11 slice-5.1 / slice-5.2"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§2 Slice 5; §99 R3"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.5 F4; §10 H3"
+  - path: .pHive/audits/multica-mode-audit-2026-05-22.md
+    relevant_section: "§F4 inconsistent push behavior"

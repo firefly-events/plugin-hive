@@ -1,0 +1,116 @@
+id: tce-3-bootstrap-reconciliation-tests
+epic: team-cell-execution-mode
+title: Reconcile 9 new personas + resolve name mismatches + verify backend routing
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [tce-2-bootstrap-runtime-resolver]
+
+description: |
+  Slice 1 second half per outline §4.3 + hv-plan §2 Slice 1.
+  Verbatim slice goal (outline §4.3): "Reconcile 9 new agents into
+  the workspace (researcher, architect, tpm, technical-writer,
+  peer-validator, backend-developer, frontend-developer, analyst,
+  ui-designer) and resolve three name mismatches (`security`,
+  `performance`, `qa-engineer`)."
+
+  Per outline §3.3 the persona gap is: four Multica agents existed at
+  audit time (developer, tester, reviewer, qa-engineer) — the
+  composer roster needs nine more reconciled in. This story
+  reconciles those nine and resolves three name-mismatches:
+    - `security-reviewer.md` (source) ↔ `security` (workspace name)
+    - `performance-reviewer.md` ↔ `performance`
+    - `qa-engineer` — no source persona file; either create
+      `hive/agents/qa-engineer.md` OR alias to `tester` (design §2.6,
+      §3 R6, hv-plan §1.3).
+
+  Story carries the test fixtures + assertion harness that proves
+  tce-2's runtime resolver produces the expected mapping in
+  practice. Fixture set covers all 13 agents (4 existing + 9 new)
+  per the §2.4 routing table:
+    Codex runtime: researcher / developer / backend-developer /
+      frontend-developer / technical-writer / architect
+    Claude Sonnet runtime: tester / qa-engineer / ui-designer
+    Claude Opus runtime: reviewer / peer-validator / security
+
+  Per `feedback_no_team_lead_intermediary` the workspace agents must
+  match the planning roster vocabulary; tester reviewer asserts
+  outline §10 vocabulary rules on the reconciled records.
+
+acceptance_criteria:
+  - "Given `multica-init` runs after this story merges, when `multica agent list` is inspected, then all 13 expected agents are present (4 existing + 9 new per outline §3.3 + design §2.6)."
+  - "Given the routing fixture asserts researcher → Codex, when the bootstrap reconciles, then the researcher's runtime_id resolves to the Codex runtime."
+  - "Given the routing fixture asserts reviewer → Claude Opus, when reconciliation runs, then the reviewer's runtime_id resolves to the Claude Opus runtime (cross-LLM gate per §2.4)."
+  - "Given the three name mismatches are encountered (security-reviewer/performance-reviewer/qa-engineer), when reconciliation runs, then each is resolved per design §2.6 with no orphaned source files."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Inventory current Multica workspace agents; cross-reference with
+      `hive/agents/` source personas; identify which need creation and
+      which need alias. Decide qa-engineer disposition (new file vs.
+      alias) per design §3 R6.
+  - id: implement
+    agent: developer
+    description: |
+      Add the 9 new persona reconciliations + resolve the three name
+      mismatches. If new persona files are needed (e.g. qa-engineer
+      per the chosen disposition), create them under `hive/agents/`.
+      Add reconciliation test fixtures + assertions.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Run the assertion that every row of the §2.4 routing table
+      lands on its expected runtime. Verify name-mismatch resolution
+      does not break dispatch (a follow-on smoke).
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Reject any persona file whose tone/scope contradicts
+      `feedback_check_readme_first`. Confirm the qa-engineer
+      decision is documented in the story trail.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-bootstrap/index.mjs
+      purpose: Reconciliation entry point (extended by tce-2; this story exercises the result).
+    - path: hive/agents/
+      purpose: Source persona files; may gain qa-engineer.md per R6.
+    - path: hive.config.yaml
+      purpose: agent_backends map (read-only) consumed by the resolver.
+
+files_to_modify:
+  - file: hive/agents/qa-engineer.md
+    change: NEW — created iff `qa-engineer` disposition is `new persona file` (R6).
+  - file: hive/lib/multica-bootstrap/index.mjs
+    change: Reconcile 9 new personas; resolve security/performance/qa-engineer name mismatches.
+  - file: tests/multica-bootstrap-routing.test.js
+    change: NEW — fixture set asserting routing-table rows.
+
+design_decisions:
+  - decision: qa-engineer disposition documented in research step; either new persona file or alias to tester.
+    rationale: Design §2.6 + §3 R6 leave the call to slice 1; documenting the chosen route in the story trail keeps reviewer-class verification auditable.
+  - decision: Name mismatches resolved in bootstrap config, not via source-file rename.
+    rationale: hv-plan §1.3 — source filenames stay stable; the workspace alias lives in the bootstrap layer.
+
+risks:
+  - severity: low
+    description: R6 — qa-engineer source file may not exist; choosing alias vs. new file changes the contract.
+    mitigation: Document the chosen disposition explicitly in this story's research output; downstream consumers reference the documented choice.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§3.3 Persona gap; §3.4 routing table; §4.3 Slice 1; §9 slice-1 assertions; §11 slice-1.2 / slice-1.3"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§1.3 Persona layer; §2 Slice 1; §99 R6"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.6; §3 R6"
