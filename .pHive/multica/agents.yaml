@@ -1,8 +1,10 @@
 schema_version: 1
 agents:
+  # --- Codex runtime (researcher, developer, architect, technical-writer,
+  #     backend-developer, frontend-developer) per outline §3.4 routing table ---
   - name: developer
-    provider: claude
-    model: claude-sonnet-4-6
+    provider: codex
+    model: gpt-5.4
     max_concurrent_tasks: 1
     persona_ref: hive/agents/developer.md
     custom_env: {}
@@ -10,6 +12,57 @@ agents:
     mcp_config: null
     skills: []
     visibility: workspace
+  - name: researcher
+    provider: codex
+    model: gpt-5.4
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/researcher.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+  - name: architect
+    provider: codex
+    model: gpt-5.4
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/architect.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+  - name: technical-writer
+    provider: codex
+    model: gpt-5.4
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/technical-writer.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+  - name: backend-developer
+    provider: codex
+    model: gpt-5.4
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/backend-developer.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+  - name: frontend-developer
+    provider: codex
+    model: gpt-5.4
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/frontend-developer.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+  # --- Claude Sonnet runtime (tester, qa-engineer, ui-designer) per §3.4 ---
   - name: tester
     provider: claude
     model: claude-sonnet-4-6
@@ -20,11 +73,86 @@ agents:
     mcp_config: null
     skills: []
     visibility: workspace
+  # qa-engineer: new persona file (hive/agents/qa-engineer.md) per design §3 R6
+  - name: qa-engineer
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/qa-engineer.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+  - name: ui-designer
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/ui-designer.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+  # --- Claude Opus runtime (reviewer, peer-validator, security) per §3.4 ---
   - name: reviewer
     provider: claude
     model: claude-opus-4-7
     max_concurrent_tasks: 1
     persona_ref: hive/agents/reviewer.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+  - name: peer-validator
+    provider: claude
+    model: claude-opus-4-7
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/peer-validator.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+  # security: name mismatch — source file is security-reviewer.md, workspace name is security
+  - name: security
+    provider: claude
+    model: claude-opus-4-7
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/security-reviewer.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+  # --- Non-routing-table agents (tpm, analyst) — Claude Opus per model_tiers ---
+  - name: tpm
+    provider: claude
+    model: claude-opus-4-7
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/tpm.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+  - name: analyst
+    provider: claude
+    model: claude-opus-4-7
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/analyst.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+  # performance: name mismatch — source file is performance-reviewer.md, workspace name is performance
+  - name: performance
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/performance-reviewer.md
     custom_env: {}
     custom_args: []
     mcp_config: null
