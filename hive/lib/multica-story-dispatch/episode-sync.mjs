@@ -235,11 +235,14 @@ export async function writeMulticaRunEpisode(opts) {
     identifier,
     terminal,
     messagesCaptureMax,
+    phase = null,
   } = opts;
 
   const dir = path.join(hiveStateDir, 'episodes', epicHandle, storyId);
-  const markerPath = path.join(dir, 'multica-run.yaml');
-  const messagesPath = path.join(dir, 'multica-run.messages.jsonl');
+  const basename = phase != null ? `${phase}.yaml` : 'multica-run.yaml';
+  const messageBasename = phase != null ? `${phase}.messages.jsonl` : 'multica-run.messages.jsonl';
+  const markerPath = path.join(dir, basename);
+  const messagesPath = path.join(dir, messageBasename);
   await fs.mkdir(dir, { recursive: true });
 
   const allMessages = Array.isArray(terminal?.messages) ? terminal.messages : [];
