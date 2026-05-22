@@ -108,6 +108,23 @@ async function loadAgentsConfig(agentsConfigPath) {
     return parseAgentsConfig(yamlString);
   }
 }
+async function loadHiveConfig(repoRoot) {
+  const hiveConfigPath = path.join(repoRoot, 'hive.config.yaml');
+  try {
+    const yamlString = fs.readFileSync(hiveConfigPath, 'utf8');
+    const yaml = await import('js-yaml');
+    return yaml.load(yamlString) ?? {};
+  } catch {
+    return {};
+  }
+}
+function resolveBackendProvider(agentName, agentBackends, defaultProvider) {
+  if (Object.prototype.hasOwnProperty.call(agentBackends, agentName)) {
+    return agentBackends[agentName];
+  }
+  process.stderr.write(`[multica-bootstrap] warn: persona "${agentName}" not in agent_backends — binding to default provider "${defaultProvider}".\n`);
+  return defaultProvider;
+}
 function buildAgentPayload(agent, runtimeId, instructions) {
   const payload = { name: agent.name, runtime_id: runtimeId };
   for (const key of ['description', 'model', 'thinking_level', 'visibility', 'max_concurrent_tasks', 'custom_env', 'custom_args', 'mcp_config', 'skills']) {
@@ -262,6 +279,8 @@ export async function reconcileAgents({
   }
   const config = await loadAgentsConfig(agentsConfigPath);
   const desiredAgents = Array.isArray(config?.agents) ? config.agents : [];
+  const hiveConfig = await loadHiveConfig(repoRoot);
+  const agentBackends = hiveConfig.agent_backends && typeof hiveConfig.agent_backends === 'object' ? hiveConfig.agent_backends : {};
   const existingBody = await httpJson(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
   const existingAgents = normalizeList(existingBody, 'agents');
   const existingByName = new Map(existingAgents.map((agent) => [agent.name, agent]));
@@ -269,7 +288,8 @@ export async function reconcileAgents({
   const patched = [];
   const skipped = [];
   for (const agent of desiredAgents) {
-    const runtimeId = await resolveRuntimeId(serverUrl, token, workspaceId, agent.provider);
+    const provider = resolveBackendProvider(agent.name, agentBackends, agent.provider);
+    const runtimeId = await resolveRuntimeId(serverUrl, token, workspaceId, provider);
     const instructions = agent.persona_ref ? resolveAgentInstructions(agent, repoRoot) : agent.instructions;
     const payload = buildAgentPayload(agent, runtimeId, instructions);
     const existing = existingByName.get(agent.name);
