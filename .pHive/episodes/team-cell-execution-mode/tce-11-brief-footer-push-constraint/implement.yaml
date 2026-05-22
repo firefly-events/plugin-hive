@@ -1,0 +1,9 @@
+step: implement
+status: done
+agent: developer
+timestamp: "2026-05-22T00:00:00Z"
+summary: |
+  Added three-line advisory push-constraint footer to serializeStoryBrief in
+  hive/lib/multica-story-dispatch/index.mjs. Footer interpolates feat/{epic}
+  from story.epic, forbids orphan branches, names hive-worker commit author.
+  Uses workflow-phase vocabulary (no bare 'phase'). All 10 existing tests pass.
