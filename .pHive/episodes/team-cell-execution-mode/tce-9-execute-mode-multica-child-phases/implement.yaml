@@ -1,0 +1,10 @@
+step: implement
+story: "tce-9-execute-mode-multica-child-phases"
+epic: "team-cell-execution-mode"
+agent: "developer"
+status: passed
+started_at: "2026-05-22T18:56:10Z"
+completed_at: "2026-05-22T19:15:00Z"
+artifacts:
+  - "skills/hive/skills/execute-mode-multica/SKILL.md"
+notes: "Added steps 3-4: per-workflow-phase child fan-out, brief injection, pollTaskUntilTerminal, writeMulticaRunEpisode({phase}), U2 failure-policy table (FAILURE_POLICY mapping), parent close. V2 vocabulary enforced."
