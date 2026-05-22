@@ -1,0 +1,13 @@
+step_id: integrate
+status: completed
+timestamp: "2026-05-22T20:30:00Z"
+artifacts:
+  - .pHive/dogfood/team-cell-mode-parallel-run.md
+  - hive/team-cells/execute-cell.yaml
+  - hive/lib/multica-story-dispatch/index.mjs
+  - hive/lib/multica-story-dispatch/episode-sync.mjs
+  - skills/hive/skills/execute-mode-multica/SKILL.md
+  - skills/execute/SKILL.md
+notes: |
+  Committed and pushed: b66f3c0 feat(tce-15): parallel-run gate — fix cell-mode regressions + flip default to cell
+  Branch: agent/developer/2339d768 → origin
