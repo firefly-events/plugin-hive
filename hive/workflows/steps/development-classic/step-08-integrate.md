@@ -69,7 +69,38 @@ git commit -m "[{story-id}] {commit message}"
 git push -u origin hive-{story-id}
 ```
 
-### 6. Verify CI (if available)
+### 6a. Multica story close (adapter gate)
+
+After a successful push, close the story's Multica issue — best-effort, never blocks integration.
+
+**Skip this step entirely if:**
+- Running in dry-run mode (`--dry-run` present in `$ARGUMENTS`)
+- /execute was invoked in `--simulated-manual` mode (cycle state `simulated_manual: true`)
+
+**Gate check:** Read `task_tracking.adapter` from the root `hive.config.yaml`. If the value is not `'multica'`, emit one log line and skip:
+```
+[gate_mode] task_tracking.adapter={value} — Multica close skipped
+```
+
+**When `task_tracking.adapter === 'multica'`:**
+
+```javascript
+import { closeStoryIssue } from 'hive/lib/multica-issue-closer.mjs';
+
+const result = await closeStoryIssue({ epic_id, story_id });
+```
+
+Emit one log line based on the result. Use `story.tracker_id` as the issue identifier when available; otherwise use the `story_id`:
+
+| Result | Log line |
+|---|---|
+| `ok: true, was_changed: true` | `[multica-closer] closed {identifier} (story_id={story_id})` |
+| `ok: true, was_changed: false` | `[multica-closer] {identifier} already {result.reason} (story_id={story_id})` |
+| `ok: false` | `[multica-closer] WARN {result.reason} for story_id={story_id} — Multica board may be stale` |
+
+On `ok: false`: emit the warn line and continue. Do **not** halt the integrate step.
+
+### 6b. Verify CI (if available)
 If the project has CI: check that the push triggers a build and it passes.
 If no CI: note "no CI configured" in the report.
 
