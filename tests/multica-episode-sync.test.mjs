@@ -309,6 +309,70 @@ test('AC6: writeMulticaRunEpisode truncates messages to last N with note indicat
   }
 });
 
+test('AC8: writeMulticaRunEpisode with phase writes {phase}.yaml', async () => {
+  const hiveStateDir = await tempHiveState();
+  try {
+    const result = await writeMulticaRunEpisode({
+      hiveStateDir,
+      epicHandle: 'epic-1',
+      storyId: 'story-1',
+      issueUuid: ISSUE_UUID,
+      identifier: 'plugin-hive/PLU-42',
+      phase: 'research',
+      terminal: {
+        status: 'completed',
+        notes: 'done',
+        messages: [],
+        task_id: 'task-2',
+        agent_id: 'agent-2',
+        agent_name: 'researcher',
+        work_dir: '/tmp/work',
+        attempts: 1,
+        started_at: '2026-05-22T00:00:00.000Z',
+        completed_at: '2026-05-22T00:01:00.000Z',
+      },
+    });
+    assert.match(result.markerPath, /research\.yaml$/);
+    assert.match(result.messagesPath, /research\.messages\.jsonl$/);
+    const marker = parseMarker(await fs.readFile(result.markerPath, 'utf8'));
+    assert.equal(marker.status, 'passed');
+    assert.equal(marker.agent, 'researcher');
+  } finally {
+    await fs.rm(hiveStateDir, { recursive: true, force: true });
+  }
+});
+
+test('AC9: writeMulticaRunEpisode without phase writes multica-run.yaml (back-compat)', async () => {
+  const hiveStateDir = await tempHiveState();
+  try {
+    const result = await writeMulticaRunEpisode({
+      hiveStateDir,
+      epicHandle: 'epic-1',
+      storyId: 'story-1',
+      issueUuid: ISSUE_UUID,
+      identifier: 'plugin-hive/PLU-42',
+      terminal: {
+        status: 'completed',
+        notes: 'done',
+        messages: [],
+        task_id: 'task-3',
+        agent_id: 'agent-3',
+        agent_name: 'developer',
+        work_dir: '/tmp/work',
+        attempts: 1,
+        started_at: '2026-05-22T00:00:00.000Z',
+        completed_at: '2026-05-22T00:01:00.000Z',
+      },
+    });
+    assert.match(result.markerPath, /multica-run\.yaml$/);
+    assert.match(result.messagesPath, /multica-run\.messages\.jsonl$/);
+    const marker = parseMarker(await fs.readFile(result.markerPath, 'utf8'));
+    assert.equal(marker.status, 'passed');
+  } finally {
+    await fs.rm(hiveStateDir, { recursive: true, force: true });
+  }
+});
+
 test('AC7: pollTaskUntilTerminal tolerates two transient failures and throws on three', async () => {
   const recovers = await startMockMultica({
     failActiveFirst: 2,
