@@ -5,8 +5,10 @@ Status markers are lightweight files that track workflow step completion. They r
 ## Storage Path
 
 ```
-.pHive/episodes/{epic-id}/{story-id}/{step-id}.yaml
+.pHive/episodes/{epic-id}/{story-id}/{workflow-phase}.yaml
 ```
+
+The marker basename is derived from the workflow-phase name (e.g. `research.yaml`, `implement.yaml`, `test.yaml`, `review.yaml`, `integrate.yaml`). Legacy callers that do not pass a `phase` argument write `multica-run.yaml` — this preserves the pre-H1 behavior.
 
 ## Format
 
@@ -27,7 +29,7 @@ That's it. Four fields. Target: under 200 bytes per marker.
 | `step_id` | string | yes | Step ID matching the workflow definition |
 | `status` | enum | yes | `completed`, `failed`, or `escalated` |
 | `timestamp` | string | yes | ISO 8601 completion time |
-| `artifacts` | list | yes | File paths created or modified (empty list if none) |
+| `artifacts` | list | yes | **File paths only** — no embedded prose (R2). List the paths of files created or modified; use an empty list if none. |
 
 ## Status Values
 
@@ -55,7 +57,7 @@ Check `.pHive/episodes/{epic-id}/{story-id}/` for marker files. Cross-reference 
 | Any marker has `status: failed` or `escalated` | failed |
 | All `depends_on` stories not yet completed | blocked |
 
-For in-progress stories, the most recent marker (by step order in the workflow) indicates the current phase.
+For in-progress stories, the most recent marker (by step order in the workflow) indicates the current workflow-phase.
 
 ## Story state — derived from markers, not free-written
 
@@ -70,8 +72,30 @@ Agent guidance:
 - If a workflow needs to express "this story moved state at time T", write a marker for the appropriate step (or a new `status_transition` synthetic step in workflows that need explicit state events).
 - Tools reading story state (`/hive:status`, planning consumers, meta-team feeds) MUST reconstruct from markers, not read the YAML field.
 
-## Inter-phase context passing
+## `artifacts:` contract — file paths only (R2)
 
-Context between workflow steps is passed **directly via agent prompts**, not stored in marker files. When the orchestrator or team lead runs step N+1, they include relevant output from step N in the task prompt. This is ephemeral — it lives in the conversation, not on disk.
+The `artifacts:` list carries **file paths only**. Prose, conclusions, summaries, and decisions must never be embedded in this field.
 
-For context that should persist beyond the current session, use the **insight capture** system (see `agent-memory-schema.md`).
+**Why (R2 mitigation):** Markers must stay lean (target: under 200 bytes). The next workflow-phase's brief is the prose carrier — it includes the artifact file references verbatim and the agent reads those files directly. Embedding prose in markers would duplicate content, bloat the marker, and make the inter-phase context channel brittle.
+
+Valid:
+```yaml
+artifacts:
+  - hive/references/episode-schema.md
+  - .pHive/epics/my-epic/research/findings.md
+```
+
+Invalid (never do this):
+```yaml
+artifacts:
+  - "Updated the schema doc to clarify the artifacts field"  # prose — forbidden
+```
+
+## Inter-workflow-phase context passing
+
+Context between workflow steps is passed via two channels:
+
+1. **Agent prompts** — the orchestrator or team lead includes the previous workflow-phase's `artifacts:` file paths in the next step's brief. The receiving agent reads those files directly. This is the primary inter-phase channel.
+2. **Insight capture** — for context that must survive beyond the current session, use the insight capture system (see `agent-memory-schema.md`).
+
+Marker files are **not** a context channel. They record completion state and artifact pointers only.
