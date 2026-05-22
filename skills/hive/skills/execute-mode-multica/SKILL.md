@@ -1,13 +1,13 @@
 ---
 name: execute-mode-multica
-description: Run Hive workflow stories through team cells. One Multica parent issue per Hive story (pure container, unassigned); per-workflow-phase child fan-out dispatched by tce-9. Episode markers track lifecycle per workflow-phase.
+description: Run Hive workflow stories through team cells. One Multica parent issue per Hive story (unassigned container); N child issues dispatched per workflow-phase in roster order. Per-workflow-phase episode markers. U2 failure-policy table governs retry, fail, and block outcomes.
 ---
 
-# Hive Mode — Multica (cell shell)
+# Hive Mode — Multica
 
-Atomic skill, NOT inline `/execute` prose. Runs the Multica execution mode for a workflow using the team-cell model: each story gets one Multica **parent issue** (holds the brief, assigned to nobody) plus N child issues per resolved workflow-phase (dispatched in tce-9).
+Atomic skill, NOT inline `/execute` prose. Runs the Multica execution mode for a workflow using the team-cell model: each story gets one Multica **parent issue** (holds the brief, assigned to nobody) plus N child issues — one per resolved workflow-phase in roster order.
 
-This file delivers the parent-issue half of the rewrite (outline §4.6 steps 1–2 + 5; design §2.3). Child fan-out (steps 3–4) ships in tce-9. The F1 null-`project_id` hard-block ships in tce-10. The renamed legacy single-developer path ships in tce-14.
+This file delivers the full rewrite per outline §4.6 steps 1–5 + design §2.3. The F1 null-`project_id` hard-block ships in tce-10. The renamed legacy single-developer path ships in tce-14.
 
 Vocabulary anchor (outline §10): "team cell" = one parent issue + N child issues per workflow-phase. "workflow-phase" is the slot type. "role" is the persona bound to a workflow-phase. No bare "phase" outside §8 quotes.
 
@@ -27,8 +27,9 @@ Called once per parent workflow when `mode_decision == multica` was returned by 
 
 **Outputs:**
 - One parent Multica issue per story (unassigned, holds brief, bound to resolved `project_id`).
-- Roll-up summary returned to `/execute` with parent issue handles per story.
-- Per-workflow-phase episode markers (`multica-run-{workflow-phase}.yaml`) are written by tce-9's child fan-out.
+- N child Multica issues per story — one per resolved workflow-phase in roster order, each assigned to the role agent.
+- One episode marker per workflow-phase at `${HIVE_STATE_DIR}/episodes/{epic_handle}/{story_id}/{workflow-phase}.yaml`.
+- Roll-up summary returned to `/execute` with dispatched stories and terminal statuses.
 
 ## Process
 
@@ -104,7 +105,7 @@ const parentIssue = await multicaFetch(
 );
 ```
 
-Capture `{ parentUuid, identifier }` from the response. Record in an in-memory map keyed by `story_id` for use in Step 5 and by tce-9's child fan-out.
+Capture `{ parentUuid, identifier }` from the response. Record in an in-memory map keyed by `story_id` for use in Steps 3–4 and Step 5.
 
 Log to stderr:
 
@@ -112,39 +113,196 @@ Log to stderr:
 [multica:{story_id}] parent issue created: {identifier} ({parentUuid})
 ```
 
-### Steps 3–4: Per-workflow-phase child fan-out — DEFERRED (tce-9)
+### Step 3: Per-workflow-phase child fan-out
 
-Steps 3 and 4 (child issue creation per workflow-phase + parent close) ship in tce-9. When this story merges in isolation, no child issues are created and the parent issue remains open.
+Process each workflow-phase in `roster` order sequentially. Track `attemptsByPhase` (per workflow-phase retry counts, starting at 1).
 
-Emit for each story:
+#### 3a. Create child issue
+
+Resolve the role agent UUID for this workflow-phase:
+
+```js
+import {
+  resolveAgentUuidByName,
+  serializeStoryBrief,
+} from '../../../../hive/lib/multica-story-dispatch/index.mjs';
+
+const roleAgentUuid = await resolveAgentUuidByName(serverUrl, token, workspaceId, phase.role);
+```
+
+Create the child issue with parent binding and role assignment:
+
+```js
+const childIssue = await multicaFetch(
+  `/api/issues?workspace_id=${encodeURIComponent(workspaceId)}`,
+  {
+    method: 'POST',
+    body: {
+      title: `[${phase['workflow-phase']}] ${storySpec.title}`,
+      description: phaseBrief,    // built in step 3b
+      status: 'todo',
+      parent_id: parentUuid,
+      project_id: resolvedProjectId ?? undefined,
+      assignee_type: 'agent',
+      assignee_id: roleAgentUuid,
+    },
+  },
+);
+```
+
+Log to stderr:
 
 ```text
-[multica:{story_id}] child fan-out deferred to tce-9 — roster has {N} workflow-phase(s): {list}
+[multica:{story_id}:{workflow-phase}] child created: {identifier} ({childUuid}) → role={role}
+```
+
+#### 3b. Inject workflow-phase brief
+
+The workflow-phase brief is composed from two channels (R2 — marker `artifacts:` file-path-only):
+
+1. **Story brief subset** — the parent brief produced by `serializeStoryBrief(storySpec)`, annotated with the current workflow-phase name so the agent knows which step it owns.
+2. **Prior workflow-phase artifact paths** — if a prior workflow-phase marker exists at `.pHive/episodes/{epic_handle}/{story_id}/{prior-workflow-phase}.yaml`, extract its `artifacts:` list and append as a reference block. File paths only; no embedded prose.
+
+Template:
+
+```text
+## Workflow-phase: {workflow-phase} (role: {role})
+
+{parent_brief_content}
+
+## Prior workflow-phase outputs
+{artifact_path_1}
+{artifact_path_2}
+...
+(omit section if no prior workflow-phases have run)
+```
+
+#### 3c. Poll until terminal
+
+```js
+import {
+  pollTaskUntilTerminal,
+} from '../../../../hive/lib/multica-story-dispatch/episode-sync.mjs';
+
+const maxWallClockMs = (hive_config?.execution?.multica?.story_timeout_seconds ?? 1800) * 1000;
+const pollIntervalMs = (hive_config?.execution?.multica?.poll_interval_seconds ?? 5) * 1000;
+const messagesCaptureMax = hive_config?.execution?.multica?.messages_capture_max ?? 200;
+
+const terminal = await pollTaskUntilTerminal({
+  serverUrl,
+  token,
+  workspaceId,
+  issueUuid: childIssue.id,
+  maxWallClockMs,
+  pollIntervalMs,
+  messagesCaptureMax,
+  onStateTransition(prev, next) {
+    stderr.write(`[multica:${storyId}:${phase['workflow-phase']}] ${prev} → ${next}\n`);
+  },
+});
+```
+
+#### 3d. Write per-workflow-phase episode marker
+
+```js
+import {
+  writeMulticaRunEpisode,
+} from '../../../../hive/lib/multica-story-dispatch/episode-sync.mjs';
+
+await writeMulticaRunEpisode({
+  hiveStateDir: process.env.HIVE_STATE_DIR ?? '.pHive',
+  epicHandle,
+  storyId,
+  issueUuid: childIssue.id,
+  identifier: childIssue.identifier,
+  terminal,
+  messagesCaptureMax,
+  phase: phase['workflow-phase'],   // → {workflow-phase}.yaml per tce-6
+});
+```
+
+Marker path: `.pHive/episodes/{epic_handle}/{story_id}/{workflow-phase}.yaml`.
+
+#### 3e. Consult U2 failure-policy table
+
+When `terminal.status !== 'completed'`, look up the scenario in the explicit failure-policy table:
+
+```js
+const FAILURE_POLICY = {
+  core_phase_fail:     (attempt, maxRetries) => attempt < maxRetries ? 'retry' : 'fail_story',
+  optional_phase_fail: ()                    => 'block_story',
+  circuit_breaker_hit: ()                    => 'fail_story',
+};
+```
+
+| Scenario | Condition | Action |
+|---|---|---|
+| `core_phase_fail` — first attempt | `terminal.status === 'failed'` on a core workflow-phase, attempt 1 | `retry` — re-run step 3a through 3e for this workflow-phase (attempt 2) |
+| `core_phase_fail` — after retries | `terminal.status === 'failed'` on a core workflow-phase, attempt ≥ `max_step_retries` (default 2) | `fail_story` — mark parent `failed`; emit no further workflow-phases |
+| `optional_phase_fail` | `terminal.status === 'failed'` on an optional workflow-phase (any attempt) | `block_story` — mark parent `blocked`; halt; operator review required before continuation |
+| `circuit_breaker_hit` | `terminal.status === 'cancelled'` (wall-clock timeout — `story_timeout_seconds`, design intent 45 min) | `fail_story` — cell terminated; mark parent `failed`; markers reflect final state |
+
+Whether a workflow-phase is `core` or `optional` is determined by the roster slot type (from `execute-cell.yaml`): core workflow-phases come from `core[]`; optional workflow-phases originate from an `optional[]` slot with `appends_after:` or `replaces:`.
+
+On `fail_story`:
+
+```js
+await multicaFetch(
+  `/api/issues/${parentUuid}?workspace_id=${encodeURIComponent(workspaceId)}`,
+  { method: 'PUT', body: { status: 'failed' } },
+);
+// dispatch no further workflow-phases; proceed to Step 5
+```
+
+On `block_story`:
+
+```js
+await multicaFetch(
+  `/api/issues/${parentUuid}?workspace_id=${encodeURIComponent(workspaceId)}`,
+  { method: 'PUT', body: { status: 'blocked' } },
+);
+stderr.write(
+  `[multica:${storyId}:${phase['workflow-phase']}] BLOCKED — optional workflow-phase failed; operator review required\n`,
+);
+// dispatch no further workflow-phases; proceed to Step 5
+```
+
+### Step 4: Close parent issue
+
+When all workflow-phases in the roster complete with `terminal.status === 'completed'`, mark the parent done:
+
+```js
+await multicaFetch(
+  `/api/issues/${parentUuid}?workspace_id=${encodeURIComponent(workspaceId)}`,
+  { method: 'PUT', body: { status: 'done' } },
+);
+```
+
+Log to stderr:
+
+```text
+[multica:{story_id}] all {N} workflow-phases completed — parent closed: done
 ```
 
 ### Step 5: Return roll-up summary
 
-After all stories in `unblocked_stories[]` have produced a parent issue (or a per-story failure record), return to caller (`/execute`):
+After all stories in `unblocked_stories[]` have resolved (all workflow-phases completed, or a failure/block outcome reached), return to caller (`/execute`):
 
 ```js
 {
-  parents: [
-    {
-      story_id,
-      parentUuid,
-      identifier,
-      project_id: resolvedProjectId ?? null,
-      roster: [{ 'workflow-phase': string, role: string }],
-      created_at,
-    }
+  dispatched: [
+    { story_id, parentUuid, identifier, roster: [{ 'workflow-phase', role }] }
+  ],
+  completed: [
+    { story_id, status: 'passed', parentUuid, identifier }
   ],
   failed: [
-    { story_id, reason }
+    { story_id, status: 'failed' | 'cancelled' | 'blocked', parentUuid, identifier, notes }
   ]
 }
 ```
 
-`/execute` uses this summary to advance the DAG to the next depth, then re-invokes this skill for the next depth's unblocked stories. Child fan-out (tce-9) consumes `parents[].parentUuid` and `parents[].roster` to create per-workflow-phase child issues.
+`/execute` uses this summary to advance the DAG to the next depth, then re-invokes this skill for the next depth's unblocked stories.
 
 ### Sidecar deferral
 
@@ -162,8 +320,13 @@ No additional Multica dispatch is performed for sidecars in v1.
 - Workspace slug not found: abort entire mode with a clear workspace resolution error.
 - `hive/team-cells/execute-cell.yaml` missing: abort with error — cell definition is required.
 - Roster resolution failure (resolver throws): record per-story failure; continue with other stories; surface in `failed[]`.
-- Multica `4xx` at parent issue creation: record per-story failure; continue with other stories in the same depth; surface in `failed[]`.
+- `resolveAgentUuidByName` throws `BOOTSTRAP_REQUIRED`: abort entire mode; emit runbook line (same pattern as prior single-developer mode).
+- Multica `4xx` at parent or child issue creation: record per-story failure; continue with other stories in the same depth; surface in `failed[]`.
 - `project_id` absent (P1 posture): warn to stderr and proceed; hard-block ships in tce-10.
+- Core workflow-phase `failed` after retries: `fail_story` per U2 table — parent marked `failed`; no further workflow-phases dispatched.
+- Optional workflow-phase `failed`: `block_story` per U2 table — parent marked `blocked`; operator review required.
+- Wall-clock timeout (`terminal.status === 'cancelled'`): `circuit_breaker_hit` per U2 table — `fail_story`; parent marked `failed`.
+- Transient network failures during poll: `pollTaskUntilTerminal`'s 3-strike rule throws `TRANSPORT`; episode marker written with `status=failed`; treated as core-phase-fail for policy purposes.
 
 ## Configuration
 
@@ -173,19 +336,20 @@ No additional Multica dispatch is performed for sidecars in v1.
 execution:
   mode: multica                       # opt-in trigger
   multica:
-    project_id: <uuid>                # bound project for parent issue creation
-    poll_interval_seconds: 5          # used by tce-9 child polling
-    story_timeout_seconds: 1800       # 30 min wall-clock per story (tce-9)
-    messages_capture_max: 200         # last N messages into sidecar (tce-9)
+    project_id: <uuid>                # bound project for parent + child issue creation
+    poll_interval_seconds: 5          # how often to poll child task state (step 3c)
+    story_timeout_seconds: 2700       # 45 min wall-clock circuit-breaker per story (U2; design intent)
+    messages_capture_max: 200         # last N messages into sidecar per workflow-phase
+    max_step_retries: 2               # max attempts per core workflow-phase (U2 retry)
 ```
 
 ## Reuses (atomic deps)
 
 - `hive/lib/cell-roster-resolver/index.mjs` (tce-4) — `resolveRoster(storySpec, cellDef)`.
 - `hive/team-cells/execute-cell.yaml` (tce-5) — execute cell roster spec (required at Step 0).
-- `hive/lib/multica-story-dispatch/index.mjs` (s2) — `serializeStoryBrief`.
+- `hive/lib/multica-story-dispatch/index.mjs` (s2) — `serializeStoryBrief`, `resolveAgentUuidByName`.
+- `hive/lib/multica-story-dispatch/episode-sync.mjs` (tce-6) — `pollTaskUntilTerminal`, `writeMulticaRunEpisode` with `phase` parameter.
 - `hive/adapters/multica/index.ts` (`multica-substrate-adoption` s1) — `multicaFetch` / issue CRUD.
-- Per-workflow-phase episode markers and child fan-out: tce-9.
 - F1 null-`project_id` hard-block: tce-10.
 - Legacy single-developer path renamed to `execute-mode-multica-flat`: tce-14.
 
@@ -196,8 +360,12 @@ execution:
 | Atomic skill, not inline `/execute` prose | This file owns the Multica lifecycle for selected mode |
 | Parent is unassigned | `POST /api/issues` carries no `assignee_type` / `assignee_id` |
 | One parent issue per story | Step 2 creates exactly one parent; roll-up handle for `/hive:status` |
-| `project_id` binding | Step 0 resolves project; Step 2 passes it at creation; warn-only until tce-10 |
+| One child issue per workflow-phase | Step 3a creates one child per roster slot; sequential within a story |
+| `project_id` binding | Step 0 resolves project; Steps 2/3a pass it at creation; warn-only until tce-10 |
 | No bare "workflow-phase" shortened to "phase" | V2 vocabulary rule — "workflow-phase" used throughout (outline §10) |
-| Child fan-out deferred | Steps 3–4 stub; tce-9 owns per-workflow-phase child issues |
+| U2 failure-policy is one explicit mapping table | `FAILURE_POLICY` object in step 3e; no scattered inline branching |
+| Marker `artifacts:` entries are file paths only | R2 — no embedded prose; next child's brief includes file refs verbatim |
+| Per-workflow-phase episode marker | `writeMulticaRunEpisode({phase})` called after each child terminates |
+| Parent closed on all-completed | Step 4 sets `status: done`; `status: failed` on fail_story; `status: blocked` on block_story |
 | Parallel only within current depth | `/execute` owns DAG advancement between depths |
 | No sequential fallback | Setup failures abort Multica mode |
