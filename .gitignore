@@ -67,6 +67,11 @@ state/
 !.pHive/epics/team-cell-execution-mode/**
 !.pHive/episodes/team-cell-execution-mode/
 !.pHive/episodes/team-cell-execution-mode/**
+# tce-15 dogfood smoke epic + parallel-run record
+!.pHive/epics/tce-dogfood-smoke/
+!.pHive/epics/tce-dogfood-smoke/**
+!.pHive/dogfood/
+!.pHive/dogfood/**
 # Per-epic cycle-state lives under .pHive/cycle-state/; only the
 # meta-improvement-system entry is tracked at this time (same maintainer-
 # infrastructure rationale as the epics/ and episodes/ subtrees above).

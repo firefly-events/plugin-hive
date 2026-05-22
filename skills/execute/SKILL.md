@@ -182,7 +182,7 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
    **Sub-mode resolution (env > config > default):**
    1. Check `HIVE_MULTICA_SUBMODE` env var. If set to `flat` or `cell`, use that value (source: `env`).
    2. Else check `execution.multica.submode` in root `hive.config.yaml`. If set to `flat` or `cell`, use that value (source: `config`).
-   3. Else default to `flat` (source: `default`). The default is `flat` during the tce-15 parallel-run window; it flips to `cell` at tce-15 close.
+   3. Else default to `cell` (source: `default`). Default flipped to `cell` at tce-15 close; legacy `flat` path exercisable only by explicit flag (tce-16 tracks its removal).
 
    Any value other than `flat` or `cell` is rejected: emit an error and abort with exit `1`:
    ```

@@ -1,0 +1,22 @@
+name: tce-dogfood-smoke
+title: TCE parallel-run dogfood — flat vs cell smoke validation
+description: |
+  Tiny dogfood epic for tce-15 parallel-run gate. NOT story-loop-closure
+  per design §9 explicit note. Two stories: one normal + one CI-touching
+  (to exercise F5 OAuth scope constraint). Purpose: validate equivalence
+  (or documented divergence) between flat and cell execute modes, satisfy
+  design §9 six-checkpoint gate, then flip the default flag to cell.
+
+  This epic is a test vehicle — it does not ship production capability.
+methodology: classic
+
+stories:
+  - id: tce-dogfood-s1
+    title: Smoke story — add CHANGELOG entry (non-CI-touching)
+    complexity: low
+    depends_on: []
+
+  - id: tce-dogfood-s2
+    title: Smoke story — update CI test matrix (CI-touching, exercises F5 OAuth scope)
+    complexity: low
+    depends_on: [tce-dogfood-s1]

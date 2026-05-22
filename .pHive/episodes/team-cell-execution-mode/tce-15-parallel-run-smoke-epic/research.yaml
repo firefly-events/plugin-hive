@@ -1,0 +1,10 @@
+step_id: research
+status: completed
+timestamp: "2026-05-22T19:30:00Z"
+artifacts:
+  - .pHive/epics/tce-dogfood-smoke/epic.yaml
+notes: |
+  Dogfood epic candidate selected: tce-dogfood-smoke (2 stories, 1 CI-touching).
+  Design §9 six-checkpoint definitions reviewed from structured-outline.md §9.
+  Regression inventory completed: four regressions found in R1–R4 (see parallel-run record).
+  tce-0 OAuth scope prerequisite confirmed satisfied.
