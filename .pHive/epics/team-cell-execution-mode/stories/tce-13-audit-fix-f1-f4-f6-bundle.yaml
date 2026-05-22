@@ -1,0 +1,114 @@
+id: tce-13-audit-fix-f1-f4-f6-bundle
+epic: team-cell-execution-mode
+title: Audit fix reconciliation — F1 + F4 + F6 closed; F5 split via chore PR
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [tce-12-post-phase-push-verifier]
+
+description: |
+  Slice 6 per outline §4.8 + hv-plan §2 Slice 6. Reconciliation pass,
+  NOT new construction — the constituent fixes already shipped:
+    - F1 (workspace repo binding) — tce-10 hard-block.
+    - F4 (push behavior) — tce-11 footer + tce-12 verifier.
+    - F6 (git identity drift) — workspace agent commits as `hive-worker`
+      via `custom_env` injected at bootstrap (tce-3 reconciliation —
+      see hv-plan §1.2 / §1.3 for the call site).
+    - F5 (OAuth `workflow` scope) — SPLIT to separate chore PR per
+      C1 (tce-0 documentation anchor).
+
+  Per outline §4.8 + hv-plan §slice-ordering-rationale: "F1 lives
+  inside the skill rewrite, F4/F6 inside bootstrap + verifier; this
+  slice is the reconciliation pass that confirms the bundle is
+  coherent rather than new construction."
+
+  Deliverables:
+    1. Audit doc update at
+       `.pHive/audits/multica-mode-audit-2026-05-22.md` — add
+       closure notes for F1 / F4 / F6, attribute F5 to the chore PR
+       (tce-0).
+    2. End-to-end integration test that exercises a story with a
+       CI-touching file change — verifies F4 (push to feat/{epic}),
+       F5 (CI workflow file accepted by OAuth scope), F6
+       (hive-worker authorship) all work together (outline §9
+       slice-6 assertions).
+
+  This is the audit-closure reconciliation deliverable that audit
+  §Recommended-follow-ons calls for. Per `feedback_scope_class_changes`
+  the audit fixes were bundled inline with the new mode rather than
+  filed as piecemeal patches.
+
+  Vocabulary anchor (outline §10): "team cell" / "workflow-phase"
+  throughout audit doc updates and test prose.
+
+acceptance_criteria:
+  - "Given the audit doc is updated, when a reader inspects `.pHive/audits/multica-mode-audit-2026-05-22.md`, then F1 / F4 / F6 are marked closed via this epic and F5 is marked closed via the chore PR (tce-0)."
+  - "Given a story with a CI-touching file change is dispatched, when it runs end-to-end under the new cell mode, then it succeeds — F4 (push to feat/{epic}), F5 (scope present), F6 (hive-worker author) all green together (outline §9 slice-6 assertions)."
+  - "Given the integration test runs in CI, when its outputs are inspected, then commits are pushed to `feat/{epic}` on the firefly origin with `hive-worker` author (F4 + F6 confirmed) and CI workflow file changes succeed (F5 confirmed via chore prerequisite)."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Inventory which audit findings are closed by which earlier
+      story (F1 → tce-10; F4 → tce-11/tce-12; F6 → tce-3 custom_env
+      injection — confirm with that story's outputs; F5 → tce-0
+      chore-PR anchor). Identify a small CI-touching story shape for
+      the integration test.
+  - id: implement
+    agent: technical-writer
+    description: |
+      Update the audit doc with closure notes per finding. Cross-link
+      each closure to the implementing story id.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Build the end-to-end integration test exercising a CI-touching
+      story; assert F4 + F5 + F6 all hold together in the same run.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Confirm bundle coherence — no double-counting, no missing
+      finding. Confirm F5 is correctly attributed to tce-0 / chore PR.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/audits/multica-mode-audit-2026-05-22.md
+      purpose: Audit doc receiving closure updates.
+    - path: hive/lib/multica-bootstrap/index.mjs
+      purpose: F6 `custom_env` injection site (tce-3 reconciliation work).
+
+files_to_modify:
+  - file: .pHive/audits/multica-mode-audit-2026-05-22.md
+    change: Add closure notes — F1 / F4 / F6 closed by this epic; F5 closed by chore PR (tce-0).
+  - file: tests/multica-cell-mode-audit-bundle.test.js
+    change: NEW — end-to-end integration test exercising a CI-touching story.
+
+design_decisions:
+  - decision: F6 git identity injection lands in the bootstrap reconciliation pass (tce-3 / hv-plan §1.2), not as a separate story.
+    rationale: hv-plan §1.2 — `custom_env: {GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL}` injection is at the bootstrap call site; bundling it with persona reconciliation keeps the call-site coherent.
+  - decision: This slice is a reconciliation pass, not new construction.
+    rationale: hv-plan §slice-ordering-rationale + outline §4.8 — constituent fixes already shipped; the bundle slice confirms cohesion.
+
+risks:
+  - severity: medium
+    description: A finding may be reported "closed" while a subtle regression remains; integration test must exercise all three together.
+    mitigation: End-to-end integration test exercises F4 + F5 + F6 in one CI-touching run.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.8 Slice 6; §3.1 audit findings F1-F6; §9 slice-6 assertions; §11 slice-6.1 / slice-6.2"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§1.8 Audit fix layer; §2 Slice 6; §slice-ordering-rationale"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.5; §10 C1"
+  - path: .pHive/audits/multica-mode-audit-2026-05-22.md
+    relevant_section: "§Findings F1-F6; §Recommended-follow-ons"

@@ -1,0 +1,117 @@
+id: tce-4-cell-roster-resolver-lib
+epic: team-cell-execution-mode
+title: Scaffold `hive/lib/cell-roster-resolver/` resolution package
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [tce-3-bootstrap-reconciliation-tests]
+
+description: |
+  Slice 2 first half per outline §4.4 + hv-plan §2 Slice 2.
+  Verbatim slice goal (outline §4.4): "New `hive/lib/cell-roster-resolver/`
+  package resolves `story-spec + cell-yaml + signal predicates` into
+  a concrete roster (`workflow-phase → role`) per design §2.2 +
+  hv-plan slice 2."
+
+  Per V1 resolution (outline §10; design §10 V1) the package name is
+  `cell-roster-resolver`, NOT `team-cell-composer` (collides with
+  planning-routing's roster-builder).
+
+  Per P2 resolution (outline §10; design §10 P2) the resolver ships
+  as a hive-lib code module called from the new skill — NOT as an
+  atomic skill. Rationale: "composer is pure resolution logic
+  (story-spec → roster), not a user-callable composable surface;
+  skill-layer cost not justified" (design §10 P2). Skill-layer
+  extraction is flagged as post-2.x candidate.
+
+  Scope of this story: scaffold the package + implement the
+  resolution logic. Inputs: story spec (carries scope hints), cell
+  YAML at `hive/team-cells/execute-cell.yaml` (delivered by tce-5),
+  signal predicates inline in the YAML. Output: ordered
+  `[(workflow-phase, role)]` list (outline §5.2).
+
+  Signal detection runs over the story spec at cell creation time
+  using the keyword-list pattern from design §2.2 (precedent: /plan
+  step 16 UI detection — research §4.1). Predicates are simple
+  `==`/boolean fields; per design §2.2: "Don't compile to the
+  predicate grammar yet — keep it dumb until we see a real signal
+  that needs OR / NOT."
+
+  Vocabulary anchor (outline §10): code uses `workflow-phase` not
+  bare `phase`; the slot type is `role` not `agent`.
+
+acceptance_criteria:
+  - "Given a backend-tagged story spec is passed to the resolver, when resolution runs, then the output roster has `backend-developer` substituting `developer` via the `replaces:` slot rule (outline §9 slice-2 assertions; design §2.2)."
+  - "Given a UI-tagged story spec, when resolution runs, then the roster contains the `frontend-developer` variant per the cell YAML."
+  - "Given a story with no triggering signals, when resolution runs, then only `core[]` roles are returned in roster order."
+  - "Given the resolver is invoked from the new skill (tce-9), when it returns, then every roster slot carries a `workflow-phase` field, never bare `phase` (V2 vocabulary rule)."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read /plan step 16 (UI detection keyword-list precedent —
+      research §4.1) and meta-team workflow predicate examples to
+      pick the predicate evaluation shape.
+  - id: implement
+    agent: developer
+    description: |
+      Scaffold `hive/lib/cell-roster-resolver/` with `index.mjs` +
+      adjacent helpers. Implement resolution: load cell YAML, evaluate
+      signal predicates against story spec, apply `replaces:` and
+      `appends_after:` slot rules.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Unit tests cover: core[] always present, optional[] applied iff
+      signal matches, `replaces:` swaps the slot, `appends_after:`
+      appends after the named phase, vocabulary rule (no bare "phase").
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Confirm V1 naming, P2 code-module shape (no skill manifest),
+      V2 vocabulary across exported types and function names.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/plan/SKILL.md
+      purpose: /plan step 16 — keyword-list signal-detection precedent.
+    - path: hive/lib/multica-bootstrap/index.mjs
+      purpose: Reference for hive-lib code-module shape (tce-2 sibling).
+
+files_to_modify:
+  - file: hive/lib/cell-roster-resolver/index.mjs
+    change: NEW — package entry point.
+  - file: hive/lib/cell-roster-resolver/predicates.mjs
+    change: NEW — predicate evaluator (boolean / equality only).
+  - file: tests/cell-roster-resolver.test.js
+    change: NEW — resolution unit tests covering core/optional/replaces/appends_after.
+
+design_decisions:
+  - decision: Package name is `cell-roster-resolver`, not `team-cell-composer`.
+    rationale: V1 resolution — `composer` collides with planning-routing's roster-builder; collision was flagged by grill V1 / design §10 V1.
+  - decision: Ship as hive-lib code module, not as atomic skill.
+    rationale: P2 resolution — pure resolution logic with no user-callable composable surface; skill-layer cost not justified at this stage (post-2.x candidate).
+  - decision: Predicate grammar stays "dumb" — equality / boolean fields only.
+    rationale: Design §2.2 — "keep it dumb until we see a real signal that needs OR / NOT."
+
+risks:
+  - severity: medium
+    description: R2 — Inter-phase context-passing risk lands on the resolver's output shape; if it omits ordering metadata, child briefs cannot reference prior workflow-phase artifacts.
+    mitigation: Roster output is ordered; tester asserts ordering matches `core[]` + `optional[]` insertion rules.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.4 Slice 2; §5.2 Roster resolution; §9 slice-2 assertions; §11 slice-2.1/2.2"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§1.2 Hive lib layer; §2 Slice 2"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.2; §10 V1; §10 P2"

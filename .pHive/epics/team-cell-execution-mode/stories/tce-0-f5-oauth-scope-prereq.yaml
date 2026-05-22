@@ -1,0 +1,75 @@
+id: tce-0-f5-oauth-scope-prereq
+epic: team-cell-execution-mode
+title: F5 OAuth `workflow` scope refresh (documented prerequisite chore)
+status: documented-prereq
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  DOCUMENTATION-ONLY story. This story exists to record that the F5
+  OAuth-scope prerequisite chore must merge in a SEPARATE PR before
+  tce-7 dispatch, and to capture the one-line acceptance test the
+  operator runs against the live daemon.
+
+  Context (outline §4.1, §3.1 F5, hv-plan §2 Prerequisite): the audit
+  documented story s1-3 (CI workflow file) as unsalvageable because
+  the Multica daemon's GitHub OAuth credential lacked the `workflow`
+  scope. Per grill C1 / design §10 C1, bundling the OAuth refresh
+  inline would create a slice-0 hard-block that pauses for human
+  OAuth flow inside an otherwise autonomous-execution epic. The fix
+  is therefore EXTRACTED into a one-off chore PR named
+  `chore:multica:auth-refresh-workflow-scope`, run with operator
+  participation, BEFORE slice 4 of this epic dispatches.
+
+  Acceptance test (single line, operator-run):
+    `gh auth status | grep workflow`
+  Daemon log inspected after `multica setup` re-run shows the new
+  token carries the `workflow` scope.
+
+  No code in this epic touches this fix. Slice 0 (tce-1) DETECTS the
+  scope is live and halts with a runbook line if it is missing (R5
+  mitigation); this story is closed at planning time as
+  `status: documented-prereq` and is the link-target for that
+  detection runbook line.
+
+acceptance_criteria:
+  - "Given an operator runs `gh auth status` after the chore PR completes, when they grep for `workflow`, then the scope is listed for the Multica daemon's token."
+  - "Given the chore PR has not yet merged, when tce-1 slice-0 detection runs, then it halts with a runbook line pointing back to this story id."
+  - "Given this story file is read at planning time, when the reader inspects its status, then it shows `documented-prereq` so /hive:status excludes it from active-story counts."
+
+steps:
+  - id: documentation-only
+    agent: tpm
+    description: |
+      No execution steps. This story is a planning-time documentation
+      anchor for the F5 OAuth-scope prerequisite chore PR.
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/audits/multica-mode-audit-2026-05-22.md
+      purpose: Source of the F5 finding (audit §F5) and Recommended-follow-ons #3.
+    - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+      purpose: Design §10 C1 — rationale for extracting F5 into a separate chore PR.
+    - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+      purpose: hv-plan §2 Prerequisite block — chore PR shape.
+
+files_to_modify: []
+
+design_decisions:
+  - decision: F5 token-scope refresh is extracted from this epic into a separate prerequisite chore PR.
+    rationale: Grill C1 / design §10 C1 — bundling a user-interactive OAuth flow inside an autonomous-execution epic would create a slice-0 hard-block. Keeping it as a one-off chore preserves slice-0's autonomous-spikeability.
+
+risks:
+  - severity: medium
+    description: R5 — F5 prerequisite requires user-interactive OAuth; if the chore PR is not run, tce-1 halts with a runbook line and tce-7 cannot proceed.
+    mitigation: Slice-0 detection (tce-1) probes daemon token scope and emits a clear runbook line referencing this story id when `workflow` scope is missing.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.1 F5 Chore PR (prerequisite, NOT in this epic); §3.1 F5; §6 R5"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§10 C1; §2.5 F5; §3 R5"
+  - path: .pHive/epics/team-cell-execution-mode/docs/grill-record.md
+    relevant_section: "C1 — Audit-fix bundling risks slice coupling"

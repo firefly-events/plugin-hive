@@ -1,0 +1,117 @@
+id: tce-15-parallel-run-smoke-epic
+epic: team-cell-execution-mode
+title: Dogfood epic parallel-run gate — flat vs cell mode + design §9 six-checkpoint
+status: pending
+complexity: high
+methodology: classic
+depends_on: [tce-14-feature-flag-execute-mode-flat]
+
+description: |
+  Slice 7 second third per outline §4.9 + hv-plan §2 Slice 7.
+  Verbatim slice goal (outline §4.9): "Run both modes on a tiny
+  dogfood epic (NOT story-loop-closure per design §9), validate
+  equivalence (or documented divergence), then flip the default flag
+  to the new cell mode."
+
+  Per design §9 the acceptance gate is six numbered checkpoints
+  (outline §9 slice-7 assertions):
+    1 — parent+child visible in Multica board (slice-4).
+    2 — correct role+runtime per workflow-phase (slice-1).
+    3 — markers at correct paths per workflow-phase (slice-3).
+    4 — commits pushed to feat/{epic} on firefly as hive-worker (slice-5 + F4/F6).
+    5 — CI-touching stories don't fail on token scope (F5 chore).
+    6 — /hive:status renders accurate story state by aggregating
+        per-phase markers.
+
+  This story:
+    1. Picks a tiny dogfood epic (NOT story-loop-closure per design
+       §9 explicit note).
+    2. Runs it under `flat` mode (baseline).
+    3. Runs the same epic under `cell` mode.
+    4. Compares outputs against the six-checkpoint gate.
+    5. Documents equivalence OR documented divergence in
+       `.pHive/dogfood/team-cell-mode-parallel-run.md`.
+    6. Flips the feature flag default to `cell` at slice close.
+
+  Vocabulary anchor (outline §10): "team cell" mode, "workflow-phase"
+  markers; design §9 six-checkpoint vocabulary preserved.
+
+acceptance_criteria:
+  - "Given a tiny dogfood epic (NOT story-loop-closure) is selected, when it runs end-to-end under `cell` mode, then all six design §9 checkpoints are green (outline §9 slice-7 assertions)."
+  - "Given the same epic runs under `flat` mode, when its outputs are compared against the `cell` run, then any divergence is documented in `.pHive/dogfood/team-cell-mode-parallel-run.md` with a disposition (acceptable / blocker)."
+  - "Given the slice closes successfully, when the feature flag default is inspected post-merge, then `/execute` defaults to `cell` mode and the legacy `flat` path is exercisable only by explicit flag (tce-16 tracks its removal)."
+  - "Given `/hive:status` is invoked on the dogfood epic post-run, when it aggregates per-workflow-phase markers, then story state is accurately rendered from the markers (design §9 checkpoint 6)."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Identify a tiny dogfood epic candidate (NOT story-loop-closure).
+      Read design §9 six-checkpoint definitions; outline §9 slice-7
+      assertions. Confirm CI-touching story exists in the dogfood
+      epic so F5 is exercised (depends on tce-0 chore PR being live).
+  - id: implement
+    agent: developer
+    description: |
+      Run the dogfood epic under `flat` mode (baseline). Run it under
+      `cell` mode. Capture both outputs. Document equivalence /
+      divergence in `.pHive/dogfood/team-cell-mode-parallel-run.md`.
+      Flip the default flag at end of run.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      For each of design §9's six checkpoints, assert pass/fail on
+      the `cell` mode run. If any fails, the slice does not close
+      (per outline §9: "epic is NOT done until all six numbered
+      assertions … pass on the dogfood epic").
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Confirm dogfood epic is NOT story-loop-closure. Confirm all six
+      checkpoints green. Confirm the flag-flip happened and is
+      reversible if a regression surfaces.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push the parallel-run record + flag flip.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/execute/SKILL.md
+      purpose: `/execute` host — flag default flipped here.
+    - path: skills/hive/skills/status/SKILL.md
+      purpose: /hive:status — checkpoint 6 carrier.
+    - path: .pHive/epics/
+      purpose: Dogfood epic candidate selection.
+
+files_to_modify:
+  - file: .pHive/dogfood/team-cell-mode-parallel-run.md
+    change: NEW — parallel-run record + six-checkpoint disposition.
+  - file: skills/hive/skills/execute/SKILL.md
+    change: Flip feature flag default from `flat` to `cell` (at slice close).
+
+design_decisions:
+  - decision: Dogfood epic must NOT be story-loop-closure.
+    rationale: Design §9 explicit note — "do NOT re-run the actual `story-loop-closure` epic; pick a tiny dogfood epic for the migration test."
+  - decision: Flag flip is at slice close, post-validation, not at slice start.
+    rationale: hv-plan §1.9 — parallel-run discipline requires both modes succeed before flipping default.
+
+risks:
+  - severity: high
+    description: R1 + R4 — Cell startup latency on a real epic may exceed slice-0 spike measurements; if the dogfood epic times out, the slice does not close.
+    mitigation: Circuit-breaker at `story_timeout_minutes=45` caps wall-clock per story; if circuit-breaker fires, the slice halts and feeds back to scope adjustment.
+  - severity: high
+    description: R3 — Push-target verifier (tce-12) is exercised here for the first time on a real epic; false positives would fail otherwise-good runs.
+    mitigation: tce-12 contingency allow-list available; if false positive surfaces, narrow the verifier rather than weaken the rule (per outline §6 R3 contingency).
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.9 Slice 7; §9 slice-7 assertions (six checkpoints); §11 slice-7.2"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§1.9 Migration / parallel-run layer; §2 Slice 7"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§9 What done looks like"

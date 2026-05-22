@@ -1,0 +1,99 @@
+id: tce-11-brief-footer-push-constraint
+epic: team-cell-execution-mode
+title: Advisory brief-footer naming permitted push target (`feat/{epic}`)
+status: pending
+complexity: low
+methodology: classic
+depends_on: [tce-10-dispatch-null-project-hardblock]
+
+description: |
+  Slice 5 first half per outline §4.7 + hv-plan §2 Slice 5.
+  Verbatim slice goal fragment (outline §4.7): "Brief footer text
+  from §1.7 is kept as advisory belt-and-braces; the verifier is the
+  enforcement (design §10 H3)."
+
+  Per H3 resolution (outline §6 R3; design §10 H3): footer alone is
+  insufficient — audit §F4 already showed agents disobeyed an
+  equivalent constraint twice. The actual enforcement is the
+  post-task verifier (tce-12). This story carries the footer as the
+  belt-and-braces advisory layer that names the permitted push
+  target in the brief itself.
+
+  Footer constraints (hv-plan §1.7):
+    - Push target MUST be `feat/{epic}` on the firefly origin.
+    - `agent/developer/<task>` orphan branches are forbidden.
+    - Commit author must be `hive-worker <hive-worker@noreply.github.com>`
+      (per F6; injected via `custom_env` at bootstrap per tce-3, not
+      via footer alone).
+
+  Footer text is added to all execute-mode-multica child briefs at
+  serialization time. Brief serializer call site is in
+  `hive/lib/multica-story-dispatch/` (or sibling) where
+  `serializeStoryBrief` lives. Vocabulary anchor (outline §10): refer
+  to "team cell" child briefs; "workflow-phase" not bare "phase".
+
+acceptance_criteria:
+  - "Given a child brief is serialized for any workflow-phase, when the brief is read, then it carries the three-line footer naming `feat/{epic}` as the permitted push target, orphan branches as forbidden, and `hive-worker` as the commit author."
+  - "Given an epic with id `team-cell-execution-mode`, when a child brief is serialized, then the footer's epic placeholder resolves to `feat/team-cell-execution-mode`."
+  - "Given the footer is read by V2-rule linting, when it is inspected, then no bare `phase` appears in the footer prose."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Locate the brief serializer in `hive/lib/multica-story-dispatch/`;
+      identify the call site that builds the child brief; read
+      hv-plan §1.7 + outline §4.7 for the exact footer constraints.
+  - id: implement
+    agent: developer
+    description: |
+      Add the three-line advisory footer to the child brief
+      serialization output. Interpolate `feat/{epic}` from the epic
+      context.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Snapshot a serialized child brief and assert the footer is
+      present with the resolved epic name. Verify no bare `phase`
+      appears in the footer text.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Confirm the footer is advisory only (no enforcement here —
+      that's tce-12). Confirm V2 vocabulary.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: Likely host of `serializeStoryBrief`; research confirms exact location.
+    - path: skills/hive/skills/execute-mode-multica/SKILL.md
+      purpose: Skill calling the serializer (tce-8 / tce-9 wiring).
+
+files_to_modify:
+  - file: hive/lib/multica-story-dispatch/index.mjs
+    change: Extend `serializeStoryBrief` to append the three-line advisory footer (push target, orphan ban, commit author).
+
+design_decisions:
+  - decision: Footer is advisory only; enforcement is the verifier (tce-12).
+    rationale: H3 — audit F4 shows agents already disobeyed the same constraint twice; advisory text alone is insufficient. The verifier (tce-12) is the enforcement layer; the footer is belt-and-braces.
+
+risks:
+  - severity: high
+    description: R3 — Push-target enforcement gap; if the footer is the only signal, F4 recurs.
+    mitigation: tce-12 verifier is the enforcement layer; this story is intentionally advisory.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.7 Slice 5; §6 R3; §11 slice-5.1 (verifier sibling)"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§1.7 Brief footer layer; §2 Slice 5"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.5 F4; §10 H3"

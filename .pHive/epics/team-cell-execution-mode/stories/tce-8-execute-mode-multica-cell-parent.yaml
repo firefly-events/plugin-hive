@@ -1,0 +1,113 @@
+id: tce-8-execute-mode-multica-cell-parent
+epic: team-cell-execution-mode
+title: execute-mode-multica skill — parent issue per story (cell shell)
+status: pending
+complexity: high
+methodology: classic
+depends_on: [tce-7-episode-schema-doc-update]
+
+description: |
+  Slice 4 first third per outline §4.6 + hv-plan §2 Slice 4.
+  Verbatim slice goal (outline §4.6): "Replace
+  `skills/hive/skills/execute-mode-multica/SKILL.md` with the
+  per-workflow-phase parent/child dispatch flow per design §2.3."
+
+  This story delivers the parent-issue half of the rewrite. The
+  child-issue per-workflow-phase fan-out is tce-9. The F1 hard-block
+  on null `project_id` is tce-10. The renamed legacy single-developer
+  path is tce-14.
+
+  Per outline §5.1 + design §2.1 the parent issue holds the brief and
+  is assigned to nobody (pure container). Project_id binding is
+  mandatory: the parent acts as the roll-up handle for `/hive:status`
+  aggregation and for the closer (s1-1 from `story-loop-closure`,
+  already shipped per outline §2 non-goals).
+
+  Skill flow steps delivered here (outline §4.6 step 1-2 + step 5):
+    1. Resolve story → cell roster (composer reads story signals +
+       cell YAML) — calls tce-4 resolver.
+    2. Create PARENT issue (one per story, holds brief, assigned to
+       nobody).
+    5. Return roll-up summary to /execute (cell shell handle).
+
+  Steps 3-4 (per-workflow-phase child fan-out + parent close) ship in
+  tce-9. The F1 binding check ships in tce-10.
+
+  Vocabulary anchor (outline §10): the parent is a "team cell" parent;
+  child fan-out happens per "workflow-phase"; the slot type is "role".
+  No bare "session" or bare "phase" outside §8 quotes.
+
+acceptance_criteria:
+  - "Given a story is dispatched through the rewritten skill, when the cell shell runs, then exactly one Multica parent issue is created per story holding the parent brief, assigned to nobody (outline §5.1; design §2.3 step 2)."
+  - "Given the resolver (tce-4) is invoked during step 1, when it returns a roster, then the parent issue carries the project_id binding to the workspace's resolved project — making it the roll-up handle for /hive:status."
+  - "Given child fan-out is not yet wired (lands in tce-9), when this story merges in isolation, then the parent-only path runs end-to-end with no child fan-out and produces a parent issue that subsequent stories build on."
+  - "Given the skill is read by V2-rule linting, when the spec is inspected, then no bare `phase` appears outside §8 quotes."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read `skills/hive/skills/execute-mode-multica/SKILL.md` to
+      identify what must be removed; read design §2.3 step 1-2 + 5 +
+      outline §4.6 for the new shape; cross-reference tce-4 resolver
+      contract.
+  - id: implement
+    agent: developer
+    description: |
+      Rewrite the skill's main flow per design §2.3 step 1-2 + 5.
+      Wire resolver call (tce-4) at step 1. Create parent issue at
+      step 2 with `--parent` topology readiness (children land in
+      tce-9). Emit roll-up handle at step 5.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Dispatch a throwaway story through the rewritten skill and
+      assert: exactly one parent issue created; parent carries
+      project_id; parent is unassigned; resolver was invoked exactly
+      once and its output is logged.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Verify V2 vocabulary across the rewritten skill prose. Confirm
+      that no child fan-out logic has bled in here (tce-9's scope).
+      Confirm legacy path is untouched (renaming lands in tce-14).
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/execute-mode-multica/SKILL.md
+      purpose: Skill being rewritten.
+    - path: hive/lib/cell-roster-resolver/index.mjs
+      purpose: Resolver invoked at step 1 (delivered by tce-4).
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: Reused dispatch primitives (`dispatchStoryToAgent`).
+
+files_to_modify:
+  - file: skills/hive/skills/execute-mode-multica/SKILL.md
+    change: Rewrite — parent-issue creation + resolver-call step 1; defers child fan-out to tce-9.
+
+design_decisions:
+  - decision: Parent issue is unassigned (pure container).
+    rationale: Outline §5.1 + design §2.3 step 2 — parent holds the brief and acts as roll-up handle; children carry the assignments.
+  - decision: This story ships steps 1, 2, 5 only; steps 3-4 (child fan-out, parent close) ship in tce-9.
+    rationale: Outline §4.6 estimates 3-4 stories for the rewrite; splitting parent shell from child fan-out keeps each story reviewable.
+
+risks:
+  - severity: high
+    description: R1 — Cell startup latency lands on the dispatch flow; even the parent-only path adds a CLI roundtrip vs single-developer mode.
+    mitigation: Reuse `dispatchStoryToAgent` as-is per outline §4.6; baseline measured during slice-0 spike.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.6 Slice 4; §5.1 Cell shape on Multica; §9 slice-4 assertions; §11 slice-4.1"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§1.1 Skill layer; §2 Slice 4"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.3 step 1-2/5; §2.1"

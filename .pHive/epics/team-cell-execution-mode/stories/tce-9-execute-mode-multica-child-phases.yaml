@@ -1,0 +1,119 @@
+id: tce-9-execute-mode-multica-child-phases
+epic: team-cell-execution-mode
+title: Child issue per workflow-phase + roster-driven assignment + U2 failure-policy
+status: pending
+complexity: high
+methodology: classic
+depends_on: [tce-8-execute-mode-multica-cell-parent]
+
+description: |
+  Slice 4 second third per outline §4.6 + hv-plan §2 Slice 4. Pairs
+  with tce-8 (parent shell) and tce-10 (F1 hard-block).
+
+  This story delivers design §2.3 steps 3-4 (verbatim from outline §4.6):
+
+  > 3. For each phase in roster order:
+  >      3a. Create CHILD issue (--parent <parent_uuid> --assignee <role-agent>)
+  >      3b. Inject phase brief into child (subset of parent's brief + prior phase outputs)
+  >      3c. Wait for child to terminate (pollTaskUntilTerminal — reused as-is)
+  >      3d. writeMulticaRunEpisode → multica-run-{phase}.yaml
+  >      3e. If terminal != completed → fail-fast (no further phases dispatched)
+  > 4. Close parent (status: done) when all phases completed
+
+  Each child is assigned to a role drawn from the roster (tce-4) — the
+  runtime_id is already correctly bound per persona thanks to tce-2 /
+  tce-3 (H2). Step 3d writes the per-workflow-phase marker using the
+  tce-6 signature extension. Per outline §5.3, marker `artifacts:`
+  carry file paths only — no marker-embedded prose; the next child's
+  brief includes those file refs verbatim.
+
+  Per U2 resolution (outline §10; design §10 U2), the explicit
+  failure-policy table is wired here:
+    - `core_phase_fail` first time → retry once (per max_step_retries=2 minus initial)
+    - `core_phase_fail` after retries → story fails; parent marked failed; no further phases
+    - `optional_phase_fail` → story blocked; operator review required (design §5 Q2)
+    - `circuit_breaker_hit` (`story_timeout_minutes=45`) → cell terminates; story fails
+
+  Vocabulary anchor (outline §10): "workflow-phase" everywhere; the
+  per-child issue is a "team cell" child; the slot is "role".
+
+acceptance_criteria:
+  - "Given a parent issue created by tce-8 + a resolved roster from tce-4, when the skill executes step 3 for each workflow-phase, then exactly N child issues are created (one per workflow-phase in roster order) (outline §9 slice-4 assertions #1)."
+  - "Given a child terminates `completed`, when its termination handler runs, then `writeMulticaRunEpisode({phase: <name>})` is called and a per-workflow-phase marker lands at `.pHive/episodes/{epic}/{story}/{phase}.yaml` (outline §9 #3)."
+  - "Given a core workflow-phase terminates `failed` after retries, when the failure-policy table is consulted, then the story fails, the parent is marked failed, and no further workflow-phases are dispatched (U2)."
+  - "Given an optional workflow-phase fails, when the policy table is consulted, then the story is blocked pending operator review (U2 + design §5 Q2)."
+  - "Given the skill is read by V2-rule linting, when the spec is inspected, then no bare `phase` appears outside §8 quotes."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read tce-8's parent-creation flow; read `pollTaskUntilTerminal`
+      + dispatch primitives in `hive/lib/multica-story-dispatch/`;
+      cross-reference U2 table in outline §10 + design §10.
+  - id: implement
+    agent: developer
+    description: |
+      Wire steps 3a-3e per workflow-phase in roster order. Use
+      tce-6's `phase` parameter on the marker call. Implement the U2
+      failure-policy table as an explicit mapping (no inline branching
+      across multiple code paths). Close parent at step 4.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Throwaway-story integration: assert N child issues created in
+      roster order; each correctly assigned to its role; per-workflow-phase
+      marker written. Fault-injection: force a core phase failure
+      after retries → story fails per U2; force an optional failure →
+      story blocked per U2.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Confirm U2 table is one explicit mapping (not three scattered
+      branches per grill U2). Confirm V2 vocabulary. Reject any
+      marker-embedded prose path (R2 violation).
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/execute-mode-multica/SKILL.md
+      purpose: Skill being extended.
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: `dispatchStoryToAgent` + `pollTaskUntilTerminal` reused as-is.
+    - path: hive/lib/multica-story-dispatch/episode-sync.mjs
+      purpose: `writeMulticaRunEpisode` with `phase` parameter (tce-6).
+    - path: hive/team-cells/execute-cell.yaml
+      purpose: Roster spec consumed by the resolver (tce-5).
+
+files_to_modify:
+  - file: skills/hive/skills/execute-mode-multica/SKILL.md
+    change: Add steps 3-4 — child issue per workflow-phase, brief injection, termination polling, marker write, U2 failure-policy table, parent close.
+
+design_decisions:
+  - decision: U2 failure-policy is one explicit mapping table.
+    rationale: Grill U2 — design had three overlapping behaviors (§2.3 step 3e, §3 R3, §5 Q2); table consolidates them.
+  - decision: Inter-phase context channel is marker `artifacts:` file paths only.
+    rationale: R2 mitigation — next child's brief includes those file refs verbatim; no prose in markers.
+
+risks:
+  - severity: high
+    description: R1 — N+1 CLI roundtrips per story may multiply latency 2-4x; multiplied across an epic this is the dominant scaling risk.
+    mitigation: Optional slots capped in cell YAML; circuit-breaker at `story_timeout_minutes=45` aborts pathological cases.
+  - severity: high
+    description: R2 — Without disciplined `artifacts:` plumbing, child N+1 starts cold without phase-N output and retry rate degrades.
+    mitigation: Marker schema doc (tce-7) forbids prose; brief-injection step references marker artifacts verbatim.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.6 Slice 4 step 3-4 verbatim; §5.1 / §5.3; §9 slice-4 assertions; §11 slice-4.1 / slice-4.3"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§1.1 Skill layer; §2 Slice 4"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.3 step 3-4; §10 U2"

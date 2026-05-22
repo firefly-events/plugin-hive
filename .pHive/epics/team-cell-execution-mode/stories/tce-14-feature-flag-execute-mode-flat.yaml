@@ -1,0 +1,108 @@
+id: tce-14-feature-flag-execute-mode-flat
+epic: team-cell-execution-mode
+title: Rename legacy single-developer path to `execute-mode-multica-flat` + flag
+status: pending
+complexity: low
+methodology: classic
+depends_on: [tce-13-audit-fix-f1-f4-f6-bundle]
+
+description: |
+  Slice 7 first third per outline §4.9 + hv-plan §2 Slice 7.
+  Verbatim slice goal fragment (outline §4.9): "Feature flag added to
+  `/execute` (or to the dispatch-skill mode selection), defaulting
+  initially to flat; flipped at slice close. Removal-track ticket
+  created for `execute-mode-multica-flat` (next release, per proposal
+  §Migration)."
+
+  This story carries the rename and flag-add, NOT the flip. Per
+  outline §4.6 the new skill's rewrite (tce-8 / tce-9 / tce-10)
+  replaced the original `skills/hive/skills/execute-mode-multica/SKILL.md`
+  in place; this story extracts the pre-rewrite legacy content into a
+  sibling skill `execute-mode-multica-flat` so it can be selected by
+  the feature flag during the parallel-run window (tce-15).
+
+  Flag mechanic (hv-plan §1.9): a feature flag on `/execute` (or on
+  the dispatch-skill mode selection) toggles between `cell` (new) and
+  `flat` (renamed legacy). Default is `flat` while tce-15 parallel-runs;
+  default flips to `cell` at tce-15 close.
+
+  Per proposal Migration line: `execute-mode-multica-flat` is kept
+  for ONE release cycle, then removed (tce-16 follow-on issue tracks
+  removal — NOT a story).
+
+  Vocabulary anchor (outline §10): "team cell" mode vs "flat" mode;
+  the flag value is `cell` or `flat`, not `phase` or `session`.
+
+acceptance_criteria:
+  - "Given the renamed legacy skill exists at `skills/hive/skills/execute-mode-multica-flat/SKILL.md`, when `/execute` is invoked with the flag set to `flat`, then the single-developer dispatch path runs as it did pre-rewrite."
+  - "Given the flag is set to `cell` (or absent if cell-default is later set), when `/execute` is invoked, then the new cell-mode dispatch runs (tce-8/9/10 path)."
+  - "Given the initial default for this story is `flat`, when no flag is supplied during the parallel-run window, then the legacy flat path is selected (tce-15 will exercise the flip)."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Locate the pre-rewrite single-developer dispatch content (git
+      log + diff against tce-8's commit). Identify the flag carrier
+      surface in `/execute` (skill mode selection vs. flag in
+      `hive.config.yaml`).
+  - id: implement
+    agent: developer
+    description: |
+      Extract the pre-rewrite content into
+      `skills/hive/skills/execute-mode-multica-flat/SKILL.md`. Add
+      the flag-handling shim so `/execute` selects between `cell` and
+      `flat` based on the flag value (default `flat` until tce-15
+      flips).
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Two-mode test: flag=`flat` dispatches via legacy path; flag=`cell`
+      dispatches via new path (tce-8/9/10). Verify default selection
+      is `flat` while this story is the head.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Confirm the legacy content is intact (no regression vs.
+      pre-rewrite behavior). Confirm flag handling is a thin shim,
+      not a deep refactor.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/execute-mode-multica/SKILL.md
+      purpose: New cell-mode skill (tce-8/9/10).
+    - path: skills/hive/skills/execute/SKILL.md
+      purpose: `/execute` orchestrator — likely flag-handler host.
+
+files_to_modify:
+  - file: skills/hive/skills/execute-mode-multica-flat/SKILL.md
+    change: NEW — extracted pre-rewrite single-developer dispatch path.
+  - file: skills/hive/skills/execute/SKILL.md
+    change: Add flag-handling shim selecting between `cell` and `flat`.
+
+design_decisions:
+  - decision: Initial flag default is `flat` for the parallel-run window.
+    rationale: hv-plan §1.9 — "feature-flag the new mode, parallel-run for one epic, then flip"; tce-15 carries the flip.
+  - decision: Legacy content extracted via git log + diff against tce-8's commit, not reconstructed from memory.
+    rationale: Faithful preservation of the pre-rewrite behavior; reviewer asserts no regression.
+
+risks:
+  - severity: low
+    description: Drift between legacy and current state — the extracted content must match the pre-rewrite shape exactly.
+    mitigation: Research step confirms via git log; reviewer compares against the pre-tce-8 commit.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.9 Slice 7; §11 slice-7.1"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§1.9 Migration / parallel-run layer; §2 Slice 7"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§Proposal Migration line"

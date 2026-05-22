@@ -1,0 +1,108 @@
+id: tce-2-bootstrap-runtime-resolver
+epic: team-cell-execution-mode
+title: Bootstrap reconciliation reads agent_backends and resolves per-persona runtime_id
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [tce-1-multica-primitive-spike]
+
+description: |
+  Slice 1 first half per outline §4.3 + hv-plan §2 Slice 1.
+  Verbatim slice goal (outline §4.3): "Extend
+  `hive/lib/multica-bootstrap/index.mjs` to read `agent_backends`
+  from `hive.config.yaml` and write the correct `runtime_id` per
+  persona at reconciliation."
+
+  Per H2 resolution (design §10 H2; grill H2): "the bootstrap
+  reconciles personas but does NOT consult `agent_backends` to pick
+  a runtime today. Without this slice, every persona binds to the
+  default runtime and backend-routing claim is theatre. This is the
+  gate that makes Codex-for-work / Opus-for-review real on Multica."
+
+  Scope of this story: the runtime-resolution code path only.
+  Persona reconciliation + name-mismatch handling is tce-3.
+  Git-identity injection arrives later via slice-4 / slice-6 audit
+  bundle (tce-13). This split is per outline §4.3 estimate:
+  "Estimated 2-3 stories: one for runtime resolution, one for
+  persona reconciliation + qa-engineer disposition, one for
+  git-identity injection."
+
+  Mapping (outline §3.4, design §2.4):
+    researcher / developer / backend-developer / frontend-developer /
+    technical-writer / architect → codex runtime
+    tester / qa-engineer / ui-designer → claude sonnet runtime
+    reviewer / peer-validator / security → claude opus runtime
+
+  Vocabulary anchor (outline §10): use "Multica agent" for the
+  workspace agent record; "Hive persona" for the source file under
+  `hive/agents/`.
+
+acceptance_criteria:
+  - "Given `hive.config.yaml` carries an `agent_backends` map, when `multica-bootstrap` reconciliation runs, then each Multica agent's `runtime_id` is set from the mapping (outline §9 slice-1 assertions)."
+  - "Given a researcher persona reconciles, when the resulting agent is inspected via `multica agent list`, then its runtime_id resolves to the Codex runtime."
+  - "Given a reviewer persona reconciles, when the agent is inspected, then its runtime_id resolves to the Claude Opus 4.7 runtime."
+  - "Given the `agent_backends` map is unchanged, when the bootstrap reconciliation runs, then no schema change is required to `hive.config.yaml` (hv-plan §1.4)."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read `hive/lib/multica-bootstrap/index.mjs` to locate the
+      reconciliation call site; read `hive.config.yaml.agent_backends`
+      to confirm shape; read outline §3.4 + design §2.4 for the target
+      mapping.
+  - id: implement
+    agent: developer
+    description: |
+      Extend the reconciliation pass to consult `agent_backends`,
+      resolve persona → runtime_id, and write the resolved id into
+      the Multica agent record.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Unit-test the resolver: each role from the §2.4 routing table
+      lands on the expected runtime; unmapped personas fall through
+      to a documented default and emit a warning.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Verify no `agent_backends` schema change. Verify the resolver
+      surfaces unmapped personas (no silent default-binding).
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-bootstrap/index.mjs
+      purpose: Reconciliation entry point — extension lands here.
+    - path: hive.config.yaml
+      purpose: Source of `agent_backends` map (read-only for this story).
+
+files_to_modify:
+  - file: hive/lib/multica-bootstrap/index.mjs
+    change: Extend reconciliation pass to read `agent_backends` and write per-persona `runtime_id`.
+
+design_decisions:
+  - decision: Bootstrap runtime resolution precedes the cell-roster-resolver lib.
+    rationale: hv-plan slice-ordering-rationale #2 — "without H2 first, the resolver returns roles that all bind to the wrong runtime."
+  - decision: Unmapped personas warn rather than silently bind to default.
+    rationale: Per design §2.4 + outline §3.4, the routing claim being "theatre" was caused by silent default-binding; explicit warning prevents recurrence.
+
+risks:
+  - severity: high
+    description: Without per-persona runtime resolution, the entire epic's backend-routing claim collapses (theatre) — this story is the gate.
+    mitigation: Test coverage of every routing-table row; review step inspects for silent fallbacks.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.3 Slice 1; §3.4 Backend routing today vs target; §9 slice-1 assertions; §11 slice-1.1"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§2 Slice 1; §0 H2; §1.2"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.4; §10 H2"

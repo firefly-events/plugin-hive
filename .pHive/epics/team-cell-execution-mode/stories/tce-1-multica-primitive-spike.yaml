@@ -1,0 +1,108 @@
+id: tce-1-multica-primitive-spike
+epic: team-cell-execution-mode
+title: Spike Multica primitives (a), (b), (c) and document evidence
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [tce-0-f5-oauth-scope-prereq]
+
+description: |
+  Slice 0 deliverable per outline §4.2 + hv-plan §2 Slice 0.
+  Verbatim slice goal (outline §4.2): "Spike Multica primitives (a),
+  (b), (c) explicitly on throwaway issues; document evidence per
+  option."
+
+  Per U1 resolution (design §10 U1; grill U1), `feedback_test_offtheshelf_before_rewriting`
+  mandates spike-before-commit. The design committed to option (a) by
+  elimination BEFORE the spike; the spike's role is to confirm the
+  commitment is sound and characterize fallback paths (option (b) for
+  failure recovery, per design §5 Q7).
+
+  Option scope:
+    (a) parent issue + child issues per workflow-phase — end-to-end on
+        throwaway; confirms primitive (a) is viable on Multica 0.3.4.
+    (b) sequential reassignment via `multica issue update --assignee`
+        — characterize whether mutation alone spawns a fresh task run
+        (design §5 Q7).
+    (c) re-confirm absence of any `session` command on Multica 0.3.4
+        (research §1.1).
+
+  A scope-detection probe is included: query daemon GitHub OAuth
+  scopes; if `workflow` missing despite the F5 chore (tce-0), halt
+  with a runbook line referencing tce-0 per R5.
+
+  Output artifact: research memo at
+  `.pHive/epics/team-cell-execution-mode/research/primitive-spike.md`
+  documenting evidence per option and the scope-probe result. The
+  memo's recommendation gates slice-1 (tce-2) commitment.
+
+acceptance_criteria:
+  - "Given the spike memo is reviewed, when (a) is exercised on a throwaway parent+child pair, then the memo records the end-to-end behavior and concludes (a) is the sole viable hosting primitive on 0.3.4."
+  - "Given (b) is exercised, when `multica issue update --assignee` is run against a throwaway task, then the memo characterizes whether reassignment alone spawns a fresh task run (works-as-fallback or not)."
+  - "Given (c) is probed, when the Multica 0.3.4 CLI is inspected, then the memo confirms no `session` or `sessions` command exists (re-confirms research §1.1)."
+  - "Given the daemon scope-probe runs, when `workflow` scope is missing despite tce-0 merging, then the spike halts with a clear runbook line referencing tce-0."
+
+steps:
+  - id: research
+    agent: researcher
+    description: |
+      Read Multica 0.3.4 CLI inventory in research-brief §1, F5 audit
+      finding, design §5 Q7/Q8, outline §4.2.
+  - id: implement
+    agent: developer
+    description: |
+      Execute the three spike strands on throwaway issues + run the
+      scope-probe; write `.pHive/epics/team-cell-execution-mode/research/primitive-spike.md`
+      with one section per option (a/b/c) plus a scope-probe section.
+    depends_on: [research]
+  - id: test
+    agent: tester
+    description: |
+      Verify the throwaway issues exist + were exercised; confirm the
+      memo's evidence claims map to observable Multica state at spike
+      time.
+    depends_on: [implement]
+  - id: review
+    agent: reviewer
+    description: |
+      Sign off on the memo's recommendation. Reject if the
+      recommendation flips slice-1 commitment without a replan.
+    depends_on: [test]
+  - id: integrate
+    agent: developer
+    description: Commit + push to feat/team-cell-execution-mode.
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/epics/team-cell-execution-mode/docs/research-brief.md
+      purpose: §1 Multica 0.3.4 CLI inventory baseline.
+    - path: .pHive/audits/multica-mode-audit-2026-05-22.md
+      purpose: §F5 scope-missing finding the scope-probe re-checks.
+
+files_to_modify:
+  - file: .pHive/epics/team-cell-execution-mode/research/primitive-spike.md
+    change: NEW — evidence memo with one section per option (a/b/c) plus a scope-probe section.
+
+design_decisions:
+  - decision: Spike all three primitive options before committing slice-1.
+    rationale: U1 resolution — `feedback_test_offtheshelf_before_rewriting` mandates spike-before-commit even when the design has already committed by elimination; spike characterizes fallback paths.
+  - decision: Embed the F5 scope-probe in slice-0 detection.
+    rationale: R5 mitigation — slice-0 must halt with a clear runbook line if tce-0 chore has not merged, before slice-1 proceeds.
+
+risks:
+  - severity: medium
+    description: R4 — Primitive (a) is heavier than the proposal's hoped-for (c); spike result may surface unexpected latency or CLI roundtrip cost.
+    mitigation: Spike measures baseline cost as evidence; if regression is severe, replan slice-4 scope before committing.
+  - severity: medium
+    description: R5 — F5 chore (tce-0) must merge before this spike runs; missing scope blocks dispatch end-to-end exercise.
+    mitigation: Scope-probe halts with a runbook line; story does not proceed past detection until scope is live.
+
+references:
+  - path: .pHive/epics/team-cell-execution-mode/docs/structured-outline.md
+    relevant_section: "§4.2 Slice 0 — Primitive spike; §3.2 Multica 0.3.4 primitive inventory verdict; §11 slice-0 prompts"
+  - path: .pHive/epics/team-cell-execution-mode/docs/hv-plan.md
+    relevant_section: "§2 Slice 0; §0 U1"
+  - path: .pHive/epics/team-cell-execution-mode/docs/design-discussion.md
+    relevant_section: "§2.1; §5 Q7/Q8; §10 U1"
