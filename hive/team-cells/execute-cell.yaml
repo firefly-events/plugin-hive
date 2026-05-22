@@ -1,0 +1,72 @@
+# Execute cell roster spec — design §2.2, outline §5.2.
+#
+# Vocabulary (outline §10 V2):
+#   "workflow-phase"  — cell-internal workflow-phases (researcher / developer / tester / reviewer)
+#   "role"            — roster slot type (NOT "agent")
+#   "core[]"          — per-cell-type roster (NOT "core team", which is the planning roster)
+#
+# Signal detection: keyword-list pattern over story text (title + description +
+# acceptance_criteria). Keywords declared in `scope_signals:` below; predicates
+# in `optional[].when` are evaluated by cell-roster-resolver/predicates.mjs.
+
+cell: execute
+
+core:
+  - researcher
+  - developer
+  - tester
+  - reviewer
+
+scope_signals:
+  backend:
+    keywords:
+      - backend
+      - server-side
+      - api endpoint
+      - database
+      - sql
+      - postgres
+      - migration
+      - rest api
+      - graphql
+  frontend:
+    keywords:
+      - frontend
+      - ui
+      - react
+      - component
+      - css
+      - html
+      - browser
+      - client-side
+      - vue
+      - angular
+  security:
+    keywords:
+      - security
+      - auth
+      - authentication
+      - authorization
+      - vulnerability
+      - xss
+      - csrf
+      - injection
+      - owasp
+      - penetration
+
+optional:
+  - role: backend-developer
+    when: scope_signals.backend
+    replaces: developer
+
+  - role: frontend-developer
+    when: scope_signals.frontend
+    replaces: developer
+
+  - role: security-reviewer
+    when: scope_signals.security
+    appends_after: review
+
+  - role: peer-validator
+    when: "planning.collaborative_review == true"
+    appends_after: review
