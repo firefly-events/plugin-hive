@@ -146,6 +146,31 @@ s4 is the DEPENDENCY of this story. Temporarily, until s4 lands, this step can b
 
 After s4 merges, this skill consumes the real `episode-sync.mjs` API.
 
+### Step 2b: Push-target verification (H3 enforcement)
+
+After `pollTaskUntilTerminal` returns and **before** calling `writeMulticaRunEpisode`, verify the child agent obeyed the push-target constraint.
+
+```js
+import { verifyPushTarget } from '../../../../hive/lib/multica-story-dispatch/index.mjs';
+
+const pushCheck = await verifyPushTarget(taskId, epicHandle);
+if (pushCheck.orphanPushExists) {
+  // H3: orphan-branch push detected — phase outcome is `failed`, NOT `escalated`.
+  // Retry per max_step_retries; do NOT proceed to writeMulticaRunEpisode here.
+  phaseOutcome = 'failed';
+  phaseNotes = `H3 violation: agent pushed to agent/developer/${taskId}`;
+  // apply max_step_retries retry logic, then surface failure to caller
+}
+// No orphan push → continue to Step 3 (marker write) normally.
+```
+
+Outcome label rules (H3 — design §10):
+- Orphan-branch push detected → `failed` (**never** `escalated`)
+- Retry behaviour follows the same `max_step_retries` counter as `core_phase_fail`
+- If retries exhausted, the story fails and the parent is marked failed per the U2 table
+
+`verifyPushTarget` throws `TRANSPORT` if `git ls-remote` cannot reach the remote; treat this the same as a `TRANSPORT` poll failure (3-strike rule from s4 applies).
+
 ### Step 3: Episode marker per terminal
 
 Call `writeMulticaRunEpisode` with the terminal state returned by polling.
@@ -228,12 +253,13 @@ execution:
 
 ## Reuses (atomic deps)
 
-- `hive/lib/multica-story-dispatch/index.mjs` (s2) — 5 dispatch helpers:
+- `hive/lib/multica-story-dispatch/index.mjs` (s2/tce-12) — 6 dispatch helpers:
   - `resolveAgentUuidByName`
   - `serializeStoryBrief`
   - `ensureIssueBriefMatches`
   - `dispatchStoryToAgent`
   - `moveOutOfBacklogIfNeeded`
+  - `verifyPushTarget` — H3 orphan-branch check (Step 2b)
 - `hive/lib/multica-story-dispatch/episode-sync.mjs` (s4) — poll plus episode write.
 - `hive/adapters/multica/index.ts` (`multica-substrate-adoption` s1) — issue CRUD via dispatch ABI.
 - `.pHive/multica/agents.yaml` (`multica-substrate-adoption` s4) — persona seed; must be bootstrapped via `/hive:multica-init`.

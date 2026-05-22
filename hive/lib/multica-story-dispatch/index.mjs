@@ -1,4 +1,8 @@
 import crypto from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 const HTTP_TIMEOUT_MS = 30_000;
 const USER_AGENT = 'hive-multica-story-dispatch/0.1.0';
@@ -223,4 +227,35 @@ export async function moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, is
 
   await httpJson(url, { method: 'PUT', token, body: { status: 'todo' } });
   return { was_moved: true };
+}
+
+/**
+ * H3 enforcement: verify the agent did NOT push to its orphan branch.
+ *
+ * Runs `git ls-remote origin agent/developer/{taskId}` against the firefly
+ * origin. If the ref exists the workflow-phase must be marked `failed`
+ * (NOT `escalated`) and retried per `max_step_retries`.
+ *
+ * @param {string} taskId  - Multica task UUID (same string used in the branch name)
+ * @param {string} epicId  - Epic handle (e.g. "team-cell-execution-mode"); used for error context
+ * @returns {{ orphanPushExists: boolean, taskId: string, epicId: string }}
+ */
+export async function verifyPushTarget(taskId, epicId) {
+  let stdout = '';
+  try {
+    const result = await execFileAsync('git', [
+      'ls-remote',
+      'origin',
+      `agent/developer/${taskId}`,
+    ]);
+    stdout = result.stdout;
+  } catch (err) {
+    throw dispatchError(
+      'TRANSPORT',
+      `verifyPushTarget: git ls-remote failed for task ${taskId}: ${err?.message}`,
+      `epic: ${epicId}`,
+    );
+  }
+  const orphanPushExists = stdout.trim().length > 0;
+  return { orphanPushExists, taskId, epicId };
 }
