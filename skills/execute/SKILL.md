@@ -200,6 +200,8 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
 7c. **Terminal handoff dispatch.** After the `integrate` workflow step completes for a story, dispatch any configured post-integrate handoff.
 
+   > **Multica issue close.** When `task_tracking.adapter` is `multica`, the closer (`hive/lib/multica-issue-closer.mjs`) is invoked here to transition the story's Multica issue to `done`. See [multica-issue-closer-runbook.md](../../hive/references/multica-issue-closer-runbook.md) for failure modes, WARN escalation thresholds, and the manual sweep procedure.
+
    **Gate check — integrate episode marker required.** Before reading `terminal_handoff`, verify the integrate episode marker exists at `${HIVE_STATE_DIR}/episodes/{epic-id}/{story-id}/integrate.yaml`. If the marker is absent (integrate failed or was skipped):
 
    ```
