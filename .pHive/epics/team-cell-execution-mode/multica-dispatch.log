@@ -1,0 +1,16 @@
+OK tce-1-multica-primitive-spike -> 3939d516-8f04-4da4-80e0-d1063296212e  tce-1-multica-primitive-spike: Spike Multica primitives (a), (b), (c) and document evidence
+OK tce-2-bootstrap-runtime-resolver -> 3fc05c76-23f5-40fa-8099-70bfc5f6c390  tce-2-bootstrap-runtime-resolver: Bootstrap reconciliation reads agent_backends and resolves per-persona runtime_id
+OK tce-3-bootstrap-reconciliation-tests -> 710624df-828e-4e2b-b6e6-08a1316c70bb  tce-3-bootstrap-reconciliation-tests: Reconcile 9 new personas + resolve name mismatches + verify backend routing
+OK tce-4-cell-roster-resolver-lib -> 23c2f91f-507a-4c3e-a565-421db37514e9  tce-4-cell-roster-resolver-lib: Scaffold `hive/lib/cell-roster-resolver/` resolution package
+OK tce-5-cell-yaml-schema -> 3bbdd7bf-110f-41c3-8b3c-5e05910d6f46  tce-5-cell-yaml-schema: Declarative `hive/team-cells/execute-cell.yaml` roster spec
+OK tce-6-write-episode-phase-param -> e8ded7f6-28af-461d-a592-8dc15119c9d4  tce-6-write-episode-phase-param: Extend writeMulticaRunEpisode with optional `phase` parameter
+OK tce-7-episode-schema-doc-update -> 685ae249-9ffd-4278-8f58-1a486da804a7  tce-7-episode-schema-doc-update: Update episode marker schema doc — `artifacts:` is file-path-only
+OK tce-8-execute-mode-multica-cell-parent -> d4e166d1-c9e5-4e28-ac45-8790cc6c3a0a  tce-8-execute-mode-multica-cell-parent: execute-mode-multica skill — parent issue per story (cell shell)
+OK tce-9-execute-mode-multica-child-phases -> 159a509a-8baa-4c16-bf88-e4d8c6366872  tce-9-execute-mode-multica-child-phases: Child issue per workflow-phase + roster-driven assignment + U2 failure-policy
+OK tce-10-dispatch-null-project-hardblock -> b8f01c3c-7ad6-4d4c-8ab3-91ae78fdfc55  tce-10-dispatch-null-project-hardblock: F1 hard-block — dispatch refuses fan-out on null `project_id`
+OK tce-11-brief-footer-push-constraint -> 1b90daba-cd98-48c5-90c3-ebb7a5dc3f33  tce-11-brief-footer-push-constraint: Advisory brief-footer naming permitted push target (`feat/{epic}`)
+OK tce-12-post-phase-push-verifier -> a22f3012-078f-4f73-b0e7-51a0c50dee64  tce-12-post-phase-push-verifier: Post-workflow-phase push-target verifier (H3 enforcement)
+OK tce-13-audit-fix-f1-f4-f6-bundle -> a63aa1c4-9ef1-4438-9635-79492198dc14  tce-13-audit-fix-f1-f4-f6-bundle: Audit fix reconciliation — F1 + F4 + F6 closed; F5 split via chore PR
+OK tce-14-feature-flag-execute-mode-flat -> f31244bd-186b-4c6b-8244-1dab71eaec45  tce-14-feature-flag-execute-mode-flat: Rename legacy single-developer path to `execute-mode-multica-flat` + flag
+OK tce-15-parallel-run-smoke-epic -> 38df315f-212b-4ad8-90b9-b7df815e60bb  tce-15-parallel-run-smoke-epic: Dogfood epic parallel-run gate — flat vs cell mode + design §9 six-checkpoint
+OK tce-16-flat-mode-removal-issue -> 791c60d8-97a5-4bdb-b149-ad52c0e52b6b  tce-16-flat-mode-removal-issue: File follow-on issue tracking `execute-mode-multica-flat` removal
