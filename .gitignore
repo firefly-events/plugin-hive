@@ -109,6 +109,7 @@ state/
 !.pHive/audits/mvl-proof/**
 !.pHive/audits/mvs-proof/
 !.pHive/audits/mvs-proof/**
+!.pHive/audits/multica-mode-audit-2026-05-22.md
 # Consumer-side executor flag (hde-9a Q4 lock). Tracked because the maintainer
 # repo doubles as the canonical consumer for plugin-hive itself; consumers of
 # the plugin choose whether to commit their own .pHive/hive.config.yaml.
