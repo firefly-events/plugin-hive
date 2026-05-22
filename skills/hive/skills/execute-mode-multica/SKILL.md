@@ -21,6 +21,7 @@ Called once per parent workflow when `mode_decision == multica` was returned by 
 - `unblocked_stories[]` — ordered list of story specs whose `depends_on` is satisfied at start.
 - `appends_map` — `{story_id: [sidecar_agent_name, ...]}` from the parent's escalation partition (v1: logged but DEFERRED; see Constraints below).
 - `epic_handle` — parent epic identifier (used for episode paths).
+- `parent_issue_uuid` — Multica issue UUID of the team-cell parent created by the cell-parent phase (tce-8); required for the F1 `project_id` gate.
 - `hive_config` — parsed root `hive.config.yaml` for `execution.multica.*` options.
 
 **Outputs:**
@@ -67,6 +68,26 @@ ERROR: Multica execution mode requires bootstrapped agents.
 Exit `1`. Do NOT fall back to sequential.
 
 ### Step 1: Per-story dispatch (parallel within depth)
+
+**F1 gate (hard-block): inspect parent `project_id` before fan-out.**
+
+Before processing any story, fetch the team-cell parent issue and check its `project_id`:
+
+```js
+const parent = await multica.getIssue(serverUrl, token, workspaceId, parent_issue_uuid);
+if (!parent.project_id) {
+  process.stderr.write(
+    'ERROR: Dispatch aborted — parent issue ' + parent.identifier + ' has no project_id.\n' +
+    '       Bind this workspace to a Multica project before fan-out.\n' +
+    '       (Run: multica workspace bind --project <uuid>)\n'
+  );
+  process.exit(1);
+}
+```
+
+Exit `1`. Do NOT create any child issues. Do NOT fall back to warn-only.
+
+> **Relax-path (future epic only):** A warn-only mode that logs a warning instead of blocking is documented as a future-epic relax-path. It is **NOT implemented here** per P1 resolution (outline §5.1; hv-plan §0 P1). This gate follows the parallel-dispatch-gate precedent (ed-7): it is an enforcement gate, not a kickoff gate.
 
 For each story in `unblocked_stories[]` at this depth:
 
@@ -209,6 +230,7 @@ Return to caller (`/execute`) with a summary:
 - `BOOTSTRAP_REQUIRED` at Step 0: abort entire mode with exit `1`; user must run `/hive:multica-init`.
 - Missing credentials or server URL: abort entire mode with a clear setup error; do not create issues.
 - Workspace slug not found: abort entire mode with a clear workspace resolution error.
+- F1 gate: null `project_id` on parent issue: abort entire mode with exit `1`; user must bind workspace to a Multica project. Warn-only is future-epic scope (NOT implemented here per P1).
 - Multica issue `4xx` at any per-story step: record per-story failure; emit episode marker with `status=failed`; continue with other stories in the same depth; surface summary to `/execute`.
 - Wall-clock timeout per story: s4's `pollTaskUntilTerminal` calls the Multica cancel endpoint and returns `status=cancelled`; episode marker is written.
 - Transient network failures during poll: s4's 3-strike rule throws `TRANSPORT` after 3 consecutive failures; episode marker is written with `status=failed` and `notes='polling lost connection'`.
@@ -248,4 +270,5 @@ execution:
 | Sidecars deferred in v1 | Log deferral only; no extra Multica dispatch |
 | Parallel only within current depth | `/execute` owns DAG advancement between depths |
 | Episode marker per story | `multica-run.yaml` plus messages sidecar |
+| F1 hard-block: null `project_id` gates fan-out | Checked before Step 1 dispatch loop; warn-only is future-epic scope only (NOT implemented per P1) |
 | No sequential fallback | Bootstrap or setup failures abort Multica mode |
