@@ -1,0 +1,40 @@
+epic_id: hermes-integration-mvp
+story_id: h-05-version-bump
+step: integrate
+status: passed
+agent: orchestrator
+completion:
+  mode: orchestrator-completed
+  by: orchestrator
+  rationale: |
+    Version bump is small + must be LAST commit on epic branch per versioning
+    cross-cutting concern. After h-04 required orchestrator completion due to
+    Multica/Anthropic API socket instability, completing h-05 manually too
+    keeps the final commit deterministic + avoids additional Multica risk.
+    h-05 was always orchestrator-shaped (4 mechanical file edits).
+multica:
+  issue_id: 2dd7ead1-84ac-438f-a328-17ad8a5b3907
+  issue_identifier: PLU-58
+  attempts: 0
+  notes: "Not dispatched to Multica — see completion.rationale"
+commit:
+  committed_to: feat/hermes-integration-mvp
+  semver_bump: minor
+  prior_version: 2.7.0
+  new_version: 2.8.0
+files_changed:
+  - .claude-plugin/plugin.json         # 2.7.0 → 2.8.0
+  - .claude-plugin/marketplace.json    # 2.7.0 → 2.8.0 (both root + nested)
+  - README.md                          # version badge 2.7.0 → 2.8.0
+  - CHANGELOG.md                       # new dated section [2.8.0] - 2026-05-24
+test_verification:
+  command: n/a
+  result: "No code/test changes in this commit — version + changelog + readme only per versioning concern checklist"
+notes: |
+  Closes hermes-integration-mvp epic. 4 of 5 stories ran through Multica:
+  - h-01 (12 tests, 8af99d8) — clean Multica run via plugin-hive clone in workdir
+  - h-02 (6 tests, 02c04f1) — Multica improvised by writing to h-01's leftover workdir
+  - h-03 (15 tests, 7461829) — agent edited caller checkout directly (no clone)
+  - h-04 (9 tests, e8493c0) — 3 Multica failures → orchestrator completed
+  - h-05 (this) — orchestrator-only by design + risk reduction
+  Cross-cutting versioning concern checklist satisfied.

@@ -9,6 +9,26 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-05-24
+
+### Added
+
+- `/hive:context-snapshot` skill emits a versioned JSON snapshot of Hive state (branch, epics, stories via `deriveStoryStatus`, recent episodes, open triage, metric verdicts) for consumption by external coordinators (Hermes, custom scheduler integrations, etc.). Read-only, transport-agnostic (stdout default, optional `--write` to `.pHive/context-snapshot.json`).
+- `hive/lib/context-snapshot.mjs` library composer (`composeContextSnapshot`) — reusable across consumers without going through the skill surface.
+- `hive/references/context-snapshot-schema.md` documents the versioned JSON shape with additive-only versioning rule.
+- `/hive:standup --format slack` flag emits Phase 1 standup report in Slack-friendly markdown (no ANSI, code-block tables, no interactive prompts) suitable for cron capture + Slack delivery.
+- `hive/references/standup-slack-format.md` documents the slack output conventions.
+- `/hive:triage --json` flag emits machine-parseable envelopes for every sub-command (`--list`, single-id inspect, create, `--advance`, `--hand-off`, `--close`). Single-writer invariant on `queue.yaml` preserved — `--json` only changes output formatting, never adds write paths.
+- `skills/triage/run.mjs` CLI runner backing the triage skill with full state-machine implementation, queue read/write, and JSON envelopes.
+
+### Changed
+
+- `hive/references/routines-integration.md` adds §"External coordinators (Hermes equivalence)" noting that any cron/webhook-capable coordinator (Anthropic Routines, Hermes, custom) plugs into the standup skill via the same scheduler-as-trigger contract.
+
+### Notes
+
+- Substrate for the planned Hermes-as-external-supervisor integration (companion epic `hermes-bridge-mvp` in `~/Code/hermes-agent` planned separately). All three flags are additive opt-in surfaces — default behavior is byte-equivalent on every existing entry point.
+
 ## [2.7.0] - 2026-05-21
 
 ### Added
