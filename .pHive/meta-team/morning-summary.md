@@ -1,35 +1,20 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-05-23 | **Date:** 2026-05-23 | **Verdict:** passed
+**Cycle:** meta-2026-05-24 | **Date:** 2026-05-24 | **Verdict:** discard
 
 ---
 
 ## What Changed
 
-- **`hive/GUIDE.md`** — Corrected Planning Agents table Tier column for Analyst,
-  Architect, and TPM from "Opus" to "Sonnet". The Model Tier Routing table was
-  fixed in cycle meta-2026-05-20 to move these agents to the Sonnet row (matching
-  their agent files `model: sonnet` and `hive.config.yaml`), but the Planning
-  Agents table in the same file was not updated at that time. This cycle closes
-  the residual inconsistency between the two tables. Three-row field update;
-  no cross-references broken; revert is a three-line edit.
+No changes promoted this cycle. All findings were out-of-scope STUB_DOC entries.
 
 ## What Was Found (Not Fixed This Cycle)
 
-- **`hive/references/hive-cloud-roadmap.md`** (STUB_DOC, low) — 13-line S16
-  placeholder for the deferred Hive Cloud epic. Ninth+ consecutive `out_of_scope`
-  deferral — remains dormant until the Hive Cloud epic is activated.
+- **[STUB_DOC / out_of_scope]** `hive/references/hive-cloud-roadmap.md` (13 lines) — S16 forward-reference placeholder for the deferred Hive Cloud epic. Expanding this stub is premature without the Hive Cloud epic active. 9th consecutive deferral.
+- **[STUB_DOC / out_of_scope]** `hive/references/ui-prompts/design-system.md` (19 lines) — Functional W3C Design Token prompt template; intentionally brief and operationally complete. Not subject to the 30-line stub threshold.
+- **[STUB_DOC / out_of_scope]** `hive/references/ui-prompts/design-review-design-critique.md` (11 lines) — Functional UI design critique prompt template; intentionally brief and operationally complete.
 
 ## Metrics
+- Findings: 3 | Proposals: 0 | Promoted: 0 | Reverted: 0
+- Next cycle priority: activate Hive Cloud epic before hive-cloud-roadmap.md can be expanded; ui-prompts templates are intentionally brief and should be removed from future STUB_DOC checks
 
-- Findings: 2 | Proposals: 1 | Promoted: 1 | Reverted: 0
-- Commit: `4e48cf6b0d598be713734d40a7225cc38006c48f`
-- Rollback ref: `401f121e98f5b155b77bba8cbaaa8ab81da6e547`
-- Next cycle priority: GUIDE.md is now internally consistent on model tier routing;
-  the hive-cloud-roadmap.md stub remains the only recurring deferred finding.
-
-## Regression Watch
-
-- State: **armed**
-- Window: 2026-05-23T00:30:00Z → 2026-05-23T04:30:00Z
-
-kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.00 miss_reason=empty_kg
+kg-signal: findings=0 proposals=0 hit_rate_5cycle=0 miss_reason=empty_kg
