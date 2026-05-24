@@ -67,6 +67,11 @@ state/
 !.pHive/epics/hermes-integration-mvp/**
 !.pHive/episodes/hermes-integration-mvp/
 !.pHive/episodes/hermes-integration-mvp/**
+# Test scenarios (.pHive/test-scenarios/) — referenced by autonomous-cycle-loop
+# config + simulated-manual cross-cutting concern. Per-story scenarios shipped
+# alongside the stories that need them.
+!.pHive/test-scenarios/
+!.pHive/test-scenarios/**
 # Per-epic cycle-state lives under .pHive/cycle-state/; only the
 # meta-improvement-system entry is tracked at this time (same maintainer-
 # infrastructure rationale as the epics/ and episodes/ subtrees above).
