@@ -236,6 +236,16 @@ execution:
   terminal_mux: cmux            # required for codex-backend panes
   interactive_panes: true       # visible agent conversation in cmux panes
   idle_timeout_seconds: 300     # 5-min idle reaper for persistent Codex panes
+  # Multica substrate adoption per project_multica_substrate_adoption (2026-05-20)
+  # + multica-execute-routing follow-on. Hands each Hive story to a bootstrapped
+  # Multica agent (developer / tester / reviewer) which owns the work dir +
+  # task execution after assignment. Hive owns dispatch + polling + episode
+  # markers. Override via HIVE_EXECUTION_MODE env when needed (sandcastle, etc.).
+  mode: multica
+  multica:
+    poll_interval_seconds: 5
+    story_timeout_seconds: 1800   # 30-min wall clock per story
+    messages_capture_max: 200     # last N messages captured into episode sidecar
 
 # Autonomous cycle loop (epic: autonomous-cycle-loop, story s0-1 foundation)
 # Root-layer override surface for the same block declared in

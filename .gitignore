@@ -63,6 +63,8 @@ state/
 !.pHive/epics/per-epic-branch-pr-flow/**
 !.pHive/epics/ghcr-sandcastle-image/
 !.pHive/epics/ghcr-sandcastle-image/**
+!.pHive/epics/hermes-integration-mvp/
+!.pHive/epics/hermes-integration-mvp/**
 # Per-epic cycle-state lives under .pHive/cycle-state/; only the
 # meta-improvement-system entry is tracked at this time (same maintainer-
 # infrastructure rationale as the epics/ and episodes/ subtrees above).
@@ -74,6 +76,7 @@ state/
 !.pHive/cycle-state/brand-system-2.0-update.yaml
 !.pHive/cycle-state/kg-signal-revival.yaml
 !.pHive/cycle-state/skill-ergo-may2026.yaml
+!.pHive/cycle-state/hermes-integration-mvp.yaml
 # /find-skills (se-5) writes ranked candidates here; track the dir marker so
 # consumer projects ship with an initialized output location.
 !.pHive/meta/
@@ -105,6 +108,10 @@ state/
 !.pHive/audits/mvl-proof/**
 !.pHive/audits/mvs-proof/
 !.pHive/audits/mvs-proof/**
+# Post-run audits for /plan + /execute (gate-mode telemetry). Tracked so
+# cross-run aggregation (hive/scripts/gate-mode-audit.mjs) sees a stable corpus.
+!.pHive/audits/post-run/
+!.pHive/audits/post-run/**
 # Consumer-side executor flag (hde-9a Q4 lock). Tracked because the maintainer
 # repo doubles as the canonical consumer for plugin-hive itself; consumers of
 # the plugin choose whether to commit their own .pHive/hive.config.yaml.
