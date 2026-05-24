@@ -1,0 +1,60 @@
+epic_id: hermes-integration-mvp
+story_id: h-04-triage-json-output
+step: multica-run
+status: passed
+agent: developer  # primary author; orchestrator completed after Multica failure
+multica:
+  issue_id: 6b991ea5-2454-441c-8529-2ae806f4850c
+  issue_identifier: PLU-57
+  agent_id: d9946f9a-2747-49d4-b967-2590ffb5be43
+  attempts: 3
+  attempt_1:
+    run_id: 6b08b856-ff9d-4ddd-948b-e380f07d4a12
+    started_at: "2026-05-24T07:24:55Z"
+    completed_at: "2026-05-24T07:32:04Z"
+    status: failed
+    error_summary: "API Error: socket connection closed unexpectedly + SessionEnd cmux cleanup left empty cmux-claude-node-options/ dir"
+    notes: "Agent wrote partial work: skills/triage/SKILL.md (--json section + flag mention) + skills/triage/run.mjs (531 lines). No tests yet."
+  attempt_2:
+    run_id: cae5cf26-5352-4288-be42-fbd17de101f0
+    started_at: "2026-05-24T07:34:42Z"
+    completed_at: "2026-05-24T07:34:52Z"
+    status: failed
+    error_summary: "MODULE_NOT_FOUND restore-node-options.cjs — cmux SessionStart hook can't find file in empty cmux-claude-node-options/ left by attempt 1's cleanup"
+  attempt_3:
+    run_id: 7cca207c-86ba-4469-a8dd-920f1513c130
+    started_at: "2026-05-24T07:36:42Z"
+    completed_at: "2026-05-24T07:38:01Z"
+    status: failed
+    error_summary: "API Error: socket connection closed unexpectedly (same as attempt 1)"
+    notes: "Orchestrator removed empty cmux dir before this attempt; cmux issue cleared but Anthropic API socket dropped again"
+completion:
+  mode: orchestrator-completed
+  by: orchestrator
+  rationale: |
+    3 consecutive Multica failures (2 API socket drops + 1 cmux cleanup state leak).
+    Pattern indicates Multica session-level instability, not story-specific issue.
+    Orchestrator pulled agent's partial work (SKILL.md edit + run.mjs at h-01 leftover
+    workdir), wrote tests, fixed two minor bugs in run.mjs (YAML parser missed list-prefix
+    `  - id:`; close + hand-off envelopes missing new_state field), validated 9/9 tests pass.
+commit:
+  agent_branch: null
+  agent_commit: null
+  committed_to: feat/hermes-integration-mvp
+  orchestrator_fixes:
+    - "skills/triage/run.mjs parseItemBlock: read id via list-prefix regex (`  - id:`) not 4-space-indent scalar"
+    - "skills/triage/run.mjs cmdClose: add previous_state + new_state to envelope"
+    - "skills/triage/run.mjs cmdHandoff: add previous_state + new_state to envelope for consistency"
+files_changed:
+  - skills/triage/SKILL.md   # modified — --json flag + JSON output section
+  - skills/triage/run.mjs    # new — CLI runner with full state machine + --json envelopes
+  - tests/skills/triage-json.test.mjs   # new — 9 integration tests
+test_verification:
+  command: bun test tests/skills/triage-json.test.mjs
+  result: 9 pass / 0 fail
+  duration_ms: 385
+notes: |
+  Single-writer invariant preserved (--json branches only change output formatting,
+  no extra queue writes — verified by write-count assertion in test 9).
+  Three Multica attempts captured Anthropic API instability + cmux SessionEnd cleanup
+  ordering bug. Both gaps captured in tasks #62/#63/#64 follow-on.
