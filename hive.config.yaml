@@ -33,6 +33,18 @@ metrics:
 # off: disable lifecycle KG emission without disabling KG reads/imports.
 emit_lifecycle_at: phase
 
+# Meta-optimize signal weights (design §3.2)
+# Per-source multiplier applied to the base priority score in step-03 ranking.
+# Weighted score = weight × Impact × (6 − Risk) / Effort.
+# Default 1.0 for every key preserves ranking order when unset.
+meta_optimize:
+  signal_weights:
+    metrics: 1.0
+    external_research: 0.9
+    kg_signal: 0.4         # demoted pending KG repair
+    dreaming_replay: 0.5
+    backlog: 0.2
+
 # Quality gate thresholds
 quality_gates:
   auto_pass_threshold: 0.9

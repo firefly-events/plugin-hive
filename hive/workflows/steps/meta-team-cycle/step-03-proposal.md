@@ -145,9 +145,35 @@ Score each proposal on three dimensions (1–5 each):
 - **Risk:** How much could this break existing content? (5 = high risk, 1 = no risk — LOWER is better)
 - **Effort:** How many files, how many sections? (5 = large, 1 = single file addition)
 
-**Priority score = Impact × (6 − Risk) / Effort**
+**Base priority score = Impact × (6 − Risk) / Effort**
 
-Sort proposals by priority score descending.
+#### 3a. Apply signal-source weight multiplier
+
+After computing the base score, apply a per-source weight from
+`meta_optimize.signal_weights` in `hive.config.yaml`:
+
+**Weighted score = weight(source) × Base priority score**
+
+Source-to-weight-key mapping:
+
+| `discovery_source` | Weight key |
+|--------------------|------------|
+| `internal_audit`   | `metrics`  |
+| `external_research`| `external_research` |
+| `kg_signal`        | `kg_signal` |
+| `dreaming_replay`  | `dreaming_replay` |
+| `backlog`          | `backlog`  |
+
+Default weight for every key is `1.0` — absent config preserves prior ranking
+order exactly. The weight knob applies **after** precedence routing (metrics →
+external_research → kg_signal → dreaming_replay → backlog); it does not change
+which pool a proposal comes from, only its rank within the merged pool.
+
+The reference implementation and test suite live at:
+- `hive/workflows/steps/meta-team-cycle/signal-weights.mjs`
+- `hive/workflows/steps/meta-team-cycle/__tests__/signal-weights.test.mjs`
+
+Sort proposals by **weighted score** descending.
 
 ### 4. Write proposal specs
 For each proposal (top 5 by priority):
