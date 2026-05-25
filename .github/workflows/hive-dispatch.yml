@@ -152,7 +152,7 @@ jobs:
             # controlled so this is the injection boundary.
             SAFE_TITLE=$(printf '%s' "$ISSUE_TITLE" | tr -d '`$\n\r')
             gh pr create \
-              --base "${{ github.event.repository.default_branch }}" \
+              --base develop \
               --head "$BRANCH" \
               --title "${SAFE_TITLE} (#${ISSUE_NUMBER})" \
               --body "Automated /hive:execute run for #${ISSUE_NUMBER}." || true
