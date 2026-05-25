@@ -30,9 +30,22 @@ const searchRoots = [
  */
 function* findMarkers(dir) {
   if (!existsSync(dir)) return;
-  for (const entry of readdirSync(dir)) {
+  let entries;
+  try {
+    entries = readdirSync(dir);
+  } catch (err) {
+    process.stderr.write(`warn: skip unreadable directory ${dir}: ${err.message}\n`);
+    return;
+  }
+  for (const entry of entries) {
     const full = join(dir, entry);
-    const st = statSync(full);
+    let st;
+    try {
+      st = statSync(full);
+    } catch (err) {
+      process.stderr.write(`warn: skip unreadable entry ${full}: ${err.message}\n`);
+      continue;
+    }
     if (st.isDirectory()) {
       yield* findMarkers(full);
     } else if (entry === 'multica-run.yaml') {

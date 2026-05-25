@@ -84,11 +84,14 @@ function loadAuth(configPath = DEFAULT_CONFIG_PATH) {
 function readMarker(markerPath) {
   try {
     const raw = fs.readFileSync(markerPath, 'utf8');
-    // Parse minimal YAML: extract issue_id and assignee_id lines
+    // Parse minimal YAML: extract issue_id (or issue_identifier fallback) and
+    // assignee_id lines. issue_identifier is an alternate schema variant some
+    // markers use; treat it as a synonym.
     const issueMatch = raw.match(/^issue_id:\s*["']?([^\s'"]+)["']?/m);
+    const issueIdentifierMatch = raw.match(/^issue_identifier:\s*["']?([^\s'"]+)["']?/m);
     const assigneeMatch = raw.match(/^assignee_id:\s*["']?([^\s'"]+)["']?/m);
     return {
-      issue_id: issueMatch?.[1] ?? null,
+      issue_id: issueMatch?.[1] ?? issueIdentifierMatch?.[1] ?? null,
       assignee_id: assigneeMatch?.[1] ?? null,
     };
   } catch {

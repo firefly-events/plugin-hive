@@ -173,8 +173,21 @@ export async function run({ repoRoot, serverUrl, token }) {
 
     if (!issueId || !workspaceId) continue;
 
-    const epicId = marker.epic || epicFromPath;
-    const storyId = marker.story_id || storyFromPath;
+    // Sanitize epic/story IDs before they reach file paths. Markers are
+    // attacker-influenceable inputs; reject anything outside the safe ID
+    // pattern (alphanumeric + dash + underscore + dot) so a malformed marker
+    // cannot inject `..` segments via patchStoryYaml.
+    const SAFE_ID = /^[A-Za-z0-9._-]+$/;
+    const rawEpicId = marker.epic || epicFromPath;
+    const rawStoryId = marker.story_id || storyFromPath;
+    if (!SAFE_ID.test(rawEpicId) || !SAFE_ID.test(rawStoryId)) {
+      process.stderr.write(
+        `  warn: skip marker with unsafe ids epic=${JSON.stringify(rawEpicId)} story=${JSON.stringify(rawStoryId)} (${markerPath})\n`,
+      );
+      continue;
+    }
+    const epicId = rawEpicId;
+    const storyId = rawStoryId;
     const issueIdentifier = marker.issue_identifier || issueId;
 
     checked++;
