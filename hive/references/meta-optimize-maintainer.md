@@ -24,6 +24,22 @@ The candidate queue lives at
 `.pHive/meta-team/queue-meta-meta-optimize.yaml`. Each nightly run processes
 exactly one candidate. The queue is human-edited only (`Q-new-D` locked).
 
+### Queue Management — `tier` Field
+
+Each candidate may carry an optional `tier:` field that classifies work by
+size and risk. When absent, `structural` is assumed (backward-compatible).
+
+| Value | Meaning | Target cycle |
+|-------|---------|--------------|
+| `little-fix` | <50 lines diff, no schema/skill behavior change | `/meta-shotgun` (shotgun) |
+| `structural` | File/module-scope changes — **default** | Nightly cycle |
+| `strategic` | Cross-cutting / multi-epic changes | Manual planning only |
+
+Set `tier: little-fix` only when the diff is trivially small and carries zero
+behavioral risk. Set `tier: strategic` for anything that touches multiple epics
+or alters public skill contracts — those candidates must be promoted through a
+planning epic before the automated cycle can consume them.
+
 ## MVS Proof
 
 Regenerate the canonical BL3.6 MVS proof by running:
