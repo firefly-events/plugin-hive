@@ -1,0 +1,10 @@
+story: wmc-4-scope-drift-emit
+epic: wire-execute-multica-codex
+phase: integrate
+status: passed
+timestamp: 2026-05-25T20:00:04Z
+notes: |
+  Step 3 adds emit_scope_drift call after writeMulticaRunEpisode.
+  phase_label='execute:story', skill='execute', fire-and-forget posture.
+  delta_reasons enum documented inline from cycle-state-schema.md (no invention).
+  delivered_scope sourced from parse_delivered_from(terminal.notes).

@@ -225,6 +225,25 @@ Terminal status mapping is owned by the helper:
 
 The helper writes exactly one marker per story per run. The marker includes the Multica issue UUID, identifier, task ID, agent ID/name, work_dir, attempts, started/completed timestamps, and notes/error text when present. Truncation is reflected in `notes` when `messagesCaptureMax` clips the captured tail.
 
+**Scope-drift emit (per-story boundary).** Immediately after the episode marker is written, emit one `scope_drift_score` event per `/execute`'s Scope-drift emit prescription. This is the per-story boundary call for Multica mode — fire-and-forget, no error handling. The `ed-1-maturity-helper` gate inside the helper silently skips on greenfield/early projects.
+
+```sh
+python3 -c "
+from hive.lib.scope_drift import emit_scope_drift
+emit_scope_drift(
+    run_id='${run_id}',
+    phase_label='execute:story',
+    expected_scope=${json.dumps(story.acceptance_criteria or [])},
+    delivered_scope=${json.dumps(parse_delivered_from(terminal.notes))},
+    delta_reasons=[],
+    story_id='${story.id}',
+    skill='execute',
+)
+"
+```
+
+`delivered_scope` is sourced from the developer's done-summary captured in `terminal.notes` (one bullet per logical delivery; split on newlines/semicolons). When the parsed delivered list equals `expected_scope`, `delta_reasons` stays empty and the helper buckets to `none`. When divergence is detected (a future enhancement once we trust the parse), `delta_reasons` carries values from the cycle-state-schema enum: `rescope`, `scope-creep`, `deferred`, `blocked`, `misunderstood-ac`, `out-of-band-work`.
+
 ### Step 4: Sidecar deferral
 
 For each `story_id` in `appends_map`, emit:
