@@ -1,0 +1,177 @@
+id: mi-03-execute-mode-multica-fail-fast
+epic: multica-integration-fixes
+title: execute-mode-multica skill — explicit clone with --ref + post-clone verify + fail-fast
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []   # independent of Wave 1; pure Hive-side patch
+wave: W2
+action_id: MI-03
+
+description: |
+  Patch `skills/hive/skills/execute-mode-multica/SKILL.md` so each per-task
+  dispatch:
+    1. Calls `multica repo checkout --ref <epic-branch>` explicitly before
+       assignment (instead of relying on Multica's default-branch auto-clone)
+    2. Verifies `workdir/plugin-hive/` exists post-dispatch + the checked-out
+       branch matches the epic-branch hint
+    3. Fails fast with actionable error if either check fails (lists workdir
+       path, expected branch, suggested manual rerun command) instead of
+       silently letting the agent improvise
+
+  Document the canonical post-dispatch reconciliation pattern in the skill
+  itself: "agent's commits land on agent/<persona>/<run-id> branch; orchestrator
+  cherry-picks (or fetches + rebases) into the epic branch as a final step."
+
+  Pre-implementation verification step: invoke `multica repo checkout
+  --ref feat/multica-integration-fixes` against a throwaway issue + inspect
+  the resulting workdir. Document actual behavior in a comment block at the
+  top of the patch PR (or in the skill's commentary). Only proceed with the
+  skill patch AFTER this verification — per grill H4, the CLI behavior is
+  unverified at planning time.
+
+acceptance_criteria:
+  - "Pre-implementation step run + behavior documented (commit message or inline skill comment): result of `multica repo checkout --ref <branch>` invocation against a throwaway issue, listing whether clone lands in workdir, what branch is checked out, error cases observed"
+  - "`skills/hive/skills/execute-mode-multica/SKILL.md` Step 1 (per-story dispatch) updated to invoke explicit clone + verify"
+  - "Post-clone verification: skill confirms `workdir/plugin-hive/` exists AND `git -C workdir/plugin-hive branch --show-current` returns a value that matches epic-branch convention (e.g., `agent/<persona>/<run-short>` based off the requested ref)"
+  - "Fail-fast error message names: the expected workdir path, the requested ref, the actual workdir contents, a suggested `multica repo checkout` command for manual rerun"
+  - "Reconciliation pattern documented inline in skill — names the canonical pattern (cherry-pick OR fetch+rebase) + the orchestrator-side command to run after agent terminal"
+  - "Regression: existing execute-mode-multica behavior on the auto-clone success path (h-01-style runs) still works — either via auto-detect + skip-explicit-clone branch OR via the explicit clone replacing auto-clone cleanly"
+  - "Story commit message documents the pre-implementation verification finding"
+
+metric:
+  applies: false
+  justification: "Hive-side skill patch — substrate change that makes execute-mode-multica more robust by failing fast on workdir gaps instead of silently degrading. Success is verified by acceptance criteria + integration smoke test (next mi- story dispatch through this patched skill succeeds OR fails loudly with actionable error); no user-facing performance/throughput metric ships in this story alone."
+
+steps:
+  - id: research
+    description: |
+      Read `skills/hive/skills/execute-mode-multica/SKILL.md` Step 1 + Step 0
+      (current per-story dispatch flow + precondition gate). Read
+      `hive/lib/multica-story-dispatch/index.mjs` for the helper API surface
+      (`dispatchStoryToAgent`, `moveOutOfBacklogIfNeeded`). Identify where
+      the explicit checkout call belongs in the dispatch order (before
+      `dispatchStoryToAgent` per spec).
+    agent: researcher
+
+  - id: implement
+    description: |
+      Step 1: pre-implementation verification — invoke `multica repo
+      checkout --ref feat/multica-integration-fixes` against a throwaway
+      issue in workspace plugin-hive; inspect resulting workdir; document
+      actual behavior (clone target path, checked-out branch, error
+      conditions). Capture in a verification log committed alongside the
+      patch.
+
+      Step 2: patch the skill — add an "explicit clone + verify" sub-step
+      to Step 1 of execute-mode-multica per acceptance criteria.
+
+      Step 3: add reconciliation pattern doc to the skill (markdown section
+      with the canonical orchestrator-side command + when to use cherry-pick
+      vs fetch+rebase).
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Manual: invoke the patched skill against a throwaway story (just
+      assign + check workdir state, no agent work needed). Verify success
+      path: clone exists in workdir + branch matches. Verify failure path:
+      delete the expected workdir + rerun; verify fail-fast error fires with
+      actionable message. (No unit test framework exists for execute-mode-*
+      skills since they're skill-md prose; manual smoke is the verification
+      method per existing skill convention.)
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Review the patch for: behavior-preservation invariant (auto-clone
+      success path doesn't regress), error message quality (actionable, not
+      just "clone missing"), reconciliation pattern doc clarity. Read the
+      pre-implementation verification log; confirm the documented CLI
+      behavior matches what the patch assumes.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: |
+      Commit on feat/multica-integration-fixes branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/execute-mode-multica/SKILL.md
+      purpose: "Skill to patch — Step 1 per-story dispatch is the modification site"
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: "Helper API; understand existing dispatch surface before adding clone+verify"
+    - path: .pHive/episodes/hermes-integration-mvp/h-01-context-snapshot-composer/multica-run.yaml
+      purpose: "Reference run that worked (auto-clone success) — patch must preserve this path's behavior"
+    - path: .pHive/episodes/hermes-integration-mvp/h-02-context-snapshot-skill/multica-run.yaml
+      purpose: "Reference run that improvised (no clone) — patch must reliably catch this case + fail fast"
+
+files_to_modify:
+  - file: skills/hive/skills/execute-mode-multica/SKILL.md
+    change: Patch Step 1 — add explicit clone + post-clone verify + fail-fast; add reconciliation pattern doc section
+  - file: .pHive/upstream-watch/multica-repo-checkout-behavior.md
+    change: NEW — pre-implementation verification log (committed alongside patch for traceability)
+
+code_examples:
+  - title: Multica repo checkout CLI signature (verified — per grill H4 still needs invocation test)
+    file: <CLI help output>
+    snippet: |
+      multica repo checkout <url> [flags]
+      FLAGS
+        --ref string   branch, tag, or commit to check out instead of the remote default branch
+
+  - title: Current execute-mode-multica dispatch flow (Step 1, abbreviated)
+    file: skills/hive/skills/execute-mode-multica/SKILL.md
+    snippet: |
+      1. **Issue resolution.** Use getStory or createStory
+      2. **Backlog kick.** moveOutOfBacklogIfNeeded
+      3. **Brief write.** ensureIssueBriefMatches
+      4. **Dispatch.** dispatchStoryToAgent
+      5. **Track.** record dispatch_started_at in poll loop
+      # Patch adds: between step 3 and step 4, an explicit clone + verify
+
+design_decisions:
+  - decision: "Explicit clone before dispatch instead of detect-and-fall-back-to-caller-checkout"
+    rationale: "Per grill H4 + design discussion §6 Q2: cleaner contract surface. The skill's documented behavior is 'Multica owns the workdir' — making it explicit catches Multica regressions early instead of silently working sometimes."
+  - decision: "Pre-implementation verification step before writing the patch"
+    rationale: "Per grill H4: --ref CLI is unverified at planning time. Cheap probe prevents shape mismatch costing a rewrite. Committed log makes the assumption auditable."
+  - decision: "Manual smoke test instead of unit tests"
+    rationale: "execute-mode-* skills are skill-md prose, not code. No unit test framework exists for them. Manual smoke is the existing convention for skill changes."
+
+cross_cutting:
+  - concern: documentation
+    action: "Skill itself is documentation; this patch updates it. Add explicit reconciliation pattern section. New `.pHive/upstream-watch/multica-repo-checkout-behavior.md` verification log."
+  - concern: versioning
+    action: "If shipped consumer-facing, qualifies as minor bump. Decision deferred to epic-close (no h-05-equivalent in this 4-story plan; the patch + spike briefs land together as one PR — see Done definition in design discussion)."
+
+risks:
+  - severity: high
+    description: `multica repo checkout --ref` might not behave the way the help text implies (require pre-fetched ref, leave workdir in inconsistent state, etc.)
+    mitigation: Pre-implementation verification step is exactly this check; commit message documents actual behavior; patch is written to match what was observed
+  - severity: medium
+    description: Patch regresses the h-01-style auto-clone success path
+    mitigation: Acceptance criterion explicitly requires preservation; manual smoke verifies both paths
+  - severity: low
+    description: Reconciliation pattern doc could over-prescribe; orchestrator might want flexibility
+    mitigation: Doc names the canonical pattern + lists when each alternative (cherry-pick vs fetch+rebase) is appropriate, not a hard rule
+
+references:
+  - path: .pHive/epics/multica-integration-fixes/docs/research-brief.md
+    relevant_excerpt: |
+      execute-mode-multica skill never calls `multica repo checkout --ref`.
+      Three of four h-* runs had no clone in workdir; agent improvised by
+      writing to caller checkout or h-01's leftover workdir. Patch scope:
+      (a) extend skill to call --ref explicitly, (b) verify clone exists +
+      fail loudly if not, (c) document canonical reconciliation pattern.
+
+parallel_allowed: false
+
+tracker_id: "plugin-hive/PLU-61"
+tracker_url: "http://localhost:3000/plugin-hive/issues/PLU-61"
+tracker_uuid: "45d7b435-255b-413b-b293-0942a9ec10f0"

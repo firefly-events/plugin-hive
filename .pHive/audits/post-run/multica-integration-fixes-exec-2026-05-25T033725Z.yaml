@@ -1,0 +1,70 @@
+run_id: multica-integration-fixes-exec-2026-05-25T033725Z
+skill: execute
+epic_id: multica-integration-fixes
+branch: feat/multica-integration-fixes
+timestamp: "2026-05-25T03:37:25Z"
+
+stories_completed:
+  - mi-01-spike-plugin-loading
+  - mi-03-execute-mode-multica-fail-fast
+  - mi-02-spike-session-lifecycle
+  - mi-04-apply-plugin-install-finding
+
+commits:
+  - 1ca1de0  # mi-01
+  - 689b886  # mi-03
+  - a631ead  # mi-02
+  - 0beaa32  # mi-04
+
+gate_lift_fired: false
+mode_decision: team-cmux-bypassed-to-serial-codex-rescue
+mode_reason: "User requested local Codex backend; serial codex:codex-rescue dispatch per feedback_codex_parallel_race"
+runner_path: orchestrator-narrated
+runner_reason: "Executor cutover not enabled; orchestrator-narrated per Q4 fail-closed lock"
+
+backend_sources:
+  sessions_enabled: default
+  parallel_teams: config
+  terminal_mux: config
+  executor: default
+
+methodology:
+  value: classic
+  source: epic.yaml
+
+nonsensical_defaults: []
+
+dispatch_pattern:
+  description: |
+    Serial dispatch of codex:codex-rescue subagent (4 spawns total, one per
+    story). Per feedback_codex_parallel_race: Agent(isolation:worktree) does
+    NOT isolate codex:codex-rescue subagents — default to SERIAL.
+    Orchestrator (Opus 4.7) verified outputs via Read, committed manually
+    per feedback_codex_sandbox_commit_block (codex sandbox cannot write
+    .git/index.lock).
+  agent_backend_routing:
+    researcher: codex  # mi-01, mi-02
+    developer: codex   # mi-03, mi-04
+    reviewer: claude   # n/a — orchestrator-side verification
+
+work_artifacts:
+  files_modified:
+    - .pHive/upstream-watch/multica-plugin-loading.md  # NEW (mi-01)
+    - .pHive/upstream-watch/multica-repo-checkout-behavior.md  # NEW (mi-03)
+    - skills/hive/skills/execute-mode-multica/SKILL.md  # MODIFIED (mi-03)
+    - .pHive/upstream-watch/multica-session-lifecycle.md  # NEW (mi-02)
+    - .pHive/multica/agents.yaml  # MODIFIED (mi-04)
+    - skills/multica-init/SKILL.md  # MODIFIED (mi-04)
+    - hive/lib/multica-agents-config/index.mjs  # MODIFIED (mi-04)
+  test_runs:
+    - command: "node --test tests/multica-agents-config.test.mjs"
+      result: pass
+      context: mi-04 verified yaml parser change doesn't regress
+
+deferrals:
+  - story: mi-04
+    item: "Throwaway-dispatch + /hive:status invocation smoke test"
+    reason: "Requires full Multica run cycle (init → dispatch → slash command verify); landing in follow-on after agents.yaml reconciles via /hive:multica-init"
+  - story: epic-level
+    item: "Upstream PR coordination for mi-02 socket-classification fix + mi-01 documentation PR"
+    reason: "Per epic partial-closure framing: this epic ships Hive-side hardening + upstream-PR-ready artifacts; full closure requires upstream Multica PRs in follow-on effort"

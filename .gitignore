@@ -83,6 +83,7 @@ state/
 !.pHive/cycle-state/brand-system-2.0-update.yaml
 !.pHive/cycle-state/kg-signal-revival.yaml
 !.pHive/cycle-state/skill-ergo-may2026.yaml
+!.pHive/cycle-state/multica-integration-fixes.yaml
 !.pHive/cycle-state/hermes-integration-mvp.yaml
 # /find-skills (se-5) writes ranked candidates here; track the dir marker so
 # consumer projects ship with an initialized output location.
@@ -179,3 +180,7 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/multica-substrate-adoption/**
 !.pHive/epics/multica-execute-routing/
 !.pHive/epics/multica-execute-routing/**
+!.pHive/epics/multica-integration-fixes/
+!.pHive/epics/multica-integration-fixes/**
+!.pHive/episodes/multica-integration-fixes/
+!.pHive/episodes/multica-integration-fixes/**
