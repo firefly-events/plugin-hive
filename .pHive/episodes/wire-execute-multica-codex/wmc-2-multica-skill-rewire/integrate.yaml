@@ -1,0 +1,11 @@
+story: wmc-2-multica-skill-rewire
+epic: wire-execute-multica-codex
+phase: integrate
+status: passed
+timestamp: 2026-05-25T19:56:44Z
+notes: |
+  Step 1 reframed as serial-per-story Phase 1 contract (Phase 2 parallel deferred).
+  Step 2 stub replaced with real pollTaskUntilTerminal call + terminal-object shape doc.
+  Step 3 prose replaced with real writeMulticaRunEpisode call shape.
+  Zero 'not yet implemented' lines remain (was 1, target 0).
+  Sidecar v1 DEFERRED note preserved.

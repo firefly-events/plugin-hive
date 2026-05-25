@@ -66,7 +66,11 @@ ERROR: Multica execution mode requires bootstrapped agents.
 
 Exit `1`. Do NOT fall back to sequential.
 
-### Step 1: Per-story dispatch (parallel within depth)
+### Step 1: Per-story dispatch (serial within depth — Phase 1)
+
+Phase 1 dispatches stories **serially** within the current depth: dispatch story N, poll to terminal (Step 2), write the episode marker (Step 3), then advance to story N+1. This is the v1 contract — it keeps Multica daemon load bounded, makes failure isolation trivial, and matches how `meta-improvement-reset` was actually run inline on 2026-05-25.
+
+> **Phase 2 (future):** parallel-within-depth fanout is a documented option once we have evidence the daemon and agent runtime tolerate concurrent task pressure. Do not enable parallel dispatch in v1.
 
 For each story in `unblocked_stories[]` at this depth:
 
@@ -120,7 +124,7 @@ For each story in `unblocked_stories[]` at this depth:
    - Record `{story_id, issueUuid, identifier, dispatch_started_at}` in an in-memory map for the poll loop.
    - Keep per-story state independent so one 4xx or terminal failure does not block sibling stories in the same depth.
 
-The dispatch fanout is parallel within the current depth. Do not advance to later DAG depths inside this skill; `/execute` owns DAG advancement and re-invokes this skill for the next depth.
+The dispatch fanout is **serial within the current depth** in Phase 1 (see Step 1 preamble). Do not advance to later DAG depths inside this skill; `/execute` owns DAG advancement and re-invokes this skill for the next depth.
 
 ### Step 2: Poll until terminal (per story)
 
@@ -137,7 +141,7 @@ For each dispatched story, drive `pollTaskUntilTerminal` with:
 - `pollIntervalMs` from `hive_config.execution.multica.poll_interval_seconds * 1000`.
 - Default `pollIntervalMs` is `5_000`.
 
-The future API contract from s4 is:
+Import the helpers:
 
 ```js
 import {
@@ -146,7 +150,7 @@ import {
 } from '../../../../hive/lib/multica-story-dispatch/episode-sync.mjs';
 ```
 
-Expected poll call shape:
+Poll call shape:
 
 ```js
 const terminal = await pollTaskUntilTerminal({
@@ -154,27 +158,49 @@ const terminal = await pollTaskUntilTerminal({
   token,
   workspaceId,
   issueUuid,
-  storyId: story.id,
   maxWallClockMs,
   pollIntervalMs,
   messagesCaptureMax,
   onStateTransition(prev, next) {
-    stderr.write(`[multica:${story.id}] ${prev} → ${next}\n`);
+    process.stderr.write(`[multica:${story.id}] ${prev} → ${next}\n`);
   },
 });
 ```
 
-s4 is the DEPENDENCY of this story. Temporarily, until s4 lands, this step can be a stub that logs:
+`terminal` is an object of shape:
 
 ```text
-[multica:{story_id}] s4 episode-marker-sync not yet implemented — would poll here
+{
+  status:        'completed' | 'failed' | 'cancelled',
+  notes:         string,
+  messages:      [<message>, ...],            // last messagesCaptureMax entries
+  task_id:       string,
+  agent_id:      string | null,
+  agent_name:    string | null,
+  work_dir:      string | null,
+  attempts:      number,
+  started_at:    ISO-8601 string | null,
+  completed_at:  ISO-8601 string | null,
+}
 ```
 
-After s4 merges, this skill consumes the real `episode-sync.mjs` API.
+A timeout-cancelled story returns `status: 'cancelled'` and `notes: 'timeout after Ns'`; transport failure after 3 consecutive errors throws `TRANSPORT` (caller catches per-story and writes a failure marker — see Failure modes).
 
 ### Step 3: Episode marker per terminal
 
-Call `writeMulticaRunEpisode` with the terminal state returned by polling.
+Call `writeMulticaRunEpisode` with the terminal state returned by polling:
+
+```js
+const { markerPath, messagesPath, status, notes } = await writeMulticaRunEpisode({
+  hiveStateDir,            // resolved from paths.state_dir (default .pHive)
+  epicHandle: epic_handle, // parent epic identifier
+  storyId: story.id,
+  issueUuid,               // captured in Step 1 dispatch
+  identifier,              // human-readable issue ID (e.g. plugin-hive/PLU-42)
+  terminal,                // object returned by pollTaskUntilTerminal in Step 2
+  messagesCaptureMax,      // hive_config.execution.multica.messages_capture_max (default 200)
+});
+```
 
 The marker path is:
 
@@ -188,7 +214,7 @@ The messages sidecar path is:
 ${HIVE_STATE_DIR}/episodes/{epic_handle}/{story_id}/multica-run.messages.jsonl
 ```
 
-Terminal status mapping:
+Terminal status mapping is owned by the helper:
 
 | Multica terminal | Episode marker status |
 |---|---|
@@ -196,7 +222,7 @@ Terminal status mapping:
 | `failed` | `failed` |
 | `cancelled` | `cancelled` |
 
-Write exactly one marker per story for this run. Include the Multica issue UUID, identifier, dispatch timestamps, terminal timestamps, and notes/error text when present.
+The helper writes exactly one marker per story per run. The marker includes the Multica issue UUID, identifier, task ID, agent ID/name, work_dir, attempts, started/completed timestamps, and notes/error text when present. Truncation is reflected in `notes` when `messagesCaptureMax` clips the captured tail.
 
 ### Step 4: Sidecar deferral
 
