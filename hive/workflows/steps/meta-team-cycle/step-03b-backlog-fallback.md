@@ -58,15 +58,31 @@ Load `.pHive/meta-team/queue-meta-meta-optimize.yaml` from disk.
 - Preserve the human-authored order exactly as written
 - Do not add derived candidates, inferred candidates, or synthetic metadata
 
-### 3. Select the fallback candidate
-Inspect `candidates` in listed order.
+### 3. Filter tier-ineligible candidates
+
+Before selecting, remove any candidate whose `tier` field equals `little-fix`.
+These belong to the shotgun path (`/meta-shotgun`, mir-6/mir-7) and must NOT
+be consumed by nightly cycles.
+
+Filter rule (implemented in `hive/lib/meta-team/backlog-loader.mjs →
+filterNightlyEligible`):
+- `tier: little-fix` → **exclude** (remains `status: pending` in the backlog, untouched)
+- `tier: structural` → include
+- `tier: strategic`  → include
+- `tier` absent      → treat as `structural` → include (backward-compatible)
+
+Record the number of excluded candidates as `filtered_count` for the dry-run
+report.
+
+### 4. Select the fallback candidate
+Inspect the **filtered** candidate list in listed order.
 
 - Pick the FIRST entry with `status: pending`
 - Do not priority-score entries
 - Do not skip a pending entry because another one "looks better"
-- If no pending entry exists: the fallback result is empty and the cycle ends
+- If no pending entry exists after filtering: the fallback result is empty and the cycle ends
 
-### 4. Build the dry-run report
+### 5. Build the dry-run report
 Emit exactly one structured YAML report with this shape:
 
 ```yaml
@@ -77,14 +93,16 @@ selected:
   type: null
   description: null
   safety_notes: null
+filtered_count: 0                 # number of little-fix candidates excluded from consideration
 decision: no-fallback-available   # enum: would-execute | no-fallback-available
 ```
 
 Rules:
-- `decision: would-execute` when a pending candidate was found
-- `decision: no-fallback-available` when no pending candidate exists
+- `decision: would-execute` when a pending candidate was found in the filtered pool
+- `decision: no-fallback-available` when no pending candidate exists after filtering
 - `decision` MUST match whether `selected.*` are populated or `null`
-- All fields other than `decision` mirror the selected backlog entry or become `null`
+- All fields other than `decision` and `filtered_count` mirror the selected backlog entry or become `null`
+- `filtered_count` is always set (0 when no candidates were excluded)
 
 Example A: no fallback candidate available
 
@@ -95,10 +113,11 @@ selected:
   type: null
   description: null
   safety_notes: null
+filtered_count: 0
 decision: no-fallback-available
 ```
 
-Example B: candidate found, dry-run would execute
+Example B: candidate found, dry-run would execute (with little-fix candidates excluded)
 
 ```yaml
 selected:
@@ -107,10 +126,11 @@ selected:
   type: workflow-doc-fix
   description: Clarify fallback execution handoff wording
   safety_notes: Docs only; no runtime mutation
+filtered_count: 2
 decision: would-execute
 ```
 
-### 5. Stop after reporting
+### 6. Stop after reporting
 After the report is emitted:
 
 - Do NOT edit the backlog
@@ -123,7 +143,9 @@ After the report is emitted:
 
 - [ ] Step used only when all actionable inputs were empty: step 2 findings = 0, step 2b external_research_candidates = 0, and no metric_signal
 - [ ] Backlog loaded from `.pHive/meta-team/queue-meta-meta-optimize.yaml` without modification
-- [ ] First `status: pending` candidate selected with no priority scoring
+- [ ] `tier: little-fix` candidates excluded from selection pool; filtered candidates remain `status: pending` (untouched)
+- [ ] First `status: pending` candidate from the filtered pool selected with no priority scoring
+- [ ] Dry-run report includes `filtered_count` reflecting how many little-fix candidates were excluded
 - [ ] Exactly one structured YAML report emitted
 - [ ] (S8) No promotion, mutation, experiment execution, or step-4 advancement occurred (S9/BL2.2+ live mode: step-4 advancement is expected — see NEXT STEP forward-compatibility note)
 
@@ -132,6 +154,7 @@ After the report is emitted:
 - Backlog file missing: emit the structured YAML report with all nullable fields set to `null` and `decision: no-fallback-available`
 - Backlog YAML invalid: report the parse failure in operator-facing logs, then emit `decision: no-fallback-available`
 - Backlog has zero pending entries: emit `decision: no-fallback-available` and end the cycle
+- All pending entries are `tier: little-fix` (filtered out): emit `decision: no-fallback-available` with `filtered_count` set to the number excluded; do not promote any little-fix candidate to fill the gap
 - Caller invokes this step even though step 2 produced findings, step 2b produced external candidates, OR a metric signal is present: reject the fallback run and return control to step-03-proposal (see §1 eligibility check)
 
 ## NEXT STEP
