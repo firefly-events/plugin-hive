@@ -24,10 +24,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Changed
 
 - `hive/references/routines-integration.md` adds §"External coordinators (Hermes equivalence)" noting that any cron/webhook-capable coordinator (Anthropic Routines, Hermes, custom) plugs into the standup skill via the same scheduler-as-trigger contract.
+- `skills/hive/skills/execute-mode-multica/SKILL.md` adds explicit checkout + verify + fail-fast (mi-03).
+- `hive/lib/multica-bootstrap/index.mjs` + `hive/lib/multica-agents-config/index.mjs` install Claude Code plugins via `custom_env.CLAUDE_PLUGIN_PATH` (mi-04).
+
+### Fixed
+
+- `hive/lib/multica-story-dispatch/custom-env.mjs` (new) resolves `~`, `${HOME}`, and `$HOME` in `custom_env` values before sending to Multica, so plugin paths reach the agent literally (ab17b0b, PR #220).
 
 ### Notes
 
 - Substrate for the planned Hermes-as-external-supervisor integration (companion epic `hermes-bridge-mvp` in `~/Code/hermes-agent` planned separately). All three flags are additive opt-in surfaces — default behavior is byte-equivalent on every existing entry point.
+- Bundles `multica-integration-fixes` epic (PR #220, merged before this release): mi-01/mi-02 spikes documented in `.pHive/upstream-watch/`, mi-03/mi-04 + custom-env-resolve fix shipped above.
 
 ## [2.7.0] - 2026-05-21
 
