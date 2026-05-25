@@ -17,7 +17,11 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..');
-const QUEUE_DIR = join(REPO_ROOT, '.pHive', 'triage');
+// Test isolation: HIVE_TRIAGE_QUEUE_DIR overrides the default location so
+// tests can run against a tmp fixture without touching the real repo queue.
+const QUEUE_DIR = process.env.HIVE_TRIAGE_QUEUE_DIR
+  ? process.env.HIVE_TRIAGE_QUEUE_DIR
+  : join(REPO_ROOT, '.pHive', 'triage');
 const QUEUE_PATH = join(QUEUE_DIR, 'queue.yaml');
 const SCHEMA_VERSION = 1;
 
@@ -109,6 +113,16 @@ function parseArgs(argv) {
       opts.positional = arg;
     }
   }
+
+  const actionCount =
+    Number(opts.list) +
+    Number(opts.advance !== null) +
+    Number(opts.handOff) +
+    Number(opts.close);
+  if (actionCount > 1) {
+    die(`mutually exclusive sub-commands: choose only one of --list, --advance, --hand-off, --close.\n${usage()}`);
+  }
+
   return opts;
 }
 

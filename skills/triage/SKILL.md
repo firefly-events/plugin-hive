@@ -160,6 +160,8 @@ All envelopes include `schema_version: 1` at the top level (same integer version
   "schema_version": 1,
   "command": "hand-off",
   "id": "t-001",
+  "previous_state": "prioritized",
+  "new_state": "plan-ready",
   "linked_epic": null,
   "linked_story": null
 }
@@ -172,6 +174,8 @@ All envelopes include `schema_version: 1` at the top level (same integer version
   "schema_version": 1,
   "command": "close",
   "id": "t-001",
+  "previous_state": "plan-ready",
+  "new_state": "closed",
   "reason": "duplicate of t-005"
 }
 ```

@@ -108,6 +108,11 @@ state/
 # fixtures consumed by hive/lib/metrics/ unit tests.
 !.pHive/metrics/
 !.pHive/metrics/**
+# Per-session stop-hook event files are runtime artifacts (one per session)
+# that accumulate locally and should never be tracked — they leak session IDs
+# and explode the diff on every PR. Meta-* / agent-spawn-* fixtures stay tracked.
+.pHive/metrics/events/stop-*.jsonl
+.pHive/metrics/events/agent-spawn-runtime-*.jsonl
 # MVL proof artifacts — only the canonical mvl-proof folder ships with the repo.
 !.pHive/audits/
 .pHive/audits/*

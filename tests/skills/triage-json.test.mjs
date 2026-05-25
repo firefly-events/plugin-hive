@@ -8,7 +8,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync, statSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -19,48 +19,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const RUNNER = path.join(REPO_ROOT, 'skills', 'triage', 'run.mjs');
 
-// Each test runs in its own isolated REPO_ROOT-like directory.
-// run.mjs derives QUEUE_DIR from REPO_ROOT = __dirname/../.. — so we copy the
-// runner into a fixture tree to fully isolate writes.
-function buildFixture() {
-  const tmp = mkdtempSync(path.join(os.tmpdir(), 'triage-json-'));
-  // Mirror the relative path layout: skills/triage/run.mjs at tmp/skills/triage/
-  mkdirSync(path.join(tmp, 'skills', 'triag-real'), { recursive: true });
-  // Symlink/copy: just spawn with cwd=tmp and override REPO_ROOT via process.env hint.
-  // The runner uses __dirname-based REPO_ROOT, so spawn the actual runner but
-  // override the resolved QUEUE_DIR by isolating cwd + symlinking the runner.
-  // Simpler: spawn the real runner with HOME-isolated env that points it
-  // to tmp via a wrapper. But run.mjs hardcodes path resolution, so the
-  // cleanest path is to give it a writable .pHive/triage under tmp and
-  // accept that REPO_ROOT-derived QUEUE_PATH still points to the real repo
-  // for these tests. To prevent test pollution, each test cleans queue
-  // entries it creates after the assertion.
-  return tmp;
+// Each test gets its own tmp queue dir via HIVE_TRIAGE_QUEUE_DIR. The runner
+// honors that env var when set, so writes never touch the real repo queue.
+function mkQueueDir() {
+  return mkdtempSync(path.join(os.tmpdir(), 'triage-json-'));
 }
 
-function run(args) {
-  return spawnSync(process.execPath, [RUNNER, ...args], { encoding: 'utf8' });
+function run(args, queueDir) {
+  return spawnSync(process.execPath, [RUNNER, ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, HIVE_TRIAGE_QUEUE_DIR: queueDir },
+  });
 }
 
-function realQueuePath() {
-  return path.join(REPO_ROOT, '.pHive', 'triage', 'queue.yaml');
+function queuePath(queueDir) {
+  return path.join(queueDir, 'queue.yaml');
 }
 
-function cleanQueue() {
-  const qp = realQueuePath();
-  try { rmSync(qp, { force: true }); } catch { /* ok */ }
-  try { rmSync(path.dirname(qp), { recursive: true, force: true }); } catch { /* ok */ }
+function cleanQueue(queueDir) {
+  try { rmSync(queueDir, { recursive: true, force: true }); } catch { /* ok */ }
 }
 
-function queueWriteCount(beforeMtime) {
-  const qp = realQueuePath();
-  if (!existsSync(qp)) return 0;
-  const st = statSync(qp);
-  return st.mtimeMs !== beforeMtime ? 1 : 0;
-}
-
-function queueMtime() {
-  const qp = realQueuePath();
+function queueMtime(queueDir) {
+  const qp = queuePath(queueDir);
   return existsSync(qp) ? statSync(qp).mtimeMs : 0;
 }
 
@@ -69,9 +50,9 @@ function queueMtime() {
 // ---------------------------------------------------------------------------
 
 test('--list --json on empty queue returns valid envelope', () => {
-  cleanQueue();
+  const qd = mkQueueDir();
   try {
-    const result = run(['--list', '--json']);
+    const result = run(['--list', '--json'], qd);
     assert.equal(result.status, 0, `expected exit 0, got ${result.status}\nstderr: ${result.stderr}`);
     const parsed = JSON.parse(result.stdout);
     assert.equal(parsed.schema_version, 1);
@@ -79,14 +60,14 @@ test('--list --json on empty queue returns valid envelope', () => {
     assert.equal(parsed.count, 0);
     assert.ok(Array.isArray(parsed.items));
   } finally {
-    cleanQueue();
+    cleanQueue(qd);
   }
 });
 
 test('create with --json returns new entry id envelope', () => {
-  cleanQueue();
+  const qd = mkQueueDir();
   try {
-    const result = run(['Login drops session at 401', '--json']);
+    const result = run(['Login drops session at 401', '--json'], qd);
     assert.equal(result.status, 0, `exit non-zero\nstderr: ${result.stderr}`);
     const parsed = JSON.parse(result.stdout);
     assert.equal(parsed.schema_version, 1);
@@ -94,18 +75,18 @@ test('create with --json returns new entry id envelope', () => {
     assert.equal(parsed.state, 'inbox');
     assert.match(parsed.id, /^t-\d+$/);
   } finally {
-    cleanQueue();
+    cleanQueue(qd);
   }
 });
 
 test('inspect by id with --json returns full entry detail', () => {
-  cleanQueue();
+  const qd = mkQueueDir();
   try {
-    const create = run(['Test bug', '--json']);
+    const create = run(['Test bug', '--json'], qd);
     const created = JSON.parse(create.stdout);
     const id = created.id;
 
-    const inspect = run([id, '--json']);
+    const inspect = run([id, '--json'], qd);
     assert.equal(inspect.status, 0, `inspect exit non-zero\nstderr: ${inspect.stderr}`);
     const parsed = JSON.parse(inspect.stdout);
     assert.equal(parsed.schema_version, 1);
@@ -114,17 +95,17 @@ test('inspect by id with --json returns full entry detail', () => {
     assert.equal(parsed.item.state, 'inbox');
     assert.equal(parsed.item.title, 'Test bug');
   } finally {
-    cleanQueue();
+    cleanQueue(qd);
   }
 });
 
 test('--advance with --json returns state transition envelope', () => {
-  cleanQueue();
+  const qd = mkQueueDir();
   try {
-    const create = run(['Advance test bug', '--json']);
+    const create = run(['Advance test bug', '--json'], qd);
     const { id } = JSON.parse(create.stdout);
 
-    const advance = run([id, '--advance', 'clarified', '--kind', 'bug', '--json']);
+    const advance = run([id, '--advance', 'clarified', '--kind', 'bug', '--json'], qd);
     assert.equal(advance.status, 0, `advance exit non-zero\nstderr: ${advance.stderr}`);
     const parsed = JSON.parse(advance.stdout);
     assert.equal(parsed.schema_version, 1);
@@ -133,17 +114,17 @@ test('--advance with --json returns state transition envelope', () => {
     assert.equal(parsed.previous_state, 'inbox');
     assert.equal(parsed.new_state, 'clarified');
   } finally {
-    cleanQueue();
+    cleanQueue(qd);
   }
 });
 
 test('--close with --json returns terminal envelope', () => {
-  cleanQueue();
+  const qd = mkQueueDir();
   try {
-    const create = run(['Close test bug', '--json']);
+    const create = run(['Close test bug', '--json'], qd);
     const { id } = JSON.parse(create.stdout);
 
-    const closed = run([id, '--close', '--reason', 'duplicate of #1', '--json']);
+    const closed = run([id, '--close', '--reason', 'duplicate of #1', '--json'], qd);
     assert.equal(closed.status, 0, `close exit non-zero\nstderr: ${closed.stderr}`);
     const parsed = JSON.parse(closed.stdout);
     assert.equal(parsed.schema_version, 1);
@@ -152,19 +133,19 @@ test('--close with --json returns terminal envelope', () => {
     assert.equal(parsed.new_state, 'closed');
     assert.equal(parsed.reason, 'duplicate of #1');
   } finally {
-    cleanQueue();
+    cleanQueue(qd);
   }
 });
 
 test('--hand-off with --json returns hand-off envelope', () => {
-  cleanQueue();
+  const qd = mkQueueDir();
   try {
-    const create = run(['Hand-off test bug', '--json']);
+    const create = run(['Hand-off test bug', '--json'], qd);
     const { id } = JSON.parse(create.stdout);
-    run([id, '--advance', 'clarified', '--kind', 'bug', '--json']);
-    run([id, '--advance', 'prioritized', '--priority', 'p2', '--severity', 'moderate', '--json']);
+    run([id, '--advance', 'clarified', '--kind', 'bug', '--json'], qd);
+    run([id, '--advance', 'prioritized', '--priority', 'p2', '--severity', 'moderate', '--json'], qd);
 
-    const handoff = run([id, '--hand-off', '--json']);
+    const handoff = run([id, '--hand-off', '--json'], qd);
     assert.equal(handoff.status, 0, `hand-off exit non-zero\nstderr: ${handoff.stderr}`);
     const parsed = JSON.parse(handoff.stdout);
     assert.equal(parsed.schema_version, 1);
@@ -172,52 +153,75 @@ test('--hand-off with --json returns hand-off envelope', () => {
     assert.equal(parsed.id, id);
     assert.equal(parsed.new_state, 'plan-ready');
   } finally {
-    cleanQueue();
+    cleanQueue(qd);
   }
 });
 
 test('unknown flag exits non-zero with usage in stderr', () => {
-  const result = run(['--bogus-flag']);
-  assert.notEqual(result.status, 0, 'expected non-zero exit for unknown flag');
-  assert.ok(
-    result.stderr.includes('unknown flag') || result.stderr.includes('Usage'),
-    `expected usage in stderr, got: ${result.stderr}`,
-  );
+  const qd = mkQueueDir();
+  try {
+    const result = run(['--bogus-flag'], qd);
+    assert.notEqual(result.status, 0, 'expected non-zero exit for unknown flag');
+    assert.ok(
+      result.stderr.includes('unknown flag') || result.stderr.includes('Usage'),
+      `expected usage in stderr, got: ${result.stderr}`,
+    );
+  } finally {
+    cleanQueue(qd);
+  }
 });
 
 test('--list (non-json) emits human-readable output', () => {
-  cleanQueue();
+  const qd = mkQueueDir();
   try {
-    run(['Human-readable list test bug', '--json']);
-    const result = run(['--list']);
+    run(['Human-readable list test bug', '--json'], qd);
+    const result = run(['--list'], qd);
     assert.equal(result.status, 0, `exit non-zero\nstderr: ${result.stderr}`);
     // Non-json output should NOT be valid JSON
     let isJson = true;
     try { JSON.parse(result.stdout); } catch { isJson = false; }
     assert.equal(isJson, false, '--list without --json unexpectedly produced JSON');
   } finally {
-    cleanQueue();
+    cleanQueue(qd);
   }
 });
 
 test('--json branch does not introduce extra writes vs non-json', () => {
-  cleanQueue();
+  const qdA = mkQueueDir();
+  const qdB = mkQueueDir();
   try {
     // Create with non-json, count writes
-    const before1 = queueMtime();
-    run(['Write-count test plain']);
-    const after1 = queueMtime();
+    const before1 = queueMtime(qdA);
+    run(['Write-count test plain'], qdA);
+    const after1 = queueMtime(qdA);
     const plainWrites = after1 !== before1 ? 1 : 0;
-    cleanQueue();
 
-    // Create with --json, count writes
-    const before2 = queueMtime();
-    run(['Write-count test json', '--json']);
-    const after2 = queueMtime();
+    // Create with --json, count writes (fresh dir — no cross-contamination)
+    const before2 = queueMtime(qdB);
+    run(['Write-count test json', '--json'], qdB);
+    const after2 = queueMtime(qdB);
     const jsonWrites = after2 !== before2 ? 1 : 0;
 
     assert.equal(jsonWrites, plainWrites, '--json branch produced different write count than non-json');
   } finally {
-    cleanQueue();
+    cleanQueue(qdA);
+    cleanQueue(qdB);
+  }
+});
+
+test('mutually exclusive sub-commands rejected (e.g. --advance + --close)', () => {
+  const qd = mkQueueDir();
+  try {
+    const create = run(['Mutex test', '--json'], qd);
+    const { id } = JSON.parse(create.stdout);
+
+    const result = run([id, '--advance', 'clarified', '--close'], qd);
+    assert.notEqual(result.status, 0, 'expected non-zero exit for conflicting sub-commands');
+    assert.ok(
+      result.stderr.includes('mutually exclusive'),
+      `expected mutex error in stderr, got: ${result.stderr}`,
+    );
+  } finally {
+    cleanQueue(qd);
   }
 });

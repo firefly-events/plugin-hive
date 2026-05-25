@@ -142,7 +142,7 @@ function readDependsList(text) {
   if (inline) {
     return inline[1].split(',').map(s => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
   }
-  const block = text.match(/^depends_on:\s*$([\s\S]*?)(?=^\S)/m);
+  const block = text.match(/^depends_on:\s*$([\s\S]*?)(?=^\S|$(?![\s\S]))/m);
   if (block) {
     return block[1].split('\n')
       .map(l => l.match(/^\s+-\s+(.+)$/))

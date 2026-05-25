@@ -60,4 +60,4 @@ deferred_followups:
   - id: hermes-bridge-mvp-epic
     description: "Companion epic for Hermes-side bot/cron/SDK consumer (Slack bot, cron script, context-snapshot reader). Plan after this epic's contracts land."
     suggested_skill: plan
-    target_repo: /Users/don/Code/hermes-agent
+    target_repo_slug: hermes-agent
