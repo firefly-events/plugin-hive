@@ -4,6 +4,8 @@ title: Add meta_optimize.signal_weights knob to step-03 ranking
 status: pending
 complexity: medium
 methodology: tdd
+tracker_id: plugin-hive/PLU-70
+tracker_url: http://localhost:3000/plugin-hive/issues/70
 depends_on: [mir-7-meta-shotgun-workflow]
 
 description: |

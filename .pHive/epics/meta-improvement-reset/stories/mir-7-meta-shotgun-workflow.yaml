@@ -4,6 +4,8 @@ title: Build meta-shotgun workflow + integration test
 status: pending
 complexity: medium
 methodology: classic
+tracker_id: plugin-hive/PLU-69
+tracker_url: http://localhost:3000/plugin-hive/issues/69
 depends_on: [mir-6-meta-shotgun-skill-scaffold]
 
 description: |
@@ -121,7 +123,7 @@ cross_cutting:
 risks:
   - severity: medium
     description: PR push succeeds but mark_done fails (network glitch) → next run reapplies + opens duplicate PR
-    mitigation: Idempotency check at load_backlog: also exclude candidates whose target has matching commit in last 24h on develop. Surface in PR body.
+    mitigation: "Idempotency check at load_backlog — also exclude candidates whose target has matching commit in last 24h on develop. Surface in PR body."
   - severity: low
     description: Validation step (lint/tests) fails partway → cleanup needed
     mitigation: Worktree-based; abort discards worktree, no side effects on main checkout

@@ -4,6 +4,8 @@ title: Exclude tier=little-fix candidates from nightly cycle backlog-fallback
 status: pending
 complexity: medium
 methodology: classic
+tracker_id: plugin-hive/PLU-67
+tracker_url: http://localhost:3000/plugin-hive/issues/67
 depends_on: [mir-4-tier-field-backlog-schema]
 
 description: |

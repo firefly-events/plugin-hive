@@ -4,6 +4,8 @@ title: Add Claude Code release-notes subprovider to step-02b
 status: pending
 complexity: medium
 methodology: classic
+tracker_id: plugin-hive/PLU-64
+tracker_url: http://localhost:3000/plugin-hive/issues/64
 depends_on: []
 
 description: |

@@ -4,6 +4,8 @@ title: Add Anthropic blog subprovider to step-02b
 status: pending
 complexity: medium
 methodology: classic
+tracker_id: plugin-hive/PLU-65
+tracker_url: http://localhost:3000/plugin-hive/issues/65
 depends_on: [mir-2-cc-release-notes-subprovider]
 
 description: |

@@ -4,6 +4,8 @@ title: Retarget meta-meta-nightly PRs from main to develop
 status: pending
 complexity: low
 methodology: classic
+tracker_id: plugin-hive/PLU-63
+tracker_url: http://localhost:3000/plugin-hive/issues/63
 depends_on: []
 
 description: |

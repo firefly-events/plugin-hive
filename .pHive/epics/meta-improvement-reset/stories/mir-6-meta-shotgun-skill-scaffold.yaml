@@ -4,6 +4,8 @@ title: Scaffold /meta-shotgun skill (maintainer-local)
 status: pending
 complexity: medium
 methodology: classic
+tracker_id: plugin-hive/PLU-68
+tracker_url: http://localhost:3000/plugin-hive/issues/68
 depends_on: [mir-5-nightly-tier-exclusion]
 
 description: |

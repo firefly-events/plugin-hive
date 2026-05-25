@@ -4,6 +4,8 @@ title: Add tier field to queue-meta-meta-optimize backlog schema
 status: pending
 complexity: low
 methodology: classic
+tracker_id: plugin-hive/PLU-66
+tracker_url: http://localhost:3000/plugin-hive/issues/66
 depends_on: []
 
 description: |

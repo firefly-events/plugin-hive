@@ -4,6 +4,8 @@ title: Flip step-03c metric gate to blocking with advisory escape hatch
 status: pending
 complexity: medium
 methodology: tdd
+tracker_id: plugin-hive/PLU-71
+tracker_url: http://localhost:3000/plugin-hive/issues/71
 depends_on: [mir-8-signal-weights-knob]
 
 description: |
@@ -101,7 +103,7 @@ files_to_modify:
   - file: hive/hive.config.yaml
     change: Add commented example `meta_optimize.metric_gate:` block
   - file: hive.config.yaml
-    change: Add active `meta_optimize.metric_gate: blocking` (explicit; matches new default)
+    change: "Add active `meta_optimize.metric_gate: blocking` (explicit; matches new default)"
   - file: hive/workflows/steps/meta-team-cycle/__tests__/metric-gate.test.mjs
     change: New test file
 

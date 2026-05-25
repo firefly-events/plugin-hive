@@ -4,6 +4,8 @@ title: Audit cross-cutting metrics concern + docs sweep + CHANGELOG
 status: pending
 complexity: low
 methodology: classic
+tracker_id: plugin-hive/PLU-72
+tracker_url: http://localhost:3000/plugin-hive/issues/72
 depends_on: [mir-9-metric-gate-flip]
 
 description: |
