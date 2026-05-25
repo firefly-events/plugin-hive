@@ -1,0 +1,143 @@
+name: meta-shotgun
+description: >
+  Maintainer-triggered batch cleanup for tier=little-fix backlog candidates.
+  Reads pending little-fix entries from the meta-meta-optimize queue, excludes
+  targets touched in the last 30 days, applies all changes in a single worktree,
+  validates, commits, pushes one PR titled 'meta-shotgun YYYY-MM' with sections
+  per directory, and marks processed candidates done in the queue.
+version: "1.0.0"
+
+steps:
+  - id: filter
+    agent: orchestrator
+    task: >
+      Read .pHive/meta-team/queue-meta-meta-optimize.yaml. Select all candidates
+      where tier=little-fix AND status=pending. Emit the list as
+      little_fix_candidates. If the list is empty, emit an empty array and
+      halt the workflow with a short summary (nothing to do).
+    outputs:
+      - name: little_fix_candidates
+        type: json
+      - name: candidate_count
+        type: json
+
+  - id: exclude-recent
+    agent: orchestrator
+    task: >
+      For each candidate in little_fix_candidates, run:
+        git log --since="30 days ago" -- <candidate.target>
+      If the command produces any output, the target was recently touched —
+      exclude that candidate and record it in excluded_candidates with reason
+      "recent-touch". Emit eligible_candidates (those not excluded) and
+      excluded_candidates with per-entry reasons. If eligible_candidates is
+      empty after exclusion, halt with a summary listing what was skipped.
+    depends_on:
+      - filter
+    inputs:
+      - name: little_fix_candidates
+        source: step_output
+        step_id: filter
+        output_name: little_fix_candidates
+    outputs:
+      - name: eligible_candidates
+        type: json
+      - name: excluded_candidates
+        type: json
+
+  - id: apply
+    agent: developer
+    task: >
+      Apply each candidate in eligible_candidates in the active worktree.
+      Process candidates in order. For each candidate: read the target file,
+      apply the described change, write the result. Emit changes_made as a
+      list of {candidate_id, target, dir, summary} objects. Group by the
+      leading directory component of target for the PR body later.
+    depends_on:
+      - exclude-recent
+    inputs:
+      - name: eligible_candidates
+        source: step_output
+        step_id: exclude-recent
+        output_name: eligible_candidates
+    outputs:
+      - name: changes_made
+        type: json
+      - name: dirs_touched
+        type: json
+
+  - id: validate
+    agent: tester
+    task: >
+      Validate all changes from the apply step. Run the project test suite and
+      lint checks. Return validation_passed (bool), validation_report (string),
+      and per-change test_results. If validation_passed is false, list failing
+      checks with full paths and error messages so the apply step can be debugged.
+    depends_on:
+      - apply
+    inputs:
+      - name: changes_made
+        source: step_output
+        step_id: apply
+        output_name: changes_made
+    outputs:
+      - name: validation_passed
+        type: json
+      - name: test_results
+        type: json
+      - name: validation_report
+        type: string
+
+  - id: commit-push
+    agent: orchestrator
+    task: >
+      Commit all changes and push a single PR. Steps:
+      1. Stage every file in changes_made.
+      2. Commit with message: "meta-shotgun: batch little-fix candidates YYYY-MM".
+      3. Push branch and open PR titled "meta-shotgun YYYY-MM" (use current
+         year-month). PR body must have one H2 section per directory in
+         dirs_touched, each listing the candidate IDs and one-line summaries
+         that were applied in that directory. No in-skill grouping — all
+         sections in one PR, ordered alphabetically by directory path.
+      4. Emit pr_url and pr_title.
+    when: "$validate.output.validation_passed == true"
+    depends_on:
+      - validate
+    inputs:
+      - name: changes_made
+        source: step_output
+        step_id: apply
+        output_name: changes_made
+      - name: dirs_touched
+        source: step_output
+        step_id: apply
+        output_name: dirs_touched
+    outputs:
+      - name: pr_url
+        type: string
+      - name: pr_title
+        type: string
+
+  - id: mark-done
+    agent: orchestrator
+    task: >
+      Mark all successfully applied candidates as status=done in
+      .pHive/meta-team/queue-meta-meta-optimize.yaml. Use the backlog-mutator
+      helper at hive/lib/meta-team/backlog-mutator.mjs. Emit marked_done_count
+      and a brief completion summary listing the PR URL and how many candidates
+      were processed, skipped (recent-touch), and marked done.
+    depends_on:
+      - commit-push
+    inputs:
+      - name: eligible_candidates
+        source: step_output
+        step_id: exclude-recent
+        output_name: eligible_candidates
+      - name: pr_url
+        source: step_output
+        step_id: commit-push
+        output_name: pr_url
+    outputs:
+      - name: marked_done_count
+        type: json
+      - name: completion_summary
+        type: string
