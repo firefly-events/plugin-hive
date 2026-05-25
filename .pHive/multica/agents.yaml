@@ -6,7 +6,7 @@ agents:
     max_concurrent_tasks: 1
     persona_ref: hive/agents/developer.md
     custom_env:
-      CLAUDE_PLUGIN_PATH: ~/.claude/plugins
+      CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
     custom_args: []
     mcp_config: null
     skills: []
@@ -17,7 +17,7 @@ agents:
     max_concurrent_tasks: 1
     persona_ref: hive/agents/tester.md
     custom_env:
-      CLAUDE_PLUGIN_PATH: ~/.claude/plugins
+      CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
     custom_args: []
     mcp_config: null
     skills: []
@@ -28,7 +28,7 @@ agents:
     max_concurrent_tasks: 1
     persona_ref: hive/agents/reviewer.md
     custom_env:
-      CLAUDE_PLUGIN_PATH: ~/.claude/plugins
+      CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
     custom_args: []
     mcp_config: null
     skills: []

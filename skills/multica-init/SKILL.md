@@ -61,7 +61,7 @@ Do not mention success for repo allowlisting.
 
 ## Plugin discovery
 
-Claude-provider agents pick up Claude Code plugins via `custom_env.CLAUDE_PLUGIN_PATH` (default `~/.claude/plugins`). `reconcileAgents` writes this through to Multica; the agent runtime resolves slash commands like `/hive:status` from that path. Override per-agent in `.pHive/multica/agents.yaml` if the daemon runs as a different user than the plugin install location implies. This convention follows the source-backed rationale in `.pHive/upstream-watch/multica-plugin-loading.md`, and preserves the single-writer invariant: only `multica-init` mutates Multica-side agent state.
+Claude-provider agents pick up Claude Code plugins via `custom_env.CLAUDE_PLUGIN_PATH` (default `${HOME}/.claude/plugins`). `reconcileAgents` expands `${HOME}`, `$HOME`, and leading `~` to the bootstrap user's home directory before sending the value to Multica — Claude Code does not perform tilde expansion on env values, so the stored value must be absolute. The agent runtime then resolves slash commands like `/hive:status` from that path. Override per-agent in `.pHive/multica/agents.yaml` if the daemon runs as a different user than the plugin install location implies. This convention follows the source-backed rationale in `.pHive/upstream-watch/multica-plugin-loading.md`, and preserves the single-writer invariant: only `multica-init` mutates Multica-side agent state.
 
 ## Process
 

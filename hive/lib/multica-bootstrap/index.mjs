@@ -108,10 +108,32 @@ async function loadAgentsConfig(agentsConfigPath) {
     return parseAgentsConfig(yamlString);
   }
 }
+export function resolveEnvPath(value) {
+  if (typeof value !== 'string') return value;
+  let resolved = value;
+  if (resolved.startsWith('~/') || resolved === '~') {
+    resolved = resolved.replace(/^~/, os.homedir());
+  }
+  resolved = resolved.replace(/\$\{HOME\}/g, os.homedir());
+  resolved = resolved.replace(/\$HOME(?![A-Za-z0-9_])/g, os.homedir());
+  return resolved;
+}
+
+export function resolveCustomEnv(customEnv) {
+  if (!customEnv || typeof customEnv !== 'object') return customEnv;
+  const resolved = {};
+  for (const [key, value] of Object.entries(customEnv)) {
+    resolved[key] = resolveEnvPath(value);
+  }
+  return resolved;
+}
+
 function buildAgentPayload(agent, runtimeId, instructions) {
   const payload = { name: agent.name, runtime_id: runtimeId };
   for (const key of ['description', 'model', 'thinking_level', 'visibility', 'max_concurrent_tasks', 'custom_env', 'custom_args', 'mcp_config', 'skills']) {
-    if (agent[key] !== undefined) payload[key] = agent[key];
+    if (agent[key] !== undefined) {
+      payload[key] = key === 'custom_env' ? resolveCustomEnv(agent[key]) : agent[key];
+    }
   }
   if (instructions !== undefined) payload.instructions = instructions;
   return payload;
