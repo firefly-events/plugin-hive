@@ -85,7 +85,8 @@ For each story in `unblocked_stories[]` at this depth:
    - This ensures a newly dispatchable story is not stranded in backlog state before assignment.
 
 3. **Brief write.**
-   - Call `serializeStoryBrief(story)` to produce Markdown.
+   - Read `hive_config.agent_backends?.developer` (the `developer` role is the persona Multica's bootstrapped agent runs under). If it equals `'codex'`, pass `{ codexInstruction: true }` so the brief instructs the inner Claude Code session to use `/codex:rescue` for implementation. Otherwise omit options for backward-compatible behavior.
+   - Call `serializeStoryBrief(story, codexInstruction ? { codexInstruction: true } : {})` to produce Markdown.
    - Resolve `requestedRef` from the current epic branch/ref (for example `feat/multica-integration-fixes`) and include it in the issue brief as the required repository ref for the agent task.
    - Call `ensureIssueBriefMatches(serverUrl, token, workspaceId, issueUuid, brief)`.
    - If the issue description has drifted, the helper updates it with `PUT`.
