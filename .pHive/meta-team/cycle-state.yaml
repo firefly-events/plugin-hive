@@ -1,8 +1,8 @@
-cycle_id: meta-2026-05-22
-started: '2026-05-22T08:06:12Z'
+cycle_id: meta-2026-05-23
+started: '2026-05-23T00:00:00Z'
 status: closed
 phase: close
-closed: '2026-05-22T08:15:00Z'
+closed: '2026-05-23T00:30:00Z'
 charter_constraints:
   - operate only on hive/references/**, hive/agents/**, hive/workflows/**, hive/lib/**,
     skills/hive/agents/memories/**, .pHive/meta-team/**, .pHive/teams/**
@@ -16,7 +16,7 @@ prior_cycle:
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-05-22T08:06:12Z'
+    started_at: '2026-05-23T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
@@ -28,15 +28,13 @@ steps:
   step_02b_external_research:
     external_research_candidates_count: 0
     summary: >
-      External research skipped — sandboxed nightly context; no-leak boundary
-      prevents sanitizable queries with sufficient specificity. No provider
+      External research skipped — sandboxed nightly context; no provider
       queries issued. external_candidates_count: 0.
   step_02c_kg_signal:
     kg_findings_count: 0
     summary: >
-      Step 02c runs via /meta-optimize SKILL routing only; skipped for
-      maintainer cycle. kg.sqlite absent. kg_signal findings=0
-      miss_reason=empty_kg.
+      Step 02c skipped for maintainer cycle. kg.sqlite absent.
+      kg_signal findings=0 miss_reason=empty_kg.
   step_03_proposal:
     routing: step-03 (findings_count=2 > 0)
     approved_proposals_count: 1
@@ -50,10 +48,12 @@ steps:
         action: update_field
         file: hive/GUIDE.md
         description: >
-          Updated Tier column for Analyst, Architect, and TPM rows in Planning
-          Agents table from "Opus" to "Sonnet" to match the Model Tier Routing
-          table (corrected in meta-2026-05-20), agent model fields (all three
-          have model: sonnet), and hive.config.yaml model_tiers.sonnet.
+          Updated Tier column for Analyst, Architect, and TPM rows in
+          Planning Agents table from "Opus" to "Sonnet". The Model Tier
+          Routing table was corrected in meta-2026-05-20 but the Planning
+          Agents table was missed, leaving both tables internally inconsistent.
+          Fix aligns the Planning Agents table with agent files (model: sonnet)
+          and the corrected Model Tier Routing table.
         status: done
   step_05_testing:
     test_results:
@@ -71,7 +71,7 @@ steps:
     needs_revision_count: 0
     metrics_snapshot:
       tokens: 0
-      wall_clock_ms: 6000
+      wall_clock_ms: 5000
       first_attempt_pass: true
     evaluations:
       - change_id: proposal-1_hive-GUIDE.md
@@ -79,18 +79,18 @@ steps:
         charter_objective: consistency
         quality_score: 1.0
         rationale: |
-          Addresses finding-1 (SCHEMA_INCONSISTENCY): corrects three stale
-          "Opus" tier labels in the Planning Agents table to "Sonnet", matching
-          the Model Tier Routing table, analyst.md/architect.md/tpm.md agent
-          files, and hive.config.yaml model_tiers.sonnet. No cross-references
-          broken, no content removed, all tests pass.
+          Addresses finding-1 (SCHEMA_INCONSISTENCY): corrects Planning Agents
+          table Tier column for Analyst, Architect, and TPM from "Opus" to "Sonnet",
+          matching the Model Tier Routing table corrected in meta-2026-05-20 and
+          the actual agent files (all three have model: sonnet). Table update is
+          accurate, no cross-references broken, no content removed, all tests pass.
   step_07_promotion:
     promoted_changes:
       - proposal_id: proposal-1
         file: hive/GUIDE.md
         verdict: pass
         status: promoted
-        commit_ref: fc4b9c2755c7491b7a965ffeb091fa5b313de9c8
+        commit_ref: 4e48cf6b0d598be713734d40a7225cc38006c48f
         rollback_target: 401f121e98f5b155b77bba8cbaaa8ab81da6e547
     reverted_changes: []
     insights_staged: 0
@@ -105,48 +105,46 @@ summary:
   flagged_for_human: 0
   cycle_verdict: passed
 closure_evidence:
-  commit_ref: fc4b9c2755c7491b7a965ffeb091fa5b313de9c8
+  commit_ref: 4e48cf6b0d598be713734d40a7225cc38006c48f
   metrics_snapshot:
     tokens: 0
-    wall_clock_ms: 6000
+    wall_clock_ms: 5000
     first_attempt_pass: true
   rollback_ref: 401f121e98f5b155b77bba8cbaaa8ab81da6e547
 decision: accept
 regression_watch:
   state: armed
-  armed_at: '2026-05-22T08:15:00Z'
+  armed_at: '2026-05-23T00:30:00Z'
 observation_window:
-  start: '2026-05-22T08:15:00Z'
-  end: '2026-05-22T12:15:00Z'
+  start: '2026-05-23T00:30:00Z'
+  end: '2026-05-23T04:30:00Z'
 findings:
   - id: finding-1
     category: SCHEMA_INCONSISTENCY
     severity: medium
     location: hive/GUIDE.md
     description: >
-      Planning Agents table (lines 187-189) lists Analyst, Architect, and TPM
-      as Tier: Opus, but all three have model: sonnet in their agent files and
-      in hive.config.yaml model_tiers.sonnet. The Model Tier Routing table in
-      the same document correctly lists these three as Sonnet (corrected in
-      meta-2026-05-20 — the Planning Agents table was missed).
+      Planning Agents table lists Analyst, Architect, and TPM with Tier "Opus"
+      but their agent files declare model: sonnet and the Model Tier Routing
+      table was corrected to Sonnet in cycle meta-2026-05-20. The two tables
+      are now internally inconsistent.
     evidence: >
-      GUIDE.md line 187: "Analyst ... Opus", line 188: "Architect ... Opus",
-      line 189: "TPM ... Opus". analyst.md: model: sonnet. architect.md: model:
-      sonnet. tpm.md: model: sonnet. hive.config.yaml model_tiers.sonnet
-      includes analyst, architect, tpm. Model Tier Routing table line 179
-      correctly lists all three under Sonnet.
+      GUIDE.md lines 187-189: Analyst | Opus, Architect | Opus, TPM | Opus.
+      Model Tier Routing table (line 179): Sonnet row lists architect, analyst,
+      tpm. Agent files: analyst.md model: sonnet, architect.md model: sonnet,
+      tpm.md model: sonnet.
   - id: finding-2
     category: STUB_DOC
     severity: low
     location: hive/references/hive-cloud-roadmap.md
-    description: 13-line S16 forward-reference placeholder, recurring
+    description: 13-line S16 placeholder below 30-line stub threshold
     evidence: >
-      Line count: 13. Explicit S16 stub for deferred A8 bootstrap. Recurring
-      out_of_scope finding across multiple prior cycles.
+      File contains only a title and one bullet noting it is a placeholder
+      for the deferred Hive Cloud epic (S16 forward reference).
+      Consistently out_of_scope across prior cycles.
 approved_proposals:
   - id: proposal-1
-    title: Correct Planning Agents tier column in hive/GUIDE.md — Analyst, Architect,
-      TPM are Sonnet not Opus
+    title: Correct Planning Agents table Tier column for Analyst, Architect, TPM
     discovery_source: internal_audit
     addresses_findings:
       - finding-1
@@ -158,41 +156,35 @@ approved_proposals:
     metric:
       applies: false
       justification: >
-        Pure schema-doc accuracy correction (tier label in guide table) — no
-        measurable throughput, error-rate, or quality-rate claim; no observable
-        performance surface to instrument.
+        Documentation table correction with no measurable performance surface —
+        schema doc fix to restore table consistency after a partial fix in
+        prior cycle meta-2026-05-20.
     implementation_plan:
       - step: >
-          Update the Tier column for Analyst (line 187), Architect (line 188),
-          and TPM (line 189) in the Planning Agents table from "Opus" to
-          "Sonnet" to match the Model Tier Routing table, agent model fields,
-          and hive.config.yaml model_tiers.sonnet.
+          Update Tier column from "Opus" to "Sonnet" for Analyst, Architect,
+          and TPM rows in the Planning Agents table in hive/GUIDE.md.
         file: hive/GUIDE.md
         action: update_field
     rationale: |
-      The Planning Agents table in hive/GUIDE.md has stale "Opus" tier labels
-      for Analyst, Architect, and TPM. The meta-2026-05-20 cycle corrected the
-      Model Tier Routing table to show these three as Sonnet, but the Planning
-      Agents table was not updated in that cycle. The three agents have
-      model: sonnet in their individual agent files (analyst.md, architect.md,
-      tpm.md) and hive.config.yaml model_tiers.sonnet explicitly lists them.
-      The stale "Opus" label misleads operators into thinking Opus-cost calls
-      will be made for these agents, inflating cost expectations.
+      GUIDE.md Planning Agents table shows Analyst, Architect, and TPM as
+      "Opus" tier agents. The Model Tier Routing table was corrected in
+      meta-2026-05-20 to move these agents to the Sonnet row (matching
+      their agent files and hive.config.yaml), but the Planning Agents table
+      was not updated. This leaves two tables in the same file inconsistent
+      with each other, creating misleading documentation about model routing.
     risk_notes: |
-      Update three table cells in a single doc. No cross-references depend on
-      this table. No runtime behavior changes. Revert is a three-cell restore.
+      Documentation-only change. No runtime impact. Revert is a 3-line edit.
       Risk: none beyond typo.
 skipped_findings:
   - finding_id: finding-2
     reason: out_of_scope
     notes: >
-      S16 forward-reference placeholder for deferred A8 bootstrap. Recurring
-      finding in prior cycles (meta-2026-05-11 through meta-2026-05-21),
-      consistently marked out_of_scope. Not eligible until Hive Cloud epic
-      is active.
+      S16 placeholder stub for the deferred Hive Cloud epic. Not actionable
+      without the Hive Cloud epic being active. Ninth+ consecutive out_of_scope
+      deferral.
 changes:
   - proposal_id: proposal-1
     file: hive/GUIDE.md
     action: update_field
-    description: Corrected Planning Agents tier labels — Analyst/Architect/TPM Opus→Sonnet
+    description: Updated Planning Agents table Tier column — Analyst, Architect, TPM changed from Opus to Sonnet
     status: promoted
