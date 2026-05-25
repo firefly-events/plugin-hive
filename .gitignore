@@ -71,6 +71,10 @@ state/
 !.pHive/epics/wire-execute-multica-codex/**
 !.pHive/episodes/wire-execute-multica-codex/
 !.pHive/episodes/wire-execute-multica-codex/**
+!.pHive/epics/smoke-test-execute-multica-codex/
+!.pHive/epics/smoke-test-execute-multica-codex/**
+!.pHive/episodes/smoke-test-execute-multica-codex/
+!.pHive/episodes/smoke-test-execute-multica-codex/**
 # Test scenarios (.pHive/test-scenarios/) — referenced by autonomous-cycle-loop
 # config + simulated-manual cross-cutting concern. Per-story scenarios shipped
 # alongside the stories that need them.
@@ -130,6 +134,8 @@ state/
 # cross-run aggregation (hive/scripts/gate-mode-audit.mjs) sees a stable corpus.
 !.pHive/audits/post-run/
 !.pHive/audits/post-run/**
+!.pHive/audits/smoke-test/
+!.pHive/audits/smoke-test/**
 # Consumer-side executor flag (hde-9a Q4 lock). Tracked because the maintainer
 # repo doubles as the canonical consumer for plugin-hive itself; consumers of
 # the plugin choose whether to commit their own .pHive/hive.config.yaml.
