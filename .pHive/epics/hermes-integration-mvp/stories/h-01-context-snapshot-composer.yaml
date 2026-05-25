@@ -1,0 +1,164 @@
+id: h-01-context-snapshot-composer
+epic: hermes-integration-mvp
+title: Library composer + JSON schema for context-snapshot
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+wave: W1
+action_id: H-01
+
+description: |
+  Build the read-only composer that produces a single JSON blob describing
+  current Hive state for a project. Consumed by the /hive:context-snapshot
+  skill (h-02) and by any external coordinator (e.g., Hermes supervisor).
+  Also ship the versioned JSON schema doc that defines the output contract.
+
+  The composer is pure read — no writes to any Hive state. Inputs:
+  - git current branch
+  - .pHive/epics/*/epic.yaml and per-story YAMLs (using deriveStoryStatus, not raw status)
+  - .pHive/cycle-state/*.yaml
+  - .pHive/episodes/ (most recent N per story)
+  - .pHive/triage/queue.yaml (gracefully absent OK)
+  - Story metric: blocks (gracefully absent OK)
+
+  Schema starts small (additive-only versioning rule). schema_version: 1 at
+  top of payload. Future fields are additive; removals require version bump.
+
+acceptance_criteria:
+  - "composeContextSnapshot({ stateDir, epic? }) is exported from hive/lib/context-snapshot.mjs"
+  - "Composer returns an object with top-level keys: schema_version, branch, epics, stories, episodes_recent, triage_open, metrics_health"
+  - "schema_version is the integer 1"
+  - "epics is an array of {id, title, status, story_count}"
+  - "stories is an array of {id, epic, title, status_derived, complexity, methodology, wave}"
+  - "episodes_recent is an array of the 10 most recent episodes across all epics, shape {epic, story, step, status, at}"
+  - "triage_open is an array of {id, state, kind, title, priority, severity} for any entry whose state != closed; empty array if queue.yaml is missing"
+  - "metrics_health is an array of {epic, story, name, direction, verdict_outcome, verify_at, overdue} for stories with applies:true metric blocks; empty array if no such stories"
+  - "story status uses deriveStoryStatus from hive/lib/story-status.mjs (NOT raw YAML status field) per feedback_story_status_stale"
+  - "Composer handles graceful absence: missing .pHive/triage/queue.yaml → triage_open: []; missing .pHive/epics/ → epics: [] + stories: []; no exceptions raised"
+  - "hive/references/context-snapshot-schema.md exists and documents the schema with JSON example payload + per-key shape + additive-only versioning rule"
+  - "Unit tests in tests/lib/context-snapshot.test.* exercise: full state fixture, empty-everything fixture, missing-triage fixture, missing-metrics fixture"
+  - "All unit tests pass under bun test"
+
+metric:
+  applies: false
+  justification: "Library composer + JSON schema doc are pure substrate — the Hermes-side consumer (deferred to companion epic) is what measures any user-facing context-query metric like operator-time-to-state-query or schema-coverage; this story has no observable surface beyond passing tests."
+
+steps:
+  - id: research
+    description: |
+      Verify the read sources: cycle-state YAML shape, episode-schema, triage queue
+      schema, story metric block shape. Confirm hive/lib/story-status.mjs API
+      (deriveStoryStatus signature). Identify existing .mjs vs .ts convention under
+      hive/lib/ (pick matching extension for new file).
+    agent: researcher
+
+  - id: implement
+    description: |
+      Create hive/lib/context-snapshot.mjs (or .ts matching existing convention)
+      exporting composeContextSnapshot({ stateDir, epic? }). Read all six sources
+      with graceful-absence handling. Use deriveStoryStatus for story status.
+      Also write hive/references/context-snapshot-schema.md per acceptance criteria.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Write unit tests at tests/lib/context-snapshot.test.* exercising: full-state
+      fixture, empty-everything fixture, missing-triage fixture, missing-metrics
+      fixture. Validate output structure against schema. Run bun test, confirm all
+      pass.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Review the composer for: read-only correctness (no writes), schema completeness,
+      additive-only versioning posture, graceful-absence handling, use of
+      deriveStoryStatus over raw status field. Review the schema doc for clarity and
+      examples. Flag any deviation from the additive-only versioning rule.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: |
+      Commit composer + schema doc + tests on feat/hermes-integration-mvp branch
+      following per-epic-branch-PR flow + caveman commit conventions.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/story-status.mjs
+      purpose: "deriveStoryStatus({ epic_id, story_id }) — authoritative status (composer MUST use this, not raw YAML status)"
+    - path: hive/references/episode-schema.md
+      purpose: "episode record format — composer reads .pHive/episodes/ per this shape"
+    - path: hive/references/cycle-state-schema.md
+      purpose: "cycle-state YAML format — composer reads .pHive/cycle-state/*.yaml per this shape"
+    - path: hive/references/story-yaml-schema.md
+      purpose: "story YAML shape — composer reads .pHive/epics/*/stories/*.yaml; metric: block at §3"
+    - path: skills/triage/SKILL.md
+      purpose: "triage queue schema reference — composer reads .pHive/triage/queue.yaml read-only"
+  tech_stack:
+    runtime: node
+    test_runner: bun
+    language: javascript (mjs) — match existing hive/lib/ convention
+
+files_to_modify:
+  - file: hive/lib/context-snapshot.mjs
+    change: NEW — export composeContextSnapshot
+  - file: hive/references/context-snapshot-schema.md
+    change: NEW — JSON schema documentation with example payload + versioning rule
+  - file: tests/lib/context-snapshot.test.* (extension matches existing convention)
+    change: NEW — unit tests
+
+code_examples:
+  - title: deriveStoryStatus usage (existing pattern)
+    file: hive/lib/story-status.mjs
+    snippet: |
+      // From callers like standup Phase 1 — composer follows same pattern:
+      import { deriveStoryStatus } from "./story-status.mjs";
+      const statusDerived = await deriveStoryStatus({ epic_id, story_id });
+
+design_decisions:
+  - decision: "schema_version: 1 (integer) at top of payload; additive-only future changes"
+    rationale: "Versioned contract from day one. Consumers can pin to a version. Additive-only rule means schema_version: 1 stays valid as fields are added; only removals/renames bump the version."
+  - decision: "Graceful-absence over hard-fail for optional sources"
+    rationale: "Composer should produce a useful snapshot even on a half-initialized repo. Missing triage queue → empty array, not error. Reviewer + tests verify the no-exception invariant."
+  - decision: ".mjs (or matching) extension chosen to match existing hive/lib/ convention"
+    rationale: "Avoid mixing extensions in the same dir. Researcher confirms current convention before implement step."
+
+cross_cutting:
+  - concern: documentation
+    action: "New reference doc hive/references/context-snapshot-schema.md is itself the documentation. No other Hive docs reference context-snapshot yet — h-02 will add cross-references when the skill ships."
+
+risks:
+  - severity: medium
+    description: JSON schema shape becomes long-term contract — bad initial shape costs consumer churn later
+    mitigation: Keep schema minimal at v1 (only what's needed today); additive-only versioning rule documented; reviewer specifically validates additive-only posture
+  - severity: low
+    description: hive/lib/ extension convention may not be uniform — guessing wrong extension creates lint/import friction
+    mitigation: Researcher step confirms convention before implement step
+
+references:
+  - path: .pHive/epics/hermes-integration-mvp/docs/design-discussion.md
+    relevant_excerpt: |
+      Slice 1: Persistent context query surface (vector 1) — Add a new read-only
+      skill /hive:context-snapshot that emits a single JSON blob summarizing:
+      current branch, active epic(s), in-flight stories, last episode summary,
+      open triage items, pending metric verdicts. Transport-agnostic by design.
+  - path: .pHive/epics/hermes-integration-mvp/docs/vertical-plan.md
+    relevant_excerpt: |
+      Slice 1 — context-snapshot read surface. Composer first (library), skill
+      wrapper second (h-02). NOT YET: Standup --format slack, Triage --json.
+  - path: hive/references/story-yaml-schema.md
+    relevant_excerpt: |
+      §2a Status field — advisory vs authoritative. The status: field is advisory.
+      Derived status from hive/lib/story-status.mjs is authoritative.
+
+parallel_allowed: false
+
+tracker_id: "plugin-hive/PLU-54"
+tracker_url: "http://localhost:3000/plugin-hive/issues/PLU-54"
+tracker_uuid: "cd472e68-f39e-4403-97e2-389aa898d6c7"

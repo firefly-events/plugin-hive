@@ -1,0 +1,45 @@
+epic_id: hermes-integration-mvp
+story_id: h-02-context-snapshot-skill
+step: multica-run
+status: passed
+agent: developer
+multica:
+  issue_id: 7fc02675-3b22-437c-a442-cd2d02674a4b
+  issue_identifier: PLU-55
+  run_id: 5c1bc08f
+  agent_id: d9946f9a-2747-49d4-b967-2590ffb5be43
+  session_id: 326a37c8-d079-419e-8430-56d7ffe29959
+  work_dir: /Users/don/multica_workspaces/21c6d282-d6b4-4b25-8d0d-a85e96038416/5c1bc08f/workdir
+  attempt: 1
+  dispatched_at: "2026-05-24T06:49:56Z"
+  started_at: "2026-05-24T06:49:56Z"
+  completed_at: "2026-05-24T07:12:55Z"
+  wall_clock_seconds: 1379
+commit:
+  agent_branch: null
+  agent_commit: null
+  committed_to: feat/hermes-integration-mvp
+files_changed:
+  - skills/context-snapshot/SKILL.md   # new — skill with warning-only kickoff gate, 4 flags
+  - skills/context-snapshot/run.mjs    # new — CLI runner (4 flags: --schema-version, --epic, --write, --epic+--write)
+  - tests/skills/context-snapshot.test.mjs   # new — 6 integration tests
+test_verification:
+  command: bun test tests/skills/context-snapshot.test.mjs
+  result: 6 pass / 0 fail (after orchestrator added 90s timeout to 3 real-repo tests)
+  duration_ms: 77610
+  notes: |
+    Tests against the real repo were timing out at the node:test default 5s because
+    the composer takes ~38s to walk all epics/stories on this state-heavy repo.
+    Orchestrator added `{ timeout: 90000 }` to 3 tests that run against REPO_ROOT.
+    Functional behavior of composer + runner unchanged; perf is captured as follow-on.
+performance_followup:
+  description: "Composer full-snapshot is O(epics × stories) read; takes ~38s on this repo. Streaming or per-epic caching would speed it up substantially."
+  affects: "Any consumer that calls /hive:context-snapshot without --epic filter; --epic-scoped calls are sub-second."
+notes: |
+  Multica behavior surprise: agent's own workdir had no plugin-hive subdir (matching h-03
+  pattern), so agent IMPROVISED by writing files into h-01's leftover workdir at
+  /Users/don/multica_workspaces/.../3c517fd1/workdir/plugin-hive/. Orchestrator copied
+  files from there into caller checkout and committed manually. This is a workdir-
+  isolation bug — Multica should either (a) clone plugin-hive per task, OR (b) mount
+  caller checkout consistently and expose it as the agent's work_dir. Captured in
+  Multica integration follow-on task.

@@ -16,6 +16,8 @@ Brownfield intake skill for bugs and feature requests. Captures raw reports, wal
 - `--hand-off <id>` (pushes a `plan-ready` entry to `/plan --from-triage`)
 - `--close <id> [--reason "..."]` (resolves an entry to `closed`)
 
+Append `--json` to any sub-command for machine-readable output. See [§ JSON output](#json-output) below.
+
 ## Skill Preamble
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — kickoff gate (initialization check) + persona / config / memory loading.
@@ -97,6 +99,86 @@ The flow is operator-driven — triage does not auto-advance based on time, plan
 - Auto-advance / time-based queue policy — operator-driven by design
 - Triage UI / dashboard — queue.yaml is the source; rendering is a downstream concern
 - Multi-queue or per-team queues — single file, single source per atomic-skill posture
+
+## JSON output
+
+Add `--json` to any sub-command to receive a machine-readable envelope instead of the human-readable table/summary. The `--json` flag only changes output formatting — it never adds write paths to `queue.yaml`.
+
+All envelopes include `schema_version: 1` at the top level (same integer versioning contract as `hive/references/context-snapshot-schema.md`). On error, triage exits non-zero and writes to stderr; the stdout envelope is omitted.
+
+### `--list [<state>] --json`
+
+```json
+{
+  "schema_version": 1,
+  "command": "list",
+  "filter": "inbox",
+  "count": 2,
+  "items": [
+    { "id": "t-001", "state": "inbox", "kind": "bug", "title": "Login drops session", ... }
+  ]
+}
+```
+
+### `<id> --json`
+
+```json
+{
+  "schema_version": 1,
+  "command": "get",
+  "item": { "id": "t-001", "state": "inbox", ... }
+}
+```
+
+### `<description> --json`
+
+```json
+{
+  "schema_version": 1,
+  "command": "create",
+  "id": "t-001",
+  "state": "inbox"
+}
+```
+
+### `<id> --advance <state> --json`
+
+```json
+{
+  "schema_version": 1,
+  "command": "advance",
+  "id": "t-001",
+  "previous_state": "inbox",
+  "new_state": "clarified"
+}
+```
+
+### `<id> --hand-off --json`
+
+```json
+{
+  "schema_version": 1,
+  "command": "hand-off",
+  "id": "t-001",
+  "previous_state": "prioritized",
+  "new_state": "plan-ready",
+  "linked_epic": null,
+  "linked_story": null
+}
+```
+
+### `<id> --close [--reason "..."] --json`
+
+```json
+{
+  "schema_version": 1,
+  "command": "close",
+  "id": "t-001",
+  "previous_state": "plan-ready",
+  "new_state": "closed",
+  "reason": "duplicate of t-005"
+}
+```
 
 ## See also
 

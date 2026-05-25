@@ -63,6 +63,15 @@ state/
 !.pHive/epics/per-epic-branch-pr-flow/**
 !.pHive/epics/ghcr-sandcastle-image/
 !.pHive/epics/ghcr-sandcastle-image/**
+!.pHive/epics/hermes-integration-mvp/
+!.pHive/epics/hermes-integration-mvp/**
+!.pHive/episodes/hermes-integration-mvp/
+!.pHive/episodes/hermes-integration-mvp/**
+# Test scenarios (.pHive/test-scenarios/) — referenced by autonomous-cycle-loop
+# config + simulated-manual cross-cutting concern. Per-story scenarios shipped
+# alongside the stories that need them.
+!.pHive/test-scenarios/
+!.pHive/test-scenarios/**
 # Per-epic cycle-state lives under .pHive/cycle-state/; only the
 # meta-improvement-system entry is tracked at this time (same maintainer-
 # infrastructure rationale as the epics/ and episodes/ subtrees above).
@@ -75,6 +84,7 @@ state/
 !.pHive/cycle-state/kg-signal-revival.yaml
 !.pHive/cycle-state/skill-ergo-may2026.yaml
 !.pHive/cycle-state/multica-integration-fixes.yaml
+!.pHive/cycle-state/hermes-integration-mvp.yaml
 # /find-skills (se-5) writes ranked candidates here; track the dir marker so
 # consumer projects ship with an initialized output location.
 !.pHive/meta/
@@ -99,6 +109,11 @@ state/
 # fixtures consumed by hive/lib/metrics/ unit tests.
 !.pHive/metrics/
 !.pHive/metrics/**
+# Per-session stop-hook event files are runtime artifacts (one per session)
+# that accumulate locally and should never be tracked — they leak session IDs
+# and explode the diff on every PR. Meta-* / agent-spawn-* fixtures stay tracked.
+.pHive/metrics/events/stop-*.jsonl
+.pHive/metrics/events/agent-spawn-runtime-*.jsonl
 # MVL proof artifacts — only the canonical mvl-proof folder ships with the repo.
 !.pHive/audits/
 .pHive/audits/*

@@ -78,3 +78,36 @@ ceremony itself. If Routines is unreachable, unavailable, or not configured:
 This is a capability skip, not a failure of `daily-ceremony.workflow.yaml`. The
 ceremony remains runnable by a human operator even when the remote trigger
 layer is absent.
+
+## External Coordinators (Hermes Equivalence)
+
+Any cron- or webhook-capable coordinator can plug into the daily ceremony via
+the same scheduler-as-trigger contract described in this document. Anthropic
+Routines is the reference implementation, but it is not the only valid trigger.
+
+**Hermes** (or any equivalent external supervisor) connects by:
+
+1. Owning a cron schedule or trigger condition outside the Hive repo.
+2. Invoking `/hive:standup --format slack` on the configured repo via CLI or
+   webhook.
+3. Capturing stdout and delivering the Phase 1 report verbatim to Slack (or
+   another channel).
+
+Because `--format slack` suppresses Phase 2/3 and all interactive prompts, the
+invocation is safe to run under cron capture without a PTY. The output is
+plain markdown suitable for direct Slack delivery.
+
+**Phase 2/3 handoff remains operator-driven at MVP.** The operator sees the
+Phase 1 report in Slack, then opens a Claude Code session to run Phase 2
+(planning) and Phase 3 (execution) interactively. Auto-approve under cron is
+not supported at MVP due to idempotency risk (see design-discussion §4 H4).
+
+**No Routines-specific metadata required.** External coordinators do not need
+to inject `under_scheduler` context. The `--format slack` flag is the sole
+signal that differentiates cron-driven invocations from interactive ones. The
+workflow's `plan-approval` pause step is never reached under `--format slack`,
+so its `under_scheduler.auto_approve` field is irrelevant for this path.
+
+This equivalence means any coordinator that can shell out (or call a webhook
+that triggers a Claude Code run) can participate in the same daily-ceremony
+pipeline as Routines — without bespoke integration work on Hive's side.

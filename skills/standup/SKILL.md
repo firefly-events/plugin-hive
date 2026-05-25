@@ -12,6 +12,7 @@ Run the daily ceremony workflow: standup → planning → execution.
 | Flag | Description |
 |------|-------------|
 | `--interactive` | Activates Phase 1.5 (Interactive Routing) between the standup report and planning. Lets the operator redirect or reprioritize before the planning short-list runs. |
+| `--format <default\|slack>` | Controls output format. `default` (or omitted) runs the full interactive ceremony. `slack` emits the Phase 1 standup report only — no Phase 2/3, no interactive prompts, markdown-only output, no ANSI escape codes. See [hive/references/standup-slack-format.md](../../hive/references/standup-slack-format.md) for Slack output conventions. |
 
 **Config knob:** `standup.interactive_default` in `hive.config.yaml` (default: `false`). When `true`, `--interactive` behavior is always active without passing the flag. The CLI flag takes precedence over the config value — passing `--interactive` enables Phase 1.5 regardless of the config setting.
 
@@ -32,8 +33,18 @@ Parse `$ARGUMENTS` before loading the workflow:
 2. Check for `--interactive` flag.
 3. Read `standup.interactive_default` from `hive.config.yaml` (consumer override layer wins over the shipped default of `false`).
 4. Set `args.interactive = (--interactive flag present) OR (standup.interactive_default == true)`.
+5. Parse `--format` flag value. Accepted values: `default`, `slack`. If omitted, treat as `default`. Invalid values are an error.
+6. Set `args.format = <parsed value>`.
 
-Pass `args.interactive` into the workflow loader so the `when:` gate on the `interactive-routing` step evaluates correctly.
+Pass `args.interactive` and `args.format` into the workflow loader.
+
+**`--format slack` short-circuit:** When `args.format == "slack"`, execute Phase 1 only. After the Phase 1 report is emitted:
+- Do NOT present the "Ready for Planning?" prompt.
+- Do NOT proceed to Phase 2 (Planning) or Phase 3 (Execution).
+- Do NOT emit any ANSI escape codes (colors, bold, etc.) — plain markdown only.
+- Exit immediately after the report. This makes the invocation safe for cron capture and non-interactive piping.
+
+See `hive/references/standup-slack-format.md` for the full markdown conventions that apply to the `--format slack` output path.
 
 **Phase 1 — Standup:** Reconstruct state from previous sessions. Read status markers (`.pHive/episodes/`), cycle state (`.pHive/cycle-state/`), task tracker (pending human items), agent memories, the **triage queue** at `.pHive/triage/queue.yaml`, and **metrics health** across story-declared `metric:` blocks (per [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3). Surface open triage items (any entry whose `state` is not `closed`) alongside in-flight epics so the operator sees the intake backlog before selecting today's work. Surface OVERDUE and FAIL metric verdicts alongside the same context so claim-vs-reality gaps land in the operator's eye before they pick today's work. Present structured report to user.
 
