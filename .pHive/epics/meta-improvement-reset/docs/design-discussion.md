@@ -36,15 +36,25 @@ The infrastructure for reframes #1 and #2 mostly ALREADY EXISTS but isn't wired 
 
 Five concrete surface changes, sequenced so each lands measurable:
 
-### 3.1 Extend step-02b providers with Claude Code release-notes feed
+### 3.1 Extend step-02b providers with Claude Code release-notes + Anthropic blog feeds
 
-Add explicit subprovider to `step-02b-external-research.md`:
-- Source: `https://github.com/anthropics/claude-code/releases` (RSS or GH API)
-- Trigger: every cycle (cheap fetch)
-- Output: candidate proposals tagged `discovery_source: external_research` + `signal_subtype: claude_code_release`
-- Failure handling: empty list, not error (treat fetch failure as zero candidates)
+Add two explicit subproviders to `step-02b-external-research.md`:
 
-Optional follow-on (not in scope): ecosystem feeds (Karpathy YouTube transcripts, arXiv ML systems search). Defer to second story or backlog.
+**Claude Code release notes**
+- Source: `https://github.com/anthropics/claude-code/releases` (GH API or RSS)
+- Tag: `discovery_source: external_research` + `signal_subtype: claude_code_release`
+
+**Anthropic blog**
+- Source: `https://www.anthropic.com/news` (RSS / feed; verify endpoint at story time)
+- Tag: `discovery_source: external_research` + `signal_subtype: anthropic_blog`
+- Filter: model releases, capability announcements, agent SDK changes (skip company / business / policy posts)
+
+Shared mechanics:
+- Trigger: every cycle (cheap fetch per source)
+- Failure handling: empty list per source, not error (treat fetch failure as zero candidates)
+- Researcher persona filter (per grill H1): distinguish "Anthropic shipped X" from "Hive should adopt X"
+
+Optional follow-on (not in scope): ecosystem feeds (Karpathy YouTube transcripts, arXiv ML systems search). Defer to second epic or backlog.
 
 ### 3.2 Add ranking weight knob to step-03
 
@@ -149,21 +159,25 @@ Either way, single-line fix once located.
 
 ## 6. Open Questions
 
-1. **Release-notes feed scope** — Claude Code only, or include broader Anthropic feed (Anthropic blog, model release notes)? My default: Claude Code releases only for v1; expand in follow-on.
+**Questions 1-4 locked by user 2026-05-25 at Phase B step 5 gate:**
 
-2. **Weight defaults** — should the shipped baseline ship with the new weights (priming consumers to weight external_research up), or strictly preserve current behavior with all `1.0`? My default: ship all `1.0` (no behavior change), maintainer's root config overrides.
+1. **Release-notes feed scope** — ✅ **LOCKED: Claude Code releases + Anthropic blog.** Both subsources land in v1. Ecosystem feeds (Karpathy, arXiv) deferred to follow-on. Reflected in §3.1.
 
-3. **Step-03c blocking gate scope** — block per-proposal (proposal-A passes, proposal-B blocked) or block whole cycle if any fail? My default: per-proposal. Cycle continues with passing subset.
+2. **Weight defaults** — ✅ **LOCKED: all-`1.0` baseline.** Shipped baseline preserves current behavior. Plugin-hive root `hive.config.yaml` carries maintainer-specific weights. Reframe #1 is maintainer-side first; baseline weights may flip in a follow-on epic if it wins.
 
-4. **Monthly shotgun cadence enforcement** — calendar-day cron, or "next maintainer run after 30 days since last shotgun"? My default: maintainer-triggered with idempotency window (30-day dedupe).
+3. **Step-03c gate scope** — ✅ **LOCKED: per-proposal block.** Proposal-A passes, proposal-B blocked; cycle continues with passing subset. Cycle-level failure only when zero proposals pass the gate.
 
-5. **"Little-fix" threshold** — exact line-count limit (50, 100)? My default: <50 lines diff + no schema/skill behavior change.
+4. **Monthly shotgun cadence** — ✅ **LOCKED: maintainer-triggered.** No calendar cron. Maintainer fires `/meta-shotgun` monthly. Idempotency: skip candidates touched in last 30 days via `git log`.
 
-6. **`/meta-shotgun` grouping heuristic** — by file dir, by candidate cluster, or all-in-one PR? My default: single PR, sections per dir. Reviewer reads top-down.
+**Questions 5-8 carry defaults (no user redirect):**
 
-7. **Escape hatch flag name** — `--metric-gate=advisory` per 3.3, or `--allow-thin-metrics`? My default: the explicit name `--metric-gate=advisory` matches existing `gate_mode: warning|hard` convention.
+5. **"Little-fix" threshold** — Default: <50 lines diff + no schema/skill behavior change.
 
-8. **Should reframe #2 spawn a follow-on for /plan?** — /plan's own metric gate is already at §14a same shape. If we tighten step-03c's gate, should /plan's also flip blocking? My default: no — out of this epic's scope, keep /plan unchanged.
+6. **`/meta-shotgun` grouping heuristic** — Default per grill H4 + §3.4 simplification: single PR, sections per dir, no in-skill grouping.
+
+7. **Escape hatch mechanism name** — Default per grill H3: `hive.config.yaml → meta_optimize.metric_gate: blocking | advisory` (config knob, not CLI flag). Matches `paths.gate_mode: warning | hard` convention.
+
+8. **Should reframe #2 spawn a follow-on for /plan?** — Default: no. /plan's §14a gate stays unchanged this epic. If step-03c blocking + advisory escape works empirically over 2-3 cycles, follow-on can mirror to /plan.
 
 ## 7. Verification Strategy
 
