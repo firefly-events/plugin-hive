@@ -200,6 +200,8 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
 7c. **Terminal handoff dispatch.** After the `integrate` workflow step completes for a story, dispatch any configured post-integrate handoff.
 
+   > **Multica issue close.** When `task_tracking.adapter` is `multica`, the closer (`hive/lib/multica-issue-closer.mjs`) is invoked here to transition the story's Multica issue to `done`. See [multica-issue-closer-runbook.md](../../hive/references/multica-issue-closer-runbook.md) for failure modes, WARN escalation thresholds, and the manual sweep procedure.
+
    **Gate check — integrate episode marker required.** Before reading `terminal_handoff`, verify the integrate episode marker exists at `${HIVE_STATE_DIR}/episodes/{epic-id}/{story-id}/integrate.yaml`. If the marker is absent (integrate failed or was skipped):
 
    ```
@@ -289,6 +291,8 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
     ```
 
     Episode markers (per `hive/references/episode-schema.md`) are still authoritative for in-Hive state. Tracker status updates are a one-way projection — failures here never block the workflow.
+
+7d. **Multica story close (integrate hook).** Immediately after the `integrate` step's commit+push completes, the integrate step file calls `closeStoryIssue({epic_id, story_id})` from `hive/lib/multica-issue-closer.mjs`. This hook is gated on `task_tracking.adapter === 'multica'` (read from root `hive.config.yaml`); other values (including null / unset) skip with a one-line `[gate_mode]` log. The hook is also skipped for dry-run invocations and when /execute is in `--simulated-manual` mode. On any `ok: false` result, one warn line is emitted and /execute continues — this hook never blocks story completion. The full gate logic and log-line templates live in the integrate step file (`hive/workflows/steps/development-classic/step-08-integrate.md` §6a).
 
 8. After all stories complete, produce a summary plus the post-run audit:
 
