@@ -182,6 +182,8 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/multica-execute-routing/**
 !.pHive/epics/multica-integration-fixes/
 !.pHive/epics/multica-integration-fixes/**
+!.pHive/epics/meta-improvement-reset/
+!.pHive/epics/meta-improvement-reset/**
 !.pHive/episodes/multica-integration-fixes/
 !.pHive/episodes/multica-integration-fixes/**
 !.pHive/epics/story-loop-closure/
