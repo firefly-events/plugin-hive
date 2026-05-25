@@ -40,6 +40,55 @@ behavioral risk. Set `tier: strategic` for anything that touches multiple epics
 or alters public skill contracts — those candidates must be promoted through a
 planning epic before the automated cycle can consume them.
 
+## Metric Gate
+
+Step-03c applies the metrics cross-cutting concern to every approved proposal.
+The gate mode is read from `meta_optimize.metric_gate` in `hive.config.yaml`:
+
+| Value | Behavior |
+|-------|----------|
+| `blocking` *(default since mir-9)* | Proposals that fail metric validation receive `status: rejected_metric_gate` and are excluded from `enriched_proposals` handed to step-04. Cycle fails only when zero proposals pass. Rejected proposals appear in the PR body under "Rejected by metric gate". |
+| `advisory` | Gate failures are reported but all proposals advance to step-04 (legacy non-blocking behavior, pre-mir-9). |
+
+To revert to legacy advisory behavior temporarily:
+
+```yaml
+# hive.config.yaml (plugin-hive root)
+meta_optimize:
+  metric_gate: advisory
+```
+
+A proposal passes the gate when it carries either a full `metric:` block
+(`applies: true` with name/direction/baseline/target/window/source) or an
+explicit `metric: {applies: false, justification: "<one-line reason>"}` that
+is not a one-word placeholder (`N/A`, `none`, `TBD`, `pending`, etc.) and
+does not use `verify_at: eventually`.
+
+## Meta-Shotgun Cycle
+
+`/meta-shotgun` is the companion batch-cleanup skill for accumulated
+`tier: little-fix` backlog candidates. It is **not** nightly — it is
+maintainer-triggered (monthly cadence recommended).
+
+Run from the `plugin-hive` root:
+
+```
+/meta-shotgun
+/meta-shotgun dry_run=true   # preview candidates without making changes
+```
+
+The skill reads `.pHive/meta-team/queue-meta-meta-optimize.yaml`, filters
+`tier: little-fix` AND `status: pending`, applies all candidates in a single
+worktree, validates (test suite + lint), and opens a single PR titled
+`meta-shotgun YYYY-MM` targeting `develop`. Queue entries are marked
+`status: done` only after the PR is successfully opened.
+
+The nightly meta-meta-optimize cycle automatically skips `tier: little-fix`
+candidates — those belong exclusively to the shotgun path.
+
+See `hive/references/meta-shotgun-runbook.md` for the full runbook and
+`maintainer-skills/meta-shotgun/SKILL.md` for the runner contract.
+
 ## MVS Proof
 
 Regenerate the canonical BL3.6 MVS proof by running:
