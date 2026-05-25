@@ -1,3 +1,32 @@
+- experiment_id: meta-2026-05-22
+  date: '2026-05-22'
+  started: '2026-05-22T08:06:12Z'
+  closed: '2026-05-22T08:15:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 2
+  top_changes:
+    - "hive/GUIDE.md: corrected Planning Agents table tier column — Analyst, Architect,
+      and TPM changed from Opus to Sonnet, matching the Model Tier Routing table,
+      agent model fields, and hive.config.yaml"
+  commit: fc4b9c2755c7491b7a965ffeb091fa5b313de9c8
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 6000
+    first_attempt_pass: true
+  rollback_ref: 401f121e98f5b155b77bba8cbaaa8ab81da6e547
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-05-22. Analysis found 2 findings: (1) SCHEMA_INCONSISTENCY
+    in hive/GUIDE.md Planning Agents table — the table rows for Analyst, Architect,
+    and TPM listed Tier: Opus, but all three agents have model: sonnet in their agent
+    files and hive.config.yaml model_tiers.sonnet. The meta-2026-05-20 cycle corrected
+    the Model Tier Routing table above but missed the Planning Agents table below it.
+    Fixed by updating the three Tier cells from Opus to Sonnet. (2) STUB_DOC
+    hive/references/hive-cloud-roadmap.md (13 lines) — continuing out_of_scope
+    (S16 placeholder, deferred A8 bootstrap, 9th+ consecutive deferral). Closure
+    validator passed. Regression watch armed for 4-hour observation window.
 - experiment_id: meta-2026-05-21
   date: '2026-05-21'
   started: '2026-05-21T00:00:00Z'
