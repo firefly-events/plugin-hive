@@ -1,8 +1,8 @@
-cycle_id: meta-2026-05-24
-started: '2026-05-24T08:07:28Z'
-status: closed
+cycle_id: meta-2026-05-25
+started: '2026-05-25T00:00:00Z'
+status: closing
 phase: close
-closed: '2026-05-24T08:22:00Z'
+closed: '2026-05-25T00:15:00Z'
 charter_constraints:
   - operate only on hive/references/**, hive/agents/**, hive/workflows/**, hive/lib/**,
     skills/hive/agents/memories/**, .pHive/meta-team/**, .pHive/teams/**
@@ -12,11 +12,11 @@ charter_constraints:
   - no changes to hive/hive.config.yaml without human confirmation
   - no new external service integrations without human confirmation
 prior_cycle:
-  id: meta-2026-05-21
-  outcome: passed
+  id: meta-2026-05-24
+  outcome: discard
 steps:
   step_01_boot:
-    started_at: '2026-05-24T08:07:28Z'
+    started_at: '2026-05-25T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
@@ -63,7 +63,7 @@ steps:
     reverted_changes: []
     insights_staged: 0
     decision: discard
-    rollback_target: 401f121e98f5b155b77bba8cbaaa8ab81da6e547
+    rollback_target: 64dc1b11bf886e4d342589bc191a28f205a61c6d
 summary:
   total_findings: 3
   proposals_generated: 0
@@ -77,7 +77,7 @@ closure_evidence:
     tokens: 0
     wall_clock_ms: 0
     first_attempt_pass: true
-  rollback_ref: 401f121e98f5b155b77bba8cbaaa8ab81da6e547
+  rollback_ref: 64dc1b11bf886e4d342589bc191a28f205a61c6d
 decision: discard
 regression_watch:
   state: not_applicable
@@ -89,7 +89,7 @@ findings:
     description: 13-line reference doc below 30-line stub threshold
     evidence: >
       Line count: 13. Explicit S16 forward-reference placeholder for the
-      deferred Hive Cloud epic. Marked out_of_scope in 8+ consecutive cycles.
+      deferred Hive Cloud epic. Marked out_of_scope in 10+ consecutive cycles.
   - id: finding-2
     category: STUB_DOC
     severity: low
@@ -113,7 +113,7 @@ skipped_findings:
     notes: >
       S16 forward-reference placeholder for the deferred Hive Cloud epic.
       Expanding this stub is premature without the Hive Cloud epic active.
-      Marked out_of_scope in consecutive cycles (9th deferral).
+      Marked out_of_scope in consecutive cycles (10th+ deferral).
   - finding_id: finding-2
     reason: out_of_scope
     notes: >
