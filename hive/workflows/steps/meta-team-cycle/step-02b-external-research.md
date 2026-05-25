@@ -19,6 +19,56 @@ The research agent may query external sources using its granted tools. Current t
 
 Use WebSearch/WebFetch as the primary research path. Fall back to WebSearch for arXiv searches. Use Context7 MCP when library documentation is needed and the server is mounted.
 
+### Subproviders
+
+#### `claude_code_release` — Claude Code GitHub Releases
+
+Fetches the Claude Code release history from the GitHub Releases API and filters for releases that represent Hive-actionable capability shifts.
+
+**GH API endpoint:**
+```
+GET https://api.github.com/repos/anthropics/claude-code/releases?per_page=30
+Accept: application/vnd.github+json
+X-GitHub-Api-Version: 2022-11-28
+```
+
+**Fetch shape:** Array of release objects. Each object must include:
+- `tag_name` — semver tag (e.g. `v1.5.0`)
+- `name` — release title
+- `body` — release notes markdown
+- `html_url` — canonical release URL
+- `published_at` — ISO 8601 timestamp
+
+**Tag rule:**
+Candidates emitted by this subprovider are tagged:
+```yaml
+discovery_source: external_research
+signal_subtype: claude_code_release
+```
+
+**Actionability filter (MANDATORY — researcher persona):**
+
+> **Distinguish "Anthropic shipped X" from "Hive should adopt X".**
+> Most Claude Code releases are bug fixes or minor patches. Only propagate a
+> release to the candidate pool when it describes a Hive-actionable capability
+> shift — for example:
+> - A new Workflows or Routines primitive
+> - A new or renamed slash command with Hive relevance (e.g. `/code-review`)
+> - A new agents view, hooks model, or permissions change
+> - A capability that implies Hive should update reference docs, skill files,
+>   or step instructions
+>
+> Releases whose notes consist primarily of bug fixes, performance improvements,
+> or internal refactors should be **discarded** — do not emit a candidate.
+
+**Implementation module:** `hive/workflows/steps/meta-team-cycle/external-research-providers.mjs`
+Export: `fetchClaudeCodeReleases(opts?)` — accepts optional `{ fetchFn, apiUrl, perPage }` for test injection. Returns `{ candidates, error }`. On HTTP error or network failure: `candidates: []`, `error: <string>` — never throws.
+
+**Failure handling:**
+- HTTP 4xx/5xx (including rate-limit 403/429): return `candidates: []`, log the error in the research summary; do NOT fail the step.
+- Network unreachable: same — empty list + error note.
+- Malformed/non-array response: empty list + error note.
+
 Use them to identify relevant ideas, patterns, safeguards, or implementation approaches that could improve Hive within charter scope.
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
@@ -91,10 +141,12 @@ in place) is the query permitted to leave the project. Log the sanitized query
 text alongside each candidate produced in step 4 so the evidence trail captures
 what was actually sent outbound.
 
-Use Firecrawl, Context7, and arXiv as available to gather:
+Use Firecrawl, Context7, arXiv, and the `claude_code_release` subprovider as available to gather:
 - Comparable workflow patterns for autonomous review / proposal systems
 - Documentation or reference patterns that improve maintainability, clarity, or schema consistency
 - Research-backed practices for ranking, validation, or bounded agent execution that fit Hive's current model
+- Recent Claude Code capability shifts that Hive workflows, reference docs, or skill files should reflect
+  (via `fetchClaudeCodeReleases()` from `external-research-providers.mjs` — apply the actionability filter described in the `claude_code_release` subprovider section above)
 
 Do not treat any single provider as authoritative. Cross-check promising ideas before turning them into candidates.
 
