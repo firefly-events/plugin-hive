@@ -1,0 +1,181 @@
+id: wmc-5-smoke-test-end-to-end
+epic: wire-execute-multica-codex
+title: Smoke-test 2-story dummy epic through real /execute → multica → /codex:rescue
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [wmc-3-brief-codex-injection, wmc-4-scope-drift-emit]
+tracker_id: plugin-hive/PLU-77
+tracker_url: http://localhost:3000/plugin-hive/issues/77
+
+description: |
+  Validate the full Phase 1 pipeline end-to-end before declaring the epic
+  done. Hand-roll a trivial 2-story dummy epic at
+  .pHive/epics/smoke-test-execute-multica-codex/ with stories small enough
+  to complete in <5 minutes each:
+  - s1: create .pHive/smoke/marker.txt with one line of content
+  - s2: depends_on s1; append a second line to that file
+
+  Invoke /execute smoke-test-execute-multica-codex (with no flags) and verify:
+  1. execute-dispatch returns mode_decision=multica (config has execution.mode: multica)
+  2. /execute routes to step 6e (wmc-1) and invokes execute-mode-multica
+  3. execute-mode-multica dispatches s1 first (serial, not parallel)
+  4. Brief for s1 includes the '## Use /codex:rescue' section (agent_backends.developer=codex)
+  5. Inner Claude Code spawned by Multica has codex plugin loaded — pre-flight check
+  6. Story completes; writeMulticaRunEpisode produces marker at .pHive/episodes/smoke-test-.../s1/multica-run.yaml
+  7. scope_drift_score event fires for s1
+  8. s2 dispatches only after s1 reaches terminal
+  9. Both stories' commits land one-per-story on feat/smoke-test-execute-multica-codex
+  10. Zero orchestrator-side cherry-pick rescue executed
+  11. Post-run audit YAML written at .pHive/audits/post-run/<run-id>.yaml with backend_sources
+
+  If pre-flight (item 5) fails — inner Claude Code does not have codex plugin
+  loaded — the smoke test reports the gap loudly, stops, and recommends the
+  operator install the plugin in the Claude Code config Multica uses to spawn
+  the developer agent. The production wiring is correct; the precondition
+  just isn't met yet.
+
+acceptance_criteria:
+  - "Dummy epic .pHive/epics/smoke-test-execute-multica-codex/ created with 2 stories"
+  - "/execute smoke-test-execute-multica-codex runs successfully end-to-end"
+  - "All 11 verification points above PASS (or item 5 fails loudly with operator guidance)"
+  - "Smoke test report written at .pHive/audits/smoke-test/wire-execute-multica-codex.md documenting each verification outcome"
+  - "If any pipeline gap is found (other than item 5 plugin precondition), open a follow-on story and update the smoke-test report"
+
+steps:
+  - id: research
+    description: |
+      Verify that execution.mode=multica is set in root hive.config.yaml.
+      Verify that agent_backends.developer=codex. Verify that Multica
+      developer agent is online (curl localhost:8080/api/agents?workspace_id=...
+      and check status). Inspect how Multica spawns the inner Claude Code to
+      understand where the plugin precondition check belongs (Step 0 of
+      execute-mode-multica per wmc-2 design open question 1, OR only in smoke
+      test).
+    agent: researcher
+  - id: implement
+    description: |
+      Create dummy epic at .pHive/epics/smoke-test-execute-multica-codex/ —
+      epic.yaml + 2 story YAMLs (s1 creates marker.txt, s2 appends line).
+      Add .gitignore allowlist for the new epic dir. Implement the
+      pre-flight plugin check (either in execute-mode-multica Step 0 if
+      design favors it, or as a standalone smoke-test pre-step). Document
+      verification approach for each of the 11 points.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Execute the smoke test: invoke /execute smoke-test-execute-multica-codex.
+      Capture observability: telemetry line, episode markers, scope_drift
+      events, commits on branch, audit YAML. Walk through 11 verification
+      points and record PASS/FAIL/INCONCLUSIVE for each. Write the smoke-test
+      report at .pHive/audits/smoke-test/wire-execute-multica-codex.md.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Review the smoke-test report. If any point failed (other than the
+      plugin precondition with a known operator-fix), open a follow-on story.
+      If all 11 points PASS, the epic is ready to merge.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: |
+      Commit smoke-test infrastructure + report on feat/wire-execute-multica-codex
+      with subject 'test(wmc-5): smoke-test /execute → multica → /codex:rescue
+      pipeline end-to-end'. After this commit, the epic is ready for PR to develop.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: /execute skill machinery, Multica daemon, Claude Code with codex plugin
+  key_files:
+    - path: hive.config.yaml
+      purpose: Confirm execution.mode=multica + agent_backends.developer=codex before running smoke test.
+    - path: skills/hive/skills/execute/SKILL.md
+      purpose: Step 6e is reached during the smoke test (added by wmc-1).
+    - path: skills/hive/skills/execute-mode-multica/SKILL.md
+      purpose: Skill text exercised end-to-end (rewired by wmc-2 + wmc-4).
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: serializeStoryBrief codex injection (added by wmc-3) is exercised.
+
+files_to_modify:
+  - file: .pHive/epics/smoke-test-execute-multica-codex/epic.yaml
+    change: new minimal epic index
+  - file: .pHive/epics/smoke-test-execute-multica-codex/stories/s1-create-marker.yaml
+    change: new — trivial create-file story
+  - file: .pHive/epics/smoke-test-execute-multica-codex/stories/s2-append-line.yaml
+    change: new — trivial append story, depends_on s1
+  - file: .gitignore
+    change: add !.pHive/epics/smoke-test-execute-multica-codex/** allowlist + episodes + audit subtree
+  - file: .pHive/audits/smoke-test/wire-execute-multica-codex.md
+    change: new — 11-point verification report
+
+design_decisions:
+  - decision: Use the smallest possible dummy epic (2 stories, trivial work)
+    rationale: |
+      Smoke test exercises pipeline integration, not application logic. Trivial
+      stories complete fast, fail fast on infra gaps, and don't muddy the
+      verification signal with content debugging.
+  - decision: Surface plugin-precondition failure loudly, don't auto-install
+    rationale: |
+      Operator action required to install codex plugin in Multica's spawn config.
+      Auto-install would mask deployment-state surprises. Loud failure with
+      remediation steps is the right user contract.
+
+cross_cutting:
+  - concern: documentation
+    action: |
+      Add a short note to GUIDE.md or the README quickstart that documents the
+      /execute → multica → /codex:rescue end-to-end flow, citing the smoke
+      test as the canonical reference for "what success looks like".
+  - concern: versioning
+    action: |
+      This epic ships consumer-visible behavior changes — /execute now actually
+      fires under execution.mode=multica. Bump plugin.json + marketplace.json
+      minor version (e.g., 2.7.0 → 2.8.0). Update README version badge.
+      Add CHANGELOG entry under [Unreleased] → [2.8.0] for the
+      wire-execute-multica-codex epic.
+  - concern: simulated-manual
+    action: |
+      This story IS itself the simulated-manual verification of the pipeline.
+      No separate test-scenarios/ file needed — the smoke-test report serves
+      as the manual_verdict.
+
+risks:
+  - severity: high
+    description: Inner Claude Code spawned by Multica doesn't have codex plugin
+    mitigation: Pre-flight check (item 5) catches this. Operator installs plugin and re-runs.
+  - severity: medium
+    description: Multica daemon spawn config diverges from local Claude Code config — different plugin set
+    mitigation: Document the spawn config location in the smoke-test report; flag for follow-on epic if recurring.
+  - severity: low
+    description: scope_drift events may have low signal on trivial dummy stories
+    mitigation: Acceptable — smoke test validates event firing (count = 2), not signal quality.
+
+references:
+  - path: .pHive/epics/meta-improvement-reset/docs/research-brief.md
+    relevant_excerpt: |
+      Meta-improvement-reset epic 2026-05-25 shipped 10 commits but bypassed
+      the entire /execute machinery via inline orchestrator HTTP+git scripting.
+      This smoke test is the proof that the bypass is no longer necessary.
+  - path: hive.config.yaml
+    relevant_excerpt: |
+      execution.mode: multica  (per local-first direction 2026-05-20)
+      agent_backends.developer: codex  (per Codex routing 2026-05-01)
+
+metric:
+  applies: true
+  name: execute_pipeline.bypass_count
+  direction: down
+  baseline: 1
+  target: 0
+  window: story-integrate
+  unit: count
+  source:
+    kind: manual
+    ref: "Smoke test verification point #10 (zero orchestrator-side cherry-pick rescue executed). Pass = 0, Fail = >0."
+  verify_at: integrate
+  owner: reviewer

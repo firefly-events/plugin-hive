@@ -1,0 +1,183 @@
+id: wmc-3-brief-codex-injection
+epic: wire-execute-multica-codex
+title: Inject /codex:rescue instruction into brief when agent_backends[role]=codex
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [wmc-2-multica-skill-rewire]
+tracker_id: plugin-hive/PLU-75
+tracker_url: http://localhost:3000/plugin-hive/issues/75
+
+description: |
+  Phase 1 Codex routing (locked alignment 2026-05-25): Multica's existing
+  Claude-runtime developer agent runs the work, and the brief instructs it
+  to invoke /codex:rescue (provided by the codex plugin loaded inside the
+  Claude Code wrapper) for implementation work. No new Multica agent
+  bootstrapping; the routing decision is brief-level.
+
+  Today serializeStoryBrief (hive/lib/multica-story-dispatch/index.mjs:140)
+  emits Goal / Acceptance Criteria / Files to Touch / Code Examples /
+  References sections — but no signal to the inner Claude Code that this
+  story is Codex-routed. The inner session has no way to know to use
+  /codex:rescue, so it falls back to writing code itself (Claude-only path),
+  defeating the agent_backends config entirely.
+
+  Add a conditional injection: when caller passes codexInstruction:true
+  (and execute-mode-multica passes true when agent_backends[role]=codex),
+  serializeStoryBrief emits an additional "## Use /codex:rescue" section
+  after Goal that tells the inner session to delegate implementation work
+  to the codex plugin's /codex:rescue skill.
+
+acceptance_criteria:
+  - "serializeStoryBrief accepts an optional named-options argument {codexInstruction: boolean}"
+  - "Default behavior unchanged when codexInstruction is omitted or false (no brief diff)"
+  - "When codexInstruction:true, brief includes a '## Use /codex:rescue' section after Goal with instruction to invoke /codex:rescue for implementation work"
+  - "execute-mode-multica Step 1 reads hive_config.agent_backends[role] and passes codexInstruction:true when value is 'codex'"
+  - "Unit test in hive/lib/multica-story-dispatch/__tests__/ covers both injection-on and injection-off paths"
+  - "All existing callers of serializeStoryBrief continue to work without modification (backward-compatible)"
+
+steps:
+  - id: research
+    description: |
+      Read serializeStoryBrief implementation (index.mjs:140-168). Identify
+      all caller sites via grep: `grep -rn serializeStoryBrief hive/ skills/`.
+      Read codex-invoke SKILL.md to understand /codex:rescue invocation shape
+      so the injection text is accurate.
+    agent: researcher
+  - id: implement
+    description: |
+      Extend serializeStoryBrief signature from `(story)` to `(story, options = {})`.
+      Read `codexInstruction` from options with default false. When true, insert
+      a new section between Goal and Acceptance Criteria:
+        '## Use /codex:rescue\nThis story is routed through the Codex backend.
+        For implementation work, invoke the /codex:rescue skill with the story
+        spec from this brief rather than writing code directly. Return changes
+        for the orchestrator to commit.'
+      Update execute-mode-multica Step 1 callsite to read
+      hive_config.agent_backends[role] and pass codexInstruction:true when
+      value is 'codex'.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Write unit tests in hive/lib/multica-story-dispatch/__tests__/serialize-story-brief.test.mjs
+      (node:test): (a) default behavior emits no codex section; (b) codexInstruction:true
+      emits the section in the correct position; (c) section text mentions
+      /codex:rescue verbatim; (d) all other brief sections present unchanged
+      in both paths.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Review serializeStoryBrief change for: (a) signature backward-compat
+      (named-options, default false); (b) injection text accuracy against
+      codex-invoke SKILL.md; (c) all caller sites (existing tests pass
+      unchanged); (d) brief section ordering preserved.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: |
+      Commit on feat/wire-execute-multica-codex with subject
+      'feat(brief): inject /codex:rescue instruction when agent_backends[role]=codex'.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: Node.js (.mjs ES modules, node:test for tests)
+  key_files:
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: serializeStoryBrief lives at line 140. Sole code edit site.
+    - path: hive/lib/multica-story-dispatch/__tests__/
+      purpose: Test home for the new unit test.
+    - path: skills/hive/skills/execute-mode-multica/SKILL.md
+      purpose: Step 1 callsite that must pass codexInstruction:true when agent_backends[role]=codex.
+    - path: skills/hive/skills/codex-invoke/SKILL.md
+      purpose: Documents /codex:rescue invocation pattern. Injection text references this skill.
+
+files_to_modify:
+  - file: hive/lib/multica-story-dispatch/index.mjs
+    change: extend serializeStoryBrief signature to (story, options); add conditional ## Use /codex:rescue section
+  - file: hive/lib/multica-story-dispatch/__tests__/serialize-story-brief.test.mjs
+    change: new file; node:test covering injection-on and injection-off paths
+  - file: skills/hive/skills/execute-mode-multica/SKILL.md
+    change: Step 1 callsite passes codexInstruction:true when agent_backends[role]=codex
+
+code_examples:
+  - title: Existing serializeStoryBrief signature
+    file: hive/lib/multica-story-dispatch/index.mjs
+    snippet: |
+      // line 140
+      export function serializeStoryBrief(story) {
+        const sections = [];
+        if (story?.description) {
+          sections.push(`## Goal\n${cleanText(story.description)}`);
+        }
+        if (hasItems(story?.acceptance_criteria)) {
+          sections.push(`## Acceptance Criteria\n${story.acceptance_criteria.map(formatBullet).join('\n')}`);
+        }
+        // ... existing sections ...
+        sections.push(`---\n_Generated by hive multica-story-dispatch — story ${story?.id ?? ''} in epic ${story?.epic ?? ''}_`);
+        return `${sections.join('\n\n')}\n`;
+      }
+
+design_decisions:
+  - decision: Use named-options object (not positional second arg)
+    rationale: |
+      Future-proofs the signature — additional options (sidecar handling,
+      compression flags, etc.) can land without re-shuffling positional args.
+      Avoids the grill-H4 risk of callers passing the wrong positional.
+  - decision: Inject section between Goal and Acceptance Criteria
+    rationale: |
+      Placement matters for inner Claude Code's read order. Goal sets context,
+      then the injection tells the agent how to satisfy it (via /codex:rescue),
+      then acceptance criteria provide the success contract. Putting the
+      injection at the end (after References) would be read too late.
+  - decision: Injection text references /codex:rescue verbatim, not generic "use codex"
+    rationale: |
+      The inner Claude Code needs the exact skill name to invoke. Generic
+      phrasing risks the agent inventing a workaround (e.g., calling the
+      codex CLI directly) instead of using the plugin skill machinery.
+
+cross_cutting:
+  - concern: documentation
+    action: |
+      Add a short note to hive/references/multica-story-dispatch.md (if exists)
+      or inline JSDoc on serializeStoryBrief documenting the new options
+      parameter. No README update needed (internal lib API).
+
+risks:
+  - severity: medium
+    description: Inner Claude Code may not have codex plugin loaded — injection becomes noise
+    mitigation: wmc-5 smoke test validates plugin presence before dispatching the dummy stories
+  - severity: low
+    description: Existing callers of serializeStoryBrief in test fixtures may break
+    mitigation: signature default keeps codexInstruction:false; backward-compat by construction
+
+references:
+  - path: skills/hive/skills/codex-invoke/SKILL.md
+    relevant_excerpt: |
+      The /codex:rescue subagent handles supported personas
+      (researcher/developer/etc.) and returns file lists for the orchestrator
+      to commit. agent_backends[persona] == codex is the routing signal.
+  - path: skills/hive/skills/execute-mode-multica/SKILL.md
+    relevant_excerpt: |
+      Step 1 — per-story dispatch. Reads hive_config to determine routing.
+      Currently passes only (serverUrl, token, workspaceId, issueUuid, brief)
+      — after this story, also reads agent_backends[role] and passes
+      codexInstruction:true accordingly.
+
+metric:
+  applies: true
+  name: brief.codex_instruction_present_when_routed
+  direction: up
+  baseline: 0
+  target: 1
+  window: story-integrate
+  unit: ratio
+  source:
+    kind: manual
+    ref: "Manual check during wmc-5 smoke test: when agent_backends[role]=codex, brief output includes '## Use /codex:rescue' section. Pass = 1.0, Fail = 0.0."
+  verify_at: integrate
+  owner: reviewer
