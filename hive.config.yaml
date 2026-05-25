@@ -38,6 +38,11 @@ emit_lifecycle_at: phase
 # Weighted score = weight × Impact × (6 − Risk) / Effort.
 # Default 1.0 for every key preserves ranking order when unset.
 meta_optimize:
+  # Flip step-03c metric gate to blocking per locked Q3 + design §3.3.
+  # Per-proposal scope: passing proposals enter step-04; failed proposals get
+  # status: rejected_metric_gate. Cycle continues with passing subset.
+  # Set to advisory to restore legacy non-blocking behavior.
+  metric_gate: blocking
   signal_weights:
     metrics: 1.0
     external_research: 0.9
