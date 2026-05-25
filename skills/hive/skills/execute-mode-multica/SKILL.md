@@ -82,15 +82,41 @@ For each story in `unblocked_stories[]` at this depth:
 
 3. **Brief write.**
    - Call `serializeStoryBrief(story)` to produce Markdown.
+   - Resolve `requestedRef` from the current epic branch/ref (for example `feat/multica-integration-fixes`) and include it in the issue brief as the required repository ref for the agent task.
    - Call `ensureIssueBriefMatches(serverUrl, token, workspaceId, issueUuid, brief)`.
    - If the issue description has drifted, the helper updates it with `PUT`.
 
-4. **Dispatch.**
+4. **Clone + verify.**
+   - Standalone `multica repo checkout` is daemon-task scoped. Do not run it as an orchestrator-side pre-dispatch command unless the Multica daemon API exposes an equivalent checkout endpoint for this workflow.
+   - Preserve the auto-clone success path used by h-01-style runs: if `workdir/plugin-hive/` already exists inside the assigned task and its current branch equals `requestedRef`, skip the explicit clone and continue.
+   - Otherwise, the task brief or dispatch payload MUST instruct the agent to run this as its first repository action inside the daemon task:
+
+     ```sh
+     multica repo checkout https://github.com/firefly-events/plugin-hive --ref "${requestedRef}"
+     ```
+
+   - Post-dispatch verify before implementation work:
+
+     ```sh
+     test -d workdir/plugin-hive
+     ls -la workdir
+     ls -la workdir/plugin-hive
+     git -C workdir/plugin-hive branch --show-current
+     ```
+
+   - Fail fast if verification fails or the branch output does not equal `requestedRef`. Emit an error message that names all of:
+     - workdir path: `workdir/plugin-hive`
+     - requested ref: `${requestedRef}`
+     - actual contents: output from `ls -la workdir`, `ls -la workdir/plugin-hive`, and `git -C workdir/plugin-hive branch --show-current`
+     - suggested manual rerun command: `multica repo checkout https://github.com/firefly-events/plugin-hive --ref "${requestedRef}"`
+   - Stop the task after that error. Do NOT let the agent improvise on an unknown checkout.
+
+5. **Dispatch.**
    - Call `dispatchStoryToAgent(serverUrl, token, workspaceId, issueUuid, developerAgentUuid)`.
    - The `PUT` returns `200` with `assignee_type` and `assignee_id` populated.
    - Multica internally enqueues the task after assignment.
 
-5. **Track.**
+6. **Track.**
    - Record `{story_id, issueUuid, identifier, dispatch_started_at}` in an in-memory map for the poll loop.
    - Keep per-story state independent so one 4xx or terminal failure does not block sibling stories in the same depth.
 
@@ -181,6 +207,42 @@ For each `story_id` in `appends_map`, emit:
 ```
 
 No Multica dispatch is performed for sidecars in v1. Do not create extra issues, do not assign additional agents, and do not mutate the primary issue for sidecar-only work.
+
+## Reconciliation pattern
+
+Reconcile completed Multica work by bringing the agent branch back onto the epic branch with the smallest history-preserving operation that matches the branch shape.
+
+Multica agent commits land on:
+
+```text
+agent/<persona>/<run-short>
+```
+
+Canonical orchestrator-side reconciliation is cherry-pick when selecting a subset of commits or when the agent branch has diverged unrelated work:
+
+```sh
+git fetch origin agent/developer/<run-short>:refs/remotes/origin/agent/developer/<run-short>
+git switch feat/multica-integration-fixes
+git cherry-pick <commit-sha>
+```
+
+Use fetch + rebase, or fetch + fast-forward merge, when the agent branch is a clean linear extension of the epic branch:
+
+```sh
+git fetch origin agent/developer/<run-short>:refs/remotes/origin/agent/developer/<run-short>
+git switch agent/developer/<run-short>
+git rebase feat/multica-integration-fixes
+git switch feat/multica-integration-fixes
+git merge --ff-only agent/developer/<run-short>
+```
+
+Fast-forward-only variant:
+
+```sh
+git fetch origin agent/developer/<run-short>:refs/remotes/origin/agent/developer/<run-short>
+git switch feat/multica-integration-fixes
+git merge --ff-only origin/agent/developer/<run-short>
+```
 
 ### Step 5: Wait for all depth-0 to terminate, then return
 

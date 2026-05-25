@@ -43,9 +43,16 @@ export function parseAgentsConfig(yamlString) {
   let schemaVersion;
   const agents = [];
   let currentAgent = null;
+  let currentNestedField = null;
 
   for (const [index, line] of lines.entries()) {
     if (!line.trim()) {
+      continue;
+    }
+
+    const nestedFieldMatch = line.match(/^      ([^:]+):\s*(.*)$/);
+    if (nestedFieldMatch && currentAgent && currentNestedField) {
+      currentAgent[currentNestedField][nestedFieldMatch[1]] = parseScalar(nestedFieldMatch[2].trim());
       continue;
     }
 
@@ -56,10 +63,12 @@ export function parseAgentsConfig(yamlString) {
     const schemaMatch = line.match(/^schema_version:\s*(.+)$/);
     if (schemaMatch) {
       schemaVersion = parseScalar(schemaMatch[1].trim());
+      currentNestedField = null;
       continue;
     }
 
     if (line === 'agents:') {
+      currentNestedField = null;
       continue;
     }
 
@@ -68,12 +77,16 @@ export function parseAgentsConfig(yamlString) {
       currentAgent = {};
       currentAgent[agentStartMatch[1]] = parseScalar(agentStartMatch[2].trim());
       agents.push(currentAgent);
+      currentNestedField = null;
       continue;
     }
 
     const agentFieldMatch = line.match(/^    ([^:]+):\s*(.*)$/);
     if (agentFieldMatch && currentAgent) {
-      currentAgent[agentFieldMatch[1]] = parseScalar(agentFieldMatch[2].trim());
+      const [, field, rawValue] = agentFieldMatch;
+      const value = rawValue.trim();
+      currentAgent[field] = value === '' ? {} : parseScalar(value);
+      currentNestedField = value === '' ? field : null;
     }
   }
 

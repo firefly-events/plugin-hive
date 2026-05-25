@@ -74,6 +74,7 @@ state/
 !.pHive/cycle-state/brand-system-2.0-update.yaml
 !.pHive/cycle-state/kg-signal-revival.yaml
 !.pHive/cycle-state/skill-ergo-may2026.yaml
+!.pHive/cycle-state/multica-integration-fixes.yaml
 # /find-skills (se-5) writes ranked candidates here; track the dir marker so
 # consumer projects ship with an initialized output location.
 !.pHive/meta/
@@ -105,6 +106,10 @@ state/
 !.pHive/audits/mvl-proof/**
 !.pHive/audits/mvs-proof/
 !.pHive/audits/mvs-proof/**
+# Post-run audits for /plan + /execute (gate-mode telemetry). Tracked so
+# cross-run aggregation (hive/scripts/gate-mode-audit.mjs) sees a stable corpus.
+!.pHive/audits/post-run/
+!.pHive/audits/post-run/**
 # Consumer-side executor flag (hde-9a Q4 lock). Tracked because the maintainer
 # repo doubles as the canonical consumer for plugin-hive itself; consumers of
 # the plugin choose whether to commit their own .pHive/hive.config.yaml.
@@ -160,3 +165,7 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/multica-substrate-adoption/**
 !.pHive/epics/multica-execute-routing/
 !.pHive/epics/multica-execute-routing/**
+!.pHive/epics/multica-integration-fixes/
+!.pHive/epics/multica-integration-fixes/**
+!.pHive/episodes/multica-integration-fixes/
+!.pHive/episodes/multica-integration-fixes/**
