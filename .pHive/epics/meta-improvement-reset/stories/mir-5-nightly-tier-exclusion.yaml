@@ -1,0 +1,119 @@
+id: mir-5-nightly-tier-exclusion
+epic: meta-improvement-reset
+title: Exclude tier=little-fix candidates from nightly cycle backlog-fallback
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [mir-4-tier-field-backlog-schema]
+
+description: |
+  Nightly meta-meta-optimize cycles consume backlog candidates via
+  step-03b-backlog-fallback when no signal-driven findings exist. After mir-4
+  adds the `tier:` field, this story filters `tier: little-fix` candidates OUT
+  of the nightly-eligible pool — delegating little-fix surface to /meta-shotgun
+  (mir-6/mir-7).
+
+  Cleanest delegation per grill U2 resolution: little-fix surface is shotgun-
+  only; nightly cycles consume structural+strategic.
+
+acceptance_criteria:
+  - "step-03b-backlog-fallback.md filter logic excludes tier=little-fix"
+  - "Workflow YAML wires the filter step (if not inherent to step doc)"
+  - "Mixed-tier backlog: nightly cycle proposes only structural+strategic; little-fix candidates remain in queue with status=pending"
+  - "Unit test verifies filter behavior"
+  - "Backward-compatible: candidates without tier field treated as structural → still consumed by nightly"
+
+steps:
+  - id: research
+    description: |
+      Read step-03b-backlog-fallback.md current candidate-selection logic.
+      Identify where filter inserts: pre-selection or post-selection. Read
+      meta-team-cycle.workflow.yaml to see step wiring.
+    agent: researcher
+  - id: implement
+    description: |
+      Add filter step to step-03b-backlog-fallback.md: before selecting the
+      first pending candidate, filter out tier=little-fix entries. Treat
+      missing tier as `structural` (include). If after filter zero candidates
+      remain, exit step-03b empty (cycle then has no actionable backlog —
+      legitimate empty-cycle path).
+
+      If a candidate-selection helper exists in `hive/lib/`, update it instead
+      of the step doc.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Unit test (`hive/lib/meta-team/__tests__/backlog-tier-filter.test.mjs`):
+      - Backlog with 1 little-fix + 1 structural → step-03b returns structural
+      - Backlog with 1 little-fix only → step-03b returns empty (zero candidates)
+      - Backlog without tier field → step-03b returns it (treated as structural)
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Confirm filter is documented in step-03b YOUR TASK section (visible to
+      consumers reading the doc). Verify cycle-state output reports `filtered_count` when little-fix candidates skipped.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    - markdown
+    - yaml
+    - node
+  key_files:
+    - path: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+      purpose: Step file being extended with filter logic
+    - path: hive/workflows/meta-team-cycle.workflow.yaml
+      purpose: May need to wire filter step explicitly
+
+files_to_modify:
+  - file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+    change: Add filter rule + cycle-state output of filtered_count
+  - file: hive/lib/meta-team/backlog-loader.mjs
+    change: If helper exists, add filter; otherwise inline in step doc
+  - file: hive/lib/meta-team/__tests__/backlog-tier-filter.test.mjs
+    change: New test file
+
+design_decisions:
+  - decision: Hard exclusion (filter pre-selection), not soft demotion (rank lower)
+    rationale: Clean delegation per grill U2 — little-fix surface is shotgun-only. Soft demotion creates ambiguity about which cycle owns each tier.
+
+cross_cutting:
+  - concern: documentation
+    action: step-03b doc + meta-optimize-maintainer.md note about delegation
+
+risks:
+  - severity: low
+    description: Filter typo could drop ALL candidates accidentally
+    mitigation: Unit test for "no-tier defaults to structural; included" covers this
+
+references:
+  - path: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
+    relevant_excerpt: |
+      Backlog-fallback consumes queue-meta-meta-optimize.yaml when zero signals
+      come from steps 02/02b/02c/02d. Selects first pending entry by listed order.
+  - path: .pHive/epics/meta-improvement-reset/docs/design-discussion.md
+    relevant_excerpt: |
+      U2 resolution: clean delegation. Nightly cycles exclude tier:little-fix
+      candidates after this lands. Single-source-of-truth for little-fix backlog = shotgun.
+
+metric:
+  applies: true
+  name: nightly.proposals_with_little_fix_tier
+  direction: down
+  unit: count
+  baseline: tracked-from-merge
+  target: 0
+  window: every nightly cycle after merge
+  source:
+    kind: manual
+    ref: "PR body of meta-meta nightly cycles; count proposals whose source candidate had tier=little-fix"
+  verify_at: integrate
+  owner: reviewer

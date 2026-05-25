@@ -1,0 +1,163 @@
+id: mir-9-metric-gate-flip
+epic: meta-improvement-reset
+title: Flip step-03c metric gate to blocking with advisory escape hatch
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [mir-8-signal-weights-knob]
+
+description: |
+  Current step-03c metric-declaration runs but its gate is NON-BLOCKING:
+  failures (missing/thin metric, "eventually" window, one-word justification)
+  are reported but the orchestrator/user decides whether to proceed with gaps.
+
+  Flip default to BLOCKING per locked Q3 + design §3.3:
+  - Per-proposal scope: passing proposals enter step-04; failed proposals get
+    `status: rejected_metric_gate` with failing field named
+  - Cycle continues with passing subset (cycle-level failure only when zero
+    proposals pass)
+  - Rejected proposals surface in PR body under "Rejected by metric gate" section
+  - Escape hatch: `hive.config.yaml → meta_optimize.metric_gate: blocking | advisory`
+    (default `blocking`; `advisory` restores old non-blocking behavior)
+
+  THIS IS THE LAST SLICE in the epic. Lands after Slices 1-4 to avoid blocking
+  in-flight work mid-flip.
+
+acceptance_criteria:
+  - "step-03c-metric-declaration.md flipped: default behavior is blocking"
+  - "Config knob `meta_optimize.metric_gate: blocking | advisory` (default blocking)"
+  - "Advisory mode preserves current non-blocking behavior (escape hatch tested)"
+  - "Per-proposal scope: A passes, B blocked; cycle continues with A"
+  - "Cycle-level failure only when zero proposals pass gate"
+  - "PR body surfaces rejected proposals under named section"
+  - "step-03c.md cross-references /plan §14a (drift risk acknowledged)"
+
+steps:
+  - id: research
+    description: |
+      Read step-03c-metric-declaration.md current gate logic carefully. Identify:
+      - Where gate verdict is computed (which field/var)
+      - Where downstream step-04 consumes `enriched_proposals`
+      - Where cycle-state currently records gate failures
+      Document the exact insertion points for blocking-mode rejection.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Failing tests first (TDD):
+      `hive/workflows/steps/meta-team-cycle/__tests__/metric-gate.test.mjs`:
+      - blocking + 1 thin-metric proposal → status=rejected_metric_gate, NOT in step-04 input
+      - blocking + 1 thin + 1 passing → step-04 receives passing only, rejected surfaces in PR body
+      - blocking + 0 passing → cycle-level failure (verdict='discard')
+      - advisory + thin-metric → still in step-04 input (current behavior preserved)
+      - config missing → defaults to blocking
+      - Per-failing-field naming: rejection includes which field failed (e.g.,
+        "metric.window: eventually" or "metric.justification: one-word")
+    agent: tester
+  - id: implement
+    description: |
+      Make failing tests pass:
+      - Read `meta_optimize.metric_gate` from config (default `blocking`)
+      - When blocking: failed-gate proposals get `status: rejected_metric_gate`,
+        `failed_field: <field_name>`, excluded from `enriched_proposals` passed
+        to step-04
+      - When advisory: existing behavior (failures reported but proposals pass)
+      - PR-body section added by step-07-promotion (or wherever PR body is
+        composed): "Rejected by metric gate" with rejected proposals listed
+      - step-03c.md cross-reference to /plan §14a drift-risk note
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify escape hatch (advisory mode) is actually escape-y — i.e., maintainer
+      can override single-cycle without code change. Confirm no in-flight cycle
+      breaks: a cycle started before merge that hasn't entered step-03c yet uses
+      the new default; one already past step-03c is unaffected.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit + push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    - markdown
+    - yaml
+    - node
+  key_files:
+    - path: hive/workflows/steps/meta-team-cycle/step-03c-metric-declaration.md
+      purpose: Gate logic being flipped
+    - path: hive/workflows/steps/meta-team-cycle/step-04-implementation.md
+      purpose: Downstream consumer of enriched_proposals; verify shape preserved
+    - path: hive/workflows/steps/meta-team-cycle/step-07-promotion.md
+      purpose: PR body composition site; add rejection section
+
+files_to_modify:
+  - file: hive/workflows/steps/meta-team-cycle/step-03c-metric-declaration.md
+    change: Flip gate default + add config-knob read + cross-reference /plan §14a
+  - file: hive/workflows/steps/meta-team-cycle/step-07-promotion.md
+    change: Add "Rejected by metric gate" section to PR body
+  - file: hive/hive.config.yaml
+    change: Add commented example `meta_optimize.metric_gate:` block
+  - file: hive.config.yaml
+    change: Add active `meta_optimize.metric_gate: blocking` (explicit; matches new default)
+  - file: hive/workflows/steps/meta-team-cycle/__tests__/metric-gate.test.mjs
+    change: New test file
+
+code_examples:
+  - title: Pattern — config knob block
+    file: hive.config.yaml
+    snippet: |
+      meta_optimize:
+        metric_gate: blocking   # blocking | advisory (default blocking after mir-9 lands)
+
+design_decisions:
+  - decision: blocking is the new default, advisory is opt-in (P1 deliberate authority shift)
+    rationale: Default flips to convergence; user/orchestrator escape hatch preserves the latitude posture per locked Q3 + grill P1 resolution
+  - decision: Per-proposal scope, not cycle-fail-fast
+    rationale: Locked Q3. Productive cycles continue even when some proposals miss the metric bar.
+
+cross_cutting:
+  - concern: documentation
+    action: Update step-03c.md + hive/GUIDE.md
+  - concern: versioning
+    action: Minor bump on plugin.json + CHANGELOG entry for behavior change
+
+risks:
+  - severity: high
+    description: First cycle after flip may produce zero proposals (all rejected) → discard cycle
+    mitigation: Advisory mode is one-line config flip if needed; reviewer monitors first 2 nightlies after merge
+  - severity: medium
+    description: PR-body section addition may collide with existing section ordering
+    mitigation: Reviewer compares before/after PR-body in test fixture
+  - severity: low
+    description: Cross-reference to /plan §14a goes stale if /plan evolves
+    mitigation: One-line note + path link; revisit in follow-on epic that mirrors gate to /plan
+
+references:
+  - path: hive/workflows/steps/meta-team-cycle/step-03c-metric-declaration.md
+    relevant_excerpt: |
+      ## TASK SEQUENCE
+      2a. Surface the planning_prompt (applies:true branch) — gate rules verbatim
+      from /plan SKILL.md step 14/14a. NON-BLOCKING: failures reported but
+      proposal proceeds.
+  - path: .pHive/epics/meta-improvement-reset/docs/design-discussion.md
+    relevant_excerpt: |
+      §3.3 Flip step-03c gate to blocking with config-knob escape hatch.
+      P1: deliberate authority shift; escape hatch preserves orchestrator/user latitude.
+      Per-proposal scope per locked Q3.
+
+metric:
+  applies: true
+  name: step_03c.proposals_rejected_per_cycle
+  direction: up
+  unit: count
+  baseline: 0 (current non-blocking)
+  target: 0-2 per cycle steady state (thin metric work surfaced; not 0 = silent acceptance)
+  window: next 5 meta-meta nightly cycles after merge
+  source:
+    kind: manual
+    ref: "PR body 'Rejected by metric gate' section count per cycle"
+  verify_at: 2026-06-30T00:00:00Z
+  owner: reviewer

@@ -1,0 +1,122 @@
+id: mir-1-retarget-meta-prs-to-develop
+epic: meta-improvement-reset
+title: Retarget meta-meta-nightly PRs from main to develop
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  Meta-meta-optimize nightly PRs currently target `main` (verified via PR #217:
+  baseRefName=main). Per `feedback_seek_direct_push_auth` (2026-05-21): develop
+  is staging-trunk, only main is gated. Meta PRs should target develop, get
+  exercised in staging, then ride a develop→main release PR like any feature.
+
+  Root cause: `.github/workflows/hive-dispatch.yml:155` (or sibling nightly
+  workflow) passes `--base "${{ github.event.repository.default_branch }}"` —
+  repo default_branch = main, so meta-meta nightly PRs target main.
+
+  Story locates the PR-create site, overrides --base to explicit `develop`,
+  verifies the next nightly PR.
+
+acceptance_criteria:
+  - "PR-create site for meta-meta-nightly is located and documented"
+  - "PR-create call uses explicit --base develop (NOT default_branch lookup)"
+  - "Synthetic test PR (or first natural nightly) opens with baseRefName=develop"
+  - "Existing PRs (#216/#217 already merged to main) NOT retargeted — change is forward-only"
+
+steps:
+  - id: research
+    description: |
+      Find the gh pr create site for meta-meta-nightly. Candidates:
+      `.github/workflows/hive-dispatch.yml:155` (uses default_branch), or a
+      sibling workflow (e.g. `meta-meta-nightly.yml`), or step-07-promotion.md.
+      Confirm by inspecting recent PR #217 / #216 workflow run logs.
+    agent: researcher
+  - id: implement
+    description: |
+      Override the --base argument in the located PR-create call to literal
+      `develop`. Do NOT update repo default_branch (other workflows depend on it).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Trigger workflow_dispatch (if available) or wait for next nightly.
+      Verify `gh pr view <N> --json baseRefName` returns `develop`.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify change is forward-only; no other workflows accidentally retargeted
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feat/meta-improvement-reset
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    - github-actions
+    - bash
+  key_files:
+    - path: .github/workflows/hive-dispatch.yml
+      purpose: Likely site of PR-create call using default_branch (line 155 per grep)
+    - path: hive/workflows/steps/meta-team-cycle/step-07-promotion.md
+      purpose: Alternative site if PR-create lives inside the SKILL flow
+
+files_to_modify:
+  - file: .github/workflows/hive-dispatch.yml
+    change: Replace `--base "${{ github.event.repository.default_branch }}"` with `--base develop` on the meta-meta-nightly PR-create call ONLY (other PR creates in same file unaffected)
+
+code_examples:
+  - title: Pattern — explicit base branch in gh pr create
+    file: .github/workflows/hive-dispatch.yml
+    snippet: |
+      # Current (line 155):
+      gh pr create \
+        --base "${{ github.event.repository.default_branch }}" \
+        --head "${BRANCH}" \
+        ...
+
+      # Change to:
+      gh pr create \
+        --base develop \
+        --head "${BRANCH}" \
+        ...
+
+design_decisions:
+  - decision: Use explicit `develop` literal, not a default_branch override
+    rationale: "Other workflows in hive-dispatch.yml may legitimately target the default_branch. Explicit literal scopes the change."
+
+cross_cutting:
+  - concern: documentation
+    action: Update `hive/references/meta-optimize-maintainer.md` to note PRs land on develop, not main
+
+risks:
+  - severity: low
+    description: Other PR-create calls in same workflow file may be affected by sloppy edit
+    mitigation: Edit precisely; review diff before merge
+
+references:
+  - path: .pHive/epics/meta-improvement-reset/docs/design-discussion.md
+    relevant_excerpt: |
+      §3.6 Retarget meta-meta nightly PRs from main to develop. Per
+      feedback_seek_direct_push_auth: develop = staging-trunk; only main is gated.
+  - path: .pHive/epics/meta-improvement-reset/docs/vertical-plan.md
+    relevant_excerpt: |
+      Slice 1: smallest+independent; unblocks every subsequent PR flow review.
+
+metric:
+  applies: true
+  name: meta_pr.base_ref_correct_rate
+  direction: up
+  unit: ratio
+  baseline: 0/3
+  target: 3/3
+  window: next 3 nightlies after merge
+  source:
+    kind: manual
+    ref: "gh pr view <PR> --json baseRefName for next 3 meta-meta nightly PRs"
+  verify_at: integrate
+  owner: reviewer
