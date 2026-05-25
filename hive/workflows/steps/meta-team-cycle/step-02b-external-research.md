@@ -69,6 +69,56 @@ Export: `fetchClaudeCodeReleases(opts?)` — accepts optional `{ fetchFn, apiUrl
 - Network unreachable: same — empty list + error note.
 - Malformed/non-array response: empty list + error note.
 
+#### `anthropic_blog` — Anthropic News Blog
+
+Fetches the Anthropic news RSS feed and filters for posts about model releases, capability announcements, and agent SDK changes.
+
+**Feed endpoint:**
+```
+GET https://www.anthropic.com/rss.xml
+Accept: application/rss+xml, application/xml, text/xml
+```
+
+> **Endpoint note:** Verify the feed URL is still live at story time. If `rss.xml` returns 404, try `feed.xml` or `news/rss.xml`. The subprovider's `feedUrl` option accepts an override for both tests and fallback.
+
+**Fetch shape:** RSS 2.0 XML. Each `<item>` must provide:
+- `<title>` — post headline
+- `<link>` — canonical post URL
+- `<pubDate>` — RFC 2822 publication timestamp
+- `<description>` — post summary or excerpt (may be CDATA-wrapped)
+
+**Content filter rule (MANDATORY):**
+
+> Keep posts whose title + description contain at least one signal from the
+> **keep list** AND do NOT contain any term from the **skip list**.
+>
+> **Keep signals** (model / capability / SDK): `model`, `claude`, `api`, `sdk`,
+> `agent`, `capability`, `introducing`, `computer use`, `tool`, `vision`,
+> `context window`, `token`, `feature`, `benchmark`, `release`.
+>
+> **Skip signals** (company / business / policy): `policy`, `legislation`,
+> `government`, `regulation`, `funding`, `investment`, `valuation`, `series`,
+> `partnership`, `acquisition`, `hiring`, `culture`, `diversity`, `leadership`,
+> `company news`.
+>
+> Skip signals take precedence — a post matching both lists is excluded.
+
+**Tag rule:**
+Candidates emitted by this subprovider are tagged:
+```yaml
+discovery_source: external_research
+signal_subtype: anthropic_blog
+```
+
+**Implementation module:** `hive/workflows/steps/meta-team-cycle/external-research-providers.mjs`
+Export: `fetchAnthropicBlog(opts?)` — accepts optional `{ fetchFn, feedUrl }` for test injection. Returns `{ candidates, error }`. On any failure: `candidates: []`, `error: <string>` — never throws.
+
+**Failure handling:**
+- HTTP 4xx/5xx: return `candidates: []`, log the error; do NOT fail the step.
+- Network unreachable: same — empty list + error note.
+- Malformed/unparseable RSS: empty list + error note.
+- Empty feed (zero `<item>` elements): return `candidates: []`, `error: null`.
+
 Use them to identify relevant ideas, patterns, safeguards, or implementation approaches that could improve Hive within charter scope.
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
