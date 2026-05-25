@@ -137,11 +137,18 @@ export function __resetCache() {
   AGENT_CACHE.clear();
 }
 
-export function serializeStoryBrief(story) {
+export function serializeStoryBrief(story, options = {}) {
+  const { codexInstruction = false } = options;
   const sections = [];
 
   if (story?.description) {
     sections.push(`## Goal\n${cleanText(story.description)}`);
+  }
+
+  if (codexInstruction) {
+    sections.push(
+      `## Use /codex:rescue\nThis story is routed through the Codex backend. For implementation work, invoke the /codex:rescue skill with the story spec from this brief rather than writing code directly. Return changes for the orchestrator to commit.`,
+    );
   }
 
   if (hasItems(story?.acceptance_criteria)) {

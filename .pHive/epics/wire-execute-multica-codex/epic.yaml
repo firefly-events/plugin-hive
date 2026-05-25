@@ -1,0 +1,43 @@
+name: wire-execute-multica-codex
+title: Wire /execute through Multica + Phase 1 Codex routing
+description: |
+  Close the gap that let meta-improvement-reset (2026-05-25) ship 10 commits
+  without invoking the /execute machinery. Five stories: add multica routing
+  case to /execute (BLOCKER), refit execute-mode-multica skill to serial
+  dispatch + episode-sync helpers, inject /codex:rescue instruction into
+  brief when agent_backends[role]=codex, wire scope_drift emit per story
+  close, and smoke-test the end-to-end pipeline.
+
+  Phase 1 routing: Multica's existing Claude-runtime developer agent runs
+  the work, brief instructs the inner Claude Code session to use
+  /codex:rescue for implementation. Phase 2 (native Codex-runtime agents
+  in Multica) is deferred to a follow-on epic.
+
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  - id: wmc-1-execute-multica-routing
+    title: Add multica routing case to /execute SKILL.md step 5/6 (BLOCKER)
+    complexity: low
+    depends_on: []
+  - id: wmc-2-multica-skill-rewire
+    title: Refit execute-mode-multica skill to dispatch serially + call episode-sync helpers
+    complexity: medium
+    depends_on: [wmc-1-execute-multica-routing]
+  - id: wmc-3-brief-codex-injection
+    title: Inject /codex:rescue instruction into brief when agent_backends[role]=codex
+    complexity: medium
+    depends_on: [wmc-2-multica-skill-rewire]
+  - id: wmc-4-scope-drift-emit
+    title: Emit scope_drift_score at story close in execute-mode-multica
+    complexity: low
+    depends_on: [wmc-2-multica-skill-rewire]
+  - id: wmc-5-smoke-test-end-to-end
+    title: Smoke-test 2-story dummy epic through real /execute → multica → /codex:rescue
+    complexity: medium
+    depends_on: [wmc-3-brief-codex-injection, wmc-4-scope-drift-emit]

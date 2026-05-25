@@ -1,0 +1,173 @@
+id: wmc-4-scope-drift-emit
+epic: wire-execute-multica-codex
+title: Emit scope_drift_score at story close in execute-mode-multica
+status: pending
+complexity: low
+methodology: classic
+depends_on: [wmc-2-multica-skill-rewire]
+tracker_id: plugin-hive/PLU-76
+tracker_url: http://localhost:3000/plugin-hive/issues/76
+
+description: |
+  /execute SKILL.md "Scope-drift emit (per-story boundary)" section prescribes
+  one scope_drift_score event per story close, phase_label='execute:story',
+  via hive.lib.scope_drift.emit_scope_drift. The current execute-mode-multica
+  skill text does not call this helper — the meta-improvement-reset epic
+  shipped 10 stories with zero scope_drift events. After wmc-2 wires
+  writeMulticaRunEpisode at Step 3, add the scope_drift emit immediately
+  after the episode marker write.
+
+  Inputs:
+  - run_id: the /execute run identifier (from the dispatch context)
+  - phase_label: 'execute:story' (per /execute prescription)
+  - expected_scope: derived from the story's acceptance_criteria
+  - delivered_scope: derived from the episode marker's notes field
+                     (developer's "what I did" summary)
+  - delta_reasons: enum values from cycle-state-schema.md when expected !=
+                   delivered; empty list otherwise
+  - story_id: the story's canonical ID
+  - skill: 'execute'
+
+  The helper applies a maturity gate (per ed-1) that skips emit on
+  greenfield/early projects and logs once per run. Fire-and-forget — do
+  not branch on the helper's exit code.
+
+acceptance_criteria:
+  - "execute-mode-multica SKILL.md Step 3 adds a scope_drift emit call after writeMulticaRunEpisode"
+  - "Emit uses phase_label='execute:story' and skill='execute'"
+  - "expected_scope sources from story.acceptance_criteria"
+  - "delivered_scope sources from episode marker notes field (developer's done-summary)"
+  - "delta_reasons is empty list when scopes match; otherwise carries enum values per cycle-state-schema.md"
+  - "Emit is fire-and-forget per the /execute prescription"
+
+steps:
+  - id: research
+    description: |
+      Read /execute SKILL.md "Scope-drift emit (per-story boundary)" section
+      verbatim — confirm phase_label, skill, and other arg shapes. Read
+      hive/lib/scope_drift.py emit_scope_drift signature. Read
+      cycle-state-schema.md "Phase records" section for the delta_reasons enum.
+    agent: researcher
+  - id: implement
+    description: |
+      Edit execute-mode-multica SKILL.md Step 3. After the writeMulticaRunEpisode
+      call (added by wmc-2), add a code block invoking
+      emit_scope_drift(run_id=..., phase_label='execute:story',
+      expected_scope=story.acceptance_criteria,
+      delivered_scope=parse_delivered_from(episode.notes),
+      delta_reasons=[], story_id=story.id, skill='execute').
+      Note the maturity gate behavior in skill text comment.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Manual verification: grep for 'emit_scope_drift' in execute-mode-multica
+      SKILL.md — should appear exactly once in Step 3. wmc-5 smoke test
+      provides end-to-end coverage (verify 2 events fire for the 2-story
+      dummy epic).
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Review the emit-call shape against /execute SKILL.md prescription
+      verbatim. Confirm fire-and-forget posture (no error handling
+      added). Confirm delta_reasons enum values are from
+      cycle-state-schema.md, not invented.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: |
+      Commit on feat/wire-execute-multica-codex with subject
+      'feat(execute-mode-multica): emit scope_drift_score at story close'.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/execute-mode-multica/SKILL.md
+      purpose: Edit site — add emit call to Step 3.
+    - path: hive/lib/scope_drift.py
+      purpose: emit_scope_drift function definition.
+    - path: skills/hive/skills/execute/SKILL.md
+      purpose: "Scope-drift emit (per-story boundary)" section is the prescription this story implements.
+    - path: hive/references/cycle-state-schema.md
+      purpose: delta_reasons enum definition.
+
+files_to_modify:
+  - file: skills/hive/skills/execute-mode-multica/SKILL.md
+    change: append scope_drift emit block to Step 3 after writeMulticaRunEpisode call
+
+code_examples:
+  - title: /execute prescription for scope_drift emit
+    file: skills/hive/skills/execute/SKILL.md
+    snippet: |
+      Emit a single `scope_drift_score` event when a story completes (after
+      the final workflow phase writes its episode marker, before /execute
+      moves to the next story).
+      python3 -c "
+      from hive.lib.scope_drift import emit_scope_drift
+      emit_scope_drift(
+          run_id='{run-id}',
+          phase_label='execute:story',
+          expected_scope={list from acceptance criteria + planned files},
+          delivered_scope={list of items actually delivered when the story closed},
+          delta_reasons={enum values from cycle-state-schema.md when they differ},
+          story_id='{story-id}',
+          skill='execute',
+      )
+      "
+
+design_decisions:
+  - decision: Source expected_scope from acceptance_criteria, delivered_scope from episode notes
+    rationale: |
+      Phase 1 collapses per-phase records into a single dispatch — there's no
+      research/test/review phase_record to aggregate. The simplest signal is
+      "what was the contract" (acceptance_criteria) vs "what was claimed
+      done" (episode notes). Refinement (structured delivered_scope from
+      brief response) is a follow-on if signal quality is too low.
+  - decision: Fire-and-forget, no exception handling
+    rationale: |
+      Per /execute prescription verbatim. Adding error handling would
+      contradict the section's explicit "no new error handling — treat the
+      call as fire-and-forget" guidance.
+
+cross_cutting:
+  - concern: documentation
+    action: |
+      No separate doc — the scope_drift behavior is documented in
+      /execute SKILL.md already; this story just wires the missing call site.
+
+risks:
+  - severity: low
+    description: Initial delivered_scope parsing may produce low-quality signal
+    mitigation: Acceptable for Phase 1 — meta-team can refine the source in a follow-on
+  - severity: low
+    description: scope_drift helper may not be importable in the inner Python context where /execute runs
+    mitigation: scope_drift.py is a top-level hive lib module, already used by /plan; same import pattern
+
+references:
+  - path: hive/lib/scope_drift.py
+    relevant_excerpt: |
+      def emit_scope_drift(run_id, phase_label, expected_scope, delivered_scope,
+                            delta_reasons, story_id=None, proposal_id=None, skill=None) -> None
+      # Maturity gate applies per ed-1; greenfield projects skipped silently.
+      # Buckets to {none, minor, major, divergent} based on Jaccard-style overlap.
+  - path: hive/references/cycle-state-schema.md
+    relevant_excerpt: |
+      delta_reasons enum: acceptance-criteria-changed, files-touched-changed,
+      dependencies-discovered, scope-narrowed, scope-expanded, etc.
+
+metric:
+  applies: true
+  name: scope_drift.events_per_story
+  direction: up
+  baseline: 0
+  target: 1
+  window: story-integrate
+  unit: count
+  source:
+    kind: events
+    ref: ".pHive/metrics/events/scope-drift-*.jsonl filtered by phase_label=execute:story"
+  verify_at: integrate
+  owner: reviewer

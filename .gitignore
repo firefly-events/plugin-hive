@@ -67,6 +67,14 @@ state/
 !.pHive/epics/hermes-integration-mvp/**
 !.pHive/episodes/hermes-integration-mvp/
 !.pHive/episodes/hermes-integration-mvp/**
+!.pHive/epics/wire-execute-multica-codex/
+!.pHive/epics/wire-execute-multica-codex/**
+!.pHive/episodes/wire-execute-multica-codex/
+!.pHive/episodes/wire-execute-multica-codex/**
+!.pHive/epics/smoke-test-execute-multica-codex/
+!.pHive/epics/smoke-test-execute-multica-codex/**
+!.pHive/episodes/smoke-test-execute-multica-codex/
+!.pHive/episodes/smoke-test-execute-multica-codex/**
 # Test scenarios (.pHive/test-scenarios/) — referenced by autonomous-cycle-loop
 # config + simulated-manual cross-cutting concern. Per-story scenarios shipped
 # alongside the stories that need them.
@@ -85,6 +93,7 @@ state/
 !.pHive/cycle-state/skill-ergo-may2026.yaml
 !.pHive/cycle-state/multica-integration-fixes.yaml
 !.pHive/cycle-state/hermes-integration-mvp.yaml
+!.pHive/cycle-state/wire-execute-multica-codex.yaml
 # /find-skills (se-5) writes ranked candidates here; track the dir marker so
 # consumer projects ship with an initialized output location.
 !.pHive/meta/
@@ -125,6 +134,8 @@ state/
 # cross-run aggregation (hive/scripts/gate-mode-audit.mjs) sees a stable corpus.
 !.pHive/audits/post-run/
 !.pHive/audits/post-run/**
+!.pHive/audits/smoke-test/
+!.pHive/audits/smoke-test/**
 # Consumer-side executor flag (hde-9a Q4 lock). Tracked because the maintainer
 # repo doubles as the canonical consumer for plugin-hive itself; consumers of
 # the plugin choose whether to commit their own .pHive/hive.config.yaml.
