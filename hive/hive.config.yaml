@@ -256,6 +256,18 @@ meta_team:
 # before backlog because it is still automatic signal, not human-curated input.
 # When either source is disabled or unavailable, routing falls through without
 # error and remaining sources continue normally.
+#
+# signal_weights: per-source multiplier applied to the base priority score in
+# step-03 ranking. Weighted score = weight × Impact × (6 − Risk) / Effort.
+# Default 1.0 for every source preserves existing ranking order byte-for-byte.
+# Override in your root hive.config.yaml (see design §3.2 for guidance).
+#
+# signal_weights:
+#   metrics: 1.0           # internal_audit (step-02 findings)
+#   external_research: 1.0
+#   kg_signal: 1.0
+#   dreaming_replay: 1.0
+#   backlog: 1.0
 meta_optimize:
   kg_signal:
     enabled: true              # set false to disable kg_signal source
