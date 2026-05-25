@@ -7,6 +7,10 @@ import {
   GH_RELEASES_URL,
   isHiveActionable,
   releaseToCandidate,
+  fetchAnthropicBlog,
+  isBlogPostRelevant,
+  blogItemToCandidate,
+  ANTHROPIC_BLOG_FEED_URL,
 } from '../external-research-providers.mjs';
 
 // ---------------------------------------------------------------------------
@@ -231,4 +235,216 @@ test('fetchClaudeCodeReleases — does not throw on any failure', async () => {
 test('GH_RELEASES_URL points to anthropics/claude-code releases', () => {
   assert.ok(GH_RELEASES_URL.includes('anthropics/claude-code'));
   assert.ok(GH_RELEASES_URL.includes('releases'));
+});
+
+// ---------------------------------------------------------------------------
+// Anthropic blog fixtures
+// ---------------------------------------------------------------------------
+
+const MODEL_POST = {
+  title: 'Introducing Claude 3.5 Sonnet',
+  link: 'https://www.anthropic.com/news/claude-3-5-sonnet',
+  pubDate: 'Wed, 20 Jun 2025 12:00:00 +0000',
+  description: 'Today we are releasing Claude 3.5 Sonnet, our most capable model yet with vision and tool use.',
+};
+
+const SDK_POST = {
+  title: 'New agent SDK capabilities in the Anthropic API',
+  link: 'https://www.anthropic.com/news/agent-sdk-update',
+  pubDate: 'Mon, 10 Mar 2025 09:00:00 +0000',
+  description: 'The Anthropic API now supports agent tool calls and multi-turn workflows natively.',
+};
+
+const POLICY_POST = {
+  title: 'Our approach to AI policy and government regulation',
+  link: 'https://www.anthropic.com/news/ai-policy',
+  pubDate: 'Fri, 05 Apr 2025 08:00:00 +0000',
+  description: 'Anthropic shares its perspective on legislation and government policy for AI.',
+};
+
+const FUNDING_POST = {
+  title: 'Anthropic raises $2B in Series D funding',
+  link: 'https://www.anthropic.com/news/series-d',
+  pubDate: 'Tue, 01 Jan 2025 10:00:00 +0000',
+  description: 'We are excited to announce our latest investment round and partnership.',
+};
+
+function makeRssFeed(items) {
+  const itemsXml = items.map((it) => `
+    <item>
+      <title><![CDATA[${it.title}]]></title>
+      <link>${it.link}</link>
+      <pubDate>${it.pubDate}</pubDate>
+      <description><![CDATA[${it.description}]]></description>
+    </item>`).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Anthropic News</title>${itemsXml}</channel></rss>`;
+}
+
+// ---------------------------------------------------------------------------
+// isBlogPostRelevant
+// ---------------------------------------------------------------------------
+
+test('isBlogPostRelevant — returns true for model release post', () => {
+  assert.equal(isBlogPostRelevant(MODEL_POST), true);
+});
+
+test('isBlogPostRelevant — returns true for agent SDK post', () => {
+  assert.equal(isBlogPostRelevant(SDK_POST), true);
+});
+
+test('isBlogPostRelevant — returns false for policy post', () => {
+  assert.equal(isBlogPostRelevant(POLICY_POST), false);
+});
+
+test('isBlogPostRelevant — returns false for funding/investment post', () => {
+  assert.equal(isBlogPostRelevant(FUNDING_POST), false);
+});
+
+test('isBlogPostRelevant — skip signals take precedence over keep signals', () => {
+  // Has "model" (keep) but also "policy" (skip) — must be excluded
+  const mixed = {
+    title: 'Anthropic model policy update',
+    description: 'New policy governing model access.',
+    link: '',
+    pubDate: '',
+  };
+  assert.equal(isBlogPostRelevant(mixed), false);
+});
+
+test('isBlogPostRelevant — returns false for empty post', () => {
+  assert.equal(isBlogPostRelevant({ title: '', description: '', link: '', pubDate: '' }), false);
+});
+
+// ---------------------------------------------------------------------------
+// blogItemToCandidate shape
+// ---------------------------------------------------------------------------
+
+test('blogItemToCandidate — emits correct discovery_source and signal_subtype', () => {
+  const candidate = blogItemToCandidate(MODEL_POST, 0);
+  assert.equal(candidate.discovery_source, 'external_research');
+  assert.equal(candidate.signal_subtype, 'anthropic_blog');
+});
+
+test('blogItemToCandidate — id uses external-proposal-anthropic-blog namespace', () => {
+  const candidate = blogItemToCandidate(MODEL_POST, 0);
+  assert.match(candidate.id, /^external-proposal-anthropic-blog-/);
+});
+
+test('blogItemToCandidate — includes source_url and published_at', () => {
+  const candidate = blogItemToCandidate(MODEL_POST, 0);
+  assert.equal(candidate.source_url, MODEL_POST.link);
+  assert.equal(candidate.published_at, MODEL_POST.pubDate);
+});
+
+test('blogItemToCandidate — raw_body_excerpt truncated to 500 chars', () => {
+  const longPost = { ...MODEL_POST, description: 'x'.repeat(1000) };
+  const candidate = blogItemToCandidate(longPost, 0);
+  assert.ok(candidate.raw_body_excerpt.length <= 500);
+});
+
+test('blogItemToCandidate — charter_objective is tooling', () => {
+  const candidate = blogItemToCandidate(MODEL_POST, 0);
+  assert.equal(candidate.charter_objective, 'tooling');
+});
+
+// ---------------------------------------------------------------------------
+// fetchAnthropicBlog — happy path
+// ---------------------------------------------------------------------------
+
+test('fetchAnthropicBlog — returns only relevant candidates', async () => {
+  const xml = makeRssFeed([MODEL_POST, POLICY_POST, SDK_POST, FUNDING_POST]);
+  const fetchFn = () => Promise.resolve({
+    ok: true,
+    text: () => Promise.resolve(xml),
+  });
+  const result = await fetchAnthropicBlog({ fetchFn, feedUrl: 'http://unused' });
+  assert.equal(result.error, null);
+  assert.equal(result.candidates.length, 2);
+  const titles = result.candidates.map((c) => c.title);
+  assert.ok(titles.includes(MODEL_POST.title));
+  assert.ok(titles.includes(SDK_POST.title));
+  assert.ok(!titles.includes(POLICY_POST.title));
+  assert.ok(!titles.includes(FUNDING_POST.title));
+});
+
+test('fetchAnthropicBlog — all candidates have correct shape', async () => {
+  const xml = makeRssFeed([MODEL_POST]);
+  const fetchFn = () => Promise.resolve({
+    ok: true,
+    text: () => Promise.resolve(xml),
+  });
+  const result = await fetchAnthropicBlog({ fetchFn, feedUrl: 'http://unused' });
+  assert.equal(result.candidates.length, 1);
+  const c = result.candidates[0];
+  assert.equal(c.discovery_source, 'external_research');
+  assert.equal(c.signal_subtype, 'anthropic_blog');
+  assert.match(c.id, /^external-proposal-anthropic-blog-/);
+  assert.ok(typeof c.source_url === 'string');
+  assert.ok(typeof c.rationale === 'string');
+});
+
+test('fetchAnthropicBlog — empty list when no posts are relevant', async () => {
+  const xml = makeRssFeed([POLICY_POST, FUNDING_POST]);
+  const fetchFn = () => Promise.resolve({
+    ok: true,
+    text: () => Promise.resolve(xml),
+  });
+  const result = await fetchAnthropicBlog({ fetchFn, feedUrl: 'http://unused' });
+  assert.equal(result.error, null);
+  assert.deepEqual(result.candidates, []);
+});
+
+// ---------------------------------------------------------------------------
+// fetchAnthropicBlog — failure modes → empty list, not error throw
+// ---------------------------------------------------------------------------
+
+test('fetchAnthropicBlog — HTTP 403 returns empty candidates with error string', async () => {
+  const { baseUrl, close } = await startMockServer((_req, res) => {
+    sendJson(res, 403, { message: 'forbidden' });
+  });
+  try {
+    const result = await fetchAnthropicBlog({ feedUrl: baseUrl });
+    assert.deepEqual(result.candidates, []);
+    assert.ok(typeof result.error === 'string');
+    assert.ok(result.error.includes('403'));
+  } finally {
+    await close();
+  }
+});
+
+test('fetchAnthropicBlog — network error returns empty candidates with error string', async () => {
+  const fetchFn = () => Promise.reject(new Error('ECONNREFUSED'));
+  const result = await fetchAnthropicBlog({ fetchFn, feedUrl: 'http://0.0.0.0:1' });
+  assert.deepEqual(result.candidates, []);
+  assert.ok(typeof result.error === 'string');
+  assert.ok(result.error.length > 0);
+});
+
+test('fetchAnthropicBlog — does not throw on any failure', async () => {
+  const fetchFn = () => { throw new Error('sync throw'); };
+  const result = await fetchAnthropicBlog({ fetchFn, feedUrl: 'http://unused' });
+  assert.deepEqual(result.candidates, []);
+  assert.ok(typeof result.error === 'string');
+});
+
+test('fetchAnthropicBlog — HTTP 500 returns empty candidates with error string', async () => {
+  const { baseUrl, close } = await startMockServer((_req, res) => {
+    sendJson(res, 500, { message: 'server error' });
+  });
+  try {
+    const result = await fetchAnthropicBlog({ feedUrl: baseUrl });
+    assert.deepEqual(result.candidates, []);
+    assert.ok(typeof result.error === 'string');
+    assert.ok(result.error.includes('500'));
+  } finally {
+    await close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// ANTHROPIC_BLOG_FEED_URL constant
+// ---------------------------------------------------------------------------
+
+test('ANTHROPIC_BLOG_FEED_URL points to anthropic.com', () => {
+  assert.ok(ANTHROPIC_BLOG_FEED_URL.includes('anthropic.com'));
 });

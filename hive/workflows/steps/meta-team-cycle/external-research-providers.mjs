@@ -153,5 +153,183 @@ export async function fetchClaudeCodeReleases(opts = {}) {
   return { candidates, error: null };
 }
 
+// ---------------------------------------------------------------------------
+// Anthropic blog subprovider
+// ---------------------------------------------------------------------------
+
+// RSS feed for https://www.anthropic.com/news
+const ANTHROPIC_BLOG_FEED_URL = 'https://www.anthropic.com/rss.xml';
+
+// Keywords that indicate a post is about a model release, capability, or SDK.
+const BLOG_KEEP_KEYWORDS = [
+  'model',
+  'claude',
+  'api',
+  'sdk',
+  'agent',
+  'capability',
+  'introducing',
+  'computer use',
+  'tool',
+  'vision',
+  'context window',
+  'token',
+  'feature',
+  'benchmark',
+  'release',
+];
+
+// Keywords that indicate a post is primarily company/business/policy — skip.
+const BLOG_SKIP_KEYWORDS = [
+  'policy',
+  'legislation',
+  'government',
+  'regulation',
+  'funding',
+  'investment',
+  'valuation',
+  'series',
+  'partnership',
+  'acquisition',
+  'hiring',
+  'culture',
+  'diversity',
+  'leadership',
+  'company news',
+];
+
+function extractXmlTag(xml, tag) {
+  const re = new RegExp(
+    `<${tag}[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/${tag}>`,
+    'i',
+  );
+  const m = xml.match(re);
+  return m ? m[1].trim() : '';
+}
+
+function parseRssItems(xml) {
+  const items = [];
+  const itemRe = /<item[^>]*>([\s\S]*?)<\/item>/g;
+  let m;
+  while ((m = itemRe.exec(xml)) !== null) {
+    const chunk = m[1];
+    const link = extractXmlTag(chunk, 'link') ||
+      (chunk.match(/<link\s*\/?>(.*?)<\/link>/i)?.[1] ?? '');
+    items.push({
+      title: extractXmlTag(chunk, 'title'),
+      link: link.trim(),
+      pubDate: extractXmlTag(chunk, 'pubDate'),
+      description: extractXmlTag(chunk, 'description'),
+    });
+  }
+  return items;
+}
+
+/**
+ * Returns true if the post is about a model release, capability announcement,
+ * or agent SDK change. Returns false for company/business/policy posts.
+ */
+function isBlogPostRelevant(item) {
+  const text = `${item.title} ${item.description}`.toLowerCase();
+  if (BLOG_SKIP_KEYWORDS.some((kw) => text.includes(kw))) return false;
+  return BLOG_KEEP_KEYWORDS.some((kw) => text.includes(kw));
+}
+
+/**
+ * Map a parsed RSS item → ExternalCandidate shape expected by step-03.
+ */
+function blogItemToCandidate(item, index) {
+  const slugBase = item.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 60);
+
+  return {
+    id: `external-proposal-anthropic-blog-${slugBase || index}`,
+    title: item.title,
+    discovery_source: 'external_research',
+    signal_subtype: 'anthropic_blog',
+    source_url: item.link,
+    published_at: item.pubDate || null,
+    impact_score: null,
+    risk_score: null,
+    effort_score: null,
+    priority_score: null,
+    charter_objective: 'tooling',
+    rationale: `Anthropic blog post published on ${item.pubDate || 'unknown date'}. Review for Hive-actionable model or capability changes.`,
+    raw_body_excerpt: item.description.slice(0, 500),
+  };
+}
+
+/**
+ * Fetch the Anthropic blog RSS feed and return relevant candidates.
+ *
+ * @param {object}   [opts]
+ * @param {Function} [opts.fetchFn]  - injectable fetch (default: globalThis.fetch)
+ * @param {string}   [opts.feedUrl] - override feed URL (for tests)
+ * @returns {Promise<{ candidates: object[], error: string|null }>}
+ */
+export async function fetchAnthropicBlog(opts = {}) {
+  const fetchFn = opts.fetchFn ?? globalThis.fetch;
+  const feedUrl = opts.feedUrl ?? ANTHROPIC_BLOG_FEED_URL;
+
+  let xml;
+  try {
+    const res = await fetchFn(feedUrl, {
+      headers: {
+        Accept: 'application/rss+xml, application/xml, text/xml',
+        'User-Agent': 'plugin-hive-meta-team/1.0',
+      },
+    });
+
+    if (!res.ok) {
+      return {
+        candidates: [],
+        error: `Anthropic blog feed returned HTTP ${res.status} for ${feedUrl}`,
+      };
+    }
+
+    xml = await res.text();
+  } catch (err) {
+    return {
+      candidates: [],
+      error: `fetch failed: ${err?.message ?? String(err)}`,
+    };
+  }
+
+  let items;
+  try {
+    items = parseRssItems(xml);
+  } catch (err) {
+    return {
+      candidates: [],
+      error: `RSS parse failed: ${err?.message ?? String(err)}`,
+    };
+  }
+
+  if (items.length === 0) {
+    return {
+      candidates: [],
+      error: typeof xml === 'string' && xml.length > 0
+        ? null
+        : 'RSS feed returned no parseable items',
+    };
+  }
+
+  const candidates = items
+    .filter(isBlogPostRelevant)
+    .map((item, i) => blogItemToCandidate(item, i));
+
+  return { candidates, error: null };
+}
+
 // Exported for tests only.
-export { isHiveActionable, releaseToCandidate, GH_RELEASES_URL };
+export {
+  isHiveActionable,
+  releaseToCandidate,
+  GH_RELEASES_URL,
+  isBlogPostRelevant,
+  blogItemToCandidate,
+  ANTHROPIC_BLOG_FEED_URL,
+};
