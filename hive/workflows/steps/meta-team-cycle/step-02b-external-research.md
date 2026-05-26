@@ -191,12 +191,14 @@ in place) is the query permitted to leave the project. Log the sanitized query
 text alongside each candidate produced in step 4 so the evidence trail captures
 what was actually sent outbound.
 
-Use Firecrawl, Context7, arXiv, and the `claude_code_release` subprovider as available to gather:
+Use Firecrawl, Context7, arXiv, and the `claude_code_release` + `anthropic_blog` subproviders as available to gather:
 - Comparable workflow patterns for autonomous review / proposal systems
 - Documentation or reference patterns that improve maintainability, clarity, or schema consistency
 - Research-backed practices for ranking, validation, or bounded agent execution that fit Hive's current model
 - Recent Claude Code capability shifts that Hive workflows, reference docs, or skill files should reflect
   (via `fetchClaudeCodeReleases()` from `external-research-providers.mjs` — apply the actionability filter described in the `claude_code_release` subprovider section above)
+- Anthropic model and capability announcements that should reshape Hive defaults
+  (via `fetchAnthropicBlog()` from `external-research-providers.mjs` — apply the same actionability filter described in the `anthropic_blog` subprovider section above; invoke alongside `fetchClaudeCodeReleases()` so both subproviders are surfaced together)
 
 Do not treat any single provider as authoritative. Cross-check promising ideas before turning them into candidates.
 

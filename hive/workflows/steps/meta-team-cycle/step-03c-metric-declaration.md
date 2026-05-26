@@ -241,7 +241,7 @@ metric_gate_failures: [ ... ]   # advisory mode: failures present but proposals 
 - `.pHive/cross-cutting-concerns.yaml` absent or `id: metrics` entry missing: log warning, emit `enriched_proposals` = `approved_proposals` unchanged, no gate failures. Do NOT block step-04.
 - `approved_proposals` empty: emit `enriched_proposals: []` and `metric_declaration_summary` with all-zero counts. Move to step-04 — implementation will close cycle on its own zero-proposal path.
 - Proposal lacks a `rationale` or `implementation_plan` field (malformed step-03 output): emit `metric: { applies: false, justification: "Malformed proposal record (no rationale or implementation_plan); cannot evaluate applies_when." }` plus a gate-failure entry, and continue. Do NOT block the whole step.
-- Schema validation failure when shaping a `metric:` block (e.g., `direction` value other than `up|down`): record a gate failure for that proposal with `rule: direction-invalid` (or equivalent), retain whatever fields are valid, emit the proposal with the partial block, and continue. The gate is informative; the step is enrichment-only.
+- Schema validation failure when shaping a `metric:` block (e.g., `direction` value other than `up|down`): in `blocking` mode (default), record a gate failure for that proposal with `rule: direction-invalid` (or equivalent), retain whatever fields are valid, emit the partial block into `rejected_proposals` for logging/enrichment, and exclude the proposal from `enriched_proposals`. In `advisory` mode, record the same gate failure but keep the proposal in `enriched_proposals` (legacy behavior).
 
 ## NEXT STEP
 

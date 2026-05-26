@@ -312,8 +312,8 @@ export async function fetchAnthropicBlog(opts = {}) {
     return {
       candidates: [],
       error: typeof xml === 'string' && xml.length > 0
-        ? null
-        : 'RSS feed returned no parseable items',
+        ? 'RSS feed returned no parseable items (malformed or unrecognized format)'
+        : 'RSS feed returned empty response',
     };
   }
 

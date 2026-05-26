@@ -197,7 +197,7 @@ risk_notes: |
   {What could go wrong, what to check before shipping}
 ```
 
-> **Backward compatibility:** Proposals written before this field was added (i.e., proposals without a `discovery_source` entry) default to `internal_audit` for schema-handling purposes. Do NOT reject or fail a proposal for a missing `discovery_source` field — treat it as the default. Valid `discovery_source` values are: `internal_audit`, `external_research`, `kg_signal`.
+> **Backward compatibility:** Proposals written before this field was added (i.e., proposals without a `discovery_source` entry) default to `internal_audit` for schema-handling purposes. Do NOT reject or fail a proposal for a missing `discovery_source` field — treat it as the default. Valid `discovery_source` values are: `internal_audit`, `external_research`, `kg_signal`, `dreaming_replay`, `backlog`.
 
 ### 5. List skipped findings
 Document all findings that were skipped:
@@ -237,7 +237,7 @@ Skipped findings:
 ## SUCCESS METRICS
 
 - [ ] All findings reviewed against charter scope
-- [ ] Proposals ranked by priority score
+- [ ] Proposals ranked by weighted score
 - [ ] Maximum 5 proposals approved (excess moved to skipped with reason: `deferred_to_next_cycle`)
 - [ ] Each proposal has complete implementation plan with specific file paths and actions
 - [ ] `cycle-state.yaml` updated with proposals and skipped findings

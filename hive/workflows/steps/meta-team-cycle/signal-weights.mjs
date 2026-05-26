@@ -59,7 +59,11 @@ export function resolveWeight(discoverySource, configWeights = {}) {
  * @returns {number}
  */
 export function computePriorityScore(impact, risk, effort) {
-  return (impact * (6 - risk)) / effort;
+  if (![impact, risk, effort].every(Number.isFinite) || effort === 0) {
+    return 0;
+  }
+  const score = (impact * (6 - risk)) / effort;
+  return Number.isFinite(score) ? score : 0;
 }
 
 /**

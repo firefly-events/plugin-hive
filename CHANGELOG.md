@@ -31,7 +31,7 @@ entries in a single monthly PR rather than routing them through the nightly cycl
 ### Changed
 
 - **Step-03c metric gate flipped to `blocking` by default (mir-9, 3.3).** Previously non-blocking (advisory). Now: proposals failing metric validation receive `status: rejected_metric_gate` and are excluded from `enriched_proposals` handed to step-04. The cycle continues with passing proposals; cycle-level failure occurs only when zero proposals pass. Rejected proposals surface in the step summary and in the PR body under "Rejected by metric gate". Escape hatch via `meta_optimize.metric_gate: advisory` in `hive.config.yaml` restores the legacy non-blocking behavior.
-- **`hive/workflows/hive-dispatch.yml` meta PR base branch retargeted to `develop` (mir-1, 3.6).** Meta-meta nightly PRs previously targeted `main` via the default-branch lookup; they now explicitly target `develop` to respect the `develop`-as-staging-trunk convention. Merged via develop→main release PRs like every other feature.
+- **`.github/workflows/hive-dispatch.yml` meta PR base branch retargeted to `develop` (mir-1, 3.6).** Meta-meta nightly PRs previously targeted `main` via the default-branch lookup; they now explicitly target `develop` to respect the `develop`-as-staging-trunk convention. Merged via develop→main release PRs like every other feature.
 - **`hive/GUIDE.md`** — new "Configuration Knobs (`meta_optimize:`)" subsection documents `signal_weights` and `metric_gate`, replaces the stale "no public `meta_optimize:` block shipped yet" note.
 - **`hive/references/meta-optimize-maintainer.md`** — adds "Metric Gate" and "Meta-Shotgun Cycle" sections.
 

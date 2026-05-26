@@ -32,7 +32,7 @@ Before starting, verify all of the following:
 - `.pHive/meta-team/queue-meta-meta-optimize.yaml` exists
 - At least one entry has `tier: little-fix` AND `status: pending`
 - The repo has a clean working tree (no unresolved local state before worktree creation)
-- `hive/lib/meta-experiment/` is importable from this repo
+- `hive/lib/meta-team/backlog-mutator.mjs` is importable from this repo
 
 **Zero candidates:** if no `tier: little-fix` + `status: pending` entry exists, exit immediately with:
 

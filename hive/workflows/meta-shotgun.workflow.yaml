@@ -94,7 +94,8 @@ steps:
       1. Stage every file in changes_made.
       2. Commit with message: "meta-shotgun: batch little-fix candidates YYYY-MM".
       3. Push branch and open PR titled "meta-shotgun YYYY-MM" (use current
-         year-month). PR body must have one H2 section per directory in
+         year-month) targeting the `develop` base branch
+         (`gh pr create --base develop ...`). PR body must have one H2 section per directory in
          dirs_touched, each listing the candidate IDs and one-line summaries
          that were applied in that directory. No in-skill grouping — all
          sections in one PR, ordered alphabetically by directory path.

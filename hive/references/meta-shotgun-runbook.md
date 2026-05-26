@@ -14,7 +14,7 @@ candidates). Cadence: monthly, maintainer-triggered. Not registered in
 1. Working tree is clean (`git status` shows no uncommitted changes).
 2. `.pHive/meta-team/queue-meta-meta-optimize.yaml` exists.
 3. At least one entry has `tier: little-fix` AND `status: pending`.
-4. `hive/lib/meta-experiment/` is importable (standard plugin-hive checkout).
+4. `hive/lib/meta-team/backlog-mutator.mjs` is importable (standard plugin-hive checkout).
 
 If prerequisite 3 is not met, the skill exits cleanly with no side effects —
 no worktree, no PR, no error.
@@ -64,7 +64,7 @@ candidates `status: done` in the queue file by hand.
 
 ## Queue Hygiene
 
-- `tier: little-fix` definition: diff < 50 lines, no schema change, no skill behavior change.
+- `tier: little-fix` definition (advisory; maintainer-enforced, not code-enforced): diff < 50 lines, no schema change, no skill behavior change.
 - Set `tier: structural` (the default) for anything that touches file/module structure.
 - Set `tier: strategic` for cross-cutting or multi-epic changes — those require a planning epic before the automated cycle can consume them.
 - The nightly `/meta-meta-optimize` cycle excludes `tier: little-fix` candidates entirely; they accumulate until the next shotgun run.

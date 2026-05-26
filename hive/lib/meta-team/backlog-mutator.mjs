@@ -25,7 +25,7 @@ export function markCandidatesDone(queuePath, candidateIds) {
     if (idMatch) {
       currentId = idMatch[1];
     }
-    const statusMatch = line.match(/^(\s+status:\s+)"pending"(.*)$/);
+    const statusMatch = line.match(/^(\s+status:\s+)"?pending"?(\s*(?:#.*)?)$/);
     if (statusMatch && currentId && idSet.has(currentId)) {
       updated.push(currentId);
       currentId = null;
