@@ -1,39 +1,20 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-05-21 | **Date:** 2026-05-21 | **Verdict:** passed
+**Cycle:** meta-2026-05-24 | **Date:** 2026-05-24 | **Verdict:** discard
 
 ---
 
 ## What Changed
 
-- **`hive/agents/backend-developer.md`** — Removed two duplicate YAML fields
-  (`write: false` and `delete: false`) from the domain block. Due to YAML
-  last-value-wins semantics, these duplicates overrode the intended `write: true`,
-  making the backend-developer agent effectively read-only in any context that
-  consumed the domain block directly. Fix restores the permissive configuration
-  documented by the "Default: permissive" comment and aligns with the canonical
-  form used in `frontend-developer.md`. Two-line deletion; no cross-references
-  broken; revert is a two-line re-insert.
+No changes promoted this cycle. All findings were out-of-scope STUB_DOC entries.
 
 ## What Was Found (Not Fixed This Cycle)
 
-- **`hive/references/ui-prompts/design-system.md`** (STUB_DOC, low) — 19-line
-  prompt template below 30-line threshold. Marked out_of_scope: functional prompt
-  template for W3C Design Token conversion; brevity is intentional.
-- **`hive/references/ui-prompts/design-review-design-critique.md`** (STUB_DOC, low)
-  — 11-line prompt template below 30-line threshold. Marked out_of_scope: functional
-  prompt template for UI design critique; complete task directive in 11 lines.
+- **[STUB_DOC / out_of_scope]** `hive/references/hive-cloud-roadmap.md` (13 lines) — S16 forward-reference placeholder for the deferred Hive Cloud epic. Expanding this stub is premature without the Hive Cloud epic active. 9th consecutive deferral.
+- **[STUB_DOC / out_of_scope]** `hive/references/ui-prompts/design-system.md` (19 lines) — Functional W3C Design Token prompt template; intentionally brief and operationally complete. Not subject to the 30-line stub threshold.
+- **[STUB_DOC / out_of_scope]** `hive/references/ui-prompts/design-review-design-critique.md` (11 lines) — Functional UI design critique prompt template; intentionally brief and operationally complete.
 
 ## Metrics
+- Findings: 3 | Proposals: 0 | Promoted: 0 | Reverted: 0
+- Next cycle priority: activate Hive Cloud epic before hive-cloud-roadmap.md can be expanded; ui-prompts templates are intentionally brief and should be removed from future STUB_DOC checks
 
-- Findings: 3 | Proposals: 1 | Promoted: 1 | Reverted: 0
-- Commit: `278628860f00353af5e773c8817bacf0944ebbaf`
-- Rollback ref: `af0649fa3d8c62157e0148e2fd6673dacb3a6092`
-- Next cycle priority: the two ui-prompts STUB_DOC findings remain eligible if
-  higher-priority structural findings are absent; both are functionally complete.
-
-## Regression Watch
-
-- State: **armed**
-- Window: 2026-05-21T00:30:00Z → 2026-05-21T04:30:00Z
-
-kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.00 miss_reason=empty_kg
+kg-signal: findings=0 proposals=0 hit_rate_5cycle=0 miss_reason=empty_kg

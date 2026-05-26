@@ -36,7 +36,7 @@ Parse `$ARGUMENTS` before loading the workflow:
 5. Parse `--format` flag value. Accepted values: `default`, `slack`. If omitted, treat as `default`. Invalid values are an error.
 6. Set `args.format = <parsed value>`.
 
-Pass `args.interactive` and `args.format` into the workflow loader.
+Pass `args.interactive` and `args.format` into the workflow loader so the `when:` gate on the `interactive-routing` step evaluates correctly.
 
 **`--format slack` short-circuit:** When `args.format == "slack"`, execute Phase 1 only. After the Phase 1 report is emitted:
 - Do NOT present the "Ready for Planning?" prompt.

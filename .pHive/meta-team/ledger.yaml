@@ -1,3 +1,30 @@
+- experiment_id: meta-2026-05-24
+  date: '2026-05-24'
+  started: '2026-05-24T08:07:28Z'
+  closed: '2026-05-24T08:22:00Z'
+  verdict: discard
+  changes_promoted: 0
+  changes_reverted: 0
+  findings_identified: 3
+  top_changes: []
+  commit: 3c6859bb107ae675201737a5d5f030e62e5abc2f
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 0
+    first_attempt_pass: true
+  rollback_ref: 401f121e98f5b155b77bba8cbaaa8ab81da6e547
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-05-24. Analysis found 3 STUB_DOC findings: (1)
+    hive/references/hive-cloud-roadmap.md (13 lines) — S16 forward-reference
+    placeholder for the deferred Hive Cloud epic; marked out_of_scope (9th
+    consecutive deferral). (2) hive/references/ui-prompts/design-system.md
+    (19 lines) — functional prompt template, intentionally brief;
+    out_of_scope. (3) hive/references/ui-prompts/design-review-design-critique.md
+    (11 lines) — functional prompt template, intentionally brief; out_of_scope.
+    Zero proposals generated; zero changes promoted. Cycle closes as discard.
+    Closure validator passed (discard path; rollback_ref and metrics_snapshot
+    present). Regression watch: not_applicable.
 - experiment_id: meta-2026-05-21
   date: '2026-05-21'
   started: '2026-05-21T00:00:00Z'
