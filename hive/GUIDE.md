@@ -217,9 +217,9 @@ Configure in `hive.config.yaml`. Override per-agent with `model_overrides` for c
 ### Planning Agents
 | Agent | Role | Tier |
 |-------|------|------|
-| **Analyst** | Requirements decomposition, gap analysis, prioritization | Opus |
-| **Architect** | System design, technology evaluation, API design | Opus |
-| **TPM** | Cross-system sequencing, horizontal/vertical planning, incremental delivery | Opus |
+| **Analyst** | Requirements decomposition, gap analysis, prioritization | Sonnet |
+| **Architect** | System design, technology evaluation, API design | Sonnet |
+| **TPM** | Cross-system sequencing, horizontal/vertical planning, incremental delivery | Sonnet |
 | **UI Designer** | Wireframes (Frame0), design briefs, marketing materials | Sonnet |
 
 ### Development Agents
