@@ -17,7 +17,7 @@ This step runs after step-03-proposal and before step-04-implementation. It is w
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
 - Read this entire step file before taking any action
-- This step is additive enrichment only — do not drop, re-rank, or rewrite proposals from step-03
+- This step is additive enrichment only — do not drop, re-rank, or rewrite proposals from step-03, EXCEPT when `meta_optimize.metric_gate` is `blocking` (the default), in which case proposals that fail the M-03 / `/plan` step 14a metric gate are marked `status: rejected_metric_gate` and removed from `enriched_proposals` (see rules below). When `metric_gate: advisory`, all proposals pass through unchanged.
 - Surface the `metrics` concern's `planning_prompt` verbatim when evaluating each proposal (do not paraphrase)
 - Every emitted proposal MUST carry exactly one of: full `metric:` block (`applies: true`), `metric: {applies: false, justification: "<one-line reason>"}`, or `un-falsifiable: true` tag (last is reserved — see §5 below)
 - Apply the M-03 / `/plan` step 14a review-gate rules verbatim: reject one-word justifications (`N/A`, `none`, `-`, `pending`, `TBD`, `not applicable`); reject `verify_at` values of `"eventually"`, `"someday"`, or empty

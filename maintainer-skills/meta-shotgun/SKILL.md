@@ -49,7 +49,7 @@ Dispatch to and follow `hive/workflows/meta-shotgun.workflow.yaml` exactly. Do n
 1. **Read queue** — load `.pHive/meta-team/queue-meta-meta-optimize.yaml`, filter `tier: little-fix` AND `status: pending`
 2. **Apply changes** — execute all selected candidates in a single worktree (`git worktree add`); no per-candidate worktrees
 3. **Validate** — run test suite (`node --test`) and linter; abort and discard worktree if validation fails
-4. **Commit** — one commit per file or logical group within the worktree
+4. **Commit** — single batch commit covering all applied candidates (one commit per run, message: `meta-shotgun: batch little-fix candidates YYYY-MM`); matches the `commit-push` step in `hive/workflows/meta-shotgun.workflow.yaml`
 5. **Promote** — open a single PR titled `meta-shotgun YYYY-MM` targeting `develop`; PR body contains one section per directory touched
 6. **Mark done** — update each processed candidate to `status: done` in the queue file
 

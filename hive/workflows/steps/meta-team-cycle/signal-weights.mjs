@@ -40,11 +40,16 @@ export const DISCOVERY_SOURCE_TO_WEIGHT_KEY = {
  */
 export function resolveWeight(discoverySource, configWeights = {}) {
   const key = DISCOVERY_SOURCE_TO_WEIGHT_KEY[discoverySource] ?? discoverySource;
+  const coerce = (v) => {
+    const n = typeof v === 'number' ? v : Number(v);
+    if (!Number.isFinite(n) || n < 0) return 1.0;
+    return Math.min(n, 10.0);
+  };
   if (Object.prototype.hasOwnProperty.call(configWeights, key)) {
-    return configWeights[key];
+    return coerce(configWeights[key]);
   }
   if (Object.prototype.hasOwnProperty.call(DEFAULT_WEIGHTS, key)) {
-    return DEFAULT_WEIGHTS[key];
+    return coerce(DEFAULT_WEIGHTS[key]);
   }
   return 1.0; // unknown source → neutral weight
 }

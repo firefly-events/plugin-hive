@@ -308,13 +308,12 @@ export async function fetchAnthropicBlog(opts = {}) {
     };
   }
 
+  // Per step-02b doc contract: empty feed (zero <item> elements) returns
+  // candidates:[] with error:null. Malformed-RSS detection is not possible
+  // with the current regex-based parser (silently returns []); doc treats
+  // both as "empty feed" by design.
   if (items.length === 0) {
-    return {
-      candidates: [],
-      error: typeof xml === 'string' && xml.length > 0
-        ? 'RSS feed returned no parseable items (malformed or unrecognized format)'
-        : 'RSS feed returned empty response',
-    };
+    return { candidates: [], error: null };
   }
 
   const candidates = items

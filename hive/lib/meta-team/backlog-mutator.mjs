@@ -61,8 +61,9 @@ export function filterShotgunEligible(candidates) {
 export function groupByDir(candidates) {
   const map = new Map();
   for (const c of candidates ?? []) {
-    const dir = c.target.includes('/')
-      ? c.target.split('/').slice(0, -1).join('/')
+    const target = typeof c?.target === 'string' ? c.target : '.';
+    const dir = target.includes('/')
+      ? target.split('/').slice(0, -1).join('/')
       : '.';
     if (!map.has(dir)) map.set(dir, []);
     map.get(dir).push(c);

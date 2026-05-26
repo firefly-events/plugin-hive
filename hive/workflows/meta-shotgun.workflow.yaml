@@ -100,7 +100,7 @@ steps:
          that were applied in that directory. No in-skill grouping — all
          sections in one PR, ordered alphabetically by directory path.
       4. Emit pr_url and pr_title.
-    when: "$validate.output.validation_passed == true"
+    when: "$validate.output.validation_passed == true && $apply.output.changes_made.length > 0"
     depends_on:
       - validate
     inputs:

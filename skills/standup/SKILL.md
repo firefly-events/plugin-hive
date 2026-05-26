@@ -12,7 +12,7 @@ Run the daily ceremony workflow: standup → planning → execution.
 | Flag | Description |
 |------|-------------|
 | `--interactive` | Activates Phase 1.5 (Interactive Routing) between the standup report and planning. Lets the operator redirect or reprioritize before the planning short-list runs. |
-| `--format <default\|slack>` | Controls output format. `default` (or omitted) runs the full interactive ceremony. `slack` emits the Phase 1 standup report only — no Phase 2/3, no interactive prompts, markdown-only output, no ANSI escape codes. See [hive/references/standup-slack-format.md](../../hive/references/standup-slack-format.md) for Slack output conventions. |
+| `--format <default\|slack>` | Controls output format. `default` (or omitted) runs the full standup → planning → execution ceremony (Phase 1.5 interactive routing is opt-in, controlled by `--interactive` or `standup.interactive_default`). `slack` emits the Phase 1 standup report only — no Phase 2/3, no interactive prompts, markdown-only output, no ANSI escape codes. See [hive/references/standup-slack-format.md](../../hive/references/standup-slack-format.md) for Slack output conventions. |
 
 **Config knob:** `standup.interactive_default` in `hive.config.yaml` (default: `false`). When `true`, `--interactive` behavior is always active without passing the flag. The CLI flag takes precedence over the config value — passing `--interactive` enables Phase 1.5 regardless of the config setting.
 

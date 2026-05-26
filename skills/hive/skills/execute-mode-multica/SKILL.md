@@ -354,6 +354,6 @@ execution:
 | Bootstrap required | `resolveAgentUuidByName(..., 'developer')` gates execution |
 | One Multica issue per Hive story | Story dispatch creates or reuses only the primary issue |
 | Sidecars deferred in v1 | Log deferral only; no extra Multica dispatch |
-| Parallel only within current depth | `/execute` owns DAG advancement between depths |
+| Serial within current depth (no parallelism in v1) | `/execute` owns DAG advancement between depths; parallel-within-depth is Phase 2, see Step 1 |
 | Episode marker per story | `multica-run.yaml` plus messages sidecar |
 | No sequential fallback | Bootstrap or setup failures abort Multica mode |

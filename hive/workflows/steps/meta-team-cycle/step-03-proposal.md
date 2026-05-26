@@ -176,7 +176,7 @@ The reference implementation and test suite live at:
 Sort proposals by **weighted score** descending.
 
 ### 4. Write proposal specs
-For each proposal (top 5 by priority):
+For each proposal (top 5 by weighted score):
 ```yaml
 id: proposal-{N}
 title: {one-line title}

@@ -176,10 +176,9 @@ function loadEpisodesRecent(pHiveDir, epicFilter, limit) {
 
     for (const storyId of storyDirs) {
       const storyDir = join(epicEpisodesDir, storyId);
-      const files = readdirSync(storyDir)
-        .filter(f => f.endsWith('.yaml'))
-        .sort()
-        .slice(-limit);
+      const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 0;
+      const sorted = readdirSync(storyDir).filter(f => f.endsWith('.yaml')).sort();
+      const files = safeLimit === 0 ? [] : sorted.slice(-safeLimit);
 
       const markers = files.map(f => {
         const raw = safeRead(join(storyDir, f));
@@ -256,11 +255,25 @@ function loadMetricsHealth(pHiveDir, epicFilter, repoRoot) {
       // Gracefully absent — skip stories with no metric: block
       if (!/^metric:/m.test(text)) continue;
 
-      const applies = readField(text, 'applies');
-      const name = readField(text, 'name');
-      const direction = readField(text, 'direction');
-      const unit = readField(text, 'unit');
-      const baseline = readField(text, 'baseline');
+      // Extract the metric: block only — from "metric:" line to next top-level
+      // key (or EOF). Without this scoping, readField regex picks up matching
+      // keys from unrelated blocks (e.g. manual_verdict, references).
+      const metricStart = text.search(/^metric:/m);
+      const afterMetric = text.slice(metricStart);
+      // Find the next top-level YAML key after the "metric:" line. Skip the
+      // "metric:" line itself by jumping past its newline.
+      const firstNewline = afterMetric.indexOf('\n');
+      const restAfterFirstLine = firstNewline === -1 ? '' : afterMetric.slice(firstNewline + 1);
+      const nextTopLevelInRest = restAfterFirstLine.search(/^[a-zA-Z_]/m);
+      const metricBlock = nextTopLevelInRest === -1
+        ? afterMetric
+        : afterMetric.slice(0, firstNewline + 1 + nextTopLevelInRest);
+
+      const applies = readField(metricBlock, 'applies');
+      const name = readField(metricBlock, 'name');
+      const direction = readField(metricBlock, 'direction');
+      const unit = readField(metricBlock, 'unit');
+      const baseline = readField(metricBlock, 'baseline');
 
       results.push({
         epic_id: epicId,

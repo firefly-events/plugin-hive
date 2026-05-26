@@ -144,7 +144,7 @@ function patchStoryYaml(repoRoot, epicId, storyId, issueIdentifier) {
     `deferred:\n` +
     `  at: "${at}"\n` +
     `  source: multica-cancelled\n` +
-    `  issue_identifier: ${issueIdentifier}`;
+    `  issue_identifier: ${JSON.stringify(String(issueIdentifier))}`;
 
   text = text.trimEnd() + '\n' + deferredBlock + '\n';
   writeFileSync(path, text, 'utf8');
@@ -176,11 +176,18 @@ export async function run({ repoRoot, serverUrl, token }) {
     // Sanitize epic/story IDs before they reach file paths. Markers are
     // attacker-influenceable inputs; reject anything outside the safe ID
     // pattern (alphanumeric + dash + underscore + dot) so a malformed marker
-    // cannot inject `..` segments via patchStoryYaml.
+    // cannot inject `..` segments via patchStoryYaml. Additionally reject
+    // any id that IS or CONTAINS a dot-segment (".", "..") which the regex
+    // alone would not catch.
     const SAFE_ID = /^[A-Za-z0-9._-]+$/;
+    const hasDotSegment = (id) =>
+      id === '.' || id === '..' || id.split(/[/\\]/).some((seg) => seg === '.' || seg === '..');
     const rawEpicId = marker.epic || epicFromPath;
     const rawStoryId = marker.story_id || storyFromPath;
-    if (!SAFE_ID.test(rawEpicId) || !SAFE_ID.test(rawStoryId)) {
+    if (
+      !SAFE_ID.test(rawEpicId) || !SAFE_ID.test(rawStoryId) ||
+      hasDotSegment(rawEpicId) || hasDotSegment(rawStoryId)
+    ) {
       process.stderr.write(
         `  warn: skip marker with unsafe ids epic=${JSON.stringify(rawEpicId)} story=${JSON.stringify(rawStoryId)} (${markerPath})\n`,
       );
@@ -204,12 +211,9 @@ export async function run({ repoRoot, serverUrl, token }) {
 
     const currentStatus = getCurrentStoryStatus(repoRoot, epicId, storyId);
 
-    // Skip completed/failed/deferred — only patch pending or in_progress stories.
-    if (
-      currentStatus === 'deferred' ||
-      currentStatus === 'completed' ||
-      currentStatus === 'failed'
-    ) {
+    // Allowlist — only patch pending or in_progress stories. All other
+    // states (deferred, completed, failed, blocked, null, …) are noops.
+    if (currentStatus !== 'pending' && currentStatus !== 'in_progress') {
       noops++;
       continue;
     }

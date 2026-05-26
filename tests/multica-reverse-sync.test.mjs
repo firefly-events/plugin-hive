@@ -130,7 +130,7 @@ test('patched bucket: cancelled issue with pending story gets patched', async ()
     assert.match(yaml, /^status: deferred$/m);
     assert.match(yaml, /^deferred:$/m);
     assert.match(yaml, /source: multica-cancelled/);
-    assert.match(yaml, /issue_identifier: PLU-20/);
+    assert.match(yaml, /issue_identifier: "?PLU-20"?/);
     assert.match(yaml, /at: "\d{4}-\d{2}-\d{2}T/);
   } finally {
     await mock.close();
@@ -215,7 +215,7 @@ test('all four buckets in one pass', async () => {
     const patchedYaml = await readStory('epic-x', 's2-cancelled');
     assert.match(patchedYaml, /^status: deferred$/m);
     assert.match(patchedYaml, /source: multica-cancelled/);
-    assert.match(patchedYaml, /issue_identifier: PLU-2/);
+    assert.match(patchedYaml, /issue_identifier: "?PLU-2"?/);
   } finally {
     await mock.close();
     await fs.rm(root, { recursive: true, force: true });
