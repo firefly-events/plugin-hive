@@ -1,0 +1,136 @@
+id: mir-2-cc-release-notes-subprovider
+epic: meta-improvement-reset
+title: Add Claude Code release-notes subprovider to step-02b
+status: pending
+complexity: medium
+methodology: classic
+tracker_id: plugin-hive/PLU-64
+tracker_url: http://localhost:3000/plugin-hive/issues/64
+depends_on: []
+
+description: |
+  Extend step-02b external research with explicit Claude Code release-notes
+  subprovider. Source: github.com/anthropics/claude-code/releases (GH API).
+  Tagged candidates feed into step-03 §2b merge as eligible-pool entries with
+  `discovery_source: external_research` + `signal_subtype: claude_code_release`.
+
+  Researcher persona filter critical (grill H1): distinguish "Anthropic
+  shipped X" from "Hive should adopt X". Most release notes are bug fixes;
+  candidates that propagate to step-03 must represent Hive-actionable
+  capability shifts (e.g., new Workflows primitive, Routines cloud trigger,
+  agents view, /code-review rename).
+
+acceptance_criteria:
+  - "step-02b-external-research.md adds named Claude Code release subprovider section"
+  - "Subprovider docs GH API endpoint, fetch shape, tag rule"
+  - "Researcher prompt template includes the actionability filter rule"
+  - "Failure (fetch error / rate limit) → empty list, not error"
+  - "Unit test mocks GH releases response; verifies candidates emitted with correct shape + tag"
+
+steps:
+  - id: research
+    description: |
+      Read current step-02b-external-research.md provider table. Verify GH
+      releases API endpoint shape (`/repos/anthropics/claude-code/releases`).
+      Read step-03 §2b merge logic for shape expected of candidates.
+    agent: researcher
+  - id: implement
+    description: |
+      Add `claude_code_release` subprovider section to step-02b. Include:
+      - Endpoint URL + auth requirement (public, no token needed)
+      - Filter heuristic (last 7 days of releases; skip bug-fix-only releases by tag keyword scan)
+      - Candidate shape: { id: external-proposal-{N}, rationale: <release notes summary>, discovery_source: external_research, signal_subtype: claude_code_release, raw_source_url: <URL> }
+      - Failure handling: catch + empty list
+      Update YOUR TASK section to mention CC release subsource explicitly.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Write unit test (`hive/workflows/steps/meta-team-cycle/__tests__/external-research-providers.test.mjs`):
+      - Mock GH releases API response with 2 releases (1 bug-fix, 1 capability)
+      - Assert filter passes capability release through, drops bug-fix
+      - Assert candidate shape: id, tags, raw_source_url present
+      - Assert empty list on fetch error
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Review filter heuristic for false-positive risk. Confirm researcher
+      filter rule is in step-02b YOUR TASK section, not buried elsewhere.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push to feat/meta-improvement-reset
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    - markdown
+    - bash
+    - node
+  key_files:
+    - path: hive/workflows/steps/meta-team-cycle/step-02b-external-research.md
+      purpose: Step file being extended with new subprovider section
+    - path: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
+      purpose: §2b merge consumes candidates; verify shape matches
+
+files_to_modify:
+  - file: hive/workflows/steps/meta-team-cycle/step-02b-external-research.md
+    change: Add `claude_code_release` subprovider section under PROVIDERS table; update YOUR TASK + TASK SEQUENCE step 2 to mention CC subsource
+  - file: hive/workflows/steps/meta-team-cycle/__tests__/external-research-providers.test.mjs
+    change: New file — unit test for subprovider fetch + filter + shape
+
+code_examples:
+  - title: Pattern — provider section format
+    file: hive/workflows/steps/meta-team-cycle/step-02b-external-research.md
+    snippet: |
+      ## Providers
+      | Tool | Status | Notes |
+      |------|--------|-------|
+      | WebSearch | Available | ... |
+
+      ## Subproviders (cycle-runtime fetches)
+      ### claude_code_release
+      - **Endpoint:** https://api.github.com/repos/anthropics/claude-code/releases (no auth)
+      - **Filter:** last 7 days; skip releases whose body matches /^bug ?fix/i in title
+      - **Tag:** discovery_source=external_research, signal_subtype=claude_code_release
+      - **Failure:** catch + return []
+
+design_decisions:
+  - decision: Filter by release recency (7-day window) + bug-fix title heuristic
+    rationale: Researcher filter (H1) is judgment-heavy; the recency+bug-fix filter is a cheap pre-filter to reduce noise before the LLM sees candidates
+
+cross_cutting:
+  - concern: documentation
+    action: Update step-02b YOUR TASK section to name CC subsource
+
+risks:
+  - severity: medium
+    description: GH releases API rate-limited (60/hour unauth). Multiple cycles per hour could trip limit.
+    mitigation: Use ETags or skip if rate-limit error; fail-soft to empty list
+
+references:
+  - path: hive/workflows/steps/meta-team-cycle/step-02b-external-research.md
+    relevant_excerpt: |
+      ## Providers — current table. Subproviders section is being added here.
+      WebSearch/WebFetch are always-grantable; Context7 MCP available when mounted.
+  - path: .pHive/epics/meta-improvement-reset/docs/design-discussion.md
+    relevant_excerpt: |
+      §3.1 Extend step-02b providers with Claude Code release-notes + Anthropic blog feeds.
+      Researcher persona filter critical (grill H1).
+
+metric:
+  applies: true
+  name: external_research.claude_code_release_candidates_per_cycle
+  direction: up
+  unit: count
+  baseline: 0
+  target: ≥1 per cycle in next 3 cycles given ≥1 CC release in window
+  window: next 3 meta-meta nightly cycles after merge
+  source:
+    kind: manual
+    ref: "PR body of meta-meta nightly cycles; count entries with signal_subtype=claude_code_release"
+  verify_at: integrate
+  owner: reviewer

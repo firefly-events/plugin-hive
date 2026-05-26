@@ -125,7 +125,14 @@ Promoted changes:
 
 Discarded changes:
   {proposal_id} — {file}: {reason}
+
+## Rejected by metric gate
+{present only when step-03c rejected_proposals is non-empty}
+  {proposal_id} — {proposal.title}: metric.{field} failed ({rule})
+{omit section entirely when rejected_proposals is empty or metric_gate: advisory}
 ```
+
+When generating the promotion report for promoted changes, include the "Rejected by metric gate" section if `step-03c` emitted any `rejected_proposals` (i.e., `metric_gate: blocking` was active and at least one proposal was excluded). List each rejected proposal by ID and title with the specific failing field and rule. Omit the section entirely when `rejected_proposals` is empty or when `metric_gate: advisory` was in effect (advisory failures are surfaced in the metric-declaration summary, not in the promotion report).
 
 ## SUCCESS METRICS
 

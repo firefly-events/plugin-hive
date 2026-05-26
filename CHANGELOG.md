@@ -9,6 +9,38 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-05-25
+
+**Meta-improvement reset — signal quality, metric gate, and batch-cleanup path.**
+
+Addresses the pattern of "motion without measurable convergence" in the
+`meta-meta-optimize` nightly cycle: external research feeds now include
+Claude Code releases + Anthropic blog, a signal-weights knob controls
+proposal-source ranking, the step-03c metric gate is now blocking by default,
+and a new `/meta-shotgun` skill clears accumulated `tier: little-fix` backlog
+entries in a single monthly PR rather than routing them through the nightly cycle.
+
+### Added
+
+- **External research: Claude Code release-notes + Anthropic blog subproviders (mir-3/mir-2, 3.1).** `step-02b-external-research.md` now includes two explicit subproviders: `signal_subtype: claude_code_release` (GitHub Releases API / RSS) and `signal_subtype: anthropic_blog` (Anthropic news feed, filtered to model releases + capability announcements). Both tag `discovery_source: external_research`. Failure handling is empty-list-per-source, not error.
+- **`meta_optimize.signal_weights` config knob (mir-8, 3.2).** New optional block in `hive.config.yaml` lets maintainers set per-source ranking multipliers (`metrics`, `external_research`, `kg_signal`, `dreaming_replay`, `backlog`). Shipped default weights reflect post-reset priorities (`external_research: 0.9`, `kg_signal: 0.4`, `backlog: 0.2`). Omitting the block preserves prior implicit-equal-weight behavior.
+- **`/meta-shotgun` maintainer skill (mir-6/mir-7, 3.4).** New `maintainer-skills/meta-shotgun/SKILL.md` + `hive/workflows/meta-shotgun.workflow.yaml`. Batch-processes all `tier: little-fix` + `status: pending` candidates from the queue into a single PR (`meta-shotgun YYYY-MM`) targeting `develop`. Dry-run mode via `dry_run=true`. Zero-candidate exit is clean and silent. LOCAL-ONLY — not registered in `plugin.json`.
+- **`tier:` field on `queue-meta-meta-optimize.yaml` candidates (mir-4/mir-5, 3.5).** New optional enum field (`little-fix | structural | strategic`; default `structural`). The nightly cycle now excludes `tier: little-fix` candidates (routed to `/meta-shotgun`). `tier: strategic` candidates require a planning epic before automated processing.
+- **`hive/references/meta-shotgun-runbook.md`** — full runbook for the monthly shotgun cycle (prerequisites, failure recovery, queue hygiene, relationship to nightly cycle).
+
+### Changed
+
+- **Step-03c metric gate flipped to `blocking` by default (mir-9, 3.3).** Previously non-blocking (advisory). Now: proposals failing metric validation receive `status: rejected_metric_gate` and are excluded from `enriched_proposals` handed to step-04. The cycle continues with passing proposals; cycle-level failure occurs only when zero proposals pass. Rejected proposals surface in the step summary and in the PR body under "Rejected by metric gate". Escape hatch via `meta_optimize.metric_gate: advisory` in `hive.config.yaml` restores the legacy non-blocking behavior.
+- **`.github/workflows/hive-dispatch.yml` meta PR base branch retargeted to `develop` (mir-1, 3.6).** Meta-meta nightly PRs previously targeted `main` via the default-branch lookup; they now explicitly target `develop` to respect the `develop`-as-staging-trunk convention. Merged via develop→main release PRs like every other feature.
+- **`hive/GUIDE.md`** — new "Configuration Knobs (`meta_optimize:`)" subsection documents `signal_weights` and `metric_gate`, replaces the stale "no public `meta_optimize:` block shipped yet" note.
+- **`hive/references/meta-optimize-maintainer.md`** — adds "Metric Gate" and "Meta-Shotgun Cycle" sections.
+
+### Notes
+
+- KG signal repair is **not** in scope for this epic; `kg_signal` weight is demoted to `0.4` as confirming evidence pending a dedicated KG-revival epic.
+- The `advisory` escape hatch for `metric_gate` is intentional — allows the maintainer to ship proposals whose metric is genuinely hard to formalize without blocking the cycle.
+- All surface changes are additive or have opt-out escape hatches. No breaking changes to the public `/meta-optimize` consumer path.
+
 ## [2.8.0] - 2026-05-24
 
 ### Added
@@ -696,7 +728,11 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/firefly-events/plugin-hive/compare/v2.8.0...v2.9.0
+[2.8.0]: https://github.com/firefly-events/plugin-hive/compare/v2.7.0...v2.8.0
+[2.7.0]: https://github.com/firefly-events/plugin-hive/compare/v2.6.0...v2.7.0
+[2.6.0]: https://github.com/firefly-events/plugin-hive/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/firefly-events/plugin-hive/compare/v2.4.2...v2.5.0
 [2.4.2]: https://github.com/firefly-events/plugin-hive/compare/v2.4.1...v2.4.2
 [2.4.1]: https://github.com/firefly-events/plugin-hive/compare/v2.4.0...v2.4.1

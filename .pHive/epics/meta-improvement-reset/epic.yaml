@@ -1,0 +1,66 @@
+name: meta-improvement-reset
+title: Meta-Improvement Reset — release-notes-weighted signals + metric gate + monthly shotgun
+description: |
+  Restructure how /meta-meta-optimize cycles select work. Three coupled reframes
+  captured in conversation 2026-05-24 + locked at Phase B step 5 (2026-05-25):
+
+    1. Release-notes-weighted signals — Claude Code releases + Anthropic blog
+       feeds wired into step-02b; signal_weights knob in step-03 ranking
+    2. Metric gate on enriched_proposals — step-03c default flips to blocking;
+       config-knob escape hatch (advisory) preserves orchestrator latitude
+    3. Monthly shotgun for little fixes — new /meta-shotgun maintainer-local
+       skill consumes tier:little-fix backlog candidates; nightly cycles delegate
+
+  Companion surface: meta-meta nightly PRs retarget main → develop.
+
+  Scope: maintainer-side (meta-meta-optimize). Public meta-optimize swarm
+  unchanged. KG signal repair out of scope (separate epic).
+
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  - id: mir-1-retarget-meta-prs-to-develop
+    title: Retarget meta-meta-nightly PRs from main to develop
+    complexity: low
+    depends_on: []
+  - id: mir-2-cc-release-notes-subprovider
+    title: Add Claude Code release-notes subprovider to step-02b
+    complexity: medium
+    depends_on: []
+  - id: mir-3-anthropic-blog-subprovider
+    title: Add Anthropic blog subprovider to step-02b
+    complexity: medium
+    depends_on: [mir-2-cc-release-notes-subprovider]
+  - id: mir-4-tier-field-backlog-schema
+    title: Add tier field to queue-meta-meta-optimize backlog schema
+    complexity: low
+    depends_on: []
+  - id: mir-5-nightly-tier-exclusion
+    title: Exclude tier=little-fix candidates from nightly cycle backlog-fallback
+    complexity: medium
+    depends_on: [mir-4-tier-field-backlog-schema]
+  - id: mir-6-meta-shotgun-skill-scaffold
+    title: Scaffold /meta-shotgun skill (maintainer-local)
+    complexity: medium
+    depends_on: [mir-5-nightly-tier-exclusion]
+  - id: mir-7-meta-shotgun-workflow
+    title: Build meta-shotgun workflow + integration test
+    complexity: medium
+    depends_on: [mir-6-meta-shotgun-skill-scaffold]
+  - id: mir-8-signal-weights-knob
+    title: Add meta_optimize.signal_weights knob to step-03 ranking
+    complexity: medium
+    depends_on: [mir-7-meta-shotgun-workflow]
+  - id: mir-9-metric-gate-flip
+    title: Flip step-03c metric gate to blocking with advisory escape hatch
+    complexity: medium
+    depends_on: [mir-8-signal-weights-knob]
+  - id: mir-10-docs-and-concern-audit
+    title: Audit cross-cutting metrics concern + docs sweep + CHANGELOG
+    complexity: low
+    depends_on: [mir-9-metric-gate-flip]

@@ -17,6 +17,15 @@
 # branches or recent commits. Check `git log --since="1 week" -- <path>` before
 # seeding a candidate. If the target is actively churning, either wait or
 # pick a dormant alternative.
+#
+# Tier field (optional — default: structural when absent):
+#   tier: little-fix    — <50 lines diff, no schema/skill behavior change.
+#                         Eligible for shotgun (/meta-shotgun) targeting.
+#   tier: structural    — File/module-scope changes. Default for all existing
+#                         candidates and any entry where tier is absent.
+#                         Processed in the nightly cycle.
+#   tier: strategic     — Cross-cutting or multi-epic changes. Requires manual
+#                         planning; excluded from automated cycles.
 
 schema_version: 1
 

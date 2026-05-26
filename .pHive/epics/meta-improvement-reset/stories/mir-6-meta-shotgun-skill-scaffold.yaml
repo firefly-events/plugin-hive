@@ -1,0 +1,126 @@
+id: mir-6-meta-shotgun-skill-scaffold
+epic: meta-improvement-reset
+title: Scaffold /meta-shotgun skill (maintainer-local)
+status: pending
+complexity: medium
+methodology: classic
+tracker_id: plugin-hive/PLU-68
+tracker_url: http://localhost:3000/plugin-hive/issues/68
+depends_on: [mir-5-nightly-tier-exclusion]
+
+description: |
+  Build the user-invocable entry point for monthly batch-cleanup. SKILL.md
+  defines the surface; the workflow YAML (mir-7) carries the step sequence.
+
+  Maintainer-skill posture per signed decision `meta-meta-optimize-ships: no`:
+  /meta-shotgun MUST NOT appear in plugin.json public manifest. Lives under
+  `maintainer-skills/` (or whatever local-only path the plugin uses).
+
+  Trigger: `/meta-shotgun` (maintainer-typed); also automatable via maintainer
+  cron if maintainer chooses, but no shipped cron.
+
+acceptance_criteria:
+  - "skills/.../meta-shotgun/SKILL.md exists with required frontmatter (name, description, args, trigger phrases)"
+  - "Skill NOT registered in plugin.json public manifest"
+  - "Process section documents preconditions, dispatch to workflow YAML, output (single PR)"
+  - "Skill is invocable via /meta-shotgun in maintainer session"
+  - "If backlog has zero tier=little-fix candidates pending, skill exits cleanly with message"
+
+steps:
+  - id: research
+    description: |
+      Identify the maintainer-skill path convention. Read /meta-meta-optimize
+      SKILL.md location + plugin.json structure. Determine where /meta-shotgun
+      lives (likely `maintainer-skills/meta-shotgun/SKILL.md` if convention
+      established, else `skills/hive/skills/meta-shotgun/` with explicit
+      manifest exclusion).
+    agent: researcher
+  - id: implement
+    description: |
+      Write SKILL.md with:
+      - YAML frontmatter (name=meta-shotgun, description, args=none, triggers)
+      - Skill Preamble section (see hive/references/skill-prelude.md)
+      - Process section: dispatch to hive/workflows/meta-shotgun.workflow.yaml
+        (mir-7), pass backlog path + cwd
+      - Preconditions: ≥1 pending tier:little-fix candidate in
+        queue-meta-meta-optimize.yaml
+      - Output: single PR opened with sections per dir
+      - Local-only posture banner: NOT in plugin.json manifest
+      - Out-of-scope: structural/strategic candidates
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Manual smoke test:
+      - Empty backlog → skill exits with "no pending little-fix candidates" message
+      - 1 little-fix candidate → workflow YAML invocation (validated in mir-7's integration test)
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Verify plugin.json does NOT register meta-shotgun. Verify SKILL.md
+      preamble references skill-prelude.md correctly.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    - markdown
+    - yaml
+  key_files:
+    - path: skills/hive/skills/meta-optimize/SKILL.md
+      purpose: Pattern reference — sibling skill in same maintainer surface
+    - path: hive/references/skill-prelude.md
+      purpose: Required preamble for all skills
+    - path: .claude-plugin/plugin.json
+      purpose: Public manifest — verify meta-shotgun excluded
+
+files_to_modify:
+  - file: skills/hive/skills/meta-shotgun/SKILL.md
+    change: New file — skill definition
+  - file: .claude-plugin/plugin.json
+    change: NO change (verify meta-shotgun NOT added)
+
+design_decisions:
+  - decision: Skill is the entry point (P2 resolution), workflow YAML carries sequence
+    rationale: Skills are user-invocable entry points; workflows compose. /meta-shotgun being skill is consistent with /meta-optimize being skill.
+
+cross_cutting:
+  - concern: documentation
+    action: Add reference to hive/references/meta-optimize-maintainer.md
+  - concern: versioning
+    action: NO version bump for adding maintainer-local skill (not consumer-visible)
+
+risks:
+  - severity: medium
+    description: Skill accidentally registered in plugin.json → shipped to consumers
+    mitigation: Reviewer checks plugin.json explicitly; per-step verification
+
+references:
+  - path: skills/hive/skills/meta-optimize/SKILL.md
+    relevant_excerpt: |
+      Pattern for sibling meta-optimize SKILL.md — frontmatter, Skill Preamble,
+      Preconditions, Live Cycle steps. /meta-shotgun follows same skeleton.
+  - path: .pHive/epics/meta-improvement-reset/docs/design-discussion.md
+    relevant_excerpt: |
+      §3.4 Build /meta-shotgun skill. Maintainer-triggered cadence.
+      P2 resolution: skill is entry point; workflow YAML carries step sequence.
+
+metric:
+  applies: true
+  name: meta_shotgun.skill_invocable
+  direction: up
+  unit: binary
+  baseline: 0
+  target: 1
+  window: at integrate step
+  source:
+    kind: manual
+    ref: "Type /meta-shotgun in maintainer session; skill loads or errors"
+  verify_at: integrate
+  owner: reviewer
