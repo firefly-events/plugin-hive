@@ -1,0 +1,17 @@
+step: multica-run
+story: "stmc-1-create-marker"
+epic: "smoke-test-execute-multica-codex"
+agent: "developer"
+status: passed
+started_at: "2026-05-25T20:03:39Z"
+completed_at: "2026-05-25T20:04:02Z"
+artifacts:
+  - ".pHive/episodes/smoke-test-execute-multica-codex/stmc-1-create-marker/multica-run.messages.jsonl"
+multica:
+  issue_id: "PLU-78"
+  issue_uuid: "b46c08a9-05d6-43ae-b2fb-d42107573fa6"
+  task_id: "23479ad7-7eba-4409-8816-ceeaec20cc7b"
+  agent_id: "d9946f9a-2747-49d4-b967-2590ffb5be43"
+  work_dir: "/Users/don/multica_workspaces/21c6d282-d6b4-4b25-8d0d-a85e96038416/23479ad7/workdir"
+  attempts: 1
+notes: "Done. File created at `.pHive/smoke/smoke-marker.txt` with `smoke-test:created:2026-05-25T20:04:00Z`. PLU-78 moved to `in_review`."

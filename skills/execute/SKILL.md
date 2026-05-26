@@ -148,7 +148,7 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
    When `gate_violations[]` is non-empty, the dispatch has been downgraded to `sequential` by the parallel-dispatch gate (`ed-7`). Surface the warning to stdout naming every offending story ID and the reason recorded by the gate (the structured format is documented in `execute-dispatch/SKILL.md` Step 1.5). Do not re-implement the gate logic here — the dispatch skill is the single boundary for this decision per the parallel-call-sites registry (`hive/references/parallel-call-sites.md`).
 
-   Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d.
+   Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d, `multica` -> step 6e.
 5pre. **Executor cutover routing.** Use only the returned `runner_path` and `runner_reason`; do not re-evaluate the cutover tree here. If `runner_path == hive-dag`, call `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`; otherwise continue on the orchestrator-narrated path. Single dispatch point: this skill call is the only `/execute` policy boundary for executor-vs-orchestrator routing.
 
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
@@ -177,6 +177,14 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
    - `epic_handle`: the current epic identifier
    - `hive_config`: parsed root `hive.config.yaml` (for `execution.sandcastle.*` options)
 
+6e. **Multica execution** (used when `HIVE_EXECUTION_MODE=multica` or root config `execution.mode: multica`). Routes each story into a Multica issue assigned to the bootstrapped `developer` agent; Multica owns the inner task work_dir and execution after assignment.
+   Invoke `skills/hive/skills/execute-mode-multica/SKILL.md` with:
+   - `workflow_path`: the workflow loaded in step 3
+   - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
+   - `appends_map`: the review-phase sidecar map from step 2b
+   - `epic_handle`: the current epic identifier
+   - `hive_config`: parsed root `hive.config.yaml` (for `execution.multica.*` options and `agent_backends.*`)
+
 7. **Sequential execution.** Follow **`references/sequential-execution.md`** for the step-by-step workflow within each story, sidecar injection at the review step, episode records, gate checks, and respawn monitoring.
 
 7a. **Post-exec phase loop.** If `post_exec[]` is empty, skip this step entirely — zero behavior change for escalation-free epics.
@@ -199,6 +207,8 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
    > **v1 note:** v1 routing handles `workflow`-based catalog entries only. A catalog entry with `skill: <path>` (allowed by catalog schema but unused in v1) is not reached by condition (i) and falls to condition (ii) or (iii). Skill-based routing is a Phase 6 extension point.
 
 7c. **Terminal handoff dispatch.** After the `integrate` workflow step completes for a story, dispatch any configured post-integrate handoff.
+
+   > **Multica issue close.** When `task_tracking.adapter` is `multica`, the closer (`hive/lib/multica-issue-closer.mjs`) is invoked here to transition the story's Multica issue to `done`. See [multica-issue-closer-runbook.md](../../hive/references/multica-issue-closer-runbook.md) for failure modes, WARN escalation thresholds, and the manual sweep procedure.
 
    **Gate check — integrate episode marker required.** Before reading `terminal_handoff`, verify the integrate episode marker exists at `${HIVE_STATE_DIR}/episodes/{epic-id}/{story-id}/integrate.yaml`. If the marker is absent (integrate failed or was skipped):
 
@@ -289,6 +299,8 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
     ```
 
     Episode markers (per `hive/references/episode-schema.md`) are still authoritative for in-Hive state. Tracker status updates are a one-way projection — failures here never block the workflow.
+
+7d. **Multica story close (integrate hook).** Immediately after the `integrate` step's commit+push completes, the integrate step file calls `closeStoryIssue({epic_id, story_id})` from `hive/lib/multica-issue-closer.mjs`. This hook is gated on `task_tracking.adapter === 'multica'` (read from root `hive.config.yaml`); other values (including null / unset) skip with a one-line `[gate_mode]` log. The hook is also skipped for dry-run invocations and when /execute is in `--simulated-manual` mode. On any `ok: false` result, one warn line is emitted and /execute continues — this hook never blocks story completion. The full gate logic and log-line templates live in the integrate step file (`hive/workflows/steps/development-classic/step-08-integrate.md` §6a).
 
 8. After all stories complete, produce a summary plus the post-run audit:
 

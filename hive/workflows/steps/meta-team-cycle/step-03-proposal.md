@@ -145,12 +145,38 @@ Score each proposal on three dimensions (1–5 each):
 - **Risk:** How much could this break existing content? (5 = high risk, 1 = no risk — LOWER is better)
 - **Effort:** How many files, how many sections? (5 = large, 1 = single file addition)
 
-**Priority score = Impact × (6 − Risk) / Effort**
+**Base priority score = Impact × (6 − Risk) / Effort**
 
-Sort proposals by priority score descending.
+#### 3a. Apply signal-source weight multiplier
+
+After computing the base score, apply a per-source weight from
+`meta_optimize.signal_weights` in `hive.config.yaml`:
+
+**Weighted score = weight(source) × Base priority score**
+
+Source-to-weight-key mapping:
+
+| `discovery_source` | Weight key |
+|--------------------|------------|
+| `internal_audit`   | `metrics`  |
+| `external_research`| `external_research` |
+| `kg_signal`        | `kg_signal` |
+| `dreaming_replay`  | `dreaming_replay` |
+| `backlog`          | `backlog`  |
+
+Default weight for every key is `1.0` — absent config preserves prior ranking
+order exactly. The weight knob applies **after** precedence routing (metrics →
+external_research → kg_signal → dreaming_replay → backlog); it does not change
+which pool a proposal comes from, only its rank within the merged pool.
+
+The reference implementation and test suite live at:
+- `hive/workflows/steps/meta-team-cycle/signal-weights.mjs`
+- `hive/workflows/steps/meta-team-cycle/__tests__/signal-weights.test.mjs`
+
+Sort proposals by **weighted score** descending.
 
 ### 4. Write proposal specs
-For each proposal (top 5 by priority):
+For each proposal (top 5 by weighted score):
 ```yaml
 id: proposal-{N}
 title: {one-line title}
@@ -171,7 +197,7 @@ risk_notes: |
   {What could go wrong, what to check before shipping}
 ```
 
-> **Backward compatibility:** Proposals written before this field was added (i.e., proposals without a `discovery_source` entry) default to `internal_audit` for schema-handling purposes. Do NOT reject or fail a proposal for a missing `discovery_source` field — treat it as the default. Valid `discovery_source` values are: `internal_audit`, `external_research`, `kg_signal`.
+> **Backward compatibility:** Proposals written before this field was added (i.e., proposals without a `discovery_source` entry) default to `internal_audit` for schema-handling purposes. Do NOT reject or fail a proposal for a missing `discovery_source` field — treat it as the default. Valid `discovery_source` values are: `internal_audit`, `external_research`, `kg_signal`, `dreaming_replay`, `backlog`.
 
 ### 5. List skipped findings
 Document all findings that were skipped:
@@ -211,7 +237,7 @@ Skipped findings:
 ## SUCCESS METRICS
 
 - [ ] All findings reviewed against charter scope
-- [ ] Proposals ranked by priority score
+- [ ] Proposals ranked by weighted score
 - [ ] Maximum 5 proposals approved (excess moved to skipped with reason: `deferred_to_next_cycle`)
 - [ ] Each proposal has complete implementation plan with specific file paths and actions
 - [ ] `cycle-state.yaml` updated with proposals and skipped findings

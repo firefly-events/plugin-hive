@@ -9,6 +9,65 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-05-25
+
+**Meta-improvement reset — signal quality, metric gate, and batch-cleanup path.**
+
+Addresses the pattern of "motion without measurable convergence" in the
+`meta-meta-optimize` nightly cycle: external research feeds now include
+Claude Code releases + Anthropic blog, a signal-weights knob controls
+proposal-source ranking, the step-03c metric gate is now blocking by default,
+and a new `/meta-shotgun` skill clears accumulated `tier: little-fix` backlog
+entries in a single monthly PR rather than routing them through the nightly cycle.
+
+### Added
+
+- **External research: Claude Code release-notes + Anthropic blog subproviders (mir-3/mir-2, 3.1).** `step-02b-external-research.md` now includes two explicit subproviders: `signal_subtype: claude_code_release` (GitHub Releases API / RSS) and `signal_subtype: anthropic_blog` (Anthropic news feed, filtered to model releases + capability announcements). Both tag `discovery_source: external_research`. Failure handling is empty-list-per-source, not error.
+- **`meta_optimize.signal_weights` config knob (mir-8, 3.2).** New optional block in `hive.config.yaml` lets maintainers set per-source ranking multipliers (`metrics`, `external_research`, `kg_signal`, `dreaming_replay`, `backlog`). Shipped default weights reflect post-reset priorities (`external_research: 0.9`, `kg_signal: 0.4`, `backlog: 0.2`). Omitting the block preserves prior implicit-equal-weight behavior.
+- **`/meta-shotgun` maintainer skill (mir-6/mir-7, 3.4).** New `maintainer-skills/meta-shotgun/SKILL.md` + `hive/workflows/meta-shotgun.workflow.yaml`. Batch-processes all `tier: little-fix` + `status: pending` candidates from the queue into a single PR (`meta-shotgun YYYY-MM`) targeting `develop`. Dry-run mode via `dry_run=true`. Zero-candidate exit is clean and silent. LOCAL-ONLY — not registered in `plugin.json`.
+- **`tier:` field on `queue-meta-meta-optimize.yaml` candidates (mir-4/mir-5, 3.5).** New optional enum field (`little-fix | structural | strategic`; default `structural`). The nightly cycle now excludes `tier: little-fix` candidates (routed to `/meta-shotgun`). `tier: strategic` candidates require a planning epic before automated processing.
+- **`hive/references/meta-shotgun-runbook.md`** — full runbook for the monthly shotgun cycle (prerequisites, failure recovery, queue hygiene, relationship to nightly cycle).
+
+### Changed
+
+- **Step-03c metric gate flipped to `blocking` by default (mir-9, 3.3).** Previously non-blocking (advisory). Now: proposals failing metric validation receive `status: rejected_metric_gate` and are excluded from `enriched_proposals` handed to step-04. The cycle continues with passing proposals; cycle-level failure occurs only when zero proposals pass. Rejected proposals surface in the step summary and in the PR body under "Rejected by metric gate". Escape hatch via `meta_optimize.metric_gate: advisory` in `hive.config.yaml` restores the legacy non-blocking behavior.
+- **`.github/workflows/hive-dispatch.yml` meta PR base branch retargeted to `develop` (mir-1, 3.6).** Meta-meta nightly PRs previously targeted `main` via the default-branch lookup; they now explicitly target `develop` to respect the `develop`-as-staging-trunk convention. Merged via develop→main release PRs like every other feature.
+- **`hive/GUIDE.md`** — new "Configuration Knobs (`meta_optimize:`)" subsection documents `signal_weights` and `metric_gate`, replaces the stale "no public `meta_optimize:` block shipped yet" note.
+- **`hive/references/meta-optimize-maintainer.md`** — adds "Metric Gate" and "Meta-Shotgun Cycle" sections.
+
+### Notes
+
+- KG signal repair is **not** in scope for this epic; `kg_signal` weight is demoted to `0.4` as confirming evidence pending a dedicated KG-revival epic.
+- The `advisory` escape hatch for `metric_gate` is intentional — allows the maintainer to ship proposals whose metric is genuinely hard to formalize without blocking the cycle.
+- All surface changes are additive or have opt-out escape hatches. No breaking changes to the public `/meta-optimize` consumer path.
+
+## [2.8.0] - 2026-05-24
+
+### Added
+
+- `/hive:context-snapshot` skill emits a versioned JSON snapshot of Hive state (branch, epics, stories via `deriveStoryStatus`, recent episodes, open triage, metric verdicts) for consumption by external coordinators (Hermes, custom scheduler integrations, etc.). Read-only, transport-agnostic (stdout default, optional `--write` to `.pHive/context-snapshot.json`).
+- `hive/lib/context-snapshot.mjs` library composer (`composeContextSnapshot`) — reusable across consumers without going through the skill surface.
+- `hive/references/context-snapshot-schema.md` documents the versioned JSON shape with additive-only versioning rule.
+- `/hive:standup --format slack` flag emits Phase 1 standup report in Slack-friendly markdown (no ANSI, code-block tables, no interactive prompts) suitable for cron capture + Slack delivery.
+- `hive/references/standup-slack-format.md` documents the slack output conventions.
+- `/hive:triage --json` flag emits machine-parseable envelopes for every sub-command (`--list`, single-id inspect, create, `--advance`, `--hand-off`, `--close`). Single-writer invariant on `queue.yaml` preserved — `--json` only changes output formatting, never adds write paths.
+- `skills/triage/run.mjs` CLI runner backing the triage skill with full state-machine implementation, queue read/write, and JSON envelopes.
+
+### Changed
+
+- `hive/references/routines-integration.md` adds §"External coordinators (Hermes equivalence)" noting that any cron/webhook-capable coordinator (Anthropic Routines, Hermes, custom) plugs into the standup skill via the same scheduler-as-trigger contract.
+- `skills/hive/skills/execute-mode-multica/SKILL.md` adds explicit checkout + verify + fail-fast (mi-03).
+- `hive/lib/multica-bootstrap/index.mjs` + `hive/lib/multica-agents-config/index.mjs` install Claude Code plugins via `custom_env.CLAUDE_PLUGIN_PATH` (mi-04).
+
+### Fixed
+
+- `hive/lib/multica-story-dispatch/custom-env.mjs` (new) resolves `~`, `${HOME}`, and `$HOME` in `custom_env` values before sending to Multica, so plugin paths reach the agent literally (ab17b0b, PR #220).
+
+### Notes
+
+- Substrate for the planned Hermes-as-external-supervisor integration (companion epic `hermes-bridge-mvp` in `~/Code/hermes-agent` planned separately). All three flags are additive opt-in surfaces — default behavior is byte-equivalent on every existing entry point.
+- Bundles `multica-integration-fixes` epic (PR #220, merged before this release): mi-01/mi-02 spikes documented in `.pHive/upstream-watch/`, mi-03/mi-04 + custom-env-resolve fix shipped above.
+
 ## [2.7.0] - 2026-05-21
 
 ### Added
@@ -669,7 +728,11 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/firefly-events/plugin-hive/compare/v2.8.0...v2.9.0
+[2.8.0]: https://github.com/firefly-events/plugin-hive/compare/v2.7.0...v2.8.0
+[2.7.0]: https://github.com/firefly-events/plugin-hive/compare/v2.6.0...v2.7.0
+[2.6.0]: https://github.com/firefly-events/plugin-hive/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/firefly-events/plugin-hive/compare/v2.4.2...v2.5.0
 [2.4.2]: https://github.com/firefly-events/plugin-hive/compare/v2.4.1...v2.4.2
 [2.4.1]: https://github.com/firefly-events/plugin-hive/compare/v2.4.0...v2.4.1

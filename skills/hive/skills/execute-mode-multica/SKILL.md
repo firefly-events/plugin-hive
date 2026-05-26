@@ -66,7 +66,11 @@ ERROR: Multica execution mode requires bootstrapped agents.
 
 Exit `1`. Do NOT fall back to sequential.
 
-### Step 1: Per-story dispatch (parallel within depth)
+### Step 1: Per-story dispatch (serial within depth — Phase 1)
+
+Phase 1 dispatches stories **serially** within the current depth: dispatch story N, poll to terminal (Step 2), write the episode marker (Step 3), then advance to story N+1. This is the v1 contract — it keeps Multica daemon load bounded, makes failure isolation trivial, and matches how `meta-improvement-reset` was actually run inline on 2026-05-25.
+
+> **Phase 2 (future):** parallel-within-depth fanout is a documented option once we have evidence the daemon and agent runtime tolerate concurrent task pressure. Do not enable parallel dispatch in v1.
 
 For each story in `unblocked_stories[]` at this depth:
 
@@ -81,20 +85,47 @@ For each story in `unblocked_stories[]` at this depth:
    - This ensures a newly dispatchable story is not stranded in backlog state before assignment.
 
 3. **Brief write.**
-   - Call `serializeStoryBrief(story)` to produce Markdown.
+   - Read `hive_config.agent_backends?.developer` (the `developer` role is the persona Multica's bootstrapped agent runs under). If it equals `'codex'`, pass `{ codexInstruction: true }` so the brief instructs the inner Claude Code session to use `/codex:rescue` for implementation. Otherwise omit options for backward-compatible behavior.
+   - Call `serializeStoryBrief(story, codexInstruction ? { codexInstruction: true } : {})` to produce Markdown.
+   - Resolve `requestedRef` from the current epic branch/ref (for example `feat/multica-integration-fixes`) and include it in the issue brief as the required repository ref for the agent task.
    - Call `ensureIssueBriefMatches(serverUrl, token, workspaceId, issueUuid, brief)`.
    - If the issue description has drifted, the helper updates it with `PUT`.
 
-4. **Dispatch.**
+4. **Clone + verify.**
+   - Standalone `multica repo checkout` is daemon-task scoped. Do not run it as an orchestrator-side pre-dispatch command unless the Multica daemon API exposes an equivalent checkout endpoint for this workflow.
+   - Preserve the auto-clone success path used by h-01-style runs: if `workdir/plugin-hive/` already exists inside the assigned task and its current branch equals `requestedRef`, skip the explicit clone and continue.
+   - Otherwise, the task brief or dispatch payload MUST instruct the agent to run this as its first repository action inside the daemon task:
+
+     ```sh
+     multica repo checkout https://github.com/firefly-events/plugin-hive --ref "${requestedRef}"
+     ```
+
+   - Post-dispatch verify before implementation work:
+
+     ```sh
+     test -d workdir/plugin-hive
+     ls -la workdir
+     ls -la workdir/plugin-hive
+     git -C workdir/plugin-hive branch --show-current
+     ```
+
+   - Fail fast if verification fails or the branch output does not equal `requestedRef`. Emit an error message that names all of:
+     - workdir path: `workdir/plugin-hive`
+     - requested ref: `${requestedRef}`
+     - actual contents: output from `ls -la workdir`, `ls -la workdir/plugin-hive`, and `git -C workdir/plugin-hive branch --show-current`
+     - suggested manual rerun command: `multica repo checkout https://github.com/firefly-events/plugin-hive --ref "${requestedRef}"`
+   - Stop the task after that error. Do NOT let the agent improvise on an unknown checkout.
+
+5. **Dispatch.**
    - Call `dispatchStoryToAgent(serverUrl, token, workspaceId, issueUuid, developerAgentUuid)`.
    - The `PUT` returns `200` with `assignee_type` and `assignee_id` populated.
    - Multica internally enqueues the task after assignment.
 
-5. **Track.**
+6. **Track.**
    - Record `{story_id, issueUuid, identifier, dispatch_started_at}` in an in-memory map for the poll loop.
    - Keep per-story state independent so one 4xx or terminal failure does not block sibling stories in the same depth.
 
-The dispatch fanout is parallel within the current depth. Do not advance to later DAG depths inside this skill; `/execute` owns DAG advancement and re-invokes this skill for the next depth.
+The dispatch fanout is **serial within the current depth** in Phase 1 (see Step 1 preamble). Do not advance to later DAG depths inside this skill; `/execute` owns DAG advancement and re-invokes this skill for the next depth.
 
 ### Step 2: Poll until terminal (per story)
 
@@ -111,7 +142,7 @@ For each dispatched story, drive `pollTaskUntilTerminal` with:
 - `pollIntervalMs` from `hive_config.execution.multica.poll_interval_seconds * 1000`.
 - Default `pollIntervalMs` is `5_000`.
 
-The future API contract from s4 is:
+Import the helpers:
 
 ```js
 import {
@@ -120,7 +151,7 @@ import {
 } from '../../../../hive/lib/multica-story-dispatch/episode-sync.mjs';
 ```
 
-Expected poll call shape:
+Poll call shape:
 
 ```js
 const terminal = await pollTaskUntilTerminal({
@@ -128,27 +159,49 @@ const terminal = await pollTaskUntilTerminal({
   token,
   workspaceId,
   issueUuid,
-  storyId: story.id,
   maxWallClockMs,
   pollIntervalMs,
   messagesCaptureMax,
   onStateTransition(prev, next) {
-    stderr.write(`[multica:${story.id}] ${prev} → ${next}\n`);
+    process.stderr.write(`[multica:${story.id}] ${prev} → ${next}\n`);
   },
 });
 ```
 
-s4 is the DEPENDENCY of this story. Temporarily, until s4 lands, this step can be a stub that logs:
+`terminal` is an object of shape:
 
 ```text
-[multica:{story_id}] s4 episode-marker-sync not yet implemented — would poll here
+{
+  status:        'completed' | 'failed' | 'cancelled',
+  notes:         string,
+  messages:      [<message>, ...],            // last messagesCaptureMax entries
+  task_id:       string,
+  agent_id:      string | null,
+  agent_name:    string | null,
+  work_dir:      string | null,
+  attempts:      number,
+  started_at:    ISO-8601 string | null,
+  completed_at:  ISO-8601 string | null,
+}
 ```
 
-After s4 merges, this skill consumes the real `episode-sync.mjs` API.
+A timeout-cancelled story returns `status: 'cancelled'` and `notes: 'timeout after Ns'`; transport failure after 3 consecutive errors throws `TRANSPORT` (caller catches per-story and writes a failure marker — see Failure modes).
 
 ### Step 3: Episode marker per terminal
 
-Call `writeMulticaRunEpisode` with the terminal state returned by polling.
+Call `writeMulticaRunEpisode` with the terminal state returned by polling:
+
+```js
+const { markerPath, messagesPath, status, notes } = await writeMulticaRunEpisode({
+  hiveStateDir,            // resolved from paths.state_dir (default .pHive)
+  epicHandle: epic_handle, // parent epic identifier
+  storyId: story.id,
+  issueUuid,               // captured in Step 1 dispatch
+  identifier,              // human-readable issue ID (e.g. plugin-hive/PLU-42)
+  terminal,                // object returned by pollTaskUntilTerminal in Step 2
+  messagesCaptureMax,      // hive_config.execution.multica.messages_capture_max (default 200)
+});
+```
 
 The marker path is:
 
@@ -162,7 +215,7 @@ The messages sidecar path is:
 ${HIVE_STATE_DIR}/episodes/{epic_handle}/{story_id}/multica-run.messages.jsonl
 ```
 
-Terminal status mapping:
+Terminal status mapping is owned by the helper:
 
 | Multica terminal | Episode marker status |
 |---|---|
@@ -170,7 +223,26 @@ Terminal status mapping:
 | `failed` | `failed` |
 | `cancelled` | `cancelled` |
 
-Write exactly one marker per story for this run. Include the Multica issue UUID, identifier, dispatch timestamps, terminal timestamps, and notes/error text when present.
+The helper writes exactly one marker per story per run. The marker includes the Multica issue UUID, identifier, task ID, agent ID/name, work_dir, attempts, started/completed timestamps, and notes/error text when present. Truncation is reflected in `notes` when `messagesCaptureMax` clips the captured tail.
+
+**Scope-drift emit (per-story boundary).** Immediately after the episode marker is written, emit one `scope_drift_score` event per `/execute`'s Scope-drift emit prescription. This is the per-story boundary call for Multica mode — fire-and-forget, no error handling. The `ed-1-maturity-helper` gate inside the helper silently skips on greenfield/early projects.
+
+```sh
+python3 -c "
+from hive.lib.scope_drift import emit_scope_drift
+emit_scope_drift(
+    run_id='${run_id}',
+    phase_label='execute:story',
+    expected_scope=${json.dumps(story.acceptance_criteria or [])},
+    delivered_scope=${json.dumps(parse_delivered_from(terminal.notes))},
+    delta_reasons=[],
+    story_id='${story.id}',
+    skill='execute',
+)
+"
+```
+
+`delivered_scope` is sourced from the developer's done-summary captured in `terminal.notes` (one bullet per logical delivery; split on newlines/semicolons). When the parsed delivered list equals `expected_scope`, `delta_reasons` stays empty and the helper buckets to `none`. When divergence is detected (a future enhancement once we trust the parse), `delta_reasons` carries values from the cycle-state-schema enum: `rescope`, `scope-creep`, `deferred`, `blocked`, `misunderstood-ac`, `out-of-band-work`.
 
 ### Step 4: Sidecar deferral
 
@@ -181,6 +253,42 @@ For each `story_id` in `appends_map`, emit:
 ```
 
 No Multica dispatch is performed for sidecars in v1. Do not create extra issues, do not assign additional agents, and do not mutate the primary issue for sidecar-only work.
+
+## Reconciliation pattern
+
+Reconcile completed Multica work by bringing the agent branch back onto the epic branch with the smallest history-preserving operation that matches the branch shape.
+
+Multica agent commits land on:
+
+```text
+agent/<persona>/<run-short>
+```
+
+Canonical orchestrator-side reconciliation is cherry-pick when selecting a subset of commits or when the agent branch has diverged unrelated work:
+
+```sh
+git fetch origin agent/developer/<run-short>:refs/remotes/origin/agent/developer/<run-short>
+git switch feat/multica-integration-fixes
+git cherry-pick <commit-sha>
+```
+
+Use fetch + rebase, or fetch + fast-forward merge, when the agent branch is a clean linear extension of the epic branch:
+
+```sh
+git fetch origin agent/developer/<run-short>:refs/remotes/origin/agent/developer/<run-short>
+git switch agent/developer/<run-short>
+git rebase feat/multica-integration-fixes
+git switch feat/multica-integration-fixes
+git merge --ff-only agent/developer/<run-short>
+```
+
+Fast-forward-only variant:
+
+```sh
+git fetch origin agent/developer/<run-short>:refs/remotes/origin/agent/developer/<run-short>
+git switch feat/multica-integration-fixes
+git merge --ff-only origin/agent/developer/<run-short>
+```
 
 ### Step 5: Wait for all depth-0 to terminate, then return
 
@@ -246,6 +354,6 @@ execution:
 | Bootstrap required | `resolveAgentUuidByName(..., 'developer')` gates execution |
 | One Multica issue per Hive story | Story dispatch creates or reuses only the primary issue |
 | Sidecars deferred in v1 | Log deferral only; no extra Multica dispatch |
-| Parallel only within current depth | `/execute` owns DAG advancement between depths |
+| Serial within current depth (no parallelism in v1) | `/execute` owns DAG advancement between depths; parallel-within-depth is Phase 2, see Step 1 |
 | Episode marker per story | `multica-run.yaml` plus messages sidecar |
 | No sequential fallback | Bootstrap or setup failures abort Multica mode |

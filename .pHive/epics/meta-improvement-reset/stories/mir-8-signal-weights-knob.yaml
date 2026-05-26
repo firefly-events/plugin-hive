@@ -1,0 +1,156 @@
+id: mir-8-signal-weights-knob
+epic: meta-improvement-reset
+title: Add meta_optimize.signal_weights knob to step-03 ranking
+status: pending
+complexity: medium
+methodology: tdd
+tracker_id: plugin-hive/PLU-70
+tracker_url: http://localhost:3000/plugin-hive/issues/70
+depends_on: [mir-7-meta-shotgun-workflow]
+
+description: |
+  Add a config-driven weight knob to step-03's eligible-pool ranking. Each
+  signal source (metrics, external_research, kg_signal, dreaming_replay,
+  backlog) gets a weight multiplier applied to its existing priority score.
+
+  Shipped baseline: all weights `1.0` (no behavior change). Plugin-hive root
+  `hive.config.yaml` carries non-default weights per design §3.2:
+    metrics: 1.0
+    external_research: 0.9
+    kg_signal: 0.4         # demoted pending KG repair
+    dreaming_replay: 0.5
+    backlog: 0.2
+
+  PRECONDITION (grill H2): step-03 ranking surface verified to support
+  multiplier. If absent (e.g., step-03 uses precedence ordering not scoring),
+  story scope expands to add scoring infrastructure.
+
+acceptance_criteria:
+  - "step-03-proposal.md documents the weight knob + reads from hive.config.yaml"
+  - "Default weights all 1.0 preserves current ranking order on shipped baseline"
+  - "Maintainer root hive.config.yaml carries non-default weights per design §3.2"
+  - "Unit tests: weight=1.0 preserves order; weight>1 elevates; weight=0 demotes"
+  - "If step-03 lacks score surface, scoring added (scope expansion documented)"
+
+steps:
+  - id: research
+    description: |
+      READ step-03-proposal.md ranking logic carefully. Determine:
+      - Does step-03 produce a numeric priority score per proposal?
+      - If yes, weight multiplier slots in as: `weighted_score = priority × weight[discovery_source]`
+      - If no, step expansion: add scoring infrastructure first (default neutral score; weight kicks in once scoring exists)
+      Document the ranking shape in story-local research notes.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementing (TDD):
+      `hive/workflows/steps/meta-team-cycle/__tests__/signal-weights.test.mjs`:
+      - given proposals from {metrics, external_research} with equal raw priority,
+        weights {1.0, 1.0} → order unchanged (deterministic tiebreak by source name)
+      - given same proposals with weights {1.0, 2.0} → external_research ranked first
+      - given weight=0 for any source → that source's proposals demoted to last
+      - given weight config missing entirely → all defaults to 1.0, behavior identical
+      - given malformed weight (negative / string / null) → reject with clear error
+    agent: tester
+  - id: implement
+    description: |
+      Make the failing tests pass. Edit step-03-proposal.md ranking section.
+      If step-03 has multiplier surface, simple insertion. If not, add scoring:
+      - Each proposal gets a `priority_score` (default 1.0 if no metrics)
+      - Weighted score = priority_score × weight[discovery_source]
+      - Tiebreak: alphabetical by source name then proposal id
+
+      Also update hive/hive.config.yaml shipped baseline with commented example
+      `meta_optimize.signal_weights:` block (all 1.0). Plugin-hive root
+      hive.config.yaml gets active non-default weights per design §3.2.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Confirm shipped baseline is commented-only (no active behavior change).
+      Verify weight read uses config-precedence-layer-aware accessor (root
+      overrides shipped per established convention).
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit + push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    - markdown
+    - yaml
+    - node
+  key_files:
+    - path: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
+      purpose: Ranking step being extended
+    - path: hive/hive.config.yaml
+      purpose: Shipped baseline — gets commented example only
+    - path: hive.config.yaml
+      purpose: Maintainer root — gets active non-default weights
+
+files_to_modify:
+  - file: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
+    change: Add weight-multiplier ranking section
+  - file: hive/hive.config.yaml
+    change: Add commented example block (no active change)
+  - file: hive.config.yaml
+    change: Add active `meta_optimize.signal_weights:` block per design §3.2
+  - file: hive/workflows/steps/meta-team-cycle/__tests__/signal-weights.test.mjs
+    change: New test file
+
+code_examples:
+  - title: Pattern — weight config block
+    file: hive.config.yaml
+    snippet: |
+      meta_optimize:
+        signal_weights:
+          metrics: 1.0
+          external_research: 0.9   # bumped per meta-improvement-reset epic
+          kg_signal: 0.4           # demoted pending KG repair
+          dreaming_replay: 0.5
+          backlog: 0.2
+
+design_decisions:
+  - decision: Default all-1.0 baseline; non-defaults in maintainer root only
+    rationale: Locked Q2. Shipped consumers see no behavior change.
+  - decision: Tiebreak by source name then proposal id
+    rationale: Deterministic ordering for test reproducibility
+
+cross_cutting:
+  - concern: documentation
+    action: Update hive/GUIDE.md meta-optimize section with weight knob reference
+
+risks:
+  - severity: medium
+    description: Step-03 may not have multiplier surface — scope expansion
+    mitigation: Research step verifies first; if expansion needed, document in story-local research notes and surface to user at implement-start (gate decision)
+  - severity: low
+    description: Weight = 0 silently drops a signal source (could mask bugs)
+    mitigation: Test covers weight=0 demotes-not-drops; reviewer confirms
+
+references:
+  - path: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
+    relevant_excerpt: |
+      Routing precedence is signal-first: metrics → external research → kg_signal
+      → dreaming_replay → backlog. Weight knob applies AFTER precedence routing.
+  - path: .pHive/epics/meta-improvement-reset/docs/design-discussion.md
+    relevant_excerpt: |
+      §3.2 Add ranking weight knob; H2 hidden assumption requires verification
+      of step-03 multiplier surface before implementing.
+
+metric:
+  applies: true
+  name: meta_optimize.proposals_by_discovery_source_distribution
+  direction: up
+  unit: ratio
+  baseline: backlog-dominant in last 5 cycles
+  target: external_research representation ≥30% over next 5 cycles in plugin-hive root
+  window: next 5 meta-meta nightly cycles in plugin-hive after merge
+  source:
+    kind: manual
+    ref: "PR bodies of next 5 nightlies; sum proposals tagged external_research / total"
+  verify_at: 2026-06-30T00:00:00Z
+  owner: reviewer

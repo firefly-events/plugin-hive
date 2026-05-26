@@ -1,0 +1,123 @@
+id: mir-3-anthropic-blog-subprovider
+epic: meta-improvement-reset
+title: Add Anthropic blog subprovider to step-02b
+status: pending
+complexity: medium
+methodology: classic
+tracker_id: plugin-hive/PLU-65
+tracker_url: http://localhost:3000/plugin-hive/issues/65
+depends_on: [mir-2-cc-release-notes-subprovider]
+
+description: |
+  Extend step-02b external research with Anthropic blog subprovider. Source:
+  https://www.anthropic.com/news (RSS or feed; verify endpoint at story time).
+  Tagged candidates: `discovery_source: external_research` +
+  `signal_subtype: anthropic_blog`.
+
+  Filter scope (per design §3.1): keep model releases, capability
+  announcements, agent SDK changes. Skip company / business / policy posts.
+
+  Depends on mir-2 to reuse the subprovider section pattern established there.
+
+acceptance_criteria:
+  - "step-02b-external-research.md adds named Anthropic blog subprovider section"
+  - "Subprovider docs feed endpoint, fetch shape, content filter rule"
+  - "Filter excludes company/business/policy posts; keeps model/capability/SDK"
+  - "Failure → empty list, not error"
+  - "Unit test mocks feed; verifies filter behavior + candidate shape"
+
+steps:
+  - id: research
+    description: |
+      Locate Anthropic blog RSS/feed endpoint. Inspect:
+      - `https://www.anthropic.com/news` (HTML; may have RSS link in head)
+      - `https://www.anthropic.com/feed.xml` or similar
+      - Atom alternative if no RSS
+      Confirm parser-friendly format (JSON/XML).
+    agent: researcher
+  - id: implement
+    description: |
+      Add `anthropic_blog` subprovider section to step-02b. Include:
+      - Feed endpoint (from research)
+      - Filter rule: keep posts tagged "Engineering" / "Models" / "Product";
+        skip "Policy" / "Company" / "Customers"
+      - Candidate shape: parallel to mir-2 (id, rationale, tags, raw_source_url)
+      - Researcher prompt extension: distinguish "Anthropic announced X" from
+        "Hive should adopt X"
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Extend `external-research-providers.test.mjs`:
+      - Mock feed response with 3 posts (1 model, 1 policy, 1 SDK)
+      - Assert filter keeps model+SDK, drops policy
+      - Assert candidate shape includes signal_subtype=anthropic_blog
+      - Assert empty list on fetch error
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Review filter rule for posture neutrality (don't accidentally bias
+      proposals toward Anthropic marketing language).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push to feat/meta-improvement-reset
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    - markdown
+    - node
+  key_files:
+    - path: hive/workflows/steps/meta-team-cycle/step-02b-external-research.md
+      purpose: Same step file mir-2 extended; this adds second subprovider section
+
+files_to_modify:
+  - file: hive/workflows/steps/meta-team-cycle/step-02b-external-research.md
+    change: Add `anthropic_blog` subprovider section under Subproviders heading (added in mir-2)
+  - file: hive/workflows/steps/meta-team-cycle/__tests__/external-research-providers.test.mjs
+    change: Add test cases for anthropic_blog filter + shape
+
+design_decisions:
+  - decision: Hard-coded category allow-list, not deny-list
+    rationale: "Allow-list is more conservative — if Anthropic adds new tags (e.g., Research), they require explicit add. Deny-list would silently pass new categories."
+
+cross_cutting:
+  - concern: documentation
+    action: Mention both subproviders in step-02b YOUR TASK section
+
+risks:
+  - severity: medium
+    description: Feed endpoint may not exist or may require auth; could break v1
+    mitigation: Research step confirms endpoint; if absent, fall back to scraping the news page index with conservative parsing
+  - severity: low
+    description: Filter false-negative (drops a relevant model/capability post)
+    mitigation: Allow-list approach is conservative; tunable in follow-on
+
+references:
+  - path: hive/workflows/steps/meta-team-cycle/step-02b-external-research.md
+    relevant_excerpt: |
+      ## Providers — extended by mir-2 with Subproviders subsection.
+      This story adds the second subprovider entry.
+  - path: .pHive/epics/meta-improvement-reset/docs/design-discussion.md
+    relevant_excerpt: |
+      §3.1 Anthropic blog subprovider details:
+      - Filter: model releases, capability announcements, agent SDK changes
+      - Skip: company/business/policy
+
+metric:
+  applies: true
+  name: external_research.anthropic_blog_candidates_per_cycle
+  direction: up
+  unit: count
+  baseline: 0
+  target: ≥1 per cycle when an in-scope post lands in window
+  window: next 5 meta-meta nightly cycles after merge
+  source:
+    kind: manual
+    ref: "PR body of meta-meta nightly cycles; count entries with signal_subtype=anthropic_blog"
+  verify_at: integrate
+  owner: reviewer

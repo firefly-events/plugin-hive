@@ -1,0 +1,174 @@
+id: h-03-standup-format-slack
+epic: hermes-integration-mvp
+title: Standup --format slack flag for cron-friendly Phase 1 report
+status: pending
+complexity: small
+methodology: classic
+depends_on: []
+wave: W2
+action_id: H-03
+
+description: |
+  Add --format <default|slack> flag to /hive:standup. When --format slack:
+    - Emit Phase 1 standup report only (skip interactive Phase 2/3)
+    - Markdown-flavored, Slack-thread-aware (code blocks for tables; no ANSI)
+    - Suppress interactive prompts so it works under cron capture
+  Default behavior preservation: --format default (or omitted) byte-equivalent
+  to current standup output (regression guard via snapshot test).
+
+  Enables Hermes (the external supervisor) to invoke standup from cron, capture
+  stdout, and post to Slack channel verbatim — using the existing Routines bridge
+  contract (which becomes "external coordinators bridge" in the doc update).
+
+acceptance_criteria:
+  - "skills/standup/SKILL.md documents new --format flag with values 'default' and 'slack'"
+  - "/hive:standup --format slack emits ONLY Phase 1 standup report (no Phase 2 planning prompts, no Phase 3 execution kickoff)"
+  - "Output under --format slack uses markdown (headings, code blocks for tabular data) and is free of ANSI escape codes"
+  - "/hive:standup without --format (or with --format default) produces byte-identical output to current behavior (regression guard via snapshot test)"
+  - "hive/references/standup-slack-format.md exists and documents the slack output conventions (heading levels, code block usage, line length guidance, no-emoji-required rule)"
+  - "hive/references/routines-integration.md updated with a new §'External coordinators (Hermes equivalence)' noting that any cron/webhook-capable coordinator plugs in via the same scheduler-as-trigger contract"
+  - "Snapshot test at tests/skills/standup-format-slack.test.* validates --format slack output against committed snapshot fixture"
+  - "Default-behavior regression snapshot test validates --format default output unchanged"
+
+metric:
+  applies: false
+  justification: "Standup --format slack output flag is pure substrate — the Hermes-side cron job posting to Slack (deferred to companion epic) is what measures any user-facing metric like operator-time-to-daily-report; this story ships only the output-shaping flag and reference doc, with no observable user surface absent the Hermes consumer."
+
+steps:
+  - id: research
+    description: |
+      Read current standup skill phase-1 output composition. Identify where to
+      insert format branching. Confirm Routines integration doc's existing
+      section structure for clean addition. Check for ANSI/color helpers in
+      current standup output path that need conditional suppression.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Add --format flag parsing to skills/standup/SKILL.md (or its step files
+      if logic lives there). Under --format slack: branch Phase 1 output through
+      a slack-formatter (markdown, no ANSI), skip Phase 2/3 entirely. Under
+      --format default (or omitted): preserve current behavior byte-for-byte.
+      Write hive/references/standup-slack-format.md and update routines-
+      integration.md per acceptance criteria.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Write tests/skills/standup-format-slack.test.* — snapshot of --format slack
+      output against fixture cycle-state, AND regression snapshot of --format
+      default to guarantee byte-equivalence with pre-change behavior.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Review for: behavior-preservation invariant on default path, markdown
+      compliance on slack path, no ANSI escapes leaking into slack output, no
+      Phase 2/3 prompts firing under --format slack, doc cross-references intact.
+      Manually preview slack output by pasting into a Slack message preview to
+      eyeball formatting.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: |
+      Commit on feat/hermes-integration-mvp branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/standup/SKILL.md
+      purpose: "Skill to modify — add --format flag handling, document slack mode behavior"
+    - path: hive/workflows/daily-ceremony.workflow.yaml
+      purpose: "Daily ceremony workflow — referenced by standup; Phase 1 step boundary informs where to short-circuit under --format slack"
+    - path: hive/workflows/steps/daily-ceremony/step-03-present-standup.md
+      purpose: "Phase 1 report composition step — likely the format branching site"
+    - path: hive/references/routines-integration.md
+      purpose: "Reference doc to update with Hermes equivalence section"
+
+files_to_modify:
+  - file: skills/standup/SKILL.md
+    change: Add --format flag documentation + behavior spec; note Phase 1-only under slack
+  - file: hive/workflows/steps/daily-ceremony/step-03-present-standup.md (or wherever Phase 1 output composes)
+    change: Branch output composition by --format value; preserve default path byte-equivalently
+  - file: hive/references/standup-slack-format.md
+    change: NEW — markdown conventions spec for slack output
+  - file: hive/references/routines-integration.md
+    change: Add §'External coordinators (Hermes equivalence)' section
+  - file: tests/skills/standup-format-slack.test.* (extension matches existing convention)
+    change: NEW — snapshot tests for slack format + default regression
+
+code_examples:
+  - title: Routines integration §"Capability Skip When Routines Is Unreachable" pattern (to extend with Hermes equivalence)
+    file: hive/references/routines-integration.md
+    snippet: |
+      ## Capability Skip When Routines Is Unreachable
+
+      Routines is an optional trigger capability, not a hard runtime dependency for the
+      ceremony itself. If Routines is unreachable, unavailable, or not configured:
+
+      - Do not treat that condition as a workflow error.
+      - Do not synthesize a fake scheduler context.
+      - Fall back to the normal interactive ceremony entry path.
+
+design_decisions:
+  - decision: "--format <default|slack> as enumerated flag, not multiple boolean flags"
+    rationale: "Future formats (e.g., html, json) can extend the enum without flag explosion. Default value preserves byte-equivalence with prior behavior."
+  - decision: "Slack output is markdown-only; no Slack-specific block-kit JSON at MVP"
+    rationale: "Markdown renders cleanly in Slack messages without bot SDK. Block-kit is over-engineering for an MVP cron post."
+  - decision: "Phase 1 only under slack; no auto-approve under cron"
+    rationale: "Per design-discussion §4 H4 finding — auto-approve under cron carries idempotency risk. Operator-driven Phase 2/3 from a session at MVP."
+
+cross_cutting:
+  - concern: documentation
+    action: "Update skills/standup/SKILL.md to document --format flag. NEW hive/references/standup-slack-format.md. UPDATE hive/references/routines-integration.md with Hermes equivalence section."
+  - concern: simulated-manual
+    action: |
+      Slack output is a perceptual outcome — markdown rendering correctness is best
+      verified by pasting into Slack. Add a test scenario at
+      .pHive/test-scenarios/h-03-standup-format-slack-manual.yaml describing:
+        invocation: skill /hive:standup --format slack
+        pre-conditions: project has at least one active epic + episode markers
+        pass expectations: copy/paste into Slack DM, rendering matches expected
+          shape (headings render, tables render in code blocks, no raw ANSI text)
+      Set manual_verdict.scenario_ref to that path.
+
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/h-03-standup-format-slack-manual.yaml
+  verdict: null
+  timestamp: null
+  agent: null
+
+risks:
+  - severity: medium
+    description: Byte-equivalent default-path regression hard to fully guarantee — incidental whitespace or formatting changes could break the snapshot
+    mitigation: Snapshot test pinned to a specific fixture state; if snapshot breaks legitimately, regenerate after manual diff review
+  - severity: low
+    description: Slack markdown rendering varies across Slack clients (desktop, mobile, web)
+    mitigation: Spec targets the lowest common denominator (no advanced features); manual verdict covers desktop preview
+
+references:
+  - path: .pHive/epics/hermes-integration-mvp/docs/design-discussion.md
+    relevant_excerpt: |
+      Slice 2: Cron-driven standup with Slack delivery — Hive-side changes:
+      (a) new --format slack flag on standup output (markdown-flavored,
+      thread-aware); (b) document the operator-driven Phase 2 handoff
+      (operator sees report in Slack, returns to Claude Code session to plan
+      + execute — no auto-approve under cron at MVP).
+  - path: hive/references/routines-integration.md
+    relevant_excerpt: |
+      Routines decides when to invoke the daily ceremony. The webhook launches
+      Hive's daily-ceremony.workflow.yaml. Hive evaluates the workflow YAML
+      exactly as written; Routines does not rewrite step behavior or inject
+      alternate gate policy.
+
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+tracker_id: "plugin-hive/PLU-56"
+tracker_url: "http://localhost:3000/plugin-hive/issues/PLU-56"
+tracker_uuid: "ce083fa0-1408-4277-874c-b37cb0f4b127"

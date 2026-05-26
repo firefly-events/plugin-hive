@@ -1,0 +1,130 @@
+id: mi-01-spike-plugin-loading
+epic: multica-integration-fixes
+title: Spike — Multica Claude provider plugin loading mechanism
+status: pending
+complexity: small
+methodology: classic
+depends_on: []
+wave: W1
+action_id: MI-01
+
+description: |
+  Read Multica source to determine how (or whether) the Claude provider loads
+  Claude Code plugins into agent runtime. Goal: a written brief naming the
+  function/config field/env-var that controls plugin loading, so mi-04 can
+  install plugin-hive + codex plugins via the right surface.
+
+  Pre-step: verify `~/Code/spikes/multica` exists + is current (recent
+  upstream sync). If stale or missing, fresh-clone from
+  `github.com/multica-ai/multica` into `~/Code/spikes/multica-fresh` and
+  read from there. Document which source was actually read in the brief.
+
+  HARD BUDGET: ≤2 hours wall-clock OR ≤15 file reads in the Multica repo.
+  At budget, ship the brief documenting WHAT was searched and what wasn't
+  findable — non-completion is a valid output, NOT a failure. Brief with
+  "couldn't find within budget — recommend upstream question" is still a
+  shipped deliverable.
+
+acceptance_criteria:
+  - "Pre-step documented: which Multica source was read (~/Code/spikes/multica vs fresh clone) + last commit SHA verified"
+  - "`.pHive/upstream-watch/multica-plugin-loading.md` exists with four required sections: ## Repro, ## Root cause, ## Suggested fix, ## Recommended Multica-side change"
+  - "Brief names the specific Multica function/config field/env var that gates plugin loading, OR explicitly documents that the mechanism couldn't be found within budget + names the suggested upstream question to file"
+  - "Brief is ≤80 lines (excluding code blocks); concise + scannable; not a deep architectural treatise"
+  - "Brief verifies plugin discovery posture: does Claude provider pass through CLAUDE_PLUGIN_PATH? Inherit caller's ~/.claude/plugins/? Mount per-agent plugin dir? Skip entirely? Name the actual behavior."
+  - "Brief includes a 1-paragraph 'mi-04 routing recommendation' naming which of three branches mi-04 should execute (a) config-only / (b) Multica patch / (c) unfindable"
+
+metric:
+  applies: false
+  justification: "Spike story — deliverable is a written brief at .pHive/upstream-watch/multica-plugin-loading.md documenting an upstream gap. Has no observable user-facing surface to measure; success is the brief shipping with the four required sections + the mi-04 routing recommendation, verified by reviewer reading the file."
+
+steps:
+  - id: research
+    description: |
+      Pre-step: locate Multica source. Check ~/Code/spikes/multica freshness
+      (git log -1; if older than 2 weeks OR not a multica-ai/multica clone,
+      fresh-clone to ~/Code/spikes/multica-fresh). Record actual SHA read.
+      Then read provider initialization code, agent dispatch code, env-var
+      handling for the Claude provider. Target: name the plugin discovery
+      surface (config / env / mount / skip).
+    agent: researcher
+
+  - id: implement
+    description: |
+      Write .pHive/upstream-watch/multica-plugin-loading.md per acceptance
+      criteria. Four sections (Repro, Root cause, Suggested fix, Recommended
+      Multica-side change) + the mi-04 routing recommendation paragraph.
+      Brief ≤80 lines (excluding code blocks). If unfindable within budget,
+      ship the brief documenting the search effort + suggested upstream
+      question instead.
+    agent: technical-writer
+    depends_on: [research]
+
+  - id: review
+    description: |
+      Read the brief; verify four sections + mi-04 routing recommendation
+      present; verify ≤80-line cap (excluding code); confirm brief is
+      actionable (mi-04 can pick branch (a)/(b)/(c) from it). Verify the
+      pre-step source-verification was done + recorded.
+    agent: reviewer
+    depends_on: [implement]
+
+  - id: integrate
+    description: |
+      Commit the brief on feat/multica-integration-fixes branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  external_source: ~/Code/spikes/multica  # may be stale; pre-step verifies
+  upstream_repo: https://github.com/multica-ai/multica  # for fresh-clone fallback
+  key_files:
+    - path: ~/Code/spikes/multica/
+      purpose: "Multica source clone — primary read target for this spike"
+    - path: .pHive/multica/agents.yaml
+      purpose: "Reference for how agents declare provider+model+persona — informs what plugin loading SHOULD plug into"
+    - path: .pHive/upstream-watch/
+      purpose: "Output dir for this brief; existing tracked convention per .gitignore"
+
+files_to_modify:
+  - file: .pHive/upstream-watch/multica-plugin-loading.md
+    change: NEW — ≤80-line upstream-blocker brief
+
+design_decisions:
+  - decision: "Hard budget of 2h wall-clock OR 15 file reads"
+    rationale: "Per grill H1: spike scope explosion is the #1 risk for source-reading stories. Explicit cap with non-completion path keeps scope honest."
+  - decision: "Three-branch mi-04 routing recommendation in this brief"
+    rationale: "Per grill H3: mi-04 needs to know which path to take. Pushing the decision into mi-01's brief means mi-04 has a concrete spec instead of 'apply mi-01's recommendation' hand-waving."
+
+cross_cutting:
+  - concern: documentation
+    action: "The deliverable IS documentation. Brief lives in tracked .pHive/upstream-watch/ subtree per existing convention. No other Hive docs reference it yet (mi-04 will cross-reference)."
+
+risks:
+  - severity: medium
+    description: Multica source might use vendored dependencies that hide plugin loading logic outside the main repo
+    mitigation: Pre-step verifies main repo SHA + go.mod inspection; if logic appears vendored, brief documents that as the actual finding (recommend upstream question about which dep owns the behavior)
+  - severity: low
+    description: Source could be in TypeScript/JS not Go (some Multica components might be CLI shells around node)
+    mitigation: Researcher follows actual code; brief documents the runtime found
+
+references:
+  - path: .pHive/epics/multica-integration-fixes/docs/design-discussion.md
+    relevant_excerpt: |
+      mi-01 spike: read Multica source to find plugin-loading mechanism for the
+      Claude provider. Pre-step: verify ~/Code/spikes/multica is current OR
+      fresh-clone upstream. Budget: ≤2h wall-clock + ≤15 file reads. Output:
+      .pHive/upstream-watch/multica-plugin-loading.md with sections {repro,
+      root cause, suggested fix, recommended Multica-side change}.
+  - path: .pHive/epics/multica-integration-fixes/docs/research-brief.md
+    relevant_excerpt: |
+      Multica daemon supports `claude` + `codex` providers. agents.yaml declares
+      three agents (developer, tester, reviewer) all using `provider: claude`.
+      `multica agent get <uuid>` shows the agent's `instructions` field contains
+      the FULL persona file inlined. No reference to plugin manifests or skill paths.
+
+parallel_allowed: false
+
+tracker_id: "plugin-hive/PLU-59"
+tracker_url: "http://localhost:3000/plugin-hive/issues/PLU-59"
+tracker_uuid: "d8b66f3f-ddda-42b6-81bf-04f4e406664e"

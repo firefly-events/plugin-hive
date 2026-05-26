@@ -1,0 +1,161 @@
+id: mi-04-apply-plugin-install-finding
+epic: multica-integration-fixes
+title: Apply mi-01 plugin loading finding — three-branch implementation
+status: pending
+complexity: small   # may be medium if branch (a) ships; small if (b)/(c)
+methodology: classic
+depends_on: [mi-01-spike-plugin-loading]
+wave: W2
+action_id: MI-04
+
+description: |
+  Apply mi-01's finding on Multica's Claude provider plugin loading. The
+  executing agent reads mi-01's brief at `.pHive/upstream-watch/multica-plugin-loading.md`
+  + its routing recommendation paragraph + executes the corresponding branch:
+
+  **Branch (a) — config-only fix:** If mi-01 names a config/env/agent-yaml
+  surface that controls plugin loading, extend `/hive:multica-init` (skill
+  + its bootstrap procedure) to install plugin-hive + codex plugins via that
+  surface. Agents.yaml is single-writer (per skill convention) — multica-init
+  remains the only mutator. After install, invocation of `/reload-plugins`
+  in the agent's claude session finalizes registration. Acceptance: dispatch
+  a throwaway story that runs `/hive:status`; verify the slash command
+  resolves (proving plugin-hive is registered, not just present-as-source).
+
+  **Branch (b) — Multica source patch needed:** If mi-01 names a Multica
+  source site that needs a code patch (not config), this story extends
+  mi-01's brief into an implementation spec at
+  `.pHive/upstream-watch/multica-plugin-loading-impl.md` with the proposed
+  patch detail, file paths, function signatures. ALSO writes a sibling
+  upstream-watch note `.pHive/upstream-watch/multica-codex-provider-deviation.md`
+  documenting the C2 grill finding (Multica agents all `provider: claude`
+  contradicts agent_backends Codex-for-developer policy) so the deviation
+  isn't silent debt. No Multica code changes in this story — those land in
+  a follow-on epic with upstream PR coordination.
+
+  **Branch (c) — unfindable:** If mi-01's brief documents that the
+  plugin-loading mechanism couldn't be found within budget, this story is a
+  no-op. Story acceptance is "execute the right branch per mi-01" —
+  branch (c) means "no execution needed; mi-01's brief stands as the
+  upstream-watch deliverable." Story marked completed with branch=c note.
+
+acceptance_criteria:
+  - "Story commit message names the executed branch (a, b, or c) + cites the mi-01 routing recommendation line that drove the choice"
+  - "**If branch (a):** `/hive:multica-init` skill OR its bootstrap procedure updated to install plugins via the mi-01-identified surface; agents.yaml mutations (if any) go through multica-init only; throwaway-story smoke test passes (`/hive:status` resolves)"
+  - "**If branch (b):** `.pHive/upstream-watch/multica-plugin-loading-impl.md` exists extending mi-01's brief with implementation detail (named file paths, function signatures, suggested PR shape); `.pHive/upstream-watch/multica-codex-provider-deviation.md` exists documenting the Codex policy deviation per grill C2"
+  - "**If branch (c):** No new files; commit message documents the no-op rationale + cites mi-01's 'unfindable' conclusion"
+  - "Regardless of branch: NO direct edits to .pHive/multica/agents.yaml outside of multica-init invocation (single-writer invariant preserved per grill C1)"
+
+metric:
+  applies: false
+  justification: "Substrate story — three-branch implementation gated on mi-01's spike output. Branch (a) ships working plugin install procedure; branch (b) ships extended upstream-watch docs; branch (c) is a no-op. None of the branches alone moves a measurable user-facing metric in this epic; the user-facing capability (Multica agents using /hive:* slash commands + codex routing) requires the actual install to land + a real story to test against, which happens in a follow-on cycle."
+
+steps:
+  - id: research
+    description: |
+      Read mi-01's brief at .pHive/upstream-watch/multica-plugin-loading.md
+      end-to-end. Pay specific attention to the "mi-04 routing recommendation"
+      paragraph. Determine which branch (a/b/c) this story executes. Also
+      read skills/multica-init/SKILL.md to understand the bootstrap surface
+      that branch (a) would extend.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Execute the branch chosen in research step.
+      - Branch (a): patch multica-init to install plugins; invoke /reload-plugins
+        as final bootstrap step; test via throwaway-story `/hive:status` smoke.
+      - Branch (b): write upstream-watch implementation extension + Codex
+        deviation note. No code changes.
+      - Branch (c): no-op. Document rationale in commit message.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Branch (a) only: dispatch throwaway story to Multica developer agent;
+      assert `/hive:status` invocation in the agent's session resolves
+      (proves plugin-hive registered, not just source-present). Capture
+      session_id + verdict in commit message.
+
+      Branches (b) and (c): no test step — deliverable is documentation
+      (or no-op). Skip.
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Verify executed branch matches mi-01 routing recommendation. For
+      branch (a): verify multica-init still owns agents.yaml writes (no
+      external mutations); verify smoke test result. For branch (b):
+      verify both upstream-watch files exist + extend mi-01's brief
+      coherently. For branch (c): verify commit message rationale.
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: |
+      Commit on feat/multica-integration-fixes branch with explicit branch
+      label in commit message (e.g., `mi-04 [branch a]: plugins installed
+      via X` OR `mi-04 [branch c]: no-op per mi-01 unfindable conclusion`).
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/upstream-watch/multica-plugin-loading.md
+      purpose: "mi-01 output — this story READS this file to pick branch (a/b/c)"
+    - path: skills/multica-init/SKILL.md
+      purpose: "Branch (a) modification target — bootstrap surface for plugin install"
+    - path: .pHive/multica/agents.yaml
+      purpose: "Single-writer agents config — branch (a) writes go through multica-init ONLY"
+
+files_to_modify:
+  - file: skills/multica-init/SKILL.md
+    change: "Branch (a) ONLY — extend bootstrap to install plugins + invoke /reload-plugins. Branches (b) and (c) do NOT modify this file."
+  - file: .pHive/upstream-watch/multica-plugin-loading-impl.md
+    change: "Branch (b) ONLY — extension of mi-01's brief with implementation detail. Branches (a) and (c) do NOT create this file."
+  - file: .pHive/upstream-watch/multica-codex-provider-deviation.md
+    change: "Branch (b) ONLY — Codex policy deviation note per grill C2. Branches (a) and (c) do NOT create this file."
+
+design_decisions:
+  - decision: "Three-branch acceptance criteria with explicit branch tag in commit message"
+    rationale: "Per grill H3: under-specification was the original risk. Pre-deciding three concrete branches gives the executing agent a clear pick instead of negotiating shape. Commit message tag makes the choice auditable."
+  - decision: "Branch (a) extends /hive:multica-init rather than mutating agents.yaml directly"
+    rationale: "Per grill C1: agents.yaml is single-writer. Going through multica-init preserves the convention + reuses the existing bootstrap surface."
+  - decision: "Branch (b) Codex-deviation note ships alongside the plugin-impl note"
+    rationale: "Per grill C2: deferring Codex provider must NOT be silent debt. Branch (b) inevitably touches upstream-watch anyway; bundling the deviation note keeps both upstream concerns in one place."
+
+cross_cutting:
+  - concern: documentation
+    action: "Branch (a) updates skills/multica-init/SKILL.md (the skill IS its own doc). Branches (b) and (c) ship docs as the primary deliverable."
+
+risks:
+  - severity: high
+    description: mi-01's routing recommendation might be ambiguous or inconclusive
+    mitigation: Research step explicitly reads the recommendation paragraph + asks orchestrator for tie-break if ambiguous (rather than agent improvising); branch (c) is the safe default if recommendation is unclear
+  - severity: medium
+    description: Branch (a) plugin install procedure could break existing Multica agent dispatch
+    mitigation: Smoke test against a throwaway story before merging; rollback path is `/hive:multica-init` re-run without plugin install (acceptance includes the rollback being clean)
+  - severity: low
+    description: Branch (b)'s upstream-watch impl doc could drift from mi-01's brief over time
+    mitigation: Branch (b) doc explicitly cross-references mi-01 by file path + commit SHA; if mi-01 is superseded, both docs update together
+
+references:
+  - path: .pHive/epics/multica-integration-fixes/docs/design-discussion.md
+    relevant_excerpt: |
+      mi-04 apply mi-01 finding: install plugin-hive + codex plugins into
+      Multica agent runtime by extending /hive:multica-init. Three-branch
+      acceptance criteria (executing agent picks based on mi-01's brief).
+  - path: .pHive/epics/multica-integration-fixes/docs/grill-record.md
+    relevant_excerpt: |
+      H3 — mi-04 under-specification: violates agent-ready-checklist item #2
+      (Pre-made decisions). Resolution: three-branch spec; agent picks based
+      on mi-01's brief.
+
+parallel_allowed: false
+
+tracker_id: "plugin-hive/PLU-62"
+tracker_url: "http://localhost:3000/plugin-hive/issues/PLU-62"
+tracker_uuid: "4895b181-2243-4da2-9206-3e11cfd77211"

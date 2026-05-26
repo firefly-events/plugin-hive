@@ -1,0 +1,113 @@
+id: h-05-version-bump
+epic: hermes-integration-mvp
+title: Plugin version bump + CHANGELOG entry for hermes-integration-mvp
+status: pending
+complexity: small
+methodology: classic
+depends_on: [h-01-context-snapshot-composer, h-02-context-snapshot-skill, h-03-standup-format-slack, h-04-triage-json-output]
+wave: W3
+action_id: H-05
+
+description: |
+  Final commit on the epic branch. Bumps consumer-facing plugin version per
+  semver (minor — additive features: new skill + new flags + new reference
+  docs). Updates README version badge + CHANGELOG dated section describing
+  the four landed contract surfaces. Per cross-cutting concern 'versioning',
+  this commit MUST be the LAST on the epic branch so the version reflects
+  the full landed state.
+
+acceptance_criteria:
+  - ".claude-plugin/plugin.json version bumped per semver (minor — additive)"
+  - ".claude-plugin/marketplace.json version bumped to match plugin.json"
+  - "README.md version badge updated to match plugin.json"
+  - "CHANGELOG.md gains a new dated section for the new version with bullet entries for: /hive:context-snapshot skill + library composer + JSON schema; standup --format slack flag + reference; triage --json flag across sub-commands; Routines integration doc Hermes equivalence note"
+  - "Bump commit is the LAST commit on feat/hermes-integration-mvp (verify via git log)"
+  - "No code or test changes in this commit — version + changelog + readme only"
+
+metric:
+  applies: false
+  justification: "Version bump + CHANGELOG entry is a release-hygiene substrate story — there is no user-facing metric to move; the metric this enables (consumers correctly resolving the new minor version) is observed at install time and is implicitly verified by the existing release-readiness CI."
+
+steps:
+  - id: implement
+    description: |
+      Bump versions in .claude-plugin/plugin.json + .claude-plugin/marketplace.json
+      (use minor bump per semver — additive features, no breaking changes).
+      Update README version badge to match. Add CHANGELOG.md section dated
+      with merge date; bullet each landed contract surface from h-01..h-04.
+    agent: developer
+
+  - id: review
+    description: |
+      Verify: plugin.json + marketplace.json + README badge all show same
+      version string; CHANGELOG bullets cover all 4 landed stories; commit is
+      last on epic branch (git log inspection); no incidental code/test
+      changes leaked in.
+    agent: reviewer
+    depends_on: [implement]
+
+  - id: integrate
+    description: |
+      Commit on feat/hermes-integration-mvp as the FINAL commit. Open PR
+      against develop per git_flow.default_pr_base: auto.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .claude-plugin/plugin.json
+      purpose: "Authoritative plugin version (semver)"
+    - path: .claude-plugin/marketplace.json
+      purpose: "Marketplace listing version — must match plugin.json"
+    - path: README.md
+      purpose: "Version badge near top of README"
+    - path: CHANGELOG.md
+      purpose: "Dated release notes — new section per version bump"
+
+files_to_modify:
+  - file: .claude-plugin/plugin.json
+    change: Bump version (minor)
+  - file: .claude-plugin/marketplace.json
+    change: Bump version to match plugin.json
+  - file: README.md
+    change: Update version badge
+  - file: CHANGELOG.md
+    change: Add new dated section describing four landed contract surfaces
+
+design_decisions:
+  - decision: "Minor bump (not patch, not major)"
+    rationale: "Additive new skill + new flags = minor per semver. No removals, no behavior changes on default paths (default-behavior-preservation invariants tested in h-03 + h-04 ensure non-breaking)."
+  - decision: "Standalone version-bump story rather than checklist on h-04"
+    rationale: "Per versioning cross-cutting concern: bump commit must be LAST on epic branch. A dedicated story makes the ordering invariant explicit and reviewable."
+
+cross_cutting:
+  - concern: versioning
+    action: "This story IS the versioning concern fulfillment for the epic. Implementation checklist items from concerns/versioning are the acceptance criteria above."
+  - concern: documentation
+    action: "CHANGELOG update IS the user-facing documentation of the release."
+
+risks:
+  - severity: low
+    description: Merging an earlier story PR before this story lands could leave version unbumped on the merged surface
+    mitigation: Epic uses one branch + one PR per feedback_git_flow_per_epic; all stories land in one PR with h-05 as final commit; merge order is enforced naturally
+  - severity: low
+    description: Forgotten files (e.g., docs referencing the old version) cause drift
+    mitigation: grep for prior version string across repo before commit; reviewer step includes this check
+
+references:
+  - path: .pHive/cross-cutting-concerns.yaml
+    relevant_excerpt: |
+      id: versioning
+      implementation_checklist:
+        - ".claude-plugin/plugin.json version bumped per semver"
+        - ".claude-plugin/marketplace.json version bumped to match plugin.json"
+        - "README.md version badge updated to match plugin.json"
+        - "CHANGELOG.md gains a new dated section ..."
+        - "Bump commit is the LAST commit on the epic branch ..."
+
+parallel_allowed: false
+
+tracker_id: "plugin-hive/PLU-58"
+tracker_url: "http://localhost:3000/plugin-hive/issues/PLU-58"
+tracker_uuid: "2dd7ead1-84ac-438f-a328-17ad8a5b3907"

@@ -1,0 +1,128 @@
+id: mir-10-docs-and-concern-audit
+epic: meta-improvement-reset
+title: Audit cross-cutting metrics concern + docs sweep + CHANGELOG
+status: pending
+complexity: low
+methodology: classic
+tracker_id: plugin-hive/PLU-72
+tracker_url: http://localhost:3000/plugin-hive/issues/72
+depends_on: [mir-9-metric-gate-flip]
+
+description: |
+  Final story — closes the epic. Three substrate tasks:
+
+  1. Audit `.pHive/cross-cutting-concerns.yaml` metrics concern: verify
+     `applies_when` and `planning_prompt` are consistent with the new
+     blocking-gate semantics shipped in mir-9. Update if drift detected.
+
+  2. Update consumer-visible docs:
+     - hive/GUIDE.md meta-optimize section (new knobs, gate flip)
+     - hive/references/meta-optimize-maintainer.md (queue tier + shotgun + gate)
+     - New `hive/references/meta-shotgun-runbook.md` (or inline in SKILL.md if short enough)
+
+  3. CHANGELOG.md entries for all 6 surface changes (3.1-3.6):
+     - 3.1 external research feeds (CC + Anthropic blog)
+     - 3.2 signal weights knob
+     - 3.3 metric gate flip + advisory hatch
+     - 3.4 /meta-shotgun skill
+     - 3.5 backlog tier field
+     - 3.6 meta-PR retarget to develop
+
+acceptance_criteria:
+  - "Cross-cutting metrics concern audited; any drift fixed or accepted with note"
+  - "hive/GUIDE.md updated with new knobs + behavior"
+  - "hive/references/meta-optimize-maintainer.md covers tier + shotgun + gate"
+  - "meta-shotgun-runbook.md exists (or content inlined in SKILL.md with rationale)"
+  - "CHANGELOG.md has dated section for new version (2.8.1 or 2.9.0 per semver)"
+
+steps:
+  - id: research
+    description: |
+      Read .pHive/cross-cutting-concerns.yaml metrics concern entry. Compare
+      its applies_when + planning_prompt against the blocking-gate semantics.
+      List any drift items.
+    agent: researcher
+  - id: implement
+    description: |
+      Apply audit findings to cross-cutting-concerns.yaml if drift detected.
+      Write docs updates:
+      - hive/GUIDE.md: add subsection for signal weights + metric gate
+      - hive/references/meta-optimize-maintainer.md: queue-tier section,
+        shotgun reference, gate section
+      - hive/references/meta-shotgun-runbook.md OR inline in SKILL.md
+      - CHANGELOG.md: new dated section listing all 6 surface changes
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Manual link-check: every new internal ref resolves. Manual read-through
+      of CHANGELOG entries for accuracy.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Confirm CHANGELOG is consumer-facing (skips maintainer-only items like
+      /meta-shotgun unless consumer-visible). Verify version bump matches change
+      surface (minor for behavior changes).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    - markdown
+    - yaml
+  key_files:
+    - path: .pHive/cross-cutting-concerns.yaml
+      purpose: Concern catalog being audited
+    - path: hive/GUIDE.md
+      purpose: Consumer-facing guide
+    - path: hive/references/meta-optimize-maintainer.md
+      purpose: Maintainer reference
+    - path: CHANGELOG.md
+      purpose: Version history
+
+files_to_modify:
+  - file: .pHive/cross-cutting-concerns.yaml
+    change: Update metrics concern if audit detects drift; otherwise no-op
+  - file: hive/GUIDE.md
+    change: New subsection for signal weights + metric gate behavior
+  - file: hive/references/meta-optimize-maintainer.md
+    change: Add tier + shotgun + gate sections
+  - file: hive/references/meta-shotgun-runbook.md
+    change: New file (or skip if SKILL.md is sufficient)
+  - file: CHANGELOG.md
+    change: New dated section for 2.8.1 / 2.9.0 with 6 entries
+
+design_decisions:
+  - decision: Use existing CHANGELOG conventions (one entry per surface change)
+    rationale: Match prior epic patterns; reviewer-friendly
+
+cross_cutting:
+  - concern: documentation
+    action: This story IS the documentation concern fulfillment for the epic
+  - concern: versioning
+    action: Bump plugin.json version per semver; reflect in CHANGELOG and README badge
+
+risks:
+  - severity: low
+    description: Stale ref in cross-reference drifts after future epic edits
+    mitigation: Run link-check at test step; future epics inherit the responsibility
+
+references:
+  - path: .pHive/cross-cutting-concerns.yaml
+    relevant_excerpt: |
+      Each concern is evaluated per-story during planning. The metrics concern
+      drives step-03c gate; verify its planning_prompt + applies_when match
+      post-mir-9 blocking semantics.
+  - path: .pHive/epics/meta-improvement-reset/docs/design-discussion.md
+    relevant_excerpt: |
+      §3 surface changes 3.1-3.6 — all need CHANGELOG entries per docs concern.
+
+metric:
+  applies: false
+  justification: "Documentation + audit substrate story; effect measured via mir-9's step_03c.proposals_rejected_per_cycle and mir-8's discovery_source distribution. This story confirms the docs reflect those measurements correctly; its own surface is text not behavior."

@@ -71,11 +71,44 @@ selects from eligible entries when fallback is needed.
 `/meta-meta-optimize` remains maintainer-local only. It is not a shipped public
 consumer command.
 
-No public `meta_optimize:` config block is shipped in `hive.config.yaml` yet.
-Reviewers looking for the future config shape should treat
-`skills/hive/skills/meta-optimize/SKILL.md` and
-`hive/references/meta-optimize-contract.md` as the current source of truth
-until a runtime key is promoted into the public config surface.
+### Configuration Knobs (`meta_optimize:`)
+
+Two config keys are now shipped in the maintainer-local `hive.config.yaml`
+(plugin-hive root). Consumer projects do not carry these keys by default; add
+them under `meta_optimize:` only when you want to override the defaults.
+
+**`signal_weights`** — multipliers applied to each proposal-source pool during
+step-03 ranking. Higher weight = proposals from that source rank above
+lower-weight proposals at equal priority:
+
+```yaml
+meta_optimize:
+  signal_weights:
+    metrics: 1.0           # default; most trusted
+    external_research: 0.9 # Claude Code releases + Anthropic blog feeds
+    kg_signal: 0.4         # knowledge-graph signal (pending repair)
+    dreaming_replay: 0.5
+    backlog: 0.2           # lowest — human queue, no measurement signal
+```
+
+Omitting this block preserves prior behavior (implicit equal weighting).
+
+**`metric_gate`** — controls whether step-03c metric failures block a proposal
+from advancing to step-04 or are advisory only:
+
+| Value | Behavior |
+|-------|----------|
+| `blocking` *(default)* | Proposals failing the metric gate receive `status: rejected_metric_gate` and are excluded from step-04. Cycle fails only when zero proposals pass. Rejected proposals surface in the step summary and PR body. |
+| `advisory` | Gate failures are reported but all proposals pass through to step-04 (legacy non-blocking behavior). |
+
+```yaml
+meta_optimize:
+  metric_gate: blocking  # or: advisory
+```
+
+See `hive/references/meta-optimize-maintainer.md` for the full maintainer
+contract and `hive/references/meta-optimize-contract.md` for the public-path
+contract.
 
 ---
 

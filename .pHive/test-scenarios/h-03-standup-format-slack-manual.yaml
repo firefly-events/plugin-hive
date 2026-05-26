@@ -1,0 +1,47 @@
+id: h-03-standup-format-slack-manual
+title: "Standup --format slack — Slack render verification"
+mode: simulated-manual
+story: h-03-standup-format-slack
+epic: hermes-integration-mvp
+
+preconditions:
+  - "Project has at least one active epic with episode markers in .pHive/episodes/"
+  - "At least one story is in-progress or completed to give the report non-trivial content"
+  - "No active triage items required (slack output with empty triage section should be silent)"
+
+steps:
+  - action: "Invoke /hive:standup --format slack in a Claude Code session"
+    expected: "Claude emits the Phase 1 standup report and stops. No 'Ready for Planning?' prompt appears. No Phase 2 or Phase 3 output follows."
+    actor: operator
+
+  - action: "Inspect the raw output for ANSI escape sequences (e.g., \\e[, \\033[, \\x1b[ patterns)"
+    expected: "Zero ANSI escape sequences found. Output is plain UTF-8 text."
+    actor: operator
+
+  - action: "Copy the full output and paste into a Slack DM (to yourself or a test channel)"
+    expected: >
+      Headings (##, ###) render as bold section titles.
+      Bullet lists render as bulleted lists.
+      Fenced code blocks (``` ... ```) render as monospace blocks.
+      No raw escape characters or formatting artifacts visible.
+    actor: operator
+
+  - action: "Verify the dependency graph section (if present) rendered inside a code block"
+    expected: "Dependency graph is monospace-aligned and readable without raw pipe/dash artifacts."
+    actor: operator
+
+  - action: "Invoke /hive:standup (without --format flag) in the same session"
+    expected: "Full interactive ceremony runs. 'Ready for Planning?' prompt appears at the end of Phase 1. Behavior is unchanged from pre-h-03 baseline."
+    actor: operator
+
+postconditions:
+  - "Slack render of --format slack output is clean: headings, bullets, code blocks all display correctly"
+  - "No ANSI artifacts visible in Slack output"
+  - "Default (no-flag) invocation behavior is byte-equivalent to pre-h-03 behavior"
+  - "Manual verdict recorded in cycle-state manual_verdict block"
+
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/h-03-standup-format-slack-manual.yaml
+  verdict: null
+  timestamp: null
+  agent: null

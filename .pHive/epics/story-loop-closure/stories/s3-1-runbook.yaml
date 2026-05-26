@@ -1,0 +1,72 @@
+id: s3-1-runbook
+epic: story-loop-closure
+title: "S3.1 — runbook: failure modes + manual sweep instructions"
+status: pending
+complexity: low
+methodology: classic
+depends_on: [s1-2-execute-integrate-hook]
+
+description: |
+  Single-page runbook covering: how the closer works, what each failure
+  mode looks like, how to manually sweep stale Multica issues, and what
+  to do when the closer logs a WARN line. Lives at
+  `hive/references/multica-issue-closer-runbook.md`. Linked from the
+  closer module's header comment + from `skills/execute/SKILL.md`'s
+  integrate-step section.
+
+acceptance_criteria:
+  - "`hive/references/multica-issue-closer-runbook.md` covers: (1) flow diagram (PR merge → integrate hook → closer → Multica API), (2) every return-shape from the closer (`no_marker`, `no_auth`, `already_done`, `cancelled`, `agent_drift`, `transport`, `was_changed`), (3) manual sweep — `multica issue list --status in_review` + `multica issue status set <key> done` per stale match, (4) when to escalate (closer warns 5+ runs in a row)."
+  - "Runbook is linked from `hive/lib/multica-issue-closer.mjs`'s module header comment."
+  - "Runbook is linked from the integrate-step section of `skills/execute/SKILL.md` (or its referenced step file)."
+  - "Markdown lint clean (no MD033 violations from the worked-example code blocks)."
+
+steps:
+  - id: research
+    description: Re-skim the closer module + the integrate hook to enumerate every documented return-shape; check `multica issue --help` for the manual-sweep CLI syntax.
+    agent: researcher
+  - id: implement
+    description: Write the runbook + add the cross-links from the two referenced files.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Markdown lint the runbook + visually verify the links resolve from the two referrers.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm runbook covers every closer return-shape from s1-1's acceptance criteria.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-issue-closer.mjs
+      purpose: source of the return-shape vocabulary that the runbook documents
+    - path: skills/execute/SKILL.md
+      purpose: the integrate-step section that links to the runbook
+
+files_to_modify:
+  - file: hive/references/multica-issue-closer-runbook.md
+    change: new runbook
+  - file: hive/lib/multica-issue-closer.mjs
+    change: add a one-line link comment to the runbook in the module header
+  - file: skills/execute/SKILL.md
+    change: add a runbook link in the integrate-step section
+
+cross_cutting:
+  - concern: documentation
+    action: Runbook should match the prose tone of `hive/references/episode-schema.md` (canonical reference shape; not a tutorial).
+
+risks:
+  - severity: low
+    description: Runbook drifts from the actual closer behavior over time
+    mitigation: Closer's return-shape vocabulary is enumerated in s1-1's acceptance criteria; a future change to that vocabulary should update the runbook as a follow-on commit.
+
+references:
+  - path: hive/references/episode-schema.md
+    relevant_excerpt: |
+      (read in research — reference for runbook tone + structure)

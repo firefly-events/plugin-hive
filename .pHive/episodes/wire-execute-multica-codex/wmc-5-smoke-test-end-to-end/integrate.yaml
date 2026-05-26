@@ -1,0 +1,13 @@
+story: wmc-5-smoke-test-end-to-end
+epic: wire-execute-multica-codex
+phase: integrate
+status: passed
+timestamp: 2026-05-25T20:10:00Z
+notes: |
+  Real end-to-end dispatch through Multica + Codex routing exercised.
+  PLU-78 created, assigned to developer agent, task auto-spawned,
+  status=completed in ~23s. Brief carried '## Use /codex:rescue' section.
+  writeMulticaRunEpisode wrote real marker. scope_drift emit ran cleanly
+  (skipped at ed-1 maturity gate as expected).
+  All 11 verification points PASS — report at
+  .pHive/audits/smoke-test/wire-execute-multica-codex.md.

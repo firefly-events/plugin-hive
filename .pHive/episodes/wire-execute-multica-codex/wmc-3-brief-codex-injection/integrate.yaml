@@ -1,0 +1,12 @@
+story: wmc-3-brief-codex-injection
+epic: wire-execute-multica-codex
+phase: integrate
+status: passed
+timestamp: 2026-05-25T19:58:22Z
+notes: |
+  serializeStoryBrief signature extended (story, options={}).
+  codexInstruction:true inserts '## Use /codex:rescue' between Goal and Acceptance Criteria.
+  Default (omitted/false) is byte-equivalent to prior single-arg behavior.
+  execute-mode-multica Step 1 reads hive_config.agent_backends.developer and passes
+  codexInstruction:true when value === 'codex'.
+  5 new unit tests pass; 10 pre-existing story-dispatch tests still pass.

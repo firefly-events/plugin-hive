@@ -1,0 +1,144 @@
+id: mi-02-spike-session-lifecycle
+epic: multica-integration-fixes
+title: Spike — Multica Claude provider session lifecycle + API socket idle drop
+status: pending
+complexity: small
+methodology: classic
+depends_on: [mi-01-spike-plugin-loading]   # serial per grill C3 (defensive vs codex race; also serializes Multica-source-read budget across spikes)
+wave: W1
+action_id: MI-02
+
+description: |
+  Read Multica source to determine how the Claude provider manages its
+  Anthropic API connection lifecycle — keepalive, idle timeout, retry,
+  reconnect. Diagnose the API socket idle drop seen in hermes-integration-mvp
+  h-04 attempt 1 (16-minute idle gap between agent's last message and socket
+  drop; pattern affects multiple unrelated tasks per daemon log).
+
+  Pre-step: same as mi-01 — verify ~/Code/spikes/multica or fresh-clone.
+
+  HARD BUDGET: ≤2 hours wall-clock OR ≤15 file reads. Non-completion path:
+  brief documenting search effort + recommended upstream question.
+
+  IMPORTANT — composable-substrate posture (per grill P1): this brief ships
+  diagnosis + upstream-fix-spec ONLY. Hive-side workaround proposals
+  (retry-with-backoff, smaller stories, keepalive-tickle) go in an APPENDIX
+  marked "options NOT recommended for this epic — see follow-on" so the
+  composable substrate posture isn't violated. The right Hive-side response
+  to upstream socket drops is fail-fast + clear error, not workarounds.
+
+acceptance_criteria:
+  - "Pre-step documented same as mi-01 (which source read, SHA verified)"
+  - "`.pHive/upstream-watch/multica-session-lifecycle.md` exists with four required sections: ## Repro, ## Root cause, ## Suggested fix, ## Recommended Multica-side change"
+  - "Repro section cites the h-04 attempt 1 daemon log lines (task 6b08b856, 16-min idle gap, socket drop after 7m9s)"
+  - "Root cause names: keepalive mechanism (if any), idle timeout (Multica-configurable vs Anthropic-server-imposed), retry-on-disconnect (present or absent), connection pooling posture"
+  - "Suggested fix is a concrete change at a named Multica code site OR a concrete config knob to expose"
+  - "Workaround appendix lists 3-5 Hive-side options with brief pros/cons but explicitly states 'not recommended for this epic' per composable-substrate posture"
+  - "Brief ≤100 lines (excluding code blocks + appendix); slightly larger than mi-01 because session lifecycle is multi-step"
+
+metric:
+  applies: false
+  justification: "Spike story — deliverable is a written brief at .pHive/upstream-watch/multica-session-lifecycle.md documenting an upstream connection-management gap. No observable user-facing surface to measure; success is the brief shipping with four sections + repro citation + composable-substrate-aware workaround appendix, verified by reviewer reading the file."
+
+steps:
+  - id: research
+    description: |
+      Read Multica source for the Claude provider's connection management:
+      Anthropic SDK initialization, keepalive code, retry/reconnect handlers,
+      idle timeout config, WebSocket vs HTTP transport choice. Cross-reference
+      ~/.multica/daemon.log for h-04 attempt 1 (task 6b08b856) timing
+      evidence. Identify whether the 16-min idle drop is Anthropic-side
+      timeout (suggests increase keepalive frequency) or Multica-side
+      (suggests connection-pool or retry change).
+    agent: researcher
+
+  - id: implement
+    description: |
+      Write .pHive/upstream-watch/multica-session-lifecycle.md per acceptance
+      criteria. Four sections + repro citation + workaround appendix marked
+      "not recommended for this epic." Brief ≤100 lines.
+    agent: technical-writer
+    depends_on: [research]
+
+  - id: review
+    description: |
+      Verify four sections + repro citation + ≤100-line cap + workaround
+      appendix's "not recommended" disclaimer present. Confirm root cause
+      names actual Multica code site (or explicit "couldn't find within
+      budget"). Confirm fix is actionable (upstream maintainer could open
+      the PR from this brief alone).
+    agent: reviewer
+    depends_on: [implement]
+
+  - id: integrate
+    description: |
+      Commit the brief on feat/multica-integration-fixes branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  external_source: ~/Code/spikes/multica
+  upstream_repo: https://github.com/multica-ai/multica
+  evidence_log: ~/.multica/daemon.log
+  key_files:
+    - path: ~/.multica/daemon.log
+      purpose: "Evidence source — contains h-04 attempt 1 timing (search for task=6b08b856)"
+    - path: ~/Code/spikes/multica/
+      purpose: "Multica source — read connection management code"
+
+files_to_modify:
+  - file: .pHive/upstream-watch/multica-session-lifecycle.md
+    change: NEW — ≤100-line upstream-blocker brief with repro + composable-aware appendix
+
+code_examples:
+  - title: Existing repro evidence in daemon log
+    file: ~/.multica/daemon.log
+    snippet: |
+      # Search the log for this entry to cite in the brief:
+      # 04:26:49 DBG agent task=6b08b856 text="Now write the tests:"
+      # 04:42:58 DBG agent task=6b08b856 text="API Error: The socket connection was closed unexpectedly"
+      # 04:42:58 INF claude finished pid=51349 status=failed duration=7m9.126s
+      # The 16-min gap (04:26 → 04:42) is the smoking gun
+
+design_decisions:
+  - decision: "Workaround appendix included but marked 'not recommended for this epic'"
+    rationale: "Per grill P1: composable-substrate posture says fail-fast + clear error, not workarounds. Listing options helps future planning; recommending them violates posture. Explicit framing keeps the door open without taking the wrong step."
+  - decision: "Slightly larger budget (100 lines) than mi-01 (80 lines)"
+    rationale: "Session lifecycle is multi-step (init → keepalive → retry → teardown). The brief needs to name each step to be actionable for an upstream maintainer. Still tight enough to fit on one screen at standard zoom."
+
+cross_cutting:
+  - concern: documentation
+    action: "Brief IS the deliverable. Same .pHive/upstream-watch/ tracked subtree as mi-01."
+
+risks:
+  - severity: medium
+    description: Root cause may be in Anthropic SDK (claude-code or anthropic npm package) not Multica itself
+    mitigation: Brief documents which side owns the fix (Multica vs Anthropic SDK); if Anthropic-side, recommend Multica file the upstream issue + workaround locally
+  - severity: medium
+    description: Spike could conflate symptoms — socket drop after idle could also be Bun runtime issue inside Multica or local network instability
+    mitigation: Repro section cites the cross-task pattern (302e56c4 also dropped); if spike can't disambiguate, brief documents the ambiguity + suggests two parallel upstream questions
+  - severity: low
+    description: cmux MODULE_NOT_FOUND noise might tempt the spike to chase the wrong target
+    mitigation: Story spec explicitly reframes cmux as cosmetic per research-brief; spike confirms during research step + cites that finding
+
+references:
+  - path: .pHive/epics/multica-integration-fixes/docs/design-discussion.md
+    relevant_excerpt: |
+      mi-02 spike: read Multica source to find session-lifecycle / connection
+      management for the Claude provider. Output: brief documenting how
+      socket-keepalive works, whether idle timeout is Multica-configurable
+      or Anthropic-server. Composable-substrate posture: diagnosis +
+      upstream-fix-spec ONLY, workaround appendix marked "not recommended."
+  - path: .pHive/epics/multica-integration-fixes/docs/research-brief.md
+    relevant_excerpt: |
+      h-04 attempt 1 (task 6b08b856): 16 minutes between agent's last text
+      message and socket drop. Daemon log shows the SAME socket-drop pattern
+      across multiple unrelated tasks (302e56c4 also dropped, different epic)
+      — this is a Multica session-lifecycle issue, not a Hive issue.
+
+parallel_allowed: false
+
+tracker_id: "plugin-hive/PLU-60"
+tracker_url: "http://localhost:3000/plugin-hive/issues/PLU-60"
+tracker_uuid: "fec21902-8502-49f1-a8e9-e3a50e4445e0"

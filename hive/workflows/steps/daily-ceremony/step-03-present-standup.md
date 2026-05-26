@@ -10,9 +10,16 @@
 
 ## EXECUTION PROTOCOLS
 
-**Mode:** interactive
+**Mode:** interactive (default) | non-interactive (when `args.format == "slack"`)
 
-Format the combined state and memory data into a structured standup report. Present to the user. Wait for acknowledgment before proceeding.
+Format the combined state and memory data into a structured standup report. Present to the user.
+
+**Format branching:**
+
+- `args.format == "slack"` → emit the report as plain markdown (no ANSI escape codes, no color sequences, no bold/dim terminal formatting). Skip the "Ready for Planning?" prompt. Return immediately after printing the report — do NOT proceed to step 4 or beyond. This path is designed for cron capture and non-interactive pipeline use.
+- `args.format == "default"` (or omitted) → standard interactive mode. Wait for user acknowledgment before proceeding. All ANSI formatting and interactive prompts apply as normal.
+
+When rendering under `--format slack`, use markdown constructs only: `##`/`###` headings (no H1), `-` bullet lists, ` ``` ` fenced code blocks for tabular data. Do not emit terminal escape sequences. See `hive/references/standup-slack-format.md` for the full output spec.
 
 ## CONTEXT BOUNDARIES
 
@@ -145,6 +152,8 @@ Output the complete report to the user. End with:
 
 ## NEXT STEP
 
-**Gating:** Standup report presented to user. User has acknowledged.
-**Next:** Load `workflows/steps/daily-ceremony/step-04-select-work.md`
+**Gating (default format):** Standup report presented to user. User has acknowledged.
+**Next (default format):** Load `workflows/steps/daily-ceremony/step-04-select-work.md`
 **If gating fails:** If user requests changes to the report format or wants more detail on specific items, provide it before proceeding.
+
+**Slack format:** After emitting the report, stop. Do NOT load step 4. The workflow terminates at this step.
