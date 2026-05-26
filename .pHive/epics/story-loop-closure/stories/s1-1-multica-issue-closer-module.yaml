@@ -69,7 +69,7 @@ design_decisions:
 risks:
   - severity: medium
     description: Marker drift — issue reassigned to a different agent between dispatch + closer-run
-    mitigation: Pre-fetch the issue and validate `agent_id` still matches `assignee_id` in the marker; if not, skip with `{reason: 'agent_drift'}`.
+    mitigation: "Pre-fetch the issue and validate `agent_id` still matches `assignee_id` in the marker; if not, skip with `{reason: 'agent_drift'}`."
 
 references:
   - path: hive/lib/multica-story-dispatch/index.mjs

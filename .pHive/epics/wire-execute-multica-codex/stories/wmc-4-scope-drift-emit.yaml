@@ -90,7 +90,7 @@ context:
     - path: hive/lib/scope_drift.py
       purpose: emit_scope_drift function definition.
     - path: skills/hive/skills/execute/SKILL.md
-      purpose: "Scope-drift emit (per-story boundary)" section is the prescription this story implements.
+      purpose: '"Scope-drift emit (per-story boundary)" section is the prescription this story implements.'
     - path: hive/references/cycle-state-schema.md
       purpose: delta_reasons enum definition.
 

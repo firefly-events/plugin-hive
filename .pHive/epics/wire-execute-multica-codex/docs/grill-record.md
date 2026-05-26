@@ -53,7 +53,7 @@
 
 - **C1** — Draft's G6 fix (per-story ephemeral branch + per-story PR) contradicts `feedback_git_flow_per_epic` ("One branch per epic, one commit per story; per-story branches fragment review").
   - Draft location: §3 line "create branch `agent/{story-id}/{short-hash}`, commit, push, run `gh pr create`"
-  - Convention: `~/.claude/projects/-Users-don-Documents-plugin-hive/memory/feedback_git_flow_per_epic.md` — "branch is feat/<epic-id>; each story is one commit on it; per-story branches fragment review"
+  - Convention: `~/.claude/projects/-Users-don-Documents-plugin-hive/memory/feedback_git_flow_per_epic.md` — "branch is `feat/<epic-id>`; each story is one commit on it; per-story branches fragment review"
   - Question for planner: is this an explicit deviation (PR-per-story is the cost we accept for race elimination) or an alignment (find a race fix that preserves one-commit-per-story-on-epic-branch — e.g., orchestrator-side serial cherry-pick promoted from bandage to canonical)? The draft §6 Q1 frames the alternative as inferior, but the convention memo is explicit and well-aged.
 
 ## Posture mismatches

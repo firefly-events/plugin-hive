@@ -43,7 +43,7 @@
   - Question for planner: either gate mi-04 explicitly on mi-01 completion (orchestrator re-spec mi-04 after mi-01 lands), OR ship mi-04 with three branches in the acceptance criteria (config-only / patch-needed / unfindable) and the agent picks based on mi-01's brief.
 
 - **H4** — Draft assumes `multica repo checkout --ref <branch>` behaves as the help text implies.
-  - Draft location: §3 mi-03 "call multica repo checkout --ref <epic-branch> explicitly before dispatch"
+  - Draft location: §3 mi-03 "call `multica repo checkout --ref <epic-branch>` explicitly before dispatch"
   - Why this matters: only verified via `--help` output, not by actual invocation. CLI might require the daemon's bare-clone cache to already have the branch fetched, or only work for issue-assigned tasks, or have side-effects on workspace state.
   - Question for planner: add a pre-implementation verification step to mi-03 — invoke `multica repo checkout --ref feat/multica-integration-fixes` against a throwaway issue + inspect resulting workdir BEFORE writing the skill patch. Cheap, prevents shape mismatch.
 

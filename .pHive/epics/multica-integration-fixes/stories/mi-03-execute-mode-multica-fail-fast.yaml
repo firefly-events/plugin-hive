@@ -152,7 +152,7 @@ cross_cutting:
 
 risks:
   - severity: high
-    description: `multica repo checkout --ref` might not behave the way the help text implies (require pre-fetched ref, leave workdir in inconsistent state, etc.)
+    description: "`multica repo checkout --ref` might not behave the way the help text implies (require pre-fetched ref, leave workdir in inconsistent state, etc.)"
     mitigation: Pre-implementation verification step is exactly this check; commit message documents actual behavior; patch is written to match what was observed
   - severity: medium
     description: Patch regresses the h-01-style auto-clone success path

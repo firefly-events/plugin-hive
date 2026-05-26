@@ -63,7 +63,7 @@
 
 - **C1** — Cross-repo work without explicit branch posture commitment violates `feedback_git_flow_per_epic` (one branch per epic).
   - Draft location: §5 cross-repo paragraph
-  - Convention: memory `feedback_git_flow_per_epic` — "branch is feat/<epic-id>; each story is one commit on it"
+  - Convention: memory `feedback_git_flow_per_epic` — "branch is `feat/<epic-id>`; each story is one commit on it"
   - Question for planner: confirm — this epic's branch `feat/hermes-integration-mvp` exists only on plugin-hive; any Hermes-side work goes on a Hermes-repo branch with the same name; explicitly document in epic.yaml that the "one branch per epic" convention applies per-repo for cross-repo epics?
 
 - **C2** — Compressed planning mode bypasses `agent_backends` codex routing (researcher/writer/architect should route through codex per root config + `feedback_orchestrator_must_honor_backend_routing`).
