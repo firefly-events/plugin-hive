@@ -1,0 +1,69 @@
+id: w2-6-dispatch-record-squad-eval
+epic: multica-substrate-deepen
+title: "Add recordSquadEvaluation helper to multica-story-dispatch"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [w2-4-adapter-abi-1-1]
+
+description: |
+  Add recordSquadEvaluation(issueId, options) helper to
+  hive/lib/multica-story-dispatch/ that:
+
+  1. Calls adapter.updateIssueStatus(issueId, 'in_review')
+  2. Calls adapter.getSquadActivity(issueId) to fetch any existing evaluation
+  3. Returns the evaluation object (or null) for inclusion in the episode marker
+
+  Used by W2.7's execute integrate-step extension.
+
+  Helper handles the same error-mapping conventions as serializeStoryBrief
+  (TRANSPORT, AUTH_FAILURE wraps).
+
+acceptance_criteria:
+  - "recordSquadEvaluation exported from hive/lib/multica-story-dispatch/index.mjs"
+  - "Function calls updateIssueStatus then getSquadActivity in order"
+  - "Returns { status_transitioned: bool, evaluation: <obj|null> } shape"
+  - "Tests cover: happy path, getSquadActivity 404 (no eval), updateIssueStatus auth fail"
+  - "Auth failure surfaces with /hive:multica-init hint per existing convention"
+
+steps:
+  - id: research
+    description: Read W2.4 adapter methods + W2.5 contract; identify exact call shape
+    agent: researcher
+  - id: implement
+    description: Add helper + wire error handling
+    agent: backend-developer
+    depends_on: [research]
+  - id: test
+    description: 3-path coverage
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Reviewer checks error conventions + return shape consistency
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/multica-substrate-deepen
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: Module to extend (sibling to serializeStoryBrief)
+    - path: hive/lib/multica-story-dispatch/episode-sync.mjs
+      purpose: Episode marker writer that will include evaluation
+
+cross_cutting:
+  - concern: documentation
+    action: "Update hive/lib/multica-story-dispatch/README.md (if absent, create)"
+
+risks:
+  - severity: medium
+    description: Two-call ordering bug (status change without eval read)
+    mitigation: Atomic helper; explicit ordering documented + tested
+
+metric:
+  applies: false
+  justification: "Implementation helper; w2-7 execute integration carries the end-to-end metric."

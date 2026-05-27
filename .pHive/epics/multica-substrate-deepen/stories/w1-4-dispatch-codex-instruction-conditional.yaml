@@ -1,0 +1,93 @@
+id: w1-4-dispatch-codex-instruction-conditional
+epic: multica-substrate-deepen
+title: "Make serializeStoryBrief codexInstruction conditional on per-persona provider"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [w0-1-codex-spike, w1-2-agents-yaml-expansion]
+
+description: |
+  Today's serializeStoryBrief takes a `codexInstruction: bool` and conditionally
+  embeds a "## Use /codex:rescue" section. Decision is made by
+  execute-mode-multica based on hive_config.agent_backends.developer === 'codex'.
+
+  After W1.2, the dispatching persona is no longer always `developer` — and
+  for each persona, the provider may be codex (native) or claude (rescue-via-
+  /codex:rescue). The codexInstruction flag must become conditional on the
+  *dispatching persona's effective provider in agents.yaml*, not on a global
+  developer-only flag.
+
+  Behavior:
+  - If W0.1 verdict = supported AND persona.provider = codex: omit the
+    /codex:rescue section entirely. Rescue dance dies.
+  - If persona.provider = claude AND hive_config.agent_backends.<persona> =
+    codex: keep current behavior (embed /codex:rescue section).
+  - Else: omit /codex:rescue section.
+
+acceptance_criteria:
+  - "serializeStoryBrief reads dispatchingPersona name + looks up effective provider from agents.yaml"
+  - "If effective provider = codex: brief omits the '## Use /codex:rescue' section"
+  - "If effective provider = claude AND agent_backends.<persona> = codex: brief embeds '## Use /codex:rescue' section (backward-compat)"
+  - "Existing 3-persona behavior unchanged when agents.yaml is at W1.2 default state"
+  - "Tests cover all four combinations (codex+codex, codex+claude, claude+codex, claude+claude)"
+
+steps:
+  - id: research
+    description: Read serializeStoryBrief; map control flow + flag origin
+    agent: researcher
+  - id: implement
+    description: Refactor codexInstruction decision to per-persona provider lookup
+    agent: backend-developer
+    depends_on: [research]
+  - id: test
+    description: 4-combo test matrix; assert brief content shape per combo
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Reviewer validates backward-compat + correctness
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/multica-substrate-deepen
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: serializeStoryBrief location (line ~140-150)
+    - path: skills/hive/skills/execute-mode-multica/SKILL.md
+      purpose: Caller of serializeStoryBrief with current codexInstruction wire
+
+code_examples:
+  - title: Current codexInstruction wiring
+    file: hive/lib/multica-story-dispatch/index.mjs
+    snippet: |
+      export function serializeStoryBrief(story, options = {}) {
+        const { codexInstruction = false } = options;
+        // ... if (codexInstruction) embed rescue section ...
+      }
+
+cross_cutting:
+  - concern: documentation
+    action: "Update execute-mode-multica SKILL.md to document the new decision criterion"
+
+risks:
+  - severity: medium
+    description: Per-persona lookup reads agents.yaml at dispatch time, adding I/O
+    mitigation: Cache agents.yaml load once per /execute run; invalidate on file change
+
+metric:
+  applies: true
+  name: multica.brief_codex_rescue_sections_emitted
+  direction: down
+  unit: count
+  baseline: 1.0
+  target: 0.0
+  window: per-story-dispatch (when all creators are codex-native)
+  source:
+    kind: manual
+    ref: "grep '/codex:rescue' on serialized brief output across one full /execute pass"
+  verify_at: integrate
+  owner: tester

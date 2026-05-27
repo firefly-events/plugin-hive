@@ -1,0 +1,85 @@
+id: w2-4-adapter-abi-1-1
+epic: multica-substrate-deepen
+title: "Adapter ABI 1.1.0 — add getSquadActivity + updateIssueStatus"
+status: pending
+complexity: high
+methodology: classic
+depends_on: [w0-2-squad-read-spike]
+
+description: |
+  Bump multica adapter ABI from 1.0.0 → 1.1.0. Add two new methods:
+
+  - getSquadActivity(issueId) — returns { leader, evaluation, timestamp }
+    or null if no activity recorded. Used by /execute at PR-open moment to
+    fetch the squad-leader's evaluation.
+  - updateIssueStatus(issueId, status) — moves Multica issue between
+    statuses (in particular, transition to 'in_review' at PR-open time).
+
+  Endpoint paths + JSON shapes per W0.2 spike finding. If W0.2 returned
+  blocking-negative, this story is cut and Phase B downgrades to roster-
+  namespace only.
+
+  Bump capabilities() output to indicate ABI 1.1.0.
+
+acceptance_criteria:
+  - "Adapter exports getSquadActivity + updateIssueStatus methods"
+  - "Both methods conform to W0.2 spike's documented endpoint shapes"
+  - "Methods follow existing adapter error mapping conventions (mapHttpError, AdapterError)"
+  - "capabilities() output includes abi_version: '1.1.0' and supports_squad_activity: true"
+  - "Tests cover happy path + 404 (no activity) + auth failure"
+  - "friction-notes.md updated with ABI 1.1.0 delta (and any new friction discovered)"
+  - "Adapter README updated with new methods"
+
+steps:
+  - id: research
+    description: Read W0.2 spike finding + current adapter shape
+    agent: researcher
+  - id: implement
+    description: Add two methods + ABI bump + capabilities update
+    agent: backend-developer
+    depends_on: [research]
+  - id: test
+    description: Test happy + 404 + auth failure paths
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Reviewer checks ABI bump consistency + error handling
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/multica-substrate-deepen
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/adapters/multica/index.ts
+      purpose: Adapter to extend (445 lines today)
+    - path: hive/adapters/multica/friction-notes.md
+      purpose: ABI deltas to document
+
+cross_cutting:
+  - concern: documentation
+    action: "Update friction-notes.md + adapter README"
+  - concern: versioning
+    action: "Adapter ABI bump 1.0.0 → 1.1.0; consumer-visible; plugin.json + marketplace.json + CHANGELOG.md updated; minor bump per semver (additive)"
+
+risks:
+  - severity: high
+    description: ABI 1.1.0 contract drifts from W0.2 spike findings
+    mitigation: Story explicitly cites spike doc; test verifies endpoint signatures match
+
+metric:
+  applies: true
+  name: multica.adapter_abi_version
+  direction: up
+  unit: semver
+  baseline: "1.0.0"
+  target: "1.1.0"
+  window: post-story-integrate
+  source:
+    kind: manual
+    ref: "Adapter capabilities() output"
+  verify_at: integrate
+  owner: reviewer

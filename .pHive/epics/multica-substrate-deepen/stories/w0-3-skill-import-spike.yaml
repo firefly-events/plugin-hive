@@ -1,0 +1,63 @@
+id: w0-3-skill-import-spike
+epic: multica-substrate-deepen
+title: "Spike: confirm Multica skill import supports private visibility mechanism"
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: read-only
+
+description: |
+  Phase 0 feasibility spike. Confirm that `multica skill import` accepts a
+  visibility/privacy mechanism so plugin-hive skills exported into the
+  spike workspace in W4 do not leak into a shared-tenancy surface.
+
+  Inspect `multica skill import --help` exhaustively; if no flag exposed,
+  inspect spike source at ~/Code/spikes/multica/cmd/cli/skill for default
+  visibility + post-import patch options. Try importing one throwaway skill;
+  inspect its row in the `skill` table for visibility column value.
+
+  Outputs: confirmed flag (or absence of flag) + recommended W4 protocol
+  for visibility-safe imports.
+
+acceptance_criteria:
+  - "Written finding at .pHive/epics/multica-substrate-deepen/docs/spike-findings/s0-3-skill-import.md"
+  - "Finding states whether --visibility (or equivalent) flag exists on skill import + default visibility value"
+  - "Finding includes one round-tripped throwaway import in spike workspace as proof"
+  - "Throwaway skill cleaned up after spike (no leftover in spike workspace skill table)"
+  - "No changes to plugin-hive production files"
+
+steps:
+  - id: research
+    description: Inspect skill import CLI + spike source for visibility mechanism
+    agent: researcher
+  - id: implement
+    description: One round-trip import of throwaway test skill; verify table state; clean up
+    agent: researcher
+    depends_on: [research]
+  - id: integrate
+    description: Write finding doc; commit on feat/multica-substrate-deepen
+    agent: technical-writer
+    depends_on: [implement]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: ~/Code/spikes/multica/cmd/cli/skill
+      purpose: Skill subcommand source
+    - path: ~/Code/spikes/multica/server/internal/handler/skill.go
+      purpose: Skill import endpoint shape
+
+cross_cutting:
+  - concern: documentation
+    action: "Spike finding satisfies documentation concern"
+
+risks:
+  - severity: medium
+    description: No visibility flag; imports default to workspace-shared
+    mitigation: W4 reconcileSkills uses post-import patch (if available) OR pilot stays in single-tenancy spike only
+
+metric:
+  applies: false
+  justification: "Spike story; written finding doc only. W4 delivery metric is on the pilot validation story."

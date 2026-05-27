@@ -199,3 +199,5 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/episodes/multica-integration-fixes/**
 !.pHive/epics/story-loop-closure/
 !.pHive/epics/story-loop-closure/**
+!.pHive/epics/multica-substrate-deepen/
+!.pHive/epics/multica-substrate-deepen/**

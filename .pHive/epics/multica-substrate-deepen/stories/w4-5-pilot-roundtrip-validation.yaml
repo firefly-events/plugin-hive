@@ -1,0 +1,78 @@
+id: w4-5-pilot-roundtrip-validation
+epic: multica-substrate-deepen
+title: "Pilot round-trip validation — export /metrics-check, verify in spike workspace"
+status: pending
+complexity: low
+methodology: classic
+depends_on: [w4-3-bootstrap-reconcile-skills]
+
+description: |
+  End-to-end smoke test of the Mode D-a skills export pipeline.
+
+  1. Run /hive:multica-init in the spike workspace.
+  2. Verify reconcileSkills materialized /metrics-check as a Multica skill
+     row with the correct bundled substrate.
+  3. Fetch the skill via `multica skill get` and confirm content matches
+     in-repo SKILL.md (normalized comparison).
+  4. Confirm all substrate_deps from W4.2 are present as skill_files.
+  5. Confirm visibility flag is set per W0.3 finding.
+
+  This is the pilot success gate. If this passes, the Mode D-a pattern is
+  validated. Future skills can be added to skills-export.yaml without re-
+  validating the mechanism.
+
+acceptance_criteria:
+  - "Pilot round-trip executed end-to-end against spike workspace"
+  - "metrics-check skill present in Multica skill table after /hive:multica-init"
+  - "Skill content matches in-repo SKILL.md after normalization"
+  - "All substrate_deps present as skill_files"
+  - "Visibility flag correctly set"
+  - "Validation finding documented at .pHive/epics/multica-substrate-deepen/docs/pilot-roundtrip-validation.md"
+
+steps:
+  - id: research
+    description: Recap W4.2 manifest + W4.3 reconcile flow + W0.3 visibility
+    agent: researcher
+  - id: implement
+    description: Run /hive:multica-init in spike workspace
+    agent: tester
+    depends_on: [research]
+  - id: test
+    description: Verify all 5 acceptance points
+    agent: tester
+    depends_on: [implement]
+  - id: integrate
+    description: Write validation finding doc; commit
+    agent: technical-writer
+    depends_on: [test]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/multica/skills-export.yaml
+      purpose: Pilot manifest
+    - path: skills/multica-init/SKILL.md
+      purpose: Bootstrap entrypoint
+
+cross_cutting:
+  - concern: documentation
+    action: "Validation finding doc satisfies documentation concern"
+
+risks:
+  - severity: medium
+    description: Round-trip exposes bundling protocol gap
+    mitigation: Failure surfaces a defect story against W4.3, not a re-plan
+
+metric:
+  applies: true
+  name: multica.skills_export_pilot_roundtrip_pass
+  direction: up
+  unit: boolean
+  baseline: 0
+  target: 1
+  window: post-story-integrate
+  source:
+    kind: manual
+    ref: "Validation finding doc declares PASS"
+  verify_at: integrate
+  owner: tester
