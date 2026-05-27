@@ -138,7 +138,7 @@ export function __resetCache() {
 }
 
 export function serializeStoryBrief(story, options = {}) {
-  const { codexInstruction = false } = options;
+  const { codexInstruction = false, integrationBranch = null } = options;
   const sections = [];
 
   if (story?.description) {
@@ -165,6 +165,37 @@ export function serializeStoryBrief(story, options = {}) {
 
   if (hasItems(story?.references)) {
     sections.push(`## References\n${story.references.map(formatReference).join('\n')}`);
+  }
+
+  if (integrationBranch) {
+    sections.push(
+      [
+        `## Integration Contract — single shared branch`,
+        ``,
+        `Work directly on \`${integrationBranch}\` (the epic branch). Do NOT use the daemon's auto-created \`agent/developer/<task>\` worktree branch as your commit target.`,
+        ``,
+        `**First action (overrides daemon checkout):**`,
+        '```sh',
+        `git fetch origin ${integrationBranch}`,
+        `git checkout ${integrationBranch}`,
+        `git reset --hard origin/${integrationBranch}`,
+        '```',
+        ``,
+        `**After completing all acceptance criteria:**`,
+        '```sh',
+        `git add <specific files for this story>`,
+        `git commit -m "[${story?.id ?? '<story-id>'}] <type>(<scope>): <description>"`,
+        `# fetch + rebase to handle peer dispatches landing concurrently`,
+        `git fetch origin ${integrationBranch}`,
+        `git rebase origin/${integrationBranch}`,
+        `git push origin HEAD:${integrationBranch}`,
+        '```',
+        ``,
+        `**If push rejected (non-fast-forward):** re-run \`git fetch + git rebase + git push\`. Retry up to 3 times. If conflict on rebase, STOP and post the conflict diff as a comment — this means the parallel-dispatch gate let an overlapping story through and orchestrator must adjudicate.`,
+        ``,
+        `**Final comment on this issue MUST include:** commit SHA(s) you pushed.`,
+      ].join('\n'),
+    );
   }
 
   sections.push(
