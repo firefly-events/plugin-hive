@@ -165,6 +165,24 @@ Call helpers in this exact order:
 
    Leave extra Multica squads untouched (warn, never delete).
 
+8. `reconcileAutopilots({ serverUrl, token, workspaceId, autopilotsConfigPath, consent })`
+
+   Load desired autopilots from `.pHive/multica/autopilots.yaml`.
+
+   Resolve agent names to agent IDs.
+
+   Create missing autopilots with their triggers.
+
+   Patch drifted autopilot metadata.
+
+   Reconcile triggers (add/update/delete).
+
+   Capture webhook URLs from webhook triggers and write back to autopilots.yaml.
+
+   Skip unchanged autopilots.
+
+   Leave extra Multica autopilots untouched (warn, never delete).
+
 ## Flags
 
 `--yes`
@@ -199,6 +217,7 @@ Multica bootstrap complete.
   Daemon:    running, PID 94821
   Agents:    3 reconciled (1 created, 1 patched, 1 skipped)
   Squads:    2 reconciled (1 created, 0 patched, 1 skipped)
+  Autopilots: 2 reconciled (1 created, 0 patched, 1 skipped)
 
 Run `multica daemon status` to monitor agent activity.
 ```
