@@ -768,3 +768,162 @@ export async function reconcileAutopilots({
 } = {}) {
   return reconcileAutopilotsWithDeps({ serverUrl, token, workspaceId, autopilotsConfigPath, consent });
 }
+
+// ---------------------------------------------------------------------------
+// Skills reconciler
+// ---------------------------------------------------------------------------
+
+function normalizeContent(str) {
+  return String(str)
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+$/gm, '')
+    .trim();
+}
+
+function bundleSkillContent(repoRoot, skillRef, substrateDeps) {
+  const mainRaw = fs.readFileSync(path.resolve(repoRoot, skillRef), 'utf8');
+  const parts = [normalizeContent(mainRaw)];
+  for (const dep of substrateDeps) {
+    const depRaw = fs.readFileSync(path.resolve(repoRoot, dep), 'utf8');
+    parts.push(`<!-- substrate: ${dep} -->`);
+    parts.push(normalizeContent(depRaw));
+  }
+  return parts.join('\n\n');
+}
+
+function computeContentHash(bundled) {
+  return crypto.createHash('sha256').update(bundled, 'utf8').digest('hex');
+}
+
+function validateSkillsExport(exports, repoRoot) {
+  const errors = [];
+  for (const entry of exports) {
+    const skillPath = path.resolve(repoRoot, entry.skill_ref);
+    if (!fs.existsSync(skillPath)) errors.push(`skill_ref not found: ${entry.skill_ref}`);
+    for (const dep of entry.substrate_deps ?? []) {
+      const depPath = path.resolve(repoRoot, dep);
+      if (!fs.existsSync(depPath)) errors.push(`substrate_dep not found: ${dep}`);
+    }
+  }
+  if (errors.length > 0) {
+    throw bootstrapError('VALIDATION_ERROR', errors.join('; '), 'All skill_ref and substrate_dep paths must exist in the repo relative to repoRoot.');
+  }
+}
+
+async function loadSkillsExportConfig(skillsConfigPath) {
+  const yamlString = fs.readFileSync(skillsConfigPath, 'utf8');
+  try {
+    const yaml = await import('js-yaml');
+    return yaml.load(yamlString);
+  } catch {
+    throw bootstrapError('CONFIG_PARSE_ERROR', 'Failed to parse skills-export.yaml.', 'Ensure the file is valid YAML with schema_version and exports fields.');
+  }
+}
+
+function buildSkillPayload(entry, bundledContent, contentHash) {
+  return {
+    name: entry.multica_name,
+    content: bundledContent,
+    content_hash: contentHash,
+    visibility: entry.visibility ?? 'workspace',
+  };
+}
+
+function diffSkill(existing, desired) {
+  // Use content_hash as content fingerprint — don't compare raw content (server may normalise it)
+  const fields = ['name', 'content_hash', 'visibility'];
+  const changed = [];
+  for (const key of fields) {
+    if (!jsonEqual(existing?.[key], desired[key])) changed.push(key);
+  }
+  return changed;
+}
+
+export async function reconcileSkillsWithDeps({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  skillsConfigPath,
+  repoRoot = process.cwd(),
+  consent = false,
+  httpJsonFn = httpJson,
+  loadSkillsExportConfigFn = null,
+} = {}) {
+  if (!token) throw bootstrapError('AUTH_REQUIRED', 'A Multica PAT is required.', 'Call ensureAuth first.');
+  if (!workspaceId) throw bootstrapError('WORKSPACE_REQUIRED', 'A workspace id is required.', 'Call ensureWorkspace first.');
+
+  if (!skillsConfigPath && !loadSkillsExportConfigFn) {
+    return { created: [], patched: [], skipped: [], removed: [] };
+  }
+
+  let config;
+  try {
+    config = loadSkillsExportConfigFn
+      ? await loadSkillsExportConfigFn(skillsConfigPath)
+      : await loadSkillsExportConfig(skillsConfigPath);
+  } catch (error) {
+    if (error?.code) throw error;
+    throw bootstrapError('CONFIG_LOAD_ERROR', error?.message || 'Failed to load skills-export config.', `Check that ${skillsConfigPath} exists and is valid YAML.`);
+  }
+
+  const desiredExports = Array.isArray(config?.exports) ? config.exports : [];
+
+  // Validate all paths before any network call — fail fast, no partial imports
+  validateSkillsExport(desiredExports, repoRoot);
+
+  const existingBody = await httpJsonFn(serverUrl, `/api/skills?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+  const existingSkills = normalizeList(existingBody, 'skills');
+  const existingByName = new Map(existingSkills.map((s) => [s.name, s]));
+  const desiredByName = new Map(desiredExports.map((e) => [e.multica_name, e]));
+
+  const created = [];
+  const patched = [];
+  const skipped = [];
+
+  for (const entry of desiredExports) {
+    const bundledContent = bundleSkillContent(repoRoot, entry.skill_ref, entry.substrate_deps ?? []);
+    const contentHash = computeContentHash(bundledContent);
+    const payload = buildSkillPayload(entry, bundledContent, contentHash);
+    const existing = existingByName.get(entry.multica_name);
+
+    if (!existing) {
+      assertConsent(consent, `Creating Multica skill "${entry.multica_name}" requires consent.`, 'Re-run with --yes or create the skill manually.');
+      await httpJsonFn(serverUrl, `/api/skills?workspace_id=${encodeURIComponent(workspaceId)}`, {
+        method: 'POST',
+        token,
+        body: payload,
+      });
+      created.push(entry.multica_name);
+      continue;
+    }
+
+    const changedFields = diffSkill(existing, payload);
+    if (changedFields.length === 0) {
+      skipped.push(entry.multica_name);
+      continue;
+    }
+
+    assertConsent(consent, `Updating Multica skill "${entry.multica_name}" requires consent.`, `Changed fields: ${changedFields.join(', ')}.`);
+    await httpJsonFn(serverUrl, `/api/skills/${encodeURIComponent(existing.id)}?workspace_id=${encodeURIComponent(workspaceId)}`, { method: 'PUT', token, body: payload });
+    patched.push(entry.multica_name);
+  }
+
+  // Detect orphaned skills — warn but do NOT delete (Mode D-a safety invariant)
+  const removed = existingSkills.filter((s) => !desiredByName.has(s.name)).map((s) => s.name);
+  for (const name of removed) {
+    console.warn(`[hive-bootstrap] Skill "${name}" exists in Multica but is not in skills-export.yaml — skipping deletion for safety.`);
+  }
+
+  return { created, patched, skipped, removed };
+}
+
+export async function reconcileSkills({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  skillsConfigPath,
+  repoRoot = process.cwd(),
+  consent = false,
+} = {}) {
+  return reconcileSkillsWithDeps({ serverUrl, token, workspaceId, skillsConfigPath, repoRoot, consent });
+}

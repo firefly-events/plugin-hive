@@ -183,6 +183,24 @@ Call helpers in this exact order:
 
    Leave extra Multica autopilots untouched (warn, never delete).
 
+9. `reconcileSkills({ serverUrl, token, workspaceId, skillsConfigPath, repoRoot, consent })`
+
+   Load desired skill exports from `.pHive/multica/skills-export.yaml`.
+
+   If `.pHive/multica/skills-export.yaml` does not exist, skip this step silently.
+
+   For each entry, read `skill_ref` content and bundle `substrate_deps` into a single payload.
+
+   Compute `content_hash` (SHA-256) of the normalised bundle.
+
+   Create missing skills.
+
+   Update skills whose `content_hash` or `visibility` differs from the live copy.
+
+   Skip skills whose hash matches.
+
+   Leave Multica skills not listed in `skills-export.yaml` untouched (warn but never delete).
+
 ## Flags
 
 `--yes`
@@ -207,7 +225,7 @@ The slug must contain only lowercase letters, numbers, and hyphens.
 
 ## Status Report Sample
 
-Print a compact final report after all six steps succeed:
+Print a compact final report after all seven steps succeed:
 
 ```text
 Multica bootstrap complete.
@@ -218,6 +236,7 @@ Multica bootstrap complete.
   Agents:    3 reconciled (1 created, 1 patched, 1 skipped)
   Squads:    2 reconciled (1 created, 0 patched, 1 skipped)
   Autopilots: 2 reconciled (1 created, 0 patched, 1 skipped)
+  Skills:    1 reconciled (1 created, 0 patched, 0 skipped)
 
 Run `multica daemon status` to monitor agent activity.
 ```
