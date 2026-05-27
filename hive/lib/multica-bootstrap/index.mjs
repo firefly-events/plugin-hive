@@ -269,35 +269,61 @@ export async function ensureDaemon({ consent = false } = {}) {
     }
   }
 }
-export async function reconcileAgents({
+export async function reconcileAgentsWithDeps({
   serverUrl = DEFAULT_SERVER_URL,
   token,
   workspaceId,
   agentsConfigPath,
   repoRoot = process.cwd(),
   consent = false,
+  httpJsonFn = httpJson,
+  resolveInstructionsFn = resolveAgentInstructions,
+  loadAgentsConfigFn = null,
 } = {}) {
   if (!token) throw bootstrapError('AUTH_REQUIRED', 'A Multica PAT is required.', 'Call ensureAuth first.');
   if (!workspaceId) throw bootstrapError('WORKSPACE_REQUIRED', 'A workspace id is required.', 'Call ensureWorkspace first.');
-  if (!agentsConfigPath) {
+  if (!loadAgentsConfigFn && !agentsConfigPath) {
     throw bootstrapError('AGENTS_CONFIG_REQUIRED', 'An agents config path is required.', 'Pass the path to .pHive/multica/agents.yaml.');
   }
-  const config = await loadAgentsConfig(agentsConfigPath);
+  const config = loadAgentsConfigFn ? await loadAgentsConfigFn(agentsConfigPath) : await loadAgentsConfig(agentsConfigPath);
   const desiredAgents = Array.isArray(config?.agents) ? config.agents : [];
-  const existingBody = await httpJson(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+
+  // Single list call — fetch all existing agents up front
+  const existingBody = await httpJsonFn(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
   const existingAgents = normalizeList(existingBody, 'agents');
   const existingByName = new Map(existingAgents.map((agent) => [agent.name, agent]));
+
+  // Pre-resolve runtime IDs — one call per unique provider, not per agent
+  const uniqueProviders = [...new Set(desiredAgents.map((a) => a.provider).filter(Boolean))];
+  const providerToRuntimeId = new Map();
+  for (const provider of uniqueProviders) {
+    const runtimesBody = await httpJsonFn(serverUrl, `/api/runtimes?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+    const runtimes = normalizeList(runtimesBody, 'runtimes');
+    if (runtimes.length === 0) {
+      throw bootstrapError('NO_RUNTIMES', 'No Multica runtimes are registered for this workspace.', 'Start the Multica daemon before reconciling agents.');
+    }
+    const runtime = runtimes.find((candidate) => candidate?.provider === provider);
+    if (!runtime?.id) {
+      throw bootstrapError('RUNTIME_NOT_FOUND', `No runtime with provider "${provider}" found.`, 'Check that the daemon has registered the expected provider for this workspace.');
+    }
+    providerToRuntimeId.set(provider, runtime.id);
+  }
+
+  // O(1) lookup map for desired agents
+  const desiredByName = new Map(desiredAgents.map((a) => [a.name, a]));
+
   const created = [];
   const patched = [];
   const skipped = [];
+
   for (const agent of desiredAgents) {
-    const runtimeId = await resolveRuntimeId(serverUrl, token, workspaceId, agent.provider);
-    const instructions = agent.persona_ref ? resolveAgentInstructions(agent, repoRoot) : agent.instructions;
+    const runtimeId = providerToRuntimeId.get(agent.provider);
+    const instructions = agent.persona_ref ? resolveInstructionsFn(agent, repoRoot) : agent.instructions;
     const payload = buildAgentPayload(agent, runtimeId, instructions);
     const existing = existingByName.get(agent.name);
     if (!existing) {
       assertConsent(consent, `Creating Multica agent "${agent.name}" requires consent.`, 'Re-run with --yes or create the agent manually.');
-      await httpJson(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, {
+      await httpJsonFn(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, {
         method: 'POST',
         token,
         body: payload,
@@ -311,8 +337,26 @@ export async function reconcileAgents({
       continue;
     }
     assertConsent(consent, `Updating Multica agent "${agent.name}" requires consent.`, `Changed fields: ${changedFields.join(', ')}.`);
-    await httpJson(serverUrl, `/api/agents/${encodeURIComponent(existing.id)}?workspace_id=${encodeURIComponent(workspaceId)}`, { method: 'PUT', token, body: payload });
+    await httpJsonFn(serverUrl, `/api/agents/${encodeURIComponent(existing.id)}?workspace_id=${encodeURIComponent(workspaceId)}`, { method: 'PUT', token, body: payload });
     patched.push(agent.name);
   }
-  return { created, patched, skipped };
+
+  // Detect removed personas — warn but do NOT delete
+  const removed = existingAgents.filter((a) => !desiredByName.has(a.name)).map((a) => a.name);
+  for (const name of removed) {
+    console.warn(`[hive-bootstrap] Agent "${name}" exists in Multica but is not in agents.yaml — skipping deletion for safety.`);
+  }
+
+  return { created, patched, skipped, removed };
+}
+
+export async function reconcileAgents({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  agentsConfigPath,
+  repoRoot = process.cwd(),
+  consent = false,
+} = {}) {
+  return reconcileAgentsWithDeps({ serverUrl, token, workspaceId, agentsConfigPath, repoRoot, consent });
 }
