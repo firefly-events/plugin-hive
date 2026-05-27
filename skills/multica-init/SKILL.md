@@ -35,7 +35,7 @@ the current Multica API has no write endpoint for workspace repos.
 
 ## What This Skill Does
 
-Run a six-step bootstrap flow:
+Run a seven-step bootstrap flow:
 
 1. Check Multica server health with `checkHealth`.
 
@@ -49,7 +49,9 @@ Run a six-step bootstrap flow:
 
 6. Reconcile configured agents with `reconcileAgents`.
 
-Step 7, repo allowlist, is deferred.
+7. Reconcile configured squads with `reconcileSquads` (squads depend on agents existing).
+
+Step 8, repo allowlist, is deferred.
 
 The endpoint does not exist in Multica v0.3.4.
 
@@ -145,6 +147,24 @@ Call helpers in this exact order:
 
    Leave extra Multica agents untouched.
 
+7. `reconcileSquads({ serverUrl, token, workspaceId, squadsConfigPath, consent })`
+
+   Load desired squads from `.pHive/multica/squads.yaml`.
+
+   Default `squadsConfigPath` to `.pHive/multica/squads.yaml`.
+
+   Resolve leader and member names to agent IDs.
+
+   Create missing squads (with leader).
+
+   Add and remove non-leader members to match YAML.
+
+   Update drifted squad metadata (leader change, description change).
+
+   Skip unchanged squads.
+
+   Leave extra Multica squads untouched (warn, never delete).
+
 ## Flags
 
 `--yes`
@@ -178,6 +198,7 @@ Multica bootstrap complete.
   Workspace: plugin-hive (PLU) - id: 21c6d282-...
   Daemon:    running, PID 94821
   Agents:    3 reconciled (1 created, 1 patched, 1 skipped)
+  Squads:    2 reconciled (1 created, 0 patched, 1 skipped)
 
 Run `multica daemon status` to monitor agent activity.
 ```
@@ -217,6 +238,17 @@ Desired agent fields include `runtime_id`, `instructions`, `model`,
 Agents present in Multica but absent from `.pHive/multica/agents.yaml` are
 extras and must be left untouched.
 
+Squad creation is skipped when a squad with the desired name exists.
+
+Squad update is skipped when leader and description match Multica state.
+
+Member add is skipped when the member already belongs to the squad.
+
+Member remove fires only for members no longer in the desired YAML list.
+
+Squads present in Multica but absent from `.pHive/multica/squads.yaml` are
+extras and must be left untouched.
+
 ## References
 
 Helper module:
@@ -234,6 +266,10 @@ Agent config helper:
 Agent config:
 
 `.pHive/multica/agents.yaml`
+
+Squad config:
+
+`.pHive/multica/squads.yaml`
 
 Multica adapter:
 

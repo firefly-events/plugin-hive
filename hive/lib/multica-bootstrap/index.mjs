@@ -360,3 +360,162 @@ export async function reconcileAgents({
 } = {}) {
   return reconcileAgentsWithDeps({ serverUrl, token, workspaceId, agentsConfigPath, repoRoot, consent });
 }
+
+async function loadSquadsConfig(squadsConfigPath) {
+  const yamlString = fs.readFileSync(squadsConfigPath, 'utf8');
+  const yaml = await import('js-yaml');
+  return yaml.load(yamlString);
+}
+
+export async function reconcileSquadsWithDeps({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  squadsConfigPath,
+  consent = false,
+  httpJsonFn = httpJson,
+  loadSquadsConfigFn = null,
+} = {}) {
+  if (!token) throw bootstrapError('AUTH_REQUIRED', 'A Multica PAT is required.', 'Call ensureAuth first.');
+  if (!workspaceId) throw bootstrapError('WORKSPACE_REQUIRED', 'A workspace id is required.', 'Call ensureWorkspace first.');
+  if (!loadSquadsConfigFn && !squadsConfigPath) {
+    throw bootstrapError('SQUADS_CONFIG_REQUIRED', 'A squads config path is required.', 'Pass the path to .pHive/multica/squads.yaml.');
+  }
+
+  const config = loadSquadsConfigFn
+    ? await loadSquadsConfigFn(squadsConfigPath)
+    : await loadSquadsConfig(squadsConfigPath);
+  const desiredSquads = Array.isArray(config?.squads) ? config.squads : [];
+
+  // Resolve agent names → IDs
+  const agentsBody = await httpJsonFn(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+  const existingAgents = normalizeList(agentsBody, 'agents');
+  const agentIdByName = new Map(existingAgents.map((a) => [a.name, a.id]));
+  const agentNameById = new Map(existingAgents.map((a) => [a.id, a.name]));
+
+  // Fetch existing squads
+  const squadsBody = await httpJsonFn(serverUrl, `/api/squads?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+  const existingSquads = normalizeList(squadsBody, 'squads');
+  const existingByName = new Map(existingSquads.map((s) => [s.name, s]));
+  const desiredByName = new Map(desiredSquads.map((s) => [s.name, s]));
+
+  const created = [];
+  const patched = [];
+  const skipped = [];
+  const membersAdded = [];
+  const membersRemoved = [];
+
+  for (const squad of desiredSquads) {
+    const leaderId = agentIdByName.get(squad.leader);
+    if (!leaderId) {
+      console.warn(`[hive-bootstrap] Squad "${squad.name}" leader "${squad.leader}" not found in agents — skipping squad.`);
+      continue;
+    }
+
+    // Non-leader members from YAML
+    const desiredMemberNames = (squad.members || []).filter((m) => m !== squad.leader);
+
+    const existing = existingByName.get(squad.name);
+
+    if (!existing) {
+      assertConsent(consent, `Creating Multica squad "${squad.name}" requires consent.`, 'Re-run with --yes or create the squad manually.');
+      const createdSquad = await httpJsonFn(serverUrl, `/api/squads?workspace_id=${encodeURIComponent(workspaceId)}`, {
+        method: 'POST',
+        token,
+        body: { name: squad.name, description: squad.description || '', leader_id: leaderId },
+      });
+      created.push(squad.name);
+
+      for (const memberName of desiredMemberNames) {
+        const memberId = agentIdByName.get(memberName);
+        if (!memberId) {
+          console.warn(`[hive-bootstrap] Squad "${squad.name}" member "${memberName}" not found in agents — skipping.`);
+          continue;
+        }
+        assertConsent(consent, `Adding member "${memberName}" to squad "${squad.name}" requires consent.`, 'Re-run with --yes.');
+        await httpJsonFn(serverUrl, `/api/squads/${encodeURIComponent(createdSquad.id)}/members?workspace_id=${encodeURIComponent(workspaceId)}`, {
+          method: 'POST',
+          token,
+          body: { member_id: memberId, member_type: 'agent', role: 'member' },
+        });
+        membersAdded.push(`${squad.name}:${memberName}`);
+      }
+      continue;
+    }
+
+    // Squad exists — check metadata drift
+    const descriptionDrifted = squad.description !== undefined && existing.description !== squad.description;
+    const leaderDrifted = existing.leader_id !== leaderId;
+    if (leaderDrifted || descriptionDrifted) {
+      assertConsent(consent, `Updating Multica squad "${squad.name}" requires consent.`, 'Re-run with --yes.');
+      await httpJsonFn(serverUrl, `/api/squads/${encodeURIComponent(existing.id)}?workspace_id=${encodeURIComponent(workspaceId)}`, {
+        method: 'PUT',
+        token,
+        body: {
+          name: squad.name,
+          description: squad.description ?? existing.description ?? '',
+          leader_id: leaderId,
+        },
+      });
+      patched.push(squad.name);
+    } else {
+      skipped.push(squad.name);
+    }
+
+    // Reconcile members for existing squad
+    const membersBody = await httpJsonFn(serverUrl, `/api/squads/${encodeURIComponent(existing.id)}/members?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+    const currentMembers = normalizeList(membersBody, 'members');
+    const regularMembers = currentMembers.filter((m) => m.role !== 'leader');
+    const currentMemberIds = new Set(regularMembers.map((m) => m.member_id));
+
+    const desiredMemberIds = new Set(
+      desiredMemberNames.map((n) => agentIdByName.get(n)).filter(Boolean),
+    );
+
+    for (const memberName of desiredMemberNames) {
+      const memberId = agentIdByName.get(memberName);
+      if (!memberId) {
+        console.warn(`[hive-bootstrap] Squad "${squad.name}" member "${memberName}" not found in agents — skipping.`);
+        continue;
+      }
+      if (currentMemberIds.has(memberId)) continue;
+      assertConsent(consent, `Adding member "${memberName}" to squad "${squad.name}" requires consent.`, 'Re-run with --yes.');
+      await httpJsonFn(serverUrl, `/api/squads/${encodeURIComponent(existing.id)}/members?workspace_id=${encodeURIComponent(workspaceId)}`, {
+        method: 'POST',
+        token,
+        body: { member_id: memberId, member_type: 'agent', role: 'member' },
+      });
+      membersAdded.push(`${squad.name}:${memberName}`);
+    }
+
+    for (const member of regularMembers) {
+      if (desiredMemberIds.has(member.member_id)) continue;
+      const memberName = agentNameById.get(member.member_id) ?? member.member_id;
+      assertConsent(consent, `Removing member "${memberName}" from squad "${squad.name}" requires consent.`, 'Re-run with --yes.');
+      await httpJsonFn(
+        serverUrl,
+        `/api/squads/${encodeURIComponent(existing.id)}/members/${encodeURIComponent(member.member_id)}?workspace_id=${encodeURIComponent(workspaceId)}&type=agent`,
+        { method: 'DELETE', token },
+      );
+      membersRemoved.push(`${squad.name}:${memberName}`);
+    }
+  }
+
+  // Removed squads — warn, never delete
+  const removed = existingSquads.filter((s) => !desiredByName.has(s.name)).map((s) => s.name);
+  for (const name of removed) {
+    console.warn(`[hive-bootstrap] Squad "${name}" exists in Multica but is not in squads.yaml — skipping deletion for safety.`);
+  }
+
+  return { created, patched, skipped, removed, membersAdded, membersRemoved };
+}
+
+export async function reconcileSquads({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  squadsConfigPath,
+  consent = false,
+} = {}) {
+  return reconcileSquadsWithDeps({ serverUrl, token, workspaceId, squadsConfigPath, consent });
+}
