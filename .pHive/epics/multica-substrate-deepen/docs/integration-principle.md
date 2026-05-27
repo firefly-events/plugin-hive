@@ -25,26 +25,34 @@ This is the same reason trunk-based development beat long-lived feature branches
 
 ## Operational rules
 
-1. **Default serial.** Dispatch one story at a time. Each agent fetches the latest trunk before starting; their work becomes the trunk for the next agent. Compounding context is preserved.
+The invariant that matters is **execution serialness against the latest trunk** — not dispatch sequencing.
 
-2. **Parallel only when proven non-conflict.** Two conditions must BOTH hold:
-   - `parallel_allowed: true` on every peer story (per-spec opt-in)
-   - `parallel_rationale ∈ {read-only, bounded-slice}` with explicit declarative proof:
-     - `read-only` — the work modifies no production files (spikes, audits, reads)
-     - `bounded-slice` — `files_to_modify` is non-empty AND disjoint across peers
-   - `variation` is NOT sufficient for the trunk-based model — variation means "different angles on the same surface," which destroys cognitive coherence even when file-disjoint.
+1. **Dispatch fanout is queue-ordering.** Today Multica has one bootstrapped agent per role (`developer`, `tester`, `reviewer`). Dispatching 5 issues at once enqueues 5 → the agent processes them one at a time. Execution is serial by single-agent bottleneck regardless of dispatch fanout. Swim-lane visualisation confirms: one ticket in_progress at any moment.
 
-3. **Rebase-then-push.** Every agent ends with `git fetch + git rebase + git push origin HEAD:<epic-branch>`. If push rejected: retry up to 3 times after re-fetching. If rebase conflicts: STOP and post the conflict diff as a comment — the parallel gate let an overlap through and orchestrator must adjudicate.
+2. **Fresh-checkout at start-of-task.** Each agent's first action MUST be `git fetch origin <epic-branch> + git checkout <epic-branch> + git reset --hard origin/<epic-branch>` — synchronising the workdir to the *latest* trunk at execution time, not the snapshot taken when the issue was dispatched. Without this, agent N processes against the trunk-as-of-dispatch and misses agent N-1's commits even though it ran second. This was the actual bug observed in depth-1: 5 issues dispatched in parallel, executed serially, but each saw a stale snapshot.
 
-4. **Final comment carries the SHA.** Agents post their pushed commit SHA(s) in the final issue comment so orchestrator + telemetry can correlate Multica issue → trunk commit without scraping workdirs.
+3. **Rebase-then-push at end-of-task.** Every agent ends with `git fetch + git rebase + git push origin HEAD:<epic-branch>`. Retry up to 3 times on non-FF rejection. On rebase conflict: STOP and post the conflict diff as a comment — the parallel-dispatch gate let an overlap through and orchestrator must adjudicate.
+
+4. **Final comment carries the SHA.** Agents post pushed commit SHA(s) in the final issue comment so orchestrator + telemetry can correlate Multica issue → trunk commit without scraping workdirs.
+
+5. **Parallel dispatch is safe when execution is also serial.** Today this holds trivially — single agent per role. When multi-agent runtimes land (e.g. multiple developer instances), parallel dispatch becomes parallel execution and the non-overlap gate must hold:
+   - `parallel_allowed: true` on every peer story
+   - `parallel_rationale ∈ {read-only, bounded-slice}` with explicit declarative proof
+     - `read-only` — modifies no production files (spikes, audits, reads)
+     - `bounded-slice` — `files_to_modify` non-empty AND disjoint across peers
+   - `variation` is NOT sufficient under the build-up principle — variation = different angles on the same surface = destroys coherence even when file-disjoint.
 
 ## What this changes for downstream tooling
 
-- `serializeStoryBrief({ integrationBranch })` renders the contract in every brief.
-- The `multica` execute mode skill's dispatch should default to serial — parallel only when ALL peer stories at the current depth carry the two-condition non-overlap proof.
-- The cron sweep no longer needs to cherry-pick from agent workdirs — it just `git pull --ff-only` to surface what agents have pushed.
-- Epic plans should err toward depth-chains (build-up) rather than wide-fanout (parallel breadth) when authoring story DAGs.
+- `serializeStoryBrief({ integrationBranch })` renders the contract in every brief — fresh-checkout-then-rebase-then-push baked in.
+- The `multica` execute mode skill keeps depth-batched dispatch; serialness is enforced by the agent runtime (1 agent per role today) not the dispatch layer.
+- The cron sweep no longer needs to cherry-pick from agent workdirs — `git pull --ff-only` surfaces what agents have pushed.
+- Epic plans can still author depth-chains for build-up but don't need to artificially serialise sibling stories — execution-serialness gives that for free under today's runtime.
 
 ## Cost
 
-The throughput hit is real: 19 stories serial at ~5–15 min each = several hours. But the alternative (parallel branch merge hell + lost cognitive compounding + orchestrator-side integration risk) has been observed to be worse in practice — both in this epic and in the broader plugin-hive history with isolated-branch agents that produced misaligned work needing later harmonization.
+No artificial throughput hit. Execution time = sum of per-story wall-clock × agents-per-role. With one developer agent today and ~5–15 min per story, 19 stories ≈ 2–5 hours wall-clock. The cost recovered relative to per-task branch + cherry-pick: orchestrator no longer scrapes workdirs, agent/* branch graveyard stops growing, history stays linear.
+
+## When the principle re-tightens
+
+If we ever spawn multiple developer agents (parallel runtimes per role), dispatch parallelism becomes execution parallelism. At that point rule 5 above is no longer trivially satisfied — the non-overlap gate must hold in practice, and a rebase-conflict signal becomes a runtime fault rather than a theoretical concern.
