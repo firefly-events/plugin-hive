@@ -1,80 +1,67 @@
 id: w4-4-ci-drift-guard
 epic: multica-substrate-deepen
-title: CI drift guard — fail build on in-repo vs Multica skill divergence
+title: "CI drift guard \u2014 fail build on in-repo vs Multica skill divergence"
 status: pending
 complexity: medium
 methodology: classic
 depends_on:
-  - w4-1-export-schema-doc
+- w4-1-export-schema-doc
 parallel_allowed: true
 parallel_rationale: bounded-slice
 files_to_modify:
-  - file: .github/workflows/multica-skills-drift.yml
-    change: New GitHub Actions workflow that runs drift detection
-  - file: hive/scripts/multica-skills-drift-check.mjs
-    change: New script that compares in-repo SKILL.md content + substrate against Multica skill table contents
-description: |
-  Add a CI guard that fails the build when in-repo SKILL.md content (or its
-  declared substrate_deps) diverges from the materialized copy in the Multica
-  spike workspace's skill table.
-
-  Implementation:
-  - GitHub Actions workflow runs on PRs touching skills/ OR
-    hive/references/ OR .pHive/multica/skills-export.yaml
-  - Script (hive/scripts/multica-skills-drift-check.mjs) fetches each
-    exported skill's content from Multica spike workspace, normalizes
-    (whitespace + line endings), compares against in-repo content + bundled
-    substrate. Exit 1 on divergence with a diff.
-  - Skip gracefully if MULTICA_TOKEN env var is unset (consumers without
-    Multica access don't fail their PR)
+- file: .github/workflows/multica-skills-drift.yml
+  change: New GitHub Actions workflow that runs drift detection
+- file: hive/scripts/multica-skills-drift-check.mjs
+  change: New script that compares in-repo SKILL.md content + substrate against Multica skill table contents
+description: "Add a CI guard that fails the build when in-repo SKILL.md content (or its\ndeclared substrate_deps) diverges from the materialized copy in the Multica\nspike workspace's skill table.\n\nImplementation:\n- GitHub Actions workflow runs on PRs touching skills/ OR\n  hive/references/ OR .pHive/multica/skills-export.yaml\n- Script (hive/scripts/multica-skills-drift-check.mjs) fetches each\n  exported skill's content from Multica spike workspace, normalizes\n  (whitespace + line endings), compares against in-repo content + bundled\n  substrate. Exit 1 on divergence with a diff.\n- Skip gracefully if MULTICA_TOKEN env var is unset (consumers without\n  Multica access don't fail their PR)\n"
 acceptance_criteria:
-  - Workflow at .github/workflows/multica-skills-drift.yml triggers on relevant paths
-  - Script at hive/scripts/multica-skills-drift-check.mjs implements the comparison
-  - Script normalizes whitespace + line endings before compare
-  - Workflow skips gracefully if MULTICA_TOKEN unset
-  - 'Test: PR that edits SKILL.md without re-export fails the check'
-  - 'Test: PR that re-exports same content passes'
+- Workflow at .github/workflows/multica-skills-drift.yml triggers on relevant paths
+- Script at hive/scripts/multica-skills-drift-check.mjs implements the comparison
+- Script normalizes whitespace + line endings before compare
+- Workflow skips gracefully if MULTICA_TOKEN unset
+- 'Test: PR that edits SKILL.md without re-export fails the check'
+- 'Test: PR that re-exports same content passes'
 steps:
-  - id: research
-    description: Read W4.1 schema + reconcileSkills bundling protocol + existing CI workflow patterns
-    agent: researcher
-  - id: implement
-    description: Write workflow + script
-    agent: backend-developer
-    depends_on:
-      - research
-  - id: test
-    description: Test divergence-fail + same-content-pass + missing-token-skip paths
-    agent: tester
-    depends_on:
-      - implement
-  - id: review
-    description: Reviewer checks normalization correctness + skip-on-missing-token safety
-    agent: reviewer
-    depends_on:
-      - test
-  - id: integrate
-    description: Commit on feat/multica-substrate-deepen
-    agent: developer
-    depends_on:
-      - review
+- id: research
+  description: Read W4.1 schema + reconcileSkills bundling protocol + existing CI workflow patterns
+  agent: researcher
+- id: implement
+  description: Write workflow + script
+  agent: backend-developer
+  depends_on:
+  - research
+- id: test
+  description: Test divergence-fail + same-content-pass + missing-token-skip paths
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Reviewer checks normalization correctness + skip-on-missing-token safety
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit on feat/multica-substrate-deepen
+  agent: developer
+  depends_on:
+  - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
-    - path: .github/workflows/
-      purpose: Existing workflow patterns to model on
-    - path: hive/adapters/multica/index.ts
-      purpose: HTTP client patterns for fetching skill content
+  - path: .github/workflows/
+    purpose: Existing workflow patterns to model on
+  - path: hive/adapters/multica/index.ts
+    purpose: HTTP client patterns for fetching skill content
 cross_cutting:
-  - concern: documentation
-    action: Update README and GUIDE.md with CI guard purpose + how to skip locally
+- concern: documentation
+  action: Update README and GUIDE.md with CI guard purpose + how to skip locally
 risks:
-  - severity: medium
-    description: False positives block unrelated PRs
-    mitigation: Normalization tested; warning-only fallback if false positive rate exceeds threshold (documented in story)
-  - severity: low
-    description: Spike workspace unreachable from CI runner
-    mitigation: Skip-on-token-missing already covers; documented as known limitation
+- severity: medium
+  description: False positives block unrelated PRs
+  mitigation: Normalization tested; warning-only fallback if false positive rate exceeds threshold (documented in story)
+- severity: low
+  description: Spike workspace unreachable from CI runner
+  mitigation: Skip-on-token-missing already covers; documented as known limitation
 metric:
   applies: true
   name: multica.ci_drift_guard_false_positive_rate
@@ -86,6 +73,6 @@ metric:
   source:
     kind: manual
     ref: Observe CI runs; count failures where SKILL.md and Multica copy are semantically identical
-  verify_at: 2026-07-01T00:00:00.000Z
+  verify_at: 2026-07-01 00:00:00+00:00
   owner: reviewer
-tracker_id: plugin-hive/PLU-115
+tracker_id: plugin-hive/PLU-142
