@@ -5,59 +5,43 @@ status: pending
 complexity: low
 methodology: classic
 depends_on:
-  - w0-3-skill-import-spike
-description: |
-  Author the skills-export schema reference at
-  hive/references/multica-skills-export-schema.md.
-
-  Schema covers:
-  - schema_version
-  - exports list — each entry: skill_ref (path to SKILL.md in plugin-hive),
-    multica_name (canonical name in Multica skill table), substrate_deps
-    (array of reference doc paths bundled with the skill), visibility
-    (private | workspace; per W0.3 finding)
-  - validation rules (skill_ref must exist; substrate_deps must exist)
-  - resolution rules (skill_ref + substrate_deps resolve at reconcile time
-    relative to repo root)
-
-  Schema accommodates Mode D-a (read-only export): authoritative source
-  stays at skill_ref; exported copies materialized into Multica are
-  drift-checked by W4.4 CI guard.
+- w0-3-skill-import-spike
+description: "Author the skills-export schema reference at\nhive/references/multica-skills-export-schema.md.\n\nSchema covers:\n- schema_version\n- exports list \u2014 each entry: skill_ref (path to SKILL.md in plugin-hive),\n  multica_name (canonical name in Multica skill table), substrate_deps\n  (array of reference doc paths bundled with the skill), visibility\n  (private | workspace; per W0.3 finding)\n- validation rules (skill_ref must exist; substrate_deps must exist)\n- resolution rules (skill_ref + substrate_deps resolve at reconcile time\n  relative to repo root)\n\nSchema accommodates Mode D-a (read-only export): authoritative source\nstays at skill_ref; exported copies materialized into Multica are\ndrift-checked by W4.4 CI guard.\n"
 acceptance_criteria:
-  - Doc exists at hive/references/multica-skills-export-schema.md
-  - Structure mirrors multica-agents-schema.md / multica-squads-schema.md / multica-autopilots-schema.md
-  - Concrete example covers pilot manifest (/metrics-check + its substrate deps)
-  - Visibility field reflects W0.3 spike finding
-  - Architect-reviewed for cross-schema consistency + posture (read-only export Mode D-a)
+- Doc exists at hive/references/multica-skills-export-schema.md
+- Structure mirrors multica-agents-schema.md / multica-squads-schema.md / multica-autopilots-schema.md
+- Concrete example covers pilot manifest (/metrics-check + its substrate deps)
+- Visibility field reflects W0.3 spike finding
+- Architect-reviewed for cross-schema consistency + posture (read-only export Mode D-a)
 steps:
-  - id: implement
-    description: Write schema doc
-    agent: technical-writer
-  - id: review
-    description: Architect reviews
-    agent: architect
-    depends_on:
-      - implement
-  - id: integrate
-    description: Commit on feat/multica-substrate-deepen
-    agent: developer
-    depends_on:
-      - review
+- id: implement
+  description: Write schema doc
+  agent: technical-writer
+- id: review
+  description: Architect reviews
+  agent: architect
+  depends_on:
+  - implement
+- id: integrate
+  description: Commit on feat/multica-substrate-deepen
+  agent: developer
+  depends_on:
+  - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
-    - path: hive/references/multica-agents-schema.md
-      purpose: Sibling schema model
-    - path: .pHive/epics/multica-substrate-deepen/docs/spike-findings/s0-3-skill-import.md
-      purpose: Visibility flag finding from W0.3
+  - path: hive/references/multica-agents-schema.md
+    purpose: Sibling schema model
+  - path: .pHive/epics/multica-substrate-deepen/docs/spike-findings/s0-3-skill-import.md
+    purpose: Visibility flag finding from W0.3
 cross_cutting:
-  - concern: documentation
-    action: This story IS documentation
+- concern: documentation
+  action: This story IS documentation
 risks:
-  - severity: low
-    description: Schema doesn't anticipate Mode D-b/D-c future need
-    mitigation: Schema-version field allows additive future evolution; current schema explicit-D-a-only
+- severity: low
+  description: Schema doesn't anticipate Mode D-b/D-c future need
+  mitigation: Schema-version field allows additive future evolution; current schema explicit-D-a-only
 metric:
   applies: false
   justification: Schema doc; w4-2 + w4-3 + w4-5 carry delivery metrics.
-tracker_id: plugin-hive/PLU-112
+tracker_id: plugin-hive/PLU-137
