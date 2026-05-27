@@ -1,11 +1,11 @@
 id: w2-3-bootstrap-reconcile-squads
 epic: multica-substrate-deepen
-title: "Add reconcileSquads to multica-bootstrap"
+title: Add reconcileSquads to multica-bootstrap
 status: pending
 complexity: medium
 methodology: classic
-depends_on: [w2-2-squads-yaml]
-
+depends_on:
+  - w2-2-squads-yaml
 description: |
   Add reconcileSquads to hive/lib/multica-bootstrap/ following the same
   list+diff+batched-upsert pattern from W1.3's reconcileAgents.
@@ -16,16 +16,14 @@ description: |
 
   Idempotent on re-run. Squads removed from yaml are NOT deleted from Multica
   (safety; logged as warning).
-
 acceptance_criteria:
-  - "reconcileSquads exported from multica-bootstrap module"
-  - "Cold path: empty workspace + 3-squad yaml → 3 squads created + members added"
-  - "Warm path: 1 squad exists with stale members → diff applies only member deltas"
-  - "Drift: leader changed → update without recreating squad"
-  - "Removed squad in yaml → orphan in Multica, logged warning, not deleted"
-  - "Tests cover all 4 scenarios"
-  - "multica-init invokes reconcileSquads after reconcileAgents (squads depend on members existing)"
-
+  - reconcileSquads exported from multica-bootstrap module
+  - 'Cold path: empty workspace + 3-squad yaml → 3 squads created + members added'
+  - 'Warm path: 1 squad exists with stale members → diff applies only member deltas'
+  - 'Drift: leader changed → update without recreating squad'
+  - Removed squad in yaml → orphan in Multica, logged warning, not deleted
+  - Tests cover all 4 scenarios
+  - multica-init invokes reconcileSquads after reconcileAgents (squads depend on members existing)
 steps:
   - id: research
     description: Read multica squad CLI surface + W1.3 reconcileAgents shape
@@ -33,20 +31,23 @@ steps:
   - id: implement
     description: Add reconcileSquads + wire into multica-init flow
     agent: backend-developer
-    depends_on: [research]
+    depends_on:
+      - research
   - id: test
     description: 4-scenario test coverage
     agent: tester
-    depends_on: [implement]
+    depends_on:
+      - implement
   - id: review
     description: Reviewer validates idempotence + safety
     agent: reviewer
-    depends_on: [test]
+    depends_on:
+      - test
   - id: integrate
     description: Commit on feat/multica-substrate-deepen
     agent: developer
-    depends_on: [review]
-
+    depends_on:
+      - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
@@ -54,16 +55,13 @@ context:
       purpose: Module to extend
     - path: skills/multica-init/SKILL.md
       purpose: Bootstrap entrypoint to wire
-
 cross_cutting:
   - concern: documentation
-    action: "Update multica-init SKILL.md + bootstrap README to mention squad reconcile"
-
+    action: Update multica-init SKILL.md + bootstrap README to mention squad reconcile
 risks:
   - severity: medium
     description: Member add fires before persona is created in Multica
     mitigation: reconcileSquads runs strictly after reconcileAgents in multica-init flow
-
 metric:
   applies: true
   name: multica.squads_bootstrapped
@@ -74,6 +72,7 @@ metric:
   window: post-story-integrate
   source:
     kind: manual
-    ref: "multica squad list --output json | jq length"
+    ref: multica squad list --output json | jq length
   verify_at: test
   owner: tester
+tracker_id: plugin-hive/PLU-103

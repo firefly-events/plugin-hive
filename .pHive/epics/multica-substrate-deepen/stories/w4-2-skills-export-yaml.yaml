@@ -1,11 +1,11 @@
 id: w4-2-skills-export-yaml
 epic: multica-substrate-deepen
-title: "Author .pHive/multica/skills-export.yaml with /metrics-check pilot"
+title: Author .pHive/multica/skills-export.yaml with /metrics-check pilot
 status: pending
 complexity: low
 methodology: classic
-depends_on: [w4-1-export-schema-doc]
-
+depends_on:
+  - w4-1-export-schema-doc
 description: |
   Author .pHive/multica/skills-export.yaml as the pilot manifest.
 
@@ -19,14 +19,12 @@ description: |
     (hive/references/skill-prelude.md at minimum; specific deps determined
     by inspecting metrics-check SKILL.md)
   - visibility: private (or default per W0.3 finding)
-
 acceptance_criteria:
-  - "File exists at .pHive/multica/skills-export.yaml"
-  - "Conforms to W4.1 schema"
-  - "Pilot entry references existing files (skill_ref + all substrate_deps)"
-  - "substrate_deps list verified by reading metrics-check SKILL.md for references"
-  - "Visibility matches W0.3 finding's recommendation"
-
+  - File exists at .pHive/multica/skills-export.yaml
+  - Conforms to W4.1 schema
+  - Pilot entry references existing files (skill_ref + all substrate_deps)
+  - substrate_deps list verified by reading metrics-check SKILL.md for references
+  - Visibility matches W0.3 finding's recommendation
 steps:
   - id: research
     description: Read metrics-check SKILL.md; identify all substrate dependencies
@@ -34,16 +32,18 @@ steps:
   - id: implement
     description: Write skills-export.yaml with pilot entry
     agent: developer
-    depends_on: [research]
+    depends_on:
+      - research
   - id: review
     description: Reviewer validates schema + file existence
     agent: reviewer
-    depends_on: [implement]
+    depends_on:
+      - implement
   - id: integrate
     description: Commit on feat/multica-substrate-deepen
     agent: developer
-    depends_on: [review]
-
+    depends_on:
+      - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
@@ -51,16 +51,13 @@ context:
       purpose: Pilot skill source; substrate-dep inspection target
     - path: hive/references/multica-skills-export-schema.md
       purpose: Schema to conform to
-
 cross_cutting:
   - concern: documentation
-    action: "Reference skills-export.yaml from GUIDE.md Multica section"
-
+    action: Reference skills-export.yaml from GUIDE.md Multica section
 risks:
   - severity: medium
     description: Missing substrate_dep causes runtime failure when skill executes in Multica
     mitigation: W4.5 pilot round-trip catches missing deps; reconcileSkills (W4.3) verifies all listed paths exist
-
 metric:
   applies: true
   name: multica.skills_export_pilot_manifest_entries
@@ -71,6 +68,7 @@ metric:
   window: post-story-integrate
   source:
     kind: manual
-    ref: "yq '.exports | length' .pHive/multica/skills-export.yaml"
+    ref: yq '.exports | length' .pHive/multica/skills-export.yaml
   verify_at: integrate
   owner: reviewer
+tracker_id: plugin-hive/PLU-113

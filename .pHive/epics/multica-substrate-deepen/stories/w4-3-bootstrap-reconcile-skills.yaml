@@ -1,11 +1,11 @@
 id: w4-3-bootstrap-reconcile-skills
 epic: multica-substrate-deepen
-title: "Add reconcileSkills to multica-bootstrap (Mode D-a one-way export)"
+title: Add reconcileSkills to multica-bootstrap (Mode D-a one-way export)
 status: pending
 complexity: high
 methodology: classic
-depends_on: [w4-2-skills-export-yaml]
-
+depends_on:
+  - w4-2-skills-export-yaml
 description: |
   Add reconcileSkills to hive/lib/multica-bootstrap/ following the same
   list+diff+batched-upsert pattern as the other reconcilers.
@@ -26,18 +26,16 @@ description: |
 
   Bundling protocol per W4.1 schema: substrate_deps materialized alongside
   SKILL.md in the Multica skill_file table.
-
 acceptance_criteria:
-  - "reconcileSkills exported from multica-bootstrap module"
-  - "Cold path: empty workspace + 1-entry yaml → 1 skill created with bundled substrate"
-  - "Warm idempotent path: re-run with no source changes → no upserts fire"
-  - "Drift path: SKILL.md content edited → update fires (verified by content hash)"
-  - "Substrate-dep change: prelude.md edited → update fires"
-  - "Removed entry: orphan in Multica, logged warning, not deleted"
-  - "Tests cover all 5 paths"
-  - "multica-init invokes reconcileSkills after the other three reconcilers"
-  - "Visibility flag applied per W0.3 spike finding"
-
+  - reconcileSkills exported from multica-bootstrap module
+  - 'Cold path: empty workspace + 1-entry yaml → 1 skill created with bundled substrate'
+  - 'Warm idempotent path: re-run with no source changes → no upserts fire'
+  - 'Drift path: SKILL.md content edited → update fires (verified by content hash)'
+  - 'Substrate-dep change: prelude.md edited → update fires'
+  - 'Removed entry: orphan in Multica, logged warning, not deleted'
+  - Tests cover all 5 paths
+  - multica-init invokes reconcileSkills after the other three reconcilers
+  - Visibility flag applied per W0.3 spike finding
 steps:
   - id: research
     description: Read multica skill CLI surface + W4.1 schema + W0.3 visibility finding
@@ -45,20 +43,23 @@ steps:
   - id: implement
     description: Add reconcileSkills + bundling logic + wire into multica-init
     agent: backend-developer
-    depends_on: [research]
+    depends_on:
+      - research
   - id: test
     description: 5-path test coverage
     agent: tester
-    depends_on: [implement]
+    depends_on:
+      - implement
   - id: review
     description: Reviewer validates idempotence + safety + visibility correctness
     agent: reviewer
-    depends_on: [test]
+    depends_on:
+      - test
   - id: integrate
     description: Commit on feat/multica-substrate-deepen
     agent: developer
-    depends_on: [review]
-
+    depends_on:
+      - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
@@ -68,11 +69,9 @@ context:
       purpose: Pilot skill source
     - path: hive/references/skill-prelude.md
       purpose: Common substrate dep
-
 cross_cutting:
   - concern: documentation
-    action: "Update bootstrap README; document bundling protocol; update GUIDE.md Multica section"
-
+    action: Update bootstrap README; document bundling protocol; update GUIDE.md Multica section
 risks:
   - severity: high
     description: Bundling protocol leaks unintended files (substrate_dep glob too wide)
@@ -80,7 +79,6 @@ risks:
   - severity: medium
     description: Content-hash mismatch fires every run (false positive)
     mitigation: Normalize content before hash (trim trailing whitespace, normalize line endings)
-
 metric:
   applies: true
   name: multica.skills_exported_with_substrate
@@ -91,6 +89,7 @@ metric:
   window: post-story-integrate
   source:
     kind: manual
-    ref: "multica skill list --output json | jq length AND multica skill files <id> shows substrate"
+    ref: multica skill list --output json | jq length AND multica skill files <id> shows substrate
   verify_at: test
   owner: tester
+tracker_id: plugin-hive/PLU-114

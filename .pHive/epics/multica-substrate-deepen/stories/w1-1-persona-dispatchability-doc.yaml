@@ -1,13 +1,13 @@
 id: w1-1-persona-dispatchability-doc
 epic: multica-substrate-deepen
-title: "Classify all 25 plugin-hive personas by Multica dispatchability"
+title: Classify all 25 plugin-hive personas by Multica dispatchability
 status: pending
 complexity: low
 methodology: classic
-depends_on: [w0-1-codex-spike]
+depends_on:
+  - w0-1-codex-spike
 parallel_allowed: true
 parallel_rationale: read-only
-
 description: |
   Write a per-persona classification at
   .pHive/epics/multica-substrate-deepen/docs/persona-dispatchability.md
@@ -23,14 +23,12 @@ description: |
 
   The doc is consumed by W1.2 (agents.yaml expansion) to determine the
   bootstrap subset.
-
 acceptance_criteria:
-  - "Doc exists at .pHive/epics/multica-substrate-deepen/docs/persona-dispatchability.md"
-  - "All 25 personas in hive/agents/ classified with verdict + one-line rationale"
-  - "Dispatchable subset count documented at top of file"
-  - "Borderline cases (e.g., peer-validator) include the test-dispatch result as rationale"
-  - "Doc reviewed by architect persona before W1.2 starts"
-
+  - Doc exists at .pHive/epics/multica-substrate-deepen/docs/persona-dispatchability.md
+  - All 25 personas in hive/agents/ classified with verdict + one-line rationale
+  - Dispatchable subset count documented at top of file
+  - Borderline cases (e.g., peer-validator) include the test-dispatch result as rationale
+  - Doc reviewed by architect persona before W1.2 starts
 steps:
   - id: research
     description: Read all 25 persona files; apply classification criterion
@@ -38,16 +36,18 @@ steps:
   - id: implement
     description: Write classification doc with verdicts + rationales
     agent: technical-writer
-    depends_on: [research]
+    depends_on:
+      - research
   - id: review
     description: Architect reviews for criterion-application consistency
     agent: architect
-    depends_on: [implement]
+    depends_on:
+      - implement
   - id: integrate
     description: Commit on feat/multica-substrate-deepen
     agent: developer
-    depends_on: [review]
-
+    depends_on:
+      - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
@@ -55,16 +55,14 @@ context:
       purpose: 25 persona definitions to classify
     - path: .pHive/epics/multica-substrate-deepen/docs/grill-record.md
       purpose: Grill H3 finding on classification criterion
-
 cross_cutting:
   - concern: documentation
-    action: "Doc itself satisfies documentation concern"
-
+    action: Doc itself satisfies documentation concern
 risks:
   - severity: low
     description: Classification disputes
     mitigation: Architect review; user can override at any subsequent story
-
 metric:
   applies: false
-  justification: "Classification artifact; downstream w1-2 carries the persona-port delivery metric."
+  justification: Classification artifact; downstream w1-2 carries the persona-port delivery metric.
+tracker_id: plugin-hive/PLU-97

@@ -1,11 +1,11 @@
 id: w2-2-squads-yaml
 epic: multica-substrate-deepen
-title: "Author .pHive/multica/squads.yaml with three squads"
+title: Author .pHive/multica/squads.yaml with three squads
 status: pending
 complexity: low
 methodology: classic
-depends_on: [w2-1-squad-schema-doc]
-
+depends_on:
+  - w2-1-squad-schema-doc
 description: |
   Author .pHive/multica/squads.yaml conforming to W2.1's schema. Three squads:
 
@@ -18,13 +18,11 @@ description: |
 
   All member names must reference personas present in .pHive/multica/agents.yaml
   (post-W1.2 expansion).
-
 acceptance_criteria:
-  - "File exists at .pHive/multica/squads.yaml"
-  - "Conforms to W2.1 schema (passes whatever validation W2.3 emits)"
-  - "All three squads present with correct leader + members"
-  - "Every member name resolves to an entry in .pHive/multica/agents.yaml"
-
+  - File exists at .pHive/multica/squads.yaml
+  - Conforms to W2.1 schema (passes whatever validation W2.3 emits)
+  - All three squads present with correct leader + members
+  - Every member name resolves to an entry in .pHive/multica/agents.yaml
 steps:
   - id: implement
     description: Write squads.yaml
@@ -32,12 +30,13 @@ steps:
   - id: review
     description: Reviewer validates against W2.1 schema + agents.yaml resolution
     agent: reviewer
-    depends_on: [implement]
+    depends_on:
+      - implement
   - id: integrate
     description: Commit on feat/multica-substrate-deepen
     agent: developer
-    depends_on: [review]
-
+    depends_on:
+      - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
@@ -45,16 +44,13 @@ context:
       purpose: Source of valid persona names for squad members
     - path: hive/references/multica-squads-schema.md
       purpose: Schema to conform to
-
 cross_cutting:
   - concern: documentation
-    action: "Reference squads.yaml from GUIDE.md Multica section"
-
+    action: Reference squads.yaml from GUIDE.md Multica section
 risks:
   - severity: low
     description: Member name typo breaks reconcile
     mitigation: Reviewer cross-checks against agents.yaml
-
 metric:
   applies: true
   name: multica.squads_defined
@@ -65,6 +61,7 @@ metric:
   window: post-story-integrate
   source:
     kind: manual
-    ref: "yq '.squads | length' .pHive/multica/squads.yaml"
+    ref: yq '.squads | length' .pHive/multica/squads.yaml
   verify_at: integrate
   owner: reviewer
+tracker_id: plugin-hive/PLU-102

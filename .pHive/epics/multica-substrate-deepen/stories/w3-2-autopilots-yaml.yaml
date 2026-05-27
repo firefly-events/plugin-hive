@@ -1,11 +1,11 @@
 id: w3-2-autopilots-yaml
 epic: multica-substrate-deepen
-title: "Author .pHive/multica/autopilots.yaml with metrics-check + visual-qa autopilots"
+title: Author .pHive/multica/autopilots.yaml with metrics-check + visual-qa autopilots
 status: pending
 complexity: low
 methodology: classic
-depends_on: [w3-1-autopilot-schema-doc]
-
+depends_on:
+  - w3-1-autopilot-schema-doc
 description: |
   Author .pHive/multica/autopilots.yaml with two webhook autopilots:
 
@@ -24,14 +24,14 @@ description: |
      - description: "Run /visual-qa against post-merge state when epic has UI stories"
 
   Both autopilots reference personas that exist in W1.2's agents.yaml.
-
 acceptance_criteria:
-  - "File exists at .pHive/multica/autopilots.yaml"
-  - "Conforms to W3.1 schema"
-  - "Both autopilots present with correct agent + trigger type"
-  - "Single-persona owner verified during implementation step (analyst confirmed for metrics-check, ui-designer for visual-qa)"
-  - "Webhook URLs noted as server-generated, populated post-create"
-
+  - File exists at .pHive/multica/autopilots.yaml
+  - Conforms to W3.1 schema
+  - Both autopilots present with correct agent + trigger type
+  - >-
+    Single-persona owner verified during implementation step (analyst confirmed for metrics-check, ui-designer for
+    visual-qa)
+  - Webhook URLs noted as server-generated, populated post-create
 steps:
   - id: research
     description: Confirm single-persona owner for metrics-check (analyst or tpm)
@@ -39,16 +39,18 @@ steps:
   - id: implement
     description: Write autopilots.yaml
     agent: developer
-    depends_on: [research]
+    depends_on:
+      - research
   - id: review
     description: Reviewer validates schema + persona resolution
     agent: reviewer
-    depends_on: [implement]
+    depends_on:
+      - implement
   - id: integrate
     description: Commit on feat/multica-substrate-deepen
     agent: developer
-    depends_on: [review]
-
+    depends_on:
+      - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
@@ -58,16 +60,13 @@ context:
       purpose: Schema to conform to
     - path: skills/metrics-check/
       purpose: Skill to understand for owner-persona decision
-
 cross_cutting:
   - concern: documentation
-    action: "Reference autopilots.yaml from GUIDE.md Multica section"
-
+    action: Reference autopilots.yaml from GUIDE.md Multica section
 risks:
   - severity: low
     description: Wrong owner persona for metrics-check
     mitigation: Research step confirms; can be patched without breaking change
-
 metric:
   applies: true
   name: multica.autopilots_defined
@@ -78,6 +77,7 @@ metric:
   window: post-story-integrate
   source:
     kind: manual
-    ref: "yq '.autopilots | length' .pHive/multica/autopilots.yaml"
+    ref: yq '.autopilots | length' .pHive/multica/autopilots.yaml
   verify_at: integrate
   owner: reviewer
+tracker_id: plugin-hive/PLU-109

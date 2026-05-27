@@ -1,11 +1,12 @@
 id: w2-7-execute-mode-integrate-eval
 epic: multica-substrate-deepen
-title: "Wire squad-evaluation read into execute-mode-multica integrate step"
+title: Wire squad-evaluation read into execute-mode-multica integrate step
 status: pending
 complexity: medium
 methodology: classic
-depends_on: [w2-5-eval-contract-doc, w2-6-dispatch-record-squad-eval]
-
+depends_on:
+  - w2-5-eval-contract-doc
+  - w2-6-dispatch-record-squad-eval
 description: |
   Extend skills/hive/skills/execute-mode-multica/SKILL.md Step 3 (Episode
   marker per terminal) so that, conditional on squad presence in
@@ -20,14 +21,12 @@ description: |
 
   If .pHive/multica/squads.yaml is absent (Phase B not adopted by the
   consumer project), this step is a no-op.
-
 acceptance_criteria:
-  - "execute-mode-multica Step 3 references recordSquadEvaluation invocation"
-  - "Episode marker schema extended with optional squad_evaluation field"
-  - "Squad eval call is best-effort — null result and errors do not fail /execute"
-  - "Conditional on .pHive/multica/squads.yaml presence (consumer without squads adopted = no-op)"
-  - "Smoke test: full /execute pass on a story dispatched to dev-team-squad shows squad_evaluation in episode marker"
-
+  - execute-mode-multica Step 3 references recordSquadEvaluation invocation
+  - Episode marker schema extended with optional squad_evaluation field
+  - Squad eval call is best-effort — null result and errors do not fail /execute
+  - Conditional on .pHive/multica/squads.yaml presence (consumer without squads adopted = no-op)
+  - 'Smoke test: full /execute pass on a story dispatched to dev-team-squad shows squad_evaluation in episode marker'
 steps:
   - id: research
     description: Read execute-mode-multica Step 3 + episode-schema reference
@@ -35,20 +34,23 @@ steps:
   - id: implement
     description: Update SKILL.md prose; update episode-sync.mjs schema; update step-integrate file
     agent: technical-writer
-    depends_on: [research]
+    depends_on:
+      - research
   - id: test
     description: Smoke test via dispatch of trivial story to dev-team-squad
     agent: tester
-    depends_on: [implement]
+    depends_on:
+      - implement
   - id: review
     description: Architect + reviewer validate contract compliance + best-effort semantics
     agent: reviewer
-    depends_on: [test]
+    depends_on:
+      - test
   - id: integrate
     description: Commit on feat/multica-substrate-deepen
     agent: developer
-    depends_on: [review]
-
+    depends_on:
+      - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
@@ -60,16 +62,13 @@ context:
       purpose: Episode schema to extend
     - path: hive/references/squad-evaluation-contract.md
       purpose: Contract to honor
-
 cross_cutting:
   - concern: documentation
-    action: "Update episode-schema.md with new optional field; cross-link from execute-mode-multica + squad-evaluation-contract"
-
+    action: Update episode-schema.md with new optional field; cross-link from execute-mode-multica + squad-evaluation-contract
 risks:
   - severity: medium
     description: Best-effort error swallows real failures
     mitigation: Warning log explicit; metrics emit on error count
-
 metric:
   applies: true
   name: multica.squad_evaluation_recorded_at_pr_open
@@ -80,6 +79,7 @@ metric:
   window: per-smoke-test
   source:
     kind: manual
-    ref: "grep squad_evaluation on episode marker after smoke test pass"
+    ref: grep squad_evaluation on episode marker after smoke test pass
   verify_at: test
   owner: tester
+tracker_id: plugin-hive/PLU-107

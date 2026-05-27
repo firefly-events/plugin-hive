@@ -1,11 +1,11 @@
 id: w4-5-pilot-roundtrip-validation
 epic: multica-substrate-deepen
-title: "Pilot round-trip validation — export /metrics-check, verify in spike workspace"
+title: Pilot round-trip validation — export /metrics-check, verify in spike workspace
 status: pending
 complexity: low
 methodology: classic
-depends_on: [w4-3-bootstrap-reconcile-skills]
-
+depends_on:
+  - w4-3-bootstrap-reconcile-skills
 description: |
   End-to-end smoke test of the Mode D-a skills export pipeline.
 
@@ -20,15 +20,13 @@ description: |
   This is the pilot success gate. If this passes, the Mode D-a pattern is
   validated. Future skills can be added to skills-export.yaml without re-
   validating the mechanism.
-
 acceptance_criteria:
-  - "Pilot round-trip executed end-to-end against spike workspace"
-  - "metrics-check skill present in Multica skill table after /hive:multica-init"
-  - "Skill content matches in-repo SKILL.md after normalization"
-  - "All substrate_deps present as skill_files"
-  - "Visibility flag correctly set"
-  - "Validation finding documented at .pHive/epics/multica-substrate-deepen/docs/pilot-roundtrip-validation.md"
-
+  - Pilot round-trip executed end-to-end against spike workspace
+  - metrics-check skill present in Multica skill table after /hive:multica-init
+  - Skill content matches in-repo SKILL.md after normalization
+  - All substrate_deps present as skill_files
+  - Visibility flag correctly set
+  - Validation finding documented at .pHive/epics/multica-substrate-deepen/docs/pilot-roundtrip-validation.md
 steps:
   - id: research
     description: Recap W4.2 manifest + W4.3 reconcile flow + W0.3 visibility
@@ -36,16 +34,18 @@ steps:
   - id: implement
     description: Run /hive:multica-init in spike workspace
     agent: tester
-    depends_on: [research]
+    depends_on:
+      - research
   - id: test
     description: Verify all 5 acceptance points
     agent: tester
-    depends_on: [implement]
+    depends_on:
+      - implement
   - id: integrate
     description: Write validation finding doc; commit
     agent: technical-writer
-    depends_on: [test]
-
+    depends_on:
+      - test
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
@@ -53,16 +53,13 @@ context:
       purpose: Pilot manifest
     - path: skills/multica-init/SKILL.md
       purpose: Bootstrap entrypoint
-
 cross_cutting:
   - concern: documentation
-    action: "Validation finding doc satisfies documentation concern"
-
+    action: Validation finding doc satisfies documentation concern
 risks:
   - severity: medium
     description: Round-trip exposes bundling protocol gap
     mitigation: Failure surfaces a defect story against W4.3, not a re-plan
-
 metric:
   applies: true
   name: multica.skills_export_pilot_roundtrip_pass
@@ -73,6 +70,7 @@ metric:
   window: post-story-integrate
   source:
     kind: manual
-    ref: "Validation finding doc declares PASS"
+    ref: Validation finding doc declares PASS
   verify_at: integrate
   owner: tester
+tracker_id: plugin-hive/PLU-116
