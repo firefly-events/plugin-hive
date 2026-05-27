@@ -69,3 +69,45 @@ test('backward-compat: legacy single-arg callers unaffected', () => {
   const briefEmptyArg = serializeStoryBrief(fullStory(), {});
   assert.equal(briefNoArg, briefEmptyArg);
 });
+
+// Per-persona provider combinations
+
+function makeAgents(personaName, provider) {
+  return [{ name: personaName, provider }];
+}
+
+test('combo codex+codex: provider=codex + agent_backends=codex → omit rescue section', () => {
+  const brief = serializeStoryBrief(fullStory(), {
+    dispatchingPersona: 'backend-developer',
+    agents: makeAgents('backend-developer', 'codex'),
+    agentBackends: { 'backend-developer': 'codex' },
+  });
+  assert.doesNotMatch(brief, /\/codex:rescue/);
+});
+
+test('combo codex+claude: provider=codex + agent_backends=claude → omit rescue section', () => {
+  const brief = serializeStoryBrief(fullStory(), {
+    dispatchingPersona: 'backend-developer',
+    agents: makeAgents('backend-developer', 'codex'),
+    agentBackends: { 'backend-developer': 'claude' },
+  });
+  assert.doesNotMatch(brief, /\/codex:rescue/);
+});
+
+test('combo claude+codex: provider=claude + agent_backends=codex → embed rescue section', () => {
+  const brief = serializeStoryBrief(fullStory(), {
+    dispatchingPersona: 'reviewer',
+    agents: makeAgents('reviewer', 'claude'),
+    agentBackends: { reviewer: 'codex' },
+  });
+  assert.match(brief, /^## Use \/codex:rescue/m);
+});
+
+test('combo claude+claude: provider=claude + agent_backends=claude → omit rescue section', () => {
+  const brief = serializeStoryBrief(fullStory(), {
+    dispatchingPersona: 'reviewer',
+    agents: makeAgents('reviewer', 'claude'),
+    agentBackends: { reviewer: 'claude' },
+  });
+  assert.doesNotMatch(brief, /\/codex:rescue/);
+});

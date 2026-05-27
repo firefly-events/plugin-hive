@@ -137,15 +137,29 @@ export function __resetCache() {
   AGENT_CACHE.clear();
 }
 
+function resolveCodexInstruction(options) {
+  const { codexInstruction = false, dispatchingPersona, agents, agentBackends } = options;
+  if (dispatchingPersona !== undefined && dispatchingPersona !== null) {
+    const entry = Array.isArray(agents)
+      ? agents.find((a) => a?.name === dispatchingPersona)
+      : null;
+    const effectiveProvider = entry?.provider ?? 'claude';
+    if (effectiveProvider === 'codex') return false;
+    return agentBackends?.[dispatchingPersona] === 'codex';
+  }
+  return codexInstruction;
+}
+
 export function serializeStoryBrief(story, options = {}) {
-  const { codexInstruction = false, integrationBranch = null } = options;
+  const { integrationBranch = null } = options;
+  const showCodexInstruction = resolveCodexInstruction(options);
   const sections = [];
 
   if (story?.description) {
     sections.push(`## Goal\n${cleanText(story.description)}`);
   }
 
-  if (codexInstruction) {
+  if (showCodexInstruction) {
     sections.push(
       `## Use /codex:rescue\nThis story is routed through the Codex backend. For implementation work, invoke the /codex:rescue skill with the story spec from this brief rather than writing code directly. Return changes for the orchestrator to commit.`,
     );
