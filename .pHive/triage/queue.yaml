@@ -1,0 +1,39 @@
+# .pHive/triage/queue.yaml
+# Triage queue per hive/references/triage-queue-schema.md
+version: 1
+items:
+  - id: t-001
+    state: prioritized
+    kind: feature
+    title: "Design + wire (or drop) orphan KG predicates assigned_to/blocked_by/depends_on"
+    description: |
+      The kg-repair-activation epic (shipped 2026-05-27) wired or pruned 6 of 9
+      declared KG predicates. Three remain orphaned with no live write path:
+      `assigned_to`, `blocked_by`, `depends_on`.
+
+      These are workflow-coordination predicates that need their own design pass
+      before wiring (when does X get assigned_to whom? where does blocked_by emit?
+      do depends_on emits derive from epic.yaml or get written at planning time?).
+
+      Two options to evaluate in design:
+      (a) Wire all three with concrete emit triggers (likely 3 stories)
+      (b) Drop from schema as YAGNI; one schema-prune story
+
+      Tiebreaker: density math from /hive:kg-stats post-merge — if the kg-repair
+      epic gets density to 6/day without these, option (b). Otherwise (a).
+
+      Source: kg-repair-activation design-discussion.md §6 open-questions Q2;
+      epic confirmation gate explicit GAP acknowledgement 2026-05-27.
+    reporter: system
+    reported_at: 2026-05-27T05:30:00Z
+    priority: p2
+    severity: low
+    assignee: null
+    linked_epic: null
+    linked_story: null
+    closed_reason: null
+    closed_at: null
+    state_history:
+      - { state: inbox, at: 2026-05-27T05:30:00Z }
+      - { state: clarified, at: 2026-05-27T05:30:00Z }
+      - { state: prioritized, at: 2026-05-27T05:30:00Z }

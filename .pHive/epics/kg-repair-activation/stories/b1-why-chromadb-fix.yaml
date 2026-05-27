@@ -1,0 +1,72 @@
+id: b1-why-chromadb-fix
+epic: kg-repair-activation
+tracker_id: "fcbd60a8-6a53-4b98-984a-ae96d668659d"
+tracker_url: ""
+tracker_number: "PLU-83"
+title: "Fix /hive:why ChromaDB RuntimeError propagation"
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  /hive:why crashes in free-form mode with "RuntimeError: dictionary changed size during iteration" propagating from the ChromaDB provider call. Fix: wrap _extract_chroma_response (hive/lib/kg_why.py:292) to catch RuntimeError and return ([] | False) — degrades free-form mode to sqlite-only when ChromaDB misbehaves. Add a single log line on catch: "kg_why.chromadb_runtime_error reason=<message>" so we know how often it fires. NOT a chromadb library fix — bounded containment only.
+
+acceptance_criteria:
+  - "Given a ChromaDB provider that raises RuntimeError(\"dictionary changed size during iteration\"), when _extract_chroma_response is called, then it catches the RuntimeError and returns (False, []) without re-raising."
+  - "Given the catch fires, when stderr is captured, then it contains one line of the form \"kg_why.chromadb_runtime_error reason=<message>\"."
+  - "Given a ChromaDB provider that raises any other exception class, when _extract_chroma_response is called, then the exception still propagates — catch is RuntimeError-scoped, not catch-all."
+  - "Given python3 -m hive.lib.kg_why \"test query\" --limit 5 is invoked end-to-end against a kg.sqlite with no matching triples, when the run completes, then exit code is 0 and stdout contains \"No decisions found\"."
+
+steps:
+  - id: research
+    description: Explore the codebase for relevant patterns, files, and constraints
+    agent: researcher
+  - id: implement
+    description: Implement the story according to spec and research findings
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Write tests covering acceptance criteria and verify they pass
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review implementation and tests for correctness and convention compliance
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+files_to_modify:
+  - file: hive/lib/kg_why.py
+    change: Wrap _extract_chroma_response (line ~292) with try/except RuntimeError
+    purpose: Bounded fix; do not touch ChromaDB call at line 213
+  - file: tests/test_kg_why.py
+    change: Add regression test reproducing the dict-mutation crash via a fake provider
+    purpose: Prevent regression
+
+code_examples:
+  - title: "Existing _extract_chroma_response shape (verify exact lines)"
+    file: hive/lib/kg_why.py
+    snippet: |
+      def _extract_chroma_response(response):
+          # line ~292
+          # iterates dict — wrap this with RuntimeError catch
+
+metric:
+  applies: true
+  name: why.chromadb_crashes
+  direction: down
+  unit: crashes
+  baseline: "reproducible-on-every-freeform-query"
+  target: 0
+  window: post-merge-immediate
+  source:
+    kind: manual
+    ref: "manual repro of python3 -m hive.lib.kg_why \"any\" --limit 5"
+  verify_at: integrate
+  owner: reviewer

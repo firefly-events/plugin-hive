@@ -1,0 +1,63 @@
+id: s3-phase-lifecycle-wire
+epic: kg-repair-activation
+tracker_id: "e5d1f5c4-5387-491a-948d-5197ebc680b0"
+tracker_url: ""
+tracker_number: "PLU-87"
+title: "Wire phase_started + phase_complete in DAG walker"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: ["s2-dag-walker-emit-investigation"]
+
+description: |
+  Wire phase_started and phase_complete emits in hive/lib/dag_executor/executor/walker.py at the same call sites that already emit phase_blocked + phase_failed. Per grill U1, this story consumes s2 findings: if H2 found cause (a), this is purely additive; if (b)/(c), this story incorporates the fix scope s2 names. Update meta-optimize step-02c-kg-signal.md consumer query to include phase_started + phase_complete in its predicate set.
+
+acceptance_criteria:
+  - "Given the DAG walker enters a step, when the step starts, then a phase_started triple is emitted with subject=<step-id>, source_agent=<step-agent>, source_epic=<epic-id>."
+  - "Given the DAG walker exits a step successfully, when the step completes, then a phase_complete triple is emitted with the same subject + provenance."
+  - "Given a step that already emits phase_blocked or phase_failed, when those branches execute, then phase_started still emits at entry (no double-emit of complete on blocked/failed paths)."
+  - "Given meta-optimize step-02c-kg-signal.md, when it reads the KG, then its predicate query includes phase_started and phase_complete alongside phase_failed, phase_blocked, superseded."
+  - "Given a 1-week post-merge density check via /hive:kg-stats, when phase_started/phase_complete are counted, then both have non-zero triples (firing state per V1 taxonomy)."
+
+steps:
+  - id: research
+    description: Explore the codebase for relevant patterns, files, and constraints
+    agent: researcher
+  - id: implement
+    description: Implement the story according to spec and research findings
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Write tests covering acceptance criteria and verify they pass
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review implementation and tests for correctness and convention compliance
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+files_to_modify:
+  - file: hive/lib/dag_executor/executor/walker.py
+    change: Add phase_started emit at step entry + phase_complete at success exit
+  - file: hive/workflows/steps/meta-team-cycle/step-02c-kg-signal.md
+    change: Expand consumer predicate set to include phase_started + phase_complete
+  - file: tests/test_dag_walker_kg_emits.py
+    change: New test asserting both predicates emit on a representative step run
+
+metric:
+  applies: true
+  name: kg.lifecycle_predicates_firing
+  direction: up
+  unit: predicates
+  baseline: 2
+  target: 4
+  window: epic-merge-plus-7-days
+  source:
+    kind: sql
+    ref: "SELECT DISTINCT predicate FROM triples WHERE valid_from > epic_merge_date — expect at least phase_blocked, phase_failed, phase_started, phase_complete"
+  verify_at: epic-merge-plus-7-days
+  owner: maintainer

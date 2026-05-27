@@ -1,0 +1,49 @@
+id: s0-scope-drift-memo-verify
+epic: kg-repair-activation
+tracker_id: "f1f7a683-773c-4f7e-9bda-1488b7fde371"
+tracker_url: ""
+tracker_number: "PLU-81"
+title: "Verify scope_drift_emit_sites memory scope + cross-link"
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: read-only
+
+description: |
+  Re-read the user memory at ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/feedback_scope_drift_emit_sites.md end-to-end. Confirm the "3 emit sites" guidance is scoped to scope_drift_score only and NOT to KG predicate emits (as research-brief assumed). If confirmed, append a one-line cross-reference to the memo noting that kg-repair-activation does NOT violate the guidance. If the memo actually covers KG, escalate to /plan owner — design D2 needs revision.
+
+acceptance_criteria:
+  - "Given the memory file is read end-to-end, when its scope is identified, then the resolution is documented in this story's notes (scope_drift-only OR also covers KG)."
+  - "Given the resolution is scope_drift-only, when the memo is updated, then a one-line cross-reference is appended: \"See also kg-repair-activation epic — KG emit sites are NOT in scope of this guidance.\""
+  - "Given the resolution finds the memo covers KG too, when the planner is notified, then the story is blocked and an escalation entry is written to cycle-state."
+
+steps:
+  - id: research
+    description: Explore the codebase for relevant patterns, files, and constraints
+    agent: researcher
+  - id: implement
+    description: Implement the story according to spec and research findings
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Write tests covering acceptance criteria and verify they pass
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review implementation and tests for correctness and convention compliance
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+files_to_modify:
+  - file: ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/feedback_scope_drift_emit_sites.md
+    change: Append cross-reference line if memo is scope_drift-only
+
+metric:
+  applies: false
+  justification: "Memory-verification story produces a documentation cross-link, not a runtime behavior change; no observable surface to measure. The downstream stories (s3, s5) are where KG density actually moves."

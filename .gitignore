@@ -199,3 +199,9 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/episodes/multica-integration-fixes/**
 !.pHive/epics/story-loop-closure/
 !.pHive/epics/story-loop-closure/**
+!.pHive/epics/kg-repair-activation/
+!.pHive/epics/kg-repair-activation/**
+!.pHive/triage/
+!.pHive/triage/queue.yaml
+!.pHive/audits/
+!.pHive/audits/**
