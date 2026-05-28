@@ -32,14 +32,43 @@ Runs a simulated manual test against a single scenario instead of the full autom
    - Load the file directly via `hive/lib/scenarios/load.mjs` (`loadScenario`).
    - The loader validates the simulated-manual scenario shape: `id` (kebab-case), `title`, `mode` (`spec-walk | implementation-walk`), and a non-empty `steps` array of `{ action, expected }` objects, plus optional `preconditions` / `postconditions` string arrays.
 
+**Mode selection for `--simulated-manual`:**
+
+After resolving and validating the scenario, resolve the simulated-manual test
+mode before invoking an executor:
+
+1. If `HIVE_TEST_MODE=multica`, select Multica test mode.
+2. Otherwise, if root `hive.config.yaml` contains `test.mode: multica`, select
+   Multica test mode.
+3. Otherwise, select the existing local simulated-manual executor.
+
+Environment wins over config. Any value other than `multica` is ignored and falls
+through to the local executor. If Multica mode is selected, atomically call
+[`skills/hive/skills/test-mode-multica/SKILL.md`](../hive/skills/test-mode-multica/SKILL.md)
+with the resolved `scenario_path`, parsed `scenario`, owning `story_path`,
+`epic_handle`, `story_id`, parsed Hive config, and current integration branch.
+Selected Multica setup/bootstrap failures are terminal for that run; do not fall
+back to the local executor after Multica mode has been selected.
+
 **Executor step wiring:**
 
-After resolving the scenario, skip the standard swarm pipeline (steps 0–8) and run the simulated-manual executor instead (full contract in `hive/workflows/steps/test/simulated-manual.md`):
+After resolving the scenario, skip the standard swarm pipeline (steps 0–8) and run
+the selected simulated-manual executor instead (full local fallback contract in
+`hive/workflows/steps/test/simulated-manual.md`; Multica contract in
+`skills/hive/skills/test-mode-multica/SKILL.md`):
 
-1. Evaluate `preconditions` — if any fail, record `inconclusive` and stop.
-2. Walk `steps[]` in order, narrating each `action` against the spec (`spec-walk`) or the post-integrate implementation (`implementation-walk`); record per-step `outcome` from the declared `expected`.
-3. Evaluate `postconditions`.
-4. Compute overall verdict: `pass` (all steps + postconditions pass), `fail` (any step or postcondition failed), `inconclusive` (precondition failed → scenario skipped).
+1. If selected mode is `multica`, dispatch through `test-mode-multica`; the
+   Multica `tester` replays the same scenario contract and writes the canonical
+   story-YAML verdict.
+2. If selected mode is local/default, evaluate `preconditions` — if any fail,
+   record `inconclusive` and stop.
+3. Walk `steps[]` in order, narrating each `action` against the spec
+   (`spec-walk`) or the post-integrate implementation (`implementation-walk`);
+   record per-step `outcome` from the declared `expected`.
+4. Evaluate `postconditions`.
+5. Compute overall verdict: `pass` (all steps + postconditions pass), `fail` (any
+   step or postcondition failed), `inconclusive` (precondition failed → scenario
+   skipped).
 
 Write the verdict to the story YAML's `manual_verdict` block per [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §9. This story-YAML block is the canonical source of truth for simulated-manual verdicts; `.pHive/cycle-state/<epic-id>.yaml` is only a derived/index view if another tool mirrors it.
 
