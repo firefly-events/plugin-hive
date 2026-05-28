@@ -116,7 +116,7 @@ execution:
 
 ## 9. The `manual_verdict:` field group
 
-Added by story `c-2-test-simulated-manual-mode` in the `autonomous-cycle-loop` epic. Carries the result of a `/test --simulated-manual` run. The block is written by the test-worker after executing the linked scenario; `/plan` seeds a placeholder when the `simulated-manual` cross-cutting concern applies.
+Added by story `c-2-test-simulated-manual-mode` in the `autonomous-cycle-loop` epic. Carries the result of a `/test --simulated-manual` run. This story-YAML block is the canonical source of truth for simulated-manual verdicts; `.pHive/cycle-state/<epic-id>.yaml` may expose a derived/index view, but it is not the source. The block is written by `tester` after executing the linked scenario; `/plan` seeds a placeholder when the `simulated-manual` cross-cutting concern applies.
 
 ### 9.1 Shape
 
@@ -135,7 +135,7 @@ manual_verdict:
 | `scenario_ref` | string | — | Repo-relative path to the scenario YAML; must resolve to a file conforming to [`test-scenario-schema.md`](test-scenario-schema.md). Set at plan time; updated by the tester if the scenario file is renamed. |
 | `verdict` | enum \| null | `null` | The outcome of the last `/test --simulated-manual` run: `pass`, `fail`, or `inconclusive`. `null` = not yet run. |
 | `timestamp` | ISO 8601 \| null | `null` | Wall-clock time when the verdict was recorded. `null` = not yet run. |
-| `agent` | string \| null | `null` | Persona name that executed the scenario (e.g., `test-worker`). `null` = not yet run. |
+| `agent` | string \| null | `null` | Persona name that executed the scenario (e.g., `tester`). `null` = not yet run. |
 
 ### 9.3 Lifecycle
 
@@ -158,7 +158,7 @@ manual_verdict:
   scenario_ref: .pHive/test-scenarios/c-2-test-simulated-manual-mode-manual.yaml
   verdict: pass
   timestamp: "2026-05-21T20:45:00Z"
-  agent: test-worker
+  agent: tester
 ```
 
 ## 3. The `metric:` field group

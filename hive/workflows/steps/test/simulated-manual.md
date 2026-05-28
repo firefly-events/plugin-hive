@@ -8,7 +8,7 @@
 - Never claim a step passed without executing it against the spec or implementation
 - In implementation-walk mode: STOP and emit an error if the story's `integrate` episode marker is absent
 - The `overall_verdict` is pass only if ALL steps pass; any fail → verdict is fail
-- Write the `manual_verdict` block to cycle-state before declaring done
+- Write the `manual_verdict` block to the story YAML before declaring done
 
 ## EXECUTION PROTOCOLS
 
@@ -22,7 +22,7 @@ Execute the scenario steps, capture outcomes, write the verdict.
 - Scenario file (`tests/scenarios/<topic>.yaml` or `.pHive/test-scenarios/` fallback)
 - Story spec (acceptance criteria, description, key files)
 - Implementation code (implementation-walk only; must be post-integrate)
-- Cycle-state at `.pHive/cycle-state/<epic-id>.yaml`
+- Story YAML at `.pHive/epics/<epic-id>/stories/<story-id>.yaml`
 
 **NOT available:**
 - Runtime environment (do not spin up services; narrate against the spec or existing code)
@@ -94,35 +94,31 @@ overall_verdict = 'fail'   if any step or postcondition failed
 overall_verdict = 'inconclusive'  if any precondition failed (scenario skipped)
 ```
 
-### 6. Write manual_verdict to cycle-state
+### 6. Write manual_verdict to story YAML
 
-Write (or replace) the `manual_verdict` block in `.pHive/cycle-state/<epic-id>.yaml`:
+Write (or replace) the `manual_verdict` block in the story YAML at
+`.pHive/epics/<epic-id>/stories/<story-id>.yaml`. This story-YAML block is the
+canonical source of truth for simulated-manual verdicts. `.pHive/cycle-state/<epic-id>.yaml`
+may mirror the verdict as a derived/index view, but it is not the source of truth.
 
 ```yaml
 manual_verdict:
-  scenario_id: <scenario.id>
-  story: <scenario.story>
-  mode: <spec-walk | implementation-walk>
-  overall_verdict: <pass | fail | inconclusive>
-  executed_at: "<ISO-8601 timestamp>"
-  executor: tester
-  step_results:
-    - step: <N>
-      action: <action text>
-      outcome: <pass | fail | inconclusive>
-      reason: <string | null>
-  notes: <optional one-paragraph summary>
+  scenario_ref: <resolved scenario path>
+  verdict: pass | fail | inconclusive
+  timestamp: "<ISO-8601 timestamp>"
+  agent: tester
 ```
 
-If a `manual_verdict` block already exists for the same `scenario_id`, replace it
-(overwrite, not append) so the cycle-state stays a single-source-of-truth.
+If a `manual_verdict` block already exists, merge these verdict fields into it
+(overwrite the verdict fields, do not append) so existing story fields are preserved
+and the story YAML remains the single source of truth.
 
 ## SUCCESS METRICS
 
 - [ ] Scenario loaded and validated without error
 - [ ] Every scenario step narrated and recorded
 - [ ] overall_verdict computed from step results
-- [ ] `manual_verdict` block written to cycle-state
+- [ ] `manual_verdict` block written to the story YAML
 - [ ] Episode marker written: `.pHive/episodes/<epic>/<story>/test.yaml`
 
 ## FAILURE MODES
@@ -130,7 +126,7 @@ If a `manual_verdict` block already exists for the same `scenario_id`, replace i
 - **Skipping steps:** All steps must be narrated, even obvious ones.
 - **Soft verdicts:** "Looks correct" is not pass. Match `step.expected` exactly.
 - **implementation-walk without integrate marker:** Stop and emit the error above.
-- **Forgetting cycle-state write:** The verdict is not delivered until it is in cycle-state.
+- **Forgetting story-YAML write:** The verdict is not delivered until it is in the story YAML.
 
 ## NEXT STEP
 

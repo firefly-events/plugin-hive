@@ -41,14 +41,14 @@ After resolving the scenario, skip the standard swarm pipeline (steps 0–8) and
 3. Evaluate `postconditions`.
 4. Compute overall verdict: `pass` (all steps + postconditions pass), `fail` (any step or postcondition failed), `inconclusive` (precondition failed → scenario skipped).
 
-Write the verdict to the story YAML's `manual_verdict` block per [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §8:
+Write the verdict to the story YAML's `manual_verdict` block per [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §9. This story-YAML block is the canonical source of truth for simulated-manual verdicts; `.pHive/cycle-state/<epic-id>.yaml` is only a derived/index view if another tool mirrors it.
 
 ```yaml
 manual_verdict:
   scenario_ref: <resolved path>
   verdict: pass | fail | inconclusive
   timestamp: <ISO 8601>
-  agent: test-worker
+  agent: tester
 ```
 
 The verdict block is merged into the story YAML in place — if a prior verdict exists it is overwritten; existing story fields are preserved.
@@ -82,7 +82,7 @@ Load `hive/workflows/test-swarm.workflow.yaml` and execute the pipeline. Each st
 | 0. Rebuild | test-scout | `step-00-rebuild.md` | Rebuild from latest commit, deploy to devices |
 | 1. Scout | test-scout | `step-01-scout.md` | Detect frameworks, scan tests, read baseline |
 | 2. Architect | test-architect | `step-02-architect.md` | Map ACs to tests, author scripts, verify testId render |
-| 3. Worker | test-worker | `step-03-worker.md` | Execute tests, capture artifacts to `.pHive/test-artifacts/` |
+| 3. Worker | worker persona | `step-03-worker.md` | Execute tests, capture artifacts to `.pHive/test-artifacts/` |
 | 4. Inspector | test-inspector | `step-04-inspector.md` | Coverage analysis, gap detection |
 | 5. Sentinel | test-sentinel | `step-05-sentinel.md` | Bug filing with AI hypothesis |
 | 6. Triage | test-sentinel | `step-06-triage.md` | Categorize: transient, story issue, or human blocker |
@@ -109,4 +109,4 @@ ALL test artifacts go to `.pHive/test-artifacts/{epic-id}/{story-id}/`:
 
 - `hive/workflows/test-swarm.workflow.yaml` — workflow definition
 - `hive/references/test-swarm-architecture.md` — full architecture doc
-- `hive/agents/test-scout.md`, `test-architect.md`, `test-worker.md`, `test-inspector.md`, `test-sentinel.md` — agent personas
+- `hive/agents/test-scout.md`, `test-architect.md`, the worker persona, `test-inspector.md`, `test-sentinel.md` — agent personas
