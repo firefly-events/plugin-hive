@@ -1,0 +1,9 @@
+run_id: plan-mpt-20260528
+skill: plan
+timestamp: "2026-05-28T07:05:00Z"
+gate_lift_fired: false
+methodology: classic
+methodology_source: epic-yaml
+story_specs_produced: 11
+nonsensical_defaults: []
+warnings_emitted: 0
