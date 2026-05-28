@@ -1,6 +1,6 @@
 id: h-03-standup-format-slack-manual
 title: "Standup --format slack — Slack render verification"
-mode: simulated-manual
+mode: spec-walk
 story: h-03-standup-format-slack
 epic: hermes-integration-mvp
 
@@ -39,9 +39,3 @@ postconditions:
   - "No ANSI artifacts visible in Slack output"
   - "Default (no-flag) invocation behavior is byte-equivalent to pre-h-03 behavior"
   - "Manual verdict recorded in cycle-state manual_verdict block"
-
-manual_verdict:
-  scenario_ref: .pHive/test-scenarios/h-03-standup-format-slack-manual.yaml
-  verdict: null
-  timestamp: null
-  agent: null

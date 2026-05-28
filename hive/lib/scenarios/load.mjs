@@ -11,6 +11,7 @@
  * Scenario schema (simulated-manual):
  *   id: string (required, kebab-case)
  *   title: string (required, non-empty)
+ *   description: string (optional)
  *   mode: 'spec-walk' | 'implementation-walk' (required)
  *   story: string (optional — required for implementation-walk marker check)
  *   epic: string (optional — required for implementation-walk marker check)
@@ -26,6 +27,24 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const VALID_MODES = new Set(['spec-walk', 'implementation-walk']);
+const CANONICAL_TOP_LEVEL_FIELDS = new Set([
+  'id',
+  'title',
+  'description',
+  'mode',
+  'story',
+  'epic',
+  'preconditions',
+  'steps',
+  'postconditions',
+]);
+const LEGACY_TOP_LEVEL_FIELDS = new Set([
+  'invocation',
+  'pre_conditions',
+  'expectations',
+  'sandcastle_mode_override',
+]);
+const CANONICAL_STEP_FIELDS = new Set(['action', 'expected', 'actor']);
 
 /**
  * Load and validate a scenario YAML file.
@@ -62,6 +81,34 @@ export function loadScenario(filePath, { cwd = process.cwd(), epicId } = {}) {
 // ─── Validation ──────────────────────────────────────────────────────────────
 
 function validateSchema(doc, filePath) {
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
+    throw makeError(
+      'VALIDATION_ERROR',
+      `${filePath}: scenario must be a YAML mapping`,
+      filePath,
+      null,
+    );
+  }
+
+  for (const field of Object.keys(doc)) {
+    if (LEGACY_TOP_LEVEL_FIELDS.has(field)) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: field '${field}' belongs to the deprecated invocation/pre_conditions/expectations schema; use the canonical mode/steps/preconditions/postconditions schema`,
+        filePath,
+        field,
+      );
+    }
+    if (!CANONICAL_TOP_LEVEL_FIELDS.has(field)) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: unrecognized top-level field '${field}'`,
+        filePath,
+        field,
+      );
+    }
+  }
+
   requireString(doc, 'id', filePath);
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(doc.id.trim())) {
     throw makeError(
@@ -72,6 +119,9 @@ function validateSchema(doc, filePath) {
     );
   }
   requireString(doc, 'title', filePath);
+  optionalString(doc, 'description', filePath);
+  optionalString(doc, 'story', filePath);
+  optionalString(doc, 'epic', filePath);
 
   if (!doc.mode || !VALID_MODES.has(doc.mode)) {
     throw makeError(
@@ -101,6 +151,16 @@ function validateSchema(doc, filePath) {
         `steps[${i}]`,
       );
     }
+    for (const field of Object.keys(step)) {
+      if (!CANONICAL_STEP_FIELDS.has(field)) {
+        throw makeError(
+          'VALIDATION_ERROR',
+          `${filePath}: unrecognized field 'steps[${i}].${field}'`,
+          filePath,
+          `steps[${i}].${field}`,
+        );
+      }
+    }
     if (!step.action || typeof step.action !== 'string' || !step.action.trim()) {
       throw makeError(
         'VALIDATION_ERROR',
@@ -115,6 +175,14 @@ function validateSchema(doc, filePath) {
         `${filePath}: steps[${i}].expected is required and must be a non-empty string`,
         filePath,
         `steps[${i}].expected`,
+      );
+    }
+    if (step.actor !== undefined && (typeof step.actor !== 'string' || !step.actor.trim())) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: steps[${i}].actor must be a non-empty string when present`,
+        filePath,
+        `steps[${i}].actor`,
       );
     }
   }
@@ -148,6 +216,18 @@ function requireString(doc, field, filePath) {
     throw makeError(
       'VALIDATION_ERROR',
       `${filePath}: field '${field}' is required and must be a non-empty string`,
+      filePath,
+      field,
+    );
+  }
+}
+
+function optionalString(doc, field, filePath) {
+  if (doc[field] === undefined) return;
+  if (typeof doc[field] !== 'string' || !doc[field].trim()) {
+    throw makeError(
+      'VALIDATION_ERROR',
+      `${filePath}: field '${field}' must be a non-empty string when present`,
       filePath,
       field,
     );
