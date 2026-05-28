@@ -112,15 +112,38 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
     Place the new entries immediately after the last existing `!.pHive/epics/<name>/**` line in `.gitignore`. Commit `.gitignore` together with the first epic artifact so the dir is tracked from inception.
 
+0c. **Resolve planning dispatch mode before teammate spawn.** Read the plan dispatch
+mode with env-over-config precedence and store it as `${planning_mode_decision}`
+on the planning context:
+
+   1. If `HIVE_PLANNING_MODE=multica`, set
+      `{ mode_decision: "multica", field_sources: { planning_mode: "env" } }`.
+   2. Else if the root-first resolved `hive.config.yaml` has
+      `planning.mode: multica`, set
+      `{ mode_decision: "multica", field_sources: { planning_mode: "config" } }`.
+   3. Otherwise set
+      `{ mode_decision: "default", field_sources: { planning_mode: "default" } }`.
+
+   This is a thin selector only. It does not dispatch personas directly and it
+   does not bypass user-facing review gates. When the decision is `multica`,
+   Phase 0 routes teammate spawn through `planning-routing` ->
+   `plan-mode-multica`, which owns the Multica persona dispatch, polling, and
+   episode markers.
+
 1. **Assemble and route the planning team.** Invoke the **planning-routing** skill (atomic; `skills/hive/skills/planning-routing/SKILL.md`) — this is an **external call**, NOT inline prose copied from the routing skill.
 
-Pass three inputs: `assembled_personas` (core planning personas plus conditional architect/ui-designer selected from the requirement), the root-first `agent_backends` map (empty map if absent per [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)), and `requirement_summary`.
+Pass four inputs: `assembled_personas` (core planning personas plus conditional architect/ui-designer selected from the requirement), the root-first `agent_backends` map (empty map if absent per [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)), `${planning_mode_decision}` from step 0c, and `requirement_summary`.
 
-The skill builds final `routing_decisions`, spawns direct and/or Codex-backed teammates, emits exactly one structured routing INFO log per persona, and handles Codex runtime fallback plus circuit breaker behavior.
+The skill builds final `routing_decisions`, spawns Multica, direct, and/or Codex-backed teammates, emits exactly one structured routing INFO log per persona, and handles Multica→Codex→direct fallback plus Codex runtime fallback/circuit breaker behavior. When `${planning_mode_decision}.mode_decision == "multica"`, `planning-routing` invokes `skills/hive/skills/plan-mode-multica/SKILL.md` for Multica-dispatched personas; otherwise it preserves the existing direct/Codex routing behavior.
 
 Continue Phase A using the returned active planning team handles and `routing_decisions`.
 
 See [`skills/hive/skills/planning-routing/SKILL.md`](../hive/skills/planning-routing/SKILL.md).
+
+**Gate ownership invariant.** Multica-dispatched planning may produce or revise
+planning artifacts, but it never advances user review/sign-off gates. The
+orchestrator still presents and waits locally at the design-discussion review
+gate, the conditional H/V review gate, and the structured-outline sign-off gate.
 
 ### Phase A: Research
 
@@ -182,6 +205,10 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
    - Flag any risks or approaches they disagree with
    - Confirm or override the scale assessment recommendation
 
+   This gate is always local to the orchestrator, including when Phase 0 used
+   `planning.mode: multica`. Multica planning output may feed the document, but
+   it must not auto-advance user feedback, scale selection, or routing.
+
    After collecting user feedback, evaluate the scale and **announce the routing decision inline** — no separate confirmation step:
 
    ```
@@ -216,6 +243,10 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
    - **Medium scope (default, no `--gate-hv`):** Auto-proceed to Phase C without presenting a gate — the collaborative review in step 7 is sufficient.
    - **Medium scope + `--fast`:** H/V planning was skipped entirely at step 5 — this step is never reached.
 
+   When this gate runs, it is local to the orchestrator even if the H/V docs
+   were produced or revised by Multica-dispatched planning personas. Multica
+   completion is an artifact-readiness signal, not user review approval.
+
    **When the gate runs (large or medium + `--gate-hv`), the user reviews:**
    - Are the layers correctly identified? (horizontal)
    - Are the slice boundaries logical? (vertical)
@@ -238,6 +269,10 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     - Flags any elicitation answers that seem weak or wrong
     - Responds to the decision points (Part 8) — numbered affirm/change items
     - Provides final sign-off or requests revisions
+
+    This sign-off gate is always local to the orchestrator, including when the
+    structured outline was produced by Multica-dispatched planning personas.
+    Do not let Multica issue completion or episode markers imply sign-off.
 
     Incorporate feedback into the planning context before proceeding.
 
