@@ -16,12 +16,21 @@ function makeLoadAgentsConfigFn(agents) {
 }
 
 // Build a fake httpJsonFn from fixture data
-function makeHttpJsonFn({ existingAgents = [], calls = [] } = {}) {
+function makeHttpJsonFn({ existingAgents = [], existingSkills = [], calls = [] } = {}) {
   return async function fakeHttpJson(serverUrl, apiPath, { method = 'GET', body } = {}) {
     calls.push({ method, apiPath, body });
 
     if (method === 'GET' && apiPath.startsWith('/api/runtimes')) {
       return [{ id: 'rt-1', provider: 'claude' }];
+    }
+
+    if (method === 'GET' && apiPath.startsWith('/api/skills')) {
+      return existingSkills;
+    }
+
+    // Skill association — must be checked before the generic /api/agents/ PUT.
+    if (method === 'PUT' && /^\/api\/agents\/[^/]+\/skills/.test(apiPath)) {
+      return { ok: true, skill_ids: body?.skill_ids ?? [] };
     }
 
     if (method === 'GET' && apiPath.startsWith('/api/agents')) {
@@ -204,4 +213,82 @@ test('removed persona — warns but does NOT delete; removed array returned', as
   } finally {
     console.warn = originalWarn;
   }
+});
+
+// ---------------------------------------------------------------------------
+// Scenario 5: Skill attachment — declared skill names resolve to IDs and are
+// set via the /api/agents/{id}/skills association endpoint.
+// ---------------------------------------------------------------------------
+
+test('attaches declared skills by resolving names to workspace skill IDs', async () => {
+  const calls = [];
+  const httpJsonFn = makeHttpJsonFn({
+    existingAgents: [{ ...existingAgent('writer'), skills: [] }],
+    existingSkills: [
+      { id: 'sk-1', name: 'story-writing' },
+      { id: 'sk-2', name: 'adr' },
+    ],
+    calls,
+  });
+  // Same model as existing → no body change; isolates the skill association call.
+  const loadAgentsConfigFn = makeLoadAgentsConfigFn([
+    { name: 'writer', provider: 'claude', model: 'claude-3-haiku', skills: ['story-writing', 'adr'] },
+  ]);
+
+  const result = await reconcileAgentsWithDeps({
+    serverUrl: SERVER_URL,
+    token: TOKEN,
+    workspaceId: WORKSPACE_ID,
+    consent: true,
+    httpJsonFn,
+    loadAgentsConfigFn,
+  });
+
+  const skillPut = calls.find((c) => c.method === 'PUT' && /^\/api\/agents\/[^/]+\/skills/.test(c.apiPath));
+  assert.ok(skillPut, 'should issue a PUT to the agent skills association endpoint');
+  assert.deepEqual(skillPut.body.skill_ids, ['sk-1', 'sk-2'], 'sends resolved skill IDs in declared order');
+  assert.deepEqual(result.skillsUpdated, ['writer']);
+});
+
+test('is idempotent — does not re-set skills when already attached', async () => {
+  const calls = [];
+  const httpJsonFn = makeHttpJsonFn({
+    existingAgents: [{ ...existingAgent('writer'), skills: [{ id: 'sk-2' }, { id: 'sk-1' }] }],
+    existingSkills: [
+      { id: 'sk-1', name: 'story-writing' },
+      { id: 'sk-2', name: 'adr' },
+    ],
+    calls,
+  });
+  const loadAgentsConfigFn = makeLoadAgentsConfigFn([
+    { name: 'writer', provider: 'claude', model: 'claude-3-haiku', skills: ['story-writing', 'adr'] },
+  ]);
+
+  const result = await reconcileAgentsWithDeps({
+    serverUrl: SERVER_URL, token: TOKEN, workspaceId: WORKSPACE_ID, consent: true, httpJsonFn, loadAgentsConfigFn,
+  });
+
+  const skillPut = calls.find((c) => c.method === 'PUT' && /^\/api\/agents\/[^/]+\/skills/.test(c.apiPath));
+  assert.equal(skillPut, undefined, 'no skill PUT when attachment already matches (order-insensitive)');
+  assert.deepEqual(result.skillsUpdated, []);
+});
+
+test('throws a clear error when a declared skill is not in the workspace', async () => {
+  const httpJsonFn = makeHttpJsonFn({
+    existingAgents: [{ ...existingAgent('writer'), skills: [] }],
+    existingSkills: [],
+    calls: [],
+  });
+  const loadAgentsConfigFn = makeLoadAgentsConfigFn([
+    { name: 'writer', provider: 'claude', model: 'claude-3-haiku', skills: ['does-not-exist'] },
+  ]);
+
+  await assert.rejects(
+    () => reconcileAgentsWithDeps({ serverUrl: SERVER_URL, token: TOKEN, workspaceId: WORKSPACE_ID, consent: true, httpJsonFn, loadAgentsConfigFn }),
+    (err) => {
+      assert.equal(err.code, 'SKILL_NOT_FOUND');
+      assert.match(err.message, /unknown skill "does-not-exist"/);
+      return true;
+    },
+  );
 });

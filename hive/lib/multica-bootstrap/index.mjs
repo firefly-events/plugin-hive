@@ -130,7 +130,10 @@ export function resolveCustomEnv(customEnv) {
 
 function buildAgentPayload(agent, runtimeId, instructions) {
   const payload = { name: agent.name, runtime_id: runtimeId };
-  for (const key of ['description', 'model', 'thinking_level', 'visibility', 'max_concurrent_tasks', 'custom_env', 'custom_args', 'mcp_config', 'skills']) {
+  // NOTE: `skills` is intentionally NOT in the agent body — the /api/agents
+  // POST/PUT endpoint ignores it. Skill attachment is a separate association,
+  // handled via PUT /api/agents/{id}/skills in reconcileAgentsWithDeps.
+  for (const key of ['description', 'model', 'thinking_level', 'visibility', 'max_concurrent_tasks', 'custom_env', 'custom_args', 'mcp_config']) {
     if (agent[key] !== undefined) {
       payload[key] = key === 'custom_env' ? resolveCustomEnv(agent[key]) : agent[key];
     }
@@ -293,6 +296,43 @@ export async function reconcileAgentsWithDeps({
   const existingAgents = normalizeList(existingBody, 'agents');
   const existingByName = new Map(existingAgents.map((agent) => [agent.name, agent]));
 
+  // Skill attachment is a separate association (PUT /api/agents/{id}/skills) — the
+  // agent POST/PUT body ignores `skills`. agents.yaml declares skills by name; resolve
+  // those names to workspace skill IDs. Only fetch the skill table when needed.
+  const anyAgentDeclaresSkills = desiredAgents.some((a) => Array.isArray(a.skills) && a.skills.length > 0);
+  let skillNameToId = null;
+  if (anyAgentDeclaresSkills) {
+    const skillsBody = await httpJsonFn(serverUrl, `/api/skills?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+    skillNameToId = new Map(normalizeList(skillsBody, 'skills').map((s) => [s.name, s.id]));
+  }
+  function resolveSkillIds(agent) {
+    return (Array.isArray(agent.skills) ? agent.skills : []).map((name) => {
+      const id = skillNameToId?.get(name);
+      if (!id) {
+        throw bootstrapError(
+          'SKILL_NOT_FOUND',
+          `Agent "${agent.name}" references unknown skill "${name}".`,
+          'Run reconcileSkills before reconcileAgents, and check the multica_name in skills-export.yaml.',
+        );
+      }
+      return id;
+    });
+  }
+  // agents.yaml is authoritative for an agent's skill set: sync the attachment to
+  // exactly the declared names (empty list clears). Returns true if it issued a change.
+  async function syncAgentSkills(agentId, agent, existingSkills) {
+    const desiredIds = resolveSkillIds(agent);
+    const existingIds = (existingSkills ?? []).map((s) => (typeof s === 'string' ? s : s?.id)).filter(Boolean);
+    if (jsonEqual([...desiredIds].sort(), [...existingIds].sort())) return false;
+    assertConsent(consent, `Setting skills for Multica agent "${agent.name}" requires consent.`, `Skills: ${(agent.skills ?? []).join(', ') || '(none)'}.`);
+    await httpJsonFn(serverUrl, `/api/agents/${encodeURIComponent(agentId)}/skills?workspace_id=${encodeURIComponent(workspaceId)}`, {
+      method: 'PUT',
+      token,
+      body: { skill_ids: desiredIds },
+    });
+    return true;
+  }
+
   // Pre-resolve runtime IDs — one call per unique provider, not per agent
   const uniqueProviders = [...new Set(desiredAgents.map((a) => a.provider).filter(Boolean))];
   const providerToRuntimeId = new Map();
@@ -315,30 +355,38 @@ export async function reconcileAgentsWithDeps({
   const created = [];
   const patched = [];
   const skipped = [];
+  const skillsUpdated = [];
 
   for (const agent of desiredAgents) {
     const runtimeId = providerToRuntimeId.get(agent.provider);
     const instructions = agent.persona_ref ? resolveInstructionsFn(agent, repoRoot) : agent.instructions;
     const payload = buildAgentPayload(agent, runtimeId, instructions);
     const existing = existingByName.get(agent.name);
+    let agentId;
     if (!existing) {
       assertConsent(consent, `Creating Multica agent "${agent.name}" requires consent.`, 'Re-run with --yes or create the agent manually.');
-      await httpJsonFn(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, {
+      const createdResp = await httpJsonFn(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, {
         method: 'POST',
         token,
         body: payload,
       });
+      agentId = createdResp?.id;
       created.push(agent.name);
-      continue;
+    } else {
+      agentId = existing.id;
+      const changedFields = diffAgent(existing, payload);
+      if (changedFields.length === 0) {
+        skipped.push(agent.name);
+      } else {
+        assertConsent(consent, `Updating Multica agent "${agent.name}" requires consent.`, `Changed fields: ${changedFields.join(', ')}.`);
+        await httpJsonFn(serverUrl, `/api/agents/${encodeURIComponent(existing.id)}?workspace_id=${encodeURIComponent(workspaceId)}`, { method: 'PUT', token, body: payload });
+        patched.push(agent.name);
+      }
     }
-    const changedFields = diffAgent(existing, payload);
-    if (changedFields.length === 0) {
-      skipped.push(agent.name);
-      continue;
+    // Skill attachment is managed separately from the agent body (see syncAgentSkills).
+    if (agentId && (await syncAgentSkills(agentId, agent, existing?.skills))) {
+      skillsUpdated.push(agent.name);
     }
-    assertConsent(consent, `Updating Multica agent "${agent.name}" requires consent.`, `Changed fields: ${changedFields.join(', ')}.`);
-    await httpJsonFn(serverUrl, `/api/agents/${encodeURIComponent(existing.id)}?workspace_id=${encodeURIComponent(workspaceId)}`, { method: 'PUT', token, body: payload });
-    patched.push(agent.name);
   }
 
   // Detect removed personas — warn but do NOT delete
@@ -347,7 +395,7 @@ export async function reconcileAgentsWithDeps({
     console.warn(`[hive-bootstrap] Agent "${name}" exists in Multica but is not in agents.yaml — skipping deletion for safety.`);
   }
 
-  return { created, patched, skipped, removed };
+  return { created, patched, skipped, removed, skillsUpdated };
 }
 
 export async function reconcileAgents({

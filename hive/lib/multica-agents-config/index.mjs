@@ -11,8 +11,10 @@ function parseScalar(value) {
     return {};
   }
 
-  if (value === '[]') {
-    return [];
+  if (value.startsWith('[') && value.endsWith(']')) {
+    const inner = value.slice(1, -1).trim();
+    if (inner === '') return [];
+    return inner.split(',').map((item) => item.trim()).filter((item) => item.length > 0);
   }
 
   if (value === 'null' || value === '~') {
