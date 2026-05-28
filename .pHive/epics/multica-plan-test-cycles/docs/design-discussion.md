@@ -191,4 +191,32 @@ SCALE ASSESSMENT:
     existing dispatch plumbing, and runs on a single-agent roster (no parallelism
     design needed yet). A structured outline should resolve the schema-first ordering
     and the spawn-seam shape before stories are written.
+
+<!-- gate-decisions-marker -->
+
+## 9. Gate Decisions (locked 2026-05-28)
+
+User review gate resolved the open questions:
+
+1. **Seam shape → Option A (full mirror).** Build `plan-mode-multica` and
+   `test-mode-multica` atomic skills symmetric with `execute-mode-multica`, each
+   with its own dispatch atom. Rationale: the cycle is **plan → execute → test**;
+   keeping all three dispatch shapes consistent is worth the extra surface.
+2. **Squad model → spike squad-as-cell first.** A bounded foundational story
+   assigns a throwaway task to `planning-team-squad` and observes whether Multica
+   distributes work across member-agents (each on its `agents.yaml` provider —
+   which would preserve the Codex/Claude split for free) or runs only the leader.
+   The spike result picks the carrier (squad-as-unit vs per-persona fan-out) for
+   the real plan-dispatch stories. Resolves grill H1 + C1.
+3. **Scale → Large.** Run H/V planning + a structured outline before story
+   decomposition.
+4. **Framing.** `/test --simulated-manual` is the **verification checkpoint** that
+   execution matched the plan — the manual-style pass that catches false
+   positives/negatives unit/integration tests miss. This is the WHY for routing
+   test through Multica as the cycle's final gate.
+5. **Blocking foundational stories (locked).** Scenario-schema reconciliation
+   (`invocation/expectations` vs `mode/steps`) + verdict-location divergence
+   (cycle-state vs story YAML) MUST land before any test dispatch; the
+   doc/verdict **done-signal / episode-marker shape** must be defined before any
+   dispatch can poll to terminal.
 ```
