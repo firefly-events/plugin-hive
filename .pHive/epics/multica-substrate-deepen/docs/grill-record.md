@@ -33,7 +33,7 @@
   - Question for planner: Is squad-evaluation read part of Phase B scope, or assumed-already-shipped? If in scope, the adapter extension is its own story under Phase B.
 
 - **H2** — Draft §2 Phase C says "autopilots use `autopilot create --agent <agent-name>` flag — pinned to a specific persona that owns the skill." This assumes plugin-hive skills can be cleanly bound to single personas. `/standup` today coordinates tpm + analyst + writer; `/metrics-check` runs against multiple metric carriers; `/meta-optimize` is multi-persona by design. One-agent-per-autopilot does not fit these multi-persona skills.
-  - Draft location: §2 Phase C ("autopilots use the autopilot create --agent <agent-name> flag — pinned to a specific persona that owns the skill")
+  - Draft location: §2 Phase C ("autopilots use the `autopilot create --agent <agent-name>` flag — pinned to a specific persona that owns the skill")
   - Why this matters: If the autopilot fires a single agent, that agent must internally orchestrate the multi-persona workflow — which means the agent IS an orchestrator, contradicting the orchestrator-on-Claude routing policy AND the substrate-first posture.
   - Question for planner: For each scheduled skill (`/standup`, `/metrics-check`, `/meta-optimize`, `/visual-qa`), which single persona owns it? If no single owner is honest, the autopilot design needs a different shape (e.g., autopilot creates an issue and a squad picks it up).
 
