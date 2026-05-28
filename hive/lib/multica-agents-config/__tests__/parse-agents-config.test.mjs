@@ -55,3 +55,22 @@ agents:
   assert.deepEqual(cfg.agents[0].skills, []);
   assert.deepEqual(cfg.agents[0].custom_args, []);
 });
+
+test('strips matching surrounding quotes from scalar values (no reconcile churn)', () => {
+  const yaml = [
+    'schema_version: 1',
+    'agents:',
+    '  - name: writer',
+    '    provider: codex',
+    '    model: ""',
+    '    persona_ref: hive/agents/technical-writer.md',
+    '    custom_env:',
+    '      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"',
+    '    visibility: workspace',
+    '',
+  ].join('\n');
+  const cfg = parseAgentsConfig(yaml);
+  const w = cfg.agents[0];
+  assert.equal(w.model, '', 'empty quoted string becomes a real empty string, not the 2-char string');
+  assert.equal(w.custom_env.CLAUDE_PLUGIN_PATH, '${HOME}/.claude/plugins', 'surrounding quotes stripped from env value');
+});

@@ -25,6 +25,18 @@ function parseScalar(value) {
     return Number(value);
   }
 
+  // Strip matching surrounding quotes so quoted scalars store their content, not the
+  // delimiters. Without this, `model: ""` yields the 2-char string `""` and a quoted
+  // env value keeps its quotes — both diff against the server's normalized value on
+  // every reconcile, causing spurious patches.
+  if (
+    value.length >= 2 &&
+    ((value[0] === '"' && value[value.length - 1] === '"') ||
+      (value[0] === "'" && value[value.length - 1] === "'"))
+  ) {
+    return value.slice(1, -1);
+  }
+
   return value;
 }
 
@@ -97,7 +109,9 @@ export function parseAgentsConfig(yamlString) {
   }
 
   for (const agent of agents) {
-    const missingFields = REQUIRED_AGENT_FIELDS.filter((field) => !agent[field]);
+    // Required = the key is present. An empty string is a valid value (e.g.
+    // `model: ""` means "use the provider default"), so check presence, not truthiness.
+    const missingFields = REQUIRED_AGENT_FIELDS.filter((field) => agent[field] === undefined || agent[field] === null);
     if (missingFields.length > 0) {
       throw new Error(`agent ${agent.name ?? '<unknown>'} missing required fields: ${missingFields.join(', ')}`);
     }
