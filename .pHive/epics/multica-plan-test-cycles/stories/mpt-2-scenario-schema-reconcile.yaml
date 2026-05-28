@@ -1,0 +1,74 @@
+id: mpt-2-scenario-schema-reconcile
+epic: multica-plan-test-cycles
+title: Reconcile the two divergent simulated-manual scenario schemas into one
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+description: S2 (parallel to S1; hard-gate half for the test path). test-scenario-schema.md declares invocation/pre_conditions/expectations/sandcastle_mode_override
+  while the loader (hive/lib/scenarios/load.mjs loadScenario) + executor expect mode/steps[{action,expected}]/preconditions/postconditions.
+  Pick ONE canonical shape, update the schema doc and loader to agree, migrate any existing scenario files,
+  and add loader tests. No Multica dispatch may consume scenarios until this lands.
+acceptance_criteria:
+- Given the reconciled schema, when loadScenario parses any existing or new scenario, then it accepts
+  exactly one canonical shape with no drift between doc and loader.
+- Given existing scenario files, when migrated, then all load without error under the updated loader.
+- Loader tests cover the canonical shape and reject the legacy shape.
+steps:
+- id: research
+  description: Explore the codebase for relevant patterns, files, and constraints.
+  agent: researcher
+- id: implement
+  description: Implement the story per spec and research findings.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Write/verify tests covering acceptance criteria.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Review implementation and tests for correctness and convention compliance.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit and push to the feature branch (fresh-checkout/rebase-push per integration principle).
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/lib/scenarios/load.mjs
+    purpose: Scenario loader to reconcile.
+  - path: hive/references/test-scenario-schema.md
+    purpose: Schema doc that diverges from the loader.
+files_to_modify:
+- file: hive/references/test-scenario-schema.md
+  change: Collapse to one canonical scenario shape.
+- file: hive/lib/scenarios/load.mjs
+  change: Align loadScenario with the canonical shape.
+- file: hive/lib/scenarios/__tests__/load.test.mjs
+  change: NEW/UPDATE — canonical-accept + legacy-reject tests.
+references:
+- path: .pHive/epics/multica-plan-test-cycles/docs/structured-outline.md
+  relevant_excerpt: Phase-to-slice mapping, file manifest, risk registry.
+- path: .pHive/epics/multica-plan-test-cycles/docs/design-discussion.md
+  relevant_excerpt: §9 locked gate decisions (full-mirror seam, squad-spike-first, plan->execute->test
+    framing).
+- path: .pHive/epics/multica-plan-test-cycles/docs/vertical-plan.md
+  relevant_excerpt: 6-slice spine S1..S6 with depends_on + working states.
+risks:
+- severity: high
+  description: Scenario migration breaks existing scenarios.
+  mitigation: Loader tests + migrate-in-place before any dispatch consumes scenarios.
+cross_cutting:
+- concern: documentation
+  action: Update test-scenario-schema.md to the single canonical shape; note the migration in any /test
+    docs.
+metric:
+  applies: false
+  justification: Schema/loader reconciliation story; the shipped artifact is a unified scenario contract,
+    an un-falsifiable substrate change rather than a measurable outcome.

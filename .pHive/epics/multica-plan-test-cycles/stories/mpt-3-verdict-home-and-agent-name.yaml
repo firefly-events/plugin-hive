@@ -1,0 +1,73 @@
+id: mpt-3-verdict-home-and-agent-name
+epic: multica-plan-test-cycles
+title: Pin canonical verdict home (story-YAML) + unify verdict agent name to tester
+status: pending
+complexity: low
+methodology: classic
+depends_on:
+- mpt-2-scenario-schema-reconcile
+description: 'S3a. Per gate decision #1, pin the canonical verdict home to the story-YAML manual_verdict
+  block; make .pHive/cycle-state/<id>.yaml a DERIVED view, not a second source of truth. Unify the verdict
+  agent name to `tester` (drop `test-worker`) across skills/test/SKILL.md §8 and hive/workflows/steps/test/simulated-manual.md
+  so resolveAgentUuidByName matches the Multica roster.'
+acceptance_criteria:
+- Given a simulated-manual run, when it writes a verdict, then it writes to the story-YAML manual_verdict
+  block as the single source of truth.
+- Given the test path, when grepped, then manual_verdict.agent is `tester` everywhere and no `test-worker`
+  references remain.
+steps:
+- id: research
+  description: Explore the codebase for relevant patterns, files, and constraints.
+  agent: researcher
+- id: implement
+  description: Implement the story per spec and research findings.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Write/verify tests covering acceptance criteria.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Review implementation and tests for correctness and convention compliance.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit and push to the feature branch (fresh-checkout/rebase-push per integration principle).
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/workflows/steps/test/simulated-manual.md
+    purpose: Currently writes verdict to cycle-state.
+files_to_modify:
+- file: skills/test/SKILL.md
+  change: Point verdict writes at story-YAML; agent name tester.
+- file: hive/workflows/steps/test/simulated-manual.md
+  change: Write verdict to story-YAML manual_verdict; drop cycle-state as source.
+- file: hive/references/story-yaml-schema.md
+  change: Confirm §8 manual_verdict block is the canonical home.
+references:
+- path: .pHive/epics/multica-plan-test-cycles/docs/structured-outline.md
+  relevant_excerpt: Phase-to-slice mapping, file manifest, risk registry.
+- path: .pHive/epics/multica-plan-test-cycles/docs/design-discussion.md
+  relevant_excerpt: §9 locked gate decisions (full-mirror seam, squad-spike-first, plan->execute->test
+    framing).
+- path: .pHive/epics/multica-plan-test-cycles/docs/vertical-plan.md
+  relevant_excerpt: 6-slice spine S1..S6 with depends_on + working states.
+risks:
+- severity: medium
+  description: Wrong canonical home strands a downstream reader.
+  mitigation: Doc-only decision pinned before any dispatch depends on it; update the un-chosen consumer
+    to read the derived view.
+cross_cutting:
+- concern: documentation
+  action: Update test/SKILL.md §8 and simulated-manual.md to the single verdict home + tester agent name.
+metric:
+  applies: false
+  justification: Convention-pinning story; it removes a verdict-location ambiguity, a substrate consistency
+    fix with no measurable runtime number to move.

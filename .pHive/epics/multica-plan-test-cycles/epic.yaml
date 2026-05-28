@@ -1,0 +1,66 @@
+name: multica-plan-test-cycles
+title: Route /plan and /test --simulated-manual through Multica (plan->execute->test)
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+stories:
+- id: mpt-1-squad-cell-dispatch-spike
+  title: 'Spike: how Multica runs a squad task (squad-as-cell vs leader-only)'
+  complexity: medium
+  depends_on: []
+- id: mpt-2-scenario-schema-reconcile
+  title: Reconcile the two divergent simulated-manual scenario schemas into one
+  complexity: medium
+  depends_on: []
+- id: mpt-3-verdict-home-and-agent-name
+  title: Pin canonical verdict home (story-YAML) + unify verdict agent name to tester
+  complexity: low
+  depends_on:
+  - mpt-2-scenario-schema-reconcile
+- id: mpt-4-doc-verdict-done-signal-marker
+  title: Define the doc/verdict done-signal episode marker (no code-push SHA)
+  complexity: medium
+  depends_on:
+  - mpt-2-scenario-schema-reconcile
+- id: mpt-5-dispatch-carrier-helper
+  title: Add the dispatch carrier to multica-story-dispatch (squad or per-persona, per spike)
+  complexity: medium
+  depends_on:
+  - mpt-1-squad-cell-dispatch-spike
+- id: mpt-6-plan-mode-multica-skill
+  title: Build plan-mode-multica atomic skill + plan dispatch-mode resolve
+  complexity: medium
+  depends_on:
+  - mpt-4-doc-verdict-done-signal-marker
+  - mpt-5-dispatch-carrier-helper
+- id: mpt-7-planning-routing-multica-path
+  title: Add multica as the third planning-routing spawn path + fallback
+  complexity: medium
+  depends_on:
+  - mpt-6-plan-mode-multica-skill
+- id: mpt-8-wire-plan-phase0
+  title: Wire /plan Phase 0 to the Multica spawn path (gates stay local)
+  complexity: low
+  depends_on:
+  - mpt-7-planning-routing-multica-path
+- id: mpt-9-test-mode-multica-skill
+  title: Build test-mode-multica atomic skill (hard-gated on schema + done-signal)
+  complexity: medium
+  depends_on:
+  - mpt-2-scenario-schema-reconcile
+  - mpt-3-verdict-home-and-agent-name
+  - mpt-4-doc-verdict-done-signal-marker
+  - mpt-5-dispatch-carrier-helper
+- id: mpt-10-wire-test-simulated-manual
+  title: Wire /test --simulated-manual through test-mode-multica
+  complexity: low
+  depends_on:
+  - mpt-9-test-mode-multica-skill
+- id: mpt-11-full-cycle-dogfood
+  title: Dogfood the full plan->execute->test cycle through Multica (throwaway)
+  complexity: medium
+  depends_on:
+  - mpt-8-wire-plan-phase0
+  - mpt-10-wire-test-simulated-manual

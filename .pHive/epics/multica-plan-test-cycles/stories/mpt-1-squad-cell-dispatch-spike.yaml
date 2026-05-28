@@ -1,0 +1,73 @@
+id: mpt-1-squad-cell-dispatch-spike
+epic: multica-plan-test-cycles
+title: 'Spike: how Multica runs a squad task (squad-as-cell vs leader-only)'
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+description: Bounded spike (S1, fork point). Assign a throwaway issue to planning-team-squad via `multica
+  issue assign --to-id <squad-uuid>` and observe whether Multica distributes the task across the squad's
+  member-agents (each running on its agents.yaml provider) or runs only the squad leader. Confirm planning-team-squad
+  and verify-team-squad member roles are actually seeded in .pHive/multica/agents.yaml. Write a verdict
+  that PICKS THE CARRIER (squad-as-unit vs per-persona fan-out) for the downstream plan-dispatch stories
+  (mpt-5..mpt-9) and states the implication for the Codex-for-work / Claude-for-verify backend split.
+acceptance_criteria:
+- Given a throwaway issue assigned to planning-team-squad, when it runs, then the task-runs/messages show
+  which member-agents executed and on which provider, recorded in a spike verdict doc under .pHive/epics/multica-plan-test-cycles/research/.
+- Given the squad rosters, when checked against .pHive/multica/agents.yaml, then any missing member role
+  (e.g. test-architect/test-scout/security-reviewer) is explicitly flagged.
+- Given the observation, then the verdict names the carrier (squad-as-unit | per-persona fan-out) and
+  the backend-split implication, unblocking mpt-5.
+steps:
+- id: research
+  description: Explore the codebase for relevant patterns, files, and constraints.
+  agent: researcher
+- id: implement
+  description: Implement the story per spec and research findings.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Write/verify tests covering acceptance criteria.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Review implementation and tests for correctness and convention compliance.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit and push to the feature branch (fresh-checkout/rebase-push per integration principle).
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: .pHive/multica/squads.yaml
+    purpose: Squad definitions under test.
+  - path: .pHive/multica/agents.yaml
+    purpose: Roster to confirm squad members are seeded.
+files_to_modify:
+- file: .pHive/epics/multica-plan-test-cycles/research/squad-dispatch-spike.md
+  change: NEW — spike verdict + observations.
+references:
+- path: .pHive/epics/multica-plan-test-cycles/docs/structured-outline.md
+  relevant_excerpt: Phase-to-slice mapping, file manifest, risk registry.
+- path: .pHive/epics/multica-plan-test-cycles/docs/design-discussion.md
+  relevant_excerpt: §9 locked gate decisions (full-mirror seam, squad-spike-first, plan->execute->test
+    framing).
+- path: .pHive/epics/multica-plan-test-cycles/docs/vertical-plan.md
+  relevant_excerpt: 6-slice spine S1..S6 with depends_on + working states.
+risks:
+- severity: medium
+  description: Squad may run leader-only, silently dropping the backend split.
+  mitigation: Throwaway task, no production wiring; verdict gates mpt-5..mpt-9.
+cross_cutting: []
+metric:
+  applies: false
+  justification: Throwaway investigative spike whose only artifact is a verdict doc; it ships knowledge
+    to pick the dispatch carrier, not a measurable runtime outcome.
+parallel_allowed: true
+parallel_rationale: read-only
