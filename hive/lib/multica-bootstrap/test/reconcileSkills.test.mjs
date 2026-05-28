@@ -186,6 +186,36 @@ test('warm idempotent path — re-run with no changes skips all skills', async (
   assert.equal(mutatingCalls.length, 0, 'no POST or PUT should fire on idempotent re-run');
 });
 
+test('warm path when server omits content_hash — falls back to normalized content, skips', async () => {
+  const repoRoot = tmpDir();
+  const skillContent = '# Test Skill\nDoes things.\n';
+
+  writeSkillFixture(repoRoot, { skillContent });
+
+  const calls = [];
+  const httpJsonFn = makeHttpJsonFn({
+    // Server response intentionally omits content_hash; raw content matches (modulo normalization).
+    existingSkills: [{ id: 'id-test-skill', name: 'test-skill', content: skillContent, visibility: 'private' }],
+    calls,
+  });
+  const loadFn = makeLoadSkillsExportConfigFn([desiredExport()]);
+
+  const result = await reconcileSkillsWithDeps({
+    serverUrl: SERVER_URL,
+    token: TOKEN,
+    workspaceId: WORKSPACE_ID,
+    consent: true,
+    httpJsonFn,
+    loadSkillsExportConfigFn: loadFn,
+    repoRoot,
+  });
+
+  assert.equal(result.skipped.length, 1, 'should skip when content matches despite missing content_hash');
+  assert.ok(result.skipped.includes('test-skill'));
+  const mutatingCalls = calls.filter((c) => c.method === 'POST' || c.method === 'PUT');
+  assert.equal(mutatingCalls.length, 0, 'no PUT churn on warm run when server omits content_hash');
+});
+
 // ---------------------------------------------------------------------------
 // Path 3: Drift — SKILL.md content edited → update fires
 // ---------------------------------------------------------------------------

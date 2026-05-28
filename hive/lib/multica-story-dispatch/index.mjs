@@ -150,6 +150,13 @@ function resolveCodexInstruction(options) {
   return codexInstruction;
 }
 
+// Single-quote a git ref for safe interpolation into the rendered shell snippets.
+// Git refs may legally contain shell metacharacters (e.g. `$`, `;`, `(`), so quote
+// once and escape embedded single quotes the POSIX way ('\'').
+function shQuoteRef(ref) {
+  return `'${String(ref).replace(/'/g, "'\\''")}'`;
+}
+
 export function serializeStoryBrief(story, options = {}) {
   const { integrationBranch = null } = options;
   const showCodexInstruction = resolveCodexInstruction(options);
@@ -182,6 +189,7 @@ export function serializeStoryBrief(story, options = {}) {
   }
 
   if (integrationBranch) {
+    const qBranch = shQuoteRef(integrationBranch);
     sections.push(
       [
         `## Integration Contract — single shared branch`,
@@ -190,9 +198,9 @@ export function serializeStoryBrief(story, options = {}) {
         ``,
         `**First action (overrides daemon checkout):**`,
         '```sh',
-        `git fetch origin ${integrationBranch}`,
-        `git checkout ${integrationBranch}`,
-        `git reset --hard origin/${integrationBranch}`,
+        `git fetch origin ${qBranch}`,
+        `git checkout ${qBranch}`,
+        `git reset --hard origin/${qBranch}`,
         '```',
         ``,
         `**After completing all acceptance criteria:**`,
@@ -200,9 +208,9 @@ export function serializeStoryBrief(story, options = {}) {
         `git add <specific files for this story>`,
         `git commit -m "[${story?.id ?? '<story-id>'}] <type>(<scope>): <description>"`,
         `# fetch + rebase to handle peer dispatches landing concurrently`,
-        `git fetch origin ${integrationBranch}`,
-        `git rebase origin/${integrationBranch}`,
-        `git push origin HEAD:${integrationBranch}`,
+        `git fetch origin ${qBranch}`,
+        `git rebase origin/${qBranch}`,
+        `git push origin HEAD:${qBranch}`,
         '```',
         ``,
         `**If push rejected (non-fast-forward):** re-run \`git fetch + git rebase + git push\`. Retry up to 3 times. If conflict on rebase, STOP and post the conflict diff as a comment — this means the parallel-dispatch gate let an overlapping story through and orchestrator must adjudicate.`,

@@ -735,25 +735,12 @@ export async function reconcileAutopilotsWithDeps({
     console.warn(`[hive-bootstrap] Autopilot with title "${title}" exists in Multica but is not in autopilots.yaml — skipping deletion for safety.`);
   }
 
-  // Write back webhook URLs to the config file if any were captured
-  if (Object.keys(webhookUrlsCaptured).length > 0 && autopilotsConfigPath) {
-    try {
-      const yaml = await import('js-yaml');
-      const rawYaml = fs.readFileSync(autopilotsConfigPath, 'utf8');
-      const configData = yaml.load(rawYaml);
-      let modified = false;
-      for (const ap of configData?.autopilots ?? []) {
-        if (webhookUrlsCaptured[ap.name]) {
-          ap.webhook_url = webhookUrlsCaptured[ap.name];
-          modified = true;
-        }
-      }
-      if (modified) {
-        fs.writeFileSync(autopilotsConfigPath, yaml.dump(configData), 'utf8');
-      }
-    } catch (err) {
-      console.warn(`[hive-bootstrap] Failed to write back webhook URLs to ${autopilotsConfigPath}: ${err?.message}`);
-    }
+  // Emit captured webhook URLs to output only — do NOT write them back into the
+  // tracked autopilots manifest. They are server-assigned runtime values outside the
+  // declared schema; persisting them churns the source config on every reconcile. The
+  // URLs remain available to programmatic callers via the returned webhookUrlsCaptured.
+  for (const [name, url] of Object.entries(webhookUrlsCaptured)) {
+    console.log(`[hive-bootstrap] Captured webhook URL for autopilot "${name}": ${url}`);
   }
 
   return { created, patched, skipped, removed, triggersAdded, triggersRemoved, triggersUpdated, webhookUrlsCaptured };
@@ -795,18 +782,31 @@ function computeContentHash(bundled) {
   return crypto.createHash('sha256').update(bundled, 'utf8').digest('hex');
 }
 
+// Reject paths that resolve outside repoRoot (absolute paths or `..` traversal),
+// so a crafted skills-export.yaml can't make us read/upload files beyond the repo.
+function assertUnderRepoRoot(repoRoot, candidatePath, label, errors) {
+  const root = fs.realpathSync(path.resolve(repoRoot));
+  const target = fs.realpathSync(candidatePath);
+  const rel = path.relative(root, target);
+  if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
+    errors.push(`${label} resolves outside repoRoot: ${candidatePath}`);
+  }
+}
+
 function validateSkillsExport(exports, repoRoot) {
   const errors = [];
   for (const entry of exports) {
     const skillPath = path.resolve(repoRoot, entry.skill_ref);
     if (!fs.existsSync(skillPath)) errors.push(`skill_ref not found: ${entry.skill_ref}`);
+    else assertUnderRepoRoot(repoRoot, skillPath, `skill_ref ${entry.skill_ref}`, errors);
     for (const dep of entry.substrate_deps ?? []) {
       const depPath = path.resolve(repoRoot, dep);
       if (!fs.existsSync(depPath)) errors.push(`substrate_dep not found: ${dep}`);
+      else assertUnderRepoRoot(repoRoot, depPath, `substrate_dep ${dep}`, errors);
     }
   }
   if (errors.length > 0) {
-    throw bootstrapError('VALIDATION_ERROR', errors.join('; '), 'All skill_ref and substrate_dep paths must exist in the repo relative to repoRoot.');
+    throw bootstrapError('VALIDATION_ERROR', errors.join('; '), 'All skill_ref and substrate_dep paths must exist inside repoRoot (no absolute paths or .. traversal).');
   }
 }
 
@@ -830,11 +830,18 @@ function buildSkillPayload(entry, bundledContent, contentHash) {
 }
 
 function diffSkill(existing, desired) {
-  // Use content_hash as content fingerprint — don't compare raw content (server may normalise it)
-  const fields = ['name', 'content_hash', 'visibility'];
   const changed = [];
-  for (const key of fields) {
-    if (!jsonEqual(existing?.[key], desired[key])) changed.push(key);
+  if (!jsonEqual(existing?.name, desired.name)) changed.push('name');
+  if (!jsonEqual(existing?.visibility, desired.visibility)) changed.push('visibility');
+  // Prefer content_hash as the content fingerprint. When the server response omits
+  // content_hash, fall back to a normalized raw-content comparison so warm runs don't
+  // force a PUT on every reconcile (content_hash mismatch against undefined).
+  if (existing?.content_hash != null) {
+    if (!jsonEqual(existing.content_hash, desired.content_hash)) changed.push('content_hash');
+  } else if (existing?.content != null && desired.content != null) {
+    if (normalizeContent(existing.content) !== normalizeContent(desired.content)) changed.push('content');
+  } else {
+    changed.push('content_hash');
   }
   return changed;
 }

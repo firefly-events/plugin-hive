@@ -111,3 +111,18 @@ test('combo claude+claude: provider=claude + agent_backends=claude → omit resc
   });
   assert.doesNotMatch(brief, /\/codex:rescue/);
 });
+
+test('integrationBranch: normal branch is single-quoted in rendered git commands', () => {
+  const brief = serializeStoryBrief(fullStory(), { integrationBranch: 'feat/epic-1' });
+  assert.match(brief, /git fetch origin 'feat\/epic-1'/);
+  assert.match(brief, /git checkout 'feat\/epic-1'/);
+  assert.match(brief, /git reset --hard origin\/'feat\/epic-1'/);
+  assert.match(brief, /git push origin HEAD:'feat\/epic-1'/);
+});
+
+test('integrationBranch: shell metacharacters are neutralized by quoting', () => {
+  const brief = serializeStoryBrief(fullStory(), { integrationBranch: 'feat/x;$(touch pwned)' });
+  // The branch must appear only inside single quotes — never as bare, executable text.
+  assert.match(brief, /git fetch origin 'feat\/x;\$\(touch pwned\)'/);
+  assert.doesNotMatch(brief, /git fetch origin feat\/x;\$\(touch pwned\)/);
+});
