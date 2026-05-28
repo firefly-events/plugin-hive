@@ -1,0 +1,9 @@
+schema_version: 1
+exports:
+  - skill_ref: skills/metrics-check/SKILL.md
+    multica_name: metrics-check
+    substrate_deps:
+      - hive/references/skill-prelude.md
+      - hive/references/story-yaml-schema.md
+      - hive/references/cross-cutting-concerns.md
+    visibility: private

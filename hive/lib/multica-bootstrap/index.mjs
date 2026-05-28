@@ -269,35 +269,61 @@ export async function ensureDaemon({ consent = false } = {}) {
     }
   }
 }
-export async function reconcileAgents({
+export async function reconcileAgentsWithDeps({
   serverUrl = DEFAULT_SERVER_URL,
   token,
   workspaceId,
   agentsConfigPath,
   repoRoot = process.cwd(),
   consent = false,
+  httpJsonFn = httpJson,
+  resolveInstructionsFn = resolveAgentInstructions,
+  loadAgentsConfigFn = null,
 } = {}) {
   if (!token) throw bootstrapError('AUTH_REQUIRED', 'A Multica PAT is required.', 'Call ensureAuth first.');
   if (!workspaceId) throw bootstrapError('WORKSPACE_REQUIRED', 'A workspace id is required.', 'Call ensureWorkspace first.');
-  if (!agentsConfigPath) {
+  if (!loadAgentsConfigFn && !agentsConfigPath) {
     throw bootstrapError('AGENTS_CONFIG_REQUIRED', 'An agents config path is required.', 'Pass the path to .pHive/multica/agents.yaml.');
   }
-  const config = await loadAgentsConfig(agentsConfigPath);
+  const config = loadAgentsConfigFn ? await loadAgentsConfigFn(agentsConfigPath) : await loadAgentsConfig(agentsConfigPath);
   const desiredAgents = Array.isArray(config?.agents) ? config.agents : [];
-  const existingBody = await httpJson(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+
+  // Single list call — fetch all existing agents up front
+  const existingBody = await httpJsonFn(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
   const existingAgents = normalizeList(existingBody, 'agents');
   const existingByName = new Map(existingAgents.map((agent) => [agent.name, agent]));
+
+  // Pre-resolve runtime IDs — one call per unique provider, not per agent
+  const uniqueProviders = [...new Set(desiredAgents.map((a) => a.provider).filter(Boolean))];
+  const providerToRuntimeId = new Map();
+  for (const provider of uniqueProviders) {
+    const runtimesBody = await httpJsonFn(serverUrl, `/api/runtimes?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+    const runtimes = normalizeList(runtimesBody, 'runtimes');
+    if (runtimes.length === 0) {
+      throw bootstrapError('NO_RUNTIMES', 'No Multica runtimes are registered for this workspace.', 'Start the Multica daemon before reconciling agents.');
+    }
+    const runtime = runtimes.find((candidate) => candidate?.provider === provider);
+    if (!runtime?.id) {
+      throw bootstrapError('RUNTIME_NOT_FOUND', `No runtime with provider "${provider}" found.`, 'Check that the daemon has registered the expected provider for this workspace.');
+    }
+    providerToRuntimeId.set(provider, runtime.id);
+  }
+
+  // O(1) lookup map for desired agents
+  const desiredByName = new Map(desiredAgents.map((a) => [a.name, a]));
+
   const created = [];
   const patched = [];
   const skipped = [];
+
   for (const agent of desiredAgents) {
-    const runtimeId = await resolveRuntimeId(serverUrl, token, workspaceId, agent.provider);
-    const instructions = agent.persona_ref ? resolveAgentInstructions(agent, repoRoot) : agent.instructions;
+    const runtimeId = providerToRuntimeId.get(agent.provider);
+    const instructions = agent.persona_ref ? resolveInstructionsFn(agent, repoRoot) : agent.instructions;
     const payload = buildAgentPayload(agent, runtimeId, instructions);
     const existing = existingByName.get(agent.name);
     if (!existing) {
       assertConsent(consent, `Creating Multica agent "${agent.name}" requires consent.`, 'Re-run with --yes or create the agent manually.');
-      await httpJson(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, {
+      await httpJsonFn(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, {
         method: 'POST',
         token,
         body: payload,
@@ -311,8 +337,600 @@ export async function reconcileAgents({
       continue;
     }
     assertConsent(consent, `Updating Multica agent "${agent.name}" requires consent.`, `Changed fields: ${changedFields.join(', ')}.`);
-    await httpJson(serverUrl, `/api/agents/${encodeURIComponent(existing.id)}?workspace_id=${encodeURIComponent(workspaceId)}`, { method: 'PUT', token, body: payload });
+    await httpJsonFn(serverUrl, `/api/agents/${encodeURIComponent(existing.id)}?workspace_id=${encodeURIComponent(workspaceId)}`, { method: 'PUT', token, body: payload });
     patched.push(agent.name);
   }
-  return { created, patched, skipped };
+
+  // Detect removed personas — warn but do NOT delete
+  const removed = existingAgents.filter((a) => !desiredByName.has(a.name)).map((a) => a.name);
+  for (const name of removed) {
+    console.warn(`[hive-bootstrap] Agent "${name}" exists in Multica but is not in agents.yaml — skipping deletion for safety.`);
+  }
+
+  return { created, patched, skipped, removed };
+}
+
+export async function reconcileAgents({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  agentsConfigPath,
+  repoRoot = process.cwd(),
+  consent = false,
+} = {}) {
+  return reconcileAgentsWithDeps({ serverUrl, token, workspaceId, agentsConfigPath, repoRoot, consent });
+}
+
+async function loadSquadsConfig(squadsConfigPath) {
+  const yamlString = fs.readFileSync(squadsConfigPath, 'utf8');
+  const yaml = await import('js-yaml');
+  return yaml.load(yamlString);
+}
+
+export async function reconcileSquadsWithDeps({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  squadsConfigPath,
+  consent = false,
+  httpJsonFn = httpJson,
+  loadSquadsConfigFn = null,
+} = {}) {
+  if (!token) throw bootstrapError('AUTH_REQUIRED', 'A Multica PAT is required.', 'Call ensureAuth first.');
+  if (!workspaceId) throw bootstrapError('WORKSPACE_REQUIRED', 'A workspace id is required.', 'Call ensureWorkspace first.');
+  if (!loadSquadsConfigFn && !squadsConfigPath) {
+    throw bootstrapError('SQUADS_CONFIG_REQUIRED', 'A squads config path is required.', 'Pass the path to .pHive/multica/squads.yaml.');
+  }
+
+  const config = loadSquadsConfigFn
+    ? await loadSquadsConfigFn(squadsConfigPath)
+    : await loadSquadsConfig(squadsConfigPath);
+  const desiredSquads = Array.isArray(config?.squads) ? config.squads : [];
+
+  // Resolve agent names → IDs
+  const agentsBody = await httpJsonFn(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+  const existingAgents = normalizeList(agentsBody, 'agents');
+  const agentIdByName = new Map(existingAgents.map((a) => [a.name, a.id]));
+  const agentNameById = new Map(existingAgents.map((a) => [a.id, a.name]));
+
+  // Fetch existing squads
+  const squadsBody = await httpJsonFn(serverUrl, `/api/squads?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+  const existingSquads = normalizeList(squadsBody, 'squads');
+  const existingByName = new Map(existingSquads.map((s) => [s.name, s]));
+  const desiredByName = new Map(desiredSquads.map((s) => [s.name, s]));
+
+  const created = [];
+  const patched = [];
+  const skipped = [];
+  const membersAdded = [];
+  const membersRemoved = [];
+
+  for (const squad of desiredSquads) {
+    const leaderId = agentIdByName.get(squad.leader);
+    if (!leaderId) {
+      console.warn(`[hive-bootstrap] Squad "${squad.name}" leader "${squad.leader}" not found in agents — skipping squad.`);
+      continue;
+    }
+
+    // Non-leader members from YAML
+    const desiredMemberNames = (squad.members || []).filter((m) => m !== squad.leader);
+
+    const existing = existingByName.get(squad.name);
+
+    if (!existing) {
+      assertConsent(consent, `Creating Multica squad "${squad.name}" requires consent.`, 'Re-run with --yes or create the squad manually.');
+      const createdSquad = await httpJsonFn(serverUrl, `/api/squads?workspace_id=${encodeURIComponent(workspaceId)}`, {
+        method: 'POST',
+        token,
+        body: { name: squad.name, description: squad.description || '', leader_id: leaderId },
+      });
+      created.push(squad.name);
+
+      for (const memberName of desiredMemberNames) {
+        const memberId = agentIdByName.get(memberName);
+        if (!memberId) {
+          console.warn(`[hive-bootstrap] Squad "${squad.name}" member "${memberName}" not found in agents — skipping.`);
+          continue;
+        }
+        assertConsent(consent, `Adding member "${memberName}" to squad "${squad.name}" requires consent.`, 'Re-run with --yes.');
+        await httpJsonFn(serverUrl, `/api/squads/${encodeURIComponent(createdSquad.id)}/members?workspace_id=${encodeURIComponent(workspaceId)}`, {
+          method: 'POST',
+          token,
+          body: { member_id: memberId, member_type: 'agent', role: 'member' },
+        });
+        membersAdded.push(`${squad.name}:${memberName}`);
+      }
+      continue;
+    }
+
+    // Squad exists — check metadata drift
+    const descriptionDrifted = squad.description !== undefined && existing.description !== squad.description;
+    const leaderDrifted = existing.leader_id !== leaderId;
+    if (leaderDrifted || descriptionDrifted) {
+      assertConsent(consent, `Updating Multica squad "${squad.name}" requires consent.`, 'Re-run with --yes.');
+      await httpJsonFn(serverUrl, `/api/squads/${encodeURIComponent(existing.id)}?workspace_id=${encodeURIComponent(workspaceId)}`, {
+        method: 'PUT',
+        token,
+        body: {
+          name: squad.name,
+          description: squad.description ?? existing.description ?? '',
+          leader_id: leaderId,
+        },
+      });
+      patched.push(squad.name);
+    } else {
+      skipped.push(squad.name);
+    }
+
+    // Reconcile members for existing squad
+    const membersBody = await httpJsonFn(serverUrl, `/api/squads/${encodeURIComponent(existing.id)}/members?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+    const currentMembers = normalizeList(membersBody, 'members');
+    const regularMembers = currentMembers.filter((m) => m.role !== 'leader');
+    const currentMemberIds = new Set(regularMembers.map((m) => m.member_id));
+
+    const desiredMemberIds = new Set(
+      desiredMemberNames.map((n) => agentIdByName.get(n)).filter(Boolean),
+    );
+
+    for (const memberName of desiredMemberNames) {
+      const memberId = agentIdByName.get(memberName);
+      if (!memberId) {
+        console.warn(`[hive-bootstrap] Squad "${squad.name}" member "${memberName}" not found in agents — skipping.`);
+        continue;
+      }
+      if (currentMemberIds.has(memberId)) continue;
+      assertConsent(consent, `Adding member "${memberName}" to squad "${squad.name}" requires consent.`, 'Re-run with --yes.');
+      await httpJsonFn(serverUrl, `/api/squads/${encodeURIComponent(existing.id)}/members?workspace_id=${encodeURIComponent(workspaceId)}`, {
+        method: 'POST',
+        token,
+        body: { member_id: memberId, member_type: 'agent', role: 'member' },
+      });
+      membersAdded.push(`${squad.name}:${memberName}`);
+    }
+
+    for (const member of regularMembers) {
+      if (desiredMemberIds.has(member.member_id)) continue;
+      const memberName = agentNameById.get(member.member_id) ?? member.member_id;
+      assertConsent(consent, `Removing member "${memberName}" from squad "${squad.name}" requires consent.`, 'Re-run with --yes.');
+      await httpJsonFn(
+        serverUrl,
+        `/api/squads/${encodeURIComponent(existing.id)}/members/${encodeURIComponent(member.member_id)}?workspace_id=${encodeURIComponent(workspaceId)}&type=agent`,
+        { method: 'DELETE', token },
+      );
+      membersRemoved.push(`${squad.name}:${memberName}`);
+    }
+  }
+
+  // Removed squads — warn, never delete
+  const removed = existingSquads.filter((s) => !desiredByName.has(s.name)).map((s) => s.name);
+  for (const name of removed) {
+    console.warn(`[hive-bootstrap] Squad "${name}" exists in Multica but is not in squads.yaml — skipping deletion for safety.`);
+  }
+
+  return { created, patched, skipped, removed, membersAdded, membersRemoved };
+}
+
+export async function reconcileSquads({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  squadsConfigPath,
+  consent = false,
+} = {}) {
+  return reconcileSquadsWithDeps({ serverUrl, token, workspaceId, squadsConfigPath, consent });
+}
+
+async function loadAutopilotsConfig(autopilotsConfigPath) {
+  const yamlString = fs.readFileSync(autopilotsConfigPath, 'utf8');
+  const yaml = await import('js-yaml');
+  return yaml.load(yamlString);
+}
+
+/**
+ * Reconcile autopilots from a YAML config against the Multica server.
+ *
+ * NOTE: Autopilot identity on the server side is matched by `title` (since
+ * the `name` field in the YAML is not stored server-side). If two YAML
+ * entries share the same title, behavior is undefined.
+ *
+ * Returns: { created, patched, skipped, removed, triggersAdded, triggersRemoved, triggersUpdated, webhookUrlsCaptured }
+ */
+export async function reconcileAutopilotsWithDeps({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  autopilotsConfigPath,
+  consent = false,
+  httpJsonFn = httpJson,
+  loadAutopilotsConfigFn = null,
+} = {}) {
+  if (!token) throw bootstrapError('AUTH_REQUIRED', 'A Multica PAT is required.', 'Call ensureAuth first.');
+  if (!workspaceId) throw bootstrapError('WORKSPACE_REQUIRED', 'A workspace id is required.', 'Call ensureWorkspace first.');
+  if (!loadAutopilotsConfigFn && !autopilotsConfigPath) {
+    throw bootstrapError('AUTOPILOTS_CONFIG_REQUIRED', 'An autopilots config path is required.', 'Pass the path to .pHive/multica/autopilots.yaml.');
+  }
+
+  const config = loadAutopilotsConfigFn
+    ? await loadAutopilotsConfigFn(autopilotsConfigPath)
+    : await loadAutopilotsConfig(autopilotsConfigPath);
+  const desiredAutopilots = Array.isArray(config?.autopilots) ? config.autopilots : [];
+
+  // Resolve agent names → IDs
+  const agentsBody = await httpJsonFn(serverUrl, `/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+  const existingAgents = normalizeList(agentsBody, 'agents');
+  const agentIdByName = new Map(existingAgents.map((a) => [a.name, a.id]));
+
+  // Fetch existing autopilots
+  const autopilotsBody = await httpJsonFn(serverUrl, `/api/autopilots?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+  const existingAutopilots = normalizeList(autopilotsBody, 'autopilots');
+  // Match by title (server-side unique key)
+  const existingByTitle = new Map(existingAutopilots.map((ap) => [ap.title, ap]));
+  const desiredTitles = new Set(desiredAutopilots.map((ap) => ap.title));
+
+  const created = [];
+  const patched = [];
+  const skipped = [];
+  const triggersAdded = [];
+  const triggersRemoved = [];
+  const triggersUpdated = [];
+  // Map from autopilot name (YAML) → captured webhook URL
+  const webhookUrlsCaptured = {};
+
+  // Helper: build autopilot payload from YAML entry + resolved agent_id
+  function buildAutopilotPayload(ap, agentId) {
+    const payload = {
+      title: ap.title,
+      description: ap.description ?? '',
+      agent_id: agentId,
+      mode: ap.mode ?? 'run_only',
+      priority: ap.priority ?? 'none',
+      status: ap.status ?? 'active',
+    };
+    if (ap.issue_title_template != null && ap.issue_title_template !== '') {
+      payload.issue_title_template = ap.issue_title_template;
+    }
+    if (ap.project != null && ap.project !== '') {
+      payload.project_id = ap.project;
+    }
+    return payload;
+  }
+
+  // Helper: trigger identity key for matching
+  function triggerKey(trigger) {
+    if (trigger.kind === 'schedule') return `schedule::${trigger.cron ?? ''}`;
+    if (trigger.kind === 'webhook') return `webhook::${trigger.label ?? ''}`;
+    return `${trigger.kind}::${trigger.label ?? ''}`;
+  }
+
+  // Helper: check if a server trigger matches a desired trigger (beyond identity)
+  function triggerDrifted(serverTrigger, desiredTrigger) {
+    if (desiredTrigger.kind === 'schedule') {
+      return serverTrigger.cron !== desiredTrigger.cron || serverTrigger.timezone !== desiredTrigger.timezone || serverTrigger.label !== desiredTrigger.label;
+    }
+    if (desiredTrigger.kind === 'webhook') {
+      return serverTrigger.label !== desiredTrigger.label;
+    }
+    return false;
+  }
+
+  // Helper: build trigger payload
+  function buildTriggerPayload(trigger) {
+    if (trigger.kind === 'schedule') {
+      return { kind: 'schedule', cron: trigger.cron, timezone: trigger.timezone ?? 'UTC', label: trigger.label ?? '' };
+    }
+    if (trigger.kind === 'webhook') {
+      return { kind: 'webhook', label: trigger.label ?? '' };
+    }
+    return { kind: trigger.kind, label: trigger.label ?? '' };
+  }
+
+  // Helper: reconcile triggers for an autopilot ID
+  async function reconcileTriggers(autopilotId, desiredTriggers, autopilotName) {
+    const triggersBody = await httpJsonFn(serverUrl, `/api/autopilots/${encodeURIComponent(autopilotId)}/triggers?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+    const serverTriggers = normalizeList(triggersBody, 'triggers');
+
+    const serverByKey = new Map(serverTriggers.map((t) => [triggerKey(t), t]));
+    const desiredByKey = new Map((desiredTriggers || []).map((t) => [triggerKey(t), t]));
+
+    // Add or update
+    for (const [key, desiredTrigger] of desiredByKey) {
+      const serverTrigger = serverByKey.get(key);
+      if (!serverTrigger) {
+        // Add trigger
+        const payload = buildTriggerPayload(desiredTrigger);
+        const triggerResponse = await httpJsonFn(
+          serverUrl,
+          `/api/autopilots/${encodeURIComponent(autopilotId)}/triggers?workspace_id=${encodeURIComponent(workspaceId)}`,
+          { method: 'POST', token, body: payload },
+        );
+        triggersAdded.push(`${autopilotName}:${key}`);
+        // Capture webhook URL if present
+        if (desiredTrigger.kind === 'webhook' && triggerResponse?.webhook_url && !webhookUrlsCaptured[autopilotName]) {
+          webhookUrlsCaptured[autopilotName] = triggerResponse.webhook_url;
+        }
+      } else if (triggerDrifted(serverTrigger, desiredTrigger)) {
+        // Update trigger
+        const payload = buildTriggerPayload(desiredTrigger);
+        const triggerResponse = await httpJsonFn(
+          serverUrl,
+          `/api/autopilots/${encodeURIComponent(autopilotId)}/triggers/${encodeURIComponent(serverTrigger.id)}?workspace_id=${encodeURIComponent(workspaceId)}`,
+          { method: 'PUT', token, body: payload },
+        );
+        triggersUpdated.push(`${autopilotName}:${key}`);
+        // Capture webhook URL if updated
+        if (desiredTrigger.kind === 'webhook' && triggerResponse?.webhook_url && !webhookUrlsCaptured[autopilotName]) {
+          webhookUrlsCaptured[autopilotName] = triggerResponse.webhook_url;
+        }
+      }
+    }
+
+    // Delete triggers in server but not in desired
+    for (const [key, serverTrigger] of serverByKey) {
+      if (!desiredByKey.has(key)) {
+        await httpJsonFn(
+          serverUrl,
+          `/api/autopilots/${encodeURIComponent(autopilotId)}/triggers/${encodeURIComponent(serverTrigger.id)}?workspace_id=${encodeURIComponent(workspaceId)}`,
+          { method: 'DELETE', token },
+        );
+        triggersRemoved.push(`${autopilotName}:${key}`);
+      }
+    }
+  }
+
+  for (const ap of desiredAutopilots) {
+    const agentId = agentIdByName.get(ap.agent);
+    if (!agentId) {
+      console.warn(`[hive-bootstrap] Autopilot "${ap.name}" agent "${ap.agent}" not found in agents — skipping autopilot.`);
+      continue;
+    }
+
+    const payload = buildAutopilotPayload(ap, agentId);
+    const existing = existingByTitle.get(ap.title);
+
+    if (!existing) {
+      assertConsent(consent, `Creating Multica autopilot "${ap.name}" (title: "${ap.title}") requires consent.`, 'Re-run with --yes or create the autopilot manually.');
+      const createdAp = await httpJsonFn(serverUrl, `/api/autopilots?workspace_id=${encodeURIComponent(workspaceId)}`, {
+        method: 'POST',
+        token,
+        body: payload,
+      });
+      created.push(ap.name);
+
+      // Add triggers for the newly created autopilot
+      if (ap.triggers && ap.triggers.length > 0) {
+        await reconcileTriggers(createdAp.id, ap.triggers, ap.name);
+      }
+      continue;
+    }
+
+    // Check metadata drift
+    const drifted =
+      existing.description !== payload.description ||
+      existing.agent_id !== payload.agent_id ||
+      existing.mode !== payload.mode ||
+      existing.priority !== payload.priority ||
+      existing.status !== payload.status ||
+      (payload.issue_title_template !== undefined && existing.issue_title_template !== payload.issue_title_template) ||
+      (payload.project_id !== undefined && existing.project_id !== payload.project_id);
+
+    if (drifted) {
+      assertConsent(consent, `Updating Multica autopilot "${ap.name}" (title: "${ap.title}") requires consent.`, 'Re-run with --yes.');
+      await httpJsonFn(serverUrl, `/api/autopilots/${encodeURIComponent(existing.id)}?workspace_id=${encodeURIComponent(workspaceId)}`, {
+        method: 'PUT',
+        token,
+        body: payload,
+      });
+      patched.push(ap.name);
+    } else {
+      skipped.push(ap.name);
+    }
+
+    // Always reconcile triggers for existing autopilots
+    await reconcileTriggers(existing.id, ap.triggers || [], ap.name);
+  }
+
+  // Orphan safety — warn but never delete
+  const removed = existingAutopilots.filter((ap) => !desiredTitles.has(ap.title)).map((ap) => ap.title);
+  for (const title of removed) {
+    console.warn(`[hive-bootstrap] Autopilot with title "${title}" exists in Multica but is not in autopilots.yaml — skipping deletion for safety.`);
+  }
+
+  // Emit captured webhook URLs to output only — do NOT write them back into the
+  // tracked autopilots manifest. They are server-assigned runtime values outside the
+  // declared schema; persisting them churns the source config on every reconcile. The
+  // URLs remain available to programmatic callers via the returned webhookUrlsCaptured.
+  for (const [name, url] of Object.entries(webhookUrlsCaptured)) {
+    console.log(`[hive-bootstrap] Captured webhook URL for autopilot "${name}": ${url}`);
+  }
+
+  return { created, patched, skipped, removed, triggersAdded, triggersRemoved, triggersUpdated, webhookUrlsCaptured };
+}
+
+export async function reconcileAutopilots({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  autopilotsConfigPath,
+  consent = false,
+} = {}) {
+  return reconcileAutopilotsWithDeps({ serverUrl, token, workspaceId, autopilotsConfigPath, consent });
+}
+
+// ---------------------------------------------------------------------------
+// Skills reconciler
+// ---------------------------------------------------------------------------
+
+function normalizeContent(str) {
+  return String(str)
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+$/gm, '')
+    .trim();
+}
+
+function bundleSkillContent(repoRoot, skillRef, substrateDeps) {
+  const mainRaw = fs.readFileSync(path.resolve(repoRoot, skillRef), 'utf8');
+  const parts = [normalizeContent(mainRaw)];
+  for (const dep of substrateDeps) {
+    const depRaw = fs.readFileSync(path.resolve(repoRoot, dep), 'utf8');
+    parts.push(`<!-- substrate: ${dep} -->`);
+    parts.push(normalizeContent(depRaw));
+  }
+  return parts.join('\n\n');
+}
+
+function computeContentHash(bundled) {
+  return crypto.createHash('sha256').update(bundled, 'utf8').digest('hex');
+}
+
+// Reject paths that resolve outside repoRoot (absolute paths or `..` traversal),
+// so a crafted skills-export.yaml can't make us read/upload files beyond the repo.
+function assertUnderRepoRoot(repoRoot, candidatePath, label, errors) {
+  const root = fs.realpathSync(path.resolve(repoRoot));
+  const target = fs.realpathSync(candidatePath);
+  const rel = path.relative(root, target);
+  if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
+    errors.push(`${label} resolves outside repoRoot: ${candidatePath}`);
+  }
+}
+
+function validateSkillsExport(exports, repoRoot) {
+  const errors = [];
+  for (const entry of exports) {
+    const skillPath = path.resolve(repoRoot, entry.skill_ref);
+    if (!fs.existsSync(skillPath)) errors.push(`skill_ref not found: ${entry.skill_ref}`);
+    else assertUnderRepoRoot(repoRoot, skillPath, `skill_ref ${entry.skill_ref}`, errors);
+    for (const dep of entry.substrate_deps ?? []) {
+      const depPath = path.resolve(repoRoot, dep);
+      if (!fs.existsSync(depPath)) errors.push(`substrate_dep not found: ${dep}`);
+      else assertUnderRepoRoot(repoRoot, depPath, `substrate_dep ${dep}`, errors);
+    }
+  }
+  if (errors.length > 0) {
+    throw bootstrapError('VALIDATION_ERROR', errors.join('; '), 'All skill_ref and substrate_dep paths must exist inside repoRoot (no absolute paths or .. traversal).');
+  }
+}
+
+async function loadSkillsExportConfig(skillsConfigPath) {
+  const yamlString = fs.readFileSync(skillsConfigPath, 'utf8');
+  try {
+    const yaml = await import('js-yaml');
+    return yaml.load(yamlString);
+  } catch {
+    throw bootstrapError('CONFIG_PARSE_ERROR', 'Failed to parse skills-export.yaml.', 'Ensure the file is valid YAML with schema_version and exports fields.');
+  }
+}
+
+function buildSkillPayload(entry, bundledContent, contentHash) {
+  return {
+    name: entry.multica_name,
+    content: bundledContent,
+    content_hash: contentHash,
+    visibility: entry.visibility ?? 'workspace',
+  };
+}
+
+function diffSkill(existing, desired) {
+  const changed = [];
+  if (!jsonEqual(existing?.name, desired.name)) changed.push('name');
+  if (!jsonEqual(existing?.visibility, desired.visibility)) changed.push('visibility');
+  // Prefer content_hash as the content fingerprint. When the server response omits
+  // content_hash, fall back to a normalized raw-content comparison so warm runs don't
+  // force a PUT on every reconcile (content_hash mismatch against undefined).
+  if (existing?.content_hash != null) {
+    if (!jsonEqual(existing.content_hash, desired.content_hash)) changed.push('content_hash');
+  } else if (existing?.content != null && desired.content != null) {
+    if (normalizeContent(existing.content) !== normalizeContent(desired.content)) changed.push('content');
+  } else {
+    changed.push('content_hash');
+  }
+  return changed;
+}
+
+export async function reconcileSkillsWithDeps({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  skillsConfigPath,
+  repoRoot = process.cwd(),
+  consent = false,
+  httpJsonFn = httpJson,
+  loadSkillsExportConfigFn = null,
+} = {}) {
+  if (!token) throw bootstrapError('AUTH_REQUIRED', 'A Multica PAT is required.', 'Call ensureAuth first.');
+  if (!workspaceId) throw bootstrapError('WORKSPACE_REQUIRED', 'A workspace id is required.', 'Call ensureWorkspace first.');
+
+  if (!skillsConfigPath && !loadSkillsExportConfigFn) {
+    return { created: [], patched: [], skipped: [], removed: [] };
+  }
+
+  let config;
+  try {
+    config = loadSkillsExportConfigFn
+      ? await loadSkillsExportConfigFn(skillsConfigPath)
+      : await loadSkillsExportConfig(skillsConfigPath);
+  } catch (error) {
+    if (error?.code) throw error;
+    throw bootstrapError('CONFIG_LOAD_ERROR', error?.message || 'Failed to load skills-export config.', `Check that ${skillsConfigPath} exists and is valid YAML.`);
+  }
+
+  const desiredExports = Array.isArray(config?.exports) ? config.exports : [];
+
+  // Validate all paths before any network call — fail fast, no partial imports
+  validateSkillsExport(desiredExports, repoRoot);
+
+  const existingBody = await httpJsonFn(serverUrl, `/api/skills?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
+  const existingSkills = normalizeList(existingBody, 'skills');
+  const existingByName = new Map(existingSkills.map((s) => [s.name, s]));
+  const desiredByName = new Map(desiredExports.map((e) => [e.multica_name, e]));
+
+  const created = [];
+  const patched = [];
+  const skipped = [];
+
+  for (const entry of desiredExports) {
+    const bundledContent = bundleSkillContent(repoRoot, entry.skill_ref, entry.substrate_deps ?? []);
+    const contentHash = computeContentHash(bundledContent);
+    const payload = buildSkillPayload(entry, bundledContent, contentHash);
+    const existing = existingByName.get(entry.multica_name);
+
+    if (!existing) {
+      assertConsent(consent, `Creating Multica skill "${entry.multica_name}" requires consent.`, 'Re-run with --yes or create the skill manually.');
+      await httpJsonFn(serverUrl, `/api/skills?workspace_id=${encodeURIComponent(workspaceId)}`, {
+        method: 'POST',
+        token,
+        body: payload,
+      });
+      created.push(entry.multica_name);
+      continue;
+    }
+
+    const changedFields = diffSkill(existing, payload);
+    if (changedFields.length === 0) {
+      skipped.push(entry.multica_name);
+      continue;
+    }
+
+    assertConsent(consent, `Updating Multica skill "${entry.multica_name}" requires consent.`, `Changed fields: ${changedFields.join(', ')}.`);
+    await httpJsonFn(serverUrl, `/api/skills/${encodeURIComponent(existing.id)}?workspace_id=${encodeURIComponent(workspaceId)}`, { method: 'PUT', token, body: payload });
+    patched.push(entry.multica_name);
+  }
+
+  // Detect orphaned skills — warn but do NOT delete (Mode D-a safety invariant)
+  const removed = existingSkills.filter((s) => !desiredByName.has(s.name)).map((s) => s.name);
+  for (const name of removed) {
+    console.warn(`[hive-bootstrap] Skill "${name}" exists in Multica but is not in skills-export.yaml — skipping deletion for safety.`);
+  }
+
+  return { created, patched, skipped, removed };
+}
+
+export async function reconcileSkills({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  skillsConfigPath,
+  repoRoot = process.cwd(),
+  consent = false,
+} = {}) {
+  return reconcileSkillsWithDeps({ serverUrl, token, workspaceId, skillsConfigPath, repoRoot, consent });
 }

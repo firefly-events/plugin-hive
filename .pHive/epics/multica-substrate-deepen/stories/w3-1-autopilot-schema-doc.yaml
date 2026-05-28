@@ -1,0 +1,45 @@
+id: w3-1-autopilot-schema-doc
+epic: multica-substrate-deepen
+title: Author hive/references/multica-autopilots-schema.md
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: variation
+description: "Author the autopilot schema reference at hive/references/multica-autopilots-schema.md.\n\nSchema covers:\n- schema_version\n- autopilots list \u2014 each entry: name, title, mode (create_issue|run_only),\n  agent (persona name from agents.yaml), description, priority, triggers\n  (array of { type: schedule|webhook, cron|url, ... })\n- validation rules (agent must exist in agents.yaml; at least one trigger\n  per autopilot; webhook URL is server-generated, not user-provided)\n- resolution rules (agent name resolves to entry in\n  .pHive/multica/agents.yaml at reconcile time)\n"
+acceptance_criteria:
+- Doc exists at hive/references/multica-autopilots-schema.md
+- Structure mirrors multica-agents-schema.md + multica-squads-schema.md
+- Concrete example covers both webhook autopilots (metrics-check + visual-qa)
+- Architect-reviewed for cross-schema consistency
+steps:
+- id: implement
+  description: Write schema doc
+  agent: technical-writer
+- id: review
+  description: Architect reviews
+  agent: architect
+  depends_on:
+  - implement
+- id: integrate
+  description: Commit on feat/multica-substrate-deepen
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/references/multica-agents-schema.md
+    purpose: Sibling schema doc
+cross_cutting:
+- concern: documentation
+  action: This story IS documentation; reference from GUIDE.md
+risks:
+- severity: low
+  description: Schema doesn't match Multica autopilot CLI surface
+  mitigation: W3.2 yaml + W3.3 reconcile drives corrections
+metric:
+  applies: false
+  justification: Schema doc; w3-2 + w3-3 carry delivery metrics.
+tracker_id: plugin-hive/PLU-135

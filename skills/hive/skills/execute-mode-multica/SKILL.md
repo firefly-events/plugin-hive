@@ -85,8 +85,13 @@ For each story in `unblocked_stories[]` at this depth:
    - This ensures a newly dispatchable story is not stranded in backlog state before assignment.
 
 3. **Brief write.**
-   - Read `hive_config.agent_backends?.developer` (the `developer` role is the persona Multica's bootstrapped agent runs under). If it equals `'codex'`, pass `{ codexInstruction: true }` so the brief instructs the inner Claude Code session to use `/codex:rescue` for implementation. Otherwise omit options for backward-compatible behavior.
-   - Call `serializeStoryBrief(story, codexInstruction ? { codexInstruction: true } : {})` to produce Markdown.
+   - Determine the dispatching persona name for this story (e.g. `backend-developer`, `researcher`). Load `.pHive/multica/agents.yaml` once per `/execute` run (cache the parsed result; do not re-read per story).
+   - Call `serializeStoryBrief(story, { dispatchingPersona, agents, agentBackends, integrationBranch })` to produce Markdown, where:
+     - `dispatchingPersona` is the persona name string
+     - `agents` is the `agents[]` array from the parsed agents.yaml
+     - `agentBackends` is `hive_config.agent_backends` (an object mapping persona name → `'codex'|'claude'`)
+     - The function applies the following decision: if `agents[persona].provider === 'codex'`, the `## Use /codex:rescue` section is **omitted** (native Codex runtime handles execution directly). If `agents[persona].provider === 'claude'` and `agentBackends[persona] === 'codex'`, the section is **embedded** (backward-compat rescue dance). Otherwise omitted.
+   - Legacy callers that pass `{ codexInstruction: true }` without `dispatchingPersona` continue to work unchanged.
    - Resolve `requestedRef` from the current epic branch/ref (for example `feat/multica-integration-fixes`) and include it in the issue brief as the required repository ref for the agent task.
    - Call `ensureIssueBriefMatches(serverUrl, token, workspaceId, issueUuid, brief)`.
    - If the issue description has drifted, the helper updates it with `PUT`.

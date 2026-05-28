@@ -1,34 +1,261 @@
 schema_version: 1
 agents:
+  # Creators — provider: codex (W0.1 verdict: supported)
   - name: developer
-    provider: claude
-    model: claude-sonnet-4-6
+    provider: codex
+    model: ""
     max_concurrent_tasks: 1
     persona_ref: hive/agents/developer.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+    custom_env: {}
     custom_args: []
     mcp_config: null
     skills: []
     visibility: workspace
-  - name: tester
-    provider: claude
-    model: claude-sonnet-4-6
+
+  - name: backend-developer
+    provider: codex
+    model: ""
     max_concurrent_tasks: 1
-    persona_ref: hive/agents/tester.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+    persona_ref: hive/agents/backend-developer.md
+    custom_env: {}
     custom_args: []
     mcp_config: null
     skills: []
     visibility: workspace
+
+  - name: frontend-developer
+    provider: codex
+    model: ""
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/frontend-developer.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: researcher
+    provider: codex
+    model: ""
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/researcher.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: architect
+    provider: codex
+    model: ""
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/architect.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: technical-writer
+    provider: codex
+    model: ""
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/technical-writer.md
+    custom_env: {}
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  # Verifiers — provider: claude, model: claude-opus-4-7
   - name: reviewer
     provider: claude
     model: claude-opus-4-7
     max_concurrent_tasks: 1
     persona_ref: hive/agents/reviewer.md
     custom_env:
-      CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: peer-validator
+    provider: claude
+    model: claude-opus-4-7
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/peer-validator.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: tester
+    provider: claude
+    model: claude-opus-4-7
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/tester.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: tpm
+    provider: claude
+    model: claude-opus-4-7
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/tpm.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  # Remaining specialists — provider: claude, model: claude-sonnet-4-6
+  - name: analyst
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/analyst.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: accessibility-specialist
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/accessibility-specialist.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: animations-specialist
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/animations-specialist.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: idiomatic-reviewer
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/idiomatic-reviewer.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: performance-reviewer
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/performance-reviewer.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: security-reviewer
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/security-reviewer.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: test-architect
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/test-architect.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: test-inspector
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/test-inspector.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: test-scout
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/test-scout.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: test-sentinel
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/test-sentinel.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: test-worker
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/test-worker.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
+    custom_args: []
+    mcp_config: null
+    skills: []
+    visibility: workspace
+
+  - name: ui-designer
+    provider: claude
+    model: claude-sonnet-4-6
+    max_concurrent_tasks: 1
+    persona_ref: hive/agents/ui-designer.md
+    custom_env:
+      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
     custom_args: []
     mcp_config: null
     skills: []
