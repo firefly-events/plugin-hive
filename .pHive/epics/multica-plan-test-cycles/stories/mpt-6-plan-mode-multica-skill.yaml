@@ -69,3 +69,6 @@ metric:
   applies: false
   justification: New atomic dispatch skill; the deliverable is the dispatch capability itself, exercised
     end-to-end in mpt-8/mpt-11 rather than a standalone measurable number.
+tracker_id: plugin-hive/PLU-159
+tracker_uuid: aae648ac-2937-435d-9425-8b2f78ed9f90
+tracker_url: http://localhost:3000/issue/PLU-159

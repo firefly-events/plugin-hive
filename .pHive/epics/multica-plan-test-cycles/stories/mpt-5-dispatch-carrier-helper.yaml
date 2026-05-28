@@ -68,3 +68,6 @@ metric:
   applies: false
   justification: Library helper plus unit tests; it adds dispatch plumbing whose correctness is asserted
     by tests, not by a moved product/throughput metric.
+tracker_id: plugin-hive/PLU-158
+tracker_uuid: de974767-94d5-4256-a132-1952cf3ff8f8
+tracker_url: http://localhost:3000/issue/PLU-158

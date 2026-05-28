@@ -71,3 +71,6 @@ metric:
   applies: false
   justification: Convention-pinning story; it removes a verdict-location ambiguity, a substrate consistency
     fix with no measurable runtime number to move.
+tracker_id: plugin-hive/PLU-156
+tracker_uuid: 0c55773f-b531-45d4-897e-e9ab42388e08
+tracker_url: http://localhost:3000/issue/PLU-156

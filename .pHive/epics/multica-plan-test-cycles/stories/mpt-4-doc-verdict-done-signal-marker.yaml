@@ -69,3 +69,6 @@ metric:
   applies: false
   justification: Defines a marker schema; the gate itself (a shared terminal-derivation contract) is what
     ships, so it is un-falsifiable substrate per the metrics concern.
+tracker_id: plugin-hive/PLU-157
+tracker_uuid: 3df417c7-d8bf-4d47-acb5-c32c838df5bf
+tracker_url: http://localhost:3000/issue/PLU-157

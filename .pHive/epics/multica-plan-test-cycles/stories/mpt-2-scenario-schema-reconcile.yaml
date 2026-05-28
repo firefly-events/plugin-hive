@@ -72,3 +72,6 @@ metric:
   applies: false
   justification: Schema/loader reconciliation story; the shipped artifact is a unified scenario contract,
     an un-falsifiable substrate change rather than a measurable outcome.
+tracker_id: plugin-hive/PLU-155
+tracker_uuid: 03b3ca70-728d-423b-b01a-70e6cb723435
+tracker_url: http://localhost:3000/issue/PLU-155

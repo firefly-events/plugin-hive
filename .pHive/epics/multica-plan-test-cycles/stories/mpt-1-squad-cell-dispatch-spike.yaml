@@ -71,3 +71,6 @@ metric:
     to pick the dispatch carrier, not a measurable runtime outcome.
 parallel_allowed: true
 parallel_rationale: read-only
+tracker_id: plugin-hive/PLU-154
+tracker_uuid: 3737ce44-7d00-49f4-921c-fc5d89d56343
+tracker_url: http://localhost:3000/issue/PLU-154

@@ -84,3 +84,6 @@ manual_verdict:
   verdict: null
   timestamp: null
   agent: null
+tracker_id: plugin-hive/PLU-163
+tracker_uuid: 6819399c-dece-40f3-8899-d133085da016
+tracker_url: http://localhost:3000/issue/PLU-163

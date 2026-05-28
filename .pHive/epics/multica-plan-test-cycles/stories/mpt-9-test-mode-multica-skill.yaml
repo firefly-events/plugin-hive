@@ -74,3 +74,6 @@ metric:
   applies: false
   justification: New atomic dispatch skill for the test cycle; the capability is proven end-to-end in
     mpt-10/mpt-11, so this story ships substrate rather than a measurable metric.
+tracker_id: plugin-hive/PLU-162
+tracker_uuid: 965be9fd-97f4-4643-bd17-6e516d8b75f6
+tracker_url: http://localhost:3000/issue/PLU-162

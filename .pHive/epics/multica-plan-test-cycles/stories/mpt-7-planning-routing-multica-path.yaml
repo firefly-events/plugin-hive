@@ -67,3 +67,6 @@ metric:
   applies: false
   justification: Adds a spawn-routing branch with fallback; correctness is behavioral (routes + degrades
     gracefully), an un-falsifiable substrate change rather than a measured metric.
+tracker_id: plugin-hive/PLU-160
+tracker_uuid: bc1b90b9-776e-483c-840c-b9568b0c3022
+tracker_url: http://localhost:3000/issue/PLU-160
