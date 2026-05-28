@@ -2,6 +2,7 @@ schema_version: 1
 agents:
   # Creators — provider: codex (W0.1 verdict: supported)
   - name: developer
+    description: General-purpose code implementation. Deprecated — prefer backend-developer or frontend-developer.
     provider: codex
     model: ""
     max_concurrent_tasks: 1
@@ -13,6 +14,7 @@ agents:
     visibility: workspace
 
   - name: backend-developer
+    description: Implements APIs, services, database logic, and other server-side code.
     provider: codex
     model: ""
     max_concurrent_tasks: 1
@@ -24,6 +26,7 @@ agents:
     visibility: workspace
 
   - name: frontend-developer
+    description: Implements UI components, screens, styles, and client-side logic.
     provider: codex
     model: ""
     max_concurrent_tasks: 1
@@ -35,6 +38,7 @@ agents:
     visibility: workspace
 
   - name: researcher
+    description: Gathers research data from the codebase and external sources to inform planning.
     provider: codex
     model: ""
     max_concurrent_tasks: 1
@@ -46,6 +50,7 @@ agents:
     visibility: workspace
 
   - name: architect
+    description: Designs technical solutions and evaluates technology choices, with rationale for each decision.
     provider: codex
     model: ""
     max_concurrent_tasks: 1
@@ -57,6 +62,7 @@ agents:
     visibility: workspace
 
   - name: technical-writer
+    description: Transforms raw material into structured documentation, references, and guides.
     provider: codex
     model: ""
     max_concurrent_tasks: 1
@@ -69,6 +75,7 @@ agents:
 
   # Verifiers — provider: claude, model: claude-opus-4-7
   - name: reviewer
+    description: Independent fresh-context code reviewer; evaluates diffs for correctness and risk.
     provider: claude
     model: claude-opus-4-7
     max_concurrent_tasks: 1
@@ -81,6 +88,7 @@ agents:
     visibility: workspace
 
   - name: peer-validator
+    description: Cross-story validator for consistency, convention compliance, and integration risk.
     provider: claude
     model: claude-opus-4-7
     max_concurrent_tasks: 1
@@ -93,6 +101,7 @@ agents:
     visibility: workspace
 
   - name: tester
+    description: Writes and runs test suites against story specs and acceptance criteria.
     provider: claude
     model: claude-opus-4-7
     max_concurrent_tasks: 1
@@ -105,6 +114,7 @@ agents:
     visibility: workspace
 
   - name: tpm
+    description: Technical program manager; sequences cross-system work and owns horizontal/vertical planning.
     provider: claude
     model: claude-opus-4-7
     max_concurrent_tasks: 1
@@ -118,6 +128,7 @@ agents:
 
   # Remaining specialists — provider: claude, model: claude-sonnet-4-6
   - name: analyst
+    description: Turns raw ideas into precise, testable requirements and detects gaps.
     provider: claude
     model: claude-sonnet-4-6
     max_concurrent_tasks: 1
@@ -130,6 +141,7 @@ agents:
     visibility: workspace
 
   - name: accessibility-specialist
+    description: Remediates accessibility issues — ARIA, keyboard navigation, focus management, contrast.
     provider: claude
     model: claude-sonnet-4-6
     max_concurrent_tasks: 1
@@ -142,6 +154,7 @@ agents:
     visibility: workspace
 
   - name: animations-specialist
+    description: Implements and optimizes animations, transitions, and motion across web and native.
     provider: claude
     model: claude-sonnet-4-6
     max_concurrent_tasks: 1
@@ -154,6 +167,7 @@ agents:
     visibility: workspace
 
   - name: idiomatic-reviewer
+    description: Reviews code for language idioms, anti-patterns, and community best practices (narrow focus).
     provider: claude
     model: claude-sonnet-4-6
     max_concurrent_tasks: 1
@@ -166,6 +180,7 @@ agents:
     visibility: workspace
 
   - name: performance-reviewer
+    description: Reviews algorithmic complexity, memory, and I/O for performance impact (narrow focus).
     provider: claude
     model: claude-sonnet-4-6
     max_concurrent_tasks: 1
@@ -178,6 +193,7 @@ agents:
     visibility: workspace
 
   - name: security-reviewer
+    description: Reviews changes for security vulnerabilities using the OWASP Top 10; binary verdict.
     provider: claude
     model: claude-sonnet-4-6
     max_concurrent_tasks: 1
@@ -190,6 +206,7 @@ agents:
     visibility: workspace
 
   - name: test-architect
+    description: Designs test strategy mapping acceptance criteria to concrete test cases.
     provider: claude
     model: claude-sonnet-4-6
     max_concurrent_tasks: 1
@@ -202,6 +219,7 @@ agents:
     visibility: workspace
 
   - name: test-inspector
+    description: Coverage analyst — judges whether tests are sufficient, correct, and aligned to requirements.
     provider: claude
     model: claude-sonnet-4-6
     max_concurrent_tasks: 1
@@ -214,6 +232,7 @@ agents:
     visibility: workspace
 
   - name: test-scout
+    description: Gathers full test context across the change surface before testing begins.
     provider: claude
     model: claude-sonnet-4-6
     max_concurrent_tasks: 1
@@ -226,6 +245,7 @@ agents:
     visibility: workspace
 
   - name: test-sentinel
+    description: Quality gate — triages test failures with evidence, hypotheses, and severity routing.
     provider: claude
     model: claude-sonnet-4-6
     max_concurrent_tasks: 1
@@ -238,6 +258,7 @@ agents:
     visibility: workspace
 
   - name: test-worker
+    description: Executes test scripts and captures results and screenshots; fast mechanical runs.
     provider: claude
     model: claude-sonnet-4-6
     max_concurrent_tasks: 1
@@ -250,6 +271,7 @@ agents:
     visibility: workspace
 
   - name: ui-designer
+    description: Creates wireframes, design briefs, and UI specifications (Frame0).
     provider: claude
     model: claude-sonnet-4-6
     max_concurrent_tasks: 1
