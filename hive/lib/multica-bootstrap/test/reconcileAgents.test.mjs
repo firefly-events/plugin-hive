@@ -292,3 +292,27 @@ test('throws a clear error when a declared skill is not in the workspace', async
     },
   );
 });
+
+test('SKILL_NOT_FOUND aborts BEFORE any agent mutation (no partial reconcile)', async () => {
+  // Two desired agents: alpha is fine, beta references a missing skill.
+  // Pre-validation must throw before alpha is created — otherwise the workspace
+  // is left half-reconciled.
+  const calls = [];
+  const httpJsonFn = makeHttpJsonFn({
+    existingAgents: [],
+    existingSkills: [{ id: 'sk-alpha', name: 'skill-alpha' }],
+    calls,
+  });
+  const loadAgentsConfigFn = makeLoadAgentsConfigFn([
+    { name: 'alpha', provider: 'claude', model: 'claude-3-haiku', skills: ['skill-alpha'] },
+    { name: 'beta', provider: 'claude', model: 'claude-3-haiku', skills: ['does-not-exist'] },
+  ]);
+
+  await assert.rejects(
+    () => reconcileAgentsWithDeps({ serverUrl: SERVER_URL, token: TOKEN, workspaceId: WORKSPACE_ID, consent: true, httpJsonFn, loadAgentsConfigFn }),
+    (err) => err.code === 'SKILL_NOT_FOUND',
+  );
+
+  const mutations = calls.filter((c) => c.method === 'POST' || c.method === 'PUT');
+  assert.equal(mutations.length, 0, 'no POST/PUT should have been issued before pre-validation threw');
+});

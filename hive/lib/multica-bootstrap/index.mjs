@@ -318,10 +318,19 @@ export async function reconcileAgentsWithDeps({
       return id;
     });
   }
+
+  // Pre-validate every agent's skill names BEFORE any HTTP mutation. Any
+  // SKILL_NOT_FOUND must abort the reconcile before the first create/patch,
+  // otherwise the loop below leaves the workspace in a partial state.
+  const desiredSkillIdsByAgent = new Map();
+  for (const agent of desiredAgents) {
+    desiredSkillIdsByAgent.set(agent.name, resolveSkillIds(agent));
+  }
+
   // agents.yaml is authoritative for an agent's skill set: sync the attachment to
   // exactly the declared names (empty list clears). Returns true if it issued a change.
   async function syncAgentSkills(agentId, agent, existingSkills) {
-    const desiredIds = resolveSkillIds(agent);
+    const desiredIds = desiredSkillIdsByAgent.get(agent.name) ?? [];
     const existingIds = (existingSkills ?? []).map((s) => (typeof s === 'string' ? s : s?.id)).filter(Boolean);
     if (jsonEqual([...desiredIds].sort(), [...existingIds].sort())) return false;
     assertConsent(consent, `Setting skills for Multica agent "${agent.name}" requires consent.`, `Skills: ${(agent.skills ?? []).join(', ') || '(none)'}.`);
@@ -908,6 +917,13 @@ export async function reconcileSkillsWithDeps({
   if (!workspaceId) throw bootstrapError('WORKSPACE_REQUIRED', 'A workspace id is required.', 'Call ensureWorkspace first.');
 
   if (!skillsConfigPath && !loadSkillsExportConfigFn) {
+    return { created: [], patched: [], skipped: [], removed: [] };
+  }
+
+  // SKILL.md documents that a missing skills-export.yaml is skipped silently.
+  // The injected-loader path (tests) bypasses this guard because it sources
+  // config from memory rather than disk.
+  if (skillsConfigPath && !loadSkillsExportConfigFn && !fs.existsSync(skillsConfigPath)) {
     return { created: [], patched: [], skipped: [], removed: [] };
   }
 

@@ -353,3 +353,24 @@ test('removed entry — orphan in Multica logs warning but is not deleted', asyn
     console.warn = originalWarn;
   }
 });
+
+test('missing skillsConfigPath file → empty envelope, no HTTP calls (matches SKILL.md)', async () => {
+  // SKILL.md documents that a missing skills-export.yaml is skipped silently.
+  // Without the fs.existsSync guard this would throw CONFIG_LOAD_ERROR.
+  const calls = [];
+  const httpJsonFn = async (...args) => { calls.push(args); throw new Error('should not be called'); };
+  const missingPath = path.join(os.tmpdir(), `skills-export-missing-${crypto.randomBytes(6).toString('hex')}.yaml`);
+  assert.equal(fs.existsSync(missingPath), false, 'fixture path must not exist');
+
+  const result = await reconcileSkillsWithDeps({
+    serverUrl: SERVER_URL,
+    token: TOKEN,
+    workspaceId: WORKSPACE_ID,
+    consent: true,
+    httpJsonFn,
+    skillsConfigPath: missingPath,
+  });
+
+  assert.deepEqual(result, { created: [], patched: [], skipped: [], removed: [] });
+  assert.equal(calls.length, 0, 'no HTTP calls when skills-export.yaml is absent');
+});
