@@ -53,7 +53,7 @@ Which model the agent runs on.
 
 | Value | Model | Use for |
 |-------|-------|---------|
-| `opus` | claude-opus-4-7 | Complex reasoning, coordination, architecture, requirements |
+| `opus` | claude-opus-4-8 | Complex reasoning, coordination, architecture, requirements |
 | `sonnet` | claude-sonnet-4-6 | Analytical work, implementation, review, test design |
 | `haiku` | claude-haiku-4-5-20251001 | Fast mechanical execution (running tests, collecting results) |
 | `inherit` | Same as parent | When agent should match the spawning session's model |
