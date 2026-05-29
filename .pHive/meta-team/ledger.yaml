@@ -1,13 +1,13 @@
-- experiment_id: meta-2026-05-26
-  date: '2026-05-26'
-  started: '2026-05-26T08:05:33Z'
-  closed: '2026-05-26T08:12:00Z'
+- experiment_id: meta-2026-05-27
+  date: '2026-05-27'
+  started: '2026-05-27T00:00:00Z'
+  closed: '2026-05-27T00:30:00Z'
   verdict: discard
   changes_promoted: 0
   changes_reverted: 0
-  findings_identified: 7
+  findings_identified: 3
   top_changes: []
-  commit: d025ae03ab87a32cfcf1da1cceb6cece10eb90ce
+  commit: 96a803b8c42f7555e5c3250cae8268b6ee581213
   metrics_snapshot:
     tokens: 0
     wall_clock_ms: 0
@@ -15,17 +15,18 @@
   rollback_ref: 5294090ebdc098ecb96725df1a5b5603e522ea34
   kg_signal_proposals_total: 0
   notes: |
-    Nightly cycle meta-2026-05-26. Analysis found 7 STUB_DOC findings across
-    hive/references/: (1) hive-cloud-roadmap.md (11 lines) — S16 forward-reference
-    placeholder, 10th+ consecutive deferral, out_of_scope. (2) meta-safety-constraints.md
-    (29 non-blank lines) — borderline by threshold but functionally complete compact
-    reference, out_of_scope. (3-7) ui-prompts/polish-audit.md, brand-system.md,
-    design-review-design-critique.md, design-review-synthesis.md, design-system.md —
-    all functional prompt templates, intentionally compact, out_of_scope. Six other
-    audit categories (cross-ref, schema, step-files, memories, workflow completeness,
-    missing files) passed with zero findings. Zero proposals generated; zero changes
-    promoted. Cycle closes as discard. Closure validator passed (discard path;
-    rollback_ref and metrics_snapshot present). Regression watch: not_applicable.
+    Nightly cycle meta-2026-05-27. Analysis found 3 STUB_DOC findings: (1)
+    hive/references/hive-cloud-roadmap.md (13 lines) — S16 forward-reference
+    placeholder for the deferred Hive Cloud epic; marked out_of_scope (10th
+    consecutive deferral). (2) hive/references/ui-prompts/design-system.md
+    (19 lines) — functional prompt template, intentionally brief;
+    out_of_scope. (3) hive/references/ui-prompts/design-review-design-critique.md
+    (11 lines) — functional prompt template, intentionally brief; out_of_scope.
+    Zero proposals generated; zero changes promoted. Cycle closes as discard.
+    Closure validator passed (discard path; rollback_ref and metrics_snapshot
+    present). Regression watch: not_applicable. Insight staged (local-only):
+    stub-doc-false-positive-pattern.yaml documenting the chronic false-positive
+    routing issue that blocks queue candidates from being processed.
 - experiment_id: meta-2026-05-24
   date: '2026-05-24'
   started: '2026-05-24T08:07:28Z'

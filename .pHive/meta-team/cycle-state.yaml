@@ -1,8 +1,8 @@
-cycle_id: meta-2026-05-26
-started: '2026-05-26T08:05:33Z'
+cycle_id: meta-2026-05-27
+started: '2026-05-27T00:00:00Z'
 status: closed
 phase: close
-closed: '2026-05-26T08:12:00Z'
+closed: '2026-05-27T00:30:00Z'
 charter_constraints:
   - operate only on hive/references/**, hive/agents/**, hive/workflows/**, hive/lib/**,
     skills/hive/agents/memories/**, .pHive/meta-team/**, .pHive/teams/**
@@ -16,7 +16,7 @@ prior_cycle:
   outcome: discard
 steps:
   step_01_boot:
-    started_at: '2026-05-26T08:05:33Z'
+    started_at: '2026-05-27T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
@@ -61,7 +61,7 @@ steps:
   step_07_promotion:
     promoted_changes: []
     reverted_changes: []
-    insights_staged: 0
+    insights_staged: 1
     decision: discard
     rollback_target: 5294090ebdc098ecb96725df1a5b5603e522ea34
 summary:
@@ -88,8 +88,8 @@ findings:
     location: hive/references/hive-cloud-roadmap.md
     description: 11-line reference doc below 30-line stub threshold
     evidence: >
-      Line count: 11. Explicit S16 forward-reference placeholder for the
-      deferred Hive Cloud epic. Marked out_of_scope in 10+ consecutive cycles.
+      Line count: 13. Explicit S16 forward-reference placeholder for the
+      deferred Hive Cloud epic. Out_of_scope in 10+ consecutive cycles.
   - id: finding-2
     category: STUB_DOC
     severity: low
@@ -152,7 +152,7 @@ skipped_findings:
     notes: >
       S16 forward-reference placeholder for the deferred Hive Cloud epic.
       Expanding this stub is premature without the Hive Cloud epic active.
-      Marked out_of_scope in 10+ consecutive cycles (deferred since meta-2026-05-12).
+      Out_of_scope in consecutive cycles (10th deferral this cycle).
   - finding_id: finding-2
     reason: out_of_scope
     notes: >
