@@ -73,7 +73,7 @@ agents:
     visibility: workspace
   - name: reviewer
     provider: claude
-    model: claude-opus-4-7
+    model: claude-opus-4-8
     max_concurrent_tasks: 1
     persona_ref: hive/agents/reviewer.md
     custom_env: {}
