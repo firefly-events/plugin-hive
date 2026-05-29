@@ -94,6 +94,7 @@ state/
 !.pHive/cycle-state/multica-integration-fixes.yaml
 !.pHive/cycle-state/hermes-integration-mvp.yaml
 !.pHive/cycle-state/wire-execute-multica-codex.yaml
+!.pHive/cycle-state/cc-workflows-first-party.yaml
 # /find-skills (se-5) writes ranked candidates here; track the dir marker so
 # consumer projects ship with an initialized output location.
 !.pHive/meta/

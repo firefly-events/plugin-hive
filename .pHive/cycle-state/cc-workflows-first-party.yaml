@@ -1,0 +1,22 @@
+epic_id: cc-workflows-first-party
+schema_version: 1
+
+# Per-epic cross-phase decision accumulator.
+# Initialized at Phase B step 4b (collaborative review gate) — 2026-05-29.
+# Schema: hive/references/cycle-state-schema.md
+
+escalations:
+  - trigger: security:plan-audit
+    placement: pre-exec
+    severity: moderate
+    stories: [phase-1-adapter-scaffold, phase-2-integration-branch-contract]
+    reason: |
+      execution.runtime knob + new mode_decision branch + per-persona provider routing
+      carrier change touches auth-adjacent surfaces (codex creators write commits; CC
+      /workflows fan-out spawns parallel writers). Memory feedback_codex_parallel_race
+      + feedback_codex_sandbox_commit_block unaddressed in draft (grill C1, C2).
+      Pre-exec specialist review before adapter build.
+    raised_by: tpm
+    raised_at: "2026-05-29T23:24:00Z"
+
+phase_records: []
