@@ -70,7 +70,7 @@ agents:
     custom_env: {}
     custom_args: []
     mcp_config: null
-    skills: []
+    skills: [story-writing, architecture-doc, readme, adr, research-brief, runbook]
     visibility: workspace
 
   # Verifiers — provider: claude, model: claude-opus-4-7

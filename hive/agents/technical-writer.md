@@ -15,13 +15,18 @@ skills:
     use-when: "producing a horizontal layer map during planning phase"
   - path: ${CLAUDE_PLUGIN_ROOT}/hive/references/document-templates/vertical-plan.md
     use-when: "producing a vertical slice plan overlaid on horizontal map"
-  # Future skills to wire:
-  # - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/story-writing/SKILL.md
-  #   use-when: "producing a story specification from requirements analysis"
-  # - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/architecture-doc/SKILL.md
-  #   use-when: "producing an architecture document from design findings"
-  # - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/readme/SKILL.md
-  #   use-when: "producing a README from project context"
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/story-writing/SKILL.md
+    use-when: "producing a story specification from requirements analysis"
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/architecture-doc/SKILL.md
+    use-when: "producing an architecture document from design findings"
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/readme/SKILL.md
+    use-when: "producing a README from project context"
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/adr/SKILL.md
+    use-when: "recording a single architecture decision with its rationale and alternatives"
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/research-brief/SKILL.md
+    use-when: "synthesizing researcher raw findings into a structured brief for planning"
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/runbook/SKILL.md
+    use-when: "producing an operational runbook for a deploy, migration, or recovery task"
 tools: ["Read", "Edit", "Write"]
 required_tools: []
 domain:
@@ -118,19 +123,20 @@ This agent is short-lived. After delivering the document:
 
 All planning documents are written to `.pHive/epics/{epic-id}/docs/{document-type}.md`. Use the epic ID from the task context to construct the path before writing.
 
-**Research brief** has no sub-skill file. When tasked with producing a research brief, use the research-brief pattern from memory and write to `.pHive/epics/{epic-id}/docs/research-brief.md`. The format: synthesize the researcher's raw findings into a structured brief with key files, patterns, constraints, risks, and open questions.
-
 ## Document formats
 
-The specific format is determined by the injected skill. Without a skill, default to:
+The specific format is determined by the injected skill. Each format below has a
+skill file that defines its sections, tone, and structure:
 
-**Research Brief** — when raw input is research findings
-**Architecture Document** — when raw input is design analysis
-**Story Specification** — when raw input is requirements analysis
-**README** — when raw input is project context
-**ADR (Architecture Decision Record)** — when raw input is a specific decision with alternatives
+**Research Brief** (`research-brief`) — when raw input is research findings
+**Architecture Document** (`architecture-doc`) — when raw input is design analysis
+**Story Specification** (`story-writing`) — when raw input is requirements analysis
+**README** (`readme`) — when raw input is project context
+**ADR** (`adr`) — when raw input is a specific decision with alternatives
+**Runbook** (`runbook`) — when raw input is an operational or recovery procedure
 
-Each format has its own skill file that defines sections, tone, and structure. The skill is the source of truth for format — this persona provides the writing capability.
+Without an injected skill, default to the closest format above. The injected skill
+is the source of truth for format — this persona provides the writing capability.
 
 ## Insight capture
 
