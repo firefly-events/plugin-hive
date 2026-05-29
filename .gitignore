@@ -201,3 +201,9 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/story-loop-closure/**
 !.pHive/epics/multica-substrate-deepen/
 !.pHive/epics/multica-substrate-deepen/**
+
+# Multica bootstrap runtime artifacts — transient per-run workspaces and JS
+# runtime caches created by /hive:multica-init. Regeneratable; never tracked.
+multica-bootstrap-*/
+node-compile-cache/
+tsx-*/
