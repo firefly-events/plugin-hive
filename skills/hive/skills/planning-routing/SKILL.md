@@ -1,26 +1,28 @@
 ---
 name: planning-routing
-description: Assemble and route a planning persona team across direct TeamCreate and Codex-backed agent-spawn paths. Inherits the caller's model and execution context.
+description: Assemble and route a planning persona team across Multica, direct TeamCreate, and Codex-backed agent-spawn paths. Inherits the caller's model and execution context.
 ---
 
 # Hive Planning Routing
 
-Atomic skill, NOT inline `/plan` prose. It assembles the caller's planning persona team, resolves backend routing, spawns direct and Codex paths, and returns active teammate handles plus final routing decisions. It inherits the caller's model and does not choose or override it.
+Atomic skill, NOT inline `/plan` prose. It assembles the caller's planning persona team, resolves backend routing, spawns Multica, direct, and Codex paths, and returns active teammate handles plus final routing decisions. It inherits the caller's model and does not choose or override it.
 
 ## Invocation contract
 
 Call this skill once per planning-team assembly.
 Do not call it again after successful teammate creation unless abandoning the prior attempt.
 
-**Inputs:** `assembled_personas` (ordered final planning persona list), `agent_backends` (resolved root-first routing map, `{}` if absent), and `requirement_summary` (concise task summary used in spawn prompts).
+**Inputs:** `assembled_personas` (ordered final planning persona list), `agent_backends` (resolved root-first routing map, `{}` if absent), `planning_mode_decision` (`multica` when `/plan` selected `HIVE_PLANNING_MODE=multica` or root `planning.mode: multica`; otherwise `default` or unset), and `requirement_summary` (concise task summary used in spawn prompts).
 
-**Outputs:** `routing_decisions` (persona -> final `codex` or `direct` path), `routing_reasons` (persona -> final reason), and `spawn_outcome` (active teammate handles/ids sufficient for caller `SendMessage` work assignment).
+**Outputs:** `routing_decisions` (persona -> final `multica`, `codex`, or `direct` path), `routing_reasons` (persona -> final reason), and `spawn_outcome` (active teammate handles/ids sufficient for caller `SendMessage` work assignment).
 
 **Side effects:** emits exactly one INFO log line per persona at final spawn
-decision; calls `TeamCreate` for direct-routed personas; calls `agent-spawn` ->
-`codex-invoke` for Codex-routed personas.
+decision; calls `plan-mode-multica` for Multica-routed personas; calls
+`TeamCreate` for direct-routed personas; calls `agent-spawn` -> `codex-invoke`
+for Codex-routed personas.
 
-INFO log requested field uses codex-invoke vocabulary: `codex|direct|unset`.
+INFO log requested field uses planning-routing vocabulary:
+`multica|codex|direct|unset`.
 
 ## Process
 
@@ -41,9 +43,20 @@ Routing happens only after the assembled persona list is finalized. Backend rout
 
 ### Step 0.2: Build Routing Decisions
 
-For each persona in `assembled_personas`, consult `agent_backends` using the root-first precedence contract already resolved by the caller. Compare the configured backend against `skills/hive/skills/codex-invoke/SKILL.md` `Supported personas (PoC)` and `Known-incompatible personas`.
+If `planning_mode_decision == multica`, route every persona in
+`assembled_personas` to `multica` with reason `no-fallback-needed`. This is a
+spawn-path override selected by `/plan`; do not filter the assembled list through
+the Codex supported/known-incompatible tables. Multica persona/provider validity is
+owned by `skills/hive/skills/plan-mode-multica/SKILL.md` and the Multica agent
+roster.
 
-Produce `routing_decisions` with one value per persona: `codex` or `direct`. Also store tentative `routing_reason` for Step 0.3 final INFO emission.
+Otherwise, for each persona in `assembled_personas`, consult `agent_backends`
+using the root-first precedence contract already resolved by the caller. Compare
+the configured backend against `skills/hive/skills/codex-invoke/SKILL.md`
+`Supported personas (PoC)` and `Known-incompatible personas`.
+
+Produce `routing_decisions` with one value per persona: `multica`, `codex`, or
+`direct`. Also store tentative `routing_reason` for Step 0.3 final INFO emission.
 
 - When `agent_backends[persona] == codex` and persona is supported, route `codex` with reason `no-fallback-needed`.
 - When `agent_backends[persona] == codex` and persona is known-incompatible, route `direct` with reason `known-incompatible`.
@@ -53,39 +66,57 @@ Produce `routing_decisions` with one value per persona: `codex` or `direct`. Als
 
 Apply this only to personas present in the assembled list. `ui-designer` is always `direct` even when configured to `codex`, because codex-invoke marks it known-incompatible. Step 0.2 does not emit INFO logs.
 
-### Step 0.3: Spawn Across Two Paths
+### Step 0.3: Spawn Across Three Paths
 
 > **Parallel-call-site annotation (audit pass):** `parallel_rationale: read-only` — the planning team produces design-discussion documents under `.pHive/epics/{id}/docs/`; no production code writes. Out-of-scope for the `ed-7` story-level fan-out gate (one team with N personas, not N independent stories); catalogued in [`hive/references/parallel-call-sites.md`](../../../../hive/references/parallel-call-sites.md) §3 (`planning-routing:mixed-team`).
 
 Use `routing_decisions` to assemble one conceptual planning team:
 
+- **Multica path (`plan-mode-multica`):** when any persona is routed `multica`,
+  call `skills/hive/skills/plan-mode-multica/SKILL.md` once with the full
+  Multica-routed persona list, planning story payload, config, and integration
+  branch context. `plan-mode-multica` owns per-persona fan-out, polling, and
+  `multica-run.yaml` episode markers. Do not also create local teammates for a
+  Multica-routed persona unless fallback is triggered.
 - **Direct path (`TeamCreate`):** collect every persona routed `direct` and create them in one `TeamCreate` call. Use Step 0.4 and include only direct-routed personas in `## Team Members`.
 - **Codex path (`agent-spawn` -> `codex-invoke`):** for each persona routed `codex`, create a separate persistent-pane teammate through `agent-spawn`, passing full persona context, resolved paths, memory loading context, and the same planning-team coordination context direct teammates receive.
 
-Mixed teams are valid. Some planning personas may come from `TeamCreate` while others come from `agent-spawn` -> `codex-invoke`; they are still one planning team. The caller remains coordinator and uses `SendMessage` for assignments and review loops.
+Mixed teams are valid. Some planning personas may come from `plan-mode-multica`,
+some from `TeamCreate`, and others from `agent-spawn` -> `codex-invoke`; they are
+still one planning team. The caller remains coordinator and uses `SendMessage` for
+assignments and review loops where local teammate handles exist, and uses the
+`plan-mode-multica` summary/episode markers for Multica-produced work.
 
-Emit the structured INFO log after each persona's final spawn path is known. If Step 0.5 handles a runtime Codex failure, update that persona's result to the fallback outcome instead of adding a second line.
+Emit the structured INFO log after each persona's final spawn path is known. If
+Step 0.5 handles a runtime Multica or Codex failure, update that persona's result
+to the fallback outcome instead of adding a second line.
 
 Preserve the 4-field template exactly:
-- `[info] planning routing: persona={X} requested={codex|direct|unset} path={codex-invoke|TeamCreate} reason={reason}`
+- `[info] planning routing: persona={X} requested={multica|codex|direct|unset} path={plan-mode-multica|codex-invoke|TeamCreate} reason={reason}`
 
 Valid `reason=` values:
 - `no-fallback-needed`
 - `known-incompatible`
 - `unvalidated-persona`
 - `agent_backends-unset`
+- `multica-daemon-down: {error}`
+- `multica-dispatch-failed: {error}`
 - `codex-dispatch-failed: {error}`
 
 Examples:
+- `[info] planning routing: persona=researcher requested=multica path=plan-mode-multica reason=no-fallback-needed`
+- `[info] planning routing: persona=researcher requested=multica path=codex-invoke reason=multica-daemon-down: ECONNREFUSED`
+- `[info] planning routing: persona=ui-designer requested=multica path=TeamCreate reason=multica-daemon-down: ECONNREFUSED`
 - `[info] planning routing: persona=technical-writer requested=codex path=codex-invoke reason=no-fallback-needed`
 - `[info] planning routing: persona=ui-designer requested=codex path=TeamCreate reason=known-incompatible`
 - `[info] planning routing: persona={X} requested=codex path=TeamCreate reason=unvalidated-persona`
 - `[info] planning routing: persona={X} requested=direct path=TeamCreate reason=no-fallback-needed`
 - `[info] planning routing: persona={X} requested=unset path=TeamCreate reason=agent_backends-unset`
 
-Return `spawn_outcome` with all active direct and Codex teammate handles. The
-caller does not need to know which backend produced a handle before assigning
-normal planning work.
+Return `spawn_outcome` with all active direct and Codex teammate handles plus the
+Multica dispatch summary/episode marker paths for Multica-routed personas. The
+caller does not need to know which local backend produced a handle before
+assigning normal planning work.
 
 ### Step 0.4: Mixed-Team TeamCreate Prompt Template
 
@@ -122,11 +153,45 @@ Load memories from the agent's knowledge paths. Scan existing design language be
 - Use agent-spawn skill patterns: load full persona, resolve paths, load memories
 ```
 
-If the team is mixed, the `TeamCreate` prompt includes only direct-routed personas. Codex-routed personas participate via separate panes and read team context from their own `agent-spawn` prompt.
+If the team is mixed, the `TeamCreate` prompt includes only direct-routed personas.
+Codex-routed personas participate via separate panes and read team context from
+their own `agent-spawn` prompt. Multica-routed personas participate through
+`plan-mode-multica` and read the planning story/config context passed to that
+mode atom.
 
 **Agent-spawn compliance:** Every codex-routed teammate must follow `skills/hive/skills/agent-spawn/SKILL.md` patterns: full persona injection, path resolution (`~`, `${CLAUDE_PLUGIN_ROOT}`), memory loading, domain constraints, and required tool validation. Direct `TeamCreate` teammates still read their persona files and load knowledge paths on startup.
 
 ### Step 0.5: Runtime Fallback
+
+Fallback order is `multica` -> `codex` -> `direct`.
+
+If `plan-mode-multica` fails before or during persona dispatch because the
+Multica daemon is down or unreachable (connection refused, timeout resolving the
+server/workspace, daemon health check failure, or equivalent transport setup
+error), handle it gracefully:
+
+1. Do not hard-fail planning-team assembly.
+2. Re-route each affected persona to Codex when that persona is supported by
+   `codex-invoke` and not known-incompatible; otherwise re-route it to direct
+   `TeamCreate`.
+3. If the Codex fallback for an affected persona also fails, apply the Codex
+   fallback rules below and end at direct `TeamCreate`.
+4. Update the Step 0.3 INFO log outcome for each affected persona:
+   `[info] planning routing: persona={X} requested=multica path={codex-invoke|TeamCreate} reason=multica-daemon-down: {error}`
+   where `{error}` is truncated to 120 chars.
+5. Continue the planning flow.
+
+If `plan-mode-multica` returns a non-daemon dispatch failure for any persona
+after reaching the daemon, handle it gracefully:
+
+1. Do not hard-fail planning-team assembly.
+2. Re-route the failed persona to Codex when supported, otherwise direct
+   `TeamCreate`.
+3. If the Codex fallback also fails, apply the Codex fallback rules below.
+4. Update the Step 0.3 INFO log outcome for that persona:
+   `[info] planning routing: persona={X} requested=multica path={codex-invoke|TeamCreate} reason=multica-dispatch-failed: {error}`
+   where `{error}` is truncated to 120 chars.
+5. Continue the planning flow.
 
 If `codex-invoke` dispatch FAILS at runtime for any persona (Codex CLI missing, auth expired, cmux pane creation error, pre-flight failure, timeout, or any error returned from `agent-spawn`/`codex-invoke`), handle it gracefully:
 

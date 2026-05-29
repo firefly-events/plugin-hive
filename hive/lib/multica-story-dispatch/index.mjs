@@ -276,6 +276,79 @@ export async function dispatchStoryToAgent(serverUrl, token, workspaceId, issueU
   });
 }
 
+function normalizePersonaDispatches(personaIssues) {
+  if (Array.isArray(personaIssues)) {
+    return personaIssues.map((entry) => ({
+      persona: entry?.persona ?? entry?.agent ?? entry?.name,
+      issueUuid: entry?.issueUuid ?? entry?.issue_uuid ?? entry?.issueId ?? entry?.issue_id,
+    }));
+  }
+
+  return Object.entries(personaIssues ?? {}).map(([persona, issueUuid]) => ({
+    persona,
+    issueUuid,
+  }));
+}
+
+export async function dispatchStoryToPersonas(
+  serverUrl,
+  token,
+  workspaceId,
+  story,
+  personaIssues,
+  options = {},
+) {
+  const {
+    agents = [],
+    agentBackends = options.agent_backends ?? {},
+    integrationBranch = null,
+    moveOutOfBacklog = true,
+  } = options;
+  const dispatches = [];
+
+  for (const entry of normalizePersonaDispatches(personaIssues)) {
+    const { persona, issueUuid } = entry;
+    if (!persona) {
+      throw dispatchError('INVALID_PERSONA_DISPATCH', 'persona dispatch is missing persona', undefined, token);
+    }
+    if (!issueUuid) {
+      throw dispatchError(
+        'INVALID_PERSONA_DISPATCH',
+        `persona dispatch for '${persona}' is missing issue UUID`,
+        undefined,
+        token,
+      );
+    }
+
+    const agentUuid = await resolveAgentUuidByName(serverUrl, token, workspaceId, persona);
+    const brief = serializeStoryBrief(story, {
+      dispatchingPersona: persona,
+      agents,
+      agentBackends,
+      integrationBranch,
+    });
+    const briefResult = await ensureIssueBriefMatches(serverUrl, token, workspaceId, issueUuid, brief);
+    const issue = await dispatchStoryToAgent(serverUrl, token, workspaceId, issueUuid, agentUuid);
+    const backlogResult = moveOutOfBacklog
+      ? await moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, issueUuid)
+      : { was_moved: false };
+
+    dispatches.push({
+      persona,
+      issue_uuid: issueUuid,
+      agent_uuid: agentUuid,
+      was_updated: briefResult.was_updated,
+      was_moved: backlogResult.was_moved,
+      issue,
+    });
+  }
+
+  return {
+    carrier: 'per-persona-fan-out',
+    dispatches,
+  };
+}
+
 export async function moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, issueUuid) {
   const url = issueUrl(serverUrl, workspaceId, issueUuid);
   const issue = await httpJson(url, { token });

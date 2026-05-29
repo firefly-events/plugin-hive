@@ -1,0 +1,79 @@
+id: mpt-9-test-mode-multica-skill
+epic: multica-plan-test-cycles
+title: Build test-mode-multica atomic skill (hard-gated on schema + done-signal)
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- mpt-2-scenario-schema-reconcile
+- mpt-3-verdict-home-and-agent-name
+- mpt-4-doc-verdict-done-signal-marker
+- mpt-5-dispatch-carrier-helper
+description: 'S5. Build skills/hive/skills/test-mode-multica/SKILL.md, atomic and symmetric with execute-mode-multica:
+  dispatch a --simulated-manual scenario to a Multica `tester`, poll to terminal, write the verdict to
+  the canonical home (story-YAML manual_verdict, mpt-3) plus an episode marker (mpt-4). Add a thin test
+  dispatch-mode resolve via env HIVE_TEST_MODE or test.mode: multica. HARD-GATED on mpt-2 (schema) + mpt-4
+  (done-signal).'
+acceptance_criteria:
+- 'Given test.mode: multica and a reconciled scenario, when /test --simulated-manual runs, then test-mode-multica
+  dispatches to a Multica tester and polls to terminal.'
+- Given the run terminates, then the verdict lands in the story-YAML manual_verdict block (canonical home)
+  and an episode marker is written.
+steps:
+- id: research
+  description: Explore the codebase for relevant patterns, files, and constraints.
+  agent: researcher
+- id: implement
+  description: Implement the story per spec and research findings.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Write/verify tests covering acceptance criteria.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Review implementation and tests for correctness and convention compliance.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit and push to the feature branch (fresh-checkout/rebase-push per integration principle).
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: skills/hive/skills/execute-mode-multica/SKILL.md
+    purpose: Symmetry template.
+  - path: hive/workflows/steps/test/simulated-manual.md
+    purpose: Current local executor to mirror via dispatch.
+files_to_modify:
+- file: skills/hive/skills/test-mode-multica/SKILL.md
+  change: NEW — atomic test dispatch mode skill.
+references:
+- path: .pHive/epics/multica-plan-test-cycles/docs/structured-outline.md
+  relevant_excerpt: Phase-to-slice mapping, file manifest, risk registry.
+- path: .pHive/epics/multica-plan-test-cycles/docs/design-discussion.md
+  relevant_excerpt: §9 locked gate decisions (full-mirror seam, squad-spike-first, plan->execute->test
+    framing).
+- path: .pHive/epics/multica-plan-test-cycles/docs/vertical-plan.md
+  relevant_excerpt: 6-slice spine S1..S6 with depends_on + working states.
+risks:
+- severity: medium
+  description: tester/test-worker name mismatch breaks resolveAgentUuidByName.
+  mitigation: mpt-3 unifies the name; mpt-1 confirmed roster.
+cross_cutting:
+- concern: documentation
+  action: 'Document test.mode: multica + HIVE_TEST_MODE in /test + config reference.'
+- concern: versioning
+  action: Additive new skill + config key -> minor bump.
+metric:
+  applies: false
+  justification: New atomic dispatch skill for the test cycle; the capability is proven end-to-end in
+    mpt-10/mpt-11, so this story ships substrate rather than a measurable metric.
+tracker_id: plugin-hive/PLU-162
+tracker_uuid: 965be9fd-97f4-4643-bd17-6e516d8b75f6
+tracker_url: http://localhost:3000/issue/PLU-162
