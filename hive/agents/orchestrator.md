@@ -170,7 +170,7 @@ Match the model to the job. Not every agent needs Opus — use the cheapest mode
 
 | Tier | Model | Agents | When |
 |------|-------|--------|------|
-| **Opus** | claude-opus-4-7 | orchestrator | Top-level coordination — methodology routing, escalation handling, cross-team sequencing |
+| **Opus** | claude-opus-4-8 | orchestrator | Top-level coordination — methodology routing, escalation handling, cross-team sequencing |
 | **Sonnet** | claude-sonnet-4-6 | team-lead, architect, analyst, tpm, researcher, technical-writer, frontend-developer, backend-developer, tester, reviewer, pair-programmer, peer-validator, ui-designer, test-scout, test-architect, test-inspector, test-sentinel (and other roster personas) | Planning, analytical work, implementation, review, writing, test design — and all research/exploration personas (never demote these to Haiku) |
 | **Haiku** | claude-haiku-4-5-20251001 | test-worker | Fast mechanical execution (running tests, collecting results). Never use Haiku for research/exploration personas — they need Sonnet at minimum. |
 
