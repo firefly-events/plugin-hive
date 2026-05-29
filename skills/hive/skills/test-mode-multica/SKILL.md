@@ -248,9 +248,13 @@ field. Do not infer a verdict from the issue comment, task notes, or messages.
 Use the mpt-4 doc/verdict dialect on the existing `multica-run.yaml` marker. Do not
 invent a test-specific marker.
 
-Before calling the writer, annotate the terminal object:
+Before calling the writer, derive the sibling messages path and annotate the
+terminal object. The writer emits `multica-run.messages.jsonl` next to
+`multica-run.yaml` in the episode directory, so the path is deterministic; both
+artifacts must be listed per the contract table below.
 
 ```js
+const messagesPath = `${hiveStateDir}/episodes/${epic_handle}/${story_id}/multica-run.messages.jsonl`;
 const verdictTerminal = {
   ...terminal,
   completion_kind: 'doc-verdict',
@@ -258,7 +262,7 @@ const verdictTerminal = {
     terminal.status === 'completed' &&
     manualVerdict?.agent === 'tester' &&
     ['pass', 'fail', 'inconclusive'].includes(manualVerdict?.verdict),
-  artifacts: [story_path],
+  artifacts: [story_path, messagesPath],
 };
 ```
 

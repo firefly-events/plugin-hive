@@ -69,7 +69,7 @@ Shared-branch handling held for the S6 workstream commits:
 
 - PLU-161 and PLU-163 pushed directly to `origin/feat/multica-plan-test-cycles`.
 - PLU-164 used the existing shared-branch worktree at
-  `/Users/don/multica_workspaces/21c6d282-d6b4-4b25-8d0d-a85e96038416/0cf72e6b/workdir/plugin-hive`
+  `<multica-workspace>/<task-id>/workdir/plugin-hive`
   because Git refused to check out the already-attached branch in the daemon-created
   `agent/developer/23c2283d` worktree.
 

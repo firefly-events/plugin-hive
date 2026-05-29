@@ -138,4 +138,4 @@ ALL test artifacts go to `.pHive/test-artifacts/{epic-id}/{story-id}/`:
 
 - `hive/workflows/test-swarm.workflow.yaml` — workflow definition
 - `hive/references/test-swarm-architecture.md` — full architecture doc
-- `hive/agents/test-scout.md`, `test-architect.md`, the worker persona, `test-inspector.md`, `test-sentinel.md` — agent personas
+- `hive/agents/test-scout.md`, `hive/agents/test-architect.md`, `hive/agents/test-worker.md` (worker persona), `hive/agents/test-inspector.md`, `hive/agents/test-sentinel.md` — agent personas
