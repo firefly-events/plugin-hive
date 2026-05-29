@@ -38,4 +38,4 @@ postconditions:
   - "Slack render of --format slack output is clean: headings, bullets, code blocks all display correctly"
   - "No ANSI artifacts visible in Slack output"
   - "Default (no-flag) invocation behavior is byte-equivalent to pre-h-03 behavior"
-  - "Manual verdict recorded in cycle-state manual_verdict block"
+  - "Manual verdict recorded in story-YAML manual_verdict block"

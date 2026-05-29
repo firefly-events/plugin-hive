@@ -519,7 +519,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     | Concern `id` | Target field | Schema ref |
     |---|---|---|
     | `metrics` | top-level `metric:` block | [`story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §3 |
-    | `simulated-manual` | `scenario` step injection + top-level `manual_verdict.scenario_ref` | [`story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §8 |
+    | `simulated-manual` | `scenario` step injection + top-level `manual_verdict.scenario_ref` | [`story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §9 |
 
     To add a new dedicated-field concern later, extend this routing table; do not hardcode concern-specific logic elsewhere in the skill.
 

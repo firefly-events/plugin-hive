@@ -131,19 +131,27 @@ const carrier = await dispatchStoryToPersonas(
 );
 ```
 
-Dispatch units are serial in v1: dispatch persona N, poll to terminal, write the
-episode marker, then advance to persona N+1. This bounds Multica daemon load and
-keeps failures isolated to one planning unit.
+The carrier call above is a **single** batch dispatch: `dispatchStoryToPersonas`
+iterates `persona_issues` internally — for each persona it ensures the issue
+brief, dispatches the issue to that persona's agent, and moves it out of backlog
+— then returns `{ carrier: 'per-persona-fan-out', dispatches }`. It does not
+poll. Polling and marker-writing are serial in v1 (Step 2): poll persona N to
+terminal, write its episode marker, then advance to N+1. This bounds Multica
+daemon load and keeps failures isolated to one planning unit.
 
-For each persona:
+Before the carrier call, for each persona:
 
 1. Ensure or create one Multica issue for that persona. Title format:
    `{planning_story.title} - {persona}`.
-2. Pass the persona's issue UUID to `dispatchStoryToPersonas`.
-3. Confirm the returned carrier is `per-persona-fan-out`.
-4. Record `{persona, issueUuid, identifier, agentUuid, dispatch_started_at}` for
-   the poll loop.
-5. Emit:
+2. Add `{ persona, issueUuid }` to the `persona_issues` array passed to the carrier.
+
+After the carrier returns:
+
+3. Confirm the returned `carrier` is `per-persona-fan-out`.
+4. For each entry in `dispatches`, record
+   `{persona, issueUuid, identifier, agentUuid, dispatch_started_at}` for the
+   poll loop.
+5. Emit one info line per persona:
    `[info] planning multica dispatch: persona={persona} carrier=per-persona-fan-out issue={identifier}`.
 
 Do not create or assign a squad issue. Do not collapse personas into one shared
