@@ -1,3 +1,41 @@
+- experiment_id: meta-2026-05-30
+  date: '2026-05-30'
+  started: '2026-05-30T00:00:00Z'
+  closed: '2026-05-30T00:30:00Z'
+  verdict: passed
+  changes_promoted: 5
+  changes_reverted: 0
+  findings_identified: 5
+  top_changes:
+    - "hive/GUIDE.md: corrected Agent Roster count from 20 to 25 Personas; added 5 specialist agents to Sonnet tier row and new Specialist Agents subsection"
+    - "hive/lib/budget-gate.js, hive/lib/sandcastle-worker-runner.js, hive/lib/messages-session.js: updated FALLBACK_MODEL / DEFAULT_MODEL from claude-opus-4-7 to claude-opus-4-8"
+    - "hive/references/session-system-prompt-spec.md: updated claude-opus-4-7 to claude-opus-4-8 in two code examples"
+  commit: 90e2a521dd6199f4a93d53ec5841a4ca6d6a27ae
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 8000
+    first_attempt_pass: true
+  rollback_ref: 8809cba7a2bab36ced6f50e942ab3c9b11aba26c
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-05-30. Analysis found 5 findings: (1)
+    SCHEMA_INCONSISTENCY — session-system-prompt-spec.md had two claude-opus-4-7
+    model ID references in code examples (Python messages.create() and JSON
+    response); updated to claude-opus-4-8. (2) SCHEMA_INCONSISTENCY —
+    hive/GUIDE.md Agent Roster count said 20 Personas but 25 agent .md files
+    exist; idiomatic-reviewer, security-reviewer, performance-reviewer,
+    accessibility-specialist, and animations-specialist were absent from the
+    roster and Sonnet tier row; fixed by updating count and adding Specialist
+    Agents section. (3) SCHEMA_INCONSISTENCY — hive/lib/budget-gate.js
+    FALLBACK_MODEL was 'claude-opus-4-7'; updated to 'claude-opus-4-8' (rate
+    card retains both keys for backward compat). (4) SCHEMA_INCONSISTENCY —
+    hive/lib/sandcastle-worker-runner.js DEFAULT_MODEL was 'claude-opus-4-7';
+    updated to 'claude-opus-4-8' (JSDoc comment also updated). (5)
+    SCHEMA_INCONSISTENCY — hive/lib/messages-session.js DEFAULT_MODEL was
+    'claude-opus-4-7'; updated to 'claude-opus-4-8'. One STUB_DOC finding
+    (hive-cloud-roadmap.md, 13 lines) marked out_of_scope (11th+ consecutive
+    deferral). Closure validator passed. Regression watch armed for 4-hour
+    observation window.
 - experiment_id: meta-2026-05-29
   date: '2026-05-29'
   started: '2026-05-29T00:00:00Z'
