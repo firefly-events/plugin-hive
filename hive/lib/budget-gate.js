@@ -52,7 +52,7 @@ const RATES_PER_MTOK = {
   'claude-haiku-4-5':          { in:  1.0, out:  5.0 },
 };
 
-const FALLBACK_MODEL = 'claude-opus-4-7';
+const FALLBACK_MODEL = 'claude-opus-4-8';
 
 function rateLookup(model, warn = console.warn) {
   if (RATES_PER_MTOK[model]) return RATES_PER_MTOK[model];
