@@ -304,6 +304,11 @@ export async function dispatchStoryToPersonas(
     integrationBranch = null,
     moveOutOfBacklog = true,
   } = options;
+  // Routing-contract rendering must reflect the actual agent the issue is assigned to.
+  // Fall back to the populated AGENT_CACHE when the caller omits options.agents so the
+  // rendered /codex:rescue (or absence thereof) matches the resolved agent's provider.
+  const resolvedAgents =
+    agents.length > 0 ? agents : AGENT_CACHE.get(cacheKey(serverUrl, workspaceId, token)) ?? [];
   const dispatches = [];
 
   for (const entry of normalizePersonaDispatches(personaIssues)) {
@@ -321,9 +326,13 @@ export async function dispatchStoryToPersonas(
     }
 
     const agentUuid = await resolveAgentUuidByName(serverUrl, token, workspaceId, persona);
+    const briefAgents =
+      resolvedAgents.length > 0
+        ? resolvedAgents
+        : AGENT_CACHE.get(cacheKey(serverUrl, workspaceId, token)) ?? [];
     const brief = serializeStoryBrief(story, {
       dispatchingPersona: persona,
-      agents,
+      agents: briefAgents,
       agentBackends,
       integrationBranch,
     });

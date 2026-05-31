@@ -33,10 +33,11 @@ Per-trigger fields:
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `type` | string | yes | `schedule` or `webhook`. |
-| `cron` | string | yes (if `type: schedule`) | Standard cron expression (5-field UTC). Required when `type` is `schedule`. |
-| `url` | string | no (`type: webhook`) | Server-generated. **Do not provide.** Reconciler reads it back after autopilot creation and stores it for CI/CD wiring. |
-| `event` | string | no | Informational label for the webhook event (e.g., `post-merge`). Not validated by the server. |
+| `kind` | string | yes | `schedule` or `webhook`. Sent as `kind` in the API payload. |
+| `cron` | string | yes (if `kind: schedule`) | Standard cron expression (5-field UTC). Required when `kind` is `schedule`. |
+| `label` | string | no | Informational label (e.g., `post-merge`). Used as part of the reconciler's identity key alongside `kind`. Not validated by the server. |
+
+Webhook `url` is server-assigned at creation time. Do not write `url` into source YAML. The reconciler reads the server-assigned URL back and surfaces it to programmatic callers via the returned `webhookUrlsCaptured` map. It is not persisted to the source manifest.
 
 ## Mode semantics
 
@@ -47,9 +48,9 @@ Per-trigger fields:
 
 1. **Agent must exist.** The `agent` value must match the `name` field of an entry in `.pHive/multica/agents.yaml`. The reconciler rejects any autopilot whose agent name is not present at reconcile time.
 2. **At least one trigger.** Each autopilot entry must have a non-empty `triggers` array. The reconciler rejects entries with zero triggers.
-3. **Cron required for schedule triggers.** A trigger with `type: schedule` must include a valid 5-field cron expression in `cron`.
-4. **Webhook URL is server-generated.** Webhook `url` values are assigned by the Multica server when the autopilot is created. Do not write `url` into the source YAML. The reconciler reads the server-assigned URL back and may store it in a generated side-file for CI/CD wiring, but it is not a stable config field.
-5. **Name is stable.** `name` is the reconciler's idempotency key. Renaming an autopilot deletes the old one and creates a new one, including a new webhook URL for any webhook triggers. Rename deliberately.
+3. **Cron required for schedule triggers.** A trigger with `kind: schedule` must include a valid 5-field cron expression in `cron`.
+4. **Webhook URL is server-generated.** Webhook `url` values are assigned by the Multica server when the autopilot is created. Do not write `url` into the source YAML. The reconciler reads the server-assigned URL back and surfaces it programmatically via `webhookUrlsCaptured`, but it is not a stable config field.
+5. **`title` is the idempotency key.** The current reconciler matches existing autopilots by `title`. Changing `title` is treated as a new autopilot — the prior entry is **not** auto-deleted; orphan autopilots with no matching `title` in YAML emit a warning. To force prune behavior, delete the orphan manually in the Multica UI. (Note: `name` remains the trigger-key prefix and the agent reference, but is not used as the autopilot identity key by the current reconciler.)
 
 ## Resolution rules
 
@@ -60,8 +61,8 @@ At reconcile time (run via `reconcileAutopilots` in the bootstrap):
 3. Diff the declared list against the live Multica autopilot list (`multica autopilot list`).
 4. **Create** autopilots present in YAML but absent from Multica.
 5. **Update** autopilots present in both where fields diverge (title, mode, description, priority, triggers).
-6. **Preserve** autopilots present in Multica but absent from YAML (out-of-band entries are not deleted by default; use `--prune` to delete them).
-7. After create/update, read server-assigned webhook URLs back and emit them to stdout for CI/CD wiring.
+6. **Preserve** autopilots present in Multica but absent from YAML. Out-of-band entries are **not** deleted by the current reconciler — they emit a warning only. Delete orphans manually in the Multica UI when intentional.
+7. After create/update, read server-assigned webhook URLs back into `webhookUrlsCaptured` (returned to programmatic callers; not written into the source manifest). The reconciler logs only that a URL was captured per autopilot, not the URL itself.
 
 ## schema_version semantics
 
@@ -79,9 +80,9 @@ autopilots:
     description: Run /metrics-check after each merge to main; creates a Multica issue for the tpm agent to process and post results.
     priority: low
     triggers:
-      - type: webhook
-        event: post-merge
-        # url is server-generated — do not populate
+      - kind: webhook
+        label: post-merge
+        # url is server-assigned — do not populate
 
   - name: visual-qa-post-merge
     title: Visual QA (post-merge)
@@ -90,12 +91,12 @@ autopilots:
     description: Run /visual-qa after each merge to main; creates a Multica issue for the ui-designer agent to review visual diffs and flag regressions.
     priority: medium
     triggers:
-      - type: webhook
-        event: post-merge
-        # url is server-generated — do not populate
+      - kind: webhook
+        label: post-merge
+        # url is server-assigned — do not populate
 ```
 
-Both autopilots use `mode: create_issue` so their results are trackable on the Multica issue board. The `event: post-merge` label is informational; the actual webhook must be wired to the CI/CD pipeline using the server-assigned URL produced by the reconciler.
+Both autopilots use `mode: create_issue` so their results are trackable on the Multica issue board. The `label: post-merge` value is informational; the actual webhook must be wired to the CI/CD pipeline using the server-assigned URL captured by the reconciler (read from `webhookUrlsCaptured`, not stdout).
 
 ## Relationship to other schema files
 
@@ -107,7 +108,7 @@ Both autopilots use `mode: create_issue` so their results are trackable on the M
 
 ## Drift contract
 
-The config is re-runnable. Reconciler upserts — it does not blindly recreate. On repeated runs, no-op entries produce no server calls. Updates patch diverged fields only. The `name` field is the identity key; order in the YAML is not significant.
+The config is re-runnable. Reconciler upserts — it does not blindly recreate. On repeated runs, no-op entries produce no server calls. Updates patch diverged fields only. The `title` field is the autopilot identity key; trigger identity is `(kind, label)`. Order in the YAML is not significant.
 
 ## Deprecation scope
 

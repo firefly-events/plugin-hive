@@ -244,7 +244,9 @@ function repoRelative(filePath) {
 
 function artifactRelative(filePath) {
   if (!filePath) return null;
-  return path.isAbsolute(String(filePath)) ? repoRelative(String(filePath)) : String(filePath);
+  const normalized = path.normalize(String(filePath));
+  if (path.isAbsolute(normalized)) return repoRelative(normalized);
+  return normalized.replace(/^\.[/\\]/, '');
 }
 
 function normalizeArtifactPaths(terminal, messagesPath) {
