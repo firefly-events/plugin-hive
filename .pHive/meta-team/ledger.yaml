@@ -1,3 +1,34 @@
+- experiment_id: meta-2026-05-31
+  date: '2026-05-31'
+  started: '2026-05-31T00:00:00Z'
+  closed: '2026-05-31T00:30:00Z'
+  verdict: passed
+  changes_promoted: 3
+  changes_reverted: 0
+  findings_identified: 5
+  top_changes:
+    - "hive/lib/messages-session.js: updated DEFAULT_MODEL from claude-opus-4-7 to claude-opus-4-8"
+    - "hive/lib/sandcastle-worker-runner.js: updated DEFAULT_MODEL constant and JSDoc from claude-opus-4-7 to claude-opus-4-8"
+    - "hive/references/session-system-prompt-spec.md: updated model in API call and response examples from claude-opus-4-7 to claude-opus-4-8"
+  commit: 280b1f46011109ae75c1f88ab992b2feae3afb61
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 0
+    first_attempt_pass: true
+  rollback_ref: 8809cba7a2bab36ced6f50e942ab3c9b11aba26c
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-05-31. Analysis found 5 findings: (1-3)
+    SCHEMA_INCONSISTENCY — claude-opus-4-7 stale in messages-session.js
+    DEFAULT_MODEL, sandcastle-worker-runner.js DEFAULT_MODEL and JSDoc, and
+    session-system-prompt-spec.md API example payloads; prior cycle
+    (meta-2026-05-29) had fixed RATES_PER_MTOK and doc tables but missed
+    these three files. All updated to claude-opus-4-8. (4) STUB_DOC
+    hive/references/hive-cloud-roadmap.md (13 lines) — S16 forward-reference
+    placeholder, out_of_scope (11th+ consecutive deferral). (5) STUB_DOC
+    hive/references/meta-safety-constraints.md (42 lines) — functional
+    reference, intentionally concise, out_of_scope. Closure validator passed.
+    Regression watch armed for 4-hour observation window.
 - experiment_id: meta-2026-05-29
   date: '2026-05-29'
   started: '2026-05-29T00:00:00Z'

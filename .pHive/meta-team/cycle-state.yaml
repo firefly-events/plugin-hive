@@ -1,6 +1,6 @@
 cycle_id: meta-2026-05-31
 started: '2026-05-31T00:00:00Z'
-status: closing
+status: closed
 phase: close
 closed: '2026-05-31T00:30:00Z'
 charter_constraints:
@@ -134,21 +134,24 @@ steps:
         file: hive/lib/messages-session.js
         verdict: pass
         status: promoted
-        rollback_target: 8809cba
+        commit_ref: 280b1f46011109ae75c1f88ab992b2feae3afb61
+        rollback_target: 8809cba7a2bab36ced6f50e942ab3c9b11aba26c
       - proposal_id: proposal-2
         file: hive/references/session-system-prompt-spec.md
         verdict: pass
         status: promoted
-        rollback_target: 8809cba
+        commit_ref: 280b1f46011109ae75c1f88ab992b2feae3afb61
+        rollback_target: 8809cba7a2bab36ced6f50e942ab3c9b11aba26c
       - proposal_id: proposal-3
         file: hive/lib/sandcastle-worker-runner.js
         verdict: pass
         status: promoted
-        rollback_target: 8809cba
+        commit_ref: 280b1f46011109ae75c1f88ab992b2feae3afb61
+        rollback_target: 8809cba7a2bab36ced6f50e942ab3c9b11aba26c
     reverted_changes: []
     insights_staged: 0
     decision: accept
-    rollback_target: 8809cba
+    rollback_target: 8809cba7a2bab36ced6f50e942ab3c9b11aba26c
 summary:
   total_findings: 5
   proposals_generated: 3
@@ -158,13 +161,19 @@ summary:
   flagged_for_human: 0
   cycle_verdict: passed
 closure_evidence:
-  commit_ref: PENDING
+  commit_ref: 280b1f46011109ae75c1f88ab992b2feae3afb61
   metrics_snapshot:
     tokens: 0
     wall_clock_ms: 0
     first_attempt_pass: true
-  rollback_ref: 8809cba
+  rollback_ref: 8809cba7a2bab36ced6f50e942ab3c9b11aba26c
 decision: accept
+regression_watch:
+  state: armed
+  armed_at: '2026-05-31T00:30:00Z'
+observation_window:
+  start: '2026-05-31T00:30:00Z'
+  end: '2026-05-31T04:30:00Z'
 findings:
   - id: finding-1
     category: SCHEMA_INCONSISTENCY
