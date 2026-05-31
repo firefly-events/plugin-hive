@@ -1,0 +1,67 @@
+id: cwfp-s2-1-execute-step-6f
+epic: cc-workflows-first-party
+title: Add Process step 6f cc-workflows branch to skills/execute/SKILL.md
+status: pending
+complexity: low
+methodology: classic
+depends_on: [cwfp-s1-1-phase0-capability-spike]
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Extend skills/execute/SKILL.md Process step 6 with a new 6f branch routing
+  mode_decision == 'cc-workflows' to invoke skills/hive/skills/execute-mode-cc-workflows/SKILL.md.
+  Mirrors the shape of 6e multica. Preserves single-isolation-layer rule —
+  step 6f does not recursively spawn /workflows.
+
+  Additive; existing 6a-6e branches unchanged.
+
+acceptance_criteria:
+  - "Given skills/execute/SKILL.md Process step 6, when mode_decision resolves to 'cc-workflows', then the doc routes to skills/hive/skills/execute-mode-cc-workflows/SKILL.md"
+  - "Given the single-isolation-layer rule, when step 6f executes, then it does not recursively spawn /workflows from within a dispatched agent"
+  - "Given the existing 6a-6e branches, when this story commits, then none of those branches regress (additive change)"
+
+steps:
+  - id: implement
+    description: Add 6f branch to skills/execute/SKILL.md mirroring 6e multica's structure
+    agent: developer
+  - id: test
+    description: Doc-test — assert step 6 enumerates 6a-6f; assert 6f invocation contract matches execute-mode-cc-workflows/SKILL.md (which lands in cwfp-s2-3)
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Reviewer checks additive-only; single-isolation-layer rule preserved; no regression to 6a-6e
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: 'Commit on feat/cc-workflows-first-party "[cwfp-s2-1] feat(execute): add step 6f cc-workflows branch"'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/execute/SKILL.md
+      purpose: Process step 6 is the mode-selection chain; 6f added here
+
+files_to_modify:
+  - file: skills/execute/SKILL.md
+    change: ADD step 6f cc-workflows branch mirroring 6e multica's invocation contract
+
+cross_cutting:
+  - concern: documentation
+    action: skills/execute/SKILL.md IS the docs that downstream skills/agents read; this story IS a doc change
+
+risks:
+  - severity: low
+    description: 6f introduces a routing branch before execute-mode-cc-workflows/SKILL.md (cwfp-s2-3) lands
+    mitigation: Story ordering — s2-1 + s2-3 commit together via Phase 2 MVP slice; reviewer flags if integrated solo
+
+references:
+  - path: .pHive/epics/cc-workflows-first-party/docs/horizontal-plan.md
+    relevant_excerpt: |
+      Layer 1 — Executor seam: skills/execute/SKILL.md Process step 6 has five mode branches today (6a-6e); adding 6f cc-workflows is additive.
+
+metric:
+  applies: false
+  justification: Doc-only step branch addition; the metric-bearing surface is the dispatch resolver (cwfp-s2-2) and the MVP E2E run (cwfp-s2-5), not this single-line routing addition.

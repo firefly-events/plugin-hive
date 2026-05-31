@@ -1,0 +1,106 @@
+id: cwfp-s4-1-disposition-pass-msd
+epic: cc-workflows-first-party
+title: Disposition AUDIT — multica-substrate-deepen 19 stories
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [cwfp-s1-1-phase0-capability-spike]
+parallel_allowed: true
+parallel_rationale: read-only
+
+description: |
+  Read-only audit of each of the 19 stories in
+  .pHive/epics/multica-substrate-deepen/stories/. For each, write a
+  candidate disposition (keep-as-second-party / park / supersede) +
+  rationale + git+disk evidence.
+
+  Method: per memory feedback_story_status_stale, YAML status: pending
+  LIES for shipped work. Reads git log + PR refs (PR #230, PR #231,
+  post-#230/231 merges) + actual files on disk; does NOT trust the YAML
+  status field.
+
+  NO file mutations to story YAMLs this slice (Phase 4 is read-only AUDIT
+  only; Phase 5 = cwfp-s5-3a..s5-3s applies the mutations).
+
+  W3.2 w3-2-autopilots-yaml special case: candidate verdict = park
+  (architect-v2 Q5 descope ruling).
+
+acceptance_criteria:
+  - "Given the audit doc at .pHive/epics/cc-workflows-first-party/docs/disposition-pass-msd.md, when reviewed, then it has per-story candidate (keep-as-second-party / park / supersede) for all 19 stories"
+  - "Given the trust-git+disk method, when each candidate is recorded, then the rationale cites git evidence (commit SHA / PR ref / file state) — not YAML status"
+  - "Given W3.2, when the audit records it, then the candidate verdict is park with rationale citing architect-v2 Q5 descope ruling"
+  - "Given the read-only constraint, when this story commits, then NO file in .pHive/epics/multica-substrate-deepen/stories/ is modified (Phase 5b mutates; Phase 4 audits only)"
+  - "Given the spot-check, when 3 sample stories per audit are cross-checked against actual git state + PR refs, then candidate verdict matches reality"
+
+steps:
+  - id: research
+    description: |
+      Read all 19 story YAML files in .pHive/epics/multica-substrate-deepen/stories/.
+      Read git log + git blame for each story's referenced files.
+      Read gh pr view for PR #230, PR #231, and any post-#230/231 merges
+      affecting multica-substrate-deepen.
+      Cross-reference each story's tracker_id where present.
+    agent: researcher
+  - id: implement
+    description: |
+      Author .pHive/epics/cc-workflows-first-party/docs/disposition-pass-msd.md
+      with the per-story candidate verdict + rationale + git evidence cite.
+      Audit-method header line: "git+disk over YAML status (per feedback_story_status_stale)".
+      W3.2 verdict = park; rationale: "Q5 autopilot descope per architect-v2 gate-1 ruling".
+    agent: technical-writer
+    depends_on: [research]
+  - id: review
+    description: |
+      Spot-check 3 sample stories per epic against actual git state + PR refs:
+      verdict matches reality. W3.2 = park (verified explicitly). Audit-method
+      line present. Reviewer confirms zero file mutations to story YAMLs.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Commit "[cwfp-s4-1] docs(disposition): audit candidates for multica-substrate-deepen (19 stories, read-only)"'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/epics/multica-substrate-deepen/stories/
+      purpose: 19 story YAMLs under audit
+    - path: .pHive/epics/multica-substrate-deepen/epic.yaml
+      purpose: Epic-level context for the 19 stories
+
+files_to_modify:
+  - file: .pHive/epics/cc-workflows-first-party/docs/disposition-pass-msd.md
+    change: CREATE the audit doc with per-story candidate dispositions + rationale + git evidence
+
+design_decisions:
+  - decision: Trust git+disk, not YAML status
+    rationale: 'Memory feedback_story_status_stale — YAML status: pending lies for shipped work; the audit''s value depends on bypassing the lie'
+  - decision: Audit is read-only; no story YAML mutations
+    rationale: TPM Phase 5 split — 5a (this story) audits; 5b (cwfp-s5-3a..s5-3s) applies; separation makes audit reviewable as a unit before mutations land
+  - decision: W3.2 verdict = park
+    rationale: Architect-v2 Q5 descope at gate 1 — autopilot work not in this epic; story is not yet shipped and no longer load-bearing for this epic's scope
+
+cross_cutting:
+  - concern: documentation
+    action: disposition-pass-msd.md IS the deliverable; Phase 5 (cwfp-s5-3a..s5-3s) story YAML mutations cite this doc as the source candidate
+
+risks:
+  - severity: low
+    description: Misclassifying a shipped story as pending or vice versa
+    mitigation: Trust-git+disk method + reviewer spot-check 3 samples
+  - severity: low
+    description: PR refs change between audit and apply (e.g. PR #235+ merges arrive mid-audit)
+    mitigation: Audit doc records a "audit-date" line at the top; Phase 5 entry runs a "drift check" precondition (per V plan §6 moldability cross-epic-ripples)
+
+references:
+  - path: .pHive/epics/cc-workflows-first-party/docs/structured-outline.md
+    relevant_excerpt: |
+      Part 2 Phase 4 — disposition-pass-msd.md (NEW). For each of 19 stories: candidate verdict (keep-as-second-party / park / supersede) + rationale + git+disk evidence. W3.2 w3-2-autopilots-yaml candidate: park (architect-v2 Q5 descope).
+  - path: .pHive/cycle-state/cc-workflows-first-party.yaml
+    relevant_excerpt: |
+      gate_decisions.open_questions.Q5: DESCOPED — autopilot work removed from this epic scope.
+
+metric:
+  applies: false
+  justification: Read-only audit doc; the metric-bearing surface is cycle-state per-epic-override (cwfp-s5-1) and the routing behavior (cwfp-s2-2 resolver) which together let `auto` heuristic honor the dispositions. This doc supplies evidence; the routing measures the outcome.

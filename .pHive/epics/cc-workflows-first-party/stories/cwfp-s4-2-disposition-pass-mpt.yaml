@@ -1,0 +1,111 @@
+id: cwfp-s4-2-disposition-pass-mpt
+epic: cc-workflows-first-party
+title: Disposition AUDIT — multica-plan-test-cycles 11 stories
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [cwfp-s1-1-phase0-capability-spike]
+parallel_allowed: true
+parallel_rationale: read-only
+
+description: |
+  Read-only audit of each of the 11 stories in
+  .pHive/epics/multica-plan-test-cycles/stories/ (mpt-1..mpt-11). For each,
+  write a candidate disposition (keep-as-second-party / park / supersede) +
+  rationale + git+disk evidence.
+
+  All 11 mpt stories shipped via PR #234 (merged 2026-05-28). Default
+  candidate verdict per Q3 (maintainer-confirmed at gate 1):
+  keep-as-second-party for first release — Multica still routes /plan +
+  /test --simulated-manual when user opts in. Per-story drill-down can
+  override the default if evidence supports it; deviation rationale
+  required.
+
+  Method same as cwfp-s4-1: trust git+disk over YAML status; NO file
+  mutations to story YAMLs this slice.
+
+acceptance_criteria:
+  - "Given the audit doc at .pHive/epics/cc-workflows-first-party/docs/disposition-pass-mpt.md, when reviewed, then it has per-story candidate (keep-as-second-party / park / supersede) for all 11 stories mpt-1..mpt-11"
+  - "Given the Q3 default (keep-as-second-party), when each candidate is recorded, then any deviation from the default carries an explicit rationale citing evidence"
+  - "Given the read-only constraint, when this story commits, then NO file in .pHive/epics/multica-plan-test-cycles/stories/ is modified"
+  - "Given the spot-check, when 3 sample stories are cross-checked against actual git state (PR #234), then candidate verdict matches reality"
+  - "Given mpt-10 wire-test-simulated-manual specifically (the simulated-manual route ownership), when its candidate is recorded, then the verdict expresses how the Phase 5 per-epic-override entry will route /test --simulated-manual through Multica per Q3"
+
+steps:
+  - id: research
+    description: |
+      Read all 11 mpt story YAMLs. Read PR #234 (gh pr view 234) for the
+      shipped state. Cross-reference each story's tracker_id where present.
+      Pay particular attention to mpt-10 (wire-test-simulated-manual) and
+      mpt-8 (wire-plan-phase0) — these are the load-bearing /test + /plan
+      routing carriers.
+    agent: researcher
+  - id: implement
+    description: |
+      Author .pHive/epics/cc-workflows-first-party/docs/disposition-pass-mpt.md
+      with per-story candidate + rationale + git evidence. Default verdict:
+      keep-as-second-party. Audit-method header line: "git+disk over YAML
+      status (per feedback_story_status_stale); Q3 default keep-as-second-party
+      for first release".
+    agent: technical-writer
+    depends_on: [research]
+  - id: review
+    description: |
+      Spot-check 3 sample stories per epic against actual git state + PR #234.
+      Verify mpt-10's verdict expresses how Phase 5 routes /test --simulated-
+      manual through Multica. Reviewer confirms zero file mutations.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Commit "[cwfp-s4-2] docs(disposition): audit candidates for multica-plan-test-cycles (11 stories, read-only)"'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/epics/multica-plan-test-cycles/stories/
+      purpose: 11 mpt story YAMLs under audit
+    - path: .pHive/epics/multica-plan-test-cycles/epic.yaml
+      purpose: Epic-level context
+    - path: .pHive/epics/multica-plan-test-cycles/stories/mpt-10-wire-test-simulated-manual.yaml
+      purpose: Specifically load-bearing — /test --simulated-manual routing carrier
+    - path: .pHive/epics/multica-plan-test-cycles/stories/mpt-8-wire-plan-phase0.yaml
+      purpose: Load-bearing — /plan Phase 0 routing carrier
+
+files_to_modify:
+  - file: .pHive/epics/cc-workflows-first-party/docs/disposition-pass-mpt.md
+    change: CREATE the audit doc with per-story candidate dispositions + rationale + git evidence
+
+design_decisions:
+  - decision: Default verdict is keep-as-second-party
+    rationale: Q3 maintainer-confirmed at gate 1; Multica still routes /plan + /test --simulated-manual when user opts in; per-story deviation requires explicit rationale
+  - decision: Audit-method line cites Q3 default
+    rationale: Reviewer + downstream Phase 5 reader can scan and understand the audit's baseline assumption without re-reading gate_decisions
+
+cross_cutting:
+  - concern: documentation
+    action: disposition-pass-mpt.md IS the deliverable; cwfp-s5-4a..s5-4k cite this doc as source
+  - concern: simulated-manual
+    action: mpt-10's audit verdict expresses /test --simulated-manual routing under Phase 5 per-epic-override; this story documents the audit decision but does NOT itself create a test-scenario YAML (Phase 5 + the runtime do)
+
+risks:
+  - severity: low
+    description: PR #234 merged mid-development of this epic; post-merge fixes (post-#234 commits) may shift per-story state
+    mitigation: Trust-git+disk method captures actual state at audit time; audit-date line at top of doc
+  - severity: low
+    description: Q3 default obscures per-story nuance — e.g. one mpt story is genuinely superseded by first-party path
+    mitigation: Per-story deviation rationale required; spot-check 3 samples ensures defaults aren't applied blindly
+
+references:
+  - path: .pHive/cycle-state/cc-workflows-first-party.yaml
+    relevant_excerpt: |
+      gate_decisions.open_questions.Q3: agree keep-as-second-party first release.
+      gate_decisions.open_questions.Q4: agree auto + per-epic disposition overrides heuristic.
+  - path: .pHive/epics/cc-workflows-first-party/docs/structured-outline.md
+    relevant_excerpt: |
+      Part 2 Phase 4 — disposition-pass-mpt.md (NEW). For each of 11 stories: candidate verdict + rationale + git+disk evidence. All 11 currently shipped via PR #234 (merged 2026-05-28). Default candidate verdict per Q3: keep-as-second-party for first release.
+
+metric:
+  applies: false
+  justification: Read-only audit doc; companion to cwfp-s4-1 covering the sibling epic. Metric surface is the cycle-state per-epic-override entry (cwfp-s5-2) + resolver routing.

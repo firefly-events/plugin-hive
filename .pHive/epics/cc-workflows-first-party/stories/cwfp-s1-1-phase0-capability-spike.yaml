@@ -1,0 +1,152 @@
+id: cwfp-s1-1-phase0-capability-spike
+epic: cc-workflows-first-party
+title: Phase 0 — /workflows capability spike with maintainer gate
+status: pending
+complexity: high
+methodology: classic
+depends_on: []
+
+description: |
+  Run CC `/workflows` end-to-end against one real hive epic (≤5 stories;
+  synthetic only if no real epic fits the bound per gate_3_decisions.D6) with
+  at least one Codex-routed creator persona in the team (architect+TPM
+  requirement — without this the spike-pass is hollow). Produce
+  `spike-findings.md` with explicit PASS/FAIL verdicts for criteria (a)-(d).
+
+  Spike-pass criteria (architect-tightened):
+    (a) integration-branch contract honored — /workflows either accepts
+        injected shell-snippet prompts OR is structurally compatible via
+        CC-native worktree primitives respecting shared-branch
+        single-commit-per-story discipline
+    (b) Codex creators return file lists AND the adapter commits serially
+        against integration branch (UNIFIED architect Q3+Q4 mechanism —
+        eliminates parallel-Codex race + sandbox commit-block in one move)
+    (c) completion signal + failure modes are recoverable
+    (d) plugin-shipped skill auto-load verified for plugin-hive under
+        CLI-interactive 2.1.157 — auto-load works for marketplace-installed
+        plugins OR a documented workaround exists
+
+  Per gate_3_decisions.D2 COMPROMISE: spike-findings template forces
+  per-story evidence breakdown for criteria (a) and (b) only. Criteria (c)
+  and (d) use per-criterion summary (no per-story breakdown).
+
+  No production code lands this slice — only the spike-findings artifact +
+  cycle-state spike_outcome block. Maintainer-gated at end; Slices 2-6 carry
+  `blockedBy: cwfp-s1-1-phase0-capability-spike`.
+
+acceptance_criteria:
+  - "Given /workflows exists locally at CC 2.1.154+, when the spike runs against one ≤5-story epic with ≥1 Codex-routed creator, then spike-findings.md exists at .pHive/epics/cc-workflows-first-party/docs/spike-findings.md with explicit PASS/FAIL verdicts for criteria (a)-(d)"
+  - "Given the maintainer-confirmed D2 COMPROMISE, when criteria (a) and (b) are recorded, then each carries a per-story evidence breakdown (1 row per story in the test epic); criteria (c) and (d) carry per-criterion summary only"
+  - "Given the spike completes, when the team-lead writes the cycle-state, then .pHive/cycle-state/cc-workflows-first-party.yaml gains a spike_outcome block mirroring the verdicts + Plan B branch selections (Q2 path + Layer-5 auto-load PASS/FAIL)"
+  - "Given the spike-findings doc is complete, when the maintainer reviews, then the gate signature is recorded in cycle-state; Slices 2-6 unblock"
+  - "Given the spike's test epic, when the team is composed, then ≥1 Codex-routed creator persona is present (per architect+TPM unified C1/C2 mitigation)"
+
+steps:
+  - id: research
+    description: |
+      Identify the test epic. Prefer a real existing tiny epic (≤5 stories)
+      per gate_3_decisions.D6; if none fits the bound, scaffold a synthetic
+      one. Confirm CC 2.1.154+ locally. Determine persona team composition
+      including at least one Codex-routed creator (researcher,
+      developer/backend-developer/frontend-developer, technical-writer, or
+      architect per hive.config.yaml agent_backends map).
+    agent: researcher
+  - id: implement
+    description: |
+      (a) Author spike-findings.md template at
+      .pHive/epics/cc-workflows-first-party/docs/spike-findings.md with the
+      D2-compromise structure: per-story evidence rows under criteria (a)+(b);
+      per-criterion summary under (c)+(d).
+      (b) Run /workflows against the test epic; capture observed behavior for
+      each criterion as evidence cites.
+      (c) Fill verdicts in the doc.
+      (d) Update .pHive/cycle-state/cc-workflows-first-party.yaml with a
+      spike_outcome block + Plan B branch selections.
+    agent: developer
+    depends_on: [research]
+  - id: review
+    description: |
+      Reviewer cross-checks: each verdict has evidence; per-story breakdown
+      present for (a)+(b); Codex-routed creator confirmed in team; cycle-state
+      spike_outcome block is well-formed and gate_decisions preserved.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Commit on feat/cc-workflows-first-party with message
+      "[cwfp-s1-1] feat(cc-workflows): Phase 0 capability spike verdicts (a)-(d) + cycle-state spike_outcome".
+      Then surface the gate to the maintainer; sign only on maintainer review.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: /Users/don/Documents/plugin-hive/.claude/worktrees/multica-substrate-deepen/.pHive/epics/cc-workflows-first-party/docs/structured-outline.md
+      purpose: Part 2 Phase 1 details + Part 7 Failure 1 (hollow PASS risk) drives the D2 per-story evidence forcing
+    - path: /Users/don/Documents/plugin-hive/.claude/worktrees/multica-substrate-deepen/.pHive/epics/cc-workflows-first-party/docs/research-brief.md
+      purpose: §6 Open Questions Q1-Q9 — Phase 0 must answer the seven that map to criteria (a)-(d)
+    - path: /Users/don/Documents/plugin-hive/.claude/worktrees/multica-substrate-deepen/.pHive/cycle-state/cc-workflows-first-party.yaml
+      purpose: gate_decisions Q1-Q9 + gate_3_decisions D1-D6 (D2 + D6 are spike-relevant)
+    - path: /Users/don/Documents/plugin-hive/hive.config.yaml
+      purpose: agent_backends map identifies Codex-routed personas for test team composition
+
+files_to_modify:
+  - file: .pHive/epics/cc-workflows-first-party/docs/spike-findings.md
+    change: CREATE the artifact with per-criterion verdicts; per-story evidence rows for (a)+(b); per-criterion summary for (c)+(d)
+  - file: .pHive/cycle-state/cc-workflows-first-party.yaml
+    change: APPEND spike_outcome block mirroring verdicts + Plan B branch selections; preserve gate_decisions + gate_3_decisions + escalations blocks
+
+design_decisions:
+  - decision: D2 compromise forces per-story evidence for (a) and (b) only
+    rationale: Architect+TPM unified C1/C2 mitigation requires per-story granularity on integration-branch + serial-commit behavior; (c) and (d) are binary/runtime-level outcomes that don't decompose per-story
+  - decision: Codex-routed creator is a structural test requirement, not a stretch goal
+    rationale: feedback_codex_parallel_race + feedback_codex_sandbox_commit_block are the load-bearing constraints the spike must validate
+  - decision: Prefer real existing tiny epic; synthetic acceptable
+    rationale: gate_3_decisions.D6 — evidence quality is higher with a real epic but synthetic is acceptable if no ≤5-story fit exists
+
+cross_cutting:
+  - concern: documentation
+    action: spike-findings.md IS this story's deliverable; reference from epic README during Phase 6 (Slice 6)
+  - concern: simulated-manual
+    action: The /workflows invocation is itself a manual run with structured verdict capture; spike-findings.md serves as the verdict carrier (no separate test-scenario YAML needed — the spike-findings doc IS the simulated-manual replay record)
+
+risks:
+  - severity: high
+    description: Spike "passes" with caveats not surfaced as verdict downgrades (hollow PASS)
+    mitigation: D2 forced per-story evidence template for (a)+(b); reviewer cross-checks per-story rows; maintainer-gated review
+  - severity: high
+    description: Spike reveals criterion (b) FAIL — Codex creators cannot return file lists under /workflows fan-out
+    mitigation: Plan B path documented in cycle-state spike_outcome; potential pivot to rescope-memo Option C per Q7 fallback (Slices 2-5 reshape)
+  - severity: medium
+    description: No existing tiny epic fits the ≤5-story bound, forcing synthetic spike substrate
+    mitigation: gate_3_decisions.D6 explicitly permits synthetic; evidence quality penalty is acknowledged + accepted
+  - severity: low
+    description: CC 2.1.157 .claude/skills/ auto-load (criterion d) cannot be tested separately from the spike's other criteria
+    mitigation: Criterion (d) verdict acceptable as standalone runtime check (fresh CC session with plugin-hive installed; observe skill availability)
+
+references:
+  - path: .pHive/epics/cc-workflows-first-party/docs/research-brief.md
+    relevant_excerpt: |
+      §5.1 HIGH — /workflows public spec is one CHANGELOG sentence. Anthropic CC CHANGELOG 2.1.154 is the entirety of the published spec. Context7 query for /workflows orchestration/fan-out/step-mapping returns ZERO content. Implication: treat first-party path as research-spike-required.
+  - path: .pHive/epics/cc-workflows-first-party/docs/design-discussion.md
+    relevant_excerpt: |
+      §3 Phase 0 — Bounded /workflows capability spike (NON-NEGOTIABLE, OWN STORY-SET, MAINTAINER-GATED). The spike runs one real hive epic (small, ≤5 stories) end-to-end via CC /workflows, with at least one Codex-routed creator persona in the team (per TPM + architect-v2).
+  - path: .pHive/cycle-state/cc-workflows-first-party.yaml
+    relevant_excerpt: |
+      gate_3_decisions.D2: COMPROMISE — forced per-story evidence breakdown for criteria (a) and (b) only.
+      gate_3_decisions.D6: AFFIRM — Phase 0 spike prefers real existing tiny epic; synthetic acceptable.
+
+metric:
+  applies: true
+  name: cc_workflows_phase0_spike_criteria_pass_count
+  direction: up
+  unit: count
+  baseline: 0
+  target: 4
+  window: phase-0-spike-close
+  source:
+    kind: manual
+    ref: .pHive/epics/cc-workflows-first-party/docs/spike-findings.md
+  verify_at: integrate step of cwfp-s1-1-phase0-capability-spike
+  owner: cc-workflows-first-party

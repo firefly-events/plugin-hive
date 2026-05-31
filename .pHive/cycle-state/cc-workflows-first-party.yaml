@@ -50,3 +50,26 @@ gate_decisions:
     Q8: agree orthogonal — keep both execution.runtime + execution.substrate keys
     Q9: agree (i) "Hive composes ON Claude Code" durable in CONTEXT.md before Phase C
   goal_or_risk_corrections: none
+
+# Maintainer responses at user gate 3 (Phase B3 step 10) — 2026-05-31
+gate_3_decisions:
+  outline_signoff: approved
+  elicitation:
+    failure_2_clarification: |
+      Commit invariant refined: "at least one commit per story, and any subsequent
+      fixes before that story is finalized are additional commits." Confirms
+      architect's variable-length commit-sequence-per-story invariant. Phase 2
+      Step 3 serial-commit gate accepts ≥1 commit/story.
+  part_8_decisions:
+    D1: B — copy-with-attribution this epic; refactor as follow-on `chore/integration-branch-contract-shared`
+    D2: COMPROMISE — forced per-story evidence breakdown for criteria (a) and (b) only
+    D3: A — ship Phase 6 vocab-grep as designed (flag don't fix); follow-on `chore/vocab-disambiguation` if grep flags drift
+    D4: |
+      CONDITIONAL PARALLEL: serial-commit gate applies WHEN story touch-sets overlap.
+      Bounded-slice stories with disjoint file_to_modify slices MAY commit in parallel.
+      Phase C decomp MUST emit parallel_allowed: true + parallel_rationale: bounded-slice
+      + non-empty files_to_modify for stories that qualify. Per /plan skill step 13
+      parallel-dispatch flag emission rules. Architect Q3+Q4 unified serial-commit gate
+      remains the FALLBACK invariant for overlapping touch-sets and the safe default.
+    D5: AFFIRM — Phase 5 additive-only updates to project_multica_substrate_adoption.md + project_multica_plan_test_cycles.md
+    D6: AFFIRM — Phase 0 spike prefers real existing tiny epic; synthetic acceptable if no ≤5-story fit

@@ -1,0 +1,76 @@
+id: cwfp-s5-3r-disp-w4-4-ci-drift-guard
+epic: cc-workflows-first-party
+title: 'Disposition APPLY (msd): w4-4-ci-drift-guard'
+status: pending
+complexity: low
+methodology: classic
+depends_on:
+  - cwfp-s4-1-disposition-pass-msd
+  - cwfp-s5-1-cycle-state-msd
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Apply disposition verdict for multica-substrate-deepen story `w4-4-ci-drift-guard`
+  ("CI drift guard - fail build on in-repo vs Multica skill divergence") per cwfp-s4-1 audit. Adds three additive fields to the
+  target story YAML:
+    disposition: keep-as-second-party
+    disposition_rationale: |
+      <one-line from audit>
+    disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd
+
+  Read-then-Edit; preserve all existing fields. Per cwfp-s4-1 audit
+  recommendation (review the disposition-pass-msd.md row for w4-4-ci-drift-guard
+  before edit; deviate from default only with rationale).
+
+acceptance_criteria:
+  - "Given .pHive/epics/multica-substrate-deepen/stories/w4-4-ci-drift-guard.yaml after this story commits, when read, then it carries disposition: keep-as-second-party + disposition_rationale + disposition_source_slice (additive fields)"
+  - "Given the prior YAML content, when this story commits, then prior fields (id, epic, title, status, methodology, depends_on, description, acceptance_criteria, steps, etc.) are preserved verbatim"
+  - "Given cwfp-s4-1's audit row for w4-4-ci-drift-guard, when the disposition verdict is applied, then it matches the audit's candidate (or deviates with explicit rationale)"
+
+steps:
+  - id: implement
+    description: |
+      Read .pHive/epics/multica-substrate-deepen/stories/w4-4-ci-drift-guard.yaml in full.
+      Read cwfp-s4-1's disposition-pass-msd.md row for w4-4-ci-drift-guard.
+      Append the three additive fields preserving all existing content.
+    agent: developer
+  - id: review
+    description: Reviewer diffs against pre-edit state; confirms additive-only; confirms verdict matches audit
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Commit "[cwfp-s5-3r] docs(disposition): apply keep-as-second-party to w4-4-ci-drift-guard"'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/epics/multica-substrate-deepen/stories/w4-4-ci-drift-guard.yaml
+      purpose: Target story YAML — single file modified
+    - path: .pHive/epics/cc-workflows-first-party/docs/disposition-pass-msd.md
+      purpose: Audit source for the verdict
+
+files_to_modify:
+  - file: .pHive/epics/multica-substrate-deepen/stories/w4-4-ci-drift-guard.yaml
+    change: 'APPEND disposition: keep-as-second-party + disposition_rationale + disposition_source_slice (additive only)'
+
+cross_cutting:
+  - concern: documentation
+    action: Story YAML modification is doc; downstream readers (cwfp-s5-5 project memo update, future maintainer audit) consume this disposition field
+
+risks:
+  - severity: low
+    description: Audit candidate changed between cwfp-s4-1 commit and this story's implement
+    mitigation: Read the audit doc just before edit; if mismatch, surface to team-lead before applying
+
+references:
+  - path: .pHive/cycle-state/cc-workflows-first-party.yaml
+    relevant_excerpt: |
+      gate_decisions.open_questions.Q3: agree keep-as-second-party first release.
+      gate_decisions.open_questions.Q5: DESCOPED — autopilot work removed from this epic scope.
+
+metric:
+  applies: false
+  justification: Disposition mutation to a single story YAML; the routing outcome is observable via cwfp-s5-1 cycle-state read by cwfp-s2-2 resolver, measured at the epic-level mpt_routing_preserved metric (cwfp-s5-2)
