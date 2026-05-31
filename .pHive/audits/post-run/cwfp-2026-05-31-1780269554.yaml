@@ -21,3 +21,18 @@ team_members:
   - technical-writer (claude direct)
   - tpm (claude direct)
   - architect-v2 (claude direct, respawn after architect-v1 bypass)
+
+insight_capture_outcome: |
+  4 of 4 teammates (researcher, technical-writer, tpm, architect-v2) idled
+  without producing the requested 3-bullet insight responses, despite explicit
+  prompts. Same silent-idle pattern as architect-v1 earlier in the cycle.
+  Plausible causes: persona-not-tuned-for-self-reflection at end-of-cycle,
+  session-state limitation, or prompt structure (open-ended introspection
+  underperforms compared to structured review tasks). Noted as a process
+  gap to investigate; for future runs consider:
+  - Structured insight format with leading examples (lower cognitive load)
+  - OR capture insights immediately after each phase (not end-of-cycle)
+  - OR drop the insight-capture step for plan-only runs since the cycle
+    artifacts (research-brief, design-discussion, grill-record, H/V,
+    structured-outline, story YAMLs) already encode learning.
+  Shutdown proceeded gracefully despite the gap.
