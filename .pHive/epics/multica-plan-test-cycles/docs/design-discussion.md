@@ -56,8 +56,8 @@ both skills paralleling `mode_decision`: a planning-side resolver that, on a
 multica override, routes Step 0.3's spawn to a third path (`TeamCreate` | codex |
 **multica**), handing the assembled personas to `planning-team-squad`; and a
 test-side resolver that hands the scenario to a Multica `tester` / `verify-team-squad`.
-Each gets its own `*-mode-multica` atomic skill that reuses `multica-story-dispatch`
-+ `episode-sync`, writing episode markers under the same
+Each gets its own `*-mode-multica` atomic skill that reuses
+`multica-story-dispatch` + `episode-sync`, writing episode markers under the same
 `${HIVE_STATE_DIR}/episodes/...` tree. Maximal symmetry with `/execute`; maximal new
 surface (two new mode skills, a new spawn path with fallback wiring, a generalized
 dispatch atom).
