@@ -1,0 +1,78 @@
+id: w1-2-agents-yaml-expansion
+epic: multica-substrate-deepen
+title: Expand .pHive/multica/agents.yaml to dispatchable persona subset with codex routing
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- w1-1-persona-dispatchability-doc
+- w0-1-codex-spike
+description: "Expand .pHive/multica/agents.yaml from 3 personas (developer/tester/reviewer)\nto the dispatchable subset (~20 personas per W1.1).\n\nApply 2026-05-01 codex-routing policy gated on W0.1 result:\n- If W0.1 verdict = supported: creators (developer, backend-developer,\n  frontend-developer, researcher, architect, technical-writer) get\n  `provider: codex` (or whatever the actual codex-runtime registration\n  shape is per W0.1 finding).\n- If W0.1 verdict = not_supported: all creators stay `provider: claude`;\n  codexInstruction rescue dance remains via W1.4 conditional.\n- If W0.1 verdict = supported_with_caveats: user checkpoint before\n  proceeding; document caveats inline.\n\nVerifiers (reviewer, peer-validator, tester, tpm) get\n`provider: claude` + `model: claude-opus-4-7`.\n\nRemaining specialists default to `provider: claude` + `model: claude-sonnet-4-6`.\n"
+acceptance_criteria:
+- agents.yaml lists exactly the dispatchable subset from W1.1 (no orchestrator, no team-lead, no pair-programmer)
+- Creator personas route to codex provider IFF W0.1 = supported, else claude
+- Verifier personas route to claude-opus-4-7
+- All entries have persona_ref pointing to hive/agents/<name>.md
+- Schema version stays 1 (matches hive/references/multica-agents-schema.md)
+- Multica bootstrap (multica-init) succeeds against new agents.yaml in spike workspace
+- After bootstrap, `multica agent list --output json` returns all dispatchable personas
+steps:
+- id: research
+  description: Read W0.1 finding + W1.1 classification + multica-agents-schema reference
+  agent: researcher
+- id: implement
+  description: Edit agents.yaml; add all dispatchable personas with correct routing
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Run /hive:multica-init against spike; verify all personas exist
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Reviewer checks routing policy compliance + schema validity
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit on feat/multica-substrate-deepen
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: .pHive/multica/agents.yaml
+    purpose: File to expand
+  - path: hive/references/multica-agents-schema.md
+    purpose: Schema contract
+  - path: hive/agents/
+    purpose: Persona ref targets
+code_examples:
+- title: Current agents.yaml structure
+  file: .pHive/multica/agents.yaml
+  snippet: "schema_version: 1\nagents:\n  - name: developer\n    provider: claude\n    model: claude-sonnet-4-6\n    max_concurrent_tasks: 1\n    persona_ref: hive/agents/developer.md\n    custom_env: {}\n    custom_args: []\n    mcp_config: null\n    skills: []\n    visibility: workspace\n"
+cross_cutting:
+- concern: documentation
+  action: Update GUIDE.md Multica section to reference new persona inventory
+- concern: versioning
+  action: "Conditional \u2014 maintainer-only file; no version bump unless multica-init is consumer-invoked"
+risks:
+- severity: medium
+  description: Provider value rejected by Multica runtime
+  mitigation: W0.1 spike pre-empts this; if discovered post-W0.1, downgrade to claude per fallback rule
+metric:
+  applies: true
+  name: multica.dispatchable_personas_bootstrapped
+  direction: up
+  unit: count
+  baseline: 3
+  target: 18
+  window: post-story-integrate
+  source:
+    kind: manual
+    ref: multica agent list --output json | jq length
+  verify_at: integrate
+  owner: tester
+tracker_id: plugin-hive/PLU-138

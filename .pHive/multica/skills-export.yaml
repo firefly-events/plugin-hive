@@ -1,0 +1,34 @@
+schema_version: 1
+exports:
+  - skill_ref: skills/metrics-check/SKILL.md
+    multica_name: metrics-check
+    substrate_deps:
+      - hive/references/skill-prelude.md
+      - hive/references/story-yaml-schema.md
+      - hive/references/cross-cutting-concerns.md
+    visibility: private
+  # Technical-writer doc-type format skills (self-contained; no substrate deps).
+  - skill_ref: skills/hive/skills/story-writing/SKILL.md
+    multica_name: story-writing
+    substrate_deps: []
+    visibility: private
+  - skill_ref: skills/hive/skills/architecture-doc/SKILL.md
+    multica_name: architecture-doc
+    substrate_deps: []
+    visibility: private
+  - skill_ref: skills/hive/skills/readme/SKILL.md
+    multica_name: readme
+    substrate_deps: []
+    visibility: private
+  - skill_ref: skills/hive/skills/adr/SKILL.md
+    multica_name: adr
+    substrate_deps: []
+    visibility: private
+  - skill_ref: skills/hive/skills/research-brief/SKILL.md
+    multica_name: research-brief
+    substrate_deps: []
+    visibility: private
+  - skill_ref: skills/hive/skills/runbook/SKILL.md
+    multica_name: runbook
+    substrate_deps: []
+    visibility: private

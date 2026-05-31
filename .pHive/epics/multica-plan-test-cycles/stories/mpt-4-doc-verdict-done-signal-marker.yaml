@@ -1,0 +1,74 @@
+id: mpt-4-doc-verdict-done-signal-marker
+epic: multica-plan-test-cycles
+title: Define the doc/verdict done-signal episode marker (no code-push SHA)
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- mpt-2-scenario-schema-reconcile
+description: S3b. A Multica plan/test task produces docs/verdicts, not a code-push SHA, so the execute
+  path's SHA-in-final-comment completion contract does not apply. Extend episode-sync.mjs (multica-run.yaml
+  marker) so a doc/verdict task reaches terminal on artifacts-committed + episode-terminal status. Document
+  ONE marker dialect that both plan-mode-multica and test-mode-multica reuse (avoid two marker dialects).
+acceptance_criteria:
+- Given a doc/verdict Multica task, when it completes, then writeMulticaRunEpisode records a terminal
+  marker without requiring a code-push SHA.
+- Given the marker shape, when documented, then plan-mode-multica and test-mode-multica reference one
+  shared dialect (single source).
+steps:
+- id: research
+  description: Explore the codebase for relevant patterns, files, and constraints.
+  agent: researcher
+- id: implement
+  description: Implement the story per spec and research findings.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Write/verify tests covering acceptance criteria.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Review implementation and tests for correctness and convention compliance.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit and push to the feature branch (fresh-checkout/rebase-push per integration principle).
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/lib/multica-story-dispatch/episode-sync.mjs
+    purpose: writeMulticaRunEpisode + pollTaskUntilTerminal.
+files_to_modify:
+- file: hive/lib/multica-story-dispatch/episode-sync.mjs
+  change: Add doc/verdict terminal derivation to writeMulticaRunEpisode.
+- file: hive/references/episode-schema.md
+  change: Document the doc/verdict marker dialect.
+references:
+- path: .pHive/epics/multica-plan-test-cycles/docs/structured-outline.md
+  relevant_excerpt: Phase-to-slice mapping, file manifest, risk registry.
+- path: .pHive/epics/multica-plan-test-cycles/docs/design-discussion.md
+  relevant_excerpt: §9 locked gate decisions (full-mirror seam, squad-spike-first, plan->execute->test
+    framing).
+- path: .pHive/epics/multica-plan-test-cycles/docs/vertical-plan.md
+  relevant_excerpt: 6-slice spine S1..S6 with depends_on + working states.
+risks:
+- severity: high
+  description: 'Done-signal gap: without a defined marker the poller has no trustworthy terminal for non-SHA
+    work.'
+  mitigation: Define + document the marker before any plan/test dispatch (mpt-6/mpt-9) consumes it.
+cross_cutting:
+- concern: documentation
+  action: Document the doc/verdict marker dialect in episode-schema.md.
+metric:
+  applies: false
+  justification: Defines a marker schema; the gate itself (a shared terminal-derivation contract) is what
+    ships, so it is un-falsifiable substrate per the metrics concern.
+tracker_id: plugin-hive/PLU-157
+tracker_uuid: 3df417c7-d8bf-4d47-acb5-c32c838df5bf
+tracker_url: http://localhost:3000/issue/PLU-157

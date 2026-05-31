@@ -88,6 +88,37 @@ tooling to look up the live issue without scanning the full cycle state. Run
 every marker satisfies this requirement; the script exits 1 and prints the
 offending paths if any field is missing or empty.
 
+## Multica doc/verdict completion dialect
+
+`multica-run.yaml` is the single marker dialect for Multica work. Execute, plan-mode,
+and test-mode must all reuse this marker rather than invent phase-specific marker
+files. For source-code execution tasks, completion may still require a code-push SHA.
+For doc/verdict tasks, including plan documents and simulated-manual test verdicts,
+the terminal predicate is:
+
+```
+artifacts_committed == true && episode_terminal == true
+```
+
+Doc/verdict tasks do not require a code-push SHA. Writers set the following scalar
+fields on the same `multica-run.yaml` marker:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `completion_kind` | enum | yes | `doc-verdict` for plan/test doc or verdict tasks; `code-push` for source-code execution tasks. |
+| `artifacts_committed` | boolean | yes | `true` only after the task's docs/verdict artifacts have been committed to the shared branch. |
+| `episode_terminal` | boolean | yes | `true` when the underlying Multica task status is terminal (`passed`, `failed`, or `cancelled`). The base marker `status:` enum (`completed` / `failed` / `escalated`) is a separate, derived vocabulary. |
+| `requires_code_push_sha` | boolean | yes | `false` for `doc-verdict`; `true` for `code-push`. |
+| `code_push_sha` | string or null | yes | Commit SHA for code-push tasks; `null` for doc/verdict tasks. |
+| `terminal_by_dialect` | boolean | yes | The derived terminal predicate for the selected completion kind. |
+
+The `artifacts` list remains the manifest of committed outputs and audit sidecars.
+For doc/verdict tasks it must include the committed plan documents or verdict files
+plus `multica-run.messages.jsonl`. Both `plan-mode-multica` and
+`test-mode-multica` must set `completion_kind: doc-verdict` and rely on
+`terminal_by_dialect`, not a final-comment SHA, to decide whether the Multica run is
+complete.
+
 ## Inter-phase context passing
 
 Context between workflow steps is passed **directly via agent prompts**, not stored in marker files. When the orchestrator or team lead runs step N+1, they include relevant output from step N in the task prompt. This is ephemeral — it lives in the conversation, not on disk.

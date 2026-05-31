@@ -1,0 +1,45 @@
+id: w2-1-squad-schema-doc
+epic: multica-substrate-deepen
+title: Author hive/references/multica-squads-schema.md (team-as-squad)
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: variation
+description: "Author the squad schema reference at hive/references/multica-squads-schema.md\nmodeled on multica-agents-schema.md (same shape, same drift contract).\n\nSchema covers:\n- schema_version (semantic)\n- squads list \u2014 each squad has: name, leader (persona reference by name),\n  members (array of persona names), description, visibility\n- validation rules (leader must be in members; members must exist in agents.yaml)\n- resolution rules (leader/member names resolve to agents in\n  .pHive/multica/agents.yaml)\n"
+acceptance_criteria:
+- Doc exists at hive/references/multica-squads-schema.md
+- Structure mirrors hive/references/multica-agents-schema.md (Purpose / Schema reference / Required fields / Optional fields / Validation / Concrete example / Drift contract / Forward link)
+- Concrete example shows all three squads (planning-team-squad, dev-team-squad, verify-team-squad)
+- Architect-reviewed for consistency with agents-schema
+steps:
+- id: implement
+  description: Write schema doc
+  agent: technical-writer
+- id: review
+  description: Architect reviews for cross-schema consistency
+  agent: architect
+  depends_on:
+  - implement
+- id: integrate
+  description: Commit on feat/multica-substrate-deepen
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/references/multica-agents-schema.md
+    purpose: Sibling schema doc to model on
+cross_cutting:
+- concern: documentation
+  action: This story IS the documentation; reference from GUIDE.md Multica section
+risks:
+- severity: low
+  description: Schema doesn't match Multica CLI surface
+  mitigation: W2.2 yaml + W2.3 reconcile drives any schema corrections
+metric:
+  applies: false
+  justification: Schema doc; downstream w2-2 squads.yaml and w2-3 reconcileSquads carry delivery metrics.
+tracker_id: plugin-hive/PLU-134

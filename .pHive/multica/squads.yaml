@@ -1,0 +1,30 @@
+schema_version: "1.0.0"
+squads:
+  - name: planning-team-squad
+    leader: tpm
+    members:
+      - researcher
+      - architect
+      - technical-writer
+      - tpm
+    description: Planning and discovery squad responsible for research, architecture, and documentation.
+    visibility: workspace
+  - name: dev-team-squad
+    leader: reviewer
+    members:
+      - developer
+      - backend-developer
+      - frontend-developer
+      - reviewer
+    description: Development squad covering implementation and code review across the stack.
+    visibility: workspace
+  - name: verify-team-squad
+    leader: peer-validator
+    members:
+      - tester
+      - test-architect
+      - test-scout
+      - peer-validator
+      - security-reviewer
+    description: Verification squad responsible for testing, validation, and security review.
+    visibility: workspace

@@ -1,0 +1,93 @@
+id: w3-3-bootstrap-reconcile-autopilots
+epic: multica-substrate-deepen
+title: Add reconcileAutopilots to multica-bootstrap
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- w3-2-autopilots-yaml
+description: 'Add reconcileAutopilots to hive/lib/multica-bootstrap/ following the same
+
+  list+diff+batched-upsert pattern as reconcileAgents and reconcileSquads.
+
+
+  Reads .pHive/multica/autopilots.yaml; calls `multica autopilot list`;
+
+  diffs; batched upserts via `multica autopilot create/update` and
+
+  `multica autopilot trigger-add/delete/update`.
+
+
+  Captures the server-generated webhook URL on create and writes it back
+
+  into the yaml as a `webhook_url:` field (consumer wires this URL into
+
+  the source repo''s GitHub Actions or equivalent).
+
+
+  Idempotent on re-run. Autopilots removed from yaml are NOT deleted
+
+  (safety; logged as warning).
+
+  '
+acceptance_criteria:
+- reconcileAutopilots exported from multica-bootstrap module
+- "Cold path: empty workspace + 2-autopilot yaml \u2192 2 autopilots created + webhook URLs captured"
+- "Warm path: 1 autopilot exists \u2192 diff applies only delta"
+- "Drift: agent changed \u2192 update without recreating autopilot"
+- "Removed autopilot in yaml \u2192 orphan, logged warning, not deleted"
+- Tests cover all 4 scenarios
+- multica-init invokes reconcileAutopilots after reconcileAgents AND reconcileSquads
+- Captured webhook URLs written back to autopilots.yaml
+steps:
+- id: research
+  description: Read multica autopilot CLI surface + W2.3 reconcileSquads shape
+  agent: researcher
+- id: implement
+  description: Add reconcileAutopilots + wire into multica-init flow
+  agent: backend-developer
+  depends_on:
+  - research
+- id: test
+  description: 4-scenario test coverage including webhook URL capture
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Reviewer validates idempotence + safety + URL persistence
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit on feat/multica-substrate-deepen
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/lib/multica-bootstrap/
+    purpose: Module to extend
+  - path: skills/multica-init/SKILL.md
+    purpose: Bootstrap entrypoint
+cross_cutting:
+- concern: documentation
+  action: Update multica-init SKILL.md + bootstrap README to mention autopilot reconcile + webhook URL persistence
+risks:
+- severity: medium
+  description: "Webhook URL capture fails silently \u2192 consumer never gets URL"
+  mitigation: Explicit assertion + log; failure halts reconcileAutopilots
+metric:
+  applies: true
+  name: multica.autopilots_bootstrapped_with_webhooks
+  direction: up
+  unit: count
+  baseline: 0
+  target: 2
+  window: post-story-integrate
+  source:
+    kind: manual
+    ref: Count autopilots in `multica autopilot list` + verify webhook_url field set in autopilots.yaml
+  verify_at: test
+  owner: tester
+tracker_id: plugin-hive/PLU-146

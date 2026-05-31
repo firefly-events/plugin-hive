@@ -137,15 +137,36 @@ export function __resetCache() {
   AGENT_CACHE.clear();
 }
 
+function resolveCodexInstruction(options) {
+  const { codexInstruction = false, dispatchingPersona, agents, agentBackends } = options;
+  if (dispatchingPersona !== undefined && dispatchingPersona !== null) {
+    const entry = Array.isArray(agents)
+      ? agents.find((a) => a?.name === dispatchingPersona)
+      : null;
+    const effectiveProvider = entry?.provider ?? 'claude';
+    if (effectiveProvider === 'codex') return false;
+    return agentBackends?.[dispatchingPersona] === 'codex';
+  }
+  return codexInstruction;
+}
+
+// Single-quote a git ref for safe interpolation into the rendered shell snippets.
+// Git refs may legally contain shell metacharacters (e.g. `$`, `;`, `(`), so quote
+// once and escape embedded single quotes the POSIX way ('\'').
+function shQuoteRef(ref) {
+  return `'${String(ref).replace(/'/g, "'\\''")}'`;
+}
+
 export function serializeStoryBrief(story, options = {}) {
-  const { codexInstruction = false } = options;
+  const { integrationBranch = null } = options;
+  const showCodexInstruction = resolveCodexInstruction(options);
   const sections = [];
 
   if (story?.description) {
     sections.push(`## Goal\n${cleanText(story.description)}`);
   }
 
-  if (codexInstruction) {
+  if (showCodexInstruction) {
     sections.push(
       `## Use /codex:rescue\nThis story is routed through the Codex backend. For implementation work, invoke the /codex:rescue skill with the story spec from this brief rather than writing code directly. Return changes for the orchestrator to commit.`,
     );
@@ -165,6 +186,38 @@ export function serializeStoryBrief(story, options = {}) {
 
   if (hasItems(story?.references)) {
     sections.push(`## References\n${story.references.map(formatReference).join('\n')}`);
+  }
+
+  if (integrationBranch) {
+    const qBranch = shQuoteRef(integrationBranch);
+    sections.push(
+      [
+        `## Integration Contract — single shared branch`,
+        ``,
+        `Work directly on \`${integrationBranch}\` (the epic branch). Do NOT use the daemon's auto-created \`agent/developer/<task>\` worktree branch as your commit target.`,
+        ``,
+        `**First action (overrides daemon checkout):**`,
+        '```sh',
+        `git fetch origin ${qBranch}`,
+        `git checkout ${qBranch}`,
+        `git reset --hard origin/${qBranch}`,
+        '```',
+        ``,
+        `**After completing all acceptance criteria:**`,
+        '```sh',
+        `git add <specific files for this story>`,
+        `git commit -m "[${story?.id ?? '<story-id>'}] <type>(<scope>): <description>"`,
+        `# fetch + rebase to handle peer dispatches landing concurrently`,
+        `git fetch origin ${qBranch}`,
+        `git rebase origin/${qBranch}`,
+        `git push origin HEAD:${qBranch}`,
+        '```',
+        ``,
+        `**If push rejected (non-fast-forward):** re-run \`git fetch + git rebase + git push\`. Retry up to 3 times. If conflict on rebase, STOP and post the conflict diff as a comment — this means the parallel-dispatch gate let an overlapping story through and orchestrator must adjudicate.`,
+        ``,
+        `**Final comment on this issue MUST include:** commit SHA(s) you pushed.`,
+      ].join('\n'),
+    );
   }
 
   sections.push(
@@ -221,6 +274,88 @@ export async function dispatchStoryToAgent(serverUrl, token, workspaceId, issueU
     token,
     body: { assignee_type: 'agent', assignee_id: agentUuid },
   });
+}
+
+function normalizePersonaDispatches(personaIssues) {
+  if (Array.isArray(personaIssues)) {
+    return personaIssues.map((entry) => ({
+      persona: entry?.persona ?? entry?.agent ?? entry?.name,
+      issueUuid: entry?.issueUuid ?? entry?.issue_uuid ?? entry?.issueId ?? entry?.issue_id,
+    }));
+  }
+
+  return Object.entries(personaIssues ?? {}).map(([persona, issueUuid]) => ({
+    persona,
+    issueUuid,
+  }));
+}
+
+export async function dispatchStoryToPersonas(
+  serverUrl,
+  token,
+  workspaceId,
+  story,
+  personaIssues,
+  options = {},
+) {
+  const {
+    agents = [],
+    agentBackends = options.agent_backends ?? {},
+    integrationBranch = null,
+    moveOutOfBacklog = true,
+  } = options;
+  // Routing-contract rendering must reflect the actual agent the issue is assigned to.
+  // Fall back to the populated AGENT_CACHE when the caller omits options.agents so the
+  // rendered /codex:rescue (or absence thereof) matches the resolved agent's provider.
+  const resolvedAgents =
+    agents.length > 0 ? agents : AGENT_CACHE.get(cacheKey(serverUrl, workspaceId, token)) ?? [];
+  const dispatches = [];
+
+  for (const entry of normalizePersonaDispatches(personaIssues)) {
+    const { persona, issueUuid } = entry;
+    if (!persona) {
+      throw dispatchError('INVALID_PERSONA_DISPATCH', 'persona dispatch is missing persona', undefined, token);
+    }
+    if (!issueUuid) {
+      throw dispatchError(
+        'INVALID_PERSONA_DISPATCH',
+        `persona dispatch for '${persona}' is missing issue UUID`,
+        undefined,
+        token,
+      );
+    }
+
+    const agentUuid = await resolveAgentUuidByName(serverUrl, token, workspaceId, persona);
+    const briefAgents =
+      resolvedAgents.length > 0
+        ? resolvedAgents
+        : AGENT_CACHE.get(cacheKey(serverUrl, workspaceId, token)) ?? [];
+    const brief = serializeStoryBrief(story, {
+      dispatchingPersona: persona,
+      agents: briefAgents,
+      agentBackends,
+      integrationBranch,
+    });
+    const briefResult = await ensureIssueBriefMatches(serverUrl, token, workspaceId, issueUuid, brief);
+    const issue = await dispatchStoryToAgent(serverUrl, token, workspaceId, issueUuid, agentUuid);
+    const backlogResult = moveOutOfBacklog
+      ? await moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, issueUuid)
+      : { was_moved: false };
+
+    dispatches.push({
+      persona,
+      issue_uuid: issueUuid,
+      agent_uuid: agentUuid,
+      was_updated: briefResult.was_updated,
+      was_moved: backlogResult.was_moved,
+      issue,
+    });
+  }
+
+  return {
+    carrier: 'per-persona-fan-out',
+    dispatches,
+  };
 }
 
 export async function moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, issueUuid) {

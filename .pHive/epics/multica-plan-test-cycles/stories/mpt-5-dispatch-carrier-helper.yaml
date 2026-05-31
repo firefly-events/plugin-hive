@@ -1,0 +1,73 @@
+id: mpt-5-dispatch-carrier-helper
+epic: multica-plan-test-cycles
+title: Add the dispatch carrier to multica-story-dispatch (squad or per-persona, per spike)
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- mpt-1-squad-cell-dispatch-spike
+description: 'S4 lib (conditional on the mpt-1 spike verdict). If squad-as-unit: add dispatchStoryToSquad(serverUrl,
+  token, workspaceId, issueUuid, squadUuid) using the squad-assign API. If per-persona fan-out: add a
+  helper that dispatches one issue per persona to its agent, honoring agent_backends. Either way the helper
+  must preserve the Codex-for-work / Claude-for-verify split and carry unit tests in the existing serialize-story-brief.test.mjs
+  style.'
+acceptance_criteria:
+- Given the spike carrier, when the new helper dispatches, then work reaches the correct agent(s) and
+  the per-persona Codex/Claude split is preserved.
+- Given the helper, when tested, then unit tests cover the dispatch shape and the backend-split mapping.
+steps:
+- id: research
+  description: Explore the codebase for relevant patterns, files, and constraints.
+  agent: researcher
+- id: implement
+  description: Implement the story per spec and research findings.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Write/verify tests covering acceptance criteria.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Review implementation and tests for correctness and convention compliance.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit and push to the feature branch (fresh-checkout/rebase-push per integration principle).
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/lib/multica-story-dispatch/index.mjs
+    purpose: Existing 5 dispatch helpers to extend.
+files_to_modify:
+- file: hive/lib/multica-story-dispatch/index.mjs
+  change: Add the dispatch carrier helper (squad or fan-out) per spike.
+- file: hive/lib/multica-story-dispatch/__tests__/dispatch-carrier.test.mjs
+  change: NEW — carrier + backend-split tests.
+references:
+- path: .pHive/epics/multica-plan-test-cycles/docs/structured-outline.md
+  relevant_excerpt: Phase-to-slice mapping, file manifest, risk registry.
+- path: .pHive/epics/multica-plan-test-cycles/docs/design-discussion.md
+  relevant_excerpt: §9 locked gate decisions (full-mirror seam, squad-spike-first, plan->execute->test
+    framing).
+- path: .pHive/epics/multica-plan-test-cycles/docs/vertical-plan.md
+  relevant_excerpt: 6-slice spine S1..S6 with depends_on + working states.
+risks:
+- severity: medium
+  description: Carrier choice wrong if spike misread.
+  mitigation: Helper shape is gated on the mpt-1 verdict; tests assert backend-split mapping.
+cross_cutting:
+- concern: documentation
+  action: Document the new dispatch helper in the multica-story-dispatch README.
+metric:
+  applies: false
+  justification: Library helper plus unit tests; it adds dispatch plumbing whose correctness is asserted
+    by tests, not by a moved product/throughput metric.
+tracker_id: plugin-hive/PLU-158
+tracker_uuid: de974767-94d5-4256-a132-1952cf3ff8f8
+tracker_url: http://localhost:3000/issue/PLU-158

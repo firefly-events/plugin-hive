@@ -1,0 +1,55 @@
+id: w0-2-squad-read-spike
+epic: multica-substrate-deepen
+title: 'Spike: confirm Multica squad-activity read path exists in REST surface'
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: read-only
+description: "Phase 0 feasibility spike. Determine whether the squad-leader evaluation\ndata written via `multica squad activity` is readable via the Multica REST\nsurface \u2014 required for the adapter ABI 1.1.0 bump in W2.4 and the squad\nevaluation contract in W2.5.\n\nTwo possibilities:\n1. Squad-activity rows exposed via extended GET /api/issues/{id} (preferred \u2014\n   no new endpoint needed).\n2. Squad-activity exposed via separate /api/squads/{id}/activity or similar.\n\nIf neither: spike returns blocking-negative. Phase B downgrades to\nroster-namespace only.\n"
+acceptance_criteria:
+- Written finding at .pHive/epics/multica-substrate-deepen/docs/spike-findings/s0-2-squad-read.md
+- Finding sketches the exact adapter method signatures W2.4 will need (getSquadActivity, possibly updateIssueStatus)
+- Finding cites endpoint path + HTTP method + JSON shape for each read path
+- 'If blocking-negative: explicit statement that W2.4/W2.6/W2.7 are blocked AND W2.1-W2.3 reduce to roster-namespace only'
+- No changes to plugin-hive production files
+steps:
+- id: research
+  description: Inspect spike handler source for squad endpoints + activity endpoint
+  agent: researcher
+- id: implement
+  description: Curl spike server to verify endpoints return expected shape
+  agent: researcher
+  depends_on:
+  - research
+- id: integrate
+  description: Write finding doc; commit on feat/multica-substrate-deepen
+  agent: technical-writer
+  depends_on:
+  - implement
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: ~/Code/spikes/multica/server/internal/handler/squad.go
+    purpose: Squad endpoint surface
+  - path: ~/Code/spikes/multica/server/internal/handler/issue.go
+    purpose: Verify whether squad-activity fields land on issue GET response
+references:
+- path: hive/adapters/multica/index.ts
+  relevant_excerpt: 'Current adapter ABI: capabilities, createStory, updateStory, addComment,
+
+    getStory. No squad methods. ABI version 1.0.0.
+
+    '
+cross_cutting:
+- concern: documentation
+  action: Spike finding satisfies documentation concern
+risks:
+- severity: medium
+  description: Squad-activity not readable; eval-write would be one-way
+  mitigation: Phase B downgrades to roster-namespace; user re-confirms at W2 entry
+metric:
+  applies: false
+  justification: Spike story; written finding doc, no measurable consumer behavior. W2.4 carries the adapter delivery metric.
+tracker_id: plugin-hive/PLU-130

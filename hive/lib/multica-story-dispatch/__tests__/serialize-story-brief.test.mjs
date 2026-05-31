@@ -69,3 +69,60 @@ test('backward-compat: legacy single-arg callers unaffected', () => {
   const briefEmptyArg = serializeStoryBrief(fullStory(), {});
   assert.equal(briefNoArg, briefEmptyArg);
 });
+
+// Per-persona provider combinations
+
+function makeAgents(personaName, provider) {
+  return [{ name: personaName, provider }];
+}
+
+test('combo codex+codex: provider=codex + agent_backends=codex → omit rescue section', () => {
+  const brief = serializeStoryBrief(fullStory(), {
+    dispatchingPersona: 'backend-developer',
+    agents: makeAgents('backend-developer', 'codex'),
+    agentBackends: { 'backend-developer': 'codex' },
+  });
+  assert.doesNotMatch(brief, /\/codex:rescue/);
+});
+
+test('combo codex+claude: provider=codex + agent_backends=claude → omit rescue section', () => {
+  const brief = serializeStoryBrief(fullStory(), {
+    dispatchingPersona: 'backend-developer',
+    agents: makeAgents('backend-developer', 'codex'),
+    agentBackends: { 'backend-developer': 'claude' },
+  });
+  assert.doesNotMatch(brief, /\/codex:rescue/);
+});
+
+test('combo claude+codex: provider=claude + agent_backends=codex → embed rescue section', () => {
+  const brief = serializeStoryBrief(fullStory(), {
+    dispatchingPersona: 'reviewer',
+    agents: makeAgents('reviewer', 'claude'),
+    agentBackends: { reviewer: 'codex' },
+  });
+  assert.match(brief, /^## Use \/codex:rescue/m);
+});
+
+test('combo claude+claude: provider=claude + agent_backends=claude → omit rescue section', () => {
+  const brief = serializeStoryBrief(fullStory(), {
+    dispatchingPersona: 'reviewer',
+    agents: makeAgents('reviewer', 'claude'),
+    agentBackends: { reviewer: 'claude' },
+  });
+  assert.doesNotMatch(brief, /\/codex:rescue/);
+});
+
+test('integrationBranch: normal branch is single-quoted in rendered git commands', () => {
+  const brief = serializeStoryBrief(fullStory(), { integrationBranch: 'feat/epic-1' });
+  assert.match(brief, /git fetch origin 'feat\/epic-1'/);
+  assert.match(brief, /git checkout 'feat\/epic-1'/);
+  assert.match(brief, /git reset --hard origin\/'feat\/epic-1'/);
+  assert.match(brief, /git push origin HEAD:'feat\/epic-1'/);
+});
+
+test('integrationBranch: shell metacharacters are neutralized by quoting', () => {
+  const brief = serializeStoryBrief(fullStory(), { integrationBranch: 'feat/x;$(touch pwned)' });
+  // The branch must appear only inside single quotes — never as bare, executable text.
+  assert.match(brief, /git fetch origin 'feat\/x;\$\(touch pwned\)'/);
+  assert.doesNotMatch(brief, /git fetch origin feat\/x;\$\(touch pwned\)/);
+});
