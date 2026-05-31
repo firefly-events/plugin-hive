@@ -5,72 +5,60 @@ status: pending
 complexity: low
 methodology: classic
 depends_on:
-  - cwfp-s4-1-disposition-pass-msd
-  - cwfp-s5-1-cycle-state-msd
+- cwfp-s4-1-disposition-pass-msd
+- cwfp-s5-1-cycle-state-msd
 parallel_allowed: true
 parallel_rationale: bounded-slice
-
-description: |
-  Apply disposition verdict for multica-substrate-deepen story `w4-1-export-schema-doc`
-  ("Author hive/references/multica-skills-export-schema.md") per cwfp-s4-1 audit. Adds three additive fields to the
-  target story YAML:
-    disposition: keep-as-second-party
-    disposition_rationale: |
-      <one-line from audit>
-    disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd
-
-  Read-then-Edit; preserve all existing fields. Per cwfp-s4-1 audit
-  recommendation (review the disposition-pass-msd.md row for w4-1-export-schema-doc
-  before edit; deviate from default only with rationale).
-
+description: "Apply disposition verdict for multica-substrate-deepen story `w4-1-export-schema-doc`\n(\"Author hive/references/multica-skills-export-schema.md\") per cwfp-s4-1 audit. Adds three additive\
+  \ fields to the\ntarget story YAML:\n  disposition: keep-as-second-party\n  disposition_rationale: |\n    <one-line from audit>\n  disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd\n\
+  \nRead-then-Edit; preserve all existing fields. Per cwfp-s4-1 audit\nrecommendation (review the disposition-pass-msd.md row for w4-1-export-schema-doc\nbefore edit; deviate from default only with rationale).\n"
 acceptance_criteria:
-  - "Given .pHive/epics/multica-substrate-deepen/stories/w4-1-export-schema-doc.yaml after this story commits, when read, then it carries disposition: keep-as-second-party + disposition_rationale + disposition_source_slice (additive fields)"
-  - "Given the prior YAML content, when this story commits, then prior fields (id, epic, title, status, methodology, depends_on, description, acceptance_criteria, steps, etc.) are preserved verbatim"
-  - "Given cwfp-s4-1's audit row for w4-1-export-schema-doc, when the disposition verdict is applied, then it matches the audit's candidate (or deviates with explicit rationale)"
-
+- 'Given .pHive/epics/multica-substrate-deepen/stories/w4-1-export-schema-doc.yaml after this story commits, when read, then it carries disposition: keep-as-second-party + disposition_rationale + disposition_source_slice
+  (additive fields)'
+- Given the prior YAML content, when this story commits, then prior fields (id, epic, title, status, methodology, depends_on, description, acceptance_criteria, steps, etc.) are preserved verbatim
+- Given cwfp-s4-1's audit row for w4-1-export-schema-doc, when the disposition verdict is applied, then it matches the audit's candidate (or deviates with explicit rationale)
 steps:
-  - id: implement
-    description: |
-      Read .pHive/epics/multica-substrate-deepen/stories/w4-1-export-schema-doc.yaml in full.
-      Read cwfp-s4-1's disposition-pass-msd.md row for w4-1-export-schema-doc.
-      Append the three additive fields preserving all existing content.
-    agent: developer
-  - id: review
-    description: Reviewer diffs against pre-edit state; confirms additive-only; confirms verdict matches audit
-    agent: reviewer
-    depends_on: [implement]
-  - id: integrate
-    description: 'Commit "[cwfp-s5-3o] docs(disposition): apply keep-as-second-party to w4-1-export-schema-doc"'
-    agent: developer
-    depends_on: [review]
+- id: implement
+  description: 'Read .pHive/epics/multica-substrate-deepen/stories/w4-1-export-schema-doc.yaml in full.
 
+    Read cwfp-s4-1''s disposition-pass-msd.md row for w4-1-export-schema-doc.
+
+    Append the three additive fields preserving all existing content.
+
+    '
+  agent: developer
+- id: review
+  description: Reviewer diffs against pre-edit state; confirms additive-only; confirms verdict matches audit
+  agent: reviewer
+  depends_on:
+  - implement
+- id: integrate
+  description: 'Commit "[cwfp-s5-3o] docs(disposition): apply keep-as-second-party to w4-1-export-schema-doc"'
+  agent: developer
+  depends_on:
+  - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
-    - path: .pHive/epics/multica-substrate-deepen/stories/w4-1-export-schema-doc.yaml
-      purpose: Target story YAML — single file modified
-    - path: .pHive/epics/cc-workflows-first-party/docs/disposition-pass-msd.md
-      purpose: Audit source for the verdict
-
+  - path: .pHive/epics/multica-substrate-deepen/stories/w4-1-export-schema-doc.yaml
+    purpose: "Target story YAML \u2014 single file modified"
+  - path: .pHive/epics/cc-workflows-first-party/docs/disposition-pass-msd.md
+    purpose: Audit source for the verdict
 files_to_modify:
-  - file: .pHive/epics/multica-substrate-deepen/stories/w4-1-export-schema-doc.yaml
-    change: 'APPEND disposition: keep-as-second-party + disposition_rationale + disposition_source_slice (additive only)'
-
+- file: .pHive/epics/multica-substrate-deepen/stories/w4-1-export-schema-doc.yaml
+  change: 'APPEND disposition: keep-as-second-party + disposition_rationale + disposition_source_slice (additive only)'
 cross_cutting:
-  - concern: documentation
-    action: Story YAML modification is doc; downstream readers (cwfp-s5-5 project memo update, future maintainer audit) consume this disposition field
-
+- concern: documentation
+  action: Story YAML modification is doc; downstream readers (cwfp-s5-5 project memo update, future maintainer audit) consume this disposition field
 risks:
-  - severity: low
-    description: Audit candidate changed between cwfp-s4-1 commit and this story's implement
-    mitigation: Read the audit doc just before edit; if mismatch, surface to team-lead before applying
-
+- severity: low
+  description: Audit candidate changed between cwfp-s4-1 commit and this story's implement
+  mitigation: Read the audit doc just before edit; if mismatch, surface to team-lead before applying
 references:
-  - path: .pHive/cycle-state/cc-workflows-first-party.yaml
-    relevant_excerpt: |
-      gate_decisions.open_questions.Q3: agree keep-as-second-party first release.
-      gate_decisions.open_questions.Q5: DESCOPED — autopilot work removed from this epic scope.
-
+- path: .pHive/cycle-state/cc-workflows-first-party.yaml
+  relevant_excerpt: "gate_decisions.open_questions.Q3: agree keep-as-second-party first release.\ngate_decisions.open_questions.Q5: DESCOPED \u2014 autopilot work removed from this epic scope.\n"
 metric:
   applies: false
-  justification: Disposition mutation to a single story YAML; the routing outcome is observable via cwfp-s5-1 cycle-state read by cwfp-s2-2 resolver, measured at the epic-level mpt_routing_preserved metric (cwfp-s5-2)
+  justification: Disposition mutation to a single story YAML; the routing outcome is observable via cwfp-s5-1 cycle-state read by cwfp-s2-2 resolver, measured at the epic-level mpt_routing_preserved metric
+    (cwfp-s5-2)
+tracker_id: 716f3c5c-0d27-4c31-b772-215f60559851

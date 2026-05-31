@@ -5,72 +5,65 @@ status: pending
 complexity: low
 methodology: classic
 depends_on:
-  - cwfp-s4-2-disposition-pass-mpt
-  - cwfp-s5-2-cycle-state-mpt
+- cwfp-s4-2-disposition-pass-mpt
+- cwfp-s5-2-cycle-state-mpt
 parallel_allowed: true
 parallel_rationale: bounded-slice
-
-description: |
-  Apply disposition verdict for multica-plan-test-cycles story `mpt-5-dispatch-carrier-helper`
-  ("Add the dispatch carrier to multica-story-dispatch (squad or per-persona, per spike)") per cwfp-s4-2 audit. Adds three additive fields to the
-  target story YAML:
-    disposition: keep-as-second-party
-    disposition_rationale: |
-      <one-line from audit>
-    disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt
-
-  Read-then-Edit; preserve all existing fields. Default is keep-as-second-party
-  per Q3 gate-1 confirmation; if cwfp-s4-2 audit row for mpt-5-dispatch-carrier-helper deviates,
-  follow audit + cite deviation rationale.
-
+description: "Apply disposition verdict for multica-plan-test-cycles story `mpt-5-dispatch-carrier-helper`\n(\"Add the dispatch carrier to multica-story-dispatch (squad or per-persona, per spike)\") per\
+  \ cwfp-s4-2 audit. Adds three additive fields to the\ntarget story YAML:\n  disposition: keep-as-second-party\n  disposition_rationale: |\n    <one-line from audit>\n  disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt\n\
+  \nRead-then-Edit; preserve all existing fields. Default is keep-as-second-party\nper Q3 gate-1 confirmation; if cwfp-s4-2 audit row for mpt-5-dispatch-carrier-helper deviates,\nfollow audit + cite deviation\
+  \ rationale.\n"
 acceptance_criteria:
-  - "Given .pHive/epics/multica-plan-test-cycles/stories/mpt-5-dispatch-carrier-helper.yaml after this story commits, when read, then it carries disposition: keep-as-second-party + disposition_rationale + disposition_source_slice (additive fields)"
-  - "Given the prior YAML content, when this story commits, then prior fields are preserved verbatim"
-  - "Given cwfp-s4-2's audit row for mpt-5-dispatch-carrier-helper, when the disposition verdict is applied, then it matches the audit (default keep-as-second-party unless audit deviates)"
-
+- 'Given .pHive/epics/multica-plan-test-cycles/stories/mpt-5-dispatch-carrier-helper.yaml after this story commits, when read, then it carries disposition: keep-as-second-party + disposition_rationale +
+  disposition_source_slice (additive fields)'
+- Given the prior YAML content, when this story commits, then prior fields are preserved verbatim
+- Given cwfp-s4-2's audit row for mpt-5-dispatch-carrier-helper, when the disposition verdict is applied, then it matches the audit (default keep-as-second-party unless audit deviates)
 steps:
-  - id: implement
-    description: |
-      Read .pHive/epics/multica-plan-test-cycles/stories/mpt-5-dispatch-carrier-helper.yaml in full.
-      Read cwfp-s4-2's disposition-pass-mpt.md row for mpt-5-dispatch-carrier-helper.
-      Append the three additive fields preserving all existing content.
-    agent: developer
-  - id: review
-    description: Reviewer diffs against pre-edit state; confirms additive-only; confirms verdict matches audit
-    agent: reviewer
-    depends_on: [implement]
-  - id: integrate
-    description: 'Commit "[cwfp-s5-4e] docs(disposition): apply keep-as-second-party to mpt-5-dispatch-carrier-helper"'
-    agent: developer
-    depends_on: [review]
+- id: implement
+  description: 'Read .pHive/epics/multica-plan-test-cycles/stories/mpt-5-dispatch-carrier-helper.yaml in full.
 
+    Read cwfp-s4-2''s disposition-pass-mpt.md row for mpt-5-dispatch-carrier-helper.
+
+    Append the three additive fields preserving all existing content.
+
+    '
+  agent: developer
+- id: review
+  description: Reviewer diffs against pre-edit state; confirms additive-only; confirms verdict matches audit
+  agent: reviewer
+  depends_on:
+  - implement
+- id: integrate
+  description: 'Commit "[cwfp-s5-4e] docs(disposition): apply keep-as-second-party to mpt-5-dispatch-carrier-helper"'
+  agent: developer
+  depends_on:
+  - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
-    - path: .pHive/epics/multica-plan-test-cycles/stories/mpt-5-dispatch-carrier-helper.yaml
-      purpose: Target story YAML — single file modified
-    - path: .pHive/epics/cc-workflows-first-party/docs/disposition-pass-mpt.md
-      purpose: Audit source for the verdict
-
+  - path: .pHive/epics/multica-plan-test-cycles/stories/mpt-5-dispatch-carrier-helper.yaml
+    purpose: "Target story YAML \u2014 single file modified"
+  - path: .pHive/epics/cc-workflows-first-party/docs/disposition-pass-mpt.md
+    purpose: Audit source for the verdict
 files_to_modify:
-  - file: .pHive/epics/multica-plan-test-cycles/stories/mpt-5-dispatch-carrier-helper.yaml
-    change: 'APPEND disposition: keep-as-second-party + disposition_rationale + disposition_source_slice (additive only)'
-
+- file: .pHive/epics/multica-plan-test-cycles/stories/mpt-5-dispatch-carrier-helper.yaml
+  change: 'APPEND disposition: keep-as-second-party + disposition_rationale + disposition_source_slice (additive only)'
 cross_cutting:
-  - concern: documentation
-    action: Story YAML modification is doc; cwfp-s5-5 cites this in the project memory additive note
-
+- concern: documentation
+  action: Story YAML modification is doc; cwfp-s5-5 cites this in the project memory additive note
 risks:
-  - severity: low
-    description: Audit candidate drifted between cwfp-s4-2 commit and this story's implement
-    mitigation: Read the audit doc just before edit; if mismatch, surface to team-lead before applying
-
+- severity: low
+  description: Audit candidate drifted between cwfp-s4-2 commit and this story's implement
+  mitigation: Read the audit doc just before edit; if mismatch, surface to team-lead before applying
 references:
-  - path: .pHive/cycle-state/cc-workflows-first-party.yaml
-    relevant_excerpt: |
-      gate_decisions.open_questions.Q3: agree keep-as-second-party first release.
-      gate_decisions.open_questions.Q4: agree auto + per-epic disposition overrides heuristic.
+- path: .pHive/cycle-state/cc-workflows-first-party.yaml
+  relevant_excerpt: 'gate_decisions.open_questions.Q3: agree keep-as-second-party first release.
 
+    gate_decisions.open_questions.Q4: agree auto + per-epic disposition overrides heuristic.
+
+    '
 metric:
   applies: false
-  justification: Disposition mutation to a single story YAML; routing outcome observable via cwfp-s5-2 cycle-state read by cwfp-s2-2 resolver, measured at the epic-level cc_workflows_mpt_routing_preserved metric (cwfp-s5-2)
+  justification: Disposition mutation to a single story YAML; routing outcome observable via cwfp-s5-2 cycle-state read by cwfp-s2-2 resolver, measured at the epic-level cc_workflows_mpt_routing_preserved
+    metric (cwfp-s5-2)
+tracker_id: f72d1dd2-9f30-4a1e-be15-ffb2d7ccdf25

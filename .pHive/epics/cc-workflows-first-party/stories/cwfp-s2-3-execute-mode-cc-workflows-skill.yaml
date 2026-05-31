@@ -1,163 +1,139 @@
 id: cwfp-s2-3-execute-mode-cc-workflows-skill
 epic: cc-workflows-first-party
-title: NEW execute-mode-cc-workflows skill — workflow_assembly + serial-commit gate
+title: "NEW execute-mode-cc-workflows skill \u2014 workflow_assembly + serial-commit gate"
 status: pending
 complexity: high
 methodology: classic
-depends_on: [cwfp-s1-1-phase0-capability-spike]
+depends_on:
+- cwfp-s1-1-phase0-capability-spike
 parallel_allowed: true
 parallel_rationale: bounded-slice
-
-description: |
-  Create skills/hive/skills/execute-mode-cc-workflows/SKILL.md mirroring the
-  shape of skills/hive/skills/execute-mode-multica/SKILL.md. Steps:
-    - Step 0: precondition gate — verify CC runtime >= 2.1.154; verify
-      execution.runtime resolves to cc-workflows (or env override
-      HIVE_EXECUTION_RUNTIME=workflows); reject otherwise with field_sources
-      cite
-    - Step 1: workflow_assembly substep — prompt construction, persona-to-
-      step mapping (per feedback_use_roster_agents — references persona
-      files, no improvised inline personas), /workflows invocation,
-      completion-signal wiring. Internal logic gated by Phase 0 (a) verdict;
-      OUTER SEAM INVARIANT — Phase 0 (a) failure changes only what
-      workflow_assembly emits, not how execute-dispatch calls into this skill
-    - Step 2: /workflows dispatch — invoke via CC native primitives; capture
-      run handle
-    - Step 3: SERIAL-COMMIT GATE (architect Q3+Q4 unified mechanism) —
-      receive file lists from agents; adapter applies serially against
-      integration branch; fast-forward enforced; rebase-and-push 3-retry
-      (mirrors hive/lib/multica-story-dispatch/index.mjs:192-262). Step 3
-      accepts ≥1 commit per story; in-story fix sequences add more commits;
-      integration branch advances fast-forward regardless (gate 3
-      elicitation clarification per maintainer)
-    - Step 4: episode marker write — ${HIVE_STATE_DIR}/episodes/{epic}/{story}/cc-workflows-run.yaml
-    - Step 5: summary return — surface completion, scope-drift signal,
-      episode path; invokes task-tracking-dispatch ABI for status updates
-      (unchanged ABI, no fork)
-    - "Replaces respawn skill for its stories" (mirrors session-mode pattern)
-    - Honors single-isolation-layer rule
-
-  Per gate_3_decisions.D1: this story's Step 3 uses COPY-WITH-ATTRIBUTION
-  from hive/lib/multica-story-dispatch/index.mjs:192-262; no shared helper
-  extraction this epic (follow-on chore/integration-branch-contract-shared).
-
+description: "Create skills/hive/skills/execute-mode-cc-workflows/SKILL.md mirroring the\nshape of skills/hive/skills/execute-mode-multica/SKILL.md. Steps:\n  - Step 0: precondition gate \u2014 verify CC\
+  \ runtime >= 2.1.154; verify\n    execution.runtime resolves to cc-workflows (or env override\n    HIVE_EXECUTION_RUNTIME=workflows); reject otherwise with field_sources\n    cite\n  - Step 1: workflow_assembly\
+  \ substep \u2014 prompt construction, persona-to-\n    step mapping (per feedback_use_roster_agents \u2014 references persona\n    files, no improvised inline personas), /workflows invocation,\n    completion-signal\
+  \ wiring. Internal logic gated by Phase 0 (a) verdict;\n    OUTER SEAM INVARIANT \u2014 Phase 0 (a) failure changes only what\n    workflow_assembly emits, not how execute-dispatch calls into this skill\n\
+  \  - Step 2: /workflows dispatch \u2014 invoke via CC native primitives; capture\n    run handle\n  - Step 3: SERIAL-COMMIT GATE (architect Q3+Q4 unified mechanism) \u2014\n    receive file lists from\
+  \ agents; adapter applies serially against\n    integration branch; fast-forward enforced; rebase-and-push 3-retry\n    (mirrors hive/lib/multica-story-dispatch/index.mjs:192-262). Step 3\n    accepts\
+  \ \u22651 commit per story; in-story fix sequences add more commits;\n    integration branch advances fast-forward regardless (gate 3\n    elicitation clarification per maintainer)\n  - Step 4: episode\
+  \ marker write \u2014 ${HIVE_STATE_DIR}/episodes/{epic}/{story}/cc-workflows-run.yaml\n  - Step 5: summary return \u2014 surface completion, scope-drift signal,\n    episode path; invokes task-tracking-dispatch\
+  \ ABI for status updates\n    (unchanged ABI, no fork)\n  - \"Replaces respawn skill for its stories\" (mirrors session-mode pattern)\n  - Honors single-isolation-layer rule\n\nPer gate_3_decisions.D1:\
+  \ this story's Step 3 uses COPY-WITH-ATTRIBUTION\nfrom hive/lib/multica-story-dispatch/index.mjs:192-262; no shared helper\nextraction this epic (follow-on chore/integration-branch-contract-shared).\n"
 acceptance_criteria:
-  - "Given the new SKILL.md exists at skills/hive/skills/execute-mode-cc-workflows/SKILL.md, when execute-dispatch routes mode_decision: cc-workflows, then Steps 0-5 execute in order and produce a summary return"
-  - "Given Step 3 receives file lists from /workflows agents, when applied, then ≥1 commit per story lands on the integration branch with fast-forward enforced + rebase-and-push 3-retry; in-story fix sequences land as additional commits"
-  - "Given no agent makes direct .git writes under /workflows fan-out, when Step 3 commits serially, then feedback_codex_sandbox_commit_block + feedback_codex_parallel_race are honored"
-  - "Given the episode marker contract, when a story completes, then ${HIVE_STATE_DIR}/episodes/{epic}/{story}/cc-workflows-run.yaml exists with the run record"
-  - "Given Step 5 summary return, when status update is required, then it invokes hive/lib/task-tracking-dispatch ABI unchanged (vendor-neutral re-use)"
-  - "Given the single-isolation-layer rule, when /workflows runs a dispatched agent, then that agent cannot recursively invoke /workflows"
-  - "Given the D1 copy-with-attribution decision, when Step 3 logic ships, then the shell-snippet contract cites hive/lib/multica-story-dispatch/index.mjs:192-262 as source"
-
+- 'Given the new SKILL.md exists at skills/hive/skills/execute-mode-cc-workflows/SKILL.md, when execute-dispatch routes mode_decision: cc-workflows, then Steps 0-5 execute in order and produce a summary
+  return'
+- "Given Step 3 receives file lists from /workflows agents, when applied, then \u22651 commit per story lands on the integration branch with fast-forward enforced + rebase-and-push 3-retry; in-story fix\
+  \ sequences land as additional commits"
+- Given no agent makes direct .git writes under /workflows fan-out, when Step 3 commits serially, then feedback_codex_sandbox_commit_block + feedback_codex_parallel_race are honored
+- Given the episode marker contract, when a story completes, then ${HIVE_STATE_DIR}/episodes/{epic}/{story}/cc-workflows-run.yaml exists with the run record
+- Given Step 5 summary return, when status update is required, then it invokes hive/lib/task-tracking-dispatch ABI unchanged (vendor-neutral re-use)
+- Given the single-isolation-layer rule, when /workflows runs a dispatched agent, then that agent cannot recursively invoke /workflows
+- Given the D1 copy-with-attribution decision, when Step 3 logic ships, then the shell-snippet contract cites hive/lib/multica-story-dispatch/index.mjs:192-262 as source
 steps:
-  - id: research
-    description: |
-      Read execute-mode-multica/SKILL.md fully; read execute-mode-session/SKILL.md
-      for "replaces respawn skill" pattern; read multica-story-dispatch/index.mjs:192-262
-      for the shell-snippet contract to mirror. Capture episode-marker contract
-      from existing mode skills.
-    agent: researcher
-  - id: implement
-    description: |
-      Author SKILL.md with frontmatter, Step 0-5 invocation contract, episode marker
-      contract, summary return contract. Step 3 includes copy-with-attribution from
-      multica-story-dispatch + variable-length-commit-sequence-per-story invariant.
-      workflow_assembly substep documents that its internal logic is gated by
-      Phase 0 (a) verdict (Q2 (a) shell-snippet injection if PASS; Plan B b/c
-      if FAIL).
-    agent: developer
-    depends_on: [research]
-  - id: test
-    description: |
-      Doc-test: SKILL.md frontmatter + sections + invocation contract intact.
-      Integration test: end-to-end run of a tiny epic with HIVE_EXECUTION_RUNTIME=workflows;
-      verify ≥1 commit per story lands on integration branch with fast-forward;
-      verify episode marker exists at expected path; verify Step 5 invokes
-      task-tracking-dispatch unchanged.
-    agent: tester
-    depends_on: [implement]
-  - id: review
-    description: |
-      Architect review on Step 3 serial-commit gate (load-bearing mechanism);
-      reviewer cross-checks no recursive /workflows spawn; cross-checks
-      copy-with-attribution discipline (D1) honored.
-    agent: reviewer
-    depends_on: [test]
-  - id: integrate
-    description: 'Commit "[cwfp-s2-3] feat(execute-mode-cc-workflows): NEW skill with workflow_assembly + serial-commit gate"'
-    agent: developer
-    depends_on: [review]
+- id: research
+  description: 'Read execute-mode-multica/SKILL.md fully; read execute-mode-session/SKILL.md
 
+    for "replaces respawn skill" pattern; read multica-story-dispatch/index.mjs:192-262
+
+    for the shell-snippet contract to mirror. Capture episode-marker contract
+
+    from existing mode skills.
+
+    '
+  agent: researcher
+- id: implement
+  description: 'Author SKILL.md with frontmatter, Step 0-5 invocation contract, episode marker
+
+    contract, summary return contract. Step 3 includes copy-with-attribution from
+
+    multica-story-dispatch + variable-length-commit-sequence-per-story invariant.
+
+    workflow_assembly substep documents that its internal logic is gated by
+
+    Phase 0 (a) verdict (Q2 (a) shell-snippet injection if PASS; Plan B b/c
+
+    if FAIL).
+
+    '
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: "Doc-test: SKILL.md frontmatter + sections + invocation contract intact.\nIntegration test: end-to-end run of a tiny epic with HIVE_EXECUTION_RUNTIME=workflows;\nverify \u22651 commit per\
+    \ story lands on integration branch with fast-forward;\nverify episode marker exists at expected path; verify Step 5 invokes\ntask-tracking-dispatch unchanged.\n"
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: 'Architect review on Step 3 serial-commit gate (load-bearing mechanism);
+
+    reviewer cross-checks no recursive /workflows spawn; cross-checks
+
+    copy-with-attribution discipline (D1) honored.
+
+    '
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: 'Commit "[cwfp-s2-3] feat(execute-mode-cc-workflows): NEW skill with workflow_assembly + serial-commit gate"'
+  agent: developer
+  depends_on:
+  - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
-    - path: skills/hive/skills/execute-mode-multica/SKILL.md
-      purpose: Shape mirror; this new skill is the cc-workflows-runtime analog
-    - path: skills/hive/skills/execute-mode-session/SKILL.md
-      purpose: '"Replaces respawn skill" pattern reference'
-    - path: hive/lib/multica-story-dispatch/index.mjs
-      purpose: Lines 192-262 carry the shell-snippet integration-branch contract this skill mirrors via copy-with-attribution
-    - path: hive/lib/task-tracking-dispatch/index.ts
-      purpose: Vendor-neutral ABI re-used by Step 5 (no fork)
-
+  - path: skills/hive/skills/execute-mode-multica/SKILL.md
+    purpose: Shape mirror; this new skill is the cc-workflows-runtime analog
+  - path: skills/hive/skills/execute-mode-session/SKILL.md
+    purpose: '"Replaces respawn skill" pattern reference'
+  - path: hive/lib/multica-story-dispatch/index.mjs
+    purpose: Lines 192-262 carry the shell-snippet integration-branch contract this skill mirrors via copy-with-attribution
+  - path: hive/lib/task-tracking-dispatch/index.ts
+    purpose: Vendor-neutral ABI re-used by Step 5 (no fork)
 files_to_modify:
-  - file: skills/hive/skills/execute-mode-cc-workflows/SKILL.md
-    change: CREATE the atomic execute-mode skill with Steps 0-5 invocation contract + serial-commit gate + episode marker + summary return
-
+- file: skills/hive/skills/execute-mode-cc-workflows/SKILL.md
+  change: CREATE the atomic execute-mode skill with Steps 0-5 invocation contract + serial-commit gate + episode marker + summary return
 code_examples:
-  - title: Integration-branch shell-snippet contract (mirror of multica-story-dispatch:192-262)
-    file: hive/lib/multica-story-dispatch/index.mjs
-    snippet: |
-      # Pattern this skill's Step 3 mirrors (paraphrased — full source in cited lines):
-      git fetch origin <integration-branch>
-      git checkout <integration-branch>
-      git reset --hard origin/<integration-branch>
-      git apply <agent-file-list>
-      git add -A
-      git commit -m "[<story-id>] <type>(<scope>): <description>"
-      # Rebase-and-push with 3-retry
-      for i in 1 2 3; do git pull --rebase origin <integration-branch> && git push origin <integration-branch> && break; done
-
+- title: Integration-branch shell-snippet contract (mirror of multica-story-dispatch:192-262)
+  file: hive/lib/multica-story-dispatch/index.mjs
+  snippet: "# Pattern this skill's Step 3 mirrors (paraphrased \u2014 full source in cited lines):\ngit fetch origin <integration-branch>\ngit checkout <integration-branch>\ngit reset --hard origin/<integration-branch>\n\
+    git apply <agent-file-list>\ngit add -A\ngit commit -m \"[<story-id>] <type>(<scope>): <description>\"\n# Rebase-and-push with 3-retry\nfor i in 1 2 3; do git pull --rebase origin <integration-branch>\
+    \ && git push origin <integration-branch> && break; done\n"
 design_decisions:
-  - decision: Copy-with-attribution from multica-story-dispatch:192-262 (no shared helper this epic)
-    rationale: gate_3_decisions.D1 — keeps Phase 2 PR file count lean; follow-on chore/integration-branch-contract-shared epic does the refactor
-  - decision: Step 3 accepts ≥1 commit per story (variable-length sequence)
-    rationale: gate 3 elicitation clarification per maintainer + architect's Failure 2 resolution — in-story fix sequences shouldn't be artificially squashed
-  - decision: workflow_assembly is the substep gated by Phase 0 (a) verdict
-    rationale: Outer seam invariant — execute-dispatch's contract with this skill is stable; only internal logic shifts based on (a) verdict
-  - decision: Step 5 re-uses task-tracking-dispatch ABI unchanged
-    rationale: ABI is already vendor-neutral; no fork needed (research brief §3 + structured outline Layer 7)
-
+- decision: Copy-with-attribution from multica-story-dispatch:192-262 (no shared helper this epic)
+  rationale: "gate_3_decisions.D1 \u2014 keeps Phase 2 PR file count lean; follow-on chore/integration-branch-contract-shared epic does the refactor"
+- decision: "Step 3 accepts \u22651 commit per story (variable-length sequence)"
+  rationale: "gate 3 elicitation clarification per maintainer + architect's Failure 2 resolution \u2014 in-story fix sequences shouldn't be artificially squashed"
+- decision: workflow_assembly is the substep gated by Phase 0 (a) verdict
+  rationale: "Outer seam invariant \u2014 execute-dispatch's contract with this skill is stable; only internal logic shifts based on (a) verdict"
+- decision: Step 5 re-uses task-tracking-dispatch ABI unchanged
+  rationale: "ABI is already vendor-neutral; no fork needed (research brief \xA73 + structured outline Layer 7)"
 cross_cutting:
-  - concern: documentation
-    action: This SKILL.md IS the doc; reference from CONTEXT.md vocab section (cwfp-s6-2) so consumers understand the first-party execute-mode shape
-  - concern: simulated-manual
-    action: Integration test in this story's test step is a manual run of a tiny epic; verdict captured in episode marker (no separate test-scenario YAML needed)
-
+- concern: documentation
+  action: This SKILL.md IS the doc; reference from CONTEXT.md vocab section (cwfp-s6-2) so consumers understand the first-party execute-mode shape
+- concern: simulated-manual
+  action: Integration test in this story's test step is a manual run of a tiny epic; verdict captured in episode marker (no separate test-scenario YAML needed)
 risks:
-  - severity: high
-    description: Phase 0 (a) FAIL — /workflows rejects free-form shell-snippet prompt injection
-    mitigation: workflow_assembly substep gates its internal logic on Phase 0 (a) verdict; Plan B b (per-unit PR) or c (worktree-per-story isolation + serialized merge) — chosen at this story's research step based on cycle-state spike_outcome block
-  - severity: medium
-    description: Serial-commit gate handles multi-step stories incorrectly (squashes instead of preserving fix sequence)
-    mitigation: Step 3 accepts ≥1 commit per story per maintainer gate 3 clarification; test step's integration test exercises a multi-commit story explicitly
-  - severity: medium
-    description: Copy-with-attribution from multica-story-dispatch drifts as the source evolves
-    mitigation: D1 follow-on chore epic does the shared-helper extraction; until then, attribution + drift watch is the discipline
-  - severity: low
-    description: Episode marker path collision if epic+story names collide
-    mitigation: Path includes both {epic} and {story} segments; existing mode-skills use this convention without collision
-
+- severity: high
+  description: "Phase 0 (a) FAIL \u2014 /workflows rejects free-form shell-snippet prompt injection"
+  mitigation: "workflow_assembly substep gates its internal logic on Phase 0 (a) verdict; Plan B b (per-unit PR) or c (worktree-per-story isolation + serialized merge) \u2014 chosen at this story's research\
+    \ step based on cycle-state spike_outcome block"
+- severity: medium
+  description: Serial-commit gate handles multi-step stories incorrectly (squashes instead of preserving fix sequence)
+  mitigation: "Step 3 accepts \u22651 commit per story per maintainer gate 3 clarification; test step's integration test exercises a multi-commit story explicitly"
+- severity: medium
+  description: Copy-with-attribution from multica-story-dispatch drifts as the source evolves
+  mitigation: D1 follow-on chore epic does the shared-helper extraction; until then, attribution + drift watch is the discipline
+- severity: low
+  description: Episode marker path collision if epic+story names collide
+  mitigation: Path includes both {epic} and {story} segments; existing mode-skills use this convention without collision
 references:
-  - path: .pHive/epics/cc-workflows-first-party/docs/structured-outline.md
-    relevant_excerpt: |
-      Part 2 Phase 2 — skills/hive/skills/execute-mode-cc-workflows/SKILL.md (NEW). Steps 0-5. Step 3 serial-commit gate (architect Q3+Q4 unified). Either factor common serialization into a shared helper OR copy with attribution; decision deferred to implementation.
-  - path: .pHive/cycle-state/cc-workflows-first-party.yaml
-    relevant_excerpt: |
-      gate_3_decisions.D1: B — copy-with-attribution this epic; refactor as follow-on chore/integration-branch-contract-shared.
-      gate_3_decisions.elicitation.failure_2_clarification: Step 3 accepts ≥1 commit per story; in-story fix sequences add more commits.
-
+- path: .pHive/epics/cc-workflows-first-party/docs/structured-outline.md
+  relevant_excerpt: "Part 2 Phase 2 \u2014 skills/hive/skills/execute-mode-cc-workflows/SKILL.md (NEW). Steps 0-5. Step 3 serial-commit gate (architect Q3+Q4 unified). Either factor common serialization\
+    \ into a shared helper OR copy with attribution; decision deferred to implementation.\n"
+- path: .pHive/cycle-state/cc-workflows-first-party.yaml
+  relevant_excerpt: "gate_3_decisions.D1: B \u2014 copy-with-attribution this epic; refactor as follow-on chore/integration-branch-contract-shared.\ngate_3_decisions.elicitation.failure_2_clarification:\
+    \ Step 3 accepts \u22651 commit per story; in-story fix sequences add more commits.\n"
 metric:
   applies: true
   name: cc_workflows_mvp_integration_branch_correctness
@@ -171,3 +147,4 @@ metric:
     ref: ${HIVE_STATE_DIR}/episodes/cc-workflows-first-party/cwfp-s2-3/integration-test-run.yaml
   verify_at: integrate step of cwfp-s2-3-execute-mode-cc-workflows-skill
   owner: cc-workflows-first-party
+tracker_id: f7145bbb-e3f2-4be9-9cb9-4e6c9383d445

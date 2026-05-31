@@ -5,96 +5,86 @@ status: pending
 complexity: low
 methodology: classic
 depends_on:
-  - cwfp-s5-1-cycle-state-msd
-  - cwfp-s5-2-cycle-state-mpt
-
-description: |
-  Append additive notes to project memory entries to reflect disposition
-  outcomes from cwfp-s5-1 + cwfp-s5-2:
-
-    - ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_substrate_adoption.md
-    - ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_plan_test_cycles.md
-
-  Per gate_3_decisions.D5: AFFIRM additive-only updates. Read-then-Edit per
-  file — DO NOT bulk-overwrite. Preserve historical context in both memos;
-  the additive note records the disposition decision + this epic's
-  attribution.
-
-  Note shape (one paragraph each):
-    "[cc-workflows-first-party gate 1, 2026-05-31] Disposition: <verdict
-    for the epic as a whole> per Q3/Q5 + per-story candidates in
-    disposition-pass-{msd|mpt}.md. Cycle-state per-epic-override:
-    .pHive/cycle-state/<epic>.yaml execution_runtime: multica. W3.2
-    autopilot story PARKED per architect-v2 Q5 descope (msd only)."
-
+- cwfp-s5-1-cycle-state-msd
+- cwfp-s5-2-cycle-state-mpt
+description: "Append additive notes to project memory entries to reflect disposition\noutcomes from cwfp-s5-1 + cwfp-s5-2:\n\n  - ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_substrate_adoption.md\n\
+  \  - ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_plan_test_cycles.md\n\nPer gate_3_decisions.D5: AFFIRM additive-only updates. Read-then-Edit per\nfile \u2014 DO NOT bulk-overwrite.\
+  \ Preserve historical context in both memos;\nthe additive note records the disposition decision + this epic's\nattribution.\n\nNote shape (one paragraph each):\n  \"[cc-workflows-first-party gate 1,\
+  \ 2026-05-31] Disposition: <verdict\n  for the epic as a whole> per Q3/Q5 + per-story candidates in\n  disposition-pass-{msd|mpt}.md. Cycle-state per-epic-override:\n  .pHive/cycle-state/<epic>.yaml execution_runtime:\
+  \ multica. W3.2\n  autopilot story PARKED per architect-v2 Q5 descope (msd only).\"\n"
 acceptance_criteria:
-  - "Given ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_substrate_adoption.md, when read after this story commits, then it carries an additive note recording the cc-workflows-first-party disposition outcome + cycle-state link + W3.2 park"
-  - "Given the same file's prior content, when this story commits, then prior content is preserved verbatim (no bulk-overwrite per gate_3_decisions.D5)"
-  - "Given ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_plan_test_cycles.md, when read after commit, then it carries an additive note recording Q3 keep-as-second-party + cycle-state link"
-  - "Given Read-then-Edit discipline, when this story implements, then it reads each file in full before any edit; the additive note is appended (or placed at an unambiguous insertion point) without disturbing prior structure"
-
+- Given ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_substrate_adoption.md, when read after this story commits, then it carries an additive note recording the cc-workflows-first-party
+  disposition outcome + cycle-state link + W3.2 park
+- Given the same file's prior content, when this story commits, then prior content is preserved verbatim (no bulk-overwrite per gate_3_decisions.D5)
+- Given ~/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_plan_test_cycles.md, when read after commit, then it carries an additive note recording Q3 keep-as-second-party + cycle-state
+  link
+- Given Read-then-Edit discipline, when this story implements, then it reads each file in full before any edit; the additive note is appended (or placed at an unambiguous insertion point) without disturbing
+  prior structure
 steps:
-  - id: implement
-    description: |
-      Read each of the two project memory files in full.
-      Append (or place) an additive note paragraph at an unambiguous
-      insertion point (after the most recent dated status block, before
-      historical context).
-      Verify no prior content modified.
-    agent: developer
-  - id: review
-    description: |
-      Reviewer diffs each memory file against pre-edit state; confirms
-      additive-only (no deletions / no rewrites); confirms note cites both
-      cycle-state file path + disposition pass doc.
-    agent: reviewer
-    depends_on: [implement]
-  - id: integrate
-    description: 'Commit "[cwfp-s5-5] docs(memory): additive notes for msd + mpt disposition outcomes"'
-    agent: developer
-    depends_on: [review]
+- id: implement
+  description: 'Read each of the two project memory files in full.
 
+    Append (or place) an additive note paragraph at an unambiguous
+
+    insertion point (after the most recent dated status block, before
+
+    historical context).
+
+    Verify no prior content modified.
+
+    '
+  agent: developer
+- id: review
+  description: 'Reviewer diffs each memory file against pre-edit state; confirms
+
+    additive-only (no deletions / no rewrites); confirms note cites both
+
+    cycle-state file path + disposition pass doc.
+
+    '
+  agent: reviewer
+  depends_on:
+  - implement
+- id: integrate
+  description: 'Commit "[cwfp-s5-5] docs(memory): additive notes for msd + mpt disposition outcomes"'
+  agent: developer
+  depends_on:
+  - review
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
-    - path: /Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_substrate_adoption.md
-      purpose: msd project memo; gains additive disposition note
-    - path: /Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_plan_test_cycles.md
-      purpose: mpt project memo; gains additive disposition note
-    - path: .pHive/cycle-state/multica-substrate-deepen.yaml
-      purpose: Source of msd disposition link (cwfp-s5-1)
-    - path: .pHive/cycle-state/multica-plan-test-cycles.yaml
-      purpose: Source of mpt disposition link (cwfp-s5-2)
-
+  - path: /Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_substrate_adoption.md
+    purpose: msd project memo; gains additive disposition note
+  - path: /Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_plan_test_cycles.md
+    purpose: mpt project memo; gains additive disposition note
+  - path: .pHive/cycle-state/multica-substrate-deepen.yaml
+    purpose: Source of msd disposition link (cwfp-s5-1)
+  - path: .pHive/cycle-state/multica-plan-test-cycles.yaml
+    purpose: Source of mpt disposition link (cwfp-s5-2)
 files_to_modify:
-  - file: /Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_substrate_adoption.md
-    change: APPEND additive note recording cc-workflows-first-party disposition outcome + cycle-state link + W3.2 park
-  - file: /Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_plan_test_cycles.md
-    change: APPEND additive note recording Q3 keep-as-second-party + cycle-state link
-
+- file: /Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_substrate_adoption.md
+  change: APPEND additive note recording cc-workflows-first-party disposition outcome + cycle-state link + W3.2 park
+- file: /Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/project_multica_plan_test_cycles.md
+  change: APPEND additive note recording Q3 keep-as-second-party + cycle-state link
 design_decisions:
-  - decision: Additive-only updates
-    rationale: gate_3_decisions.D5 AFFIRM — memory files carry historical context that subsequent readers (including future-self) depend on; bulk-overwriting destroys context
-  - decision: Read-then-Edit per file
-    rationale: Memory bulk-overwrite is explicitly called out in Risk Registry #13; Read-then-Edit is the named mitigation
-
+- decision: Additive-only updates
+  rationale: "gate_3_decisions.D5 AFFIRM \u2014 memory files carry historical context that subsequent readers (including future-self) depend on; bulk-overwriting destroys context"
+- decision: Read-then-Edit per file
+  rationale: Memory bulk-overwrite is explicitly called out in Risk Registry
 cross_cutting:
-  - concern: documentation
-    action: These memory files ARE the docs (project-memory tree); this story IS a doc change
-
+- concern: documentation
+  action: These memory files ARE the docs (project-memory tree); this story IS a doc change
 risks:
-  - severity: low
-    description: Memory file path absent (e.g. fresh dev environment)
-    mitigation: Read step surfaces absence; if missing, story creates the file with the additive note (and only the additive note); maintainer review confirms
-  - severity: low
-    description: Insertion point ambiguous if memory file lacks dated structure
-    mitigation: Append-at-end is the safe default; reviewer confirms semantic placement
-
+- severity: low
+  description: Memory file path absent (e.g. fresh dev environment)
+  mitigation: Read step surfaces absence; if missing, story creates the file with the additive note (and only the additive note); maintainer review confirms
+- severity: low
+  description: Insertion point ambiguous if memory file lacks dated structure
+  mitigation: Append-at-end is the safe default; reviewer confirms semantic placement
 references:
-  - path: .pHive/cycle-state/cc-workflows-first-party.yaml
-    relevant_excerpt: |
-      gate_3_decisions.D5: AFFIRM — Phase 5 additive-only updates to project_multica_substrate_adoption.md + project_multica_plan_test_cycles.md.
-
+- path: .pHive/cycle-state/cc-workflows-first-party.yaml
+  relevant_excerpt: "gate_3_decisions.D5: AFFIRM \u2014 Phase 5 additive-only updates to project_multica_substrate_adoption.md + project_multica_plan_test_cycles.md.\n"
 metric:
   applies: false
   justification: Project-memory additive notes for downstream-reader context preservation; no observable runtime outcome moves from this story alone.
+tracker_id: 475fdba1-73b6-4967-b5b8-81d3851bbebf
