@@ -1,8 +1,8 @@
-cycle_id: meta-2026-05-29
-started: '2026-05-29T00:00:00Z'
+cycle_id: meta-2026-06-01
+started: '2026-06-01T00:00:00Z'
 status: closed
 phase: close
-closed: '2026-05-29T00:30:00Z'
+closed: '2026-06-01T00:30:00Z'
 charter_constraints:
   - operate only on hive/references/**, hive/agents/**, hive/workflows/**, hive/lib/**,
     skills/hive/agents/memories/**, .pHive/meta-team/**, .pHive/teams/**
@@ -12,17 +12,17 @@ charter_constraints:
   - no changes to hive/hive.config.yaml without human confirmation
   - no new external service integrations without human confirmation
 prior_cycle:
-  id: meta-2026-05-21
+  id: meta-2026-05-29
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-05-29T00:00:00Z'
+    started_at: '2026-06-01T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
     prior_cycle_status: closed
   step_02_analysis:
-    findings_count: 4
+    findings_count: 5
     metric_signal: false
     external_candidates_count: 0
   step_02b_external_research:
@@ -38,58 +38,51 @@ steps:
       maintainer cycle. kg.sqlite absent. kg_signal findings=0
       miss_reason=empty_kg.
   step_03_proposal:
-    routing: step-03 (findings_count=4 > 0)
-    approved_proposals_count: 2
-    skipped_findings_count: 3
+    routing: step-03 (findings_count=5 > 0)
+    approved_proposals_count: 3
+    skipped_findings_count: 1
   step_03c_metric_declaration:
-    enriched_proposals_count: 2
+    enriched_proposals_count: 3
     gate_failures: 0
   step_04_implementation:
     changes_made:
       - proposal_id: proposal-1
         action: update_field
-        file: hive/GUIDE.md
+        file: hive/lib/sandcastle-worker-runner.js
         description: >
-          Updated Opus model ID from claude-opus-4-7 to claude-opus-4-8 in
-          Model Tier Routing table.
+          Updated DEFAULT_MODEL from claude-opus-4-7 to claude-opus-4-8.
         status: done
       - proposal_id: proposal-1
         action: update_field
-        file: hive/references/agent-config-schema.md
+        file: hive/lib/messages-session.js
         description: >
-          Updated Opus model ID from claude-opus-4-7 to claude-opus-4-8 in
-          model tier table.
-        status: done
-      - proposal_id: proposal-1
-        action: update_field
-        file: hive/agents/orchestrator.md
-        description: >
-          Updated Opus model ID from claude-opus-4-7 to claude-opus-4-8 in
-          Model Tier Routing table.
-        status: done
-      - proposal_id: proposal-1
-        action: update_field
-        file: hive/references/multica-agents-schema.md
-        description: >
-          Updated reviewer example model from claude-opus-4-7 to
-          claude-opus-4-8.
+          Updated DEFAULT_MODEL from claude-opus-4-7 to claude-opus-4-8.
         status: done
       - proposal_id: proposal-2
-        action: add_entry
+        action: update_field
         file: hive/lib/budget-gate.js
         description: >
-          Added claude-opus-4-8 rate entry to RATES_PER_MTOK (same rates as
-          4-7: in 15.0, out 75.0). Additive; kept claude-opus-4-7 key for
-          backward compatibility.
+          Updated FALLBACK_MODEL from claude-opus-4-7 to claude-opus-4-8.
+          Updated JSDoc example model from claude-opus-4-7 to claude-opus-4-8.
+        status: done
+      - proposal_id: proposal-3
+        action: update_field
+        file: hive/references/session-system-prompt-spec.md
+        description: >
+          Updated API fixture examples (lines 357, 420) from claude-opus-4-7
+          to claude-opus-4-8.
         status: done
   step_05_testing:
     test_results:
-      - change_id: proposal-1_docs
-        files:
-          - hive/GUIDE.md
-          - hive/references/agent-config-schema.md
-          - hive/agents/orchestrator.md
-          - hive/references/multica-agents-schema.md
+      - change_id: proposal-1_sandcastle-worker-runner
+        file: hive/lib/sandcastle-worker-runner.js
+        tests:
+          cross_reference_integrity: pass
+          schema_compliance: pass
+          content_safety: pass
+        overall: pass
+      - change_id: proposal-1_messages-session
+        file: hive/lib/messages-session.js
         tests:
           cross_reference_integrity: pass
           schema_compliance: pass
@@ -101,154 +94,183 @@ steps:
           cross_reference_integrity: pass
           schema_compliance: pass
           content_safety: pass
-          additive_only: pass
+        overall: pass
+      - change_id: proposal-3_session-spec
+        file: hive/references/session-system-prompt-spec.md
+        tests:
+          cross_reference_integrity: pass
+          schema_compliance: pass
+          content_safety: pass
         overall: pass
   step_06_evaluation:
     cycle_verdict: passed
-    pass_count: 2
+    pass_count: 3
     needs_optimization_count: 0
     needs_revision_count: 0
     metrics_snapshot:
       tokens: 0
-      wall_clock_ms: 0
+      wall_clock_ms: 5000
       first_attempt_pass: true
     evaluations:
-      - change_id: proposal-1_docs
+      - change_id: proposal-1_lib_defaults
         change_verdict: passed
         charter_objective: consistency
         quality_score: 1.0
         rationale: |
-          Updates four documentation files to reflect that the current Opus
-          model ID is claude-opus-4-8, replacing the stale claude-opus-4-7
-          reference. The change is consistent across all affected doc tables
-          and examples. No cross-references broken, no content removed.
+          Updates DEFAULT_MODEL in two runtime lib files
+          (sandcastle-worker-runner.js, messages-session.js) from the stale
+          claude-opus-4-7 to the current claude-opus-4-8. Both files use
+          DEFAULT_MODEL as the fallback when no explicit model is passed by
+          callers. The change is a targeted single-line substitution per file;
+          no existing functionality is removed, no cross-references broken.
+          claude-opus-4-8 is confirmed as the current production Opus model per
+          system context.
       - change_id: proposal-2_budget-gate
         change_verdict: passed
         charter_objective: consistency
         quality_score: 1.0
         rationale: |
-          Adds claude-opus-4-8 to RATES_PER_MTOK in budget-gate.js so token
-          cost events using the new model ID resolve correctly rather than
-          falling back to the fallback model. Additive-only change; old key
-          retained for backward compatibility. Same pattern used in
-          meta-2026-05-17 for the haiku model ID update.
+          Updates FALLBACK_MODEL constant and JSDoc example in budget-gate.js
+          from claude-opus-4-7 to claude-opus-4-8. The claude-opus-4-7 key is
+          retained in RATES_PER_MTOK for backward compatibility (same rates as
+          4-8, 15.0/75.0). FALLBACK_MODEL update ensures unknown models fall
+          back to the current Opus tier rather than a stale ID. JSDoc example
+          update improves documentation accuracy. Both changes are targeted
+          substitutions; no content removed.
+      - change_id: proposal-3_session-spec
+        change_verdict: passed
+        charter_objective: consistency
+        quality_score: 1.0
+        rationale: |
+          Updates two API fixture code examples in session-system-prompt-spec.md
+          (Python request fixture and JSON response fixture) from claude-opus-4-7
+          to claude-opus-4-8. This is a documentation-only change ensuring the
+          spec's example calls reflect the current Opus model ID. No schema,
+          cross-references, or structural content changed.
   step_07_promotion:
     promoted_changes:
       - proposal_id: proposal-1
         files:
-          - hive/GUIDE.md
-          - hive/references/agent-config-schema.md
-          - hive/agents/orchestrator.md
-          - hive/references/multica-agents-schema.md
+          - hive/lib/sandcastle-worker-runner.js
+          - hive/lib/messages-session.js
         verdict: pass
         status: promoted
-        commit_ref: 91490b37b812863ae9f1d4c01ddf3af0510e5ce4
-        rollback_target: 401f121e98f5b155b77bba8cbaaa8ab81da6e547
+        commit_ref: 74d889fdb62612c6d873b0767d6bdc3d958ebe38
+        rollback_target: 59f1f711b454a4c9f210d236727e9f7acb013fb0
       - proposal_id: proposal-2
         file: hive/lib/budget-gate.js
         verdict: pass
         status: promoted
-        commit_ref: 91490b37b812863ae9f1d4c01ddf3af0510e5ce4
-        rollback_target: 401f121e98f5b155b77bba8cbaaa8ab81da6e547
+        commit_ref: 74d889fdb62612c6d873b0767d6bdc3d958ebe38
+        rollback_target: 59f1f711b454a4c9f210d236727e9f7acb013fb0
+      - proposal_id: proposal-3
+        file: hive/references/session-system-prompt-spec.md
+        verdict: pass
+        status: promoted
+        commit_ref: 74d889fdb62612c6d873b0767d6bdc3d958ebe38
+        rollback_target: 59f1f711b454a4c9f210d236727e9f7acb013fb0
     reverted_changes: []
     insights_staged: 0
     decision: accept
-    rollback_target: 401f121e98f5b155b77bba8cbaaa8ab81da6e547
+    rollback_target: 59f1f711b454a4c9f210d236727e9f7acb013fb0
 summary:
-  total_findings: 4
-  proposals_generated: 2
-  changes_attempted: 5
-  changes_promoted: 5
+  total_findings: 5
+  proposals_generated: 3
+  changes_attempted: 4
+  changes_promoted: 4
   changes_reverted: 0
   flagged_for_human: 0
-  cycle_verdict: discard
+  cycle_verdict: passed
 closure_evidence:
-  commit_ref: 91490b37b812863ae9f1d4c01ddf3af0510e5ce4
+  commit_ref: 74d889fdb62612c6d873b0767d6bdc3d958ebe38
   metrics_snapshot:
     tokens: 0
-    wall_clock_ms: 0
+    wall_clock_ms: 5000
     first_attempt_pass: true
-  rollback_ref: 401f121e98f5b155b77bba8cbaaa8ab81da6e547
+  rollback_ref: 59f1f711b454a4c9f210d236727e9f7acb013fb0
 decision: accept
 regression_watch:
   state: armed
-  armed_at: '2026-05-29T00:30:00Z'
+  armed_at: '2026-06-01T00:30:00Z'
 observation_window:
-  start: '2026-05-29T00:30:00Z'
-  end: '2026-05-29T04:30:00Z'
+  start: '2026-06-01T00:30:00Z'
+  end: '2026-06-01T04:30:00Z'
 findings:
   - id: finding-1
     category: SCHEMA_INCONSISTENCY
     severity: high
-    location: hive/GUIDE.md, hive/references/agent-config-schema.md, hive/agents/orchestrator.md, hive/references/multica-agents-schema.md
+    location: hive/lib/sandcastle-worker-runner.js
     description: >
-      claude-opus-4-7 documented as current Opus model ID; current model
-      is claude-opus-4-8.
+      DEFAULT_MODEL set to stale 'claude-opus-4-7'; should be 'claude-opus-4-8'
+      to match the current production Opus model.
     evidence: >
-      hive/GUIDE.md line 178, agent-config-schema.md line 56,
-      orchestrator.md line 173, multica-agents-schema.md line 76 all
-      reference claude-opus-4-7. System context confirms current model
-      family is claude-opus-4-8.
+      Line 48: const DEFAULT_MODEL = 'claude-opus-4-7'; — used as the
+      default for actual API calls when no explicit model is passed.
   - id: finding-2
+    category: SCHEMA_INCONSISTENCY
+    severity: high
+    location: hive/lib/messages-session.js
+    description: >
+      DEFAULT_MODEL set to stale 'claude-opus-4-7'; should be 'claude-opus-4-8'
+      to match the current production Opus model.
+    evidence: >
+      Line 36: const DEFAULT_MODEL = 'claude-opus-4-7'; — used as the default
+      model for messages API sessions when no explicit model is provided.
+  - id: finding-3
     category: SCHEMA_INCONSISTENCY
     severity: medium
     location: hive/lib/budget-gate.js
     description: >
-      RATES_PER_MTOK missing claude-opus-4-8 key; token cost events for
-      the new model fall back to FALLBACK_MODEL rates rather than resolving
-      directly.
+      FALLBACK_MODEL set to stale 'claude-opus-4-7' and JSDoc example uses
+      old model ID; current model is 'claude-opus-4-8'.
     evidence: >
-      Line 48: 'claude-opus-4-7' present but 'claude-opus-4-8' absent.
-      Same pattern that caused haiku fallback-to-opus miscounting fixed
-      in meta-2026-05-17.
-  - id: finding-3
+      Line 55: const FALLBACK_MODEL = 'claude-opus-4-7'; controls fallback
+      rate resolution. Line 27 JSDoc comment example shows stale model ID.
+  - id: finding-4
+    category: SCHEMA_INCONSISTENCY
+    severity: medium
+    location: hive/references/session-system-prompt-spec.md
+    description: >
+      API fixture code examples at lines 357 and 420 use stale 'claude-opus-4-7';
+      should show 'claude-opus-4-8'.
+    evidence: >
+      Line 357: model="claude-opus-4-7" in Python API request example.
+      Line 420: "model": "claude-opus-4-7" in JSON response fixture.
+  - id: finding-5
     category: STUB_DOC
     severity: low
     location: hive/references/hive-cloud-roadmap.md
-    description: 13-line reference doc below 30-line stub threshold
+    description: 13-line reference doc below 30-line stub threshold.
     evidence: >
-      Line count: 13. S16 forward-reference placeholder for the deferred
-      Hive Cloud epic. Marked out_of_scope in 9+ consecutive cycles.
-  - id: finding-4
-    category: STUB_DOC
-    severity: low
-    location: hive/references/meta-safety-constraints.md
-    description: 29 non-blank lines — borderline stub threshold
-    evidence: >
-      Line count: 19. Functional W3C Design Token conversion prompt
-      template. Intentionally brief by design.
+      S16 forward-reference placeholder for the deferred Hive Cloud epic.
+      Marked out_of_scope in 10+ consecutive cycles.
 approved_proposals:
   - id: proposal-1
-    title: Update claude-opus-4-7 to claude-opus-4-8 in documentation files
+    title: Update DEFAULT_MODEL to claude-opus-4-8 in sandcastle-worker-runner.js and messages-session.js
     discovery_source: internal_audit
     addresses_findings:
       - finding-1
-    impact_score: 3
-    risk_score: 1
+      - finding-2
+    impact_score: 4
+    risk_score: 2
     effort_score: 1
-    priority_score: 15
+    priority_score: 16
     charter_objective: consistency
     metric:
       applies: false
-      justification: Documentation-only model ID correction.
+      justification: Runtime default model correction; same API pricing tier.
     implementation_plan:
-      - step: Update Opus model ID in hive/GUIDE.md Model Tier Routing table
-        file: hive/GUIDE.md
+      - step: Update DEFAULT_MODEL from claude-opus-4-7 to claude-opus-4-8
+        file: hive/lib/sandcastle-worker-runner.js
         action: update_field
-      - step: Update Opus model ID in hive/references/agent-config-schema.md
-        file: hive/references/agent-config-schema.md
-        action: update_field
-      - step: Update Opus model ID in hive/agents/orchestrator.md
-        file: hive/agents/orchestrator.md
-        action: update_field
-      - step: Update reviewer example model in hive/references/multica-agents-schema.md
-        file: hive/references/multica-agents-schema.md
+      - step: Update DEFAULT_MODEL from claude-opus-4-7 to claude-opus-4-8
+        file: hive/lib/messages-session.js
         action: update_field
   - id: proposal-2
-    title: Add claude-opus-4-8 rate entry to budget-gate.js RATES_PER_MTOK
+    title: Update FALLBACK_MODEL and JSDoc example in budget-gate.js to claude-opus-4-8
     discovery_source: internal_audit
     addresses_findings:
-      - finding-2
+      - finding-3
     impact_score: 3
     risk_score: 1
     effort_score: 1
@@ -257,39 +279,64 @@ approved_proposals:
     metric:
       applies: false
       justification: >
-        Additive rate-card entry; prevents fallback miscounting when
-        claude-opus-4-8 events are logged.
+        Updates FALLBACK_MODEL so unknown-model fallback resolves to the current
+        Opus model; old claude-opus-4-7 key retained in RATES_PER_MTOK for
+        backward compatibility.
     implementation_plan:
-      - step: Add claude-opus-4-8 entry to RATES_PER_MTOK (additive)
+      - step: Update FALLBACK_MODEL from claude-opus-4-7 to claude-opus-4-8
         file: hive/lib/budget-gate.js
-        action: add_entry
+        action: update_field
+      - step: Update JSDoc comment example model from claude-opus-4-7 to claude-opus-4-8
+        file: hive/lib/budget-gate.js
+        action: update_field
+  - id: proposal-3
+    title: Update API fixture examples in session-system-prompt-spec.md to claude-opus-4-8
+    discovery_source: internal_audit
+    addresses_findings:
+      - finding-4
+    impact_score: 2
+    risk_score: 1
+    effort_score: 1
+    priority_score: 10
+    charter_objective: consistency
+    metric:
+      applies: false
+      justification: Documentation-only fixture code update.
+    implementation_plan:
+      - step: Update model in Python API request fixture (line 357)
+        file: hive/references/session-system-prompt-spec.md
+        action: update_field
+      - step: Update model in JSON response fixture (line 420)
+        file: hive/references/session-system-prompt-spec.md
+        action: update_field
 skipped_findings:
-  - finding_id: finding-3
+  - finding_id: finding-5
     reason: out_of_scope
     notes: >
       S16 forward-reference placeholder for the deferred Hive Cloud epic.
       Expanding this stub is premature without the Hive Cloud epic active.
-      Marked out_of_scope in 9+ consecutive cycles.
-  - finding_id: finding-4
-    reason: out_of_scope
-    notes: >
-      Functional prompt template intentionally brief. Not a documentation
-      stub — operationally complete for its purpose.
+      Marked out_of_scope in 10+ consecutive cycles.
 changes:
   - proposal_id: proposal-1
     files:
-      - hive/GUIDE.md
-      - hive/references/agent-config-schema.md
-      - hive/agents/orchestrator.md
-      - hive/references/multica-agents-schema.md
+      - hive/lib/sandcastle-worker-runner.js
+      - hive/lib/messages-session.js
     action: update_field
     description: >
-      Updated Opus model ID from claude-opus-4-7 to claude-opus-4-8 in
-      four documentation files.
+      Updated DEFAULT_MODEL from claude-opus-4-7 to claude-opus-4-8 in
+      two runtime lib files.
     status: promoted
   - proposal_id: proposal-2
     file: hive/lib/budget-gate.js
-    action: add_entry
+    action: update_field
     description: >
-      Added claude-opus-4-8 rate entry to RATES_PER_MTOK (additive).
+      Updated FALLBACK_MODEL and JSDoc example from claude-opus-4-7 to
+      claude-opus-4-8.
+    status: promoted
+  - proposal_id: proposal-3
+    file: hive/references/session-system-prompt-spec.md
+    action: update_field
+    description: >
+      Updated API fixture examples (lines 357, 420) from claude-opus-4-7
+      to claude-opus-4-8.
     status: promoted

@@ -1,3 +1,38 @@
+- experiment_id: meta-2026-06-01
+  date: '2026-06-01'
+  started: '2026-06-01T00:00:00Z'
+  closed: '2026-06-01T00:30:00Z'
+  verdict: passed
+  changes_promoted: 4
+  changes_reverted: 0
+  findings_identified: 5
+  top_changes:
+    - "hive/lib/sandcastle-worker-runner.js: updated DEFAULT_MODEL from claude-opus-4-7 to claude-opus-4-8"
+    - "hive/lib/messages-session.js: updated DEFAULT_MODEL from claude-opus-4-7 to claude-opus-4-8"
+    - "hive/lib/budget-gate.js: updated FALLBACK_MODEL and JSDoc example from claude-opus-4-7 to claude-opus-4-8"
+    - "hive/references/session-system-prompt-spec.md: updated API fixture examples from claude-opus-4-7 to claude-opus-4-8"
+  commit: 74d889fdb62612c6d873b0767d6bdc3d958ebe38
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 59f1f711b454a4c9f210d236727e9f7acb013fb0
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-01. Analysis found 5 findings: (1)
+    SCHEMA_INCONSISTENCY — hive/lib/sandcastle-worker-runner.js DEFAULT_MODEL
+    set to stale claude-opus-4-7; updated to claude-opus-4-8. (2)
+    SCHEMA_INCONSISTENCY — hive/lib/messages-session.js DEFAULT_MODEL set to
+    stale claude-opus-4-7; updated to claude-opus-4-8. (3)
+    SCHEMA_INCONSISTENCY — hive/lib/budget-gate.js FALLBACK_MODEL and JSDoc
+    example used claude-opus-4-7; both updated to claude-opus-4-8 (claude-opus-4-7
+    key retained in RATES_PER_MTOK for backward compatibility). (4)
+    SCHEMA_INCONSISTENCY — hive/references/session-system-prompt-spec.md API
+    fixture examples at lines 357 and 420 used claude-opus-4-7; updated to
+    claude-opus-4-8. (5) STUB_DOC hive/references/hive-cloud-roadmap.md (13
+    lines) — S16 forward-reference placeholder, out_of_scope (10th+ consecutive
+    deferral). All 4 in-scope changes promoted. Closure validator passed.
+    Regression watch armed for 4-hour observation window.
 - experiment_id: meta-2026-05-29
   date: '2026-05-29'
   started: '2026-05-29T00:00:00Z'
