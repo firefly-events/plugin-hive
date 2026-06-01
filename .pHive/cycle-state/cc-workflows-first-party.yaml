@@ -73,3 +73,74 @@ gate_3_decisions:
       remains the FALLBACK invariant for overlapping touch-sets and the safe default.
     D5: AFFIRM — Phase 5 additive-only updates to project_multica_substrate_adoption.md + project_multica_plan_test_cycles.md
     D6: AFFIRM — Phase 0 spike prefers real existing tiny epic; synthetic acceptable if no ≤5-story fit
+
+spike_outcome:
+  story_id: cwfp-s1-1-phase0-capability-spike
+  recorded_at: "2026-06-01T05:39:42Z"
+  claude_code_version: "2.1.159"
+  test_epic:
+    id: smoke-test-execute-multica-codex
+    kind: real
+    story_count: 2
+    stories:
+      - stmc-1-create-marker
+      - stmc-2-append-line
+  team_composition:
+    codex_routed_creator_present: true
+    personas:
+      - persona: developer
+        backend: codex
+        role: creator
+      - persona: reviewer
+        backend: claude
+        role: review
+  verdicts:
+    integration_branch_contract:
+      criterion: a
+      verdict: FAIL
+      evidence: >
+        Interactive /workflows opened only a Dynamic workflows history dialog;
+        print-mode /workflows returned "isn't available in this environment";
+        no workflow run or story commit could be created.
+    codex_file_lists_serial_commits:
+      criterion: b
+      verdict: FAIL
+      evidence: >
+        Codex-routed creator was present in the planned team, but /workflows
+        dispatch never started, so no file list or adapter-side serial commit
+        evidence exists.
+    completion_signal_failure_modes:
+      criterion: c
+      verdict: FAIL
+      evidence: >
+        Failure was operator-recoverable because no background sessions or
+        worktree mutations existed, but no run-level completion, partial
+        failure, resume, or restart surface was observable.
+    plugin_shipped_skill_autoload:
+      criterion: d
+      verdict: PASS
+      evidence: >
+        claude plugin list showed plugin-hive@plugin-hive 2.9.0 enabled; a
+        fresh CLI-interactive session auto-loaded plugin-hive slash commands
+        including /execute and /status under Claude Code 2.1.159.
+  plan_b_branch_selections:
+    q2_path: unresolved_followup_required
+    q2_path_rationale: >
+      Do not select shell-snippet injection or CC-native worktree fallback from
+      this spike; /workflows did not expose a creation/invocation primitive.
+    serial_commit_gate: mandatory
+    serial_commit_gate_rationale: >
+      Criteria (a) and (b) produced no evidence that direct /workflows fan-out
+      can honor Hive's integration-branch contract or Codex file-list handoff.
+    layer_5_autoload: primary_path_pass
+    layer_5_autoload_rationale: >
+      Plugin-hive auto-loaded from the installed plugin in CLI-interactive
+      Claude Code 2.1.159; first-party does not need Mode D-a solely for this
+      tested environment.
+  maintainer_gate:
+    status: pending
+    signature: null
+    note: >
+      Slices 2-6 remain blocked until the maintainer reviews the failed
+      Phase 0 spike and decides whether to provide a /workflows creation
+      primitive, re-run the spike, or pivot Plan B.
