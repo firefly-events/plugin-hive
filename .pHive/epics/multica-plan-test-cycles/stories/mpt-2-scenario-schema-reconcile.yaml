@@ -75,3 +75,9 @@ metric:
 tracker_id: plugin-hive/PLU-155
 tracker_uuid: 03b3ca70-728d-423b-b01a-70e6cb723435
 tracker_url: http://localhost:3000/issue/PLU-155
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4b)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; reconciles the simulated-manual scenario shape before Multica consumes scenarios as shared substrate for the routed test path.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt
