@@ -76,7 +76,8 @@ gate_3_decisions:
 
 spike_outcome:
   story_id: cwfp-s1-1-phase0-capability-spike
-  recorded_at: "2026-06-01T05:39:42Z"
+  latest_run_id: 2
+  recorded_at: "2026-06-02T00:28:00Z"
   claude_code_version: "2.1.159"
   test_epic:
     id: smoke-test-execute-multica-codex
@@ -89,58 +90,86 @@ spike_outcome:
     codex_routed_creator_present: true
     personas:
       - persona: developer
-        backend: codex
+        surface: Workflow.agent(agentType=codex:codex-rescue)
         role: creator
       - persona: reviewer
-        backend: claude
+        surface: Workflow.agent(default Claude subagent)
         role: review
+  surface_under_test:
+    run_1: "/workflows slash command (history browser)"
+    run_2: "Workflow tool (deterministic script runner)"
+    clarification: >
+      Run 1 measured the /workflows slash command, which is a history browser
+      surface ("Browse dynamic workflow history") and is not the workflow
+      runner. Run 2 measures the Workflow tool surface, which IS the
+      workflow-creation/invocation primitive the spike criteria target.
   verdicts:
     integration_branch_contract:
       criterion: a
-      verdict: FAIL
+      verdict: PASS
       evidence: >
-        Interactive /workflows opened only a Dynamic workflows history dialog;
-        print-mode /workflows returned "isn't available in this environment";
-        no workflow run or story commit could be created.
+        Workflow.agent() accepted integration-branch shell-snippet prompts.
+        Codex agents honored "no git command" constraint and returned
+        structured file lists. Adapter (orchestrator) committed serially:
+        15614a1 [stmc-1-create-marker] then 916c2c1 [stmc-2-append-line] on
+        feat/cc-workflows-first-party. Integration branch advanced exactly
+        once per story in dependency order.
     codex_file_lists_serial_commits:
       criterion: b
-      verdict: FAIL
+      verdict: PASS
       evidence: >
-        Codex-routed creator was present in the planned team, but /workflows
-        dispatch never started, so no file list or adapter-side serial commit
-        evidence exists.
+        Codex creators (agentType=codex:codex-rescue) returned structured
+        {files,timestamp} payloads. Zero git tool uses by any agent. Adapter
+        authored two serial commits after the Workflow run returned —
+        confirms architect Q3+Q4 unified serial-commit gate mechanism and
+        bypasses feedback_codex_sandbox_commit_block by design.
     completion_signal_failure_modes:
       criterion: c
-      verdict: FAIL
+      verdict: PASS
       evidence: >
-        Failure was operator-recoverable because no background sessions or
-        worktree mutations existed, but no run-level completion, partial
-        failure, resume, or restart surface was observable.
+        Workflow tool emits <task-notification> on completion with structured
+        <result>, <status>, <usage>, <output-file>, and per-run transcript
+        directory. resumeFromRunId token persists at dispatch — completed
+        agents cache, edits replay only changed calls. TaskStop cancels in
+        flight.
     plugin_shipped_skill_autoload:
       criterion: d
       verdict: PASS
       evidence: >
-        claude plugin list showed plugin-hive@plugin-hive 2.9.0 enabled; a
-        fresh CLI-interactive session auto-loaded plugin-hive slash commands
-        including /execute and /status under Claude Code 2.1.159.
+        Carried forward from Run 1: plugin-hive@plugin-hive 2.9.0 enabled;
+        /execute and /status auto-loaded in CLI-interactive Claude Code
+        2.1.159. Auto-load surface is independent of Workflow tool surface.
   plan_b_branch_selections:
-    q2_path: unresolved_followup_required
+    q2_path: a_shell_snippet
     q2_path_rationale: >
-      Do not select shell-snippet injection or CC-native worktree fallback from
-      this spike; /workflows did not expose a creation/invocation primitive.
+      Workflow.agent() accepts arbitrary prompts carrying the integration-
+      branch shell-snippet contract verbatim. Run 2 confirms agents respect
+      the no-git constraint when so prompted. Q2 selection (a) resolved.
     serial_commit_gate: mandatory
     serial_commit_gate_rationale: >
-      Criteria (a) and (b) produced no evidence that direct /workflows fan-out
-      can honor Hive's integration-branch contract or Codex file-list handoff.
+      MECHANISM CONFIRMED end-to-end. Adapter (orchestrator) owns commit role;
+      Codex agents return file lists and never write .git. Pattern bypasses
+      sandbox-commit-block constraint by design and remains the canonical
+      contract for cwfp-s2-3-execute-mode-cc-workflows-skill.
     layer_5_autoload: primary_path_pass
     layer_5_autoload_rationale: >
       Plugin-hive auto-loaded from the installed plugin in CLI-interactive
-      Claude Code 2.1.159; first-party does not need Mode D-a solely for this
+      Claude Code 2.1.159; first-party does not need Mode D-a for this
       tested environment.
   maintainer_gate:
     status: pending
     signature: null
     note: >
-      Slices 2-6 remain blocked until the maintainer reviews the failed
-      Phase 0 spike and decides whether to provide a /workflows creation
-      primitive, re-run the spike, or pivot Plan B.
+      Run 2 (2026-06-02) produced ALL-PASS verdicts on (a)(b)(c)(d) using
+      the Workflow tool surface. Slices 2-6 unblock pending maintainer
+      sign-off. Evidence: spike-findings.md Run 2 section + smoke commits
+      15614a1 and 916c2c1 on feat/cc-workflows-first-party.
+  run_1_archive:
+    recorded_at: "2026-06-01T05:39:42Z"
+    surface_tested: "/workflows slash command (history browser)"
+    verdicts: { a: FAIL, b: FAIL, c: FAIL, d: PASS }
+    reason_for_supersession: >
+      Run 1 measured the wrong surface — the /workflows slash command is a
+      browser, not a runner. Run 2 re-measures the correct runner surface
+      (Workflow tool) and produces PASS verdicts. Run 1 verdicts retained
+      for audit but superseded.
