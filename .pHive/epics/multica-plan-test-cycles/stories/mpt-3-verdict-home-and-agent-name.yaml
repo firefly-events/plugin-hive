@@ -74,3 +74,9 @@ metric:
 tracker_id: plugin-hive/PLU-156
 tracker_uuid: 0c55773f-b531-45d4-897e-e9ab42388e08
 tracker_url: http://localhost:3000/issue/PLU-156
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4c)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; pins story-YAML manual_verdict and tester naming used by both local and Multica simulated-manual flows.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt
