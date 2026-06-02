@@ -76,3 +76,9 @@ metric:
   verify_at: 2026-07-01 00:00:00+00:00
   owner: reviewer
 tracker_id: plugin-hive/PLU-142
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3r)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep only as second-party backlog; implementation evidence is sparse and the requested CI/script files are absent, so do not treat it as shipped.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd
