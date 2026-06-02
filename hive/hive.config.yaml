@@ -1,6 +1,8 @@
 # Hive Configuration
 # All settings have sensible defaults. Override only what you need.
 
+schema_version: "1.2"
+
 # File system paths
 # Where Hive stores all per-project state (epics, episodes, cycle state,
 # memories, sessions). Default: .pHive/ (hidden directory, like .git/ or
@@ -315,6 +317,12 @@ planning:
 # Execution defaults
 # Note: default_methodology can be populated by developer elicitation (Phase 2b-ii)
 execution:
+  runtime: auto         # auto | workflows | multica  (Q4 maintainer-confirmed default: auto)
+  # cwfp-s2-2 execute-dispatch resolver precedence:
+  # env HIVE_EXECUTION_RUNTIME > root config > shipped baseline > skill override > default.
+  # When runtime is 'auto', execute-dispatch may use a per-epic
+  # .pHive/cycle-state/<epic-id>.yaml execution_runtime override; explicit
+  # 'workflows' or 'multica' bypass that per-epic override.
   default_methodology: classic
   parallel_teams: true
   max_retry_attempts: 2
