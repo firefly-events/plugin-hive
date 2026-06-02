@@ -43,3 +43,9 @@ metric:
   applies: false
   justification: Schema doc; w3-2 + w3-3 carry delivery metrics.
 tracker_id: plugin-hive/PLU-135
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3k)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep the schema reference as second-party documentation, while the concrete autopilot manifest is parked by Q5.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd
