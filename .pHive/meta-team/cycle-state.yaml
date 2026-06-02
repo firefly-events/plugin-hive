@@ -135,6 +135,21 @@ steps:
     reverted_changes: []
     insights_staged: 0
     decision: accept
+    rollback_target: 59f1f711b454a4c9f210d236727e9f7acb013fb0
+closure_evidence:
+  commit_ref: 027a136bf595ba011ffe3048f1bd5bfdbe628052
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 59f1f711b454a4c9f210d236727e9f7acb013fb0
+decision: accept
+regression_watch:
+  state: armed
+  armed_at: '2026-06-02T00:30:00Z'
+observation_window:
+  start: '2026-06-02T00:30:00Z'
+  end: '2026-06-02T04:30:00Z'
 summary:
   total_findings: 6
   proposals_generated: 2

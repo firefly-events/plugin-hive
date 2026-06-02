@@ -20,7 +20,8 @@
 - Next cycle priority: Check for remaining claude-opus-4-7 references in other lib or reference files
 
 ## Commit
-- Rollback ref: `59f1f71` (pre-cycle HEAD)
-- Regression watch: armed (4-hour window)
+- `027a136bf595ba011ffe3048f1bd5bfdbe628052` on branch `meta-meta/nightly-20260602`
+- Rollback ref: `59f1f711b454a4c9f210d236727e9f7acb013fb0`
+- Regression watch: armed (4-hour window, closes 2026-06-02T04:30:00Z)
 
 kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.0 miss_reason=empty_kg

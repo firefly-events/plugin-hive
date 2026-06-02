@@ -1,3 +1,35 @@
+- experiment_id: meta-2026-06-02
+  date: '2026-06-02'
+  started: '2026-06-02T00:00:00Z'
+  closed: '2026-06-02T00:30:00Z'
+  verdict: passed
+  changes_promoted: 3
+  changes_reverted: 0
+  findings_identified: 6
+  top_changes:
+    - "hive/references/session-system-prompt-spec.md: updated claude-opus-4-7 to claude-opus-4-8 in Python request and JSON response API examples"
+    - "hive/lib/messages-session.js: updated DEFAULT_MODEL constant from claude-opus-4-7 to claude-opus-4-8"
+    - "hive/lib/sandcastle-worker-runner.js: updated DEFAULT_MODEL constant and JSDoc from claude-opus-4-7 to claude-opus-4-8"
+  commit: 027a136bf595ba011ffe3048f1bd5bfdbe628052
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 59f1f711b454a4c9f210d236727e9f7acb013fb0
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-02. Analysis found 6 findings: (1)
+    SCHEMA_INCONSISTENCY — hive/references/session-system-prompt-spec.md lines
+    357 and 420 used stale claude-opus-4-7 in API example code blocks; updated
+    to claude-opus-4-8. (2) SCHEMA_INCONSISTENCY — hive/lib/messages-session.js
+    DEFAULT_MODEL constant referenced stale claude-opus-4-7; updated to
+    claude-opus-4-8. (3) SCHEMA_INCONSISTENCY — hive/lib/sandcastle-worker-runner.js
+    DEFAULT_MODEL constant and JSDoc @param referenced stale claude-opus-4-7;
+    updated to claude-opus-4-8. (4-6) STUB_DOC — hive/references/hive-cloud-roadmap.md
+    (13 lines, 11th+ consecutive deferral), design-review-design-critique.md (11
+    lines), design-system.md (19 lines) — all marked out_of_scope (intentionally
+    brief or deferred epics). Closure validator passed. Regression watch armed for
+    4-hour observation window.
 - experiment_id: meta-2026-05-29
   date: '2026-05-29'
   started: '2026-05-29T00:00:00Z'
