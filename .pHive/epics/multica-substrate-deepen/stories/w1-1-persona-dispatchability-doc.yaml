@@ -52,3 +52,9 @@ metric:
   applies: false
   justification: Classification artifact; downstream w1-2 carries the persona-port delivery metric.
 tracker_id: plugin-hive/PLU-133
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3d)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep as the Multica-specific dispatchability inventory; first-party CC has its own later reclassification, but this document still governs the second-party agent manifest.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd
