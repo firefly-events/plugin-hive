@@ -53,3 +53,9 @@ metric:
   applies: false
   justification: Spike story; written finding doc, no measurable consumer behavior. W2.4 carries the adapter delivery metric.
 tracker_id: plugin-hive/PLU-130
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3b)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep as second-party squad substrate context; the exact spike artifact is absent, but shipped squad schema/config/reconcile code shows the squad path continued as Multica-owned work.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd
