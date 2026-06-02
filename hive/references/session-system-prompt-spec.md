@@ -354,7 +354,7 @@ This is the on-the-wire shape of one turn for a `researcher` session whose first
 
 ```python
 client.messages.create(
-    model="claude-opus-4-7",
+    model="claude-opus-4-8",
     max_tokens=4096,
     system=(
         "# Researcher\n"
@@ -417,7 +417,7 @@ client.messages.create(
 {
     "id": "msg_01ABC",
     "role": "assistant",
-    "model": "claude-opus-4-7",
+    "model": "claude-opus-4-8",
     "stop_reason": "tool_use",
     "content": [
         {"type": "text", "text": "I'll start by searching for messages.create in hive/lib."},
