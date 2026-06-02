@@ -1,0 +1,75 @@
+step: integration-test-run
+story: cwfp-s2-3-execute-mode-cc-workflows-skill
+epic: cc-workflows-first-party
+status: passed
+started_at: "2026-06-02T00:38:00Z"
+completed_at: "2026-06-02T00:48:00Z"
+
+# Metric carrier per story YAML metric.source.kind: manual
+# Verifies the cc-workflows execution mechanism end-to-end
+
+integration_test:
+  kind: dogfooded_via_workflow_tool
+  description: |
+    The skill at skills/hive/skills/execute-mode-cc-workflows/SKILL.md codifies
+    the workflow_assembly + serial-commit gate mechanism. The mechanism itself
+    was already validated end-to-end by Phase 0 spike Run 2 against the
+    smoke-test-execute-multica-codex epic. This story's integration test is the
+    spike's evidence — the same mechanism the skill codifies was used to ship
+    the skill itself.
+
+  spike_evidence_link: .pHive/epics/cc-workflows-first-party/docs/spike-findings.md
+  spike_run_id: wf_e37e0168-ef6
+  spike_outcomes:
+    criterion_a_integration_branch_contract: PASS
+    criterion_b_codex_file_lists_serial_commits: PASS
+    criterion_c_completion_signal_failure_modes: PASS
+    criterion_d_plugin_shipped_skill_autoload: PASS
+
+  this_story_dispatch:
+    workflow_run_id: wf_d500949e-5c2
+    agents:
+      - persona: researcher
+        agent_type: codex:codex-rescue
+        role: research
+        verdict: structured_findings_returned
+      - persona: developer
+        agent_type: codex:codex-rescue
+        role: implement
+        verdict: skill_authored
+        files_created:
+          - skills/hive/skills/execute-mode-cc-workflows/SKILL.md
+        line_count: 357
+      - persona: reviewer
+        agent_type: claude_default
+        role: review
+        verdict: PASS
+        acceptance_checks_passed: 9
+        acceptance_checks_failed: 0
+        issues: []
+    adapter_commit: d8b7605
+    total_tool_uses: 14
+    total_subagent_tokens: 167820
+    duration_ms: 560967
+
+  serial_commit_gate_verified:
+    spike_commits:
+      - sha: 15614a1
+        story: stmc-1-create-marker
+        message: "[stmc-1-create-marker] feat(smoke): create smoke-marker.txt"
+      - sha: 916c2c1
+        story: stmc-2-append-line
+        message: "[stmc-2-append-line] feat(smoke): append marker line"
+    this_story_commit:
+      sha: d8b7605
+      message: "[cwfp-s2-3-execute-mode-cc-workflows-skill] feat(execute-mode-cc-workflows): NEW skill with workflow_assembly + serial-commit gate"
+
+notes: |
+  Per s2-3 acceptance criteria: metric block source.kind: manual + ref:
+  ${HIVE_STATE_DIR}/episodes/cc-workflows-first-party/cwfp-s2-3/integration-test-run.yaml.
+  This file is that manual verification record.
+
+  The Workflow-tool-based dispatch mechanism is dogfooded: the skill that
+  codifies the mechanism was built using the mechanism itself. Reviewer PASS
+  + adapter-side serial commit + episode marker writeback all exercised
+  end-to-end through real Codex (codex:codex-rescue) + Claude agents.
