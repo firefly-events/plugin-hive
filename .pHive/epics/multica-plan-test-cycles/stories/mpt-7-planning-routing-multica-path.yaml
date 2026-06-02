@@ -70,3 +70,9 @@ metric:
 tracker_id: plugin-hive/PLU-160
 tracker_uuid: bc1b90b9-776e-483c-840c-b9568b0c3022
 tracker_url: http://localhost:3000/issue/PLU-160
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4g)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; adds multica as a planning-routing spawn path with fallback vocabulary feeding plan-mode-multica.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt
