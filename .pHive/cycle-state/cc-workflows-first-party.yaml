@@ -157,13 +157,13 @@ spike_outcome:
       Claude Code 2.1.159; first-party does not need Mode D-a for this
       tested environment.
   maintainer_gate:
-    status: pending
-    signature: null
+    status: signed
+    signature: "don.matthews@ff.events — 2026-06-02T00:35:00Z"
     note: >
       Run 2 (2026-06-02) produced ALL-PASS verdicts on (a)(b)(c)(d) using
-      the Workflow tool surface. Slices 2-6 unblock pending maintainer
-      sign-off. Evidence: spike-findings.md Run 2 section + smoke commits
-      15614a1 and 916c2c1 on feat/cc-workflows-first-party.
+      the Workflow tool surface. Maintainer signed off verbally after
+      reviewing spike-findings.md Run 2 section + smoke commits 15614a1
+      and 916c2c1 on feat/cc-workflows-first-party. Slices 2-6 UNBLOCKED.
   run_1_archive:
     recorded_at: "2026-06-01T05:39:42Z"
     surface_tested: "/workflows slash command (history browser)"
