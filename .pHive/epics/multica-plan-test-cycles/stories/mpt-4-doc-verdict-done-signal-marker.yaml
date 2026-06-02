@@ -72,3 +72,9 @@ metric:
 tracker_id: plugin-hive/PLU-157
 tracker_uuid: 3df417c7-d8bf-4d47-acb5-c32c838df5bf
 tracker_url: http://localhost:3000/issue/PLU-157
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4d)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; adds the doc/verdict completion dialect so non-code-push Multica plan/test work can reach terminal.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt
