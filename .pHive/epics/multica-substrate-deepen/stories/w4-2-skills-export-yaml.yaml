@@ -60,3 +60,9 @@ metric:
   verify_at: integrate
   owner: reviewer
 tracker_id: plugin-hive/PLU-141
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3p)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep as the shipped second-party export manifest; it now contains the metrics pilot plus writer doc-type skills.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd
