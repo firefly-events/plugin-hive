@@ -43,3 +43,9 @@ metric:
   applies: false
   justification: Schema doc; downstream w2-2 squads.yaml and w2-3 reconcileSquads carry delivery metrics.
 tracker_id: plugin-hive/PLU-134
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3h)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep as the schema reference for Multica team-as-squad configuration.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd
