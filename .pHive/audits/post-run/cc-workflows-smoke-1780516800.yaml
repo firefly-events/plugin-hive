@@ -1,0 +1,133 @@
+run_id: smoke-1780516800
+skill: execute
+epic_id: cc-workflows-smoke
+timestamp: "2026-06-03T13:58:30Z"
+gate_lift_fired: false
+methodology: classic
+methodology_source: epic-yaml
+story_specs_produced: 3
+backend_sources:
+  sessions_enabled: default
+  parallel_teams: config
+  terminal_mux: config
+  executor: default
+  execution_runtime: env
+mode_decision: cc-workflows
+mode_reason: execution-runtime-override-env
+runner_path: orchestrator-narrated
+runner_reason: consumer-config-missing
+nonsensical_defaults: []
+warnings_emitted: 0
+substrate_test:
+  goal: validate cc-workflows execution substrate end-to-end (PR #241)
+  pass_criteria:
+    - dispatch_resolves_to_cc_workflows: PASS  # required dispatch fix on PR branch (commit 29bc5d3)
+    - workflow_tool_fires_per_story: PASS
+    - structured_file_list_returned: PASS
+    - per_story_episode_marker_written: PASS
+    - per_story_messages_sidecar_written: PASS
+    - exactly_three_chore_commits_landed: PASS
+    - reconcile_branch_attribution_correct: PASS  # orchestrator authored, not agents
+  findings:
+    - id: dispatch-dead-runtime-branch
+      severity: major
+      surface: skills/hive/skills/execute-dispatch/SKILL.md step 1 pseudocode
+      observation: |
+        Resolved before any story dispatched. The else-branch on the per-epic
+        override block routed every explicit non-auto runtime value to the
+        auto heuristic, which only returns sessions / sequential / team /
+        team-cmux — never cc-workflows or multica. HIVE_EXECUTION_RUNTIME=workflows
+        resolved with source=env but mode_decision fell through to team-cmux.
+      fix: |
+        Added explicit-runtime branch above the per-epic-override path that
+        maps resolved_runtime in {workflows, multica} to the corresponding
+        mode_decision with mode_reason=execution-runtime-override-{source}.
+        Unknown explicit runtime values fail-closed to the auto heuristic.
+        Landed on feat/cc-workflows-first-party as commit 29bc5d3.
+      status: fix-applied
+    - id: workflow-tool-args-string-vs-object
+      severity: minor
+      surface: orchestrator-built Workflow scripts dispatched from execute-mode-cc-workflows
+      observation: |
+        First dispatch (wf_506227d1-a29) wrote to <worktree>/undefined and
+        the agent fabricated a timestamp. Root cause: the Workflow tool's
+        `args` global arrived as a JSON-encoded string instead of the parsed
+        object, so `args.notes_path` evaluated to JavaScript undefined and
+        the template literal rendered the word "undefined" as the filename.
+        Documented in the Workflow tool description ("a stringified list
+        reaches the script as one string") but easy to miss when building
+        scripts from an orchestrator's string-typed parameters.
+      fix: |
+        Defensive parse shim added at the top of the per-story Workflow
+        script: `const a = typeof args === 'string' ? JSON.parse(args) : args;`
+        Re-fired wf_d2b00bfb-b38 succeeded with correct path resolution and
+        timestamp echo. Recommend the execute-mode-cc-workflows skill spell
+        out the defensive-parse contract in its Step 1.5 "Dispatch" bullets
+        so future implementers do not rediscover this.
+      status: workaround-applied
+    - id: tracker-skipped-throwaway
+      severity: info
+      surface: cc-workflows-smoke run
+      observation: |
+        Multica adapter is configured (task_tracking.adapter=multica in root
+        hive.config.yaml) but the workspace is not bootstrapped on this
+        worktree. Step 1.1 createIssue + Step 5 updateStatus were skipped
+        for this throwaway run on the grounds that substrate-under-test
+        does not include tracker plumbing. Smoke epic disposition is
+        keep-as-zeroth-party so no Multica issues should be created.
+      fix: |
+        None for this run. A real epic routed through cc-workflows mode
+        will exercise the tracker path; reserve that test for a separately
+        bootstrapped follow-up rather than mixing it with substrate
+        validation.
+      status: deliberate-skip
+    - id: workflow-step-shape-deviation
+      severity: info
+      surface: execute-mode-cc-workflows skill Step 1.5 vs cc-workflows-smoke run
+      observation: |
+        Skill says "one phase() per workflow step, one agent() per (story, step)";
+        classic workflow has 7 steps. For 3 stories the spec would build
+        21 agent calls, including preflight (which would fail — no build
+        command for the throwaway epic) and review/integrate (which would
+        try to write git from inside agents, violating the no-git contract).
+        For this substrate smoke we deliberately collapsed the workflow to
+        a single "Implement" phase with one agent() per story.
+      fix: |
+        None. Documents that the skill's workflow-step expansion is a
+        product question for execute-mode-cc-workflows v2: classic-as-is,
+        or a substrate-mode-specific workflow that omits preflight/integrate
+        because the orchestrator owns reconcile.
+      status: substrate-question
+  artifacts:
+    workflow_runs:
+      - run_id: wf_506227d1-a29
+        story_id: smoke-1-append-note
+        verdict: failed
+        reason: args-stringified-not-parsed
+      - run_id: wf_d2b00bfb-b38
+        story_id: smoke-1-append-note
+        verdict: passed
+      - run_id: wf_8c4a0967-867
+        story_id: smoke-2-append-note
+        verdict: passed
+      - run_id: wf_22cc0c73-9e4
+        story_id: smoke-3-append-note
+        verdict: passed
+    commits:
+      - cda1440  # orchestrator infra (markers + gitignore allowlist)
+      - 63da79b  # smoke-1-append-note chore(smoke)
+      - 1617110  # smoke-2-append-note chore(smoke)
+      - 91f0cee  # smoke-3-append-note chore(smoke)
+    episode_markers:
+      - .pHive/episodes/cc-workflows-smoke/smoke-1-append-note/cc-workflows-run.yaml
+      - .pHive/episodes/cc-workflows-smoke/smoke-2-append-note/cc-workflows-run.yaml
+      - .pHive/episodes/cc-workflows-smoke/smoke-3-append-note/cc-workflows-run.yaml
+  setup_context:
+    cache_overlay:
+      strategy: symlink
+      target_worktree: /Users/don/Documents/plugin-hive/.claude/worktrees/cc-wf-pr
+      pr_branch: feat/cc-workflows-first-party
+      backup_dirs:
+        - ~/.claude/plugins/cache/plugin-hive/plugin-hive/2.9.0/skills.bak
+        - ~/.claude/plugins/cache/plugin-hive/plugin-hive/2.9.0/hive.bak
+      cleanup_required: true
