@@ -119,6 +119,7 @@ For each story in `unblocked_stories[]`:
    - Codex-routed personas resolve to `agentType: "codex:codex-rescue"`.
    - Claude-routed personas use the default subagent surface, equivalent to `Workflow.agent()` without a Codex `agentType`.
    - Persona files are referenced at `hive/agents/<persona>.md`; prompts carry the integration branch and no-git contracts.
+   - **Defensive `args` parse contract.** Every assembled script MUST begin its body with `const a = typeof args === 'string' ? JSON.parse(args) : args;` and reference inputs via `a.<field>` (NOT `args.<field>`). The Workflow tool surface does not guarantee that the `args` global arrives as a parsed object — when the tool is invoked from an orchestrator whose tool-call parameters are string-typed (XML/JSON-string body parameters), `args` arrives as the raw JSON-encoded string and `args.<field>` evaluates to JavaScript `undefined`. Template literals then render the word `undefined` as filename / path fragments and downstream Edit / Write tool calls touch the wrong path. Surfaced by the cc-workflows-smoke run (audit finding `workflow-tool-args-string-vs-object`); the defensive shim is cheap and idempotent.
    - Invoke the Workflow TOOL with the assembled script.
    - Capture returned `run_id` and `transcript_dir`. This is not the `/workflows` slash command; `/workflows` is the history browser, per `.pHive/epics/cc-workflows-first-party/docs/spike-findings.md:40`.
 
