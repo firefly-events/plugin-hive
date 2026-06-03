@@ -78,7 +78,7 @@ For `execution_mode` and `execution_runtime`, record the expanded source chain a
   - When source is `env` or `config`: immediately set `mode_decision=multica` and `mode_reason=execution-mode-override-{source}`. Skip Step 1 entirely. This takes precedence over sessions, team, and sequential.
   - `execution_mode=default` does NOT trigger the "fell to defaults" warning — it is the normal non-multica path.
 - `execution_runtime`:
-  - env path: future runtime env input set to an explicit runtime → that runtime, source `env`
+  - env path: `env.HIVE_EXECUTION_RUNTIME` set to an explicit runtime → that runtime, source `env`
   - root config path: root `hive.config.yaml execution.runtime` set → that runtime, source `root config`
   - shipped baseline path: shipped baseline runtime disposition set → that runtime, source `shipped baseline`
   - skill override path: skill-local runtime override set → that runtime, source `skill override`
@@ -114,7 +114,7 @@ if epic_id is known:
   cycle_state_path = ".pHive/cycle-state/<epic-id>.yaml"
   if file exists:
     cycle_state = read YAML(cycle_state_path)
-    per_epic_override = cycle_state.execution_runtime.override_mode
+    per_epic_override = cycle_state.execution_runtime.adapter
   else:
     per_epic_override = null  # graceful fall-through for unknown epic; no hard error
 

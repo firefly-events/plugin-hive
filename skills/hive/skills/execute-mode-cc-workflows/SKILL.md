@@ -93,10 +93,10 @@ Phase 1 dispatches stories serially within the current depth: resolve story N, a
 
 For each story in `unblocked_stories[]`:
 
-1. **Issue resolution via Multica adapter direct methods.**
-   - If `story.tracker_id` exists, call `getStory`; capture tracker id, adapter story id, issue identifier, and URL.
-   - If missing, call `createStory({ title: story.title, body: '<brief placeholder — will be filled before dispatch>', labels: [] })`; capture the new tracker id for the final task-tracking update.
-   - Do not use literal `TaskTrackingDispatch` or `dispatch.invoke(...)` names for this issue-resolution surface; the named surface is `getStory` / `createStory` from `hive/adapters/multica/index.ts`.
+1. **Issue resolution via task-tracking ABI.**
+   - If `story.tracker_id` exists, call `task-tracking-dispatch.invoke("getIssue", { tracker_id: story.tracker_id })`; capture tracker id, adapter story id, issue identifier, and URL.
+   - If missing, call `task-tracking-dispatch.invoke("createIssue", { title: story.title, body: '<brief placeholder — will be filled before dispatch>', labels: [] })`; capture the new tracker id for the final task-tracking update.
+   - Use the vendor-neutral task-tracking ABI consistently — same pattern as the `updateStatus` step below — so this skill stays atomic and adapter-agnostic.
 
 2. **Backlog kick.**
    - Ensure the resolved tracker story is not stranded in backlog state before dispatch.

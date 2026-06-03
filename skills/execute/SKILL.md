@@ -185,7 +185,7 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
    - `epic_handle`: the current epic identifier
    - `hive_config`: parsed root `hive.config.yaml` (for `execution.multica.*` options and `agent_backends.*`)
 
-6f. **CC Workflows execution** (used when `HIVE_EXECUTION_MODE=cc-workflows` or root config `execution.mode: cc-workflows`). Routes each story into a Workflow tool dispatch.
+6f. **CC Workflows execution** (used when `HIVE_EXECUTION_RUNTIME=workflows` or root config `execution.runtime: cc-workflows`). Routes each story into a Workflow tool dispatch.
    Invoke `skills/hive/skills/execute-mode-cc-workflows/SKILL.md` with:
    - `workflow_path`: the workflow loaded in step 3
    - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
