@@ -1,0 +1,2 @@
+{"event":"dispatch_started","story_id":"smoke-2-append-note","workflow_run_id":"wf_8c4a0967-867","timestamp":"2026-06-03T13:55:30Z"}
+{"event":"agent_terminal","story_id":"smoke-2-append-note","workflow_run_id":"wf_8c4a0967-867","status":"completed","result":{"files":[{"path":".pHive/smoke/cc-workflows/NOTES-2.md","change":"modified"}],"agent_timestamp":"2026-06-03T13:55:30Z"},"timestamp":"2026-06-03T13:56:25Z"}

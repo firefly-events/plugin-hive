@@ -1,0 +1,4 @@
+{"event":"dispatch_started","story_id":"smoke-1-append-note","workflow_run_id":"wf_506227d1-a29","timestamp":"2026-06-03T13:55:00Z"}
+{"event":"agent_terminal","story_id":"smoke-1-append-note","workflow_run_id":"wf_506227d1-a29","status":"completed","result":{"files":[{"path":"/Users/don/Documents/plugin-hive/.claude/worktrees/multica-substrate-deepen/undefined","change":"modified"}],"agent_timestamp":"2026-06-03T00:00:00Z"},"finding":"args-stringified-not-parsed","timestamp":"2026-06-03T13:56:30Z"}
+{"event":"redispatch","story_id":"smoke-1-append-note","workflow_run_id":"wf_d2b00bfb-b38","reason":"args-stringified-not-parsed","timestamp":"2026-06-03T13:56:30Z"}
+{"event":"agent_terminal","story_id":"smoke-1-append-note","workflow_run_id":"wf_d2b00bfb-b38","status":"completed","result":{"files":[{"path":".pHive/smoke/cc-workflows/NOTES-1.md","change":"modified"}],"agent_timestamp":"2026-06-03T13:55:00Z"},"timestamp":"2026-06-03T13:58:00Z"}

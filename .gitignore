@@ -207,3 +207,5 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/cc-workflows-smoke/**
 !.pHive/smoke/
 !.pHive/smoke/**
+!.pHive/episodes/cc-workflows-smoke/
+!.pHive/episodes/cc-workflows-smoke/**
