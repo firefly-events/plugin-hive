@@ -11,7 +11,7 @@
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.8.0-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-2.9.0-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
@@ -121,6 +121,21 @@ Then opt in through `hive.config.yaml` or `HIVE_EXECUTION_MODE` when you want `/
 - **Test swarm**: 5-agent pipeline that runs tests, files bugs, and routes fixes automatically
 - **Layered memory (L0–L3)**: Persists decisions across sessions/projects via session insights, compiled wiki, knowledge graph, and optional ChromaDB semantic index
 - **Extensible by design**: Add agents, skills, workflows, and teams without touching core code
+
+---
+
+## Inspirations
+
+Hive stands on the shoulders of the agentic-engineering community. We borrow patterns and posture from camps that came before us:
+
+- **[IndyDevDan](https://www.youtube.com/@indydevdan)** — agentic engineering as a *practice*; videos, principles, taste
+- **[QRSPI](https://github.com/matanshavit/qrspi)** — 8-phase Claude Code workflow (Question · Research · Structure · Plan · Implement); builder workflows and real-world patterns
+- **[BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)** — structured multi-agent methodology and role taxonomy
+- **[archon](https://github.com/coleam00/archon)** — orchestration runtime and agent-execution patterns
+- **[Matt Pocock](https://www.mattpocock.com)** — atomic-skill design: composable, single-purpose, well-named units of capability
+- **[Andrej Karpathy](https://karpathy.ai)** — the intellectual current of software 2.0/3.0
+
+We don't compete with them; we synthesize, in a specific shape, on a specific surface (Claude Code), and put it in the open. Where their patterns show up in Hive, the credit travels with the claim.
 
 ---
 
