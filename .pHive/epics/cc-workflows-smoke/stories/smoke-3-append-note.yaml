@@ -1,0 +1,55 @@
+id: smoke-3-append-note
+epic: cc-workflows-smoke
+title: Append timestamped line to NOTES-3.md
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Append a single timestamped line to the NOTES-3.md sentinel file at
+  .pHive/smoke/cc-workflows/NOTES-3.md. Third sibling — completes the
+  three-way depth-0 fan-out so the cc-workflows dispatch loop is exercised with
+  N>2 concurrent stories (catches off-by-one and pair-only assumptions).
+
+  Disposition: throwaway. Never merges.
+
+acceptance_criteria:
+  - "Given the cc-workflows-smoke epic is being executed via /hive:execute with HIVE_EXECUTION_RUNTIME=workflows, when this story dispatches, then .pHive/smoke/cc-workflows/NOTES-3.md is appended with one line in the form `<ISO-8601-utc> smoke-3-append-note <run-id>`."
+  - "Given the story completes, when the orchestrator runs serial reconcile, then a single commit lands on feat/cc-workflows-smoke whose subject begins with `chore(smoke): smoke-3-append-note`."
+  - "Given all three smoke stories dispatched concurrently, when the run ends, then exactly three commits land on the branch in any order — never zero, never two, never four."
+
+steps:
+  - id: implement
+    description: |
+      Append exactly one line of the form `<ISO-8601-utc> smoke-3-append-note <run-id>`
+      to .pHive/smoke/cc-workflows/NOTES-3.md. Create the file if missing. Do not
+      modify any other file.
+    agent: developer
+
+context:
+  codebase: .
+  tech_stack: {}
+  key_files:
+    - path: .pHive/smoke/cc-workflows/NOTES-3.md
+      purpose: Sentinel file that this story appends a line to
+
+files_to_modify:
+  - file: .pHive/smoke/cc-workflows/NOTES-3.md
+    change: Append one timestamped line
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: |
+    Throwaway smoke story — observable surface is the orchestrator's serial reconcile
+    loop producing exactly N commits for N depth-0 stories, not product metrics.
+
+risks:
+  - severity: low
+    description: Orchestrator reconcile drops one of the three commits
+    mitigation: AC #3 explicitly counts the commit landings; the test FAILS if the count is wrong

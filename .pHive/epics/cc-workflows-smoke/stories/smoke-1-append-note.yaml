@@ -1,0 +1,62 @@
+id: smoke-1-append-note
+epic: cc-workflows-smoke
+title: Append timestamped line to NOTES-1.md
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Append a single timestamped line to the NOTES-1.md sentinel file at
+  .pHive/smoke/cc-workflows/NOTES-1.md. This story exists ONLY to exercise the
+  cc-workflows execution substrate end-to-end with a minimal write surface.
+
+  The story is intentionally trivial. The interesting behavior under test is
+  NOT the file edit — it is the surrounding plumbing:
+    - Workflow tool dispatch path resolution
+    - Per-story polling + terminal status normalization
+    - Episode marker + .messages.jsonl sidecar write
+    - Orchestrator-attributed serial reconcile and commit on feat/cc-workflows-smoke
+
+  Disposition: throwaway. Never merges.
+
+acceptance_criteria:
+  - "Given the cc-workflows-smoke epic is being executed via /hive:execute with HIVE_EXECUTION_RUNTIME=workflows, when this story dispatches, then .pHive/smoke/cc-workflows/NOTES-1.md is appended with one line in the form `<ISO-8601-utc> smoke-1-append-note <run-id>`."
+  - "Given the story completes, when the orchestrator runs serial reconcile, then a single commit lands on feat/cc-workflows-smoke whose subject begins with `chore(smoke): smoke-1-append-note`."
+  - "Given the story dispatched through cc-workflows mode, when execution finishes, then an episode marker + .messages.jsonl sidecar exist under the run state directory and reference this story's ID."
+
+steps:
+  - id: implement
+    description: |
+      Append exactly one line of the form `<ISO-8601-utc> smoke-1-append-note <run-id>`
+      to .pHive/smoke/cc-workflows/NOTES-1.md. Create the file if missing. Do not
+      modify any other file.
+    agent: developer
+
+context:
+  codebase: .
+  tech_stack: {}
+  key_files:
+    - path: .pHive/smoke/cc-workflows/NOTES-1.md
+      purpose: Sentinel file that this story appends a line to
+
+files_to_modify:
+  - file: .pHive/smoke/cc-workflows/NOTES-1.md
+    change: Append one timestamped line
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: |
+    Throwaway smoke story — observable surface is process plumbing (Workflow tool
+    dispatch + reconcile), not product metrics. The whole epic is keep-as-zeroth-party
+    and will be deleted after the test run.
+
+risks:
+  - severity: low
+    description: A concurrent peer story races on the same epic state dir
+    mitigation: Each story writes to a disjoint NOTES file; bounded-slice declaration restricts the touch set

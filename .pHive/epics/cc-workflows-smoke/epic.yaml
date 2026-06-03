@@ -1,0 +1,44 @@
+name: cc-workflows-smoke
+title: CC Workflows substrate smoke test (throwaway)
+description: |
+  Throwaway smoke epic — validates the cc-workflows execution substrate added in
+  PR #241 (feat/cc-workflows-first-party). Goal: prove the full chain works
+  end-to-end against trivial, isolated story shapes that surface bugs in
+  Workflow tool dispatch, polling, episode markers, and orchestrator-attributed
+  reconcile WITHOUT touching product code.
+
+  Disposition: keep-as-zeroth-party. This epic NEVER merges to develop. The
+  branch (feat/cc-workflows-smoke) and all artifacts are deleted after the test
+  run completes and observations are captured.
+
+  Surface under test:
+    /hive:execute → skills/execute/SKILL.md step 6f
+      → skills/hive/skills/execute-dispatch/SKILL.md (mode resolution)
+      → skills/hive/skills/execute-mode-cc-workflows/SKILL.md (per-story Workflow tool dispatch)
+        → Workflow tool invocation
+        → per-story polling + episode markers
+        → orchestrator-attributed serial reconcile + commit on feat/<epic-id>
+
+  Trigger to set for the test run:
+    HIVE_EXECUTION_RUNTIME=workflows /hive:execute cc-workflows-smoke
+
+target_codebase: .
+methodology: classic
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  - id: smoke-1-append-note
+    title: Append timestamped line to NOTES-1.md
+    complexity: low
+    depends_on: []
+  - id: smoke-2-append-note
+    title: Append timestamped line to NOTES-2.md
+    complexity: low
+    depends_on: []
+  - id: smoke-3-append-note
+    title: Append timestamped line to NOTES-3.md
+    complexity: low
+    depends_on: []

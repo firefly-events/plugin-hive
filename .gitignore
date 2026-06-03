@@ -203,3 +203,7 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/multica-substrate-deepen/**
 !.pHive/epics/multica-plan-test-cycles/
 !.pHive/epics/multica-plan-test-cycles/**
+!.pHive/epics/cc-workflows-smoke/
+!.pHive/epics/cc-workflows-smoke/**
+!.pHive/smoke/
+!.pHive/smoke/**
