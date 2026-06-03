@@ -118,19 +118,39 @@ if epic_id is known:
   else:
     per_epic_override = null  # graceful fall-through for unknown epic; no hard error
 
-if resolved_runtime == "auto" and per_epic_override is present:
+if resolved_runtime != "auto" and runtime_source != "default":
+  # Explicit runtime override (env / root config / shipped baseline / skill override).
+  # Map the runtime value directly to the corresponding mode_decision and skip
+  # both the per-epic override path and the auto heuristic below.
+  field_sources.execution_runtime.epic_override = null
+  if resolved_runtime == "workflows":
+    mode_decision = "cc-workflows"
+  elif resolved_runtime == "multica":
+    mode_decision = "multica"
+  else:
+    # Unknown explicit runtime value — fail-closed back to the auto heuristic
+    # so callers see a normal team / sequential resolution instead of crashing.
+    # The unknown value still appears on the telemetry line via runtime_source.
+    mode_decision = auto heuristic below
+  mode_reason = f"execution-runtime-override-{runtime_source}"
+  source = runtime_source
+elif resolved_runtime == "auto" and per_epic_override is present:
   mode_decision = per_epic_override
   mode_reason = "execution-runtime-epic-override"
   field_sources.execution_runtime.epic_override = cycle_state_path
   source = "epic_override"
 else:
-  # invariant: explicit "workflows" or "multica" runtime values are not overridable
+  # resolved_runtime == "auto" and no per-epic override — fall through to the
+  # auto heuristic. Explicit "workflows" / "multica" runtime values are handled
+  # by the first branch above and never reach this fall-through.
   field_sources.execution_runtime.epic_override = null
   mode_decision = auto heuristic below
   source = runtime_source
 
 INFO [execute-dispatch] mode={mode_decision} source={source} epic_override={field_sources.execution_runtime.epic_override|null}
 ```
+
+When the first branch above selects `mode_decision ∈ {cc-workflows, multica}`, skip the auto heuristic (Step 1 list below) entirely. The explicit runtime value is the final decision; the auto heuristic only runs when `mode_decision = auto heuristic below` was set.
 
 Evaluate in this order and stop at the first selected path:
 
