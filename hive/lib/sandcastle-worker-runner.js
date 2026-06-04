@@ -45,7 +45,7 @@ function getDefaultOutputSchema() {
 }
 
 const DEFAULT_IMAGE = 'sandcastle:hive';
-const DEFAULT_MODEL = 'claude-opus-4-7';
+const DEFAULT_MODEL = 'claude-opus-4-8';
 // Default sandcastle idleTimeout is 600s. Claude Code on a non-trivial story
 // (read context → plan → edit → test → commit → PR) routinely thinks
 // quietly for >60s between stdout bursts. Bump to 1800s (30 min) to
