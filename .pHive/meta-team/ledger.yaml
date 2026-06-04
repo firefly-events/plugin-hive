@@ -1,3 +1,36 @@
+- experiment_id: meta-2026-06-04
+  date: '2026-06-04'
+  started: '2026-06-04T00:00:00Z'
+  closed: '2026-06-04T00:30:00Z'
+  verdict: passed
+  changes_promoted: 4
+  changes_reverted: 0
+  findings_identified: 4
+  top_changes:
+    - "hive/lib/sandcastle-worker-runner.js, hive/lib/messages-session.js: updated DEFAULT_MODEL from claude-opus-4-7 to claude-opus-4-8"
+    - "hive/references/session-system-prompt-spec.md: updated two example model IDs from claude-opus-4-7 to claude-opus-4-8"
+    - "hive/lib/budget-gate.js: updated JSDoc event-shape example and FALLBACK_MODEL from claude-opus-4-7 to claude-opus-4-8"
+  commit: 4cae202e8c352fc053dcefa01c9fb721dd22ad5a
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 8809cba7a2bab36ced6f50e942ab3c9b11aba26c
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-04. Analysis found 4 findings: (1)
+    SCHEMA_INCONSISTENCY — claude-opus-4-7 stale DEFAULT_MODEL in
+    hive/lib/sandcastle-worker-runner.js and hive/lib/messages-session.js;
+    updated to claude-opus-4-8. (2) SCHEMA_INCONSISTENCY —
+    hive/references/session-system-prompt-spec.md example code showed
+    claude-opus-4-7 in Python call and JSON response examples; updated to
+    claude-opus-4-8. (3) SCHEMA_INCONSISTENCY — hive/lib/budget-gate.js
+    JSDoc event-shape comment and FALLBACK_MODEL used claude-opus-4-7;
+    updated to claude-opus-4-8 (backward-compat rate-card key retained).
+    (4) STUB_DOC hive/references/hive-cloud-roadmap.md (13 lines) —
+    out_of_scope (S16 forward-reference placeholder, 11th+ consecutive
+    deferral). Closure validator passed. Regression watch armed for 4-hour
+    observation window.
 - experiment_id: meta-2026-05-29
   date: '2026-05-29'
   started: '2026-05-29T00:00:00Z'
