@@ -1,7 +1,6 @@
 id: h-03-standup-format-slack
 epic: hermes-integration-mvp
 title: Standup --format slack flag for cron-friendly Phase 1 report
-status: pending
 complexity: small
 methodology: classic
 depends_on: []

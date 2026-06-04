@@ -1,7 +1,6 @@
 id: h-05-version-bump
 epic: hermes-integration-mvp
 title: Plugin version bump + CHANGELOG entry for hermes-integration-mvp
-status: pending
 complexity: small
 methodology: classic
 depends_on: [h-01-context-snapshot-composer, h-02-context-snapshot-skill, h-03-standup-format-slack, h-04-triage-json-output]
