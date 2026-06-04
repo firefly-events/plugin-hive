@@ -1,0 +1,142 @@
+id: hg-3-action-log-surface
+epic: hermes-guardrails-mvp
+title: Action log schema + library + atomic skill
+complexity: medium
+methodology: classic
+depends_on: []
+
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Every chat-message → resolved-Hive-command pair gets persisted so that
+  Hive (and downstream /meta-optimize) can audit and learn from the LLM-agent
+  on-call surface's interpretation choices. Hive defines schema +
+  validate-and-write library so all agent backends (Hermes, Claude Code
+  session, OpenCode) produce comparable records.
+
+  Three artifacts:
+    - hive/references/action-log-schema.md — schema doc
+    - hive/lib/action-log.mjs — appendAction + validation
+    - skills/hive/skills/action-log-append/SKILL.md — atomic skill (so
+      agent backends without direct library access can append via skill
+      invocation)
+
+  Storage: append-only JSONL at ${HIVE_STATE_DIR}/triggers/actions.jsonl.
+  Schema fields: {timestamp, transport, channel, user, raw_message,
+  resolved_command, executed, run_id, verdict}.
+
+acceptance_criteria:
+  - "Given hive/references/action-log-schema.md is shipped, when a consumer reads it, then it documents all nine schema fields with type, requiredness, and one example per field, plus a complete example JSONL entry."
+  - "Given hive/lib/action-log.mjs is shipped, when a consumer calls `appendAction(entry)` with a valid entry, then one line of JSON is appended to ${HIVE_STATE_DIR}/triggers/actions.jsonl with a timestamp normalized to ISO 8601 UTC."
+  - "Given a consumer calls appendAction with a malformed entry (missing required field, wrong type), when the call fires, then the library throws ActionLogValidationError naming the offending field BEFORE any file write — partial-write defense."
+  - "Given skills/hive/skills/action-log-append/SKILL.md is shipped, when an agent invokes it with the entry inline, then the skill validates and appends via the library, returning the resolved entry (with normalized timestamp) on success."
+  - "Given the unit test suite at hive/lib/action-log.test.mjs is run, when the runner executes it, then all assertions pass (valid append round-trips, every required-field omission throws, type-mismatch throws, timestamp normalization for missing/non-ISO inputs)."
+
+steps:
+  - id: research
+    description: |
+      Inventory existing JSONL logs under .pHive/ (metrics events,
+      gate-lift telemetry, etc.) to confirm the shape pattern. Decide
+      whether action-log validation lives in the library or as a JSON
+      Schema file — design discussion deferred JSON Schema; verify no
+      existing convention contradicts that choice.
+    agent: researcher
+  - id: implement
+    description: |
+      Write hive/references/action-log-schema.md with the 9-field schema
+      table + example entry. Write hive/lib/action-log.mjs with
+      appendAction + ActionLogValidationError + timestamp normalization.
+      Write skills/hive/skills/action-log-append/SKILL.md per the atomic
+      skill pattern (frontmatter + Process section + invocation contract).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Write hive/lib/action-log.test.mjs covering all five AC bullet
+      points. Verify both happy-path round-trip and every failure path
+      (missing required, wrong type, malformed timestamp).
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Audit schema doc for completeness (all 9 fields documented,
+      example matches schema). Audit library for input-validation
+      ordering (validate BEFORE write, never partial-write). Audit skill
+      for atomic-pattern compliance (no inline prose duplicating the
+      library, single invocation contract).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: |
+      Stage + commit all four artifacts as one orchestrator-attributed
+      commit on feat/hermes-guardrails-mvp.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: Node.js (ESM)
+    test_runner: node --test
+  key_files:
+    - path: hive/references/episode-schema.md
+      purpose: Sibling schema doc — reference for documentation shape
+    - path: hive/lib/task-tracking-dispatch/
+      purpose: Validation pattern reference (input check before side effect)
+    - path: skills/hive/skills/agent-spawn/SKILL.md
+      purpose: Atomic skill pattern reference
+
+files_to_modify:
+  - file: hive/references/action-log-schema.md
+    change: Create schema doc
+  - file: hive/lib/action-log.mjs
+    change: Create library
+  - file: hive/lib/action-log.test.mjs
+    change: Create unit tests
+  - file: skills/hive/skills/action-log-append/SKILL.md
+    change: Create atomic skill
+
+code_examples:
+  - title: Atomic skill frontmatter + invocation contract pattern
+    file: skills/hive/skills/agent-spawn/SKILL.md
+    snippet: |
+      ---
+      name: agent-spawn
+      description: ...
+      ---
+      ## Invocation contract
+      Inputs: ...
+      Outputs: ...
+      ## Process
+      ### Step N: ...
+
+design_decisions:
+  - decision: Library validates before writing (no partial writes)
+    rationale: JSONL is append-only; a partial-validated write would corrupt the log
+  - decision: Skill is a thin wrapper around the library
+    rationale: Agent backends that can import JS use the library; those that can only invoke skills get the same validation surface via the skill
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: |
+    Audit-substrate story; metric for action-log usefulness lives in
+    /meta-optimize's downstream learning of intent-mapping drift, not
+    in this surface's own ship verdict.
+
+risks:
+  - severity: low
+    description: Schema drifts vs library validation rules
+    mitigation: Library validation is the source of truth; schema doc references the library's enforced fields directly
+  - severity: low
+    description: Concurrent appendAction calls interleave (multi-agent backends)
+    mitigation: appendAction uses fs.appendFileSync; POSIX guarantees atomic appends under PIPE_BUF size
+
+references:
+  - path: hive/references/episode-schema.md
+    relevant_excerpt: |
+      Schema documentation pattern — use the same headings and example
+      shape so consumers see a consistent style across Hive's contract
+      surfaces.

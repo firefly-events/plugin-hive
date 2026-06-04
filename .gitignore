@@ -203,3 +203,9 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/multica-substrate-deepen/**
 !.pHive/epics/multica-plan-test-cycles/
 !.pHive/epics/multica-plan-test-cycles/**
+!.pHive/epics/hermes-guardrails-mvp/
+!.pHive/epics/hermes-guardrails-mvp/**
+!.pHive/episodes/hermes-guardrails-mvp/
+!.pHive/episodes/hermes-guardrails-mvp/**
+!.pHive/triggers/
+!.pHive/triggers/**

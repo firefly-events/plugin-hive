@@ -1,0 +1,49 @@
+name: hermes-guardrails-mvp
+title: LLM-agent on-call substrate — destructive-cmd catalog, run-status stream, action log, pending-confirm registry
+description: |
+  Hive-side contract surface so an LLM-agent on-call surface (Hermes today,
+  Claude Code long-running session / OpenCode later) can safely kick off Hive
+  workflows over Slack/Discord without explicit command syntax. Four atomic,
+  vendor-neutral surfaces; Hermes-side prompt/policy/Slack-bot edit-message
+  loop ships separately on the Hermes repo.
+
+  The four surfaces:
+    1. Destructive-command catalog (hive/references/destructive-commands.yaml + loader)
+    2. Run-status event stream (.pHive/triggers/runs/<run-id>.jsonl + shim)
+    3. Action log surface (.pHive/triggers/actions.jsonl + skill)
+    4. Pending-confirm registry (.pHive/triggers/pending/<id>.yaml + skill)
+
+  Compose with existing task-tracking-dispatch / Multica adapter shapes; do NOT
+  invent a parallel adapter layer. NO hardcoded Hermes references — surfaces
+  are named for the role (agent on-call surface), not the vendor.
+
+  Validation: this epic is the FIRST real (non-smoke) substrate test for the
+  cc-workflows execution runtime added in PR #241. Each story runs full
+  classic workflow (preflight → research → implement → test → review →
+  integrate) so substrate findings surface against real test material rather
+  than trivial appends.
+
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  - id: hg-1-destructive-command-catalog
+    title: Destructive-command catalog YAML + loader library
+    complexity: low
+    depends_on: []
+  - id: hg-2-run-status-event-stream
+    title: Run-status JSONL event stream + episode-marker shim
+    complexity: medium
+    depends_on: []
+  - id: hg-3-action-log-surface
+    title: Action log schema + library + atomic skill
+    complexity: medium
+    depends_on: []
+  - id: hg-4-pending-confirm-registry
+    title: Pending-confirm registry library + resolve skill
+    complexity: medium
+    depends_on: []

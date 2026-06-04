@@ -1,0 +1,137 @@
+id: hg-4-pending-confirm-registry
+epic: hermes-guardrails-mvp
+title: Pending-confirm registry library + resolve skill
+complexity: medium
+methodology: classic
+depends_on: []
+
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  When the LLM-agent on-call surface proposes a destructive command (per the
+  hg-1 catalog), it registers a pending-confirm entry on disk. A second
+  surface resolves the entry to fire/cancel based on the user's reaction
+  (Slack emoji, Discord button, etc.). State-on-disk means the agent backend
+  can crash and a follow-up tick can recover — the user's pending decisions
+  survive process restarts.
+
+  Three artifacts:
+    - hive/lib/pending-confirm.mjs — register/resolve/expire/list functions
+    - hive/lib/pending-confirm.test.mjs — unit tests
+    - skills/hive/skills/pending-confirm-resolve/SKILL.md — atomic skill the
+      agent surface calls to resolve an entry by id + verdict
+
+  Storage: one YAML per pending entry at
+  ${HIVE_STATE_DIR}/triggers/pending/<id>.yaml with
+  {id, requested_command, requested_args, expires_at, thread_ref,
+  created_at, status}. expire() sweeps entries past expires_at.
+
+acceptance_criteria:
+  - "Given hive/lib/pending-confirm.mjs is shipped, when a consumer calls `register({command, args, expires_at, thread_ref})`, then one YAML file is written to ${HIVE_STATE_DIR}/triggers/pending/<id>.yaml with status `pending` and a generated id (UUIDv4 or timestamp slug)."
+  - "Given a pending entry exists, when a consumer calls `resolve({id, verdict})` with verdict `fire` or `cancel`, then the file's `status:` updates to `fired` or `cancelled` with `resolved_at` and `verdict:` recorded; returns the resolved entry."
+  - "Given a pending entry exists, when `resolve({id, verdict})` is called for an already-resolved entry, then it throws `PendingAlreadyResolvedError` naming the id and prior verdict — idempotency at the resolve boundary."
+  - "Given some entries have expired (now > expires_at), when a consumer calls `expire()`, then expired pending entries flip to `status: expired`, `resolved_at: <now>`, `verdict: expired`; returns the list of expired ids."
+  - "Given a consumer calls `list({status?})`, when it iterates the registry dir, then it yields entries matching the optional status filter; default is all statuses."
+  - "Given the unit test suite at hive/lib/pending-confirm.test.mjs is run, when the runner executes it, then all assertions pass (register round-trip, resolve fire/cancel, already-resolved throws, expire sweep, list filter)."
+
+steps:
+  - id: research
+    description: |
+      Decide id generation strategy (UUIDv4 via crypto.randomUUID vs
+      timestamp-slug). Read sibling on-disk-state libraries (cycle-state,
+      episode markers) for write-then-rename atomicity patterns. Confirm
+      no naming collision with existing .pHive/triggers/ contents (this
+      epic introduces .pHive/triggers/; verify untouched).
+    agent: researcher
+  - id: implement
+    description: |
+      Write hive/lib/pending-confirm.mjs with
+      {register, resolve, expire, list, PendingAlreadyResolvedError}.
+      Atomic write via write-to-tmp + rename. UUIDv4 for ids (built into
+      Node ≥ 19 via crypto.randomUUID). Use js-yaml for YAML
+      serialization. Write skills/hive/skills/pending-confirm-resolve/SKILL.md
+      as the atomic skill surface.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Write hive/lib/pending-confirm.test.mjs covering all six AC bullet
+      points. Use tmp dir as ${HIVE_STATE_DIR} fixture. Mock time for
+      expire() tests (parameterize the now value).
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Audit register-then-resolve race condition: two concurrent
+      resolve() calls for the same id should only succeed once. Audit
+      expire() for re-entrancy (running twice in quick succession should
+      not double-expire entries). Audit skill atomic-pattern compliance.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: |
+      Stage + commit all three artifacts as one orchestrator-attributed
+      commit on feat/hermes-guardrails-mvp.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: Node.js (ESM, ≥ 19 for crypto.randomUUID)
+    test_runner: node --test
+    yaml_serializer: js-yaml
+  key_files:
+    - path: hive/lib/task-tracking-dispatch/
+      purpose: On-disk state library pattern reference
+    - path: hive/references/episode-schema.md
+      purpose: YAML-on-disk schema documentation pattern
+
+files_to_modify:
+  - file: hive/lib/pending-confirm.mjs
+    change: Create registry library
+  - file: hive/lib/pending-confirm.test.mjs
+    change: Create unit tests
+  - file: skills/hive/skills/pending-confirm-resolve/SKILL.md
+    change: Create atomic skill
+
+code_examples:
+  - title: Atomic write-then-rename pattern (sibling)
+    file: hive/lib/multica-issue-closer.mjs
+    snippet: |
+      // Read the sibling closer's commit-state write semantics. For
+      // pending-confirm, mirror the write-to-tmp + fs.renameSync pattern
+      // to keep individual YAML files atomic across crash points.
+
+design_decisions:
+  - decision: One YAML file per pending entry (not a single registry file)
+    rationale: Atomic register/resolve/expire per entry; no whole-file rewrites; readers can list lazily via fs.readdir
+  - decision: Default expires_at is 5 minutes if caller omits
+    rationale: Long-running confirmation is a UX failure on the agent surface; 5 min is a sane upper bound for human-attended confirms (per design discussion open question 2)
+  - decision: register returns the resolved id (not just side-effects on disk)
+    rationale: Caller needs the id to seed the thread reaction watcher
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: |
+    Substrate-state story; metric for confirm-flow latency and
+    cancel-rate lives on the chat side, owned by the Hermes follow-up
+    planning that consumes this surface.
+
+risks:
+  - severity: medium
+    description: Two concurrent resolve() for the same id (e.g. user reacts ✅ and Hermes also resolves via timeout)
+    mitigation: resolve() reads, validates status==pending, then writes; if the read shows non-pending, throw PendingAlreadyResolvedError without writing
+  - severity: low
+    description: Registry dir grows without bound (resolved entries pile up)
+    mitigation: list({status: 'resolved', older_than: <ts>}) + cleanup is a deferred housekeeping skill — not blocking this MVP
+
+references:
+  - path: hive/references/episode-schema.md
+    relevant_excerpt: |
+      File-on-disk YAML schema documentation pattern. Use the same
+      heading structure and example block in the pending-confirm
+      schema section of the library docstring.
