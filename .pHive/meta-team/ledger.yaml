@@ -1,3 +1,33 @@
+- experiment_id: meta-2026-06-05
+  date: '2026-06-05'
+  started: '2026-06-05T00:00:00Z'
+  closed: '2026-06-05T00:30:00Z'
+  verdict: passed
+  changes_promoted: 5
+  changes_reverted: 0
+  findings_identified: 3
+  top_changes:
+    - "hive/agents/reviewer.md, hive/agents/peer-validator.md: updated model frontmatter from sonnet to opus to match model_overrides in hive.config.yaml"
+    - "hive/lib/sandcastle-worker-runner.js, hive/lib/messages-session.js: updated DEFAULT_MODEL constant from claude-opus-4-7 to claude-opus-4-8"
+    - "hive/references/session-system-prompt-spec.md: updated two example model IDs from claude-opus-4-7 to claude-opus-4-8"
+  commit: 6740e73b205cf1adcb74e59f011dc08806a17dc7
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 5422e7b20776cfc2c0a0e35fb20da857811dbc1f
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-05. Analysis found 3 SCHEMA_INCONSISTENCY findings:
+    (1) reviewer.md and peer-validator.md frontmatter model: sonnet inconsistent with
+    hive.config.yaml model_overrides (both promoted to opus); fixed by updating
+    model field to opus. (2) DEFAULT_MODEL constant in sandcastle-worker-runner.js
+    and messages-session.js still claude-opus-4-7; updated to claude-opus-4-8.
+    (3) Two example code blocks in session-system-prompt-spec.md used
+    claude-opus-4-7; updated to claude-opus-4-8. Out-of-scope: hive.config.yaml
+    comment (protected), orphaned step file (deletions forbidden),
+    hive-cloud-roadmap.md stub (10+ consecutive deferrals). Closure validator
+    passed. Regression watch armed for 4-hour observation window.
 - experiment_id: meta-2026-05-29
   date: '2026-05-29'
   started: '2026-05-29T00:00:00Z'
