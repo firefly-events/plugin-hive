@@ -56,6 +56,7 @@ On `BOOTSTRAP_REQUIRED`, abort immediately with stderr:
 ```text
 ERROR: Multica execution mode requires a bootstrapped assignee.
        Single-agent mode needs the 'developer' agent (run /hive:multica-init).
+       Phase-loop mode needs every configured phase agent to exist (execution.multica.tdd_phases).
        Squad mode needs the configured squad to exist (execution.multica.squad).
        (assignee missing in workspace <slug>)
 ```

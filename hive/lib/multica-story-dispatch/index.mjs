@@ -388,7 +388,13 @@ export async function dispatchStoryToSquad(serverUrl, token, workspaceId, issueU
 
 // Build the per-story branch name, e.g. fir/embers-rename/s1-convex-module.
 export function resolveStoryBranch(epicId, storyId, prefix = 'fir') {
-  const clean = (s) => String(s ?? '').trim().replace(/[^A-Za-z0-9._/-]+/g, '-').replace(/^-+|-+$/g, '');
+  const clean = (s) => String(s ?? '')
+    .trim()
+    .replace(/[^A-Za-z0-9._/-]+/g, '-')
+    .replace(/\.{2,}/g, '.')          // collapse `..` (git rejects)
+    .replace(/\.lock$/i, '')          // refs may not end in `.lock`
+    .replace(/^[-.]+|[-.]+$/g, '')    // trim leading/trailing `-` and `.`
+    || 'untitled';                    // never emit an empty segment
   return `${clean(prefix)}/${clean(epicId)}/${clean(storyId)}`;
 }
 
