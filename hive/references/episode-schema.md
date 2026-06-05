@@ -119,6 +119,44 @@ plus `multica-run.messages.jsonl`. Both `plan-mode-multica` and
 `terminal_by_dialect`, not a final-comment SHA, to decide whether the Multica run is
 complete.
 
+## cc-workflows-run.yaml — `field_sources.agent_models` map
+
+`cc-workflows-run.yaml` markers (emitted by `execute-mode-cc-workflows` and `plan-mode-cc-workflows`) carry an optional but strongly recommended `field_sources.agent_models` section that records the resolved model tier for every agent dispatched in the run. This enables post-run audit tooling to verify every agent ran at the intended tier rather than inheriting the parent session model.
+
+### Shape
+
+```yaml
+field_sources:
+  agent_models:
+    <phase>:           # matches the phase() label in the assembled Workflow script
+      persona: <persona>
+      tier: sonnet | opus | haiku
+      source: model_overrides | model_tiers | default
+```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `<phase>` | string | Phase label from the Workflow script `phase()` call |
+| `persona` | string | Persona name as dispatched (e.g. `developer`, `reviewer`) |
+| `tier` | string | Resolved model tier (`sonnet`, `opus`, or `haiku`) |
+| `source` | string | Attribution: `model_overrides` (runtime promotion), `model_tiers` (base assignment), or `default` (unmapped — always `sonnet` with WARN) |
+
+### Resolution contract
+
+The tier is resolved by `hive/lib/cc-workflows-model-tier.mjs` at `workflow_assembly` time, before the Workflow tool is invoked. Precedence:
+
+1. `model_overrides[persona]` — runtime promotion wins
+2. `model_tiers[tier]` — iterate tiers looking for persona inclusion
+3. Default — `sonnet` with `console.warn` naming the unmapped persona
+
+The helper MUST NOT read persona frontmatter `model:` fields from `hive/agents/*.md`. Frontmatter is documentation (base tier annotation); `hive.config.yaml` is the sole runtime source of truth (per `feedback_frontmatter_base_tier_not_override`).
+
+### Coverage metric
+
+`substrate_coverage.cc_workflows_model_tier_resolved_per_agent` measures the ratio of agents with `field_sources.agent_models` populated to total agent count in a cc-workflows-mode dispatch. Target: `1.0` (every agent carries an explicit resolved tier in the marker).
+
 ## Inter-phase context passing
 
 Context between workflow steps is passed **directly via agent prompts**, not stored in marker files. When the orchestrator or team lead runs step N+1, they include relevant output from step N in the task prompt. This is ephemeral — it lives in the conversation, not on disk.

@@ -143,6 +143,14 @@ For each persona in `assembled_personas[]`:
    - Use `parallel()` only inside a phase when the workflow definition and dependency order allow it (rare in planning; documents are usually sequential within a persona).
    - **No Codex routing inside cc-workflows mode.** Every `agent()` call MUST use the default workflow subagent — do NOT pass `agentType: "codex:codex-rescue"` (or any other Codex `agentType`) even when `agent_backends[persona] == "codex"`. The cc-workflows substrate runs each agent INLINE within the Claude orchestrator so that the returned `<result>` IS the planning-artifact payload, not a pointer to out-of-band work. Persona files at `hive/agents/<persona>.md` provide BEHAVIOR (mission, output format, validation rules) — that behavior is injected into the agent's prompt body; the agent's runtime is always the default workflow subagent regardless of how `agent_backends` would route the persona in other modes.
    - Persona files are referenced at `hive/agents/<persona>.md`; prompts carry the integration branch and no-git contracts.
+   - **`opts.model` is REQUIRED on every `agent()` call.** Before assembling the Workflow script, import and call the model-tier resolver for each persona:
+     ```js
+     import { resolveModelTier } from 'hive/lib/cc-workflows-model-tier.mjs';
+     const { tier, source } = resolveModelTier(persona, { config: hive_config });
+     // assembled agent() call must carry opts.model:
+     // agent(prompt, { schema, phase, label, model: tier })
+     ```
+     No `agent()` call may omit `opts.model`. The resolver reads `model_overrides` (runtime promotion) then `model_tiers` (base assignment) from `hive.config.yaml` — never from persona frontmatter. Unmapped personas default to `sonnet` with a WARN. Collect `{phase, persona, tier, source}` for each dispatched agent to populate `field_sources.agent_models` in the per-persona marker (Step 3).
    - **Defensive `args` parse contract.** Every assembled script MUST begin its body with `const a = typeof args === 'string' ? JSON.parse(args) : args;` and reference inputs via `a.<field>` (NOT `args.<field>`). The Workflow tool surface does not guarantee that the `args` global arrives as a parsed object when invoked from an orchestrator whose tool-call parameters are string-typed. Mirror the same contract documented in `execute-mode-cc-workflows` Step 1.5 — both skills share the same Workflow tool seam.
    - Invoke the Workflow TOOL with the assembled script.
    - Capture returned `run_id` and `transcript_dir`. This is not the `/workflows` slash command; `/workflows` is the history browser.
@@ -206,7 +214,15 @@ agentType: <default | codex:codex-rescue>
 files: [{path, change}]
 started_at: <iso>
 completed_at: <iso>
+field_sources:
+  agent_models:
+    <phase>:
+      persona: <persona>
+      tier: sonnet | opus | haiku
+      source: model_overrides | model_tiers | default
 ```
+
+`field_sources.agent_models` records the resolved model tier for every dispatched agent in this persona run, keyed by phase (matching the `phase()` label in the Workflow script). This enables post-run audit tooling to confirm every planning agent ran at the intended tier. The `source` field traces whether the tier came from `model_overrides` (runtime promotion), `model_tiers` (base assignment), or the unmapped `default` (always `sonnet` with WARN). Mirrors the same field documented in `execute-mode-cc-workflows` Step 3 marker shape.
 
 The marker references the planning persona as the unit (not a story). It uses the same `cc-workflows-run.yaml` filename family as `execute-mode-cc-workflows` so downstream consumers (run-status event stream, etc.) can pattern-match a single emit shape.
 

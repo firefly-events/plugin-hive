@@ -1,0 +1,8 @@
+step_id: implement
+status: completed
+timestamp: "2026-06-05T22:00:00Z"
+artifacts:
+  - hive/lib/cc-workflows-model-tier.mjs
+  - skills/hive/skills/execute-mode-cc-workflows/SKILL.md
+  - skills/hive/skills/plan-mode-cc-workflows/SKILL.md
+  - hive/references/episode-schema.md
