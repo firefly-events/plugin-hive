@@ -1,0 +1,123 @@
+id: d-2-design-dispatch-router
+epic: substrate-coverage-and-test-cleanup
+title: Create design-dispatch router consuming mode-resolver.mjs and returning {mode_decision, sources}
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+  - s-2-mode-resolver
+  - s-4-cc-workflows-preconditions
+  - s-3-no-codex-lint
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: |
+  Create `skills/hive/skills/design-dispatch/SKILL.md` (~200-250 lines).
+  Step 0: invoke shared resolver `hive/lib/mode-resolver.mjs` with
+  `HIVE_DESIGN_MODE` to resolve `mode_decision`. Step 1: dispatch to the
+  chosen mode atom (`design-mode-multica` or `design-mode-cc-workflows`).
+  Step 2: return `{mode_decision, sources}` to callers so they can audit
+  provenance. Router structurally mirrors `skills/hive/skills/execute-dispatch/SKILL.md`
+  (architect ESCALATION anchor — prevents re-invention across the 4
+  substrate routers in this epic).
+
+acceptance_criteria:
+  - Given `skills/hive/skills/design-dispatch/SKILL.md` is created, when it executes Step 0, then it invokes `resolveMode('HIVE_DESIGN_MODE', ctx)` from `hive/lib/mode-resolver.mjs`.
+  - Given Step 1 runs, when `mode_decision` is `multica`, then design-dispatch routes to `design-mode-multica`; when `mode_decision` is `cc-workflows`, then it routes to `design-mode-cc-workflows`.
+  - Given Step 2 runs, when the router returns to the caller, then it emits `{mode_decision, sources}` (sources carries field-source telemetry from mode-resolver).
+  - Given the router structurally mirrors `skills/hive/skills/execute-dispatch/SKILL.md`, when a reader compares Step 0/1/2 shapes, then they are structurally identical to execute-dispatch.
+  - Given the vitest resolution test runs at `skills/hive/skills/design-dispatch/test/resolver.test.mjs`, when 5-tier permutations are exercised, then mode_decision and sources are emitted correctly for each tier.
+  - DO. Mirror `execute-dispatch/SKILL.md` Step 0/1/2 structure verbatim.
+  - DO NOT. Re-implement the 5-tier resolver inline — consume `mode-resolver.mjs`.
+
+metric:
+  applies: true
+  name: substrate_coverage.design_dispatch_resolver_pass_rate
+  direction: up
+  unit: ratio
+  baseline: null
+  target: 1.0
+  window: story integrate step
+  source:
+    kind: manual
+    ref: "vitest run skills/hive/skills/design-dispatch/test/resolver.test.mjs"
+  verify_at: story integrate step
+  owner: developer
+
+steps:
+  - id: research
+    description: Read `skills/hive/skills/execute-dispatch/SKILL.md:1-219` (router structural mirror); confirm `mode-resolver.mjs` signature `{decision, sources}` shape from s-2.
+    agent: researcher
+  - id: implement
+    description: Create `skills/hive/skills/design-dispatch/SKILL.md` ~200-250 lines mirroring execute-dispatch structure; Step 0 calls `resolveMode('HIVE_DESIGN_MODE', ctx)`; Step 1 dispatches to chosen atom; Step 2 returns `{mode_decision, sources}`.
+    agent: developer
+    depends_on:
+      - research
+  - id: test
+    description: Author `skills/hive/skills/design-dispatch/test/resolver.test.mjs` covering 5-tier permutations + correct atom routing.
+    agent: tester
+    depends_on:
+      - implement
+  - id: review
+    description: Architect review on router structural mirror to execute-dispatch + correct emit of `{mode_decision, sources}`.
+    agent: reviewer
+    depends_on:
+      - test
+  - id: integrate
+    description: 'Commit "[d-2] feat(/design): design-dispatch router consuming mode-resolver.mjs"'
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  tech_stack:
+    - language: markdown (SKILL.md), javascript (.mjs)
+    - runtime: node 20+
+    - test: vitest
+  key_files:
+    - path: skills/hive/skills/design-dispatch/SKILL.md
+      purpose: NEW router for /design substrate resolution
+    - path: skills/hive/skills/execute-dispatch/SKILL.md
+      purpose: Structural mirror anchor (lines 1-219)
+    - path: hive/lib/mode-resolver.mjs
+      purpose: Shared resolver consumed at Step 0
+
+files_to_modify:
+  - file: skills/hive/skills/design-dispatch/SKILL.md
+    change: CREATE ~200-250 lines mirroring execute-dispatch Step 0/1/2 structure
+  - file: skills/hive/skills/design-dispatch/test/resolver.test.mjs
+    change: CREATE — vitest spec covering 5-tier permutations + correct atom routing
+
+code_examples:
+  - language: markdown
+    description: design-dispatch Step 0 — consume mode-resolver
+    snippet: |
+      ## Step 0 — Resolve mode_decision
+      Import `hive/lib/mode-resolver.mjs`.
+      Call `resolveMode('HIVE_DESIGN_MODE', ctx)`.
+      Returns `{decision, sources}`; pass through as `{mode_decision: decision, sources}` to caller.
+
+references:
+  - path: skills/hive/skills/execute-dispatch/SKILL.md
+    relevant_excerpt: "Router structural mirror — Step 0 field-source resolution at lines 46-101, canonical 5-tier env > root config > shipped baseline > skill override > default at line 50."
+  - path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/structured-outline.md
+    relevant_excerpt: "d-2: design-dispatch router — Create skills/hive/skills/design-dispatch/SKILL.md (~200-250 lines). Consumes mode-resolver.mjs from Slice 1. Returns {mode_decision, sources} to callers."
+  - path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/outline-collab-review-record.md
+    relevant_excerpt: "ESCALATION — d-2 / dr-1 / r-1 / test-dispatch-portion-of-t-3 lack mirror-reference anchor. Recommend adding 'mirror execute-dispatch/SKILL.md structure' to each dispatch story."
+
+cross_cutting:
+  - concern: documentation
+    action: "design-dispatch/SKILL.md is itself the doc; cite execute-dispatch as structural mirror in the front-matter comment block."
+  - concern: versioning
+    action: "New consumer-visible skill — flag for epic-close version bump (minor — additive feature) in CHANGELOG."
+
+design_decisions:
+  - decision: Router structurally mirrors execute-dispatch/SKILL.md
+    rationale: Architect ESCALATION in outline-collab-review-record — the 4 substrate routers in this epic (test-dispatch, design-dispatch, design-review-dispatch, review-dispatch) all share `execute-dispatch/SKILL.md` as the structural mirror anchor to prevent re-invention.
+  - decision: Step 2 returns `{mode_decision, sources}` (router wraps helper output)
+    rationale: Mirrors execute-dispatch emit; preserves field-source telemetry for callers auditing provenance.
+
+risks:
+  - severity: low
+    description: Router structural drift from execute-dispatch
+    mitigation: Design decision cites execute-dispatch as structural mirror; architect review verifies Step 0/1/2 parity

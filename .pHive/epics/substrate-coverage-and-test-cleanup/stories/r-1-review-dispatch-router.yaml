@@ -1,0 +1,132 @@
+id: r-1-review-dispatch-router
+epic: substrate-coverage-and-test-cleanup
+title: Create review-dispatch router + wire Phase 0 into skills/review/SKILL.md + preserve scope_drift emit
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+  - s-2-mode-resolver
+  - s-4-cc-workflows-preconditions
+  - s-3-no-codex-lint
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: |
+  Create `skills/hive/skills/review-dispatch/SKILL.md` consuming
+  `hive/lib/mode-resolver.mjs` with `HIVE_REVIEW_MODE`. Add Phase 0
+  invocation of the router to `skills/review/SKILL.md`. Preserve solo
+  reviewer pattern (lines 39-49) — no panel-mode expansion in this epic
+  (Decision Point 2: DEFER panel mode). Preserve the `scope_drift` emit
+  call (from `hive/lib/scope_drift.py`) when wrapping reviewer dispatch.
+  Router structurally mirrors `skills/hive/skills/execute-dispatch/SKILL.md`.
+
+acceptance_criteria:
+  - Given `skills/hive/skills/review-dispatch/SKILL.md` is created, when it executes Step 0, then it invokes `resolveMode('HIVE_REVIEW_MODE', ctx)` from `hive/lib/mode-resolver.mjs`.
+  - Given Step 1 runs, when `mode_decision` is `multica`, then it routes to `review-mode-multica`; when `cc-workflows`, then it routes to `review-mode-cc-workflows`.
+  - Given Step 2 runs, when the router returns to the caller, then it emits `{mode_decision, sources}`.
+  - Given `skills/review/SKILL.md` is updated, when /review is invoked, then Phase 0 invokes `review-dispatch` BEFORE the existing solo reviewer dispatch.
+  - Given the solo reviewer pattern (lines 39-49) is preserved, when /review runs, then it dispatches a single reviewer (no panel-mode).
+  - Given the `scope_drift` emit call (from `hive/lib/scope_drift.py`) is preserved, when /review wraps the reviewer dispatch, then the `scope_drift` emit fires identically to pre-epic behavior.
+  - Given the router structurally mirrors `skills/hive/skills/execute-dispatch/SKILL.md`, when a reader compares Step 0/1/2 shapes, then they are structurally identical.
+  - Given the vitest resolution test runs at `skills/hive/skills/review-dispatch/test/resolver.test.mjs`, when 5-tier permutations are exercised, then mode_decision emits correctly AND the scope_drift emit is preserved through router wrapping (asserted by spy).
+  - DO. Mirror execute-dispatch structure verbatim. Preserve scope_drift emit and solo reviewer pattern.
+  - DO NOT. Add panel-mode dispatch — Decision Point 2 DEFERS panel mode to a future epic.
+
+metric:
+  applies: true
+  name: substrate_coverage.review_dispatch_scope_drift_emit_preserved
+  direction: up
+  unit: bool
+  baseline: null
+  target: 1
+  window: story integrate step
+  source:
+    kind: manual
+    ref: "vitest run skills/hive/skills/review-dispatch/test/resolver.test.mjs (scope_drift emit spy passes)"
+  verify_at: story integrate step
+  owner: developer
+
+steps:
+  - id: research
+    description: Read `skills/review/SKILL.md:1-115` — solo reviewer pattern at lines 39-49; identify scope_drift emit call from `hive/lib/scope_drift.py`; read execute-dispatch as structural mirror anchor.
+    agent: researcher
+  - id: implement
+    description: Create `skills/hive/skills/review-dispatch/SKILL.md` mirroring execute-dispatch Step 0/1/2; add Phase 0 invocation of review-dispatch to `skills/review/SKILL.md`; preserve solo reviewer pattern and scope_drift emit.
+    agent: developer
+    depends_on:
+      - research
+  - id: test
+    description: Author `skills/hive/skills/review-dispatch/test/resolver.test.mjs` covering 5-tier permutations + correct atom routing + scope_drift emit preserved (spy on hive/lib/scope_drift.py emit).
+    agent: tester
+    depends_on:
+      - implement
+  - id: review
+    description: Architect review on router structural mirror + scope_drift emit preservation + solo reviewer pattern.
+    agent: reviewer
+    depends_on:
+      - test
+  - id: integrate
+    description: 'Commit "[r-1] feat(/review): review-dispatch router + Phase 0 wire-in + scope_drift emit preserved"'
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  tech_stack:
+    - language: markdown (SKILL.md), javascript (.mjs), python (.py)
+    - runtime: node 20+
+    - test: vitest
+  key_files:
+    - path: skills/hive/skills/review-dispatch/SKILL.md
+      purpose: NEW router for /review substrate resolution
+    - path: skills/review/SKILL.md
+      purpose: Dispatcher (1-115) — solo reviewer at 39-49; scope_drift emit; Phase 0 invocation added
+    - path: hive/lib/scope_drift.py
+      purpose: scope_drift emit helper preserved through router wrapping
+    - path: skills/hive/skills/execute-dispatch/SKILL.md
+      purpose: Structural mirror anchor
+
+files_to_modify:
+  - file: skills/hive/skills/review-dispatch/SKILL.md
+    change: CREATE ~200-250 lines mirroring execute-dispatch Step 0/1/2
+  - file: skills/review/SKILL.md
+    change: ADD Phase 0 invocation of `review-dispatch`; PRESERVE solo reviewer pattern (lines 39-49); PRESERVE `scope_drift` emit call
+  - file: skills/hive/skills/review-dispatch/test/resolver.test.mjs
+    change: CREATE — vitest spec covering 5-tier permutations + atom routing + scope_drift emit preserved (spy)
+
+code_examples:
+  - language: markdown
+    description: review-dispatch Step 0
+    snippet: |
+      ## Step 0 — Resolve mode_decision
+      Call `resolveMode('HIVE_REVIEW_MODE', ctx)` from `hive/lib/mode-resolver.mjs`.
+
+references:
+  - path: skills/review/SKILL.md
+    relevant_excerpt: "Lines 39-49: solo reviewer pattern; workflow at hive/workflows/code-review.workflow.yaml; lines 88-103 reference hive/lib/scope_drift.py."
+  - path: skills/hive/skills/execute-dispatch/SKILL.md
+    relevant_excerpt: "Router structural mirror — Step 0 field-source resolution at lines 46-101."
+  - path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/structured-outline.md
+    relevant_excerpt: "r-1: review-dispatch router — Create skills/hive/skills/review-dispatch/SKILL.md (router; consumes mode-resolver.mjs). Add Phase 0 invocation of the router to skills/review/SKILL.md. Preserve solo reviewer pattern (lines 39-49); preserve scope_drift emit call when wrapping."
+
+cross_cutting:
+  - concern: documentation
+    action: "review-dispatch/SKILL.md is itself the doc; cite execute-dispatch as structural mirror and document scope_drift preservation."
+  - concern: versioning
+    action: "New consumer-visible skill — flag for epic-close version bump (minor — additive feature) in CHANGELOG."
+
+design_decisions:
+  - decision: Router structurally mirrors execute-dispatch/SKILL.md
+    rationale: Architect ESCALATION in outline-collab-review-record — the 4 substrate routers share `execute-dispatch/SKILL.md` as structural mirror anchor.
+  - decision: Solo reviewer only — defer panel mode
+    rationale: Decision Point 2 DEFERS panel mode to a future epic; introducing it here would widen the router contract and risk blocking substrate-parity goal.
+  - decision: scope_drift emit preserved through router wrapping
+    rationale: Existing `/review` semantic; router is a transparent wrapper for substrate selection, not a behavior modifier.
+
+risks:
+  - severity: medium
+    description: Router wrapping silently drops scope_drift emit
+    mitigation: AC asserts emit preserved via spy in vitest; manual smoke confirms scope_drift output identical to pre-epic
+  - severity: low
+    description: Router drifts from execute-dispatch structural mirror
+    mitigation: Design decision cites execute-dispatch; architect review verifies Step 0/1/2 parity

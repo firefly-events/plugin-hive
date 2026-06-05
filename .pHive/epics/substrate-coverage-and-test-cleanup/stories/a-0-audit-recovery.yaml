@@ -1,0 +1,109 @@
+id: a-0-audit-recovery
+epic: substrate-coverage-and-test-cleanup
+title: Audit recovery spike — locate, regenerate, or accept-risk the missing cc-workflows smoke audit
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+description: |
+  Pre-flight 0.5-day spike that closes Constraint 5 (gate-ownership invariant)
+  by either (a) locating the missing `cc-workflows-smoke-1780516800.yaml`
+  audit, (b) re-running the cc-workflows smoke locally to produce a fresh
+  audit, or (c) writing an explicit single-citation-acceptance decision doc.
+  All downstream slices gate on this spike landing. The spike runs BEFORE
+  Phase C story authoring per user decision (design-discussion §6 Q4).
+
+acceptance_criteria:
+  - Branch (a) — locate. Given the cc-workflows-smoke audit is searched for in `.pHive/audits/post-run/` and likely sibling locations, when the file is found, then it is copied into `.pHive/audits/post-run/` under its original or a normalised name and design-discussion §5 Constraint 5 citation resolves.
+  - Branch (b) — re-run. Given branch (a) yields no file within the 0.5-day budget, when the cc-workflows smoke is executed locally, then a fresh audit is written under `.pHive/audits/post-run/cc-workflows-smoke-<iso-timestamp>.yaml` and design-discussion §5 Constraint 5 citation is updated to the new timestamp.
+  - Branch (c) — accept-risk. Given branches (a) and (b) both fail or exceed budget, when single-citation risk is accepted, then `.pHive/epics/substrate-coverage-and-test-cleanup/docs/audit-recovery-decision.md` exists with the four required sections enumerated below AND design-discussion §5 Constraint 5 is updated to read "single-citation accepted; recovery rationale at audit-recovery-decision.md".
+  - Branch (c) decision-doc — required sections. Given branch (c) is taken, the decision doc MUST contain four named sections — (1) "What risk we accept" — names the specific gate-ownership invariant exposure created by the missing audit; (2) "What corroboration replaces the missing citation" — identifies the plan-mode-validation audit (or other concrete artifact) as the sole remaining grounding; (3) "What runtime carrier substitutes" — names the Slice 2 manual smoke on the bounce-back as the runtime verification carrier; (4) "Design-discussion §5 update" — provides the verbatim text to splice into Constraint 5 narrative.
+  - Verification. Given the spike closes, when `ls .pHive/audits/post-run/` is run, then either a `cc-workflows-smoke-*.yaml` file is present OR `.pHive/epics/substrate-coverage-and-test-cleanup/docs/audit-recovery-decision.md` exists.
+  - DO. Try branch (a) first, then branch (b), then branch (c) only if budget exhausted.
+  - DO NOT. Do not author any Slice 1+ story YAMLs before this spike closes.
+
+metric:
+  applies: false
+  justification: "Process-substrate spike — produces a recovery artifact or decision doc, not a falsifiable runtime number; downstream slices carry the falsifiable metrics."
+
+steps:
+  - id: research
+    description: Re-walk `.pHive/audits/post-run/` and sibling directories (e.g., `.pHive/audits/`, scratch dirs under `closer-test-*`) for any file whose name matches `cc-workflows-smoke-*.yaml`; capture what is and is not found.
+    agent: researcher
+  - id: implement
+    description: |
+      Execute the chosen branch.
+      Branch (a): copy any located audit into `.pHive/audits/post-run/`.
+      Branch (b): run the cc-workflows smoke locally and verify it writes a fresh audit under `.pHive/audits/post-run/cc-workflows-smoke-<iso-timestamp>.yaml`.
+      Branch (c): create `.pHive/epics/substrate-coverage-and-test-cleanup/docs/audit-recovery-decision.md` with the four required sections.
+      In all branches, update design-discussion §5 Constraint 5 narrative to reflect the outcome.
+    agent: developer
+    depends_on:
+      - research
+  - id: test
+    description: Verify the acceptance signal — `ls .pHive/audits/post-run/` shows the recovered/regenerated audit OR `.pHive/epics/substrate-coverage-and-test-cleanup/docs/audit-recovery-decision.md` exists; spot-check design-discussion §5 reflects the chosen branch.
+    agent: tester
+    depends_on:
+      - implement
+  - id: review
+    description: Architect review confirms the chosen branch closes Constraint 5 either by recovering a citation or by documenting an acceptable single-citation posture with a substitute runtime carrier.
+    agent: reviewer
+    depends_on:
+      - test
+  - id: integrate
+    description: 'Commit "[a-0] chore(audit): close substrate-coverage Constraint 5 via <branch>"'
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  tech_stack:
+    - language: yaml / markdown
+    - runtime: shell, node
+  key_files:
+    - path: .pHive/audits/post-run/
+      purpose: Canonical audit directory; recovery target for branches (a) and (b)
+    - path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/design-discussion.md
+      purpose: §5 Constraint 5 narrative needs an outcome-conditional update
+    - path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/audit-recovery-decision.md
+      purpose: New file created only on branch (c); must carry the four named sections
+
+files_to_modify:
+  - file: .pHive/epics/substrate-coverage-and-test-cleanup/docs/design-discussion.md
+    change: Update §5 Constraint 5 narrative to reflect the chosen branch outcome (recovered citation OR single-citation acceptance with link to decision doc)
+  - file: .pHive/epics/substrate-coverage-and-test-cleanup/docs/audit-recovery-decision.md
+    change: CREATE on branch (c) only; carries 4 required sections (what risk, what corroboration, what runtime carrier, design-discussion §5 update)
+
+code_examples:
+  - language: shell
+    description: Search for the audit across likely directories
+    snippet: |
+      find .pHive -name 'cc-workflows-smoke-*.yaml' -print
+      ls .pHive/audits/post-run/
+
+references:
+  - path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/structured-outline.md
+    relevant_excerpt: "Phase 0 — Audit recovery (= Slice 0): close the missing cc-workflows-smoke-1780516800.yaml audit blocker so Constraint 5 (gate-ownership invariant) either re-attains its dual-citation grounding or is explicitly accepted as a single-citation risk with the rationale captured."
+  - path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/design-discussion.md
+    relevant_excerpt: "§4 high-severity — cc-workflows-smoke-1780516800.yaml audit referenced in outline line 115 does not exist on disk. Only the plan-mode-validation audit is present."
+  - path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/outline-collab-review-record.md
+    relevant_excerpt: "ESCALATION — Branch (c) acceptance criterion for Slice 0 is underspecified. Recommend adding 3-4 required sections to the decision doc AC before story authoring begins."
+
+cross_cutting:
+  - concern: documentation
+    action: "Update design-discussion §5 Constraint 5 narrative; on branch (c), author audit-recovery-decision.md with the four named sections; no other doc surface is affected."
+
+risks:
+  - severity: high
+    description: Branch (c) is taken with thin rationale and downstream slices proceed without genuine grounding for Constraint 5
+    mitigation: Branch (c) AC names four required sections; reviewer step confirms each section is substantive (not a one-liner); design-discussion §5 update is verbatim, not paraphrased
+  - severity: medium
+    description: Re-running the cc-workflows smoke (branch b) within 0.5 day exceeds budget
+    mitigation: Pre-budget budget triage at the start of the spike; if branch (a) fails fast, jump straight to (b) only if cc-workflows smoke is known to run cleanly; otherwise short-circuit to (c)
+
+design_decisions:
+  - decision: Three acceptable resolution branches (locate / re-run / accept-risk)
+    rationale: User-locked at design-discussion §6 Q4 — outline-collab-review-record ESCALATION required branch (c) carry 3-4 named decision-doc sections to prevent a thin pass.
+  - decision: Branch (c) decision doc requires four named sections (risk / corroboration / runtime carrier / §5 update)
+    rationale: Outline-collab-review-record TPM escalation flagged branch (c) as underspecified; baking sections into AC prevents an implementer from passing the gate with a 2-line note.
