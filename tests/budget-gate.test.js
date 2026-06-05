@@ -48,7 +48,7 @@ function makeFs(files /* { name: contents } */) {
 /** Build a JSONL-line stop-event row. */
 function tokensRow({
   ts,
-  model = 'claude-opus-4-7',
+  model = 'claude-opus-4-8',
   input_tokens = 0,
   output_tokens = 0,
 }) {
@@ -98,7 +98,7 @@ test('AC-budget-2: mixed-model events → correct weighted sum', () => {
   // Total = $88.50
   const files = {
     'stop-a.jsonl': [
-      tokensRow({ ts: TODAY_TS, model: 'claude-opus-4-7', input_tokens: 1_000_000, output_tokens: 500_000 }),
+      tokensRow({ ts: TODAY_TS, model: 'claude-opus-4-8', input_tokens: 1_000_000, output_tokens: 500_000 }),
       tokensRow({ ts: TODAY_TS, model: 'claude-sonnet-4-6', input_tokens: 2_000_000, output_tokens: 1_000_000 }),
     ].join('\n'),
     'stop-b.jsonl': tokensRow({ ts: TODAY_TS, model: 'claude-haiku-4-5', input_tokens: 5_000_000, output_tokens: 2_000_000 }),
@@ -113,7 +113,7 @@ test('AC-budget-2: mixed-model events → correct weighted sum', () => {
 
 test('AC-budget-3: over-limit → gate fails with remaining-budget message', () => {
   const files = {
-    'stop-x.jsonl': tokensRow({ ts: TODAY_TS, model: 'claude-opus-4-7', input_tokens: 10_000_000, output_tokens: 0 }),
+    'stop-x.jsonl': tokensRow({ ts: TODAY_TS, model: 'claude-opus-4-8', input_tokens: 10_000_000, output_tokens: 0 }),
     // Cost: $150
   };
   const errs = [];
@@ -163,7 +163,7 @@ test('AC-budget-5: unknown model → opus rate fallback + warn', () => {
 test('AC-budget-6: rows older than UTC midnight today → excluded', () => {
   const files = {
     'stop-old.jsonl': [
-      tokensRow({ ts: YESTERDAY_TS, model: 'claude-opus-4-7', input_tokens: 10_000_000, output_tokens: 0 }),
+      tokensRow({ ts: YESTERDAY_TS, model: 'claude-opus-4-8', input_tokens: 10_000_000, output_tokens: 0 }),
       tokensRow({ ts: TODAY_TS, model: 'claude-haiku-4-5', input_tokens: 1_000_000, output_tokens: 0 }),
     ].join('\n'),
   };
@@ -191,7 +191,7 @@ test('AC-budget-7: non-tokens metric_type rows → contribute zero', () => {
 
 test('AC-budget-8: missing daily_usd_limit → limit=Infinity, gate passes', () => {
   const files = {
-    'stop-big.jsonl': tokensRow({ ts: TODAY_TS, model: 'claude-opus-4-7', input_tokens: 100_000_000, output_tokens: 100_000_000 }),
+    'stop-big.jsonl': tokensRow({ ts: TODAY_TS, model: 'claude-opus-4-8', input_tokens: 100_000_000, output_tokens: 100_000_000 }),
   };
   const { warn, warns } = silentWarns();
   // config=null forces the gate to fall through readDailyLimit; we point
@@ -218,7 +218,7 @@ test('AC-budget-8: missing daily_usd_limit → limit=Infinity, gate passes', () 
 });
 
 test('rateLookup: known models return inline rate-card entries', () => {
-  assert.deepEqual(_internal.rateLookup('claude-opus-4-7', () => {}), { in: 15.0, out: 75.0 });
+  assert.deepEqual(_internal.rateLookup('claude-opus-4-8', () => {}), { in: 15.0, out: 75.0 });
   assert.deepEqual(_internal.rateLookup('claude-sonnet-4-6', () => {}), { in: 3.0, out: 15.0 });
   assert.deepEqual(_internal.rateLookup('claude-haiku-4-5', () => {}), { in: 1.0, out: 5.0 });
 });

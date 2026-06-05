@@ -43,8 +43,8 @@ _make_main_jsonl() {
   local path="$1"
   mkdir -p "$(dirname "$path")"
   cat > "$path" <<'JSONL'
-{"type":"assistant","sessionId":"test-sess-001","isSidechain":false,"timestamp":"2026-04-21T10:00:00Z","message":{"model":"claude-opus-4-7","usage":{"input_tokens":100,"output_tokens":200,"cache_creation_input_tokens":50,"cache_read_input_tokens":300}}}
-{"type":"assistant","sessionId":"test-sess-001","isSidechain":false,"timestamp":"2026-04-21T10:01:00Z","message":{"model":"claude-opus-4-7","usage":{"input_tokens":80,"output_tokens":150,"cache_creation_input_tokens":0,"cache_read_input_tokens":120}}}
+{"type":"assistant","sessionId":"test-sess-001","isSidechain":false,"timestamp":"2026-04-21T10:00:00Z","message":{"model":"claude-opus-4-8","usage":{"input_tokens":100,"output_tokens":200,"cache_creation_input_tokens":50,"cache_read_input_tokens":300}}}
+{"type":"assistant","sessionId":"test-sess-001","isSidechain":false,"timestamp":"2026-04-21T10:01:00Z","message":{"model":"claude-opus-4-8","usage":{"input_tokens":80,"output_tokens":150,"cache_creation_input_tokens":0,"cache_read_input_tokens":120}}}
 {"type":"user","sessionId":"test-sess-001","message":{"role":"user","content":"task"}}
 JSONL
 }
@@ -337,7 +337,7 @@ _make_meta_json "$SESS_E_DIR/subagents/agent-subA.meta.json" "hive:developer" "D
 
 # Second subagent with different usage amounts (reuse _make_subagent_jsonl but different tokens)
 cat > "$SESS_E_DIR/subagents/agent-subB.jsonl" <<'JSONL'
-{"type":"assistant","sessionId":"sess-e","isSidechain":true,"timestamp":"2026-04-21T10:05:00Z","message":{"model":"claude-opus-4-7","usage":{"input_tokens":200,"output_tokens":350,"cache_creation_input_tokens":25,"cache_read_input_tokens":90}}}
+{"type":"assistant","sessionId":"sess-e","isSidechain":true,"timestamp":"2026-04-21T10:05:00Z","message":{"model":"claude-opus-4-8","usage":{"input_tokens":200,"output_tokens":350,"cache_creation_input_tokens":25,"cache_read_input_tokens":90}}}
 JSONL
 _make_meta_json "$SESS_E_DIR/subagents/agent-subB.meta.json" "hive:reviewer" "Reviewer subagent"
 
