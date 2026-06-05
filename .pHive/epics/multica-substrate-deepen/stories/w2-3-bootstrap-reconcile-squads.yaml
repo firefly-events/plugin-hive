@@ -83,3 +83,9 @@ metric:
   verify_at: test
   owner: tester
 tracker_id: plugin-hive/PLU-145
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3j)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep because squad reconciliation is shipped Multica bootstrap infrastructure.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd

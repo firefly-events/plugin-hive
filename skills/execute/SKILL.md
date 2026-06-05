@@ -148,7 +148,7 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
    When `gate_violations[]` is non-empty, the dispatch has been downgraded to `sequential` by the parallel-dispatch gate (`ed-7`). Surface the warning to stdout naming every offending story ID and the reason recorded by the gate (the structured format is documented in `execute-dispatch/SKILL.md` Step 1.5). Do not re-implement the gate logic here — the dispatch skill is the single boundary for this decision per the parallel-call-sites registry (`hive/references/parallel-call-sites.md`).
 
-   Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d, `multica` -> step 6e.
+   Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d, `multica` -> step 6e, `cc-workflows` -> step 6f.
 5pre. **Executor cutover routing.** Use only the returned `runner_path` and `runner_reason`; do not re-evaluate the cutover tree here. If `runner_path == hive-dag`, call `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`; otherwise continue on the orchestrator-narrated path. Single dispatch point: this skill call is the only `/execute` policy boundary for executor-vs-orchestrator routing.
 
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
@@ -184,6 +184,16 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
    - `appends_map`: the review-phase sidecar map from step 2b
    - `epic_handle`: the current epic identifier
    - `hive_config`: parsed root `hive.config.yaml` (for `execution.multica.*` options and `agent_backends.*`)
+
+6f. **CC Workflows execution** (used when `HIVE_EXECUTION_RUNTIME=workflows` or root config `execution.runtime: cc-workflows`). Routes each story into a Workflow tool dispatch.
+   Invoke `skills/hive/skills/execute-mode-cc-workflows/SKILL.md` with:
+   - `workflow_path`: the workflow loaded in step 3
+   - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
+   - `appends_map`: the review-phase sidecar map from step 2b
+   - `epic_handle`: the current epic identifier
+   - `hive_config`: parsed root `hive.config.yaml` (for `execution.cc-workflows.*` options)
+
+   Step 6f does not recursively spawn /workflows from within a dispatched agent — the Workflow tool runs once per /execute invocation.
 
 7. **Sequential execution.** Follow **`references/sequential-execution.md`** for the step-by-step workflow within each story, sidecar injection at the review step, episode records, gate checks, and respawn monitoring.
 

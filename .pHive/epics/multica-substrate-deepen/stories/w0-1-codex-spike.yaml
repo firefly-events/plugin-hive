@@ -77,3 +77,9 @@ metric:
   applies: false
   justification: Spike story; produces a written finding doc, not measurable consumer behavior. Downstream stories (W1.4) carry the routing metric.
 tracker_id: plugin-hive/PLU-127
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3a)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep as Multica second-party provider-risk context; no spike finding doc shipped, but the downstream agents manifest encodes the positive codex-provider assumption.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd

@@ -71,3 +71,9 @@ metric:
 tracker_id: plugin-hive/PLU-158
 tracker_uuid: de974767-94d5-4256-a132-1952cf3ff8f8
 tracker_url: http://localhost:3000/issue/PLU-158
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4e)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; adds the per-persona dispatch carrier helper selected by the spike while preserving persona identity and backend split.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt

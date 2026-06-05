@@ -45,3 +45,9 @@ metric:
   applies: false
   justification: Schema doc; w4-2 + w4-3 + w4-5 carry delivery metrics.
 tracker_id: plugin-hive/PLU-137
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3o)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep because Mode D-a skill export is retained as second-party/fallback documentation, not required by the first-party CC path.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd

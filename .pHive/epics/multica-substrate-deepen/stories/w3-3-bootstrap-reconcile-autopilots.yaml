@@ -91,3 +91,9 @@ metric:
   verify_at: test
   owner: tester
 tracker_id: plugin-hive/PLU-146
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3m)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep as dormant second-party bootstrap capability already shipped; it is not load-bearing for the first-party path and has no manifest until parked W3.2 resumes.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd

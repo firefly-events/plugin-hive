@@ -66,3 +66,9 @@ metric:
   applies: false
   justification: Spike story; written finding doc only. W4 delivery metric is on the pilot validation story.
 tracker_id: plugin-hive/PLU-131
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3c)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep as second-party Mode D-a visibility context; no spike finding doc shipped, but the retained export manifest and reconciler use private visibility.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd

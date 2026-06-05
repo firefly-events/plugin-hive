@@ -1,0 +1,126 @@
+id: cwfp-s6-1-readme-rewrite
+epic: cc-workflows-first-party
+title: README hero + Quick Start rewrite for first-party CC workflows
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- cwfp-s2-5-mvp-e2e-validation
+- cwfp-s3-1-persona-dispatchability-under-cc-workflows
+- cwfp-s5-1-cycle-state-msd
+- cwfp-s5-2-cycle-state-mpt
+- cwfp-s5-5-project-memory-additive-notes
+description: "Rewrite README.md hero (lines 1-20) + Quick Start step 1 per Q9 (i)\nmaintainer-confirmed reframe \"Hive composes ON Claude Code\".\n\nHero (sketch \u2014 exact wording at implementation):\n\
+  \  \"Hive composes ON Claude Code: first-party CC workflows for in-session\n  execution; second-party Multica for codex co-mingling, headless\n  webhooks, and durable cross-session issue queue.\"\n\n\
+  Quick Start step 1:\n  OLD: /hive:multica-init as \"Bootstrap Multica as the execution substrate\"\n  NEW: CC-workflows-first onboarding (verify CC 2.1.154+; opt-in via\n       execution.runtime: workflows\
+  \ or default 'auto')\n  Multica step demoted to step 2 (or later): \"Optional: bootstrap\n  Multica for codex co-mingling / headless webhooks / durable queue\"\n\nPreserve all Multica references (don't\
+  \ deprecate \u2014 demote).\n\nThis is the canonical North Star edit per memory feedback_check_readme_first.\nLands AFTER Phases 1-5 ship so language reflects shipped behavior, not\naspiration (defended\
+  \ in design-discussion \xA710 vs grill C3).\n"
+acceptance_criteria:
+- "Given README.md after this story commits, when the hero is read, then it expresses Q9 (i) reframe \u2014 'Hive composes ON Claude Code' or equivalent \u2014 and references first-party CC workflows +\
+  \ second-party Multica with the three Multica moats"
+- Given Quick Start step 1, when read, then it leads with a CC-workflows-first onboarding step (verify CC 2.1.154+; opt-in via execution.runtime), NOT /hive:multica-init
+- Given the prior Multica references in README.md, when this story commits, then no reference is removed; Multica content is demoted (later steps / optional positioning)
+- Given any code samples in README.md (commands, paths), when validated, then they resolve in the current worktree state
+- Given a fresh consumer reading the rewritten README, when they follow Quick Start step 1, then they can bootstrap CC-workflows-first execution successfully
+steps:
+- id: research
+  description: 'Read README.md fully (current 1-20 hero + Quick Start steps). Read
+
+    cwfp-s5-5''s project memory notes for the current operational state.
+
+    Read CONTEXT.md for the existing "Composability" posture statement
+
+    (to be paralleled in cwfp-s6-2).
+
+    '
+  agent: researcher
+- id: implement
+  description: 'Rewrite hero (lines 1-20) per Q9 (i). Rewrite Quick Start step 1.
+
+    Demote /hive:multica-init step (move to step 2+ with "Optional"
+
+    framing). Preserve all other content.
+
+    '
+  agent: technical-writer
+  depends_on:
+  - research
+- id: test
+  description: 'Doc-test: cite each path/command in README.md and verify it resolves
+
+    in the worktree state (Read each cited path; verify each cited
+
+    command exists in skills/).
+
+    Fresh-consumer test: a reviewer unfamiliar with the new framing
+
+    follows Quick Start step 1; confirms they can bootstrap CC-workflows-
+
+    first execution without confusion.
+
+    '
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: 'Maintainer review on positioning correctness (Q9 (i) reframe captured).
+
+    Reviewer confirms no Multica references removed (demoted only).
+
+    Architect-optional: cross-check hero against CONTEXT.md posture
+
+    statement (cwfp-s6-2 lands in parallel).
+
+    '
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: 'Commit "[cwfp-s6-1] docs(readme): rewrite hero + Quick Start for first-party CC workflows per Q9 (i)"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: README.md
+    purpose: Lines 1-20 hero + Quick Start step 1 are the targets
+  - path: CONTEXT.md
+    purpose: Parallel posture statement updated in cwfp-s6-2
+files_to_modify:
+- file: README.md
+  change: REWRITE hero (lines 1-20) per Q9 (i); REWRITE Quick Start step 1 to CC-workflows-first onboarding; DEMOTE /hive:multica-init step (move to step 2+ Optional framing); PRESERVE all other content
+design_decisions:
+- decision: Posture (i) "Hive composes ON Claude Code"
+  rationale: Q9 maintainer-confirmed at gate 1; durable placement in CONTEXT.md cwfp-s6-2; README hero reflects same posture
+- decision: Demote, don't deprecate Multica references
+  rationale: "User framing at gate 1 explicit \u2014 \"Don't deprecate Multica. Demote it from default to opt-in\""
+- decision: Phase 6 placement is intentional (lands AFTER Phases 1-5)
+  rationale: "gate_3_decisions.D3 + design-discussion \xA710 \u2014 README is output of design, not anchor; language reflects shipped behavior"
+cross_cutting:
+- concern: documentation
+  action: README IS canonical North Star; this story IS the doc change. cwfp-s6-2 carries the CONTEXT.md companion
+- concern: versioning
+  action: README.md version badge bump is handled by the LAST commit on the epic branch per cross-cutting concern 'versioning' (TPM-owned); this story rewrites content, NOT the version badge
+risks:
+- severity: low
+  description: README rewrite ships positioning ahead of behavior that subtly regresses post-merge
+  mitigation: Phase 6 lands AFTER all other phases; behavior is verified before this story commits
+- severity: low
+  description: Fresh consumer can't follow rewritten Quick Start (e.g. missing CC version detection step)
+  mitigation: Fresh-consumer test in this story's test step explicitly exercises onboarding from scratch
+- severity: low
+  description: Multica reference accidentally removed
+  mitigation: Reviewer checks demoted-not-removed; gate_decisions Q-confirmed framing
+references:
+- path: .pHive/cycle-state/cc-workflows-first-party.yaml
+  relevant_excerpt: "gate_decisions.open_questions.Q9: agree (i) \"Hive composes ON Claude Code\" durable in CONTEXT.md before Phase C.\ngate_3_decisions.D3: A \u2014 ship Phase 6 vocab-grep as designed.\n"
+- path: .pHive/epics/cc-workflows-first-party/docs/design-discussion.md
+  relevant_excerpt: "\xA710 C3 \u2014 README is OUTPUT of this design, not its anchor. Anchoring Phase 1 stories on a pre-resolution README risks language drift if Q-resolutions shift the posture. Phase\
+    \ 6 placement protects against that drift.\n"
+metric:
+  applies: false
+  justification: Positioning rewrite; downstream outcome (consumer onboarding success rate, Multica-vs-CC-workflows opt-in distribution) is observable but not declared as this story's contract. The story's
+    contract is "language reflects shipped behavior + Q9 posture (i)".
+tracker_id: 23246428-50dd-45fb-a6ae-9b3a328f5c0f

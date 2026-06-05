@@ -1,0 +1,63 @@
+id: cwfp-s5-3l-disp-w3-2-autopilots-yaml
+epic: cc-workflows-first-party
+title: 'Disposition APPLY (msd): w3-2-autopilots-yaml'
+status: pending
+complexity: low
+methodology: classic
+depends_on:
+- cwfp-s4-1-disposition-pass-msd
+- cwfp-s5-1-cycle-state-msd
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: "Apply disposition verdict for multica-substrate-deepen story `w3-2-autopilots-yaml`\n(\"Author .pHive/multica/autopilots.yaml with metrics-check + visual-qa autopilots\") per cwfp-s4-1 audit.\
+  \ Adds three additive fields to the\ntarget story YAML:\n  disposition: park\n  disposition_rationale: |\n    <one-line from audit>\n  disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd\n\
+  \nRead-then-Edit; preserve all existing fields. Per cwfp-s4-1 audit\nrecommendation (review the disposition-pass-msd.md row for w3-2-autopilots-yaml\nbefore edit; deviate from default only with rationale).\n"
+acceptance_criteria:
+- 'Given .pHive/epics/multica-substrate-deepen/stories/w3-2-autopilots-yaml.yaml after this story commits, when read, then it carries disposition: park + disposition_rationale + disposition_source_slice
+  (additive fields)'
+- Given the prior YAML content, when this story commits, then prior fields (id, epic, title, status, methodology, depends_on, description, acceptance_criteria, steps, etc.) are preserved verbatim
+- Given cwfp-s4-1's audit row for w3-2-autopilots-yaml, when the disposition verdict is applied, then it matches the audit's candidate (or deviates with explicit rationale)
+steps:
+- id: implement
+  description: 'Read .pHive/epics/multica-substrate-deepen/stories/w3-2-autopilots-yaml.yaml in full.
+
+    Read cwfp-s4-1''s disposition-pass-msd.md row for w3-2-autopilots-yaml.
+
+    Append the three additive fields preserving all existing content.
+
+    '
+  agent: developer
+- id: review
+  description: Reviewer diffs against pre-edit state; confirms additive-only; confirms verdict matches audit
+  agent: reviewer
+  depends_on:
+  - implement
+- id: integrate
+  description: 'Commit "[cwfp-s5-3l] docs(disposition): apply park to w3-2-autopilots-yaml"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: .pHive/epics/multica-substrate-deepen/stories/w3-2-autopilots-yaml.yaml
+    purpose: "Target story YAML \u2014 single file modified"
+  - path: .pHive/epics/cc-workflows-first-party/docs/disposition-pass-msd.md
+    purpose: Audit source for the verdict
+files_to_modify:
+- file: .pHive/epics/multica-substrate-deepen/stories/w3-2-autopilots-yaml.yaml
+  change: 'APPEND disposition: park + disposition_rationale + disposition_source_slice (additive only)'
+cross_cutting:
+- concern: documentation
+  action: Story YAML modification is doc; downstream readers (cwfp-s5-5 project memo update, future maintainer audit) consume this disposition field
+risks:
+- severity: low
+  description: Audit candidate changed between cwfp-s4-1 commit and this story's implement
+  mitigation: Read the audit doc just before edit; if mismatch, surface to team-lead before applying
+references:
+- path: .pHive/cycle-state/cc-workflows-first-party.yaml
+  relevant_excerpt: "gate_decisions.open_questions.Q3: agree keep-as-second-party first release.\ngate_decisions.open_questions.Q5: DESCOPED \u2014 autopilot work removed from this epic scope.\n"
+metric:
+  applies: false
+  justification: "Disposition mutation to park a single not-yet-shipped story; no observable runtime metric \u2014 the W3.2 park is an explicit scope exclusion"
+tracker_id: a1a0d140-76e2-4fca-badb-bd51990b8f72

@@ -1,0 +1,108 @@
+id: cwfp-s3-1-persona-dispatchability-under-cc-workflows
+epic: cc-workflows-first-party
+title: Persona dispatchability re-classification under /workflows-as-harness
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- cwfp-s1-1-phase0-capability-spike
+- cwfp-s2-5-mvp-e2e-validation
+description: "Produce .pHive/epics/cc-workflows-first-party/docs/persona-dispatchability-under-cc-workflows.md\nwith per-persona verdicts sourced from first-hand evidence in Phase 0\nspike (cwfp-s1-1) +\
+  \ MVP E2E run (cwfp-s2-5).\n\nPer-persona verdict:\n  - DISPATCHABLE: persona remains a standalone agent invoked by /workflows\n  - COLLAPSED: persona's coordination work is fully expressed in workflow\n\
+  \    YAML/spec (ELIMINATION per feedback_no_team_lead_intermediary \u2014 NOT\n    relocation; this is a load-bearing invariant)\n  - REFRAMED: persona's role changes shape (e.g. pair-programmer may\n\
+  \    become a /workflows step pattern rather than a standalone agent)\n\nInvariants:\n  - feedback_no_team_lead_intermediary preserved \u2014 no team-lead-shaped\n    intermediary reintroduced; if /workflows\
+  \ cannot fully express a\n    persona's coordination, persona remains DISPATCHABLE\n  - feedback_use_roster_agents preserved \u2014 any persona reused in workflow\n    YAML references the persona file\
+  \ at hive/agents/, not improvised\n    inline\n\nUNVERIFIED-defer policy: any persona without first-hand evidence is\nmarked UNVERIFIED + deferred; do NOT speculate (writer scope discipline).\n\nCompares\
+  \ to existing .pHive/epics/multica-substrate-deepen/docs/persona-dispatchability.md:15-65\n(22 dispatchable / 3 harness-only on Multica substrate).\n"
+acceptance_criteria:
+- Given the persona-dispatchability-under-cc-workflows.md doc, when reviewed, then each of the 25 personas in hive/agents/ has a verdict OR an explicit UNVERIFIED-defer note
+- Given a COLLAPSED verdict, when justified, then it cites first-hand evidence from cwfp-s1-1 or cwfp-s2-5 + confirms ELIMINATION (not relocation) per feedback_no_team_lead_intermediary
+- "Given a persona referenced in a /workflows YAML/spec example, when shown, then the persona file at hive/agents/ is cited (per feedback_use_roster_agents \u2014 no improvised inline personas)"
+- "Given the existing persona-dispatchability.md 22/3 cut on Multica substrate, when this doc is read, then the comparison surface explicitly notes which personas changed verdict (Multica \u2192 CC /workflows\
+  \ substrate)"
+- "Given an UNVERIFIED persona, when the doc lists it, then a defer reason is recorded \u2014 no speculation"
+steps:
+- id: research
+  description: 'Read all 25 persona files at hive/agents/; read existing
+
+    .pHive/epics/multica-substrate-deepen/docs/persona-dispatchability.md:15-65;
+
+    read cwfp-s1-1 spike-findings.md + cwfp-s2-5 mvp-validation.md for
+
+    first-hand evidence of persona behavior under /workflows.
+
+    '
+  agent: researcher
+- id: implement
+  description: "Author .pHive/epics/cc-workflows-first-party/docs/persona-dispatchability-under-cc-workflows.md.\nStructure:\n  - Source comparison (existing 22/3 cut)\n  - Per-persona verdict (one row\
+    \ per persona; DISPATCHABLE / COLLAPSED /\n    REFRAMED / UNVERIFIED) with evidence cite to s1-1 or s2-5\n  - Posture invariants section (feedback_no_team_lead_intermediary +\n    feedback_use_roster_agents\
+    \ cross-check)\n  - Changed-verdict callout (where Multica \u2192 CC verdict differs)\n"
+  agent: technical-writer
+  depends_on:
+  - research
+- id: review
+  description: 'Maintainer review confirms no team-lead-shaped intermediary
+
+    reintroduced; reviewer cross-checks every verdict has evidence or
+
+    UNVERIFIED-defer; architect spot-check on COLLAPSED verdicts to
+
+    confirm ELIMINATION (not relocation).
+
+    '
+  agent: reviewer
+  depends_on:
+  - implement
+- id: integrate
+  description: 'Commit "[cwfp-s3-1] docs(personas): re-classify persona dispatchability under /workflows-as-harness"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/agents/
+    purpose: "25 persona files \u2014 all under verdict scope"
+  - path: .pHive/epics/multica-substrate-deepen/docs/persona-dispatchability.md
+    purpose: "Source comparison \u2014 existing 22/3 cut on Multica substrate"
+  - path: .pHive/epics/cc-workflows-first-party/docs/spike-findings.md
+    purpose: First-hand evidence from cwfp-s1-1
+  - path: .pHive/epics/cc-workflows-first-party/docs/mvp-validation.md
+    purpose: First-hand evidence from cwfp-s2-5
+files_to_modify:
+- file: .pHive/epics/cc-workflows-first-party/docs/persona-dispatchability-under-cc-workflows.md
+  change: CREATE the doc with per-persona verdicts + posture invariants + changed-verdict callout
+design_decisions:
+- decision: COLLAPSED = elimination, not relocation
+  rationale: "feedback_no_team_lead_intermediary invariant; design-discussion \xA73 Phase 3 clarification \u2014 \"if /workflows cannot fully express a persona's coordination work, persona remains DISPATCHABLE;\
+    \ no team-lead-shaped surface gets reintroduced\""
+- decision: UNVERIFIED-defer policy for personas without first-hand evidence
+  rationale: "Writer scope discipline \u2014 speculation is not evidence; UNVERIFIED is an honest state and acceptable for follow-on resolution"
+- decision: Doc is the deliverable; no skill/code changes this story
+  rationale: Phase 3 is read-only doc work per V plan Slice 3; downstream consumers are humans + future workflow YAML authors
+cross_cutting:
+- concern: documentation
+  action: This doc IS the deliverable; CONTEXT.md vocab section (cwfp-s6-2) may cite this doc as the canonical persona-under-/workflows reference
+risks:
+- severity: medium
+  description: Speculation slips in as "evidence" without first-hand corroboration
+  mitigation: UNVERIFIED-defer is acceptable + reviewer cross-checks every verdict has evidence cite to s1-1 or s2-5
+- severity: medium
+  description: "Posture regression \u2014 a persona reclassified into a team-lead-shaped intermediary"
+  mitigation: Maintainer review explicitly checks for this; architect spot-check on COLLAPSED verdicts to confirm ELIMINATION
+- severity: low
+  description: Verdicts drift as future workflow YAML patterns emerge
+  mitigation: This story's verdicts cite spike + MVP evidence; future shifts trigger a re-cut story in a follow-on epic, not in-place edits
+references:
+- path: .pHive/epics/cc-workflows-first-party/docs/structured-outline.md
+  relevant_excerpt: "Part 2 Phase 3 \u2014 Per-persona verdict: DISPATCHABLE / COLLAPSED-elimination / REFRAMED. The no-team-lead-intermediary posture is preserved \u2014 no team-lead-shaped surface reintroduced.\
+    \ UNVERIFIED-defer policy.\n"
+- path: .pHive/epics/multica-substrate-deepen/docs/persona-dispatchability.md
+  relevant_excerpt: 'Lines 15-65 (paraphrased): 22 dispatchable + 3 harness-only on Multica substrate. Harness-only verdict cites Multica-specific lack of TeamCreate + SendMessage.
+
+    '
+metric:
+  applies: false
+  justification: Persona re-classification doc; the surfaces affected (workflow YAML authoring, future skill design) are downstream of this evidence-collection deliverable. No quantitative outcome moves
+    from this doc itself.
+tracker_id: eb6d0dae-c869-4662-91f0-0325d35b0171

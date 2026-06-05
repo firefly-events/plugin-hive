@@ -1,0 +1,28 @@
+epic_id: multica-substrate-deepen
+created: 2026-05-27T06:14:32Z
+methodology: classic
+execution_mode: multica
+mode_reason: execution-mode-override-config
+runner_path: orchestrator-narrated
+workflow: hive/workflows/development.classic.workflow.yaml
+field_sources:
+  sessions_enabled: default
+  parallel_teams: config
+  terminal_mux: config
+  executor: default
+  execution_mode: config
+escalations: []
+phase_records: []
+notes:
+  - "Multica execution mode active. Phase 1 contract: serial-within-depth dispatch."
+  - "Depth-0 stories (no depends_on): w0-1-codex-spike, w0-2-squad-read-spike, w0-3-skill-import-spike, w3-1-autopilot-schema-doc, w3-4-autopilot-deprecation-doc"
+  - "tracker_id missing on stories — execute-mode-multica step 1 will createStory + capture identifier."
+
+# Per-epic execution_runtime override (cwfp-s2-2 resolver target)
+# Source: cwfp-s4-1 disposition audit (.pHive/epics/cc-workflows-first-party/docs/disposition-pass-msd.md)
+execution_runtime:
+  adapter: multica
+  rationale: |
+    18/19 msd stories were shipped on Multica primitives + the 1 parked story (w3-2) is descoped per architect-v2 Q5. Keeping the epic routed to multica honors the substrate the stories were authored against and matches the disposition audit verdict (18 keep-as-second-party + 1 park).
+  decided_by: cc-workflows-first-party/cwfp-s5-1-cycle-state-msd
+  decided_at: "2026-06-02T01:05:00Z"

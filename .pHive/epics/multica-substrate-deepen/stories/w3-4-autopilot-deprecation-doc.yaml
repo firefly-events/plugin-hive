@@ -50,3 +50,9 @@ metric:
   applies: false
   justification: Adoption-guidance doc; behavior change is downstream by consumers, not measurable in this story.
 tracker_id: plugin-hive/PLU-136
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3n)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep as second-party adoption/deprecation guidance; useful if autopilot work is resumed outside this first-party rebase.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd

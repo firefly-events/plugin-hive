@@ -74,3 +74,9 @@ parallel_rationale: read-only
 tracker_id: plugin-hive/PLU-154
 tracker_uuid: 3737ce44-7d00-49f4-921c-fc5d89d56343
 tracker_url: http://localhost:3000/issue/PLU-154
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4a)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; spike picked the downstream carrier for Multica planning/test dispatch, so retain this substrate knowledge.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt

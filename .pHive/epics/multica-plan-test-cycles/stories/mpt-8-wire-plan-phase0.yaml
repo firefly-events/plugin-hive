@@ -84,3 +84,9 @@ manual_verdict:
 tracker_id: plugin-hive/PLU-161
 tracker_uuid: 6a2778db-11de-4ce7-900d-7b5b76c606a7
 tracker_url: http://localhost:3000/issue/PLU-161
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4h)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; load-bearing /plan Phase 0 carrier wires Multica planning path selection while keeping user review gates local.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt
