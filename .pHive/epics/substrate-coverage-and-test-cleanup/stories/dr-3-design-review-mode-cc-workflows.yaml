@@ -6,6 +6,7 @@ complexity: medium
 methodology: classic
 depends_on:
 - s-2-mode-resolver
+- s-5-cc-workflows-model-tier-resolver
 - s-4-cc-workflows-preconditions
 - s-3-no-codex-lint
 - dr-1-design-review-dispatch-router

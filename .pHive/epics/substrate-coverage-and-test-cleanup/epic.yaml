@@ -23,9 +23,13 @@ stories:
     complexity: low
     depends_on: []
 
-  # Slice 1 — foundation (commit order LOCKED: s-2 → s-4 → s-3)
+  # Slice 1 — foundation (commit order LOCKED: s-2 → s-4 → s-3; s-5 parallel to s-2)
   - id: s-2-mode-resolver
     title: Extract 5-tier mode-resolver helper into hive/lib/mode-resolver.mjs
+    complexity: medium
+    depends_on: [a-0-audit-recovery]
+  - id: s-5-cc-workflows-model-tier-resolver
+    title: Auto-resolve per-persona model tier in cc-workflows mode dispatch + helper extraction
     complexity: medium
     depends_on: [a-0-audit-recovery]
   - id: s-4-cc-workflows-preconditions
@@ -35,7 +39,7 @@ stories:
   - id: s-3-no-codex-lint
     title: Multi-surface no-codex lint with AST + grep checks + helper-import assertion + npm test wiring
     complexity: medium
-    depends_on: [s-4-cc-workflows-preconditions]
+    depends_on: [s-4-cc-workflows-preconditions, s-5-cc-workflows-model-tier-resolver]
 
   # Slice 2 — /test substrate (t-2 has TDD methodology override)
   - id: t-1-fold-simulated-manual
