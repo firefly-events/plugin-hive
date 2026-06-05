@@ -693,7 +693,11 @@ export async function reconcileAutopilotsWithDeps({
     for (const [key, desiredTrigger] of desiredByKey) {
       const serverTrigger = serverByKey.get(key);
       if (!serverTrigger) {
-        // Add trigger
+        assertConsent(
+          consent,
+          `Adding trigger "${key}" to autopilot "${autopilotName}" requires consent.`,
+          'Re-run with --yes.',
+        );
         const payload = buildTriggerPayload(desiredTrigger);
         const triggerResponse = await httpJsonFn(
           serverUrl,
@@ -701,12 +705,15 @@ export async function reconcileAutopilotsWithDeps({
           { method: 'POST', token, body: payload },
         );
         triggersAdded.push(`${autopilotName}:${key}`);
-        // Capture webhook URL if present
         if (desiredTrigger.kind === 'webhook' && triggerResponse?.webhook_url && !webhookUrlsCaptured[autopilotName]) {
           webhookUrlsCaptured[autopilotName] = triggerResponse.webhook_url;
         }
       } else if (triggerDrifted(serverTrigger, desiredTrigger)) {
-        // Update trigger
+        assertConsent(
+          consent,
+          `Updating trigger "${key}" on autopilot "${autopilotName}" requires consent.`,
+          'Re-run with --yes.',
+        );
         const payload = buildTriggerPayload(desiredTrigger);
         const triggerResponse = await httpJsonFn(
           serverUrl,
@@ -714,7 +721,6 @@ export async function reconcileAutopilotsWithDeps({
           { method: 'PUT', token, body: payload },
         );
         triggersUpdated.push(`${autopilotName}:${key}`);
-        // Capture webhook URL if updated
         if (desiredTrigger.kind === 'webhook' && triggerResponse?.webhook_url && !webhookUrlsCaptured[autopilotName]) {
           webhookUrlsCaptured[autopilotName] = triggerResponse.webhook_url;
         }
@@ -724,6 +730,11 @@ export async function reconcileAutopilotsWithDeps({
     // Delete triggers in server but not in desired
     for (const [key, serverTrigger] of serverByKey) {
       if (!desiredByKey.has(key)) {
+        assertConsent(
+          consent,
+          `Removing trigger "${key}" from autopilot "${autopilotName}" requires consent.`,
+          'Re-run with --yes.',
+        );
         await httpJsonFn(
           serverUrl,
           `/api/autopilots/${encodeURIComponent(autopilotId)}/triggers/${encodeURIComponent(serverTrigger.id)}?workspace_id=${encodeURIComponent(workspaceId)}`,
@@ -796,8 +807,8 @@ export async function reconcileAutopilotsWithDeps({
   // tracked autopilots manifest. They are server-assigned runtime values outside the
   // declared schema; persisting them churns the source config on every reconcile. The
   // URLs remain available to programmatic callers via the returned webhookUrlsCaptured.
-  for (const [name, url] of Object.entries(webhookUrlsCaptured)) {
-    console.log(`[hive-bootstrap] Captured webhook URL for autopilot "${name}": ${url}`);
+  for (const name of Object.keys(webhookUrlsCaptured)) {
+    console.log(`[hive-bootstrap] Captured webhook URL for autopilot "${name}".`);
   }
 
   return { created, patched, skipped, removed, triggersAdded, triggersRemoved, triggersUpdated, webhookUrlsCaptured };

@@ -14,7 +14,11 @@ function parseScalar(value) {
   if (value.startsWith('[') && value.endsWith(']')) {
     const inner = value.slice(1, -1).trim();
     if (inner === '') return [];
-    return inner.split(',').map((item) => item.trim()).filter((item) => item.length > 0);
+    return inner
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+      .map((item) => parseScalar(item));
   }
 
   if (value === 'null' || value === '~') {

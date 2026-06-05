@@ -151,7 +151,7 @@ and the story YAML remains the single source of truth.
 - [ ] Every scenario step narrated and recorded
 - [ ] overall_verdict computed from step results
 - [ ] `manual_verdict` block written to the story YAML
-- [ ] Episode marker written: `.pHive/episodes/<epic>/<story>/test.yaml`
+- [ ] Episode marker written: `.pHive/episodes/<epic>/<story>/test.yaml` (classic mode) or `.pHive/episodes/<epic>/<story>/multica-run.yaml` + `multica-run.messages.jsonl` sidecar (Multica mode)
 
 ## FAILURE MODES
 

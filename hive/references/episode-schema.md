@@ -107,7 +107,7 @@ fields on the same `multica-run.yaml` marker:
 |-------|------|----------|-------------|
 | `completion_kind` | enum | yes | `doc-verdict` for plan/test doc or verdict tasks; `code-push` for source-code execution tasks. |
 | `artifacts_committed` | boolean | yes | `true` only after the task's docs/verdict artifacts have been committed to the shared branch. |
-| `episode_terminal` | boolean | yes | `true` when `status` is terminal for the episode marker (`passed`, `failed`, or `cancelled`). |
+| `episode_terminal` | boolean | yes | `true` when the underlying Multica task status is terminal (`passed`, `failed`, or `cancelled`). The base marker `status:` enum (`completed` / `failed` / `escalated`) is a separate, derived vocabulary. |
 | `requires_code_push_sha` | boolean | yes | `false` for `doc-verdict`; `true` for `code-push`. |
 | `code_push_sha` | string or null | yes | Commit SHA for code-push tasks; `null` for doc/verdict tasks. |
 | `terminal_by_dialect` | boolean | yes | The derived terminal predicate for the selected completion kind. |

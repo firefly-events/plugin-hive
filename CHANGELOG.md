@@ -9,18 +9,43 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-## [2.9.0] - 2026-05-25
+## [2.9.0] - 2026-05-31
 
-**Meta-improvement reset — signal quality, metric gate, and batch-cleanup path.**
+**Multica substrate deepens — execute / plan / test all route through Multica; meta-improvement reset; autonomous standup loop; Hermes integration MVP.**
 
-Addresses the pattern of "motion without measurable convergence" in the
-`meta-meta-optimize` nightly cycle: external research feeds now include
-Claude Code releases + Anthropic blog, a signal-weights knob controls
-proposal-source ranking, the step-03c metric gate is now blocking by default,
-and a new `/meta-shotgun` skill clears accumulated `tier: little-fix` backlog
-entries in a single monthly PR rather than routing them through the nightly cycle.
+Wraps the multi-epic push that started with v2.7.0's multica execute mode. This release
+makes Multica the first-class dispatch substrate for the full `/execute` + `/plan` + `/test`
+trio (PRs #223, #230, #234), pairs it with the meta-improvement-reset signal-quality work
+(PR #224), adds the autonomous nightly standup loop (PR #211), and ships the Hermes
+external-coordinator integration MVP (PR #218). Story-loop closure (PR #219) tightens the
+post-merge feedback path. Multica-integration-fixes (PR #220) was credited in 2.8.0 Notes.
 
 ### Added
+
+#### Multica substrate — execute mode wiring (PR #223, `feat/wire-execute-multica-codex`)
+
+- **`/execute` Step 5/6e multica routing (`feat(execute): add multica routing case to step 5/6e`).** `/execute` now branches into the multica dispatch path when `execution.mode: multica` (or `HIVE_EXECUTION_MODE=multica`) is set, mirroring the existing Sandcastle and GH-Actions paths.
+- **Serial dispatch + episode-sync rewire of `execute-mode-multica` skill.** Skill now dispatches stories serially against the integration branch, with per-story episode markers written via `episode-sync.mjs`.
+- **`/codex:rescue` brief injection when `backend=codex`.** `multica-story-dispatch` automatically prepends the rescue instruction when the per-persona provider routes to Codex, so the dispatched agent has the recovery contract in hand from turn 0.
+- **`scope_drift_score` emission at story close.** `execute-mode-multica` now writes `scope_drift_score` to the episode marker at story close, feeding the meta-cycle drift telemetry.
+
+#### Multica substrate — N-persona bootstrap + 22 dispatchable agents (PR #230, `feat/multica-substrate-deepen`)
+
+- **`reconcileAgents` batched bootstrap.** `multica-bootstrap/index.mjs` batches the N-persona reconcile so 22 personas register in a single Multica call instead of N sequential calls.
+- **22-persona `agents.yaml` with codex routing.** Expands the dispatchable roster to all major Hive personas (developer, reviewer, tester, architect, technical-writer, ui-designer, qa, et al.), with per-persona `provider:` so codex-routed personas pick up the right backend.
+- **`reconcileSquads`, `reconcileAutopilots`, `reconcileSkills` bootstrap helpers (w2-3, w3-3, w4-3).** Squads, autopilots, and skills now reconcile declaratively against Multica with content-hash short-circuits.
+- **`integrationBranch` dispatch option (single-shared-branch flow).** `multica-story-dispatch` accepts `integrationBranch:` so dispatched stories commit to a shared epic branch by default, matching Hive's "one branch per epic, one commit per story" convention.
+- **`codexInstruction` conditional on per-persona provider (w1-4).** Codex instruction is only injected for personas whose provider routes to Codex; Claude-backed personas get the unmodified brief.
+- **`.pHive/multica/squads.yaml` (w2-2).** Three default squads shipped alongside the agents roster.
+- **Autopilot deprecation migration guide (w3-4).** `hive/references/` doc covers the autopilot → squad transition for substrate consumers.
+- **`multica-skills-export-schema.md` (w4-1).** Documents the export contract for skills reconciliation.
+- **Pilot round-trip validation finding (w4-5).** `.pHive/upstream-watch/` capture of the validated end-to-end dispatch round-trip.
+
+#### Multica substrate — `/plan` + `/test --simulated-manual` routing (PR #234, `feat/multica-plan-test-cycles`)
+
+- **Plan + test routing through Multica (planning artifacts shipped; implementation pinned as PLU-154..164 for next cycle).** Epic + 11 stories landed across docs/, stories/, research/ describing the `/plan` Phase 0 + `/test --simulated-manual` Multica routing contract. The single shipped code fix is `mpt-2`: `feat(multica-plan-test-cycles): reconcile scenario schema loader shape`.
+
+#### Meta-improvement reset (PR #224, `feat/meta-improvement-reset`)
 
 - **External research: Claude Code release-notes + Anthropic blog subproviders (mir-3/mir-2, 3.1).** `step-02b-external-research.md` now includes two explicit subproviders: `signal_subtype: claude_code_release` (GitHub Releases API / RSS) and `signal_subtype: anthropic_blog` (Anthropic news feed, filtered to model releases + capability announcements). Both tag `discovery_source: external_research`. Failure handling is empty-list-per-source, not error.
 - **`meta_optimize.signal_weights` config knob (mir-8, 3.2).** New optional block in `hive.config.yaml` lets maintainers set per-source ranking multipliers (`metrics`, `external_research`, `kg_signal`, `dreaming_replay`, `backlog`). Shipped default weights reflect post-reset priorities (`external_research: 0.9`, `kg_signal: 0.4`, `backlog: 0.2`). Omitting the block preserves prior implicit-equal-weight behavior.
@@ -28,18 +53,51 @@ entries in a single monthly PR rather than routing them through the nightly cycl
 - **`tier:` field on `queue-meta-meta-optimize.yaml` candidates (mir-4/mir-5, 3.5).** New optional enum field (`little-fix | structural | strategic`; default `structural`). The nightly cycle now excludes `tier: little-fix` candidates (routed to `/meta-shotgun`). `tier: strategic` candidates require a planning epic before automated processing.
 - **`hive/references/meta-shotgun-runbook.md`** — full runbook for the monthly shotgun cycle (prerequisites, failure recovery, queue hygiene, relationship to nightly cycle).
 
+#### Autonomous standup loop (PR #211, `feat/autonomous-cycle-loop`)
+
+- **`/standup --interactive` flag + Phase 1.5 hook (a-1).** Adds the interactive turn before the automated phases so an external scheduler can hand off seamlessly.
+- **`/standup` wiring for `labelExistingIssue` + `migrate-local` (a-3).** Standup now labels existing tracker issues + migrates local-only state forward without manual intervention.
+- **Scenario loader + `simulated-manual` step file (c-1).** Shared loader for scenario fixtures consumed by `/test` and the autonomous loop.
+- **`/test --simulated-manual` wiring + `/plan simulated-manual` concern (c-2).** Both skills accept the `--simulated-manual` mode that the autonomous loop exercises end-to-end.
+- **Handoff dispatch helper + `/execute` post-integrate step (d-1, d-2).** Handoff timeout hardening + no-PR fallback + KG triple emission close the loop between integrate and the next standup cycle.
+- **Story status deriver + backfill script + post-merge CI hook (e-1).** `deriveStoryStatus` + `hive/scripts/backfill-story-status.mjs` keep YAML `status:` in lockstep with git+disk reality; post-merge CI now reconciles.
+
+#### Hermes integration MVP (PR #218, `feat/hermes-integration-mvp`)
+
+- **Episode-marker schema audit + `issue_id`/`issue_identifier` (s0-1).** Foundation for the Multica-issue closer feedback path.
+- **`multica-issue-closer` module + unit tests (s1-1).** Closes Multica issues on `/execute` integrate; idempotent, schema-validated.
+- **Multica close hook in `/execute` integrate step (s1-2).** Wires the closer to fire at integrate completion.
+- **Reverse-sync: Multica cancelled → story YAML `status: deferred` (s2-1).** New `.github/workflows/multica-reverse-sync.yml` + `hive/scripts/multica-reverse-sync.mjs` script. Manual-trigger only (no schedule); secret-gated on `MULTICA_SERVER_URL`. Patches story YAML when matching Multica issues are cancelled, opens a chore PR with the diff.
+- **`multica-issue-closer` runbook + docs link from closer + SKILL.md (s3-1).**
+
+#### Story-loop closure (PR #219, `feat/story-loop-closure`)
+
+- Tightens the post-merge feedback path so story status reconciliation, episode markers, and Multica issue close all fire in the correct order at integrate completion.
+
 ### Changed
 
 - **Step-03c metric gate flipped to `blocking` by default (mir-9, 3.3).** Previously non-blocking (advisory). Now: proposals failing metric validation receive `status: rejected_metric_gate` and are excluded from `enriched_proposals` handed to step-04. The cycle continues with passing proposals; cycle-level failure occurs only when zero proposals pass. Rejected proposals surface in the step summary and in the PR body under "Rejected by metric gate". Escape hatch via `meta_optimize.metric_gate: advisory` in `hive.config.yaml` restores the legacy non-blocking behavior.
 - **`.github/workflows/hive-dispatch.yml` meta PR base branch retargeted to `develop` (mir-1, 3.6).** Meta-meta nightly PRs previously targeted `main` via the default-branch lookup; they now explicitly target `develop` to respect the `develop`-as-staging-trunk convention. Merged via develop→main release PRs like every other feature.
 - **`hive/GUIDE.md`** — new "Configuration Knobs (`meta_optimize:`)" subsection documents `signal_weights` and `metric_gate`, replaces the stale "no public `meta_optimize:` block shipped yet" note.
 - **`hive/references/meta-optimize-maintainer.md`** — adds "Metric Gate" and "Meta-Shotgun Cycle" sections.
+- **`multica-bootstrap`** defaults `mcp_config` to `null` instead of `{}` so Multica's config-merge path doesn't observe an empty object as an override.
+- **`multica-story-dispatch/custom-env.mjs`** resolves `~`, `${HOME}`, `$HOME` in `custom_env` values before sending to Multica (carried forward from PR #220 / 2.8.0 Fixes).
+
+### Fixed
+
+- **CodeRabbit batch 2 review findings on release PR #226** — assorted lint + correctness fixes blocking release.
+- **YAML + markdown lint errors blocking release PR #226** — `chore(lint)` pass.
+- **`hive-dispatch.yml`** — retargets PRs from `main` → `develop` (alongside the workflow change above).
+- **`story-status-reconcile`** — PR body rewritten via heredoc so multiline content survives shell quoting.
+- **CodeRabbit findings on PR #219** (story-loop-closure) and PR #224 (meta-improvement-reset) addressed.
 
 ### Notes
 
-- KG signal repair is **not** in scope for this epic; `kg_signal` weight is demoted to `0.4` as confirming evidence pending a dedicated KG-revival epic.
-- The `advisory` escape hatch for `metric_gate` is intentional — allows the maintainer to ship proposals whose metric is genuinely hard to formalize without blocking the cycle.
-- All surface changes are additive or have opt-out escape hatches. No breaking changes to the public `/meta-optimize` consumer path.
+- **Multica substrate is the default execution path going forward.** Sandcastle + GH-Actions remain available; their archival is scheduled in `sandcastle-adoption-followon`.
+- **KG signal repair** is **not** in scope; `kg_signal` weight stays at `0.4` pending the dedicated KG-revival epic.
+- The `advisory` escape hatch for `metric_gate` is intentional — allows shipping proposals whose metric is hard to formalize without blocking the cycle.
+- All surface changes are additive or have opt-out escape hatches. **No breaking changes** to the public `/execute`, `/plan`, `/test`, or `/meta-optimize` consumer paths.
+- `multica-plan-test-cycles` planning artifacts ship with this release; the 11 implementation stories (PLU-154..164) execute via Multica in the next cycle.
 
 ## [2.8.0] - 2026-05-24
 

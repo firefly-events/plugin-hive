@@ -164,8 +164,8 @@ tension carried into the design discussion.
 
 - **#230** (squads/agents) — merged (commit `1112d04`). Provides the squads primitive
   and the post-#230 worktree `agents.yaml` / `squads.yaml`.
-- `hive/lib/multica-story-dispatch/` (`index.mjs` + `episode-sync.mjs`) — the dispatch
-  + polling + episode-marker library to reuse.
+- `hive/lib/multica-story-dispatch/` (`index.mjs` + `episode-sync.mjs`) — the
+  dispatch + polling + episode-marker library to reuse.
 - `multica-bootstrap` + the `multica-init` skill (`skills/multica-init/SKILL.md`) —
   server / CLI / auth / workspace / daemon / agents bootstrap, prerequisite for any
   dispatch.
