@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: "Independent code reviewer providing fresh-context evaluation. Spawned by team lead after implementation."
-model: sonnet
+model: opus
 color: yellow
 knowledge:
   - path: ~/.claude/hive/memories/reviewer/

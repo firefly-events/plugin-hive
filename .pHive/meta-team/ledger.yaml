@@ -1,3 +1,45 @@
+- experiment_id: meta-2026-0530-0605-squash
+  date: '2026-06-05'
+  started: '2026-05-30T00:00:00Z'
+  closed: '2026-06-05T00:30:00Z'
+  verdict: passed
+  changes_promoted: 8
+  changes_reverted: 0
+  findings_identified: 3
+  squashes:
+    - meta-2026-05-30
+    - meta-2026-05-31
+    - meta-2026-06-01
+    - meta-2026-06-02
+    - meta-2026-06-03
+    - meta-2026-06-04
+    - meta-2026-06-05
+  top_changes:
+    - "hive/lib/messages-session.js, hive/lib/sandcastle-worker-runner.js: DEFAULT_MODEL claude-opus-4-7 -> claude-opus-4-8 (+ JSDoc)"
+    - "hive/lib/budget-gate.js: FALLBACK_MODEL + JSDoc example claude-opus-4-7 -> claude-opus-4-8 (RATES_PER_MTOK already carries both keys)"
+    - "hive/references/session-system-prompt-spec.md: two API fixture model IDs claude-opus-4-7 -> claude-opus-4-8"
+    - "hive/agents/reviewer.md, hive/agents/peer-validator.md: model frontmatter sonnet -> opus (match hive.config.yaml model_overrides)"
+    - "hive/GUIDE.md: Agent Roster expanded 20 -> 25 personas; added Specialist Agents table (from meta-2026-05-30)"
+  commit: PENDING
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 0
+    first_attempt_pass: true
+  kg_signal_proposals_total: 0
+  notes: |
+    SQUASH of 7 stranded nightly cycles (meta-2026-05-30 .. meta-2026-06-05),
+    collapsed into one entry per maintainer directive 2026-06-05. Each of the
+    7 nights independently re-discovered the SAME finding set — the stale
+    claude-opus-4-7 -> claude-opus-4-8 model-ID bump — because prior cycles'
+    promotions never actually landed on a base branch (PRs targeted main and
+    stranded unreviewed; DirectCommitAdapter worktree tips were discarded while
+    only the ledger append survived). This squash promotes the REAL code changes
+    once, retargeted to develop. Superseded nightly PRs #235/#236/#239/#240/#242/
+    #244/#245 closed and their meta-meta/nightly-* branches deleted. Per-night
+    bookkeeping granularity intentionally dropped; cycle-state.yaml and
+    morning-summary.md reflect the final (06-05) snapshot. Workflow hardened so
+    future cycles read open PRs + verify on-disk file state before proposing
+    (see step-02-analysis pre-flight).
 - experiment_id: meta-2026-05-29
   date: '2026-05-29'
   started: '2026-05-29T00:00:00Z'

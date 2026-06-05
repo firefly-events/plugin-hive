@@ -198,7 +198,7 @@ Planning Team ──→ Dev Team ──→ Test Swarm
 
 ---
 
-## Agent Roster (20 Personas)
+## Agent Roster (25 Personas)
 
 Personas are a bench — pull who you need. Having a persona doesn't mean you must use it.
 
@@ -209,7 +209,7 @@ Match the model to the job — not every agent needs Opus.
 | Tier | Model | Agents | Cost |
 |------|-------|--------|------|
 | **Opus** | claude-opus-4-8 | orchestrator | Highest — complex reasoning |
-| **Sonnet** | claude-sonnet-4-6 | team-lead, architect, analyst, tpm, researcher, technical-writer, frontend-developer, backend-developer, developer, tester, reviewer, pair-programmer, peer-validator, ui-designer, test-scout, test-architect, test-inspector, test-sentinel | Medium — analytical/implementation |
+| **Sonnet** | claude-sonnet-4-6 | team-lead, architect, analyst, tpm, researcher, technical-writer, frontend-developer, backend-developer, developer, tester, reviewer, pair-programmer, peer-validator, ui-designer, test-scout, test-architect, test-inspector, test-sentinel, idiomatic-reviewer, security-reviewer, performance-reviewer, accessibility-specialist, animations-specialist | Medium — analytical/implementation |
 | **Haiku** | claude-haiku-4-5-20251001 | test-worker | Lowest — fast mechanical execution (consider bumping to Sonnet if context issues arise) |
 
 Configure in `hive.config.yaml`. Override per-agent with `model_overrides` for complex projects.
@@ -249,6 +249,15 @@ Configure in `hive.config.yaml`. Override per-agent with `model_overrides` for c
 | **Orchestrator** | Main session — coordinates across epics and teams |
 | **Team Lead** | Per-team coordinator — staffs teams, routes developer roles, validates domains |
 | **Peer Validator** | Cross-team validation — consistency, conventions, integration risk |
+
+### Specialist Agents
+| Agent | Role | Tier |
+|-------|------|------|
+| **Idiomatic Reviewer** | Language-idiomatic code review — style, patterns, and convention compliance | Sonnet |
+| **Security Reviewer** | Security-focused code review — vulnerabilities, threat modeling, OWASP compliance | Sonnet |
+| **Performance Reviewer** | Performance analysis — bottlenecks, profiling, optimization recommendations | Sonnet |
+| **Accessibility Specialist** | Accessibility audit and remediation — WCAG compliance, screen-reader compatibility | Sonnet |
+| **Animations Specialist** | Animation and motion design review — timing, easing, UX motion guidelines | Sonnet |
 
 ---
 
