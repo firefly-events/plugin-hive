@@ -12,17 +12,18 @@ Atomic skill, NOT inline `/plan` prose. It assembles the caller's planning perso
 Call this skill once per planning-team assembly.
 Do not call it again after successful teammate creation unless abandoning the prior attempt.
 
-**Inputs:** `assembled_personas` (ordered final planning persona list), `agent_backends` (resolved root-first routing map, `{}` if absent), `planning_mode_decision` (`multica` when `/plan` selected `HIVE_PLANNING_MODE=multica` or root `planning.mode: multica`; otherwise `default` or unset), and `requirement_summary` (concise task summary used in spawn prompts).
+**Inputs:** `assembled_personas` (ordered final planning persona list), `agent_backends` (resolved root-first routing map, `{}` if absent), `planning_mode_decision` (`cc-workflows` when `/plan` selected `HIVE_PLANNING_MODE=cc-workflows` or root `planning.mode: cc-workflows`; `multica` when `/plan` selected `HIVE_PLANNING_MODE=multica` or root `planning.mode: multica`; otherwise `default` or unset), and `requirement_summary` (concise task summary used in spawn prompts).
 
-**Outputs:** `routing_decisions` (persona -> final `multica`, `codex`, or `direct` path), `routing_reasons` (persona -> final reason), and `spawn_outcome` (active teammate handles/ids sufficient for caller `SendMessage` work assignment).
+**Outputs:** `routing_decisions` (persona -> final `cc-workflows`, `multica`, `codex`, or `direct` path), `routing_reasons` (persona -> final reason), and `spawn_outcome` (active teammate handles/ids plus, for `cc-workflows`/`multica`-routed personas, the dispatch summary and per-persona episode marker paths sufficient for caller `SendMessage` work assignment and document reconciliation).
 
 **Side effects:** emits exactly one INFO log line per persona at final spawn
-decision; calls `plan-mode-multica` for Multica-routed personas; calls
-`TeamCreate` for direct-routed personas; calls `agent-spawn` -> `codex-invoke`
-for Codex-routed personas.
+decision; calls `plan-mode-cc-workflows` for CC-Workflows-routed personas;
+calls `plan-mode-multica` for Multica-routed personas; calls `TeamCreate`
+for direct-routed personas; calls `agent-spawn` -> `codex-invoke` for
+Codex-routed personas.
 
 INFO log requested field uses planning-routing vocabulary:
-`multica|codex|direct|unset`.
+`cc-workflows|multica|codex|direct|unset`.
 
 ## Process
 
@@ -42,6 +43,13 @@ The caller may pass a completed `assembled_personas` list. If asked to assemble 
 Routing happens only after the assembled persona list is finalized. Backend routing must not change team composition.
 
 ### Step 0.2: Build Routing Decisions
+
+If `planning_mode_decision == cc-workflows`, route every persona in
+`assembled_personas` to `cc-workflows` with reason `no-fallback-needed`. This
+is a spawn-path override selected by `/plan`; do not filter the assembled list
+through the Codex supported/known-incompatible tables. CC Workflows persona/provider
+validity is owned by `skills/hive/skills/plan-mode-cc-workflows/SKILL.md` and the
+Workflow tool seam shared with `execute-mode-cc-workflows`.
 
 If `planning_mode_decision == multica`, route every persona in
 `assembled_personas` to `multica` with reason `no-fallback-needed`. This is a
@@ -72,6 +80,13 @@ Apply this only to personas present in the assembled list. `ui-designer` is alwa
 
 Use `routing_decisions` to assemble one conceptual planning team:
 
+- **CC Workflows path (`plan-mode-cc-workflows`):** when any persona is routed
+  `cc-workflows`, call `skills/hive/skills/plan-mode-cc-workflows/SKILL.md` once
+  with the full CC-Workflows-routed persona list, planning story payload, epic
+  handle, config, and integration branch context. `plan-mode-cc-workflows` owns
+  per-persona Workflow tool dispatch, polling, and `cc-workflows-run.yaml`
+  episode markers. Do not also create local teammates for a CC-Workflows-routed
+  persona unless fallback is triggered.
 - **Multica path (`plan-mode-multica`):** when any persona is routed `multica`,
   call `skills/hive/skills/plan-mode-multica/SKILL.md` once with the full
   Multica-routed persona list, planning story payload, config, and integration
@@ -81,29 +96,35 @@ Use `routing_decisions` to assemble one conceptual planning team:
 - **Direct path (`TeamCreate`):** collect every persona routed `direct` and create them in one `TeamCreate` call. Use Step 0.4 and include only direct-routed personas in `## Team Members`.
 - **Codex path (`agent-spawn` -> `codex-invoke`):** for each persona routed `codex`, create a separate persistent-pane teammate through `agent-spawn`, passing full persona context, resolved paths, memory loading context, and the same planning-team coordination context direct teammates receive.
 
-Mixed teams are valid. Some planning personas may come from `plan-mode-multica`,
-some from `TeamCreate`, and others from `agent-spawn` -> `codex-invoke`; they are
-still one planning team. The caller remains coordinator and uses `SendMessage` for
-assignments and review loops where local teammate handles exist, and uses the
-`plan-mode-multica` summary/episode markers for Multica-produced work.
+Mixed teams are valid. Some planning personas may come from
+`plan-mode-cc-workflows`, some from `plan-mode-multica`, some from `TeamCreate`,
+and others from `agent-spawn` -> `codex-invoke`; they are still one planning
+team. The caller remains coordinator and uses `SendMessage` for assignments and
+review loops where local teammate handles exist, and uses the
+`plan-mode-cc-workflows` / `plan-mode-multica` summaries and episode markers for
+CC-Workflows-produced / Multica-produced work.
 
 Emit the structured INFO log after each persona's final spawn path is known. If
 Step 0.5 handles a runtime Multica or Codex failure, update that persona's result
 to the fallback outcome instead of adding a second line.
 
 Preserve the 4-field template exactly:
-- `[info] planning routing: persona={X} requested={multica|codex|direct|unset} path={plan-mode-multica|codex-invoke|TeamCreate} reason={reason}`
+- `[info] planning routing: persona={X} requested={cc-workflows|multica|codex|direct|unset} path={plan-mode-cc-workflows|plan-mode-multica|codex-invoke|TeamCreate} reason={reason}`
 
 Valid `reason=` values:
 - `no-fallback-needed`
 - `known-incompatible`
 - `unvalidated-persona`
 - `agent_backends-unset`
+- `cc-workflows-precondition-failed: {error}`
+- `cc-workflows-dispatch-failed: {error}`
 - `multica-daemon-down: {error}`
 - `multica-dispatch-failed: {error}`
 - `codex-dispatch-failed: {error}`
 
 Examples:
+- `[info] planning routing: persona=researcher requested=cc-workflows path=plan-mode-cc-workflows reason=no-fallback-needed`
+- `[info] planning routing: persona=researcher requested=cc-workflows path=codex-invoke reason=cc-workflows-precondition-failed: claude-version-too-low`
 - `[info] planning routing: persona=researcher requested=multica path=plan-mode-multica reason=no-fallback-needed`
 - `[info] planning routing: persona=researcher requested=multica path=codex-invoke reason=multica-daemon-down: ECONNREFUSED`
 - `[info] planning routing: persona=ui-designer requested=multica path=TeamCreate reason=multica-daemon-down: ECONNREFUSED`
@@ -113,10 +134,11 @@ Examples:
 - `[info] planning routing: persona={X} requested=direct path=TeamCreate reason=no-fallback-needed`
 - `[info] planning routing: persona={X} requested=unset path=TeamCreate reason=agent_backends-unset`
 
-Return `spawn_outcome` with all active direct and Codex teammate handles plus the
-Multica dispatch summary/episode marker paths for Multica-routed personas. The
-caller does not need to know which local backend produced a handle before
-assigning normal planning work.
+Return `spawn_outcome` with all active direct and Codex teammate handles plus
+the CC-Workflows and Multica dispatch summaries and per-persona episode marker
+paths for CC-Workflows-routed and Multica-routed personas. The caller does not
+need to know which local backend produced a handle before assigning normal
+planning work.
 
 ### Step 0.4: Mixed-Team TeamCreate Prompt Template
 
@@ -163,7 +185,43 @@ mode atom.
 
 ### Step 0.5: Runtime Fallback
 
-Fallback order is `multica` -> `codex` -> `direct`.
+Fallback order is `cc-workflows` -> `codex` -> `direct` for CC-Workflows-routed
+personas, and `multica` -> `codex` -> `direct` for Multica-routed personas.
+CC-Workflows and Multica are sibling spawn-path overrides; falling from one to
+the other is not a supported transition because the user picked the requested
+mode for substrate-shape reasons. Fall through to Codex (and then direct) on
+runtime rejection instead.
+
+If `plan-mode-cc-workflows` returns a Step 0 `precondition_failed` (CC runtime
+too low, Workflow tool absent, `planning.mode` / `HIVE_PLANNING_MODE` not
+resolving to `cc-workflows`, `assembled_personas[]` empty, or `planning_story`
+missing), handle it gracefully:
+
+1. Do not hard-fail planning-team assembly.
+2. Re-route each affected persona to Codex when that persona is supported by
+   `codex-invoke` and not known-incompatible; otherwise re-route it to direct
+   `TeamCreate`.
+3. If the Codex fallback for an affected persona also fails, apply the Codex
+   fallback rules below and end at direct `TeamCreate`.
+4. Update the Step 0.3 INFO log outcome for each affected persona:
+   `[info] planning routing: persona={X} requested=cc-workflows path={codex-invoke|TeamCreate} reason=cc-workflows-precondition-failed: {error}`
+   where `{error}` is truncated to 120 chars and reflects the
+   `field_sources` citation from the structured precondition_failed payload.
+5. Continue the planning flow.
+
+If `plan-mode-cc-workflows` returns a non-precondition dispatch failure for any
+persona after Step 0 passed (Workflow tool invocation error, persona file
+missing, agent failed terminal status, episode marker write failed), handle it
+gracefully:
+
+1. Do not hard-fail planning-team assembly.
+2. Re-route the failed persona to Codex when supported, otherwise direct
+   `TeamCreate`.
+3. If the Codex fallback also fails, apply the Codex fallback rules below.
+4. Update the Step 0.3 INFO log outcome for that persona:
+   `[info] planning routing: persona={X} requested=cc-workflows path={codex-invoke|TeamCreate} reason=cc-workflows-dispatch-failed: {error}`
+   where `{error}` is truncated to 120 chars.
+5. Continue the planning flow.
 
 If `plan-mode-multica` fails before or during persona dispatch because the
 Multica daemon is down or unreachable (connection refused, timeout resolving the
