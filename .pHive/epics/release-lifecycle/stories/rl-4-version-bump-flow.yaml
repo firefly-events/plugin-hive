@@ -1,0 +1,89 @@
+id: rl-4-version-bump-flow
+epic: release-lifecycle
+title: Version-bump intent at plan, executed late in /execute
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [rl-3]
+
+description: |
+  Maintainer posture: the version bump happens DURING IMPLEMENTATION as one of the
+  last steps of /execute — NOT during /ship. /plan records the *intent*; /execute
+  performs it; /ship (rl-6) only verifies it occurred and patches the gap.
+
+  Two surfaces:
+    1. /plan question set gains: "Does this epic bump the version? major | minor |
+       patch | none". Persist to epic.yaml as `version_bump: <level>`.
+    2. /execute, near the end of the epic's last story (or an epic-finalize step),
+       reads epic.yaml.version_bump and applies it across the version sources
+       (.claude-plugin/*.json, plugin.json — all three currently read 2.9.0) plus a
+       changelog entry. `none` is a valid no-op.
+
+  Version sources to keep in lockstep (grep confirms three "version": "2.9.0"):
+    - .claude-plugin/<marketplace>.json
+    - plugin.json
+
+acceptance_criteria:
+  - "Given /plan decomposes an epic, when the version-bump question is answered, then epic.yaml carries version_bump: major|minor|patch|none."
+  - "Given an epic with version_bump != none, when /execute reaches the finalize step, then all version sources are bumped to the same new semver in one commit."
+  - "Given version_bump == none, when /execute finalizes, then no version source changes (clean no-op)."
+  - "Given the bump runs, when it completes, then a changelog entry for the epic is written."
+
+steps:
+  - id: research
+    description: Confirm every version source file + current value; find the /plan question surface and the /execute epic-finalize point.
+    agent: researcher
+  - id: implement
+    description: Add version_bump question + epic.yaml field to /plan; add the late bump step to /execute that bumps all sources in lockstep + writes changelog.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Cover major/minor/patch lockstep bump across all sources and the none no-op.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify all version sources stay in sync and that /ship (rl-6) can later read the result to verify.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feat/release-lifecycle.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: plugin.json
+      purpose: One of the version sources (currently 2.9.0).
+    - path: skills/plan/SKILL.md
+      purpose: Add version-bump question + epic.yaml field write.
+    - path: skills/execute/SKILL.md
+      purpose: Add the late epic-finalize bump step.
+    - path: hive/references/story-yaml-schema.md
+      purpose: epic.yaml schema (§6) — version_bump field documented here.
+
+files_to_modify:
+  - file: skills/plan/SKILL.md
+    change: Add version_bump question + persist to epic.yaml.
+  - file: skills/execute/SKILL.md
+    change: Late finalize step bumps all version sources + changelog.
+  - file: hive/references/story-yaml-schema.md
+    change: Document epic.yaml version_bump field.
+
+cross_cutting:
+  - concern: versioning
+    action: "This story IS the versioning mechanism; ensure all three version sources bump in lockstep."
+  - concern: documentation
+    action: "Document version_bump in epic.yaml schema + changelog convention."
+
+metric:
+  applies: false
+  justification: "Mechanism story (where/when the bump fires); correctness is binary and covered by tests (lockstep bump + none no-op), not a trend metric. rl-6 verification provides the runtime safety net."
+
+risks:
+  - severity: medium
+    description: Version sources drift out of sync (one bumped, another not).
+    mitigation: Single lockstep step + test asserts all sources equal; rl-6 verifies at ship.
+  - severity: low
+    description: Shares /plan + /execute edits with rl-3.
+    mitigation: depends_on rl-3 — serial; this story edits the question/bump surfaces, rl-3 the status surfaces.

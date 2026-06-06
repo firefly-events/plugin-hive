@@ -1,0 +1,99 @@
+id: rl-3-wire-status-transitions
+epic: release-lifecycle
+title: Wire explicit status transitions into workflow commands
+status: pending
+complexity: high
+methodology: classic
+depends_on: [rl-1]
+
+description: |
+  The core "work finished but never marked" fix. Implement the rl-1 contract: make
+  each workflow command write its owned status transition explicitly, gated on step
+  SUCCESS (never on step entry — a failing review must not mark complete).
+
+  Per the rl-1 migration map:
+    /execute : pending -> in_progress when a story is dispatched.
+    /review (or /test gate) : in_progress -> in_review on entry of review.
+    /review pass : in_review -> complete.
+    /review fail : in_review -> in_progress (REWORK) — reassign the right agent,
+                   re-trigger pickup. This is the bidirectional edge from rl-1.
+    blocked : set/clear on dependency stall.
+
+  /status remains read-only — do not add writes to it. /ship's complete->shipped
+  write is OUT OF SCOPE here (it lives in rl-6).
+
+acceptance_criteria:
+  - "Given a story is dispatched by /execute, when dispatch succeeds, then the story YAML status advances pending -> in_progress."
+  - "Given a review fails, when /review records the failure, then the story bounces in_review -> in_progress AND is reassigned to the appropriate agent for re-pickup (rework edge)."
+  - "Given a review passes, when /review records the pass, then status advances in_review -> complete."
+  - "Given any transition, when the owning step FAILS, then no forward status write occurs (gated on success, not entry)."
+  - "Given /status, when run, then it performs zero writes (still read-only)."
+
+steps:
+  - id: research
+    description: Re-read rl-1 migration map + the current status writers (plan, execute-mode-session, session-registry, team-execution) to locate exact write sites.
+    agent: researcher
+  - id: implement
+    description: Edit /execute, /review, /test skill machinery to perform the owned transitions per rl-1, gated on success; implement the rework reassignment+repickup on review fail.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Cover success-gated forward transitions, the rework bounce + reassignment, and that /status stays read-only.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Audit every edited write site against the rl-1 contract; confirm no transition fires on step entry.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feat/release-lifecycle.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/references/status-lifecycle.md
+      purpose: The contract this story implements (created by rl-1).
+    - path: skills/hive/skills/execute-mode-session/SKILL.md
+      purpose: Existing status writer; in_progress transition lands here.
+    - path: skills/execute/references/team-execution.md
+      purpose: Execution status-write site.
+    - path: skills/review/SKILL.md
+      purpose: Owns in_review/complete + rework bounce.
+    - path: skills/hive/skills/session-registry/SKILL.md
+      purpose: Existing status writer to reconcile with the contract.
+
+files_to_modify:
+  - file: skills/execute/SKILL.md
+    change: pending -> in_progress on dispatch.
+  - file: skills/review/SKILL.md
+    change: in_review/complete on pass; rework bounce to in_progress on fail.
+  - file: skills/test/SKILL.md
+    change: in_progress -> in_review gate where /test is the review entry.
+
+cross_cutting:
+  - concern: documentation
+    action: "Link status-lifecycle.md from each edited skill's Key-References section."
+
+metric:
+  applies: true
+  name: story.unmarked_complete_rate
+  direction: down
+  unit: ratio
+  baseline: "unknown-high (today many finished stories never leave in_progress)"
+  target: "0.10"
+  window: next-3-epics
+  source:
+    kind: manual
+    ref: "Audit of .pHive/epics/*/stories/*.yaml status vs git reality across next 3 epics after merge"
+  verify_at: "2026-07-15T00:00:00Z"
+  owner: reviewer
+
+risks:
+  - severity: high
+    description: Over-eager status write marks a story complete mid-failure.
+    mitigation: AC4 — every forward transition gated on step success; reviewer audits for entry-time writes.
+  - severity: medium
+    description: Edits to /plan and /execute overlap with rl-4 (same files).
+    mitigation: rl-4 depends_on this story; serial ordering prevents concurrent edits.
