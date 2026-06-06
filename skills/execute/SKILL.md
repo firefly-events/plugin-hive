@@ -282,7 +282,11 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
    [debug] handoff: story={story_id} target={target} verdict={verdict} duration={duration_ms}ms
    ```
 
-7b. **Update story status in the task tracker.** When a story advances through a workflow phase that warrants an externally-visible status change (e.g., research → in-progress, review → in-review, integrate → done), call the dispatch module. This is a no-op when `task_tracking.adapter` is unset.
+7b. **Project dispatch status.** After a story is successfully dispatched or claimed for work by the selected execution mode, write `/execute`'s owned lifecycle transition from [`status-lifecycle.md`](../../hive/references/status-lifecycle.md): update that story YAML's `status:` projection from `pending` to `in_progress`.
+
+    This write is gated on dispatch success. Do not write `in_progress` before the story is actually handed to a teammate/session/sandcastle/Multica/CC Workflows runner, and do not write it when dispatch fails, is skipped, or is blocked by dependency gating. `/execute` does not own `in_review`, `complete`, or `shipped`; terminal workflow completion and integrate success must not be projected as story `complete`.
+
+    When `task_tracking.adapter` is configured, mirror only this owned `in_progress` transition to the task tracker via the dispatch module. This is a no-op when `task_tracking.adapter` is unset.
 
     Only stories with a populated `tracker_id` (written by `plan` Phase D) are eligible. The dispatch module owns gate_mode behavior, telemetry, and error mapping — do not branch on the adapter vendor here.
 
@@ -383,7 +387,8 @@ greenfield/early projects and logs once per run. No new error handling
 - **`references/sequential-execution.md`** — Per-story workflow steps, sidecar injection at review, episode records, gate checks
 - `hive/references/agent-teams-guide.md` — Team mechanics and limitations
 - `hive/references/methodology-routing.md` — Methodology selection
-- `hive/references/episode-schema.md` — Status marker format. **Story state is derived from these markers — do NOT free-write `status:` in story YAMLs.** When a workflow step completes, write the corresponding episode marker; story-level state is computed from the marker set per the schema. The free-write `status:` field in some legacy story YAMLs is deprecated (per `feedback_story_status_stale`).
+- `hive/references/episode-schema.md` — Status marker format. Episode markers remain the authoritative evidence for workflow steps; story YAML `status:` is a lifecycle projection and may be written only for command-owned transitions defined in `status-lifecycle.md`.
+- `hive/references/status-lifecycle.md` — Canonical command-owned story lifecycle; `/execute` owns only the success-gated `pending -> in_progress` dispatch projection.
 
 ### Per-step token budgets (advisory caps)
 
