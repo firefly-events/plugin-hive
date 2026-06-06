@@ -4,7 +4,7 @@
   "description": "Hive shared lib helpers (mode-resolver and friends)",
   "type": "module",
   "scripts": {
-    "test": "npx vitest run --reporter=verbose test/mode-resolver.test.mjs"
+    "test": "npx vitest run --reporter=verbose test/mode-resolver.test.mjs test/cc-workflows-preconditions.test.mjs"
   },
   "engines": {
     "node": ">=20"

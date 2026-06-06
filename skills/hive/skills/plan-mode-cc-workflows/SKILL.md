@@ -87,6 +87,14 @@ The process below mirrors `execute-mode-cc-workflows`: precondition gate, per-pe
 
 ### Step 0: Precondition gate
 
+```js
+// Worktree-isolation check — must be the first action in this gate.
+// Rejects before any field resolution if the skill is not running inside
+// a `.claude/worktrees/<name>/` checkout.
+import { assertWorktreeIsolation } from '../../../hive/lib/cc-workflows-preconditions.mjs';
+assertWorktreeIsolation(); // throws precondition_failed if cwd is not a worktree
+```
+
 Resolve runtime and tooling before dispatching any persona: verify CC runtime version `>= 2.1.154`; read `claude --version` when available; otherwise rely on Workflow tool presence as proxy. Verify `planning.mode` resolves to `"cc-workflows"` OR `HIVE_PLANNING_MODE=cc-workflows` is set. Resolve `${HIVE_STATE_DIR}` from `hive_config.paths.state_dir`, then default to `.pHive`, and confirm `assembled_personas[]` plus `planning_story` are present.
 
 Runtime field resolution must preserve source attribution:
