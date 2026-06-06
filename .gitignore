@@ -212,3 +212,4 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/cc-workflows-first-party/**
 !.pHive/proposals/
 !.pHive/proposals/**
+hive/lib/.pHive/

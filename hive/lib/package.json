@@ -4,7 +4,8 @@
   "description": "Hive shared lib helpers (mode-resolver and friends)",
   "type": "module",
   "scripts": {
-    "test": "npx vitest run --reporter=verbose test/mode-resolver.test.mjs test/cc-workflows-preconditions.test.mjs"
+    "lint:cc-workflows": "node ../scripts/lint-cc-workflows-no-codex.mjs",
+    "test": "npm run lint:cc-workflows && npx vitest run --reporter=verbose --root .. test/mode-resolver.test.mjs test/cc-workflows-preconditions.test.mjs scripts/test/lint-cc-workflows-no-codex.test.mjs"
   },
   "engines": {
     "node": ">=20"
