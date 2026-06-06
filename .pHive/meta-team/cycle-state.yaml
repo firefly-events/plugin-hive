@@ -121,7 +121,7 @@ summary:
   flagged_for_human: 0
   cycle_verdict: discard
 closure_evidence:
-  commit_ref: PENDING
+  commit_ref: c8699a99ff6741456a581352f3fcab736f189f8e
   metrics_snapshot:
     tokens: 0
     wall_clock_ms: 0

@@ -1,3 +1,31 @@
+- experiment_id: meta-2026-06-06
+  date: '2026-06-06'
+  started: '2026-06-06T00:00:00Z'
+  closed: '2026-06-06T00:30:00Z'
+  verdict: passed
+  changes_promoted: 0
+  changes_reverted: 0
+  findings_identified: 1
+  findings_suppressed_by_dedup: 7
+  top_changes: []
+  commit: c8699a99ff6741456a581352f3fcab736f189f8e
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 0
+    first_attempt_pass: true
+  rollback_ref: d7ef316d8febf4f3294ebd443bfcc14c77616f95
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-06. Analysis found 1 finding: (1) STUB_DOC
+    hive/references/hive-cloud-roadmap.md (13 lines) — S16 forward-reference
+    placeholder for the deferred Hive Cloud epic; marked out_of_scope (11+
+    consecutive deferrals). 7 additional findings suppressed by Step-0
+    in-flight dedup: all claude-opus-4-7→4-8 model-ID issues and the
+    GUIDE.md Roster 20→25 count discrepancy are already covered by open
+    PR #246 (chore/squash-nightly-meta → develop). Zero proposals generated;
+    zero changes promoted. Cycle closes as discard. Closure invariant passed
+    (decision: discard path — commit_ref not required by validator).
+    Regression watch: not_applicable.
 - experiment_id: meta-2026-05-29
   date: '2026-05-29'
   started: '2026-05-29T00:00:00Z'
