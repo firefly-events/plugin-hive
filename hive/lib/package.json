@@ -1,0 +1,12 @@
+{
+  "name": "@hive/lib",
+  "version": "0.1.0",
+  "description": "Hive shared lib helpers (mode-resolver and friends)",
+  "type": "module",
+  "scripts": {
+    "test": "npx vitest run --reporter=verbose test/mode-resolver.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,19 @@
+[
+  {"varName":"HIVE_EXECUTE_MODE","ctx":{"env":"HIVE_EXECUTE_MODE=sandcastle"},"expected":{"decision":"sandcastle","sources":{"env":"HIVE_EXECUTE_MODE=sandcastle"}}},
+  {"varName":"HIVE_EXECUTE_MODE","ctx":{"env":"HIVE_EXECUTE_MODE=multica"},"expected":{"decision":"multica","sources":{"env":"HIVE_EXECUTE_MODE=multica"}}},
+  {"varName":"HIVE_EXECUTE_MODE","ctx":{"rootConfig":{"execution":{"mode":"sandcastle"}}},"expected":{"decision":"sandcastle","sources":{"root_config":"execution.mode=sandcastle"}}},
+  {"varName":"HIVE_EXECUTE_MODE","ctx":{"rootConfig":{"execution":{"mode":"multica"}}},"expected":{"decision":"multica","sources":{"root_config":"execution.mode=multica"}}},
+  {"varName":"HIVE_EXECUTE_MODE","ctx":{},"expected":{"decision":"default","sources":{"default":"auto"}}},
+  {"varName":"HIVE_EXECUTE_MODE","ctx":{"env":"HIVE_EXECUTE_MODE=sandcastle","rootConfig":{"execution":{"mode":"multica"}}},"expected":{"decision":"sandcastle","sources":{"env":"HIVE_EXECUTE_MODE=sandcastle"}}},
+  {"varName":"HIVE_EXECUTE_MODE","ctx":{"env":"HIVE_EXECUTE_MODE=multica","rootConfig":{"execution":{"mode":"sandcastle"}}},"expected":{"decision":"multica","sources":{"env":"HIVE_EXECUTE_MODE=multica"}}},
+  {"varName":"HIVE_EXECUTE_MODE","ctx":{"env":"HIVE_EXECUTE_MODE=unknown-value","rootConfig":{"execution":{"mode":"sandcastle"}}},"expected":{"decision":"sandcastle","sources":{"root_config":"execution.mode=sandcastle"}}},
+  {"varName":"HIVE_EXECUTE_MODE","ctx":{"env":"HIVE_EXECUTE_MODE=unknown-value"},"expected":{"decision":"default","sources":{"default":"auto"}}},
+  {"varName":"HIVE_EXECUTE_MODE","ctx":{"shippedBaseline":"sandcastle"},"expected":{"decision":"sandcastle","sources":{"shipped_baseline":"sandcastle"}}},
+  {"varName":"HIVE_EXECUTE_MODE","ctx":{"skillOverride":"multica"},"expected":{"decision":"multica","sources":{"skill_override":"multica"}}},
+  {"varName":"HIVE_EXECUTE_MODE","ctx":{"env":"HIVE_EXECUTE_MODE=sandcastle","shippedBaseline":"multica","skillOverride":"multica","rootConfig":{"execution":{"mode":"multica"}}},"expected":{"decision":"sandcastle","sources":{"env":"HIVE_EXECUTE_MODE=sandcastle"}}},
+  {"varName":"HIVE_PLAN_MODE","ctx":{"env":"HIVE_PLAN_MODE=multica"},"expected":{"decision":"multica","sources":{"env":"HIVE_PLAN_MODE=multica"}}},
+  {"varName":"HIVE_TEST_MODE","ctx":{"rootConfig":{"execution":{"mode":"sandcastle"}}},"expected":{"decision":"sandcastle","sources":{"root_config":"execution.mode=sandcastle"}}},
+  {"varName":"HIVE_DESIGN_MODE","ctx":{},"expected":{"decision":"default","sources":{"default":"auto"}}},
+  {"varName":"HIVE_DESIGN_REVIEW_MODE","ctx":{"env":"HIVE_DESIGN_REVIEW_MODE=cc-workflows"},"expected":{"decision":"cc-workflows","sources":{"env":"HIVE_DESIGN_REVIEW_MODE=cc-workflows"}}},
+  {"varName":"HIVE_REVIEW_MODE","ctx":{"skillOverride":"cc-workflows","rootConfig":{"execution":{"mode":"sandcastle"}}},"expected":{"decision":"sandcastle","sources":{"root_config":"execution.mode=sandcastle"}}}
+]
