@@ -316,6 +316,43 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
 7d. **Multica story close (integrate hook).** Immediately after the `integrate` step's commit+push completes, the integrate step file calls `closeStoryIssue({epic_id, story_id})` from `hive/lib/multica-issue-closer.mjs`. This hook is gated on `task_tracking.adapter === 'multica'` (read from root `hive.config.yaml`); other values (including null / unset) skip with a one-line `[gate_mode]` log. The hook is also skipped for dry-run invocations and when /execute is in `--simulated-manual` mode. On any `ok: false` result, one warn line is emitted and /execute continues — this hook never blocks story completion. The full gate logic and log-line templates live in the integrate step file (`hive/workflows/steps/development-classic/step-08-integrate.md` §6a).
 
+7e. **Epic finalize — version bump and changelog.** After the last story's integrate step has completed successfully, and before the final run summary, read `version_bump` from the loaded `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`.
+
+   - If `version_bump` is absent, treat it as `none` and emit:
+
+     ```
+     [info] finalize: epic.yaml has no version_bump; treating as none
+     ```
+
+   - If `version_bump: none`, perform a clean no-op: do not edit any version source, do not add a changelog release entry, do not create a finalize commit. Continue to step 8.
+
+   - If `version_bump` is one of `major`, `minor`, or `patch`, compute the next SemVer from the current lockstep version. Version sources are:
+     - every JSON file matching `.claude-plugin/*.json`;
+     - `plugin.json` at the repository root when present.
+
+     Parse each JSON file with a structured JSON parser. Collect every `version` field recursively (for example `.claude-plugin/marketplace.json` has both a root `version` and nested plugin metadata). All discovered values MUST be identical before bumping. If they differ, stop finalize and report the mismatched path/key/value set; do not partially edit files.
+
+   - Apply the computed new version to every discovered `version` field in those sources, preserving JSON formatting conventions already present in the file.
+
+   - Write a changelog entry under `## [Unreleased]` in `CHANGELOG.md` for this epic. The entry MUST name the epic ID, the bump level, and the old/new version pair, for example:
+
+     ```markdown
+     ### Changed
+
+     - **`{epic-id}` release finalization.** `/execute` applied the planned `{version_bump}` version bump (`{old_version}` → `{new_version}`) and kept plugin version sources in lockstep.
+     ```
+
+     If `## [Unreleased]` already contains the appropriate category heading, append under it instead of duplicating the heading.
+
+   - Commit the version-source and changelog changes together in one finalize commit:
+
+     ```bash
+     git add .claude-plugin/*.json plugin.json CHANGELOG.md
+     git commit -m "chore(release): bump plugin version for {epic-id}"
+     ```
+
+     If `plugin.json` is absent, omit it from `git add`. If there are no diffs after applying the bump and changelog entry, report `[info] finalize: version bump already applied for {epic-id}` and do not commit.
+
 8. After all stories complete, produce a summary plus the post-run audit:
 
    1. **Run summary** — existing behavior: list completed stories, any failed/blocked, and final status.
