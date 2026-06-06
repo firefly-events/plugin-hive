@@ -135,6 +135,31 @@ For each story in `unblocked_stories[]`:
      ```
      No `agent()` call may omit `opts.model`. The resolver reads `model_overrides` (runtime promotion) then `model_tiers` (base assignment) from `hive.config.yaml` — never from persona frontmatter. Unmapped personas default to `sonnet` with a WARN. Collect `{phase, persona, tier, source}` for each dispatched agent to populate `field_sources.agent_models` in the terminal marker (Step 3).
    - **Defensive `args` parse contract.** Every assembled script MUST begin its body with `const a = typeof args === 'string' ? JSON.parse(args) : args;` and reference inputs via `a.<field>` (NOT `args.<field>`). The Workflow tool surface does not guarantee that the `args` global arrives as a parsed object — when the tool is invoked from an orchestrator whose tool-call parameters are string-typed (XML/JSON-string body parameters), `args` arrives as the raw JSON-encoded string and `args.<field>` evaluates to JavaScript `undefined`. Template literals then render the word `undefined` as filename / path fragments and downstream Edit / Write tool calls touch the wrong path. Surfaced by the cc-workflows-smoke run (audit finding `workflow-tool-args-string-vs-object`); the defensive shim is cheap and idempotent.
+   - **Per-agent insight-capture clause (MANDATORY).** Every `agent()` prompt MUST end with the suffix template below. This bridges `feedback_insights_before_shutdown` and `feedback_execution_protocol` for one-shot Workflow subagents that never receive `SendMessage({type: shutdown_request})` and therefore have no shutdown-protocol hook to self-capture. Why this lives in the mode skill instead of `hive/agents/<persona>.md`: Workflow subagents follow the `agent()` prompt literally; they do not chain-load persona memories or fire a shutdown hook. A persona-file rule has no enforcement surface in cc-workflows mode. The mode skill is the single dispatch point that CAN enforce it, by template.
+
+     Persona substitution: replace `<persona>` with the exact persona name (e.g. `researcher`, `developer`, `tester`, `reviewer`). The mode skill template is persona-agnostic; the orchestrator interpolates the right value per `agent()` call.
+
+     Suffix template (append verbatim to each prompt):
+
+     ```text
+     INSIGHT CAPTURE (before returning your structured output)
+
+     If you encountered any reusable lesson during this turn — a constraint that surprised you, a pattern that worked unexpectedly well, a footgun the next <persona> on this codebase will hit — append it to:
+
+       hive/agents/memories/<persona>/<kebab-case-title>.md
+
+     File shape (frontmatter + 3-5 line body):
+
+     ---
+     name: <kebab-case-title>
+     description: <one-line summary, second-person imperative>
+     applies_to: <persona>
+     ---
+
+     <2-4 lines: the lesson + why it matters. Concrete, not generic. Cite file paths or line numbers where useful.>
+
+     Skip the capture entirely if nothing on this turn is reusable across stories. Do NOT write a memory just to satisfy this clause; empty captures pollute the memory dir. Fire-and-forget — do not block your return on the write. If the directory does not exist, create it.
+     ```
    - Invoke the Workflow TOOL with the assembled script.
    - Capture returned `run_id` and `transcript_dir`. This is not the `/workflows` slash command; `/workflows` is the history browser, per `.pHive/epics/cc-workflows-first-party/docs/spike-findings.md:40`.
 
