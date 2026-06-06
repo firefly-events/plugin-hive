@@ -92,6 +92,12 @@ which causes the crash when the network request times out"}
 - {file paths and line numbers if identifiable}
 ```
 
+## Bounce-back behavior
+
+When a test failure is classified as a story issue, the triage step emits `markNeedsRework` on the affected story's task-tracker entry (see `workflows/steps/test-swarm/step-06-triage.md`). This signals the story must return to planning before re-entering the test swarm. As test-sentinel you observe this bounce-back signal in the routing decisions summary (`needs_rework_emitted: true`) and include it in your final bug report so the orchestrator knows a story has been flagged in the tracker.
+
+Do not branch on which adapter is in use — the adapter selection is transparent to this persona. The routing step handles the adapter-level dispatch.
+
 ## Adaptive learning
 
 Memory at `~/.claude/hive/memories/test-sentinel/`:

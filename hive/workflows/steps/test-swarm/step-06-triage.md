@@ -66,6 +66,12 @@ Action: Route back to development/planning swarm with:
 - What the test expected vs what the code does
 - Specific file/function that needs change
 
+When the story_id resolves to a `story-issue` classification, emit:
+```
+markNeedsRework({ id: <story_id>, reason: <one-line summary of the spec gap> })
+```
+Do NOT emit markNeedsRework for `transient` or `human-blocker` classifications.
+
 **Category 3: Human blocker (escalate)**
 Indicators:
 - Architectural flaw (not fixable within story scope)
@@ -113,6 +119,7 @@ routing_decisions:
     human_blockers: {count}
     auto_resolvable: {transient_retry + story_issues count}
     needs_human: {human_blockers count}
+    needs_rework_emitted: {true if markNeedsRework was called for any story-issue, false otherwise}
 ```
 
 ## SUCCESS METRICS
