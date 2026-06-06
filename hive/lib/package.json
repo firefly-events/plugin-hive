@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "lint:cc-workflows": "node ../scripts/lint-cc-workflows-no-codex.mjs",
-    "test": "npm run lint:cc-workflows && npx vitest run --reporter=verbose --root ../.. hive/lib/test/mode-resolver.test.mjs hive/lib/test/cc-workflows-preconditions.test.mjs hive/scripts/test/lint-cc-workflows-no-codex.test.mjs skills/hive/skills/design-dispatch/test/resolver.test.mjs skills/hive/skills/design-review-dispatch/test/resolver.test.mjs"
+    "test": "npm run lint:cc-workflows && npx vitest run --reporter=verbose --root ../.. hive/lib/test/mode-resolver.test.mjs hive/lib/test/cc-workflows-preconditions.test.mjs hive/scripts/test/lint-cc-workflows-no-codex.test.mjs skills/hive/skills/design-dispatch/test/resolver.test.mjs skills/hive/skills/design-review-dispatch/test/resolver.test.mjs skills/hive/skills/review-dispatch/test/resolver.test.mjs"
   },
   "engines": {
     "node": ">=20"

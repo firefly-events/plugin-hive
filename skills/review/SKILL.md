@@ -30,6 +30,31 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 ## Process
 
+### Phase 0 — Resolve dispatch mode
+
+Call `skills/hive/skills/review-dispatch/SKILL.md` once before doing any other work. Pass:
+
+- `env` — current process environment (at minimum `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, `HIVE_REVIEW_MODE`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`)
+- `rootConfig` — parsed root `hive.config.yaml`
+- `consumerConfig` — parsed `.pHive/hive.config.yaml` or `None`
+- `graduationRegistry` — parsed graduation registry workflow list or `None`
+- `workflow_name` — `"code-review"`
+- `epic_id` — current epic ID when known, else omit
+- `arguments` — parsed `$ARGUMENTS` (PR number / branch / `--sequential` flag state)
+- `unblocked_stories[]` — depth-0 ready stories at this tick (may be empty for a direct `/review` invocation)
+
+Capture the response as `{ mode_decision, mode_reason, runner_path, runner_reason, field_sources, gate_violations }`.
+
+Branch on `mode_decision`:
+
+- **`multica`** → hand off to `skills/hive/skills/review-mode-multica/SKILL.md` (forward all arguments + `field_sources`) and **stop**. Do not continue to Phase 1 below.
+- **`cc-workflows`** → hand off to `skills/hive/skills/review-mode-cc-workflows/SKILL.md` (forward all arguments + `field_sources`) and **stop**. Do not continue to Phase 1 below.
+- **any other value** (`sequential`, `team`, `team-cmux`, `sessions`, `sandcastle`) → continue inline with the steps below. The solo reviewer pattern (Steps 1–6) is the authoritative inline path.
+
+> `review-mode-multica` and `review-mode-cc-workflows` are forward declarations — their skill files ship in later slices. A missing skill file is not an error at dispatch resolution time; the dispatch skill itself is what this story delivers.
+
+### Phase 1 — Inline solo reviewer (default path)
+
 1. **Obtain the diff.** Run the appropriate diff command from the table above. If the diff is empty, report "No changes to review" and stop.
 
 2. **Load the review workflow.** Read `hive/workflows/code-review.workflow.yaml`. This defines the ordered steps for a code review. If the file does not exist, fall back to the two-step process below.
