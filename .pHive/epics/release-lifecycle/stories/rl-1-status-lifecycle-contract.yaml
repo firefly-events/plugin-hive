@@ -34,36 +34,53 @@ description: |
   pass OR /ship's pre-flight reconciliation (rl-6) performs. /status stays read-only.
 
 acceptance_criteria:
-  - "Given the new reference, when an agent reads it, then it finds the full state set, the transition-ownership table, and the rework edge defined unambiguously."
-  - "Given complete is often reached via manual review, when the contract describes complete, then it explicitly allows /ship pre-flight reconciliation as a valid path to complete (not only an automated /review pass)."
-  - "Given existing scattered status writers (plan, execute-mode-session, session-registry, team-execution), when the doc is done, then it lists each current writer and the transition it should own going forward (migration map for rl-3)."
+  - "Given the new reference, when an agent reads it, then it finds the full
+    state set, the transition-ownership table, and the rework edge defined
+    unambiguously."
+  - "Given complete is often reached via manual review, when the contract
+    describes complete, then it explicitly allows /ship pre-flight
+    reconciliation as a valid path to complete (not only an automated /review
+    pass)."
+  - "Given existing scattered status writers (plan, execute-mode-session,
+    session-registry, team-execution), when the doc is done, then it lists each
+    current writer and the transition it should own going forward (migration map
+    for rl-3)."
 
 steps:
   - id: research
-    description: Inventory every current `status:` writer across skills/ and hive/references/ (plan, execute-mode-session, session-registry, team-execution, story-yaml-schema, cycle-state-schema). Capture current values used.
+    description: Inventory every current `status:` writer across skills/ and
+      hive/references/ (plan, execute-mode-session, session-registry,
+      team-execution, story-yaml-schema, cycle-state-schema). Capture current
+      values used.
     agent: researcher
   - id: implement
-    description: Write hive/references/status-lifecycle.md — state set, transition-ownership table, rework edge, manual-complete path, and the migration map for rl-3.
+    description: Write hive/references/status-lifecycle.md — state set,
+      transition-ownership table, rework edge, manual-complete path, and the
+      migration map for rl-3.
     agent: developer
-    depends_on: [research]
+    depends_on: [ research ]
   - id: review
-    description: Verify the contract is internally consistent and that the migration map covers every writer found in research.
+    description: Verify the contract is internally consistent and that the migration
+      map covers every writer found in research.
     agent: reviewer
-    depends_on: [implement]
+    depends_on: [ implement ]
   - id: integrate
     description: Commit to feat/release-lifecycle.
     agent: developer
-    depends_on: [review]
+    depends_on: [ review ]
 
 context:
   codebase: /Users/don/Documents/plugin-hive
   key_files:
     - path: hive/references/story-yaml-schema.md
-      purpose: Defines the story `status:` field; contract must align with its allowed values (incl. `completed`).
+      purpose: Defines the story `status:` field; contract must align with its allowed
+        values (incl. `completed`).
     - path: hive/references/cycle-state-schema.md
-      purpose: Phase records reference status; contract must not contradict cycle-state vocabulary.
+      purpose: Phase records reference status; contract must not contradict
+        cycle-state vocabulary.
     - path: skills/status/SKILL.md
-      purpose: Read-only reporter — contract must keep it read-only (it consumes, never writes).
+      purpose: Read-only reporter — contract must keep it read-only (it consumes,
+        never writes).
 
 files_to_modify:
   - file: hive/references/status-lifecycle.md
@@ -71,13 +88,21 @@ files_to_modify:
 
 cross_cutting:
   - concern: documentation
-    action: "This story IS documentation; ensure it is linked from story-yaml-schema.md and the plan/execute/review skill Key-References sections by rl-3."
+    action: "This story IS documentation; ensure it is linked from
+      story-yaml-schema.md and the plan/execute/review skill Key-References
+      sections by rl-3."
 
 metric:
   applies: false
-  justification: "Pure contract/reference document with no runtime surface; its effectiveness is measured downstream by rl-3 (wiring) and rl-6 (ship gate) consuming it, not by this story emitting a number."
+  justification: "Pure contract/reference document with no runtime surface; its
+    effectiveness is measured downstream by rl-3 (wiring) and rl-6 (ship gate)
+    consuming it, not by this story emitting a number."
 
 risks:
   - severity: medium
-    description: Contract states a transition no command currently owns, creating a spec/impl gap.
-    mitigation: Migration map (AC3) ties every transition to a concrete rl-3 edit; rl-3 is gated on this map.
+    description: Contract states a transition no command currently owns, creating a
+      spec/impl gap.
+    mitigation: Migration map (AC3) ties every transition to a concrete rl-3 edit;
+      rl-3 is gated on this map.
+tracker_id: plugin-hive/PLU-232
+tracker_url: http://localhost:3000/plugin-hive/issues/232

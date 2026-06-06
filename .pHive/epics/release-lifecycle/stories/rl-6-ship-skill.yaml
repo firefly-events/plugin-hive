@@ -4,7 +4,7 @@ title: /ship capstone skill — reconcile, verify, ship, announce
 status: pending
 complexity: high
 methodology: classic
-depends_on: [rl-2, rl-3, rl-4, rl-5]
+depends_on: [ rl-2, rl-3, rl-4, rl-5 ]
 
 description: |
   The capstone. A new top-level /ship skill that closes the lifecycle. Multi-epic
@@ -31,34 +31,52 @@ description: |
        ONLY writer of `shipped` (per rl-1).
 
 acceptance_criteria:
-  - "Given /ship with no args, when one epic is the obvious target, then it operates on that epic without requiring an epic ID."
-  - "Given /ship with multiple epic IDs, when run, then the release aggregates all of them."
-  - "Given a target epic with an incomplete story, when pre-flight runs, then the operator is prompted to confirm-complete or bounce-to-rework, and ship is refused (sans --partial) until all are complete."
-  - "Given version_bump != none but /execute did not bump, when verify runs, then /ship reports the gap and offers to patch it."
-  - "Given ship_target resolves to an action, when /ship proceeds, then it shows a dry-run and requires confirmation before executing (custom commands always confirm)."
-  - "Given a successful ship, when it completes, then release artifacts exist under .pHive/releases/<id>/ and every shipped story status == shipped."
-  - "Given /status is run after, when read, then it reflects shipped (and /status performed no writes)."
+  - "Given /ship with no args, when one epic is the obvious target, then it
+    operates on that epic without requiring an epic ID."
+  - "Given /ship with multiple epic IDs, when run, then the release aggregates
+    all of them."
+  - "Given a target epic with an incomplete story, when pre-flight runs, then
+    the operator is prompted to confirm-complete or bounce-to-rework, and ship
+    is refused (sans --partial) until all are complete."
+  - "Given version_bump != none but /execute did not bump, when verify runs,
+    then /ship reports the gap and offers to patch it."
+  - "Given ship_target resolves to an action, when /ship proceeds, then it shows
+    a dry-run and requires confirmation before executing (custom commands always
+    confirm)."
+  - "Given a successful ship, when it completes, then release artifacts exist
+    under .pHive/releases/<id>/ and every shipped story status == shipped."
+  - "Given /status is run after, when read, then it reflects shipped (and
+    /status performed no writes)."
 
 steps:
   - id: research
-    description: Read rl-1 contract, rl-2 ship_target schema, rl-4 epic.yaml version_bump, rl-5 generator input contract; study an existing top-level skill (e.g. skills/review/SKILL.md) for skill structure + preamble conventions.
+    description: Read rl-1 contract, rl-2 ship_target schema, rl-4 epic.yaml
+      version_bump, rl-5 generator input contract; study an existing top-level
+      skill (e.g. skills/review/SKILL.md) for skill structure + preamble
+      conventions.
     agent: researcher
   - id: implement
-    description: Author skills/ship/SKILL.md implementing the 5-step flow; wire pre-flight reconciliation, bump-verify, ship_target dispatch w/ dry-run confirm, rl-5 generator call, and the complete->shipped write.
+    description: Author skills/ship/SKILL.md implementing the 5-step flow; wire
+      pre-flight reconciliation, bump-verify, ship_target dispatch w/ dry-run
+      confirm, rl-5 generator call, and the complete->shipped write.
     agent: developer
-    depends_on: [research]
+    depends_on: [ research ]
   - id: test
-    description: Cover single vs multi-epic, the reconciliation prompt + refuse-without-partial, bump-gap patch path, dry-run confirm gate, and shipped marking.
+    description: Cover single vs multi-epic, the reconciliation prompt +
+      refuse-without-partial, bump-gap patch path, dry-run confirm gate, and
+      shipped marking.
     agent: tester
-    depends_on: [implement]
+    depends_on: [ implement ]
   - id: review
-    description: Audit the confirm gate on ship actions (esp. custom command) and that shipped is written only here, only after a successful ship action.
+    description: Audit the confirm gate on ship actions (esp. custom command) and
+      that shipped is written only here, only after a successful ship action.
     agent: reviewer
-    depends_on: [test]
+    depends_on: [ test ]
   - id: integrate
-    description: Commit to feat/release-lifecycle; register /ship in the plugin manifest if top-level skills are enumerated there.
+    description: Commit to feat/release-lifecycle; register /ship in the plugin
+      manifest if top-level skills are enumerated there.
     agent: developer
-    depends_on: [review]
+    depends_on: [ review ]
 
 context:
   codebase: /Users/don/Documents/plugin-hive
@@ -78,9 +96,11 @@ files_to_modify:
 
 cross_cutting:
   - concern: documentation
-    action: "Document /ship in the skills catalog + link status-lifecycle, ship_target, release-post refs."
+    action: "Document /ship in the skills catalog + link status-lifecycle,
+      ship_target, release-post refs."
   - concern: versioning
-    action: "/ship is the verify-and-ship surface; ensure version is confirmed bumped before the ship action runs."
+    action: "/ship is the verify-and-ship surface; ensure version is confirmed
+      bumped before the ship action runs."
 
 metric:
   applies: true
@@ -92,14 +112,19 @@ metric:
   window: next-3-ships
   source:
     kind: manual
-    ref: "Over next 3 /ship runs, fraction of finished-but-unmarked stories caught by pre-flight reconciliation vs missed"
+    ref: "Over next 3 /ship runs, fraction of finished-but-unmarked stories caught
+      by pre-flight reconciliation vs missed"
   verify_at: "2026-07-31T00:00:00Z"
   owner: reviewer
 
 risks:
   - severity: high
     description: ship_target custom command executes arbitrary shell with high blast radius.
-    mitigation: Mandatory dry-run + explicit confirmation before any ship action; never auto-run.
+    mitigation: Mandatory dry-run + explicit confirmation before any ship action;
+      never auto-run.
   - severity: medium
     description: shipped written before the ship action actually succeeds.
-    mitigation: AC6 + review — complete->shipped write is strictly after a successful ship action.
+    mitigation: AC6 + review — complete->shipped write is strictly after a
+      successful ship action.
+tracker_id: plugin-hive/PLU-237
+tracker_url: http://localhost:3000/plugin-hive/issues/237

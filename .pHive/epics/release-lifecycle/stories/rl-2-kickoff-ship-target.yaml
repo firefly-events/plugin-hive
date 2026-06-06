@@ -4,7 +4,7 @@ title: Kickoff captures the project's ship-target definition
 status: pending
 complexity: medium
 methodology: classic
-depends_on: [rl-1]
+depends_on: [ rl-1 ]
 
 parallel_allowed: true
 parallel_rationale: bounded-slice
@@ -26,31 +26,39 @@ description: |
   For Hive itself, kind resolves to `github-release` (the repo ships via gh releases).
 
 acceptance_criteria:
-  - "Given a fresh /hive:kickoff run, when the ship-target question is asked and answered, then .pHive/project-profile.yaml gains a valid ship_target block."
-  - "Given kind == custom, when no command is provided, then kickoff re-prompts (custom requires a command string)."
-  - "Given an existing project-profile.yaml without ship_target, when /hive:kickoff is re-run, then the block is added idempotently without clobbering other fields."
-  - "Given the kickoff-protocol reference, when ship_target is added, then kickoff-protocol.md documents the new block and its enum."
+  - "Given a fresh /hive:kickoff run, when the ship-target question is asked and
+    answered, then .pHive/project-profile.yaml gains a valid ship_target block."
+  - "Given kind == custom, when no command is provided, then kickoff re-prompts
+    (custom requires a command string)."
+  - "Given an existing project-profile.yaml without ship_target, when
+    /hive:kickoff is re-run, then the block is added idempotently without
+    clobbering other fields."
+  - "Given the kickoff-protocol reference, when ship_target is added, then
+    kickoff-protocol.md documents the new block and its enum."
 
 steps:
   - id: research
-    description: Read skills/kickoff/SKILL.md + hive/references/kickoff-protocol.md to find where project-profile fields are gathered and written.
+    description: Read skills/kickoff/SKILL.md + hive/references/kickoff-protocol.md
+      to find where project-profile fields are gathered and written.
     agent: researcher
   - id: implement
-    description: Add the ship-target question + ship_target block write to kickoff; document the block in kickoff-protocol.md.
+    description: Add the ship-target question + ship_target block write to kickoff;
+      document the block in kickoff-protocol.md.
     agent: developer
-    depends_on: [research]
+    depends_on: [ research ]
   - id: test
-    description: Verify idempotent add on existing profile + custom-requires-command re-prompt logic.
+    description: Verify idempotent add on existing profile + custom-requires-command
+      re-prompt logic.
     agent: tester
-    depends_on: [implement]
+    depends_on: [ implement ]
   - id: review
     description: Confirm enum + schema match what rl-6 /ship will consume.
     agent: reviewer
-    depends_on: [test]
+    depends_on: [ test ]
   - id: integrate
     description: Commit to feat/release-lifecycle.
     agent: developer
-    depends_on: [review]
+    depends_on: [ review ]
 
 context:
   codebase: /Users/don/Documents/plugin-hive
@@ -70,15 +78,22 @@ files_to_modify:
 
 cross_cutting:
   - concern: documentation
-    action: "Document ship_target enum + custom-command requirement in kickoff-protocol.md."
+    action: "Document ship_target enum + custom-command requirement in
+      kickoff-protocol.md."
   - concern: versioning
-    action: "Adds a project-profile field consumed by /ship — note in changelog when versioning concern runs at epic close."
+    action: "Adds a project-profile field consumed by /ship — note in changelog when
+      versioning concern runs at epic close."
 
 metric:
   applies: false
-  justification: "Config-capture story for a per-project setting; the observable payoff is rl-6 /ship reading a non-null ship_target, verified in rl-6 acceptance, not a metric this story moves."
+  justification: "Config-capture story for a per-project setting; the observable
+    payoff is rl-6 /ship reading a non-null ship_target, verified in rl-6
+    acceptance, not a metric this story moves."
 
 risks:
   - severity: low
     description: ship_target schema drifts from what rl-6 expects.
-    mitigation: rl-6 depends_on rl-2; reviewer cross-checks the consuming contract in the review step.
+    mitigation: rl-6 depends_on rl-2; reviewer cross-checks the consuming contract
+      in the review step.
+tracker_id: plugin-hive/PLU-233
+tracker_url: http://localhost:3000/plugin-hive/issues/233

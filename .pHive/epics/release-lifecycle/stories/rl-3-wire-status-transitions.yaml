@@ -4,7 +4,7 @@ title: Wire explicit status transitions into workflow commands
 status: pending
 complexity: high
 methodology: classic
-depends_on: [rl-1]
+depends_on: [ rl-1 ]
 
 description: |
   The core "work finished but never marked" fix. Implement the rl-1 contract: make
@@ -23,32 +23,43 @@ description: |
   write is OUT OF SCOPE here (it lives in rl-6).
 
 acceptance_criteria:
-  - "Given a story is dispatched by /execute, when dispatch succeeds, then the story YAML status advances pending -> in_progress."
-  - "Given a review fails, when /review records the failure, then the story bounces in_review -> in_progress AND is reassigned to the appropriate agent for re-pickup (rework edge)."
-  - "Given a review passes, when /review records the pass, then status advances in_review -> complete."
-  - "Given any transition, when the owning step FAILS, then no forward status write occurs (gated on success, not entry)."
+  - "Given a story is dispatched by /execute, when dispatch succeeds, then the
+    story YAML status advances pending -> in_progress."
+  - "Given a review fails, when /review records the failure, then the story
+    bounces in_review -> in_progress AND is reassigned to the appropriate agent
+    for re-pickup (rework edge)."
+  - "Given a review passes, when /review records the pass, then status advances
+    in_review -> complete."
+  - "Given any transition, when the owning step FAILS, then no forward status
+    write occurs (gated on success, not entry)."
   - "Given /status, when run, then it performs zero writes (still read-only)."
 
 steps:
   - id: research
-    description: Re-read rl-1 migration map + the current status writers (plan, execute-mode-session, session-registry, team-execution) to locate exact write sites.
+    description: Re-read rl-1 migration map + the current status writers (plan,
+      execute-mode-session, session-registry, team-execution) to locate exact
+      write sites.
     agent: researcher
   - id: implement
-    description: Edit /execute, /review, /test skill machinery to perform the owned transitions per rl-1, gated on success; implement the rework reassignment+repickup on review fail.
+    description: Edit /execute, /review, /test skill machinery to perform the owned
+      transitions per rl-1, gated on success; implement the rework
+      reassignment+repickup on review fail.
     agent: developer
-    depends_on: [research]
+    depends_on: [ research ]
   - id: test
-    description: Cover success-gated forward transitions, the rework bounce + reassignment, and that /status stays read-only.
+    description: Cover success-gated forward transitions, the rework bounce +
+      reassignment, and that /status stays read-only.
     agent: tester
-    depends_on: [implement]
+    depends_on: [ implement ]
   - id: review
-    description: Audit every edited write site against the rl-1 contract; confirm no transition fires on step entry.
+    description: Audit every edited write site against the rl-1 contract; confirm no
+      transition fires on step entry.
     agent: reviewer
-    depends_on: [test]
+    depends_on: [ test ]
   - id: integrate
     description: Commit to feat/release-lifecycle.
     agent: developer
-    depends_on: [review]
+    depends_on: [ review ]
 
 context:
   codebase: /Users/don/Documents/plugin-hive
@@ -86,14 +97,18 @@ metric:
   window: next-3-epics
   source:
     kind: manual
-    ref: "Audit of .pHive/epics/*/stories/*.yaml status vs git reality across next 3 epics after merge"
+    ref: "Audit of .pHive/epics/*/stories/*.yaml status vs git reality across next 3
+      epics after merge"
   verify_at: "2026-07-15T00:00:00Z"
   owner: reviewer
 
 risks:
   - severity: high
     description: Over-eager status write marks a story complete mid-failure.
-    mitigation: AC4 — every forward transition gated on step success; reviewer audits for entry-time writes.
+    mitigation: AC4 — every forward transition gated on step success; reviewer
+      audits for entry-time writes.
   - severity: medium
     description: Edits to /plan and /execute overlap with rl-4 (same files).
     mitigation: rl-4 depends_on this story; serial ordering prevents concurrent edits.
+tracker_id: plugin-hive/PLU-234
+tracker_url: http://localhost:3000/plugin-hive/issues/234

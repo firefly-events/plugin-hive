@@ -4,7 +4,7 @@ title: Version-bump intent at plan, executed late in /execute
 status: pending
 complexity: medium
 methodology: classic
-depends_on: [rl-3]
+depends_on: [ rl-3 ]
 
 description: |
   Maintainer posture: the version bump happens DURING IMPLEMENTATION as one of the
@@ -24,31 +24,41 @@ description: |
     - plugin.json
 
 acceptance_criteria:
-  - "Given /plan decomposes an epic, when the version-bump question is answered, then epic.yaml carries version_bump: major|minor|patch|none."
-  - "Given an epic with version_bump != none, when /execute reaches the finalize step, then all version sources are bumped to the same new semver in one commit."
-  - "Given version_bump == none, when /execute finalizes, then no version source changes (clean no-op)."
-  - "Given the bump runs, when it completes, then a changelog entry for the epic is written."
+  - "Given /plan decomposes an epic, when the version-bump question is answered,
+    then epic.yaml carries version_bump: major|minor|patch|none."
+  - "Given an epic with version_bump != none, when /execute reaches the finalize
+    step, then all version sources are bumped to the same new semver in one
+    commit."
+  - "Given version_bump == none, when /execute finalizes, then no version source
+    changes (clean no-op)."
+  - "Given the bump runs, when it completes, then a changelog entry for the epic
+    is written."
 
 steps:
   - id: research
-    description: Confirm every version source file + current value; find the /plan question surface and the /execute epic-finalize point.
+    description: Confirm every version source file + current value; find the /plan
+      question surface and the /execute epic-finalize point.
     agent: researcher
   - id: implement
-    description: Add version_bump question + epic.yaml field to /plan; add the late bump step to /execute that bumps all sources in lockstep + writes changelog.
+    description: Add version_bump question + epic.yaml field to /plan; add the late
+      bump step to /execute that bumps all sources in lockstep + writes
+      changelog.
     agent: developer
-    depends_on: [research]
+    depends_on: [ research ]
   - id: test
-    description: Cover major/minor/patch lockstep bump across all sources and the none no-op.
+    description: Cover major/minor/patch lockstep bump across all sources and the
+      none no-op.
     agent: tester
-    depends_on: [implement]
+    depends_on: [ implement ]
   - id: review
-    description: Verify all version sources stay in sync and that /ship (rl-6) can later read the result to verify.
+    description: Verify all version sources stay in sync and that /ship (rl-6) can
+      later read the result to verify.
     agent: reviewer
-    depends_on: [test]
+    depends_on: [ test ]
   - id: integrate
     description: Commit to feat/release-lifecycle.
     agent: developer
-    depends_on: [review]
+    depends_on: [ review ]
 
 context:
   codebase: /Users/don/Documents/plugin-hive
@@ -72,18 +82,25 @@ files_to_modify:
 
 cross_cutting:
   - concern: versioning
-    action: "This story IS the versioning mechanism; ensure all three version sources bump in lockstep."
+    action: "This story IS the versioning mechanism; ensure all three version
+      sources bump in lockstep."
   - concern: documentation
     action: "Document version_bump in epic.yaml schema + changelog convention."
 
 metric:
   applies: false
-  justification: "Mechanism story (where/when the bump fires); correctness is binary and covered by tests (lockstep bump + none no-op), not a trend metric. rl-6 verification provides the runtime safety net."
+  justification: "Mechanism story (where/when the bump fires); correctness is
+    binary and covered by tests (lockstep bump + none no-op), not a trend
+    metric. rl-6 verification provides the runtime safety net."
 
 risks:
   - severity: medium
     description: Version sources drift out of sync (one bumped, another not).
-    mitigation: Single lockstep step + test asserts all sources equal; rl-6 verifies at ship.
+    mitigation: Single lockstep step + test asserts all sources equal; rl-6 verifies
+      at ship.
   - severity: low
     description: Shares /plan + /execute edits with rl-3.
-    mitigation: depends_on rl-3 — serial; this story edits the question/bump surfaces, rl-3 the status surfaces.
+    mitigation: depends_on rl-3 — serial; this story edits the question/bump
+      surfaces, rl-3 the status surfaces.
+tracker_id: plugin-hive/PLU-235
+tracker_url: http://localhost:3000/plugin-hive/issues/235
