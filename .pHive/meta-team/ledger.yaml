@@ -1,3 +1,29 @@
+- experiment_id: meta-2026-06-07
+  date: '2026-06-07'
+  started: '2026-06-07T00:00:00Z'
+  closed: '2026-06-07T00:30:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 0
+  top_changes:
+    - ".pHive/meta-team/archive/2026-04-19/MANIFEST.md: appended reviewed-on provenance comment for meta-2026-06-07 nightly cycle (backlog fallback candidate mmo-2026-04-21-001)"
+  commit: c0ca1d83d994b4cfaaf399a09c660eaa62697b2c
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 3000
+    first_attempt_pass: true
+  rollback_ref: d7ef316d8febf4f3294ebd443bfcc14c77616f95
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-07. Analysis found 0 in-scope findings.
+    2 findings suppressed by in-flight PR dedup: reviewer.md and
+    peer-validator.md model-field inconsistencies (sonnet vs hive.config.yaml
+    model_overrides: opus) already proposed in PR #246 (chore/squash-nightly-meta).
+    6 STUB_DOC candidates rejected as false positives (all above 30-line threshold).
+    Routed to step-03b backlog fallback. Processed candidate mmo-2026-04-21-001:
+    appended reviewed-on provenance comment to archived MANIFEST.md. Closure
+    validator passed. Regression watch armed for 4-hour observation window.
 - experiment_id: meta-2026-05-29
   date: '2026-05-29'
   started: '2026-05-29T00:00:00Z'
