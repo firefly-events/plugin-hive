@@ -212,3 +212,5 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/release-lifecycle/**
 !.pHive/epics/multica-insight-capture/
 !.pHive/epics/multica-insight-capture/**
+!.pHive/epics/planning-queue/
+!.pHive/epics/planning-queue/**
