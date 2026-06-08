@@ -1,0 +1,85 @@
+id: pq-3-gate-elevation-contract
+epic: planning-queue
+title: Gate-elevation contract (leader side) — GATE comment + blocked-for-human label
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [pq-2-watermark-feeder]
+
+description: |
+  Slice 3. The leader-side gate-elevation contract: when a planning/execution leader
+  hits an open question it can't resolve, it posts an `@orchestrator GATE: <question>`
+  comment, sets the issue `blocked`, and attaches the `blocked-for-human` label. Both
+  signals required (locked fork default): label = relay's operational signal, comment =
+  the question payload. Multica labels are ID-based, so label attach needs resolve-or-create.
+
+  Working state: a blocked planning issue is machine-detectable by (label AND GATE comment)
+  — the input the relay (pq-5) will poll for.
+
+acceptance_criteria:
+  - "Given a leader needs maintainer input, when it elevates, then it posts a comment formatted exactly `@orchestrator GATE: <question>`, sets status=blocked, and attaches blocked-for-human."
+  - "Given the blocked-for-human label does not exist, when attaching, then resolve_or_create_label creates it first, then attaches (ID-based)."
+  - "Given a label-create race, when two elevations attach concurrently, then the label is not double-created (idempotent resolve-or-create)."
+  - "Given an answer formatter, when a maintainer answer is supplied, then it renders the canonical `GATE ANSWER:` block with source attribution."
+  - "Given an elevated issue, when scanned, then (blocked-for-human label present AND latest unresolved @orchestrator GATE: comment) uniquely identifies it as a live gate."
+
+steps:
+  - id: research
+    description: Confirm multica label create/attach is ID-based; confirm comment + status-set CLI/API shapes.
+    agent: researcher
+  - id: implement
+    description: Build hive/lib/planning_queue/gates.py (gate comment formatter, GATE ANSWER formatter, leader elevate helper) + extend multica_client.py with comment post, status update, resolve_or_create_label, add_label.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: tests/planning_queue/test_gates.py — comment format, label resolve-or-create idempotency, both-signal detectability, answer formatter.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review label-race idempotency + exact comment-prefix contract (relay depends on it).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack: {language: python}
+  key_files:
+    - path: hive/lib/planning_queue/multica_client.py
+      purpose: "Extend (from pq-2) with comment/status/label write operations."
+
+files_to_modify:
+  - file: hive/lib/planning_queue/gates.py
+    change: NEW — gate comment formatter + answer formatter + leader elevate helper
+  - file: hive/lib/planning_queue/multica_client.py
+    change: extend — comment post, status update, resolve_or_create_label, add_label
+  - file: hive/lib/config.py
+    change: extend — blocked-for-human label default available
+
+design_decisions:
+  - decision: Require BOTH blocked-for-human label and @orchestrator GATE: comment
+    rationale: "Locked fork default — label is the relay signal, comment carries the question; label-only loses payload, comment-only is noisy."
+  - decision: resolve_or_create_label before attach
+    rationale: "Multica labels are ID-based; the label list returned empty, so create-if-missing is required."
+
+cross_cutting:
+  - concern: idempotency
+    action: "resolve_or_create_label must not double-create under concurrent elevations (lookup, create-if-absent, cache id)."
+
+metric:
+  applies: false
+  justification: "Contract/substrate slice — it defines the machine-detectable gate shape (label + comment prefix) consumed by pq-5; its correctness is the exact-format and label-idempotency assertions in test_gates, not a runtime trend."
+
+risks:
+  - severity: medium
+    description: Gate detectability depends on exact comment prefix + blocked status + ID-based label attach all succeeding.
+    mitigation: Single elevate helper enforces all three atomically; tests assert the exact contract the relay polls.
+
+references:
+  - path: .pHive/epics/planning-queue/docs/structured-outline.md
+    relevant_excerpt: "Slice 3 manifest: gates.py + multica_client comment/status/label; both-signal gate."
+  - path: .pHive/epics/planning-queue/docs/design-discussion.md
+    relevant_excerpt: "v1 should require both label and GATE comment — label = operational signal, comment = question + context."

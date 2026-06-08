@@ -1,0 +1,91 @@
+id: pq-2-watermark-feeder
+epic: planning-queue
+title: Kanban-low watermark feeder + Python Multica client (read)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [pq-1-queue-store-config]
+
+description: |
+  Slice 2. Build a small Python Multica client (read path) and the watermark feeder:
+  when the kanban ready/in-progress count is below N, promote the top queue idea into
+  the kanban. Event-driven watermark (locked D4), live `multica issue list` depth with
+  a capped scan (locked fork default — no cached signal exists). Idempotent: one pull
+  per tick, no double-promote under concurrent ticks.
+
+  Working state: with ideas in the queue, the feeder auto-promotes the top idea onto
+  the board whenever depth < N.
+
+acceptance_criteria:
+  - "Given kanban depth >= N, when the feeder ticks, then it promotes nothing."
+  - "Given depth < N and a non-empty queue, when the feeder ticks, then it promotes exactly one idea (the top) and marks it consumed in planning-queue.yaml."
+  - "Given two concurrent ticks, when both run, then at most one promotion occurs for the same idea (no double-promote)."
+  - "Given the Multica client, when listing issues, then it applies the same timeout/JSON/error posture as the ESM dispatch seam and caps the scan at max_issue_scan."
+  - "Given an empty queue and depth < N, when the feeder ticks, then it is a no-op (no error)."
+
+steps:
+  - id: research
+    description: Confirm multica issue list JSON shape + ready_statuses semantics; review ESM dispatch timeout/error posture in hive/lib/multica-story-dispatch for parity.
+    agent: researcher
+  - id: implement
+    description: Build hive/lib/planning_queue/multica_client.py (read — list with status filter + capped scan) + feeder.py (watermark decision, one-pull-per-tick, idempotent promote via store.promote_next/mark_consumed).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: tests/planning_queue/test_multica_client.py + test_feeder.py — depth>=N no-op, depth<N single promote, concurrent-tick no-double-promote, empty-queue no-op, scan cap respected.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review idempotency guard + client error posture + scan-cap exposure.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack: {language: python}
+  key_files:
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: "ESM dispatch — precedent for Multica client timeout/JSON/error posture (port the posture to Python, do NOT reuse directly)."
+    - path: hive/lib/planning_queue/store.py
+      purpose: "promote_next/mark_consumed from pq-1 — feeder calls these."
+
+files_to_modify:
+  - file: hive/lib/planning_queue/multica_client.py
+    change: NEW — Python Multica issue list/create/comment/label/update client (read path used here)
+  - file: hive/lib/planning_queue/feeder.py
+    change: NEW — watermark decision + one-pull-per-tick promotion
+  - file: hive/lib/planning_queue/store.py
+    change: extend — wire promote_next/mark_consumed to feeder flow
+  - file: hive/lib/config.py
+    change: extend — ensure watermark/cap/ready_statuses/timeout/scan_cap typed + defaulted
+
+design_decisions:
+  - decision: Live issue-list depth with capped scan, not a cached signal
+    rationale: "Locked fork default — research found no reliable cached depth source."
+  - decision: One pull per tick, idempotent
+    rationale: "Avoid overfilling the board and double-promoting under concurrent ticks."
+
+cross_cutting:
+  - concern: idempotency
+    action: "Guard promotion so concurrent ticks promote each idea at most once (store-level claim before kanban create)."
+  - concern: error-handling
+    action: "Transient Multica failures during a tick are swallowed and retried next tick, not fatal."
+
+metric:
+  applies: false
+  justification: "First-build substrate slice — the feeder's production value (kanban never starves when ideas exist) needs post-ship observation over time and has no baseline corpus yet; this story's correctness is the idempotent single-promote behavior verified by test_feeder."
+
+risks:
+  - severity: medium
+    description: First Multica integration — label-ID resolution, duplicate issue creation, timeout posture.
+    mitigation: Capped scan + idempotent promote + parity with ESM error posture; defer label-create to pq-3.
+
+references:
+  - path: .pHive/epics/planning-queue/docs/structured-outline.md
+    relevant_excerpt: "Slice 2 manifest: multica_client.py + feeder.py; watermark decision + one-pull-per-tick."
+  - path: .pHive/epics/planning-queue/docs/design-gate-decisions.md
+    relevant_excerpt: "D4 kanban-low watermark; live issue list depth capped scan."

@@ -1,0 +1,94 @@
+id: pq-5-gateway-relay-loop
+epic: planning-queue
+title: Hermes gateway relay loop — blocked/GATE → Slack → answer-back → re-dispatch
+status: pending
+complexity: high
+methodology: classic
+depends_on: [pq-4-hermes-multica-plugin-tools]
+
+description: |
+  Slice 5 (highest risk). The gateway-owned relay that closes the human-gate loop:
+  poll Multica for blocked/GATE issues (via the pq-4 tool / Python client), relay the
+  question to Slack using the existing gateway Slack adapter, ingest the maintainer's
+  threaded reply, post a canonical `GATE ANSWER:` comment back to the Multica issue, and
+  explicitly re-dispatch the blocked leader (locked fork default — do not assume auto-wake).
+  Correlation is stored (Multica issue id + GATE comment id ↔ Slack channel + thread_ts)
+  so simultaneous gates never cross-wire.
+
+  Working state: end-to-end async human-gate over Slack — a leader's GATE question reaches
+  the maintainer in Slack and their answer resumes the right leader.
+
+acceptance_criteria:
+  - "Given a blocked+GATE issue, when the relay polls, then it posts the question to Slack via the existing adapter send(chat_id, content, ...) and records correlation (issue id, GATE comment id, Slack channel, thread_ts)."
+  - "Given a maintainer threaded reply, when ingested, then the relay matches it to the correct issue via stored correlation and ignores unmatched replies."
+  - "Given a matched answer, when processed, then it posts a `GATE ANSWER:` comment to the Multica issue AND explicitly re-dispatches the blocked leader (no reliance on auto-wake)."
+  - "Given two simultaneous gates, when both are answered, then each answer routes to its own issue/leader (no cross-wire) — verified by a fake-relay two-gate test."
+  - "Given a transient Slack or Multica failure during a tick, when it occurs, then the relay logs and retries next tick without losing the gate."
+  - "Given the relay, when registered, then it lives in the gateway (multica_gate_relay.py + run.py hook), reusing the existing kanban watcher pattern — NOT a plugin routine."
+
+steps:
+  - id: research
+    description: Confirm gateway watcher/poll pattern (run.py kanban notifier ~L4495-5400), slack.py send + inbound thread-reply ingest + thread context fetch, and where correlation state can persist.
+    agent: researcher
+  - id: implement
+    description: Build /Users/don/Code/hermes-agent/gateway/multica_gate_relay.py (poll, Slack relay, answer ingest, GATE ANSWER post, leader re-dispatch, correlation store) + hook into gateway/run.py lifecycle; minimal slack.py adapter touch only if inbound metadata needs it.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Gateway relay tests — poll→Slack, answer match/ignore-unmatched, GATE ANSWER post + re-dispatch, two-simultaneous-gate no-cross-wire, transient-failure retry.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review correlation completeness (4-tuple), explicit re-dispatch, failure retry, and that polling is gateway-owned.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push (Hermes repo).
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Code/hermes-agent
+  tech_stack: {language: python, host: hermes-agent-gateway}
+  key_files:
+    - path: /Users/don/Code/hermes-agent/gateway/run.py
+      purpose: "Existing gateway-owned watcher/poll pattern (kanban notifier ~L4495-5400) to mirror for the relay hook."
+    - path: /Users/don/Code/hermes-agent/gateway/platforms/slack.py
+      purpose: "Slack send/outbound + inbound thread-reply ingest + thread context (SLACK_BOT_TOKEN/SLACK_APP_TOKEN)."
+    - path: /Users/don/Code/hermes-agent/plugins/multica/tools.py
+      purpose: "pq-4 tools (list_blocked_gates, post_comment) the relay calls."
+
+files_to_modify:
+  - file: /Users/don/Code/hermes-agent/gateway/multica_gate_relay.py
+    change: NEW — poll/relay/answer/post/re-dispatch + correlation store
+  - file: /Users/don/Code/hermes-agent/gateway/run.py
+    change: extend — hook relay into gateway lifecycle/polling
+  - file: /Users/don/Code/hermes-agent/gateway/platforms/slack.py
+    change: extend (only if inbound metadata handling needs a small adapter point)
+
+design_decisions:
+  - decision: Gateway-owned relay, explicit leader re-dispatch
+    rationale: "Locked G1 (no plugin routine API) + fork default (don't assume Multica auto-wake on answer comment)."
+  - decision: 4-tuple correlation (issue id, GATE comment id, Slack channel, thread_ts)
+    rationale: "Single-key correlation cross-wires simultaneous gates; the 4-tuple makes answer routing deterministic."
+
+cross_cutting:
+  - concern: error-handling
+    action: "Transient Slack/Multica failures during a tick are logged + retried next tick; the gate is never dropped."
+  - concern: idempotency
+    action: "An already-answered gate is not re-relayed; re-dispatch fires once per answered gate."
+
+metric:
+  applies: false
+  justification: "First-build of the relay loop — its production value (maintainer round-trip latency on a blocked gate) needs live Slack traffic to measure and has no baseline; this story's correctness is the no-cross-wire + answer-routing + retry behavior verified by the fake-relay gateway tests."
+
+risks:
+  - severity: high
+    description: Relay crosses Multica + gateway + Slack send/reply + correlation + explicit re-dispatch — many failure surfaces.
+    mitigation: Thin gateway integration reusing the kanban watcher; 4-tuple correlation; fake-relay tests for two-gate + failure paths; retry-next-tick.
+
+references:
+  - path: .pHive/epics/planning-queue/docs/structured-outline.md
+    relevant_excerpt: "Slice 5 elicitation: correlation stores issue id, GATE comment id, Slack channel, thread_ts; answer handling ignores unmatched replies."
+  - path: .pHive/epics/planning-queue/docs/design-gate-decisions.md
+    relevant_excerpt: "G1 gateway-owned relay; relay re-dispatches leader (no auto-wake)."

@@ -1,0 +1,73 @@
+id: pq-6-docs-tunables
+epic: planning-queue
+title: Docs + tunables polish (README + operations-guide)
+status: pending
+complexity: low
+methodology: classic
+depends_on: [pq-5-gateway-relay-loop]
+
+description: |
+  Slice 6. Document the planning queue end-to-end and finalize the config example.
+  README Quick Start (seed queue, feeder basics) + operations-guide (queue ops, gate
+  workflow, relay troubleshooting, all tunables). Make the shipped config example match
+  the actual defaults. Explicitly document that saved board-view automation is deferred
+  (label-only v1, locked G2) so users do not expect it.
+
+  Working state: a user can stand up + operate the planning queue from docs alone.
+
+acceptance_criteria:
+  - "Given README, when a user reads the Quick Start, then they can seed the queue and understand watermark feeding."
+  - "Given operations-guide, when read, then queue ops, the gate-elevation/Slack workflow, relay troubleshooting, and every tunable (watermark, cap, label names, ready_statuses, scan cap, poll interval) are documented."
+  - "Given the config example, when compared to the typed defaults, then they match exactly (no drift)."
+  - "Given the docs, when they mention the visual surface, then they state the idea-queue label is v1 and saved board-view automation is deferred (not implying it exists)."
+
+steps:
+  - id: implement
+    description: Update README.md Quick Start + docs/operations-guide.md (queue ops, gate workflow, relay troubleshooting, tunables) + finalize planning_queue example in hive.config.yaml / hive/hive.config.yaml to match defaults.
+    agent: technical-writer
+  - id: review
+    description: Verify docs match shipped defaults + no implied board-view automation + tunables complete.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit + push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack: {language: markdown}
+  key_files:
+    - path: README.md
+      purpose: "Add planning queue Quick Start (per maintainer rule: new top-level capability needs README Quick Start)."
+    - path: docs/operations-guide.md
+      purpose: "Add Commands Reference + operations for the queue + gate workflow + tunables."
+
+files_to_modify:
+  - file: README.md
+    change: extend — planning queue Quick Start
+  - file: docs/operations-guide.md
+    change: extend — queue ops, gate workflow, relay troubleshooting, tunables
+  - file: hive.config.yaml
+    change: extend — final planning_queue example matching defaults
+
+design_decisions:
+  - decision: Document board-view automation as deferred
+    rationale: "Locked G2 label-only v1; avoid implying a capability that does not exist."
+
+cross_cutting:
+  - concern: documentation
+    action: "New top-level capability → README Quick Start + operations-guide reference (maintainer rule)."
+
+metric:
+  applies: false
+  justification: "Documentation slice — README + operations-guide + a config example; its correctness is doc-matches-defaults and tunable-completeness checked at review, with no runtime-measurable surface of its own."
+
+risks:
+  - severity: low
+    description: Docs drift from actual defaults or imply deferred board-view automation.
+    mitigation: Review gate diffs docs against the typed config defaults and the G2 deferral.
+
+references:
+  - path: .pHive/epics/planning-queue/docs/design-gate-decisions.md
+    relevant_excerpt: "G2 label-only v1, board-view deferred; tunables: watermark, cap, labels, ready_statuses, scan cap, poll interval."

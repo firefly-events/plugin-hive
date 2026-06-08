@@ -1,0 +1,87 @@
+id: pq-4-hermes-multica-plugin-tools
+epic: planning-queue
+title: hermes-multica plugin — Multica tool surface in Hermes
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [pq-3-gate-elevation-contract]
+
+description: |
+  Slice 4. Build the `hermes-multica` Hermes plugin: a directory plugin
+  (`plugin.yaml` + `__init__.py register(ctx)`) exposing Multica tools via
+  `PluginContext.register_tool` (spotify-style pattern). Tools: multica_post_comment,
+  multica_update_issue, multica_resolve_label, multica_add_label, multica_list_blocked_gates.
+  Tools only — NO polling/routine here (no generic plugin routine API exists; the poll
+  loop lives in the gateway in pq-5, locked G1).
+
+  Working state: Hermes can drive Multica (comment/label/list-blocked) through registered tools.
+
+acceptance_criteria:
+  - "Given the plugin directory, when Hermes loads plugins, then hermes-multica registers via register(ctx) and its tools appear in the tool registry."
+  - "Given multica_list_blocked_gates, when called, then it returns issues that are status=blocked AND carry blocked-for-human AND have an unresolved @orchestrator GATE: comment (client-side filtered, scan-capped)."
+  - "Given multica_resolve_label/add_label, when called for a missing label, then it resolves-or-creates then attaches (reuses the pq-3 contract semantics)."
+  - "Given the plugin manifest, when inspected, then it declares requires_env for the Multica token and does NOT claim any routine/poll capability."
+  - "Given a tool error (auth/timeout), when raised, then it surfaces a structured error, not a crash."
+
+steps:
+  - id: research
+    description: Confirm Hermes plugin shape — plugins.py register_tool signature, plugin.yaml manifest fields, spotify/teams_pipeline examples; confirm requires_env handling.
+    agent: researcher
+  - id: implement
+    description: Build /Users/don/Code/hermes-agent/plugins/multica/{plugin.yaml,__init__.py,tools.py} with the 5 tools; tool handlers call the Multica REST/CLI surface (mirror the Python multica_client posture).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Hermes plugin tests near existing plugin tests — registration, list_blocked_gates filtering, label resolve-or-create, error surfacing.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review that the plugin claims tools only (no routine), manifest requires_env, and filter logic matches the pq-3 gate contract.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push (Hermes repo at ~/Code/hermes-agent).
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Code/hermes-agent
+  tech_stack: {language: python, host: hermes-agent}
+  key_files:
+    - path: /Users/don/Code/hermes-agent/hermes_cli/plugins.py
+      purpose: "register_tool(name,toolset,schema,handler,...) signature + directory plugin discovery (L230-355)."
+    - path: /Users/don/Code/hermes-agent/plugins/spotify/__init__.py
+      purpose: "Concrete register(ctx)+register_tool example (L56-66)."
+    - path: /Users/don/Code/hermes-agent/plugins/spotify/plugin.yaml
+      purpose: "plugin.yaml manifest shape."
+
+files_to_modify:
+  - file: /Users/don/Code/hermes-agent/plugins/multica/plugin.yaml
+    change: NEW — Hermes plugin manifest (requires_env Multica token, provides_tools, no routine)
+  - file: /Users/don/Code/hermes-agent/plugins/multica/__init__.py
+    change: NEW — register(ctx) entry point
+  - file: /Users/don/Code/hermes-agent/plugins/multica/tools.py
+    change: NEW — 5 Multica tool handlers + schemas
+
+design_decisions:
+  - decision: Tools only, no polling in the plugin
+    rationale: "Locked G1 + research — no generic Hermes plugin register_routine/register_poll API; the poll loop is gateway-owned (pq-5)."
+
+cross_cutting:
+  - concern: error-handling
+    action: "Tool handlers return structured errors on auth/timeout; never crash the gateway."
+
+metric:
+  applies: false
+  justification: "Substrate slice — a Hermes plugin exposing five Multica tool handlers; its correctness is registration + per-tool behavior in the Hermes plugin tests, with no standalone runtime trend to measure until the relay (pq-5) consumes it."
+
+risks:
+  - severity: medium
+    description: Net-new Multica plugin could imply long-running polling support it must not have.
+    mitigation: Manifest declares tools only; review gate checks no routine capability is claimed.
+
+references:
+  - path: .pHive/epics/planning-queue/docs/research-brief.md
+    relevant_excerpt: "Hermes tool registration uses ctx.register_tool(...); directory plugin = plugin.yaml + __init__.py register(ctx)."
+  - path: .pHive/epics/planning-queue/docs/design-gate-decisions.md
+    relevant_excerpt: "G1 relay = gateway feature + plugin tools; hermes-multica ships tools via register_tool."

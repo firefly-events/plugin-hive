@@ -1,0 +1,41 @@
+name: planning-queue
+title: Autonomous Planning Queue + Human-Gate Elevation (cluster B)
+description: >
+  A rough-idea queue that auto-feeds the kanban via a kanban-low watermark, plus
+  a human-gate elevation path so an in-flight planning/execution leader can ask the
+  maintainer a question asynchronously (Multica blocked + GATE comment → Hermes
+  gateway relay → Slack → answer back → leader re-dispatch). Built two-layer on the
+  current ephemeral orchestrator; always-on Hermes is a later slice.
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+version_bump: minor
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  - id: pq-1-queue-store-config
+    title: Planning-queue store + typed config + CLI ops
+    complexity: medium
+    depends_on: []
+  - id: pq-2-watermark-feeder
+    title: Kanban-low watermark feeder + Python Multica client (read)
+    complexity: medium
+    depends_on: [pq-1-queue-store-config]
+  - id: pq-3-gate-elevation-contract
+    title: Gate-elevation contract (leader side) — GATE comment + blocked-for-human label
+    complexity: medium
+    depends_on: [pq-2-watermark-feeder]
+  - id: pq-4-hermes-multica-plugin-tools
+    title: hermes-multica plugin — Multica tool surface in Hermes
+    complexity: medium
+    depends_on: [pq-3-gate-elevation-contract]
+  - id: pq-5-gateway-relay-loop
+    title: Hermes gateway relay loop — blocked/GATE → Slack → answer-back → re-dispatch
+    complexity: high
+    depends_on: [pq-4-hermes-multica-plugin-tools]
+  - id: pq-6-docs-tunables
+    title: Docs + tunables polish (README + operations-guide)
+    complexity: low
+    depends_on: [pq-5-gateway-relay-loop]

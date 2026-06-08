@@ -1,0 +1,95 @@
+id: pq-1-queue-store-config
+epic: planning-queue
+title: Planning-queue store + typed config + CLI ops
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Slice 1 of the planning-queue epic. Build the rough-idea queue store as a NEW
+  `planning-queue.yaml` (separate from triage `queue.yaml` per locked decision D2),
+  a typed config reader for the `planning_queue` block, and a local CLI for seeding
+  and inspecting the queue. Python-primary per cluster-C ADR.
+
+  Working state: a human can seed, list, reorder, and inspect the rough-idea queue
+  from the CLI; config tunables resolve with defaults. No Multica integration yet.
+
+acceptance_criteria:
+  - "Given an absent queue file, when the store reads it, then it returns an empty queue (not an error) and the CLI can initialize one."
+  - "Given a malformed queue file, when the store reads it, then it raises QueueMalformed naming the path (no silent corruption)."
+  - "Given two ideas with the same id, when appended, then the store raises DuplicateId."
+  - "Given the CLI `add`/`list`/`promote-next` commands, when run, then they mutate/read planning-queue.yaml correctly and round-trip."
+  - "Given hive.config.yaml with a planning_queue block, when the typed reader loads, then watermark/consumption_cap/label names/ready_statuses resolve; absent keys fall back to documented defaults (watermark=3, cap=1, labels idea-queue/blocked-for-human)."
+  - "Given no state-dir-resolver, when resolving the queue path, then it defaults to .pHive/planning-queue.yaml; when the resolver contract is available it uses <resolved_state_dir>/planning-queue.yaml."
+
+steps:
+  - id: research
+    description: Confirm triage queue.yaml store shape (skills/triage/run.mjs single-writer) and hive/lib/config.py reader pattern; note hooks/common.sh state-dir contract.
+    agent: researcher
+  - id: implement
+    description: Build hive/lib/planning_queue/{__init__,schema,errors,store}.py + hive/bin/planning-queue CLI + PlanningQueueConfig in hive/lib/config.py + example planning_queue block in hive.config.yaml.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: tests/planning_queue/test_store.py + test_config.py — cover absent/malformed/duplicate, round-trip, config defaults, path resolution.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review schema/error taxonomy + config typing + CLI for convention compliance and overwrite safety.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push to feat/planning-queue.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack: {language: python, runtime: "python3"}
+  key_files:
+    - path: skills/triage/run.mjs
+      purpose: "Precedent for a single-writer YAML queue store (contrast — this is a SEPARATE queue with different semantics)."
+    - path: hive/lib/config.py
+      purpose: "Extend with PlanningQueueConfig typed reader; currently narrow, no planning_queue surface."
+    - path: hooks/common.sh
+      purpose: "state_dir resolver contract (L4-17,64-149); queue path = <resolved>/planning-queue.yaml, default .pHive/."
+
+files_to_modify:
+  - file: hive/lib/planning_queue/schema.py
+    change: NEW — queue document, item type, state enum, validation helpers
+  - file: hive/lib/planning_queue/errors.py
+    change: NEW — QueueMissing/QueueMalformed/SchemaVersionMismatch/DuplicateId/InvalidTransition
+  - file: hive/lib/planning_queue/store.py
+    change: NEW — read/write/append/reorder/promote_next/mark_consumed
+  - file: hive/bin/planning-queue
+    change: NEW — local CLI for queue ops
+  - file: hive/lib/config.py
+    change: extend — add PlanningQueueConfig + typed planning_queue reader
+  - file: hive.config.yaml
+    change: extend — example/default planning_queue block
+
+design_decisions:
+  - decision: Separate planning-queue.yaml, not an extension of triage queue.yaml
+    rationale: "Locked D2 — triage is bug/feature intake (5-state lifecycle); idea-feed queue has consumption-fed semantics."
+  - decision: Path via state-dir-resolver contract with .pHive/ default
+    rationale: "Resolver planned-not-shipped; do not block on it."
+
+cross_cutting:
+  - concern: error-handling
+    action: "Typed error taxonomy (QueueMalformed names path); absent-file returns empty, never raises."
+
+metric:
+  applies: false
+  justification: "Substrate slice — a local YAML store, typed config reader, and CLI with no runtime-observable product surface; correctness is established by the test_store/test_config unit suites, not a measurable trend."
+
+risks:
+  - severity: low
+    description: Malformed-YAML overwrite could corrupt the queue.
+    mitigation: Read-validate-before-write; atomic write; QueueMalformed on parse failure.
+
+references:
+  - path: .pHive/epics/planning-queue/docs/structured-outline.md
+    relevant_excerpt: "Slice 1 manifest: planning_queue/{__init__,schema,errors,store}.py + bin/planning-queue + config.py PlanningQueueConfig."
+  - path: .pHive/epics/planning-queue/docs/design-gate-decisions.md
+    relevant_excerpt: "D2 separate planning-queue.yaml; path <resolved_state_dir>/planning-queue.yaml default .pHive/."
