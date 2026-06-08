@@ -5,6 +5,9 @@ status: pending
 complexity: high
 methodology: classic
 depends_on: []
+tracker_id: "PLU-267"
+tracker_uuid: "cc2e3e55-8f4f-4fca-8133-278198aaa447"
+tracker_url: "http://localhost:8080/issues/cc2e3e55-8f4f-4fca-8133-278198aaa447"
 
 description: |
   Create the Python-first artifact lifecycle library skeleton under

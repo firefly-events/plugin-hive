@@ -5,6 +5,9 @@ status: pending
 complexity: medium
 methodology: classic
 depends_on: [al-1-lifecycle-library-and-registry]
+tracker_id: "PLU-273"
+tracker_uuid: "5daf8513-c09b-4067-943b-ac5849d29459"
+tracker_url: "http://localhost:8080/issues/5daf8513-c09b-4067-943b-ac5849d29459"
 parallel_allowed: true
 parallel_rationale: bounded-slice
 

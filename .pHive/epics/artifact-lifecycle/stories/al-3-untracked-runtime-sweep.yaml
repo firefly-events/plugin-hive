@@ -7,6 +7,9 @@ methodology: classic
 depends_on:
   - al-1-lifecycle-library-and-registry
   - al-2-forever-exclusions-guard
+tracker_id: "PLU-269"
+tracker_uuid: "6f74319d-1c59-4e20-9b31-0131199eb017"
+tracker_url: "http://localhost:8080/issues/6f74319d-1c59-4e20-9b31-0131199eb017"
 
 description: |
   Implement the untracked-runtime sweep that generalizes the sdr-8 pattern. The

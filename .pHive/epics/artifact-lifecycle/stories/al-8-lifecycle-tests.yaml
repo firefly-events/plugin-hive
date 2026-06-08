@@ -7,6 +7,9 @@ methodology: classic
 depends_on:
   - al-3-untracked-runtime-sweep
   - al-5-report-only-tracked-classes
+tracker_id: "PLU-274"
+tracker_uuid: "4c30c104-42b7-4e64-8fdb-abaf11371c10"
+tracker_url: "http://localhost:8080/issues/4c30c104-42b7-4e64-8fdb-abaf11371c10"
 
 description: |
   Add the epic-level guard test suite for artifact lifecycle behavior. These

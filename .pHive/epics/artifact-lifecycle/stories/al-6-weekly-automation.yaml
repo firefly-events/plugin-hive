@@ -5,6 +5,9 @@ status: pending
 complexity: medium
 methodology: classic
 depends_on: [al-3-untracked-runtime-sweep]
+tracker_id: "PLU-272"
+tracker_uuid: "eb550fef-afbe-4d99-891d-2b740c98494e"
+tracker_url: "http://localhost:8080/issues/eb550fef-afbe-4d99-891d-2b740c98494e"
 
 description: |
   Add a weekly launchd/cron automation path that invokes the Python artifact

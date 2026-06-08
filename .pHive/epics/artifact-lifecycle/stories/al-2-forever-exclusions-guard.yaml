@@ -5,6 +5,9 @@ status: pending
 complexity: medium
 methodology: classic
 depends_on: [al-1-lifecycle-library-and-registry]
+tracker_id: "PLU-268"
+tracker_uuid: "5d4453c4-fb51-40f9-ab05-8fc03bb8f223"
+tracker_url: "http://localhost:8080/issues/5d4453c4-fb51-40f9-ab05-8fc03bb8f223"
 
 description: |
   Add default hard exclusions and enforce them before planning or executing any
