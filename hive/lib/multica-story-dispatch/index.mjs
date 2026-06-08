@@ -188,6 +188,15 @@ export function serializeStoryBrief(story, options = {}) {
     sections.push(`## References\n${story.references.map(formatReference).join('\n')}`);
   }
 
+  sections.push(
+    [
+      `## Insight Capture`,
+      `Before finishing, write any distilled implementation insights to \`.hive/insights/${story?.id ?? '<story-id>'}.md\` inside your repo checkout work_dir.`,
+      ``,
+      `Capture only non-obvious, reusable learning: surprises, gotchas, decisions and why, or things the next agent should know. Do not write a task recap or routine completion summary.`,
+    ].join('\n'),
+  );
+
   if (integrationBranch) {
     const qBranch = shQuoteRef(integrationBranch);
     sections.push(
