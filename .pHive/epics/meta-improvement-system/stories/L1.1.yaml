@@ -2,7 +2,7 @@ id: L1.1
 epic: meta-improvement-system
 slice: S7
 title: "Scaffold `hive/lib/meta-experiment/`"
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: ["C1.3", "C1.4"]

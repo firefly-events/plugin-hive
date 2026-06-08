@@ -1,7 +1,7 @@
 id: ulo-4-artifact-conventions
 epic: ui-logo-imagegen-integration
 title: .pHive/brand/logo-explorations/ artifact contract
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [ulo-1-openai-image-tool]

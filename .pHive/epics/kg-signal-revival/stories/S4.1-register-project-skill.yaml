@@ -1,7 +1,7 @@
 id: S4.1-register-project-skill
 epic: kg-signal-revival
 title: /hive:register-project skill with quoted/spaced-path handling
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [B0.2-persist-ref-telemetry-contract]

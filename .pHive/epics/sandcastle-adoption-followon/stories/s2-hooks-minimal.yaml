@@ -1,7 +1,7 @@
 id: s2-hooks-minimal
 epic: sandcastle-adoption-followon
 title: Wire only host.onWorktreeReady for copyToWorktree preparation
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s1-auth-setup-skill, s1-redaction-wrapper, s1-gitignore-template]

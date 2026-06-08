@@ -3,7 +3,7 @@ epic: sandcastle-gh-issue-dispatch
 tracker_id: "158"
 tracker_url: "https://github.com/firefly-events/plugin-hive/issues/158"
 title: Build the /hive:sandcastle-gh-init scaffolding skill
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s1-workflow-template]

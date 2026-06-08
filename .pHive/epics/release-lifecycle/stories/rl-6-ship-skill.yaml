@@ -1,7 +1,7 @@
 id: rl-6-ship-skill
 epic: release-lifecycle
 title: /ship capstone skill — reconcile, verify, ship, announce
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [ rl-2, rl-3, rl-4, rl-5 ]

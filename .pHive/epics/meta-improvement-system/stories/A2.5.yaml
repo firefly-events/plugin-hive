@@ -2,7 +2,7 @@ id: A2.5
 epic: meta-improvement-system
 slice: S4
 title: Rewrite close step and add closure validator
-status: pending
+status: in_progress
 complexity: high
 methodology: classic
 depends_on: ["B0.1", "B0.3", "A1.2", "A1.5", "A2.4"]

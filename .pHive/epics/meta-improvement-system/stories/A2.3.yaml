@@ -2,7 +2,7 @@ id: A2.3
 epic: meta-improvement-system
 slice: S4
 title: Rewrite evaluation step
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: ["A1.2", "A1.5", "A2.1"]

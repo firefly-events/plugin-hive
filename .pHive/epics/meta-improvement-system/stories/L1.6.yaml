@@ -2,7 +2,7 @@ id: L1.6
 epic: meta-improvement-system
 slice: S7
 title: Rollback watch and auto-revert trigger
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: ["L1.4", "L1.5", "B0.3"]

@@ -1,7 +1,7 @@
 id: w4-5-pilot-roundtrip-validation
 epic: multica-substrate-deepen
 title: Pilot round-trip validation — export /metrics-check, verify in spike workspace
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on:

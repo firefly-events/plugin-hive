@@ -2,7 +2,7 @@ id: BL2i.2
 epic: meta-improvement-system
 slice: S8
 title: Meta-optimize backlog template
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: ["BL2i.1"]

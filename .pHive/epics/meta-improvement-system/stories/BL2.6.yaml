@@ -2,7 +2,7 @@ id: BL2.6
 epic: meta-improvement-system
 slice: S9
 title: Real commit-then-revert proof during observation window
-status: pending
+status: in_progress
 complexity: high
 methodology: classic
 depends_on: ["BL2.4", "BL2.5", "L1.6", "L1.7"]

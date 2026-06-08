@@ -1,7 +1,7 @@
 id: S4.2b-cross-project-hard-tag-wiring
 epic: kg-signal-revival
 title: "Wire [cross-project: <name>] hard tag into step-02c + step-03 finding/proposal shape"
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [S4.1-register-project-skill]

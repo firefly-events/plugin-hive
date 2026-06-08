@@ -2,7 +2,7 @@ id: A2.8
 epic: meta-improvement-system
 slice: S4
 title: Audit step-write obligations against team grants
-status: pending
+status: in_progress
 complexity: high
 methodology: classic
 depends_on: ["A2.2", "A2.3", "A2.4", "A2.5", "A2.6", "A2.7"]

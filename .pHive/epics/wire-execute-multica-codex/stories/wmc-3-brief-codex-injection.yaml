@@ -1,7 +1,7 @@
 id: wmc-3-brief-codex-injection
 epic: wire-execute-multica-codex
 title: Inject /codex:rescue instruction into brief when agent_backends[role]=codex
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: [wmc-2-multica-skill-rewire]

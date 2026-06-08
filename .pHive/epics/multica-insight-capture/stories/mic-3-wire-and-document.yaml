@@ -1,7 +1,7 @@
 id: mic-3-wire-and-document
 epic: multica-insight-capture
 title: Wire capture+distill into execute-mode-multica lifecycle + docs
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [ mic-1-agent-self-capture-brief, mic-2-orchestrator-distill ]

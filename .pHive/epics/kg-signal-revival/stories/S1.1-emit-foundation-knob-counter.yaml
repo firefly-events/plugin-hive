@@ -1,7 +1,7 @@
 id: S1.1-emit-foundation-knob-counter
 epic: kg-signal-revival
 title: emitKgEvent() helper + emit_lifecycle_at scalar knob + write-rate counter
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [B0.1-consumer-contracts, B0.2-persist-ref-telemetry-contract]

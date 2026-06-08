@@ -1,7 +1,7 @@
 id: mir-5-nightly-tier-exclusion
 epic: meta-improvement-reset
 title: Exclude tier=little-fix candidates from nightly cycle backlog-fallback
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 tracker_id: plugin-hive/PLU-67

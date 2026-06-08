@@ -1,7 +1,7 @@
 id: mi-04-apply-plugin-install-finding
 epic: multica-integration-fixes
 title: Apply mi-01 plugin loading finding — three-branch implementation
-status: pending
+status: blocked
 complexity: small   # may be medium if branch (a) ships; small if (b)/(c)
 methodology: classic
 depends_on: [mi-01-spike-plugin-loading]

@@ -1,7 +1,7 @@
 id: rl-5-release-post-generator
 epic: release-lifecycle
 title: Release-post + video-script generator (Hive-first, generic-aware)
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [ rl-1 ]
