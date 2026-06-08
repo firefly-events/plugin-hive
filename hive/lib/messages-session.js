@@ -33,7 +33,7 @@ const REQUIRED_HEADERS = {
   'content-type': 'application/json',
 };
 
-const DEFAULT_MODEL = 'claude-opus-4-7';
+const DEFAULT_MODEL = 'claude-opus-4-8';
 const DEFAULT_MAX_TOKENS = 4096;
 
 /**

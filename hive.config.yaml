@@ -1,6 +1,8 @@
 # Hive Configuration
 # All settings have sensible defaults. Override only what you need.
 
+schema_version: "1.2"
+
 # File system paths
 paths:
   state_dir: .pHive
@@ -247,6 +249,13 @@ external_models:
 
 # Execution defaults
 execution:
+  runtime: auto         # auto | workflows | multica  (Q4 maintainer-confirmed default: auto)
+  # cwfp-s2-2 execute-dispatch resolver precedence:
+  # env HIVE_EXECUTION_RUNTIME > root config > shipped baseline > skill override > default.
+  # Per-epic-override rule (architect Q2 tightening): when runtime is 'auto',
+  # execute-dispatch reads .pHive/cycle-state/<epic-id>.yaml execution_runtime
+  # block; if present, the per-epic value overrides auto. Explicit 'workflows'
+  # or 'multica' bypass the per-epic override.
   default_methodology: classic
   parallel_teams: true
   max_retry_attempts: 2

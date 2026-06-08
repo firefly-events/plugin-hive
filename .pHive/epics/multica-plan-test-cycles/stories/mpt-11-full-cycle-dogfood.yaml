@@ -86,3 +86,9 @@ manual_verdict:
 tracker_id: plugin-hive/PLU-164
 tracker_uuid: 3e38b80c-bd6c-4def-94c8-5f8f3a405514
 tracker_url: http://localhost:3000/issue/PLU-164
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4k)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; records the throwaway plan->execute->test dogfood run validating the routed cycle and branch discipline.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt

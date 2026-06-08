@@ -1,0 +1,116 @@
+id: cwfp-s2-2-dispatch-enum-and-field-sources
+epic: cc-workflows-first-party
+title: Extend execute-dispatch mode_decision enum + field_sources + per-epic-override resolver
+status: pending
+complexity: high
+methodology: classic
+depends_on:
+- cwfp-s1-1-phase0-capability-spike
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: "Extend skills/hive/skills/execute-dispatch/SKILL.md:\n  - Add 'cc-workflows' to mode_decision enum (additive)\n  - Add field_sources.execution_mode + field_sources.execution_runtime\n    with\
+  \ precedence chain: env > root config > shipped baseline > skill\n    override > default\n  - Add field_sources.execution_runtime.epic_override: <path> traceability\n    field (architect Q2 tightening\
+  \ \u2014 records which per-epic disposition\n    file overrode the auto heuristic)\n  - Add resolver logic: BEFORE emitting mode_decision, read\n    .pHive/cycle-state/<epic-id>.yaml execution_runtime\
+  \ block; IF\n    execution.runtime resolves to 'auto' AND per-epic override present,\n    force mode_decision to the override value AND set epic_override path\n  - Add resolver invariant: per-epic disposition\
+  \ does NOT override\n    explicit 'workflows' or 'multica' values (only 'auto' is overridable)\n  - Add graceful fall-through: missing cycle-state file for an unknown\n    epic falls through to auto heuristic;\
+  \ no hard error (Phase 5 chicken-\n    and-egg gate)\n  - Add resolver log: one-line \"execution.runtime resolved to {mode}\n    ({source})\" where source is env | root | baseline | skill | default |\n\
+  \    auto+epic_override:<path> (Elicitation \xA77.1 Failure 4 mitigation)\n"
+acceptance_criteria:
+- Given execute-dispatch resolves mode_decision, when execution.runtime is set, then the precedence chain env > root > shipped baseline > skill > default is honored AND field_sources.execution_runtime records
+  the source
+- Given execution.runtime is 'auto' AND .pHive/cycle-state/<epic>.yaml has an execution_runtime block, when resolver fires, then mode_decision is forced to the override value AND field_sources.execution_runtime.epic_override
+  records the cycle-state file path
+- Given execution.runtime is explicit 'workflows' or 'multica', when resolver fires with a per-epic override present, then the explicit value wins (override is ignored)
+- "Given the cycle-state file for an epic is absent, when resolver fires with execution.runtime: auto, then it falls through to the auto heuristic gracefully \u2014 no hard error"
+- Given mode_decision is resolved, when execute-dispatch emits, then a one-line log records the resolved mode + source for forensic traceability
+- Given the existing mode_decision enum values (sessions | team | team-cmux | sequential | sandcastle | multica), when 'cc-workflows' is added, then none regress
+steps:
+- id: research
+  description: Read execute-dispatch/SKILL.md fully; map existing field_sources convention; confirm precedence-chain semantics from execution.mode resolution (the existing pattern)
+  agent: researcher
+- id: implement
+  description: 'Extend mode_decision enum; add field_sources.execution_mode + execution_runtime
+
+    entries with precedence chain documented; add field_sources.execution_runtime.epic_override
+
+    field; add resolver behavior block specifying cycle-state read + override rule
+
+    + graceful fall-through + one-line log
+
+    '
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: "Unit assertions (against the resolver contract as documented):\n  (1) precedence chain resolves correctly for permutations of {env, root, baseline, skill, default}\n  (2) epic_override populated\
+    \ ONLY when auto + cycle-state present\n  (3) epic_override NOT populated for explicit workflows/multica\n  (4) missing cycle-state falls through to auto gracefully\n  (5) existing mode_decision values\
+    \ do not regress (parameterized over enum)\n  (6) one-line log records mode + source on every resolve\n"
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Architect review on per-epic-override rule + epic_override traceability field; reviewer cross-checks no regression to existing modes
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: 'Commit "[cwfp-s2-2] feat(execute-dispatch): add cc-workflows mode + execution.runtime field_sources + per-epic-override resolver"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: skills/hive/skills/execute-dispatch/SKILL.md
+    purpose: Single extension point for mode_decision; all upstream /execute callers route through this
+  - path: .pHive/cycle-state/cc-workflows-first-party.yaml
+    purpose: Models the cycle-state shape resolver reads; existing schema_version + escalations + gate_decisions blocks
+files_to_modify:
+- file: skills/hive/skills/execute-dispatch/SKILL.md
+  change: ADD 'cc-workflows' to mode_decision enum; ADD field_sources.execution_mode + execution_runtime + execution_runtime.epic_override entries with precedence chain + per-epic-override rule + graceful
+    fall-through + one-line resolver log
+design_decisions:
+- decision: epic_override is a traceability field, not a routing primitive
+  rationale: "Architect Q2 tightening \u2014 provenance for forensic debugging + future routing analysis; cheap (one field write per resolve)"
+- decision: Per-epic disposition does NOT override explicit 'workflows' or 'multica' values
+  rationale: "Preserves maintainer intent \u2014 explicit choice always wins; auto is the only \"I trust the heuristic\" value"
+- decision: Missing cycle-state file falls through gracefully
+  rationale: Avoids Phase 5 chicken-and-egg (resolver needs cycle-state files; Phase 5 writes them); bootstrap-safe
+- decision: One-line resolver log
+  rationale: "Elicitation \xA77.1 Failure 4 mitigation \u2014 surprise routing detected by trace inspection"
+cross_cutting:
+- concern: documentation
+  action: execute-dispatch/SKILL.md IS the doc; downstream consumers (skills/execute step 6, future skill authors) read this
+- concern: versioning
+  action: "This story does NOT bump schema_version (cwfp-s2-4 owns the version bump); flag for cwfp-s2-4 coordination \u2014 field_sources additions are part of the same minor bump"
+risks:
+- severity: medium
+  description: Resolver change regresses existing modes (sessions, team, team-cmux, sequential, sandcastle, multica)
+  mitigation: Parameterized unit test over enum; reviewer cross-check; additive-only discipline
+- severity: medium
+  description: Per-epic-override resolver invoked before Phase 5 writes cycle-state files (chicken-and-egg)
+  mitigation: "Graceful fall-through to auto heuristic when file absent \u2014 acceptance criterion 4"
+- severity: low
+  description: epic_override field consumed inconsistently by downstream readers
+  mitigation: Document the field semantics in SKILL.md; future readers cite the field path explicitly
+references:
+- path: .pHive/epics/cc-workflows-first-party/docs/structured-outline.md
+  relevant_excerpt: "Part 2 Phase 2 \u2014 Extend mode_decision enum: add 'cc-workflows' value (additive). Add field_sources.execution_mode + execution_runtime. Add field_sources.execution_runtime.epic_override:\
+    \ <path> (architect Q2 tightening). Add resolver logic: BEFORE emitting mode_decision, read .pHive/cycle-state/<epic-id>.yaml.\n"
+- path: .pHive/epics/cc-workflows-first-party/docs/design-discussion.md
+  relevant_excerpt: "\xA73 Phase 1 \u2014 execute-dispatch reads per-epic disposition BEFORE emitting mode_decision (architect-v2 Q2 tightening). Records field_sources.execution_runtime.epic_override: <path>\
+    \ for traceability.\n"
+metric:
+  applies: true
+  name: cc_workflows_dispatch_resolver_precedence_test_pass_rate
+  direction: up
+  unit: percent
+  baseline: null
+  target: 100
+  window: epic-close
+  source:
+    kind: events
+    ref: ${HIVE_STATE_DIR}/episodes/cc-workflows-first-party/cwfp-s2-2/test-run.yaml
+  verify_at: integrate step of cwfp-s2-2-dispatch-enum-and-field-sources
+  owner: cc-workflows-first-party
+tracker_id: b9581bf1-06f9-42b1-baa2-2dfc5755c73a

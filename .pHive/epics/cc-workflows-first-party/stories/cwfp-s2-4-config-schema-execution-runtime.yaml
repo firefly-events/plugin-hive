@@ -1,0 +1,122 @@
+id: cwfp-s2-4-config-schema-execution-runtime
+epic: cc-workflows-first-party
+title: Add execution.runtime knob to hive.config.yaml + shipped baseline + schema_version bump
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- cwfp-s1-1-phase0-capability-spike
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: "Add execution.runtime: workflows | multica | auto knob (default auto) to:\n  - hive.config.yaml (root maintainer override)\n  - hive/hive.config.yaml (shipped baseline)\n\nDocument the precedence\
+  \ chain in inline comments:\n  env (HIVE_EXECUTION_RUNTIME) > root config > shipped baseline > skill\n  override > default\n\nDocument the per-epic-override rule in inline comments:\n  When execution.runtime\
+  \ resolves to 'auto', the resolver reads\n  .pHive/cycle-state/<epic-id>.yaml execution_runtime block (if present)\n  and forces mode_decision to the override value. Explicit 'workflows' or\n  'multica'\
+  \ are NOT overridden by per-epic disposition.\n\nBump hive.config.yaml schema_version per semver minor (additive enum +\nadditive field_sources entries are minor-version changes per cross-cutting\nconcern\
+  \ 'versioning').\n"
+acceptance_criteria:
+- Given the new execution.runtime knob, when hive.config.yaml is read, then 'workflows | multica | auto' values are accepted; default is 'auto'
+- Given the precedence chain, when inline comments are present, then they document env > root > shipped baseline > skill > default
+- Given the per-epic-override rule, when inline comments are present, then they document that 'auto' is overridable by per-epic disposition; 'workflows' and 'multica' are not
+- Given the schema_version bump, when hive.config.yaml is read, then schema_version is incremented per semver minor compared to the prior shipped value
+- 'Given the shipped baseline hive/hive.config.yaml, when read by a consumer plugin install, then execution.runtime: auto is the shipped default'
+- Given existing fields in hive.config.yaml (paths.*, agent_backends, model_overrides, git_flow, execution.* sandcastle/multica blocks, task_tracking), when this story commits, then none regress (additive
+  only)
+steps:
+- id: research
+  description: 'Read current hive.config.yaml (root) + hive/hive.config.yaml (shipped baseline)
+
+    schema_version + existing execution.* block; map exact location to add the
+
+    execution.runtime knob; identify all readers of schema_version
+
+    (git grep schema_version) to assess version-range-check impact
+
+    '
+  agent: researcher
+- id: implement
+  description: 'Add execution.runtime: auto to both YAMLs with inline comments documenting
+
+    precedence chain + per-epic-override rule. Bump schema_version per semver
+
+    minor. Coordinate with cwfp-s2-2 which adds the field_sources side of the
+
+    same minor bump.
+
+    '
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: 'YAML lint passes both files; schema_version bump verified;
+
+    git grep schema_version skills/ confirms no consumer breaks from minor bump;
+
+    manual: set HIVE_EXECUTION_RUNTIME=workflows in env; verify root config + shipped
+
+    baseline together produce expected resolved value when consumed by execute-dispatch
+
+    (test step depends on cwfp-s2-2 having shipped the resolver)
+
+    '
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Reviewer checks additive-only; precedence chain comments match cwfp-s2-2 resolver behavior; semver minor justification correct
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: 'Commit "[cwfp-s2-4] feat(config): add execution.runtime knob + per-epic-override rule + schema_version bump"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive.config.yaml
+    purpose: Root maintainer override; new execution.runtime knob lands inside the execution.* block
+  - path: hive/hive.config.yaml
+    purpose: Shipped baseline fall-through default
+  - path: .claude-plugin/plugin.json
+    purpose: "Plugin version (referenced by cross-cutting concern 'versioning' \u2014 separate from hive.config.yaml schema_version)"
+files_to_modify:
+- file: hive.config.yaml
+  change: 'ADD execution.runtime: auto + inline-comment precedence chain + per-epic-override rule; BUMP schema_version per semver minor'
+- file: hive/hive.config.yaml
+  change: 'ADD execution.runtime: auto (shipped baseline) + schema_version mirror'
+design_decisions:
+- decision: Default value is 'auto'
+  rationale: "Q4 maintainer-confirmed at gate 1 \u2014 auto + per-epic-override rule (cwfp-s5-1, cwfp-s5-2 write the override entries); workflows/multica are opt-in via explicit override"
+- decision: schema_version bump is semver minor
+  rationale: Additive enum + additive field_sources entries don't break existing readers; range-based consumers continue to work; cross-cutting concern 'versioning' covers this
+- decision: execution.runtime and execution.substrate are orthogonal keys
+  rationale: "Q8 maintainer-confirmed at gate 1 \u2014 substrate = caller-side loop variant; runtime = executor seam; both keys live in execution.* block"
+cross_cutting:
+- concern: documentation
+  action: hive.config.yaml inline comments ARE the doc here; CONTEXT.md vocab disambiguation (cwfp-s6-2) cites this
+- concern: versioning
+  action: Bump hive.config.yaml schema_version per semver minor. This story is NOT the source of the consumer-facing plugin.json version bump (that lands at epic close per cross-cutting concern 'versioning');
+    the TPM owns the final plugin.json + marketplace.json + README badge + CHANGELOG entry as the LAST epic commit
+risks:
+- severity: medium
+  description: schema_version bump breaks downstream consumers reading via version-range check
+  mitigation: Research step runs git grep schema_version skills/; test step verifies no break; semver minor is additive and shouldn't break range readers
+- severity: low
+  description: Default 'auto' silently routes mpt /plan + /test --simulated-manual to workflows before Phase 5 writes per-epic override
+  mitigation: "cwfp-s2-2 resolver's graceful fall-through means 'auto' produces the heuristic value when no override present; Phase 5 writes the override before the route can drift (Q3 keep-as-second-party\
+    \ invariant \u2014 but until Phase 5 ships, the explicit env override remains the only safe way to run a real epic; opt-in only is the stated MVP slice contract)"
+- severity: low
+  description: execution.* block becomes cluttered with two adjacent keys (runtime + substrate)
+  mitigation: Q8 affirms orthogonality; inline comments differentiate
+references:
+- path: .pHive/epics/cc-workflows-first-party/docs/structured-outline.md
+  relevant_excerpt: "Part 2 Phase 2 \u2014 hive.config.yaml: execution.runtime: workflows | multica | auto (default auto). hive/hive.config.yaml: execution.runtime: auto (shipped baseline). Bump hive.config.yaml\
+    \ schema_version (cross-cutting versioning concern).\n"
+- path: .pHive/cross-cutting-concerns.yaml
+  relevant_excerpt: "versioning \u2014 Epic adds, removes, or modifies any consumer-visible surface \u2014 including public config keys in hive/hive.config.yaml (the shipped baseline). Bump per semver.\n"
+metric:
+  applies: false
+  justification: Config-schema story; the metric-bearing surface is execute-dispatch's resolver (cwfp-s2-2) and the MVP E2E run (cwfp-s2-5); this story ships the schema knob itself, not the routing behavior
+    it enables.
+tracker_id: e96d9d39-4add-4f25-b187-f4c990aede0d

@@ -81,3 +81,24 @@ When a session ends naturally (not via shutdown_request), the session-end hook f
 3. Call `compile()` and `chromadb.index()` in parallel (after step 2 — see Receiver Protocol step 1c for details)
 
 The pre-shutdown receiver protocol handles orchestrator-initiated termination; the session-end hook handles natural completion. Both paths write KG triples — these are complementary, not redundant. Circuit-breaker kills skip both paths (no insight capture, no KG writes).
+
+---
+
+## Multica Mode Variant
+
+Multica execution realizes the same insight-capture intent through the task lifecycle
+rather than the in-process Claude-Code pre-shutdown turn:
+
+1. **Agent self-capture (mic-1):** the Multica-assigned agent writes any
+   non-obvious, reusable implementation insight to `.hive/insights/{story_id}.md`
+   inside its task repository checkout before finishing the issue.
+2. **Post-terminal orchestrator distill (mic-2):** after polling reaches a terminal
+   state and `multica-run.yaml` plus `multica-run.messages.jsonl` are written, the
+   orchestrator runs the Multica distill pass over the self-capture file, transcript
+   tail, and git diff. Reusable team signal is written to
+   `${HIVE_STATE_DIR}/team-memories/{epic_handle}/{story_id}.md`.
+
+This is a valid realization of the pre-shutdown protocol for Multica mode because
+the assigned agent is not available for a separate in-process pre-shutdown exchange
+after the daemon task has terminated. The episode marker remains the execution
+source of truth; the distill pass is the protocol's memory-capture layer.

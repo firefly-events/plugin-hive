@@ -94,6 +94,7 @@ state/
 !.pHive/cycle-state/multica-integration-fixes.yaml
 !.pHive/cycle-state/hermes-integration-mvp.yaml
 !.pHive/cycle-state/wire-execute-multica-codex.yaml
+!.pHive/cycle-state/cc-workflows-first-party.yaml
 # /find-skills (se-5) writes ranked candidates here; track the dir marker so
 # consumer projects ship with an initialized output location.
 !.pHive/meta/
@@ -203,3 +204,11 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/multica-substrate-deepen/**
 !.pHive/epics/multica-plan-test-cycles/
 !.pHive/epics/multica-plan-test-cycles/**
+!.pHive/epics/cc-workflows-first-party/
+!.pHive/epics/cc-workflows-first-party/**
+!.pHive/proposals/
+!.pHive/proposals/**
+!.pHive/epics/release-lifecycle/
+!.pHive/epics/release-lifecycle/**
+!.pHive/epics/multica-insight-capture/
+!.pHive/epics/multica-insight-capture/**

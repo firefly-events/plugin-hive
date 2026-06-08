@@ -87,3 +87,9 @@ manual_verdict:
 tracker_id: plugin-hive/PLU-163
 tracker_uuid: 6819399c-dece-40f3-8899-d133085da016
 tracker_url: http://localhost:3000/issue/PLU-163
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4j)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; load-bearing /test --simulated-manual carrier wires mode selection to test-mode-multica with local fallback when unset.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt

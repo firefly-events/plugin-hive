@@ -70,3 +70,9 @@ metric:
   verify_at: integrate
   owner: tester
 tracker_id: plugin-hive/PLU-144
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3g)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep because per-persona rescue-section logic remains relevant to Multica second-party dispatch even though CC `/workflows` is first-party.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd

@@ -1,0 +1,14 @@
+---
+epic_id: multica-plan-test-cycles
+created: "2026-06-02T01:05:00Z"
+
+# Per-epic execution_runtime override (cwfp-s2-2 resolver target)
+# Source: cwfp-s4-2 disposition audit (.pHive/epics/cc-workflows-first-party/docs/disposition-pass-mpt.md)
+# Critical invariant — Q4 + Q3 + per-epic-override unified rule: even when execution.runtime: auto is the shipped baseline, this override forces the resolver to emit mode_decision: 'multica' for this epic. auto MUST NOT silently route mpt /plan + /test routes away from multica until/unless this override is changed.
+execution_runtime:
+  adapter: multica
+  rationale: |
+    Q3 maintainer-confirmed keep-as-second-party for first release. All 11 mpt stories shipped via PR #234 (merged 2026-05-28) routing /plan + /test --simulated-manual through Multica. Revisit after first release if the cc-workflows path matures to cover these flows. Q4 invariant: explicit execution.runtime: workflows or multica from env/root/baseline overrides this per-epic block; per-epic only applies when execution.runtime: auto.
+  decided_by: cc-workflows-first-party/cwfp-s5-2-cycle-state-mpt
+  decided_at: "2026-06-02T01:05:00Z"
+---

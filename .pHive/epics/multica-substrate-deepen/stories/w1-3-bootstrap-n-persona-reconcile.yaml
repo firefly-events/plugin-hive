@@ -70,3 +70,9 @@ metric:
   verify_at: review
   owner: reviewer
 tracker_id: plugin-hive/PLU-143
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3f)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep because the N-persona reconciler is shipped second-party bootstrap infrastructure.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd

@@ -188,6 +188,15 @@ export function serializeStoryBrief(story, options = {}) {
     sections.push(`## References\n${story.references.map(formatReference).join('\n')}`);
   }
 
+  sections.push(
+    [
+      `## Insight Capture`,
+      `Before finishing, write any distilled implementation insights to \`.hive/insights/${story?.id ?? '<story-id>'}.md\` inside your repo checkout work_dir.`,
+      ``,
+      `Capture only non-obvious, reusable learning: surprises, gotchas, decisions and why, or things the next agent should know. Do not write a task recap or routine completion summary.`,
+    ].join('\n'),
+  );
+
   if (integrationBranch) {
     const qBranch = shQuoteRef(integrationBranch);
     sections.push(
@@ -356,6 +365,102 @@ export async function dispatchStoryToPersonas(
     carrier: 'per-persona-fan-out',
     dispatches,
   };
+}
+
+function squadsUrl(serverUrl, workspaceId) {
+  return `${trimTrailingSlash(serverUrl)}/api/squads?workspace_id=${encodeURIComponent(workspaceId)}`;
+}
+
+export async function resolveSquadUuidByName(serverUrl, token, workspaceId, squadName) {
+  const body = await httpJson(squadsUrl(serverUrl, workspaceId), { token });
+  const squads = normalizeList(body, 'squads');
+  if (squads.length === 0) {
+    throw dispatchError('BOOTSTRAP_REQUIRED', 'no Multica squads in workspace; create the squad before running squad mode', undefined, token);
+  }
+  const match = squads.find((squad) => squad?.name === squadName);
+  if (match?.id) return String(match.id);
+  const available = squads.map((squad) => squad?.name).filter(Boolean).join(', ');
+  throw dispatchError('BOOTSTRAP_REQUIRED', `squad '${squadName}' not found in workspace; available: [${available}]`, undefined, token);
+}
+
+export async function dispatchStoryToSquad(serverUrl, token, workspaceId, issueUuid, squadUuid) {
+  return httpJson(issueUrl(serverUrl, workspaceId, issueUuid), {
+    method: 'PUT', token, body: { assignee_type: 'squad', assignee_id: squadUuid },
+  });
+}
+
+// ── Orchestrator-driven TDD phase loop (X / floor-manager) ────────────────────
+// The /execute orchestrator is the long-lived stateful leader. It runs the TDD
+// loop itself and hands the work tree between phases via a shared remote story
+// branch (each phase clones + checks out the branch, commits, pushes). No leader
+// agent; workers are stateless, one clone per task.
+
+// Build the per-story branch name, e.g. fir/embers-rename/s1-convex-module.
+export function resolveStoryBranch(epicId, storyId, prefix = 'fir') {
+  const clean = (s) => String(s ?? '')
+    .trim()
+    .replace(/[^A-Za-z0-9._/-]+/g, '-')
+    .replace(/\.{2,}/g, '.')          // collapse `..` (git rejects)
+    .replace(/\.lock$/i, '')          // refs may not end in `.lock`
+    .replace(/^[-.]+|[-.]+$/g, '')    // trim leading/trailing `-` and `.`
+    || 'untitled';                    // never emit an empty segment
+  return `${clean(prefix)}/${clean(epicId)}/${clean(storyId)}`;
+}
+
+const PHASE_DIRECTIVES = {
+  red: 'PHASE RED — write failing test(s) that encode the story acceptance criteria. Do NOT implement production code. Run the tests and CONFIRM they fail. Commit message: `test(<story>): red`.',
+  green: 'PHASE GREEN — implement the minimum production code to make the red test(s) pass. Do not over-build. Run the tests and confirm they pass. Commit message: `feat(<story>): green`.',
+  review: 'PHASE REVIEW — review the accumulated diff against the acceptance criteria AND any "do NOT change" / decision-lock guards in this brief. Write findings to a REVIEW.md (or note "REVIEW: clean"). Do not change production code; only record findings. Commit if REVIEW.md changed.',
+  refactor: 'PHASE REFACTOR — apply the REVIEW.md notes, dedupe, and tidy. Tests MUST stay green. Commit message: `refactor(<story>): cleanup`.',
+};
+
+// Produce one phase's brief: story context + phase directive + git protocol.
+// opts: { storyBranch, baseBranch, repoUrl, isFirst, priorSummaries, cloneDepth, sparsePaths }
+//   cloneDepth  — shallow clone depth (default 20: covers the story's phase commits +
+//                 base for diff-vs-base, while skipping the monorepo's full history).
+//   sparsePaths — optional array of paths for cone sparse-checkout (cuts working-tree
+//                 size on large monorepos). Omit when phases run package-wide build/test
+//                 that needs the whole package tree.
+export function serializePhaseBrief(story, phase, opts = {}) {
+  const {
+    storyBranch, baseBranch = 'development', repoUrl, isFirst = false,
+    priorSummaries = [], cloneDepth = 20, sparsePaths = [],
+  } = opts;
+  const directive = PHASE_DIRECTIVES[phase] ?? `PHASE ${String(phase).toUpperCase()}`;
+  const ac = Array.isArray(story?.acceptance_criteria) ? story.acceptance_criteria : [];
+  const url = repoUrl ?? '<repoUrl>';
+  // First phase clones the BASE branch (story branch doesn't exist yet) then forks it;
+  // later phases clone the story branch directly. Shallow + single-branch keeps it fast.
+  const cloneBranch = isFirst ? baseBranch : storyBranch;
+  const git = [
+    `git clone --depth ${cloneDepth} --single-branch --branch ${cloneBranch} ${url}`,
+    `cd "$(basename ${url} .git)"`,
+  ];
+  if (Array.isArray(sparsePaths) && sparsePaths.length) {
+    git.push(`git sparse-checkout set --cone ${sparsePaths.join(' ')}`);
+  }
+  if (isFirst) git.push(`git checkout -b ${storyBranch}`);
+  git.push(
+    '# ... perform ONLY this phase\'s work ...',
+    'git add -A && git commit -m "<phase-scoped message>"',
+    `git push -u origin ${storyBranch}`,
+  );
+  const sections = [
+    `# Story ${story?.id ?? ''}: ${story?.title ?? ''} — ${directive.split(' — ')[0]}`,
+    `## Directive\n${directive}`,
+    story?.description ? `## Story context\n${String(story.description).trim()}` : '',
+    ac.length ? `## Acceptance criteria (whole story)\n${ac.map((c) => `- ${c}`).join('\n')}` : '',
+    priorSummaries.length ? `## Prior phases delivered\n${priorSummaries.map((s) => `- ${s}`).join('\n')}` : '',
+    [
+      '## Git protocol — REQUIRED',
+      'Work in your task work_dir. The work tree travels via the remote branch — you MUST clone (shallow), do ONLY this phase, then commit and push. A shallow clone can still push new commits.',
+      '```sh',
+      ...git,
+      '```',
+      'If the clone/branch is missing expected prior-phase files, STOP and report — do not improvise.',
+    ].join('\n'),
+  ].filter(Boolean);
+  return sections.join('\n\n');
 }
 
 export async function moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, issueUuid) {

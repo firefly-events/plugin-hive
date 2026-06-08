@@ -114,36 +114,48 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 0c. **Resolve planning dispatch mode before teammate spawn.** Read the plan dispatch
 mode with env-over-config precedence and store it as `${planning_mode_decision}`
-on the planning context:
+on the planning context. CC Workflows and Multica are sibling overrides; env wins
+over config within each, and CC Workflows wins over Multica when both are set
+(env-over-env, config-over-config) so the maintainer can flip a single knob
+without re-reading the older setting:
 
-   1. If `HIVE_PLANNING_MODE=multica`, set
+   1. If `HIVE_PLANNING_MODE=cc-workflows`, set
+      `{ mode_decision: "cc-workflows", field_sources: { planning_mode: "env" } }`.
+   2. Else if `HIVE_PLANNING_MODE=multica`, set
       `{ mode_decision: "multica", field_sources: { planning_mode: "env" } }`.
-   2. Else if the root-first resolved `hive.config.yaml` has
+   3. Else if the root-first resolved `hive.config.yaml` has
+      `planning.mode: cc-workflows`, set
+      `{ mode_decision: "cc-workflows", field_sources: { planning_mode: "config" } }`.
+   4. Else if the root-first resolved `hive.config.yaml` has
       `planning.mode: multica`, set
       `{ mode_decision: "multica", field_sources: { planning_mode: "config" } }`.
-   3. Otherwise set
+   5. Otherwise set
       `{ mode_decision: "default", field_sources: { planning_mode: "default" } }`.
 
    This is a thin selector only. It does not dispatch personas directly and it
-   does not bypass user-facing review gates. When the decision is `multica`,
+   does not bypass user-facing review gates. When the decision is `cc-workflows`,
    Phase 0 routes teammate spawn through `planning-routing` ->
-   `plan-mode-multica`, which owns the Multica persona dispatch, polling, and
-   episode markers.
+   `plan-mode-cc-workflows`, which owns the Workflow tool persona dispatch,
+   polling, and episode markers. When the decision is `multica`, Phase 0 routes
+   teammate spawn through `planning-routing` -> `plan-mode-multica`, which owns
+   the Multica persona dispatch, polling, and episode markers.
 
 1. **Assemble and route the planning team.** Invoke the **planning-routing** skill (atomic; `skills/hive/skills/planning-routing/SKILL.md`) — this is an **external call**, NOT inline prose copied from the routing skill.
 
 Pass four inputs: `assembled_personas` (core planning personas plus conditional architect/ui-designer selected from the requirement), the root-first `agent_backends` map (empty map if absent per [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)), `${planning_mode_decision}` from step 0c, and `requirement_summary`.
 
-The skill builds final `routing_decisions`, spawns Multica, direct, and/or Codex-backed teammates, emits exactly one structured routing INFO log per persona, and handles Multica→Codex→direct fallback plus Codex runtime fallback/circuit breaker behavior. When `${planning_mode_decision}.mode_decision == "multica"`, `planning-routing` invokes `skills/hive/skills/plan-mode-multica/SKILL.md` for Multica-dispatched personas; otherwise it preserves the existing direct/Codex routing behavior.
+The skill builds final `routing_decisions`, spawns CC Workflows, Multica, direct, and/or Codex-backed teammates, emits exactly one structured routing INFO log per persona, and handles CC-Workflows→Codex→direct fallback, Multica→Codex→direct fallback, and Codex runtime fallback/circuit breaker behavior. When `${planning_mode_decision}.mode_decision == "cc-workflows"`, `planning-routing` invokes `skills/hive/skills/plan-mode-cc-workflows/SKILL.md` for CC-Workflows-dispatched personas. When `${planning_mode_decision}.mode_decision == "multica"`, `planning-routing` invokes `skills/hive/skills/plan-mode-multica/SKILL.md` for Multica-dispatched personas. Otherwise it preserves the existing direct/Codex routing behavior.
 
 Continue Phase A using the returned active planning team handles and `routing_decisions`.
 
 See [`skills/hive/skills/planning-routing/SKILL.md`](../hive/skills/planning-routing/SKILL.md).
 
-**Gate ownership invariant.** Multica-dispatched planning may produce or revise
-planning artifacts, but it never advances user review/sign-off gates. The
-orchestrator still presents and waits locally at the design-discussion review
-gate, the conditional H/V review gate, and the structured-outline sign-off gate.
+**Gate ownership invariant.** CC-Workflows-dispatched and Multica-dispatched
+planning may produce or revise planning artifacts, but neither ever advances
+user review/sign-off gates. The orchestrator still presents and waits locally at
+the design-discussion review gate, the conditional H/V review gate, and the
+structured-outline sign-off gate. Workflow tool completion and Multica issue
+completion are artifact-readiness signals, not user review approvals.
 
 ### Phase A: Research
 
@@ -206,8 +218,9 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
    - Confirm or override the scale assessment recommendation
 
    This gate is always local to the orchestrator, including when Phase 0 used
-   `planning.mode: multica`. Multica planning output may feed the document, but
-   it must not auto-advance user feedback, scale selection, or routing.
+   `planning.mode: cc-workflows` or `planning.mode: multica`. CC-Workflows or
+   Multica planning output may feed the document, but neither must auto-advance
+   user feedback, scale selection, or routing.
 
    After collecting user feedback, evaluate the scale and **announce the routing decision inline** — no separate confirmation step:
 
@@ -244,8 +257,9 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
    - **Medium scope + `--fast`:** H/V planning was skipped entirely at step 5 — this step is never reached.
 
    When this gate runs, it is local to the orchestrator even if the H/V docs
-   were produced or revised by Multica-dispatched planning personas. Multica
-   completion is an artifact-readiness signal, not user review approval.
+   were produced or revised by CC-Workflows-dispatched or Multica-dispatched
+   planning personas. Workflow tool completion and Multica completion are
+   artifact-readiness signals, not user review approvals.
 
    **When the gate runs (large or medium + `--gate-hv`), the user reviews:**
    - Are the layers correctly identified? (horizontal)
@@ -271,8 +285,9 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     - Provides final sign-off or requests revisions
 
     This sign-off gate is always local to the orchestrator, including when the
-    structured outline was produced by Multica-dispatched planning personas.
-    Do not let Multica issue completion or episode markers imply sign-off.
+    structured outline was produced by CC-Workflows-dispatched or
+    Multica-dispatched planning personas. Do not let Workflow tool completion,
+    Multica issue completion, or episode markers imply sign-off.
 
     Incorporate feedback into the planning context before proceeding.
 
@@ -579,13 +594,20 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Stories that fail the gate are flagged in the step 18 confirmation output alongside `agent-ready-checklist` failures; the user can approve with known gaps or ask to fix them before proceeding.
 
-15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories. The emitted YAML MUST include the `git_flow:` block populated from the `${git_flow_resolution}` value captured in Phase A step 0a (pe-5):
+14b. **Capture release intent.** Ask the user exactly:
+
+    > Does this epic bump the version? major | minor | patch | none
+
+    Store the answer on the planning context as `${version_bump}`. The value MUST be exactly one of `major`, `minor`, `patch`, or `none`; if the answer is missing or ambiguous, ask once for clarification before writing `epic.yaml`. If the clarification answer is STILL not exactly one of the four literals, default `${version_bump}` to `none`, record `version_bump_defaulted: true` on the planning context and in `epic.yaml`, and surface a user-facing warning: `version_bump answer not recognized — defaulted to none; re-run /plan or edit epic.yaml to change.` Only those four literal values may be written to `epic.yaml`. Use `none` when the user explicitly selects it, when a re-plan preserves an existing `version_bump: none`, or via this default-on-invalid path.
+
+15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories. The emitted YAML MUST include `version_bump: <major|minor|patch|none>` populated from `${version_bump}`, plus the `git_flow:` block populated from the `${git_flow_resolution}` value captured in Phase A step 0a (pe-5):
 
     ```yaml
     name: <epic-id>
     title: <epic title>
     target_codebase: <abs path>
     methodology: <classic|tdd|bdd>
+    version_bump: <major|minor|patch|none>
 
     git_flow:
       base_branch: <resolved>          # from Phase A 0a — `develop` if origin/develop existed at plan time, else `main`, else the explicit override
@@ -599,8 +621,11 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     ```
 
     **Idempotency on re-plan.** If `epic.yaml` already exists for this epic:
+      - if it already has a `version_bump:` field, update that field in place from the user's latest answer;
+      - if it does not, insert `version_bump:` immediately after `methodology:`;
       - if it already has a `git_flow:` block, update the two field values in place (do NOT duplicate the block);
-      - if it does not, insert a fresh `git_flow:` block immediately after `methodology:` (the canonical position above).
+      - if it does not, insert a fresh `git_flow:` block immediately after `version_bump:`;
+      - canonical field order owned by /plan is `methodology` → `version_bump` → `git_flow`; insert to preserve that order.
       - all other fields not owned by /plan (e.g. `source_issue`, `description`, free-form notes) are preserved untouched.
 
     Schema reference: `hive/references/story-yaml-schema.md` §6 "Epic index (`epic.yaml`)" documents the canonical block shape.

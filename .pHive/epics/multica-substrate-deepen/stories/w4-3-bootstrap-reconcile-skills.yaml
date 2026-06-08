@@ -74,3 +74,9 @@ metric:
   verify_at: test
   owner: tester
 tracker_id: plugin-hive/PLU-147
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3q)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep because the skills reconciler and bundling protocol are shipped second-party infrastructure, with a known warm-path defect documented separately.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd

@@ -74,3 +74,9 @@ metric:
   verify_at: integrate
   owner: tester
 tracker_id: plugin-hive/PLU-116
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3s)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep as the validation record for retained second-party Mode D-a; outcome is partial pass, not a first-party blocker.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd

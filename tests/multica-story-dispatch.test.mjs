@@ -5,9 +5,13 @@ import test from 'node:test';
 import {
   __resetCache,
   dispatchStoryToAgent,
+  dispatchStoryToSquad,
   ensureIssueBriefMatches,
   moveOutOfBacklogIfNeeded,
   resolveAgentUuidByName,
+  resolveSquadUuidByName,
+  resolveStoryBranch,
+  serializePhaseBrief,
   serializeStoryBrief,
 } from '../hive/lib/multica-story-dispatch/index.mjs';
 
@@ -304,4 +308,89 @@ test('AC10 moveOutOfBacklogIfNeeded moves backlog and skips in_progress', async 
   } finally {
     await close();
   }
+});
+
+// ── Squad assignment ──────────────────────────────────────────────────────────
+
+test('AC11 resolveSquadUuidByName finds squad by name', async () => {
+  const { serverUrl, close } = await startMockServer((req, res) => {
+    assert.equal(req.url, '/api/squads?workspace_id=workspace-1');
+    sendJson(res, 200, [
+      { id: 'squad-a', name: 'planning-squad' },
+      { id: 'squad-b', name: 'tdd-squad' },
+    ]);
+  });
+  try {
+    const uuid = await resolveSquadUuidByName(serverUrl, 'mul_test', 'workspace-1', 'tdd-squad');
+    assert.equal(uuid, 'squad-b');
+  } finally {
+    await close();
+  }
+});
+
+test('AC12 resolveSquadUuidByName missing squad throws bootstrap hint', async () => {
+  const { serverUrl, close } = await startMockServer((req, res) => {
+    sendJson(res, 200, [{ id: 'squad-a', name: 'planning-squad' }]);
+  });
+  try {
+    await assert.rejects(
+      () => resolveSquadUuidByName(serverUrl, 'mul_test', 'workspace-1', 'tdd-squad'),
+      (err) => err.code === 'BOOTSTRAP_REQUIRED' && /tdd-squad/.test(err.message),
+    );
+  } finally {
+    await close();
+  }
+});
+
+test('AC13 dispatchStoryToSquad PUTs squad assignment', async () => {
+  const putBodies = [];
+  const { serverUrl, close } = await startMockServer((req, res, body) => {
+    assert.equal(req.method, 'PUT');
+    assert.equal(req.url, '/api/issues/issue-1?workspace_id=workspace-1');
+    putBodies.push(body);
+    sendJson(res, 200, { id: 'issue-1', assignee_type: 'squad', assignee_id: body.assignee_id });
+  });
+  try {
+    const result = await dispatchStoryToSquad(serverUrl, 'mul_test', 'workspace-1', 'issue-1', 'squad-b');
+    assert.deepEqual(putBodies[0], { assignee_type: 'squad', assignee_id: 'squad-b' });
+    assert.equal(result.assignee_type, 'squad');
+  } finally {
+    await close();
+  }
+});
+
+// ── Orchestrator-driven TDD phase loop (X) ────────────────────────────────────
+
+test('AC14 resolveStoryBranch builds and sanitizes the branch name', () => {
+  assert.equal(
+    resolveStoryBranch('embers-rename', 's2-react-component-renames', 'fir'),
+    'fir/embers-rename/s2-react-component-renames',
+  );
+  // sanitizes spaces/illegal chars; trims leading/trailing separators
+  assert.equal(resolveStoryBranch('My Epic!', 'story #1', 'fir'), 'fir/My-Epic/story-1');
+});
+
+test('AC15 serializePhaseBrief first phase shallow-clones base and forks the story branch', () => {
+  const story = { id: 's2', title: 'Rename', description: 'd', acceptance_criteria: ['ac1'] };
+  const brief = serializePhaseBrief(story, 'red', {
+    storyBranch: 'fir/e/s2', baseBranch: 'development',
+    repoUrl: 'git@github.com:org/repo.git', isFirst: true,
+  });
+  assert.match(brief, /PHASE RED/);
+  assert.match(brief, /git clone --depth 20 --single-branch --branch development git@github\.com:org\/repo\.git/);
+  assert.match(brief, /git checkout -b fir\/e\/s2/);
+  assert.match(brief, /git push -u origin fir\/e\/s2/);
+});
+
+test('AC16 serializePhaseBrief later phase clones the story branch and honors sparsePaths', () => {
+  const story = { id: 's2', title: 'Rename', description: 'd', acceptance_criteria: ['ac1'] };
+  const brief = serializePhaseBrief(story, 'green', {
+    storyBranch: 'fir/e/s2', baseBranch: 'development',
+    repoUrl: 'git@github.com:org/repo.git', isFirst: false, sparsePaths: ['apps/dashboard'],
+    priorSummaries: ['red: failing test'],
+  });
+  assert.match(brief, /git clone --depth 20 --single-branch --branch fir\/e\/s2/);
+  assert.doesNotMatch(brief, /git checkout -b/); // not the first phase
+  assert.match(brief, /git sparse-checkout set --cone apps\/dashboard/);
+  assert.match(brief, /Prior phases delivered/);
 });
