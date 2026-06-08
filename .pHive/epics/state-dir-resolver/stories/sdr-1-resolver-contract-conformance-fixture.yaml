@@ -1,0 +1,72 @@
+id: sdr-1-resolver-contract-conformance-fixture
+epic: state-dir-resolver
+title: Establish resolver contract and shared conformance fixture
+status: pending
+complexity: high
+methodology: classic
+depends_on: []
+description: |
+  Characterize the existing shell `_resolve_state_dir()` behavior, then add matching
+  Node and Python resolver helpers plus one shared conformance fixture. This is the
+  serial spine for the epic: later stories can migrate consumers only after all three
+  runtimes prove byte-identical resolution for env override, config, default `.pHive`,
+  relative paths, target project handling, and symlink canonicalization.
+acceptance_criteria:
+  - "Given `HIVE_STATE_DIR` is set, when shell, Node, and Python resolve the state dir, then all three return the env override path even when `hive.config.yaml` also contains `paths.state_dir`."
+  - "Given `HIVE_STATE_DIR` is unset and root `hive.config.yaml` contains `paths.state_dir`, when all three resolvers run, then they resolve the configured path rather than falling through to default `.pHive`."
+  - "Given neither env nor config supplies a state dir, when all three resolvers run, then default `.pHive` remains unchanged."
+  - "Given fixture rows cover absolute paths, `target_project: null`, already-canonical paths, symlinks, missing config, env-vs-config interaction, relative-under-target_project, and relative-under-cwd, when the conformance harnesses run, then every runtime matches the shared expected absolute path for every row."
+  - "Given no consumer adoption belongs in this story, when the diff is reviewed, then downstream literal `.pHive` joins remain for later bounded slices."
+metric:
+  applies: false
+  justification: "This story locks resolver correctness through conformance tests and does not introduce a product metric; success is whether shell, Node, and Python resolve identical paths under the shared fixture."
+steps:
+  - id: research
+    description: Confirm the repo's shell, Node, and Python test harness conventions and identify how to feed one shared YAML fixture into all three.
+    agent: researcher
+  - id: implement
+    description: Characterize-test `hooks/common.sh`, add `resolveStateDir({cwd, env})`, add `resolve_state_dir(*, cwd, env)`, and create the shared fixture plus three conformance harnesses.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run the shell, Node, and Python conformance suites and confirm default `.pHive`, config, and env-override cases all pass.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify resolver semantics match Q2, shell behavior is pinned rather than reinterpreted, and no consumer migration leaked into this serial story.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit the resolver contract and fixture to `feat/state-dir-resolver`.
+    agent: developer
+    depends_on: [review]
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hooks/common.sh
+      purpose: Shell `_resolve_state_dir()` is the reference behavior to characterize and preserve.
+    - path: hive/lib/config.js
+      purpose: Node config reader that must export the new resolver helper.
+    - path: hive/lib/config.py
+      purpose: Python config reader that must export the new resolver helper.
+    - path: tests/fixtures/state-dir-conformance.yaml
+      purpose: Shared golden input-to-expected-path fixture for all runtimes.
+files_to_modify:
+  - file: hooks/common.sh
+    change: Add characterize coverage around `_resolve_state_dir()` without changing behavior.
+  - file: hive/lib/config.js
+    change: Export `resolveStateDir({cwd, env})` with shell-parallel semantics.
+  - file: hive/lib/config.py
+    change: Export `resolve_state_dir(*, cwd, env)` with shell-parallel semantics.
+  - file: tests/fixtures/state-dir-conformance.yaml
+    change: Create shared resolver conformance vectors.
+  - file: tests
+    change: Add shell, Node, and Python harnesses that iterate the shared fixture.
+cross_cutting:
+  - concern: state-dir-relocation
+    action: "Define the contract all later relocation stories must use; assert Q2 env-override precedence and unchanged default `.pHive` behavior."
+references:
+  - path: .pHive/epics/state-dir-resolver/docs/design-decisions.md
+    relevant_excerpt: "Q2 — `HIVE_STATE_DIR` precedence → env-override: explicit env, then root config, then default `.pHive`."
+  - path: .pHive/epics/state-dir-resolver/docs/vertical-plan.md
+    relevant_excerpt: "Step 1 makes all three runtimes resolve byte-identical absolute paths for every shared fixture row."
