@@ -344,14 +344,21 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
      If `## [Unreleased]` already contains the appropriate category heading, append under it instead of duplicating the heading.
 
-   - Commit the version-source and changelog changes together in one finalize commit:
+   - Commit the version-source and changelog changes together in one finalize commit. Stage only the targets that exist — a literal `git add` of a missing path or an unmatched glob errors out — so build the add-list from the version sources actually present plus `CHANGELOG.md` when present:
 
      ```bash
-     git add .claude-plugin/*.json plugin.json CHANGELOG.md
+     # Collect only existing targets (globs that match nothing are dropped).
+     targets=()
+     for f in .claude-plugin/*.json plugin.json CHANGELOG.md; do
+       [ -e "$f" ] && targets+=("$f")
+     done
+     if [ ${#targets[@]} -gt 0 ]; then
+       git add "${targets[@]}"
+     fi
      git commit -m "chore(release): bump plugin version for {epic-id}"
      ```
 
-     If `plugin.json` is absent, omit it from `git add`. If there are no diffs after applying the bump and changelog entry, report `[info] finalize: version bump already applied for {epic-id}` and do not commit.
+     If there are no diffs after applying the bump and changelog entry (nothing staged), report `[info] finalize: version bump already applied for {epic-id}` and do not commit.
 
 8. After all stories complete, produce a summary plus the post-run audit:
 

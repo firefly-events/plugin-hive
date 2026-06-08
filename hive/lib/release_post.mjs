@@ -17,6 +17,13 @@ function moduleRoot() {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 }
 
+// Honor the configured state directory (paths.state_dir) via HIVE_STATE_DIR,
+// falling back to the default `.pHive`. Keeps release artifacts under the
+// relocated state dir when a consumer overrides it.
+function stateDir() {
+  return process.env.HIVE_STATE_DIR || '.pHive';
+}
+
 function stripQuotes(value) {
   return String(value ?? '').trim().replace(/^['"]|['"]$/g, '');
 }
@@ -62,7 +69,7 @@ function storyFromYaml(epicId, file, text) {
     storyId,
     title,
     outcome: outcome || title,
-    sourcePath: `.pHive/epics/${epicId}/stories/${path.basename(file)}`,
+    sourcePath: `${stateDir()}/epics/${epicId}/stories/${path.basename(file)}`,
   };
 }
 
@@ -81,7 +88,7 @@ function normalizeStory(story) {
     storyId,
     title,
     outcome,
-    sourcePath: story.sourcePath ?? story.source_path ?? `.pHive/epics/${epicId}/stories/${storyId}.yaml`,
+    sourcePath: story.sourcePath ?? story.source_path ?? `${stateDir()}/epics/${epicId}/stories/${storyId}.yaml`,
   };
 }
 
@@ -92,7 +99,7 @@ export async function collectShippedStories({ epicIds, repoRoot = process.cwd() 
 
   const stories = [];
   for (const epicId of epicIds) {
-    const storiesDir = path.join(repoRoot, '.pHive', 'epics', epicId, 'stories');
+    const storiesDir = path.join(repoRoot, stateDir(), 'epics', epicId, 'stories');
     let files;
     try {
       files = await fs.readdir(storiesDir);
@@ -244,7 +251,7 @@ export async function generateReleasePostArtifacts({
     generatedAt,
   });
 
-  const outDir = path.join(repoRoot, '.pHive', 'releases', releaseId);
+  const outDir = path.join(repoRoot, stateDir(), 'releases', releaseId);
   await fs.mkdir(outDir, { recursive: true });
 
   const written = [];

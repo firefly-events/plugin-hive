@@ -473,7 +473,7 @@ A story's `parallel_allowed` / `parallel_rationale` pair is acceptable when:
   ignored. A stale rationale here yields a warning (documentation
   hygiene), not a failure.
 
-## 5. Epic index (`epic.yaml`)
+## 6. Epic index (`epic.yaml`)
 
 Each epic carries a sibling index at `.pHive/epics/{epic-id}/epic.yaml`
 emitted by `/plan` step 15. The index is a lightweight pointer to the
@@ -507,7 +507,7 @@ stories:
     depends_on: [<story-ids>]
 ```
 
-### 5.2 The `git_flow` block
+### 6.2 The `git_flow` block
 
 | Field | Type | Allowed values | Source |
 |---|---|---|---|
@@ -532,7 +532,7 @@ Downstream consumers fall back to the live `hive.config.yaml` for those
 epics; the bridge / workflow emit a one-line info log noting the
 fall-through.
 
-### 5.3 The `version_bump` field
+### 6.3 The `version_bump` field
 
 | Field | Type | Allowed values | Source |
 |---|---|---|---|

@@ -622,12 +622,13 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     **Idempotency on re-plan.** If `epic.yaml` already exists for this epic:
       - if it already has a `version_bump:` field, update that field in place from the user's latest answer;
-      - if it does not, insert `version_bump:` immediately after `methodology:` (before `git_flow:`);
+      - if it does not, insert `version_bump:` immediately after `methodology:`;
       - if it already has a `git_flow:` block, update the two field values in place (do NOT duplicate the block);
-      - if it does not, insert a fresh `git_flow:` block immediately after `methodology:` (the canonical position above).
+      - if it does not, insert a fresh `git_flow:` block immediately after `version_bump:`;
+      - canonical field order owned by /plan is `methodology` → `version_bump` → `git_flow`; insert to preserve that order.
       - all other fields not owned by /plan (e.g. `source_issue`, `description`, free-form notes) are preserved untouched.
 
-    Schema reference: `hive/references/story-yaml-schema.md` §5 "Epic index (`epic.yaml`)" documents the canonical block shape.
+    Schema reference: `hive/references/story-yaml-schema.md` §6 "Epic index (`epic.yaml`)" documents the canonical block shape.
 
 16. **Detect UI stories — delegate to `/design` (atomic external call).** After generating stories and before presenting for confirmation, scan each story for UI work indicators. When a story matches, invoke the **design** skill (atomic; `skills/design/SKILL.md`) — this is an **external Skill call**, NOT inline wireframe-ceremony prose copied into this skill. See the UI Step Detection section below for the detection keywords, the delegation invocation shape, and the blocking-gate contract.
 
