@@ -1,8 +1,8 @@
-cycle_id: meta-2026-06-05
-started: '2026-06-05T00:00:00Z'
+cycle_id: meta-2026-06-08
+started: '2026-06-08T00:00:00Z'
 status: closed
 phase: close
-closed: '2026-06-05T00:30:00Z'
+closed: '2026-06-08T00:30:00Z'
 charter_constraints:
   - operate only on hive/references/**, hive/agents/**, hive/workflows/**, hive/lib/**,
     skills/hive/agents/memories/**, .pHive/meta-team/**, .pHive/teams/**
@@ -12,110 +12,88 @@ charter_constraints:
   - no changes to hive/hive.config.yaml without human confirmation
   - no new external service integrations without human confirmation
 prior_cycle:
-  id: meta-2026-05-29
+  id: meta-2026-06-05
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-06-05T00:00:00Z'
+    started_at: '2026-06-08T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
     prior_cycle_status: closed
   step_02_analysis:
-    findings_count: 3
+    findings_count: 0
     metric_signal: false
     external_candidates_count: 0
+    routing: step-03b (findings_count=0 AND external_candidates_count=0 AND metric_signal=false)
+    summary: >
+      Systematic audit of hive/agents/**, hive/references/**, hive/workflows/**,
+      skills/hive/agents/memories/**, and hive/MAIN.md + hive/GUIDE.md cross-refs
+      found no in-scope actionable findings. All 12 step files complete (7 sections
+      each). All 25 agent files have required frontmatter (name, model). All workflow
+      YAML files have name/version/steps. All workflow step_file paths resolve. All
+      MAIN.md skill references resolve. Agent model IDs (claude-opus-4-8,
+      claude-sonnet-4-6, claude-haiku-4-5-20251001) are current. Memory files for
+      all 25 agents have valid frontmatter. One stub doc (hive-cloud-roadmap.md,
+      13 lines) remains out_of_scope (S16 placeholder, 10+ consecutive deferrals).
+      Dedup pre-flight: 0 open PRs on develop or main. No in-flight proposals to
+      suppress. Step-02b skipped (sandboxed nightly; charter scope local-only).
+      Step-02c skipped (meta-optimize routing only; kg.sqlite absent).
+    findings: []
+    findings_suppressed: []
   step_02b_external_research:
     external_research_candidates_count: 0
     summary: >
       External research skipped — sandboxed nightly context; charter scope is
       local-only maintainer tool. No provider queries issued.
-      external_candidates_count: 0.
   step_02c_kg_signal:
     kg_findings_count: 0
     summary: >
       Step 02c runs via /meta-optimize SKILL routing only; skipped for
       maintainer cycle. kg.sqlite absent. kg_signal findings=0
       miss_reason=empty_kg.
-  step_03_proposal:
-    routing: step-03 (findings_count=3 > 0)
-    approved_proposals_count: 3
-    skipped_findings_count: 4
+  step_03b_backlog_fallback:
+    routing: step-03b (AND-of-empty: findings=0, external=0, metric_signal=false)
+    filtered_count: 0
+    selected_candidate_id: mmo-2026-04-21-001
+    selected_target: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
+    decision: would-execute
+    summary: >
+      Loaded queue-meta-meta-optimize.yaml. No little-fix tier candidates
+      (filtered_count=0). First pending candidate: mmo-2026-04-21-001. Target
+      file confirmed at .pHive/meta-team/archive/2026-04-19/MANIFEST.md.
+      Current state: 3 prior reviewed-on comments (meta-2026-04-22,
+      meta-2026-05-03, meta-2026-05-08). Will append meta-2026-06-08.
   step_03c_metric_declaration:
-    enriched_proposals_count: 3
+    gate_mode: blocking
+    enriched_proposals_count: 1
     gate_failures: 0
-    metric_gate_mode: blocking
+    rejected_proposals_count: 0
+    summary: >
+      Gate mode: blocking (default — key absent from hive.config.yaml).
+      Proposal mmo-2026-04-21-001: applies_when=false (pure archival annotation,
+      no measurable outcome claim). Justification: full sentence. Gate: passed.
+      enriched_proposals: 1.
   step_04_implementation:
     changes_made:
-      - proposal_id: proposal-1
-        action: update_field
-        file: hive/agents/reviewer.md
-        description: Updated model field from sonnet to opus to match model_overrides in hive.config.yaml
-        status: done
-      - proposal_id: proposal-1
-        action: update_field
-        file: hive/agents/peer-validator.md
-        description: Updated model field from sonnet to opus to match model_overrides in hive.config.yaml
-        status: done
-      - proposal_id: proposal-2
-        action: update_field
-        file: hive/lib/sandcastle-worker-runner.js
-        description: Updated DEFAULT_MODEL from claude-opus-4-7 to claude-opus-4-8; updated line 145 JSDoc comment
-        status: done
-      - proposal_id: proposal-2
-        action: update_field
-        file: hive/lib/messages-session.js
-        description: Updated DEFAULT_MODEL from claude-opus-4-7 to claude-opus-4-8
-        status: done
-      - proposal_id: proposal-3
-        action: update_field
-        file: hive/references/session-system-prompt-spec.md
-        description: >
-          Updated two example model IDs from claude-opus-4-7 to claude-opus-4-8
-          (line 357 Python request example, line 420 JSON response example)
+      - proposal_id: mmo-2026-04-21-001
+        action: add_entry
+        file: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
+        description: Appended <!-- reviewed-on: meta-2026-06-08 --> as fourth provenance line
         status: done
   step_05_testing:
     test_results:
-      - change_id: proposal-1_reviewer
-        file: hive/agents/reviewer.md
+      - change_id: mmo-2026-04-21-001_MANIFEST
+        file: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
         tests:
           cross_reference_integrity: pass
-          schema_compliance: pass
-          content_safety: pass
-        overall: pass
-      - change_id: proposal-1_peer-validator
-        file: hive/agents/peer-validator.md
-        tests:
-          cross_reference_integrity: pass
-          schema_compliance: pass
-          content_safety: pass
-        overall: pass
-      - change_id: proposal-2_sandcastle
-        file: hive/lib/sandcastle-worker-runner.js
-        tests:
-          cross_reference_integrity: pass
-          schema_compliance: pass
+          schema_compliance: skip
           content_safety: pass
           additive_only: pass
-        overall: pass
-      - change_id: proposal-2_messages
-        file: hive/lib/messages-session.js
-        tests:
-          cross_reference_integrity: pass
-          schema_compliance: pass
-          content_safety: pass
-          additive_only: pass
-        overall: pass
-      - change_id: proposal-3_session-spec
-        file: hive/references/session-system-prompt-spec.md
-        tests:
-          cross_reference_integrity: pass
-          schema_compliance: pass
-          content_safety: pass
         overall: pass
   step_06_evaluation:
     cycle_verdict: passed
-    pass_count: 3
+    pass_count: 1
     needs_optimization_count: 0
     needs_revision_count: 0
     metrics_snapshot:
@@ -123,206 +101,80 @@ steps:
       wall_clock_ms: 5000
       first_attempt_pass: true
     evaluations:
-      - change_id: proposal-1_agents
+      - change_id: mmo-2026-04-21-001_MANIFEST
         change_verdict: passed
         charter_objective: consistency
         quality_score: 1.0
         rationale: |
-          Updates reviewer.md and peer-validator.md model frontmatter from
-          sonnet to opus, matching the effective runtime tier set by
-          hive.config.yaml model_overrides. Change is additive (single field
-          update), no cross-references broken, no content removed.
-      - change_id: proposal-2_lib
-        change_verdict: passed
-        charter_objective: consistency
-        quality_score: 1.0
-        rationale: |
-          Updates DEFAULT_MODEL constant in two lib files from claude-opus-4-7
-          to claude-opus-4-8, aligning fallback defaults with the current Opus
-          model tier. Also updates the JSDoc comment. Same pattern applied in
-          meta-2026-05-17 (haiku) and meta-2026-05-29 (opus). Additive.
-      - change_id: proposal-3_session-spec
-        change_verdict: passed
-        charter_objective: consistency
-        quality_score: 1.0
-        rationale: |
-          Updates two illustrative Python/JSON example model strings from
-          claude-opus-4-7 to claude-opus-4-8. Documentation examples now
-          reflect the current Opus model ID. No cross-references broken,
-          no content removed.
+          Appended exactly one reviewed-on HTML comment to a frozen archive file.
+          1 line added, 0 lines removed (0% content loss). Consistent with the
+          three prior reviewed-on lines (meta-2026-04-22, meta-2026-05-03,
+          meta-2026-05-08). No cross-references broken, no schema violations,
+          no live code paths affected.
+    compare:
+      baseline:
+        tokens: 0
+        wall_clock_ms: 45000
+        first_attempt_pass: true
+      candidate:
+        tokens: 0
+        wall_clock_ms: 5000
+        first_attempt_pass: true
+      delta:
+        wall_clock_ms: -40000
+        first_attempt_pass: no_change
   step_07_promotion:
     promoted_changes:
-      - proposal_id: proposal-1
-        files:
-          - hive/agents/reviewer.md
-          - hive/agents/peer-validator.md
+      - proposal_id: mmo-2026-04-21-001
+        file: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
         verdict: pass
         status: promoted
-        commit_ref: 6740e73b205cf1adcb74e59f011dc08806a17dc7
-        rollback_target: 5422e7b20776cfc2c0a0e35fb20da857811dbc1f
-      - proposal_id: proposal-2
-        files:
-          - hive/lib/sandcastle-worker-runner.js
-          - hive/lib/messages-session.js
-        verdict: pass
-        status: promoted
-        commit_ref: 6740e73b205cf1adcb74e59f011dc08806a17dc7
-        rollback_target: 5422e7b20776cfc2c0a0e35fb20da857811dbc1f
-      - proposal_id: proposal-3
-        file: hive/references/session-system-prompt-spec.md
-        verdict: pass
-        status: promoted
-        commit_ref: 6740e73b205cf1adcb74e59f011dc08806a17dc7
-        rollback_target: 5422e7b20776cfc2c0a0e35fb20da857811dbc1f
+        commit_ref: dc6a0f3a2c2fd4725f83df9aa5c233c423899417
+        rollback_target: b8499673f6116e9e6b52e21a72bb4f9cd214c33a
     reverted_changes: []
     insights_staged: 0
     decision: accept
-    rollback_target: 5422e7b20776cfc2c0a0e35fb20da857811dbc1f
+    rollback_target: b8499673f6116e9e6b52e21a72bb4f9cd214c33a
 summary:
-  total_findings: 3
-  proposals_generated: 3
-  changes_attempted: 5
-  changes_promoted: 5
+  total_findings: 0
+  proposals_generated: 1
+  changes_attempted: 1
+  changes_promoted: 1
   changes_reverted: 0
   flagged_for_human: 0
   cycle_verdict: passed
 closure_evidence:
-  commit_ref: 6740e73b205cf1adcb74e59f011dc08806a17dc7
+  commit_ref: dc6a0f3a2c2fd4725f83df9aa5c233c423899417
   metrics_snapshot:
     tokens: 0
     wall_clock_ms: 5000
     first_attempt_pass: true
-  rollback_ref: 5422e7b20776cfc2c0a0e35fb20da857811dbc1f
+  rollback_ref: b8499673f6116e9e6b52e21a72bb4f9cd214c33a
 decision: accept
 regression_watch:
   state: armed
-  armed_at: '2026-06-05T00:30:00Z'
+  armed_at: '2026-06-08T00:30:00Z'
 observation_window:
-  start: '2026-06-05T00:30:00Z'
-  end: '2026-06-05T04:30:00Z'
-findings:
-  - id: finding-1
-    category: SCHEMA_INCONSISTENCY
-    severity: medium
-    location: hive/agents/reviewer.md, hive/agents/peer-validator.md
-    description: >
-      Agent frontmatter declares model: sonnet but hive.config.yaml model_overrides
-      promotes both agents to opus; frontmatter must match effective tier per
-      agent-config-schema.md line 61.
-    evidence: >
-      reviewer.md line 4: model: sonnet. peer-validator.md line 4: model: sonnet.
-      hive.config.yaml lines 179-180: model_overrides.reviewer: opus,
-      model_overrides.peer-validator: opus.
-  - id: finding-2
-    category: SCHEMA_INCONSISTENCY
-    severity: low
-    location: hive/lib/sandcastle-worker-runner.js, hive/lib/messages-session.js
-    description: DEFAULT_MODEL constant is claude-opus-4-7; current Opus model is claude-opus-4-8.
-    evidence: sandcastle-worker-runner.js line 48, messages-session.js line 36.
-  - id: finding-3
-    category: SCHEMA_INCONSISTENCY
-    severity: low
-    location: hive/references/session-system-prompt-spec.md
-    description: >
-      Two example code blocks use model="claude-opus-4-7"; current Opus model
-      is claude-opus-4-8.
-    evidence: Lines 357 and 420.
-approved_proposals:
-  - id: proposal-1
-    title: Update reviewer.md and peer-validator.md frontmatter model field from sonnet to opus
-    discovery_source: internal_audit
-    addresses_findings:
-      - finding-1
-    impact_score: 2
-    risk_score: 1
-    effort_score: 1
-    priority_score: 10
-    charter_objective: consistency
-    metric:
-      applies: false
-      justification: >
-        Pure schema-consistency fix updating two agent frontmatter fields to
-        match the effective runtime tier set by model_overrides; no behavioral
-        or measurable-outcome claim is made.
-    implementation_plan:
-      - step: Update model field from sonnet to opus in reviewer.md frontmatter
-        file: hive/agents/reviewer.md
-        action: update_field
-      - step: Update model field from sonnet to opus in peer-validator.md frontmatter
-        file: hive/agents/peer-validator.md
-        action: update_field
-  - id: proposal-2
-    title: Update DEFAULT_MODEL constant from claude-opus-4-7 to claude-opus-4-8 in lib files
-    discovery_source: internal_audit
-    addresses_findings:
-      - finding-2
-    impact_score: 2
-    risk_score: 1
-    effort_score: 1
-    priority_score: 10
-    charter_objective: consistency
-    metric:
-      applies: false
-      justification: >
-        Additive correction of a fallback constant to the current model ID;
-        no throughput, coverage, or latency claim is made.
-    implementation_plan:
-      - step: Update DEFAULT_MODEL in sandcastle-worker-runner.js
-        file: hive/lib/sandcastle-worker-runner.js
-        action: update_field
-      - step: Update DEFAULT_MODEL in messages-session.js
-        file: hive/lib/messages-session.js
-        action: update_field
-  - id: proposal-3
-    title: Update example model IDs in session-system-prompt-spec.md to claude-opus-4-8
-    discovery_source: internal_audit
-    addresses_findings:
-      - finding-3
-    impact_score: 1
-    risk_score: 1
-    effort_score: 1
-    priority_score: 5
-    charter_objective: consistency
-    metric:
-      applies: false
-      justification: >
-        Documentation-only example code correction; updates two illustrative
-        code snippets to reflect the current Opus model ID with no claim on
-        any measurable runtime outcome.
-    implementation_plan:
-      - step: Update model ID in lines 357 and 420 of session-system-prompt-spec.md
-        file: hive/references/session-system-prompt-spec.md
-        action: update_field
-skipped_findings:
-  - finding_id: FIND-001
-    reason: out_of_scope
-    notes: hive.config.yaml comment — protected file, no changes without human confirmation.
-  - finding_id: FIND-005
-    reason: out_of_scope
-    notes: Orphaned step file — charter forbids file deletions.
-  - finding_id: FIND-006
-    reason: out_of_scope
-    notes: step-02c-kg-signal.md not wired — intentional design, optional via /meta-optimize routing.
-  - finding_id: FIND-007
-    reason: out_of_scope
-    notes: hive-cloud-roadmap.md stub — S16 forward-reference placeholder, 10+ consecutive deferrals.
+  start: '2026-06-08T00:30:00Z'
+  end: '2026-06-08T04:30:00Z'
 changes:
-  - proposal_id: proposal-1
-    files:
-      - hive/agents/reviewer.md
-      - hive/agents/peer-validator.md
-    action: update_field
-    description: Updated model frontmatter from sonnet to opus in both promoted agents.
+  - proposal_id: mmo-2026-04-21-001
+    file: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
+    action: add_entry
+    description: Appended reviewed-on provenance comment for meta-2026-06-08.
     status: promoted
-  - proposal_id: proposal-2
-    files:
-      - hive/lib/sandcastle-worker-runner.js
-      - hive/lib/messages-session.js
-    action: update_field
-    description: Updated DEFAULT_MODEL constant from claude-opus-4-7 to claude-opus-4-8.
-    status: promoted
-  - proposal_id: proposal-3
-    file: hive/references/session-system-prompt-spec.md
-    action: update_field
-    description: Updated two example model ID strings from claude-opus-4-7 to claude-opus-4-8.
-    status: promoted
+findings: []
+enriched_proposals:
+  - id: mmo-2026-04-21-001
+    title: Append reviewed-on provenance line for meta-2026-06-08 to archived MANIFEST
+    discovery_source: backlog
+    candidate_id: mmo-2026-04-21-001
+    target: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
+    type: archive-provenance-note
+    action: add_entry
+    metric:
+      applies: false
+      justification: >
+        Pure append-only archival annotation to a frozen historical artifact; the
+        file is not consumed by any live workflow, skill, or runtime code, and
+        the change makes no claim about any measurable outcome or behavioral change.
