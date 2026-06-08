@@ -9,6 +9,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-06-08
+
+**Release lifecycle + Multica insight capture — `/ship`, status discipline, version-bump flow, release posts, and orchestrator-distilled Multica memory.**
+
+The first epics planned *and* executed end-to-end through the Multica substrate.
+
+- **Release lifecycle** (PR #247): canonical status-lifecycle contract (`hive/references/status-lifecycle.md`) with an `in_review → in_progress` rework edge; explicit success-gated status transitions wired into `/execute`, `/review`, `/test`; kickoff captures a per-project `ship_target` (App Store / Vercel / GitHub release / npm / custom); version-bump *intent* recorded at `/plan` and performed late in `/execute`; a release-post + video-script + post-ideas generator (`hive/lib/release_post.mjs`); and the new **`/ship`** capstone — pre-flight status reconciliation (the "finished but never marked" fix), version-bump verify, configured ship action behind a dry-run gate, then release-comms generation. Documented in README Quick Start + operations-guide.
+- **Multica insight capture** (PR #250, from triage t-001): closes the gap where Multica execution mode ran none of Hive's pre-shutdown insight/memory capture. Agents now self-record insights via story-brief injection (`.hive/insights/<id>.md`); the orchestrator distills inline (full capability) into `team-memories/`, promoting durable cross-epic learnings to Hive memory; wired into `execute-mode-multica` + `pre-shutdown-protocol.md`.
+- **Meta-team bookkeeping** (PR #246): squashed 7 stranded nightly cycles; reverted the `sonnet → opus` frontmatter flip (frontmatter stays base-tier; opus applies via `model_overrides`); purged stale `claude-opus-4-7` references.
+
 ## [2.9.0] - 2026-05-31
 
 **Multica substrate deepens — execute / plan / test all route through Multica; meta-improvement reset; autonomous standup loop; Hermes integration MVP.**
