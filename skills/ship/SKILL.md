@@ -188,7 +188,7 @@ Resolve the concrete action:
 
 | Kind | Action |
 |------|--------|
-| `github-release` | `gh release create {release-id} --generate-notes` |
+| `github-release` | `gh release create {release-id} --generate-notes` — default `release-id` is `<project>-<YYYYMMDD-HHMMSS>`; for a versioned release pass `--release-id v{version}` so the Git tag follows semver (e.g. `v2.10.0`) |
 | `vercel` | `vercel deploy --prod` |
 | `npm` | `npm publish` |
 | `app-store` | Use `ship_target.command` when present; otherwise stop and ask the operator to add a store-specific command or switch to `custom`. |

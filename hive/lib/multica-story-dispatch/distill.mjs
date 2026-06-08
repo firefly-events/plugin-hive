@@ -86,6 +86,16 @@ export async function collectMulticaDistillInputs(opts) {
     messagesMaxBytes = DEFAULT_MESSAGES_MAX_BYTES,
   } = opts;
 
+  // Path-traversal guard: epicHandle/storyId are joined into episode paths.
+  // Reject anything that is not a single safe path segment.
+  for (const [name, seg] of [['epicHandle', epicHandle], ['storyId', storyId]]) {
+    if (seg == null) continue;
+    const s = String(seg);
+    if (s.includes('/') || s.includes('\\') || s.includes('..') || path.isAbsolute(s)) {
+      throw new Error(`collectMulticaDistillInputs: unsafe path segment for ${name}: ${s}`);
+    }
+  }
+
   const agentSelfCapturePath =
     selfCapturePath ||
     (workDir ? path.join(workDir, '.hive', 'insights', `${storyId}.md`) : null);

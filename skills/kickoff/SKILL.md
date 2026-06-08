@@ -22,6 +22,7 @@ For every kickoff, make sure the project has a concrete ship target:
 - Offer the allowed kinds: `app-store`, `vercel`, `github-release`, `npm`, `custom`.
 - Persist the answer to `.pHive/project-profile.yaml` under `ship_target.kind`, with optional `ship_target.notes`.
 - If the user chooses `custom`, require a non-empty shell command and persist it to `ship_target.command`; if no command is provided, re-prompt until one is provided or the user chooses a non-custom kind.
+- A `ship_target` block is **valid** when `kind` is one of the allowed values AND, when `kind: custom`, `command` is a non-empty, non-whitespace string. (Deeper command sanitization / injection safety is out of scope here — it is the `/ship` executor's responsibility, which dry-runs and confirms the resolved action before running it. This skill performs only the basic non-empty check and re-prompts.)
 - On re-kickoff, if `.pHive/project-profile.yaml` already has a valid `ship_target` block, show it and ask whether to keep or change it. If it is missing, add only that block without clobbering other profile fields.
 - For Hive itself, use `github-release` because this repo ships through GitHub releases.
 

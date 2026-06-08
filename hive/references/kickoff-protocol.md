@@ -160,6 +160,10 @@ Then:
 4. If `kind == custom` and the command is empty or missing, re-prompt:
    `Custom shipping requires a command string. What command should /ship run?`
 5. Do not write a `custom` ship target until a non-empty command is collected.
+6. Security note: a `custom` command runs in a shell at ship time. Kickoff only
+   enforces the non-empty check; command sanitization and injection safety are
+   deferred to the `/ship` executor, which presents the resolved action as a
+   dry-run and requires explicit operator confirmation before executing it.
 
 Example custom result:
 

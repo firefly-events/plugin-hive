@@ -598,7 +598,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     > Does this epic bump the version? major | minor | patch | none
 
-    Store the answer on the planning context as `${version_bump}`. The value MUST be exactly one of `major`, `minor`, `patch`, or `none`; if the answer is missing or ambiguous, ask once for clarification before writing `epic.yaml`. Use `none` only when the user explicitly selects it or when a re-plan preserves an existing `version_bump: none`.
+    Store the answer on the planning context as `${version_bump}`. The value MUST be exactly one of `major`, `minor`, `patch`, or `none`; if the answer is missing or ambiguous, ask once for clarification before writing `epic.yaml`. If the clarification answer is STILL not exactly one of the four literals, default `${version_bump}` to `none`, record `version_bump_defaulted: true` on the planning context and in `epic.yaml`, and surface a user-facing warning: `version_bump answer not recognized — defaulted to none; re-run /plan or edit epic.yaml to change.` Only those four literal values may be written to `epic.yaml`. Use `none` when the user explicitly selects it, when a re-plan preserves an existing `version_bump: none`, or via this default-on-invalid path.
 
 15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories. The emitted YAML MUST include `version_bump: <major|minor|patch|none>` populated from `${version_bump}`, plus the `git_flow:` block populated from the `${git_flow_resolution}` value captured in Phase A step 0a (pe-5):
 

@@ -24,6 +24,16 @@ function stateDir() {
   return process.env.HIVE_STATE_DIR || '.pHive';
 }
 
+// Path-traversal guard for ids that get joined into filesystem paths
+// (epic ids, release ids). Reject path separators, parent refs, absolutes.
+function assertSafeId(name, value) {
+  const s = String(value ?? '');
+  if (!s || s.includes('/') || s.includes('\\') || s.includes('..') || path.isAbsolute(s)) {
+    throw new Error(`release_post: unsafe ${name} (must be a single path segment): ${JSON.stringify(value)}`);
+  }
+  return s;
+}
+
 function stripQuotes(value) {
   return String(value ?? '').trim().replace(/^['"]|['"]$/g, '');
 }
@@ -99,6 +109,7 @@ export async function collectShippedStories({ epicIds, repoRoot = process.cwd() 
 
   const stories = [];
   for (const epicId of epicIds) {
+    assertSafeId('epicId', epicId);
     const storiesDir = path.join(repoRoot, stateDir(), 'epics', epicId, 'stories');
     let files;
     try {
@@ -238,6 +249,7 @@ export async function generateReleasePostArtifacts({
   shippedStories,
   generatedAt,
 }) {
+  assertSafeId('releaseId', releaseId);
   const stories = shippedStories
     ? shippedStories.map(normalizeStory)
     : await collectShippedStories({ epicIds, repoRoot });
