@@ -594,13 +594,20 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Stories that fail the gate are flagged in the step 18 confirmation output alongside `agent-ready-checklist` failures; the user can approve with known gaps or ask to fix them before proceeding.
 
-15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories. The emitted YAML MUST include the `git_flow:` block populated from the `${git_flow_resolution}` value captured in Phase A step 0a (pe-5):
+14b. **Capture release intent.** Ask the user exactly:
+
+    > Does this epic bump the version? major | minor | patch | none
+
+    Store the answer on the planning context as `${version_bump}`. The value MUST be exactly one of `major`, `minor`, `patch`, or `none`; if the answer is missing or ambiguous, ask once for clarification before writing `epic.yaml`. Use `none` only when the user explicitly selects it or when a re-plan preserves an existing `version_bump: none`.
+
+15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories. The emitted YAML MUST include `version_bump: <major|minor|patch|none>` populated from `${version_bump}`, plus the `git_flow:` block populated from the `${git_flow_resolution}` value captured in Phase A step 0a (pe-5):
 
     ```yaml
     name: <epic-id>
     title: <epic title>
     target_codebase: <abs path>
     methodology: <classic|tdd|bdd>
+    version_bump: <major|minor|patch|none>
 
     git_flow:
       base_branch: <resolved>          # from Phase A 0a — `develop` if origin/develop existed at plan time, else `main`, else the explicit override
@@ -614,8 +621,11 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     ```
 
     **Idempotency on re-plan.** If `epic.yaml` already exists for this epic:
+      - if it already has a `version_bump:` field, update that field in place from the user's latest answer;
+      - if it does not, insert `version_bump:` immediately after `methodology:`;
       - if it already has a `git_flow:` block, update the two field values in place (do NOT duplicate the block);
-      - if it does not, insert a fresh `git_flow:` block immediately after `methodology:` (the canonical position above).
+      - if it does not, insert a fresh `git_flow:` block immediately after `version_bump:`;
+      - canonical field order owned by /plan is `methodology` → `version_bump` → `git_flow`; insert to preserve that order.
       - all other fields not owned by /plan (e.g. `source_issue`, `description`, free-form notes) are preserved untouched.
 
     Schema reference: `hive/references/story-yaml-schema.md` §6 "Epic index (`epic.yaml`)" documents the canonical block shape.
