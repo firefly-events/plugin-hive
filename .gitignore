@@ -213,3 +213,7 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/proposals/
 !.pHive/proposals/**
 hive/lib/.pHive/
+# Node + tsx runtime cache dirs created by vitest runs under cc-workflows
+# substrate dispatches. Stay out of commits.
+node-compile-cache/
+tsx-*/
