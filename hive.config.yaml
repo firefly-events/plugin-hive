@@ -247,6 +247,19 @@ external_models:
 #   default_pr_base: auto         # auto | <branch-name>; "auto" = develop if origin/develop exists, else main
 #   branch_strategy: per-epic     # per-epic | per-story (back-compat for in-flight epics)
 
+# Planning substrate routing (multica-plan-test-cycles epic).
+# Routes /plan Phase 0 persona dispatch through the Multica daemon instead of
+# direct TeamCreate. Per-persona fan-out (one Multica issue + agent UUID per
+# planning persona); Hive owns mode-resolve, polling, episode markers, and all
+# user review/sign-off gates (gates never advance from the Multica side).
+# Prereq: `/hive:multica-init` bootstrap. Env override: HIVE_PLANNING_MODE=multica.
+planning:
+  mode: multica
+  multica:
+    poll_interval_seconds: 5
+    persona_timeout_seconds: 1800   # 30-min wall clock per persona
+    messages_capture_max: 200       # last N messages into episode sidecar
+
 # Execution defaults
 execution:
   runtime: auto         # auto | workflows | multica  (Q4 maintainer-confirmed default: auto)
