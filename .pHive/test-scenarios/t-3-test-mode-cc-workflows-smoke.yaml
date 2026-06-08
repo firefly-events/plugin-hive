@@ -1,0 +1,50 @@
+id: t-3-test-mode-cc-workflows-smoke
+title: "/test --execution-mode cc-workflows smoke walk — test-dispatch resolver + atom invocation"
+description: Spec-walk confirming that /test routes through test-dispatch to test-mode-cc-workflows when HIVE_TEST_MODE=cc-workflows is set, the resolver returns the expected mode_decision, and the atom lifecycle runs without precondition_failed.
+mode: spec-walk
+story: t-3-test-mode-cc-workflows
+epic: substrate-coverage-and-test-cleanup
+
+preconditions:
+  - "skills/hive/skills/test-dispatch/SKILL.md is present and documents Step 0/1/2 structure"
+  - "skills/hive/skills/test-mode-cc-workflows/SKILL.md is present and imports cc-workflows-preconditions.mjs"
+  - "hive/lib/mode-resolver.mjs is present and recognizes HIVE_TEST_MODE as a registered varName"
+  - "The vitest resolver test suite passes: 24/24 green"
+  - "The s-3 no-codex lint passes: 4/4 checks across all *-mode-cc-workflows/SKILL.md files"
+
+steps:
+  - action: Run the vitest resolver test for test-mode-cc-workflows to confirm all tier permutations resolve correctly.
+    expected: All 24 tests pass. Each tier (env, root_config, shipped_baseline, skill_override, default) resolves to the expected decision with only the winning source key in sources. The raw-token footgun test confirms that passing a bare value without VARNAME= falls through to the next tier.
+    actor: tester
+
+  - action: Run the s-3 no-codex lint against all skills matching skills/hive/skills/*-mode-cc-workflows/SKILL.md.
+    expected: All 4 checks pass. No agentType literal, no codex:codex-rescue reference, no agent_backends in code blocks. The cc-workflows-preconditions-import check confirms hive/lib/cc-workflows-preconditions.mjs is present in each file.
+    actor: tester
+
+  - action: Invoke resolveMode with env set to the raw token HIVE_TEST_MODE=cc-workflows and verify the returned decision and sources.
+    expected: decision equals cc-workflows and sources contains only the env key with value HIVE_TEST_MODE=cc-workflows. No other tier keys appear in sources.
+    actor: tester
+
+  - action: Invoke resolveMode with no env and rootConfig set to execution.mode cc-workflows. Verify root_config wins.
+    expected: decision equals cc-workflows and sources contains only root_config with value execution.mode=cc-workflows.
+    actor: tester
+
+  - action: Invoke resolveMode with no env and no rootConfig. Verify the default tier fires.
+    expected: decision equals default and sources contains only the default key with value auto.
+    actor: tester
+
+  - action: Read test-dispatch SKILL.md and confirm Step 0 invokes resolveMode with varName HIVE_TEST_MODE, Step 1 switches on mode_decision to route to test-mode-cc-workflows or test-mode-multica or default, and Step 2 returns the mode_decision and sources object.
+    expected: test-dispatch SKILL.md contains all three steps, cites execute-dispatch as the structural mirror anchor, and returns both mode_decision and sources to callers.
+    actor: tester
+
+  - action: Read test-mode-cc-workflows SKILL.md and confirm Step 0 imports assertWorktreeIsolation from hive/lib/cc-workflows-preconditions.mjs, Step 1 dispatches per-scenario (not per-persona), Step 3 writes episode marker to the HIVE_STATE_DIR path using story_id as the directory, and no Codex agentType appears anywhere in code blocks.
+    expected: All six steps are documented. Step 0 includes the assertWorktreeIsolation import and call. Step 1 uses scenario as the dispatch unit. Step 3 marker path includes story_id. No agentType, codex:codex-rescue, or agent_backends appear in code blocks.
+    actor: tester
+
+postconditions:
+  - "24/24 resolver tests pass (vitest green)"
+  - "4/4 no-codex lint checks pass across all *-mode-cc-workflows files"
+  - "test-dispatch Step 0 resolveMode call uses HIVE_TEST_MODE as varName"
+  - "test-dispatch returns {mode_decision, sources} to callers"
+  - "test-mode-cc-workflows atom imports cc-workflows-preconditions.mjs at Step 0"
+  - "Dispatch granularity is per-scenario, not per-persona"
