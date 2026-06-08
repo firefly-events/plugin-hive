@@ -290,9 +290,14 @@ execution_results:
   }
 });
 
-// ─── AC-2: DAG retarget — validate-coverage depends on execute-platform-a ──────
+// ─── AC-2: DAG retarget — validate-coverage depends on scenario-replay ────────
+//
+// History: t-1a originally retargeted validate-coverage from verify-baseline to
+// execute-platform-a (sequencing the inspector downstream of the worker). t-1b
+// then inserted step-04b-scenario-replay between them, so the final edge is
+// validate-coverage → scenario-replay. This assertion tracks the post-t-1b state.
 
-test('test-swarm workflow: validate-coverage depends_on execute-platform-a', () => {
+test('test-swarm workflow: validate-coverage depends_on scenario-replay', () => {
   const workflowPath = resolve('hive/workflows/test-swarm.workflow.yaml');
   const raw = readFileSync(workflowPath, 'utf8');
 
@@ -342,8 +347,8 @@ test('test-swarm workflow: validate-coverage depends_on execute-platform-a', () 
     'validate-coverage step must exist in test-swarm.workflow.yaml',
   );
   assert.ok(
-    dependsOnValues.includes('execute-platform-a'),
-    `validate-coverage.depends_on must contain execute-platform-a; got: [${dependsOnValues.join(', ')}]`,
+    dependsOnValues.includes('scenario-replay'),
+    `validate-coverage.depends_on must contain scenario-replay; got: [${dependsOnValues.join(', ')}]`,
   );
 });
 

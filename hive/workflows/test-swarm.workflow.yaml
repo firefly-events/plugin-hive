@@ -90,6 +90,27 @@ steps:
     optional: false
     timeout_ms: 600000
 
+  - id: scenario-replay
+    agent: test-inspector
+    step_file: hive/workflows/steps/test-swarm/step-04b-scenario-replay.md
+    task: >
+      Load execution results produced by execute-platform-a via loadResults
+      from hive/lib/scenarios/load.mjs. Replay the results into a structured
+      replay_summary output for downstream consumers (validate-coverage and
+      file-bugs). Compute replay_status. Emit failed_test_ids list.
+    depends_on:
+      - execute-platform-a
+    inputs:
+      - name: platform_a_results
+        source: step_output
+        step_id: execute-platform-a
+        output_name: platform_a_results
+    outputs:
+      - name: replay_summary
+        type: string
+    optional: false
+    timeout_ms: 300000
+
   - id: validate-coverage
     agent: test-inspector
     step_file: hive/workflows/steps/test-swarm/step-04-inspector.md
@@ -98,7 +119,7 @@ steps:
       criteria. Map each requirement to its covering test(s). Identify gaps
       with specificity and severity classification. Produce a coverage report.
     depends_on:
-      - execute-platform-a
+      - scenario-replay
     inputs:
       - name: test_manifest
         source: step_output
@@ -111,6 +132,10 @@ steps:
       - name: story_spec
         source: context
         context_key: story_spec
+      - name: replay_summary
+        source: step_output
+        step_id: scenario-replay
+        output_name: replay_summary
     outputs:
       - name: coverage_report
         type: string
