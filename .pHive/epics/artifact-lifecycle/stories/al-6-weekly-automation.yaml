@@ -1,0 +1,83 @@
+id: al-6-weekly-automation
+epic: artifact-lifecycle
+title: Schedule weekly artifact lifecycle sweep
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [al-3-untracked-runtime-sweep]
+
+description: |
+  Add a weekly launchd/cron automation path that invokes the Python artifact
+  lifecycle CLI. The scheduler only triggers the CLI; the CLI owns all safety,
+  dry-run/apply behavior, class filtering, hard exclusions, and active guards.
+
+acceptance_criteria:
+  - "Given the scheduler script is installed or invoked manually, when it runs, then it calls the Python artifact lifecycle CLI rather than duplicating sweep logic in shell."
+  - "Given the scheduler configuration is generated, when inspected, then it runs weekly and includes a manual invocation path for operators."
+  - "Given the CLI exits non-zero because a guard refuses an action, when the scheduled wrapper runs, then the failure is logged and no fallback deletion logic runs."
+  - "Given `--dry-run` is passed through the manual path, when invoked, then the scheduled wrapper preserves dry-run semantics."
+  - "Given tests inspect the scheduler wrapper, when they run, then they verify the command target and arguments without requiring launchd or cron to be installed."
+
+metric:
+  applies: false
+  justification: "This automation story wires a scheduled invocation path, and correctness is verified by command-shape tests rather than by a lifecycle trend metric."
+
+steps:
+  - id: research
+    description: Confirm existing repo conventions for scheduled scripts or launchd/cron documentation.
+    agent: researcher
+  - id: implement
+    description: Add scheduler wrapper/config and docs for weekly and manual invocation while delegating all safety to the CLI.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run wrapper/config tests that validate the command target and pass-through arguments.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify no safety logic is duplicated in scheduler glue and failures remain visible.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit weekly automation on feat/artifact-lifecycle.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/scripts/artifact-lifecycle-weekly.sh
+      purpose: Wrapper script for weekly/manual invocation.
+    - path: hive/references/artifact-lifecycle.md
+      purpose: Operator-facing invocation notes for manual and scheduled use.
+    - path: tests/artifact_lifecycle/test_weekly_automation.py
+      purpose: Tests wrapper command shape and dry-run pass-through.
+
+files_to_modify:
+  - file: hive/scripts/artifact-lifecycle-weekly.sh
+    change: Add weekly wrapper that invokes the Python CLI and logs failures.
+  - file: hive/references/artifact-lifecycle.md
+    change: Document manual invocation and weekly scheduler installation expectations.
+  - file: tests/artifact_lifecycle/test_weekly_automation.py
+    change: Add tests for wrapper command target and dry-run pass-through.
+
+cross_cutting:
+  - concern: operations
+    action: Provide manual and weekly invocation paths without moving safety policy out of the CLI.
+  - concern: metrics
+    action: Opt out with metric.applies=false because this story is scheduler glue with testable command behavior.
+
+design_decisions:
+  - decision: Scheduler calls the Python CLI and owns no artifact safety logic.
+    rationale: The design discussion states cron or launchd should call the Python CLI while the CLI owns all safety.
+
+risks:
+  - severity: medium
+    description: Scheduler glue can drift from CLI flags and silently skip safeguards.
+    mitigation: Keep the wrapper minimal and test the exact command shape and pass-through behavior.
+
+references:
+  - path: .pHive/epics/artifact-lifecycle/docs/design-decisions.md
+    relevant_excerpt: "The untracked sweep generalizes sdr-8 and weekly automation should call the Python CLI while the CLI owns all safety."
+  - path: .pHive/epics/artifact-lifecycle/docs/design-discussion.md
+    relevant_excerpt: "The CLI should support dry-run, apply, and class-scoped execution; cron or launchd should call the Python CLI weekly."

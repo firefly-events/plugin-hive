@@ -1,0 +1,86 @@
+id: al-2-forever-exclusions-guard
+epic: artifact-lifecycle
+title: Enforce forever-retention hard exclusions
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [al-1-lifecycle-library-and-registry]
+
+description: |
+  Add default hard exclusions and enforce them before planning or executing any
+  lifecycle action. Memories, team memories, KG sqlite, and ChromaDB collection
+  or index data are forever-retained; Chroma pid, port, lock, lockdir, and log
+  sidecars remain evictable runtime artifacts.
+
+acceptance_criteria:
+  - "Given a candidate path under `~/.claude/hive/memories/**`, when the planner evaluates it, then it is excluded before any action is planned."
+  - "Given a candidate path under `.pHive/team-memories/**`, when the planner evaluates it, then it is excluded before any action is planned."
+  - "Given a candidate path equal to `~/.claude/hive/kg.sqlite` or the resolved `$HIVE_KG_SQLITE_PATH`, when the planner evaluates it, then it is excluded before any action is planned."
+  - "Given a ChromaDB collection or index data path, when the planner evaluates it, then it is excluded; given `chromadb.pid`, `chromadb.port`, `chromadb.lock`, `chromadb.lockdir`, or `chromadb.log`, then the sidecar may still be considered by an evictable class."
+  - "Given apply mode attempts to act on a hard-excluded root, when the guard runs, then the sweep refuses the action and returns a non-zero error naming the excluded root."
+
+metric:
+  applies: false
+  justification: "This guard story protects correctness-critical retention boundaries, and verification comes from deny-list tests rather than an operational trend metric."
+
+steps:
+  - id: research
+    description: Skip; design-decisions.md already lists the authoritative hard-exclude roots.
+    agent: researcher
+  - id: implement
+    description: Add hard-exclude defaults, path-boundary matching, and planner/executor refusal behavior.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run exclusion tests covering memory, team-memory, KG sqlite override, Chroma index, and Chroma sidecars.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify every forever-retention root from D2/exclude list is covered and sidecar exceptions are narrow.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit the hard-exclusion guard on feat/artifact-lifecycle.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/artifact_lifecycle/exclusions.py
+      purpose: New hard-exclusion matcher and default exclusion set.
+    - path: hive/lib/artifact_lifecycle/planner.py
+      purpose: Planner must apply exclusions before producing candidates.
+    - path: tests/artifact_lifecycle/test_exclusions.py
+      purpose: Guard tests for forever roots and Chroma sidecar exceptions.
+
+files_to_modify:
+  - file: hive/lib/artifact_lifecycle/exclusions.py
+    change: Create hard-exclude matcher with home/env expansion and boundary-safe matching.
+  - file: hive/lib/artifact_lifecycle/planner.py
+    change: Apply hard exclusions before candidate creation.
+  - file: tests/artifact_lifecycle/test_exclusions.py
+    change: Add refusal tests for all forever roots and sidecar exceptions.
+
+cross_cutting:
+  - concern: safety
+    action: Hard-exclude memory and KG roots before lifecycle classification or action planning.
+  - concern: metrics
+    action: Opt out with metric.applies=false because the guard is validated by direct tests.
+
+design_decisions:
+  - decision: Treat project/team memories as forever-retained memories.
+    rationale: The design-decision ruling says `.pHive/team-memories/**` is a memory root and must be hard-excluded.
+  - decision: Separate Chroma index data from Chroma process sidecars.
+    rationale: The semantic index belongs to the retained memory/KG layer, while pid, port, lock, lockdir, and log files are ephemeral process state.
+
+risks:
+  - severity: high
+    description: Prefix-only path matching could exclude or include the wrong sibling path.
+    mitigation: Implement boundary-safe resolved path checks and include sibling-path negative tests.
+
+references:
+  - path: .pHive/epics/artifact-lifecycle/docs/design-decisions.md
+    relevant_excerpt: "Forever hard-exclude covers agent memories, `.pHive/team-memories/**`, KG sqlite, and ChromaDB collection/index data; Chroma pid/port/lock/log sidecars are evictable."
+  - path: .pHive/epics/artifact-lifecycle/docs/design-discussion.md
+    relevant_excerpt: "The win condition is strict: active work is never touched, memories and KG live forever."
