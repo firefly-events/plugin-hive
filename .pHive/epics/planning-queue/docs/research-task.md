@@ -1,5 +1,9 @@
 # Research task — planning-queue epic (cluster B)
 
+> **These files ARE on your checked-out branch `feat/planning-queue`.** Read them FIRST with the Read/cat tool: this file AND `.pHive/proposals/cluster-b-planning-queue-brief.md`. Do not work from the roadmap line alone.
+>
+> **The 4 design decisions in the brief are LOCKED — do NOT flag them as risks.** Specifically: the rough-idea queue is a **NEW `planning-queue.yaml`**, separate from triage `queue.yaml` — so "autonomous refill conflicts with triage's operator-driven design" is NOT a risk (different queue, different semantics). The visual surface is a **label + saved board-view convention**, not a Multica core UI change — so "no Multica UI tab exists" is expected, not a risk. Your job is to find reuse seams + real conflicts, not to re-open settled choices.
+
 You are the **researcher** for the `planning-queue` epic. Deliver **raw findings** (concrete file paths, schemas, function signatures, gaps) — NOT a formatted brief. The technical writer formats later.
 
 **First read the design brief:** `.pHive/proposals/cluster-b-planning-queue-brief.md` — it carries 4 maintainer-locked decisions. Do NOT re-litigate them. Your job is to find the code surfaces the build will touch.
