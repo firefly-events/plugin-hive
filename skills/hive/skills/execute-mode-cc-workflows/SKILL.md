@@ -318,7 +318,7 @@ Runtime and branch configuration:
 |---|---|
 | `execution.runtime` | `"cc-workflows"` |
 | `HIVE_EXECUTION_RUNTIME` | `workflows` |
-| `HIVE_STATE_DIR` | `hive_config.paths.state_dir || ".pHive"` |
+| `HIVE_STATE_DIR` | `hive_config.paths.state_dir \|\| ".pHive"` |
 | Minimum CC runtime version | `2.1.154` |
 | Integration branch convention | `feat/<epic-id>` |
 
