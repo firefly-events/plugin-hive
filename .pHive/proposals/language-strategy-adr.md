@@ -1,9 +1,16 @@
 # ADR: Language & runtime strategy for Hive
 
-**Status:** Proposed  
+**Status:** Accepted (2026-06-08, maintainer)  
 **Date:** 2026-06-08  
 **Author:** analyst  
 **Evidence source:** `.pHive/proposals/language-strategy-research.md`
+
+> **Maintainer decision (2026-06-08):**
+> - **Direction: Option B — Python-first with bridges.**
+> - **Sandcastle: optional maintainer-only execution mode** — stays behind a Node bridge, outside the Python core; not long-term-core.
+> - **Charter home: `CLAUDE.md`** becomes the project/architecture charter; the current context-mode routing rules move to a separate file (e.g. `.claude/context-mode.md`) that `CLAUDE.md` references.
+> - Open decisions 3 (adapter ABI), 4 (Multica platform constraint), 5 (lockfile policy) deferred to the migration epic when scheduled.
+> - **Cross-epic:** `state-dir-resolver` sdr-1 must be re-specced Python-primary + shell/Node shims (not co-equal 3-runtime) before `/execute`.
 
 ---
 
