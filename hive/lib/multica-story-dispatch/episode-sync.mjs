@@ -351,16 +351,27 @@ export async function writeMulticaRunEpisode(opts) {
   await fs.writeFile(markerPath, marker, 'utf8');
   await fs.writeFile(messagesPath, jsonl ? `${jsonl}\n` : '', 'utf8');
 
-  const distillResult = distill
-    ? await runMulticaInsightDistill({
+  // Best-effort: the episode marker is the source of truth. A distill failure
+  // must never lose the already-written marker/messages, so swallow + record
+  // any throw and continue (matches the fire-and-forget, signal-gated design).
+  let distillResult = null;
+  if (distill) {
+    try {
+      distillResult = await runMulticaInsightDistill({
         hiveStateDir,
         epicHandle,
         storyId,
         workDir: terminal?.work_dir ?? null,
         messagesPath,
         ...distill,
-      })
-    : null;
+      });
+    } catch (error) {
+      process.stderr.write(
+        `[multica-distill] ${storyId}: distill failed — ${error?.message ?? error}\n`,
+      );
+      distillResult = { ok: false, error: String(error?.message ?? error) };
+    }
+  }
 
   return { markerPath, messagesPath, status, notes, completion, distill: distillResult };
 }
