@@ -363,6 +363,8 @@ Underneath the pipeline, the L0–L3 memory system and KG (described above) pers
 
 For full operational detail, see [docs/operations-guide.md](docs/operations-guide.md).
 
+See [Dispatch Parity Matrix](hive/references/dispatch-parity.md) for the canonical 6×3 substrate matrix per /plan, /execute, /test, /design, /design-review, /review.
+
 ---
 
 ## Optional Integrations
