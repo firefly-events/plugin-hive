@@ -133,6 +133,12 @@ Structured code review covering correctness, security, conventions, and domain c
 ```
 Shows active epics, story progress, and a **Drift trend (last 5 runs)** section summarizing `scope_drift_score` bucket counts when present. Silent on greenfield projects with no drift events yet.
 
+**8. Ship the release**
+```
+/hive:ship
+```
+Closes the lifecycle. Pre-flight reconciles story status (catches finished-but-unmarked work), verifies the version bump occurred, runs the project's configured ship target (App Store / Vercel / GitHub release / npm / custom — defined at `/hive:kickoff`), then generates release-comms artifacts (release post + video script + post ideas). Multi-epic capable, single-epic by default.
+
 ### How execution works
 
 `/hive:plan` and `/hive:review` still run interactively on your laptop, preserving the places where you inspect, steer, and approve the work. `/hive:execute` now routes implementation through Multica, the user-directed execution substrate used by the default path.

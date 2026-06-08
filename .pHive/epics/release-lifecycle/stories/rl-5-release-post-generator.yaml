@@ -1,0 +1,108 @@
+id: rl-5-release-post-generator
+epic: release-lifecycle
+title: Release-post + video-script generator (Hive-first, generic-aware)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [ rl-1 ]
+
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Introduce "release posts" as a first-class concept. Given the shipped stories of
+  one or more epics, generate release-communications artifacts:
+    - a release post (changelog-grade highlights, human voice)
+    - a short video script (hook -> 2-4 highlights -> call to action)
+    - post ideas: WHERE to post + the HIGHLIGHTS to cover per channel
+
+  Hive-first, generic-aware: build for Hive's own releases now, but parameterize the
+  templates (project name, repo/links, channels) so a consumer project can adopt by
+  filling params — no Hive-specific strings hardcoded in the template body.
+
+  Input contract: a list of epic IDs -> their `shipped` stories (titles + one-line
+  outcomes) aggregated into the artifacts. This is the multi-epic aggregation that
+  rl-6 (/ship) drives; this story owns the generator + templates, not the /ship glue.
+
+  Output location: .pHive/releases/<release-id>/ (post.md, video-script.md, post-ideas.md).
+  Templates live under hive/references/release-post/.
+
+acceptance_criteria:
+  - "Given a set of epic IDs with shipped stories, when the generator runs, then
+    it emits post.md, video-script.md, and post-ideas.md under
+    .pHive/releases/<release-id>/."
+  - "Given the templates, when inspected, then no Hive-specific literal is
+    hardcoded — project name, links, and channels are parameters
+    (generic-aware)."
+  - "Given post-ideas.md, when generated, then it lists target channels and
+    per-channel highlight angles (where to post + what to emphasize)."
+  - "Given an epic's shipped stories, when aggregated, then each highlight
+    traces to a shipped story (no invented features)."
+
+steps:
+  - id: research
+    description: Survey existing comms surfaces (skills/hive/skills/readme,
+      marketing/) for tone + reusable structure; confirm shipped-story shape
+      from rl-1 contract.
+    agent: researcher
+  - id: implement
+    description: Build the generator lib + the three parameterized templates under
+      hive/references/release-post/; wire output to
+      .pHive/releases/<release-id>/.
+    agent: developer
+    depends_on: [ research ]
+  - id: test
+    description: Cover single-epic and multi-epic aggregation, param substitution,
+      and the no-invented-highlights traceability rule.
+    agent: tester
+    depends_on: [ implement ]
+  - id: review
+    description: Confirm templates are project-agnostic and the input contract
+      matches what rl-6 will pass.
+    agent: reviewer
+    depends_on: [ test ]
+  - id: integrate
+    description: Commit to feat/release-lifecycle.
+    agent: developer
+    depends_on: [ review ]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/readme/SKILL.md
+      purpose: Existing comms/readme surface; reuse tone + structure where sensible.
+    - path: hive/references/status-lifecycle.md
+      purpose: Defines `shipped` — the generator aggregates shipped stories.
+
+files_to_modify:
+  - file: hive/references/release-post/post-template.md
+    change: Create parameterized release-post template (new).
+  - file: hive/references/release-post/video-script-template.md
+    change: Create parameterized video-script template (new).
+  - file: hive/references/release-post/post-ideas-template.md
+    change: Create where-to-post + highlights template (new).
+  - file: hive/lib/release_post.mjs
+    change: Create generator that aggregates shipped stories -> artifacts (new).
+
+cross_cutting:
+  - concern: documentation
+    action: "Document the release-post concept + template params; link from /ship
+      (rl-6)."
+
+metric:
+  applies: false
+  justification: "Generator + templates for a brand-new artifact type with no
+    pre-existing baseline to move; value is qualitative (release comms exist at
+    all). Adoption could be tracked later but is not a falsifiable target for
+    this build story."
+
+risks:
+  - severity: low
+    description: Generic-aware over-design balloons scope.
+    mitigation: One template set param'd by project; defer multi-project registry
+      until a consumer asks (per design R4).
+  - severity: low
+    description: Generated highlights drift from actual shipped work.
+    mitigation: AC4 — every highlight traces to a shipped story; no free invention.
+tracker_id: plugin-hive/PLU-236
+tracker_url: http://localhost:3000/plugin-hive/issues/236

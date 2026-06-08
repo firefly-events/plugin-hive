@@ -17,6 +17,14 @@ For a fresh kickoff, include the metrics opt-in question before scenario-specifi
 - Default to off. The user must actively choose yes.
 - Persist the answer to `hive/hive.config.yaml` at `metrics.enabled` using the kickoff protocol's existing config write pattern.
 
+For every kickoff, make sure the project has a concrete ship target:
+- Ask: `What does shipping mean for this project?`
+- Offer the allowed kinds: `app-store`, `vercel`, `github-release`, `npm`, `custom`.
+- Persist the answer to `.pHive/project-profile.yaml` under `ship_target.kind`, with optional `ship_target.notes`.
+- If the user chooses `custom`, require a non-empty shell command and persist it to `ship_target.command`; if no command is provided, re-prompt until one is provided or the user chooses a non-custom kind.
+- On re-kickoff, if `.pHive/project-profile.yaml` already has a valid `ship_target` block, show it and ask whether to keep or change it. If it is missing, add only that block without clobbering other profile fields.
+- For Hive itself, use `github-release` because this repo ships through GitHub releases.
+
 For a brownfield re-kickoff where `hive/hive.config.yaml` already has `metrics.enabled` set:
 - Read and show the existing `metrics.enabled` value before asking anything.
 - Ask whether the user wants to change that existing value, using change-prompt wording rather than the fresh opt-in question.

@@ -1,0 +1,330 @@
+---
+name: ship
+description: Reconcile completed work, verify the planned version bump, run the configured ship action, generate release artifacts, and mark stories shipped.
+---
+
+# Hive Ship
+
+Close one or more epics by reconciling story status, verifying release readiness,
+executing the configured ship target, generating release communications, and
+advancing shipped stories.
+
+**Input:** `$ARGUMENTS` contains zero or more epic IDs plus optional flags:
+
+| Argument | Meaning |
+|----------|---------|
+| *(none)* | Infer the obvious single target epic. |
+| `<epic-id>` | Ship one epic. |
+| `<epic-id> <epic-id> ...` | Ship a multi-epic release. |
+| `--partial` | Allow shipping only the stories that are already `complete` after reconciliation. |
+| `--release-id <id>` | Use a stable release artifact ID. Default: `<project>-<YYYYMMDD-HHMMSS>`. |
+| `--dry-run` | Stop after displaying the resolved ship plan. Do not execute, generate artifacts, or mark shipped. |
+
+## State Directory Resolution
+
+All state paths in this skill are written as `${HIVE_STATE_DIR}/...`. Resolve
+`HIVE_STATE_DIR` from `paths.state_dir` in the root `hive.config.yaml`; fall
+back to `.pHive` when unset. The shipped baseline at `hive/hive.config.yaml` is
+only a fallback source and does not override the consumer root config.
+
+## Skill Preamble
+
+See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
+for initialization, persona/config loading, and memory loading.
+
+This skill is release-action-shaped, so the kickoff gate is strict. If
+`${HIVE_STATE_DIR}/project-profile.yaml` is missing, stop and tell the operator:
+
+```text
+Hive is not initialized for shipping. Run /hive:kickoff so ship_target is captured before /ship runs.
+```
+
+## Process
+
+### 1. Resolve Target Epic Set
+
+Parse `$ARGUMENTS` into `epic_ids[]` and flags.
+
+If one or more epic IDs are supplied, validate that every
+`${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml` exists. If any are missing, stop and
+list the missing paths.
+
+If no epic IDs are supplied, infer the obvious target:
+
+1. Scan `${HIVE_STATE_DIR}/epics/*/epic.yaml`.
+2. Exclude epics where every story is already `shipped`.
+3. Prefer epics with at least one story whose derived status is `complete`.
+4. If exactly one candidate remains, use it.
+5. If zero candidates remain, stop:
+
+   ```text
+   No obvious epic to ship. Pass an epic ID, or run /status to inspect active epics.
+   ```
+
+6. If multiple candidates remain, stop and list them:
+
+   ```text
+   Multiple possible epics found. Re-run /ship with one or more epic IDs:
+   - {epic-id} - {title}
+   ```
+
+For every story status read, call `deriveStoryStatus({ epic_id, story_id })` from
+`hive/lib/story-status.mjs` when available. Treat derived `completed` as canonical
+`complete` for compatibility with older episode markers. If the helper is
+unavailable, read story YAML `status:` only as a compatibility fallback and warn
+once that marker-derived status could not be used.
+
+### 2. Pre-Flight Status Reconciliation
+
+Walk every story in every target epic in deterministic order: epics in the order
+provided, then stories in `epic.yaml` order.
+
+For each story:
+
+- `shipped`: exclude it from this release and show it as already shipped.
+- `complete` or legacy `completed`: include it in the ship set.
+- `in_review`: surface the story and ask the operator to choose:
+  - `confirm-complete` - manual review already passed. Write `status: complete`
+    to the story YAML projection and include it in the ship set.
+  - `bounce-to-rework` - review did not pass or evidence is missing. Write
+    `status: in_progress`, record the rework reason if provided, and exclude it.
+- any other status (`pending`, `in_progress`, `blocked`, `failed`, missing):
+  surface the story and ask the operator to choose:
+  - `confirm-complete` - required work and review are actually done. Write
+    `status: complete` and include it.
+  - `bounce-to-rework` - work remains. Write `status: in_progress`, record the
+    rework reason if provided, and exclude it.
+
+The reconciliation prompt must show:
+
+- epic ID and story ID;
+- title;
+- current derived status;
+- latest episode marker path or "no episode marker found";
+- the exact write that each choice will make.
+
+This step is the only `/ship` path that may write `complete`, and only as a
+manual-review reconciliation correction. It must never mark a story `shipped`.
+
+After reconciliation:
+
+- If any target story is not `complete` or `shipped` and `--partial` is absent,
+  refuse to ship:
+
+  ```text
+  Ship refused: all target stories must be complete before release.
+  Re-run /ship after rework, or pass --partial to ship only complete stories.
+  ```
+
+- If `--partial` is present, continue with only the reconciled `complete` stories
+  and show the excluded stories.
+- If the ship set is empty, stop. Do not run a ship action, generate release
+  artifacts, or mark anything shipped.
+
+### 3. Verify Planned Version Bump
+
+For each target epic, read `version_bump` from
+`${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`. Missing means `none`.
+
+If every target epic has `version_bump: none`, report that no bump is required and
+continue.
+
+For each epic where `version_bump` is `major`, `minor`, or `patch`, verify that
+`/execute` already applied the bump:
+
+1. Inspect every JSON version source named in `/execute`:
+   - `.claude-plugin/*.json`;
+   - root `plugin.json` when present.
+2. Parse JSON with a structured parser. Collect every recursive `version` field.
+3. Verify all collected version values are in lockstep. If not, stop and report
+   the mismatched path/key/value set.
+4. Verify `CHANGELOG.md` contains an `## [Unreleased]` entry for the epic that
+   names the planned bump level.
+
+If the version sources are lockstep and the changelog contains the epic bump
+entry, report the verified version and continue.
+
+If the planned bump appears missing, show the gap and offer a safety-net patch:
+
+```text
+Version bump gap detected for {epic-id}: planned {version_bump}, but /execute did not leave matching version/changelog evidence.
+Patch the missing bump here before shipping? (yes/no)
+```
+
+When the operator answers `yes`, apply the same structured bump rules described
+in `skills/execute/SKILL.md` step 7e:
+
+- compute the next SemVer from the current lockstep version;
+- update every discovered `version` field in every version source;
+- add the changelog entry under `## [Unreleased]`;
+- commit the version-source and changelog changes with:
+
+  ```bash
+  git commit -m "chore(release): apply ship-time version safety net for {epic-id}"
+  ```
+
+When the operator answers `no`, stop. `/ship` must not execute a release action
+while the planned bump is unverified.
+
+`/ship` is a verifier and safety net. The normal owner of the planned version bump
+is still `/execute`.
+
+### 4. Resolve Ship Target And Dry Run
+
+Read `${HIVE_STATE_DIR}/project-profile.yaml` and require a valid `ship_target`
+block:
+
+```yaml
+ship_target:
+  kind: app-store | vercel | github-release | npm | custom
+  command: "<shell command>" # required only when kind == custom
+  notes: "<optional human note>"
+```
+
+If the block is missing or invalid, stop and tell the operator to run
+`/hive:kickoff` to capture the ship target.
+
+Resolve the concrete action:
+
+| Kind | Action |
+|------|--------|
+| `github-release` | `gh release create {release-id} --generate-notes` |
+| `vercel` | `vercel deploy --prod` |
+| `npm` | `npm publish` |
+| `app-store` | Use `ship_target.command` when present; otherwise stop and ask the operator to add a store-specific command or switch to `custom`. |
+| `custom` | Use `ship_target.command`; it must be non-empty. |
+
+Before executing anything, print a dry-run plan:
+
+```text
+## Ship Dry Run
+
+Release ID: {release-id}
+Target epics: {epic_ids}
+Stories to mark shipped after success:
+- {epic-id}/{story-id} - {title}
+
+Ship target:
+- kind: {kind}
+- command: {resolved command}
+- notes: {notes or none}
+
+Release artifacts:
+- ${HIVE_STATE_DIR}/releases/{release-id}/post.md
+- ${HIVE_STATE_DIR}/releases/{release-id}/video-script.md
+- ${HIVE_STATE_DIR}/releases/{release-id}/post-ideas.md
+```
+
+If `--dry-run` is present, stop here.
+
+Require explicit operator confirmation before executing the command:
+
+```text
+Execute this ship action now? Type "ship {release-id}" to continue.
+```
+
+For `custom` and `app-store` command-backed targets, also show:
+
+```text
+This command is project-defined and may have high blast radius.
+```
+
+Do not execute unless the typed confirmation exactly matches `ship {release-id}`.
+
+### 5. Execute Ship Action
+
+Run the resolved command from the repository root.
+
+If the command exits non-zero, stop and report the command, exit code, and the
+first useful error output. Do not generate release artifacts and do not mark any
+story shipped.
+
+If the command succeeds, capture:
+
+- command;
+- exit code;
+- timestamp;
+- release ID;
+- target epics;
+- shipped story IDs.
+
+### 6. Announce
+
+Generate release artifacts under `${HIVE_STATE_DIR}/releases/{release-id}/`.
+
+Use `hive/lib/release_post.mjs`:
+
+```javascript
+import { generateReleasePostArtifacts } from './hive/lib/release_post.mjs';
+
+await generateReleasePostArtifacts({
+  epicIds,
+  releaseId,
+  projectName,
+  repoUrl,
+  links,
+  channels,
+  repoRoot,
+  shippedStories,
+});
+```
+
+Pass `shippedStories` explicitly from the current ship set so the artifacts can be
+created before the final `complete -> shipped` projection write. Each story entry
+must include `epicId`, `storyId`, `title`, `outcome`, and `sourcePath`. The
+generated highlights must trace to the shipped stories; do not invent features.
+
+If artifact generation fails, stop and report the failure. Do not mark stories
+shipped until the release artifacts exist.
+
+### 7. Mark Shipped
+
+Only after the ship action succeeds and release artifacts exist, advance every
+story in the ship set from `complete` to `shipped`.
+
+Write the story YAML projection:
+
+```yaml
+status: shipped
+shipped_at: "<ISO 8601 timestamp>"
+release_id: "<release-id>"
+```
+
+Do not change stories excluded by `--partial`, stories bounced to rework, or
+stories already shipped in a previous release.
+
+If task tracking is configured, project the same final status through the
+task-tracking adapter using skill context `ship`. Adapter failure is recoverable:
+local story YAML and episode markers remain the source of truth.
+
+Finally, run `/status {epic-id}` or invoke the same read-only status derivation
+path for every target epic and report the resulting shipped state. `/status`
+itself must remain read-only; do not add status writes to it.
+
+## Output
+
+End with a compact release summary:
+
+```text
+## Shipped {release-id}
+
+Ship target: {kind}
+Command: {resolved command}
+Epics: {epic_ids}
+Stories shipped: {count}
+Release artifacts:
+- ${HIVE_STATE_DIR}/releases/{release-id}/post.md
+- ${HIVE_STATE_DIR}/releases/{release-id}/video-script.md
+- ${HIVE_STATE_DIR}/releases/{release-id}/post-ideas.md
+
+Excluded stories:
+- {epic-id}/{story-id} - {status/reason}
+```
+
+## Key References
+
+- [`hive/references/status-lifecycle.md`](../../hive/references/status-lifecycle.md) - `/ship` owns `complete -> shipped` and the manual-complete reconciliation path.
+- [`hive/references/kickoff-protocol.md`](../../hive/references/kickoff-protocol.md) - `ship_target` schema and allowed target kinds.
+- [`skills/execute/SKILL.md`](../execute/SKILL.md) - primary version bump owner and ship-time safety-net patch rules.
+- [`skills/status/SKILL.md`](../status/SKILL.md) - read-only status reporting and `deriveStoryStatus` usage.
+- [`hive/lib/release_post.mjs`](../../hive/lib/release_post.mjs) - release artifact generator.

@@ -282,7 +282,11 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
    [debug] handoff: story={story_id} target={target} verdict={verdict} duration={duration_ms}ms
    ```
 
-7b. **Update story status in the task tracker.** When a story advances through a workflow phase that warrants an externally-visible status change (e.g., research → in-progress, review → in-review, integrate → done), call the dispatch module. This is a no-op when `task_tracking.adapter` is unset.
+7b. **Project dispatch status.** After a story is successfully dispatched or claimed for work by the selected execution mode, write `/execute`'s owned lifecycle transition from [`status-lifecycle.md`](../../hive/references/status-lifecycle.md): update that story YAML's `status:` projection from `pending` to `in_progress`.
+
+    This write is gated on dispatch success. Do not write `in_progress` before the story is actually handed to a teammate/session/sandcastle/Multica/CC Workflows runner, and do not write it when dispatch fails, is skipped, or is blocked by dependency gating. `/execute` does not own `in_review`, `complete`, or `shipped`; terminal workflow completion and integrate success must not be projected as story `complete`.
+
+    When `task_tracking.adapter` is configured, mirror only this owned `in_progress` transition to the task tracker via the dispatch module. This is a no-op when `task_tracking.adapter` is unset.
 
     Only stories with a populated `tracker_id` (written by `plan` Phase D) are eligible. The dispatch module owns gate_mode behavior, telemetry, and error mapping — do not branch on the adapter vendor here.
 
@@ -311,6 +315,50 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
     Episode markers (per `hive/references/episode-schema.md`) are still authoritative for in-Hive state. Tracker status updates are a one-way projection — failures here never block the workflow.
 
 7d. **Multica story close (integrate hook).** Immediately after the `integrate` step's commit+push completes, the integrate step file calls `closeStoryIssue({epic_id, story_id})` from `hive/lib/multica-issue-closer.mjs`. This hook is gated on `task_tracking.adapter === 'multica'` (read from root `hive.config.yaml`); other values (including null / unset) skip with a one-line `[gate_mode]` log. The hook is also skipped for dry-run invocations and when /execute is in `--simulated-manual` mode. On any `ok: false` result, one warn line is emitted and /execute continues — this hook never blocks story completion. The full gate logic and log-line templates live in the integrate step file (`hive/workflows/steps/development-classic/step-08-integrate.md` §6a).
+
+7e. **Epic finalize — version bump and changelog.** After the last story's integrate step has completed successfully, and before the final run summary, read `version_bump` from the loaded `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`.
+
+   - If `version_bump` is absent, treat it as `none` and emit:
+
+     ```
+     [info] finalize: epic.yaml has no version_bump; treating as none
+     ```
+
+   - If `version_bump: none`, perform a clean no-op: do not edit any version source, do not add a changelog release entry, do not create a finalize commit. Continue to step 8.
+
+   - If `version_bump` is one of `major`, `minor`, or `patch`, compute the next SemVer from the current lockstep version. Version sources are:
+     - every JSON file matching `.claude-plugin/*.json`;
+     - `plugin.json` at the repository root when present.
+
+     Parse each JSON file with a structured JSON parser. Collect every `version` field recursively (for example `.claude-plugin/marketplace.json` has both a root `version` and nested plugin metadata). All discovered values MUST be identical before bumping. If they differ, stop finalize and report the mismatched path/key/value set; do not partially edit files.
+
+   - Apply the computed new version to every discovered `version` field in those sources, preserving JSON formatting conventions already present in the file.
+
+   - Write a changelog entry under `## [Unreleased]` in `CHANGELOG.md` for this epic. The entry MUST name the epic ID, the bump level, and the old/new version pair, for example:
+
+     ```markdown
+     ### Changed
+
+     - **`{epic-id}` release finalization.** `/execute` applied the planned `{version_bump}` version bump (`{old_version}` → `{new_version}`) and kept plugin version sources in lockstep.
+     ```
+
+     If `## [Unreleased]` already contains the appropriate category heading, append under it instead of duplicating the heading.
+
+   - Commit the version-source and changelog changes together in one finalize commit. Stage only the targets that exist — a literal `git add` of a missing path or an unmatched glob errors out — so build the add-list from the version sources actually present plus `CHANGELOG.md` when present:
+
+     ```bash
+     # Collect only existing targets (globs that match nothing are dropped).
+     targets=()
+     for f in .claude-plugin/*.json plugin.json CHANGELOG.md; do
+       [ -e "$f" ] && targets+=("$f")
+     done
+     if [ ${#targets[@]} -gt 0 ]; then
+       git add "${targets[@]}"
+     fi
+     git commit -m "chore(release): bump plugin version for {epic-id}"
+     ```
+
+     If there are no diffs after applying the bump and changelog entry (nothing staged), report `[info] finalize: version bump already applied for {epic-id}` and do not commit.
 
 8. After all stories complete, produce a summary plus the post-run audit:
 
@@ -383,7 +431,8 @@ greenfield/early projects and logs once per run. No new error handling
 - **`references/sequential-execution.md`** — Per-story workflow steps, sidecar injection at review, episode records, gate checks
 - `hive/references/agent-teams-guide.md` — Team mechanics and limitations
 - `hive/references/methodology-routing.md` — Methodology selection
-- `hive/references/episode-schema.md` — Status marker format. **Story state is derived from these markers — do NOT free-write `status:` in story YAMLs.** When a workflow step completes, write the corresponding episode marker; story-level state is computed from the marker set per the schema. The free-write `status:` field in some legacy story YAMLs is deprecated (per `feedback_story_status_stale`).
+- `hive/references/episode-schema.md` — Status marker format. Episode markers remain the authoritative evidence for workflow steps; story YAML `status:` is a lifecycle projection and may be written only for command-owned transitions defined in `status-lifecycle.md`.
+- `hive/references/status-lifecycle.md` — Canonical command-owned story lifecycle; `/execute` owns only the success-gated `pending -> in_progress` dispatch projection.
 
 ### Per-step token budgets (advisory caps)
 

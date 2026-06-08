@@ -488,6 +488,7 @@ name: <epic-id>                  # kebab-case identifier; matches dir name
 title: <human title>
 target_codebase: <abs path>      # absolute path to the codebase /plan targeted
 methodology: <classic|tdd|bdd>   # selected in /plan; can be overridden per-story
+version_bump: <major|minor|patch|none>  # selected in /plan; consumed by /execute finalize
 
 # pe-5: pinned at plan time from `hive/lib/git_flow.mjs` (pe-1). The
 # sandcastle bridge (pe-2) and dispatch workflow (pe-3) prefer these
@@ -530,6 +531,27 @@ re-emits it:
 Downstream consumers fall back to the live `hive.config.yaml` for those
 epics; the bridge / workflow emit a one-line info log noting the
 fall-through.
+
+### 6.3 The `version_bump` field
+
+| Field | Type | Allowed values | Source |
+|---|---|---|---|
+| `version_bump` | string | `major` \| `minor` \| `patch` \| `none` | selected by the user during `/plan` |
+
+**Release intent.** `/plan` asks "Does this epic bump the version?
+major | minor | patch | none" and persists the answer on `epic.yaml`.
+This records intent only; `/plan` does not edit version sources.
+
+**Execution ownership.** `/execute` reads `version_bump` during the
+epic-finalize path after story implementation has completed. When the
+value is `major`, `minor`, or `patch`, `/execute` bumps every plugin
+version source to the same semver and writes a changelog entry for the
+epic. When the value is `none`, finalize performs a clean no-op for
+version files and changelog release text.
+
+**Back-compat.** Epics that pre-date this field may omit it. Downstream
+consumers treat omission as `none` and emit a one-line info log so the
+operator can decide whether to re-plan with explicit release intent.
 
 ## 7. The `test_scenario` field group
 

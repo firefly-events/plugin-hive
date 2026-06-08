@@ -1,0 +1,130 @@
+id: rl-6-ship-skill
+epic: release-lifecycle
+title: /ship capstone skill — reconcile, verify, ship, announce
+status: pending
+complexity: high
+methodology: classic
+depends_on: [ rl-2, rl-3, rl-4, rl-5 ]
+
+description: |
+  The capstone. A new top-level /ship skill that closes the lifecycle. Multi-epic
+  capable, with single-epic as the easy default (no args -> infer the obvious epic).
+
+  Ordered behavior:
+    1. PRE-FLIGHT STATUS RECONCILIATION (the keystone — solves "finished but never
+       marked"). Walk every story in the target epic(s). For any story not yet
+       `complete`, surface it and let the operator confirm done -> `complete` or
+       bounce -> `in_progress` (rework, per rl-1). Because review is often manual
+       with no auto-hook, THIS is the reliable path to complete. Refuse to ship
+       unless all target stories are `complete` — `--partial` overrides.
+    2. VERSION-BUMP VERIFY (not perform). Read epic.yaml.version_bump (rl-4) and
+       confirm /execute actually bumped all version sources. If the bump is missing,
+       surface the gap and offer to patch it here (the safety net). /ship never owns
+       the primary bump — that's rl-4/execute.
+    3. SHIP ACTION. Read ship_target from project-profile.yaml (rl-2). Resolve the
+       concrete action (github-release | vercel | app-store | npm | custom command).
+       Show it as a DRY-RUN, require confirmation, then execute. (custom = arbitrary
+       command -> always confirm; high blast radius.)
+    4. ANNOUNCE. Invoke the rl-5 generator over the shipped epic(s) -> release post,
+       video script, post ideas under .pHive/releases/<release-id>/.
+    5. MARK SHIPPED. Advance the reconciled stories complete -> shipped. /ship is the
+       ONLY writer of `shipped` (per rl-1).
+
+acceptance_criteria:
+  - "Given /ship with no args, when one epic is the obvious target, then it
+    operates on that epic without requiring an epic ID."
+  - "Given /ship with multiple epic IDs, when run, then the release aggregates
+    all of them."
+  - "Given a target epic with an incomplete story, when pre-flight runs, then
+    the operator is prompted to confirm-complete or bounce-to-rework, and ship
+    is refused (sans --partial) until all are complete."
+  - "Given version_bump != none but /execute did not bump, when verify runs,
+    then /ship reports the gap and offers to patch it."
+  - "Given ship_target resolves to an action, when /ship proceeds, then it shows
+    a dry-run and requires confirmation before executing (custom commands always
+    confirm)."
+  - "Given a successful ship, when it completes, then release artifacts exist
+    under .pHive/releases/<id>/ and every shipped story status == shipped."
+  - "Given /status is run after, when read, then it reflects shipped (and
+    /status performed no writes)."
+
+steps:
+  - id: research
+    description: Read rl-1 contract, rl-2 ship_target schema, rl-4 epic.yaml
+      version_bump, rl-5 generator input contract; study an existing top-level
+      skill (e.g. skills/review/SKILL.md) for skill structure + preamble
+      conventions.
+    agent: researcher
+  - id: implement
+    description: Author skills/ship/SKILL.md implementing the 5-step flow; wire
+      pre-flight reconciliation, bump-verify, ship_target dispatch w/ dry-run
+      confirm, rl-5 generator call, and the complete->shipped write.
+    agent: developer
+    depends_on: [ research ]
+  - id: test
+    description: Cover single vs multi-epic, the reconciliation prompt +
+      refuse-without-partial, bump-gap patch path, dry-run confirm gate, and
+      shipped marking.
+    agent: tester
+    depends_on: [ implement ]
+  - id: review
+    description: Audit the confirm gate on ship actions (esp. custom command) and
+      that shipped is written only here, only after a successful ship action.
+    agent: reviewer
+    depends_on: [ test ]
+  - id: integrate
+    description: Commit to feat/release-lifecycle; register /ship in the plugin
+      manifest if top-level skills are enumerated there.
+    agent: developer
+    depends_on: [ review ]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/references/status-lifecycle.md
+      purpose: Contract — /ship owns complete->shipped + drives reconciliation (rl-1).
+    - path: .pHive/project-profile.yaml
+      purpose: Source of ship_target (rl-2).
+    - path: skills/review/SKILL.md
+      purpose: Reference skill structure + preamble/kickoff-gate conventions to mirror.
+    - path: hive/lib/release_post.mjs
+      purpose: rl-5 generator /ship calls in the announce step.
+
+files_to_modify:
+  - file: skills/ship/SKILL.md
+    change: Create the /ship skill (new).
+
+cross_cutting:
+  - concern: documentation
+    action: "Document /ship in the skills catalog + link status-lifecycle,
+      ship_target, release-post refs."
+  - concern: versioning
+    action: "/ship is the verify-and-ship surface; ensure version is confirmed
+      bumped before the ship action runs."
+
+metric:
+  applies: true
+  name: epic.shipped_reconciliation_catch_rate
+  direction: up
+  unit: ratio
+  baseline: "0 (no ship-time reconciliation exists today)"
+  target: "1.0"
+  window: next-3-ships
+  source:
+    kind: manual
+    ref: "Over next 3 /ship runs, fraction of finished-but-unmarked stories caught
+      by pre-flight reconciliation vs missed"
+  verify_at: "2026-07-31T00:00:00Z"
+  owner: reviewer
+
+risks:
+  - severity: high
+    description: ship_target custom command executes arbitrary shell with high blast radius.
+    mitigation: Mandatory dry-run + explicit confirmation before any ship action;
+      never auto-run.
+  - severity: medium
+    description: shipped written before the ship action actually succeeds.
+    mitigation: AC6 + review — complete->shipped write is strictly after a
+      successful ship action.
+tracker_id: plugin-hive/PLU-237
+tracker_url: http://localhost:3000/plugin-hive/issues/237
