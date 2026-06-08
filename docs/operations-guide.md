@@ -152,6 +152,7 @@ Planning Team ──→ Dev Team ──→ Test Swarm
 | `/hive:status` | "what's the status" | Check active workflow state |
 | `/hive:review` | "review this code", "review my changes" | Run structured code review |
 | `/hive:test` | "run tests", "test swarm" | Run the test swarm pipeline |
+| `/hive:ship` | "ship it", "cut a release", "release this" | Close the lifecycle: reconcile story status, verify version bump, run the project's ship target, generate release post + video script + post ideas |
 
 ---
 
