@@ -85,3 +85,6 @@ references:
     relevant_excerpt: "Hermes tool registration uses ctx.register_tool(...); directory plugin = plugin.yaml + __init__.py register(ctx)."
   - path: .pHive/epics/planning-queue/docs/design-gate-decisions.md
     relevant_excerpt: "G1 relay = gateway feature + plugin tools; hermes-multica ships tools via register_tool."
+
+tracker_id: PLU-290
+tracker_url: http://localhost:3000/issues/2e011782-4cd6-404a-99a8-a2e1a00a4758

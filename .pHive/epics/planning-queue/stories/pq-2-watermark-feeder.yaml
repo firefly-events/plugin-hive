@@ -89,3 +89,6 @@ references:
     relevant_excerpt: "Slice 2 manifest: multica_client.py + feeder.py; watermark decision + one-pull-per-tick."
   - path: .pHive/epics/planning-queue/docs/design-gate-decisions.md
     relevant_excerpt: "D4 kanban-low watermark; live issue list depth capped scan."
+
+tracker_id: PLU-288
+tracker_url: http://localhost:3000/issues/fb1d71ca-9e19-4470-9c61-6e3014287962

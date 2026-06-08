@@ -92,3 +92,6 @@ references:
     relevant_excerpt: "Slice 5 elicitation: correlation stores issue id, GATE comment id, Slack channel, thread_ts; answer handling ignores unmatched replies."
   - path: .pHive/epics/planning-queue/docs/design-gate-decisions.md
     relevant_excerpt: "G1 gateway-owned relay; relay re-dispatches leader (no auto-wake)."
+
+tracker_id: PLU-291
+tracker_url: http://localhost:3000/issues/77b2578c-4baa-4611-839d-438fc55f5245

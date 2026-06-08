@@ -93,3 +93,6 @@ references:
     relevant_excerpt: "Slice 1 manifest: planning_queue/{__init__,schema,errors,store}.py + bin/planning-queue + config.py PlanningQueueConfig."
   - path: .pHive/epics/planning-queue/docs/design-gate-decisions.md
     relevant_excerpt: "D2 separate planning-queue.yaml; path <resolved_state_dir>/planning-queue.yaml default .pHive/."
+
+tracker_id: PLU-287
+tracker_url: http://localhost:3000/issues/d19abb8e-df9a-448c-9c77-bf9b8205d3f4

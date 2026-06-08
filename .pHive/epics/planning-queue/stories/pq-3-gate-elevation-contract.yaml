@@ -83,3 +83,6 @@ references:
     relevant_excerpt: "Slice 3 manifest: gates.py + multica_client comment/status/label; both-signal gate."
   - path: .pHive/epics/planning-queue/docs/design-discussion.md
     relevant_excerpt: "v1 should require both label and GATE comment — label = operational signal, comment = question + context."
+
+tracker_id: PLU-289
+tracker_url: http://localhost:3000/issues/6b0e8d37-011a-47d9-8df8-74269055432a

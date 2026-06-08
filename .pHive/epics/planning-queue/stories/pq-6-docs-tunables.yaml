@@ -71,3 +71,6 @@ risks:
 references:
   - path: .pHive/epics/planning-queue/docs/design-gate-decisions.md
     relevant_excerpt: "G2 label-only v1, board-view deferred; tunables: watermark, cap, labels, ready_statuses, scan cap, poll interval."
+
+tracker_id: PLU-292
+tracker_url: http://localhost:3000/issues/14a291a1-4c73-4823-8930-19747b0a77cd
