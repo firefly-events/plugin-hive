@@ -5,6 +5,9 @@ status: pending
 complexity: high
 methodology: classic
 depends_on: []
+tracker_id: "PLU-247"
+tracker_uuid: "37d1a894-a4a9-454b-8bd3-f9fd9a37dfae"
+tracker_url: "http://localhost:8080/issues/37d1a894-a4a9-454b-8bd3-f9fd9a37dfae"
 description: |
   Characterize the existing shell `_resolve_state_dir()` behavior, then add matching
   Node and Python resolver helpers plus one shared conformance fixture. This is the

@@ -5,6 +5,9 @@ status: pending
 complexity: medium
 methodology: classic
 depends_on: [sdr-7-dag-executor-runstate-relocation]
+tracker_id: "PLU-255"
+tracker_uuid: "899aa296-d806-43bd-9bd9-eeedd11d67e0"
+tracker_url: "http://localhost:8080/issues/899aa296-d806-43bd-9bd9-eeedd11d67e0"
 parallel_allowed: true
 parallel_rationale: bounded-slice
 description: |

@@ -5,6 +5,9 @@ status: pending
 complexity: medium
 methodology: classic
 depends_on: [sdr-1-resolver-contract-conformance-fixture]
+tracker_id: "PLU-253"
+tracker_uuid: "036734cd-bffc-450e-b7da-6fd07218e433"
+tracker_url: "http://localhost:8080/issues/036734cd-bffc-450e-b7da-6fd07218e433"
 parallel_allowed: true
 parallel_rationale: bounded-slice
 description: |
