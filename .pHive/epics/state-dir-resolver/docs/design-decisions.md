@@ -11,8 +11,11 @@ decomposition consume THIS file as the binding decision log.
 - `.pHive/hive.config.yaml` (executor opt-in) and `.pHive/runtime/executor-graduated-workflows.yaml` (graduation registry) **stay fixed** — durable policy / consumer-side lock.
 - Run-state outputs **relocate** through the Python resolver: `runs_root()` (`run_state/store.py`), worktree isolation (`isolation/worktree.py`, `isolation/nesting.py`), pause handler (`executor/handlers/pause.py`). All already accept an injectable `root` param — low-risk seam.
 - **Not split-brain:** config = policy (fixed), runs = transient state (relocate). Clean separation.
-- **Orphan gap (maintainer-flagged):** no TTL/retention exists for run-state YAML today; only worktrees get `git worktree remove`. Relocation alone does NOT solve this — run-state must survive suspend/resume (`mark_suspended`/`unfreeze_for_resume`), so a blind temp-dir destination would risk OS purge of a suspended run. **Add a dedicated suspend-aware cleanup/retention story** (keep-last-N or TTL prune that never touches active/suspended runs).
-- Pointing `paths.state_dir` at a temp path is a **supported config opt-in** for ephemeral setups — relocation provides the lever; durability is not bet on it.
+- **Orphan gap (maintainer-flagged):** no TTL/retention exists for run-state YAML today; only worktrees get `git worktree remove`. Relocation alone does NOT solve this — run-state must survive suspend/resume (`mark_suspended`/`unfreeze_for_resume`), so the live location must stay durable.
+- **Add a dedicated suspend-aware ARCHIVAL story (maintainer-refined):** rather than hard-delete, **age-archive** run-state. Live + suspended runs stay durable under `<state_dir>/runs`; runs older than a threshold (and in a terminal state — completed/failed/cancelled) are **moved to a temp/archive directory** (OS purge then reclaims them, so footprint self-bounds). Never archive an active or suspended run regardless of age.
+  - **Automated weekly:** the archival sweep runs on a weekly schedule (scheduled task / cron-style) so the project footprint does not grow unbounded with no check. Manual invocation also available.
+  - This is the elegant reconciliation of the earlier temp-dir idea: temp is the **archive destination for aged terminal runs**, not the live location — durability and cleanup both satisfied.
+  - Open knobs for the story to settle: age threshold (default e.g. 7d), archive destination resolution ($TMPDIR vs configurable), whether archive is move-then-OS-purge or move-then-explicit-delete-after-N.
 
 ### Q2 — `HIVE_STATE_DIR` precedence → **env-override**
 1. Explicit `HIVE_STATE_DIR` env (when set)
@@ -42,7 +45,7 @@ Resolves grill V1/U1: the "config-first" wording in the requirement is **correct
 1. **Resolver contract + conformance fixture** (ahead of adoption): characterize shell resolver → shared golden test vector → Node resolver in `config.js` → Python resolver in `config.py`, all proving conformance.
 2. Subsystem adoption (one story per cluster group): story/session state; metrics (Node+Python readers/writers); context-snapshot + triage; task-tracking/release/handoff seams; scenarios/audits/reverse-sync.
 3. DAG-executor: relocate run-state (config stays fixed).
-4. **Run-state retention/cleanup** (suspend-aware).
+4. **Run-state archival** (suspend-aware, weekly-automated): age-archive terminal runs from `<state_dir>/runs` to a temp/archive dir; never touch active/suspended; weekly scheduled sweep + manual invocation; footprint self-bounds via OS purge of the archive.
 5. Executable prose conversion (SKILL.md/workflow `${HIVE_STATE_DIR}`).
 6. Shell semantic-guard coverage (`check-agent-misuse.sh` relocated-dir awareness).
 7. Relocated-state regression tests (woven into adoption stories + an integration story).
