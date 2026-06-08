@@ -1,7 +1,7 @@
 id: S6.3-secondary-predicate-wiring
 epic: kg-signal-revival
 title: Conditional wiring of secondary predicates (UX-driven subset)
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [S6.1-hive-why-slash-command]

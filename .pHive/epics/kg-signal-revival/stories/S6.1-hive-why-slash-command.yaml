@@ -1,7 +1,7 @@
 id: S6.1-hive-why-slash-command
 epic: kg-signal-revival
 title: /hive:why retrospection UX slash command
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [S2.2-superseded-emit-sites, S3.2-wrapper-port-and-collection-bootstrap]

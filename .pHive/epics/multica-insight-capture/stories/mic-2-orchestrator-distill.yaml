@@ -1,7 +1,7 @@
 id: mic-2-orchestrator-distill
 epic: multica-insight-capture
 title: Orchestrator distills Multica insights into memory
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [ mic-1-agent-self-capture-brief ]

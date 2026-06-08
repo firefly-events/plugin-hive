@@ -1,7 +1,7 @@
 id: a-26-context-md-skill-prelude-citation
 epic: catalog-hygiene-and-borrows
 title: Cite CONTEXT.md from skill-prelude.md
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [a-26-context-md-schema-and-starter, a-25-skill-prelude-extraction]

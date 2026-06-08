@@ -1,7 +1,7 @@
 id: a-1-standup-interactive-flag
 epic: autonomous-cycle-loop
 title: "A.1 — /standup --interactive flag + Phase 1.5 hook"
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: [s0-1-schema-and-config-bump]

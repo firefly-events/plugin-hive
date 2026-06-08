@@ -2,7 +2,7 @@ id: K.3
 epic: meta-improvement-system
 slice: S6
 title: Kickoff docs update for backlog-fallback mode
-status: pending
+status: in_progress
 complexity: low
 methodology: classic
 depends_on: ["K.1", "K.2"]

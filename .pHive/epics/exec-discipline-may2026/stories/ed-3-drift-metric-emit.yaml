@@ -4,7 +4,7 @@ tracker_id: "firefly-events/plugin-hive#137"
 tracker_url: https://github.com/firefly-events/plugin-hive/issues/137
 epic: exec-discipline-may2026
 title: scope-drift-score metric type + emit at phase boundaries
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [ed-1-maturity-helper, ed-2-handoff-schema]

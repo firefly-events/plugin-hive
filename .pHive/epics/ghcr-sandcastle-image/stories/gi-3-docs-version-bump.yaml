@@ -1,7 +1,7 @@
 id: gi-3-docs-version-bump
 epic: ghcr-sandcastle-image
 title: README + runbook + CHANGELOG + bump 2.5.0
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [gi-2-dispatch-uses-ghcr]

@@ -1,4 +1,5 @@
 id: h-01-context-snapshot-composer
+status: in_progress
 epic: hermes-integration-mvp
 title: Library composer + JSON schema for context-snapshot
 complexity: medium

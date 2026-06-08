@@ -1,7 +1,7 @@
 id: S5.3-cycle-rollup-jsonl
 epic: kg-signal-revival
 title: Per-cycle KG metrics JSONL + cycle-rollup line in /meta-optimize report
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [S5.2-miss-reason-taxonomy]

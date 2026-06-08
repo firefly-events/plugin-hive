@@ -1,7 +1,7 @@
 id: c-4-linear-adapter-as-abi-validator
 epic: task-tracking-adapter-abi
 title: Implement Linear adapter against new ABI as second validator
-status: pending
+status: in_progress
 complexity: high
 methodology: classic
 depends_on: [c-2-abi-specification]

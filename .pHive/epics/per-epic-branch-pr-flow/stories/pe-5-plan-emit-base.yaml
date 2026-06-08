@@ -1,7 +1,7 @@
 id: pe-5-plan-emit-base
 epic: per-epic-branch-pr-flow
 title: /plan emits git_flow block on epic.yaml at planning time
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [pe-1-config-schema]

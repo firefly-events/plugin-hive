@@ -1,7 +1,7 @@
 id: mir-6-meta-shotgun-skill-scaffold
 epic: meta-improvement-reset
 title: Scaffold /meta-shotgun skill (maintainer-local)
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 tracker_id: plugin-hive/PLU-68

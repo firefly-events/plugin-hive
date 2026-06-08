@@ -1,7 +1,7 @@
 id: s6-issue-191-defer-marker
 epic: sandcastle-adoption-followon
 title: Defer marker and audit gate for Sandcastle issue 191
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s3-execution-mode-skill, s3-dispatch-routing]

@@ -1,7 +1,7 @@
 id: c-5b-skill-citation-swap-and-fallback-telemetry
 epic: task-tracking-adapter-abi
 title: Skill citation swap (kickoff/plan/execute) + prose-runbook fallback telemetry
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: [c-5a-dispatch-module-and-config-schema]

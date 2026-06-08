@@ -2,7 +2,7 @@ id: A2.7
 epic: meta-improvement-system
 slice: S4
 title: Write two new charters
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: ["A1.2", "A1.4", "A2.6"]

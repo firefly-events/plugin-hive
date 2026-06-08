@@ -1,7 +1,7 @@
 id: s7-warm-pool-placeholder
 epic: sandcastle-adoption-followon
 title: Warm-pool placeholder for future createSandbox optimization
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s2-provider-wrap]

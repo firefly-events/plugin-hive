@@ -1,7 +1,7 @@
 id: mir-8-signal-weights-knob
 epic: meta-improvement-reset
 title: Add meta_optimize.signal_weights knob to step-03 ranking
-status: pending
+status: blocked
 complexity: medium
 methodology: tdd
 tracker_id: plugin-hive/PLU-70

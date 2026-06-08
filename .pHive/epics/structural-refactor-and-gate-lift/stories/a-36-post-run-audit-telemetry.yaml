@@ -1,7 +1,7 @@
 id: a-36-post-run-audit-telemetry
 epic: structural-refactor-and-gate-lift
 title: Post-run audit check warns on nonsensical default state; telemetry feeds gate_mode flip decision
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [a-33-plan-gate-lift-and-gate-mode-knob, a-35-execute-epic-create-on-fly-and-gate-lift]

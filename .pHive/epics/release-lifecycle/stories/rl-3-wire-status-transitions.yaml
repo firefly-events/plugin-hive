@@ -1,7 +1,7 @@
 id: rl-3-wire-status-transitions
 epic: release-lifecycle
 title: Wire explicit status transitions into workflow commands
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [ rl-1 ]

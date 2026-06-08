@@ -1,7 +1,7 @@
 id: f-04-prompt-extraction-verification-gates
 epic: ui-cluster-extract-config-deeper
 title: "Codify grep gates + aggregate line-delta verification"
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on:
