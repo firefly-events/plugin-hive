@@ -1,0 +1,66 @@
+id: t-1a-scenario-loader-and-dag-retarget
+epic: substrate-coverage-and-test-cleanup
+title: Extend loadScenario (or add sibling loadResults) for execution_results shape + retarget test-swarm.workflow.yaml DAG to sequential
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- s-2-mode-resolver
+- s-4-cc-workflows-preconditions
+- s-3-no-codex-lint
+parallel_allowed: false
+parallel_rationale: blocks t-1b
+tracker_id: null
+provenance:
+  derived_from: t-1-fold-simulated-manual
+  derived_at: 2026-06-07
+  split_reason: |
+    t-1 cc-workflows run wf_7e1dbc8d-328 halted with h3_schema_gap. loadScenario
+    (hive/lib/scenarios/load.mjs) handles authored scenario YAMLs (intent/walk specs)
+    but step-03-worker outputs execution_results YAML (outcomes — different shape).
+    Step-04b insertion requires both a loader for the worker-output shape AND a DAG
+    retarget (worker/inspector currently run PARALLEL off author-tests, not sequential).
+    Decision Point 6 of original spec instructs split.
+description: |
+  Foundation for t-1b. Two paired changes that must land together:
+
+  1. Loader: either extend `hive/lib/scenarios/load.mjs::loadScenario` to accept
+     execution_results shape, OR add sibling `loadResults` exporting from same
+     module. Architect call at implementation time — defer pending fresh read of
+     the schema delta.
+
+  2. DAG retarget: edit `hive/workflows/test-swarm.workflow.yaml` so step-04-inspector
+     runs SEQUENTIALLY downstream of step-03-worker (today the two run in parallel
+     off author-tests). This enables step-04b-scenario-replay (t-1b) to slot between
+     worker output and inspector consumption.
+
+  No skill-mode change in this story. /test still exposes --simulated-manual until t-1b.
+acceptance_criteria:
+- Given the new/extended loader is invoked against a step-03-worker output, when the shape is validated, then loadScenario/loadResults returns a structured object whose fields match the worker contract.
+- Given the test-swarm.workflow.yaml DAG, when inspected after the retarget, then step-04-inspector lists step-03-worker as a depends_on (or equivalent edge), no longer running in parallel.
+- Given the existing test-swarm test fixtures, when the swarm pipeline is dry-run end-to-end, then no regression in worker→inspector handoff (current authored-scenario flow continues to pass).
+steps:
+- id: implement
+  description: |
+    Read schema delta between authored scenario YAMLs and step-03 execution_results.
+    Decide loadScenario-extend vs loadResults-sibling. Implement chosen path + DAG retarget.
+  agent: developer
+- id: test
+  description: Add vitest covering the new loader path + assert DAG edge presence in workflow YAML.
+  agent: tester
+  depends_on: [implement]
+- id: review
+  description: Architect review on loader choice + DAG retarget; reviewer cross-checks no regression in existing swarm flow.
+  agent: reviewer
+  depends_on: [test]
+- id: integrate
+  description: 'Commit "[t-1a] feat(swarm): scenario loader for execution_results + DAG retarget worker→inspector"'
+  agent: developer
+  depends_on: [review]
+files_to_modify:
+- file: hive/lib/scenarios/load.mjs
+  change: extend loadScenario for execution_results shape OR add sibling loadResults export
+- file: hive/workflows/test-swarm.workflow.yaml
+  change: retarget step-04-inspector to depend on step-03-worker (sequential, not parallel)
+- file: hive/lib/scenarios/test/load.test.mjs
+  change: vitest covering new loader path + worker-output fixture
