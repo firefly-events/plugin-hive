@@ -45,7 +45,7 @@ function getDefaultOutputSchema() {
 }
 
 const DEFAULT_IMAGE = 'sandcastle:hive';
-const DEFAULT_MODEL = 'claude-opus-4-7';
+const DEFAULT_MODEL = 'claude-opus-4-8';
 // Default sandcastle idleTimeout is 600s. Claude Code on a non-trivial story
 // (read context → plan → edit → test → commit → PR) routinely thinks
 // quietly for >60s between stdout bursts. Bump to 1800s (30 min) to
@@ -142,7 +142,7 @@ async function getSandcastleDeps(_deps) {
  * @param {object}  [opts]
  * @param {number}  [opts.issueNumber]   force a specific issue (manual path)
  * @param {string}  [opts.imageName]     docker image; default sandcastle:hive
- * @param {string}  [opts.modelTag]      Claude model; default claude-opus-4-7
+ * @param {string}  [opts.modelTag]      Claude model; default claude-opus-4-8
  * @param {number}  [opts.maxIterations] default 1 (sandcastle constraint)
  * @param {object}  [opts._deps]         test seam
  * @returns {Promise<{

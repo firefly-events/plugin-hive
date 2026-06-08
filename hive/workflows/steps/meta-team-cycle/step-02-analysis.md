@@ -60,13 +60,50 @@ Systematic scan of the target-project codebase (`$HIVE_TARGET_PROJECT`). Produce
 
 **NOT available:**
 - User input
-- Prior cycle findings (for independence — re-analyze fresh each cycle)
+- Prior cycle findings (for independence — re-analyze the codebase fresh each cycle)
+
+> **Independence vs. in-flight dedup — read carefully.** "Re-analyze fresh"
+> means do not let a *prior cycle's conclusions* bias this cycle's read of the
+> codebase. It does **NOT** mean ignore work already proposed and waiting for
+> human review. Open PRs that propose a fix are *in-flight* — the maintainer
+> simply has not merged them yet. Re-finding and re-proposing the same fix every
+> cycle (the meta-2026-05-30..06-05 duplicate-PR incident: 7 nightly PRs all
+> re-derived the identical `claude-opus-4-7 -> claude-opus-4-8` bump because none
+> had merged) is wasted work, not independence. Step 0 below consults open PRs to
+> suppress already-proposed findings.
 
 ## YOUR TASK
 
 Systematically audit the target-project codebase (`$HIVE_TARGET_PROJECT`, resolved per hooks/common.sh) and produce a ranked findings list with severity and category for each issue.
 
 ## TASK SEQUENCE
+
+### 0. In-flight proposal pre-flight (dedup gate) — RUN FIRST
+
+Before auditing the codebase, build the set of fixes that are **already
+proposed and awaiting review** so this cycle does not re-derive them.
+
+1. Enumerate open PRs authored by prior meta cycles (and any other open PRs
+   touching the maintainer-owned trees):
+   ```bash
+   gh pr list --state open --base develop --limit 100 \
+     --json number,title,headRefName,files \
+     --jq '.[] | {number, title, head: .headRefName, files: [.files[].path]}'
+   # also catch any still-mistargeted-at-main nightlies:
+   gh pr list --state open --base main --limit 100 \
+     --json number,title,headRefName,files \
+     --jq '.[] | select(.headRefName|test("meta-meta/|meta/")) | {number, title, files: [.files[].path]}'
+   ```
+2. For each open PR, collect its changed file paths and (for small diffs)
+   the proposed change. Treat this as the **in-flight proposal set**.
+3. Hold this set in working memory for Step 7's dedup filter.
+
+**Independence is preserved:** you still scan the codebase fresh. Step 0 only
+governs which findings survive into the proposal — it never seeds findings.
+
+If `gh` is unavailable or returns an error, log a `PREFLIGHT_DEGRADED` note,
+proceed without suppression, and surface it in the analysis report (so a
+duplicate slipping through is visible rather than silent).
 
 ### 1. Cross-reference audit — dangling references
 For each reference doc listed in the target project's top-level documentation manifest (e.g., plugin-hive's `hive/GUIDE.md` and `hive/MAIN.md`; adapt to the target project's equivalent structure if different):
@@ -123,7 +160,16 @@ description: {one-line description}
 evidence: {specific field, line, or pattern that demonstrates the issue}
 ```
 
-Sort findings by severity descending, then by category.
+**Dedup against in-flight PRs (from Step 0):** Before sorting, drop any
+finding whose fix is already proposed in an open PR. A finding is a duplicate
+when its `location` (file path) is in an open PR's changed-file set AND the
+PR's title/diff addresses the same issue (e.g. an open PR already bumps
+`claude-opus-4-7 -> claude-opus-4-8` in that file). Record each suppressed
+finding under `findings_suppressed` (id, location, pr_number) for the report —
+do NOT carry it into `findings`. This is the gate that prevents re-proposing
+unreviewed work; the suppressed count makes the dedup auditable.
+
+Sort the surviving findings by severity descending, then by category.
 
 ### 8. Update cycle-state.yaml
 Append all findings to `<HIVE_STATE_DIR>/meta-team/cycle-state.yaml`:
@@ -166,6 +212,10 @@ Total findings: {N}
   Medium: {N}
   Low: {N}
 
+Suppressed (already proposed in open PRs): {N}
+  - [{location}] dup of PR #{pr_number}
+  ...
+
 By category:
   MISSING_FILE: {N}
   SCHEMA_INCONSISTENCY: {N}
@@ -182,8 +232,10 @@ Top findings:
 
 ## SUCCESS METRICS
 
+- [ ] Step 0 in-flight PR pre-flight executed (or `PREFLIGHT_DEGRADED` logged)
 - [ ] All 6 audit checks executed (cross-ref, schema, step files, memories, reference docs, workflows)
 - [ ] Each finding has category, severity, location, description, evidence
+- [ ] Findings already proposed in open PRs suppressed and reported (not re-proposed)
 - [ ] Findings appended to `cycle-state.yaml`
 - [ ] Analysis report produced with counts by severity and category
 - [ ] Structured output emitted matching the OUTPUT FORMAT contract: `metric_signal: bool`, `findings_count: int` (== len(findings)), `external_candidates_count: int`, `findings: list`, `external_research_candidates: list`
