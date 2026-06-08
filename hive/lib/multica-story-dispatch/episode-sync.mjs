@@ -1,6 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import { runMulticaInsightDistill } from './distill.mjs';
+
 const HTTP_TIMEOUT_MS = 30_000;
 const USER_AGENT = 'hive-multica-episode-sync/0.1.0';
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
@@ -295,6 +297,7 @@ export async function writeMulticaRunEpisode(opts) {
     identifier,
     terminal,
     messagesCaptureMax,
+    distill,
   } = opts;
 
   const dir = path.join(hiveStateDir, 'episodes', epicHandle, storyId);
@@ -347,5 +350,17 @@ export async function writeMulticaRunEpisode(opts) {
   const jsonl = messages.map((message) => JSON.stringify(message)).join('\n');
   await fs.writeFile(markerPath, marker, 'utf8');
   await fs.writeFile(messagesPath, jsonl ? `${jsonl}\n` : '', 'utf8');
-  return { markerPath, messagesPath, status, notes, completion };
+
+  const distillResult = distill
+    ? await runMulticaInsightDistill({
+        hiveStateDir,
+        epicHandle,
+        storyId,
+        workDir: terminal?.work_dir ?? null,
+        messagesPath,
+        ...distill,
+      })
+    : null;
+
+  return { markerPath, messagesPath, status, notes, completion, distill: distillResult };
 }
