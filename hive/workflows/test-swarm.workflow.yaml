@@ -98,7 +98,7 @@ steps:
       criteria. Map each requirement to its covering test(s). Identify gaps
       with specificity and severity classification. Produce a coverage report.
     depends_on:
-      - verify-baseline
+      - execute-platform-a
     inputs:
       - name: test_manifest
         source: step_output

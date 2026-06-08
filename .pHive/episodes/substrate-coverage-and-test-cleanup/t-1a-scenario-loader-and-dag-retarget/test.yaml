@@ -1,0 +1,39 @@
+step_id: test
+status: completed
+timestamp: "2026-06-07T00:00:00Z"
+verdict: pass
+command: "node --test hive/lib/scenarios/__tests__/load.test.mjs"
+result: "12 pass, 0 fail, 0 skipped (82ms)"
+artifacts:
+  - hive/lib/scenarios/__tests__/load.test.mjs
+coverage:
+  - ac: "loadResults returns structured object matching worker contract (AC-1)"
+    tests:
+      - "loadResults returns execution_results envelope for valid worker output"
+      - "loadResults parses results array with correct item shape"
+      - "loadResults parses summary and artifacts sub-objects"
+      - "loadResults throws FILE_NOT_FOUND for missing file"
+      - "loadResults throws VALIDATION_ERROR for unrecognized top-level field"
+      - "loadResults throws VALIDATION_ERROR for invalid result status"
+  - ac: "validate-coverage depends on execute-platform-a in DAG (AC-2)"
+    tests:
+      - "test-swarm workflow: validate-coverage depends_on execute-platform-a"
+  - ac: "No regression in existing authored-scenario flow (AC-3)"
+    tests:
+      - "accepts the canonical mode/steps scenario shape"
+      - "rejects the legacy invocation/pre_conditions/expectations schema"
+      - "loads every checked-in scenario fixture"
+      - "loadScenario still accepts canonical spec-walk scenario (regression)"
+      - "loadScenario rejects execution_results shaped YAML (wrong function contract)"
+notes: |
+  Story spec says 'vitest' in step description and files_to_modify lists
+  hive/lib/scenarios/test/load.test.mjs — both are wrong. The repo uses
+  node:test runner at hive/lib/scenarios/__tests__/load.test.mjs (double
+  underscore). Tests written at the correct path using node:test.
+
+  DAG retarget was already applied by the developer: validate-coverage now
+  has depends_on: [execute-platform-a] in test-swarm.workflow.yaml. The
+  AC-2 test parses the YAML file directly to assert the edge is present.
+
+  loadResults is a sibling export from load.mjs (not an extension of
+  loadScenario), keeping schema contracts independent.
