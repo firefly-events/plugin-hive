@@ -149,13 +149,53 @@ If the target project has workflow YAML files (plugin-hive uses `hive/workflows/
 - Confirm each step has either `task` or `step_file`
 - Flag missing step files as `MISSING_STEP_FILE` findings
 
+### 6c. Stale open-PR audit
+
+Open PRs that have been sitting >7d since last activity are either stranded awaiting human review or have a process gap (reviewer unassigned, CI failing repeatedly without anyone acting). Either way they are real meta-team-actionable signals — they encode unresolved work that the maintainer has not been able to land.
+
+Implementation module: `hive/workflows/steps/meta-team-cycle/stale-pr-finder.mjs`. Pure-function over already-fetched PR data — gather first via `gh`, then pass it in.
+
+Gather data (skip cleanly if `gh` is unavailable):
+
+```bash
+gh pr list \
+  --state open \
+  --base develop \
+  --limit 100 \
+  --json number,title,headRefName,createdAt,updatedAt,reviewDecision,reviewRequests,isDraft,state \
+  > /tmp/open_prs.json
+gh pr list \
+  --state open \
+  --base main \
+  --limit 100 \
+  --json number,title,headRefName,createdAt,updatedAt,reviewDecision,reviewRequests,isDraft,state \
+  >> /tmp/open_prs.json   # concatenation is fine — helper accepts any array
+```
+
+Invoke the helper. `nowIso` MUST be pinned by the caller — workflow scripts forbid `Date.now()` so the researcher persona reads the current ISO timestamp from the environment or the cycle marker and passes it in:
+
+```js
+import { findStalePrs } from 'hive/workflows/steps/meta-team-cycle/stale-pr-finder.mjs';
+
+const pullRequests = JSON.parse(readFileSync('/tmp/open_prs.json', 'utf8'));
+const staleFindings = findStalePrs(pullRequests, {
+  nowIso: process.env.HIVE_CYCLE_NOW_ISO,   // pinned at boot
+  staleDays: 7,
+  criticalDays: 14,
+});
+```
+
+Each finding uses the standard step-02 shape with `category: STALE_OPEN_PR` and `location: branch:<head-ref>` (or `pr:<number>` if head ref is missing). Severity mapping: critical-tier (>14d AND reviewer attached) → `high`; medium-tier (>7d AND reviewer attached) → `medium`; watch-tier (>7d, no reviewer) → `low`. Append these findings to the same list emitted by audits 1-6 above.
+
+`stale-pr-finder.mjs` is pure — no fetch, no shell, no `Date.now()`. Tests live at `hive/workflows/steps/meta-team-cycle/__tests__/stale-pr-finder.test.mjs` (20 cases): `daysBetween` arithmetic, draft/closed/merged filtering, tier boundaries (7/14d), reviewer-attached vs unattended classification, finding shape, sort order (severity-desc then age-desc).
+
 ### 7. Compile findings
 For each finding, record:
 ```yaml
 id: finding-{N}
-category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | OTHER
+category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | CODERABBIT_RECURRING | STALE_OPEN_PR | OTHER
 severity: critical | high | medium | low
-location: {file path}
+location: {file path | cross-repo | branch:<ref> | pr:<n>}
 description: {one-line description}
 evidence: {specific field, line, or pattern that demonstrates the issue}
 ```
