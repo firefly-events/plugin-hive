@@ -8,7 +8,7 @@ description: |
 target_codebase: /Users/don/.claude/worktrees/substrate-coverage
 source_triage: t-001
 methodology: tdd
-version_bump: pending-user-answer
+version_bump: none
 
 git_flow:
   base_branch: develop
