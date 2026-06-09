@@ -1,7 +1,7 @@
 id: t-1a-scenario-loader-and-dag-retarget
 epic: substrate-coverage-and-test-cleanup
 title: Extend loadScenario (or add sibling loadResults) for execution_results shape + retarget test-swarm.workflow.yaml DAG to sequential
-status: completed
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on:
