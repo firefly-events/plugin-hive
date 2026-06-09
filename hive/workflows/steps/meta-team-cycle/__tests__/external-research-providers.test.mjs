@@ -6,9 +6,11 @@ import {
   fetchClaudeCodeReleases,
   GH_RELEASES_URL,
   isHiveActionable,
+  classifyRelease,
   releaseToCandidate,
   fetchAnthropicBlog,
   isBlogPostRelevant,
+  classifyBlogPost,
   blogItemToCandidate,
   ANTHROPIC_BLOG_FEED_URL,
 } from '../external-research-providers.mjs';
@@ -91,6 +93,27 @@ test('isHiveActionable — returns false for empty release', () => {
 });
 
 // ---------------------------------------------------------------------------
+// classifyRelease — tiering, not hard discard
+// ---------------------------------------------------------------------------
+
+test('classifyRelease — actionable for capability-shift release', () => {
+  assert.equal(classifyRelease(ACTIONABLE_RELEASE), 'actionable');
+  assert.equal(classifyRelease(AGENTS_RELEASE), 'actionable');
+});
+
+test('classifyRelease — watch for non-empty bugfix release (no longer discarded)', () => {
+  assert.equal(classifyRelease(BUGFIX_RELEASE), 'watch');
+});
+
+test('classifyRelease — null for empty release (hard discard)', () => {
+  assert.equal(classifyRelease({ tag_name: 'v0.0.1', name: '', body: '' }), null);
+});
+
+test('classifyRelease — null for single-word body (hard discard)', () => {
+  assert.equal(classifyRelease({ tag_name: 'v0.0.2', name: 'patch', body: 'fixes' }), null);
+});
+
+// ---------------------------------------------------------------------------
 // releaseToCandidate shape
 // ---------------------------------------------------------------------------
 
@@ -98,6 +121,18 @@ test('releaseToCandidate — emits correct discovery_source and signal_subtype',
   const candidate = releaseToCandidate(ACTIONABLE_RELEASE);
   assert.equal(candidate.discovery_source, 'external_research');
   assert.equal(candidate.signal_subtype, 'claude_code_release');
+});
+
+test('releaseToCandidate — emits signal_tier derived from classify when not passed', () => {
+  const actionable = releaseToCandidate(ACTIONABLE_RELEASE);
+  assert.equal(actionable.signal_tier, 'actionable');
+  const watch = releaseToCandidate(BUGFIX_RELEASE);
+  assert.equal(watch.signal_tier, 'watch');
+});
+
+test('releaseToCandidate — explicit tier override wins over classify', () => {
+  const candidate = releaseToCandidate(ACTIONABLE_RELEASE, 'watch');
+  assert.equal(candidate.signal_tier, 'watch');
 });
 
 test('releaseToCandidate — id uses external-proposal-cc-release namespace', () => {
@@ -129,7 +164,7 @@ test('releaseToCandidate — charter_objective is tooling', () => {
 // fetchClaudeCodeReleases — happy path
 // ---------------------------------------------------------------------------
 
-test('fetchClaudeCodeReleases — returns only hive-actionable candidates', async () => {
+test('fetchClaudeCodeReleases — emits all non-empty releases with tiered signal', async () => {
   const { baseUrl, close } = await startMockServer((_req, res) => {
     sendJson(res, 200, [ACTIONABLE_RELEASE, BUGFIX_RELEASE, AGENTS_RELEASE]);
   });
@@ -137,11 +172,16 @@ test('fetchClaudeCodeReleases — returns only hive-actionable candidates', asyn
   try {
     const result = await fetchClaudeCodeReleases({ apiUrl: baseUrl });
     assert.equal(result.error, null);
-    assert.equal(result.candidates.length, 2);
-    const tags = result.candidates.map((c) => c.id);
-    assert.ok(tags.some((id) => id.includes('v1.5.0')));
-    assert.ok(tags.some((id) => id.includes('v1.6.0')));
-    assert.ok(!tags.some((id) => id.includes('v1.4.1')));
+    // All three releases have non-empty bodies → all emit as candidates now.
+    // ACTIONABLE + AGENTS = 'actionable' tier; BUGFIX = 'watch' tier.
+    assert.equal(result.candidates.length, 3);
+    const byTag = Object.fromEntries(result.candidates.map((c) => [c.id, c]));
+    const v150 = result.candidates.find((c) => c.id.includes('v1.5.0'));
+    const v160 = result.candidates.find((c) => c.id.includes('v1.6.0'));
+    const v141 = result.candidates.find((c) => c.id.includes('v1.4.1'));
+    assert.equal(v150.signal_tier, 'actionable');
+    assert.equal(v160.signal_tier, 'actionable');
+    assert.equal(v141.signal_tier, 'watch');
   } finally {
     await close();
   }
@@ -166,9 +206,25 @@ test('fetchClaudeCodeReleases — all candidates have correct shape', async () =
   }
 });
 
-test('fetchClaudeCodeReleases — empty list when no releases are actionable', async () => {
+test('fetchClaudeCodeReleases — non-empty bugfix release now emits as watch candidate', async () => {
   const { baseUrl, close } = await startMockServer((_req, res) => {
     sendJson(res, 200, [BUGFIX_RELEASE]);
+  });
+
+  try {
+    const result = await fetchClaudeCodeReleases({ apiUrl: baseUrl });
+    assert.equal(result.error, null);
+    assert.equal(result.candidates.length, 1);
+    assert.equal(result.candidates[0].signal_tier, 'watch');
+  } finally {
+    await close();
+  }
+});
+
+test('fetchClaudeCodeReleases — empty body release is hard-discarded', async () => {
+  const empty = { tag_name: 'v0.0.1', name: '', body: '', html_url: '', published_at: null };
+  const { baseUrl, close } = await startMockServer((_req, res) => {
+    sendJson(res, 200, [empty]);
   });
 
   try {
@@ -316,6 +372,44 @@ test('isBlogPostRelevant — returns false for empty post', () => {
 });
 
 // ---------------------------------------------------------------------------
+// classifyBlogPost — tiering
+// ---------------------------------------------------------------------------
+
+test('classifyBlogPost — actionable for keep-list keyword post', () => {
+  assert.equal(classifyBlogPost(MODEL_POST), 'actionable');
+  assert.equal(classifyBlogPost(SDK_POST), 'actionable');
+});
+
+test('classifyBlogPost — null (hard skip) for policy/funding posts', () => {
+  assert.equal(classifyBlogPost(POLICY_POST), null);
+  assert.equal(classifyBlogPost(FUNDING_POST), null);
+});
+
+test('classifyBlogPost — watch for post that passes skip list but misses keep list', () => {
+  const neutral = {
+    title: 'A note about our research',
+    description: 'Today we share a short reflection on long-term planning.',
+    link: '',
+    pubDate: '',
+  };
+  assert.equal(classifyBlogPost(neutral), 'watch');
+});
+
+test('classifyBlogPost — skip wins over keep when both present', () => {
+  const mixed = {
+    title: 'Anthropic model policy update',
+    description: 'New policy governing model access.',
+    link: '',
+    pubDate: '',
+  };
+  assert.equal(classifyBlogPost(mixed), null);
+});
+
+test('classifyBlogPost — null for empty post', () => {
+  assert.equal(classifyBlogPost({ title: '', description: '', link: '', pubDate: '' }), null);
+});
+
+// ---------------------------------------------------------------------------
 // blogItemToCandidate shape
 // ---------------------------------------------------------------------------
 
@@ -323,6 +417,20 @@ test('blogItemToCandidate — emits correct discovery_source and signal_subtype'
   const candidate = blogItemToCandidate(MODEL_POST, 0);
   assert.equal(candidate.discovery_source, 'external_research');
   assert.equal(candidate.signal_subtype, 'anthropic_blog');
+});
+
+test('blogItemToCandidate — emits signal_tier derived from classify when not passed', () => {
+  const actionable = blogItemToCandidate(MODEL_POST, 0);
+  assert.equal(actionable.signal_tier, 'actionable');
+  const neutral = blogItemToCandidate({
+    title: 'A note', description: 'Some neutral content here.', link: '', pubDate: '',
+  }, 1);
+  assert.equal(neutral.signal_tier, 'watch');
+});
+
+test('blogItemToCandidate — explicit tier override wins over classify', () => {
+  const candidate = blogItemToCandidate(MODEL_POST, 0, 'watch');
+  assert.equal(candidate.signal_tier, 'watch');
 });
 
 test('blogItemToCandidate — id uses external-proposal-anthropic-blog namespace', () => {
@@ -351,7 +459,7 @@ test('blogItemToCandidate — charter_objective is tooling', () => {
 // fetchAnthropicBlog — happy path
 // ---------------------------------------------------------------------------
 
-test('fetchAnthropicBlog — returns only relevant candidates', async () => {
+test('fetchAnthropicBlog — emits actionable + drops hard-skip posts', async () => {
   const xml = makeRssFeed([MODEL_POST, POLICY_POST, SDK_POST, FUNDING_POST]);
   const fetchFn = () => Promise.resolve({
     ok: true,
@@ -359,12 +467,34 @@ test('fetchAnthropicBlog — returns only relevant candidates', async () => {
   });
   const result = await fetchAnthropicBlog({ fetchFn, feedUrl: 'http://unused' });
   assert.equal(result.error, null);
+  // POLICY + FUNDING hard-skip; MODEL + SDK pass as actionable.
   assert.equal(result.candidates.length, 2);
   const titles = result.candidates.map((c) => c.title);
   assert.ok(titles.includes(MODEL_POST.title));
   assert.ok(titles.includes(SDK_POST.title));
   assert.ok(!titles.includes(POLICY_POST.title));
   assert.ok(!titles.includes(FUNDING_POST.title));
+  for (const c of result.candidates) {
+    assert.equal(c.signal_tier, 'actionable');
+  }
+});
+
+test('fetchAnthropicBlog — emits watch candidate for neutral post (no keep keyword, no skip)', async () => {
+  const NEUTRAL_POST = {
+    title: 'A short reflection on long-term planning',
+    link: 'https://www.anthropic.com/news/neutral-reflection',
+    pubDate: 'Mon, 02 Jun 2025 09:00:00 +0000',
+    description: 'Some thoughts on planning. Does not mention any of the keep-list signals.',
+  };
+  const xml = makeRssFeed([NEUTRAL_POST]);
+  const fetchFn = () => Promise.resolve({
+    ok: true,
+    text: () => Promise.resolve(xml),
+  });
+  const result = await fetchAnthropicBlog({ fetchFn, feedUrl: 'http://unused' });
+  assert.equal(result.error, null);
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0].signal_tier, 'watch');
 });
 
 test('fetchAnthropicBlog — all candidates have correct shape', async () => {
