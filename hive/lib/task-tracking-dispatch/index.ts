@@ -281,6 +281,24 @@ export class TaskTrackingDispatch {
     return { ok: true, result };
   }
 
+  /**
+   * Mark a story as needing rework. Routes to the adapter's markNeedsRework
+   * handler which sets the appropriate status and attaches the 'hive:needs-rework'
+   * label. Returns { id, status, labels[] } on success.
+   *
+   * Multica: status = 'in_review'
+   * GitHub:  status = 'open' (issue reopened)
+   *
+   * No capability gate at the dispatch level — callers opt in by checking
+   * capability('supports_needs_rework') before calling if desired.
+   */
+  async markNeedsRework(
+    params: { id: string; reason?: string },
+    options?: { skill_context?: string },
+  ): Promise<DispatchResult> {
+    return this.invoke("markNeedsRework", params, options);
+  }
+
   /** Read a field from the cached capabilities object. */
   capability(field: string): any {
     if (!this.handle) return undefined;

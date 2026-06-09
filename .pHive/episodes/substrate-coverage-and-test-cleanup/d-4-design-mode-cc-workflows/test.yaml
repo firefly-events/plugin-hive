@@ -1,0 +1,45 @@
+step: test
+story: d-4-design-mode-cc-workflows
+epic: substrate-coverage-and-test-cleanup
+agent: tester
+status: completed
+started_at: "2026-06-08T14:05:00Z"
+completed_at: "2026-06-08T14:08:00Z"
+
+files_created:
+  - skills/hive/skills/design-mode-cc-workflows/test/resolver.test.mjs
+  - .pHive/test-scenarios/d-4-design-mode-cc-workflows-smoke.yaml
+  - .pHive/episodes/substrate-coverage-and-test-cleanup/d-4-design-mode-cc-workflows/test.yaml
+  - hive/agents/memories/tester/d4-insight-capture-suffix-line-split.md
+
+files_modified:
+  - hive/lib/package.json
+
+test_results:
+  suite: vitest
+  total_tests: 414
+  passed: 414
+  failed: 0
+  new_tests_added: 49
+  test_file: skills/hive/skills/design-mode-cc-workflows/test/resolver.test.mjs
+
+lint_results:
+  script: node hive/scripts/lint-cc-workflows-no-codex.mjs
+  files_scanned: 6
+  checks: 4
+  result: all 4 checks PASSED across 6 file(s)
+  design_mode_cc_workflows_included: true
+
+acceptance_criteria_audit:
+  ac_1: "Step 0 imports + invokes assertWorktreeIsolation() — COVERED by helper-import describe block (3 tests)"
+  ac_2: "Mirrors plan-mode-cc-workflows step shape — COVERED by per-persona dispatch + marker tests"
+  ac_3: "s-3 no-codex lint 4/4 PASS — COVERED by no-codex describe block + confirmed by direct lint run"
+  ac_4: "Per-persona dispatch via default Workflow subagent — COVERED by dispatch shape tests + no-codex checks"
+  ac_5: "5-tier resolver test at design-mode-cc-workflows/test/resolver.test.mjs — COVERED (all 5 tiers + footgun tests)"
+  verdict: "audit-first walk: complete (AC 5/5 covered, refs 5/5 re-read)"
+
+metric:
+  name: substrate_coverage.design_mode_cc_workflows_lint_pass
+  value: 1
+  direction: up
+  achieved: true

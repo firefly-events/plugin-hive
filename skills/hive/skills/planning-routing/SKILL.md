@@ -5,6 +5,8 @@ description: Assemble and route a planning persona team across Multica, direct T
 
 # Hive Planning Routing
 
+> See `hive/references/dispatch-parity.md` for the canonical 6×3 substrate matrix — this routing skill is the **plan** row of that matrix.
+
 Atomic skill, NOT inline `/plan` prose. It assembles the caller's planning persona team, resolves backend routing, spawns Multica, direct, and Codex paths, and returns active teammate handles plus final routing decisions. It inherits the caller's model and does not choose or override it.
 
 ## Invocation contract

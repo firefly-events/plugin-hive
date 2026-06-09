@@ -96,30 +96,23 @@ concerns:
       - "verify_at set to a concrete point (story integrate step, epic close, or ISO-8601 timestamp) — not 'eventually'"
       - "Review confirms metric is falsifiable: a future reader can decide pass/fail from the declared source without re-reading the story"
 
-  - id: simulated-manual
-    name: Simulated Manual Testing
+  # RETIRED: simulated-manual
+  # id: simulated-manual was the cross-cutting concern for the --simulated-manual flag
+  # in skills/test/SKILL.md. That flag was hard-ripped in story
+  # t-1b-step-04b-and-rip-simulated-manual. Scenario replay is now a first-class
+  # swarm pipeline step (step-04b-scenario-replay) that runs unconditionally between
+  # execute-platform-a and validate-coverage; substrate selection is delegated to
+  # skills/hive/skills/test-dispatch/SKILL.md (story t-3).
+  - id: scenario-replay-folded
+    name: Scenario Replay (Historical Note — retired cross-cutting concern)
+    status: retired
+    retired_by: t-1b-step-04b-and-rip-simulated-manual
+    folded_into: hive/workflows/steps/test-swarm/step-04b-scenario-replay.md
     description: >
-      Stories with UI flows, external integrations, or perceptual outcomes that
-      cannot be reliably covered by automated tests require a simulated manual
-      test scenario. The scenario is declared in the story YAML and replayed by
-      `/test --simulated-manual` to produce a pass/fail/inconclusive verdict
-      written to the story's `manual_verdict` block.
-    applies_when: >
-      Story involves a UI flow, external service integration, or perceptual
-      outcome (visual correctness, layout, end-to-end user journey) where
-      automated unit/integration tests cannot fully assert correctness. Does
-      NOT apply to pure-substrate stories (schema docs, planner-prompt edits,
-      internal-only refactors with no observable surface).
-    planning_prompt: >
-      Does this story involve a UI flow, an external integration boundary, or
-      a perceptual outcome that requires human-judgment or end-to-end replay?
-      If yes, define a test scenario YAML under .pHive/test-scenarios/ per
-      test-scenario-schema.md and set manual_verdict.scenario_ref on the story
-      YAML to the scenario path. Describe the scenario: invocation kind
-      (skill|command|workflow), pre-conditions, and pass expectations.
-    implementation_checklist:
-      - "Test scenario YAML created at .pHive/test-scenarios/<scenario-id>.yaml per hive/references/test-scenario-schema.md"
-      - "story.manual_verdict.scenario_ref set to the scenario's repo-relative path"
-      - "A `scenario` step added to the story's workflow after the position required by the resolved methodology"
-      - "/test --simulated-manual <story-id> resolves scenario, runs invocation, evaluates expectations"
-      - "Verdict (pass | fail | inconclusive) written to story YAML manual_verdict block with timestamp"
+      The simulated-manual cross-cutting concern has been retired. Scenario replay
+      is now the canonical swarm pipeline step 4b, defined at
+      hive/workflows/steps/test-swarm/step-04b-scenario-replay.md. It loads worker
+      execution results via loadResults from hive/lib/scenarios/load.mjs and emits
+      a replay_summary consumed by validate-coverage (step-04-inspector). The
+      --simulated-manual exclusive flag has been removed from skills/test/SKILL.md;
+      substrate selection is delegated to skills/hive/skills/test-dispatch/SKILL.md.

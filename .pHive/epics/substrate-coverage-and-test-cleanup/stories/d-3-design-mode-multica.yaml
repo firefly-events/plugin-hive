@@ -1,0 +1,138 @@
+id: d-3-design-mode-multica
+epic: substrate-coverage-and-test-cleanup
+title: Create design-mode-multica atom — per-persona dispatch + episode markers per persona
+status: completed
+complexity: medium
+methodology: classic
+depends_on:
+- s-2-mode-resolver
+- s-4-cc-workflows-preconditions
+- s-3-no-codex-lint
+- d-1-design-multi-persona-pipeline
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: 'Create `skills/hive/skills/design-mode-multica/SKILL.md` (~400-450 lines,
+
+  mirrors `execute-mode-multica`). Per-persona dispatch within a team-cell;
+
+  serial within team-cell; episode markers per persona at
+
+  `${HIVE_STATE_DIR}/episodes/{epic_handle}/{unit_id}/multica-run.yaml`.
+
+  Multica issue creation surface defaults to one issue per persona
+
+  (mirrors execute-mode-multica precedent; Q10 explicitly resolved
+
+  by-default rather than gated).
+
+  '
+acceptance_criteria:
+- Given `skills/hive/skills/design-mode-multica/SKILL.md` is created, when /design runs through multica substrate with Phase A toggle ON, then dispatch is per-persona (accessibility-specialist, animations-specialist, ui-designer) inside a single team-cell.
+- Given the atom executes, when episodes are written, then episode markers are emitted per persona at `${HIVE_STATE_DIR}/episodes/{epic_handle}/{unit_id}/multica-run.yaml`.
+- Given the atom structurally mirrors `execute-mode-multica`, when a reader compares dispatch shape, then per-persona dispatch + serial-within-team-cell + per-persona episode markers match.
+- Given Multica issue creation runs, when Phase A toggle is ON, then one Multica issue is created per persona (3 issues total for accessibility + animations + ui-designer); when toggle is OFF, then one issue is created for ui-designer only.
+- Given the vitest resolution test runs at `skills/hive/skills/design-mode-multica/test/resolver.test.mjs`, when the atom is dispatched, then it returns the expected mode_decision and persona dispatch sequence.
+- DO. Mirror execute-mode-multica's per-persona dispatch + episode marker shape.
+- DO NOT. Collapse to a single issue surface — default to one issue per persona per design-discussion §6 Q10 resolution.
+metric:
+  applies: true
+  name: substrate_coverage.design_mode_multica_episode_marker_count
+  direction: up
+  unit: count
+  baseline: null
+  target: 3
+  window: story integrate step
+  source:
+    kind: manual
+    ref: /design --include-constraints via design-mode-multica produces 3 episode markers (one per persona)
+  verify_at: story integrate step
+  owner: developer
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/d-3-design-mode-multica-smoke.yaml
+  verdict: null
+  timestamp: null
+  agent: null
+steps:
+- id: research
+  description: Read `skills/hive/skills/execute-mode-multica/SKILL.md` (472 lines) — per-persona dispatch within a team, episode markers per persona, serial within team-cell.
+  agent: researcher
+- id: implement
+  description: Create `skills/hive/skills/design-mode-multica/SKILL.md` ~400-450 lines mirroring execute-mode-multica; per-persona dispatch within team-cell; one Multica issue per persona; episode markers per persona.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Author `skills/hive/skills/design-mode-multica/test/resolver.test.mjs` covering Phase 0c 5-tier resolution + per-persona dispatch sequence.
+  agent: tester
+  depends_on:
+  - implement
+- id: scenario
+  description: Author `.pHive/test-scenarios/d-3-design-mode-multica-smoke.yaml` covering /design --include-constraints via design-mode-multica producing 3 episode markers and 3 Multica issues.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Architect review on per-persona dispatch + episode marker placement + Multica issue surface = one per persona.
+  agent: reviewer
+  depends_on:
+  - test
+  - scenario
+- id: integrate
+  description: 'Commit "[d-3] feat(/design): design-mode-multica atom — per-persona dispatch + per-persona episode markers"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  tech_stack:
+  - language: markdown (SKILL.md), javascript (.mjs)
+  - runtime: node 20+
+  - test: vitest
+  key_files:
+  - path: skills/hive/skills/design-mode-multica/SKILL.md
+    purpose: NEW multica atom — per-persona dispatch, ~400-450 lines
+  - path: skills/hive/skills/execute-mode-multica/SKILL.md
+    purpose: Atom mirror target (472 lines)
+  - path: hive/agents/ui-designer.md
+    purpose: Persona dispatched in both default and toggle-on paths
+  - path: hive/agents/accessibility-specialist.md
+    purpose: Persona dispatched only when Phase A toggle ON
+  - path: hive/agents/animations-specialist.md
+    purpose: Persona dispatched only when Phase A toggle ON
+files_to_modify:
+- file: skills/hive/skills/design-mode-multica/SKILL.md
+  change: CREATE ~400-450 lines mirroring execute-mode-multica; per-persona dispatch; episode markers per persona at `${HIVE_STATE_DIR}/episodes/{epic_handle}/{unit_id}/multica-run.yaml`; one Multica issue per persona
+- file: skills/hive/skills/design-mode-multica/test/resolver.test.mjs
+  change: CREATE — vitest spec covering Phase 0c 5-tier + persona dispatch sequence
+- file: .pHive/test-scenarios/d-3-design-mode-multica-smoke.yaml
+  change: CREATE — scenario for /design via design-mode-multica with toggle on
+code_examples:
+- language: markdown
+  description: design-mode-multica per-persona dispatch shape
+  snippet: '## Step — Per-persona dispatch within team-cell
+
+    Serially dispatch accessibility-specialist → animations-specialist → ui-designer.
+
+    Emit one Multica issue per persona; one episode marker per persona.
+
+    '
+references:
+- path: skills/hive/skills/execute-mode-multica/SKILL.md
+  relevant_excerpt: Largest reference shape; per-persona dispatch within team-cell; episode markers per persona; serial within team-cell.
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/structured-outline.md
+  relevant_excerpt: 'd-3: design-mode-multica — Per-persona dispatch within a team-cell; serial within team-cell; episode markers per persona at ${HIVE_STATE_DIR}/episodes/{epic_handle}/{unit_id}/multica-run.yaml. Multica issue creation surface defaults to one issue per persona (Q10 resolved by-default rather than gated).'
+cross_cutting:
+- concern: documentation
+  action: SKILL.md is itself the doc; cite execute-mode-multica as mirror anchor and design-discussion §6 Q10 resolution (one issue per persona).
+- concern: versioning
+  action: New consumer-visible skill — flag for epic-close version bump (minor — additive feature) in CHANGELOG.
+design_decisions:
+- decision: One Multica issue per persona (3 issues when Phase A toggle ON)
+  rationale: Q10 RESOLVED by-default in design-discussion §3 — mirrors execute-mode-multica precedent; per-persona issue creation gives clean per-persona traceability and matches the per-persona episode marker shape.
+- decision: Per-persona episode markers
+  rationale: Mirrors execute-mode-multica; allows downstream consumers to consume each persona's output independently.
+risks:
+- severity: low
+  description: Three Multica issues per /design call feels heavy when toggle ON; operator may want a single bundled issue
+  mitigation: Moldability note in vertical-plan §6 — one-issue-per-call is a reversible post-ship configuration; default is per-persona for traceability
+tracker_id: e793ba73-67e8-4f32-b8eb-ac64e7313c46

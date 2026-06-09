@@ -1,0 +1,166 @@
+scenario: d-4-design-mode-cc-workflows-smoke
+title: Smoke — /design via cc-workflows substrate with toggle ON (3 personas) and toggle OFF (1 persona)
+story: d-4-design-mode-cc-workflows
+kind: manual-verdict
+
+description: >
+  Verifies that the design-mode-cc-workflows atom (d-4) correctly dispatches personas
+  as per-persona serial Workflow tool dispatch. Toggle ON (--include-constraints) produces
+  3 episode markers (accessibility-specialist, animations-specialist, ui-designer). Toggle
+  OFF produces 1 episode marker (ui-designer only). Dispatched via design-dispatch (d-2)
+  when mode_decision resolves to cc-workflows. Intentional substrate asymmetry with d-3
+  (Multica vs Workflow tool). Intentional step-shape asymmetry with dr-3 (N Workflow runs
+  vs dr-3's ONE Workflow run with FOUR internal agent() calls).
+
+preconditions:
+  - cwd is inside a .claude/worktrees/<name>/ checkout (assertWorktreeIsolation passes)
+  - HIVE_DESIGN_MODE=cc-workflows is set OR hive.config.yaml has execution.design_mode cc-workflows
+  - design_context payload is available (topic_slug, brand context, surface kind)
+  - design-dispatch (d-2) routes to design-mode-cc-workflows when mode_decision is cc-workflows
+  - All three persona agent files exist in hive/agents/
+
+cases:
+  - name: toggle-on-three-personas
+    description: >
+      /design --include-constraints triggers toggle ON path. d-4 dispatches three personas
+      serially via Workflow tool: accessibility-specialist first, then animations-specialist
+      (receives accessibility outputs), then ui-designer (receives both constraint blocks).
+      Three Workflow runs are created (one per persona). Three episode markers are written
+      at per-persona paths. Prior persona outputs flow forward as optional context blocks.
+      ui-designer failure = overall run failed.
+    invocation: /design --include-constraints
+    env:
+      HIVE_DESIGN_MODE: cc-workflows
+    expected:
+      mode_decision: cc-workflows
+      include_constraints: true
+      persona_dispatch_order:
+        - accessibility-specialist
+        - animations-specialist
+        - ui-designer
+      dispatch_mode: serial
+      workflow_runs_created: 3
+      episode_markers_written: 3
+      marker_paths:
+        - episodes/{epic_handle}/accessibility-specialist/cc-workflows-run.yaml
+        - episodes/{epic_handle}/animations-specialist/cc-workflows-run.yaml
+        - episodes/{epic_handle}/ui-designer/cc-workflows-run.yaml
+      sidecar_paths:
+        - episodes/{epic_handle}/accessibility-specialist/cc-workflows-run.messages.jsonl
+        - episodes/{epic_handle}/animations-specialist/cc-workflows-run.messages.jsonl
+        - episodes/{epic_handle}/ui-designer/cc-workflows-run.messages.jsonl
+      prior_outputs_forwarded: true
+      summary_fields:
+        - persona_runs
+        - run_id
+        - include_constraints
+        - topic
+        - failed
+
+  - name: toggle-off-ui-designer-only
+    description: >
+      /design without --include-constraints triggers toggle OFF path. d-4 dispatches
+      ui-designer only. One Workflow run is created. One episode marker is written
+      at the ui-designer path. accessibility-specialist and animations-specialist
+      are absent from persona_runs entirely (not status-skipped — absent entirely).
+    invocation: /design
+    env:
+      HIVE_DESIGN_MODE: cc-workflows
+    expected:
+      mode_decision: cc-workflows
+      include_constraints: false
+      persona_dispatch_order:
+        - ui-designer
+      dispatch_mode: serial
+      workflow_runs_created: 1
+      episode_markers_written: 1
+      marker_paths:
+        - episodes/{epic_handle}/ui-designer/cc-workflows-run.yaml
+      personas_absent_from_runs:
+        - accessibility-specialist
+        - animations-specialist
+      summary_fields:
+        - persona_runs
+        - run_id
+        - include_constraints
+        - topic
+        - failed
+
+  - name: precondition-reject-outside-worktree
+    description: >
+      When cwd is not inside a .claude/worktrees/<name>/ path, assertWorktreeIsolation
+      throws precondition_failed and the skill aborts without dispatching any Workflow run.
+      Structured rejection is emitted with field_sources. design-dispatch owns fallback.
+    invocation: /design --include-constraints
+    env:
+      HIVE_DESIGN_MODE: cc-workflows
+    simulate_cwd: /Users/don/Documents/plugin-hive
+    expected:
+      error: precondition_failed
+      field_sources_present: true
+      workflow_runs_created: 0
+      episode_markers_written: 0
+      fallback_to_inline: false
+
+  - name: ui-designer-failure-is-run-failure
+    description: >
+      When ui-designer persona reaches a non-passed terminal status, the overall run
+      is failed. Prior persona markers (accessibility-specialist, animations-specialist)
+      are preserved as written. The summary failed field is populated with ui-designer
+      status and terminal notes.
+    invocation: /design --include-constraints
+    env:
+      HIVE_DESIGN_MODE: cc-workflows
+    simulate_persona_failure: ui-designer
+    expected:
+      overall_run_failed: true
+      prior_markers_preserved: true
+      summary_failed_populated: true
+      episode_markers_written: 3
+
+  - name: accessibility-failure-continues-chain
+    description: >
+      When accessibility-specialist fails, a warning is logged and the chain continues.
+      animations-specialist dispatches with accessibility outputs absent (priorOutputs
+      empty for that key). ui-designer dispatches with both constraint blocks absent.
+      All three markers are written. Overall run is not failed unless ui-designer fails.
+    invocation: /design --include-constraints
+    env:
+      HIVE_DESIGN_MODE: cc-workflows
+    simulate_persona_failure: accessibility-specialist
+    expected:
+      overall_run_failed: false
+      warning_logged: true
+      episode_markers_written: 3
+      persona_dispatch_order:
+        - accessibility-specialist
+        - animations-specialist
+        - ui-designer
+
+  - name: mode-resolution-env-wins
+    description: >
+      5-tier mode resolution: HIVE_DESIGN_MODE=cc-workflows env token wins over all other
+      tiers. design-dispatch (d-2) resolves mode_decision=cc-workflows and routes to d-4.
+      Source is recorded as env tier only. Lower tiers (root_config=multica) are ignored.
+    invocation: /design
+    env:
+      HIVE_DESIGN_MODE: cc-workflows
+    config_override:
+      execution:
+        design_mode: multica
+    expected:
+      mode_decision: cc-workflows
+      mode_source: env
+      atom_routed_to: design-mode-cc-workflows
+
+verdict: null
+timestamp: null
+agent: null
+notes: >
+  Scenario covers d-4 acceptance criteria: Step 0 assertWorktreeIsolation import and
+  invocation (AC 1), structural mirror of plan-mode-cc-workflows (AC 2), s-3 no-codex lint
+  4/4 PASS (AC 3), per-persona dispatch via default Workflow subagent with no Codex routing
+  (AC 4), vitest 5-tier resolver test (AC 5). Also covers precondition reject, partial
+  failure continuation, ui-designer failure semantics, and 5-tier mode resolution routing.
+  Intentional substrate asymmetry with d-3 (Multica issues vs Workflow tool runs).
+  Intentional step-shape asymmetry with dr-3 (N Workflow runs vs ONE Workflow run).

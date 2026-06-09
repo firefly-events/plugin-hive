@@ -1,0 +1,135 @@
+id: d-4-design-mode-cc-workflows
+epic: substrate-coverage-and-test-cleanup
+title: Create design-mode-cc-workflows atom mirroring plan-mode-cc-workflows + helper import + no-codex compliance
+status: completed
+complexity: medium
+methodology: classic
+depends_on:
+- s-2-mode-resolver
+- s-5-cc-workflows-model-tier-resolver
+- s-4-cc-workflows-preconditions
+- s-3-no-codex-lint
+- d-1-design-multi-persona-pipeline
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: 'Create `skills/hive/skills/design-mode-cc-workflows/SKILL.md`
+
+  (~330-360 lines, mirrors `plan-mode-cc-workflows`). Step 0 imports
+
+  `hive/lib/cc-workflows-preconditions.mjs` and calls
+
+  `assertWorktreeIsolation()`. No Codex routing (s-3 lint enforces all four
+
+  surface checks). Dispatches personas per Phase A toggle output from d-1
+
+  — accessibility, animations, ui-designer (toggle ON) or ui-designer only
+
+  (toggle OFF).
+
+  '
+acceptance_criteria:
+- Given `skills/hive/skills/design-mode-cc-workflows/SKILL.md` is created, when the atom executes Step 0, then it imports `hive/lib/cc-workflows-preconditions.mjs` and invokes `assertWorktreeIsolation()`.
+- Given the atom structurally mirrors `plan-mode-cc-workflows`, when a reader compares Step 0/1/2/3/4/5 shapes, then they are structurally identical.
+- Given the s-3 no-codex lint runs against the atom, when `npm test` executes, then all four checks PASS (no `agentType:` literal, no `codex:codex-rescue`, no `agent_backends`, helper import present).
+- Given Phase A toggle from d-1 dictates persona set, when /design runs through cc-workflows substrate, then the atom dispatches the resolved personas via the default workflow subagent (no Codex routing).
+- Given the vitest resolution test runs at `skills/hive/skills/design-mode-cc-workflows/test/resolver.test.mjs`, when 5-tier permutations are exercised, then mode_decision and field_sources emit correctly.
+- DO. Mirror plan-mode-cc-workflows step shape.
+- DO NOT. Include any Codex routing surfaces.
+metric:
+  applies: true
+  name: substrate_coverage.design_mode_cc_workflows_lint_pass
+  direction: up
+  unit: bool
+  baseline: 0
+  target: 1
+  window: story integrate step
+  source:
+    kind: manual
+    ref: node hive/scripts/lint-cc-workflows-no-codex.mjs (green for design-mode-cc-workflows)
+  verify_at: story integrate step
+  owner: developer
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/d-4-design-mode-cc-workflows-smoke.yaml
+  verdict: null
+  timestamp: null
+  agent: null
+steps:
+- id: research
+  description: Read `skills/hive/skills/plan-mode-cc-workflows/SKILL.md` (336 lines) as mirror; confirm Step 0 helper-import shape from s-4 back-fit.
+  agent: researcher
+- id: implement
+  description: Create `skills/hive/skills/design-mode-cc-workflows/SKILL.md` ~330-360 lines mirroring plan-mode-cc-workflows; Step 0 imports cc-workflows-preconditions.mjs; no Codex routing.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Author resolver test at `skills/hive/skills/design-mode-cc-workflows/test/resolver.test.mjs`; run s-3 lint and helper-import lint to confirm green.
+  agent: tester
+  depends_on:
+  - implement
+- id: scenario
+  description: Author `.pHive/test-scenarios/d-4-design-mode-cc-workflows-smoke.yaml` covering /design via cc-workflows substrate with toggle on.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Architect review on plan-mode-cc-workflows mirror + lint compliance + helper-import at Step 0.
+  agent: reviewer
+  depends_on:
+  - test
+  - scenario
+- id: integrate
+  description: 'Commit "[d-4] feat(/design): design-mode-cc-workflows atom"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  tech_stack:
+  - language: markdown (SKILL.md), javascript (.mjs)
+  - runtime: node 20+
+  - test: vitest
+  key_files:
+  - path: skills/hive/skills/design-mode-cc-workflows/SKILL.md
+    purpose: NEW cc-workflows atom — ~330-360 lines
+  - path: skills/hive/skills/plan-mode-cc-workflows/SKILL.md
+    purpose: Atom mirror target (336 lines)
+  - path: hive/lib/cc-workflows-preconditions.mjs
+    purpose: Helper imported at Step 0
+files_to_modify:
+- file: skills/hive/skills/design-mode-cc-workflows/SKILL.md
+  change: CREATE ~330-360 lines mirroring plan-mode-cc-workflows; Step 0 imports cc-workflows-preconditions.mjs; no Codex routing
+- file: skills/hive/skills/design-mode-cc-workflows/test/resolver.test.mjs
+  change: CREATE — vitest spec covering Phase 0c 5-tier + helper-import assertions
+- file: .pHive/test-scenarios/d-4-design-mode-cc-workflows-smoke.yaml
+  change: CREATE — scenario for /design via cc-workflows with toggle on
+code_examples:
+- language: markdown
+  description: design-mode-cc-workflows Step 0
+  snippet: '## Step 0 — Precondition
+
+    Import `hive/lib/cc-workflows-preconditions.mjs`.
+
+    Call `assertWorktreeIsolation()`.
+
+    '
+references:
+- path: skills/hive/skills/plan-mode-cc-workflows/SKILL.md
+  relevant_excerpt: Canonical cc-workflows atom shape — Step 0 precondition gate, Step 1 per-persona serial dispatch, Step 2 poll-to-terminal, Step 3 episode marker, Step 4 sidecar no-op, Step 5 aggregate return.
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/structured-outline.md
+  relevant_excerpt: 'd-4: design-mode-cc-workflows — Create skills/hive/skills/design-mode-cc-workflows/SKILL.md (~330-360 lines, mirrors plan-mode-cc-workflows). Imports cc-workflows-preconditions.mjs at Step 0. No Codex routing (lint from Slice 1 enforces).'
+cross_cutting:
+- concern: documentation
+  action: SKILL.md is itself the doc; cite plan-mode-cc-workflows as mirror anchor.
+- concern: versioning
+  action: New consumer-visible skill — flag for epic-close version bump (minor — additive feature) in CHANGELOG.
+design_decisions:
+- decision: Atom structurally mirrors plan-mode-cc-workflows
+  rationale: Architectural consistency with shipped cc-workflows atom; minimizes implementation surface drift.
+- decision: Step 0 helper import from s-4
+  rationale: Constraint 7 worktree-isolation enforced via shared helper, not per-skill duplication.
+risks:
+- severity: low
+  description: Atom drifts from plan-mode-cc-workflows shape during implementation
+  mitigation: Architect review verifies step-by-step parity; s-3 lint catches helper-import omission
+tracker_id: 5a5c295b-e143-4c9b-bb49-bc717eee8bd3

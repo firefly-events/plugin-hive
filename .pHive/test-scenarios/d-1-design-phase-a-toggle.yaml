@@ -1,0 +1,128 @@
+id: d-1-design-phase-a-toggle
+title: "/design Phase A persona pipeline toggle smoke — default-off legacy path + --include-constraints 3-persona path"
+description: >
+  Smoke walk confirming that skills/design/SKILL.md documents the Phase A persona
+  pipeline correctly. This is a spec-walk (NOT a live runtime invocation) — an operator
+  reads the SKILL.md and verifies the two code paths are described as specified.
+  Path 1: /design invoked without --include-constraints (default OFF) dispatches
+  ui-designer once with no specialist involvement. Path 2: /design --include-constraints
+  (toggle ON) serially dispatches accessibility-specialist then animations-specialist
+  then ui-designer ONCE with constraints baked in. The handoff payload differs between
+  the two paths.
+mode: spec-walk
+story: d-1-design-multi-persona-pipeline
+epic: substrate-coverage-and-test-cleanup
+
+preconditions:
+  - "skills/design/SKILL.md is present and has been modified by the d-1 implementation"
+  - "Phase 0 block (design-dispatch invocation) exists in SKILL.md above Phase A"
+  - "Phase A block exists in SKILL.md above existing step 3 (ui-designer dispatch)"
+  - "hive/workflows/design-review.workflow.yaml is present at lines 8-81 (4-step template)"
+  - "The vitest phase-a-toggle test suite passes green (23 tests, 3 describe blocks)"
+  - "skills/hive/skills/design-dispatch/SKILL.md is present (d-2, already shipped)"
+
+steps:
+  - action: >
+      Run the vitest phase-a-toggle test suite to confirm all three AC subsections
+      pass independently. Verify that 23 tests pass across 3 describe blocks and
+      that no describe block dependency exists.
+    expected: >
+      All 23 tests pass. Subsection 1 (Phase A structural insert), Subsection 2
+      (Pattern B toggle semantics), and Subsection 3 (3-persona handoff payload)
+      each report independently. Zero failures.
+    actor: tester
+
+  - action: >
+      Read skills/design/SKILL.md and locate Phase 0. Confirm that Phase 0 invokes
+      design-dispatch before the persona phase, branches on mode_decision, and
+      documents forward declarations for design-mode-multica and design-mode-cc-workflows.
+    expected: >
+      Phase 0 section exists above Phase A. It references design-dispatch (d-2 router).
+      It documents multica and cc-workflows as forward-declared handoff targets.
+      All other mode_decision values (sessions, team, team-cmux, sequential, sandcastle)
+      continue inline.
+    actor: tester
+
+  - action: >
+      Read skills/design/SKILL.md and confirm Phase A is inserted above step 3. Verify
+      the Phase A AC text cites hive/workflows/design-review.workflow.yaml:8-81
+      verbatim as the orchestration template anchor.
+    expected: >
+      Phase A section header appears before the step 3 header in file order.
+      The text "hive/workflows/design-review.workflow.yaml:8-81" appears verbatim
+      in the Phase A block. The 4-step template shape (accessibility, animations,
+      ui-designer critique, synthesis) is named as the anchor.
+    actor: tester
+
+  - action: >
+      Read skills/design/SKILL.md and walk the default-OFF path (no --include-constraints).
+      Confirm that Phase A is described as a no-op, ui-designer is dispatched once,
+      no accessibility-specialist is invoked, and no animations-specialist is invoked.
+    expected: >
+      SKILL.md states Phase A is a no-op when --include-constraints is not set.
+      The text "no accessibility-specialist invocation, no animations-specialist
+      invocation" or equivalent appears. Legacy behavior is described as preserved.
+      ui-designer dispatch remains single.
+    actor: tester
+
+  - action: >
+      Read skills/design/SKILL.md and walk the toggle-ON path (--include-constraints set).
+      Confirm serial dispatch order: (a) accessibility-specialist produces
+      accessibility-constraints.md, (b) animations-specialist produces
+      animations-constraints.md reading accessibility notes as optional input,
+      (c) ui-designer dispatched exactly once with both constraint notes prepended.
+    expected: >
+      SKILL.md documents all three sub-steps in serial order. Step (a) writes
+      .pHive/design/{topic}/accessibility-constraints.md. Step (b) writes
+      .pHive/design/{topic}/animations-constraints.md and reads step (a) output
+      as optional context. Step (c) dispatches ui-designer once with constraints
+      baked in. The text confirms ui-designer is NOT dispatched a second time.
+    actor: tester
+
+  - action: >
+      Read skills/design/SKILL.md and verify the handoff payload for both toggle states.
+      Toggle OFF: constraint doc fields are absent, PNG and .f0 ship. Toggle ON:
+      accessibility-constraints.md and animations-constraints.md are bundled with
+      PNG and .f0. Confirm d-5 is named as the payload contract owner.
+    expected: >
+      SKILL.md states PNG and .f0 always ship regardless of toggle state.
+      When toggle OFF, constraint_doc_path and animations_constraint_doc_path
+      are omitted from the index.yaml entry. When toggle ON, both constraint
+      doc fields are present. d-5 (or d-5-wireframe-artifact-handoff) is named
+      as the owner of the bundled payload contract.
+    actor: tester
+
+  - action: >
+      Read hive/workflows/design-review.workflow.yaml lines 8-81 and confirm the
+      4-step template shape that Phase A mirrors: step id=accessibility-critique
+      (line 8), step id=animations-critique (line 28), step id=design-critique
+      (line 55), step id=synthesis (line 80). Confirm Phase A uses steps 1-3
+      only (no synthesis step — ui-designer synthesizes in one pass).
+    expected: >
+      The workflow YAML documents exactly 4 steps with the expected ids and line
+      positions. Phase A in SKILL.md mirrors the first 3 steps. The synthesis
+      step is omitted from Phase A because ui-designer synthesizes inline
+      when constraints are baked into its prompt.
+    actor: tester
+
+  - action: >
+      Document the s-3 no-codex lint scope finding for d-1. d-1 modifies
+      skills/design/SKILL.md (a top-level dispatch skill), not a *-mode-cc-workflows
+      atom. Confirm the lint target glob does not cover skills/design/SKILL.md.
+    expected: >
+      The s-3 lint script targets *-mode-cc-workflows/SKILL.md files and does
+      not scan skills/design/SKILL.md. This is expected and documented. The
+      Phase A toggle changes are prose-only additions to the dispatch skill and
+      do not introduce cc-workflows code paths into a non-cc-workflows file.
+    actor: tester
+
+postconditions:
+  - "All 23 vitest phase-a-toggle tests pass (3 independent describe blocks, 0 coupling)"
+  - "Phase 0 invokes design-dispatch before Phase A on every /design call"
+  - "Phase A is a structural insert above step 3 in skills/design/SKILL.md"
+  - "Phase A AC cites hive/workflows/design-review.workflow.yaml:8-81 verbatim"
+  - "Default OFF (no --include-constraints): ui-designer dispatched once, no specialists invoked"
+  - "Toggle ON (--include-constraints): accessibility-specialist then animations-specialist then ui-designer ONCE with constraints baked in"
+  - "Handoff payload: PNG + .f0 always ship; constraint docs present only when toggle ON"
+  - "d-5 named as bundled payload contract owner"
+  - "s-3 lint scope documented: d-1 modifies dispatch skill, out of cc-workflows lint scope"
