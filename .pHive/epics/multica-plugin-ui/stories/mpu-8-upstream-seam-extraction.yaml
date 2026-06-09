@@ -1,0 +1,67 @@
+id: mpu-8-upstream-seam-extraction
+epic: multica-plugin-ui
+title: "Upstream seam extraction (conditional on measured fork churn)"
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+  - mpu-1-proof-gate-mount-store-schema
+  - mpu-2-epictree-view
+  - mpu-3-reviewgates-view
+  - mpu-4-personalqueue-view
+  - mpu-5-hermeschat-realtime
+  - mpu-6-skills-catalog-browse
+  - mpu-7-skills-materialize
+
+description: |
+  Phase 6 — CONDITIONAL (locked decision): only execute if measured fork churn from
+  mpu-1..7 shows the anchor patch set is painful enough to justify a generic seam. Extract
+  the concrete Hive-specific anchors (the transpilePackages addition, the router.go mount,
+  the nav slots) into a minimal generic plugin seam isolated enough to propose UPSTREAM to
+  Multica (framed as generic plugin infrastructure, no Hive mention) — without carrying
+  speculative loader work. If churn is small, SKIP extraction and keep the thin anchor patch
+  set. Do NOT build a dynamic/runtime loader (over-engineering guard).
+
+  Working state: either (a) a minimal generic seam is extracted + documented with evidence
+  from the working slices, ready for an upstream PR; or (b) a documented decision to skip,
+  keeping the thin fork anchors.
+
+acceptance_criteria:
+  - "Given fork-churn evidence from mpu-1..7, when evaluated, then Phase 6 proceeds ONLY if churn justifies the seam; otherwise it is documented as skipped (the conditional is honored, not an unconditional refactor)."
+  - "Given extraction proceeds, when done, then it isolates only the anchors used by working Hive slices (transpilePackages hook, router mount, nav slot) into a generic seam with NO Hive-specific naming and NO dynamic/runtime loader."
+  - "Given the seam, when documented for upstream, then the description cites concrete paths + tests from mpu-1..7 — it claims no more than the working code proves."
+  - "Given the over-engineering guard, when reviewed, then no generic abstraction is added that has only the single Hive consumer without justification."
+
+steps:
+  - id: research
+    description: Measure the actual fork diff/anchor surface across mpu-1..7; decide proceed vs skip with evidence.
+    agent: researcher
+  - id: implement
+    description: If proceeding — extract the minimal generic seam (no Hive naming, no dynamic loader) + write the proof-backed upstream-PR description. If skipping — document the decision + keep anchors.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Hive slices still work post-extraction; seam is generic (no Hive coupling); upstream doc cites real paths/tests.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify conditionality honored, no over-generalization, claims match code.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: One story-commit to feat/multica-plugin-ui (extraction or documented skip).
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Code/spikes/multica
+  tech_stack: {language: go-and-typescript}
+  key_files:
+    - path: apps/web/next.config.ts
+      purpose: "transpilePackages anchor — candidate generic hook."
+    - path: server/cmd/server/router.go
+      purpose: "The /api/plugins/<name> mount anchor — candidate generic seam."
+
+files_to_modify:
+  - file: (conditional)
+    change: "Either a minimal generic plugin seam + upstream-PR doc, OR a documented skip keeping thin anchors — decided by measured churn."

@@ -1,0 +1,67 @@
+id: mpu-5-hermeschat-realtime
+epic: multica-plugin-ui
+title: "HermesChat persisted messaging over /ws realtime"
+status: pending
+complexity: high
+methodology: classic
+depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view]
+
+description: |
+  Fourth Hive view (Phase 4). Persisted Hive chat — create/select threads, send/read
+  messages — against new hive.hermes_threads + hive.hermes_messages tables. Delivery is
+  REALTIME over Multica's EXISTING /ws (sign-off decision — override of the polling default):
+  backend publishes message-create events; frontend manages the connection. CRITICAL: reuse
+  the existing /ws + auth; do NOT stand up a second WebSocket or auth stack (see auth/WS
+  inheritance design). Higher complexity than the other views because of the realtime path.
+  Adds one top-level 'Hermes' sidebar entry.
+
+  Working state: a user creates/selects a thread, sends and reads persisted messages, and
+  sees new messages arrive in realtime via /ws without a second socket stack.
+
+acceptance_criteria:
+  - "Given a thread, when a user creates/sends/reads messages, then they persist and round-trip through /api/plugins/hive/* + HiveStore against hive.hermes_threads/hive.hermes_messages (integration test)."
+  - "Given a new message, when published, then it is delivered in realtime over Multica's EXISTING /ws — verified by a second client receiving it — with NO second WebSocket or auth stack introduced."
+  - "Given message reads, when a thread is active, then they are paginated/indexed by thread+time from first implementation (no unbounded client render)."
+  - "Given the realtime path, when reviewed, then /ws reuse is careful and inherits existing auth; connection management is on the frontend, event publishing on the backend."
+
+steps:
+  - id: research
+    description: Map Multica's /ws hub (server/internal/realtime) + how to publish a Hive event onto it without a second stack; frontend WS client pattern.
+    agent: researcher
+  - id: implement
+    description: hive.hermes_threads/messages migrations; thread/message handlers + HiveStore; backend event-publish on message-create over existing /ws; HermesChat.tsx with WS connection mgmt + pagination; route + one sidebar entry.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Persistence round-trip; two-client realtime delivery; pagination; no second socket/auth stack (review + grep).
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Adversarial review of the realtime path — single /ws reuse, auth inheritance, no unbounded reads.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: One story-commit to feat/multica-plugin-ui.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Code/spikes/multica
+  tech_stack: {language: go-and-typescript, realtime: gorilla-websocket}
+  key_files:
+    - path: server/internal/realtime/
+      purpose: "Existing /ws hub — publish Hive message events here; do NOT create a second hub."
+    - path: server/internal/hive/
+      purpose: "Thread/message handlers + store + migrations."
+    - path: packages/hive/
+      purpose: "HermesChat.tsx with WS connection management + paginated reads."
+
+files_to_modify:
+  - file: server/internal/hive/migrations/
+    change: NEW — hive.hermes_threads + hive.hermes_messages
+  - file: server/internal/hive/(handlers+store)
+    change: MODIFY — thread/message CRUD + event publish over existing /ws
+  - file: packages/hive/HermesChat.tsx
+    change: NEW — chat view, WS client, paginated reads
+  - file: apps/web/app/[workspaceSlug]/hive/hermes/page.tsx
+    change: NEW — route adapter + sidebar entry

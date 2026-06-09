@@ -1,0 +1,65 @@
+name: multica-plugin-ui
+title: Hive UI inside Multica via a build-time plugin
+description: >
+  A unified Hive UI that runs inside Multica (shared auth, shared WebSocket, native
+  look) instead of a separate app. Achieved build-time (runtime drop-in refuted: Next 16
+  App Router + Turbopack kill Module Federation; Go has no practical runtime plugin
+  loader). Frontend = a Hive workspace package added to Multica `transpilePackages` +
+  per-view route/nav anchors. Backend = one `server/cmd/server/router.go` anchor mounting
+  `/api/plugins/hive/*` inside the authed chi group + build-linked handlers behind a
+  HiveStore boundary. Hive owns its datastore: same Postgres, separate `hive` schema +
+  `hive.schema_migrations` (never touches core `server/migrations`). Slice 1 (mpu-1) is a
+  hard PROOF GATE — if the route-mount + own-store can't be proven thin inside running
+  Multica, the epic bails before the views. Impl targets a Multica fork (~/Code/spikes/
+  multica) + a hive-multica-plugin package; these planning artifacts live in plugin-hive.
+target_codebase: /Users/don/Code/spikes/multica
+methodology: classic
+version_bump: minor
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+# Sign-off decisions (2026-06-09): sidebar=separate top-level entries; chat=/ws realtime;
+# migrations=auto-run at startup; gate-perms=membership-only v1. See docs/structured-outline.md Part 8.
+
+stories:
+  - id: mpu-1-proof-gate-mount-store-schema
+    title: "Proof gate — /api/plugins/hive route mount + HiveStore + hive schema"
+    complexity: high
+    depends_on: []
+  - id: mpu-2-epictree-view
+    title: "Minimal EpicTree route, nav entry, dashboard render"
+    complexity: medium
+    depends_on: [mpu-1-proof-gate-mount-store-schema]
+  - id: mpu-3-reviewgates-view
+    title: "ReviewGates list/detail/update workflow"
+    complexity: medium
+    depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view]
+  - id: mpu-4-personalqueue-view
+    title: "PersonalQueue user-scoped work-item surface"
+    complexity: medium
+    depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view]
+  - id: mpu-5-hermeschat-realtime
+    title: "HermesChat persisted messaging over /ws realtime"
+    complexity: high
+    depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view]
+  - id: mpu-6-skills-catalog-browse
+    title: "Skills catalog — versioned packaged browse (no online runtime)"
+    complexity: medium
+    depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view]
+  - id: mpu-7-skills-materialize
+    title: "Skill materialization into Multica DB with provenance"
+    complexity: medium
+    depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view, mpu-6-skills-catalog-browse]
+  - id: mpu-8-upstream-seam-extraction
+    title: "Upstream seam extraction (conditional on measured fork churn)"
+    complexity: medium
+    depends_on:
+      - mpu-1-proof-gate-mount-store-schema
+      - mpu-2-epictree-view
+      - mpu-3-reviewgates-view
+      - mpu-4-personalqueue-view
+      - mpu-5-hermeschat-realtime
+      - mpu-6-skills-catalog-browse
+      - mpu-7-skills-materialize

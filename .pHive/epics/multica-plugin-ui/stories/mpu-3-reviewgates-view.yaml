@@ -1,0 +1,63 @@
+id: mpu-3-reviewgates-view
+epic: multica-plugin-ui
+title: "ReviewGates list/detail/update workflow"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view]
+
+description: |
+  Second Hive view (Phase 2). List/inspect/update review gates for an epic through the
+  authenticated Hive API and HiveStore, against a new hive.review_gates table. Parallel to
+  mpu-4/mpu-5 (depends only on the Slice-1 proof). Gate updates require workspace membership
+  only for v1 (sign-off decision) — WorkspaceAuthorizer is built so role-gating can be added
+  later without rework. Adds one top-level 'Review Gates' sidebar entry.
+
+  Working state: a user lists review gates for an epic, inspects evidence, and updates gate
+  state; refreshed state persists.
+
+acceptance_criteria:
+  - "Given an authenticated workspace member, when they list/detail/update review gates, then the operations succeed through /api/plugins/hive/* and HiveStore against hive.review_gates (integration test)."
+  - "Given a gate-state update, when applied and the view refreshed, then the new state persists."
+  - "Given gate update authorization, when checked, then v1 requires only workspace membership (no reviewer-role gate) — but the WorkspaceAuthorizer interface admits adding role checks later without restructuring."
+  - "Given the ReviewGates route + sidebar entry, when added, then they are additive workspace-scoped anchors reusing the mpu-1 auth/store plumbing — Step-1 assumptions unchanged."
+
+steps:
+  - id: research
+    description: Confirm minimum gate states + the HiveStore method shape; reuse mpu-2 route/nav pattern.
+    agent: researcher
+  - id: implement
+    description: hive.review_gates migration; ReviewGate handlers + HiveStore methods; ReviewGates.tsx + route + one sidebar entry + path builder.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Integration list/detail/update; persistence after update; membership-only authz.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify reuse of Step-1 plumbing, additive nav, authorizer extensibility.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: One story-commit to feat/multica-plugin-ui.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Code/spikes/multica
+  tech_stack: {language: go-and-typescript}
+  key_files:
+    - path: server/internal/hive/
+      purpose: "Add review-gate handlers + HiveStore methods + hive.review_gates migration."
+    - path: packages/hive/
+      purpose: "Add ReviewGates.tsx + export."
+
+files_to_modify:
+  - file: server/internal/hive/migrations/
+    change: NEW — hive.review_gates
+  - file: server/internal/hive/(handlers+store)
+    change: MODIFY — review-gate list/detail/update + store methods
+  - file: packages/hive/ReviewGates.tsx
+    change: NEW — ReviewGates view
+  - file: apps/web/app/[workspaceSlug]/hive/review-gates/page.tsx
+    change: NEW — route adapter + sidebar entry

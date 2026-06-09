@@ -1,0 +1,80 @@
+id: mpu-1-proof-gate-mount-store-schema
+epic: multica-plugin-ui
+title: "Proof gate — /api/plugins/hive route mount + HiveStore + hive schema"
+status: pending
+complexity: high
+methodology: classic
+depends_on: []
+
+description: |
+  Slice 1 and the HARD PROOF GATE for the epic. Prove the decisive backend seam end-to-end
+  inside running Multica: a build-linked Hive route mounted under the existing authenticated
+  chi group, reading/writing through a typed HiveStore into a Hive-owned `hive` Postgres
+  schema (separate `hive.schema_migrations` ledger), with migration failure visible at
+  startup/readiness. No Hive SQL touches core `server/migrations`.
+
+  HARD BAIL: if mounting `/api/plugins/hive/*` requires deep `server/cmd/server/router.go`
+  surgery (more than one build-linked router construction + one mount inside the authed
+  group), if a durable write/read through `hive.epic_nodes` cannot be demonstrated, or if
+  Hive schema needs files in core `server/migrations`/sqlc input — STOP the epic before the
+  views. This slice IS the proof the build-time-bundled loader works.
+
+  Working state: an authenticated request reaches a Hive handler under /api/plugins/hive/*,
+  one row round-trips through hive.epic_nodes, and a broken Hive migration is observably
+  surfaced rather than silently skipped.
+
+acceptance_criteria:
+  - "Given an authenticated dashboard request to /api/plugins/hive/*, when it is handled, then it reaches a build-linked Hive handler mounted inside the existing r.Group(middleware.Auth...) block in server/cmd/server/router.go (~L301-304), inheriting auth — no separate Hive auth/session implementation."
+  - "Given an unauthenticated request to /api/plugins/hive/*, when handled, then it is rejected by the inherited auth middleware before reaching any Hive handler (test with a no-cookie fixture)."
+  - "Given a Hive endpoint, when it performs one write then read of an epic node, then the round-trip succeeds through a typed HiveStore boundary against hive.epic_nodes (integration test)."
+  - "Given an intentionally broken Hive migration, when the server starts or reports readiness, then the failure is surfaced (fail-fast or readiness signal) — the server never serves Hive routes against a stale/missing schema."
+  - "Given a file review / CI grep, when scanning server/migrations and server/sqlc.yaml, then NO Hive table or Hive migration file is present there; all Hive SQL lives under server/internal/hive/migrations and records in hive.schema_migrations."
+  - "Given Slice 1 cannot satisfy the thin-mount + own-store criteria, when the gate is evaluated, then the epic is bailed (documented) and views 2-8 are not built."
+
+steps:
+  - id: research
+    description: Confirm the authed chi group + mount points in server/cmd/server/router.go (L301-304, 541-587), the pgx pool wiring in main.go (L142-160), and the migration runner shape (server/internal/migrations, cmd/migrate). Identify the minimal WorkspaceAuthorizer surface needed.
+    agent: researcher
+  - id: implement
+    description: Add server/internal/hive/{router,store,authz,migrations}.go + hive schema migrations (hive.schema_migrations, hive.epic_nodes); one r.Mount("/api/plugins/hive", hive.Router(...)) anchor inside the authed group in router.go; HiveStore init + Hive migrate/readiness wiring in main.go.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: router_test (authed reaches handler, unauthed rejected), store integration (epic_nodes write/read), startup migration-failure surfaced, CI grep proving no Hive SQL in server/migrations.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify the mount is thin (no router reorg), auth inheritance is real (not re-implemented), schema isolation holds, and the bail criteria are encoded as tests. This is the gate review.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit one story-commit to feat/multica-plugin-ui (in the Multica fork). Evaluate the PROOF GATE; if not satisfied, halt the epic.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Code/spikes/multica
+  tech_stack: {language: go, framework: chi, db: postgres, driver: pgx}
+  key_files:
+    - path: server/cmd/server/router.go
+      purpose: "Authed chi group at ~L301-304; the one mount anchor goes here. Explicit route mounts nearby L541-587."
+    - path: server/cmd/server/main.go
+      purpose: "pgx pool from DATABASE_URL (~L142-160); add HiveStore init + Hive migrate/readiness."
+    - path: server/internal/migrations/
+      purpose: "Core migration runner shape to mirror for the Hive-owned ledger (do NOT add Hive files here)."
+    - path: server/internal/hive/
+      purpose: "NEW package — router, HiveStore, WorkspaceAuthorizer, Hive migrations."
+
+files_to_modify:
+  - file: server/internal/hive/router.go
+    change: NEW — Hive chi sub-router mounted under /api/plugins/hive
+  - file: server/internal/hive/store.go
+    change: NEW — typed HiveStore boundary over the pgx pool (hive.* only)
+  - file: server/internal/hive/authz.go
+    change: NEW — minimal WorkspaceAuthorizer interface (context + workspace UUID)
+  - file: server/internal/hive/migrations/
+    change: NEW — hive.schema_migrations + hive.epic_nodes
+  - file: server/cmd/server/router.go
+    change: MODIFY — one r.Mount("/api/plugins/hive", hive.Router(...)) inside the authed group
+  - file: server/cmd/server/main.go
+    change: MODIFY — HiveStore init + Hive migration run/verify at startup/readiness

@@ -1,0 +1,68 @@
+id: mpu-2-epictree-view
+epic: multica-plugin-ui
+title: "Minimal EpicTree route, nav entry, dashboard render"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [mpu-1-proof-gate-mount-store-schema]
+
+description: |
+  Complete the Slice-1 proof on the frontend: a minimal EpicTree view rendering inside
+  Multica's dashboard shell, served as a workspace package added to `transpilePackages`,
+  reading through the authenticated /api/plugins/hive/* boundary proven by mpu-1. This is
+  the first of the SEPARATE top-level sidebar entries (sign-off decision: per-view nav, not
+  a single Hive parent). Establishes the frontend package + route/nav anchor pattern reused
+  by mpu-3..7.
+
+  Working state: an authenticated user clicks the "Epics" sidebar entry and sees a minimal
+  EpicTree rendered natively inside Multica, data fetched from Hive's own store.
+
+acceptance_criteria:
+  - "Given an authenticated user, when they open the EpicTree route, then it renders inside the Multica dashboard shell using the @multica/hive workspace package added to apps/web/next.config.ts transpilePackages (~L27)."
+  - "Given the route, when registered, then it is workspace-scoped under /{workspaceSlug}/hive/epics with ONE additive top-level sidebar entry 'Epics' (per the separate-entries sign-off decision)."
+  - "Given the EpicTree client, when it loads data, then it calls /api/plugins/hive/* through the same authenticated boundary proven by mpu-1 — no separate Hive auth/session/WebSocket implementation."
+  - "Given the package exports, when typechecked, then @multica/hive exports are explicit and stable (covered by tsc --noEmit)."
+
+steps:
+  - id: research
+    description: Confirm the route-group + sidebar nav source in apps/web (app/[workspaceSlug], the sidebar config array) and the transpilePackages + workspace-package wiring.
+    agent: researcher
+  - id: implement
+    description: Create the @multica/hive workspace package (packages/hive) + add to transpilePackages; EpicTree.tsx + page adapter under app/[workspaceSlug]/hive/epics; one top-level sidebar entry; path builder.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Component render test for EpicTree; manual authenticated browser check it renders in the dashboard shell; workspace-scoped React Query key includes workspace id.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify auth/WS inherited not reimplemented, sidebar entry is additive, package exports stable.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: One story-commit to feat/multica-plugin-ui.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Code/spikes/multica
+  tech_stack: {language: typescript, framework: next.js-16-app-router}
+  key_files:
+    - path: apps/web/next.config.ts
+      purpose: "transpilePackages list (~L27) — add @multica/hive; rewrites already proxy /api,/ws,/auth (free auth/WS)."
+    - path: apps/web/app/[workspaceSlug]/
+      purpose: "Workspace-scoped route group; EpicTree page adapter lands here."
+    - path: packages/hive/
+      purpose: "NEW workspace package — Hive views + index; reused by mpu-3..7."
+
+files_to_modify:
+  - file: packages/hive/EpicTree.tsx
+    change: NEW — minimal EpicTree view component
+  - file: packages/hive/index.tsx
+    change: NEW — package exports
+  - file: apps/web/next.config.ts
+    change: MODIFY — add @multica/hive to transpilePackages
+  - file: apps/web/app/[workspaceSlug]/hive/epics/page.tsx
+    change: NEW — route page adapter
+  - file: apps/web/(sidebar config)
+    change: MODIFY — add one top-level 'Epics' nav entry

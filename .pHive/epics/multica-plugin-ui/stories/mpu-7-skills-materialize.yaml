@@ -1,0 +1,63 @@
+id: mpu-7-skills-materialize
+epic: multica-plugin-ui
+title: "Skill materialization into Multica DB with provenance"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view, mpu-6-skills-catalog-browse]
+
+description: |
+  Phase 5b. Materialize a catalog skill into Multica's DB-backed skill tables when a user
+  enables/customizes/imports it — converging on the native skill + agent-assignment model
+  for active skills, while keeping the catalog versioned/isolated. On a name collision the
+  default is 409 Conflict (sign-off default) unless the caller explicitly chooses
+  customize/import. Provenance (catalogKey, catalogVersion, state, materializedBy) is stored
+  so updates/overwrites are traceable. Reuses existing skill-file path validation; never
+  auto-seeds all workspaces. Assignment to agents stays a SEPARATE flow (sign-off default).
+
+  Working state: a user materializes a chosen catalog skill into Multica skill/skill_file
+  rows with provenance; collisions are safe; customized skills are not auto-overwritten.
+
+acceptance_criteria:
+  - "Given a materialize request, when accepted, then it creates Multica skill + skill_file rows reusing existing skill-file path validation (server/internal/handler/skill.go), and existing agent-skill assignment works afterward."
+  - "Given a name collision with an existing (workspace_id,name) skill, when materializing, then the default response is 409 Conflict — overwrite/customize only happens with an explicit caller flag, never silently."
+  - "Given a materialized skill, when stored, then provenance (catalogKey, catalogVersion, state, materializedBy) is recorded in hive.plugin_skill_catalog_state; a user-customized skill is marked customized and not auto-overwritten on catalog update."
+  - "Given materialization, when it runs, then it never auto-seeds every workspace, and agent assignment is a separate explicit+authorized call (not bundled into materialize)."
+
+steps:
+  - id: research
+    description: Confirm skill/skill_file/agent_skill schema + the existing path-validation helper in skill.go; define minimal provenance.
+    agent: researcher
+  - id: implement
+    description: POST /api/plugins/hive/skills/{catalogKey}/materialize → create skill/skill_file with provenance; 409 on collision unless explicit flag; reuse path validation; store catalog state.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Materialize success + assignment works; 409 collision default; explicit overwrite path; customized-not-overwritten; no auto-seed; failed path-validation leaves no partial rows.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Security-minded review — path validation reuse, no silent upsert, provenance, partial-write safety.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: One story-commit to feat/multica-plugin-ui.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Code/spikes/multica
+  tech_stack: {language: go-and-typescript}
+  key_files:
+    - path: server/internal/handler/skill.go
+      purpose: "Existing skill-file path validation + skill CRUD to reuse; do not duplicate."
+    - path: server/migrations/008_structured_skills.up.sql
+      purpose: "skill unique (workspace_id,name); skill_file; agent_skill — the materialize targets."
+    - path: server/internal/hive/
+      purpose: "Materialize endpoint + provenance in hive.plugin_skill_catalog_state."
+
+files_to_modify:
+  - file: server/internal/hive/(handlers+store)
+    change: MODIFY — materialize endpoint, 409 collision, provenance, path-validation reuse
+  - file: server/internal/hive/migrations/
+    change: MODIFY — provenance columns on hive.plugin_skill_catalog_state

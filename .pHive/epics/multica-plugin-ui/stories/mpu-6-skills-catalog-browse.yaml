@@ -1,0 +1,64 @@
+id: mpu-6-skills-catalog-browse
+epic: multica-plugin-ui
+title: "Skills catalog — versioned packaged browse (no online runtime)"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view]
+
+description: |
+  Phase 5a. Hive ships a versioned skill catalog inside the plugin package, exposed as
+  browseable plugin-provided skills WITHOUT requiring an online runtime (distinct from
+  Multica's runtime-local skill flow, which depends on daemon callbacks). Browse-only here;
+  materialization is mpu-7. Catalog state tracked in hive.plugin_skill_catalog_state. For v1
+  the catalog reuses the existing Multica Skills page rather than a dedicated /hive/skills
+  route (sign-off default — dedicated UI deferred).
+
+  Working state: a user browses the versioned Hive skill catalog (without an online runtime),
+  seeing available packaged skills and their versions.
+
+acceptance_criteria:
+  - "Given the catalog browse endpoint, when called, then it returns the packaged versioned Hive skills WITHOUT requiring an online runtime/daemon (test offline)."
+  - "Given catalog state, when read, then it is backed by hive.plugin_skill_catalog_state and does NOT mutate Multica's skill/skill_file tables (browse is read-only)."
+  - "Given v1 UI, when surfacing the catalog, then it reuses the existing Multica Skills page (no dedicated /hive/skills route) per the sign-off decision."
+  - "Given the runtime-local skill flow, when compared, then the Hive catalog is independent of it — runtime-local evidence is used only as import precedent (mpu-7), not for browse."
+
+steps:
+  - id: research
+    description: Confirm the packaged-catalog format + how to surface entries on the existing Skills page; contrast with server/internal/handler/runtime_local_skills.go.
+    agent: researcher
+  - id: implement
+    description: hive.plugin_skill_catalog_state migration; catalog browse endpoint (packaged source); surface entries on the existing Skills page.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Offline browse (no runtime); read-only (no skill-table writes); catalog versioning visible.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify independence from runtime-local flow, read-only browse, no auto-seeding.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: One story-commit to feat/multica-plugin-ui.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Code/spikes/multica
+  tech_stack: {language: go-and-typescript}
+  key_files:
+    - path: server/internal/handler/runtime_local_skills.go
+      purpose: "Contrast — runtime-local discovery needs online runtime; Hive catalog must NOT."
+    - path: server/migrations/008_structured_skills.up.sql
+      purpose: "Existing skill/skill_file model (materialization target in mpu-7; not written here)."
+    - path: server/internal/hive/
+      purpose: "Catalog browse endpoint + hive.plugin_skill_catalog_state."
+
+files_to_modify:
+  - file: server/internal/hive/migrations/
+    change: NEW — hive.plugin_skill_catalog_state
+  - file: server/internal/hive/(handlers)
+    change: MODIFY — catalog browse endpoint (read-only, offline)
+  - file: packages/hive/(skills catalog data)
+    change: NEW — packaged versioned skill catalog source

@@ -1,0 +1,63 @@
+id: mpu-4-personalqueue-view
+epic: multica-plugin-ui
+title: "PersonalQueue user-scoped work-item surface"
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view]
+
+description: |
+  Third Hive view (Phase 3). The current user's queue of Hive work items, with links back to
+  epic/gate context, against a new hive.personal_queue_items table. Visibility is
+  current-user-only for v1 (sign-off decision) — simplest and safest; admin/delegated
+  visibility would need extra schema + authz and is deferred (can't retrofit without a
+  migration). Parallel to mpu-3/mpu-5. Adds one top-level 'My Queue' sidebar entry.
+
+  Working state: the signed-in user sees only their own authorized queue items, each linking
+  to the related Hive or Multica record.
+
+acceptance_criteria:
+  - "Given the PersonalQueue endpoint, when queried, then items are filtered by current user AND workspace authorization — a user never sees another user's items (test with a wrong-user fixture)."
+  - "Given an update, when attempted, then it is denied unless the item assignee matches the current user (or role policy permits)."
+  - "Given a queue item, when rendered, then its links resolve to related Hive/Multica epic or gate records."
+  - "Given queue handlers, when implemented, then they use HiveStore queue methods + hive.personal_queue_items and reuse the mpu-1 auth/store boundary."
+
+steps:
+  - id: research
+    description: Confirm current-user identity available in the authed context; reuse view pattern.
+    agent: researcher
+  - id: implement
+    description: hive.personal_queue_items migration; queue handlers + HiveStore read/update (user+workspace scoped); PersonalQueue.tsx + route + one sidebar entry.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Wrong-user isolation; update-permission denial; link resolution.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify user+workspace scoping in SQL, no cross-user leakage.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: One story-commit to feat/multica-plugin-ui.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Code/spikes/multica
+  tech_stack: {language: go-and-typescript}
+  key_files:
+    - path: server/internal/hive/
+      purpose: "Queue handlers + store + hive.personal_queue_items; constrain by current user + workspace."
+    - path: packages/hive/
+      purpose: "PersonalQueue.tsx + export."
+
+files_to_modify:
+  - file: server/internal/hive/migrations/
+    change: NEW — hive.personal_queue_items
+  - file: server/internal/hive/(handlers+store)
+    change: MODIFY — queue read/update, user+workspace scoped
+  - file: packages/hive/PersonalQueue.tsx
+    change: NEW — PersonalQueue view
+  - file: apps/web/app/[workspaceSlug]/hive/queue/page.tsx
+    change: NEW — route adapter + sidebar entry
