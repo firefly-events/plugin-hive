@@ -78,6 +78,12 @@ describe('HIVE_TEST_MODE — tier: env', () => {
   });
 });
 
+// NOTE: skills/hive/skills/test-dispatch/SKILL.md documents `test.mode` as the
+// per-varName root-config key for HIVE_TEST_MODE. The resolver currently reads
+// `execution.mode` for every varName (single-key fallback) and a per-varName
+// extension is queued as follow-on work. Once that extension lands, swap the
+// rootConfig structures below from `execution: { mode: ... }` to
+// `test: { mode: ... }` and update the sources string to `test.mode=...`.
 describe('HIVE_TEST_MODE — tier: root_config', () => {
   it('root_config wins when env is absent — sources records only root_config', () => {
     const result = resolveMode('HIVE_TEST_MODE', {

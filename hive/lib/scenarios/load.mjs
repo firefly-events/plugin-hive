@@ -248,6 +248,16 @@ function validateResultsSchema(doc, filePath) {
         );
       }
     }
+    for (const strField of ['test_id', 'requirement_ref', 'started_at', 'finished_at']) {
+      if (typeof item[strField] !== 'string' || !item[strField].trim()) {
+        throw makeError(
+          'VALIDATION_ERROR',
+          `${filePath}: 'execution_results.results[${i}].${strField}' must be a non-empty string`,
+          filePath,
+          `execution_results.results[${i}].${strField}`,
+        );
+      }
+    }
     if (!VALID_TEST_STATUSES.has(item.status)) {
       throw makeError(
         'VALIDATION_ERROR',
