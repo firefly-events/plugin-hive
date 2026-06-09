@@ -149,13 +149,61 @@ If the target project has workflow YAML files (plugin-hive uses `hive/workflows/
 - Confirm each step has either `task` or `step_file`
 - Flag missing step files as `MISSING_STEP_FILE` findings
 
+### 6f. Sandcastle / Multica / CI failure tail audit
+
+Recurring CI failures and stuck rework-labeled issues are real meta-team signals. A workflow that fails twice in a week probably has a structural problem (config drift, flaky integration, missing dependency) the meta-team can fix once instead of patching every run. A rework-labeled issue idle for >3d means somebody bounced the work but nobody picked it up — process gap or stalled owner.
+
+Implementation module: `hive/workflows/steps/meta-team-cycle/failure-tail-finder.mjs`. Pure-function over already-fetched run + issue records.
+
+Gather data:
+
+```bash
+# 1. GH workflow run failures within the recency window
+since=$(date -u -v-7d '+%Y-%m-%d' 2>/dev/null || date -u -d '7 days ago' '+%Y-%m-%d')
+gh run list \
+  --limit 200 \
+  --created ">=${since}" \
+  --json workflowName,conclusion,createdAt,databaseId,htmlUrl \
+  > /tmp/recent_runs.json
+
+# 2. Open issues carrying the rework label (Multica + GH)
+gh issue list \
+  --state open \
+  --label "hive:needs-rework" \
+  --limit 100 \
+  --json id,title,state,labels,createdAt,updatedAt,url \
+  > /tmp/rework_issues.json
+```
+
+Invoke the helper:
+
+```js
+import { findFailureTail } from 'hive/workflows/steps/meta-team-cycle/failure-tail-finder.mjs';
+
+const runs = JSON.parse(readFileSync('/tmp/recent_runs.json', 'utf8'));
+const issues = JSON.parse(readFileSync('/tmp/rework_issues.json', 'utf8'));
+const findings = findFailureTail({ runs, issues }, {
+  nowIso: process.env.HIVE_CYCLE_NOW_ISO,
+  windowDays: 7,
+  minRecurrence: 2,
+  stuckDays: 3,
+});
+```
+
+Two finding kinds appear in the combined output:
+
+- `category: CI_FAILURE_PATTERN`, `location: workflow:<name>` — emitted when a workflow accumulates ≥ `minRecurrence` terminal-failure runs (failure / cancelled / timed_out / action_required) within `windowDays`. Severity: `high` at 4+ failures, `medium` at 2-3.
+- `category: STUCK_REWORK_ISSUE`, `location: issue:<id>` — emitted when an open issue carrying a rework label has been idle longer than `stuckDays`. Severity: `high` past 7d, `medium` otherwise.
+
+`failure-tail-finder.mjs` is pure — no fetch, no shell. Tests live at `hive/workflows/steps/meta-team-cycle/__tests__/failure-tail-finder.test.mjs` (20 cases): conclusion filtering (success/skipped/neutral dropped, failure/cancelled/timed_out/action_required kept), windowDays boundaries, minRecurrence threshold + severity upgrade at 4+, rework-label detection (string and object forms), age thresholds, finding shape, sort order.
+
 ### 7. Compile findings
 For each finding, record:
 ```yaml
 id: finding-{N}
-category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | OTHER
+category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | CODERABBIT_RECURRING | STALE_OPEN_PR | STUCK_TRIAGE_ITEM | RECENT_FEEDBACK_MEMORY | CI_FAILURE_PATTERN | STUCK_REWORK_ISSUE | OTHER
 severity: critical | high | medium | low
-location: {file path}
+location: {file path | cross-repo | branch:<ref> | pr:<n> | triage:<id> | memory:<slug> | workflow:<name> | issue:<id>}
 description: {one-line description}
 evidence: {specific field, line, or pattern that demonstrates the issue}
 ```
