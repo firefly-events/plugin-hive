@@ -1,0 +1,137 @@
+id: mic-2-orchestrator-distill
+epic: multica-insight-capture
+title: Orchestrator distills Multica insights into memory
+status: blocked
+complexity: high
+methodology: classic
+depends_on: [ mic-1-agent-self-capture-brief ]
+
+description: |
+  After each Multica story's episode marker is written, the ORCHESTRATOR distills
+  insights into durable memory as an inline step — not a sub-agent, not a low-cost
+  model. This is surface 2 of the t-001 fix and the trustworthy half: turning raw
+  self-capture + transcript into curated, forward-looking memory.
+
+  Why the orchestrator (maintainer decision): distillation requires reasoning
+  forward and backward — what did we just do, why, and how could it impact future
+  work — using the orchestrator's full context across the epic. A cheap/haiku
+  sub-agent cannot hold that cross-story context or do the impact reasoning. This is
+  exactly the "orchestrator self-captures at phase boundaries" rule
+  (feedback_execution_protocol), applied to the Multica per-story terminal boundary.
+
+  Inputs the orchestrator reads:
+    - the agent's self-captured .hive/insights/<story-id>.md (mic-1; may be absent)
+    - the messages sidecar multica-run.messages.jsonl
+    - the story git diff (what actually changed)
+    - cross-story context already in the orchestrator's working state (prior stories
+      this epic, design discussion, cycle state)
+
+  Outputs (maintainer decision):
+    - PRIMARY: team-memories/<epic-id>/<story-id>.md (epic-local, travels w/ repo)
+    - PROMOTE: durable cross-epic feedback → Hive memory (~/.claude/.../memory/)
+      as a feedback/project note, following the existing memory frontmatter +
+      MEMORY.md pointer convention.
+
+  A helper (episode-sync.mjs or a sibling distill module) provides the read-inputs +
+  write-team-memory + promote plumbing; the orchestrator provides the judgment and
+  the forward/backward impact reasoning. Gated on signal: when inputs yield nothing
+  worth keeping, write nothing (no noise).
+
+acceptance_criteria:
+  - "Given a completed Multica story with episode marker, when the orchestrator
+    runs the distill step, then a team-memories/<epic-id>/<story-id>.md note is
+    written capturing distilled, forward-looking insights (or skipped when
+    nothing is distillable)."
+  - "Given a durable cross-epic learning, when the orchestrator promotes it,
+    then a Hive memory file + MEMORY.md pointer are written per the existing
+    convention."
+  - "Given the agent self-capture file is absent (mic-1 ignored), when the
+    distill step runs, then it still distills from transcript + diff +
+    orchestrator context alone."
+  - "Given the distill step, when it runs, then it is an inline orchestrator
+    step — NOT a dispatched sub-agent and NOT a reduced-capability model."
+  - "Given a story that yielded nothing distillable, when the step runs, then no
+    team-memory and no Hive memory file are written (signal-gated, no noise)."
+
+steps:
+  - id: research
+    description: Read episode-sync.mjs (writeMulticaRunEpisode, messages capture),
+      insight-capture.md, pre-shutdown-protocol.md, and the Hive memory
+      frontmatter+MEMORY.md convention.
+    agent: researcher
+  - id: implement
+    description: Add the distill helper (read insights+transcript+diff, write
+      team-memory, promote to Hive memory) invoked as an inline orchestrator
+      step after writeMulticaRunEpisode; signal-gate the writes. No sub-agent
+      dispatch, no model downgrade.
+    agent: developer
+    depends_on: [ research ]
+  - id: test
+    description: Cover team-memory write, promotion path, transcript-only fallback,
+      inline-orchestrator invocation (no sub-agent), and the no-noise skip.
+    agent: tester
+    depends_on: [ implement ]
+  - id: review
+    description: Confirm the step is inline-orchestrator (not a sub-agent / not
+      downgraded), promotion follows memory convention, and signal-gate prevents
+      noise.
+    agent: reviewer
+    depends_on: [ test ]
+  - id: integrate
+    description: Commit and push to feat/multica-insight-capture.
+    agent: developer
+    depends_on: [ review ]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-story-dispatch/episode-sync.mjs
+      purpose: writeMulticaRunEpisode + messages sidecar — distill hooks in here.
+    - path: hive/references/insight-capture.md
+      purpose: Quality bar for what to keep.
+    - path: hive/references/pre-shutdown-protocol.md
+      purpose: The capture protocol Multica mode is now joining (orchestrator-distill
+        variant).
+
+files_to_modify:
+  - file: hive/lib/multica-story-dispatch/episode-sync.mjs
+    change: Add distill helper invoked (by the orchestrator) after
+      writeMulticaRunEpisode.
+  - file: hive/lib/multica-story-dispatch/distill.mjs
+    change: New distill module (read inputs, write team-memory, promote) —
+      orchestrator-driven, no sub-agent.
+
+cross_cutting:
+  - concern: documentation
+    action: "Document the orchestrator distill flow + promotion rule (mic-3 wires
+      the SKILL prose)."
+  - concern: versioning
+    action: "Adds a post-terminal orchestrator distill step to Multica execution —
+      note in changelog at epic close."
+
+metric:
+  applies: true
+  name: multica.story_insight_distill_rate
+  direction: up
+  unit: ratio
+  baseline: "0 (no distill exists today; transcripts undistilled)"
+  target: "0.90"
+  window: next-2-multica-epics
+  source:
+    kind: manual
+    ref: "Fraction of completed Multica stories that produced a team-memory note (or
+      a justified skip) across next 2 multica-mode epics"
+  verify_at: "2026-07-31T00:00:00Z"
+  owner: reviewer
+
+risks:
+  - severity: medium
+    description: Distill writes noisy/low-value memories.
+    mitigation: Signal-gated (skip when nothing distillable); mirror
+      insight-capture.md quality bar; bounded one note per story.
+  - severity: low
+    description: Large transcripts inflate orchestrator context.
+    mitigation: messages_capture_max bounds transcript size; the agent self-capture
+      (mic-1) gives a pre-distilled input the orchestrator can lead with.
+tracker_id: plugin-hive/PLU-240
+tracker_url: http://localhost:3000/plugin-hive/issues/240

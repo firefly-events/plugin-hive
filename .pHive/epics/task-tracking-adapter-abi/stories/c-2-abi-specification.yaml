@@ -1,7 +1,7 @@
 id: c-2-abi-specification
 epic: task-tracking-adapter-abi
 title: Author ABI specification — methods, types, error model, capability declaration
-status: pending
+status: in_progress
 complexity: high
 methodology: classic
 depends_on: [c-1-form-factor-selection]

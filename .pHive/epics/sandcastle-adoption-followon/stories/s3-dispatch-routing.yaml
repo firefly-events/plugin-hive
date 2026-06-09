@@ -1,7 +1,7 @@
 id: s3-dispatch-routing
 epic: sandcastle-adoption-followon
 title: Route sandcastle as the fifth execute mode with field-source attribution
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [s2-provider-wrap, s2-hooks-minimal]

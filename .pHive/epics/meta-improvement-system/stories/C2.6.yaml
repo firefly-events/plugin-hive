@@ -2,7 +2,7 @@ id: C2.6
 epic: meta-improvement-system
 slice: S5
 title: Human escalation emission
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: ["C2.0", "C2.1"]

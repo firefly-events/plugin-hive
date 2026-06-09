@@ -832,4 +832,4 @@ DECISIONS REQUIRING SIGN-OFF (numbered for user response):
 
 ---
 
-_End of structured outline. Phase C of /plan consumes this for mechanical story decomposition. Decision points 1-6 surface at user gate 3 (incoming after this); Open Questions Q1-Q9 are locked at gate 1 and NOT re-opened here._
+*End of structured outline. Phase C of /plan consumes this for mechanical story decomposition. Decision points 1-6 surface at user gate 3 (incoming after this); Open Questions Q1-Q9 are locked at gate 1 and NOT re-opened here.*

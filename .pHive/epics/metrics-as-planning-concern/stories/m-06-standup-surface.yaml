@@ -1,7 +1,7 @@
 id: m-06-standup-surface
 epic: metrics-as-planning-concern
 title: /standup surfaces overdue + failing metric verdicts
-status: completed
+status: blocked
 complexity: small
 methodology: classic
 depends_on: [m-05-metrics-check-skill]

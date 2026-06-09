@@ -13,7 +13,7 @@ Structural mirror of `skills/hive/skills/execute-dispatch/SKILL.md` (architect E
 
 Call this skill once at the single `/test` dispatch point where the caller has both the scenario execution context and the current workflow handoff context.
 
-**Inputs:** `env` with at minimum `HIVE_TEST_MODE`; parsed root `hive.config.yaml` containing `test.mode` and `paths.state_dir`; parsed consumer `.pHive/hive.config.yaml` or `None`; `scenario_path` — the resolved scenario file path or story-ID argument; `story_id` when known; `epic_id` when known; and `arguments` containing flag state (e.g. `--simulated-manual`, `--execution-mode`).
+**Inputs:** `env` with at minimum `HIVE_TEST_MODE`; parsed root `hive.config.yaml` containing `test.mode` and `paths.state_dir`; parsed consumer `.pHive/hive.config.yaml` or `None`; `scenario_path` — the resolved scenario file path or story-ID argument; `story_id` when known; `epic_id` when known; and `arguments` containing flag state (e.g. `--execution-mode`). The `--simulated-manual` flag was removed in t-1b; do not reintroduce it in downstream routers or tests.
 
 **Outputs:** `mode_decision` enum `cc-workflows | multica | default`; `sources` map covering `test_mode` so callers can attribute every resolution.
 

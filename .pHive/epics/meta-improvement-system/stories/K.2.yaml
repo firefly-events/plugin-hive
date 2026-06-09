@@ -2,7 +2,7 @@ id: K.2
 epic: meta-improvement-system
 slice: S6
 title: Brownfield preservation and change prompt
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: ["K.1"]

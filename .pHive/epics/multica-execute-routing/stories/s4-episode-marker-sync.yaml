@@ -1,7 +1,7 @@
 id: s4-episode-marker-sync
 epic: multica-execute-routing
 title: "Episode marker sync — pollTaskUntilTerminal + state transitions + last-N messages capture"
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on:

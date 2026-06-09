@@ -19,7 +19,7 @@ phases_run:
 epic_id: substrate-coverage-and-test-cleanup
 cc_workflows_substrate: true
 worktree_isolated: true
-worktree_path: /Users/don/.claude/worktrees/substrate-coverage
+worktree_path: .claude/worktrees/substrate-coverage
 workflow_runs_dispatched: 11
 user_gates_passed: 3
 phase_d_published: 19

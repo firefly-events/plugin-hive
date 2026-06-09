@@ -1,7 +1,7 @@
 id: a-28-grill-plan-a2-wiring
 epic: catalog-hygiene-and-borrows
 title: Wire /plan Phase A2 to call grill; add researcher field and grill-record consumption
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [a-28-grill-skill-md]

@@ -25,8 +25,8 @@ steps:
     expected: decision equals cc-workflows and sources contains only the env key with value HIVE_TEST_MODE=cc-workflows. No other tier keys appear in sources.
     actor: tester
 
-  - action: Invoke resolveMode with no env and rootConfig set to execution.mode cc-workflows. Verify root_config wins.
-    expected: decision equals cc-workflows and sources contains only root_config with value execution.mode=cc-workflows.
+  - action: Invoke resolveMode with no env and rootConfig set to execution.mode cc-workflows. Verify root_config wins. NOTE — the dispatch contract in skills/hive/skills/test-dispatch/SKILL.md specifies `test.mode` as the per-varName root-config key for HIVE_TEST_MODE; the resolver currently reads `execution.mode` for every varName and a per-varName extension is queued as follow-on work. Update this scenario to assert `test.mode=cc-workflows` once that extension lands.
+    expected: decision equals cc-workflows and sources contains only root_config with value execution.mode=cc-workflows (today). Post-extension, the value will become test.mode=cc-workflows.
     actor: tester
 
   - action: Invoke resolveMode with no env and no rootConfig. Verify the default tier fires.

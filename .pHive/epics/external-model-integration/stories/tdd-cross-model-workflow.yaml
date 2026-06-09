@@ -1,7 +1,7 @@
 id: tdd-cross-model-workflow
 epic: external-model-integration
 title: TDD workflow with Claude test-writing + Codex implementation + Claude review loop
-status: pending
+status: blocked
 complexity: medium
 methodology: tdd
 depends_on: [codex-developer-poc]

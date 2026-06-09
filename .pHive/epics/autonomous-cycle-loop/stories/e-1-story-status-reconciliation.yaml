@@ -1,7 +1,7 @@
 id: e-1-story-status-reconciliation
 epic: autonomous-cycle-loop
 title: "E.1 — story status reconciliation (auto-close shipped stories)"
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: [s0-1-schema-and-config-bump]

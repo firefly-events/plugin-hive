@@ -1,7 +1,7 @@
 id: h-03-memo-and-verification
 epic: brand-system-2.0-update
 title: "Update project_oss_rollout_brand memo + final cross-surface grep verification"
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on:

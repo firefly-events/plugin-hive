@@ -1,7 +1,7 @@
 id: s3-1-runbook
 epic: story-loop-closure
 title: "S3.1 — runbook: failure modes + manual sweep instructions"
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s1-2-execute-integrate-hook]

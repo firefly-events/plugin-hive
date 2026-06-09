@@ -3,7 +3,7 @@
 
 ## What Changed
 
-- **hive/agents/reviewer.md, hive/agents/peer-validator.md** — updated `model: sonnet` to `model: opus` in frontmatter to match the `model_overrides` promotion in `hive.config.yaml`; frontmatter now reflects the effective runtime tier per `agent-config-schema.md` line 61
+- **hive/agents/reviewer.md, hive/agents/peer-validator.md** — frontmatter kept at `model: sonnet` (base tier). #245's `sonnet → opus` frontmatter flip was reverted in 4cdadb7; opus is applied at runtime via `hive.config.yaml` `model_overrides`, not frontmatter, per the base-tier policy (`agent-config-schema.md`). The summary line above previously claimed the flip landed — corrected to match the ledger reversion.
 - **hive/lib/sandcastle-worker-runner.js, hive/lib/messages-session.js** — updated `DEFAULT_MODEL` constant from `claude-opus-4-7` to `claude-opus-4-8`; also updated the JSDoc comment in `sandcastle-worker-runner.js` line 145
 - **hive/references/session-system-prompt-spec.md** — updated two example code blocks (Python request line 357, JSON response line 420) from `claude-opus-4-7` to `claude-opus-4-8`
 

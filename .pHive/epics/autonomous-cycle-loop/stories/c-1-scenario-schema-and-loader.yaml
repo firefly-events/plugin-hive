@@ -1,7 +1,7 @@
 id: c-1-scenario-schema-and-loader
 epic: autonomous-cycle-loop
 title: "C.1 — scenario schema + loader + executor step file"
-status: pending
+status: completed
 complexity: medium
 methodology: classic
 depends_on: [s0-1-schema-and-config-bump]
@@ -70,3 +70,6 @@ metric:
     ref: CI test output for hive/lib/scenarios/
   verify_at: integrate
   owner: tester
+shipped:
+  branch: feat/autonomous-cycle-loop
+  merged_at: "2026-06-08T20:44:01.565Z"

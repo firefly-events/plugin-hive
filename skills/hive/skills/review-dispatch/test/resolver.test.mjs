@@ -24,9 +24,11 @@ import { resolveMode } from '../../../../../hive/lib/mode-resolver.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SKILL_MD_PATH = path.resolve(__dirname, '../SKILL.md');
 
-// Path to skills/review/SKILL.md relative to this test file
-// review-dispatch test/ -> review-dispatch -> skills -> hive -> skills -> skills -> review -> SKILL.md
-// Actual: worktrees/substrate-coverage/skills/review/SKILL.md
+// Path to skills/review/SKILL.md relative to this test file.
+// Traversal from skills/hive/skills/review-dispatch/test/ up to the repo root,
+// then down to skills/review/SKILL.md:
+//   test/ -> review-dispatch/ -> skills/ -> hive/ -> skills/   (five `..` segments)
+//   then  skills/review/SKILL.md
 const REVIEW_SKILL_MD_PATH = path.resolve(__dirname, '../../../../../skills/review/SKILL.md');
 
 // ---------------------------------------------------------------------------

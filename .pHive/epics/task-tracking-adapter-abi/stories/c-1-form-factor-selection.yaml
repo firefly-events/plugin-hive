@@ -1,7 +1,7 @@
 id: c-1-form-factor-selection
 epic: task-tracking-adapter-abi
 title: Select ABI form factor — TS interface vs MCP server vs CLI contract
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: []

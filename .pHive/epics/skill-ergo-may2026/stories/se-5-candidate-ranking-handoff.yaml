@@ -4,7 +4,7 @@ tracker_id: "firefly-events/plugin-hive#146"
 tracker_url: https://github.com/firefly-events/plugin-hive/issues/146
 epic: skill-ergo-may2026
 title: /find-skills — rank candidates, output yaml, hand off to /write-skill
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [se-1-write-skill, se-4-signal-mining]

@@ -16,9 +16,10 @@
     - meta-2026-06-05
   top_changes:
     - "hive/lib/messages-session.js, hive/lib/sandcastle-worker-runner.js: DEFAULT_MODEL claude-opus-4-7 -> claude-opus-4-8 (+ JSDoc)"
-    - "hive/lib/budget-gate.js: FALLBACK_MODEL + JSDoc example claude-opus-4-7 -> claude-opus-4-8 (RATES_PER_MTOK already carries both keys)"
+    - "hive/lib/budget-gate.js: FALLBACK_MODEL + JSDoc example claude-opus-4-7 -> claude-opus-4-8; removed the stale claude-opus-4-7 RATES_PER_MTOK key (no remaining 4-7 references in live code)"
     - "hive/references/session-system-prompt-spec.md: two API fixture model IDs claude-opus-4-7 -> claude-opus-4-8"
-    - "hive/agents/reviewer.md, hive/agents/peer-validator.md: model frontmatter sonnet -> opus (match hive.config.yaml model_overrides)"
+    - "hive/agents/reviewer.md, hive/agents/peer-validator.md: frontmatter kept at model: sonnet (base tier); opus is applied at runtime via hive.config.yaml model_overrides, not frontmatter — #245's frontmatter flip was reverted"
+    - ".github/scripts/sandcastle-hive-bridge.mts + skills/sandcastle-gh-init/assets/*.mts(.tpl): claudeCode(\"claude-opus-4-7\") -> claude-opus-4-8 in the shipped bridge templates"
     - "hive/GUIDE.md: Agent Roster expanded 20 -> 25 personas; added Specialist Agents table (from meta-2026-05-30)"
   commit: PENDING
   metrics_snapshot:

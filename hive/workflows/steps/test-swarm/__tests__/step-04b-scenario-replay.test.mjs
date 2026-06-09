@@ -196,12 +196,11 @@ test('step-04b: loadResults throws FILE_NOT_FOUND when results.yaml is absent', 
 });
 
 test('step-04b: loadResults throws FILE_NOT_FOUND for an empty-string path', () => {
-  // A blank path should fail gracefully — not crash with an unexpected error
   assert.throws(
     () => loadResults(''),
     (err) => {
-      // Either FILE_NOT_FOUND or a system error — the key invariant is it throws
-      assert.ok(err instanceof Error, 'must throw an Error');
+      assert.equal(err.code, 'FILE_NOT_FOUND', 'error code must be FILE_NOT_FOUND');
+      assert.ok(err.message.includes('Cannot read results file'), 'message must describe the failure');
       return true;
     },
   );

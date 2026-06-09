@@ -25,13 +25,13 @@ Kickoff-gate fall-through behavior is explicit: if the runtime precondition gate
 
 Delegation rules: the orchestrator coordinates Workflow script assembly, Workflow invocation, polling, episode marker writes, and summary return; it does not run scenarios itself. Workflow agents execute the assigned scenario steps and return structured verdict payloads. Scenario behavior is loaded from the canonical `loadScenario(scenario_path)` result; do not improvise inline scenarios. **All workflow agents run on the default workflow subagent (no Codex `agentType`)** — cc-workflows mode is intentionally an inline-Claude substrate so the returned `<result>` IS the verdict payload. Codex routing belongs to other test paths; cc-workflows mode is an inline-Claude substrate and intentionally does not overlap.
 
-**Gate ownership invariant.** Test agents dispatched here execute scenarios and write verdicts to `manual_verdict`. They never advance user review gates. The orchestrator (`/test`) still presents and waits locally at any downstream review gate. Workflow tool completion is a verdict-readiness signal, not user review approval.
+**Gate ownership invariant.** Test agents dispatched here execute scenarios and return a verdict payload to the orchestrator; the orchestrator (`/test`) is the canonical owner of every story-YAML `manual_verdict` write. Agents MUST NOT mutate story YAMLs in-place. Agents never advance user review gates either. The orchestrator still presents and waits locally at any downstream review gate. Workflow tool completion is a verdict-readiness signal, not user review approval.
 
 Reference spine: `skills/hive/skills/plan-mode-cc-workflows/SKILL.md` (atom mirror) and `skills/hive/skills/test-mode-multica/SKILL.md` (per-scenario dispatch precedent). The anchors in those files establish that the Workflow tool is the substrate; per-scenario episode-marker unit; and structured-result capture is in place.
 
 ## Invocation contract
 
-Called once per `/test --simulated-manual <story-id|scenario-file>` invocation when the test dispatch resolver selected `mode_decision == cc-workflows`.
+Called once per `/test <story-id|scenario-file>` invocation when the test dispatch resolver selected `mode_decision == cc-workflows`. The legacy `--simulated-manual` flag was removed in t-1b; the current `/test` entry contract no longer carries it.
 
 The resolver lives in `test-dispatch` Step 0 and mirrors the execute-dispatch resolver shape:
 
@@ -61,7 +61,7 @@ invoked with scenario_path, scenario, story, story_path, epic_handle, story_id, 
 OUTER SEAM INVARIANT: any change to `workflow_assembly` for test agents affects WHAT the assembly emits but never HOW `test-dispatch` calls into this skill. This fixed call signature is the outer seam; downstream wiring through `/test` reads this contract and does not branch on internal workflow_assembly shape.
 
 **Outputs:**
-- The owning story YAML updated in place with:
+- A `verdict` payload returned to the orchestrator (see the aggregated return object below). The orchestrator — not this skill — writes `manual_verdict` onto the owning story YAML on the integration branch. The verdict payload shape is:
 
   ```yaml
   manual_verdict:

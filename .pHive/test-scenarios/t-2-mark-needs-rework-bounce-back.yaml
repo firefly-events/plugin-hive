@@ -17,11 +17,11 @@ preconditions:
   - "step-06-triage.md emits markNeedsRework only for story-issue classification"
   - "capability('supports_needs_rework') is advertised on the dispatch surface"
   - "A target story exists in the active tracker (Multica workspace OR GitHub repo) in a non-terminal state"
-  - "The vitest contract test suite passes: hive/lib/task-tracking-dispatch/test/markNeedsRework.contract.test.mjs"
+  - "The node:test contract suite passes: hive/lib/task-tracking-dispatch/test/markNeedsRework.contract.test.mjs"
 
 steps:
   - action: >
-      Run the contract test suite to confirm baseline: vitest run
+      Run the contract test suite to confirm baseline: node --test --import tsx
       hive/lib/task-tracking-dispatch/test/markNeedsRework.contract.test.mjs
     expected: >
       All contract tests pass. Both Multica and GitHub adapter cases produce

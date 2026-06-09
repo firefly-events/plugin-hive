@@ -1,7 +1,7 @@
 id: S2.3-act-i-exit-gate-verification
 epic: kg-signal-revival
 title: Automated Act I exit gate (closes S7 outcome metric loop)
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [S2.2-superseded-emit-sites]

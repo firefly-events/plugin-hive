@@ -26,6 +26,7 @@ Called once per parent workflow when `mode_decision == multica` was returned by 
 **Outputs:**
 - One episode marker per story at `${HIVE_STATE_DIR}/episodes/{epic_handle}/{story_id}/multica-run.yaml`.
 - One messages sidecar per story at `${HIVE_STATE_DIR}/episodes/{epic_handle}/{story_id}/multica-run.messages.jsonl`.
+- One team-memory note per story, when distill emits reusable signal, at `${HIVE_STATE_DIR}/team-memories/{epic_handle}/{story_id}.md`.
 - Summary returned to `/execute` with dispatched stories and terminal statuses.
 
 ## Process
@@ -357,6 +358,49 @@ emit_scope_drift(
 
 `delivered_scope` is sourced from the developer's done-summary captured in `terminal.notes` (one bullet per logical delivery; split on newlines/semicolons). When the parsed delivered list equals `expected_scope`, `delta_reasons` stays empty and the helper buckets to `none`. When divergence is detected (a future enhancement once we trust the parse), `delta_reasons` carries values from the cycle-state-schema enum: `rescope`, `scope-creep`, `deferred`, `blocked`, `misunderstood-ac`, `out-of-band-work`.
 
+### Step 3.5: Orchestrator insight distill
+
+After the episode marker and messages sidecar are written, run the orchestrator-side
+distill pass for the story. This closes the Multica insight-capture loop:
+
+- **mic-1 agent self-capture:** the dispatched agent writes non-obvious reusable
+  findings to `.hive/insights/{story_id}.md` inside its repository checkout before
+  finishing.
+- **mic-2 orchestrator distill:** `writeMulticaRunEpisode` invokes
+  `runMulticaInsightDistill` with the terminal `work_dir`, messages sidecar, and
+  optional distill payload. The distill reads the agent self-capture, transcript
+  tail, and git diff, then writes a team-memory note when it finds reusable signal.
+
+The canonical invocation is via the `distill` option on `writeMulticaRunEpisode`:
+
+```js
+const { distill } = await writeMulticaRunEpisode({
+  hiveStateDir,
+  epicHandle: epic_handle,
+  storyId: story.id,
+  issueUuid,
+  identifier,
+  terminal,
+  messagesCaptureMax,
+  distill: {
+    teamMemory,      // concise orchestrator-distilled note, if any
+    hiveMemories,    // optional promoted persona memories
+    diffBaseRef,     // optional base ref for git diff input
+  },
+});
+```
+
+When `distill.teamMemoryPath` is non-null, the team-memory output is:
+
+```text
+${HIVE_STATE_DIR}/team-memories/{epic_handle}/{story_id}.md
+```
+
+Distill is best-effort at the lifecycle level: it must not rewrite terminal status
+or suppress the episode marker. Surface distill failures in the caller summary/logs
+for diagnosis, but preserve the already-written `multica-run.yaml` and messages
+sidecar as the source of execution truth.
+
 ### Step 4: Sidecar deferral
 
 For each `story_id` in `appends_map`, emit:
@@ -469,4 +513,5 @@ execution:
 | Sidecars deferred in v1 | Log deferral only; no extra Multica dispatch |
 | Serial within current depth (no parallelism in v1) | `/execute` owns DAG advancement between depths; parallel-within-depth is Phase 2, see Step 1 |
 | Episode marker per story | `multica-run.yaml` plus messages sidecar |
+| Insight capture | mic-1 agent self-capture brief plus mic-2 orchestrator distill |
 | No sequential fallback | Bootstrap or setup failures abort Multica mode |
