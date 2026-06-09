@@ -759,42 +759,35 @@ The plan must never over-engineer a runtime plugin loader (the locked architectu
 
 ## Part 8: Decision Points for Sign-Off
 
-**1. Frontend package name and location.** Confirm `@multica/hive` and `~/Code/spikes/multica/packages/hive` as the accepted name and location. This decision is load-bearing because the package name appears in `apps/web/package.json`, `apps/web/next.config.ts`, and every import statement across all Hive views. Renaming after implementation requires a codebase-wide find-and-replace. If a different namespace (`@firefly-events/hive`) or location (`apps/hive`) is preferred, it must be stated before Phase 1 creates any files.
+This section splits decisions into **already locked** (affirm as a group — settled at the design gate or standing policy) and **open** (each carries a recommended default; accept the defaults or override individually). Only the ★ items genuinely warrant a fresh judgment call.
 
-**2. Backend package location.** Confirm `~/Code/spikes/multica/server/internal/hive` as the accepted backend package location. The import path appears in `server/cmd/server/router.go` and `server/cmd/server/main.go`. Moving the package after Phase 1 requires updating all import references and re-running Go tooling. If the preferred location differs (e.g., a top-level `hive` package outside `internal`), state it now.
+### 8a. Decisions already locked (affirm as a group)
 
-**3. Phase 1 hard bail.** Confirm the Phase 1 bail criteria: work stops if the route mount requires deep router surgery, if one durable write/read through `hive.epic_nodes` cannot be demonstrated, or if Hive schema requires files in `server/migrations`. This must be written into Phase 1's acceptance criteria, not just understood informally. A partial Phase 1 implementation that does not satisfy all three proof criteria is not acceptable — it establishes a broken foundation for the subsequent five slices.
+Not re-litigated here — approved at the design gate or standing policy. Listed for traceability.
 
-**4. Core migration isolation.** Confirm that no Hive SQL file may be added to `~/Code/spikes/multica/server/migrations` under any circumstance. This is a permanent policy decision, not a Phase 1 constraint. It applies to all six phases and to all future Hive development. Code review rejections for violating this policy must be automatic and unconditional. A CI check grepping for Hive table names in `server/migrations/` enforces this policy without relying on reviewer memory.
+- **Storage architecture** — same Postgres DB, separate `hive` schema, `hive.schema_migrations` ledger. *(Design-gate fork 2.)*
+- **Fork-first, conditional Phase 6** — upstream seam extraction happens only if measured fork churn warrants it, not as an unconditional refactor. *(Design-gate fork 3.)*
+- **Core-migration isolation** — no Hive SQL in `server/migrations`, ever; CI grep enforces it. *(Standing policy.)*
+- **Phase 1 hard bail** — stop if route mount needs deep router surgery, the durable write/read can't be shown, or Hive needs core-migration files. *(Encoded as mpu-1 acceptance criteria.)*
+- **Security plan-audit before execution** + **performance audit before production scale.** *(Standing process.)*
+- **Missing-data policy** — implementers mark gaps `[data not provided: …]` rather than inventing behavior. *(Standing policy.)*
+- **Risk Registry + Elicitation preserved downstream** — not collapsed into bullets in stories or reviews. *(Standing policy.)*
 
-**5. Storage architecture.** Confirm that Hive uses the same Postgres database as Multica, with a separate `hive` schema, and that `hive.schema_migrations` is the migration ledger for all Hive schema changes. The alternative architectures (separate database, SQLite sidecar) are out of scope. This confirmation allows HiveStore to be built against a single pgx pool without any connection management complexity.
+### 8b. Open decisions (recommended default — affirm or override)
 
-**6. Canonical EpicTree route.** Confirm whether `/hive`, `/hive/epics`, or both (with a redirect) is the canonical route. This affects the Phase 1 page file structure (one file vs. two with a redirect) and the path builder signature. The sidebar entry links to whichever is canonical. If both paths are wanted, the redirect must be implemented in Phase 1 before Phase 2 adds the second Hive route.
+Each defaults to the recommendation unless you override. **★ = worth a real look.**
 
-**7. Sidebar strategy.** Confirm whether the Hive sidebar presence is one parent entry (with child pages linked from within the Hive section) or separate top-level entries for EpicTree, ReviewGates, Queue, Chat, and Skills. This decision gates Phase 2-5 nav additions. If the answer is one parent entry, Phases 2-5 do not add new top-level sidebar items; they add sub-navigation within the Hive section. If the answer is separate entries, each phase adds one sidebar item, and the sidebar grows by five entries across the epic.
+1. **Frontend package name/location** — Default: `@multica/hive` in `packages/hive` (matches the `@multica/*` convention). Override for `@firefly-events/hive` or `apps/hive`. *Lock before Phase 1 — rename is codebase-wide.*
+2. **Backend package location** — Default: `server/internal/hive` (Go internal convention). Override for a top-level `hive` package.
+3. ★ **Sidebar strategy** — Default: one parent "Hive" entry with sub-nav for the four views + skills (keeps the sidebar from growing by five). Override for separate top-level entries per view.
+4. ★ **HermesChat refresh** — Default: polling/manual refresh for v1 (simple, sufficient). Override for `/ws` realtime (adds backend event-publish + frontend connection management).
+5. ★ **Hive migration execution** — Default: auto-run at server startup, failure surfaced at readiness. Override to verify-only (separate `hive migrate` command) if prod policy requires explicit, audited migrations.
+6. ★ **ReviewGate update permissions** — Default: workspace-membership only for v1; build `WorkspaceAuthorizer` so role-gating can be added later without rework. Override to require a `reviewer` role / `can_update_gates` now.
+7. **PersonalQueue visibility** — Default: current-user-only (simplest, safest). Override for admin/delegated visibility (needs extra schema + authz; can't retrofit without a migration).
+8. **EpicTree canonical route** — Default: `/hive/epics` canonical, `/hive` redirects. Override to collapse to one.
+9. **Skill materialization collision** — Default: 409 Conflict, caller chooses an explicit action. Override to support silent overwrite/customize flags.
+10. **Assign-skill-in-materialize call** — Default: keep materialize and agent-assignment as separate flows. Override to combine (two permissions + two write domains in one transaction).
+11. **Provenance fields** — Default: `catalogKey`, `catalogVersion`, `state`, plus `materializedBy`. Override to add `lastCheckedAt` / `originalName`.
+12. **Catalog UI route** — Default: reuse the existing Multica Skills page for v1; defer a dedicated `/hive/skills` view. Override to build the dedicated catalog UI in Phase 5.
 
-**8. ReviewGate update permissions.** Confirm whether gate state updates require only workspace membership or a specific role or permission. If a `reviewer` role or `can_update_gates` permission is required, the `WorkspaceAuthorizer` interface must support role-based checks, which affects its design in Phase 1 even though ReviewGates is Phase 2. This design decision should be made before Phase 1 so the authorizer interface is built correctly from the start.
-
-**9. PersonalQueue visibility scope.** Confirm whether the PersonalQueue shows only the authenticated user's own items, or whether workspace admins or delegators can see other users' items. The current-user-only model is the simpler and safer default. Admin or delegated visibility requires additional columns in `hive.personal_queue_items`, additional SQL conditions, and additional authorization checks. This decision directly affects the Phase 3 schema and cannot be retrofitted without a migration.
-
-**10. HermesChat refresh strategy.** Confirm whether Phase 4 HermesChat uses polling/manual refresh or the existing `/ws` WebSocket integration. Polling is simpler and sufficient for many collaboration workflows. WebSocket integration provides realtime delivery but requires coordination with Multica's WebSocket handling and adds complexity to both the backend (event publishing) and frontend (connection management). The decision gates Phase 4 scope.
-
-**11. Hive migration execution model.** Confirm whether Hive migrations run automatically at server startup or whether the server only verifies that a manual migration command has already been applied. The automatic model is simpler for development but may conflict with production deployment policies that require explicit, audited migration steps. The readiness-verification model requires a separate `hive migrate` command and a readiness endpoint or signal.
-
-**12. Skill materialization collision behavior.** Confirm the behavior when a workspace already has a skill with the same name as a catalog entry being materialized. The default is 409 Conflict, requiring the caller to choose an explicit action. If the product wants to support "overwrite" or "customize" semantics, the API must accept an explicit flag rather than doing it silently. This decision determines the API shape before Phase 5 is implemented.
-
-**13. Skill-to-agent assignment in materialization call.** Confirm whether `POST /api/plugins/hive/skills/{catalogKey}/materialize` can assign the materialized skill to an agent in the same call using `assignToAgentId`, or whether assignment must happen through the existing separate agent-skill flow. Combining the operations in one call requires the materializer to handle two permissions (create skill + assign agent skill) and two database write domains in one transaction. Separating them keeps the materializer focused on the materialization problem.
-
-**14. Minimum provenance fields.** Confirm the minimum set of provenance fields that must be stored in `hive.plugin_skill_catalog_state` for materialized skills. The minimum is `catalogKey`, `catalogVersion`, and `state`. If the product needs to track `materializedBy` (who initiated the materialization), `lastCheckedAt` (when the catalog was last checked for updates), or `originalName` (the catalog-defined name before any user renaming), those fields must be specified before Phase 5 schema design begins.
-
-**15. Catalog UI route requirement.** Confirm whether Phase 5 must include a dedicated catalog browse UI route (`/hive/skills`), or whether the browse endpoint combined with the existing Multica Skills page is sufficient for first delivery. A dedicated catalog UI adds a view component, page adapter, path builder, sidebar configuration, and tests. If the existing Skills page can display materialized skills and a simple endpoint serves the catalog data, the dedicated UI can be a follow-up.
-
-**16. Phase 6 conditionality.** Confirm that Phase 6 is conditional on measured fork churn evidence from Phases 1-5, not an unconditional refactor. This decision must be explicitly accepted by the team before any Phase 6 work begins. Without this confirmation, there is a risk that Phase 6 executes as a planned deliverable regardless of whether the fork diff evidence supports the abstraction.
-
-**17. Security plan audit.** Confirm that `security:plan-audit` is raised before execution begins. This covers the new authenticated API surface (`/api/plugins/hive/*`), the `hive.*` schema additions, and the skill materialization path that writes executable agent skill content into database-backed skill tables. The audit should complete before Phase 1 code review begins, not after Phase 5 ships.
-
-**18. Performance audit.** Confirm that `performance:audit` is raised after execution, before the implementation is promoted to production scale. The specific query patterns requiring measurement are EpicTree list queries with large node counts, PersonalQueue filter queries under high item volume, and HermesChat message pagination under active thread usage. Baseline measurements from a realistic dataset should confirm that the Phase 1 and Phase 4 indexes are sufficient.
-
-**19. Missing product data policy.** Confirm that missing product details — view-specific copy, role matrices, expected data volumes — may be represented as `[data not provided: ...]` in implementation decisions rather than having implementers invent behavior. This prevents incorrect defaults from becoming load-bearing once users depend on them.
-
-**20. Risk Registry and Elicitation preservation.** Confirm that Part 5 and Part 7 are preserved as full analytical sections in all downstream planning documents — story YAMLs, sprint plans, and architecture reviews — and must not be collapsed into checklists or summary bullets. These sections exist precisely because the highest-risk implementation decisions require full analytical context to make correctly.
+**Net:** affirm 8a as a group, accept the 8b defaults, and weigh in only on the four ★ items (sidebar, chat refresh, migration execution, gate permissions) if you'd choose differently.
