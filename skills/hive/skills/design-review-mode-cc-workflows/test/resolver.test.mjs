@@ -530,5 +530,8 @@ function extractCodeBlocks(content) {
       blockLines.push(line);
     }
   }
+  if (inBlock && blockLines.length > 0) {
+    blocks.push(blockLines.join('\n'));
+  }
   return blocks;
 }

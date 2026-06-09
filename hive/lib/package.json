@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "lint:cc-workflows": "node ../scripts/lint-cc-workflows-no-codex.mjs",
+    "verify:dispatch-parity": "node ../scripts/verify-dispatch-parity.mjs",
     "test:contract": "npx tsx --test task-tracking-dispatch/test/markNeedsRework.contract.test.mjs",
-    "test": "npm run lint:cc-workflows && npx vitest run --reporter=verbose --root ../.. hive/lib/test/mode-resolver.test.mjs hive/lib/test/cc-workflows-preconditions.test.mjs hive/lib/__tests__/cc-workflows-model-tier.test.mjs hive/scripts/test/lint-cc-workflows-no-codex.test.mjs skills/hive/skills/design-dispatch/test/resolver.test.mjs skills/hive/skills/design-review-dispatch/test/resolver.test.mjs skills/hive/skills/review-dispatch/test/resolver.test.mjs skills/hive/skills/test-mode-cc-workflows/test/resolver.test.mjs skills/hive/skills/design-review-mode-multica/test/resolver.test.mjs skills/hive/skills/design-review-mode-cc-workflows/test/resolver.test.mjs && npm run test:contract"
+    "test": "npm run lint:cc-workflows && npx vitest run --reporter=verbose --root ../.. hive/lib/test/mode-resolver.test.mjs hive/lib/test/cc-workflows-preconditions.test.mjs hive/lib/__tests__/cc-workflows-model-tier.test.mjs hive/scripts/test/lint-cc-workflows-no-codex.test.mjs hive/scripts/test/verify-dispatch-parity.test.mjs skills/hive/skills/design-dispatch/test/resolver.test.mjs skills/hive/skills/design-review-dispatch/test/resolver.test.mjs skills/hive/skills/review-dispatch/test/resolver.test.mjs skills/hive/skills/test-mode-cc-workflows/test/resolver.test.mjs skills/hive/skills/design-review-mode-multica/test/resolver.test.mjs skills/hive/skills/design-review-mode-cc-workflows/test/resolver.test.mjs skills/hive/skills/review-mode-multica/test/resolver.test.mjs skills/hive/skills/review-mode-cc-workflows/test/resolver.test.mjs skills/design/test/phase-a-toggle.test.mjs skills/hive/skills/design-mode-multica/test/resolver.test.mjs skills/hive/skills/design-mode-cc-workflows/test/resolver.test.mjs skills/design/test/wireframe-handoff-payload.test.mjs && npm run test:contract"
   },
   "engines": {
     "node": ">=20"
