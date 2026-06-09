@@ -1,0 +1,111 @@
+skill: execute
+run_id: slice-3-2026-06-08
+epic_id: substrate-coverage-and-test-cleanup
+timestamp: "2026-06-08T00:00:00Z"
+gate_lift_fired: false
+methodology:
+  value: classic
+  source: epic_yaml
+backend_sources:
+  sessions_enabled: default
+  parallel_teams: default
+  terminal_mux: default
+  executor: default
+  execution_mode: default
+  execution_runtime: default      # cc-workflows resolved via established run pattern
+stories_completed:
+  - d-1-design-multi-persona-pipeline
+  - d-3-design-mode-multica
+  - d-4-design-mode-cc-workflows
+  - d-5-wireframe-artifact-handoff
+commits:
+  - 55217d5   # [d-1] feat(/design): Phase A persona pipeline + Phase 0 dispatch
+  - 190323d   # [d-1] chore(episode): cc-workflows terminal marker + status backfill
+  - b152827   # [d-3] feat(/design): design-mode-multica atom
+  - d355706   # [d-3] chore(episode): cc-workflows terminal marker + status backfill
+  - fc4e672   # [d-4] feat(/design): design-mode-cc-workflows atom
+  - c1dfcce   # [d-4] chore(episode): cc-workflows terminal marker + status backfill
+  - 88e7bf1   # [d-5] feat(/design): wireframe handoff payload contract
+  - 31d1c9f   # [d-5] chore(episode): cc-workflows terminal marker + status backfill — Slice 3 COMPLETE
+artifacts_created:
+  - skills/design/test/phase-a-toggle.test.mjs                          # d-1
+  - skills/design/test/wireframe-handoff-payload.test.mjs               # d-5
+  - skills/hive/skills/design-mode-multica/SKILL.md                     # d-3
+  - skills/hive/skills/design-mode-multica/test/resolver.test.mjs       # d-3
+  - skills/hive/skills/design-mode-cc-workflows/SKILL.md                # d-4
+  - skills/hive/skills/design-mode-cc-workflows/test/resolver.test.mjs  # d-4
+  - .pHive/test-scenarios/d-1-design-phase-a-toggle.yaml
+  - .pHive/test-scenarios/d-3-design-mode-multica-smoke.yaml
+  - .pHive/test-scenarios/d-4-design-mode-cc-workflows-smoke.yaml
+  - .pHive/test-scenarios/d-5-wireframe-handoff-payload.yaml
+files_modified:
+  - skills/design/SKILL.md                # d-1 INSERT-ABOVE: Phase 0 + Phase A
+  - hive/references/wireframe-protocol.md # d-5 APPEND: Handoff Payload Contract section
+  - hive/lib/package.json                 # 4 test paths appended (d-1, d-3, d-4, d-5)
+  - .gitignore                            # node-compile-cache + tsx-*
+test_results:
+  hive_lib_vitest_progression:
+    baseline_post_slice_5: 273
+    after_d_1: 296                        # +23 d-1 phase-a-toggle 3 describe blocks
+    after_d_3: 350                        # +54 d-3 resolver 12 describe blocks
+    after_d_4: 414                        # +64 d-4 resolver 14 describe blocks
+    after_d_5: 430                        # +16 d-5 payload-shape 5 describe blocks
+  s3_no_codex_lint:
+    baseline_pre_slice_3: 4 atoms in scope (plan, execute, test, review-mode-cc-workflows)
+    after_slice_3: 6 atoms in scope (added design-review-mode + design-mode); all PASS
+workflow_dispatches:
+  - run_id: wf_9f475c04-aa4
+    story: d-1-design-multi-persona-pipeline
+    agent_count: 4
+    subagent_tokens: 325569
+    tool_uses: 92
+    duration_ms: 874899
+  - run_id: wf_5121ec3a-361
+    story: d-3-design-mode-multica
+    agent_count: 4
+    subagent_tokens: 358638
+    tool_uses: 96
+    duration_ms: 889645
+  - run_id: wf_b7f88ed3-120
+    story: d-4-design-mode-cc-workflows
+    agent_count: 4
+    subagent_tokens: 376928
+    tool_uses: 106
+    duration_ms: 1051051
+  - run_id: wf_eb6236ba-93c
+    story: d-5-wireframe-artifact-handoff
+    agent_count: 4
+    subagent_tokens: 264472
+    tool_uses: 75
+    duration_ms: 562547
+nonsensical_defaults: []   # healthy run; no heuristics fired
+notes: |
+  Slice 3 (/design substrate) closed in single /execute session.
+  Methodology classic; all 4 stories used established cc-workflows
+  substrate pattern (4 phases per story: research → implement → test
+  → review; orchestrator-narrated serial commits per dr-2/dr-3/r-2/r-3
+  precedent).
+
+  Epic substrate-coverage-and-test-cleanup near-complete:
+  - Slice 0 audit recovery (shipped pre-session)
+  - Slice 1 foundation s-2/s-4/s-3/s-5 (shipped pre-session)
+  - Slice 2 /test t-1/t-1a/t-1b/t-2/t-3 (shipped pre-session)
+  - Slice 3 /design d-1/d-2/d-3/d-4/d-5 (CLOSED THIS SESSION)
+  - Slice 4 /design-review dr-1/dr-2/dr-3 (shipped pre-session)
+  - Slice 5 /review r-1/r-2/r-3 (shipped THIS SESSION)
+  - Slice 6 governance close s-1-dispatch-parity-matrix (REMAINS — 1 story)
+
+  Cross-story design pattern decompositions recorded across 20 persona
+  memories (4 per story × 5 stories incl. r-2/r-3 from earlier in
+  session):
+  - INSERT-ABOVE vs replace (Phase X pattern) — d-1
+  - per-persona vs single-run substrate dispatch — d-3 vs dr-2
+  - intentional symmetry (cc-workflows atoms canonical shape) vs
+    intentional asymmetry (Multica vs cc-workflows substrate) — d-3/d-4
+  - extensible-minimum payload contract — d-5
+  - closeIssue mirror-of-mirror ambiguity — d-3
+  - scope_drift_observed null vs true atom-level dialect — r-2/r-3
+
+  After Slice 6 (s-1-dispatch-parity-matrix governance close), the
+  epic ships as a single feat branch with full substrate parity across
+  /plan, /execute, /test, /design, /design-review, /review.

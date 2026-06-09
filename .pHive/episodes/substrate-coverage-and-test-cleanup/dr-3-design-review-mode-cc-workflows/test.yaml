@@ -1,0 +1,52 @@
+step: test
+story: dr-3-design-review-mode-cc-workflows
+epic: substrate-coverage-and-test-cleanup
+status: completed
+agent: tester
+timestamp: "2026-06-08T00:16:00Z"
+
+files_created:
+  - skills/hive/skills/design-review-mode-cc-workflows/test/resolver.test.mjs
+  - .pHive/test-scenarios/dr-3-design-review-mode-cc-workflows-smoke.yaml
+  - .pHive/episodes/substrate-coverage-and-test-cleanup/dr-3-design-review-mode-cc-workflows/test.yaml
+
+files_modified:
+  - hive/lib/package.json
+
+test_results:
+  vitest_suite:
+    files: 9
+    tests: 200
+    passed: 200
+    failed: 0
+    status: green
+  s3_lint:
+    files_scanned: 4
+    checks_passed: 4
+    checks_failed: 0
+    status: green
+
+audit_walk:
+  verdict: "complete (AC 6/6 covered, refs 3/3 re-read)"
+  ac_coverage:
+    - ac: "Step 0 imports hive/lib/cc-workflows-preconditions.mjs and invokes assertWorktreeIsolation()"
+      test: "cc-workflows-preconditions.mjs import — Step 0 contract"
+    - ac: "4 agent() calls (accessibility → animations → ui-designer critique → ui-designer synthesis) via default workflow subagent"
+      test: "dr-3 4-step dispatch shape — atom SKILL.md"
+    - ac: "s-3 no-codex lint all four checks PASS"
+      test: "no-codex compliance — design-review-mode-cc-workflows SKILL.md (checks 1-3) + npm run lint:cc-workflows (check 4)"
+    - ac: "--skip suppresses steps per existing semantics"
+      test: "dr-3 --skip flag semantics"
+    - ac: "--artifact-target forwarded verbatim to ui-designer agents"
+      test: "dr-3 --artifact-target flag semantics"
+    - ac: "vitest resolution test exercises 5-tier permutations"
+      test: "HIVE_DESIGN_REVIEW_MODE — tier: env/root_config/shipped_baseline/skill_override/default"
+
+notes: >
+  All 200 vitest tests pass across 9 files. s-3 no-codex lint scans 4 *-mode-cc-workflows
+  atoms and reports all 4 checks PASSED. New resolver test covers 5-tier resolution
+  permutations, raw-token footgun, 4-step dispatch shape, cc-workflows-preconditions
+  import assertion, resolveModelTier contract, insight-capture suffix, all 4 no-codex
+  checks, --skip and --artifact-target semantics, and dispatch routing assertion.
+  Scenario YAML covers full-run, both optional-step skip variants, combined skip,
+  required-steps-non-skippable, precondition reject, and artifact-target forwarding.

@@ -1,0 +1,103 @@
+id: r-2-review-mode-multica-smoke
+title: "/review via multica substrate smoke walk — r-2 atom solo reviewer + single episode marker"
+description: >
+  Spec-walk confirming that /review routes through review-dispatch to
+  review-mode-multica when HIVE_REVIEW_MODE=multica is set, the resolver
+  returns the expected mode_decision, the atom prescribes exactly ONE reviewer agent
+  inside a SINGLE Multica run (solo reviewer pattern per skills/review/SKILL.md Phase 1),
+  and ONE episode marker captures the reviewer verdict.
+  Also verifies --sequential flag semantics and scope_drift preservation contract.
+mode: spec-walk
+story: r-2-review-mode-multica
+epic: substrate-coverage-and-test-cleanup
+
+preconditions:
+  - "skills/hive/skills/review-mode-multica/SKILL.md is present and cites skills/review/SKILL.md Phase 1 as the solo reviewer pattern"
+  - "skills/hive/skills/review-dispatch/SKILL.md is present and names review-mode-multica as the multica downstream target"
+  - "hive/lib/mode-resolver.mjs is present and recognizes HIVE_REVIEW_MODE as a registered varName"
+  - "The vitest resolver test suite passes green (all tiers covered)"
+  - "The s-3 no-codex lint scope note is documented: r-2 is *-mode-multica, not *-mode-cc-workflows, and is out of lint scope"
+
+steps:
+  - action: >
+      Run the vitest resolver test for review-mode-multica to confirm all
+      5-tier permutations resolve correctly and the raw-token footgun is covered.
+    expected: >
+      All tests pass. Each tier (env, root_config, shipped_baseline, skill_override,
+      default) resolves to the expected decision with only the winning source key in
+      sources. The raw-token footgun test confirms that passing a bare value without
+      VARNAME= falls through to the next tier.
+    actor: tester
+
+  - action: >
+      Invoke resolveMode with env set to HIVE_REVIEW_MODE=multica and verify
+      the returned decision and sources.
+    expected: >
+      decision equals multica and sources contains only the env key with value
+      HIVE_REVIEW_MODE=multica. No other tier keys appear in sources.
+    actor: tester
+
+  - action: >
+      Read review-mode-multica SKILL.md and confirm exactly ONE reviewer agent is
+      documented: the solo reviewer pattern from skills/review/SKILL.md Phase 1.
+      Confirm panel-mode (multi-reviewer) is explicitly DEFERRED.
+    expected: >
+      SKILL.md documents SOLO reviewer only. Panel-mode is explicitly marked as
+      DEFERRED per Decision Point 2. The dispatched reviewer runs internally the
+      researcher + reviewer sequential steps (Phase 1 of skills/review/SKILL.md).
+    actor: tester
+
+  - action: >
+      Read review-mode-multica SKILL.md and confirm the single-run shape:
+      ONE Multica issue for the entire review run, ONE episode marker (multica-run.yaml)
+      capturing the reviewer verdict, NO per-persona fan-out.
+    expected: >
+      SKILL.md states ONE Multica issue and ONE episode marker. The marker path uses
+      {unit_id} as the directory identifier (not persona name). The marker target is
+      at the path format "${HIVE_STATE_DIR}/episodes/{epic_handle}/{unit_id}/multica-run.yaml".
+    actor: tester
+
+  - action: >
+      Simulate /review dispatch with --sequential flag and a representative PR argument
+      (e.g. --sequential #42). Verify SKILL.md documents --sequential as accepted verbatim
+      and treated as no-op for single-agent dispatch.
+    expected: >
+      SKILL.md documents --sequential as forwarded from r-1 and accepted by this atom.
+      For single-agent dispatch there is only one reviewer, so --sequential is a no-op.
+      The flag does not alter the issue count (still ONE) or the marker count (still ONE).
+    actor: tester
+
+  - action: >
+      Verify scope_drift preservation contract: confirm SKILL.md documents that
+      scope_drift emit at review:complete is preserved by r-1 and that this atom does
+      NOT duplicate the emit. Confirm scope_drift_observed is null in the episode marker.
+    expected: >
+      SKILL.md states that scope_drift emit is the responsibility of the reviewer agent
+      dispatched inside the Multica issue, and that r-1 owns the emit contract declaration.
+      The atom's episode marker includes scope_drift_observed: null confirming the atom
+      verified the contract without owning the call. This is one of exactly 3 sanctioned
+      emit_scope_drift call sites documented in review-dispatch/SKILL.md.
+    actor: tester
+
+  - action: >
+      Run the s-3 no-codex lint and document the scope finding: r-2 is a
+      *-mode-multica atom, not a *-mode-cc-workflows atom, and is out of the lint
+      script target glob. Confirm that the equivalent no-codex checks (no agentType,
+      no agent_backends) are covered by the resolver test suite instead.
+    expected: >
+      The lint script runs against *-mode-cc-workflows/SKILL.md files and does not
+      scan review-mode-multica/SKILL.md. The resolver test suite covers the
+      equivalent code-block checks for the multica atom. The SKILL.md correctly uses
+      multica-story-dispatch helpers and does not reference assertWorktreeIsolation
+      (a cc-workflows precondition). This asymmetry is documented and expected.
+    actor: tester
+
+postconditions:
+  - "All vitest resolver tests pass (5-tier coverage + footgun + solo dispatch shape + single-run + scope_drift contract)"
+  - "review-dispatch SKILL.md routes multica decision to review-mode-multica"
+  - "Atom SKILL.md documents ONE reviewer agent following skills/review/SKILL.md Phase 1 (solo pattern)"
+  - "Atom SKILL.md documents ONE Multica issue and ONE episode marker (multica-run.yaml)"
+  - "Panel-mode (multi-reviewer) is explicitly DEFERRED per Decision Point 2"
+  - "--sequential flag is accepted verbatim and is a no-op for single-agent dispatch"
+  - "scope_drift emit at review:complete is preserved by r-1; atom confirms via scope_drift_observed: null"
+  - "s-3 lint scope is correctly documented: r-2 is out of scope as a *-mode-multica atom"

@@ -1,0 +1,32 @@
+step: implement
+story: d-5-wireframe-artifact-handoff
+epic: substrate-coverage-and-test-cleanup
+agent: developer
+status: complete
+started_at: "2026-06-08T00:10:00Z"
+completed_at: "2026-06-08T00:15:00Z"
+
+files_modified:
+  - path: hive/references/wireframe-protocol.md
+    change: INSERT — "Handoff Payload Contract" section appended after "Integration with Workflows"; names the 3 minimum fields (wireframe.png, wireframe.f0, constraints.md), posture statement (extensible-minimum), toggle-conditional clarification, field-named rationale, Q9 cite, and artifact producer forward-refs (d-1/d-3/d-4).
+
+scope_discipline_notes:
+  - "d-1/d-3/d-4 SKILL.md files NOT modified — d-5 scope is documentation-only (payload-contract section in wireframe-protocol.md) plus episode marker and memory."
+  - "Test file and scenario file are tester-step deliverables — out of implement scope per story step split."
+
+acceptance_criteria_status:
+  - ac: "hive/references/wireframe-protocol.md includes payload-contract section naming 3 minimum fields"
+    status: satisfied
+    location: "hive/references/wireframe-protocol.md — '## Handoff Payload Contract' section"
+  - ac: "Posture documented as extensible-minimum"
+    status: satisfied
+    location: "Posture paragraph + 'Posture:' statement in new section"
+  - ac: "Toggle ON → constraints.md present; toggle OFF → PNG + .f0 only"
+    status: satisfied
+    location: "Toggle-conditional clarification paragraph in new section"
+  - ac: "Field-named not file-glob-based"
+    status: satisfied
+    location: "Field-named paragraph in new section"
+  - ac: "Q9 cite + d-1/d-3/d-4 forward-refs"
+    status: satisfied
+    location: "Q9 resolution paragraph + Artifact producers paragraph in new section"

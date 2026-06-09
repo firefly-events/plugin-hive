@@ -1,0 +1,102 @@
+step: review
+story: d-3-design-mode-multica
+epic: substrate-coverage-and-test-cleanup
+agent: reviewer
+status: completed
+started_at: "2026-06-08T00:00:00Z"
+completed_at: "2026-06-08T00:00:00Z"
+change_verdict: passed
+rubric:
+  spec-fidelity: pass
+  domain-compliance: pass
+  security: pass
+  architecture: pass
+  convention-adherence: pass
+  performance: pass
+  test-coverage: pass
+audit_walk: "complete (6/6 ACs evidenced, 5/5 refs re-read)"
+findings:
+  critical: []
+  improvements:
+    - id: line-count-over-target
+      category: convention-adherence
+      file: skills/hive/skills/design-mode-multica/SKILL.md
+      line: 491
+      description: |
+        SKILL.md is 491 lines vs the 400-450 target in story spec L14. Overshoot is
+        ~9% (41 lines). Driven by the legitimate inclusion of the explicit Phase 0c
+        resolver block, per-persona brief shapes, and 15-row constraint table. Not
+        blocking — the additional lines carry contract content (the per-persona brief
+        shapes section was needed to mirror the execute-mode-multica per-story brief
+        contract). Flagging for awareness only.
+      severity: improvement
+ac_coverage:
+  - id: AC-1
+    description: per-persona dispatch when toggle ON (accessibility/animations/ui-designer)
+    evidenced_at: skills/hive/skills/design-mode-multica/SKILL.md:144-160 (Step 1 personaSet, both toggle branches); test/resolver.test.mjs:237-282 (per-persona dispatch shape describe block)
+    status: pass
+  - id: AC-2
+    description: per-persona episode markers at ${HIVE_STATE_DIR}/episodes/{epic_handle}/{unit_id}/multica-run.yaml
+    evidenced_at: skills/hive/skills/design-mode-multica/SKILL.md:329-360 (Step 2.6 marker write, persona slug as unit_id); test/resolver.test.mjs:321-349 (per-persona episode markers describe block)
+    status: pass
+  - id: AC-3
+    description: structurally mirrors execute-mode-multica
+    evidenced_at: skills/hive/skills/design-mode-multica/SKILL.md:8 (Mirror anchor HTML comment); SKILL.md:472-473 (Reuses cites execute-mode-multica as mirror anchor); test/resolver.test.mjs:533-543 (mirror anchor describe block)
+    status: pass
+  - id: AC-4
+    description: one issue per persona — toggle ON=3, toggle OFF=1
+    evidenced_at: skills/hive/skills/design-mode-multica/SKILL.md:144-160 (personaSet toggle branches); SKILL.md:160-161 (Q10 contract — "Do NOT collapse"); SKILL.md:481 (Q10 locked constraint row); test/resolver.test.mjs:288-315 (toggle persona-count describe block)
+    status: pass
+  - id: AC-5
+    description: resolver.test.mjs covers Phase 0c + dispatch sequence
+    evidenced_at: skills/hive/skills/design-mode-multica/test/resolver.test.mjs (54 tests across 12 describe blocks); 350 tests total green per npm test run
+    status: pass
+  - id: AC-6
+    description: DO NOT collapse to single issue (Q10 by-default)
+    evidenced_at: skills/hive/skills/design-mode-multica/SKILL.md:160-161 (Q10 contract — locked); SKILL.md:481 (constraint table)
+    status: pass
+verification_summary:
+  per_persona_dispatch_shape: confirmed (Step 1 personaSet + Step 2 serial loop + per-persona createIssue/dispatchStoryToAgent/poll/marker, NOT single-Multica-run wrapper)
+  one_issue_per_persona: confirmed (Step 2.1 createIssue per persona — toggle ON=3, toggle OFF=1)
+  episode_markers_per_persona: confirmed (Step 2.6 writeMulticaRunEpisode with storyId=persona slug, marker path uses {persona} as unit_id directory)
+  include_constraints_toggle: confirmed (Step 1 explicit Toggle OFF and Toggle ON branches; serial order accessibility → animations → ui-designer when ON)
+  phase_0c_5_tier_resolver: confirmed (Phase 0c block matches canonical pattern; HIVE_DESIGN_MODE varName; resolveMode imported from hive/lib/mode-resolver.mjs; field-source tracking via sources object)
+  hive_design_mode_registered: confirmed (mode-resolver.mjs:42 lists HIVE_DESIGN_MODE among recognized varNames)
+  intentional_asymmetry_documented: confirmed (description line 3 + HTML comment line 9 + Step 1 narrative + constraint table row 490)
+  reuses_section: confirmed (execute-mode-multica as mirror anchor + all three personas + multica-story-dispatch helpers + mode-resolver.mjs)
+  constraint_table_complete: confirmed (15 rows; covers atomic-skill, per-persona dispatch, ONE issue per persona Q10 locked, ONE marker per persona, serial within team-cell, toggle behavior, prior-output flow, labels:[], 5-tier mode resolution, bootstrap required, no silent fallback, intentional asymmetry with dr-2, ui-designer failure semantics)
+  insight_capture_suffix: confirmed (SKILL.md:250-251 — all three brief shapes inherit the suffix instruction; persona insights write to hive/agents/memories/{persona}/)
+  resolver_test_assertions: confirmed (54 tests across 12 describe blocks; npm test green at 350 tests across 13 files)
+  scenario_yaml_valid: confirmed (.pHive/test-scenarios/d-3-design-mode-multica-smoke.yaml — 6 cases: toggle-on, toggle-off, bootstrap-required, ui-designer-failure, accessibility-failure-continues, mode-resolution-env-wins)
+  npm_test_green: confirmed (350 tests / 13 files passing including 54 new resolver tests)
+  file_scope_strictly_limited: confirmed (changes only in skills/hive/skills/design-mode-multica/, .pHive/test-scenarios/d-3-..., .pHive/episodes/.../d-3-design-mode-multica/, hive/lib/package.json scripts.test, hive/agents/memories/{developer,researcher,tester}/ — no regression in prior atoms)
+  line_count_target: 491 vs 400-450 target — overshoot 9%, flagged as improvement only
+notes: |
+  Audit-first walk: complete (6/6 ACs evidenced, 5/5 refs re-read).
+
+  All 12 review criteria from the task prompt pass:
+    1. Per-persona dispatch shape (Step 1 + Step 2 serial loop, NOT single-Multica-run wrapper).
+    2. ONE issue per persona — Q10 cited verbatim in SKILL.md:160-161 and constraint table.
+    3. Episode markers per persona at ${HIVE_STATE_DIR}/episodes/{epic_handle}/{unit_id}/multica-run.yaml.
+    4. --include-constraints toggle dictates persona set; serial order documented.
+    5. Phase 0c 5-tier resolver matches canonical pattern; HIVE_DESIGN_MODE registered in mode-resolver.mjs:42.
+    6. Intentional asymmetry with dr-2: 3 mentions ("intentional"+"asymmetry") in description + HTML comment + constraint table.
+    7. Reuses section names execute-mode-multica as mirror anchor + accessibility-specialist + animations-specialist + ui-designer.
+    8. Constraint summary table complete: 15 rows covering all key invariants.
+    9. Insight-capture suffix template documented at SKILL.md:250-251, applies to all three brief shapes.
+    10. Resolver test covers all 9 listed assertions (and more — 54 tests across 12 describe blocks); scenario YAML valid; npm test green at 350 tests.
+    11. No regression in prior shipped atoms — file scope strictly limited.
+    12. Line count target: 491 vs 400-450 = 9% overshoot. Flagged as improvement only — extra lines carry legitimate contract content (per-persona brief shapes mirror execute-mode-multica per-story brief contract). Not blocking.
+
+  Notable architectural decisions confirmed:
+    - closeIssue intentionally NOT included (developer insight memory captures the
+      rationale): mirrors execute-mode-multica which has no closeIssue. Story spec
+      says "mirror execute-mode-multica" — conservative interpretation. dr-2 and
+      review-mode-multica DO close issues; d-3 follows the mirror anchor.
+    - Toggle OFF produces absent persona_runs entries (not status:skipped); smoke
+      scenario asserts personas_absent_from_runs accordingly.
+    - s-3 no-codex lint OUT OF SCOPE for d-3 (multica atom, not cc-workflows);
+      equivalent constraints verified inline by the no-codex describe block in
+      resolver.test.mjs.
+
+  change_verdict: passed.

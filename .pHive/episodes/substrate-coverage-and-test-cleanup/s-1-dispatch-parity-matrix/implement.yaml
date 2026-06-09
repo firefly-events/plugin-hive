@@ -1,0 +1,24 @@
+step_id: implement
+story_id: s-1-dispatch-parity-matrix
+epic_id: substrate-coverage-and-test-cleanup
+agent: developer
+status: completed
+timestamp: 2026-06-08
+artifacts:
+  - hive/references/dispatch-parity.md
+  - hive/scripts/verify-dispatch-parity.mjs
+  - hive/lib/package.json
+  - README.md
+  - skills/hive/skills/planning-routing/SKILL.md
+  - hive/agents/memories/developer/s1-dispatch-parity-no-root-package-json.md
+decisions:
+  - decision: "JSDoc block comment cannot contain `*/` inline — glob pattern `*-mode-*/SKILL.md` closes the block comment early in Node 25 ESM parser. Fixed by removing the glob from comment prose."
+    rationale: "Node 25 ESM parser is stricter about `*/` inside block comments. Replaced with descriptive prose."
+  - decision: "execute-mode-sandcastle/SKILL.md appears in future-substrate notes and is verified by the checker (13 paths total, not 12)"
+    rationale: "The path exists in git and is cited in the doc. The checker verifies ALL cited paths — including future-substrate prose references. Correct behavior."
+  - decision: "npm script added to hive/lib/package.json, not a root package.json"
+    rationale: "No root package.json exists in this repo. All hive scripts live in hive/lib/package.json per existing lint:cc-workflows pattern."
+key_findings:
+  - "verify-dispatch-parity.mjs exits 0 with '13 paths verified' — all 12 shipped mode atoms + execute-mode-sandcastle (cited in future-substrate note)"
+  - "Last verified date auto-bumps on success; --no-bump flag skips the update"
+  - "cross-links added: README.md Architecture Overview + planning-routing/SKILL.md header"

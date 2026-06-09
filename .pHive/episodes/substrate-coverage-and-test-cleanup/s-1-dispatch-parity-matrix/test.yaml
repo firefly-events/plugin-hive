@@ -1,0 +1,61 @@
+step_id: test
+story_id: s-1-dispatch-parity-matrix
+epic_id: substrate-coverage-and-test-cleanup
+agent: tester
+status: completed
+timestamp: 2026-06-08
+artifacts:
+  - hive/scripts/test/verify-dispatch-parity.test.mjs
+  - .pHive/test-scenarios/s-1-dispatch-parity-smoke.yaml
+  - hive/lib/package.json
+  - hive/agents/memories/tester/s1-dispatch-parity-jsdoc-vite-parse-error.md
+verify_command: node hive/scripts/verify-dispatch-parity.mjs --no-bump
+verify_result:
+  exit_code: 0
+  stdout: "dispatch-parity.md: 13 paths verified"
+suite_result:
+  test_files: 16
+  tests_total: 446
+  tests_passed: 446
+  tests_failed: 0
+  new_describe_blocks:
+    - "dispatch-parity matrix structure (6 tests)"
+    - "dispatch-parity cell content (4 tests)"
+    - "verify-dispatch-parity CI checker (4 tests)"
+    - "cross-references (2 tests)"
+  total_new_tests: 16
+ac_coverage:
+  - ac: "6-row x 3-column Markdown table with rows + future footer"
+    tests:
+      - "dispatch-parity matrix structure > has exactly 6 orchestrator rows"
+      - "dispatch-parity matrix structure > main matrix table header has exactly 3 substrate columns"
+      - "dispatch-parity matrix structure > Future substrate footer is present"
+  - ac: "cells carry path / inline / N/A markers"
+    tests:
+      - "dispatch-parity cell content > all 6 default cells equal inline"
+      - "dispatch-parity cell content > all 6 multica cells contain relative path"
+      - "dispatch-parity cell content > all 6 cc-workflows cells contain relative path"
+  - ac: "CI checker: every cited path resolves on disk and git ls-files"
+    tests:
+      - "verify-dispatch-parity CI checker > invoking the script exits 0"
+      - "dispatch-parity cell content > every cited mode-atom path exists on disk"
+  - ac: "future footer with not-shipped markers"
+    tests:
+      - "dispatch-parity matrix structure > Future substrate footer is present with sandcastle + gh-actions-legacy"
+  - ac: "header cites produced by Slice 6"
+    tests:
+      - "dispatch-parity matrix structure > header cites produced by Slice 6"
+  - ac: "Last verified date block"
+    tests:
+      - "dispatch-parity matrix structure > ## Last verified: subsection present with ISO date"
+out_of_scope:
+  - "s-3 no-codex lint is out of scope for s-1 (dispatch-parity.md is a doc+script, not a *-mode-cc-workflows atom)"
+decisions:
+  - decision: "JSDoc block comments cause vite import analysis parse error in vitest — replaced with line comments throughout"
+    rationale: "vitest (via vite) chokes on multi-line JSDoc containing patterns it misreads as import boundaries. Line-comment style is safe and matches existing project patterns."
+  - decision: "Header case-insensitive match — document has 'Produced' (capital P), AC spec says 'produced' (lower p)"
+    rationale: "The implementation is correct; AC wording was lower-case. Used .toLowerCase() on content before toContain() rather than modifying the implementation file."
+key_findings:
+  - "verify-dispatch-parity.mjs exits 0 with 13 paths verified (12 shipped mode atoms + execute-mode-sandcastle cited in future-substrate note)"
+  - "JSDoc block comments are incompatible with vitest/vite's import analysis — use line-comment style in vitest test files"
+  - "Full suite 446/446 green after appending verify-dispatch-parity.test.mjs to hive/lib/package.json test script"

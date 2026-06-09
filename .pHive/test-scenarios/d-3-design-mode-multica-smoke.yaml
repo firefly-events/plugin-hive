@@ -1,0 +1,165 @@
+scenario: d-3-design-mode-multica-smoke
+title: Smoke — /design via design-mode-multica with toggle ON (3 personas) and toggle OFF (1 persona)
+story: d-3-design-mode-multica
+kind: manual-verdict
+
+description: >
+  Verifies that the design-mode-multica atom (d-3) correctly dispatches personas
+  as per-persona serial dispatch within a team-cell. Toggle ON produces 3 Multica
+  issues and 3 episode markers (accessibility-specialist, animations-specialist,
+  ui-designer). Toggle OFF produces 1 Multica issue and 1 episode marker
+  (ui-designer only). Dispatched via design-dispatch (d-2) when mode_decision
+  resolves to multica. Intentionally different from dr-2 (single-run 4-step shape).
+
+preconditions:
+  - HIVE_DESIGN_MODE=multica is set OR hive.config.yaml has execution.design_mode: multica
+  - Multica server is reachable and workspace is bootstrapped (multica-init has been run)
+  - All three persona agents exist in workspace: accessibility-specialist, animations-specialist, ui-designer
+  - design_context payload is available (topic_slug, brand context, surface kind)
+  - design-dispatch (d-2) routes to design-mode-multica when mode_decision is multica
+
+cases:
+  - name: toggle-on-three-personas
+    description: >
+      /design --include-constraints triggers toggle ON path. d-3 dispatches three
+      personas serially: accessibility-specialist first, then animations-specialist
+      (receives accessibility notes), then ui-designer (receives both constraint blocks).
+      Three Multica issues are created (one per persona). Three episode markers are
+      written at the per-persona paths. Prior persona outputs flow forward as optional
+      context blocks. ui-designer failure = overall run failed.
+    invocation: /design --include-constraints
+    env:
+      HIVE_DESIGN_MODE: multica
+    expected:
+      mode_decision: multica
+      include_constraints: true
+      persona_dispatch_order:
+        - accessibility-specialist
+        - animations-specialist
+        - ui-designer
+      dispatch_mode: serial
+      issues_created: 3
+      episode_markers_written: 3
+      marker_paths:
+        - episodes/{epic_handle}/accessibility-specialist/multica-run.yaml
+        - episodes/{epic_handle}/animations-specialist/multica-run.yaml
+        - episodes/{epic_handle}/ui-designer/multica-run.yaml
+      sidecar_paths:
+        - episodes/{epic_handle}/accessibility-specialist/multica-run.messages.jsonl
+        - episodes/{epic_handle}/animations-specialist/multica-run.messages.jsonl
+        - episodes/{epic_handle}/ui-designer/multica-run.messages.jsonl
+      marker_fields:
+        labels: []
+      prior_outputs_forwarded: true
+      summary_fields:
+        - persona_runs
+        - run_id
+        - include_constraints
+        - topic
+
+  - name: toggle-off-ui-designer-only
+    description: >
+      /design without --include-constraints triggers toggle OFF path. d-3 dispatches
+      ui-designer only. One Multica issue is created. One episode marker is written
+      at the ui-designer path. accessibility-specialist and animations-specialist
+      are absent from persona_runs (not status-skipped — absent entirely).
+    invocation: /design
+    env:
+      HIVE_DESIGN_MODE: multica
+    expected:
+      mode_decision: multica
+      include_constraints: false
+      persona_dispatch_order:
+        - ui-designer
+      dispatch_mode: serial
+      issues_created: 1
+      episode_markers_written: 1
+      marker_paths:
+        - episodes/{epic_handle}/ui-designer/multica-run.yaml
+      personas_absent_from_runs:
+        - accessibility-specialist
+        - animations-specialist
+      summary_fields:
+        - persona_runs
+        - run_id
+        - include_constraints
+        - topic
+
+  - name: bootstrap-required-abort
+    description: >
+      When Multica workspace is not bootstrapped (persona agent missing), Step 0
+      emits BOOTSTRAP_REQUIRED error and exits 1. No issues are created. No fallback
+      to inline design path occurs. Structured rejection is emitted with code,
+      reason, and remediation fields.
+    invocation: /design --include-constraints
+    env:
+      HIVE_DESIGN_MODE: multica
+    simulate_bootstrap_missing: accessibility-specialist
+    expected:
+      exit_code: 1
+      error_code: precondition_failed
+      reason: bootstrap
+      issues_created: 0
+      episode_markers_written: 0
+      fallback_to_inline: false
+
+  - name: ui-designer-failure-is-run-failure
+    description: >
+      When ui-designer persona reaches a non-passed terminal status, the overall
+      run is failed. Prior persona markers (accessibility-specialist,
+      animations-specialist) are preserved as written. The summary failed field
+      is populated with ui-designer status and terminal notes.
+    invocation: /design --include-constraints
+    env:
+      HIVE_DESIGN_MODE: multica
+    simulate_persona_failure: ui-designer
+    expected:
+      overall_run_failed: true
+      prior_markers_preserved: true
+      summary_failed_populated: true
+      episode_markers_written: 3
+
+  - name: accessibility-failure-continues-chain
+    description: >
+      When accessibility-specialist fails, a warning is logged and the chain
+      continues. animations-specialist dispatches with accessibility notes absent.
+      ui-designer dispatches with both constraint blocks absent (priorOutputs empty).
+      All three markers are written. Overall run is not failed unless ui-designer fails.
+    invocation: /design --include-constraints
+    env:
+      HIVE_DESIGN_MODE: multica
+    simulate_persona_failure: accessibility-specialist
+    expected:
+      overall_run_failed: false
+      warning_logged: true
+      episode_markers_written: 3
+      persona_dispatch_order:
+        - accessibility-specialist
+        - animations-specialist
+        - ui-designer
+
+  - name: mode-resolution-env-wins
+    description: >
+      5-tier mode resolution: HIVE_DESIGN_MODE=multica env token wins over all
+      other tiers. design-dispatch (d-2) resolves mode_decision=multica and routes
+      to d-3. Source is recorded as env tier only.
+    invocation: /design
+    env:
+      HIVE_DESIGN_MODE: multica
+    config_override:
+      execution:
+        design_mode: cc-workflows
+    expected:
+      mode_decision: multica
+      mode_source: env
+      atom_routed_to: design-mode-multica
+
+verdict: null
+timestamp: null
+agent: null
+notes: >
+  Scenario covers d-3 acceptance criteria: per-persona dispatch (AC 1), episode
+  markers per persona (AC 2), mirror of execute-mode-multica shape (AC 3), issue
+  count by toggle (AC 4), vitest resolver test (AC 5). Also covers bootstrap abort,
+  partial failure continuation, and 5-tier mode resolution routing. s-3 no-codex
+  lint is OUT OF SCOPE for this scenario (d-3 is a multica atom, not cc-workflows).

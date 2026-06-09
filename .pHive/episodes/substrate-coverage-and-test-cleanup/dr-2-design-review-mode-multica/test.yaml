@@ -1,0 +1,73 @@
+step: test
+story_id: dr-2-design-review-mode-multica
+epic: substrate-coverage-and-test-cleanup
+agent: tester
+status: completed
+started_at: "2026-06-08T00:00:00Z"
+completed_at: "2026-06-08T00:10:00Z"
+files:
+  - path: skills/hive/skills/design-review-mode-multica/test/resolver.test.mjs
+    change: created
+  - path: .pHive/test-scenarios/dr-2-design-review-mode-multica-smoke.yaml
+    change: created
+  - path: hive/lib/package.json
+    change: modified
+  - path: .pHive/episodes/substrate-coverage-and-test-cleanup/dr-2-design-review-mode-multica/test.yaml
+    change: created
+  - path: hive/agents/memories/tester/markdown-escaped-underscores-in-skill-md.md
+    change: created
+notes: >
+  Created resolver.test.mjs with 36 vitest tests covering:
+    - 5-tier resolution (env, root_config, shipped_baseline, skill_override, default) — all tiers
+    - env=multica, env=cc-workflows, env=sandcastle tier 1 wins
+    - Raw-token footgun: bare value without VARNAME= silently ignores env tier
+    - Wrong VARNAME footgun: env with different var name falls through
+    - Source tracking: only winning tier key appears in sources (no leakage)
+    - 4-step dispatch shape: accessibility-specialist, animations-specialist, ui-designer critique (design-review-design-critique.md), ui-designer synthesis (design-review-synthesis.md)
+    - Step A/B/C/D label assertions matching workflow.yaml:8-81 anchor
+    - Single-run shape: ONE Multica issue, ONE episode marker (multica-run.yaml), NOT per-persona
+    - Intentional asymmetry with d-3: Q11 ruling documented in SKILL.md
+    - --skip flag semantics: accessibility suppresses Step A, animations suppresses Step B, required steps C+D cannot be skipped
+    - --artifact-target flag: design|implementation forwarded verbatim to Steps C+D
+    - Dispatch routing: design-review-dispatch SKILL.md names design-review-mode-multica as multica target
+    - Phase 0c contract: resolveMode('HIVE_DESIGN_REVIEW_MODE', ctx) import documented
+    - No-codex checks (code-block scope): no agentType=codex:codex-rescue, no agent_backends
+    - Multica-specific: assertWorktreeIsolation NOT required (cc-workflows precondition only)
+
+  FOOTGUN CAUGHT: SKILL.md uses markdown-escaped underscores (root\_config = two bytes backslash+underscore).
+  Regex root.config fails to match. Fixed with root.{1,2}config pattern.
+  Captured in hive/agents/memories/tester/markdown-escaped-underscores-in-skill-md.md.
+
+  All 151 vitest tests pass (36 new + 115 existing).
+  s-3 lint scope: dr-2 is a *-mode-multica atom — OUT OF SCOPE for lint-cc-workflows-no-codex.mjs
+    which targets *-mode-cc-workflows/SKILL.md files only. Equivalent code-block checks
+    are covered by the resolver test suite.
+
+resolver_test_result:
+  tests: 36
+  passed: 36
+  failed: 0
+  framework: vitest
+
+full_suite_result:
+  tests: 151
+  passed: 151
+  failed: 0
+  lint_checks: 4
+  lint_files_scanned: 3
+  lint_status: all_pass
+
+scenario_load_result:
+  file: .pHive/test-scenarios/dr-2-design-review-mode-multica-smoke.yaml
+  status: valid
+  mode: spec-walk
+  steps: 7
+
+no_codex_scope_finding: >
+  dr-2 is a *-mode-multica atom. The s-3 no-codex lint script
+  (hive/scripts/lint-cc-workflows-no-codex.mjs) targets *-mode-cc-workflows/SKILL.md
+  files only. design-review-mode-multica/SKILL.md is out of that lint scope.
+  Equivalent checks (no agentType, no agent_backends in code blocks) are covered
+  by resolver.test.mjs tests in the no-codex scope suite section.
+
+audit_first_walk: "complete (AC 6/6 covered, refs 3/3 re-read)"

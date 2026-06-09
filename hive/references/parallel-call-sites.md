@@ -44,6 +44,7 @@ IDs are named in the warning.
 | `execute:team-cmux` | [`skills/execute/SKILL.md`](../../skills/execute/SKILL.md) step 6b → [`references/team-execution.md`](../../skills/execute/references/team-execution.md) cmux variant | Orchestrator loops over the topologically-sorted set and spawns one cmux pane per story via `agent-spawn`; concurrent panes | per-story (planner-emitted) |
 | `execute:sessions` | [`skills/execute/SKILL.md`](../../skills/execute/SKILL.md) step 6c → [`skills/hive/skills/execute-mode-session/SKILL.md`](../../skills/hive/skills/execute-mode-session/SKILL.md) | Story-level fan-out through the Claude Agent SDK `/v1/sessions` API | per-story (planner-emitted) |
 | `execute:sandcastle` | [`skills/execute/SKILL.md`](../../skills/execute/SKILL.md) step 6d → [`skills/hive/skills/execute-mode-sandcastle/SKILL.md`](../../skills/hive/skills/execute-mode-sandcastle/SKILL.md) | Story-level fan-out into one sandcastle container per story via the Codex auth-mounted provider | per-story (planner-emitted) |
+| `design:dispatch` | [`skills/hive/skills/design-dispatch/SKILL.md`](../../skills/hive/skills/design-dispatch/SKILL.md) Step 1.5 | Parallel-dispatch gate for `/design` mode selection; same Step 1.5 gate logic as `execute-dispatch`; routes to `design-mode-multica` or `design-mode-cc-workflows` atoms (later slices) | per-story (planner-emitted) |
 
 ## 3. Out-of-scope sites — not story-level fan-out
 

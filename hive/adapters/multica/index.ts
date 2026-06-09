@@ -296,6 +296,7 @@ async function capabilities(): Promise<any> {
     abi_version: "1.0.0",
     hierarchy: "hierarchical",
     supports_parent_link: true,
+    supports_needs_rework: true,
     supported_labels: null,
     supported_states: Array.from(STATUS_VALUES),
     metadata: {
@@ -369,6 +370,31 @@ async function getStory(params: any): Promise<any> {
   return toAbiStory(issue);
 }
 
+async function addLabel(issueUuid: string, workspaceId: string, label: string): Promise<string[]> {
+  // Fetch current issue to get existing labels, then PUT with the new label appended.
+  const issue = await multicaFetch(
+    `/api/issues/${encodeURIComponent(issueUuid)}?workspace_id=${encodeURIComponent(workspaceId)}`,
+  );
+  const priorLabels: string[] = Array.isArray(issue?.labels) ? issue.labels : [];
+  const newLabels = priorLabels.includes(label) ? priorLabels : [...priorLabels, label];
+  await multicaFetch(
+    `/api/issues/${encodeURIComponent(issueUuid)}?workspace_id=${encodeURIComponent(workspaceId)}`,
+    { method: "PUT", body: { labels: newLabels } },
+  );
+  return newLabels;
+}
+
+async function markNeedsRework(params: any): Promise<any> {
+  const { id, reason: _reason } = params ?? {};
+  // Step 1: transition to in_review status
+  const statusResult = await updateStory({ id, status: "in_review" });
+  // Step 2: add hive:needs-rework label
+  const issueUuid = await resolveIssueUuid(id);
+  const workspaceId = await getWorkspaceId();
+  const labels = await addLabel(issueUuid, workspaceId, "hive:needs-rework");
+  return { id, status: statusResult.status ?? "in_review", labels };
+}
+
 export async function dispatch(req: Request): Promise<any> {
   const handlers: Record<string, (p: any) => Promise<any>> = {
     capabilities,
@@ -376,6 +402,7 @@ export async function dispatch(req: Request): Promise<any> {
     updateStory,
     addComment,
     getStory,
+    markNeedsRework,
   };
   const h = handlers[req.method];
   if (!h) throw new AdapterError("UNKNOWN_METHOD", `Unknown method: ${req.method}`);
