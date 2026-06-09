@@ -24,9 +24,9 @@ The canonical predicates (left-associative, no parentheses per strict-Archon
 grammar) are:
 
 - step-03 runs when ANY signal is non-empty:
-  `$analysis.output.findings_count > 0 || $analysis.output.external_candidates_count > 0 || $analysis.output.metric_signal == true || $kg-signal.output.kg_findings_count > 0`
+  `$analysis.output.findings_count > 0 || $analysis.output.metric_signal == true || $external-research.output.external_candidates_count > 0 || $kg-signal.output.kg_findings_count > 0`
 - step-03b runs ONLY when ALL four are empty:
-  `$analysis.output.findings_count == 0 && $analysis.output.external_candidates_count == 0 && $analysis.output.metric_signal == false && $kg-signal.output.kg_findings_count == 0`
+  `$analysis.output.findings_count == 0 && $analysis.output.metric_signal == false && $external-research.output.external_candidates_count == 0 && $kg-signal.output.kg_findings_count == 0`
 
 `kg_findings_count` joined the signal set when step-02c was wired into the
 workflow. Predicates bind to the explicit `_count` fields rather than to list
