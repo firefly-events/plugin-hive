@@ -1,21 +1,28 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-06-05 | **Date:** 2026-06-05 | **Verdict:** passed
+**Cycle:** meta-2026-06-09 | **Date:** 2026-06-09 | **Verdict:** passed
 
 ## What Changed
 
-- **hive/agents/reviewer.md, hive/agents/peer-validator.md** — frontmatter kept at `model: sonnet` (base tier). #245's `sonnet → opus` frontmatter flip was reverted in 4cdadb7; opus is applied at runtime via `hive.config.yaml` `model_overrides`, not frontmatter, per the base-tier policy (`agent-config-schema.md`). The summary line above previously claimed the flip landed — corrected to match the ledger reversion.
-- **hive/lib/sandcastle-worker-runner.js, hive/lib/messages-session.js** — updated `DEFAULT_MODEL` constant from `claude-opus-4-7` to `claude-opus-4-8`; also updated the JSDoc comment in `sandcastle-worker-runner.js` line 145
-- **hive/references/session-system-prompt-spec.md** — updated two example code blocks (Python request line 357, JSON response line 420) from `claude-opus-4-7` to `claude-opus-4-8`
+- `.pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md`: Appended `<!-- indexed-for-meta-meta-optimize proving run: meta-2026-06-09 -->` as a footer line after the Cross-refs section. Pure ADD on a frozen archive file with no live consumers. Consistent with the mmo-2026-04-21-001 MANIFEST.md precedent from prior cycles.
 
 ## What Was Found (Not Fixed This Cycle)
 
-- `hive/hive.config.yaml` line 179 comment references "Opus 4.7" — out of scope (protected file, no changes without human confirmation)
-- `hive/workflows/steps/development-classic/step-03-implement.md` appears orphaned (not referenced in any workflow YAML) — out of scope (charter forbids file deletions)
-- `hive/references/hive-cloud-roadmap.md` stub (13 lines) — out of scope; S16 forward-reference placeholder deferred 10+ consecutive cycles
+- `hive/references/hive-cloud-roadmap.md` (13 lines): STUB_DOC — S16 forward-reference placeholder for the deferred Hive Cloud epic. Marked out_of_scope. This is the 12th+ consecutive deferral; no fix warranted without the Hive Cloud epic active.
+- `mmo-2026-04-21-001` (MANIFEST.md): suppressed by dedup gate — already proposed in open PR #252. Not re-proposed.
+
+## Routing
+
+Analysis found **0 in-scope findings**. Recent develop changes (PR #253 research/language-strategy, PR #257 status-reconcile) are outside meta-team scope. Routed to step-03b backlog fallback. Selected candidate `mmo-2026-04-21-002` (first non-suppressed pending candidate after dedup of 001).
 
 ## Metrics
 
-- Findings: 3 | Proposals: 3 | Promoted: 5 changes | Reverted: 0
-- Next cycle priority: hive.config.yaml comment (Opus 4.7 → 4.8) — deferred pending human confirmation to edit that file
+- Findings: 0 | Proposals: 1 | Promoted: 1 | Reverted: 0
+- Promotion commit: `1a070c5c5dcf4e1294e5e5e35c0be10d080a619c`
+- Rollback ref: `48331da5e419e19f5ab7fe233b168c82d333619a`
+- Regression watch: armed (4-hour window, ends 2026-06-09T04:00Z)
 
-kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.00 miss_reason=empty_kg
+## Next Cycle Priority
+
+Queue still has `mmo-2026-04-21-003` (archive/2026-04-19/ledger.yaml comment) as the next pending backlog candidate. `mmo-2026-04-21-001` is awaiting merge via PR #252; `mmo-2026-04-21-002` was processed this cycle. If the codebase remains structurally clean, the next nightly will process `mmo-2026-04-21-003`.
+
+kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.0 miss_reason=empty_kg
