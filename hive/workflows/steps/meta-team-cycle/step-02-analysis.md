@@ -149,13 +149,58 @@ If the target project has workflow YAML files (plugin-hive uses `hive/workflows/
 - Confirm each step has either `task` or `step_file`
 - Flag missing step files as `MISSING_STEP_FILE` findings
 
+### 6b. CodeRabbit recurring-comment audit
+
+CodeRabbit posts inline review comments on every PR; titles that recur across multiple recent PRs are a real signal — either the codebase has a recurring convention issue, or reviewers are repeating the same advice because the author did not internalize it last time. Either way, the meta-team can address the root cause.
+
+Implementation module: `hive/workflows/steps/meta-team-cycle/coderabbit-finder.mjs`. The helper is pure-function over already-fetched data — gather the PR comment list first, then pass it in.
+
+Gather data (skip cleanly if `gh` is unavailable — log `PREFLIGHT_DEGRADED` per Step 0 and continue with zero findings from this audit):
+
+```bash
+# Window: last 14 days. Adjust via meta_optimize.coderabbit_finder.window_days in
+# hive.config.yaml when present; default 14.
+since=$(date -u -v-14d '+%Y-%m-%d' 2>/dev/null || date -u -d '14 days ago' '+%Y-%m-%d')
+gh pr list --state merged --search "merged:>=${since}" \
+  --limit 100 \
+  --json number,title,mergedAt \
+  --jq '.[] | .number' \
+  > /tmp/recent_prs.txt
+
+for n in $(cat /tmp/recent_prs.txt); do
+  gh api "repos/${OWNER}/${REPO}/pulls/${n}/comments" \
+    --jq "[.[] | {user: {login: .user.login}, body: .body, id: .id}]" \
+    > "/tmp/cr_${n}.json"
+done
+```
+
+Then invoke the helper:
+
+```js
+import { findRecurringCoderabbitComments } from 'hive/workflows/steps/meta-team-cycle/coderabbit-finder.mjs';
+
+const pullRequests = recentPrNumbers.map((n) => ({
+  number: n,
+  comments: JSON.parse(readFileSync(`/tmp/cr_${n}.json`, 'utf8')),
+}));
+const crFindings = findRecurringCoderabbitComments(pullRequests, {
+  minRecurrence: 3,
+  windowDays: 14,
+});
+```
+
+Each emitted finding uses the standard step-02 finding shape with
+`category: CODERABBIT_RECURRING` and `location: cross-repo` (the finding spans multiple PRs, not a single file). Severity is `medium` for 3-4 recurring PRs and `high` for 5+. Append these findings to the same list emitted by audits 1-6 above; the AND-of-empty routing gate treats them as ordinary signal.
+
+`coderabbit-finder.mjs` is pure — no fetch, no shell. Tests live at `hive/workflows/steps/meta-team-cycle/__tests__/coderabbit-finder.test.mjs` and cover the title-extraction regex, author filtering (only `coderabbitai*` logins), tally semantics (duplicate comments in the same PR count once toward distinct-PR recurrence), and the threshold gate.
+
 ### 7. Compile findings
 For each finding, record:
 ```yaml
 id: finding-{N}
-category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | OTHER
+category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | CODERABBIT_RECURRING | OTHER
 severity: critical | high | medium | low
-location: {file path}
+location: {file path | cross-repo}
 description: {one-line description}
 evidence: {specific field, line, or pattern that demonstrates the issue}
 ```
