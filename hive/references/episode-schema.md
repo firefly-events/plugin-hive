@@ -121,7 +121,12 @@ complete.
 
 ## cc-workflows-run.yaml — `field_sources.agent_models` map
 
-`cc-workflows-run.yaml` markers (emitted by `execute-mode-cc-workflows` and `plan-mode-cc-workflows`) carry an optional but strongly recommended `field_sources.agent_models` section that records the resolved model tier for every agent dispatched in the run. This enables post-run audit tooling to verify every agent ran at the intended tier rather than inheriting the parent session model.
+`cc-workflows-run.yaml` markers (emitted by `execute-mode-cc-workflows` and `plan-mode-cc-workflows`) carry a **required** `field_sources.agent_models` section that records the resolved model tier for every agent dispatched in the run. This enables post-run audit tooling to verify every agent ran at the intended tier rather than inheriting the parent session model.
+
+Requirement level (must match the skill specs and the `substrate_coverage.cc_workflows_model_tier_resolved_per_agent` target of `1.0`):
+
+- **REQUIRED** for every `cc-workflows-run.yaml` marker emitted by either mode skill. One entry per dispatched agent. Omitting an entry is a coverage-metric failure.
+- **N/A** when no agents are dispatched (zero-agent runs — e.g. a precondition-only dry run that exits before `phase()` is called). In that case the section may be absent or set to `{}`; mark such runs with a `notes:` line explaining the zero-dispatch.
 
 ### Shape
 

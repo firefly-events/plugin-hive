@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "lint:cc-workflows": "node ../scripts/lint-cc-workflows-no-codex.mjs",
-    "test": "npm run lint:cc-workflows && npx vitest run --reporter=verbose --root .. test/mode-resolver.test.mjs test/cc-workflows-preconditions.test.mjs scripts/test/lint-cc-workflows-no-codex.test.mjs"
+    "test": "npm run lint:cc-workflows && npx vitest run --reporter=verbose --root .. test/mode-resolver.test.mjs test/cc-workflows-preconditions.test.mjs __tests__/cc-workflows-model-tier.test.mjs ../scripts/test/lint-cc-workflows-no-codex.test.mjs"
   },
   "engines": {
     "node": ">=20"
