@@ -40,7 +40,7 @@ emit a structured `precondition_failed` error with `field_sources` and return co
 
 Called once per `/design` invocation when `mode_decision == cc-workflows` was returned by
 `design-dispatch` (d-2). The trigger is either `HIVE_DESIGN_MODE=cc-workflows` or root
-`hive.config.yaml` with `execution.design_mode: cc-workflows`.
+`hive.config.yaml` with `execution.mode: cc-workflows`.
 
 **Inputs:**
 - `arguments` — forwarded verbatim from d-2 (brief + flags).
@@ -93,7 +93,7 @@ assertWorktreeIsolation(); // throws precondition_failed if cwd is not a worktre
 ```
 
 Resolve runtime and tooling: verify CC runtime `>= 2.1.154`; read `claude --version` when
-available; otherwise rely on Workflow tool presence as proxy. Verify `execution.design_mode`
+available; otherwise rely on Workflow tool presence as proxy. Verify `execution.mode`
 resolves to `"cc-workflows"` OR `HIVE_DESIGN_MODE=cc-workflows` is set. Confirm
 `include_constraints`, `design_context`, and `epic_handle` are present.
 
@@ -101,7 +101,7 @@ Runtime field resolution must preserve source attribution:
 
 ```yaml
 field_sources:
-  execution.design_mode:
+  execution.mode:
     source: root config | shipped baseline | env | default
     value: cc-workflows
   HIVE_DESIGN_MODE:
@@ -353,7 +353,7 @@ absent entirely).
 
 ```yaml
 execution:
-  design_mode: cc-workflows
+  mode: cc-workflows
 paths:
   state_dir: .pHive
 ```
@@ -366,7 +366,7 @@ HIVE_DESIGN_MODE=cc-workflows
 
 | Setting | Value |
 |---|---|
-| `execution.design_mode` | `"cc-workflows"` |
+| `execution.mode` | `"cc-workflows"` |
 | `HIVE_DESIGN_MODE` | `cc-workflows` |
 | `HIVE_STATE_DIR` | `hive_config.paths.state_dir \|\| ".pHive"` |
 | Minimum CC runtime version | `2.1.154` |

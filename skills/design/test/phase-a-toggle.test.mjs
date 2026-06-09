@@ -100,8 +100,8 @@ describe('AC Subsection 2 — Pattern B toggle semantics', () => {
   });
 
   it('ui-designer is dispatched ONCE even when toggle ON', () => {
-    // Must contain an explicit "ONCE" qualifier for ui-designer dispatch
-    expect(content).toMatch(/dispatched\s+\*{0,2}exactly once\*{0,2}|dispatched \*{0,2}ONCE\*{0,2}|ONCE/);
+    // Must contain an explicit "ONCE" qualifier within 120 chars of "ui-designer"
+    expect(content).toMatch(/ui-designer[\s\S]{0,120}(dispatched\s+\*{0,2}exactly once\*{0,2}|dispatched\s+\*{0,2}ONCE\*{0,2})/i);
   });
 
   it('toggle ON: constraints baked into the ui-designer prompt', () => {

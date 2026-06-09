@@ -48,7 +48,7 @@ test_results:
     baseline_post_slice_5: 273
     after_d_1: 296                        # +23 d-1 phase-a-toggle 3 describe blocks
     after_d_3: 350                        # +54 d-3 resolver 12 describe blocks
-    after_d_4: 414                        # +49 d-4 resolver 14 describe blocks (with +18 from d-3 plus new)
+    after_d_4: 414                        # +64 d-4 resolver 14 describe blocks
     after_d_5: 430                        # +16 d-5 payload-shape 5 describe blocks
   s3_no_codex_lint:
     baseline_pre_slice_3: 4 atoms in scope (plan, execute, test, review-mode-cc-workflows)

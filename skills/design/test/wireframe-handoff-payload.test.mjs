@@ -47,7 +47,8 @@ describe('Payload contract — 3 minimum fields', () => {
   });
 
   it('PNG + .f0 noted as always present', () => {
-    expect(content).toMatch(/always present/i);
+    expect(content).toMatch(/wireframe\.png[^\n]*always present/i);
+    expect(content).toMatch(/wireframe\.f0[^\n]*always present/i);
   });
 
   it('constraints.md noted as toggle-conditional (present when --include-constraints)', () => {

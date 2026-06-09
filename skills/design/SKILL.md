@@ -158,9 +158,10 @@ briefs:
     source: "standalone | plan-delegated"
     created_at: "{ISO 8601 timestamp}"
     # When --include-constraints was set:
+    constraints_bundle_path: ".pHive/design/<topic>/constraints.md"
     constraint_doc_path: ".pHive/design/<topic>/accessibility-constraints.md"
     animations_constraint_doc_path: ".pHive/design/<topic>/animations-constraints.md"
-    # When --include-constraints was NOT set, omit constraint_doc_path and animations_constraint_doc_path
+    # When --include-constraints was NOT set, omit constraints_bundle_path, constraint_doc_path, and animations_constraint_doc_path
 ```
 
 This shape is what `/design-review` expects (see [`skills/design-review/SKILL.md`](../design-review/SKILL.md) "Collect artifacts" — it reads `.pHive/design/index.yaml` `brief_path` and `export_paths`). When delegated from `/plan`, also include a `linked_story` field if a story ID is in scope; otherwise the entry is topic-keyed and self-contained.

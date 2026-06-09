@@ -564,5 +564,10 @@ function extractCodeBlocks(content) {
       blockLines.push(line);
     }
   }
+  // If file ends with an unclosed code fence, include the accumulated lines
+  // so doc-grep tests scanning for forbidden patterns don't silently miss them.
+  if (inBlock && blockLines.length > 0) {
+    blocks.push(blockLines.join('\n'));
+  }
   return blocks;
 }

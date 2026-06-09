@@ -27,7 +27,7 @@ The resolver is intentionally thin and mirrors `/execute`, `/plan`, and
 `/design-review`:
 
 - `HIVE_REVIEW_MODE=multica` selects this skill with source `env`.
-- root `hive.config.yaml` with `execution.mode: multica` selects this skill with
+- root `hive.config.yaml` with `review.mode: multica` selects this skill with
   source `config` when the environment variable is unset.
 - Any other value is ignored by this mode and falls through to the inline path.
 - Env wins over config per 5-tier precedence.

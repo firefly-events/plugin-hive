@@ -102,7 +102,7 @@ function parseMainMatrixRows() {
       .split('|')
       .slice(1, -1)
       .map((c) => c.trim());
-    if (cells.length >= 4) {
+    if (cells.length === 4) {
       rows.push({
         orchestrator: cells[0],
         default: cells[1],
@@ -154,9 +154,8 @@ describe('dispatch-parity matrix structure', () => {
     const matrixSection = matrixContent.match(/## Matrix[\s\S]*?(?=## |$)/)?.[0] ?? '';
     const headerLine = matrixSection.split('\n').find((l) => l.startsWith('|') && l.includes('default'));
     expect(headerLine).toBeDefined();
-    for (const col of SUBSTRATE_COLS) {
-      expect(headerLine).toContain(col);
-    }
+    const headerCells = headerLine.split('|').slice(1, -1).map((c) => c.trim());
+    expect(headerCells).toEqual(['Orchestrator', ...SUBSTRATE_COLS]);
   });
 
   it('Future substrate footer is present with sandcastle + gh-actions-legacy columns', () => {
