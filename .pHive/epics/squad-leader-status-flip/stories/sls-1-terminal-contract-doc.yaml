@@ -1,0 +1,84 @@
+id: sls-1-terminal-contract-doc
+epic: squad-leader-status-flip
+title: Author the squad-leader terminal contract reference doc
+status: pending
+complexity: low
+methodology: tdd
+depends_on: []
+
+description: |
+  Create hive/references/squad-leader-terminal-contract.md — the canonical
+  definition of how a Multica squad-leader run must terminate. This is the
+  source of truth that sls-2 applies to the live squad.instructions and that
+  sls-3's sweep enforces as a backstop.
+
+  Contract content (from design-discussion §2):
+  1. Children-terminal check: all delegated child issues must be terminal
+     before the leader closes out. "Terminal for delegation" = done, cancelled,
+     or in_review-with-output-consumed (members routinely stop at in_review;
+     the leader consuming their artifact counts as terminal).
+  2. Final summary comment: leader posts child id + member + status (+ per-task
+     outcome) on its own parent issue. Existing convention, now binding.
+  3. Self status flip: leader runs
+     `multica issue update <own-issue-uuid> --status done` as its LAST action.
+     The leader's own issue UUID is always available in its task context.
+  4. Blocked path: if children are stuck, post a BLOCKED comment and leave
+     status in_progress (stale-by-intent; the sweep surfaces it).
+
+  Also record Fork C (upstream Multica auto-complete: parent auto-completes
+  when squad-assigned and all children terminal) as a Deferred Upstream Ask
+  section so the upstream issue is ready to file.
+
+  Scope guard: do NOT amend skills/hive/skills/plan-mode-multica/SKILL.md —
+  that skill's per-persona carrier decision is out of scope (design §5).
+
+acceptance_criteria:
+  - "Given hive/references/squad-leader-terminal-contract.md exists, when read, then it defines all four protocol steps (children-terminal, summary comment, self flip, blocked path) with the exact CLI command for step 3"
+  - "Given the doc, when grepped for 'in_review', then the terminal-for-delegation semantics are explicitly defined"
+  - "Given the doc, when read, then a Deferred Upstream Ask section records the Fork C semantics"
+  - "Given skills/hive/skills/plan-mode-multica/SKILL.md, when diffed, then it is unchanged by this story"
+
+steps:
+  - id: implement
+    description: Author the contract doc per the description (research step skipped — research-brief.md already covers it; doc story, test-spec step not applicable)
+    agent: developer
+  - id: review
+    description: Review doc for protocol completeness and consistency with design-discussion §2
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit to feat/squad-leader-status-flip
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  key_files:
+    - path: .pHive/epics/squad-leader-status-flip/docs/design-discussion.md
+      purpose: Protocol definition source (§2) and in_review semantics (§5)
+    - path: hive/references/multica-squads-schema.md
+      purpose: Existing squads reference this doc sits alongside
+    - path: .pHive/proposals/squad-doctrine-and-dynamic-composition.md
+      purpose: Deferred doctrine layer this contract will eventually fold into
+
+cross_cutting:
+  - concern: documentation
+    action: "The story IS the documentation artifact; cross-link from hive/references/multica-squads-schema.md (one-line pointer)"
+  - concern: versioning
+    action: "New reference doc is consumer-visible plugin surface — counted in epic-level version_bump decision (operator gate)"
+
+metric:
+  applies: false
+  justification: "Process-substrate reference doc; whether the protocol works is measured by sls-2 (live-squad echo + stale-parent count) and sls-3 (sweep findings), not by this document's existence."
+
+risks:
+  - severity: low
+    description: Contract drifts from what squad.instructions actually says
+    mitigation: sls-2 acceptance pins instructions content to this doc verbatim-section
+
+references:
+  - path: .pHive/triage/queue.yaml
+    relevant_excerpt: |
+      t-001: squad-leader parent issues never auto-flip from in_progress to done;
+      leader runs once, delegates via child issues, exits terminal; no code path
+      flips the parent when children all terminate.
