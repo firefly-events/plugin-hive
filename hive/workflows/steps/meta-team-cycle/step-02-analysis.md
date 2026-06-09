@@ -267,14 +267,56 @@ const triageFindings = findStuckTriageItems(queue, {
 Each finding uses the standard step-02 shape with `category: STUCK_TRIAGE_ITEM` and `location: triage:<id>`. Severity mapping: critical-tier (past the state's `criticalDays`) → `high`; medium-tier (past `staleDays`) → `medium`. Append to the standard findings list.
 
 `triage-aging-finder.mjs` is pure — no fs, no fetch, no `Date.now()`. Tests live at `hive/workflows/steps/meta-team-cycle/__tests__/triage-aging-finder.test.mjs` (17 cases): anchor resolution (state_history vs reported_at fallback), per-state threshold boundaries (inbox/clarified/prioritized 7/14d, plan-ready 14/30d), closed-item filtering, unknown-state safety, malformed-queue tolerance, finding shape, sort order.
+### 6e. Feedback-memory recents audit
+
+Every freshly-written `feedback_*.md` memory file under
+`~/.claude/projects/<project>/memory/` is a captured friction point — the
+user explicitly asked the assistant to remember it because something
+surprised them or didn't go to plan. If the meta-team picks those up the
+next morning, the loop closes: today's friction becomes tomorrow's queued
+meta-team candidate. The single strongest signal in this finder is recency:
+a feedback file modified in the last 24h is gold; 2-7 days is still
+actionable; older is queue noise.
+
+Implementation module: `hive/workflows/steps/meta-team-cycle/feedback-memory-finder.mjs`. Pure-function over file-system records — the caller walks the directory and passes results in.
+
+Gather data (the maintainer's auto-memory dir is project-specific; resolve via `paths.auto_memory_dir` in `hive.config.yaml` if set, otherwise fall back to `~/.claude/projects/<derived-slug>/memory/`):
+
+```bash
+DIR="${HIVE_AUTO_MEMORY_DIR:-$HOME/.claude/projects/-Users-don-Documents-plugin-hive/memory}"
+if [ -d "$DIR" ]; then
+  find "$DIR" -maxdepth 1 -name "feedback_*.md" -type f \
+    -newermt "$(date -u -v-7d '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -d '7 days ago' '+%Y-%m-%dT%H:%M:%SZ')" \
+    -exec stat -f '%N|%Sm' -t '%Y-%m-%dT%H:%M:%SZ' {} \; \
+    > /tmp/feedback_recents.txt
+fi
+```
+
+Parse, read frontmatter from each file, and pass as records:
+
+```js
+import { findRecentFeedbackMemories } from 'hive/workflows/steps/meta-team-cycle/feedback-memory-finder.mjs';
+
+// records: [{ path, mtimeIso, frontmatter }, ...]
+const findings = findRecentFeedbackMemories(records, {
+  nowIso: process.env.HIVE_CYCLE_NOW_ISO,
+  windowDays: 7,
+  veryFreshDays: 1,
+});
+```
+
+Each finding uses the standard step-02 shape with
+`category: RECENT_FEEDBACK_MEMORY` and `location: memory:<slug>`. Severity mapping: very-fresh (≤24h) → `high`; fresh (1d < age ≤ 7d) → `medium`. Append to the standard findings list.
+
+`feedback-memory-finder.mjs` is pure — no fs, no `Date.now()`. Tests live at `hive/workflows/steps/meta-team-cycle/__tests__/feedback-memory-finder.test.mjs` (18 cases): feedback-prefix filter, mtime window boundaries (1d / 7d each direction), custom-windowDays overrides, future-mtime guard, finding shape, frontmatter fallback to filename slug, description truncation.
 
 ### 7. Compile findings
 For each finding, record:
 ```yaml
 id: finding-{N}
-category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | CODERABBIT_RECURRING | STALE_OPEN_PR | STUCK_TRIAGE_ITEM | OTHER
+category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | CODERABBIT_RECURRING | STALE_OPEN_PR | STUCK_TRIAGE_ITEM | RECENT_FEEDBACK_MEMORY | OTHER
 severity: critical | high | medium | low
-location: {file path | cross-repo | branch:<ref> | pr:<n> | triage:<id>}
+location: {file path | cross-repo | branch:<ref> | pr:<n> | triage:<id> | memory:<slug>}
 description: {one-line description}
 evidence: {specific field, line, or pattern that demonstrates the issue}
 ```
