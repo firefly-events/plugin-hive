@@ -92,6 +92,31 @@ operator attention rather than auto-repairing it.
   with `--apply` (Fork B, lite form). The sweep re-checks the
   children-terminal invariant before any `--apply` flip.
 
+## Applying to a squad
+
+The live carrier is the squad's `instructions` field; this file is the canonical
+text. The applied copy is **this entire file**, so the instructions always match
+the doc — re-apply after any squad reconfig that loses them.
+
+**Acknowledgment marker:** `TERMINAL-ACK::squad-leader-terminal-contract::v1`
+When a probe brief asks the leader to prove it has read this contract, the
+leader echoes that marker line verbatim in its final summary comment.
+
+**Re-apply command** (append-safe — preserves any existing instructions):
+
+```sh
+SQUAD_ID=50d408e4-f92f-46b1-95c1-844de157f181  # planning-team-squad
+EXISTING="$(multica squad get "$SQUAD_ID" --output json | jq -r '.instructions')"
+multica squad update "$SQUAD_ID" \
+  --instructions "${EXISTING:+$EXISTING
+
+}$(cat hive/references/squad-leader-terminal-contract.md)"
+```
+
+If the contract section is already present in the instructions (search for
+`TERMINAL-ACK::squad-leader-terminal-contract`), replace that section rather
+than appending a duplicate copy.
+
 ## Deferred Upstream Ask (Fork C)
 
 **Desired upstream Multica semantics — not implemented in this epic; recorded
