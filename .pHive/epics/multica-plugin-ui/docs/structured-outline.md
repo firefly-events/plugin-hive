@@ -779,10 +779,10 @@ Each defaults to the recommendation unless you override. **★ = worth a real lo
 
 1. **Frontend package name/location** — Default: `@multica/hive` in `packages/hive` (matches the `@multica/*` convention). Override for `@firefly-events/hive` or `apps/hive`. *Lock before Phase 1 — rename is codebase-wide.*
 2. **Backend package location** — Default: `server/internal/hive` (Go internal convention). Override for a top-level `hive` package.
-3. ★ **Sidebar strategy** — Default: one parent "Hive" entry with sub-nav for the four views + skills (keeps the sidebar from growing by five). Override for separate top-level entries per view.
-4. ★ **HermesChat refresh** — Default: polling/manual refresh for v1 (simple, sufficient). Override for `/ws` realtime (adds backend event-publish + frontend connection management).
-5. ★ **Hive migration execution** — Default: auto-run at server startup, failure surfaced at readiness. Override to verify-only (separate `hive migrate` command) if prod policy requires explicit, audited migrations.
-6. ★ **ReviewGate update permissions** — Default: workspace-membership only for v1; build `WorkspaceAuthorizer` so role-gating can be added later without rework. Override to require a `reviewer` role / `can_update_gates` now.
+3. ★ **Sidebar strategy** — **RESOLVED (2026-06-09): separate top-level entries** per view (EpicTree, ReviewGates, Queue, Chat, Skills). Phases 2-5 each add one top-level sidebar item. *(Override of the one-parent default.)*
+4. ★ **HermesChat refresh** — **RESOLVED (2026-06-09): `/ws` realtime.** Phase 4 integrates Multica's existing WebSocket — backend event-publish + frontend connection management — not polling. *(Override of the polling default; expands Phase 4 scope.)*
+5. ★ **Hive migration execution** — **RESOLVED (2026-06-09): auto-run at server startup**, failure surfaced at readiness. *(Recommended default accepted.)*
+6. ★ **ReviewGate update permissions** — **RESOLVED (2026-06-09): workspace-membership only** for v1; `WorkspaceAuthorizer` built so role-gating can be added later without rework. *(Recommended default accepted.)*
 7. **PersonalQueue visibility** — Default: current-user-only (simplest, safest). Override for admin/delegated visibility (needs extra schema + authz; can't retrofit without a migration).
 8. **EpicTree canonical route** — Default: `/hive/epics` canonical, `/hive` redirects. Override to collapse to one.
 9. **Skill materialization collision** — Default: 409 Conflict, caller chooses an explicit action. Override to support silent overwrite/customize flags.
@@ -790,4 +790,8 @@ Each defaults to the recommendation unless you override. **★ = worth a real lo
 11. **Provenance fields** — Default: `catalogKey`, `catalogVersion`, `state`, plus `materializedBy`. Override to add `lastCheckedAt` / `originalName`.
 12. **Catalog UI route** — Default: reuse the existing Multica Skills page for v1; defer a dedicated `/hive/skills` view. Override to build the dedicated catalog UI in Phase 5.
 
-**Net:** affirm 8a as a group, accept the 8b defaults, and weigh in only on the four ★ items (sidebar, chat refresh, migration execution, gate permissions) if you'd choose differently.
+**Sign-off status (2026-06-09):** §8a locked decisions affirmed as a group; all four ★ open decisions resolved (two overrides, two defaults). Items 1-2, 7-12 stand at their recommended defaults.
+
+**Override implications carried into the phases:**
+- **Separate sidebar entries** (item 3) — Phases 2-5 each add one top-level nav entry rather than sub-nav under a single Hive parent. The "sidebar grows by five" path in the Phase 2-5 Changes sections applies. Watch the *"sidebar clutter"* Risk Registry item — five top-level entries is the accepted trade-off.
+- **`/ws` realtime chat** (item 4) — Phase 4 HermesChat now includes WebSocket integration over Multica's existing `/ws`: backend event publishing on message create + frontend connection management. This adds scope and a risk surface to Phase 4; reuse `/ws` carefully — do **not** stand up a second WebSocket or auth stack (see the auth/WS inheritance design).
