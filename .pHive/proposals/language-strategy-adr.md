@@ -193,3 +193,29 @@ These questions cannot be resolved from the codebase alone. They are the sign-of
 5. **Lockfile/dependency policy:** Where should the root `package.json` and lockfile live, and who owns the npm dependency audit? Should per-adapter `package.json` files consolidate into the root?
 
 6. **Charter document location:** Should the architecture charter live in `CLAUDE.md` (extending the current routing rules), in a new `ARCHITECTURE.md`, or in `.pHive/CONTEXT.md` (extending the existing glossary)?
+
+---
+
+## 9. Recorded exceptions
+
+### 2026-06-09 — meta-team-cycle finder modules (PR #272)
+
+Five new Node modules under `hive/workflows/steps/meta-team-cycle/` are
+approved as a recorded charter exception:
+
+- `coderabbit-finder.mjs`
+- `stale-pr-finder.mjs`
+- `triage-aging-finder.mjs`
+- `feedback-memory-finder.mjs`
+- `failure-tail-finder.mjs`
+
+**Rationale:** Pure, clock-injected classification functions co-located with
+the existing `external-research-providers.mjs` / `signal-weights.mjs` step
+helpers and their `node:test` suites; a same-language test harness was
+shipping in the same maintainer-assembled rollup (PR #272, 8-PR pipeline
+revival), and splitting the runtime mid-rollup would have stalled the
+nightly-fix.
+
+**Disposition:** Bridged-tactical, not precedent. These finders are
+Python-port candidates the next time the meta-team-cycle step-02 surface is
+reworked; new finders added to this directory default to Python per charter.
