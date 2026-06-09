@@ -3,8 +3,8 @@ agents:
   # Creators — provider: codex (W0.1 verdict: supported)
   - name: developer
     description: General-purpose code implementation. Deprecated — prefer backend-developer or frontend-developer.
-    provider: codex
-    model: ""
+    provider: claude
+    model: "claude-fable-5"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/developer.md
     custom_env: {}
@@ -15,8 +15,8 @@ agents:
 
   - name: backend-developer
     description: Implements APIs, services, database logic, and other server-side code.
-    provider: codex
-    model: ""
+    provider: claude
+    model: "claude-sonnet-4-6"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/backend-developer.md
     custom_env: {}
@@ -27,8 +27,8 @@ agents:
 
   - name: frontend-developer
     description: Implements UI components, screens, styles, and client-side logic.
-    provider: codex
-    model: ""
+    provider: claude
+    model: "claude-sonnet-4-6"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/frontend-developer.md
     custom_env: {}
@@ -39,8 +39,8 @@ agents:
 
   - name: researcher
     description: Gathers research data from the codebase and external sources to inform planning.
-    provider: codex
-    model: ""
+    provider: claude
+    model: "claude-sonnet-4-6"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/researcher.md
     custom_env: {}
@@ -51,8 +51,8 @@ agents:
 
   - name: architect
     description: Designs technical solutions and evaluates technology choices, with rationale for each decision.
-    provider: codex
-    model: ""
+    provider: claude
+    model: "claude-fable-5"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/architect.md
     custom_env: {}
@@ -63,8 +63,8 @@ agents:
 
   - name: technical-writer
     description: Transforms raw material into structured documentation, references, and guides.
-    provider: codex
-    model: ""
+    provider: claude
+    model: "claude-sonnet-4-6"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/technical-writer.md
     custom_env: {}
@@ -76,8 +76,8 @@ agents:
   # Verifiers — provider: claude, model: claude-opus-4-7
   - name: reviewer
     description: Independent fresh-context code reviewer; evaluates diffs for correctness and risk.
-    provider: claude
-    model: claude-opus-4-7
+    provider: codex
+    model: "gpt-5.4"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/reviewer.md
     custom_env:
@@ -90,7 +90,7 @@ agents:
   - name: peer-validator
     description: Cross-story validator for consistency, convention compliance, and integration risk.
     provider: claude
-    model: claude-opus-4-7
+    model: "claude-fable-5"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/peer-validator.md
     custom_env:
@@ -103,7 +103,7 @@ agents:
   - name: tester
     description: Writes and runs test suites against story specs and acceptance criteria.
     provider: claude
-    model: claude-opus-4-7
+    model: "claude-fable-5"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/tester.md
     custom_env:
@@ -116,7 +116,7 @@ agents:
   - name: tpm
     description: Technical program manager; sequences cross-system work and owns horizontal/vertical planning.
     provider: claude
-    model: claude-opus-4-7
+    model: "claude-fable-5"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/tpm.md
     custom_env:
