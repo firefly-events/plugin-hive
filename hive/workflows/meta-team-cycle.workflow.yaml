@@ -95,23 +95,63 @@ steps:
       - name: external_candidates_count
         type: json
 
+  - id: kg-signal
+    agent: researcher
+    # ADDITIVE-ONLY CONTRACT: this step always emits a `kg_findings` list
+    # (empty list when ~/.claude/hive/kg.sqlite is absent, locked, or the
+    # three-layer relevance filter discards every row). See
+    # `step-02c-kg-signal.md` §Failure modes for the guaranteed-output
+    # contract. Like external-research, downstream steps never block on
+    # its failure — they just see an empty list and continue.
+    task: >
+      Mine the L2 Knowledge Graph (~/.claude/hive/kg.sqlite) for failure,
+      blocker, and supersession triples, apply the three-layer relevance
+      filter (predicate / recency / project-tag), and emit a kg_findings list
+      shaped for direct merge into step-03's eligible-findings pool.
+    step_file: hive/workflows/steps/meta-team-cycle/step-02c-kg-signal.md
+    depends_on:
+      - analysis
+    inputs:
+      - name: cycle_id
+        source: step_output
+        step_id: boot
+        output_name: cycle_id
+      - name: findings
+        source: step_output
+        step_id: analysis
+        output_name: findings
+    outputs:
+      - name: kg_findings
+        type: json
+      - name: kg_signal_summary
+        type: string
+      # hde-3b: count companion of kg_findings so the routing predicate can
+      # bind by name (strict-Archon grammar has no len(...)).
+      # kg_findings_count MUST equal len(kg_findings). Type `json` is the
+      # graph-validator container — runtime value is an int.
+      - name: kg_findings_count
+        type: json
+
   - id: proposal
     agent: architect
     task: >
-      Review analysis findings and external research candidates, then produce a
-      ranked proposal list. Each proposal includes rationale, risk level, and
-      an implementation plan within charter constraints.
+      Review analysis findings, external research candidates, and KG-signal
+      findings, then produce a ranked proposal list. Each proposal includes
+      rationale, risk level, and an implementation plan within charter
+      constraints.
     step_file: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
     depends_on:
       - analysis
       - external-research
-    # hde-3b routing predicate: step-03 runs when ANY of the three
-    # actionable signals is non-empty. Mirrors the canonical AND-of-empty
-    # rule documented in maintainer-skills/meta-meta-optimize/SKILL.md
-    # and locked by tests/meta_meta/test_routing_findings.py. Strict-Archon
-    # grammar (no parens) — left-associative `||`. See
-    # hive/references/predicate-grammar.md.
-    when: "$analysis.output.findings_count > 0 || $analysis.output.metric_signal == true || $external-research.output.external_candidates_count > 0"
+      - kg-signal
+    # hde-3b routing predicate: step-03 runs when ANY of the FOUR actionable
+    # signals is non-empty. Mirrors the canonical AND-of-empty rule
+    # documented in maintainer-skills/meta-meta-optimize/SKILL.md and locked
+    # by tests/meta_meta/test_routing_findings.py. Strict-Archon grammar
+    # (no parens) — left-associative `||`. See
+    # hive/references/predicate-grammar.md. `kg_findings_count` joined the
+    # signal set when step-02c was wired into the workflow.
+    when: "$analysis.output.findings_count > 0 || $analysis.output.metric_signal == true || $external-research.output.external_candidates_count > 0 || $kg-signal.output.kg_findings_count > 0"
     inputs:
       - name: findings
         source: step_output
@@ -121,6 +161,10 @@ steps:
         source: step_output
         step_id: external-research
         output_name: external_research_candidates
+      - name: kg_findings
+        source: step_output
+        step_id: kg-signal
+        output_name: kg_findings
     outputs:
       - name: approved_proposals
         type: json
@@ -129,21 +173,24 @@ steps:
 
   - id: backlog-fallback
     agent: orchestrator
-    # hde-3b routing predicate: step-03b runs ONLY when ALL three signals
-    # are empty — the inverse of the step-03 `when:` predicate. The
-    # strict-Archon grammar evaluates left-to-right; the conjunction form
-    # below is the De Morgan complement of step-03's disjunction.
-    when: "$analysis.output.findings_count == 0 && $analysis.output.metric_signal == false && $external-research.output.external_candidates_count == 0"
+    # hde-3b routing predicate: step-03b runs ONLY when ALL FOUR signals are
+    # empty — the inverse of the step-03 `when:` predicate. The strict-Archon
+    # grammar evaluates left-to-right; the conjunction form below is the De
+    # Morgan complement of step-03's disjunction. `kg_findings_count == 0`
+    # joined the gate when step-02c was wired into the workflow.
+    when: "$analysis.output.findings_count == 0 && $analysis.output.metric_signal == false && $external-research.output.external_candidates_count == 0 && $kg-signal.output.kg_findings_count == 0"
     task: >
       Backlog fallback: run only when analysis produced zero findings,
-      external research produced zero candidates, AND no perf-baseline
-      metric signal is present. Loads `.pHive/meta-team/queue-meta-meta-optimize.yaml`,
-      reports which pending entry would be selected, and ends the cycle
-      without side effects (S8 dry-run gate).
+      external research produced zero candidates, KG-signal produced zero
+      findings, AND no perf-baseline metric signal is present. Loads
+      `.pHive/meta-team/queue-meta-meta-optimize.yaml`, reports which pending
+      entry would be selected, and ends the cycle without side effects (S8
+      dry-run gate).
     step_file: hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md
     depends_on:
       - analysis
       - external-research
+      - kg-signal
     inputs:
       - name: cycle_id
         source: step_output
@@ -157,6 +204,10 @@ steps:
         source: step_output
         step_id: external-research
         output_name: external_research_candidates
+      - name: kg_findings
+        source: step_output
+        step_id: kg-signal
+        output_name: kg_findings
     outputs:
       - name: backlog_dry_run_report
         type: json

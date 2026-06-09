@@ -40,16 +40,16 @@ class Step03bRoutingGateTests(unittest.TestCase):
             "## EXECUTION PROTOCOLS",
         )
 
-    def test_routes_to_03b_only_when_all_three_empty(self) -> None:
-        # ZERO findings AND ZERO external candidates AND no metric signal
+    def test_routes_to_03b_only_when_all_four_empty(self) -> None:
+        # ZERO findings AND ZERO external candidates AND ZERO kg_findings AND no metric signal
         self.assertRegex(
             self.mandatory,
-            r"ZERO\s+findings.*ZERO\s+external_research_candidates.*no metric signal",
+            r"ZERO\s+findings.*ZERO\s+external_research_candidates.*ZERO\s+kg_findings.*no metric signal",
         )
 
     def test_findings_force_step_03_route(self) -> None:
         self.assertIn(
-            "If ANY of the three actionable inputs exist, the cycle MUST route to step-03-proposal",
+            "If ANY of the four actionable inputs exist, the cycle MUST route to step-03-proposal",
             self.mandatory,
         )
 
@@ -76,6 +76,12 @@ class Step03bEligibilityCheckTests(unittest.TestCase):
             r"`external_research_candidates` is non-empty:\s*STOP and return to step-03-proposal",
         )
 
+    def test_kg_findings_nonempty_returns_to_step_03(self) -> None:
+        self.assertRegex(
+            self.text,
+            r"`kg_findings` is non-empty:\s*STOP and return to step-03-proposal",
+        )
+
     def test_metric_signal_present_returns_to_step_03(self) -> None:
         self.assertRegex(
             self.text,
@@ -96,14 +102,15 @@ class MaintainerSkillRoutingTests(unittest.TestCase):
         self.text = MAINTAINER_SKILL.read_text(encoding="utf-8")
         self.section = _section(self.text, "### Step 3 Proposal", "### Step 4 Implementation")
 
-    def test_step_03_runs_on_findings_or_external_or_metric(self) -> None:
+    def test_step_03_runs_on_findings_or_external_or_kg_or_metric(self) -> None:
         self.assertIn("`findings`", self.section)
         self.assertIn("`external_research_candidates`", self.section)
+        self.assertIn("`kg_findings`", self.section)
         self.assertIn("metric signal is present", self.section)
 
-    def test_step_03b_only_when_all_three_empty(self) -> None:
+    def test_step_03b_only_when_all_four_empty(self) -> None:
         self.assertIn(
-            "ONLY when ALL three are empty: zero findings AND zero external candidates AND no metric signal",
+            "ONLY when ALL FOUR are empty: zero findings AND zero external candidates AND zero KG findings AND no metric signal",
             self.section,
         )
 
