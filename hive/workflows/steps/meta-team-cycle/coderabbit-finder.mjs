@@ -120,7 +120,9 @@ export function tallyTitles(pullRequests) {
  * @param {Map} tally        — output of tallyTitles
  * @param {object} [opts]
  * @param {number} [opts.minRecurrence=3]  — distinct-PR threshold
- * @param {number} [opts.windowDays=14]    — captured in finding.evidence for context
+ * @param {number} [opts.windowDays=14]    — descriptive only: MUST mirror the gather
+ *   window used to fetch the PR list (the helper sees pre-fetched data and cannot
+ *   enforce it); recorded in finding.evidence and the description string
  * @returns {Array<object>}                — findings ready for step-02 emission
  */
 export function emitFindings(tally, opts = {}) {

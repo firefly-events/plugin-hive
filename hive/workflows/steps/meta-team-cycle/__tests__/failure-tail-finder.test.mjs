@@ -181,6 +181,13 @@ test('findStuckReworkIssues — fresh issues (<3d) filtered out', () => {
   assert.deepEqual(findStuckReworkIssues(issues, NOW), []);
 });
 
+test('findStuckReworkIssues — exactly stuckDays old NOT flagged (exclusive boundary, matches sibling finders)', () => {
+  const issues = [
+    makeIssue({ updatedAt: '2026-06-06T20:00:00Z' }), // exactly 3d before NOW
+  ];
+  assert.deepEqual(findStuckReworkIssues(issues, NOW), []);
+});
+
 test('findStuckReworkIssues — issue stuck 4d → medium', () => {
   const issues = [
     makeIssue({ updatedAt: '2026-06-05T00:00:00Z' }),

@@ -143,7 +143,9 @@ export function findStuckReworkIssues(issues, nowIso, opts = {}) {
     const anchor = issue.updatedAt ?? issue.createdAt;
     if (typeof anchor !== 'string') continue;
     const ageDays = daysBetween(anchor, nowIso);
-    if (ageDays == null || ageDays < stuckDays) continue;
+    // Exclusive boundary (age must EXCEED stuckDays) — matches the
+    // `<= staleDays` semantics in stale-pr-finder and triage-aging-finder.
+    if (ageDays == null || ageDays <= stuckDays) continue;
 
     const ageRounded = Math.floor(ageDays);
     findings.push({

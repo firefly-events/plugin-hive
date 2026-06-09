@@ -12,6 +12,31 @@
 'use strict';
 
 // ---------------------------------------------------------------------------
+// Watch-tier recency window
+// ---------------------------------------------------------------------------
+
+// Watch-tier candidates are keyword-misses kept only so step-03 has material
+// to rank. Without a recency bound the same stale items re-enter the pool on
+// every nightly cycle, making `external_candidates_count > 0` vacuously true
+// and starving step-03b. Actionable-tier candidates are exempt — they matched
+// a capability keyword and downstream ranking owns their fate.
+const WATCH_TIER_MAX_AGE_DAYS = 14;
+
+/**
+ * Returns true when `publishedIso` is no older than `maxAgeDays` relative to
+ * `nowIso`. Missing or unparseable dates return false — a watch-tier item
+ * whose recency cannot be established is discarded rather than recycled
+ * forever. Future-dated items pass (negative age).
+ */
+function isWithinWatchWindow(publishedIso, nowIso, maxAgeDays) {
+  if (!publishedIso) return false;
+  const published = Date.parse(publishedIso);
+  const now = Date.parse(nowIso);
+  if (Number.isNaN(published) || Number.isNaN(now)) return false;
+  return now - published <= maxAgeDays * 86_400_000;
+}
+
+// ---------------------------------------------------------------------------
 // Actionability filter keywords — heuristic for "Hive-relevant capability shift"
 // ---------------------------------------------------------------------------
 
@@ -138,12 +163,16 @@ const GH_RELEASES_URL = 'https://api.github.com/repos/anthropics/claude-code/rel
  * @param {Function} [opts.fetchFn]   - injectable fetch (default: globalThis.fetch)
  * @param {string}   [opts.apiUrl]    - override GH API URL (for tests)
  * @param {number}   [opts.perPage]   - releases per page (default 30, max 100)
+ * @param {string}   [opts.nowIso]    - injectable clock for the watch-tier window (default: wall clock)
+ * @param {number}   [opts.watchMaxAgeDays] - watch-tier recency window (default WATCH_TIER_MAX_AGE_DAYS)
  * @returns {Promise<{ candidates: object[], error: string|null }>}
  */
 export async function fetchClaudeCodeReleases(opts = {}) {
   const fetchFn = opts.fetchFn ?? globalThis.fetch;
   const apiUrl = opts.apiUrl ?? GH_RELEASES_URL;
   const perPage = opts.perPage ?? 30;
+  const nowIso = opts.nowIso ?? new Date().toISOString();
+  const watchMaxAgeDays = opts.watchMaxAgeDays ?? WATCH_TIER_MAX_AGE_DAYS;
 
   const url = `${apiUrl}?per_page=${perPage}`;
 
@@ -181,7 +210,14 @@ export async function fetchClaudeCodeReleases(opts = {}) {
 
   const candidates = releases
     .map((r) => ({ release: r, tier: classifyRelease(r) }))
-    .filter(({ tier }) => tier !== null)
+    .filter(({ release, tier }) =>
+      tier === 'actionable' ||
+      (tier === 'watch' &&
+        isWithinWatchWindow(
+          release.published_at || release.created_at,
+          nowIso,
+          watchMaxAgeDays,
+        )))
     .map(({ release, tier }) => releaseToCandidate(release, tier));
 
   return { candidates, error: null };
@@ -331,11 +367,15 @@ function blogItemToCandidate(item, index, tier) {
  * @param {object}   [opts]
  * @param {Function} [opts.fetchFn]  - injectable fetch (default: globalThis.fetch)
  * @param {string}   [opts.feedUrl] - override feed URL (for tests)
+ * @param {string}   [opts.nowIso]  - injectable clock for the watch-tier window (default: wall clock)
+ * @param {number}   [opts.watchMaxAgeDays] - watch-tier recency window (default WATCH_TIER_MAX_AGE_DAYS)
  * @returns {Promise<{ candidates: object[], error: string|null }>}
  */
 export async function fetchAnthropicBlog(opts = {}) {
   const fetchFn = opts.fetchFn ?? globalThis.fetch;
   const feedUrl = opts.feedUrl ?? ANTHROPIC_BLOG_FEED_URL;
+  const nowIso = opts.nowIso ?? new Date().toISOString();
+  const watchMaxAgeDays = opts.watchMaxAgeDays ?? WATCH_TIER_MAX_AGE_DAYS;
 
   let xml;
   try {
@@ -381,7 +421,10 @@ export async function fetchAnthropicBlog(opts = {}) {
 
   const candidates = items
     .map((item, i) => ({ item, index: i, tier: classifyBlogPost(item) }))
-    .filter(({ tier }) => tier !== null)
+    .filter(({ item, tier }) =>
+      tier === 'actionable' ||
+      (tier === 'watch' &&
+        isWithinWatchWindow(item.pubDate, nowIso, watchMaxAgeDays)))
     .map(({ item, index, tier }) => blogItemToCandidate(item, index, tier));
 
   return { candidates, error: null };
@@ -397,4 +440,6 @@ export {
   classifyBlogPost,
   blogItemToCandidate,
   ANTHROPIC_BLOG_FEED_URL,
+  isWithinWatchWindow,
+  WATCH_TIER_MAX_AGE_DAYS,
 };

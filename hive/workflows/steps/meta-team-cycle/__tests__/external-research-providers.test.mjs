@@ -13,6 +13,7 @@ import {
   classifyBlogPost,
   blogItemToCandidate,
   ANTHROPIC_BLOG_FEED_URL,
+  isWithinWatchWindow,
 } from '../external-research-providers.mjs';
 
 // ---------------------------------------------------------------------------
@@ -170,7 +171,8 @@ test('fetchClaudeCodeReleases — emits all non-empty releases with tiered signa
   });
 
   try {
-    const result = await fetchClaudeCodeReleases({ apiUrl: baseUrl });
+    // nowIso pinned 12d after BUGFIX_RELEASE so its watch tier is in-window.
+    const result = await fetchClaudeCodeReleases({ apiUrl: baseUrl, nowIso: '2025-06-01T12:00:00Z' });
     assert.equal(result.error, null);
     // All three releases have non-empty bodies → all emit as candidates now.
     // ACTIONABLE + AGENTS = 'actionable' tier; BUGFIX = 'watch' tier.
@@ -212,7 +214,65 @@ test('fetchClaudeCodeReleases — non-empty bugfix release now emits as watch ca
   });
 
   try {
-    const result = await fetchClaudeCodeReleases({ apiUrl: baseUrl });
+    const result = await fetchClaudeCodeReleases({ apiUrl: baseUrl, nowIso: '2025-06-01T12:00:00Z' });
+    assert.equal(result.error, null);
+    assert.equal(result.candidates.length, 1);
+    assert.equal(result.candidates[0].signal_tier, 'watch');
+  } finally {
+    await close();
+  }
+});
+
+test('fetchClaudeCodeReleases — stale watch release is dropped, stale actionable kept', async () => {
+  const { baseUrl, close } = await startMockServer((_req, res) => {
+    sendJson(res, 200, [ACTIONABLE_RELEASE, BUGFIX_RELEASE]);
+  });
+
+  try {
+    // 61d after BUGFIX_RELEASE — outside the 14d watch window. ACTIONABLE_RELEASE
+    // is also old but actionable tier is exempt from the recency window.
+    const result = await fetchClaudeCodeReleases({ apiUrl: baseUrl, nowIso: '2025-07-20T08:00:00Z' });
+    assert.equal(result.error, null);
+    assert.equal(result.candidates.length, 1);
+    assert.equal(result.candidates[0].signal_tier, 'actionable');
+  } finally {
+    await close();
+  }
+});
+
+test('fetchClaudeCodeReleases — watch release with no published date is dropped', async () => {
+  const undated = {
+    tag_name: 'v1.4.2',
+    name: 'patch: another fix',
+    body: 'Fixed an unrelated bug in the retry path.',
+    html_url: 'https://github.com/anthropics/claude-code/releases/tag/v1.4.2',
+    published_at: null,
+    created_at: null,
+  };
+  const { baseUrl, close } = await startMockServer((_req, res) => {
+    sendJson(res, 200, [undated]);
+  });
+
+  try {
+    const result = await fetchClaudeCodeReleases({ apiUrl: baseUrl, nowIso: '2025-06-01T12:00:00Z' });
+    assert.equal(result.error, null);
+    assert.deepEqual(result.candidates, []);
+  } finally {
+    await close();
+  }
+});
+
+test('fetchClaudeCodeReleases — watchMaxAgeDays override widens the window', async () => {
+  const { baseUrl, close } = await startMockServer((_req, res) => {
+    sendJson(res, 200, [BUGFIX_RELEASE]);
+  });
+
+  try {
+    const result = await fetchClaudeCodeReleases({
+      apiUrl: baseUrl,
+      nowIso: '2025-07-20T08:00:00Z',
+      watchMaxAgeDays: 90,
+    });
     assert.equal(result.error, null);
     assert.equal(result.candidates.length, 1);
     assert.equal(result.candidates[0].signal_tier, 'watch');
@@ -491,10 +551,53 @@ test('fetchAnthropicBlog — emits watch candidate for neutral post (no keep key
     ok: true,
     text: () => Promise.resolve(xml),
   });
-  const result = await fetchAnthropicBlog({ fetchFn, feedUrl: 'http://unused' });
+  // nowIso pinned 8d after NEUTRAL_POST so its watch tier is in-window.
+  const result = await fetchAnthropicBlog({ fetchFn, feedUrl: 'http://unused', nowIso: '2025-06-10T00:00:00Z' });
   assert.equal(result.error, null);
   assert.equal(result.candidates.length, 1);
   assert.equal(result.candidates[0].signal_tier, 'watch');
+});
+
+test('fetchAnthropicBlog — stale watch post is dropped', async () => {
+  const STALE_NEUTRAL_POST = {
+    title: 'A short reflection on long-term planning',
+    link: 'https://www.anthropic.com/news/neutral-reflection',
+    pubDate: 'Mon, 02 Jun 2025 09:00:00 +0000',
+    description: 'Some thoughts on planning. Does not mention any of the keep-list signals.',
+  };
+  const xml = makeRssFeed([STALE_NEUTRAL_POST]);
+  const fetchFn = () => Promise.resolve({
+    ok: true,
+    text: () => Promise.resolve(xml),
+  });
+  // 60d after pubDate — outside the 14d watch window.
+  const result = await fetchAnthropicBlog({ fetchFn, feedUrl: 'http://unused', nowIso: '2025-08-01T00:00:00Z' });
+  assert.equal(result.error, null);
+  assert.deepEqual(result.candidates, []);
+});
+
+// ---------------------------------------------------------------------------
+// isWithinWatchWindow
+// ---------------------------------------------------------------------------
+
+test('isWithinWatchWindow — true inside window, false outside', () => {
+  assert.equal(isWithinWatchWindow('2025-06-01T00:00:00Z', '2025-06-10T00:00:00Z', 14), true);
+  assert.equal(isWithinWatchWindow('2025-05-01T00:00:00Z', '2025-06-10T00:00:00Z', 14), false);
+});
+
+test('isWithinWatchWindow — future-dated published passes', () => {
+  assert.equal(isWithinWatchWindow('2025-06-20T00:00:00Z', '2025-06-10T00:00:00Z', 14), true);
+});
+
+test('isWithinWatchWindow — missing or unparseable dates return false', () => {
+  assert.equal(isWithinWatchWindow(null, '2025-06-10T00:00:00Z', 14), false);
+  assert.equal(isWithinWatchWindow('', '2025-06-10T00:00:00Z', 14), false);
+  assert.equal(isWithinWatchWindow('not-a-date', '2025-06-10T00:00:00Z', 14), false);
+  assert.equal(isWithinWatchWindow('2025-06-01T00:00:00Z', 'not-a-date', 14), false);
+});
+
+test('isWithinWatchWindow — RFC822 pubDate format parses', () => {
+  assert.equal(isWithinWatchWindow('Mon, 02 Jun 2025 09:00:00 +0000', '2025-06-10T00:00:00Z', 14), true);
 });
 
 test('fetchAnthropicBlog — all candidates have correct shape', async () => {

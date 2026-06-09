@@ -142,7 +142,7 @@ After the report is emitted:
 
 ## SUCCESS METRICS
 
-- [ ] Step used only when all actionable inputs were empty: step 2 findings = 0, step 2b external_research_candidates = 0, and no metric_signal
+- [ ] Step used only when all actionable inputs were empty: step 2 findings = 0, step 2b external_research_candidates = 0, no metric_signal, and step 2c kg_findings = 0
 - [ ] Backlog loaded from `.pHive/meta-team/queue-meta-meta-optimize.yaml` without modification
 - [ ] `tier: little-fix` candidates excluded from selection pool; filtered candidates remain `status: pending` (untouched)
 - [ ] First `status: pending` candidate from the filtered pool selected with no priority scoring

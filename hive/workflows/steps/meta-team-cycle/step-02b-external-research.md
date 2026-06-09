@@ -67,6 +67,10 @@ signal_subtype: claude_code_release
 >   improvements, or internal refactors. NOT discarded. The candidate still
 >   enters the pool; step-03 may de-prioritize. Catches the edge case where a
 >   one-line note in a "patch" release is actually load-bearing.
+>   Watch-tier candidates are subject to a 14-day recency window
+>   (`WATCH_TIER_MAX_AGE_DAYS` in `external-research-providers.mjs`): older or
+>   undated watch items are dropped so stale candidates do not re-enter the
+>   pool every nightly cycle. Actionable-tier candidates are exempt.
 >
 > The ONLY hard discard is **zero-content releases**: empty release body, or
 > body that is a single word (`patch`, `fixes`, `internal`), or a body that is
@@ -119,6 +123,8 @@ Accept: application/rss+xml, application/xml, text/xml
 >   keep-list signal. Still emit as a candidate. Step-03 ranking may de-prioritize.
 >   Catches posts where the Hive-relevance hides outside title/description (e.g.
 >   keep-list term appears only in the body or in a linked changelog).
+>   The same 14-day watch-tier recency window applies: posts older than the
+>   window (or with no parseable `pubDate`) are dropped.
 >
 > Skip list always wins. The point of widening the keep/watch split is to give
 > step-03 / step-03b material every cycle instead of stranding the pipeline.
