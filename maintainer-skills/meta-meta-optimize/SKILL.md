@@ -83,15 +83,22 @@ Load and follow `hive/workflows/steps/meta-team-cycle/step-02b-external-research
 
 This step is additive: it produces a candidate proposal list tagged `discovery_source: external_research` that is merged into the Step 3 proposal queue. It does not replace or override Step 2 findings. Skip this step cleanly (no abort) if charter scope forbids external sources or if the research providers (Firecrawl, Context7, arXiv) are unavailable.
 
+### Step 2c KG Signal
+
+Load and follow `hive/workflows/steps/meta-team-cycle/step-02c-kg-signal.md`.
+
+Additive like 2b: mines `~/.claude/hive/kg.sqlite` for `phase_failed`, `phase_blocked`, and `superseded` triples within the recency window, applies the three-layer relevance filter, and emits `kg_findings` tagged `discovery_source: kg_signal` into the Step 3 proposal pool. Skip cleanly (no abort) if the KG file is absent, locked, or the query returns no rows after filtering.
+
 ### Step 3 Proposal
 
 Load and follow `hive/workflows/steps/meta-team-cycle/step-03-proposal.md` when ANY of the following actionable inputs is present:
 
 - Step 2 produced one or more `findings` (structural-audit signal), OR
 - Step 2b produced one or more `external_research_candidates`, OR
+- Step 2c produced one or more `kg_findings`, OR
 - A metric signal is present (perf-baseline delta available for proposal ranking).
 
-Load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` ONLY when ALL three are empty: zero findings AND zero external candidates AND no metric signal. Step 3b is the backlog fallback path for the "nothing-actionable-from-this-cycle" case; it selects from `.pHive/meta-team/queue-meta-meta-optimize.yaml` rather than inventing a proposal path.
+Load and follow `hive/workflows/steps/meta-team-cycle/step-03b-backlog-fallback.md` ONLY when ALL FOUR are empty: zero findings AND zero external candidates AND zero KG findings AND no metric signal. Step 3b is the backlog fallback path for the "nothing-actionable-from-this-cycle" case; it selects from `.pHive/meta-team/queue-meta-meta-optimize.yaml` rather than inventing a proposal path.
 
 `metric_signal` is a perf-baseline-only flag (orthogonal to findings). A cycle that produced findings but no perf delta MUST route to step-03, not step-03b.
 

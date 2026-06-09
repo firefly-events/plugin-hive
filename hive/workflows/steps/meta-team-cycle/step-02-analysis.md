@@ -19,16 +19,17 @@ output_format:
 ```
 
 Routing between step-03 and step-03b is an **AND-of-empty** rule across
-the three signals — `metric_signal` is NOT a proxy for "are there
-findings". The canonical predicates (left-associative, no parentheses
-per strict-Archon grammar) are:
+the FOUR signals — `metric_signal` is NOT a proxy for "are there findings".
+The canonical predicates (left-associative, no parentheses per strict-Archon
+grammar) are:
 
 - step-03 runs when ANY signal is non-empty:
-  `$analysis.output.findings_count > 0 || $analysis.output.external_candidates_count > 0 || $analysis.output.metric_signal == true`
-- step-03b runs ONLY when ALL three are empty:
-  `$analysis.output.findings_count == 0 && $analysis.output.external_candidates_count == 0 && $analysis.output.metric_signal == false`
+  `$analysis.output.findings_count > 0 || $analysis.output.external_candidates_count > 0 || $analysis.output.metric_signal == true || $kg-signal.output.kg_findings_count > 0`
+- step-03b runs ONLY when ALL four are empty:
+  `$analysis.output.findings_count == 0 && $analysis.output.external_candidates_count == 0 && $analysis.output.metric_signal == false && $kg-signal.output.kg_findings_count == 0`
 
-Predicates bind to the explicit `_count` fields rather than to list
+`kg_findings_count` joined the signal set when step-02c was wired into the
+workflow. Predicates bind to the explicit `_count` fields rather than to list
 lengths because the strict-Archon grammar does not support `len(...)`.
 Cycles that produce findings but no perf delta route to step-03 — the
 meta-2026-04-29 regression scenario covered by

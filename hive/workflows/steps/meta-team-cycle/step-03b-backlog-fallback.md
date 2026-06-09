@@ -3,7 +3,7 @@
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
 - Read this entire step file before taking any action
-- Run this step ONLY when step 2 produced ZERO findings AND step 2b produced ZERO external_research_candidates AND no metric signal is present. If ANY of the three actionable inputs exist, the cycle MUST route to step-03-proposal — never step-03b. This is a FALLBACK path, not the default path
+- Run this step ONLY when step 2 produced ZERO findings AND step 2b produced ZERO external_research_candidates AND step 2c produced ZERO kg_findings AND no metric signal is present. If ANY of the four actionable inputs exist, the cycle MUST route to step-03-proposal — never step-03b. This is a FALLBACK path, not the default path
 - `metric_signal` is a perf-baseline-only flag and is orthogonal to findings. A cycle that produced findings but no perf delta routes to step-03, not here
 - S8 is dry-run only and non-destructive: read the backlog, report which candidate would be selected, and stop
 - Do NOT mutate backlog files, do NOT invoke promotion, and do NOT advance to step 4 from this step in S8
@@ -42,12 +42,13 @@ gracefully.
 ## TASK SEQUENCE
 
 ### 1. Confirm this branch is actually eligible
-Before reading the backlog, verify that the cycle has NO actionable input from step 2 or step 2b.
+Before reading the backlog, verify that the cycle has NO actionable input from step 2, step 2b, or step 2c.
 
 - If step 2 `findings` is non-empty: STOP and return to step-03-proposal (findings drive proposals regardless of metric signal)
 - If step 2b `external_research_candidates` is non-empty: STOP and return to step-03-proposal
+- If step 2c `kg_findings` is non-empty: STOP and return to step-03-proposal
 - If a metric signal is present (perf-baseline delta usable for ranking): STOP and return to step-03-proposal
-- ONLY if all three are empty (zero findings AND zero external candidates AND no metric signal): continue into backlog fallback mode
+- ONLY if all four are empty (zero findings AND zero external candidates AND zero kg findings AND no metric signal): continue into backlog fallback mode
 
 This routing rule is the canonical resolution to the conflation bug where `metric_signal: false` was treated as equivalent to "nothing to do" even when structural findings existed (see meta-2026-04-29 nightly: 8 findings ignored).
 
