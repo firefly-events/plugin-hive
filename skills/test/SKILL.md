@@ -31,6 +31,10 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 Load `hive/workflows/test-swarm.workflow.yaml` and execute the pipeline. Each step has a step file at `hive/workflows/steps/test-swarm/`.
 
+When `/test` is configured as the review gate for a resolved Hive story, project the review-entry transition from [`status-lifecycle.md`](../../hive/references/status-lifecycle.md) only after the test gate successfully records its final verdict/report: update that story YAML's `status:` projection from `in_progress` to `in_review`.
+
+This write is gated on test-gate success. Do not write `in_review` on `/test` entry, when scenario resolution fails, when the test swarm fails before recording a verdict, or when `/test` is being used only for exploratory/local validation rather than as the story's review gate. `/test` does not own `complete`, review-fail rework, or `shipped`; those remain owned by `/review` and `/ship`.
+
 ## Pipeline
 
 | Step | Agent | Step File | Purpose |
@@ -66,4 +70,5 @@ ALL test artifacts go to `.pHive/test-artifacts/{epic-id}/{story-id}/`:
 
 - `hive/workflows/test-swarm.workflow.yaml` — workflow definition
 - `hive/references/test-swarm-architecture.md` — full architecture doc
+- `hive/references/status-lifecycle.md` — Canonical command-owned story lifecycle; `/test` may own only the success-gated `in_progress -> in_review` projection when it is the configured review gate.
 - `hive/agents/test-scout.md`, `hive/agents/test-architect.md`, `hive/agents/test-worker.md` (worker persona), `hive/agents/test-inspector.md`, `hive/agents/test-sentinel.md` — agent personas

@@ -1,7 +1,7 @@
 id: stmc-2-append-line
 epic: smoke-test-execute-multica-codex
 title: Append a known line to smoke-marker.txt
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [stmc-1-create-marker]

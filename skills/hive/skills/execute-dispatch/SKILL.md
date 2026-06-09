@@ -74,8 +74,10 @@ For `execution_mode` and `execution_runtime`, record the expanded source chain a
   - Always include `execution_mode={winning-source-key}` in the telemetry line.
   - See `hive/lib/mode-resolver.mjs` for the full precedence chain, recognized mode strings, and env-silencing rules.
 - `execution_runtime`:
-  - Resolved via `hive/lib/mode-resolver.mjs` — call `resolveMode('HIVE_EXECUTION_RUNTIME', ctx)` (note: `HIVE_EXECUTION_RUNTIME` is the env var, not a named-mode varName in the registry).
+  - Resolved via `hive/lib/mode-resolver.mjs` — call `resolveMode('HIVE_EXECUTION_RUNTIME', ctx)`. `HIVE_EXECUTION_RUNTIME` is a recognized varName at the env tier.
   - Same 5-tier chain: env > root_config > shipped_baseline > skill_override > default(`auto`).
+  - Accepted token set is the resolver's single recognized set: `sandcastle | multica | cc-workflows | sequential | auto`. Any other env value (e.g. `workflows`) is silently ignored by the resolver and falls through to the next tier.
+  - **Root-config fallback note:** the resolver currently reads a single field, `rootConfig.execution.mode`, for the config tier on every varName — there is no separate `execution.runtime` key. To distinguish runtime from mode in root config today, set the env var (`HIVE_EXECUTION_RUNTIME=...`) or rely on the shipped baseline / skill override tiers.
   - `field_sources.execution_runtime.epic_override` is `null` during base resolution and is set to the per-epic cycle-state path only when Step 1 applies an auto-runtime per-epic override.
 
 Env wins over config when both are set for the same field (e.g. `HIVE_EXECUTE_MODE=sandcastle` with `execution.mode: multica` — sandcastle wins). This is enforced by `resolveMode` tier ordering.

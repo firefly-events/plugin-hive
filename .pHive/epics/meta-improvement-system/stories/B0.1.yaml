@@ -2,7 +2,7 @@ id: B0.1
 epic: meta-improvement-system
 slice: S1
 title: Experiment envelope outline
-status: pending
+status: completed
 complexity: medium
 methodology: classic
 depends_on: []
@@ -104,3 +104,6 @@ references:
       - **Required fields:** approved as listed (baseline ref, candidate ref, commit/ref, metrics snapshot, policy ref, decision, `rollback_ref`, observation window, `regression_watch`).
       - **Threshold policy:** lean — no per-metric asymmetric-tolerance class system unless a concrete use case forces it.
       - **Delayed-regression handling:** `auto-revert`.
+shipped:
+  branch: feat/meta-improvement-system
+  merged_at: "2026-06-08T20:44:01.588Z"

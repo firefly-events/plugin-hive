@@ -72,4 +72,4 @@ Local: CC 2.1.154. Dynamic workflows GA (no flag). Agent-teams flag NOT set.
 - integration-principle — holds for Multica-only (1 agent/role); rule 5 breaks only if CC `/workflows` becomes the executor (Option C).
 - squad / autopilot schema docs — substrate-internal; valid as written.
 
-_Authored direct (interactive re-validation session), epic multica-substrate-deepen. Not yet maintainer-reviewed._
+*Authored direct (interactive re-validation session), epic multica-substrate-deepen. Not yet maintainer-reviewed.*

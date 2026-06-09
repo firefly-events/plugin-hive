@@ -1,4 +1,5 @@
 id: h-02-context-snapshot-skill
+status: in_progress
 epic: hermes-integration-mvp
 title: /hive:context-snapshot skill wrapping the composer
 complexity: small

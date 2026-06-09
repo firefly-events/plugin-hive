@@ -1,7 +1,7 @@
 id: s3-execution-mode-skill
 epic: sandcastle-adoption-followon
 title: Sandcastle execution mode skill with lifecycle ownership contract
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s2-provider-wrap, s2-hooks-minimal]

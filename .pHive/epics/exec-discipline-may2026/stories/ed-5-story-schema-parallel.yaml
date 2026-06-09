@@ -4,7 +4,7 @@ tracker_id: "firefly-events/plugin-hive#139"
 tracker_url: https://github.com/firefly-events/plugin-hive/issues/139
 epic: exec-discipline-may2026
 title: Story YAML schema — parallel_allowed + parallel_rationale fields
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [ed-1-maturity-helper]

@@ -1,7 +1,7 @@
 id: s5-hooks-reference
 epic: sandcastle-adoption-followon
 title: Minimal Sandcastle hooks reference
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s4-merge-validation]

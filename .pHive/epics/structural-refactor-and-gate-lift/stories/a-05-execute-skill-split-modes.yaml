@@ -1,7 +1,7 @@
 id: a-05-execute-skill-split-modes
 epic: structural-refactor-and-gate-lift
 title: Split /execute three execution modes into composable atoms
-status: completed
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [a-05-execute-skill-split-dispatch]

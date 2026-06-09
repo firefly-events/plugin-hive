@@ -1,7 +1,7 @@
 id: a-27-triage-skill-md
 epic: catalog-hygiene-and-borrows
 title: Write skills/triage/SKILL.md with canonical 5-state intake flow
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [a-25-skill-prelude-extraction]

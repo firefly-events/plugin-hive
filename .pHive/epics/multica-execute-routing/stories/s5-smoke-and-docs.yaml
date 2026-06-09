@@ -1,7 +1,7 @@
 id: s5-smoke-and-docs
 epic: multica-execute-routing
 title: "End-to-end smoke against live spike + README/GUIDE/CHANGELOG + version bump 2.7.0"
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on:

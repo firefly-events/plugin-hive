@@ -1,7 +1,7 @@
 id: s3-execute-mode-multica-skill
 epic: multica-execute-routing
 title: "skills/hive/skills/execute-mode-multica: per-story lifecycle (precondition → fetch → brief → dispatch → poll → cleanup)"
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on:

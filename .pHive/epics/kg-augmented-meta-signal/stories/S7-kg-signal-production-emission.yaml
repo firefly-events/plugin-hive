@@ -11,7 +11,7 @@
 id: S7-kg-signal-production-emission
 epic: kg-augmented-meta-signal
 title: kg-signal feed emits non-empty findings against production KG
-status: completed
+status: blocked
 backfilled: true
 complexity: medium
 methodology: classic

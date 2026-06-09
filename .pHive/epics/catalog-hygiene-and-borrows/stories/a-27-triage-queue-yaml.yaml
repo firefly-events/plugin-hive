@@ -1,7 +1,7 @@
 id: a-27-triage-queue-yaml
 epic: catalog-hygiene-and-borrows
 title: Define .pHive/triage/queue.yaml schema and warning-only gate contract
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [a-27-triage-skill-md]

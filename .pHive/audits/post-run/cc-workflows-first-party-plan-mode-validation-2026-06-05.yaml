@@ -123,23 +123,14 @@ next_actions:
     not a real ship-this-now plan run for the hermes-guardrails-mvp epic.
     The hermes-guardrails-mvp epic still needs a real plan run later
     (separate session, fresh /plan invocation, real user gate participation).
-  - PR #241 substrate audit (.pHive/audits/post-run/cc-workflows-smoke-1780516800.yaml
+  - PR 241 substrate audit (.pHive/audits/post-run/cc-workflows-smoke-1780516800.yaml
     + this file) catalogs the full validation across execute-side smoke (3
     stories) and plan-side validation (2 phases). PR can ship as-is from a
     substrate-readiness standpoint.
 
 deviations_from_full_validation:
-  - phase_a2_grill_skipped: accelerated; grill is its own skill and not part
-    of the cc-workflows substrate seam.
-  - phase_b2_b3_skipped: validation verdict already reached after Phase B;
-    H/V and structured-outline persona dispatches would have exercised the
-    same default-subagent pattern that Phases A and B already proved clean.
-  - phase_c_decompose_skipped: orchestrator-inline phase; no substrate-dispatch
-    surface to validate.
-  - phase_d_tracker_publish_skipped: Multica workspace not bootstrapped on
-    this branch; same deliberate skip as cc-workflows-smoke (see prior audit).
-  - user_gate_not_exercised: the Phase B step 5 user-presentation gate was
-    REACHED (artifacts written, ready to present) but the user paused the
-    vehicle before answering the 7 open questions. Gate mechanics (orchestrator
-    presents, waits, collects feedback) were demonstrated up to the point of
-    presentation; user-feedback-integration loop is unexercised.
+  - phase_a2_grill_skipped: "accelerated; grill is its own skill and not part of the cc-workflows substrate seam."
+  - phase_b2_b3_skipped: "validation verdict already reached after Phase B; H/V and structured-outline persona dispatches would have exercised the same default-subagent pattern that Phases A and B already proved clean."
+  - phase_c_decompose_skipped: "orchestrator-inline phase; no substrate-dispatch surface to validate."
+  - phase_d_tracker_publish_skipped: "Multica workspace not bootstrapped on this branch; same deliberate skip as cc-workflows-smoke (see prior audit)."
+  - user_gate_not_exercised: "the Phase B step 5 user-presentation gate was REACHED (artifacts written, ready to present) but the user paused the vehicle before answering the 7 open questions. Gate mechanics (orchestrator presents, waits, collects feedback) were demonstrated up to the point of presentation; user-feedback-integration loop is unexercised."

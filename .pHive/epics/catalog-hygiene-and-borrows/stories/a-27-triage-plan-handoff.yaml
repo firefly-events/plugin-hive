@@ -1,7 +1,7 @@
 id: a-27-triage-plan-handoff
 epic: catalog-hygiene-and-borrows
 title: Wire /plan --from-triage to read one queue item and decompose it
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [a-27-triage-skill-md, a-27-triage-queue-yaml]

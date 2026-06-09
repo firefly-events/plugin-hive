@@ -1,7 +1,7 @@
 id: S5.2-miss-reason-taxonomy
 epic: kg-signal-revival
 title: Miss-reason taxonomy at step-02c with discriminator surface
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [S5.1-metric-registry-counters]

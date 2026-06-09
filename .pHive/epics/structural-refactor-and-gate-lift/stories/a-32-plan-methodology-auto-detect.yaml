@@ -1,7 +1,7 @@
 id: a-32-plan-methodology-auto-detect
 epic: structural-refactor-and-gate-lift
 title: /plan methodology auto-detect (tests → tdd, gherkin → bdd, else → classic)
-status: completed
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [a-04-plan-skill-split-routing]

@@ -102,8 +102,8 @@ _make_jsonl() {
   local path="$1"
   mkdir -p "$(dirname "$path")"
   cat > "$path" <<'JSONL'
-{"type":"assistant","sessionId":"test-session-001","isSidechain":false,"timestamp":"2026-04-21T10:00:00Z","message":{"model":"claude-opus-4-7","usage":{"input_tokens":100,"output_tokens":200,"cache_creation_input_tokens":50,"cache_read_input_tokens":300}}}
-{"type":"assistant","sessionId":"test-session-001","isSidechain":false,"timestamp":"2026-04-21T10:01:00Z","message":{"model":"claude-opus-4-7","usage":{"input_tokens":80,"output_tokens":150,"cache_creation_input_tokens":0,"cache_read_input_tokens":120}}}
+{"type":"assistant","sessionId":"test-session-001","isSidechain":false,"timestamp":"2026-04-21T10:00:00Z","message":{"model":"claude-opus-4-8","usage":{"input_tokens":100,"output_tokens":200,"cache_creation_input_tokens":50,"cache_read_input_tokens":300}}}
+{"type":"assistant","sessionId":"test-session-001","isSidechain":false,"timestamp":"2026-04-21T10:01:00Z","message":{"model":"claude-opus-4-8","usage":{"input_tokens":80,"output_tokens":150,"cache_creation_input_tokens":0,"cache_read_input_tokens":120}}}
 {"type":"user","sessionId":"test-session-001","message":{"role":"user","content":"hello"}}
 JSONL
 }
