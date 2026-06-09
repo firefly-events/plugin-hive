@@ -66,26 +66,21 @@ For `execution_mode` and `execution_runtime`, record the expanded source chain a
   - config path: consumer config `executor: hive-dag` with `executor_default` truthy → `hive-dag`, source `config`
   - default: `orchestrator-narrated`, source `default`
 - `execution_mode`:
-  - env path: `env.HIVE_EXECUTION_MODE` equals exactly `sandcastle` (case-sensitive) → source `env`; any other value is ignored (not an error — reserved for future modes)
-  - config path: root `hive.config.yaml execution.mode: sandcastle` → source `config`
-  - default: neither env nor config selects sandcastle → source `default` (fall-through to standard mode resolution)
-  - When source is `env` or `config`: immediately set `mode_decision=sandcastle` and `mode_reason=execution-mode-override-{source}`. Skip Step 1 entirely. This takes precedence over sessions, team, and sequential.
-  - `execution_mode=default` does NOT trigger the "fell to defaults" warning — it is the normal non-sandcastle path. Always include `execution_mode={source}` in the telemetry line.
-- `execution_mode` (continued): multica override
-  - env path: `env.HIVE_EXECUTION_MODE` equals exactly `multica` (case-sensitive) → source `env`; any other value is ignored (reserved for future modes)
-  - config path: root `hive.config.yaml execution.mode: multica` → source `config`
-  - default: neither env nor config selects multica → source `default` (fall-through to standard mode resolution OR sandcastle override if it fired earlier)
-  - When source is `env` or `config`: immediately set `mode_decision=multica` and `mode_reason=execution-mode-override-{source}`. Skip Step 1 entirely. This takes precedence over sessions, team, and sequential.
-  - `execution_mode=default` does NOT trigger the "fell to defaults" warning — it is the normal non-multica path.
+  - Resolved via `hive/lib/mode-resolver.mjs` — call `resolveMode('HIVE_EXECUTE_MODE', ctx)` where `ctx` is built from the current environment and root config.
+  - Call contract: `const { decision, sources } = resolveMode('HIVE_EXECUTE_MODE', { env, rootConfig, shippedBaseline, skillOverride })`
+  - Returns `{ decision, sources }` where `sources` contains only the winning tier key (e.g. `{ env: 'HIVE_EXECUTE_MODE=sandcastle' }` or `{ root_config: 'execution.mode=multica' }` or `{ default: 'auto' }`).
+  - When `decision` is `sandcastle` or `multica` (i.e. source is `env` or `root_config`): immediately set `mode_decision={decision}` and `mode_reason=execution-mode-override-{winning-source-key}`. Skip Step 1 entirely. This takes precedence over sessions, team, and sequential.
+  - When `decision` is `default` (no env/config/baseline/override matched): fall through to Step 1. `execution_mode=default` does NOT trigger the "fell to defaults" warning — it is the normal non-override path.
+  - Always include `execution_mode={winning-source-key}` in the telemetry line.
+  - See `hive/lib/mode-resolver.mjs` for the full precedence chain, recognized mode strings, and env-silencing rules.
 - `execution_runtime`:
-  - env path: `env.HIVE_EXECUTION_RUNTIME` set to an explicit runtime → that runtime, source `env`
-  - root config path: root `hive.config.yaml execution.runtime` set → that runtime, source `root config`
-  - shipped baseline path: shipped baseline runtime disposition set → that runtime, source `shipped baseline`
-  - skill override path: skill-local runtime override set → that runtime, source `skill override`
-  - default: `auto`, source `default`
+  - Resolved via `hive/lib/mode-resolver.mjs` — call `resolveMode('HIVE_EXECUTION_RUNTIME', ctx)`. `HIVE_EXECUTION_RUNTIME` is a recognized varName at the env tier.
+  - Same 5-tier chain: env > root_config > shipped_baseline > skill_override > default(`auto`).
+  - Accepted token set is the resolver's single recognized set: `sandcastle | multica | cc-workflows | sequential | auto`. Any other env value (e.g. `workflows`) is silently ignored by the resolver and falls through to the next tier.
+  - **Root-config fallback note:** the resolver currently reads a single field, `rootConfig.execution.mode`, for the config tier on every varName — there is no separate `execution.runtime` key. To distinguish runtime from mode in root config today, set the env var (`HIVE_EXECUTION_RUNTIME=...`) or rely on the shipped baseline / skill override tiers.
   - `field_sources.execution_runtime.epic_override` is `null` during base resolution and is set to the per-epic cycle-state path only when Step 1 applies an auto-runtime per-epic override.
 
-If both sandcastle and multica are set across env and config (for example env `HIVE_EXECUTION_MODE=sandcastle` with config `execution.mode: multica`, or env `HIVE_EXECUTION_MODE=multica` with config `execution.mode: sandcastle`), env wins over config per standard Hive precedence.
+Env wins over config when both are set for the same field (e.g. `HIVE_EXECUTE_MODE=sandcastle` with `execution.mode: multica` — sandcastle wins). This is enforced by `resolveMode` tier ordering.
 
 When ANY of the four fields (`sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor`) resolves with source `default`, emit a loud warning before returning, enumerating each defaulted field and the override path:
 

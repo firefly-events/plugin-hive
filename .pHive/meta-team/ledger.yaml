@@ -26,6 +26,34 @@
     indexed-for-meta-meta-optimize proving run footer comment to
     .pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md. Closure validator passed.
     Regression watch armed for 4-hour observation window.
+- experiment_id: meta-2026-06-08
+  date: '2026-06-08'
+  started: '2026-06-08T00:00:00Z'
+  closed: '2026-06-08T00:30:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 0
+  top_changes:
+    - ".pHive/meta-team/archive/2026-04-19/MANIFEST.md: appended reviewed-on provenance line for meta-2026-06-08"
+  commit: dc6a0f3a2c2fd4725f83df9aa5c233c423899417
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: b8499673f6116e9e6b52e21a72bb4f9cd214c33a
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-08. Analysis found 0 in-scope findings:
+    all 12 step files complete, all 25 agent files valid, all workflow YAML
+    references resolve, model IDs current (claude-opus-4-8, claude-sonnet-4-6,
+    claude-haiku-4-5-20251001), agent memory frontmatter valid. Only STUB_DOC
+    hive-cloud-roadmap.md (13 lines) remains out_of_scope (S16 placeholder,
+    11th+ consecutive deferral). Zero open PRs (dedup pre-flight clean). Routed
+    to step-03b backlog fallback. Processed candidate mmo-2026-04-21-001:
+    appended reviewed-on provenance comment to .pHive/meta-team/archive/
+    2026-04-19/MANIFEST.md (4th such line). Closure validator passed.
+    Regression watch armed for 4-hour observation window.
 - experiment_id: meta-2026-0530-0605-squash
   date: '2026-06-05'
   started: '2026-05-30T00:00:00Z'

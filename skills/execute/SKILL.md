@@ -193,7 +193,30 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
    - `epic_handle`: the current epic identifier
    - `hive_config`: parsed root `hive.config.yaml` (for `execution.cc-workflows.*` options)
 
-   Step 6f does not recursively spawn /workflows from within a dispatched agent — the Workflow tool runs once per /execute invocation.
+   Step 6f does not recursively spawn /workflows from within a dispatched agent — the Workflow tool runs once per dispatched story. `/execute` owns depth advancement and re-invokes this skill for each subsequent DAG depth per step 6g below.
+
+6g. **Depth-advancement loop (generic across modes).** After the chosen mode skill (6b/6c/6d/6e/6f) returns its depth summary, integrate per-story results into the run's `completed` and `failed` sets, then re-walk the topological sort from step 4:
+
+   ```text
+   next_unblocked = stories
+     - completed
+     - failed
+     - in-flight
+     filtered by: every dep ∈ completed
+   ```
+
+   - If `next_unblocked` is non-empty, re-invoke the SAME mode skill at the same step (6b/6c/6d/6e/6f) with `unblocked_stories[] = next_unblocked` and the rest of the invocation contract unchanged. Each re-invocation is one DAG depth.
+   - If `next_unblocked` is empty AND `in-flight` is empty AND `failed` is non-empty, halt with a partial-epic verdict; surface the failed story IDs and unreachable downstream stories to the user.
+   - If `next_unblocked` is empty AND `in-flight` is empty AND every story is in `completed`, proceed to step 7 (post-exec) and step 8 (summary + audit).
+
+   This loop is the contract every depth-0-only mode skill (`execute-mode-multica`, `execute-mode-cc-workflows`, `execute-mode-sandcastle`) relies on. Per their constraint summaries they explicitly delegate depth advancement to `/execute`; this step is that delegation.
+
+6h. **Branch + worktree + PR convention.** Apply for every dispatch mode unless the mode skill states otherwise:
+
+   - **Branch per epic** — integration branch is `feat/<epic-id>` (override via `epic.git_flow.branch`). Verify before step 6{x}; create from `epic.git_flow.base_branch` (default `develop`) if absent.
+   - **Commit per story** — enforced by the per-mode serial-commit gate (see `execute-mode-cc-workflows/SKILL.md` Step 3 and `references/team-execution.md` per-story commit pattern). One `git commit` per terminal-passed story; commit subject prefix `[<story-id>]`.
+   - **Worktree per epic (recommended)** — when `cc-workflows` mode is selected, isolate the whole `/execute` run to a dedicated worktree at `.claude/worktrees/<epic-id>/` per `feedback_cc_workflows_worktree_required.md`. The worktree is created once at step 6 entry and removed at step 8 close (operator choice via `ExitWorktree`).
+   - **PR per epic** — opened at step 8 close, after every story is `completed`. One PR per `feat/<epic-id>` against `epic.git_flow.base_branch`. Do NOT open per-story PRs.
 
 7. **Sequential execution.** Follow **`references/sequential-execution.md`** for the step-by-step workflow within each story, sidecar injection at the review step, episode records, gate checks, and respawn monitoring.
 
@@ -360,9 +383,21 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
      If there are no diffs after applying the bump and changelog entry (nothing staged), report `[info] finalize: version bump already applied for {epic-id}` and do not commit.
 
-8. After all stories complete, produce a summary plus the post-run audit:
+8. After step 6g exits with `next_unblocked` empty AND `in-flight` empty, produce summary + audit + PR:
 
-   1. **Run summary** — existing behavior: list completed stories, any failed/blocked, and final status.
+   0. **Epic PR.** If `task_tracking.adapter` does not own PR creation AND `failed` is empty (full-pass run), open one PR per the branch + worktree + PR convention (step 6h):
+
+      ```sh
+      gh pr create \
+        --base ${epic.git_flow.base_branch:-develop} \
+        --head ${epic.git_flow.branch:-feat/<epic-id>} \
+        --title "feat(<epic-id>): <epic.title>" \
+        --body "Closes epic <epic-id>. Stories: <comma-list of completed story-ids>."
+      ```
+
+      Capture the returned PR URL in the run summary. If `failed` is non-empty (partial-epic), skip PR open and surface unreachable downstream stories per step 6g's partial-epic verdict.
+
+   1. **Run summary** — existing behavior: list completed stories, any failed/blocked, and final status. Include PR URL when step 8.0 opened one.
 
    2. **Post-run audit** — scan this run's resolved state per `hive/references/gate-lift-telemetry.md`:
       - `gate_lift_fired` (true if step 1 took the warning branch and synthesized an ad-hoc plan)

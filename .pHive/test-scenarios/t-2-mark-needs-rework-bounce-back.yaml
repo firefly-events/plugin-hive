@@ -1,0 +1,118 @@
+id: t-2-mark-needs-rework-bounce-back
+title: "/test swarm story-issue bounce-back via markNeedsRework on both substrates"
+description: >
+  Simulated-manual walk for the step-06-triage emit path added in t-2.
+  A known story-issue failure (acceptance criterion gap) triggers step-06-triage
+  to call markNeedsRework({id, reason}) via TaskTrackingDispatch. The bounce-back
+  is verified on both the Multica substrate (status set to in_review + label added)
+  and the GitHub substrate (issue reopened + label added). Transient and
+  human-blocker classifications must NOT emit markNeedsRework.
+mode: spec-walk
+story: t-2-markNeedsRework-abi
+epic: substrate-coverage-and-test-cleanup
+
+preconditions:
+  - "t-2 implementation is complete: markNeedsRework method exists on TaskTrackingDispatch ABI"
+  - "Both adapters (hive/adapters/multica/index.ts, hive/adapters/github/index.ts) implement markNeedsRework"
+  - "step-06-triage.md emits markNeedsRework only for story-issue classification"
+  - "capability('supports_needs_rework') is advertised on the dispatch surface"
+  - "A target story exists in the active tracker (Multica workspace OR GitHub repo) in a non-terminal state"
+  - "The node:test contract suite passes: hive/lib/task-tracking-dispatch/test/markNeedsRework.contract.test.mjs"
+
+steps:
+  - action: >
+      Run the contract test suite to confirm baseline: node --test --import tsx
+      hive/lib/task-tracking-dispatch/test/markNeedsRework.contract.test.mjs
+    expected: >
+      All contract tests pass. Both Multica and GitHub adapter cases produce
+      {id, status, labels[]} where labels[] includes 'hive:needs-rework'.
+      Console shows 0 failures.
+    actor: tester
+
+  - action: >
+      Invoke /hive:test in swarm mode against a story that has a known acceptance
+      criterion gap (functional bug — implementation does not match AC). Confirm
+      at least one test failure is produced and step-05 bug report classifies it
+      as a story issue.
+    expected: >
+      Step-05 bug report contains at least one entry with category: story_issue.
+      Bug report includes: affected acceptance criterion, expected vs actual
+      behaviour, and fix_target file/function reference.
+    actor: tester
+
+  - action: >
+      Observe step-06-triage output on the Multica substrate. Inspect the
+      routing_decisions YAML block emitted by the step for the story-issue bug.
+    expected: >
+      routing_decisions contains a decision with category: story_issue and
+      action: back_to_planning. The summary block includes
+      needs_rework_emitted: true. markNeedsRework({id, reason}) was called
+      once — not zero times, not more than once per story-issue bug.
+    actor: tester
+
+  - action: >
+      Verify the Multica task tracker state after step-06-triage emitted
+      markNeedsRework. Check the story entry in the Multica workspace.
+    expected: >
+      The story's status is 'in_review' (not 'todo', 'in_progress', or 'done').
+      The story has the label 'hive:needs-rework' applied.
+      No other story statuses were changed as a side-effect.
+    actor: tester
+
+  - action: >
+      Switch to the GitHub substrate. Repeat the same /hive:test swarm run
+      against the equivalent story represented as a GitHub issue with the same
+      known AC gap. Observe step-06-triage output.
+    expected: >
+      routing_decisions contains a decision with category: story_issue and
+      action: back_to_planning. needs_rework_emitted: true in the summary block.
+      markNeedsRework was invoked via the GitHub adapter path.
+    actor: tester
+
+  - action: >
+      Verify the GitHub issue state after step-06-triage emitted markNeedsRework
+      on the GitHub substrate.
+    expected: >
+      The GitHub issue is in the 'open' state (reopened if it was closed).
+      The label 'hive:needs-rework' is present on the issue.
+      Return value of markNeedsRework resolved to {id, status:'open',
+      labels:[..., 'hive:needs-rework']}.
+    actor: tester
+
+  - action: >
+      Now run a /hive:test swarm against a story that has only TRANSIENT failures
+      (timeout / ECONNREFUSED pattern). Observe step-06-triage output.
+    expected: >
+      routing_decisions shows category: transient with action: retry for all bugs.
+      needs_rework_emitted: false in the summary block.
+      markNeedsRework is NOT called. No label or status change occurs in either
+      tracker.
+    actor: tester
+
+  - action: >
+      Run a /hive:test swarm against a story that has only HUMAN-BLOCKER failures
+      (missing external credential / architectural flaw). Observe step-06-triage output.
+    expected: >
+      routing_decisions shows category: human_blocker with action: escalate for
+      all bugs. needs_rework_emitted: false in the summary block.
+      markNeedsRework is NOT called. No label or status change occurs in either
+      tracker.
+    actor: tester
+
+  - action: >
+      Inspect hive/agents/test-sentinel.md for any executable logic related to
+      bounce-back or markNeedsRework.
+    expected: >
+      test-sentinel.md contains only prose describing the bounce-back behaviour.
+      No TypeScript, JavaScript, or YAML directives invoking markNeedsRework are
+      present in the persona file. The executable contract lives in
+      step-06-triage.md only (step-vs-persona discipline).
+    actor: tester
+
+postconditions:
+  - "markNeedsRework emitted exactly once per story-issue classification on both substrates"
+  - "Multica story lands in status:'in_review' with label 'hive:needs-rework' after bounce-back"
+  - "GitHub issue lands in state:'open' with label 'hive:needs-rework' after bounce-back"
+  - "Transient and human-blocker classifications produce needs_rework_emitted: false"
+  - "test-sentinel.md contains prose only — no executable markNeedsRework invocation"
+  - "Contract test suite passes with mark_needs_rework_contract_pass_rate == 1.0"

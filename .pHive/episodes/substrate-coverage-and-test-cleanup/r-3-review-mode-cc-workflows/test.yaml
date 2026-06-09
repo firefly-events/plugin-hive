@@ -1,0 +1,55 @@
+step: test
+unit_id: r-3-review-mode-cc-workflows
+epic: substrate-coverage-and-test-cleanup
+status: completed
+agent: tester
+started_at: 2026-06-08T12:37:00Z
+completed_at: 2026-06-08T12:38:30Z
+episode_terminal: false
+
+test_files_created:
+  - path: skills/hive/skills/review-mode-cc-workflows/test/resolver.test.mjs
+    description: Vitest spec covering 5-tier resolution, solo dispatch shape, Step 0 helper import, opts.model, insight-capture suffix, no-codex checks, scope_drift_observed true, and episode marker shape.
+  - path: .pHive/test-scenarios/r-3-review-mode-cc-workflows-smoke.yaml
+    description: Spec-walk scenario for /review via cc-workflows with --sequential flag and PR arg.
+
+files_modified:
+  - path: hive/lib/package.json
+    description: Appended skills/hive/skills/review-mode-cc-workflows/test/resolver.test.mjs to vitest file list in scripts.test.
+
+test_results:
+  suite: vitest
+  files_run: 11
+  tests_total: 273
+  tests_passed: 273
+  tests_failed: 0
+  duration_ms: 1290
+
+lint_results:
+  script: node hive/scripts/lint-cc-workflows-no-codex.mjs
+  files_scanned: 5
+  check_1_agentType_literal: PASS
+  check_2_codex_rescue_grep: PASS
+  check_3_agent_backends_grep: PASS
+  check_4_preconditions_import: PASS
+  overall: all 4 checks PASSED across 5 file(s)
+
+contract_test_results:
+  suite: tsx --test
+  tests: 5
+  passed: 5
+  failed: 0
+
+audit_first_walk:
+  verdict: "complete (AC 5/5 covered, refs 5/5 re-read)"
+  ac_coverage:
+    - ac: "Given skills/hive/skills/review-mode-cc-workflows/SKILL.md is created, when the atom executes Step 0, then it imports hive/lib/cc-workflows-preconditions.mjs and invokes assertWorktreeIsolation()."
+      test: "cc-workflows-preconditions.mjs import — Step 0 contract (3 tests)"
+    - ac: "Given the atom runs, when /review dispatches via cc-workflows, then a single (solo) reviewer is dispatched through the default workflow subagent — no Codex routing."
+      test: "r-3 solo reviewer dispatch shape (5 tests) + no-codex compliance (4 tests)"
+    - ac: "Given the s-3 no-codex lint runs against the atom, when npm test executes, then all four checks PASS."
+      test: "lint_results above: 4/4 PASS + no-codex compliance assertions in resolver.test.mjs"
+    - ac: "Given the vitest resolution test runs, when 5-tier permutations are exercised, then mode_decision emits correctly AND helper-import is asserted green."
+      test: "5-tier permutation tests (env/root_config/shipped_baseline/skill_override/default describe blocks)"
+    - ac: "Given scope_drift emit is preserved by r-1, when /review through cc-workflows completes, then scope_drift emit fires identically to pre-epic behavior."
+      test: "r-3 scope_drift contract — atom owns emit at review:complete (3 tests)"

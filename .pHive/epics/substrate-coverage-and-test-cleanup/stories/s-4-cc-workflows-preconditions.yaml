@@ -1,0 +1,127 @@
+id: s-4-cc-workflows-preconditions
+epic: substrate-coverage-and-test-cleanup
+title: Create cc-workflows-preconditions helper exporting assertWorktreeIsolation and back-fit existing 2 cc-workflows atoms
+status: completed
+complexity: medium
+methodology: classic
+depends_on:
+- s-2-mode-resolver
+description: 'Create `hive/lib/cc-workflows-preconditions.mjs` exporting
+
+  `assertWorktreeIsolation()`. The helper asserts that
+
+  `*-mode-cc-workflows` runs are on a dedicated worktree under
+
+  `.claude/worktrees/<name>/`, not the main checkout. Throws synchronously
+
+  on main-checkout cwd; passes on isolated worktree. Back-fit both existing
+
+  cc-workflows atoms (`plan-mode-cc-workflows`, `execute-mode-cc-workflows`)
+
+  to import the helper at Step 0 — same-slice modification, mandatory so
+
+  s-3''s helper-import lint asserts green on the existing tree. This is
+
+  Slice 1 commit #2 (LOCKED order s-2 → s-4 → s-3).
+
+  '
+acceptance_criteria:
+- Given `hive/lib/cc-workflows-preconditions.mjs` exports `assertWorktreeIsolation()`, when the helper is invoked from a cwd matching `.claude/worktrees/<name>/`, then it returns without throwing.
+- Given `assertWorktreeIsolation()` is invoked from the main repo checkout (not a worktree subdir), when the helper runs, then it throws a clear `Error` with a message identifying the worktree-isolation invariant and pointing the operator at the dedicated worktree pattern.
+- Given `plan-mode-cc-workflows/SKILL.md` Step 0 is updated, when the skill executes, then it imports and calls `assertWorktreeIsolation()` from `hive/lib/cc-workflows-preconditions.mjs`.
+- Given `execute-mode-cc-workflows/SKILL.md` Step 0 is updated, when the skill executes, then it imports and calls `assertWorktreeIsolation()` from `hive/lib/cc-workflows-preconditions.mjs`.
+- Given the unit test suite at `hive/lib/test/cc-workflows-preconditions.test.mjs` runs, when `npm test` executes, then it asserts (a) the helper throws on main-checkout cwd, (b) the helper passes on a simulated `.claude/worktrees/<name>/` cwd.
+- DO. Back-fit BOTH existing cc-workflows atoms in this same story so the s-3 helper-import lint asserts green from commit-time.
+- DO NOT. Do not add the helper import to any net-new cc-workflows atom in this story — those atoms ship in Slices 2-5.
+metric:
+  applies: true
+  name: substrate_coverage.worktree_isolation_helper_imports
+  direction: up
+  unit: count
+  baseline: 0
+  target: 2
+  window: story integrate step
+  source:
+    kind: manual
+    ref: grep -c "cc-workflows-preconditions" skills/hive/skills/plan-mode-cc-workflows/SKILL.md skills/hive/skills/execute-mode-cc-workflows/SKILL.md
+  verify_at: story integrate step
+  owner: developer
+steps:
+- id: research
+  description: Read `feedback_codex_parallel_race` worktree-isolation discipline and confirm the canonical worktree path pattern (`.claude/worktrees/<name>/`); inspect Step 0 of both existing cc-workflows atoms to identify the back-fit insertion point.
+  agent: researcher
+- id: implement
+  description: Create `hive/lib/cc-workflows-preconditions.mjs` exporting `assertWorktreeIsolation()`; back-fit Step 0 of `plan-mode-cc-workflows/SKILL.md` and `execute-mode-cc-workflows/SKILL.md` to import and call the helper.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Author `hive/lib/test/cc-workflows-preconditions.test.mjs` covering both throw-on-main-checkout and pass-on-isolated-worktree cases; wire to `npm test`.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Architect review on helper placement (precondition contract not duplicated per skill) + back-fit completeness for the two existing atoms; reviewer cross-checks no behavior drift in plan/execute mode-cc-workflows.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: 'Commit "[s-4] feat(cc-workflows): cc-workflows-preconditions helper + back-fit plan/execute mode-cc-workflows"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  tech_stack:
+  - language: javascript (.mjs)
+  - runtime: node 20+
+  - test: vitest
+  key_files:
+  - path: hive/lib/cc-workflows-preconditions.mjs
+    purpose: NEW shared helper exporting assertWorktreeIsolation()
+  - path: skills/hive/skills/plan-mode-cc-workflows/SKILL.md
+    purpose: Existing cc-workflows atom (336 lines) requiring Step 0 helper import back-fit
+  - path: skills/hive/skills/execute-mode-cc-workflows/SKILL.md
+    purpose: Existing cc-workflows atom (358 lines) requiring Step 0 helper import back-fit
+  - path: hive/lib/test/cc-workflows-preconditions.test.mjs
+    purpose: NEW vitest spec covering throw + pass cases
+files_to_modify:
+- file: hive/lib/cc-workflows-preconditions.mjs
+  change: CREATE — exports `assertWorktreeIsolation()` throwing synchronously on main-checkout cwd
+- file: hive/lib/test/cc-workflows-preconditions.test.mjs
+  change: CREATE — vitest spec covering throw-on-main-checkout + pass-on-worktree cases
+- file: skills/hive/skills/plan-mode-cc-workflows/SKILL.md
+  change: BACK-FIT Step 0 — add import + `assertWorktreeIsolation()` call before any other Step 0 logic
+- file: skills/hive/skills/execute-mode-cc-workflows/SKILL.md
+  change: BACK-FIT Step 0 — add import + `assertWorktreeIsolation()` call before any other Step 0 logic
+code_examples:
+- language: javascript
+  description: Helper signature and throw semantics
+  snippet: "// hive/lib/cc-workflows-preconditions.mjs\nexport function assertWorktreeIsolation(cwd = process.cwd()) {\n  if (!/\\.claude\\/worktrees\\/[^/]+/.test(cwd)) {\n    throw new Error(\n      `cc-workflows substrate must run on an isolated worktree under .claude/worktrees/<name>/, got cwd=${cwd}`\n    );\n  }\n}\n"
+references:
+- path: skills/hive/skills/plan-mode-cc-workflows/SKILL.md
+  relevant_excerpt: Step 0 precondition gate with field_sources; ~336-line skill — back-fit target for helper import.
+- path: skills/hive/skills/execute-mode-cc-workflows/SKILL.md
+  relevant_excerpt: Step 0 precondition gate; ~358-line skill — back-fit target for helper import.
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/structured-outline.md
+  relevant_excerpt: 's-4: cc-workflows-preconditions helper — Create hive/lib/cc-workflows-preconditions.mjs exporting assertWorktreeIsolation(). Throws on main-checkout cwd; passes on isolated worktree. Back-fit: add helper import + Step 0 helper call to BOTH existing cc-workflows atoms.'
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/design-discussion.md
+  relevant_excerpt: Constraint 7 — cc-workflows substrate runs MUST always isolate to a dedicated worktree. Enforced via Slice E s-4 shared helper + lint.
+cross_cutting:
+- concern: documentation
+  action: Inline doc-block at top of cc-workflows-preconditions.mjs naming the worktree-isolation invariant; downstream cc-workflows atom stories cite the helper by path.
+design_decisions:
+- decision: Single shared helper, not per-skill duplication
+  rationale: DRY — single invariant, single maintenance site (architect ESCALATION + grill H1/C1). Aligns with `feedback_codex_parallel_race` worktree-isolation discipline.
+- decision: Back-fit both existing cc-workflows atoms in this same story
+  rationale: Slice 1 commit order LOCKED — s-3 lint asserts every cc-workflows atom imports the helper. Reverse order causes s-3 lint to fail on missing imports.
+- decision: Throw synchronously at Step 0, not lazy/deferred
+  rationale: Failure must surface BEFORE any state mutation; the operator sees a clear "must run on isolated worktree" message immediately.
+risks:
+- severity: medium
+  description: Back-fit modifies behavior of plan/execute mode-cc-workflows for callers that legitimately invoke them from the main checkout
+  mitigation: cc-workflows substrate is documented as requiring worktree isolation (design-discussion Constraint 7); any caller invoking from main checkout was already incorrect per `feedback_codex_parallel_race`. Failure surface at Step 0 is the desired correction.
+- severity: low
+  description: Worktree-path regex matches false-positives for nested directories
+  mitigation: Regex anchored to `.claude/worktrees/<name>/` segment specifically; unit test covers nested vs main-checkout discrimination
+tracker_id: eaa6be63-5514-4919-8a2f-a36d5e4c0d41

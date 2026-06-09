@@ -1,0 +1,90 @@
+step_id: cc-workflows-run
+story_id: t-1b-step-04b-and-rip-simulated-manual
+epic_id: substrate-coverage-and-test-cleanup
+status: passed_with_orchestrator_fixes
+verdict: pass-with-notes
+timestamp: "2026-06-07T00:00:00Z"
+mode: cc-workflows
+runtime: workflows
+run_id: wf_8ec1bc4c-07d
+script_path: .pHive/episodes/substrate-coverage-and-test-cleanup/t-1b-step-04b-and-rip-simulated-manual/workflow-script.js
+transcript_dir: /Users/don/.claude/projects/-Users-don--claude-worktrees-substrate-coverage/8c837a93-260e-405d-8549-dc535cce0594/subagents/workflows/wf_8ec1bc4c-07d
+commit: 1dbb6aa
+integration_branch: feat/substrate-coverage-and-test-cleanup
+methodology: classic
+phases: [research, implement, test, review]
+agents:
+  - phase: research
+    persona: researcher
+    model: sonnet
+    verdict: pass
+  - phase: implement
+    persona: developer
+    model: sonnet
+    verdict: pass
+  - phase: test
+    persona: tester
+    model: sonnet
+    verdict: pass
+    extra: 16/16 node:test green (83ms)
+  - phase: review
+    persona: reviewer
+    model: opus
+    verdict: pass-with-notes
+    extra: needs_optimization — 2 improvement-severity findings reconciled by orchestrator pre-commit
+field_sources:
+  agent_models:
+    research: { persona: researcher, tier: sonnet, source: orchestrator-manual }
+    implement: { persona: developer, tier: sonnet, source: orchestrator-manual }
+    test: { persona: tester, tier: sonnet, source: orchestrator-manual }
+    review: { persona: reviewer, tier: opus, source: orchestrator-manual }
+usage:
+  agent_count: 4
+  subagent_tokens: 332640
+  tool_uses: 124
+  duration_ms: 909561
+insight_capture:
+  memories_written: 4
+  personas: [researcher, developer, tester, reviewer]
+artifacts:
+  created:
+    - hive/workflows/steps/test-swarm/step-04b-scenario-replay.md
+    - hive/workflows/steps/test-swarm/__tests__/step-04b-scenario-replay.test.mjs
+    - .pHive/test-scenarios/t-1b-step-04b-and-rip-simulated-manual.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/t-1b-step-04b-and-rip-simulated-manual/implement.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/t-1b-step-04b-and-rip-simulated-manual/test.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/t-1b-step-04b-and-rip-simulated-manual/review.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/t-1b-step-04b-and-rip-simulated-manual/workflow-script.js
+    - hive/agents/memories/researcher/test-dispatch-not-yet-created.md
+    - hive/agents/memories/developer/step-file-output-contract-before-dag-insertion.md
+    - hive/agents/memories/tester/stale-dag-test-after-dag-retarget.md
+    - hive/agents/memories/reviewer/test-scenario-folded-scalar-pitfall.md
+  modified:
+    - hive/workflows/test-swarm.workflow.yaml
+    - skills/test/SKILL.md
+    - .pHive/cross-cutting-concerns.yaml
+    - hive/lib/scenarios/__tests__/load.test.mjs  # cross-story stale assertion fix
+orchestrator_fixes:
+  - issue: stale t-1a assertion at load.test.mjs:344 (validate-coverage depends_on execute-platform-a)
+    cause: t-1b retargeted validate-coverage to depend on scenario-replay; t-1a's assertion became stale
+    fix: updated assertion text + test title to match post-t-1b DAG state
+    verified: 12/12 pass after fix
+  - issue: test-scenario YAML at .pHive/test-scenarios/t-1b-*.yaml line 81 embedded "id:" / "status:" tokens in folded scalar
+    cause: in-house YAML parser in hive/lib/scenarios/load.mjs misreads colon-prefixed tokens in folded scalars as sub-keys
+    fix: reworded line 81 to natural prose ("entry named X whose status field reads Y") avoiding colon-key patterns
+    verified: loadScenario('.pHive/test-scenarios/t-1b-*.yaml') returns OK after fix
+deviations:
+  - kind: spec-vs-codebase-naming
+    spec: step-04b (in story spec sometimes used as step id)
+    actual: workflow step id = "scenario-replay" (step_file = step-04b-scenario-replay.md)
+    resolution: workflow keys edges by step id; step_file path keeps the 04b ordinal
+scope_discipline:
+  files_match_spec: true
+  cross_story_fix_justified: true  # reviewer explicitly requested
+  no_skill_drift_outside_listed: true
+notes: |
+  Slice 2 closes once t-3 lands. t-1b's Phase 0 stub points at
+  skills/hive/skills/test-dispatch/SKILL.md which does NOT yet exist — that
+  skill ships in t-3-test-mode-cc-workflows. Until t-3 ships, /test invocations
+  will fail at Phase 0 with a missing-skill error. This is by design per the
+  Slice 2 sequencing.

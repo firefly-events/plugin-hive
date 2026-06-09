@@ -1,0 +1,61 @@
+step: test
+status: completed
+verdict: pass
+timestamp: "2026-06-05T00:00:00Z"
+agent: tester
+test_file: hive/lib/__tests__/cc-workflows-model-tier.test.mjs
+convention_note: >
+  Used hive/lib/__tests__/ (sibling __tests__ dir) rather than the story-spec's
+  hive/lib/test/ path — matches the existing project convention established in
+  hive/lib/multica-story-dispatch/__tests__/serialize-story-brief.test.mjs.
+run_output: |
+  [cc-workflows-model-tier] persona "unknown-persona" unmapped — defaulting to sonnet
+  [cc-workflows-model-tier] persona "developer" unmapped — defaulting to sonnet
+  [cc-workflows-model-tier] persona "developer" unmapped — defaulting to sonnet
+  [cc-workflows-model-tier] persona "nobody" unmapped — defaulting to sonnet
+  [cc-workflows-model-tier] persona "unmapped-persona" unmapped — defaulting to sonnet
+  ✔ override wins: reviewer is in sonnet model_tiers but model_overrides promotes to opus (0.768959ms)
+  ✔ override wins: peer-validator override returns opus regardless of tier map (0.060291ms)
+  ✔ base tier: developer maps to sonnet via model_tiers (0.052709ms)
+  ✔ base tier: orchestrator maps to opus via model_tiers (0.047042ms)
+  ✔ base tier: test-worker maps to haiku via model_tiers (0.0495ms)
+  ✔ default: unmapped persona returns tier=sonnet, source=default (0.404875ms)
+  ✔ default: unmapped persona emits console.warn naming the persona (0.114125ms)
+  ✔ default: empty config object still returns sonnet+default (no crash) (0.068125ms)
+  ✔ default: null/undefined ctx.config still returns sonnet+default (no crash) (0.075792ms)
+  ✔ return shape: all paths return exactly {tier, source} keys (0.1605ms)
+  ✔ snapshot: representative persona list produces byte-stable output (0.894583ms)
+  ℹ tests 11
+  ℹ suites 0
+  ℹ pass 11
+  ℹ fail 0
+  ℹ cancelled 0
+  ℹ skipped 0
+  ℹ todo 0
+  ℹ duration_ms 93.919917
+coverage:
+  ac_coverage: 4/4
+  audit_walk: "complete (AC 4/4 covered, refs re-read)"
+  tests:
+    - name: "override wins: reviewer is in sonnet model_tiers but model_overrides promotes to opus"
+      ac: "(a) override wins when persona has both base + override"
+    - name: "override wins: peer-validator override returns opus regardless of tier map"
+      ac: "(a) override wins when persona has both base + override"
+    - name: "base tier: developer maps to sonnet via model_tiers"
+      ac: "(b) base tier returned when only model_tiers assignment"
+    - name: "base tier: orchestrator maps to opus via model_tiers"
+      ac: "(b) base tier returned when only model_tiers assignment"
+    - name: "base tier: test-worker maps to haiku via model_tiers"
+      ac: "(b) base tier returned when only model_tiers assignment"
+    - name: "default: unmapped persona returns tier=sonnet, source=default"
+      ac: "(c) default sonnet + console.warn when persona unmapped"
+    - name: "default: unmapped persona emits console.warn naming the persona"
+      ac: "(c) default sonnet + console.warn when persona unmapped"
+    - name: "default: empty config object still returns sonnet+default (no crash)"
+      ac: "(c) edge: empty config"
+    - name: "default: null/undefined ctx.config still returns sonnet+default (no crash)"
+      ac: "(c) edge: null config"
+    - name: "return shape: all paths return exactly {tier, source} keys"
+      ac: "shape invariant — {tier, source} on all paths"
+    - name: "snapshot: representative persona list produces byte-stable output"
+      ac: "(d) snapshot fixture for representative input"

@@ -1,0 +1,22 @@
+step: implement
+story_id: t-3-test-mode-cc-workflows
+epic: substrate-coverage-and-test-cleanup
+agent: developer
+status: completed
+started_at: "2026-06-07T00:00:00Z"
+completed_at: "2026-06-07T00:00:00Z"
+files:
+  - path: skills/hive/skills/test-mode-cc-workflows/SKILL.md
+    change: created
+  - path: skills/hive/skills/test-dispatch/SKILL.md
+    change: created
+notes: >
+  Created test-mode-cc-workflows atom (~360 lines, mirrors plan-mode-cc-workflows).
+  Dispatch granularity is per-scenario (architect Q3 ruling). Step 0 imports
+  assertWorktreeIsolation from hive/lib/cc-workflows-preconditions.mjs. Zero
+  agentType literals, zero codex:codex-rescue references, zero agent_backends keys.
+
+  Created test-dispatch router (~220 lines, structural mirror of execute-dispatch).
+  Step 0 invokes resolveMode('HIVE_TEST_MODE', ctx) from hive/lib/mode-resolver.mjs.
+  ctx.env is built as raw "VARNAME=value" token per mode-resolver.mjs:75 parsing.
+  Returns {mode_decision, sources} so callers can audit provenance.
