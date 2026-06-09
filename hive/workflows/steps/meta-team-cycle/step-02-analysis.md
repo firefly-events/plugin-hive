@@ -235,13 +235,46 @@ Each finding uses the standard step-02 shape with `category: STALE_OPEN_PR` and 
 
 `stale-pr-finder.mjs` is pure — no fetch, no shell, no `Date.now()`. Tests live at `hive/workflows/steps/meta-team-cycle/__tests__/stale-pr-finder.test.mjs` (20 cases): `daysBetween` arithmetic, draft/closed/merged filtering, tier boundaries (7/14d), reviewer-attached vs unattended classification, finding shape, sort order (severity-desc then age-desc).
 
+### 6d. /hive:triage queue aging audit
+
+Triage items sitting in a non-closed state for too long are real meta-team signals: either the report needs clarification, a prioritization decision is overdue, or a plan-ready item never reached execution. The aging thresholds are state-aware — inbox/clarified/prioritized are stale at 7d / critical at 14d, while plan-ready (already cleared planning) gets a softer 14d / 30d threshold because it represents a real execution-bottleneck signal rather than a triage-handling gap.
+
+Implementation module: `hive/workflows/steps/meta-team-cycle/triage-aging-finder.mjs`. Pure-function over the parsed `.pHive/triage/queue.yaml` shape documented in `hive/references/triage-queue-schema.md`. The caller reads the file (or treats it as absent → empty queue, per the schema's fail-open semantics) and passes the parsed object in.
+
+Gather data:
+
+```bash
+# Schema-aware load — missing/malformed queue file is treated as empty
+# per hive/references/triage-queue-schema.md §Warning-only gate.
+if [ -f "${HIVE_STATE_DIR}/triage/queue.yaml" ]; then
+  cat "${HIVE_STATE_DIR}/triage/queue.yaml" | yq -o=json > /tmp/triage_queue.json || echo '{}' > /tmp/triage_queue.json
+else
+  echo '{}' > /tmp/triage_queue.json
+fi
+```
+
+Invoke the helper (clock pinned by the caller, same convention as the stale-PR finder):
+
+```js
+import { findStuckTriageItems } from 'hive/workflows/steps/meta-team-cycle/triage-aging-finder.mjs';
+
+const queue = JSON.parse(readFileSync('/tmp/triage_queue.json', 'utf8'));
+const triageFindings = findStuckTriageItems(queue, {
+  nowIso: process.env.HIVE_CYCLE_NOW_ISO,
+});
+```
+
+Each finding uses the standard step-02 shape with `category: STUCK_TRIAGE_ITEM` and `location: triage:<id>`. Severity mapping: critical-tier (past the state's `criticalDays`) → `high`; medium-tier (past `staleDays`) → `medium`. Append to the standard findings list.
+
+`triage-aging-finder.mjs` is pure — no fs, no fetch, no `Date.now()`. Tests live at `hive/workflows/steps/meta-team-cycle/__tests__/triage-aging-finder.test.mjs` (17 cases): anchor resolution (state_history vs reported_at fallback), per-state threshold boundaries (inbox/clarified/prioritized 7/14d, plan-ready 14/30d), closed-item filtering, unknown-state safety, malformed-queue tolerance, finding shape, sort order.
+
 ### 7. Compile findings
 For each finding, record:
 ```yaml
 id: finding-{N}
-category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | CODERABBIT_RECURRING | STALE_OPEN_PR | OTHER
+category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | CODERABBIT_RECURRING | STALE_OPEN_PR | STUCK_TRIAGE_ITEM | OTHER
 severity: critical | high | medium | low
-location: {file path | cross-repo | branch:<ref> | pr:<n>}
+location: {file path | cross-repo | branch:<ref> | pr:<n> | triage:<id>}
 description: {one-line description}
 evidence: {specific field, line, or pattern that demonstrates the issue}
 ```
