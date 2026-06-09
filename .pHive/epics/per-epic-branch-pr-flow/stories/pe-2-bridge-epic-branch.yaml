@@ -1,7 +1,7 @@
 id: pe-2-bridge-epic-branch
 epic: per-epic-branch-pr-flow
 title: Bridge template — branch name derived from hive:epic label
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [pe-1-config-schema]

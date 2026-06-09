@@ -187,7 +187,7 @@ const prompt = [
 ].join(" ");
 
 const result = await run({
-  agent: claudeCode("claude-opus-4-7"),
+  agent: claudeCode("claude-opus-4-8"),
   // Explicit imageName matches the workflow's GHCR pull retag
   // (sandcastle:hive). Without this, sandcastle defaults to
   // `sandcastle:<cwd-basename>` (e.g., `sandcastle:plugin-hive`), which

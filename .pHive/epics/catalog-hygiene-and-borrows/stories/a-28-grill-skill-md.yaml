@@ -1,7 +1,7 @@
 id: a-28-grill-skill-md
 epic: catalog-hygiene-and-borrows
 title: Write atomic skills/grill/SKILL.md and grill-record template
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [a-26-context-md-schema-and-starter]

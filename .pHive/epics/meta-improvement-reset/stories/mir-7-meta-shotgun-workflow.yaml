@@ -1,7 +1,7 @@
 id: mir-7-meta-shotgun-workflow
 epic: meta-improvement-reset
 title: Build meta-shotgun workflow + integration test
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 tracker_id: plugin-hive/PLU-69

@@ -1,7 +1,7 @@
 id: s2-spike-atoshell
 epic: hive-composability-audit
 title: Atoshell feasibility spike — local task_tracking adapter evaluation
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s1-spike-sandcastle]

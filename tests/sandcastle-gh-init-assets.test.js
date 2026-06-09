@@ -256,7 +256,7 @@ test('bridge imports run + claudeCode from @ai-hero/sandcastle and docker sandbo
 
 test('bridge invokes run() with derived branch and cost controls (pe-2)', () => {
   const mts = readFile(MTS_EXAMPLE);
-  assert.match(mts, /agent: claudeCode\("claude-opus-4-7"\)/);
+  assert.match(mts, /agent: claudeCode\("claude-opus-4-8"\)/);
   // env nested under docker() per cron-runner pattern (auth must flow via
   // sandboxProviderEnv, not opts.env, to actually reach the container).
   assert.match(mts, /sandbox: docker\(\{[\s\S]*?imageName: "sandcastle:hive"[\s\S]*?containerUid: 1000[\s\S]*?env: \{[\s\S]*?CLAUDE_CODE_OAUTH_TOKEN[\s\S]*?\}[\s\S]*?\}\)/);

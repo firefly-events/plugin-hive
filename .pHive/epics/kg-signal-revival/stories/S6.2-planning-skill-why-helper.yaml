@@ -1,7 +1,7 @@
 id: S6.2-planning-skill-why-helper
 epic: kg-signal-revival
 title: /plan integrates /hive:why for prior-decisions pre-flight section
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [S6.1-hive-why-slash-command]

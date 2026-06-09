@@ -1,7 +1,7 @@
 id: a-26-context-md-schema-and-starter
 epic: catalog-hygiene-and-borrows
 title: Define .pHive/CONTEXT.md schema and produce starter content
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [a-25-skill-prelude-extraction]

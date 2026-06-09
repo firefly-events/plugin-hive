@@ -1,7 +1,7 @@
 id: s2-1-reverse-sync-optional
 epic: story-loop-closure
 title: "S2.1 — (optional) reverse sync: Multica cancelled → story YAML status: deferred"
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s1-1-multica-issue-closer-module]

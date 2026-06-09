@@ -1,7 +1,7 @@
 id: m-02-story-schema-metric-fields
 epic: metrics-as-planning-concern
 title: Document `metric:` field group in story YAML conventions
-status: completed
+status: blocked
 complexity: small
 methodology: classic
 depends_on: [m-01-add-metrics-concern]

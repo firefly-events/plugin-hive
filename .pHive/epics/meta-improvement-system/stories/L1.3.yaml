@@ -2,7 +2,7 @@ id: L1.3
 epic: meta-improvement-system
 slice: S7
 title: Baseline-capture primitive
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: ["L1.2", "C1.4", "C2.1"]

@@ -8,7 +8,7 @@
 id: S6-readme-audit
 epic: kg-augmented-meta-signal
 title: README + CHANGELOG audit — 1.1.3 drift cleanup and 1.1.4 kg-signal coverage
-status: completed
+status: in_progress
 backfilled: true
 complexity: small
 methodology: classic

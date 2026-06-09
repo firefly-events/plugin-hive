@@ -1,7 +1,7 @@
 id: s2-plan-phase-d-wiring
 epic: multica-substrate-adoption
 title: /plan Phase D writes Multica issues via dispatch
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s1-multica-adapter]

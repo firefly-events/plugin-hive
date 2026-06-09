@@ -1,7 +1,7 @@
 id: s3-gh-actions-cron-loop
 epic: sandcastle-ops-layer
 title: GH Actions cron workflow + token-budget gate
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s2-sandcastle-worker-prompt]

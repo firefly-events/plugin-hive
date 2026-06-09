@@ -1,7 +1,7 @@
 id: c-6-migration-guide-and-prose-runbook-deprecation
 epic: task-tracking-adapter-abi
 title: Migration guide + deprecate prose-runbook adapter paths
-status: pending
+status: in_progress
 complexity: low
 methodology: classic
 depends_on: [c-5b-skill-citation-swap-and-fallback-telemetry]

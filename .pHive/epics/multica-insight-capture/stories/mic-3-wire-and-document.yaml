@@ -1,0 +1,88 @@
+id: mic-3-wire-and-document
+epic: multica-insight-capture
+title: Wire capture+distill into execute-mode-multica lifecycle + docs
+status: blocked
+complexity: medium
+methodology: classic
+depends_on: [ mic-1-agent-self-capture-brief, mic-2-orchestrator-distill ]
+
+description: |
+  Make the capture (mic-1) + orchestrator distill (mic-2) a first-class part of the
+  Multica execution lifecycle, and document the variant so future readers know
+  Multica mode now participates in insight capture.
+
+  Wiring:
+    - execute-mode-multica/SKILL.md: add a Step (after Step 3 "Episode marker per
+      terminal") for the orchestrator distill invocation; update the Outputs list to
+      include the team-memory note; add a Constraint-summary row "Insight capture |
+      mic-1 brief + mic-2 orchestrator distill".
+    - pre-shutdown-protocol.md: add a note that Multica mode realizes the protocol
+      via agent self-capture (mic-1) + post-terminal orchestrator distill (mic-2) rather
+      than the in-process Claude-Code pre-shutdown path.
+
+  This story closes the loop flagged in feedback_multica_skips_insight_capture.
+
+acceptance_criteria:
+  - "Given execute-mode-multica/SKILL.md, when read, then it documents the
+    orchestrator-distill step in the lifecycle (after episode marker) and lists
+    the team-memory output."
+  - "Given the SKILL constraint-summary table, when read, then it includes an
+    insight-capture row referencing mic-1 + mic-2."
+  - "Given pre-shutdown-protocol.md, when read, then it notes the Multica
+    variant (agent self-capture + orchestrator distill) as a valid realization
+    of the protocol."
+
+steps:
+  - id: research
+    description: Re-read execute-mode-multica/SKILL.md structure (Outputs, Process
+      steps, Constraint summary) and pre-shutdown-protocol.md to place the
+      additions correctly.
+    agent: researcher
+  - id: implement
+    description: Add the distill step + outputs + constraint row to the SKILL; add
+      the Multica-variant note to pre-shutdown-protocol.md.
+    agent: developer
+    depends_on: [ research ]
+  - id: review
+    description: Confirm the wired prose matches the mic-1/mic-2 implementations
+      (path contract, inline-orchestrator runner, team-memory target).
+    agent: reviewer
+    depends_on: [ implement ]
+  - id: integrate
+    description: Commit and push to feat/multica-insight-capture.
+    agent: developer
+    depends_on: [ review ]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/execute-mode-multica/SKILL.md
+      purpose: The Multica lifecycle prose to extend (Outputs, Process, Constraint
+        summary).
+    - path: hive/references/pre-shutdown-protocol.md
+      purpose: Where the Multica capture variant is documented.
+
+files_to_modify:
+  - file: skills/hive/skills/execute-mode-multica/SKILL.md
+    change: Add orchestrator-distill step + outputs + constraint row.
+  - file: hive/references/pre-shutdown-protocol.md
+    change: Note the Multica capture variant.
+
+cross_cutting:
+  - concern: documentation
+    action: "This story IS the documentation/wiring; ensure both mic-1 and mic-2 are
+      referenced."
+
+metric:
+  applies: false
+  justification: "Pure wiring/documentation story that records the mic-1+mic-2
+    mechanism into the execute-mode-multica lifecycle prose; its effect is
+    verified by mic-1/mic-2 acceptance, not a number this story moves."
+
+risks:
+  - severity: low
+    description: SKILL prose drifts from the shipped mic-1/mic-2 behavior.
+    mitigation: depends_on both; review step cross-checks path contract, runner
+      model, and target against the implementations.
+tracker_id: plugin-hive/PLU-241
+tracker_url: http://localhost:3000/plugin-hive/issues/241

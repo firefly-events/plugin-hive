@@ -2,7 +2,7 @@ id: K.1
 epic: meta-improvement-system
 slice: S6
 title: Fresh-workspace metrics opt-in question
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: ["C2.1", "C2.2", "C2.3", "C2.4", "C2.5", "C2.6"]

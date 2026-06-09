@@ -1,7 +1,7 @@
 id: w1-doc-template-reclassify
 epic: catalog-hygiene-and-borrows
 title: Reclassify 5 doc-template skills as references/document-templates/
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [a-25-skill-prelude-extraction]

@@ -112,6 +112,90 @@ again.
 
 ---
 
+## Step 1b: Ship Target Elicitation / Preservation
+
+Before entering the brownfield or greenfield path, make sure
+`.pHive/project-profile.yaml` has a concrete `ship_target` block. `/ship` reads
+this block and must not infer what "shipped" means for the project.
+
+The valid schema is:
+
+```yaml
+ship_target:
+  kind: app-store | vercel | github-release | npm | custom
+  command: "<shell command>" # required only when kind == custom
+  notes: "<optional human note, e.g. which Vercel project / npm scope>"
+```
+
+Allowed `kind` values:
+
+| Kind | Meaning |
+|------|---------|
+| `app-store` | Shipping means App Store / Play Store submission or release. |
+| `vercel` | Shipping means deploying the project through Vercel. |
+| `github-release` | Shipping means creating a GitHub release. |
+| `npm` | Shipping means publishing an npm package. |
+| `custom` | Shipping means running the provided shell command. |
+
+For Hive itself, set `kind: github-release` because this repository ships via
+GitHub releases.
+
+### Fresh kickoff path
+
+Ask the user:
+
+`What does shipping mean for this project?`
+
+Present the allowed kinds in the prompt:
+
+`Choose one: app-store, vercel, github-release, npm, custom.`
+
+Then:
+
+1. Record the selected kind as `ship_target.kind`.
+2. Ask for an optional note, such as the Vercel project name, npm scope, release
+   channel, or store track. If provided, record it as `ship_target.notes`.
+3. If the selected kind is `custom`, ask for the shell command that performs the
+   ship action.
+4. If `kind == custom` and the command is empty or missing, re-prompt:
+   `Custom shipping requires a command string. What command should /ship run?`
+5. Do not write a `custom` ship target until a non-empty command is collected.
+6. Security note: a `custom` command runs in a shell at ship time. Kickoff only
+   enforces the non-empty check; command sanitization and injection safety are
+   deferred to the `/ship` executor, which presents the resolved action as a
+   dry-run and requires explicit operator confirmation before executing it.
+
+Example custom result:
+
+```yaml
+ship_target:
+  kind: custom
+  command: "make release-prod"
+  notes: "Runs the internal release wrapper."
+```
+
+### Re-kickoff preservation path
+
+If `.pHive/project-profile.yaml` already contains a valid `ship_target` block:
+
+1. Read and show the current value to the user.
+2. Ask a change prompt, for example:
+   `Shipping is currently configured as github-release. Do you want to change it?`
+3. If the user keeps the existing value, preserve it exactly and do not rewrite
+   `ship_target`.
+4. If the user changes it, collect the replacement using the fresh kickoff rules
+   above, including the required command validation for `custom`.
+
+If `.pHive/project-profile.yaml` exists but lacks `ship_target`, add only the
+`ship_target` block. Preserve every existing top-level field and nested section
+unchanged, including manual edits. Re-running kickoff after adding the block must
+be idempotent.
+
+If `.pHive/project-profile.yaml` does not exist yet, include `ship_target` when
+the profile is created in Phase 3.
+
+---
+
 ## Step 2A: Brownfield — Discovery & Onboarding
 
 **Goal:** Build a comprehensive knowledge base so Hive agents understand the project before any planning or execution begins.
@@ -559,6 +643,7 @@ When Phase 2b-iv runs on a project that already has `.pHive/cross-cutting-concer
 | 2b-ii Developer Discovery | hive.config.yaml | `developer` |
 | 2b-iii Code Quality & Linter Detection | project-profile.yaml | `code_quality` (linters, formatters, pre_commit, code_snippets, test_first_signals), `project_maturity` |
 | 2b-iv Cross-Cutting Concern Auto-Generation | .pHive/cross-cutting-concerns.yaml | `concerns` |
+| 1b Ship Target Elicitation | project-profile.yaml | `ship_target` |
 
 ---
 
@@ -571,6 +656,11 @@ project_name: "{name}"
 type: brownfield
 discovered: "{ISO 8601}"
 source: "CLAUDE.md + codebase scan"
+
+ship_target:
+  kind: app-store | vercel | github-release | npm | custom
+  command: "<shell command>" # required only when kind == custom
+  notes: "<optional human note, e.g. which Vercel project / npm scope>"
 
 # From CLAUDE.md (verbatim or summarized)
 claude_md_summary: |

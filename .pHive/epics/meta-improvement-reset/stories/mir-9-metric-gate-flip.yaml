@@ -1,7 +1,7 @@
 id: mir-9-metric-gate-flip
 epic: meta-improvement-reset
 title: Flip step-03c metric gate to blocking with advisory escape hatch
-status: pending
+status: blocked
 complexity: medium
 methodology: tdd
 tracker_id: plugin-hive/PLU-71

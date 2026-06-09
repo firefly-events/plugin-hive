@@ -2,7 +2,7 @@ id: C2.5
 epic: meta-improvement-system
 slice: S5
 title: Fix-loop iteration and first-attempt pass emission at execute boundaries
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: ["C2.0", "C2.1"]

@@ -1,7 +1,7 @@
 id: s4-synthesis-recommendation
 epic: hive-composability-audit
 title: Joint TPM+architect structural recommendation — single gate-keeping doc
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [s1-spike-sandcastle, s2-spike-atoshell, s3-spike-skills-lens]

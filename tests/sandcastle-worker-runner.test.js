@@ -242,7 +242,7 @@ test('runOnce propagates imageName to docker() and modelTag to claudeCode()', as
   await runOnce({
     issueNumber: 1,
     imageName: 'sandcastle:custom',
-    modelTag: 'claude-opus-4-7-test',
+    modelTag: 'claude-opus-4-8-test',
     _deps: deps,
   });
   assert.deepEqual(deps._captured.capturedDockerArgs, [
@@ -257,11 +257,11 @@ test('runOnce propagates imageName to docker() and modelTag to claudeCode()', as
     },
   ]);
   assert.deepEqual(deps._captured.capturedClaudeArgs, [
-    'claude-opus-4-7-test',
+    'claude-opus-4-8-test',
   ]);
 });
 
-test('runOnce defaults imageName to sandcastle:hive and modelTag to claude-opus-4-7', async () => {
+test('runOnce defaults imageName to sandcastle:hive and modelTag to claude-opus-4-8', async () => {
   const { runOnce, _internal } = loadModule();
   const deps = makeDeps();
   await runOnce({ issueNumber: 1, _deps: deps });

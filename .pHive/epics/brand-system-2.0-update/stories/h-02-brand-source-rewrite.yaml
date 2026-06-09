@@ -1,7 +1,7 @@
 id: h-02-brand-source-rewrite
 epic: brand-system-2.0-update
 title: "Rewrite .pHive/brand/ source artifacts + re-export positioning-baked assets"
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on:

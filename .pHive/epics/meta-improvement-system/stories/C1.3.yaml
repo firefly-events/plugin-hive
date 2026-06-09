@@ -2,7 +2,7 @@ id: C1.3
 epic: meta-improvement-system
 slice: S2
 title: Experiment envelope schema
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: ["B0.1", "B0.2", "B0.3", "C1.1"]

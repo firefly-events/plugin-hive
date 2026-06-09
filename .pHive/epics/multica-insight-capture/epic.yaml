@@ -1,0 +1,33 @@
+name: multica-insight-capture
+title: Multica Insight Capture — close the shutdown-capture gap (triage t-001)
+description: |
+  Multica execution mode runs none of Hive's pre-shutdown insight/memory capture;
+  raw transcripts go undistilled. This epic adds two surfaces: (1) agents self-record
+  insights via story-brief injection, and (2) the orchestrator distills — inline, full
+  capability, reasoning forward/backward about impact — into team-memories, promoting
+  durable cross-epic learnings to Hive memory. Wired into execute-mode-multica and
+  documented as a pre-shutdown-protocol variant.
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+version_bump: patch
+
+source_triage: t-001
+
+stories:
+  - id: mic-1-agent-self-capture-brief
+    title: Agent self-records insights via story-brief injection
+    complexity: medium
+    depends_on: []
+  - id: mic-2-orchestrator-distill
+    title: Orchestrator distills Multica insights into memory
+    complexity: high
+    depends_on: [mic-1-agent-self-capture-brief]
+  - id: mic-3-wire-and-document
+    title: Wire capture+distill into execute-mode-multica lifecycle + docs
+    complexity: medium
+    depends_on: [mic-1-agent-self-capture-brief, mic-2-orchestrator-distill]

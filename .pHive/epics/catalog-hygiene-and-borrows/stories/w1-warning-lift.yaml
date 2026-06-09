@@ -1,7 +1,7 @@
 id: w1-warning-lift
 epic: catalog-hygiene-and-borrows
 title: Lift kickoff-gate hard-block to warning on 5 read-only-shaped skills
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [a-25-skill-prelude-extraction]

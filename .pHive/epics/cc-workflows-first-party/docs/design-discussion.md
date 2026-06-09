@@ -115,7 +115,7 @@ Phase 0(a) + (b) must explicitly test this — Codex creator returns file list, 
 
 ## 6. Open Questions
 
-_All Q1-Q8 maintainer-confirmed at gate 1 (2026-05-31). Q5 (autopilot owner split) DESCOPED — autopilot work removed from this epic entirely; remaining questions re-numbered? **No** — preserved as 1-9 minus 5 to keep cross-doc references stable; gap retained at Q5 with a tombstone._
+*All Q1-Q8 maintainer-confirmed at gate 1 (2026-05-31). Q5 (autopilot owner split) DESCOPED — autopilot work removed from this epic entirely; remaining questions re-numbered? **No** — preserved as 1-9 minus 5 to keep cross-doc references stable; gap retained at Q5 with a tombstone.*
 
 1. **Phase 0 spike scope.** Pass = criteria (a)-(d) under §3 Phase 0 each have an explicit verdict. Spike runs a 5-story epic with at least one Codex-routed creator. Maintainer override on the pass bar. **Maintainer-confirmed: as written.**
 2. **PR-flow under `/workflows` — preserve (a) or bend (b)?** **Conditional recommendation (grill U1):** (a) IF Phase 0 confirms `/workflows` honors shell-snippet integration-branch contract injected into agent prompts; ELSE fall back to serial-commit gate's worktree-per-story isolation + serialized merge (§3 Phase 2 mechanism). **Maintainer-confirmed at gate 1: (a) conditional.**
@@ -191,4 +191,4 @@ All other grill findings (V1, V2, V3, H1, H3, U1, U2, U3, C1, C2, P1, P2) addres
 
 ---
 
-_End of revised v2 draft. Next: Phase B2 H/V planning. Architect-v2 review state captured in §0 + §9. Maintainer gate 1 cleared 2026-05-31._
+*End of revised v2 draft. Next: Phase B2 H/V planning. Architect-v2 review state captured in §0 + §9. Maintainer gate 1 cleared 2026-05-31.*

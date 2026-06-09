@@ -2,7 +2,7 @@ id: B0.2
 epic: meta-improvement-system
 slice: S1
 title: Query shape doc for baseline vs candidate, run-over-run, and delayed-regression watch
-status: pending
+status: completed
 complexity: medium
 methodology: classic
 depends_on: ["B0.1"]
@@ -98,3 +98,6 @@ references:
     relevant_excerpt: |
       - B0.2: Draft query shape document (baseline/candidate/delta queries; what's cheap, what's expensive)
       - Query shape doc describes three named queries with cost classification
+shipped:
+  branch: feat/meta-improvement-system
+  merged_at: "2026-06-08T20:44:01.593Z"
