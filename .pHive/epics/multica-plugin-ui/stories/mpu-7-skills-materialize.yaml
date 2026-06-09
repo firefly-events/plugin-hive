@@ -2,6 +2,8 @@ id: mpu-7-skills-materialize
 epic: multica-plugin-ui
 title: "Skill materialization into Multica DB with provenance"
 status: pending
+tracker_id: PLU-322
+tracker_uuid: 3e354d28-9598-4202-9517-26992f747c1a
 complexity: medium
 methodology: classic
 depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view, mpu-6-skills-catalog-browse]

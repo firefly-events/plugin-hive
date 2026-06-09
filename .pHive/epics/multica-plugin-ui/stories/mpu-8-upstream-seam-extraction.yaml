@@ -2,6 +2,8 @@ id: mpu-8-upstream-seam-extraction
 epic: multica-plugin-ui
 title: "Upstream seam extraction (conditional on measured fork churn)"
 status: pending
+tracker_id: PLU-323
+tracker_uuid: 6f879588-06cd-47ab-8531-8c57bd55f907
 complexity: medium
 methodology: classic
 depends_on:

@@ -2,6 +2,8 @@ id: mpu-6-skills-catalog-browse
 epic: multica-plugin-ui
 title: "Skills catalog — versioned packaged browse (no online runtime)"
 status: pending
+tracker_id: PLU-321
+tracker_uuid: 2742c44b-f44b-4969-8f4b-ced026be797a
 complexity: medium
 methodology: classic
 depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view]

@@ -2,6 +2,8 @@ id: mpu-3-reviewgates-view
 epic: multica-plugin-ui
 title: "ReviewGates list/detail/update workflow"
 status: pending
+tracker_id: PLU-318
+tracker_uuid: 42d29872-7ccb-45eb-a36a-1a2b4ec36680
 complexity: medium
 methodology: classic
 depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view]

@@ -2,6 +2,8 @@ id: mpu-2-epictree-view
 epic: multica-plugin-ui
 title: "Minimal EpicTree route, nav entry, dashboard render"
 status: pending
+tracker_id: PLU-317
+tracker_uuid: 53394632-ca5d-4f7d-b01a-f65b35caf84e
 complexity: medium
 methodology: classic
 depends_on: [mpu-1-proof-gate-mount-store-schema]

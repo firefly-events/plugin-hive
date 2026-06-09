@@ -2,6 +2,8 @@ id: mpu-4-personalqueue-view
 epic: multica-plugin-ui
 title: "PersonalQueue user-scoped work-item surface"
 status: pending
+tracker_id: PLU-319
+tracker_uuid: 9d0a53fb-c283-447b-8ce2-67af6482d7a5
 complexity: medium
 methodology: classic
 depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view]

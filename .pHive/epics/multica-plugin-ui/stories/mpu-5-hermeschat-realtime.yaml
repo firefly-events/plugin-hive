@@ -2,6 +2,8 @@ id: mpu-5-hermeschat-realtime
 epic: multica-plugin-ui
 title: "HermesChat persisted messaging over /ws realtime"
 status: pending
+tracker_id: PLU-320
+tracker_uuid: 93c951bc-a414-419d-a29c-a9c9d27c752a
 complexity: high
 methodology: classic
 depends_on: [mpu-1-proof-gate-mount-store-schema, mpu-2-epictree-view]

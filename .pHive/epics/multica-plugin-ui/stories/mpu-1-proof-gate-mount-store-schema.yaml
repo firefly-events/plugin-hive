@@ -2,6 +2,8 @@ id: mpu-1-proof-gate-mount-store-schema
 epic: multica-plugin-ui
 title: "Proof gate — /api/plugins/hive route mount + HiveStore + hive schema"
 status: pending
+tracker_id: PLU-316
+tracker_uuid: 0fac9c3f-e4b6-46c2-afc2-926d4c7ee206
 complexity: high
 methodology: classic
 depends_on: []
