@@ -1,0 +1,116 @@
+id: r-3-review-mode-cc-workflows-smoke
+title: "/review via cc-workflows substrate smoke walk — r-3 atom solo reviewer + single cc-workflows-run.yaml marker"
+description: >
+  Spec-walk confirming that /review routes through review-dispatch to
+  review-mode-cc-workflows when HIVE_REVIEW_MODE=cc-workflows is set, the resolver
+  returns the expected mode_decision, the atom prescribes exactly ONE reviewer agent
+  inside a SINGLE Workflow TOOL run (solo reviewer pattern per skills/review/SKILL.md Phase 1),
+  and ONE cc-workflows-run.yaml episode marker captures the reviewer verdict.
+  Also verifies --sequential flag semantics, Step 0 assertWorktreeIsolation import,
+  scope_drift_observed: true (atom owns emit), and s-3 lint 4/4 PASS.
+mode: spec-walk
+story: r-3-review-mode-cc-workflows
+epic: substrate-coverage-and-test-cleanup
+
+preconditions:
+  - "skills/hive/skills/review-mode-cc-workflows/SKILL.md is present and cites skills/review/SKILL.md Phase 1 as the solo reviewer pattern"
+  - "skills/hive/skills/review-dispatch/SKILL.md is present and names review-mode-cc-workflows as the cc-workflows downstream target"
+  - "hive/lib/mode-resolver.mjs is present and recognizes HIVE_REVIEW_MODE as a registered varName"
+  - "hive/lib/cc-workflows-preconditions.mjs is present and exports assertWorktreeIsolation"
+  - "hive/lib/cc-workflows-model-tier.mjs is present and exports resolveModelTier"
+  - "The vitest resolver test suite at skills/hive/skills/review-mode-cc-workflows/test/resolver.test.mjs passes green"
+  - "The s-3 no-codex lint targets *-mode-cc-workflows/SKILL.md and review-mode-cc-workflows is in scope"
+
+steps:
+  - action: >
+      Run the vitest resolver test for review-mode-cc-workflows to confirm all
+      5-tier permutations resolve correctly and the raw-token footgun is covered.
+    expected: >
+      All tests pass. Each tier (env, root_config, shipped_baseline, skill_override,
+      default) resolves to the expected decision with only the winning source key in
+      sources. The raw-token footgun test confirms that passing a bare value without
+      VARNAME= falls through to the next tier.
+    actor: tester
+
+  - action: >
+      Invoke resolveMode with env set to HIVE_REVIEW_MODE=cc-workflows and verify
+      the returned decision and sources.
+    expected: >
+      decision equals cc-workflows and sources contains only the env key with value
+      HIVE_REVIEW_MODE=cc-workflows. No other tier keys appear in sources.
+    actor: tester
+
+  - action: >
+      Read review-mode-cc-workflows SKILL.md and confirm exactly ONE reviewer agent is
+      documented: the solo reviewer pattern from skills/review/SKILL.md Phase 1.
+      Confirm panel-mode (multi-reviewer) is explicitly DEFERRED.
+    expected: >
+      SKILL.md documents SOLO reviewer only. Panel-mode is explicitly marked as
+      DEFERRED per Decision Point 2. The dispatched reviewer runs internally the
+      researcher + reviewer sequential steps (Phase 1 of skills/review/SKILL.md).
+    actor: tester
+
+  - action: >
+      Read review-mode-cc-workflows SKILL.md and confirm the single-run shape:
+      ONE Workflow TOOL run for the entire review, ONE agent() call for the reviewer,
+      ONE cc-workflows-run.yaml episode marker capturing the reviewer verdict,
+      NO per-persona fan-out.
+    expected: >
+      SKILL.md states ONE Workflow TOOL run with ONE agent() call. The marker path uses
+      {unit_id} as the directory identifier (not persona name). The marker target is
+      at the path format "${HIVE_STATE_DIR}/episodes/{epic_handle}/{unit_id}/cc-workflows-run.yaml".
+    actor: tester
+
+  - action: >
+      Simulate /review dispatch with --sequential flag and a representative PR argument
+      (e.g. --sequential #42). Verify SKILL.md documents --sequential as accepted verbatim
+      and treated as no-op for single-agent dispatch.
+    expected: >
+      SKILL.md documents --sequential as forwarded from r-1 and accepted by this atom.
+      For single-agent dispatch there is only one reviewer, so --sequential is a no-op.
+      The flag does not alter the run count (still ONE) or the marker count (still ONE).
+    actor: tester
+
+  - action: >
+      Verify Step 0 precondition gate: confirm SKILL.md imports assertWorktreeIsolation
+      from hive/lib/cc-workflows-preconditions.mjs and invokes it as the first action
+      in Step 0. Confirm on reject a structured precondition_failed error is returned.
+    expected: >
+      SKILL.md shows import statement for cc-workflows-preconditions.mjs at Step 0.
+      assertWorktreeIsolation() is called before any other Step 0 logic.
+      On reject the atom exits with a structured error object including the error key
+      "precondition_failed" and field_sources. It does not fall through silently.
+    actor: tester
+
+  - action: >
+      Verify scope_drift ownership: confirm SKILL.md documents scope_drift_observed: true
+      in the episode marker, and the reviewer agent prompt instructs it to emit scope_drift
+      at review:complete. Confirm this is one of exactly 3 sanctioned emit sites.
+    expected: >
+      SKILL.md states scope_drift_observed: true in the episode marker shape. The
+      reviewer agent is instructed to call emit_scope_drift with phase_label review:complete
+      and extra_dimensions verdict. The scope_drift emit contract section confirms this
+      is one of exactly 3 sanctioned emit_scope_drift call sites per r-1 contract.
+    actor: tester
+
+  - action: >
+      Run the s-3 no-codex lint (node hive/scripts/lint-cc-workflows-no-codex.mjs)
+      and confirm review-mode-cc-workflows/SKILL.md passes all 4 checks.
+    expected: >
+      All 4 checks PASS for review-mode-cc-workflows/SKILL.md:
+      Check 1 (agentType literal): PASS
+      Check 2 (codex:codex-rescue): PASS
+      Check 3 (agent_backends): PASS
+      Check 4 (cc-workflows-preconditions.mjs import): PASS
+    actor: tester
+
+postconditions:
+  - "All vitest resolver tests pass (5-tier coverage + footgun + solo dispatch shape + single-run + scope_drift contract)"
+  - "review-dispatch SKILL.md routes cc-workflows decision to review-mode-cc-workflows"
+  - "Atom SKILL.md documents ONE reviewer agent following skills/review/SKILL.md Phase 1 (solo pattern)"
+  - "Atom SKILL.md documents ONE Workflow TOOL run with ONE agent() call and ONE cc-workflows-run.yaml marker"
+  - "Panel-mode (multi-reviewer) is explicitly DEFERRED per Decision Point 2"
+  - "--sequential flag is accepted verbatim and is a no-op for single-agent dispatch"
+  - "Step 0 imports assertWorktreeIsolation from cc-workflows-preconditions.mjs and calls it first"
+  - "scope_drift_observed: true in marker; reviewer agent owns emit at review:complete"
+  - "s-3 lint 4/4 PASS for review-mode-cc-workflows/SKILL.md"

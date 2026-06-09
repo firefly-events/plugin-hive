@@ -1,0 +1,21 @@
+step: cc-workflows-run
+story: t-1-fold-simulated-manual
+epic: substrate-coverage-and-test-cleanup
+status: halted
+halt_reason: h3_schema_gap
+workflow_run_id: wf_7e1dbc8d-328
+research_only: true
+gap_summary: |
+  loadScenario (hive/lib/scenarios/load.mjs) handles authored scenario YAMLs
+  (intent/walk specs). step-03-worker outputs execution_results YAML
+  (outcomes — different shape). Step-04b insertion would need both loaders
+  AND a DAG retarget (worker/inspector currently run PARALLEL off author-tests,
+  not sequential).
+recommended_split:
+  - id: t-1a
+    title: Extend loadScenario or add sibling loadResults for execution_results shape + retarget test-swarm.workflow.yaml DAG
+  - id: t-1b
+    title: Create step-04b-scenario-replay step file + hard-rip --simulated-manual flag + retire cross-cutting-concerns simulated-manual block
+decision_anchor: |
+  Story spec line 155-156 anticipated this gap; Decision Point 6 instructs split.
+usage: {agent_count: 1, subagent_tokens: 42810, tool_uses: 14, duration_ms: 93349}

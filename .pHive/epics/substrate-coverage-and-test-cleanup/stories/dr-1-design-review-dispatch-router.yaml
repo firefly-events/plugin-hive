@@ -1,0 +1,126 @@
+id: dr-1-design-review-dispatch-router
+epic: substrate-coverage-and-test-cleanup
+title: Create design-review-dispatch router + wire Phase 0 into skills/design-review/SKILL.md
+status: completed
+complexity: medium
+methodology: classic
+depends_on:
+- s-2-mode-resolver
+- s-4-cc-workflows-preconditions
+- s-3-no-codex-lint
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: 'Create `skills/hive/skills/design-review-dispatch/SKILL.md` consuming
+
+  `hive/lib/mode-resolver.mjs` with `HIVE_DESIGN_REVIEW_MODE`. Add Phase 0
+
+  invocation of the router to `skills/design-review/SKILL.md`. Reaffirm
+
+  the 3-persona pipeline contract referenced by L3/L4 atoms (semantic
+
+  preserved — `--skip` + `--artifact-target` continue to work). Router
+
+  structurally mirrors `skills/hive/skills/execute-dispatch/SKILL.md`
+
+  (architect ESCALATION anchor).
+
+  '
+acceptance_criteria:
+- Given `skills/hive/skills/design-review-dispatch/SKILL.md` is created, when it executes Step 0, then it invokes `resolveMode('HIVE_DESIGN_REVIEW_MODE', ctx)` from `hive/lib/mode-resolver.mjs`.
+- Given Step 1 runs, when `mode_decision` is `multica`, then it routes to `design-review-mode-multica`; when `mode_decision` is `cc-workflows`, then it routes to `design-review-mode-cc-workflows`.
+- Given Step 2 runs, when the router returns to the caller, then it emits `{mode_decision, sources}`.
+- Given `skills/design-review/SKILL.md` is updated, when /design-review is invoked, then Phase 0 invokes `design-review-dispatch` BEFORE the existing 3-persona pipeline.
+- Given `--skip` and `--artifact-target` flags are passed, when the dispatcher routes through the chosen mode atom, then both flags continue to work end-to-end (no semantic change).
+- Given the router structurally mirrors `skills/hive/skills/execute-dispatch/SKILL.md`, when a reader compares Step 0/1/2 shapes, then they are structurally identical.
+- Given the vitest resolution test runs, when 5-tier permutations are exercised, then mode_decision and sources emit correctly.
+- DO. Mirror execute-dispatch structure verbatim. Preserve `--skip` + `--artifact-target` semantics.
+- DO NOT. Change the 3-persona pipeline contract — substrate parity slice with NO semantic change.
+metric:
+  applies: true
+  name: substrate_coverage.design_review_dispatch_resolver_pass_rate
+  direction: up
+  unit: ratio
+  baseline: null
+  target: 1.0
+  window: story integrate step
+  source:
+    kind: manual
+    ref: vitest run skills/hive/skills/design-review-dispatch/test/resolver.test.mjs
+  verify_at: story integrate step
+  owner: developer
+steps:
+- id: research
+  description: Read `skills/design-review/SKILL.md` (1-181) — 3-persona pipeline + `--skip` + `--artifact-target` semantics; read execute-dispatch as structural mirror anchor.
+  agent: researcher
+- id: implement
+  description: Create `skills/hive/skills/design-review-dispatch/SKILL.md` mirroring execute-dispatch Step 0/1/2; add Phase 0 invocation of design-review-dispatch to `skills/design-review/SKILL.md`; reaffirm 3-persona contract.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Author `skills/hive/skills/design-review-dispatch/test/resolver.test.mjs` covering 5-tier permutations + correct atom routing + `--skip`/`--artifact-target` pass-through.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Architect review on router structural mirror + flag pass-through preserving 3-persona pipeline semantics.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: 'Commit "[dr-1] feat(/design-review): design-review-dispatch router + Phase 0 wire-in"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  tech_stack:
+  - language: markdown (SKILL.md), javascript (.mjs)
+  - runtime: node 20+
+  - test: vitest
+  key_files:
+  - path: skills/hive/skills/design-review-dispatch/SKILL.md
+    purpose: NEW router for /design-review substrate resolution
+  - path: skills/design-review/SKILL.md
+    purpose: Dispatcher (1-181) — Phase 0 invocation added; semantic preserved
+  - path: skills/hive/skills/execute-dispatch/SKILL.md
+    purpose: Structural mirror anchor
+  - path: hive/lib/mode-resolver.mjs
+    purpose: Shared resolver consumed at Step 0
+files_to_modify:
+- file: skills/hive/skills/design-review-dispatch/SKILL.md
+  change: CREATE ~200-250 lines mirroring execute-dispatch Step 0/1/2
+- file: skills/design-review/SKILL.md
+  change: ADD Phase 0 invocation of `design-review-dispatch`; PRESERVE `--skip` + `--artifact-target` semantics
+- file: skills/hive/skills/design-review-dispatch/test/resolver.test.mjs
+  change: CREATE — vitest spec covering 5-tier permutations + atom routing + flag pass-through
+code_examples:
+- language: markdown
+  description: design-review-dispatch Step 0
+  snippet: '## Step 0 — Resolve mode_decision
+
+    Call `resolveMode(''HIVE_DESIGN_REVIEW_MODE'', ctx)` from `hive/lib/mode-resolver.mjs`.
+
+    '
+references:
+- path: skills/design-review/SKILL.md
+  relevant_excerpt: Loads 3 personas (accessibility, animations, ui-designer); --skip + --artifact-target supported.
+- path: skills/hive/skills/execute-dispatch/SKILL.md
+  relevant_excerpt: Router structural mirror — Step 0 field-source resolution at lines 46-101.
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/structured-outline.md
+  relevant_excerpt: 'dr-1: design-review-dispatch router — Create skills/hive/skills/design-review-dispatch/SKILL.md (router; consumes mode-resolver.mjs). Add Phase 0 invocation of the router to skills/design-review/SKILL.md.'
+cross_cutting:
+- concern: documentation
+  action: design-review-dispatch/SKILL.md is itself the doc; cite execute-dispatch as structural mirror.
+- concern: versioning
+  action: New consumer-visible skill — flag for epic-close version bump (minor — additive feature) in CHANGELOG.
+design_decisions:
+- decision: Router structurally mirrors execute-dispatch/SKILL.md
+  rationale: Architect ESCALATION in outline-collab-review-record — the 4 substrate routers share `execute-dispatch/SKILL.md` as structural mirror anchor.
+- decision: Substrate parity slice — NO semantic change to /design-review
+  rationale: design-discussion §3 Slice C — `design-review` keeps original intent; substrate parity adds multica + cc-workflows variants without changing 3-persona pipeline semantics.
+risks:
+- severity: low
+  description: Phase 0 wire-in inadvertently changes `--skip`/`--artifact-target` semantics
+  mitigation: AC asserts flag pass-through; vitest covers; manual smoke confirms identical artifact set to pre-epic behavior
+tracker_id: 8cbc0f90-a52c-4625-aa22-8655971fca62

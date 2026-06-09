@@ -197,7 +197,7 @@ completion are artifact-readiness signals, not user review approvals.
 
 > **Parallel-call-site annotation (audit pass):** `parallel_rationale: read-only` — the design-discussion team produces docs under `.pHive/epics/{id}/docs/`; no production code writes. Out-of-scope for the `ed-7` story-level fan-out gate (one team with N personas dispatched through [`planning-routing/SKILL.md`](../../skills/hive/skills/planning-routing/SKILL.md), not N independent stories); catalogued in [`hive/references/parallel-call-sites.md`](../../hive/references/parallel-call-sites.md) §3 (`plan:design-discussion-team`).
 
-4. **Produce design discussion (draft).** `SendMessage` to the technical writer with the `design-discussion` skill (`hive/references/document-templates/design-discussion.md`). Input: the research brief + the original user request. Output: a ~200-line design discussion document covering goal, proposed approach, risks, dependencies, open questions, and a scale assessment. Write the **draft** to `.pHive/epics/{epic-id}/docs/design-discussion.md` — Phase A2 (next step) grills it before the collaborative review gate.
+4. **Produce design discussion (draft).** `SendMessage` to the technical writer with the `design-discussion` skill (`skills/hive/skills/design-discussion/SKILL.md`, which enforces the canonical template and its completeness gate). Input: the research brief + the original user request. Output: a ~200-line design discussion document covering goal, proposed approach, risks, dependencies, open questions, and a scale assessment. Write the **draft** to `.pHive/epics/{epic-id}/docs/design-discussion.md` — Phase A2 (next step) grills it before the collaborative review gate.
 
 ### Phase A2: Adversarial Alignment (Grill)
 
@@ -270,7 +270,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 ### Phase B3: Structured Outline (large scope only)
 
-9. **Produce structured outline.** `SendMessage` to the technical writer with the `structured-outline` skill (`hive/references/document-templates/structured-outline.md`). Input: H/V plans + design discussion + user feedback + research brief. Output: a ~1000-line structured outline with detailed approach, file manifest, risk registry, and elicitation questions. The outline now builds ON the vertical slice plan — each phase in the outline maps to a vertical slice.
+9. **Produce structured outline.** `SendMessage` to the technical writer with the `structured-outline` skill (`skills/hive/skills/structured-outline/SKILL.md`, which enforces all mandatory parts and the completeness gate — Risk Registry and Elicitation are not optional). Input: H/V plans + design discussion + user feedback + research brief. Output: a ~1000-line structured outline with detailed approach, file manifest, risk registry, and elicitation questions. The outline now builds ON the vertical slice plan — each phase in the outline maps to a vertical slice.
 
 9b. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the structured outline. This is the most critical review — all active team agents review the full outline. The TPM validates sequencing, the researcher confirms technical accuracy, the architect (if present) stress-tests feasibility, and the UI designer (if present) validates UI approach. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
 
@@ -1039,13 +1039,17 @@ All planning documents are written to `.pHive/epics/{epic-id}/docs/{document-typ
 
 | Document type | Sub-skill | Output path |
 |---------------|-----------|-------------|
-| research-brief | None (no sub-skill — see note) | `.pHive/epics/{epic-id}/docs/research-brief.md` |
-| design-discussion | `hive/references/document-templates/design-discussion.md` | `.pHive/epics/{epic-id}/docs/design-discussion.md` |
-| horizontal-plan | `hive/references/document-templates/horizontal-plan.md` | `.pHive/epics/{epic-id}/docs/horizontal-plan.md` |
-| vertical-plan | `hive/references/document-templates/vertical-plan.md` | `.pHive/epics/{epic-id}/docs/vertical-plan.md` |
-| structured-outline | `hive/references/document-templates/structured-outline.md` | `.pHive/epics/{epic-id}/docs/structured-outline.md` |
+| research-brief | `skills/hive/skills/research-brief/SKILL.md` | `.pHive/epics/{epic-id}/docs/research-brief.md` |
+| design-discussion | `skills/hive/skills/design-discussion/SKILL.md` | `.pHive/epics/{epic-id}/docs/design-discussion.md` |
+| horizontal-plan | `skills/hive/skills/horizontal-plan/SKILL.md` | `.pHive/epics/{epic-id}/docs/horizontal-plan.md` |
+| vertical-plan | `skills/hive/skills/vertical-plan/SKILL.md` | `.pHive/epics/{epic-id}/docs/vertical-plan.md` |
+| structured-outline | `skills/hive/skills/structured-outline/SKILL.md` | `.pHive/epics/{epic-id}/docs/structured-outline.md` |
 
-**Note on research-brief:** No sub-skill file exists for the research brief format. The technical writer produces it using the research-brief pattern from memory, based on raw findings from the researcher. Output path: `.pHive/epics/{epic-id}/docs/research-brief.md`. See `hive/agents/technical-writer.md`.
+**Note:** each planning document now has an enforcing sub-skill that wraps its canonical
+template (`hive/references/document-templates/*.md`) and adds a **completeness gate** — the
+writer cannot silently drop mandatory sections. This replaces the old "research-brief
+produced from memory, no sub-skill" pattern; all writer doc-types are skill-backed. See
+`hive/agents/technical-writer.md` for the writer's skill bindings.
 
 Existing planning documents at the `.pHive/` root are not moved — this convention applies to new planning sessions going forward.
 

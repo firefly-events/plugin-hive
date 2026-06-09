@@ -253,6 +253,7 @@ async function capabilities(): Promise<any> {
     abi_version: "1.0.0",
     hierarchy: "mixed",
     supports_parent_link: true,
+    supports_needs_rework: true,
     supported_labels: null,
     supported_states: ["open", "closed"],
     metadata: {
@@ -383,6 +384,30 @@ async function setAssignee(params: any): Promise<any> {
   return {};
 }
 
+async function markNeedsRework(params: any): Promise<any> {
+  const { id, reason: _reason } = params;
+  const { owner, repo, number } = decodeStoryId(id);
+  // Step 1: reopen the issue (ensure it is open so it lands in triage queue)
+  await ghFetch(`/repos/${owner}/${repo}/issues/${number}`, {
+    method: "PATCH",
+    body: { state: "open" },
+  });
+  // Step 2: fetch current labels so we can append without clobbering existing ones
+  const issueRes = await ghFetch(`/repos/${owner}/${repo}/issues/${number}`);
+  const priorLabels: string[] = Array.isArray(issueRes.body.labels)
+    ? issueRes.body.labels.map((l: any) => (typeof l === "string" ? l : l.name))
+    : [];
+  const newLabels = priorLabels.includes("hive:needs-rework")
+    ? priorLabels
+    : [...priorLabels, "hive:needs-rework"];
+  // Step 3: POST labels endpoint to add hive:needs-rework
+  await ghFetch(`/repos/${owner}/${repo}/issues/${number}/labels`, {
+    method: "POST",
+    body: { labels: ["hive:needs-rework"] },
+  });
+  return { id, status: "open", labels: newLabels };
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Dispatch + main
 // ──────────────────────────────────────────────────────────────────────────────
@@ -397,6 +422,7 @@ export async function dispatch(req: Request): Promise<any> {
     addComment,
     linkStories,
     setAssignee,
+    markNeedsRework,
   };
   const h = handlers[req.method];
   if (!h) {

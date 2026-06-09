@@ -1,0 +1,80 @@
+step: test
+story: d-5-wireframe-artifact-handoff
+epic: substrate-coverage-and-test-cleanup
+agent: tester
+status: complete
+started_at: "2026-06-08T14:17:00Z"
+completed_at: "2026-06-08T14:20:00Z"
+
+files_created:
+  - path: skills/design/test/wireframe-handoff-payload.test.mjs
+    change: CREATE — 5 independent vitest describe blocks; pure static-analysis against hive/references/wireframe-protocol.md; covers all 5 AC subsections
+  - path: .pHive/test-scenarios/d-5-wireframe-handoff-payload.yaml
+    change: CREATE — spec-walk scenario covering toggle-off (2 fields), toggle-on (3 fields), extensible-minimum acceptance (4th field)
+  - path: hive/agents/memories/tester/d5-payload-contract-static-analysis-target.md
+    change: CREATE — insight capture: doc-only story targets reference doc not SKILL.md; task path name wins over story spec file name
+
+files_modified:
+  - path: hive/lib/package.json
+    change: APPEND skills/design/test/wireframe-handoff-payload.test.mjs to vitest file list in test script
+
+test_results:
+  runner: vitest v4.1.8
+  command: npm test (from hive/lib)
+  total_files: 15
+  total_tests: 430
+  passed: 430
+  failed: 0
+  new_describe_blocks: 5
+  new_tests_in_wireframe_handoff_payload: 13
+
+audit_first_walk: "complete (AC 5/5 covered, refs 3/3 re-read)"
+
+ac_coverage:
+  - ac: "Given d-1 Phase A toggle ON, payload contains 3 minimum fields (wireframe.png, wireframe.f0, constraints.md)"
+    test_file: skills/design/test/wireframe-handoff-payload.test.mjs
+    describe_block: "Payload contract — 3 minimum fields"
+    tests:
+      - "section heading '## Handoff Payload Contract' is present"
+      - "wireframe.png field is listed"
+      - "wireframe.f0 field is listed"
+      - "constraints.md field is listed"
+      - "PNG + .f0 noted as always present"
+      - "constraints.md noted as toggle-conditional (present when --include-constraints)"
+    status: covered
+
+  - ac: "Given d-1 Phase A toggle OFF, payload contains PNG + .f0 only; constraint doc absent or empty"
+    test_file: skills/design/test/wireframe-handoff-payload.test.mjs
+    describe_block: "Toggle-conditional constraint doc bundling"
+    tests:
+      - "toggle-ON path is documented (toggle + present + constraints)"
+      - "toggle-OFF path documented — absent or empty, PNG + .f0 still ship"
+    status: covered
+
+  - ac: "Posture — extensible-minimum; add-only, no breaking changes"
+    test_file: skills/design/test/wireframe-handoff-payload.test.mjs
+    describe_block: "Posture — extensible-minimum"
+    tests:
+      - "substring 'extensible-minimum' is present"
+      - "posture statement explicitly says additional fields allowed (add-only or additional fields)"
+      - "TPM escalation cite is present (outline-collab-review-record or TPM)"
+    status: covered
+
+  - ac: "/design-review can locate fields by documented field names"
+    test_file: skills/design/test/wireframe-handoff-payload.test.mjs
+    describe_blocks:
+      - "Field-named vs file-glob discipline"
+      - "Cross-references — d-1 producer + d-3/d-4 consumers"
+    status: covered
+
+  - ac: "wireframe-protocol.md includes payload-contract section naming 3 minimum fields + extensible-minimum posture"
+    test_file: skills/design/test/wireframe-handoff-payload.test.mjs
+    describe_block: "Payload contract — 3 minimum fields"
+    tests:
+      - "section heading '## Handoff Payload Contract' is present"
+    status: covered
+
+scope_discipline_notes:
+  - "s-3 no-codex lint is OUT OF SCOPE for d-5: d-5 modifies wireframe-protocol.md (reference doc), not a *-mode-cc-workflows atom. Documented in scenario postconditions."
+  - "Test file placed under skills/design/test/ (existing domain directory) rather than hive/workflows/steps/ui-design/test/ (directory did not exist; task override path)"
+  - "Scenario file named d-5-wireframe-handoff-payload.yaml (task instruction) rather than d-5-wireframe-handoff-bundle.yaml (story spec step description) — task instruction wins"

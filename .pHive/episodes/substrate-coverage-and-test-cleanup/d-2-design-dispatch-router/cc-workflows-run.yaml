@@ -1,0 +1,10 @@
+step: cc-workflows-run
+story: d-2-design-dispatch-router
+epic: substrate-coverage-and-test-cleanup
+status: passed
+workflow_run_id: wf_b8a67053-2ef
+agents: [{persona: researcher}, {persona: developer}, {persona: tester}, {persona: reviewer}]
+review_verdict: passed
+test_summary: 69/69 vitest cases (4 test files: mode-resolver, preconditions, lint, design-dispatch resolver)
+insight_capture: {memories_written: 2, personas: [developer, tester]}
+usage: {agent_count: 4, subagent_tokens: 232171, tool_uses: 63, duration_ms: 625863}

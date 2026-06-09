@@ -1,0 +1,75 @@
+audit_kind: post-run
+skill: execute
+run_id: wf_e8b85ae4-f1e
+epic_id: substrate-coverage-and-test-cleanup
+story_ids:
+  - s-5-cc-workflows-model-tier-resolver
+timestamp: "2026-06-05T21:35:00Z"
+target_branch: feat/substrate-coverage-and-test-cleanup
+commits:
+  - fc34498  # [s-5] feat(substrate): helper + execute/plan mode-skill back-fit
+
+gate_lift_fired: false
+methodology:
+  value: classic
+  source: story-spec
+
+mode_decision: cc-workflows
+mode_reason: HIVE_EXECUTE_MODE=cc-workflows env signal (orchestrator session)
+backend_sources:
+  sessions_enabled:
+    source: default
+    value: false
+  parallel_teams:
+    source: default
+    value: false
+  terminal_mux:
+    source: default
+    value: null
+  executor:
+    source: default
+    value: orchestrator-narrated
+
+work_artifacts:
+  commits_count: 1
+  files_modified:
+    - hive/lib/cc-workflows-model-tier.mjs  # created
+    - hive/lib/__tests__/cc-workflows-model-tier.test.mjs  # created
+    - skills/hive/skills/execute-mode-cc-workflows/SKILL.md  # modified
+    - skills/hive/skills/plan-mode-cc-workflows/SKILL.md  # modified
+    - hive/references/episode-schema.md  # modified
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/s-5-cc-workflows-model-tier-resolver/*.yaml  # 4 markers
+
+nonsensical_defaults: []
+
+substrate_findings_closed:
+  - id: cc-workflows-mode-skill-leaves-model-tier-to-orchestrator
+    closed_by: s-5-cc-workflows-model-tier-resolver
+    closure_artifact: hive/lib/cc-workflows-model-tier.mjs
+    skill_docs_updated:
+      - skills/hive/skills/execute-mode-cc-workflows/SKILL.md
+      - skills/hive/skills/plan-mode-cc-workflows/SKILL.md
+      - hive/references/episode-schema.md
+    notes: |
+      Documentation contract landed; mechanical enforcement (lint asserting
+      every agent() call carries opts.model) deferred to s-3. Helper-level
+      regression caught by 11/11 unit tests at hive/lib/__tests__/.
+
+terminal_handoff:
+  resolved: none
+  source: default
+
+multica_close:
+  issue_id: 9d8bec1c-968f-492e-a88c-bb1a6a6b407b
+  identifier: PLU-230
+  status: done
+  via: multica issue update --status done
+
+metric:
+  name: substrate_coverage.cc_workflows_model_tier_resolved_per_agent
+  this_run_value: 0.0
+  reason: |
+    This run's source=orchestrator-manual on every agent because the dispatch
+    path was assembled before s-5 shipped. Target=1.0 starts measuring at the
+    next cc-workflows-mode dispatch that runs through the updated skill prose
+    + helper import. Baseline 0.0 confirmed.
