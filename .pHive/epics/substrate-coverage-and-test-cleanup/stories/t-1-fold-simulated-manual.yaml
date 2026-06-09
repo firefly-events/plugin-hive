@@ -1,7 +1,7 @@
 id: t-1-fold-simulated-manual
 epic: substrate-coverage-and-test-cleanup
 title: Fold simulated-manual into the swarm pipeline as step-04b-scenario-replay and hard-rip the --simulated-manual flag
-status: halted
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on:
