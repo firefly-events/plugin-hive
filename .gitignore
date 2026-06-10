@@ -79,6 +79,8 @@ state/
 !.pHive/epics/substrate-coverage-and-test-cleanup/**
 !.pHive/episodes/substrate-coverage-and-test-cleanup/
 !.pHive/episodes/substrate-coverage-and-test-cleanup/**
+!.pHive/epics/multica-agent-ops/
+!.pHive/epics/multica-agent-ops/**
 # Test scenarios (.pHive/test-scenarios/) — referenced by autonomous-cycle-loop
 # config + simulated-manual cross-cutting concern. Per-story scenarios shipped
 # alongside the stories that need them.
