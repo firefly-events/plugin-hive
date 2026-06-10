@@ -6,7 +6,9 @@
  *     → { schema_version, generated_at, branch, epics, stories,
  *          episodes_recent, triage_open, metrics_health }
  *
- * stateDir  — repo root (the directory that contains .pHive)
+ * stateDir  — repo root; the state tree under it resolves via the sdr-1
+ *             resolver (HIVE_STATE_DIR > paths.state_dir in hive.config.yaml
+ *             > default .pHive)
  * epic       — optional epic id filter; omit to include all epics
  * episodeLimit — max episode markers per story (default 5)
  *
@@ -18,6 +20,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
+import { resolveStateDir } from './config.js';
 import { deriveStoryStatus } from './story-status.mjs';
 
 // ---------------------------------------------------------------------------
@@ -299,13 +302,14 @@ function loadMetricsHealth(pHiveDir, epicFilter, repoRoot) {
  * Compose a JSON snapshot of current Hive project state.
  *
  * @param {object} opts
- * @param {string} opts.stateDir   Repo root (contains .pHive)
+ * @param {string} opts.stateDir   Repo root; state tree resolves via the
+ *                                 sdr-1 resolver (default <root>/.pHive)
  * @param {string} [opts.epic]     Optional epic id filter
  * @param {number} [opts.episodeLimit=5]  Max episode markers per story
  * @returns {object} Snapshot payload (schema_version: 1)
  */
 export function composeContextSnapshot({ stateDir, epic, episodeLimit = 5 }) {
-  const pHiveDir = join(stateDir, '.pHive');
+  const pHiveDir = resolveStateDir({ cwd: stateDir });
 
   return {
     schema_version: 1,

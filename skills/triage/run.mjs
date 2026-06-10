@@ -15,13 +15,17 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { resolveStateDir } from '../../hive/lib/config.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..');
 // Test isolation: HIVE_TRIAGE_QUEUE_DIR overrides the default location so
 // tests can run against a tmp fixture without touching the real repo queue.
+// Otherwise the queue lives under the configured state dir (sdr-1 resolver:
+// HIVE_STATE_DIR > paths.state_dir in hive.config.yaml > default .pHive).
 const QUEUE_DIR = process.env.HIVE_TRIAGE_QUEUE_DIR
   ? process.env.HIVE_TRIAGE_QUEUE_DIR
-  : join(REPO_ROOT, '.pHive', 'triage');
+  : join(resolveStateDir({ cwd: REPO_ROOT }), 'triage');
 const QUEUE_PATH = join(QUEUE_DIR, 'queue.yaml');
 const SCHEMA_VERSION = 1;
 
