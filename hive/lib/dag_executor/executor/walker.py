@@ -58,6 +58,8 @@ from .telemetry import Telemetry
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
+_PHASE_STARTED_SLUG = "started"
+_PHASE_COMPLETE_SLUG = "completed"
 _PHASE_BLOCKED_TRIGGER_RULE_SKIP = "trigger-rule-skip"
 _PHASE_BLOCKED_UPSTREAM_FAILED = "upstream-failed"
 _PHASE_BLOCKED_UPSTREAM_SKIPPED = "upstream-skipped"
@@ -650,7 +652,7 @@ class Walker:
         inputs = _resolve_inputs(node, materialised, ctx, skipped)
 
         telemetry.emit("node_started", node.id, {})
-        state = _record_running(state, node_id)
+        state = _record_running(state, node_id, source_epic=_source_epic(ctx))
         save_state(state)
 
         scheduler_pause = _scheduler_pause_decision(node, ctx, step_metadata)
@@ -734,7 +736,7 @@ class Walker:
             {"outputs": list(output.outputs.keys())},
         )
         node_statuses[node_id] = NodeStatus.COMPLETED
-        state = _record_completion(state, node_id, output)
+        state = _record_completion(state, node_id, output, source_epic=_source_epic(ctx))
         save_state(state)
         return state, True
 
@@ -824,7 +826,7 @@ class Walker:
         # Emit node_started for each runnable node, deterministic order.
         for node_id in runnable:
             telemetry.emit("node_started", graph.nodes[node_id].id, {})
-            state = _record_running(state, node_id)
+            state = _record_running(state, node_id, source_epic=_source_epic(ctx))
             save_state(state)
 
         # Dispatch in parallel. Inputs are resolved inside the thread
@@ -858,7 +860,9 @@ class Walker:
                     {"outputs": list(output.outputs.keys())},
                 )
                 node_statuses[node_id] = NodeStatus.COMPLETED
-                state = _record_completion(state, node_id, output)
+                state = _record_completion(
+                    state, node_id, output, source_epic=_source_epic(ctx)
+                )
                 save_state(state)
                 continue
 
@@ -973,6 +977,7 @@ class Walker:
             inputs = _resolve_inputs(node, materialised, ctx, skipped_set)
 
             telemetry.emit("node_started", node.id, {"replay": True})
+            _emit_phase_started(node_id, _source_epic(ctx))
             state = set_node_status(state, node_id, NodeStatus.RUNNING)
             save(state, root=runs_root)
 
@@ -1053,6 +1058,7 @@ class Walker:
                 node.id,
                 {"outputs": list(output.outputs.keys()), "replay": True},
             )
+            _emit_phase_complete(node_id, _source_epic(ctx))
             state = set_node_output(state, node_id, dict(output.outputs))
             state = set_node_status(state, node_id, NodeStatus.COMPLETED)
             state = set_last_successful_node(state, node_id)
@@ -1152,7 +1158,8 @@ def _record_skipped(
     return set_node_status(state, node_id, NodeStatus.SKIPPED)
 
 
-def _record_running(state, node_id: str):
+def _record_running(state, node_id: str, *, source_epic: str | None = None):
+    _emit_phase_started(node_id, source_epic)
     if state is None:
         return None
     from hive.lib.dag_executor.run_state import NodeStatus, set_node_status
@@ -1160,7 +1167,14 @@ def _record_running(state, node_id: str):
     return set_node_status(state, node_id, NodeStatus.RUNNING)
 
 
-def _record_completion(state, node_id: str, output: NodeOutput):
+def _record_completion(
+    state,
+    node_id: str,
+    output: NodeOutput,
+    *,
+    source_epic: str | None = None,
+):
+    _emit_phase_complete(node_id, source_epic)
     if state is None:
         return None
     from hive.lib.dag_executor.run_state import (
@@ -1262,6 +1276,54 @@ def _emit_phase_blocked(
     except Exception:
         logging.getLogger(__name__).debug(
             "phase_blocked KG emit failed for node %s",
+            node_id,
+            exc_info=True,
+        )
+
+
+def _emit_phase_started(
+    node_id: str,
+    source_epic: str | None,
+) -> None:
+    import logging
+
+    try:
+        from hive.lib.kg_emit import emit_kg_event, sanitize_obj
+
+        emit_kg_event(
+            subject=node_id,
+            predicate="phase_started",
+            obj=sanitize_obj(_PHASE_STARTED_SLUG),
+            source_epic=source_epic or "unknown",
+            source_agent="dag-executor",
+        )
+    except Exception:
+        logging.getLogger(__name__).debug(
+            "phase_started KG emit failed for node %s",
+            node_id,
+            exc_info=True,
+        )
+
+
+def _emit_phase_complete(
+    node_id: str,
+    source_epic: str | None,
+) -> None:
+    import logging
+
+    try:
+        from hive.lib.kg_emit import emit_kg_event, sanitize_obj
+
+        emit_kg_event(
+            subject=node_id,
+            predicate="phase_complete",
+            obj=sanitize_obj(_PHASE_COMPLETE_SLUG),
+            source_epic=source_epic or "unknown",
+            source_agent="dag-executor",
+        )
+    except Exception:
+        logging.getLogger(__name__).debug(
+            "phase_complete KG emit failed for node %s",
             node_id,
             exc_info=True,
         )

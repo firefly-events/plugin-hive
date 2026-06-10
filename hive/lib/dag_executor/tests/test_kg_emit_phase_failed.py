@@ -177,12 +177,14 @@ def test_walker_terminal_failure_emits_phase_failed(monkeypatch, tmp_path):
         )
 
     rows = _rows(db_path)
-    assert len(rows) == 1
-    assert rows[0][0] == "fail-phase"
-    assert rows[0][1] == "phase_failed"
-    assert rows[0][2] == "failure"
-    assert rows[0][5] == "kg-signal-revival"
-    assert rows[0][6] == "dag-executor"
+    # s3-phase-lifecycle-wire: entering the node also emits phase_started,
+    # so filter to the phase_failed triple under test.
+    failed_rows = [row for row in rows if row[1] == "phase_failed"]
+    assert len(failed_rows) == 1
+    assert failed_rows[0][0] == "fail-phase"
+    assert failed_rows[0][2] == "failure"
+    assert failed_rows[0][5] == "kg-signal-revival"
+    assert failed_rows[0][6] == "dag-executor"
     assert kg_emit.get_kg_writes_counter_snapshot()["kg_writes_total"]["phase_failed"] > 0
 
 

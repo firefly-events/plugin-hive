@@ -225,3 +225,7 @@ hive/lib/.pHive/
 # substrate dispatches. Stay out of commits.
 node-compile-cache/
 tsx-*/
+!.pHive/epics/kg-repair-activation/
+!.pHive/epics/kg-repair-activation/**
+!.pHive/triage/
+!.pHive/triage/queue.yaml

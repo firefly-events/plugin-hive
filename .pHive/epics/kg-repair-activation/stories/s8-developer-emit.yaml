@@ -1,0 +1,61 @@
+id: s8-developer-emit
+epic: kg-repair-activation
+tracker_id: "fc1e55c4-6073-4f4e-b090-b7f81c529e04"
+tracker_url: ""
+tracker_number: "PLU-92"
+title: "Developer agent emits implemented at shutdown"
+status: pending
+complexity: low
+methodology: classic
+depends_on: ["s5-role-predicates-schema"]
+parallel_allowed: true
+parallel_rationale: variation
+
+description: |
+  Developer persona emits one implemented triple per story-implement completion at shutdown. Subject=<story-id>, predicate=implemented, object=<commit-sha or "wip">, source_agent=developer, source_epic=<epic-id>. Uses the shared helper from s6.
+
+acceptance_criteria:
+  - "Given the developer agent completes story implementation, when shutdown_request is received, then exactly one implemented triple is emitted with object=<commit-sha or \"wip\">."
+  - "Given the developer pushed a commit, when the emit fires, then object is the short commit SHA."
+  - "Given a 30-day post-merge audit, when SELECT COUNT(*) WHERE predicate='implemented', then count > 0."
+
+steps:
+  - id: research
+    description: Explore the codebase for relevant patterns, files, and constraints
+    agent: researcher
+  - id: implement
+    description: Implement the story according to spec and research findings
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Write tests covering acceptance criteria and verify they pass
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review implementation and tests for correctness and convention compliance
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+files_to_modify:
+  - file: hive/agents/developer.md
+    change: Add shutdown-emit contract referencing kg_emit_cli with predicate=implemented
+  - file: tests/test_developer_kg_emit.py
+    change: Test shutdown emits implemented
+
+metric:
+  applies: true
+  name: kg.implemented_triples
+  direction: up
+  unit: triples
+  baseline: 0
+  target: 5
+  window: epic-merge-plus-30-days
+  source:
+    kind: sql
+    ref: "SELECT COUNT(*) FROM triples WHERE predicate='implemented' AND source_agent='developer'"
+  verify_at: epic-merge-plus-30-days
+  owner: maintainer

@@ -1,0 +1,76 @@
+id: s1-kg-stats
+epic: kg-repair-activation
+tracker_id: "f0b5f7c2-db3b-4472-bfd3-32ebfb5bc0ed"
+tracker_url: ""
+tracker_number: "PLU-82"
+title: "Add /hive:kg-stats skill for density + predicate breakdown"
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: read-only
+
+description: |
+  Add a top-level skill skills/hive/skills/kg-stats/SKILL.md plus a Python helper hive/lib/kg_stats.py that prints: total triple count, per-predicate count, per-source-agent count, per-source-epic count, last-write timestamp, distinct (source_agent, predicate) tuple count, and trailing-30-day density. Output as a formatted table by default; --json for machine-readable. This is the baseline tool s2/s9 will use to measure progress.
+
+acceptance_criteria:
+  - "Given the skill is invoked via /hive:kg-stats, when ~/.claude/hive/kg.sqlite exists, then a formatted table prints total triples, per-predicate breakdown, per-source-agent breakdown, distinct-tuple count, last-write timestamp, and 30-day density."
+  - "Given --json flag is passed, when the skill runs, then the same data emits as JSON to stdout with no formatting."
+  - "Given the kg.sqlite file is missing, when the skill runs, then it exits 0 with a one-line \"no kg database found at <path>\" message — silent-soft-fail per other KG tooling."
+  - "Given the predicates table contains predicates that have zero triples in the triples table, when the skill runs, then those zombie predicates are listed in a dedicated \"DECLARED-BUT-NEVER-WRITTEN\" section."
+
+steps:
+  - id: research
+    description: Explore the codebase for relevant patterns, files, and constraints
+    agent: researcher
+  - id: implement
+    description: Implement the story according to spec and research findings
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Write tests covering acceptance criteria and verify they pass
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review implementation and tests for correctness and convention compliance
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+files_to_modify:
+  - file: skills/hive/skills/kg-stats/SKILL.md
+    change: New skill manifest
+  - file: hive/lib/kg_stats.py
+    change: New helper implementing the stats queries
+  - file: scripts/tests/kg-stats.test.mjs
+    change: New test using a fixture sqlite DB
+
+code_examples:
+  - title: "Helper invocation pattern (mirror kg_why.py CLI shape)"
+    file: hive/lib/kg_why.py
+    snippet: |
+      parser = argparse.ArgumentParser()
+      parser.add_argument("--db-path", default=os.path.expanduser("~/.claude/hive/kg.sqlite"))
+      parser.add_argument("--json", action="store_true")
+
+metric:
+  applies: true
+  name: kg.stats_skill_invocations
+  direction: up
+  unit: invocations
+  baseline: 0
+  target: 5
+  window: first-7-days-post-merge
+  source:
+    kind: manual
+    ref: "maintainer log of /hive:kg-stats usage in standup notes"
+  verify_at: epic-merge-plus-7-days
+  owner: maintainer
+
+cross_cutting:
+  - concern: versioning
+    action: "Adds new public skill /hive:kg-stats → minor version bump per concern checklist"
