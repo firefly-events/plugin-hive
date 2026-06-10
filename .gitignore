@@ -129,7 +129,6 @@ state/
 .pHive/metrics/events/stop-*.jsonl
 .pHive/metrics/events/agent-spawn-runtime-*.jsonl
 # MVL proof artifacts — only the canonical mvl-proof folder ships with the repo.
-!.pHive/audits/
 .pHive/audits/*
 !.pHive/audits/mvl-proof/
 !.pHive/audits/mvl-proof/**
@@ -225,5 +224,3 @@ tsx-*/
 !.pHive/epics/kg-repair-activation/**
 !.pHive/triage/
 !.pHive/triage/queue.yaml
-!.pHive/audits/
-!.pHive/audits/**
