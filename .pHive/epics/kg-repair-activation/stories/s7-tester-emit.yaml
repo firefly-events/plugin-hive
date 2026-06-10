@@ -4,7 +4,7 @@ tracker_id: "6446e202-b4aa-4611-88aa-5e6f40f3f036"
 tracker_url: ""
 tracker_number: "PLU-91"
 title: "Tester agent emits tested at shutdown"
-status: pending
+status: in_progress
 complexity: low
 methodology: classic
 depends_on: ["s5-role-predicates-schema"]
