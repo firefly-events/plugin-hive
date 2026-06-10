@@ -1,0 +1,75 @@
+step_id: cc-workflows-run
+story_id: dr-2-design-review-mode-multica
+epic_id: substrate-coverage-and-test-cleanup
+status: passed
+verdict: pass
+timestamp: "2026-06-08T00:00:00Z"
+mode: cc-workflows
+runtime: workflows
+run_id: wf_3937ced8-abe
+script_path: .pHive/episodes/substrate-coverage-and-test-cleanup/dr-2-design-review-mode-multica/workflow-script.js
+transcript_dir: /Users/don/.claude/projects/-Users-don--claude-worktrees-substrate-coverage/8c837a93-260e-405d-8549-dc535cce0594/subagents/workflows/wf_3937ced8-abe
+commit: 6b13bcb
+integration_branch: feat/substrate-coverage-and-test-cleanup
+methodology: classic
+phases: [research, implement, test, review]
+agents:
+  - phase: research
+    persona: researcher
+    model: sonnet
+    verdict: pass
+  - phase: implement
+    persona: developer
+    model: sonnet
+    verdict: pass
+  - phase: test
+    persona: tester
+    model: sonnet
+    verdict: pass
+    extra: 36/36 new vitest + 115 existing = 151/151 + 5/5 contract green
+  - phase: review
+    persona: reviewer
+    model: opus
+    verdict: pass
+    extra: change_verdict=passed; 1 non-blocking aesthetic note (HTML-comment header style at SKILL.md:8-9)
+field_sources:
+  agent_models:
+    research: { persona: researcher, tier: sonnet, source: orchestrator-manual }
+    implement: { persona: developer, tier: sonnet, source: orchestrator-manual }
+    test: { persona: tester, tier: sonnet, source: orchestrator-manual }
+    review: { persona: reviewer, tier: opus, source: orchestrator-manual }
+usage:
+  agent_count: 4
+  subagent_tokens: 302478
+  tool_uses: 100
+  duration_ms: 818003
+insight_capture:
+  memories_written: 4
+  personas: [researcher, developer, tester, reviewer]
+artifacts:
+  created:
+    - skills/hive/skills/design-review-mode-multica/SKILL.md
+    - skills/hive/skills/design-review-mode-multica/test/resolver.test.mjs
+    - .pHive/test-scenarios/dr-2-design-review-mode-multica-smoke.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/dr-2-design-review-mode-multica/implement.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/dr-2-design-review-mode-multica/test.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/dr-2-design-review-mode-multica/review.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/dr-2-design-review-mode-multica/workflow-script.js
+    - hive/agents/memories/researcher/design-review-multica-single-run-vs-per-persona.md
+    - hive/agents/memories/developer/dr2-workflow-anchor-asymmetry.md
+    - hive/agents/memories/tester/markdown-escaped-underscores-in-skill-md.md
+    - hive/agents/memories/reviewer/dr2-asymmetry-with-d3-is-deliberate-not-drift.md
+  modified:
+    - hive/lib/package.json
+scope_discipline:
+  files_match_spec: true
+  no_drift_outside_spec: true
+contract_invariants:
+  agent_calls_preserved: 4
+  agent_call_order: [accessibility-specialist, animations-specialist, ui-designer-critique, ui-designer-synthesis]
+  multica_run_shape: single  # ONE issue, ONE marker
+  asymmetric_with: d-3-design-mode-multica  # per Q11 ruling
+  flags_preserved: [--skip, --artifact-target]
+notes: |
+  Slice 4 Multica side complete. dr-3 (cc-workflows side) up next — same 4-step
+  model in cc-workflows substrate.

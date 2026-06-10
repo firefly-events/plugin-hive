@@ -2,7 +2,7 @@ id: BL2i.4
 epic: meta-improvement-system
 slice: S8
 title: Step-03b backlog-fallback logic
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: ["BL2i.1", "BL2i.2", "BL2i.3", "A2.1"]

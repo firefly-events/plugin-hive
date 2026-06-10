@@ -7,14 +7,18 @@ knowledge:
   - path: ~/.claude/hive/memories/technical-writer/
     use-when: "Read past document quality patterns, format preferences, and writing lessons. Write insights when discovering reusable document structures or audience-specific conventions."
 skills:
-  - path: ${CLAUDE_PLUGIN_ROOT}/hive/references/document-templates/design-discussion.md
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/design-discussion/SKILL.md
     use-when: "producing a design discussion document during planning phase"
-  - path: ${CLAUDE_PLUGIN_ROOT}/hive/references/document-templates/structured-outline.md
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/structured-outline/SKILL.md
     use-when: "producing a structured outline for large-scope planning"
-  - path: ${CLAUDE_PLUGIN_ROOT}/hive/references/document-templates/horizontal-plan.md
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/horizontal-plan/SKILL.md
     use-when: "producing a horizontal layer map during planning phase"
-  - path: ${CLAUDE_PLUGIN_ROOT}/hive/references/document-templates/vertical-plan.md
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/vertical-plan/SKILL.md
     use-when: "producing a vertical slice plan overlaid on horizontal map"
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/greenfield-discovery-brief/SKILL.md
+    use-when: "capturing a greenfield product-discovery session into a structured brief"
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/pr-body/SKILL.md
+    use-when: "writing a reviewer-first PR body when shipping a change through Hive"
   - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/story-writing/SKILL.md
     use-when: "producing a story specification from requirements analysis"
   - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/architecture-doc/SKILL.md

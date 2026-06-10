@@ -1,7 +1,7 @@
 id: wmc-1-execute-multica-routing
 epic: wire-execute-multica-codex
 title: Add multica routing case to /execute SKILL.md step 5/6 (BLOCKER)
-status: pending
+status: in_progress
 complexity: low
 methodology: classic
 depends_on: []

@@ -1,7 +1,7 @@
 id: s5-adoption-guide
 epic: sandcastle-adoption-followon
 title: Sandcastle adoption guide for setup, provider defaults, branch strategy, and redaction
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s4-merge-validation]

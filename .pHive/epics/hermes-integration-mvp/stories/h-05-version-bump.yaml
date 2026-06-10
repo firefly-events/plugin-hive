@@ -1,4 +1,5 @@
 id: h-05-version-bump
+status: in_progress
 epic: hermes-integration-mvp
 title: Plugin version bump + CHANGELOG entry for hermes-integration-mvp
 complexity: small

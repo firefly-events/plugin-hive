@@ -1,7 +1,7 @@
 id: rl-2-kickoff-ship-target
 epic: release-lifecycle
 title: Kickoff captures the project's ship-target definition
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [ rl-1 ]

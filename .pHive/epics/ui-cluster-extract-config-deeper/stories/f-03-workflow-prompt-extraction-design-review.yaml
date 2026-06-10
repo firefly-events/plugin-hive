@@ -1,7 +1,7 @@
 id: f-03-workflow-prompt-extraction-design-review
 epic: ui-cluster-extract-config-deeper
 title: "Extract design-review workflow ui-designer prompts via step_file:"
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [f-01-prompt-convention-brand-design]

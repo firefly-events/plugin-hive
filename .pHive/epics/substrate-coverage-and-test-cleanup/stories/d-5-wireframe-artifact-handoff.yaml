@@ -1,0 +1,147 @@
+id: d-5-wireframe-artifact-handoff
+epic: substrate-coverage-and-test-cleanup
+title: Wireframe handoff payload — PNG + .f0 + bundled constraint doc (extensible-minimum posture)
+status: in_progress
+complexity: medium
+methodology: classic
+depends_on:
+- s-2-mode-resolver
+- s-4-cc-workflows-preconditions
+- s-3-no-codex-lint
+- d-1-design-multi-persona-pipeline
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: 'Define the wireframe handoff payload that flows from /design to
+
+  downstream consumers (design-review, manual review, future Hermes).
+
+  Payload shape LOCKED by user (Q9 resolution): PNG + `.f0` + bundled
+
+  constraint doc. Posture is "at-minimum these fields" (extensible-minimum)
+
+  per TPM ESCALATION in outline-collab-review-record — d-5 is free to add
+
+  fields if downstream consumer surfaces a need during manual exercise.
+
+  When d-1 toggle ON, constraint doc field carries the accessibility +
+
+  animations notes; when toggle OFF, constraint doc field is empty/absent
+
+  but PNG + .f0 always ship.
+
+  '
+acceptance_criteria:
+- Given d-1 Phase A toggle is ON, when /design completes, then the handoff payload contains AT MINIMUM these three fields — `wireframe.png` (PNG render), `wireframe.f0` (Frame0 source), `constraints.md` (bundled accessibility + animations notes).
+- Given d-1 Phase A toggle is OFF, when /design completes, then the handoff payload contains AT MINIMUM `wireframe.png` + `wireframe.f0` (PNG + .f0 always ship); constraint doc field is empty or absent.
+- Posture — extensible-minimum. Given a downstream consumer surfaces a need for an additional field (e.g., scenario-mapping notes, version metadata, originating ticket ID), when d-5 is implemented or extended post-ship, then the payload schema is free to add fields without breaking existing consumers (add-only).
+- Given the handoff payload is consumed by /design-review (Slice 4), when manual exercise runs, then design-review receives the payload AND can locate `wireframe.png`, `wireframe.f0`, and (when toggle on) `constraints.md` by their documented field names.
+- Given the payload contract is documented, when a reader looks at `hive/references/wireframe-protocol.md` (existing 50-line doc), then it includes a payload-contract section naming the three minimum fields AND the extensible-minimum posture.
+- DO. Document the payload AS "at-minimum these fields" (extensible-minimum), not as a frozen contract.
+- DO NOT. Treat the three fields as the maximum payload — additional fields are reversible follow-ups, not breaking changes.
+metric:
+  applies: true
+  name: substrate_coverage.wireframe_handoff_payload_field_count
+  direction: up
+  unit: count
+  baseline: 0
+  target: 3
+  window: story integrate step
+  source:
+    kind: manual
+    ref: /design --include-constraints produces payload with wireframe.png + wireframe.f0 + constraints.md fields
+  verify_at: story integrate step
+  owner: developer
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/d-5-wireframe-handoff-bundle.yaml
+  verdict: null
+  timestamp: null
+  agent: null
+steps:
+- id: research
+  description: Read `hive/references/wireframe-protocol.md` (50 lines) — Touchpoint 1 + Touchpoint 2 prose; identify the bundle-emission point in d-1 Phase A output; confirm Frame0 `.f0` source-file convention.
+  agent: researcher
+- id: implement
+  description: Update `hive/references/wireframe-protocol.md` with a payload-contract section naming the three minimum fields AND extensible-minimum posture; wire the bundle emission into d-1 Phase A output (toggle ON bundles all 3; toggle OFF bundles PNG + .f0 only).
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Author `hive/workflows/steps/ui-design/test/wireframe-handoff-bundle.test.mjs` covering toggle-on and toggle-off payload composition; assert all 3 fields present when on, 2 fields when off.
+  agent: tester
+  depends_on:
+  - implement
+- id: scenario
+  description: Author `.pHive/test-scenarios/d-5-wireframe-handoff-bundle.yaml` covering /design + /design --include-constraints + manual exercise of handoff bundle reaching /design-review.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Architect review on payload contract documented as extensible-minimum (not frozen); reviewer confirms downstream consumer (design-review) can locate fields by name.
+  agent: reviewer
+  depends_on:
+  - test
+  - scenario
+- id: integrate
+  description: 'Commit "[d-5] feat(/design): wireframe handoff payload — PNG + .f0 + bundled constraint doc (extensible-minimum)"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  tech_stack:
+  - language: markdown (reference doc), javascript (.mjs)
+  - runtime: node 20+
+  - test: vitest
+  key_files:
+  - path: hive/references/wireframe-protocol.md
+    purpose: Existing reference (50 lines) — payload-contract section added
+  - path: hive/workflows/steps/ui-design/
+    purpose: Step files (7) where bundle emission wires in
+  - path: hive/agents/ui-designer.md
+    purpose: Persona producing PNG + .f0
+files_to_modify:
+- file: hive/references/wireframe-protocol.md
+  change: ADD payload-contract section naming the three minimum fields (wireframe.png, wireframe.f0, constraints.md) AND posture statement ("at-minimum these fields"; extensible-minimum)
+- file: hive/workflows/steps/ui-design/test/wireframe-handoff-bundle.test.mjs
+  change: CREATE — vitest spec covering toggle-on (3 fields) + toggle-off (2 fields) payload composition
+- file: .pHive/test-scenarios/d-5-wireframe-handoff-bundle.yaml
+  change: CREATE — scenario covering /design handoff bundle reaching /design-review
+code_examples:
+- language: markdown
+  description: Payload contract section
+  snippet: '## Wireframe handoff payload (at-minimum these fields)
+
+    - `wireframe.png` — PNG render of the wireframe (always present)
+
+    - `wireframe.f0` — Frame0 source (always present)
+
+    - `constraints.md` — bundled accessibility + animations notes (present when `--include-constraints` was on)
+
+    Posture: extensible-minimum. Downstream consumers MAY require additional fields; new fields are add-only.
+
+    '
+references:
+- path: hive/references/wireframe-protocol.md
+  relevant_excerpt: Touchpoint 1 (rendition approval via AskUserQuestion) + Touchpoint 2 (brief sign-off); applies to ui-designer step only.
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/design-discussion.md
+  relevant_excerpt: §6 Q9 RESOLVED — Wireframe-artifact handoff payload = PNG + .f0 + bundled constraint doc.
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/outline-collab-review-record.md
+  relevant_excerpt: 'ESCALATION — Wireframe handoff payload contract — locked vs extensible posture needed for d-5. Story author needs explicit posture statement: ''the minimum payload, d-5 is free to add fields if a downstream consumer surfaces a need during the manual exercise step''.'
+cross_cutting:
+- concern: documentation
+  action: Update hive/references/wireframe-protocol.md with the payload-contract section naming the three minimum fields and extensible-minimum posture.
+- concern: versioning
+  action: New consumer-visible payload contract — flag for epic-close version bump (minor — additive feature) in CHANGELOG.
+design_decisions:
+- decision: Payload contract is "at-minimum these fields" (extensible-minimum)
+  rationale: TPM ESCALATION in outline-collab-review-record — locked-vs-extensible posture needed; d-5 chooses extensible-minimum so downstream consumers surfacing new field needs (scenario-mapping, version metadata, ticket ID) can extend without breaking existing consumers.
+- decision: PNG + .f0 always ship; constraint doc conditional on toggle
+  rationale: User-locked Q9 — toggle-off must preserve legacy single-dispatch payload (PNG + .f0); toggle-on adds the constraint doc.
+risks:
+- severity: medium
+  description: Downstream consumer surfaces a needed field that the locked posture would forbid
+  mitigation: Posture is extensible-minimum — additional fields are add-only and reversible (E7 elicitation)
+- severity: low
+  description: Bundle composition leaks ui-designer's working state into the payload
+  mitigation: AC explicitly names the 3 fields; bundle composition is field-named, not file-glob
+tracker_id: f609f5b7-f31a-44e0-a093-c3630f32f638

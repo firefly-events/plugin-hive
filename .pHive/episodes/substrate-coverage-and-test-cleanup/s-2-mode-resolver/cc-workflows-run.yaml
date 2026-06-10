@@ -1,0 +1,24 @@
+step: cc-workflows-run
+story: s-2-mode-resolver
+epic: substrate-coverage-and-test-cleanup
+status: passed
+workflow_run_id: wf_59c2bd25-1a8
+transcript_dir: /Users/don/.claude/projects/-Users-don--claude-worktrees-substrate-coverage/d300a5e9-ab89-420d-8683-793b87b81895/subagents/workflows/wf_59c2bd25-1a8
+agents:
+  - {persona: researcher, role: research, phase: Research}
+  - {persona: developer,  role: implement, phase: Implement}
+  - {persona: tester,     role: test,      phase: Test}
+  - {persona: reviewer,   role: review,    phase: Review}
+review_verdict: passed
+test_summary: 37/37 vitest cases passed
+field_sources:
+  agent_models:
+    Research:  {persona: researcher, tier: sonnet, source: model_tiers}
+    Implement: {persona: developer,  tier: sonnet, source: model_tiers}
+    Test:      {persona: tester,     tier: sonnet, source: model_tiers}
+    Review:    {persona: reviewer,   tier: opus,   source: model_overrides}
+usage:
+  agent_count: 4
+  subagent_tokens: 216809
+  tool_uses: 72
+  duration_ms: 416049

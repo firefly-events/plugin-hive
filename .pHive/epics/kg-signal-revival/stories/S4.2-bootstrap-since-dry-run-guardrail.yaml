@@ -1,7 +1,7 @@
 id: S4.2-bootstrap-since-dry-run-guardrail
 epic: kg-signal-revival
 title: kg-bootstrap-from-projects.js --since flag + large-import guardrail + legacy valid_from fix
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [S4.1-register-project-skill]

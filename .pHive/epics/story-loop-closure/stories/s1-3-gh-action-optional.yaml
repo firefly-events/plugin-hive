@@ -1,7 +1,7 @@
 id: s1-3-gh-action-optional
 epic: story-loop-closure
 title: "S1.3 — optional CI workflow: close Multica on PR merge (gated on secret)"
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s1-1-multica-issue-closer-module]

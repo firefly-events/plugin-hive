@@ -1,7 +1,7 @@
 id: s1-2-execute-integrate-hook
 epic: story-loop-closure
 title: "S1.2 — /execute integrate-step hook: close Multica issue after commit+push"
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s1-1-multica-issue-closer-module]

@@ -1,0 +1,12 @@
+step: cc-workflows-run
+story: t-2-markNeedsRework-abi
+epic: substrate-coverage-and-test-cleanup
+status: passed_after_orchestrator_fix
+workflow_run_id: wf_31751e74-5de
+review_verdict: needs_revision_blocked_on_path_bug
+orchestrator_fix: hive/lib/package.json test:contract path was repo-root-relative; dropped prefix
+test_summary: 89 vitest + 5 node:test contract = 94/94 green
+methodology: tdd
+phases: [Research, TestSpec, Implement, Scenario, Review]
+insight_capture: {memories_written: 3, personas: [developer, tester, tester]}
+usage: {agent_count: 5, subagent_tokens: 306082, tool_uses: 150, duration_ms: 939739}

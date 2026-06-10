@@ -1,7 +1,7 @@
 id: mi-02-spike-session-lifecycle
 epic: multica-integration-fixes
 title: Spike — Multica Claude provider session lifecycle + API socket idle drop
-status: pending
+status: blocked
 complexity: small
 methodology: classic
 depends_on: [mi-01-spike-plugin-loading]   # serial per grill C3 (defensive vs codex race; also serializes Multica-source-read budget across spikes)

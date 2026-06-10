@@ -1,7 +1,7 @@
 id: S3.1-sidecar-lifecycle-scripts
 epic: kg-signal-revival
 title: ChromaDB sidecar lifecycle scripts + SessionStart hook
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [B0.2-persist-ref-telemetry-contract]

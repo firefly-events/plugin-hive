@@ -49,10 +49,13 @@ agents:
     skills: []
     visibility: workspace
 
+  # architect + technical-writer route to Claude/Sonnet for prose-heavy planning docs
+  # (2026-06-09): codex is a code model and produced bullet-fragment design docs;
+  # Sonnet holds analytical prose + evidence. Code roles stay on codex above.
   - name: architect
     description: Designs technical solutions and evaluates technology choices, with rationale for each decision.
-    provider: codex
-    model: ""
+    provider: claude
+    model: claude-sonnet-4-6
     max_concurrent_tasks: 1
     persona_ref: hive/agents/architect.md
     custom_env: {}
@@ -63,14 +66,14 @@ agents:
 
   - name: technical-writer
     description: Transforms raw material into structured documentation, references, and guides.
-    provider: codex
-    model: ""
+    provider: claude
+    model: claude-sonnet-4-6
     max_concurrent_tasks: 1
     persona_ref: hive/agents/technical-writer.md
     custom_env: {}
     custom_args: []
     mcp_config: null
-    skills: [story-writing, architecture-doc, readme, adr, research-brief, runbook]
+    skills: [design-discussion, structured-outline, horizontal-plan, vertical-plan, greenfield-discovery-brief, pr-body, story-writing, architecture-doc, readme, adr, research-brief, runbook]
     visibility: workspace
 
   # Verifiers — provider: claude, model: claude-opus-4-7

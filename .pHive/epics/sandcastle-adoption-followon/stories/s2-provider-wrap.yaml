@@ -1,7 +1,7 @@
 id: s2-provider-wrap
 epic: sandcastle-adoption-followon
 title: Wrap Sandcastle providers with Hive defaults and version preflight
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [s1-auth-setup-skill, s1-redaction-wrapper, s1-gitignore-template]

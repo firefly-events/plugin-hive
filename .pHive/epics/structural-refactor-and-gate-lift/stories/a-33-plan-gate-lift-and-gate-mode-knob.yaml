@@ -1,7 +1,7 @@
 id: a-33-plan-gate-lift-and-gate-mode-knob
 epic: structural-refactor-and-gate-lift
 title: Lift /plan hard-gate to warning under paths.gate_mode default warning
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [a-04-plan-skill-split-routing, a-32-plan-methodology-auto-detect]

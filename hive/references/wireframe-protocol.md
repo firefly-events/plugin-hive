@@ -96,3 +96,23 @@ This section gives the developer agent everything needed to implement the design
 ## Integration with Workflows
 
 The wireframe protocol is NOT a workflow step in `development.*.workflow.yaml`. It runs during **planning**, not execution. The plan command invokes the UI designer and runs touchpoints as part of story creation. By the time `/hive:execute` starts, stories already contain the `wireframes` section.
+
+## Handoff Payload Contract
+
+The wireframe handoff payload is the bundled artifact set that /design produces and downstream consumers (e.g., /design-review, manual review, future Hermes) consume. The payload shape is **extensible-minimum**: at minimum these three fields, downstream consumers MAY require additional fields, and new fields are add-only.
+
+Minimum payload fields:
+
+- `wireframe.png` — PNG render of the wireframe (always present)
+- `wireframe.f0` — Frame0 source (always present)
+- `constraints.md` — bundled accessibility + animations constraint notes (present when /design was invoked with `--include-constraints`, absent otherwise)
+
+**Posture:** extensible-minimum. Downstream consumers MAY require additional fields. New fields are add-only and reversible — earlier consumers seeing fewer fields will not break. This posture was set by TPM escalation in outline-collab-review-record (cite: 'the minimum payload, d-5 is free to add fields if a downstream consumer surfaces a need during the manual exercise step').
+
+When /design `--include-constraints` is ON, the `constraints.md` field is populated with the bundled accessibility-specialist + animations-specialist constraint notes produced by /design Phase A (d-1). When the flag is OFF, the `constraints.md` field is absent or empty; PNG + .f0 always ship.
+
+The payload is **field-named** (not file-glob-based) so bundle composition cannot accidentally leak ui-designer working state. Only the three named fields above are part of the canonical minimum; additional fields require explicit naming.
+
+**Q9 resolution** (design-discussion.md §6): "Wireframe-artifact handoff payload — PNG + `.f0` only, or include constraint doc from accessibility + animations?" Resolved: PNG + `.f0` + bundled constraint doc. Payload contract locked per user Q9 resolution and outline-collab-review-record researcher review.
+
+**Artifact producers:** d-1 (Phase A, `/design` skill) produces the constituent constraint artifacts (`accessibility-constraints.md` + `animations-constraints.md`). d-3 (`design-mode-multica`) and d-4 (`design-mode-cc-workflows`) produce per-persona outputs that become the constituent artifacts. d-5 defines this payload shape — the bundle field names and extensible-minimum posture.

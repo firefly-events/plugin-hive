@@ -1,7 +1,7 @@
 id: a-2-standup-routing-step-and-heuristic
 epic: autonomous-cycle-loop
 title: "A.2 — interactive-routing step file + visibility heuristic"
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [a-1-standup-interactive-flag]

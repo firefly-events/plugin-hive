@@ -1,0 +1,120 @@
+name: substrate-coverage-and-test-cleanup
+title: Substrate Coverage + Test Cleanup (Part 2 epic)
+description: |
+  Part 2 of cc-workflows-first-party substrate work (PR #241 merged develop 2026-06-05).
+  Adds Multica + cc-workflows mode coverage to /test, /design, /design-review, /review
+  across 5 slices / 19 stories, plus three semantic alignments: /test bounce-back on real
+  bugs via new markNeedsRework({id, reason}) ABI; /design 3-persona pipeline with
+  Pattern B + --include-constraints toggle (constraint-injection-upfront default);
+  /design-review substrate parity without semantic change. Foundation slice 1 ships
+  shared helpers (mode-resolver, cc-workflows-preconditions) + widened lint BEFORE the
+  4 substrate-parity slices, with locked within-slice commit order s-2 → s-4 → s-3.
+target_codebase: /Users/don/.claude/worktrees/substrate-coverage
+methodology: classic
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  # Slice 0 — audit recovery (0.5d pre-flight)
+  - id: a-0-audit-recovery
+    title: Audit recovery spike — locate, regenerate, or accept-risk the missing cc-workflows smoke audit
+    complexity: low
+    depends_on: []
+
+  # Slice 1 — foundation (commit order LOCKED: s-2 → s-4 → s-3; s-5 parallel to s-2)
+  - id: s-2-mode-resolver
+    title: Extract 5-tier mode-resolver helper into hive/lib/mode-resolver.mjs
+    complexity: medium
+    depends_on: [a-0-audit-recovery]
+  - id: s-5-cc-workflows-model-tier-resolver
+    title: Auto-resolve per-persona model tier in cc-workflows mode dispatch + helper extraction
+    complexity: medium
+    depends_on: [a-0-audit-recovery]
+  - id: s-4-cc-workflows-preconditions
+    title: Create cc-workflows-preconditions helper exporting assertWorktreeIsolation and back-fit existing 2 cc-workflows atoms
+    complexity: medium
+    depends_on: [s-2-mode-resolver]
+  - id: s-3-no-codex-lint
+    title: Multi-surface no-codex lint with AST + grep checks + helper-import assertion + npm test wiring
+    complexity: medium
+    depends_on: [s-4-cc-workflows-preconditions, s-5-cc-workflows-model-tier-resolver]
+
+  # Slice 2 — /test substrate (t-2 has TDD methodology override)
+  - id: t-1-fold-simulated-manual
+    title: Fold simulated-manual into the swarm pipeline as step-04b-scenario-replay and hard-rip the --simulated-manual flag
+    complexity: medium
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint]
+  - id: t-2-markNeedsRework-abi
+    title: Add markNeedsRework({id, reason}) ABI method with TDD contract-first + Multica/GitHub adapter implementations + step-06-triage emit
+    complexity: high
+    methodology: tdd
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint]
+  - id: t-3-test-mode-cc-workflows
+    title: Create test-mode-cc-workflows atom (per-scenario dispatch) + test-dispatch router
+    complexity: medium
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint, t-2-markNeedsRework-abi]
+
+  # Slice 3 — /design substrate (5 stories)
+  - id: d-2-design-dispatch-router
+    title: Create design-dispatch router consuming mode-resolver.mjs and returning {mode_decision, sources}
+    complexity: medium
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint]
+  - id: d-1-design-multi-persona-pipeline
+    title: /design Phase A persona-pipeline insert + Pattern B with --include-constraints toggle + 3-persona handoff wiring
+    complexity: high
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint, d-2-design-dispatch-router]
+  - id: d-3-design-mode-multica
+    title: Create design-mode-multica atom — per-persona dispatch + episode markers per persona
+    complexity: medium
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint, d-1-design-multi-persona-pipeline]
+  - id: d-4-design-mode-cc-workflows
+    title: Create design-mode-cc-workflows atom mirroring plan-mode-cc-workflows + helper import + no-codex compliance
+    complexity: medium
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint, d-1-design-multi-persona-pipeline]
+  - id: d-5-wireframe-artifact-handoff
+    title: Wireframe handoff payload — PNG + .f0 + bundled constraint doc (extensible-minimum posture)
+    complexity: medium
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint, d-1-design-multi-persona-pipeline]
+
+  # Slice 4 — /design-review substrate (3 stories)
+  - id: dr-1-design-review-dispatch-router
+    title: Create design-review-dispatch router + wire Phase 0 into skills/design-review/SKILL.md
+    complexity: medium
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint]
+  - id: dr-2-design-review-mode-multica
+    title: Create design-review-mode-multica atom preserving the 4-step workflow.yaml model with 4 agent() calls
+    complexity: medium
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint, dr-1-design-review-dispatch-router]
+  - id: dr-3-design-review-mode-cc-workflows
+    title: Create design-review-mode-cc-workflows atom preserving 4-step model + helper import + no-codex compliance
+    complexity: medium
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint, dr-1-design-review-dispatch-router]
+
+  # Slice 5 — /review substrate (3 stories)
+  - id: r-1-review-dispatch-router
+    title: Create review-dispatch router + wire Phase 0 into skills/review/SKILL.md + preserve scope_drift emit
+    complexity: medium
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint]
+  - id: r-2-review-mode-multica
+    title: Create review-mode-multica atom — thin wrapper for solo reviewer dispatch
+    complexity: low
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint, r-1-review-dispatch-router]
+  - id: r-3-review-mode-cc-workflows
+    title: Create review-mode-cc-workflows atom — thin wrapper for solo reviewer dispatch + helper import + no-codex compliance
+    complexity: medium
+    depends_on: [s-2-mode-resolver, s-4-cc-workflows-preconditions, s-3-no-codex-lint, r-1-review-dispatch-router]
+
+  # Slice 6 — governance close (1 story, runs last)
+  - id: s-1-dispatch-parity-matrix
+    title: Author hive/references/dispatch-parity.md — canonical 6×3 substrate matrix
+    complexity: low
+    depends_on:
+      - s-2-mode-resolver
+      - s-3-no-codex-lint
+      - s-4-cc-workflows-preconditions
+      - t-3-test-mode-cc-workflows
+      - d-4-design-mode-cc-workflows
+      - dr-3-design-review-mode-cc-workflows
+      - r-3-review-mode-cc-workflows

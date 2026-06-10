@@ -75,6 +75,10 @@ state/
 !.pHive/epics/smoke-test-execute-multica-codex/**
 !.pHive/episodes/smoke-test-execute-multica-codex/
 !.pHive/episodes/smoke-test-execute-multica-codex/**
+!.pHive/epics/substrate-coverage-and-test-cleanup/
+!.pHive/epics/substrate-coverage-and-test-cleanup/**
+!.pHive/episodes/substrate-coverage-and-test-cleanup/
+!.pHive/episodes/substrate-coverage-and-test-cleanup/**
 # Test scenarios (.pHive/test-scenarios/) — referenced by autonomous-cycle-loop
 # config + simulated-manual cross-cutting concern. Per-story scenarios shipped
 # alongside the stories that need them.
@@ -214,3 +218,8 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/multica-insight-capture/**
 !.pHive/epics/state-dir-resolver/
 !.pHive/epics/state-dir-resolver/**
+hive/lib/.pHive/
+# Node + tsx runtime cache dirs created by vitest runs under cc-workflows
+# substrate dispatches. Stay out of commits.
+node-compile-cache/
+tsx-*/

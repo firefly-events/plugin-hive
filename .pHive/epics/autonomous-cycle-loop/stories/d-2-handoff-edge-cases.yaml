@@ -1,7 +1,7 @@
 id: d-2-handoff-edge-cases
 epic: autonomous-cycle-loop
 title: "D.2 — handoff timeout + no-PR fallback + KG triple"
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [d-1-handoff-dispatch-and-execute-wire]

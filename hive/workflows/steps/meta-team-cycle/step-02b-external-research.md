@@ -46,20 +46,35 @@ discovery_source: external_research
 signal_subtype: claude_code_release
 ```
 
-**Actionability filter (MANDATORY — researcher persona):**
+**Actionability filter (researcher persona) — tier, do not discard:**
 
-> **Distinguish "Anthropic shipped X" from "Hive should adopt X".**
-> Most Claude Code releases are bug fixes or minor patches. Only propagate a
-> release to the candidate pool when it describes a Hive-actionable capability
-> shift — for example:
-> - A new Workflows or Routines primitive
-> - A new or renamed slash command with Hive relevance (e.g. `/code-review`)
-> - A new agents view, hooks model, or permissions change
-> - A capability that implies Hive should update reference docs, skill files,
->   or step instructions
+> Default behavior is to **emit, not discard**. The pipeline has been
+> consistently producing zero external candidates because the previous filter
+> rejected anything that wasn't already labeled "Hive should adopt X". That
+> over-filters: subtle relevance often isn't visible from a release note alone,
+> and downstream step-03 / step-03b is where ranking happens — not here.
 >
-> Releases whose notes consist primarily of bug fixes, performance improvements,
-> or internal refactors should be **discarded** — do not emit a candidate.
+> For every release since the last cycle, emit a candidate. Tag the candidate
+> with a `signal_tier` so the proposal stage can prioritize:
+>
+> - `signal_tier: actionable` — release describes a Hive-relevant capability
+>   shift: a new Workflows or Routines primitive, a new/renamed slash command
+>   with Hive relevance (e.g. `/code-review`), an agents-view / hooks / permissions
+>   change, or any capability whose adoption would update reference docs,
+>   skill files, or step instructions. These are the high-confidence candidates.
+>
+> - `signal_tier: watch` — release notes are dominated by bug fixes, perf
+>   improvements, or internal refactors. NOT discarded. The candidate still
+>   enters the pool; step-03 may de-prioritize. Catches the edge case where a
+>   one-line note in a "patch" release is actually load-bearing.
+>   Watch-tier candidates are subject to a 14-day recency window
+>   (`WATCH_TIER_MAX_AGE_DAYS` in `external-research-providers.mjs`): older or
+>   undated watch items are dropped so stale candidates do not re-enter the
+>   pool every nightly cycle. Actionable-tier candidates are exempt.
+>
+> The ONLY hard discard is **zero-content releases**: empty release body, or
+> body that is a single word (`patch`, `fixes`, `internal`), or a body that is
+> only a CI-template stub with no human prose. Those add nothing to the pool.
 
 **Implementation module:** `hive/workflows/steps/meta-team-cycle/external-research-providers.mjs`
 Export: `fetchClaudeCodeReleases(opts?)` — accepts optional `{ fetchFn, apiUrl, perPage }` for test injection. Returns `{ candidates, error }`. On HTTP error or network failure: `candidates: []`, `error: <string>` — never throws.
@@ -87,21 +102,32 @@ Accept: application/rss+xml, application/xml, text/xml
 - `<pubDate>` — RFC 2822 publication timestamp
 - `<description>` — post summary or excerpt (may be CDATA-wrapped)
 
-**Content filter rule (MANDATORY):**
+**Content filter rule — tier, do not discard by default:**
 
-> Keep posts whose title + description contain at least one signal from the
-> **keep list** AND do NOT contain any term from the **skip list**.
+> Same intent as the `claude_code_release` actionability filter: default to
+> **emit with a tier**, not discard. Posts only get hard-rejected on the skip
+> list (company/business/policy noise). Everything else enters the pool.
 >
-> **Keep signals** (model / capability / SDK): `model`, `claude`, `api`, `sdk`,
-> `agent`, `capability`, `introducing`, `computer use`, `tool`, `vision`,
-> `context window`, `token`, `feature`, `benchmark`, `release`.
+> - **Hard skip (discard, no candidate):** title or description contains any
+>   of `policy`, `legislation`, `government`, `regulation`, `funding`,
+>   `investment`, `valuation`, `series`, `partnership`, `acquisition`,
+>   `hiring`, `culture`, `diversity`, `leadership`, `company news`. These are
+>   never Hive-relevant.
 >
-> **Skip signals** (company / business / policy): `policy`, `legislation`,
-> `government`, `regulation`, `funding`, `investment`, `valuation`, `series`,
-> `partnership`, `acquisition`, `hiring`, `culture`, `diversity`, `leadership`,
-> `company news`.
+> - `signal_tier: actionable` — title or description contains at least one
+>   keep-list signal: `model`, `claude`, `api`, `sdk`, `agent`, `capability`,
+>   `introducing`, `computer use`, `tool`, `vision`, `context window`, `token`,
+>   `feature`, `benchmark`, `release`. High-confidence Hive-relevant material.
 >
-> Skip signals take precedence — a post matching both lists is excluded.
+> - `signal_tier: watch` — post passes the hard-skip but does NOT match any
+>   keep-list signal. Still emit as a candidate. Step-03 ranking may de-prioritize.
+>   Catches posts where the Hive-relevance hides outside title/description (e.g.
+>   keep-list term appears only in the body or in a linked changelog).
+>   The same 14-day watch-tier recency window applies: posts older than the
+>   window (or with no parseable `pubDate`) are dropped.
+>
+> Skip list always wins. The point of widening the keep/watch split is to give
+> step-03 / step-03b material every cycle instead of stranding the pipeline.
 
 **Tag rule:**
 Candidates emitted by this subprovider are tagged:

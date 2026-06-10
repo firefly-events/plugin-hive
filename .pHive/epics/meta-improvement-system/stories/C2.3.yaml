@@ -2,7 +2,7 @@ id: C2.3
 epic: meta-improvement-system
 slice: S5
 title: Per-agent token capture path
-status: pending
+status: in_progress
 complexity: high
 methodology: classic
 depends_on: ["C2.0", "C2.1", "C2.2"]

@@ -1,7 +1,7 @@
 id: d-1-handoff-dispatch-and-execute-wire
 epic: autonomous-cycle-loop
 title: "D.1 — handoff dispatch helper + /execute post-integrate step"
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: [s0-1-schema-and-config-bump]

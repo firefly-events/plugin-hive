@@ -1,0 +1,31 @@
+step: cc-workflows-run
+story: s-4-cc-workflows-preconditions
+epic: substrate-coverage-and-test-cleanup
+status: passed
+workflow_run_id: wf_f1567acd-740
+transcript_dir: /Users/don/.claude/projects/-Users-don--claude-worktrees-substrate-coverage/d300a5e9-ab89-420d-8683-793b87b81895/subagents/workflows/wf_f1567acd-740
+agents:
+  - {persona: researcher, role: research, phase: Research}
+  - {persona: developer,  role: implement, phase: Implement}
+  - {persona: tester,     role: test,      phase: Test}
+  - {persona: reviewer,   role: review,    phase: Review}
+review_verdict: passed_after_fix
+review_notes: |
+  Reviewer flagged hive/lib/package.json test glob ('test/*.test.mjs' literal not expanded by vitest)
+  causing 'No test files found'. Orchestrator applied fix: explicit file list in npm test script.
+  Post-fix: 48/48 tests passing.
+  Also: orchestrator's mid-flight Edit on execute-mode-cc-workflows/SKILL.md raced with the
+  developer phase's back-fit; git restore rolled back BOTH edits. Re-applied back-fit manually
+  using plan-mode-cc-workflows as reference template.
+test_summary: 48/48 vitest cases passed (37 mode-resolver + 11 cc-workflows-preconditions)
+field_sources:
+  agent_models:
+    Research:  {persona: researcher, tier: sonnet, source: model_tiers}
+    Implement: {persona: developer,  tier: sonnet, source: model_tiers}
+    Test:      {persona: tester,     tier: sonnet, source: model_tiers}
+    Review:    {persona: reviewer,   tier: opus,   source: model_overrides}
+usage:
+  agent_count: 4
+  subagent_tokens: 192930
+  tool_uses: 49
+  duration_ms: 275490

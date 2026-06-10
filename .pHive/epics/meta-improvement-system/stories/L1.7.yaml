@@ -2,7 +2,7 @@ id: L1.7
 epic: meta-improvement-system
 slice: S7
 title: Closure validator and library test suite
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: ["L1.2", "L1.3", "L1.4", "L1.5", "L1.6", "A2.5"]
