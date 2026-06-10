@@ -34,6 +34,9 @@ SEED_PREDICATES: tuple[str, ...] = (
     "phase_failed",
     "phase_blocked",
     "phase_handoff",
+    "validated",
+    "tested",
+    "implemented",
 )
 
 _BOOTSTRAP_DDL = """

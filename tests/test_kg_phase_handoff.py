@@ -75,7 +75,7 @@ def test_schema_doc_declares_phase_handoff() -> None:
 
 def test_seed_predicates_include_phase_handoff() -> None:
     assert "phase_handoff" in SEED_PREDICATES
-    assert len(SEED_PREDICATES) == 10
+    assert len(SEED_PREDICATES) == 13
 
 
 def test_bootstrap_fresh_db_seeds_phase_handoff(tmp_path: Path) -> None:

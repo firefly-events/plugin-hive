@@ -1,0 +1,7 @@
+# Insights — s5-role-predicates-schema
+
+- `tests/test_kg_phase_handoff.py` pins `len(SEED_PREDICATES) == 10` as an exact count. Any story adding predicates MUST bump that assert (now 13) or the suite breaks. Consider replacing the exact-count assert with a superset check if the vocabulary keeps growing — the count assert is a recurring coupling trap.
+- `git stash` does not stash untracked files by default. When verifying "are these failures pre-existing?" on a shared branch, the new untracked test file still runs against the stashed baseline and inflates the failure count (28 vs 20 here). Diff the failure *sets*, not the counts — or use `git stash -u`.
+- The epic branch `feat/kg-repair-activation` can be checked out in another daemon worktree, making `git checkout <branch>` fail with "already used by worktree". Detached HEAD at `origin/<branch>` + `git push origin HEAD:<branch>` satisfies the shared-branch integration contract without fighting the other worktree.
+- `kg_emit_cli.main()` returns 0 even on swallowed emit failures by design — tests must assert on the `--json` payload's `emitted: true`, not the exit code, to actually verify the INSERT landed.
+- step-02c had a latent doc bug: FAILURE MODES said "Both query groupings" while the step defined three (now four) groupings. Predicate-set expansions tend to leave stale cardinality words ("three", "five", "both") scattered across Purpose/TASK SEQUENCE/SUCCESS METRICS/FAILURE MODES — grep for number words when touching that file.
