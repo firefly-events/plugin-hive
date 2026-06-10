@@ -19,11 +19,15 @@ Before entering the swarm pipeline, invoke `skills/hive/skills/test-dispatch/SKI
 
 Switch `mode_decision` to the appropriate execution path. The swarm pipeline below is the default (`local`) path.
 
+## State Directory Resolution
+
+All state paths in this skill and its step files are written as `${HIVE_STATE_DIR}/...`. Resolve `HIVE_STATE_DIR` from `paths.state_dir` in the root `hive.config.yaml`; fall back to `.pHive` when unset.
+
 ## Skill Preamble
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — kickoff gate (initialization check) + persona / config / memory loading.
 
-**Kickoff gate override — warn, don't block.** If the kickoff checks pass, proceed silently. This skill is read-only-shaped. On a fresh repo without `.pHive/project-profile.yaml`, emit the warning below and proceed with sane defaults instead of stopping. The hard-stop in the prelude does NOT apply here.
+**Kickoff gate override — warn, don't block.** If the kickoff checks pass, proceed silently. This skill is read-only-shaped. On a fresh repo without `${HIVE_STATE_DIR}/project-profile.yaml`, emit the warning below and proceed with sane defaults instead of stopping. The hard-stop in the prelude does NOT apply here.
 
 > Warning: Hive not initialized for this project. Run `/hive:kickoff` for full context. Proceeding with defaults.
 
@@ -42,7 +46,7 @@ This write is gated on test-gate success. Do not write `in_review` on `/test` en
 | 0. Rebuild | test-scout | `step-00-rebuild.md` | Rebuild from latest commit, deploy to devices |
 | 1. Scout | test-scout | `step-01-scout.md` | Detect frameworks, scan tests, read baseline |
 | 2. Architect | test-architect | `step-02-architect.md` | Map ACs to tests, author scripts, verify testId render |
-| 3. Worker | test-worker | `step-03-worker.md` | Execute tests, capture artifacts to `.pHive/test-artifacts/` |
+| 3. Worker | test-worker | `step-03-worker.md` | Execute tests, capture artifacts to `${HIVE_STATE_DIR}/test-artifacts/` |
 | 4b. Scenario Replay | test-inspector | `step-04b-scenario-replay.md` | Load worker results via `loadResults`; emit `replay_summary` for inspector |
 | 4. Inspector | test-inspector | `step-04-inspector.md` | Coverage analysis against `replay_summary`; gap detection |
 | 5. Sentinel | test-sentinel | `step-05-sentinel.md` | Bug filing with AI hypothesis |
@@ -52,7 +56,7 @@ This write is gated on test-gate success. Do not write `in_review` on `/test` en
 
 ## Artifact Paths
 
-ALL test artifacts go to `.pHive/test-artifacts/{epic-id}/{story-id}/`:
+ALL test artifacts go to `${HIVE_STATE_DIR}/test-artifacts/{epic-id}/{story-id}/`:
 - Screenshots → `screenshots/`
 - Logs → `logs/`
 - Results → `results.yaml`
