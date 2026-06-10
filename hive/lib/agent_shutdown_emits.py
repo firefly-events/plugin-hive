@@ -50,9 +50,10 @@ REVIEWER_VERDICT_TO_OBJECT = {
 }
 
 # Closed object vocabularies per role predicate. Predicates absent from this
-# map (tested/implemented until s7/s8 pin theirs) accept any sanitized object.
+# map (implemented until s8 pins its vocabulary) accept any sanitized object.
 ALLOWED_OBJECTS = {
     "validated": frozenset({"approve", "approve-with-changes", "reject"}),
+    "tested": frozenset({"pass", "fail", "inconclusive"}),
 }
 
 
