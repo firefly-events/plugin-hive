@@ -1,0 +1,186 @@
+{
+  "description": "Shared conformance vectors for the state-dir resolver contract (story sdr-1). JSON content in a .yaml file (JSON is valid YAML) so Python (json), Node (JSON.parse), and shell-driving harnesses all parse it with stdlib. Every harness substitutes the literal token $TMP with a per-run, symlink-canonicalized temp directory, creates `dirs`, then `symlinks` (link -> target), writes `config_yaml` to `config_path` when config_yaml is non-null, runs the resolver from `cwd` with exactly the `env` given (plus PATH/HOME for the shell harness), and asserts byte-identical `expected` output across Python (canonical), shell, and Node resolvers. The shell shim self-derives HIVE_ROOT from its own location at source time, so the shell harness clears HIVE_ROOT after sourcing whenever a row's env does not set it — emulating 'HIVE_ROOT unset'.",
+  "contract": "Precedence: HIVE_STATE_DIR env > paths.state_dir in hive.config.yaml > default .pHive. Config file located via CONFIG_FILE env when set, else $HIVE_ROOT/hive.config.yaml when HIVE_ROOT is set and non-empty, else cwd/hive.config.yaml. Absolute value used as-is then symlink-canonicalized; relative value resolved under paths.target_project when set, else under cwd; target_project null/missing means cwd; output is always an absolute, symlink-canonicalized path.",
+  "rows": [
+    {
+      "name": "env-wins-over-config",
+      "env": {"HIVE_STATE_DIR": "$TMP/envdir", "CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: $TMP/cfgdir\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd", "$TMP/envdir", "$TMP/cfgdir"],
+      "symlinks": {},
+      "expected": "$TMP/envdir"
+    },
+    {
+      "name": "env-absolute-missing-config",
+      "env": {"HIVE_STATE_DIR": "$TMP/envdir", "CONFIG_FILE": "$TMP/missing-hive.config.yaml"},
+      "config_yaml": null,
+      "config_path": null,
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd", "$TMP/envdir"],
+      "symlinks": {},
+      "expected": "$TMP/envdir"
+    },
+    {
+      "name": "env-relative-under-cwd",
+      "env": {"HIVE_STATE_DIR": ".env-state", "CONFIG_FILE": "$TMP/missing-hive.config.yaml"},
+      "config_yaml": null,
+      "config_path": null,
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd"],
+      "symlinks": {},
+      "expected": "$TMP/cwd/.env-state"
+    },
+    {
+      "name": "env-relative-under-target-project",
+      "env": {"HIVE_STATE_DIR": ".env-state", "CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  target_project: $TMP/proj\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd", "$TMP/proj"],
+      "symlinks": {},
+      "expected": "$TMP/proj/.env-state"
+    },
+    {
+      "name": "config-absolute",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: $TMP/cfgdir\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd", "$TMP/cfgdir"],
+      "symlinks": {},
+      "expected": "$TMP/cfgdir"
+    },
+    {
+      "name": "config-absolute-already-canonical",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: $TMP/canonical/state\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd", "$TMP/canonical/state"],
+      "symlinks": {},
+      "expected": "$TMP/canonical/state"
+    },
+    {
+      "name": "config-absolute-nonexistent-tail",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: $TMP/cfgdir/not-yet-created\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd", "$TMP/cfgdir"],
+      "symlinks": {},
+      "expected": "$TMP/cfgdir/not-yet-created"
+    },
+    {
+      "name": "symlink-canonicalized",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: $TMP/link/state\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd", "$TMP/realdir/state"],
+      "symlinks": {"$TMP/link": "$TMP/realdir"},
+      "expected": "$TMP/realdir/state"
+    },
+    {
+      "name": "symlink-cwd-relative",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: .state\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwdlink",
+      "dirs": ["$TMP/realcwd"],
+      "symlinks": {"$TMP/cwdlink": "$TMP/realcwd"},
+      "expected": "$TMP/realcwd/.state"
+    },
+    {
+      "name": "relative-under-target-project",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: .state\n  target_project: $TMP/proj\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd", "$TMP/proj"],
+      "symlinks": {},
+      "expected": "$TMP/proj/.state"
+    },
+    {
+      "name": "target-project-null",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: .state\n  target_project: null\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd"],
+      "symlinks": {},
+      "expected": "$TMP/cwd/.state"
+    },
+    {
+      "name": "relative-under-cwd",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: .state\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd"],
+      "symlinks": {},
+      "expected": "$TMP/cwd/.state"
+    },
+    {
+      "name": "relative-target-project-under-cwd",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: .state\n  target_project: proj\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd/proj"],
+      "symlinks": {},
+      "expected": "$TMP/cwd/proj/.state"
+    },
+    {
+      "name": "missing-config-default",
+      "env": {"CONFIG_FILE": "$TMP/missing-hive.config.yaml"},
+      "config_yaml": null,
+      "config_path": null,
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd"],
+      "symlinks": {},
+      "expected": "$TMP/cwd/.pHive"
+    },
+    {
+      "name": "config-without-paths-default",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "emit_lifecycle_at: phase\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd"],
+      "symlinks": {},
+      "expected": "$TMP/cwd/.pHive"
+    },
+    {
+      "name": "quoted-config-value",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: \".state\"\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd"],
+      "symlinks": {},
+      "expected": "$TMP/cwd/.state"
+    },
+    {
+      "name": "config-file-from-hive-root",
+      "env": {"HIVE_ROOT": "$TMP/root"},
+      "config_yaml": "paths:\n  state_dir: .root-state\n",
+      "config_path": "$TMP/root/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd", "$TMP/root"],
+      "symlinks": {},
+      "expected": "$TMP/cwd/.root-state"
+    },
+    {
+      "name": "config-file-from-cwd-when-no-hive-root",
+      "env": {},
+      "config_yaml": "paths:\n  state_dir: .cwd-state\n",
+      "config_path": "$TMP/cwd/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd"],
+      "symlinks": {},
+      "expected": "$TMP/cwd/.cwd-state"
+    }
+  ]
+}
