@@ -4,7 +4,7 @@ tracker_id: "214d20e1-7660-449a-8ad5-e15698fe7609"
 tracker_url: ""
 tracker_number: "PLU-89"
 title: "Add validated/tested/implemented predicates to schema"
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: ["s3-phase-lifecycle-wire", "s4-superseded-callers-wire"]

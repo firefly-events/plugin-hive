@@ -1,0 +1,23 @@
+step: multica-run
+story: "s5-role-predicates-schema"
+epic: "kg-repair-activation"
+agent: "developer"
+status: passed
+completion_kind: "code-push"
+artifacts_committed: false
+episode_terminal: true
+requires_code_push_sha: true
+code_push_sha: null
+terminal_by_dialect: false
+started_at: "2026-06-10T06:09:48Z"
+completed_at: "2026-06-10T06:16:55Z"
+artifacts:
+  - ".pHive/episodes/kg-repair-activation/s5-role-predicates-schema/multica-run.messages.jsonl"
+multica:
+  issue_id: "PLU-89"
+  issue_uuid: "214d20e1-7660-449a-8ad5-e15698fe7609"
+  task_id: "56681dfa-5fba-4b96-a44e-47b6da8336af"
+  agent_id: "d9946f9a-2747-49d4-b967-2590ffb5be43"
+  work_dir: "/Users/don/multica_workspaces/21c6d282-d6b4-4b25-8d0d-a85e96038416/56681dfa/workdir"
+  attempts: 1
+notes: ""
