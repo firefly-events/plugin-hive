@@ -1,7 +1,7 @@
 id: sdr-9-shell-semantic-guard-coverage
 epic: state-dir-resolver
 title: Make shell semantic guard relocated-state aware
-status: pending
+status: complete
 complexity: low
 methodology: classic
 depends_on: [sdr-1-resolver-contract-conformance-fixture]

@@ -1,7 +1,7 @@
 id: sdr-6-scenarios-audits-reverse-sync-adoption
 epic: state-dir-resolver
 title: Adopt state-dir resolver for scenarios, audits, and reverse sync
-status: pending
+status: complete
 complexity: medium
 methodology: classic
 depends_on: [sdr-1-resolver-contract-conformance-fixture]
