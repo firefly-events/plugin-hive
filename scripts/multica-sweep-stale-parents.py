@@ -36,7 +36,10 @@ DEFAULT_MIN_AGE_MINUTES = 30
 BLOCKED_MARKER_RE = re.compile(r"\bBLOCKED\b")
 
 # "Delegated" comments link children as [PLU-123](mention://issue/<uuid>).
+# Only comments carrying the Delegated marker count for fallback child
+# discovery — other mentions (cross-references, status notes) are not children.
 ISSUE_MENTION_RE = re.compile(r"mention://issue/([0-9a-fA-F-]{36})")
+DELEGATED_COMMENT_RE = re.compile(r"\bDelegated\b")
 
 SWEEP_ATTRIBUTION = (
     "Stale-parent sweep (scripts/multica-sweep-stale-parents.py): all child "
@@ -74,7 +77,10 @@ def extract_delegated_child_ids(comments):
     child_ids = []
     seen = set()
     for comment in comments:
-        for issue_id in ISSUE_MENTION_RE.findall(comment.get("content") or ""):
+        content = comment.get("content") or ""
+        if not DELEGATED_COMMENT_RE.search(content):
+            continue
+        for issue_id in ISSUE_MENTION_RE.findall(content):
             normalized = issue_id.lower()
             if normalized not in seen:
                 seen.add(normalized)
@@ -269,12 +275,25 @@ def gather(min_age):
         # Fallback when the API exposes no parent linkage: recover children
         # from the leader's "Delegated" comment issue mentions.
         if parent_id not in children_by_parent:
-            mentioned = [
-                issues_by_id.get(child_id) or get_issue(child_id)
-                for child_id in extract_delegated_child_ids(comments)
-                if child_id != parent_id
-            ]
-            mentioned = [child for child in mentioned if child]
+            mentioned = []
+            for child_id in extract_delegated_child_ids(comments):
+                if child_id == parent_id:
+                    continue
+                child = issues_by_id.get(child_id)
+                if not child:
+                    try:
+                        child = get_issue(child_id)
+                    except MulticaError as exc:
+                        # One bad mention must not abort the sweep; the parent
+                        # classifies on the children we could fetch.
+                        print(
+                            f"warning: could not fetch mentioned child "
+                            f"{child_id}: {exc}",
+                            file=sys.stderr,
+                        )
+                        continue
+                if child:
+                    mentioned.append(child)
             if mentioned:
                 children_by_parent[parent_id] = mentioned
 
@@ -380,6 +399,8 @@ def main(argv=None):
         help="emit machine-readable JSON instead of the report table",
     )
     args = parser.parse_args(argv)
+    if args.min_age < 0:
+        parser.error("--min-age must be >= 0")
 
     try:
         results = gather(timedelta(minutes=args.min_age))

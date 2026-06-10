@@ -106,7 +106,7 @@ leader echoes that marker line verbatim in its final summary comment.
 
 ```sh
 SQUAD_ID=50d408e4-f92f-46b1-95c1-844de157f181  # planning-team-squad
-EXISTING="$(multica squad get "$SQUAD_ID" --output json | jq -r '.instructions')"
+EXISTING="$(multica squad get "$SQUAD_ID" --output json | jq -r '.instructions // empty')"
 multica squad update "$SQUAD_ID" \
   --instructions "${EXISTING:+$EXISTING
 

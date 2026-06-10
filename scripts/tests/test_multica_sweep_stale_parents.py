@@ -150,6 +150,16 @@ def test_extract_delegated_child_ids_from_mentions():
     assert sweep_mod.extract_delegated_child_ids(comments) == [child_id]
 
 
+def test_extract_ignores_mentions_outside_delegated_comments():
+    child_id = "22222222-3333-4444-5555-666666666666"
+    other_id = "77777777-8888-9999-aaaa-bbbbbbbbbbbb"
+    comments = [
+        {"content": f"Delegated: [PLU-901](mention://issue/{child_id})"},
+        {"content": f"see also [PLU-902](mention://issue/{other_id})"},
+    ]
+    assert sweep_mod.extract_delegated_child_ids(comments) == [child_id]
+
+
 # --- AC4/AC5: report mode mutates nothing; --apply flips with attribution ---
 
 def run_main_with_stubbed_cli(argv, results):
@@ -210,3 +220,11 @@ def test_json_output_is_machine_readable(capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["results"][0]["verdict"] == "STALE"
     assert payload["applied"] == []
+
+
+def test_negative_min_age_rejected(capsys):
+    import pytest
+    with pytest.raises(SystemExit) as excinfo:
+        sweep_mod.main(["--min-age", "-5"])
+    assert excinfo.value.code == 2
+    assert "--min-age must be >= 0" in capsys.readouterr().err
