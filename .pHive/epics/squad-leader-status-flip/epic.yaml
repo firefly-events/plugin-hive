@@ -1,0 +1,29 @@
+name: squad-leader-status-flip
+title: Squad-leader parent issues reach terminal status
+description: |
+  Fix triage t-001: Multica squad-leader parent issues stay in_progress after
+  the leader run completes. Fork A (terminal contract via squad.instructions) +
+  Fork B lite (Python stale-parent sweep). Fork C (upstream Multica
+  auto-complete) deferred — recorded as upstream ask in the contract doc.
+target_codebase: /Users/don/.claude/worktrees/substrate-coverage
+source_triage: t-001
+methodology: tdd
+version_bump: none
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  - id: sls-1-terminal-contract-doc
+    title: Author the squad-leader terminal contract reference doc
+    complexity: low
+    depends_on: []
+  - id: sls-2-apply-squad-instructions
+    title: Apply the terminal contract to planning-team-squad squad.instructions
+    complexity: low
+    depends_on: [sls-1-terminal-contract-doc]
+  - id: sls-3-stale-parent-sweep
+    title: Build the stale-parent sweep script (Fork B lite)
+    complexity: medium
+    depends_on: [sls-1-terminal-contract-doc]
