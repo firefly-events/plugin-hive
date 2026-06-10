@@ -30,8 +30,8 @@ carries the epic id and any scope notes.
 4. **File Change Manifest** (~150 lines) — every CREATE / MODIFY / DELETE / UNCHANGED-but-affected file, real paths only.
 5. **Risk Registry** (~100 lines) — table (risk / severity / likelihood / mitigation / owner); detailed mitigation for high-severity risks.
 6. **Dependency Map** (~50 lines) — internal + external dependencies + blocking questions.
-7. **Elicitation — Stress-Testing the Plan** (~200 lines) — **the most important section.** The team answers adversarial questions about its own plan: Why won't this work? · What assumptions (VERIFIED/ASSUMED/RISKY)? · What's the simplest version? · What will we wish we'd thought of? · Where are we over-engineering?
-8. **Decision Points for Sign-Off** (~50 lines) — numbered, actionable decisions the user affirms/changes.
+7. **Elicitation — Stress-Testing the Plan** (~200 lines) — **the most important section.** The team answers adversarial questions about its own plan: Why won't this work? · What assumptions (VERIFIED/ASSUMED/RISKY)? · What's the simplest version? · What will we wish we'd thought of? · Where are we over-engineering? **For "Why won't this work?", each failure mode is a reasoned paragraph with explicit `Failure:` / `Trigger:` / `Impact:` / `Signal:` / `Our answer:` — not a flat bullet list of one-liners.**
+8. **Decision Points for Sign-Off** (~50 lines) — split into **two groups, not one flat numbered list:** (a) **Decisions already locked** — settled at the design gate or standing policy (storage choice, audits, hard-bail, isolation policies); affirmed as a group, never re-asked. (b) **Open decisions** — each leads with a **recommended default + one-line rationale + an override** ("Default: X (why). Override for Y."), and **★-flag only the few that genuinely need a fresh judgment call.** Do NOT cast process commitments or already-approved design-gate forks as open decisions, and do not enumerate every implementation micro-choice — a 20-item cold-decision list is a defect. End with a one-line "affirm the locked group, accept the defaults, weigh in on the ★ items" net.
 9. **Multi-Epic Coordination** — OPTIONAL; include only when the plan crosses epic boundaries.
 
 ## Completeness gate (do not skip)
@@ -47,9 +47,20 @@ visible gap is a signal; a missing section is a defect.
 ## Tone & style
 
 Precise and structured but readable — an engineer's blueprint, not a legal contract.
-Headers, bullets, short paragraphs. Short interface examples only; no full implementation
-code. Every file reference is a real path from the research findings. Build on the design
-discussion — don't repeat it.
+
+**Prose discipline (do not skip).** Write analysis and reasoning as **short paragraphs**,
+like a senior engineer explaining the plan. Reserve bullet points for genuine enumerations
+(file lists, option lists, criteria) — **do not render analysis, mitigations, or
+elicitation answers as flat bullet fragments.** A structured outline that is wall-to-wall
+bullets is a defect even if every section is present: it reads as a checklist, not a plan.
+Detailed mitigations (Part 5) and "Our answer" (Part 7) are multi-sentence paragraphs, not
+one-liners. (Codex/code-model writers tend to bullet-dump — this section exists to counter
+that; prose-heavy planning docs are best authored by a Claude model.)
+
+Short interface examples only; no full implementation code. **Preserve every `file:line`
+citation from the inputs** — they make downstream story decomposition mechanical; dropping
+them to "simplify" is a regression. Every file reference is a real path from the research
+findings. Build on the design discussion — don't repeat it.
 
 ## Output
 

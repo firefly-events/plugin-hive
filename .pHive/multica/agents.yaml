@@ -1,6 +1,7 @@
 schema_version: 1
 agents:
-  # Creators — provider: codex (W0.1 verdict: supported)
+  # Creators — provider: claude (2026-06-09 policy: Fable 5 trial on developer,
+  # Sonnet 4.6 elsewhere; Codex reserved for reviews only)
   - name: developer
     description: General-purpose code implementation. Deprecated — prefer backend-developer or frontend-developer.
     provider: claude
@@ -49,6 +50,8 @@ agents:
     skills: []
     visibility: workspace
 
+  # architect on Fable 5 (2026-06-09 opus-tier policy); technical-writer on Sonnet
+  # for prose-heavy planning docs — codex produced bullet-fragment design docs.
   - name: architect
     description: Designs technical solutions and evaluates technology choices, with rationale for each decision.
     provider: claude
@@ -70,10 +73,11 @@ agents:
     custom_env: {}
     custom_args: []
     mcp_config: null
-    skills: [story-writing, architecture-doc, readme, adr, research-brief, runbook]
+    skills: [design-discussion, structured-outline, horizontal-plan, vertical-plan, greenfield-discovery-brief, pr-body, story-writing, architecture-doc, readme, adr, research-brief, runbook]
     visibility: workspace
 
-  # Verifiers — provider: claude, model: claude-opus-4-7
+  # Verifiers — reviewer on codex (gpt-5.4, sole Codex role per 2026-06-09 policy);
+  # peer-validator/tester/tpm on claude-fable-5
   - name: reviewer
     description: Independent fresh-context code reviewer; evaluates diffs for correctness and risk.
     provider: codex
