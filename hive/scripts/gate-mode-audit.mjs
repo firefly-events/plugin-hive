@@ -1,20 +1,27 @@
 #!/usr/bin/env node
 // gate-mode-audit.mjs — cross-run telemetry aggregator for paths.gate_mode flip decision.
-// Reads .pHive/metrics/events/*.jsonl, applies thresholds from hive/references/gate-lift-telemetry.md,
-// writes recommendation to .pHive/meta-team/gate-mode-recommendation.md when thresholds cross.
+// Reads <state-dir>/metrics/events/*.jsonl, applies thresholds from hive/references/gate-lift-telemetry.md,
+// writes recommendation to <state-dir>/meta-team/gate-mode-recommendation.md when thresholds cross.
+//
+// Classification (sdr-6, per Q3): RUNTIME state tooling — it aggregates the
+// runtime telemetry tree written by /plan and /execute stop hooks, so the
+// default state dir follows the sdr-1 resolver (HIVE_STATE_DIR env >
+// paths.state_dir in hive.config.yaml > .pHive). The explicit --state-dir
+// flag remains the injection seam and wins over the resolver.
 //
 // Usage: node hive/scripts/gate-mode-audit.mjs [--state-dir <path>] [--window-days N] [--dry-run]
 
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { resolveStateDir } from "../lib/config.js";
 
 // v1 implements gate_lift_fired thresholds only (JSONL events).
 // backendDefaultsThreshold is reserved for v2 — requires parsing a-34's
 // stdout backend_resolution log lines out of stop-hook transcripts, which
 // is a separate pipeline (see hive/references/gate-lift-telemetry.md).
 const DEFAULTS = {
-  stateDir: ".pHive",
+  stateDir: null, // resolved via resolveStateDir() unless --state-dir is given
   windowDays: 30,
   gateLiftFlipThreshold: 0.20,
   backendDefaultsThreshold: 0.50, // v2 — not active in v1 aggregator
@@ -29,6 +36,7 @@ function parseArgs(argv) {
     else if (argv[i] === "--window-days") out.windowDays = parseInt(argv[++i], 10);
     else if (argv[i] === "--dry-run") out.dryRun = true;
   }
+  if (!out.stateDir) out.stateDir = resolveStateDir();
   return out;
 }
 

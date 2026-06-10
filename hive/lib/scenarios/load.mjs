@@ -21,7 +21,9 @@
  *   postconditions: string[] (optional)
  *
  * implementation-walk refuses to proceed if the story's integrate episode
- * marker is absent from .pHive/episodes/<epic>/<story>/integrate.yaml.
+ * marker is absent from <state-dir>/episodes/<epic>/<story>/integrate.yaml,
+ * where <state-dir> follows the sdr-1 resolver (HIVE_STATE_DIR env >
+ * paths.state_dir in hive.config.yaml > default .pHive).
  *
  * execution_results schema (step-03-worker output):
  *   execution_results:
@@ -38,6 +40,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { resolveStateDir } from '../config.js';
 
 const VALID_MODES = new Set(['spec-walk', 'implementation-walk']);
 const CANONICAL_TOP_LEVEL_FIELDS = new Set([
@@ -513,7 +516,8 @@ function assertIntegrateMarker(doc, filePath, cwd, callerEpicId) {
     );
   }
 
-  const markerPath = resolve(cwd, `.pHive/episodes/${epicId}/${storyId}/integrate.yaml`);
+  const stateDir = resolveStateDir({ cwd: resolve(cwd) });
+  const markerPath = resolve(stateDir, `episodes/${epicId}/${storyId}/integrate.yaml`);
   if (!existsSync(markerPath)) {
     const err = makeError(
       'INTEGRATE_MARKER_MISSING',
