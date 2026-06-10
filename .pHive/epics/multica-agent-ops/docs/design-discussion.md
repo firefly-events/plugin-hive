@@ -12,9 +12,9 @@ The user asked two questions: (1) how do agents get access to tools like the fra
 
 For tool provisioning, the good news is the plumbing already exists — `.pHive/multica/agents.yaml` has three provisioning surfaces per agent (`mcp_config`, `custom_env`, `custom_args`), and the runtime wires them correctly. The work is **defining the convention** for declaring what each agent needs, closing an undocumented gap around `--strict-mcp-config` behavior, and patching the inconsistency in `CLAUDE_PLUGIN_PATH` handling across agents.
 
-For stuck detection, three mechanisms already cover different windows (dispatch-loop timeout, stale-parent sweep, squad-leader contract). The gap is **live detection**: issue status `in_progress`, task running, last message timestamp stale, but no timeout has fired yet. We want a watchdog that can catch this.
+For stuck detection, three mechanisms already cover different windows (dispatch-loop timeout, stale-parent sweep, squad-leader contract). The gap is **live detection**: task `running`, last message timestamp stale, but no timeout has fired yet. We want a watchdog that can catch this.
 
-"Done" looks like: (a) a verification spike answers whether `mcp_config: null` + `--strict-mcp-config` means zero MCP or falls back to `~/.claude`; (b) provisioning conventions are documented and the `CLAUDE_PLUGIN_PATH` split is resolved; (c) a Python watchdog script exists that reports stuck agents and can optionally cancel them.
+"Done" looks like: (a) a verification spike answers two questions — whether `mcp_config: null` + `--strict-mcp-config` means zero MCP or falls back to `~/.claude`, and whether headless `claude -p` loads plugins at all; (b) provisioning conventions are documented and the `CLAUDE_PLUGIN_PATH` split is resolved; (c) a Python watchdog script exists that reports stuck agents and can optionally cancel them.
 
 ---
 
@@ -27,7 +27,9 @@ Three levers exist per agent in `agents.yaml`:
 - `custom_env`: merged over the full daemon host environment via `mergeEnv(os.Environ(), extra)`. Agents inherit host `PATH`, `HOME`, etc. Last-wins for duplicate keys. (`claude.go`:508-531)
 - `custom_args`: appended to claude CLI args after filtering `claudeBlockedArgs`. `--mcp-config` is in the blocked set — you cannot inject MCP config via `custom_args`. (`claude.go`:408-421, 547-577)
 
-The critical unknown: `--strict-mcp-config` is hardcoded into every claude spawn (`claude.go`:429). Claude Code's semantics for `--strict-mcp-config` are "use only MCP servers from `--mcp-config` flags, ignoring all other config sources." When `mcp_config: null`, no `--mcp-config` flag is passed — but `--strict-mcp-config` is still there. If that means "zero MCP servers," then developer, researcher, architect, backend-developer, and frontend-developer agents run with no MCP access today. That's five of the core agents. Unverified.
+The critical unknown: `--strict-mcp-config` is hardcoded into every claude spawn (`claude.go`:429). When `mcp_config: null`, no `--mcp-config` flag is passed — but `--strict-mcp-config` is still there. If that means "zero MCP servers," then developer, researcher, architect, backend-developer, and frontend-developer agents run with no MCP access today. Unverified.
+
+Additional spawn hardcodes (background for security posture readers): `--permission-mode bypassPermissions` is hardcoded in every agent spawn — all headless sessions run with bypass permissions regardless of agent role.
 
 **CLAUDE_PLUGIN_PATH split** (`agents.yaml`:87-105):
 
@@ -38,74 +40,75 @@ No comment explains why. If the daemon process was launched without `CLAUDE_PLUG
 
 **Token cache vs context-mode** (no finding supports a cache):
 
-No evidence of a Multica-side token cache that substitutes for context-mode. More importantly, they solve different problems: a prompt cache reduces the **cost** of reusing repeated context; context-mode prevents **raw tool output from flooding the context window** within a session. A 56 KB command dump fills the window regardless of caching. Even with a perfect prompt cache, an unrouted `cat package.json | grep ...` still dumps 400 lines into context. The honest answer: context-mode is still relevant — but only if MCP loads in headless sessions (see the critical unknown above). If MCP is off, agents survive on Bash discipline alone, which is the current status quo.
+No evidence of a Multica-side token cache that substitutes for context-mode. They solve different problems: a prompt cache reduces **cost**; context-mode prevents **raw tool output from flooding the context window** within a session. A 56 KB command dump fills the window regardless of caching. Context-mode is still relevant — but only if MCP loads in headless sessions (see the critical unknown above).
 
 **Stuck detection machinery** (three existing legs, one gap):
-- `pollTaskUntilTerminal` (`episode-sync.mjs`:127-210): 30min timeout with auto-cancel. Only covers runs where a dispatch-loop is actively waiting. Sub-issues dispatched without a waiting poller are invisible to this.
-- Stale-parent sweep (`multica-sweep-stale-parents.py`): post-run backstop. Catches the "all children done but parent stuck" case. Does not catch live hung tasks where the agent is still running.
-- Squad-leader contract (`squad-leader-terminal-contract.md`): behavioral — leader must self-flip when done. Enforced by sweep as backstop. Covers squad-style issues, not single-agent tasks.
+- `pollTaskUntilTerminal` (`episode-sync.mjs`:127-210): 30min timeout with auto-cancel. Only covers runs where a dispatch-loop is actively waiting.
+- Stale-parent sweep (`multica-sweep-stale-parents.py`): post-run backstop. Catches "all children done but parent stuck." Does not catch live hung tasks.
+- Squad-leader contract (`squad-leader-terminal-contract.md`): behavioral — leader must self-flip when done. Enforced by sweep as backstop.
 
-The gap: an agent crashes mid-run, or enters an infinite reasoning loop. Issue is `in_progress`, task is `running`, but no messages are being produced. Nothing detects this until a human notices or a dispatch-loop timeout fires (which only helps if someone was waiting).
+The gap: agent crashes mid-run or enters an infinite reasoning loop. Task is `running`, no messages are being produced. Nothing detects this until a human notices or a dispatch-loop timeout fires.
 
 ---
 
 ## 3. My Proposed Approach
 
-I'd structure this as three to four stories, in dependency order:
-
 **Story 1 — MCP Availability Spike** (must go first)
 
-A short probe task that runs a claude headless session with `--strict-mcp-config` but no `--mcp-config` and attempts to call an MCP tool. The result answers Q1 definitively. This is a blocker for Story 3 (wiring mcp_config for agents) — we don't want to add mcp_config to every agent if the current setup already works. The story should output a one-paragraph finding posted as an issue comment, not a code change.
+The probe answers TWO questions: (a) does `--strict-mcp-config` without `--mcp-config` mean zero MCP or fallback to `~/.claude` defaults? (b) does headless `claude -p` load plugins at all? The probe MUST run through the real Multica dispatch path (real task claim in a test workspace), not a hand-rolled `claude -p` CLI call — daemon spawn conditions (`mergeEnv`, workdir injection, `--disallowedTools`) must be present. A CLI micro-test is supplementary only. Also: include a source read of `execenv.InjectRuntimeConfig` in the spike scope — cheap read that eliminates a floating HIGH risk (Q2). Output: one-paragraph finding posted as an issue comment, not a code change.
 
-**Story 2 — Provisioning Convention Doc + CLAUDE_PLUGIN_PATH fix** (can run in parallel with Story 1)
+**Story 2 — Provisioning Convention Doc + CLAUDE_PLUGIN_PATH fix** (runs in parallel with Story 1)
 
-Add `CLAUDE_PLUGIN_PATH` to `custom_env` for developer, researcher, architect, backend-developer, and frontend-developer in `agents.yaml`. This mirrors what reviewer/peer-validator/tester/tpm already do. Run `multica-bootstrap` reconcile to apply. Also write `hive/references/agent-tool-provisioning.md` documenting the three surfaces, when to use each, the `{}` gotcha, and the `--mcp-config`-blocked-in-custom_args constraint.
+Scope is **doc + CLAUDE_PLUGIN_PATH env hygiene only**. Add `CLAUDE_PLUGIN_PATH` to `custom_env` for developer, researcher, architect, backend-developer, and frontend-developer in `agents.yaml` — mirrors what reviewer/peer-validator/tester/tpm already do. The convention doc (`hive/references/agent-tool-provisioning.md`) covers the three surfaces, the `{}` gotcha, the `--mcp-config`-blocked-in-custom_args constraint, and must explicitly call out the `reconcileSkills`-before-`reconcileAgents` ordering constraint in bootstrap. Verification: `git diff agents.yaml` showing five agents now have `CLAUDE_PLUGIN_PATH` + clean bootstrap reconcile run. The "plugin actually loads" check moves behind the Story 1 spike gate and is NOT part of Story 2's acceptance.
 
-**Story 3 — mcp_config wiring** (gated on Story 1 outcome)
+**Story 3 — mcp_config wiring** (created as backlog; gated on Story 1 outcome)
 
-If the spike shows `mcp_config: null` = zero MCP: add `mcp_config` stanzas to agents that need context-mode or Frame0. Right now, frame0 likely only matters for ui-designer (no active UI work in hive itself — consumer projects handle this). context-mode matters for all agents if they run tool-heavy workflows. Shape TBD based on spike output — this story may be very small or unnecessary.
+Created as `backlog` and promoted based on spike outcome. The description must carry the explicit binary branch: spike shows zero-MCP → add `mcp_config` stanzas to agents that need context-mode or Frame0; spike shows fallback-to-defaults → close as no-op with comment explaining why.
 
 **Story 4 — Python watchdog for live stuck detection**
 
-A new script `scripts/multica-watch-stuck.py`, following the stdlib-only Python pattern of `multica-sweep-stale-parents.py`. Logic:
-1. List all `in_progress` issues via `multica issue list --status in_progress --output json`
-2. For each, check active task via `multica issue get {id}` + task status
-3. Fetch latest message timestamp via task messages endpoint (Q5 — field name needs verification)
-4. If task `running` + last message > N minutes → flag as STUCK
-5. Report to stdout by default; `--apply` posts a comment and cancels the task
-6. Also check `multica runtime list --output json` for runtime `last_seen_at` as a secondary signal (after verifying freshness, Q3)
+Story 4a (report-only, no gate):
+- First tasks: verify message timestamp field name (Q5) and `runtime.last_seen_at` update frequency (Q3) by direct source inspection. If both fail, degrade gracefully to "running > N minutes" report-only and say so.
+- Enumerate all RUNNING TASKS (via `multica task list --status running`), not in_progress issues. Squad-assigned parents with no running task fall out of scope by construction. Sweep and watchdog are disjoint layers: watchdog = live task-level; sweep = post-run issue-level. Reuse the sweep's BLOCKED-comment exclusion to avoid re-flagging annotated issues.
+- Staleness signal: prefer "last activity" (tool events) over "last assistant message" if available — tool events fire during long Bash calls where no assistant message is produced.
+- Threshold: 15 minutes. Output of 4a IS the missing message-cadence evidence — establishes a baseline before 4b can set a safe cancel threshold.
+- Target metric: median time-to-detection ≤ 20 min (15-min threshold + ≤5-min scan cadence); false-positive rate < 10% over a trailing week. Numbers adjustable at decomposition; shape fixed now.
 
-Default threshold: 15 minutes for message staleness. Default: report-only. This mirrors the --apply opt-in pattern in the sweep script.
+Story 4b (--apply mode, gated on 4a data):
+- Cancel threshold: 45 minutes — strictly above the 30-min `pollTaskUntilTerminal` wall clock. This ordering eliminates the canceller race by construction: a task still being polled by a dispatch-loop will have its own cancel fire first.
+- Residual risk: cancel endpoint takes no reason parameter — provenance is lossy if a watchdog cancel ever lands in a poll window. Acceptable at 45-min threshold; document it in the script.
+
+Both sub-stories follow the stdlib-only Python pattern of `multica-sweep-stale-parents.py`.
 
 ---
 
 ## 4. What Could Go Wrong
 
-**[HIGH]** The MCP spike could reveal that `--strict-mcp-config` without `--mcp-config` is already "use `~/.claude` defaults." If so, agents with `mcp_config: null` already have context-mode (if the daemon's env carries `CLAUDE_PLUGIN_PATH`). Story 3 becomes a no-op. We need to design Story 1 to produce a clear binary answer.
+**[HIGH]** The MCP spike could reveal that `--strict-mcp-config` without `--mcp-config` is already "use `~/.claude` defaults." If so, Story 3 becomes a no-op. Story 1 must produce a clear binary answer.
 
-**[HIGH]** `execenv.InjectRuntimeConfig` behavior is unknown (Q2, Q4). If it writes a CLAUDE.md that includes the context-mode routing instructions, agents may already be correctly configured despite appearances. Conversely, if skills are NOT written to disk, the skill content referenced in agents.yaml never reaches the agent. The execenv package was not in the read scope — this is a gap.
+**[HIGH]** `execenv.InjectRuntimeConfig` behavior is unknown. If it writes a CLAUDE.md including context-mode routing instructions, agents may already be correctly configured. Conversely, if skills are not written to disk, skill content referenced in `agents.yaml` never reaches the agent. Folded into Story 1 spike scope for cheap resolution.
 
-**[MEDIUM]** Persona drift on session resume. Bootstrap stores persona in the API `instructions` field; daemon writes it to disk at task claim time. If a Claude session is resumed from an existing worktree, it may run with a CLAUDE.md written from a prior persona version. Changes to `persona_ref` content require a new task claim to take effect. (`daemon.go`:2231-2238)
+**[MEDIUM]** No empirical baseline for healthy-run message cadence. Episode message files were empty for completed runs — the 15-minute staleness threshold is an informed guess, not observed data. Story 4a's report mode exists partly to produce this baseline before --apply is enabled.
 
-**[MEDIUM]** The watchdog depends on a message timestamp API (Q5) that wasn't verified. If `GET /api/tasks/{id}/messages` doesn't expose per-message timestamps, or the field name differs, the stuck-detection heuristic degrades to "task running > N minutes" which catches long-running tasks, not just stuck ones.
+**[MEDIUM]** Persona drift on session resume. Bootstrap stores persona in the API `instructions` field; daemon writes it to disk at task claim time. If a Claude session is resumed from an existing worktree, it may run with a CLAUDE.md from a prior persona version. (`daemon.go`:2231-2238)
 
-**[MEDIUM]** `runtime.last_seen_at` may be stale by design. If the daemon updates this only on task completion (not heartbeat), a runtime with a long-running task will show a stale `last_seen_at` even if healthy. Using this as a liveness signal without verifying update frequency (Q3) would produce false positives.
+**[MEDIUM]** `runtime.last_seen_at` may be stale by design. If the daemon updates this only on task completion rather than heartbeat, a runtime with a long-running task shows stale `last_seen_at` even if healthy. Story 4's first task resolves update frequency before this signal is used.
 
-**[LOW]** `CLAUDE_PLUGIN_PATH` in `custom_env` for all agents means every agent must have the same plugin root. If future agents are deployed in environments where the path differs, this breaks. A relative path or env-var reference would be more robust — but that's out of scope for this epic.
+**[LOW]** `CLAUDE_PLUGIN_PATH` in `custom_env` for all agents means every agent must have the same plugin root. If future agents are deployed in environments where the path differs, this breaks. Out of scope for this epic.
 
-**[LOW]** `--disallowedTools AskUserQuestion` is hardcoded (`claude.go`:437). Any persona or skill that references "ask the user for clarification via AskUserQuestion" is dead code. Worth auditing during Story 2 to avoid confusing agents.
+**[LOW]** `--disallowedTools AskUserQuestion` is hardcoded (`claude.go`:437). Any persona or skill referencing "ask the user for clarification via AskUserQuestion" is dead code. Worth auditing during Story 2.
 
 ---
 
 ## 5. Dependencies and Constraints
 
-- **Story 1 → Story 3**: MCP spike result is a gate. Story 3 should be created as `backlog` and promoted based on spike outcome.
-- **Story 2 is independent**: `CLAUDE_PLUGIN_PATH` fix and convention doc can run in parallel with Story 1.
-- **Story 4 is independent**: Watchdog can be built without resolving the MCP question. It depends only on the `multica` CLI being available, which is already true in the sweep pattern.
-- **Q3 (last_seen_at freshness)** should be answered before Story 4 is implemented — if unreliable, watchdog must not depend on it as a primary signal.
-- **Python-only for scripts**: `multica-story-dispatch` (Node) is a named bridge. New scripts must be Python stdlib-only, per the pattern in `multica-sweep-stale-parents.py`.
-- **No new Node logic in episode-sync or story-dispatch**: Stuck detection belongs in the Python watchdog, not in the dispatch-loop code.
-- **frame0 / context-mode for non-hive agents**: ui-designer and Frame0 are primarily a concern for consumer projects, not hive itself. Scope should stay focused on hive agents unless the spike reveals a broader gap.
+- **Story 1 → Story 3**: MCP spike result is a gate. Story 3 created as `backlog`, promoted based on outcome.
+- **Story 2 is independent**: `CLAUDE_PLUGIN_PATH` fix and convention doc run in parallel with Story 1.
+- **Story 4a is independent**: Watchdog enumeration and report mode can be built without resolving the MCP question. Q3 and Q5 are Story 4a's first tasks — resolved by source inspection before code is written.
+- **Story 4a → Story 4b**: `--apply` mode is gated on 4a data establishing a cadence baseline.
+- **Python-only for scripts**: New scripts must be Python stdlib-only, per the pattern in `multica-sweep-stale-parents.py`.
+- **No new Node logic in episode-sync or story-dispatch**: Stuck detection belongs in the Python watchdog.
+- **frame0 / context-mode for non-hive agents**: Scope stays focused on hive agents unless the spike reveals a broader gap.
 
 ---
 
@@ -113,40 +116,34 @@ Default threshold: 15 minutes for message staleness. Default: report-only. This 
 
 1. **--strict-mcp-config without --mcp-config**: Zero MCP, or fallback to `~/.claude` defaults? Binary answer needed. (Story 1 spike resolves this.)
 
-2. **execenv.InjectRuntimeConfig contents**: What does it write to the workdir? CLAUDE.md? AGENTS.md? Are skill files written individually? This affects whether skills declared in `agents.yaml` actually reach the agent.
+2. **Skill content in workdir**: Where does `AgentContextForEnv` render skills? Individual files under `.claude/skills/` or bundled into persona CLAUDE.md? Does not block any story.
 
-3. **runtime.last_seen_at update frequency**: Heartbeat or per-task-event? Determines whether it's a valid liveness signal for the watchdog.
+3. **Which agents need frame0 today?**: ui-designer is the obvious candidate. If nothing in the current agent roster needs frame0, Story 3 scope narrows to context-mode only.
 
-4. **Skill content in workdir**: Where does `AgentContextForEnv` render skills? Individual files under `.claude/skills/` or bundled into persona CLAUDE.md?
-
-5. **Message timestamp field**: What field name does `GET /api/tasks/{id}/messages` return for per-message timestamps? Watchdog Story 4 depends on this.
-
-6. **Which agents need frame0 today?**: ui-designer is the obvious candidate, but hive itself has no active UI work. Does anything in the current agent roster need frame0? If not, Story 3 scope may be "context-mode for tool-heavy agents only."
-
-7. **Is the MCP spike a blocker for this epic or a follow-up?**: If the spike shows MCP is already working, the epic is mostly documentation + watchdog. If it shows zero MCP, scope expands significantly.
+4. **Is the MCP spike a blocker for this epic or a follow-up?**: If the spike shows MCP is already working, the epic is mostly documentation + watchdog. If it shows zero MCP, scope expands significantly.
 
 ---
 
 ## 7. Verification Strategy
 
-Story 1 (spike) is its own verification — the output is an empirical observation, not code.
+Story 1 (spike) is its own verification — output is an empirical observation, not code.
 
-Story 2 (provisioning doc + CLAUDE_PLUGIN_PATH fix) should be verified by:
-- `git diff agents.yaml` showing the five agents now have `CLAUDE_PLUGIN_PATH` in `custom_env`
-- Running `multica-bootstrap` reconcile dry-run or full run; confirm no SKILL_NOT_FOUND aborts
-- Manual check: trigger a researcher or developer agent task and confirm plugin load (e.g., context-mode tool appears in MCP list)
+Story 2 (provisioning doc + CLAUDE_PLUGIN_PATH fix):
+- `git diff agents.yaml` showing five agents now have `CLAUDE_PLUGIN_PATH` in `custom_env`
+- Clean `multica-bootstrap` reconcile run (no SKILL_NOT_FOUND aborts)
 
-Story 4 (watchdog) should be verified by TDD, mirroring `multica-sweep-stale-parents.py`:
+Story 4 (watchdog):
 - Unit tests with mocked `multica` CLI output for each classification path (STUCK, RUNNING, COMPLETED)
-- End-to-end: run against a real workspace with a known-stuck issue (or simulate via a long-running test task)
+- End-to-end: run against a real workspace with a known-stuck issue
+- Success metric: report-mode median time-to-detection ≤ 20 min; false-positive rate < 10% over a trailing week
 
 ```
 VERIFICATION PLAN:
   Tools: pytest (Story 4), multica CLI (Stories 1, 2)
   Platforms: macOS/Linux (daemon environment)
   Automated: Story 4 unit tests (stuck classification logic)
-  Manual: Story 1 probe run; Story 2 bootstrap reconcile + agent task spot-check
-  Not verifying: load/scale behavior of the watchdog at large issue counts (out of scope)
+  Manual: Story 1 probe run; Story 2 bootstrap reconcile
+  Not verifying: load/scale behavior of the watchdog at large issue counts
 ```
 
 ---
@@ -157,7 +154,7 @@ VERIFICATION PLAN:
 - `.pHive/multica/agents.yaml` — `CLAUDE_PLUGIN_PATH` additions for 5 agents (Story 2)
 - `scripts/multica-watch-stuck.py` — new file (Story 4)
 - `hive/references/agent-tool-provisioning.md` — new doc (Story 2)
-- Possibly `agents.yaml` again for `mcp_config` stanzas (Story 3, gated)
+- Possibly `agents.yaml` again for `mcp_config` stanzas (Story 3, backlog)
 - `tests/` — pytest suite for watchdog (Story 4)
 
 **Subsystems affected:**
@@ -170,7 +167,7 @@ VERIFICATION PLAN:
 
 **Cross-team coordination:** No. All assets live in plugin-hive.
 
-**Unknowns:** 3 significant (Q1 MCP behavior, Q2 execenv contents, Q3 last_seen_at frequency). Q1 is a blocker for scoping Story 3. Q2 is a risk that could invalidate Story 2 assumptions. Q3 shapes Story 4 design.
+**Unknowns:** 2 significant remaining (Q1 MCP behavior — spike needed; Q2 skill rendering location — does not block). Q2/Q3/Q5 folded into Story 1 and Story 4 first-tasks respectively.
 
 ```
 SCALE ASSESSMENT:
@@ -178,12 +175,12 @@ SCALE ASSESSMENT:
   Subsystems: provisioning (agents.yaml/bootstrap), scripts, hive/references, runtime CLI
   Migration required: no
   Cross-team coordination: no
-  Unknowns: 3 (Q1 MCP behavior — spike needed; Q2 execenv — read needed; Q3 last_seen_at — check needed)
+  Unknowns: 2 (Q1 MCP behavior — spike needed; Q4 skill rendering — does not block)
 
   RECOMMENDATION: Proceed to stories
-  RATIONALE: Scope is well-bounded. Three to four stories, at most one of which expands based on spike
-  outcome. The design discussion provides enough context for story decomposition. A structured
-  outline would add overhead without clarifying anything — the unknowns are empirical (need a probe),
-  not structural (need more design work). Recommend Small-to-Medium estimate: spike + convention doc
-  + watchdog script, with mcp_config wiring as a conditional follow-on.
+  RATIONALE: Scope is well-bounded. Three to four stories, at most one of which expands based on
+  spike outcome. Story 4 slices cleanly into report-only (4a) and apply (4b) with a data gate
+  between them. The design discussion provides enough context for story decomposition.
+  Recommend Small-to-Medium estimate: spike + convention doc + watchdog script, with mcp_config
+  wiring as a conditional follow-on.
 ```
