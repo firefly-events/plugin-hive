@@ -35,14 +35,12 @@ from hive.lib.dag_executor.pause import (
     wait_for_signal,
 )
 from hive.lib.dag_executor.pause.errors import PauseRejectedError, PauseTimeoutError
+from hive.lib.dag_executor.run_state.store import default_runs_root
 
 from .agent import NodeOutput
 
 if TYPE_CHECKING:
     from hive.lib.dag_executor.executor.telemetry import Telemetry
-
-
-_DEFAULT_RUNS_ROOT = Path(".pHive") / "runs"
 
 
 class PauseHandler:
@@ -54,7 +52,9 @@ class PauseHandler:
         telemetry: "Telemetry | None" = None,
         poll_interval: float = 5.0,
     ) -> None:
-        self.runs_root = runs_root or _DEFAULT_RUNS_ROOT
+        # Default resolves via the sdr-1 resolver so the pause sentinel /
+        # signing-key tree sits beside the relocated run state.
+        self.runs_root = Path(runs_root) if runs_root is not None else default_runs_root()
         self.telemetry = telemetry
         self.poll_interval = poll_interval
 
