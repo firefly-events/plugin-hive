@@ -60,6 +60,7 @@ def collect_stats(
 
     cutoff = _window_cutoff(now)
     with sqlite3.connect(str(path)) as conn:
+        conn.execute("PRAGMA foreign_keys = ON")
         total = int(conn.execute("SELECT COUNT(*) FROM triples").fetchone()[0])
         last_write = conn.execute("SELECT MAX(valid_from) FROM triples").fetchone()[0]
         distinct_tuples = int(

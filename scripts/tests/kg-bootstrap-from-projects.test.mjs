@@ -43,6 +43,7 @@ function makeMockBetterSqlite3(dir) {
         return { run: () => ({ changes: 1 }) };
       }
       transaction(fn) { return () => fn(); }
+      pragma() { return []; }
       close() {}
     };
   `);

@@ -183,6 +183,9 @@ async function kgWrite(triples, sourceEpic, sourceAgent) {
   let db;
   try {
     db = sqlite3(KG_SQLITE_PATH);
+    // SQLite leaves FK enforcement off per-connection — without this, an
+    // undeclared predicate inserts silently despite the schema FK.
+    db.pragma('foreign_keys = ON');
 
     // Guard: idx_unique_triple is required for INSERT OR IGNORE to dedupe re-runs.
     // Mirrors the precondition check in scripts/kg-import-cycle-state.js.
@@ -241,6 +244,8 @@ async function kgSupersede(subject, predicate, priorObject, newObject, sourceEpi
       throw err;
     }
     db = sqlite3(KG_SQLITE_PATH);
+    // FK enforcement is per-connection in SQLite; see kgWrite above.
+    db.pragma('foreign_keys = ON');
 
     const hasUniqueIdx = db
       .prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_unique_triple'")
