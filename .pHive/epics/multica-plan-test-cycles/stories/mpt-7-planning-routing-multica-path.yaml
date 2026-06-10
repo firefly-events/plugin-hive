@@ -1,0 +1,78 @@
+id: mpt-7-planning-routing-multica-path
+epic: multica-plan-test-cycles
+title: Add multica as the third planning-routing spawn path + fallback
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- mpt-6-plan-mode-multica-skill
+description: S4. Extend skills/hive/skills/planning-routing/SKILL.md Step 0.3 to add `multica` as a third
+  spawn path beside direct (TeamCreate) and codex (agent-spawn), routing the assembled personas to plan-mode-multica.
+  Add a fallback multica->codex->direct on daemon-down, and extend the structured INFO-log vocabulary
+  for the new path.
+acceptance_criteria:
+- 'Given planning.mode: multica, when planning-routing spawns, then it routes to the multica path and
+  emits one structured INFO line per persona.'
+- Given the Multica daemon is down, when multica spawn fails, then it falls back codex->direct without
+  crashing planning.
+steps:
+- id: research
+  description: Explore the codebase for relevant patterns, files, and constraints.
+  agent: researcher
+- id: implement
+  description: Implement the story per spec and research findings.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Write/verify tests covering acceptance criteria.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Review implementation and tests for correctness and convention compliance.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit and push to the feature branch (fresh-checkout/rebase-push per integration principle).
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: skills/hive/skills/planning-routing/SKILL.md
+    purpose: Today knows only direct + codex paths.
+files_to_modify:
+- file: skills/hive/skills/planning-routing/SKILL.md
+  change: Add multica spawn path + fallback + INFO-log vocab.
+references:
+- path: .pHive/epics/multica-plan-test-cycles/docs/structured-outline.md
+  relevant_excerpt: Phase-to-slice mapping, file manifest, risk registry.
+- path: .pHive/epics/multica-plan-test-cycles/docs/design-discussion.md
+  relevant_excerpt: §9 locked gate decisions (full-mirror seam, squad-spike-first, plan->execute->test
+    framing).
+- path: .pHive/epics/multica-plan-test-cycles/docs/vertical-plan.md
+  relevant_excerpt: 6-slice spine S1..S6 with depends_on + working states.
+risks:
+- severity: medium
+  description: Third spawn path lacks fallback on daemon-down.
+  mitigation: Ship multica->codex->direct fallback in this story; planning never hard-fails on daemon
+    outage.
+cross_cutting:
+- concern: documentation
+  action: Document the third spawn path + fallback order in planning-routing + agent-teams-guide.
+metric:
+  applies: false
+  justification: Adds a spawn-routing branch with fallback; correctness is behavioral (routes + degrades
+    gracefully), an un-falsifiable substrate change rather than a measured metric.
+tracker_id: plugin-hive/PLU-160
+tracker_uuid: bc1b90b9-776e-483c-840c-b9568b0c3022
+tracker_url: http://localhost:3000/issue/PLU-160
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4g)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; adds multica as a planning-routing spawn path with fallback vocabulary feeding plan-mode-multica.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt

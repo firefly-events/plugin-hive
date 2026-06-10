@@ -8,7 +8,7 @@
 id: S5-fixture-test
 epic: kg-augmented-meta-signal
 title: End-to-end fixture proving step-02c kg-signal feed against a seeded KG
-status: completed
+status: in_progress
 backfilled: true
 complexity: medium
 methodology: classic

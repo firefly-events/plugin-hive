@@ -4,7 +4,7 @@ tracker_id: "firefly-events/plugin-hive#141"
 tracker_url: https://github.com/firefly-events/plugin-hive/issues/141
 epic: exec-discipline-may2026
 title: /execute refuses parallel dispatch without rationale + audits existing call sites
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [ed-5-story-schema-parallel, ed-6-plan-emits-flags]

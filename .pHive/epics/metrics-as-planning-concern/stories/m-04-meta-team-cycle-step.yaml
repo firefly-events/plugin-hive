@@ -1,7 +1,7 @@
 id: m-04-meta-team-cycle-step
 epic: metrics-as-planning-concern
 title: Add step-03c-metric-declaration to meta-team-cycle workflow
-status: completed
+status: blocked
 complexity: small
 methodology: classic
 depends_on: [m-01-add-metrics-concern, m-02-story-schema-metric-fields]

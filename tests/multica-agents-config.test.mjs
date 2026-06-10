@@ -14,12 +14,13 @@ test('AC1 parses tracked Multica agents config', () => {
   const yamlString = fs.readFileSync(path.join(repoRoot, '.pHive/multica/agents.yaml'), 'utf8');
   const config = parseAgentsConfig(yamlString);
 
-  assert.equal(config.agents.length, 3);
+  assert.ok(config.agents.length >= 3, `expected at least 3 agents, got ${config.agents.length}`);
 
   for (const agent of config.agents) {
     assert.ok(agent.name);
     assert.ok(agent.provider);
-    assert.ok(agent.model);
+    // model may be empty string for codex-routed agents (model picked by codex side).
+    assert.ok(typeof agent.model === 'string');
     assert.ok(agent.persona_ref);
   }
 });

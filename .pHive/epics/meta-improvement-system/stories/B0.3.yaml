@@ -2,7 +2,7 @@ id: B0.3
 epic: meta-improvement-system
 slice: S1
 title: Lean threshold plus rollback policy-ref contract
-status: pending
+status: completed
 complexity: low
 methodology: classic
 depends_on: ["B0.1", "B0.2"]
@@ -92,3 +92,6 @@ references:
     relevant_excerpt: |
       - **Threshold policy:** lean — no per-metric asymmetric-tolerance class system unless a concrete use case forces it.
       - **Delayed-regression handling:** `auto-revert`.
+shipped:
+  branch: feat/meta-improvement-system
+  merged_at: "2026-06-08T20:44:01.598Z"

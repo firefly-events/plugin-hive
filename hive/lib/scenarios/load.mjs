@@ -7,10 +7,12 @@
  *
  * Exports:
  *   loadScenario(filePath, opts?) → parsed scenario object (throws on invalid)
+ *   loadResults(filePath, opts?)  → parsed execution_results object (throws on invalid)
  *
  * Scenario schema (simulated-manual):
  *   id: string (required, kebab-case)
  *   title: string (required, non-empty)
+ *   description: string (optional)
  *   mode: 'spec-walk' | 'implementation-walk' (required)
  *   story: string (optional — required for implementation-walk marker check)
  *   epic: string (optional — required for implementation-walk marker check)
@@ -20,12 +22,42 @@
  *
  * implementation-walk refuses to proceed if the story's integrate episode
  * marker is absent from .pHive/episodes/<epic>/<story>/integrate.yaml.
+ *
+ * execution_results schema (step-03-worker output):
+ *   execution_results:
+ *     story_id: string (required)
+ *     epic_id: string (required)
+ *     executed_at: string (required, ISO 8601)
+ *     platform: string (required)
+ *     device: string (required)
+ *     results: { test_id, requirement_ref, status, duration_ms,
+ *                started_at, finished_at, error?, screenshot?, log? }[] (required, non-empty)
+ *     summary: { total, passed, failed, skipped, total_duration_ms } (required)
+ *     artifacts: { screenshots_dir, logs_dir, results_file } (required)
  */
 
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const VALID_MODES = new Set(['spec-walk', 'implementation-walk']);
+const CANONICAL_TOP_LEVEL_FIELDS = new Set([
+  'id',
+  'title',
+  'description',
+  'mode',
+  'story',
+  'epic',
+  'preconditions',
+  'steps',
+  'postconditions',
+]);
+const LEGACY_TOP_LEVEL_FIELDS = new Set([
+  'invocation',
+  'pre_conditions',
+  'expectations',
+  'sandcastle_mode_override',
+]);
+const CANONICAL_STEP_FIELDS = new Set(['action', 'expected', 'actor']);
 
 /**
  * Load and validate a scenario YAML file.
@@ -59,9 +91,285 @@ export function loadScenario(filePath, { cwd = process.cwd(), epicId } = {}) {
   return doc;
 }
 
+// ─── loadResults ─────────────────────────────────────────────────────────────
+
+/**
+ * Load and validate a step-03-worker execution_results YAML file.
+ *
+ * The file must contain a top-level `execution_results` mapping with fields:
+ *   story_id, epic_id, executed_at, platform, device, results, summary, artifacts
+ *
+ * @param {string} filePath - absolute or relative path to the results.yaml file
+ * @param {{ cwd?: string }} [opts]
+ * @returns {{ execution_results: object }} parsed + validated results envelope
+ * @throws structured Error with .code, .filePath, .field
+ */
+export function loadResults(filePath, { cwd = process.cwd() } = {}) {
+  let raw;
+  try {
+    raw = readFileSync(filePath, 'utf8');
+  } catch (e) {
+    throw makeError('FILE_NOT_FOUND', `Cannot read results file: ${filePath}: ${e.message}`, filePath, null);
+  }
+
+  let doc;
+  try {
+    doc = parseYaml(raw);
+  } catch (e) {
+    throw makeError('YAML_PARSE_ERROR', `YAML parse error in ${filePath}: ${e.message}`, filePath, null);
+  }
+
+  validateResultsSchema(doc, filePath);
+
+  return doc;
+}
+
+// ─── Results Validation ───────────────────────────────────────────────────────
+
+const RESULTS_TOP_LEVEL_FIELDS = new Set(['execution_results']);
+const RESULTS_ENVELOPE_FIELDS = new Set([
+  'story_id',
+  'epic_id',
+  'executed_at',
+  'platform',
+  'device',
+  'results',
+  'summary',
+  'artifacts',
+]);
+const RESULTS_ITEM_REQUIRED_FIELDS = new Set([
+  'test_id',
+  'requirement_ref',
+  'status',
+  'duration_ms',
+  'started_at',
+  'finished_at',
+]);
+const RESULTS_ITEM_OPTIONAL_FIELDS = new Set(['error', 'screenshot', 'log']);
+const RESULTS_ITEM_ALL_FIELDS = new Set([
+  ...RESULTS_ITEM_REQUIRED_FIELDS,
+  ...RESULTS_ITEM_OPTIONAL_FIELDS,
+]);
+const VALID_TEST_STATUSES = new Set(['pass', 'fail', 'skipped']);
+const SUMMARY_FIELDS = new Set(['total', 'passed', 'failed', 'skipped', 'total_duration_ms']);
+const ARTIFACTS_FIELDS = new Set(['screenshots_dir', 'logs_dir', 'results_file']);
+
+function validateResultsSchema(doc, filePath) {
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
+    throw makeError(
+      'VALIDATION_ERROR',
+      `${filePath}: results file must be a YAML mapping`,
+      filePath,
+      null,
+    );
+  }
+
+  for (const field of Object.keys(doc)) {
+    if (!RESULTS_TOP_LEVEL_FIELDS.has(field)) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: unrecognized top-level field '${field}'; expected 'execution_results'`,
+        filePath,
+        field,
+      );
+    }
+  }
+
+  const er = doc.execution_results;
+  if (!er || typeof er !== 'object' || Array.isArray(er)) {
+    throw makeError(
+      'VALIDATION_ERROR',
+      `${filePath}: 'execution_results' must be a non-null mapping`,
+      filePath,
+      'execution_results',
+    );
+  }
+
+  for (const field of Object.keys(er)) {
+    if (!RESULTS_ENVELOPE_FIELDS.has(field)) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: unrecognized field 'execution_results.${field}'`,
+        filePath,
+        `execution_results.${field}`,
+      );
+    }
+  }
+
+  // Required string scalars
+  for (const f of ['story_id', 'epic_id', 'executed_at', 'platform', 'device']) {
+    if (!er[f] || typeof er[f] !== 'string' || !er[f].trim()) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: 'execution_results.${f}' is required and must be a non-empty string`,
+        filePath,
+        `execution_results.${f}`,
+      );
+    }
+  }
+
+  // results array
+  if (!Array.isArray(er.results) || er.results.length === 0) {
+    throw makeError(
+      'VALIDATION_ERROR',
+      `${filePath}: 'execution_results.results' is required and must be a non-empty array`,
+      filePath,
+      'execution_results.results',
+    );
+  }
+
+  for (let i = 0; i < er.results.length; i++) {
+    const item = er.results[i];
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: execution_results.results[${i}] must be an object`,
+        filePath,
+        `execution_results.results[${i}]`,
+      );
+    }
+    for (const field of Object.keys(item)) {
+      if (!RESULTS_ITEM_ALL_FIELDS.has(field)) {
+        throw makeError(
+          'VALIDATION_ERROR',
+          `${filePath}: unrecognized field 'execution_results.results[${i}].${field}'`,
+          filePath,
+          `execution_results.results[${i}].${field}`,
+        );
+      }
+    }
+    for (const req of RESULTS_ITEM_REQUIRED_FIELDS) {
+      if (item[req] === undefined || item[req] === null) {
+        throw makeError(
+          'VALIDATION_ERROR',
+          `${filePath}: 'execution_results.results[${i}].${req}' is required`,
+          filePath,
+          `execution_results.results[${i}].${req}`,
+        );
+      }
+    }
+    for (const strField of ['test_id', 'requirement_ref', 'started_at', 'finished_at']) {
+      if (typeof item[strField] !== 'string' || !item[strField].trim()) {
+        throw makeError(
+          'VALIDATION_ERROR',
+          `${filePath}: 'execution_results.results[${i}].${strField}' must be a non-empty string`,
+          filePath,
+          `execution_results.results[${i}].${strField}`,
+        );
+      }
+    }
+    if (!VALID_TEST_STATUSES.has(item.status)) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: 'execution_results.results[${i}].status' must be one of [${[...VALID_TEST_STATUSES].join(', ')}]; got: ${JSON.stringify(item.status)}`,
+        filePath,
+        `execution_results.results[${i}].status`,
+      );
+    }
+    if (typeof item.duration_ms !== 'number' || item.duration_ms < 0) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: 'execution_results.results[${i}].duration_ms' must be a non-negative number`,
+        filePath,
+        `execution_results.results[${i}].duration_ms`,
+      );
+    }
+  }
+
+  // summary
+  const summary = er.summary;
+  if (!summary || typeof summary !== 'object' || Array.isArray(summary)) {
+    throw makeError(
+      'VALIDATION_ERROR',
+      `${filePath}: 'execution_results.summary' is required and must be a mapping`,
+      filePath,
+      'execution_results.summary',
+    );
+  }
+  for (const field of Object.keys(summary)) {
+    if (!SUMMARY_FIELDS.has(field)) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: unrecognized field 'execution_results.summary.${field}'`,
+        filePath,
+        `execution_results.summary.${field}`,
+      );
+    }
+  }
+  for (const f of SUMMARY_FIELDS) {
+    if (typeof summary[f] !== 'number' || summary[f] < 0) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: 'execution_results.summary.${f}' is required and must be a non-negative number`,
+        filePath,
+        `execution_results.summary.${f}`,
+      );
+    }
+  }
+
+  // artifacts
+  const artifacts = er.artifacts;
+  if (!artifacts || typeof artifacts !== 'object' || Array.isArray(artifacts)) {
+    throw makeError(
+      'VALIDATION_ERROR',
+      `${filePath}: 'execution_results.artifacts' is required and must be a mapping`,
+      filePath,
+      'execution_results.artifacts',
+    );
+  }
+  for (const field of Object.keys(artifacts)) {
+    if (!ARTIFACTS_FIELDS.has(field)) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: unrecognized field 'execution_results.artifacts.${field}'`,
+        filePath,
+        `execution_results.artifacts.${field}`,
+      );
+    }
+  }
+  for (const f of ARTIFACTS_FIELDS) {
+    if (!artifacts[f] || typeof artifacts[f] !== 'string' || !artifacts[f].trim()) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: 'execution_results.artifacts.${f}' is required and must be a non-empty string`,
+        filePath,
+        `execution_results.artifacts.${f}`,
+      );
+    }
+  }
+}
+
 // ─── Validation ──────────────────────────────────────────────────────────────
 
 function validateSchema(doc, filePath) {
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
+    throw makeError(
+      'VALIDATION_ERROR',
+      `${filePath}: scenario must be a YAML mapping`,
+      filePath,
+      null,
+    );
+  }
+
+  for (const field of Object.keys(doc)) {
+    if (LEGACY_TOP_LEVEL_FIELDS.has(field)) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: field '${field}' belongs to the deprecated invocation/pre_conditions/expectations schema; use the canonical mode/steps/preconditions/postconditions schema`,
+        filePath,
+        field,
+      );
+    }
+    if (!CANONICAL_TOP_LEVEL_FIELDS.has(field)) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: unrecognized top-level field '${field}'`,
+        filePath,
+        field,
+      );
+    }
+  }
+
   requireString(doc, 'id', filePath);
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(doc.id.trim())) {
     throw makeError(
@@ -72,6 +380,9 @@ function validateSchema(doc, filePath) {
     );
   }
   requireString(doc, 'title', filePath);
+  optionalString(doc, 'description', filePath);
+  optionalString(doc, 'story', filePath);
+  optionalString(doc, 'epic', filePath);
 
   if (!doc.mode || !VALID_MODES.has(doc.mode)) {
     throw makeError(
@@ -101,6 +412,16 @@ function validateSchema(doc, filePath) {
         `steps[${i}]`,
       );
     }
+    for (const field of Object.keys(step)) {
+      if (!CANONICAL_STEP_FIELDS.has(field)) {
+        throw makeError(
+          'VALIDATION_ERROR',
+          `${filePath}: unrecognized field 'steps[${i}].${field}'`,
+          filePath,
+          `steps[${i}].${field}`,
+        );
+      }
+    }
     if (!step.action || typeof step.action !== 'string' || !step.action.trim()) {
       throw makeError(
         'VALIDATION_ERROR',
@@ -115,6 +436,14 @@ function validateSchema(doc, filePath) {
         `${filePath}: steps[${i}].expected is required and must be a non-empty string`,
         filePath,
         `steps[${i}].expected`,
+      );
+    }
+    if (step.actor !== undefined && (typeof step.actor !== 'string' || !step.actor.trim())) {
+      throw makeError(
+        'VALIDATION_ERROR',
+        `${filePath}: steps[${i}].actor must be a non-empty string when present`,
+        filePath,
+        `steps[${i}].actor`,
       );
     }
   }
@@ -148,6 +477,18 @@ function requireString(doc, field, filePath) {
     throw makeError(
       'VALIDATION_ERROR',
       `${filePath}: field '${field}' is required and must be a non-empty string`,
+      filePath,
+      field,
+    );
+  }
+}
+
+function optionalString(doc, field, filePath) {
+  if (doc[field] === undefined) return;
+  if (typeof doc[field] !== 'string' || !doc[field].trim()) {
+    throw makeError(
+      'VALIDATION_ERROR',
+      `${filePath}: field '${field}' must be a non-empty string when present`,
       filePath,
       field,
     );

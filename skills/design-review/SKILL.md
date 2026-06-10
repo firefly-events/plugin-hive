@@ -58,6 +58,24 @@ See `hive/references/ui-skill-gates.md` for the full gate specification.
 
 ## Process
 
+### 0. Resolve dispatch mode
+
+Call `skills/hive/skills/design-review-dispatch/SKILL.md` once, passing:
+- `env` (current environment)
+- parsed root `hive.config.yaml`
+- parsed consumer `.pHive/hive.config.yaml` or `None`
+- parsed graduation registry or `None`
+- `workflow_name: "design-review"`
+- `epic_id` when known
+- `arguments` (parsed flags including `--skip`, `--artifact-target`, and dependency context)
+- `unblocked_stories[]` (empty for single-invocation; populated when called from /execute)
+
+Capture the returned `mode_decision`. When `mode_decision` is `multica`, hand off to
+`skills/hive/skills/design-review-mode-multica/SKILL.md` and stop. When `mode_decision`
+is `cc-workflows`, hand off to `skills/hive/skills/design-review-mode-cc-workflows/SKILL.md`
+and stop. For all other mode decisions (`sequential`, `team`, `team-cmux`, `sessions`,
+`sandcastle`), continue with steps 1–8 below using the standard inline orchestration path.
+
 ### 1. Load workflow
 
 Read `hive/workflows/design-review.workflow.yaml` in full.

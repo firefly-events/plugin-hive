@@ -1,0 +1,92 @@
+id: mpt-8-wire-plan-phase0
+epic: multica-plan-test-cycles
+title: Wire /plan Phase 0 to the Multica spawn path (gates stay local)
+status: pending
+complexity: low
+methodology: classic
+depends_on:
+- mpt-7-planning-routing-multica-path
+description: S4. Wire skills/plan/SKILL.md Phase 0 to invoke the multica spawn path when configured, applying
+  the per-persona backend split per the spike carrier. The orchestrator STILL owns the user review/sign-off
+  gates locally (design-discussion review, structured-outline sign-off) — Multica-dispatched planning
+  must not erode the user-directed posture (resolves grill P2).
+acceptance_criteria:
+- 'Given planning.mode: multica, when /plan runs, then it produces its planning docs via Multica-dispatched
+  personas end-to-end.'
+- Given a Multica planning run, when it reaches a review gate, then the orchestrator still presents the
+  gate to the user locally (not auto-advanced).
+steps:
+- id: research
+  description: Explore the codebase for relevant patterns, files, and constraints.
+  agent: researcher
+- id: implement
+  description: Implement the story per spec and research findings.
+  agent: developer
+  depends_on:
+  - research
+- id: scenario
+  description: Author a simulated-manual test scenario YAML under .pHive/test-scenarios/ per hive/references/test-scenario-schema.md
+    (reconciled shape from mpt-2). Set manual_verdict.scenario_ref to the scenario path.
+  agent: tester
+  depends_on:
+  - implement
+- id: test
+  description: Verify acceptance criteria and run the simulated-manual scenario.
+  agent: tester
+  depends_on:
+  - scenario
+- id: review
+  description: Review implementation and tests for correctness and convention compliance.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit and push to the feature branch (fresh-checkout/rebase-push per integration principle).
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: skills/plan/SKILL.md
+    purpose: Phase 0 planning-team assembly entrypoint.
+files_to_modify:
+- file: skills/plan/SKILL.md
+  change: Invoke multica spawn path in Phase 0 when configured; keep gates local.
+references:
+- path: .pHive/epics/multica-plan-test-cycles/docs/structured-outline.md
+  relevant_excerpt: Phase-to-slice mapping, file manifest, risk registry.
+- path: .pHive/epics/multica-plan-test-cycles/docs/design-discussion.md
+  relevant_excerpt: §9 locked gate decisions (full-mirror seam, squad-spike-first, plan->execute->test
+    framing).
+- path: .pHive/epics/multica-plan-test-cycles/docs/vertical-plan.md
+  relevant_excerpt: 6-slice spine S1..S6 with depends_on + working states.
+risks:
+- severity: medium
+  description: User gates could be bypassed when planning runs on Multica.
+  mitigation: Gate presentation remains orchestrator-local; scenario asserts the gate still appears.
+cross_cutting:
+- concern: documentation
+  action: Document the Multica planning flow + that gates stay local in /plan docs.
+- concern: versioning
+  action: Consumer-visible /plan behavior behind opt-in flag -> minor bump.
+- concern: simulated-manual
+  action: 'E2E: confirm /plan emits docs via Multica AND the user gate still presents locally.'
+metric:
+  applies: false
+  justification: Opt-in wiring of an existing capability into /plan; its success is an end-to-end behavior
+    verified by the simulated-manual scenario, not a standalone moved metric.
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/mpt-8-plan-via-multica.yaml
+  verdict: null
+  timestamp: null
+  agent: null
+tracker_id: plugin-hive/PLU-161
+tracker_uuid: 6a2778db-11de-4ce7-900d-7b5b76c606a7
+tracker_url: http://localhost:3000/issue/PLU-161
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4h)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; load-bearing /plan Phase 0 carrier wires Multica planning path selection while keeping user review gates local.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt

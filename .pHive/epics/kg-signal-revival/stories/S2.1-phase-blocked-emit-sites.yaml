@@ -1,7 +1,7 @@
 id: S2.1-phase-blocked-emit-sites
 epic: kg-signal-revival
 title: Emit phase_blocked at 3 seams (walker upstream-skip, TPM escalation, waiting-on-user)
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [S1.2-phase-failed-walker-emit]

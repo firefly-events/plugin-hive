@@ -1,0 +1,67 @@
+id: t-1b-step-04b-and-rip-simulated-manual
+epic: substrate-coverage-and-test-cleanup
+title: Create step-04b-scenario-replay step file + hard-rip --simulated-manual flag + retire cross-cutting-concerns simulated-manual block
+status: in_progress
+complexity: medium
+methodology: classic
+depends_on:
+- s-2-mode-resolver
+- s-4-cc-workflows-preconditions
+- s-3-no-codex-lint
+- t-1a-scenario-loader-and-dag-retarget
+parallel_allowed: false
+parallel_rationale: blocks t-3 + Slice 2 closure
+tracker_id: null
+provenance:
+  derived_from: t-1-fold-simulated-manual
+  derived_at: 2026-06-07
+  split_reason: |
+    Second half of t-1 split (see t-1a). Now that loader + DAG support sequential
+    worker→inspector with a slot between them, t-1b lands the actual step file,
+    rips the legacy flag from /test, and retires the cross-cutting-concerns block.
+description: |
+  Hard-rip the --simulated-manual exclusive flag from skills/test/SKILL.md and rip
+  the inline HIVE_TEST_MODE resolver (delegation goes to test-dispatch / mode-resolver).
+  Create step-04b-scenario-replay step file consuming the loader from t-1a; slot
+  between step-03-worker and step-04-inspector. Retire the simulated-manual block
+  in .pHive/cross-cutting-concerns.yaml with a historical pointer at step-04b.
+acceptance_criteria:
+- Given /test --simulated-manual is invoked, when the skill parses args, then it returns "unknown flag" (flag fully ripped, no fallback path).
+- Given a worker output exists, when the swarm pipeline runs, then step-04b-scenario-replay executes between step-03-worker and step-04-inspector, consuming the loader from t-1a.
+- Given the cross-cutting-concerns.yaml is inspected, when the simulated-manual block is searched, then it is absent (replaced by a scenario-replay-folded historical note pointing at step-04b).
+- Given the pipeline table in skills/test/SKILL.md (lines 109-119), when read, then it reflects swarm-only flow with step-04b explicit.
+- Given test-dispatch handles substrate selection, when HIVE_TEST_MODE is grep'd, then the inline resolver in skills/test/SKILL.md is gone.
+steps:
+- id: implement
+  description: |
+    Create step-04b-scenario-replay.md. Rip --simulated-manual handling (skills/test/SKILL.md lines 14-93).
+    Rip inline HIVE_TEST_MODE resolver (lines 37-51). Wire Phase 0 invocation of test-dispatch.
+    Update pipeline table. Retire cross-cutting-concerns block (lines 99-126), replace with historical note.
+  agent: developer
+- id: test
+  description: Author hive/workflows/steps/test-swarm/test/step-04b-scenario-replay.test.mjs covering loader invocation; run /test --simulated-manual and confirm "unknown flag".
+  agent: tester
+  depends_on: [implement]
+- id: scenario
+  description: Author .pHive/test-scenarios/t-1b-step-04b-and-rip-simulated-manual.yaml per test-scenario-schema.md covering /test swarm-only invocation + scenario-replay execution.
+  agent: tester
+  depends_on: [implement]
+- id: review
+  description: Architect review on step-04b placement + cross-cutting-concerns retirement; reviewer cross-checks pipeline table reflects swarm-only flow.
+  agent: reviewer
+  depends_on: [test, scenario]
+- id: integrate
+  description: 'Commit "[t-1b] feat(/test): swarm-only pipeline + step-04b-scenario-replay + retire --simulated-manual flag"'
+  agent: developer
+  depends_on: [review]
+files_to_modify:
+- file: skills/test/SKILL.md
+  change: RIP --simulated-manual flag handling (lines 14-93); RIP inline HIVE_TEST_MODE resolver (lines 37-51); ADD Phase 0 invocation of test-dispatch; UPDATE pipeline table (lines 109-119) to reflect swarm-only flow
+- file: hive/workflows/steps/test-swarm/step-04b-scenario-replay.md
+  change: CREATE — consumes loader from t-1a; sits between step-03-worker and step-04-inspector
+- file: .pHive/cross-cutting-concerns.yaml
+  change: RETIRE simulated-manual concern (lines 99-126); REPLACE with scenario-replay-folded historical note pointing at step-04b
+- file: hive/workflows/steps/test-swarm/test/step-04b-scenario-replay.test.mjs
+  change: CREATE — vitest spec covering loader invocation from step-04b
+- file: .pHive/test-scenarios/t-1b-step-04b-and-rip-simulated-manual.yaml
+  change: CREATE — test-scenario per test-scenario-schema.md

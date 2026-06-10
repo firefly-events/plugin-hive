@@ -88,6 +88,80 @@ tooling to look up the live issue without scanning the full cycle state. Run
 every marker satisfies this requirement; the script exits 1 and prints the
 offending paths if any field is missing or empty.
 
+## Multica doc/verdict completion dialect
+
+`multica-run.yaml` is the single marker dialect for Multica work. Execute, plan-mode,
+and test-mode must all reuse this marker rather than invent phase-specific marker
+files. For source-code execution tasks, completion may still require a code-push SHA.
+For doc/verdict tasks, including plan documents and simulated-manual test verdicts,
+the terminal predicate is:
+
+```
+artifacts_committed == true && episode_terminal == true
+```
+
+Doc/verdict tasks do not require a code-push SHA. Writers set the following scalar
+fields on the same `multica-run.yaml` marker:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `completion_kind` | enum | yes | `doc-verdict` for plan/test doc or verdict tasks; `code-push` for source-code execution tasks. |
+| `artifacts_committed` | boolean | yes | `true` only after the task's docs/verdict artifacts have been committed to the shared branch. |
+| `episode_terminal` | boolean | yes | `true` when the underlying Multica task status is terminal (`passed`, `failed`, or `cancelled`). The base marker `status:` enum (`completed` / `failed` / `escalated`) is a separate, derived vocabulary. |
+| `requires_code_push_sha` | boolean | yes | `false` for `doc-verdict`; `true` for `code-push`. |
+| `code_push_sha` | string or null | yes | Commit SHA for code-push tasks; `null` for doc/verdict tasks. |
+| `terminal_by_dialect` | boolean | yes | The derived terminal predicate for the selected completion kind. |
+
+The `artifacts` list remains the manifest of committed outputs and audit sidecars.
+For doc/verdict tasks it must include the committed plan documents or verdict files
+plus `multica-run.messages.jsonl`. Both `plan-mode-multica` and
+`test-mode-multica` must set `completion_kind: doc-verdict` and rely on
+`terminal_by_dialect`, not a final-comment SHA, to decide whether the Multica run is
+complete.
+
+## cc-workflows-run.yaml — `field_sources.agent_models` map
+
+`cc-workflows-run.yaml` markers (emitted by `execute-mode-cc-workflows` and `plan-mode-cc-workflows`) carry a **required** `field_sources.agent_models` section that records the resolved model tier for every agent dispatched in the run. This enables post-run audit tooling to verify every agent ran at the intended tier rather than inheriting the parent session model.
+
+Requirement level (must match the skill specs and the `substrate_coverage.cc_workflows_model_tier_resolved_per_agent` target of `1.0`):
+
+- **REQUIRED** for every `cc-workflows-run.yaml` marker emitted by either mode skill. One entry per dispatched agent. Omitting an entry is a coverage-metric failure.
+- **N/A** when no agents are dispatched (zero-agent runs — e.g. a precondition-only dry run that exits before `phase()` is called). In that case the section may be absent or set to `{}`; mark such runs with a `notes:` line explaining the zero-dispatch.
+
+### Shape
+
+```yaml
+field_sources:
+  agent_models:
+    <phase>:           # matches the phase() label in the assembled Workflow script
+      persona: <persona>
+      tier: sonnet | opus | haiku
+      source: model_overrides | model_tiers | default
+```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `<phase>` | string | Phase label from the Workflow script `phase()` call |
+| `persona` | string | Persona name as dispatched (e.g. `developer`, `reviewer`) |
+| `tier` | string | Resolved model tier (`sonnet`, `opus`, or `haiku`) |
+| `source` | string | Attribution: `model_overrides` (runtime promotion), `model_tiers` (base assignment), or `default` (unmapped — always `sonnet` with WARN) |
+
+### Resolution contract
+
+The tier is resolved by `hive/lib/cc-workflows-model-tier.mjs` at `workflow_assembly` time, before the Workflow tool is invoked. Precedence:
+
+1. `model_overrides[persona]` — runtime promotion wins
+2. `model_tiers[tier]` — iterate tiers looking for persona inclusion
+3. Default — `sonnet` with `console.warn` naming the unmapped persona
+
+The helper MUST NOT read persona frontmatter `model:` fields from `hive/agents/*.md`. Frontmatter is documentation (base tier annotation); `hive.config.yaml` is the sole runtime source of truth (per `feedback_frontmatter_base_tier_not_override`).
+
+### Coverage metric
+
+`substrate_coverage.cc_workflows_model_tier_resolved_per_agent` measures the ratio of agents with `field_sources.agent_models` populated to total agent count in a cc-workflows-mode dispatch. Target: `1.0` (every agent carries an explicit resolved tier in the marker).
+
 ## Inter-phase context passing
 
 Context between workflow steps is passed **directly via agent prompts**, not stored in marker files. When the orchestrator or team lead runs step N+1, they include relevant output from step N in the task prompt. This is ephemeral — it lives in the conversation, not on disk.

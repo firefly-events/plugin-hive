@@ -1,0 +1,72 @@
+step_id: cc-workflows-run
+story_id: s-5-cc-workflows-model-tier-resolver
+epic_id: substrate-coverage-and-test-cleanup
+status: passed
+verdict: pass
+timestamp: "2026-06-05T21:35:00Z"
+mode: cc-workflows
+runtime: workflows
+run_id: wf_e8b85ae4-f1e
+script_path: /Users/don/.claude/projects/-Users-don--claude-worktrees-substrate-coverage/a771dc45-7558-43c9-bd23-4bc2cb34e59e/workflows/scripts/execute-s-5-cc-workflows-model-tier-resolver-wf_e8b85ae4-f1e.js
+transcript_dir: /Users/don/.claude/projects/-Users-don--claude-worktrees-substrate-coverage/a771dc45-7558-43c9-bd23-4bc2cb34e59e/subagents/workflows/wf_e8b85ae4-f1e
+commit: fc34498
+integration_branch: feat/substrate-coverage-and-test-cleanup
+agents:
+  - phase: research
+    persona: researcher
+    model: sonnet
+    verdict: pass
+  - phase: implement
+    persona: developer
+    model: sonnet
+    verdict: pass
+  - phase: test
+    persona: tester
+    model: sonnet
+    verdict: pass
+    extra: 11/11 unit tests green
+  - phase: review
+    persona: reviewer
+    model: opus
+    verdict: pass
+field_sources:
+  agent_models:
+    research:
+      persona: researcher
+      tier: sonnet
+      source: orchestrator-manual  # s-5 not yet shipped in dispatch loop; manual opts.model
+    implement:
+      persona: developer
+      tier: sonnet
+      source: orchestrator-manual
+    test:
+      persona: tester
+      tier: sonnet
+      source: orchestrator-manual
+    review:
+      persona: reviewer
+      tier: opus
+      source: orchestrator-manual  # matches model_overrides[reviewer]=opus
+usage:
+  agent_count: 4
+  subagent_tokens: 233467
+  tool_uses: 66
+  duration_ms: 746209
+artifacts:
+  created:
+    - hive/lib/cc-workflows-model-tier.mjs
+    - hive/lib/__tests__/cc-workflows-model-tier.test.mjs
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/s-5-cc-workflows-model-tier-resolver/implement.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/s-5-cc-workflows-model-tier-resolver/test.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/s-5-cc-workflows-model-tier-resolver/review.yaml
+  modified:
+    - skills/hive/skills/execute-mode-cc-workflows/SKILL.md
+    - skills/hive/skills/plan-mode-cc-workflows/SKILL.md
+    - hive/references/episode-schema.md
+notes: |
+  Substrate self-fix landed. Source=orchestrator-manual on every agent in this
+  run because the dispatch path was assembled before s-5 shipped. Next
+  cc-workflows-mode dispatch SHOULD source from resolveModelTier and report
+  source=model_tiers or model_overrides accordingly. The execute-mode-cc-workflows
+  SKILL.md now documents the contract; actual emit-site enforcement happens when
+  s-3 (no-codex-lint) extends to assert opts.model presence.

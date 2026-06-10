@@ -13,55 +13,11 @@ Run the test swarm pipeline on a story, PR, or the current codebase.
 
 Parse `$ARGUMENTS` as natural language. Flags are optional; all have defined defaults.
 
-**`--simulated-manual <story-id|scenario-file>`**
+## Phase 0 — Substrate Selection
 
-Runs a simulated manual test against a single scenario instead of the full automated test swarm. The argument is either a story ID or a direct path to a scenario YAML.
+Before entering the swarm pipeline, invoke `skills/hive/skills/test-dispatch/SKILL.md` with the parsed `$ARGUMENTS`, root `hive.config.yaml`, consumer `${HIVE_STATE_DIR}/hive.config.yaml`, and current integration branch. Consume `mode_decision`, `mode_reason`, and `runner_path`.
 
-**Argument resolution:**
-
-1. **If the argument matches a story ID** (kebab-case, resolves to `.pHive/epics/{epic-id}/stories/{id}.yaml` under any epic):
-   - Read the story YAML and extract `manual_verdict.scenario_ref`.
-   - If `manual_verdict.scenario_ref` is absent or empty, fail immediately:
-     ```
-     Error: story '{id}' has no manual_verdict.scenario_ref. Add a scenario step
-     or point manual_verdict.scenario_ref at a .pHive/test-scenarios/*.yaml file.
-     ```
-   - Resolve the scenario file from the `scenario_ref` path (repo-relative).
-
-2. **If the argument is a file path** (contains `/` or ends in `.yaml`):
-   - Load the file directly via `hive/lib/scenarios/load.mjs` (`loadScenario`).
-   - The loader validates the simulated-manual scenario shape: `id` (kebab-case), `title`, `mode` (`spec-walk | implementation-walk`), and a non-empty `steps` array of `{ action, expected }` objects, plus optional `preconditions` / `postconditions` string arrays.
-
-**Executor step wiring:**
-
-After resolving the scenario, skip the standard swarm pipeline (steps 0–8) and run the simulated-manual executor instead (full contract in `hive/workflows/steps/test/simulated-manual.md`):
-
-1. Evaluate `preconditions` — if any fail, record `inconclusive` and stop.
-2. Walk `steps[]` in order, narrating each `action` against the spec (`spec-walk`) or the post-integrate implementation (`implementation-walk`); record per-step `outcome` from the declared `expected`.
-3. Evaluate `postconditions`.
-4. Compute overall verdict: `pass` (all steps + postconditions pass), `fail` (any step or postcondition failed), `inconclusive` (precondition failed → scenario skipped).
-
-Write the verdict to the story YAML's `manual_verdict` block per [`hive/references/story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §8:
-
-```yaml
-manual_verdict:
-  scenario_ref: <resolved path>
-  verdict: pass | fail | inconclusive
-  timestamp: <ISO 8601>
-  agent: test-worker
-```
-
-The verdict block is merged into the story YAML in place — if a prior verdict exists it is overwritten; existing story fields are preserved.
-
-**Example invocations:**
-
-```bash
-# By story ID — resolves scenario_ref from story YAML
-/hive:test --simulated-manual c-2-test-simulated-manual-mode
-
-# By direct path — loads and validates scenario file directly
-/hive:test --simulated-manual .pHive/test-scenarios/plan-then-execute-trivial-epic.yaml
-```
+Switch `mode_decision` to the appropriate execution path. The swarm pipeline below is the default (`local`) path.
 
 ## Skill Preamble
 
@@ -75,6 +31,10 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 Load `hive/workflows/test-swarm.workflow.yaml` and execute the pipeline. Each step has a step file at `hive/workflows/steps/test-swarm/`.
 
+When `/test` is configured as the review gate for a resolved Hive story, project the review-entry transition from [`status-lifecycle.md`](../../hive/references/status-lifecycle.md) only after the test gate successfully records its final verdict/report: update that story YAML's `status:` projection from `in_progress` to `in_review`.
+
+This write is gated on test-gate success. Do not write `in_review` on `/test` entry, when scenario resolution fails, when the test swarm fails before recording a verdict, or when `/test` is being used only for exploratory/local validation rather than as the story's review gate. `/test` does not own `complete`, review-fail rework, or `shipped`; those remain owned by `/review` and `/ship`.
+
 ## Pipeline
 
 | Step | Agent | Step File | Purpose |
@@ -83,7 +43,8 @@ Load `hive/workflows/test-swarm.workflow.yaml` and execute the pipeline. Each st
 | 1. Scout | test-scout | `step-01-scout.md` | Detect frameworks, scan tests, read baseline |
 | 2. Architect | test-architect | `step-02-architect.md` | Map ACs to tests, author scripts, verify testId render |
 | 3. Worker | test-worker | `step-03-worker.md` | Execute tests, capture artifacts to `.pHive/test-artifacts/` |
-| 4. Inspector | test-inspector | `step-04-inspector.md` | Coverage analysis, gap detection |
+| 4b. Scenario Replay | test-inspector | `step-04b-scenario-replay.md` | Load worker results via `loadResults`; emit `replay_summary` for inspector |
+| 4. Inspector | test-inspector | `step-04-inspector.md` | Coverage analysis against `replay_summary`; gap detection |
 | 5. Sentinel | test-sentinel | `step-05-sentinel.md` | Bug filing with AI hypothesis |
 | 6. Triage | test-sentinel | `step-06-triage.md` | Categorize: transient, story issue, or human blocker |
 | 7. Report | test-inspector | `step-07-report.md` | Consolidated test report |
@@ -109,4 +70,5 @@ ALL test artifacts go to `.pHive/test-artifacts/{epic-id}/{story-id}/`:
 
 - `hive/workflows/test-swarm.workflow.yaml` — workflow definition
 - `hive/references/test-swarm-architecture.md` — full architecture doc
-- `hive/agents/test-scout.md`, `test-architect.md`, `test-worker.md`, `test-inspector.md`, `test-sentinel.md` — agent personas
+- `hive/references/status-lifecycle.md` — Canonical command-owned story lifecycle; `/test` may own only the success-gated `in_progress -> in_review` projection when it is the configured review gate.
+- `hive/agents/test-scout.md`, `hive/agents/test-architect.md`, `hive/agents/test-worker.md` (worker persona), `hive/agents/test-inspector.md`, `hive/agents/test-sentinel.md` — agent personas

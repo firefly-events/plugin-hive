@@ -1,0 +1,174 @@
+step: review
+story_id: t-3-test-mode-cc-workflows
+epic: substrate-coverage-and-test-cleanup
+agent: reviewer
+status: completed
+verdict: pass
+started_at: "2026-06-07T00:00:00Z"
+completed_at: "2026-06-07T00:00:00Z"
+audit_walk:
+  acceptance_criteria_evidenced: 7
+  acceptance_criteria_total: 7
+  references_reread: 4
+  references_total: 4
+findings:
+  critical: []
+  improvements: []
+ac_coverage:
+  - ac: "AC1 — Step 0 imports assertWorktreeIsolation + no agentType literal + no codex:codex-rescue reference"
+    evidence: |
+      skills/hive/skills/test-mode-cc-workflows/SKILL.md:117-121 imports assertWorktreeIsolation
+      from hive/lib/cc-workflows-preconditions.mjs and calls it. s-3 no-codex lint Check 1/2/3
+      green: zero agentType literals, zero codex:codex-rescue references in code blocks
+      (prose-only forbidding language at :26, :178, :389 are exempt — outside fenced blocks
+      or in negative context). Helper-import Check 4 green.
+    status: passed
+  - ac: "AC2 — Per-scenario dispatch granularity (mirrors test-mode-multica, not per-persona)"
+    evidence: |
+      skills/hive/skills/test-mode-cc-workflows/SKILL.md:14 explicitly declares
+      "Dispatch granularity is per-scenario (architect-resolved Q3 in design-discussion §3)";
+      :386 constraint table reasserts. Marker path at :242 uses {story_id} not {persona}.
+      Vitest assertion: per-scenario dispatch granularity describe block, 3 tests green.
+    status: passed
+  - ac: "AC3 — Full 6-step structure (Step 0-5) with no Codex routing"
+    evidence: |
+      skills/hive/skills/test-mode-cc-workflows/SKILL.md headers at
+      :113 (Step 0), :155 (Step 1 per-scenario serial), :197 (Step 2 poll-to-terminal),
+      :229 (Step 3 episode marker), :284 (Step 4 sidecar no-op), :288 (Step 5 aggregate return).
+      Step 1 mandates default workflow subagent (:178). Marker path :242 matches AC3 verbatim:
+      ${HIVE_STATE_DIR}/episodes/{epic_handle}/{story_id}/cc-workflows-run.yaml.
+    status: passed
+  - ac: "AC4 — test-dispatch invokes resolveMode('HIVE_TEST_MODE', ctx) + returns {mode_decision, sources}"
+    evidence: |
+      skills/hive/skills/test-dispatch/SKILL.md:59 calls
+      resolveMode('HIVE_TEST_MODE', ctx) per mode-resolver.mjs:71 signature.
+      Step 2 (:123-150) returns {mode_decision, sources} (with atom result merge when present).
+      ctx.env construction (:50-52) builds raw "HIVE_TEST_MODE=value" token — explicit
+      callout to mode-resolver.mjs:75 parsing rule.
+    status: passed
+  - ac: "AC5 — test-dispatch structurally mirrors execute-dispatch Step 0/1/2"
+    evidence: |
+      Step 0 (test-dispatch:37-95) mirrors execute-dispatch:46-93: same precedence
+      env > root config > shipped baseline > skill override > default. Step 1
+      (test-dispatch:97-121) mirrors execute-dispatch:95-158 in shape (switch on
+      mode_decision; INFO log emit). Step 2 (test-dispatch:123-150) mirrors
+      execute-dispatch return semantics. Explicit citation at test-dispatch:10
+      ("Structural mirror of execute-dispatch (architect ESCALATION anchor)").
+    status: passed
+  - ac: "AC6 — s-3 no-codex lint runs against test-mode-cc-workflows, all 4 checks PASS"
+    evidence: |
+      Ran node hive/scripts/lint-cc-workflows-no-codex.mjs: scanned 3 files
+      (execute-mode-cc-workflows, plan-mode-cc-workflows, test-mode-cc-workflows);
+      all 4 checks PASSED across 3 file(s). Lint also wired into npm test (package.json
+      scripts.test prefix "npm run lint:cc-workflows").
+    status: passed
+  - ac: "AC7 — Vitest resolver covers all 5 tiers + correct mode_decision per tier"
+    evidence: |
+      skills/hive/skills/test-mode-cc-workflows/test/resolver.test.mjs has 24 tests,
+      all green. Coverage:
+        - tier env: 2 tests (cc-workflows, multica) + 1 footgun test (bare value falls through)
+        - tier root_config: 2 tests (cc-workflows, multica)
+        - tier shipped_baseline: 1 test
+        - tier skill_override: 1 test
+        - tier default: 2 tests
+        - atom routing: 2 tests (cc-workflows + multica downstream targets)
+        - no-codex compliance: 4 tests
+        - structural mirror: 5 tests
+        - per-scenario granularity: 3 tests
+      Full npm test suite: 113 vitest + 5 contract, all green.
+    status: passed
+references_reread:
+  - path: skills/hive/skills/plan-mode-cc-workflows/SKILL.md
+    finding: |
+      Atom mirror target. Confirmed test-mode-cc-workflows Step 0-5 header list and shape
+      match plan-mode-cc-workflows verbatim. Differences are scoped to unit-of-work:
+      scenario instead of persona; marker path {story_id} instead of {planning_story.id}-{persona};
+      Step 1 dispatches once per scenario instead of per-persona-in-team.
+  - path: skills/hive/skills/execute-dispatch/SKILL.md
+    finding: |
+      Router structural mirror anchor. test-dispatch Step 0/1/2 shapes match — precedence
+      chain, resolveMode invocation pattern, {decision, sources} return contract identical.
+      test-dispatch correctly omits the parallel-dispatch gate (Step 1.5) and runner-path
+      resolver (Step 2 in execute-dispatch) because they are not applicable to /test.
+  - path: skills/hive/skills/test-mode-multica/SKILL.md
+    finding: |
+      Per-scenario dispatch precedent (cited at story spec references). Atom uses same
+      manual_verdict block schema, agent: tester, same {epic_handle}/{story_id} marker
+      directory shape; replaces Multica dispatch with Workflow tool dispatch as designed.
+  - path: hive/lib/mode-resolver.mjs
+    finding: |
+      Confirmed ctx.env raw-token contract at line 75: resolver parses at '=' so test-dispatch
+      Step 0 (:47-52) correctly constructs `HIVE_TEST_MODE=${process.env.HIVE_TEST_MODE}`
+      rather than passing the bare value. The footgun is documented in resolver.test.mjs
+      (raw-token footgun test, line 66) AND in the developer insight memory
+      (hive/agents/memories/developer/mode-resolver-ctx-env-raw-token.md). Strong defense.
+rubric:
+  spec-fidelity:
+    severity: critical
+    outcome: pass
+    note: All 7 ACs evidenced with file path + line citations; all 4 references re-read and verified.
+  domain-compliance:
+    severity: critical
+    outcome: pass
+    note: All file paths within reviewer scope; developer touched only files declared in story spec plus a necessary adjacent edit to hive/lib/package.json (wiring the new resolver test into npm test). The package.json edit is implicit-but-required for the chosen vitest framework and matches the pattern of all 3 sibling resolver tests.
+  security:
+    severity: critical
+    outcome: pass
+    note: No user input handling, no secrets, no injection surface. SKILL.md documents are inert prose.
+  architecture:
+    severity: critical
+    outcome: pass
+    note: Atom faithfully mirrors plan-mode-cc-workflows substrate seam; router faithfully mirrors execute-dispatch resolver pattern; no Codex routing leakage per the cc-workflows inline-Claude invariant.
+  convention-adherence:
+    severity: improvement
+    outcome: pass
+    note: Test file follows sibling resolver test layout (skills/<router>/test/resolver.test.mjs). Episode marker placement matches existing convention. Insight memories captured to hive/agents/memories/<persona>/ per protocol.
+  performance:
+    severity: improvement
+    outcome: pass
+    note: Pure markdown + 24-test vitest suite; full test run completes in 1.10s.
+  test-coverage:
+    severity: improvement
+    outcome: pass
+    note: 7/7 ACs mapped to tests; raw-token footgun documented in test AND insight memory; smoke scenario validates end-to-end resolver + atom invocation walk.
+notes: >
+  Audit-first walk: complete (7/7 ACs evidenced, 4/4 refs re-read).
+
+  Test-mode-cc-workflows atom is a faithful structural mirror of plan-mode-cc-workflows
+  with the unit-of-work cleanly substituted from persona to scenario. Per-scenario
+  dispatch granularity is explicit at line 14 with architect-Q3 citation; reasserted
+  in the constraint table at line 386. The marker path correctly uses {story_id} as
+  the directory unit (line 242), and Step 1 dispatch is one Workflow run per scenario,
+  not per-persona in a team.
+
+  Test-dispatch router is a faithful structural mirror of execute-dispatch — Step 0/1/2
+  shapes match the architect ESCALATION anchor at line 10. The router correctly omits
+  execute-dispatch's parallel-dispatch gate (Step 1.5) and runner-path resolver (Step 2)
+  because those are inapplicable to /test routing; what remains is the canonical resolver
+  pattern with the raw-token ctx.env construction documented inline (lines 47-52) and
+  re-cited at line 192 of the references section.
+
+  Zero Codex routing — verified by both s-3 no-codex lint (4/4 PASS across 3 atoms) and
+  by manual grep of test-dispatch (zero hits for agentType / codex:codex-rescue / agent_backends).
+  The prose-only "no Codex" forbidding language in test-mode-cc-workflows at lines 26, 178,
+  and 389 is correctly outside fenced code blocks (lint scope) and is in negative-context
+  (prohibiting, not asserting) — this is the same pattern as plan-mode-cc-workflows.
+
+  Helper imports correct: cc-workflows-preconditions.mjs in atom at Step 0 (line 119);
+  mode-resolver.mjs in router at Step 0 (line 44).
+
+  Vitest suite: 24/24 green for resolver.test.mjs; full npm test suite 113 vitest + 5
+  contract tests, all green. The raw-token footgun is doubly defended: a dedicated test
+  case (line 66-78) AND an insight memory at hive/agents/memories/developer/
+  mode-resolver-ctx-env-raw-token.md.
+
+  Smoke scenario t-3-test-mode-cc-workflows-smoke.yaml loads through loadScenario
+  (mode=spec-walk, 7 steps); preconditions and postconditions align with the AC set.
+
+  Scope drift: NONE. Touched files: the 4 declared in files_to_modify + episode markers
+  (implement.yaml, review.yaml) + 3 insight memories (developer, researcher, tester) +
+  1 adjacent edit to hive/lib/package.json (necessary to wire the new resolver test
+  into the npm test command — matches the pattern of all 3 sibling resolver tests).
+  No edits outside the two new SKILL.md files in the skill catalog.
+
+  Verdict: pass.

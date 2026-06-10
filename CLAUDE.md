@@ -1,62 +1,89 @@
-# context-mode — MANDATORY routing rules
+# Hive — Project Charter
 
-You have context-mode MCP tools available. These rules are NOT optional — they protect your context window from flooding. A single unrouted command can dump 56 KB into context and waste the entire session.
+Hive is an extensible multi-agent SDLC framework, packaged as a Claude Code plugin.
+This file is the **project charter**: the implementation-language policy and runtime
+ownership that govern all new work. The full decision record is
+`.pHive/proposals/language-strategy-adr.md` (accepted: Option B — Python-first with
+bridges). Domain glossary + conventions live in `.pHive/CONTEXT.md`.
 
-## BLOCKED commands — do NOT attempt these
+> The mandatory **context-mode routing rules** (context-window protection) are not
+> repeated here — they live in `.claude/context-mode.md` and are imported at the
+> bottom of this file. Read them; they are operational policy, not optional.
 
-### curl / wget — BLOCKED
-Any Bash command containing `curl` or `wget` is intercepted and replaced with an error message. Do NOT retry.
-Instead use:
-- `ctx_fetch_and_index(url, source)` to fetch and index web pages
-- `ctx_execute(language: "javascript", code: "const r = await fetch(...)")` to run HTTP calls in sandbox
+## Language Policy
 
-### Inline HTTP — BLOCKED
-Any Bash command containing `fetch('http`, `requests.get(`, `requests.post(`, `http.get(`, or `http.request(` is intercepted and replaced with an error message. Do NOT retry with Bash.
-Instead use:
-- `ctx_execute(language, code)` to run HTTP calls in sandbox — only stdout enters context
+Python is the canonical language for new business logic.
 
-### WebFetch — BLOCKED
-WebFetch calls are denied entirely. The URL is extracted and you are told to use `ctx_fetch_and_index` instead.
-Instead use:
-- `ctx_fetch_and_index(url, source)` then `ctx_search(queries)` to query the indexed content
+Node is permitted only in named bridge surfaces. New Node, JavaScript, TypeScript,
+MJS, or CJS files outside those surfaces require explicit maintainer approval before
+implementation.
 
-## REDIRECTED tools — use sandbox equivalents
+Shell is permitted only for Claude Code hook entrypoints and OS sidecar scripts that
+must run in the host environment.
 
-### Bash (>20 lines output)
-Bash is ONLY for: `git`, `mkdir`, `rm`, `mv`, `cd`, `ls`, `npm install`, `pip install`, and other short-output commands.
-For everything else, use:
-- `ctx_batch_execute(commands, queries)` — run multiple commands + search in ONE call
-- `ctx_execute(language: "shell", code: "...")` — run in sandbox, only stdout enters context
+Existing non-canonical runtime code is tolerated only when it is listed below as a
+bridge or shim. It must not be treated as precedent for new subsystem ownership.
 
-### Read (for analysis)
-If you are reading a file to **Edit** it → Read is correct (Edit needs content in context).
-If you are reading to **analyze, explore, or summarize** → use `ctx_execute_file(path, language, code)` instead. Only your printed summary enters context. The raw file content stays in the sandbox.
+## Runtime Ownership By Subsystem
 
-### Grep (large results)
-Grep results can flood context. Use `ctx_execute(language: "shell", code: "grep ...")` to run searches in sandbox. Only your printed summary enters context.
+| Subsystem | Language | Status |
+| --- | --- | --- |
+| DAG executor (`hive/lib/dag_executor/`) | Python | Canonical |
+| Metrics (`hive/lib/metrics/`) | Python | Canonical |
+| KG helpers (`hive/lib/kg_*`, `scripts/kg-*` Python paths) | Python | Canonical |
+| Scope drift and scope helpers | Python | Canonical |
+| `hive/lib/config.py` | Python | Canonical |
+| Meta-experiment and meta-optimize logic | Python | Canonical |
+| `hive/lib/multica-story-dispatch/` | Node | Bridge |
+| `hive/lib/task-tracking-dispatch/` | Node / TypeScript | Bridge |
+| Task-tracking adapters | Node / TypeScript | Bridge |
+| Anthropic session stack (`hive/lib/session-*`, `messages-session.js`) | Node | Bridge |
+| Sandcastle provider and worker paths (`hive/lib/sandcastle-*`) | Node | Bridge |
+| Claude Code hooks (`hooks/*.sh`) | Shell | Shim |
+| OS sidecar / lifecycle scripts requiring host shell behavior | Shell | Shim |
 
-## Tool selection hierarchy
+## Named Bridge Surfaces
 
-1. **GATHER**: `ctx_batch_execute(commands, queries)` — Primary tool. Runs all commands, auto-indexes output, returns search results. ONE call replaces 30+ individual calls.
-2. **FOLLOW-UP**: `ctx_search(queries: ["q1", "q2", ...])` — Query indexed content. Pass ALL questions as array in ONE call.
-3. **PROCESSING**: `ctx_execute(language, code)` | `ctx_execute_file(path, language, code)` — Sandbox execution. Only stdout enters context.
-4. **WEB**: `ctx_fetch_and_index(url, source)` then `ctx_search(queries)` — Fetch, chunk, index, query. Raw HTML never enters context.
-5. **INDEX**: `ctx_index(content, source)` — Store content in FTS5 knowledge base for later search.
+The only places Node is permitted long-term. Each shrinks as the Python-first
+migration proceeds.
 
-## Subagent routing
+- **Sandcastle** (`hive/lib/sandcastle-*`, loads `@ai-hero/sandcastle`) — JS-native
+  execution substrate. **Optional maintainer-only execution mode**, bridged-indefinite;
+  not Hive's core. Must stay isolated behind the bridge.
+- **Multica dispatch** (`hive/lib/multica-story-dispatch/`) — drives Multica issue/task
+  APIs, Codex brief injection, episode sync, insight distill. Load-bearing for
+  Multica-routed stories. Disposition: deferred (needs a dedicated port + parity tests).
+- **Anthropic session stack** (`hive/lib/session-*`, `messages-session.js`) — uses
+  `@anthropic-ai/sdk`, Node SSE/HTTP, SQLite closeout. Disposition: deferred (a real
+  SDK + streaming rewrite, not a translation).
+- **Task-tracking adapters** (`hive/lib/task-tracking-dispatch/` + adapters) — ESM/TS
+  ABI with dynamic import. Disposition: deferred (revisit when the adapter ABI language
+  contract is decided).
 
-When spawning subagents (Agent/Task tool), the routing block is automatically injected into their prompt. Bash-type subagents are upgraded to general-purpose so they have access to MCP tools. You do NOT need to manually instruct subagents about context-mode.
+## Dependency Policy
 
-## Output constraints
+npm dependencies must be declared in the root `package.json` and locked in the root
+lockfile, each scoped to a named bridge surface (or an explicitly optional tool
+surface). Implicit reliance on transitive installs is not allowed; per-surface
+manifests may document local commands but do not replace the root manifest.
 
-- Keep responses under 500 words.
-- Write artifacts (code, configs, PRDs) to FILES — never return them as inline text. Return only: file path + 1-line description.
-- When indexing content, use descriptive source labels so others can `ctx_search(source: "label")` later.
+Python dependencies are stdlib-first. Add a third-party Python dependency only when
+the standard library or an existing dependency cannot cover the behavior.
 
-## ctx commands
+## Cross-Runtime Conformance
 
-| Command | Action |
-|---------|--------|
-| `ctx stats` | Call the `ctx_stats` MCP tool and display the full output verbatim |
-| `ctx doctor` | Call the `ctx_doctor` MCP tool, run the returned shell command, display as checklist |
-| `ctx upgrade` | Call the `ctx_upgrade` MCP tool, run the returned shell command, display as checklist |
+`hive/lib/config.py` is the canonical config reader. Any remaining JavaScript config
+caller must conform to its behavior via a shared conformance fixture. The
+state-dir-resolver `sdr-1` resolver is Python-primary; shell and Node resolvers, where
+still needed, are compatibility shims rather than co-equal runtime owners.
+
+## References
+
+- `.pHive/proposals/language-strategy-adr.md` — accepted Option B decision.
+- `.pHive/proposals/language-strategy-research.md` — language inventory, bridge
+  analysis, npm dependency audit.
+- `.pHive/CONTEXT.md` — domain glossary + conventions.
+
+---
+
+@.claude/context-mode.md

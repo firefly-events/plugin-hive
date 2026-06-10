@@ -11,11 +11,13 @@ Atomic skill, NOT inline `/execute` prose. It resolves the pre-execution dispatc
 
 Call this skill once at the single `/execute` dispatch point where the caller has both the story execution context and the current workflow handoff context.
 
-**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, `HIVE_EXECUTION_MODE`, and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; `arguments` containing the `--sequential` flag state plus dependency-depth summary; and `unblocked_stories[]` — the depth-0 ready stories at this dispatch tick, each carrying at minimum `id`, `parallel_allowed`, `parallel_rationale`, and (for `parallel_rationale: bounded-slice`) `files_to_modify[]` whose entries name the declared touch-set. Empty or single-element `unblocked_stories[]` is valid: the parallel-dispatch gate (Step 1.5) skips when there is no peer set to gate.
+**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, `HIVE_EXECUTION_MODE`, and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; `epic_id` when known; `arguments` containing the `--sequential` flag state plus dependency-depth summary; and `unblocked_stories[]` — the depth-0 ready stories at this dispatch tick, each carrying at minimum `id`, `parallel_allowed`, `parallel_rationale`, and (for `parallel_rationale: bounded-slice`) `files_to_modify[]` whose entries name the declared touch-set. Empty or single-element `unblocked_stories[]` is valid: the parallel-dispatch gate (Step 1.5) skips when there is no peer set to gate.
 
-**Outputs:** `mode_decision` enum `sessions | team | team-cmux | sequential | sandcastle | multica`; `mode_reason` as a one-line string explaining the selected mode; `runner_path` enum `hive-dag | orchestrator-narrated`; `runner_reason` as a one-line string explaining the selected runner path; `field_sources` map `{field_name: env|config|default}` covering `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor`, and `execution_mode` so callers can attribute every resolution; and `gate_violations[]` — a list of `{story_id, reason}` records emitted by Step 1.5 when the parallel-dispatch gate refuses fan-out. `gate_violations[]` is `[]` on healthy runs and on any `mode_decision` other than `team | team-cmux | sessions | sandcastle | multica`.
+**Outputs:** `mode_decision` enum `sessions | team | team-cmux | sequential | sandcastle | multica | cc-workflows`; `mode_reason` as a one-line string explaining the selected mode; `runner_path` enum `hive-dag | orchestrator-narrated`; `runner_reason` as a one-line string explaining the selected runner path; `field_sources` map covering `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor`, `execution_mode`, and `execution_runtime` so callers can attribute every resolution; `field_sources.execution_runtime.epic_override` as a `<path>` traceability field when a per-epic disposition file overrode the auto heuristic, otherwise `null`; and `gate_violations[]` — a list of `{story_id, reason}` records emitted by Step 1.5 when the parallel-dispatch gate refuses fan-out. `gate_violations[]` is `[]` on healthy runs and on any `mode_decision` other than `team | team-cmux | sessions | sandcastle | multica | cc-workflows`.
 
-`field_sources.execution_mode` tracks the source of an explicit override (sandcastle or multica): `env` when `HIVE_EXECUTION_MODE={sandcastle|multica}` wins, `config` when `execution.mode: {sandcastle|multica}` from root `hive.config.yaml` wins, `default` when neither env nor config selects an override (fall-through to the standard mode resolution chain). Unlike the four existing fields, `execution_mode=default` does NOT trigger the loud "fell to defaults" warning — default is the normal case for non-override runs. The `execution_mode={source}` token is always appended to the telemetry line regardless of source.
+`field_sources.execution_mode` tracks the source of an explicit override (sandcastle or multica): `env` when `HIVE_EXECUTION_MODE={sandcastle|multica}` wins, `config` when `execution.mode: {sandcastle|multica}` from root `hive.config.yaml` wins, `default` when neither env nor config selects an override (fall-through to the standard mode resolution chain). Its precedence chain is `env > root config > shipped baseline > skill override > default`; current shipped baseline and skill override layers are traceability slots for downstream resolver stories and fall through when absent. Unlike the four existing fields, `execution_mode=default` does NOT trigger the loud "fell to defaults" warning — default is the normal case for non-override runs. The `execution_mode={source}` token is always appended to the telemetry line regardless of source.
+
+`field_sources.execution_runtime` tracks the source of the runtime disposition used by the mode resolver. Its precedence chain is `env > root config > shipped baseline > skill override > default`, with `default` resolving to `auto` when no higher layer selects an explicit runtime. `field_sources.execution_runtime.epic_override` is a `<path>` traceability field that records which `.pHive/cycle-state/<epic-id>.yaml` per-epic disposition file overrode the auto heuristic; it is `null` when no per-epic override was applied.
 
 **Side effects:** emit a structured warning only when consumer config sets `executor` to an unknown non-empty value, OR when any of the four tracked fields resolves to `default` (loud no-config warning + telemetry line). Missing consumer config, missing graduation registry, unset `executor`, false `executor_default`, and workflow-not-graduated remain normal fail-closed states and emit no warning for the runner gate itself.
 
@@ -45,6 +47,8 @@ When neither env nor config sets a value, apply these defaults — better baseli
 
 For each tracked field, apply strict precedence: **env > config > default**. Record the source in `field_sources`. Run this BEFORE Step 1.
 
+For `execution_mode` and `execution_runtime`, record the expanded source chain as **env > root config > shipped baseline > skill override > default**. Root config corresponds to the parsed root `hive.config.yaml`; shipped baseline and skill override are additive source slots that may be populated by downstream resolver stories, and fall through when no value is present.
+
 - `sessions_enabled`:
   - env path: `env.HIVE_SESSIONS_ENABLED` truthy (`1`, `true`, `"true"`) → `true`, source `env`
   - config path: root `hive.config.yaml sessions.enabled: true` → `true`, source `config`
@@ -62,19 +66,21 @@ For each tracked field, apply strict precedence: **env > config > default**. Rec
   - config path: consumer config `executor: hive-dag` with `executor_default` truthy → `hive-dag`, source `config`
   - default: `orchestrator-narrated`, source `default`
 - `execution_mode`:
-  - env path: `env.HIVE_EXECUTION_MODE` equals exactly `sandcastle` (case-sensitive) → source `env`; any other value is ignored (not an error — reserved for future modes)
-  - config path: root `hive.config.yaml execution.mode: sandcastle` → source `config`
-  - default: neither env nor config selects sandcastle → source `default` (fall-through to standard mode resolution)
-  - When source is `env` or `config`: immediately set `mode_decision=sandcastle` and `mode_reason=execution-mode-override-{source}`. Skip Step 1 entirely. This takes precedence over sessions, team, and sequential.
-  - `execution_mode=default` does NOT trigger the "fell to defaults" warning — it is the normal non-sandcastle path. Always include `execution_mode={source}` in the telemetry line.
-- `execution_mode` (continued): multica override
-  - env path: `env.HIVE_EXECUTION_MODE` equals exactly `multica` (case-sensitive) → source `env`; any other value is ignored (reserved for future modes)
-  - config path: root `hive.config.yaml execution.mode: multica` → source `config`
-  - default: neither env nor config selects multica → source `default` (fall-through to standard mode resolution OR sandcastle override if it fired earlier)
-  - When source is `env` or `config`: immediately set `mode_decision=multica` and `mode_reason=execution-mode-override-{source}`. Skip Step 1 entirely. This takes precedence over sessions, team, and sequential.
-  - `execution_mode=default` does NOT trigger the "fell to defaults" warning — it is the normal non-multica path.
+  - Resolved via `hive/lib/mode-resolver.mjs` — call `resolveMode('HIVE_EXECUTE_MODE', ctx)` where `ctx` is built from the current environment and root config.
+  - Call contract: `const { decision, sources } = resolveMode('HIVE_EXECUTE_MODE', { env, rootConfig, shippedBaseline, skillOverride })`
+  - Returns `{ decision, sources }` where `sources` contains only the winning tier key (e.g. `{ env: 'HIVE_EXECUTE_MODE=sandcastle' }` or `{ root_config: 'execution.mode=multica' }` or `{ default: 'auto' }`).
+  - When `decision` is `sandcastle` or `multica` (i.e. source is `env` or `root_config`): immediately set `mode_decision={decision}` and `mode_reason=execution-mode-override-{winning-source-key}`. Skip Step 1 entirely. This takes precedence over sessions, team, and sequential.
+  - When `decision` is `default` (no env/config/baseline/override matched): fall through to Step 1. `execution_mode=default` does NOT trigger the "fell to defaults" warning — it is the normal non-override path.
+  - Always include `execution_mode={winning-source-key}` in the telemetry line.
+  - See `hive/lib/mode-resolver.mjs` for the full precedence chain, recognized mode strings, and env-silencing rules.
+- `execution_runtime`:
+  - Resolved via `hive/lib/mode-resolver.mjs` — call `resolveMode('HIVE_EXECUTION_RUNTIME', ctx)`. `HIVE_EXECUTION_RUNTIME` is a recognized varName at the env tier.
+  - Same 5-tier chain: env > root_config > shipped_baseline > skill_override > default(`auto`).
+  - Accepted token set is the resolver's single recognized set: `sandcastle | multica | cc-workflows | sequential | auto`. Any other env value (e.g. `workflows`) is silently ignored by the resolver and falls through to the next tier.
+  - **Root-config fallback note:** the resolver currently reads a single field, `rootConfig.execution.mode`, for the config tier on every varName — there is no separate `execution.runtime` key. To distinguish runtime from mode in root config today, set the env var (`HIVE_EXECUTION_RUNTIME=...`) or rely on the shipped baseline / skill override tiers.
+  - `field_sources.execution_runtime.epic_override` is `null` during base resolution and is set to the per-epic cycle-state path only when Step 1 applies an auto-runtime per-epic override.
 
-If both sandcastle and multica are set across env and config (for example env `HIVE_EXECUTION_MODE=sandcastle` with config `execution.mode: multica`, or env `HIVE_EXECUTION_MODE=multica` with config `execution.mode: sandcastle`), env wins over config per standard Hive precedence.
+Env wins over config when both are set for the same field (e.g. `HIVE_EXECUTE_MODE=sandcastle` with `execution.mode: multica` — sandcastle wins). This is enforced by `resolveMode` tier ordering.
 
 When ANY of the four fields (`sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor`) resolves with source `default`, emit a loud warning before returning, enumerating each defaulted field and the override path:
 
@@ -92,6 +98,55 @@ Emit one printable inline telemetry line covering every field resolution:
 
 **Precondition:** only reached when `field_sources.execution_mode=default` (Step 0 did not select sandcastle or multica via env or config). When either override was selected in Step 0, skip this step entirely.
 
+Before emitting `mode_decision`, read `.pHive/cycle-state/<epic-id>.yaml` when `epic_id` is known and inspect its `execution_runtime` block. A missing cycle-state file for an unknown epic is a normal fall-through state for the Phase 5 chicken-and-egg gate: do not hard-error, and continue to the auto heuristic. Per-epic disposition may override only `execution.runtime: auto`; it does NOT override explicit `workflows` or `multica` runtime values from env, root config, shipped baseline, or skill override. On every resolve, emit one INFO log line with the selected mode, source, and applied override path if any.
+
+```pseudo
+resolved_runtime, runtime_source = resolve execution_runtime using:
+  env > root config > shipped baseline > skill override > default(auto)
+
+epic_override_path = null
+if epic_id is known:
+  cycle_state_path = ".pHive/cycle-state/<epic-id>.yaml"
+  if file exists:
+    cycle_state = read YAML(cycle_state_path)
+    per_epic_override = cycle_state.execution_runtime.adapter
+  else:
+    per_epic_override = null  # graceful fall-through for unknown epic; no hard error
+
+if resolved_runtime != "auto" and runtime_source != "default":
+  # Explicit runtime override (env / root config / shipped baseline / skill override).
+  # Map the runtime value directly to the corresponding mode_decision and skip
+  # both the per-epic override path and the auto heuristic below.
+  field_sources.execution_runtime.epic_override = null
+  if resolved_runtime == "workflows":
+    mode_decision = "cc-workflows"
+  elif resolved_runtime == "multica":
+    mode_decision = "multica"
+  else:
+    # Unknown explicit runtime value — fail-closed back to the auto heuristic
+    # so callers see a normal team / sequential resolution instead of crashing.
+    # The unknown value still appears on the telemetry line via runtime_source.
+    mode_decision = auto heuristic below
+  mode_reason = f"execution-runtime-override-{runtime_source}"
+  source = runtime_source
+elif resolved_runtime == "auto" and per_epic_override is present:
+  mode_decision = per_epic_override
+  mode_reason = "execution-runtime-epic-override"
+  field_sources.execution_runtime.epic_override = cycle_state_path
+  source = "epic_override"
+else:
+  # resolved_runtime == "auto" and no per-epic override — fall through to the
+  # auto heuristic. Explicit "workflows" / "multica" runtime values are handled
+  # by the first branch above and never reach this fall-through.
+  field_sources.execution_runtime.epic_override = null
+  mode_decision = auto heuristic below
+  source = runtime_source
+
+INFO [execute-dispatch] mode={mode_decision} source={source} epic_override={field_sources.execution_runtime.epic_override|null}
+```
+
+When the first branch above selects `mode_decision ∈ {cc-workflows, multica}`, skip the auto heuristic (Step 1 list below) entirely. The explicit runtime value is the final decision; the auto heuristic only runs when `mode_decision = auto heuristic below` was set.
+
 Evaluate in this order and stop at the first selected path:
 
 1. If the sessions check matches, return `mode_decision=sessions` and `mode_reason=sessions-enabled`.
@@ -106,7 +161,7 @@ This preserves precedence: `sessions > team-cmux > team > sequential`.
 
 ### Step 1.5: Parallel-Dispatch Gate (ed-7)
 
-**Precondition:** only reached when `mode_decision ∈ {team, team-cmux, sessions, sandcastle, multica}` AND `unblocked_stories[]` has length > 1. When `mode_decision` is `sequential`, or when the peer set has fewer than two stories, skip this step entirely — there is no parallel fan-out to gate. The gate also runs when `mode_decision` is `sandcastle` or `multica` because the provider fans out one assignment per depth-0 story.
+**Precondition:** only reached when `mode_decision ∈ {team, team-cmux, sessions, sandcastle, multica, cc-workflows}` AND `unblocked_stories[]` has length > 1. When `mode_decision` is `sequential`, or when the peer set has fewer than two stories, skip this step entirely — there is no parallel fan-out to gate. The gate also runs when `mode_decision` is `sandcastle`, `multica`, or `cc-workflows` because the provider fans out one assignment per depth-0 story.
 
 The gate refuses parallel dispatch unless **every** story in `unblocked_stories[]` is properly annotated. Default-serial is the contract: a story without explicit opt-in MUST fall back to sequential dispatch. Initialize `gate_violations: []` and evaluate the following checks in order; record one record per offending story and continue (do NOT short-circuit on the first failure — the warning enumerates the full set so a single fix pass resolves all of them).
 

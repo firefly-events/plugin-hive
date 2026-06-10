@@ -1,0 +1,198 @@
+step: review
+story_id: dr-2-design-review-mode-multica
+epic: substrate-coverage-and-test-cleanup
+agent: reviewer
+status: completed
+started_at: "2026-06-08T00:15:00Z"
+completed_at: "2026-06-08T00:25:00Z"
+
+change_verdict: passed
+verdict_reasoning: >
+  Audit-first walk: complete (AC 6/6 evidenced, refs 3/3 re-read). All rubric
+  criteria pass — spec-fidelity, domain-compliance, architecture, security,
+  convention-adherence, performance, test-coverage. 4-step preservation,
+  single-Multica-run shape, --skip / --artifact-target flag pass-through, and
+  Phase 0c 5-tier resolver contract all verified against the workflow.yaml
+  anchor and against the canonical mode-resolver registry. No scope drift.
+
+acceptance_criteria_coverage:
+  - ac: "Atom preserves the 4-step model from design-review.workflow.yaml:8-81 with 4 agent() calls inside a SINGLE Multica run"
+    status: pass
+    evidence:
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:23-30 — enumerates 4 agent() calls (accessibility-specialist, animations-specialist, ui-designer critique, ui-designer synthesis) in workflow.yaml order"
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:144-177 — Step A/B/C/D pseudocode inside ONE issue brief"
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:131-135 — 'Create or reuse ONE Multica issue for the entire 4-step design-review run'"
+      - "test/resolver.test.mjs:234-241 — asserts Step A/B/C/D labels present"
+      - "test/resolver.test.mjs:210-232 — asserts each agent name + step_file path"
+  - ac: "Single Multica-run episode marker captures all 4 agent() outputs (NOT 3 separate per-persona markers)"
+    status: pass
+    evidence:
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:270-275 — 'Write ONE multica-run.yaml marker capturing all four agent() outputs'"
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:65-71 — Outputs section: 'One episode marker at .../{unit_id}/multica-run.yaml'"
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:317-318 — 'The marker captures all four step outputs in its notes field'"
+      - "test/resolver.test.mjs:253-294 — asserts ONE Multica issue, ONE episode marker, NOT per-persona; asserts unit_id (not persona name) in marker path"
+  - ac: "--skip flag continues to skip steps per existing semantics"
+    status: pass
+    evidence:
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:60 — captured from caller args, forwarded verbatim"
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:147-161 — Step A and Step B blocks each show explicit skip handling with log lines and null output"
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:353-371 — full --skip semantics table; required steps C+D cannot be skipped"
+      - "test/resolver.test.mjs:300-321 — asserts --skip accessibility / --skip animations documented + required steps cannot be skipped"
+  - ac: "--artifact-target flag continues to work end-to-end"
+    status: pass
+    evidence:
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:61-62 — forwarded verbatim to agent prompts"
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:179-180 — injected into Step C and Step D agent prompts"
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:378-383 — full --artifact-target semantics + valid values"
+      - "test/resolver.test.mjs:327-338 — asserts --artifact-target forwarded + {design|implementation} values"
+  - ac: "Phase 0c 5-tier resolution returns the expected mode_decision for HIVE_DESIGN_REVIEW_MODE"
+    status: pass
+    evidence:
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:80-94 — resolveMode('HIVE_DESIGN_REVIEW_MODE', ctx) call signature documented with all 5 tiers"
+      - "hive/lib/mode-resolver.mjs:43 — HIVE_DESIGN_REVIEW_MODE in registered varName list"
+      - "test/resolver.test.mjs:45-203 — full 5-tier coverage (env, root_config, shipped_baseline, skill_override, default) + raw-token + wrong-VARNAME footguns"
+      - "test/resolver.test.mjs:360-376 — Phase 0c contract assertions (resolveMode invocation, 5-tier order, mode-resolver.mjs import path)"
+      - "Test run: 151/151 vitest pass; 5/5 contract pass; 4/4 lint pass"
+  - ac: "DO preserve 4-step model; DO NOT apply d-3 per-persona shape by symmetry"
+    status: pass
+    evidence:
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:9 — '<!-- Intentional asymmetry: dr-2 = single Multica run with 4 agent() calls. d-3 = per-persona fan-out. DO NOT conflate. -->'"
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:18-22 — explicit contrast with plan-mode-multica and d-3 per-persona"
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:33-34 — cites Q11 resolution in outline-collab-review-record.md"
+      - "skills/hive/skills/design-review-mode-multica/SKILL.md:215-217 — re-emphasizes: 'This skill does not dispatch four separate issues — that is plan-mode-multica's pattern and is explicitly excluded here per the Q11 ruling'"
+      - "test/resolver.test.mjs:276-286 — asserts d-3 (or design-mode-multica) referenced + Q11 ruling cited"
+
+architect_review_checklist:
+  - check: "4-step preservation: SKILL.md prescribes 4 agent() calls matching workflow.yaml:8-81 (accessibility, animations, ui-designer-critique, ui-designer-synthesis) in order"
+    status: pass
+    notes: "SKILL.md lines 23-30 enumerate the four calls; lines 144-177 give Step A/B/C/D pseudocode in the same order. Order matches workflow.yaml line numbers 8/28/55/80."
+  - check: "Single-Multica-run shape: ONE createIssue, ONE episode marker capturing all 4 outputs"
+    status: pass
+    notes: "SKILL.md line 131-135 — 'Create or reuse ONE Multica issue for the entire 4-step design-review run.' Line 270-275 — single multica-run.yaml marker. Line 215-217 — explicit no-fan-out contract."
+  - check: "--skip and --artifact-target flags flow end-to-end"
+    status: pass
+    notes: "Inputs (lines 60-62), brief render (lines 147-161, 179-180), record (lines 197-207), telemetry (line 212), semantics tables (lines 353-383)."
+  - check: "Phase 0c 5-tier resolver matches canonical pattern; field-source tracking present"
+    status: pass
+    notes: "SKILL.md lines 80-94 mirror mode-resolver.mjs contract verbatim. Precedence string at line 94 lists all 5 tiers. mode-resolver.mjs line 43 confirms HIVE_DESIGN_REVIEW_MODE registered."
+  - check: "Resolver test covers all 5 tiers + 4-step assertion + single-run assertion; all vitest cases green"
+    status: pass
+    notes: "test/resolver.test.mjs has 36 tests across env (5), root_config (2), shipped_baseline (2), skill_override (1), default (2), 4-step shape (6), single-run shape (6), --skip (4), --artifact-target (2), dispatch routing (1), Phase 0c (3), no-codex scope (4). Full suite 151/151 pass."
+  - check: "Test scenario YAML loads via loadScenario without error"
+    status: pass
+    notes: "loadScenario verified: mode=spec-walk, 7 steps, no validation error. Confirmed reviewer 'folded-scalar-pitfall' memory does not apply — scenario uses folded scalars but action/expected bodies contain no literal 'key:' tokens that would confuse the parser."
+  - check: "hive/lib/package.json scripts.test includes new test path; full npm test green"
+    status: pass
+    notes: "hive/lib/package.json line 9 — new path 'skills/hive/skills/design-review-mode-multica/test/resolver.test.mjs' wired. npm test: 8 files, 151 tests pass; lint-cc-workflows clean; contract tests 5/5 pass."
+  - check: "NO scope drift — only files in story spec files_to_modify (plus episode markers + memories) touched"
+    status: pass
+    notes: |
+      Diff scope verified against story spec files_to_modify:
+        files_to_modify:
+          - skills/hive/skills/design-review-mode-multica/SKILL.md (created)
+          - skills/hive/skills/design-review-mode-multica/test/resolver.test.mjs (created)
+          - .pHive/test-scenarios/dr-2-design-review-mode-multica-smoke.yaml (created)
+      Additional permitted touches:
+        - hive/lib/package.json (test runner wire-in — necessary to satisfy AC and run the new vitest)
+        - .pHive/episodes/substrate-coverage-and-test-cleanup/dr-2-design-review-mode-multica/{implement,test,workflow-script,review}.yaml (episode markers — required)
+        - hive/agents/memories/{developer,researcher,tester,reviewer}/*.md (insight capture — protocol-permitted)
+      No production code outside the atom touched. No drift.
+  - check: "dr-2 vs d-3 asymmetry documented in atom"
+    status: pass
+    notes: |
+      Asymmetry documented in three distinct sites in SKILL.md:
+        - Line 9 HTML comment header
+        - Lines 18-22 in body prose contrasting plan-mode-multica and d-3
+        - Lines 215-217 reiterating no-fan-out
+        - Line 448 in constraint summary table
+      Q11 ruling cited at lines 33-34 (outline-collab-review-record.md) and line 217.
+
+rubric:
+  spec-fidelity:
+    severity: critical
+    outcome: pass
+    notes: "Every AC (6/6) maps to concrete SKILL.md lines + resolver test cases — no AC unevidenced."
+  domain-compliance:
+    severity: critical
+    outcome: pass
+    notes: "Developer agent has write access to skills/. Tester agent has write access to test/ and .pHive/. Reviewer is read-only (this marker is allowed)."
+  security:
+    severity: critical
+    outcome: pass
+    notes: "No injection surfaces introduced. Credentials read from env / .multica config per existing helpers (resolveAgentUuidByName, etc.). No new secrets."
+  architecture:
+    severity: critical
+    outcome: pass
+    notes: "Mirrors design-review.workflow.yaml:8-81 step-by-step. Reuses multica-story-dispatch helpers. Q11 ruling honored. Asymmetry with d-3 deliberate and documented."
+  convention-adherence:
+    severity: improvement
+    outcome: pass
+    notes: "Atom SKILL.md follows the same prelude/Process/Failure modes/Configuration/Constraint summary structure as plan-mode-multica and test-mode-multica. resolveMode call signature matches mode-resolver.mjs doc-block exactly."
+  performance:
+    severity: improvement
+    outcome: pass
+    notes: "run_timeout_seconds default 3600 (60 min) noted as appropriate for 4 agent calls — explicitly larger than single-tester case. poll_interval_seconds default 5. messages_capture_max default 200. No O(n^2) or unbounded loops."
+  test-coverage:
+    severity: improvement
+    outcome: pass
+    notes: "36 vitest cases cover all 6 ACs + 5-tier + footgun + dispatch routing + Phase 0c + no-codex scope. Scenario YAML loadable. Test path wired into hive/lib/package.json."
+
+findings:
+  critical: []
+  improvements:
+    - category: convention-adherence
+      file: skills/hive/skills/design-review-mode-multica/SKILL.md
+      line: 9
+      observation: "HTML comments at top of SKILL.md (lines 8-9) are unusual for an atom — other Multica atoms (plan-mode-multica, test-mode-multica) don't use HTML headers. Not a defect; the comment content is valuable as an anti-drift signal. Non-blocking."
+      suggestion: "Optionally promote the asymmetry note into prose (already partially done in lines 18-22) and drop the HTML comment to align with sibling atoms. Defer to author preference — not a regression."
+
+audit_first_walk: "complete (6/6 ACs evidenced, 3/3 refs re-read)"
+
+refs_re_read:
+  - path: hive/workflows/design-review.workflow.yaml
+    excerpt_cited: "Lines 8-81: 4 steps (accessibility:8, animations:28, ui-designer-critique:55, ui-designer-synthesis:80) with step_file references"
+    confirmation: "Confirmed verbatim. workflow.yaml has 4 steps at the cited lines with the cited step_file paths (design-review-design-critique.md and design-review-synthesis.md). Atom replicates this shape one-to-one."
+  - path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/outline-collab-review-record.md
+    excerpt_cited: "dr-2 is replicating workflow.yaml shape in Multica; intentional asymmetry with d-3 (per-persona)"
+    confirmation: "Atom honors the Q11 architect ruling: workflow.yaml-shape preserved, per-persona fan-out (d-3 shape) explicitly excluded."
+  - path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/structured-outline.md
+    excerpt_cited: "dr-2: design-review-mode-multica — Preserves the 4-step workflow.yaml model with 4 agent() calls (substrate parity with workflow.yaml structure; Q11 resolved)"
+    confirmation: "Atom delivers exactly what the structured outline scoped. Q11 cited inline."
+
+contradictions_with_refs: []
+
+scope_drift: false
+scope_drift_evidence: "git ls-files --others + git diff shows 3 implementation files (matches files_to_modify exactly) + 1 test runner wire-in (hive/lib/package.json — required to execute the new test) + 4 episode markers + 4 memory captures. No production code outside dr-2 atom touched."
+
+test_run:
+  vitest:
+    files: 8
+    tests: 151
+    passed: 151
+    failed: 0
+  contract:
+    tests: 5
+    passed: 5
+  lint_cc_workflows:
+    checks: 4
+    files_scanned: 3
+    status: pass
+  scenario_load:
+    file: .pHive/test-scenarios/dr-2-design-review-mode-multica-smoke.yaml
+    status: valid
+    mode: spec-walk
+    steps: 7
+
+notes: >
+  Strong implementation. The 4-step preservation is explicit and reads cleanly
+  against design-review.workflow.yaml:8-81. The intentional asymmetry with d-3
+  is documented in four distinct sites (HTML header, body prose, no-fan-out
+  paragraph, constraint table) — appropriate weight for a likely-to-be-confused
+  contract. The resolver test suite covers the 5-tier matrix plus both
+  raw-token and wrong-VARNAME footguns. Test path wired into hive/lib package.json.
+  Scenario YAML loads cleanly under loadScenario (no folded-scalar pitfall).
+
+  One non-blocking observation: HTML comment block at SKILL.md top is unusual
+  for atom style; siblings prefer prose. Author's call.
+
+  Verdict: passed.

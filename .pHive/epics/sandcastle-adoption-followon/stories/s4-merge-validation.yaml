@@ -1,7 +1,7 @@
 id: s4-merge-validation
 epic: sandcastle-adoption-followon
 title: Live-quota merge validation for Sandcastle branch strategy
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [s3-execution-mode-skill, s3-dispatch-routing]

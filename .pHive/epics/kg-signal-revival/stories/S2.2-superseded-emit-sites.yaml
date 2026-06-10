@@ -1,7 +1,7 @@
 id: S2.2-superseded-emit-sites
 epic: kg-signal-revival
 title: Emit superseded at 3 seams (plan overwrite, meta-optimize replace, insight promotion)
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [S2.1-phase-blocked-emit-sites]

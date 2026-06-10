@@ -2,7 +2,7 @@ id: A1.3
 epic: meta-improvement-system
 slice: S3
 title: Demote nightly-cycle reference to historical/operator narrative
-status: pending
+status: in_progress
 complexity: low
 methodology: classic
 depends_on: ["B0.1", "B0.2", "B0.3", "A1.2"]

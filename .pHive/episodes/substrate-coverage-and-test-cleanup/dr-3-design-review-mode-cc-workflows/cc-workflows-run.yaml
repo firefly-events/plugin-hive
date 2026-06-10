@@ -1,0 +1,82 @@
+step_id: cc-workflows-run
+story_id: dr-3-design-review-mode-cc-workflows
+epic_id: substrate-coverage-and-test-cleanup
+status: passed
+verdict: pass
+timestamp: "2026-06-08T00:00:00Z"
+mode: cc-workflows
+runtime: workflows
+run_id: wf_834c090c-a1c
+script_path: .pHive/episodes/substrate-coverage-and-test-cleanup/dr-3-design-review-mode-cc-workflows/workflow-script.js
+transcript_dir: /Users/don/.claude/projects/-Users-don--claude-worktrees-substrate-coverage/8c837a93-260e-405d-8549-dc535cce0594/subagents/workflows/wf_834c090c-a1c
+commit: a35885c
+integration_branch: feat/substrate-coverage-and-test-cleanup
+methodology: classic
+phases: [research, implement, test, review]
+agents:
+  - phase: research
+    persona: researcher
+    model: sonnet
+    verdict: pass
+  - phase: implement
+    persona: developer
+    model: sonnet
+    verdict: pass
+  - phase: test
+    persona: tester
+    model: sonnet
+    verdict: pass
+    extra: 200/200 vitest + 5/5 contract = 205/205 green; s-3 lint 4/4 PASS across 4 atoms
+  - phase: review
+    persona: reviewer
+    model: opus
+    verdict: pass
+    extra: 11/11 criteria PASS, no improvements
+field_sources:
+  agent_models:
+    research: { persona: researcher, tier: sonnet, source: orchestrator-manual }
+    implement: { persona: developer, tier: sonnet, source: orchestrator-manual }
+    test: { persona: tester, tier: sonnet, source: orchestrator-manual }
+    review: { persona: reviewer, tier: opus, source: orchestrator-manual }
+usage:
+  agent_count: 4
+  subagent_tokens: 315788
+  tool_uses: 70
+  duration_ms: 678408
+insight_capture:
+  memories_written: 3
+  personas: [researcher, developer, tester]
+artifacts:
+  created:
+    - skills/hive/skills/design-review-mode-cc-workflows/SKILL.md
+    - skills/hive/skills/design-review-mode-cc-workflows/test/resolver.test.mjs
+    - .pHive/test-scenarios/dr-3-design-review-mode-cc-workflows-smoke.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/dr-3-design-review-mode-cc-workflows/implement.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/dr-3-design-review-mode-cc-workflows/test.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/dr-3-design-review-mode-cc-workflows/review.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/dr-3-design-review-mode-cc-workflows/workflow-script.js
+    - hive/agents/memories/researcher/dr2-to-dr3-cc-workflows-mirror-invariants.md
+    - hive/agents/memories/developer/design-review-cc-workflows-marker-dialect.md
+    - hive/agents/memories/tester/design-review-cc-workflows-test-mirrors-multica.md
+  modified:
+    - hive/lib/package.json
+scope_discipline:
+  files_match_spec: true
+  no_drift_outside_spec: true
+contract_invariants:
+  agent_calls_preserved: 4
+  agent_call_order: [accessibility-specialist, animations-specialist, ui-designer-critique, ui-designer-synthesis]
+  single_workflow_run: true
+  helper_import_present: true       # s-3 check 4
+  no_codex_lint_status: 4/4 PASS    # s-3 checks 1-4
+  opts_model_on_every_agent: true   # s-5 contract
+  insight_capture_suffix_present: true
+  flags_preserved: [--skip, --artifact-target]
+notes: |
+  Slice 4 closed. /design-review has full substrate coverage:
+  - default (dr-1 router + existing flow)
+  - multica (dr-2)
+  - cc-workflows (dr-3)
+
+  s-3 lint scope now covers 4 atoms (plan-mode, execute-mode, test-mode,
+  design-review-mode-cc-workflows). All 4 PASS.

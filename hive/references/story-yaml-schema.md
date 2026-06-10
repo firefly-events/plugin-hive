@@ -116,7 +116,7 @@ execution:
 
 ## 9. The `manual_verdict:` field group
 
-Added by story `c-2-test-simulated-manual-mode` in the `autonomous-cycle-loop` epic. Carries the result of a `/test --simulated-manual` run. The block is written by the test-worker after executing the linked scenario; `/plan` seeds a placeholder when the `simulated-manual` cross-cutting concern applies.
+Added by story `c-2-test-simulated-manual-mode` in the `autonomous-cycle-loop` epic. Carries the result of a `/test --simulated-manual` run. This story-YAML block is the canonical source of truth for simulated-manual verdicts; `.pHive/cycle-state/<epic-id>.yaml` may expose a derived/index view, but it is not the source. The block is written by `tester` after executing the linked scenario; `/plan` seeds a placeholder when the `simulated-manual` cross-cutting concern applies.
 
 ### 9.1 Shape
 
@@ -135,7 +135,7 @@ manual_verdict:
 | `scenario_ref` | string | — | Repo-relative path to the scenario YAML; must resolve to a file conforming to [`test-scenario-schema.md`](test-scenario-schema.md). Set at plan time; updated by the tester if the scenario file is renamed. |
 | `verdict` | enum \| null | `null` | The outcome of the last `/test --simulated-manual` run: `pass`, `fail`, or `inconclusive`. `null` = not yet run. |
 | `timestamp` | ISO 8601 \| null | `null` | Wall-clock time when the verdict was recorded. `null` = not yet run. |
-| `agent` | string \| null | `null` | Persona name that executed the scenario (e.g., `test-worker`). `null` = not yet run. |
+| `agent` | string \| null | `null` | Persona name that executed the scenario (e.g., `tester`). `null` = not yet run. |
 
 ### 9.3 Lifecycle
 
@@ -158,7 +158,7 @@ manual_verdict:
   scenario_ref: .pHive/test-scenarios/c-2-test-simulated-manual-mode-manual.yaml
   verdict: pass
   timestamp: "2026-05-21T20:45:00Z"
-  agent: test-worker
+  agent: tester
 ```
 
 ## 3. The `metric:` field group
@@ -488,6 +488,7 @@ name: <epic-id>                  # kebab-case identifier; matches dir name
 title: <human title>
 target_codebase: <abs path>      # absolute path to the codebase /plan targeted
 methodology: <classic|tdd|bdd>   # selected in /plan; can be overridden per-story
+version_bump: <major|minor|patch|none>  # selected in /plan; consumed by /execute finalize
 
 # pe-5: pinned at plan time from `hive/lib/git_flow.mjs` (pe-1). The
 # sandcastle bridge (pe-2) and dispatch workflow (pe-3) prefer these
@@ -530,6 +531,27 @@ re-emits it:
 Downstream consumers fall back to the live `hive.config.yaml` for those
 epics; the bridge / workflow emit a one-line info log noting the
 fall-through.
+
+### 6.3 The `version_bump` field
+
+| Field | Type | Allowed values | Source |
+|---|---|---|---|
+| `version_bump` | string | `major` \| `minor` \| `patch` \| `none` | selected by the user during `/plan` |
+
+**Release intent.** `/plan` asks "Does this epic bump the version?
+major | minor | patch | none" and persists the answer on `epic.yaml`.
+This records intent only; `/plan` does not edit version sources.
+
+**Execution ownership.** `/execute` reads `version_bump` during the
+epic-finalize path after story implementation has completed. When the
+value is `major`, `minor`, or `patch`, `/execute` bumps every plugin
+version source to the same semver and writes a changelog entry for the
+epic. When the value is `none`, finalize performs a clean no-op for
+version files and changelog release text.
+
+**Back-compat.** Epics that pre-date this field may omit it. Downstream
+consumers treat omission as `none` and emit a one-line info log so the
+operator can decide whether to re-plan with explicit release intent.
 
 ## 7. The `test_scenario` field group
 

@@ -1,0 +1,161 @@
+scenario: dr-3-design-review-mode-cc-workflows-smoke
+title: Smoke — /design-review via cc-workflows substrate with --skip and --artifact-target
+story: dr-3-design-review-mode-cc-workflows
+kind: manual-verdict
+
+description: >
+  Verifies that the design-review-mode-cc-workflows atom (dr-3) correctly
+  dispatches the 4-step design-review workflow through the cc-workflows substrate.
+  Tests --skip flag suppression of optional steps and --artifact-target forwarding
+  to Steps C and D. Dispatched via design-review-dispatch (dr-1) when
+  mode_decision resolves to cc-workflows.
+
+preconditions:
+  - cwd is inside a .claude/worktrees/<name>/ checkout (assertWorktreeIsolation passes)
+  - HIVE_DESIGN_REVIEW_MODE=cc-workflows is set OR hive.config.yaml has design_review.mode cc-workflows
+  - design_artifacts payload is available (wireframe URLs or file paths)
+  - design-review-dispatch/SKILL.md (dr-1) routes to design-review-mode-cc-workflows on cc-workflows decision
+
+cases:
+  - name: full-run-no-skip
+    description: >
+      Full 4-step run with all steps active. Verifies all four agent() calls fire
+      in the correct order (A accessibility, B animations, C critique, D synthesis)
+      and the cc-workflows-run.yaml episode marker is written with all four outputs.
+    invocation: /design-review --artifact-target design
+    env:
+      HIVE_DESIGN_REVIEW_MODE: cc-workflows
+    expected:
+      mode_decision: cc-workflows
+      steps_dispatched:
+        - accessibility-specialist
+        - animations-specialist
+        - ui-designer-critique
+        - ui-designer-synthesis
+      marker_file: cc-workflows-run.yaml
+      marker_fields:
+        completion_kind: doc-verdict
+        artifacts_committed: true
+        episode_terminal: true
+      outputs_present:
+        - accessibility_critique
+        - animations_critique
+        - design_critique
+        - synthesis
+
+  - name: skip-accessibility
+    description: >
+      --skip accessibility suppresses Step A. Animations (Step B) receives
+      accessibility_critique=null. Steps C and D still run and produce outputs.
+    invocation: /design-review --skip accessibility --artifact-target implementation
+    env:
+      HIVE_DESIGN_REVIEW_MODE: cc-workflows
+    expected:
+      mode_decision: cc-workflows
+      steps_dispatched:
+        - animations-specialist
+        - ui-designer-critique
+        - ui-designer-synthesis
+      steps_skipped:
+        - accessibility-specialist
+      marker_fields:
+        skip_flags:
+          - accessibility
+        artifact_target: implementation
+      outputs:
+        accessibility_critique: null
+
+  - name: skip-animations
+    description: >
+      --skip animations suppresses Step B. Steps A, C, D still run. Step D synthesis
+      receives animations_critique=null and handles it gracefully.
+    invocation: /design-review --skip animations --artifact-target design
+    env:
+      HIVE_DESIGN_REVIEW_MODE: cc-workflows
+    expected:
+      mode_decision: cc-workflows
+      steps_dispatched:
+        - accessibility-specialist
+        - ui-designer-critique
+        - ui-designer-synthesis
+      steps_skipped:
+        - animations-specialist
+      marker_fields:
+        skip_flags:
+          - animations
+        artifact_target: design
+      outputs:
+        animations_critique: null
+
+  - name: skip-both-optional
+    description: >
+      --skip accessibility --skip animations suppresses both optional steps.
+      Only required Steps C and D fire. Marker records both in skip_flags.
+    invocation: /design-review --skip accessibility --skip animations
+    env:
+      HIVE_DESIGN_REVIEW_MODE: cc-workflows
+    expected:
+      mode_decision: cc-workflows
+      steps_dispatched:
+        - ui-designer-critique
+        - ui-designer-synthesis
+      steps_skipped:
+        - accessibility-specialist
+        - animations-specialist
+      outputs:
+        accessibility_critique: null
+        animations_critique: null
+
+  - name: required-steps-not-skippable
+    description: >
+      --skip design-critique and --skip synthesis are logged as warnings and ignored.
+      Steps C and D still execute. SKILL.md documents this invariant.
+    invocation: /design-review --skip design-critique --skip synthesis
+    env:
+      HIVE_DESIGN_REVIEW_MODE: cc-workflows
+    expected:
+      mode_decision: cc-workflows
+      steps_dispatched:
+        - accessibility-specialist
+        - animations-specialist
+        - ui-designer-critique
+        - ui-designer-synthesis
+      warning_logged: true
+      outputs_present:
+        - design_critique
+        - synthesis
+
+  - name: precondition-reject-outside-worktree
+    description: >
+      When cwd is not inside a .claude/worktrees/<name>/ path, assertWorktreeIsolation
+      throws precondition_failed and the skill aborts without dispatching any agent() call.
+    invocation: /design-review
+    env:
+      HIVE_DESIGN_REVIEW_MODE: cc-workflows
+    simulate_cwd: /Users/don/Documents/plugin-hive
+    expected:
+      error: precondition_failed
+      field_sources_present: true
+      agents_dispatched: 0
+
+  - name: artifact-target-forwarded-verbatim
+    description: >
+      --artifact-target value is forwarded verbatim into the Step C and Step D agent prompts
+      via a.artifact_target. Verified by inspecting the Workflow script assembled at Step 1.
+    invocation: /design-review --artifact-target implementation
+    env:
+      HIVE_DESIGN_REVIEW_MODE: cc-workflows
+    expected:
+      artifact_target_in_step_c_prompt: implementation
+      artifact_target_in_step_d_prompt: implementation
+      marker_fields:
+        artifact_target: implementation
+
+verdict: null
+timestamp: null
+agent: null
+notes: >
+  This scenario covers the dr-3 acceptance criteria for --skip flag semantics
+  (AC 4), --artifact-target forwarding (AC 5), cc-workflows substrate dispatch,
+  precondition gate (assertWorktreeIsolation at Step 0), and required-steps
+  non-skippability invariant documented in SKILL.md constraint summary.

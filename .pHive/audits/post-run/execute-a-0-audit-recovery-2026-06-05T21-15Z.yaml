@@ -1,0 +1,72 @@
+audit_kind: post-run
+skill: execute
+run_id: wf_066f4f10-1b3
+epic_id: substrate-coverage-and-test-cleanup
+story_ids:
+  - a-0-audit-recovery
+timestamp: "2026-06-05T21:15:00Z"
+target_branch: feat/substrate-coverage-and-test-cleanup
+commits:
+  - 65224dc  # [a-0] chore(audit): close substrate-coverage Constraint 5 via branch-c
+  - 45b7eee  # [a-0] chore(episode): cc-workflows terminal marker
+
+gate_lift_fired: false
+methodology:
+  value: classic
+  source: story-spec
+
+mode_decision: cc-workflows
+mode_reason: HIVE_EXECUTE_MODE=cc-workflows env signal
+backend_sources:
+  sessions_enabled:
+    source: default
+    value: false
+  parallel_teams:
+    source: default
+    value: false
+  terminal_mux:
+    source: default
+    value: null
+  executor:
+    source: default
+    value: orchestrator-narrated
+
+work_artifacts:
+  commits_count: 2
+  files_modified:
+    - .pHive/epics/substrate-coverage-and-test-cleanup/docs/audit-recovery-decision.md  # created
+    - .pHive/epics/substrate-coverage-and-test-cleanup/docs/design-discussion.md  # modified
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/a-0-audit-recovery/implement.yaml  # created
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/a-0-audit-recovery/test.yaml  # created
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/a-0-audit-recovery/review.yaml  # created
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/a-0-audit-recovery/cc-workflows-run.yaml  # created
+
+nonsensical_defaults: []
+
+substrate_findings:
+  - id: cc-workflows-mode-skill-leaves-model-tier-to-orchestrator
+    severity: medium
+    summary: |
+      cc-workflows mode skill does not auto-resolve per-persona model tier
+      from hive.config.yaml model_tiers + model_overrides. Without explicit
+      opts.model on every agent() call, every dispatched agent inherits the
+      parent session model (Opus 4.7 here), violating the documented base
+      tier (sonnet for researcher/developer/tester) and the runtime promotion
+      contract (opus for reviewer via model_overrides).
+    proposed_fix: |
+      In execute-mode-cc-workflows/SKILL.md Step 1.5 (workflow_assembly),
+      look up each persona's resolved tier (model_tiers + model_overrides
+      with override winning) and emit opts.model on the assembled agent()
+      call. Surface tier in field_sources for the post-run audit.
+    discovered_by: a-0-audit-recovery first cc-workflows-mode dispatch
+    runtime_workaround: orchestrator set opts.model per agent() manually
+
+terminal_handoff:
+  resolved: none
+  source: default
+
+multica_close:
+  issue_id: 33d747ed-c31d-4469-87da-42361c06b19b
+  identifier: PLU-211
+  status: done
+  via: multica issue update --status done

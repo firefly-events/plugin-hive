@@ -1,7 +1,7 @@
 id: a-26-context-md-kickoff-bootstrap
 epic: catalog-hygiene-and-borrows
 title: Wire CONTEXT.md bootstrap into kickoff skill
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [a-26-context-md-schema-and-starter]

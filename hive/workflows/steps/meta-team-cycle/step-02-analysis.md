@@ -19,16 +19,17 @@ output_format:
 ```
 
 Routing between step-03 and step-03b is an **AND-of-empty** rule across
-the three signals — `metric_signal` is NOT a proxy for "are there
-findings". The canonical predicates (left-associative, no parentheses
-per strict-Archon grammar) are:
+the FOUR signals — `metric_signal` is NOT a proxy for "are there findings".
+The canonical predicates (left-associative, no parentheses per strict-Archon
+grammar) are:
 
 - step-03 runs when ANY signal is non-empty:
-  `$analysis.output.findings_count > 0 || $analysis.output.external_candidates_count > 0 || $analysis.output.metric_signal == true`
-- step-03b runs ONLY when ALL three are empty:
-  `$analysis.output.findings_count == 0 && $analysis.output.external_candidates_count == 0 && $analysis.output.metric_signal == false`
+  `$analysis.output.findings_count > 0 || $analysis.output.metric_signal == true || $external-research.output.external_candidates_count > 0 || $kg-signal.output.kg_findings_count > 0`
+- step-03b runs ONLY when ALL four are empty:
+  `$analysis.output.findings_count == 0 && $analysis.output.metric_signal == false && $external-research.output.external_candidates_count == 0 && $kg-signal.output.kg_findings_count == 0`
 
-Predicates bind to the explicit `_count` fields rather than to list
+`kg_findings_count` joined the signal set when step-02c was wired into the
+workflow. Predicates bind to the explicit `_count` fields rather than to list
 lengths because the strict-Archon grammar does not support `len(...)`.
 Cycles that produce findings but no perf delta route to step-03 — the
 meta-2026-04-29 regression scenario covered by
@@ -60,13 +61,50 @@ Systematic scan of the target-project codebase (`$HIVE_TARGET_PROJECT`). Produce
 
 **NOT available:**
 - User input
-- Prior cycle findings (for independence — re-analyze fresh each cycle)
+- Prior cycle findings (for independence — re-analyze the codebase fresh each cycle)
+
+> **Independence vs. in-flight dedup — read carefully.** "Re-analyze fresh"
+> means do not let a *prior cycle's conclusions* bias this cycle's read of the
+> codebase. It does **NOT** mean ignore work already proposed and waiting for
+> human review. Open PRs that propose a fix are *in-flight* — the maintainer
+> simply has not merged them yet. Re-finding and re-proposing the same fix every
+> cycle (the meta-2026-05-30..06-05 duplicate-PR incident: 7 nightly PRs all
+> re-derived the identical `claude-opus-4-7 -> claude-opus-4-8` bump because none
+> had merged) is wasted work, not independence. Step 0 below consults open PRs to
+> suppress already-proposed findings.
 
 ## YOUR TASK
 
 Systematically audit the target-project codebase (`$HIVE_TARGET_PROJECT`, resolved per hooks/common.sh) and produce a ranked findings list with severity and category for each issue.
 
 ## TASK SEQUENCE
+
+### 0. In-flight proposal pre-flight (dedup gate) — RUN FIRST
+
+Before auditing the codebase, build the set of fixes that are **already
+proposed and awaiting review** so this cycle does not re-derive them.
+
+1. Enumerate open PRs authored by prior meta cycles (and any other open PRs
+   touching the maintainer-owned trees):
+   ```bash
+   gh pr list --state open --base develop --limit 100 \
+     --json number,title,headRefName,files \
+     --jq '.[] | {number, title, head: .headRefName, files: [.files[].path]}'
+   # also catch any still-mistargeted-at-main nightlies:
+   gh pr list --state open --base main --limit 100 \
+     --json number,title,headRefName,files \
+     --jq '.[] | select(.headRefName|test("meta-meta/|meta/")) | {number, title, files: [.files[].path]}'
+   ```
+2. For each open PR, collect its changed file paths and (for small diffs)
+   the proposed change. Treat this as the **in-flight proposal set**.
+3. Hold this set in working memory for Step 7's dedup filter.
+
+**Independence is preserved:** you still scan the codebase fresh. Step 0 only
+governs which findings survive into the proposal — it never seeds findings.
+
+If `gh` is unavailable or returns an error, log a `PREFLIGHT_DEGRADED` note,
+proceed without suppression, and surface it in the analysis report (so a
+duplicate slipping through is visible rather than silent).
 
 ### 1. Cross-reference audit — dangling references
 For each reference doc listed in the target project's top-level documentation manifest (e.g., plugin-hive's `hive/GUIDE.md` and `hive/MAIN.md`; adapt to the target project's equivalent structure if different):
@@ -112,18 +150,238 @@ If the target project has workflow YAML files (plugin-hive uses `hive/workflows/
 - Confirm each step has either `task` or `step_file`
 - Flag missing step files as `MISSING_STEP_FILE` findings
 
+### 6b. CodeRabbit recurring-comment audit
+
+CodeRabbit posts inline review comments on every PR; titles that recur across multiple recent PRs are a real signal — either the codebase has a recurring convention issue, or reviewers are repeating the same advice because the author did not internalize it last time. Either way, the meta-team can address the root cause.
+
+Implementation module: `hive/workflows/steps/meta-team-cycle/coderabbit-finder.mjs`. The helper is pure-function over already-fetched data — gather the PR comment list first, then pass it in.
+
+Gather data (skip cleanly if `gh` is unavailable — log `PREFLIGHT_DEGRADED` per Step 0 and continue with zero findings from this audit):
+
+```bash
+# Window: last 14 days. Adjust via meta_optimize.coderabbit_finder.window_days in
+# hive.config.yaml when present; default 14. WINDOW_DAYS is the single source
+# of truth for the window: it drives the gh fetch below AND must be passed as
+# `windowDays` to the helper so finding evidence reports the real window.
+WINDOW_DAYS=14
+since=$(date -u -v-${WINDOW_DAYS}d '+%Y-%m-%d' 2>/dev/null || date -u -d "${WINDOW_DAYS} days ago" '+%Y-%m-%d')
+gh pr list --state merged --search "merged:>=${since}" \
+  --limit 100 \
+  --json number,title,mergedAt \
+  --jq '.[] | .number' \
+  > /tmp/recent_prs.txt
+
+for n in $(cat /tmp/recent_prs.txt); do
+  gh api "repos/${OWNER}/${REPO}/pulls/${n}/comments" \
+    --jq "[.[] | {user: {login: .user.login}, body: .body, id: .id}]" \
+    > "/tmp/cr_${n}.json"
+done
+```
+
+Then invoke the helper:
+
+```js
+import { findRecurringCoderabbitComments } from 'hive/workflows/steps/meta-team-cycle/coderabbit-finder.mjs';
+
+const pullRequests = recentPrNumbers.map((n) => ({
+  number: n,
+  comments: JSON.parse(readFileSync(`/tmp/cr_${n}.json`, 'utf8')),
+}));
+const crFindings = findRecurringCoderabbitComments(pullRequests, {
+  minRecurrence: 3,
+  windowDays: 14, // MUST equal the WINDOW_DAYS used in the gather script above
+});
+```
+
+Each emitted finding uses the standard step-02 finding shape with
+`category: CODERABBIT_RECURRING` and `location: cross-repo` (the finding spans multiple PRs, not a single file). Severity is `medium` for 3-4 recurring PRs and `high` for 5+. Append these findings to the same list emitted by audits 1-6 above; the AND-of-empty routing gate treats them as ordinary signal.
+
+`coderabbit-finder.mjs` is pure — no fetch, no shell. Tests live at `hive/workflows/steps/meta-team-cycle/__tests__/coderabbit-finder.test.mjs` and cover the title-extraction regex, author filtering (only `coderabbitai*` logins), tally semantics (duplicate comments in the same PR count once toward distinct-PR recurrence), and the threshold gate.
+
+### 6c. Stale open-PR audit
+
+Open PRs that have been sitting >7d since last activity are either stranded awaiting human review or have a process gap (reviewer unassigned, CI failing repeatedly without anyone acting). Either way they are real meta-team-actionable signals — they encode unresolved work that the maintainer has not been able to land.
+
+Implementation module: `hive/workflows/steps/meta-team-cycle/stale-pr-finder.mjs`. Pure-function over already-fetched PR data — gather first via `gh`, then pass it in.
+
+Gather data (skip cleanly if `gh` is unavailable):
+
+```bash
+gh pr list \
+  --state open \
+  --base develop \
+  --limit 100 \
+  --json number,title,headRefName,createdAt,updatedAt,reviewDecision,reviewRequests,isDraft,state \
+  > /tmp/open_prs.json
+gh pr list \
+  --state open \
+  --base main \
+  --limit 100 \
+  --json number,title,headRefName,createdAt,updatedAt,reviewDecision,reviewRequests,isDraft,state \
+  >> /tmp/open_prs.json   # concatenation is fine — helper accepts any array
+```
+
+Invoke the helper. `nowIso` MUST be pinned by the caller — workflow scripts forbid `Date.now()` so the researcher persona reads the current ISO timestamp from the environment or the cycle marker and passes it in:
+
+```js
+import { findStalePrs } from 'hive/workflows/steps/meta-team-cycle/stale-pr-finder.mjs';
+
+const pullRequests = JSON.parse(readFileSync('/tmp/open_prs.json', 'utf8'));
+const staleFindings = findStalePrs(pullRequests, {
+  nowIso: process.env.HIVE_CYCLE_NOW_ISO,   // pinned at boot
+  staleDays: 7,
+  criticalDays: 14,
+});
+```
+
+Each finding uses the standard step-02 shape with `category: STALE_OPEN_PR` and `location: branch:<head-ref>` (or `pr:<number>` if head ref is missing). Severity mapping: critical-tier (>14d AND reviewer attached) → `high`; medium-tier (>7d AND reviewer attached) → `medium`; watch-tier (>7d, no reviewer) → `low`. Append these findings to the same list emitted by audits 1-6 above.
+
+`stale-pr-finder.mjs` is pure — no fetch, no shell, no `Date.now()`. Tests live at `hive/workflows/steps/meta-team-cycle/__tests__/stale-pr-finder.test.mjs` (20 cases): `daysBetween` arithmetic, draft/closed/merged filtering, tier boundaries (7/14d), reviewer-attached vs unattended classification, finding shape, sort order (severity-desc then age-desc).
+
+### 6d. /hive:triage queue aging audit
+
+Triage items sitting in a non-closed state for too long are real meta-team signals: either the report needs clarification, a prioritization decision is overdue, or a plan-ready item never reached execution. The aging thresholds are state-aware — inbox/clarified/prioritized are stale at 7d / critical at 14d, while plan-ready (already cleared planning) gets a softer 14d / 30d threshold because it represents a real execution-bottleneck signal rather than a triage-handling gap.
+
+Implementation module: `hive/workflows/steps/meta-team-cycle/triage-aging-finder.mjs`. Pure-function over the parsed `.pHive/triage/queue.yaml` shape documented in `hive/references/triage-queue-schema.md`. The caller reads the file (or treats it as absent → empty queue, per the schema's fail-open semantics) and passes the parsed object in.
+
+Gather data:
+
+```bash
+# Schema-aware load — missing/malformed queue file is treated as empty
+# per hive/references/triage-queue-schema.md §Warning-only gate.
+if [ -f "${HIVE_STATE_DIR}/triage/queue.yaml" ]; then
+  cat "${HIVE_STATE_DIR}/triage/queue.yaml" | yq -o=json > /tmp/triage_queue.json || echo '{}' > /tmp/triage_queue.json
+else
+  echo '{}' > /tmp/triage_queue.json
+fi
+```
+
+Invoke the helper (clock pinned by the caller, same convention as the stale-PR finder):
+
+```js
+import { findStuckTriageItems } from 'hive/workflows/steps/meta-team-cycle/triage-aging-finder.mjs';
+
+const queue = JSON.parse(readFileSync('/tmp/triage_queue.json', 'utf8'));
+const triageFindings = findStuckTriageItems(queue, {
+  nowIso: process.env.HIVE_CYCLE_NOW_ISO,
+});
+```
+
+Each finding uses the standard step-02 shape with `category: STUCK_TRIAGE_ITEM` and `location: triage:<id>`. Severity mapping: critical-tier (past the state's `criticalDays`) → `high`; medium-tier (past `staleDays`) → `medium`. Append to the standard findings list.
+
+`triage-aging-finder.mjs` is pure — no fs, no fetch, no `Date.now()`. Tests live at `hive/workflows/steps/meta-team-cycle/__tests__/triage-aging-finder.test.mjs` (17 cases): anchor resolution (state_history vs reported_at fallback), per-state threshold boundaries (inbox/clarified/prioritized 7/14d, plan-ready 14/30d), closed-item filtering, unknown-state safety, malformed-queue tolerance, finding shape, sort order.
+### 6e. Feedback-memory recents audit
+
+Every freshly-written `feedback_*.md` memory file under
+`~/.claude/projects/<project>/memory/` is a captured friction point — the
+user explicitly asked the assistant to remember it because something
+surprised them or didn't go to plan. If the meta-team picks those up the
+next morning, the loop closes: today's friction becomes tomorrow's queued
+meta-team candidate. The single strongest signal in this finder is recency:
+a feedback file modified in the last 24h is gold; 2-7 days is still
+actionable; older is queue noise.
+
+Implementation module: `hive/workflows/steps/meta-team-cycle/feedback-memory-finder.mjs`. Pure-function over file-system records — the caller walks the directory and passes results in.
+
+Gather data (the maintainer's auto-memory dir is project-specific; resolve via `paths.auto_memory_dir` in `hive.config.yaml` if set, otherwise fall back to `~/.claude/projects/<derived-slug>/memory/`):
+
+```bash
+DIR="${HIVE_AUTO_MEMORY_DIR:-$HOME/.claude/projects/-Users-don-Documents-plugin-hive/memory}"
+if [ -d "$DIR" ]; then
+  find "$DIR" -maxdepth 1 -name "feedback_*.md" -type f \
+    -newermt "$(date -u -v-7d '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -d '7 days ago' '+%Y-%m-%dT%H:%M:%SZ')" \
+    -exec stat -f '%N|%Sm' -t '%Y-%m-%dT%H:%M:%SZ' {} \; \
+    > /tmp/feedback_recents.txt
+fi
+```
+
+Parse, read frontmatter from each file, and pass as records:
+
+```js
+import { findRecentFeedbackMemories } from 'hive/workflows/steps/meta-team-cycle/feedback-memory-finder.mjs';
+
+// records: [{ path, mtimeIso, frontmatter }, ...]
+const findings = findRecentFeedbackMemories(records, {
+  nowIso: process.env.HIVE_CYCLE_NOW_ISO,
+  windowDays: 7,
+  veryFreshDays: 1,
+});
+```
+
+Each finding uses the standard step-02 shape with
+`category: RECENT_FEEDBACK_MEMORY` and `location: memory:<slug>`. Severity mapping: very-fresh (≤24h) → `high`; fresh (1d < age ≤ 7d) → `medium`. Append to the standard findings list.
+
+`feedback-memory-finder.mjs` is pure — no fs, no `Date.now()`. Tests live at `hive/workflows/steps/meta-team-cycle/__tests__/feedback-memory-finder.test.mjs` (18 cases): feedback-prefix filter, mtime window boundaries (1d / 7d each direction), custom-windowDays overrides, future-mtime guard, finding shape, frontmatter fallback to filename slug, description truncation.
+
+### 6f. Sandcastle / Multica / CI failure tail audit
+
+Recurring CI failures and stuck rework-labeled issues are real meta-team signals. A workflow that fails twice in a week probably has a structural problem (config drift, flaky integration, missing dependency) the meta-team can fix once instead of patching every run. A rework-labeled issue idle for >3d means somebody bounced the work but nobody picked it up — process gap or stalled owner.
+
+Implementation module: `hive/workflows/steps/meta-team-cycle/failure-tail-finder.mjs`. Pure-function over already-fetched run + issue records.
+
+Gather data:
+
+```bash
+# 1. GH workflow run failures within the recency window
+since=$(date -u -v-7d '+%Y-%m-%d' 2>/dev/null || date -u -d '7 days ago' '+%Y-%m-%d')
+gh run list \
+  --limit 200 \
+  --created ">=${since}" \
+  --json workflowName,conclusion,createdAt,databaseId,htmlUrl \
+  > /tmp/recent_runs.json
+
+# 2. Open issues carrying the rework label (Multica + GH)
+gh issue list \
+  --state open \
+  --label "hive:needs-rework" \
+  --limit 100 \
+  --json id,title,state,labels,createdAt,updatedAt,url \
+  > /tmp/rework_issues.json
+```
+
+Invoke the helper:
+
+```js
+import { findFailureTail } from 'hive/workflows/steps/meta-team-cycle/failure-tail-finder.mjs';
+
+const runs = JSON.parse(readFileSync('/tmp/recent_runs.json', 'utf8'));
+const issues = JSON.parse(readFileSync('/tmp/rework_issues.json', 'utf8'));
+const findings = findFailureTail({ runs, issues }, {
+  nowIso: process.env.HIVE_CYCLE_NOW_ISO,
+  windowDays: 7,
+  minRecurrence: 2,
+  stuckDays: 3,
+});
+```
+
+Two finding kinds appear in the combined output:
+
+- `category: CI_FAILURE_PATTERN`, `location: workflow:<name>` — emitted when a workflow accumulates ≥ `minRecurrence` terminal-failure runs (failure / cancelled / timed_out / action_required) within `windowDays`. Severity: `high` at 4+ failures, `medium` at 2-3.
+- `category: STUCK_REWORK_ISSUE`, `location: issue:<id>` — emitted when an open issue carrying a rework label has been idle longer than `stuckDays`. Severity: `high` past 7d, `medium` otherwise.
+
+`failure-tail-finder.mjs` is pure — no fetch, no shell. Tests live at `hive/workflows/steps/meta-team-cycle/__tests__/failure-tail-finder.test.mjs` (20 cases): conclusion filtering (success/skipped/neutral dropped, failure/cancelled/timed_out/action_required kept), windowDays boundaries, minRecurrence threshold + severity upgrade at 4+, rework-label detection (string and object forms), age thresholds, finding shape, sort order.
+
 ### 7. Compile findings
 For each finding, record:
 ```yaml
 id: finding-{N}
-category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | OTHER
+category: MISSING_FILE | SCHEMA_INCONSISTENCY | INCOMPLETE_STEP_FILE | MEMORY_GAP | STUB_DOC | MISSING_STEP_FILE | CODERABBIT_RECURRING | STALE_OPEN_PR | STUCK_TRIAGE_ITEM | RECENT_FEEDBACK_MEMORY | CI_FAILURE_PATTERN | STUCK_REWORK_ISSUE | OTHER
 severity: critical | high | medium | low
-location: {file path}
+location: {file path | cross-repo | branch:<ref> | pr:<n> | triage:<id> | memory:<slug> | workflow:<name> | issue:<id>}
 description: {one-line description}
 evidence: {specific field, line, or pattern that demonstrates the issue}
 ```
 
-Sort findings by severity descending, then by category.
+**Dedup against in-flight PRs (from Step 0):** Before sorting, drop any
+finding whose fix is already proposed in an open PR. A finding is a duplicate
+when its `location` (file path) is in an open PR's changed-file set AND the
+PR's title/diff addresses the same issue (e.g. an open PR already bumps
+`claude-opus-4-7 -> claude-opus-4-8` in that file). Record each suppressed
+finding under `findings_suppressed` (id, location, pr_number) for the report —
+do NOT carry it into `findings`. This is the gate that prevents re-proposing
+unreviewed work; the suppressed count makes the dedup auditable.
+
+Sort the surviving findings by severity descending, then by category.
 
 ### 8. Update cycle-state.yaml
 Append all findings to `<HIVE_STATE_DIR>/meta-team/cycle-state.yaml`:
@@ -133,7 +391,7 @@ findings:
   - {finding objects}
 ```
 
-**`metric_signal` field (orthogonal to findings):** If the analyzer also evaluates a perf-baseline delta (token / wall_clock_ms / first_attempt_pass) against a prior cycle baseline, record the result as a separate `metric_signal: true | false` field on this step's output. This flag is **perf-baseline-only** — it indicates whether a usable baseline-vs-candidate metric delta exists for proposal ranking. It is NOT a proxy for "are there findings". Routing between step-03 and step-03b uses an AND-of-empty rule across `findings`, `external_research_candidates`, and `metric_signal`; structural findings drive step-03 even when `metric_signal: false`. See `step-03b-backlog-fallback.md` §MANDATORY EXECUTION RULES for the canonical routing rule.
+**`metric_signal` field (orthogonal to findings):** If the analyzer also evaluates a perf-baseline delta (token / wall_clock_ms / first_attempt_pass) against a prior cycle baseline, record the result as a separate `metric_signal: true | false` field on this step's output. This flag is **perf-baseline-only** — it indicates whether a usable baseline-vs-candidate metric delta exists for proposal ranking. It is NOT a proxy for "are there findings". Routing between step-03 and step-03b uses an AND-of-empty rule across `findings`, `external_research_candidates`, `metric_signal`, and `kg_findings`; structural findings drive step-03 even when `metric_signal: false`. See `step-03b-backlog-fallback.md` §MANDATORY EXECUTION RULES for the canonical routing rule.
 
 ### 9. Emit structured output (executor contract)
 In addition to the cycle-state write above, emit a JSON object matching
@@ -166,6 +424,10 @@ Total findings: {N}
   Medium: {N}
   Low: {N}
 
+Suppressed (already proposed in open PRs): {N}
+  - [{location}] dup of PR #{pr_number}
+  ...
+
 By category:
   MISSING_FILE: {N}
   SCHEMA_INCONSISTENCY: {N}
@@ -182,8 +444,10 @@ Top findings:
 
 ## SUCCESS METRICS
 
+- [ ] Step 0 in-flight PR pre-flight executed (or `PREFLIGHT_DEGRADED` logged)
 - [ ] All 6 audit checks executed (cross-ref, schema, step files, memories, reference docs, workflows)
 - [ ] Each finding has category, severity, location, description, evidence
+- [ ] Findings already proposed in open PRs suppressed and reported (not re-proposed)
 - [ ] Findings appended to `cycle-state.yaml`
 - [ ] Analysis report produced with counts by severity and category
 - [ ] Structured output emitted matching the OUTPUT FORMAT contract: `metric_signal: bool`, `findings_count: int` (== len(findings)), `external_candidates_count: int`, `findings: list`, `external_research_candidates: list`

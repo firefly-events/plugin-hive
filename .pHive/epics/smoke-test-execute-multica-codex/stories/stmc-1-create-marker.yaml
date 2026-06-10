@@ -1,7 +1,7 @@
 id: stmc-1-create-marker
 epic: smoke-test-execute-multica-codex
 title: Create smoke-marker.txt with a known timestamp
-status: pending
+status: in_progress
 complexity: low
 methodology: classic
 depends_on: []

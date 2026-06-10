@@ -1,7 +1,7 @@
 id: h-04-triage-json-output
+status: in_progress
 epic: hermes-integration-mvp
 title: Triage --json output across read + state-transition sub-commands
-status: pending
 complexity: small
 methodology: classic
 depends_on: [h-02-context-snapshot-skill]

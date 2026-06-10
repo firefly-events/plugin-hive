@@ -1,0 +1,94 @@
+id: mpt-11-full-cycle-dogfood
+epic: multica-plan-test-cycles
+title: Dogfood the full plan->execute->test cycle through Multica (throwaway)
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- mpt-8-wire-plan-phase0
+- mpt-10-wire-test-simulated-manual
+description: 'S6. Dogfood the complete cycle on a THROWAWAY workstream (gate decision #5): plan a tiny
+  throwaway feature via Multica (mpt-8), run /execute (already on Multica), then /test --simulated-manual
+  via Multica (mpt-10) as the verification checkpoint that the build matched the plan. Validate single-shared-branch
+  + serial-against-trunk (no orphan branches; fresh-checkout/rebase-push) and capture episodes for all
+  three cycles.'
+acceptance_criteria:
+- Given a throwaway feature, when planned then executed then tested via Multica, then all three cycles
+  dispatch through Multica and episodes are captured for each.
+- Given the run, then the test verdict confirms the build matched the plan (verification-checkpoint role),
+  and serial-against-trunk held (no orphan agent branches).
+steps:
+- id: research
+  description: Explore the codebase for relevant patterns, files, and constraints.
+  agent: researcher
+- id: implement
+  description: Implement the story per spec and research findings.
+  agent: developer
+  depends_on:
+  - research
+- id: scenario
+  description: Author a simulated-manual test scenario YAML under .pHive/test-scenarios/ per hive/references/test-scenario-schema.md
+    (reconciled shape from mpt-2). Set manual_verdict.scenario_ref to the scenario path.
+  agent: tester
+  depends_on:
+  - implement
+- id: test
+  description: Verify acceptance criteria and run the simulated-manual scenario.
+  agent: tester
+  depends_on:
+  - scenario
+- id: review
+  description: Review implementation and tests for correctness and convention compliance.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit and push to the feature branch (fresh-checkout/rebase-push per integration principle).
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: .pHive/epics/multica-substrate-deepen/docs/integration-principle.md
+    purpose: Serial-against-trunk contract to validate.
+files_to_modify:
+- file: .pHive/epics/multica-plan-test-cycles/research/full-cycle-dogfood.md
+  change: NEW — dogfood run log + findings.
+references:
+- path: .pHive/epics/multica-plan-test-cycles/docs/structured-outline.md
+  relevant_excerpt: Phase-to-slice mapping, file manifest, risk registry.
+- path: .pHive/epics/multica-plan-test-cycles/docs/design-discussion.md
+  relevant_excerpt: §9 locked gate decisions (full-mirror seam, squad-spike-first, plan->execute->test
+    framing).
+- path: .pHive/epics/multica-plan-test-cycles/docs/vertical-plan.md
+  relevant_excerpt: 6-slice spine S1..S6 with depends_on + working states.
+risks:
+- severity: medium
+  description: Parallel plan+test cells contend on one branch.
+  mitigation: Enforce serial-against-trunk fresh-checkout/rebase-push; single agent per role keeps execution
+    serial.
+cross_cutting:
+- concern: documentation
+  action: Record the dogfood run + any follow-ups in the epic research log.
+- concern: simulated-manual
+  action: 'E2E: the dogfood itself is the manual verification that plan->execute->test round-trips via
+    Multica.'
+metric:
+  applies: false
+  justification: End-to-end validation run on a throwaway target; its artifact is a dogfood log proving
+    the cycle round-trips, an existence proof rather than a moved production metric.
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/mpt-11-full-cycle.yaml
+  verdict: null
+  timestamp: null
+  agent: null
+tracker_id: plugin-hive/PLU-164
+tracker_uuid: 3e38b80c-bd6c-4def-94c8-5f8f3a405514
+tracker_url: http://localhost:3000/issue/PLU-164
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4k)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; records the throwaway plan->execute->test dogfood run validating the routed cycle and branch discipline.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt

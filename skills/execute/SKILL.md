@@ -148,7 +148,7 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
    When `gate_violations[]` is non-empty, the dispatch has been downgraded to `sequential` by the parallel-dispatch gate (`ed-7`). Surface the warning to stdout naming every offending story ID and the reason recorded by the gate (the structured format is documented in `execute-dispatch/SKILL.md` Step 1.5). Do not re-implement the gate logic here — the dispatch skill is the single boundary for this decision per the parallel-call-sites registry (`hive/references/parallel-call-sites.md`).
 
-   Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d, `multica` -> step 6e.
+   Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d, `multica` -> step 6e, `cc-workflows` -> step 6f.
 5pre. **Executor cutover routing.** Use only the returned `runner_path` and `runner_reason`; do not re-evaluate the cutover tree here. If `runner_path == hive-dag`, call `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`; otherwise continue on the orchestrator-narrated path. Single dispatch point: this skill call is the only `/execute` policy boundary for executor-vs-orchestrator routing.
 
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
@@ -184,6 +184,39 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
    - `appends_map`: the review-phase sidecar map from step 2b
    - `epic_handle`: the current epic identifier
    - `hive_config`: parsed root `hive.config.yaml` (for `execution.multica.*` options and `agent_backends.*`)
+
+6f. **CC Workflows execution** (used when `HIVE_EXECUTION_RUNTIME=workflows` or root config `execution.runtime: cc-workflows`). Routes each story into a Workflow tool dispatch.
+   Invoke `skills/hive/skills/execute-mode-cc-workflows/SKILL.md` with:
+   - `workflow_path`: the workflow loaded in step 3
+   - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
+   - `appends_map`: the review-phase sidecar map from step 2b
+   - `epic_handle`: the current epic identifier
+   - `hive_config`: parsed root `hive.config.yaml` (for `execution.cc-workflows.*` options)
+
+   Step 6f does not recursively spawn /workflows from within a dispatched agent — the Workflow tool runs once per dispatched story. `/execute` owns depth advancement and re-invokes this skill for each subsequent DAG depth per step 6g below.
+
+6g. **Depth-advancement loop (generic across modes).** After the chosen mode skill (6b/6c/6d/6e/6f) returns its depth summary, integrate per-story results into the run's `completed` and `failed` sets, then re-walk the topological sort from step 4:
+
+   ```text
+   next_unblocked = stories
+     - completed
+     - failed
+     - in-flight
+     filtered by: every dep ∈ completed
+   ```
+
+   - If `next_unblocked` is non-empty, re-invoke the SAME mode skill at the same step (6b/6c/6d/6e/6f) with `unblocked_stories[] = next_unblocked` and the rest of the invocation contract unchanged. Each re-invocation is one DAG depth.
+   - If `next_unblocked` is empty AND `in-flight` is empty AND `failed` is non-empty, halt with a partial-epic verdict; surface the failed story IDs and unreachable downstream stories to the user.
+   - If `next_unblocked` is empty AND `in-flight` is empty AND every story is in `completed`, proceed to step 7 (post-exec) and step 8 (summary + audit).
+
+   This loop is the contract every depth-0-only mode skill (`execute-mode-multica`, `execute-mode-cc-workflows`, `execute-mode-sandcastle`) relies on. Per their constraint summaries they explicitly delegate depth advancement to `/execute`; this step is that delegation.
+
+6h. **Branch + worktree + PR convention.** Apply for every dispatch mode unless the mode skill states otherwise:
+
+   - **Branch per epic** — integration branch is `feat/<epic-id>` (override via `epic.git_flow.branch`). Verify before step 6{x}; create from `epic.git_flow.base_branch` (default `develop`) if absent.
+   - **Commit per story** — enforced by the per-mode serial-commit gate (see `execute-mode-cc-workflows/SKILL.md` Step 3 and `references/team-execution.md` per-story commit pattern). One `git commit` per terminal-passed story; commit subject prefix `[<story-id>]`.
+   - **Worktree per epic (recommended)** — when `cc-workflows` mode is selected, isolate the whole `/execute` run to a dedicated worktree at `.claude/worktrees/<epic-id>/` per `feedback_cc_workflows_worktree_required.md`. The worktree is created once at step 6 entry and removed at step 8 close (operator choice via `ExitWorktree`).
+   - **PR per epic** — opened at step 8 close, after every story is `completed`. One PR per `feat/<epic-id>` against `epic.git_flow.base_branch`. Do NOT open per-story PRs.
 
 7. **Sequential execution.** Follow **`references/sequential-execution.md`** for the step-by-step workflow within each story, sidecar injection at the review step, episode records, gate checks, and respawn monitoring.
 
@@ -272,7 +305,11 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
    [debug] handoff: story={story_id} target={target} verdict={verdict} duration={duration_ms}ms
    ```
 
-7b. **Update story status in the task tracker.** When a story advances through a workflow phase that warrants an externally-visible status change (e.g., research → in-progress, review → in-review, integrate → done), call the dispatch module. This is a no-op when `task_tracking.adapter` is unset.
+7b. **Project dispatch status.** After a story is successfully dispatched or claimed for work by the selected execution mode, write `/execute`'s owned lifecycle transition from [`status-lifecycle.md`](../../hive/references/status-lifecycle.md): update that story YAML's `status:` projection from `pending` to `in_progress`.
+
+    This write is gated on dispatch success. Do not write `in_progress` before the story is actually handed to a teammate/session/sandcastle/Multica/CC Workflows runner, and do not write it when dispatch fails, is skipped, or is blocked by dependency gating. `/execute` does not own `in_review`, `complete`, or `shipped`; terminal workflow completion and integrate success must not be projected as story `complete`.
+
+    When `task_tracking.adapter` is configured, mirror only this owned `in_progress` transition to the task tracker via the dispatch module. This is a no-op when `task_tracking.adapter` is unset.
 
     Only stories with a populated `tracker_id` (written by `plan` Phase D) are eligible. The dispatch module owns gate_mode behavior, telemetry, and error mapping — do not branch on the adapter vendor here.
 
@@ -302,9 +339,65 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
 7d. **Multica story close (integrate hook).** Immediately after the `integrate` step's commit+push completes, the integrate step file calls `closeStoryIssue({epic_id, story_id})` from `hive/lib/multica-issue-closer.mjs`. This hook is gated on `task_tracking.adapter === 'multica'` (read from root `hive.config.yaml`); other values (including null / unset) skip with a one-line `[gate_mode]` log. The hook is also skipped for dry-run invocations and when /execute is in `--simulated-manual` mode. On any `ok: false` result, one warn line is emitted and /execute continues — this hook never blocks story completion. The full gate logic and log-line templates live in the integrate step file (`hive/workflows/steps/development-classic/step-08-integrate.md` §6a).
 
-8. After all stories complete, produce a summary plus the post-run audit:
+7e. **Epic finalize — version bump and changelog.** After the last story's integrate step has completed successfully, and before the final run summary, read `version_bump` from the loaded `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`.
 
-   1. **Run summary** — existing behavior: list completed stories, any failed/blocked, and final status.
+   - If `version_bump` is absent, treat it as `none` and emit:
+
+     ```
+     [info] finalize: epic.yaml has no version_bump; treating as none
+     ```
+
+   - If `version_bump: none`, perform a clean no-op: do not edit any version source, do not add a changelog release entry, do not create a finalize commit. Continue to step 8.
+
+   - If `version_bump` is one of `major`, `minor`, or `patch`, compute the next SemVer from the current lockstep version. Version sources are:
+     - every JSON file matching `.claude-plugin/*.json`;
+     - `plugin.json` at the repository root when present.
+
+     Parse each JSON file with a structured JSON parser. Collect every `version` field recursively (for example `.claude-plugin/marketplace.json` has both a root `version` and nested plugin metadata). All discovered values MUST be identical before bumping. If they differ, stop finalize and report the mismatched path/key/value set; do not partially edit files.
+
+   - Apply the computed new version to every discovered `version` field in those sources, preserving JSON formatting conventions already present in the file.
+
+   - Write a changelog entry under `## [Unreleased]` in `CHANGELOG.md` for this epic. The entry MUST name the epic ID, the bump level, and the old/new version pair, for example:
+
+     ```markdown
+     ### Changed
+
+     - **`{epic-id}` release finalization.** `/execute` applied the planned `{version_bump}` version bump (`{old_version}` → `{new_version}`) and kept plugin version sources in lockstep.
+     ```
+
+     If `## [Unreleased]` already contains the appropriate category heading, append under it instead of duplicating the heading.
+
+   - Commit the version-source and changelog changes together in one finalize commit. Stage only the targets that exist — a literal `git add` of a missing path or an unmatched glob errors out — so build the add-list from the version sources actually present plus `CHANGELOG.md` when present:
+
+     ```bash
+     # Collect only existing targets (globs that match nothing are dropped).
+     targets=()
+     for f in .claude-plugin/*.json plugin.json CHANGELOG.md; do
+       [ -e "$f" ] && targets+=("$f")
+     done
+     if [ ${#targets[@]} -gt 0 ]; then
+       git add "${targets[@]}"
+     fi
+     git commit -m "chore(release): bump plugin version for {epic-id}"
+     ```
+
+     If there are no diffs after applying the bump and changelog entry (nothing staged), report `[info] finalize: version bump already applied for {epic-id}` and do not commit.
+
+8. After step 6g exits with `next_unblocked` empty AND `in-flight` empty, produce summary + audit + PR:
+
+   0. **Epic PR.** If `task_tracking.adapter` does not own PR creation AND `failed` is empty (full-pass run), open one PR per the branch + worktree + PR convention (step 6h):
+
+      ```sh
+      gh pr create \
+        --base ${epic.git_flow.base_branch:-develop} \
+        --head ${epic.git_flow.branch:-feat/<epic-id>} \
+        --title "feat(<epic-id>): <epic.title>" \
+        --body "Closes epic <epic-id>. Stories: <comma-list of completed story-ids>."
+      ```
+
+      Capture the returned PR URL in the run summary. If `failed` is non-empty (partial-epic), skip PR open and surface unreachable downstream stories per step 6g's partial-epic verdict.
+
+   1. **Run summary** — existing behavior: list completed stories, any failed/blocked, and final status. Include PR URL when step 8.0 opened one.
 
    2. **Post-run audit** — scan this run's resolved state per `hive/references/gate-lift-telemetry.md`:
       - `gate_lift_fired` (true if step 1 took the warning branch and synthesized an ad-hoc plan)
@@ -373,7 +466,8 @@ greenfield/early projects and logs once per run. No new error handling
 - **`references/sequential-execution.md`** — Per-story workflow steps, sidecar injection at review, episode records, gate checks
 - `hive/references/agent-teams-guide.md` — Team mechanics and limitations
 - `hive/references/methodology-routing.md` — Methodology selection
-- `hive/references/episode-schema.md` — Status marker format. **Story state is derived from these markers — do NOT free-write `status:` in story YAMLs.** When a workflow step completes, write the corresponding episode marker; story-level state is computed from the marker set per the schema. The free-write `status:` field in some legacy story YAMLs is deprecated (per `feedback_story_status_stale`).
+- `hive/references/episode-schema.md` — Status marker format. Episode markers remain the authoritative evidence for workflow steps; story YAML `status:` is a lifecycle projection and may be written only for command-owned transitions defined in `status-lifecycle.md`.
+- `hive/references/status-lifecycle.md` — Canonical command-owned story lifecycle; `/execute` owns only the success-gated `pending -> in_progress` dispatch projection.
 
 ### Per-step token budgets (advisory caps)
 

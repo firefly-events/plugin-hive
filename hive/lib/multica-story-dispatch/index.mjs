@@ -137,15 +137,36 @@ export function __resetCache() {
   AGENT_CACHE.clear();
 }
 
+function resolveCodexInstruction(options) {
+  const { codexInstruction = false, dispatchingPersona, agents, agentBackends } = options;
+  if (dispatchingPersona !== undefined && dispatchingPersona !== null) {
+    const entry = Array.isArray(agents)
+      ? agents.find((a) => a?.name === dispatchingPersona)
+      : null;
+    const effectiveProvider = entry?.provider ?? 'claude';
+    if (effectiveProvider === 'codex') return false;
+    return agentBackends?.[dispatchingPersona] === 'codex';
+  }
+  return codexInstruction;
+}
+
+// Single-quote a git ref for safe interpolation into the rendered shell snippets.
+// Git refs may legally contain shell metacharacters (e.g. `$`, `;`, `(`), so quote
+// once and escape embedded single quotes the POSIX way ('\'').
+function shQuoteRef(ref) {
+  return `'${String(ref).replace(/'/g, "'\\''")}'`;
+}
+
 export function serializeStoryBrief(story, options = {}) {
-  const { codexInstruction = false } = options;
+  const { integrationBranch = null } = options;
+  const showCodexInstruction = resolveCodexInstruction(options);
   const sections = [];
 
   if (story?.description) {
     sections.push(`## Goal\n${cleanText(story.description)}`);
   }
 
-  if (codexInstruction) {
+  if (showCodexInstruction) {
     sections.push(
       `## Use /codex:rescue\nThis story is routed through the Codex backend. For implementation work, invoke the /codex:rescue skill with the story spec from this brief rather than writing code directly. Return changes for the orchestrator to commit.`,
     );
@@ -165,6 +186,47 @@ export function serializeStoryBrief(story, options = {}) {
 
   if (hasItems(story?.references)) {
     sections.push(`## References\n${story.references.map(formatReference).join('\n')}`);
+  }
+
+  sections.push(
+    [
+      `## Insight Capture`,
+      `Before finishing, write any distilled implementation insights to \`.hive/insights/${story?.id ?? '<story-id>'}.md\` inside your repo checkout work_dir.`,
+      ``,
+      `Capture only non-obvious, reusable learning: surprises, gotchas, decisions and why, or things the next agent should know. Do not write a task recap or routine completion summary.`,
+    ].join('\n'),
+  );
+
+  if (integrationBranch) {
+    const qBranch = shQuoteRef(integrationBranch);
+    sections.push(
+      [
+        `## Integration Contract — single shared branch`,
+        ``,
+        `Work directly on \`${integrationBranch}\` (the epic branch). Do NOT use the daemon's auto-created \`agent/developer/<task>\` worktree branch as your commit target.`,
+        ``,
+        `**First action (overrides daemon checkout):**`,
+        '```sh',
+        `git fetch origin ${qBranch}`,
+        `git checkout ${qBranch}`,
+        `git reset --hard origin/${qBranch}`,
+        '```',
+        ``,
+        `**After completing all acceptance criteria:**`,
+        '```sh',
+        `git add <specific files for this story>`,
+        `git commit -m "[${story?.id ?? '<story-id>'}] <type>(<scope>): <description>"`,
+        `# fetch + rebase to handle peer dispatches landing concurrently`,
+        `git fetch origin ${qBranch}`,
+        `git rebase origin/${qBranch}`,
+        `git push origin HEAD:${qBranch}`,
+        '```',
+        ``,
+        `**If push rejected (non-fast-forward):** re-run \`git fetch + git rebase + git push\`. Retry up to 3 times. If conflict on rebase, STOP and post the conflict diff as a comment — this means the parallel-dispatch gate let an overlapping story through and orchestrator must adjudicate.`,
+        ``,
+        `**Final comment on this issue MUST include:** commit SHA(s) you pushed.`,
+      ].join('\n'),
+    );
   }
 
   sections.push(
@@ -221,6 +283,184 @@ export async function dispatchStoryToAgent(serverUrl, token, workspaceId, issueU
     token,
     body: { assignee_type: 'agent', assignee_id: agentUuid },
   });
+}
+
+function normalizePersonaDispatches(personaIssues) {
+  if (Array.isArray(personaIssues)) {
+    return personaIssues.map((entry) => ({
+      persona: entry?.persona ?? entry?.agent ?? entry?.name,
+      issueUuid: entry?.issueUuid ?? entry?.issue_uuid ?? entry?.issueId ?? entry?.issue_id,
+    }));
+  }
+
+  return Object.entries(personaIssues ?? {}).map(([persona, issueUuid]) => ({
+    persona,
+    issueUuid,
+  }));
+}
+
+export async function dispatchStoryToPersonas(
+  serverUrl,
+  token,
+  workspaceId,
+  story,
+  personaIssues,
+  options = {},
+) {
+  const {
+    agents = [],
+    agentBackends = options.agent_backends ?? {},
+    integrationBranch = null,
+    moveOutOfBacklog = true,
+  } = options;
+  // Routing-contract rendering must reflect the actual agent the issue is assigned to.
+  // Fall back to the populated AGENT_CACHE when the caller omits options.agents so the
+  // rendered /codex:rescue (or absence thereof) matches the resolved agent's provider.
+  const resolvedAgents =
+    agents.length > 0 ? agents : AGENT_CACHE.get(cacheKey(serverUrl, workspaceId, token)) ?? [];
+  const dispatches = [];
+
+  for (const entry of normalizePersonaDispatches(personaIssues)) {
+    const { persona, issueUuid } = entry;
+    if (!persona) {
+      throw dispatchError('INVALID_PERSONA_DISPATCH', 'persona dispatch is missing persona', undefined, token);
+    }
+    if (!issueUuid) {
+      throw dispatchError(
+        'INVALID_PERSONA_DISPATCH',
+        `persona dispatch for '${persona}' is missing issue UUID`,
+        undefined,
+        token,
+      );
+    }
+
+    const agentUuid = await resolveAgentUuidByName(serverUrl, token, workspaceId, persona);
+    const briefAgents =
+      resolvedAgents.length > 0
+        ? resolvedAgents
+        : AGENT_CACHE.get(cacheKey(serverUrl, workspaceId, token)) ?? [];
+    const brief = serializeStoryBrief(story, {
+      dispatchingPersona: persona,
+      agents: briefAgents,
+      agentBackends,
+      integrationBranch,
+    });
+    const briefResult = await ensureIssueBriefMatches(serverUrl, token, workspaceId, issueUuid, brief);
+    const issue = await dispatchStoryToAgent(serverUrl, token, workspaceId, issueUuid, agentUuid);
+    const backlogResult = moveOutOfBacklog
+      ? await moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, issueUuid)
+      : { was_moved: false };
+
+    dispatches.push({
+      persona,
+      issue_uuid: issueUuid,
+      agent_uuid: agentUuid,
+      was_updated: briefResult.was_updated,
+      was_moved: backlogResult.was_moved,
+      issue,
+    });
+  }
+
+  return {
+    carrier: 'per-persona-fan-out',
+    dispatches,
+  };
+}
+
+function squadsUrl(serverUrl, workspaceId) {
+  return `${trimTrailingSlash(serverUrl)}/api/squads?workspace_id=${encodeURIComponent(workspaceId)}`;
+}
+
+export async function resolveSquadUuidByName(serverUrl, token, workspaceId, squadName) {
+  const body = await httpJson(squadsUrl(serverUrl, workspaceId), { token });
+  const squads = normalizeList(body, 'squads');
+  if (squads.length === 0) {
+    throw dispatchError('BOOTSTRAP_REQUIRED', 'no Multica squads in workspace; create the squad before running squad mode', undefined, token);
+  }
+  const match = squads.find((squad) => squad?.name === squadName);
+  if (match?.id) return String(match.id);
+  const available = squads.map((squad) => squad?.name).filter(Boolean).join(', ');
+  throw dispatchError('BOOTSTRAP_REQUIRED', `squad '${squadName}' not found in workspace; available: [${available}]`, undefined, token);
+}
+
+export async function dispatchStoryToSquad(serverUrl, token, workspaceId, issueUuid, squadUuid) {
+  return httpJson(issueUrl(serverUrl, workspaceId, issueUuid), {
+    method: 'PUT', token, body: { assignee_type: 'squad', assignee_id: squadUuid },
+  });
+}
+
+// ── Orchestrator-driven TDD phase loop (X / floor-manager) ────────────────────
+// The /execute orchestrator is the long-lived stateful leader. It runs the TDD
+// loop itself and hands the work tree between phases via a shared remote story
+// branch (each phase clones + checks out the branch, commits, pushes). No leader
+// agent; workers are stateless, one clone per task.
+
+// Build the per-story branch name, e.g. fir/embers-rename/s1-convex-module.
+export function resolveStoryBranch(epicId, storyId, prefix = 'fir') {
+  const clean = (s) => String(s ?? '')
+    .trim()
+    .replace(/[^A-Za-z0-9._/-]+/g, '-')
+    .replace(/\.{2,}/g, '.')          // collapse `..` (git rejects)
+    .replace(/\.lock$/i, '')          // refs may not end in `.lock`
+    .replace(/^[-.]+|[-.]+$/g, '')    // trim leading/trailing `-` and `.`
+    || 'untitled';                    // never emit an empty segment
+  return `${clean(prefix)}/${clean(epicId)}/${clean(storyId)}`;
+}
+
+const PHASE_DIRECTIVES = {
+  red: 'PHASE RED — write failing test(s) that encode the story acceptance criteria. Do NOT implement production code. Run the tests and CONFIRM they fail. Commit message: `test(<story>): red`.',
+  green: 'PHASE GREEN — implement the minimum production code to make the red test(s) pass. Do not over-build. Run the tests and confirm they pass. Commit message: `feat(<story>): green`.',
+  review: 'PHASE REVIEW — review the accumulated diff against the acceptance criteria AND any "do NOT change" / decision-lock guards in this brief. Write findings to a REVIEW.md (or note "REVIEW: clean"). Do not change production code; only record findings. Commit if REVIEW.md changed.',
+  refactor: 'PHASE REFACTOR — apply the REVIEW.md notes, dedupe, and tidy. Tests MUST stay green. Commit message: `refactor(<story>): cleanup`.',
+};
+
+// Produce one phase's brief: story context + phase directive + git protocol.
+// opts: { storyBranch, baseBranch, repoUrl, isFirst, priorSummaries, cloneDepth, sparsePaths }
+//   cloneDepth  — shallow clone depth (default 20: covers the story's phase commits +
+//                 base for diff-vs-base, while skipping the monorepo's full history).
+//   sparsePaths — optional array of paths for cone sparse-checkout (cuts working-tree
+//                 size on large monorepos). Omit when phases run package-wide build/test
+//                 that needs the whole package tree.
+export function serializePhaseBrief(story, phase, opts = {}) {
+  const {
+    storyBranch, baseBranch = 'development', repoUrl, isFirst = false,
+    priorSummaries = [], cloneDepth = 20, sparsePaths = [],
+  } = opts;
+  const directive = PHASE_DIRECTIVES[phase] ?? `PHASE ${String(phase).toUpperCase()}`;
+  const ac = Array.isArray(story?.acceptance_criteria) ? story.acceptance_criteria : [];
+  const url = repoUrl ?? '<repoUrl>';
+  // First phase clones the BASE branch (story branch doesn't exist yet) then forks it;
+  // later phases clone the story branch directly. Shallow + single-branch keeps it fast.
+  const cloneBranch = isFirst ? baseBranch : storyBranch;
+  const git = [
+    `git clone --depth ${cloneDepth} --single-branch --branch ${cloneBranch} ${url}`,
+    `cd "$(basename ${url} .git)"`,
+  ];
+  if (Array.isArray(sparsePaths) && sparsePaths.length) {
+    git.push(`git sparse-checkout set --cone ${sparsePaths.join(' ')}`);
+  }
+  if (isFirst) git.push(`git checkout -b ${storyBranch}`);
+  git.push(
+    '# ... perform ONLY this phase\'s work ...',
+    'git add -A && git commit -m "<phase-scoped message>"',
+    `git push -u origin ${storyBranch}`,
+  );
+  const sections = [
+    `# Story ${story?.id ?? ''}: ${story?.title ?? ''} — ${directive.split(' — ')[0]}`,
+    `## Directive\n${directive}`,
+    story?.description ? `## Story context\n${String(story.description).trim()}` : '',
+    ac.length ? `## Acceptance criteria (whole story)\n${ac.map((c) => `- ${c}`).join('\n')}` : '',
+    priorSummaries.length ? `## Prior phases delivered\n${priorSummaries.map((s) => `- ${s}`).join('\n')}` : '',
+    [
+      '## Git protocol — REQUIRED',
+      'Work in your task work_dir. The work tree travels via the remote branch — you MUST clone (shallow), do ONLY this phase, then commit and push. A shallow clone can still push new commits.',
+      '```sh',
+      ...git,
+      '```',
+      'If the clone/branch is missing expected prior-phase files, STOP and report — do not improvise.',
+    ].join('\n'),
+  ].filter(Boolean);
+  return sections.join('\n\n');
 }
 
 export async function moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, issueUuid) {

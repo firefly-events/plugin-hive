@@ -1,0 +1,176 @@
+step_id: review
+status: completed
+timestamp: "2026-06-07T13:00:00Z"
+reviewer: reviewer
+change_verdict: needs_optimization
+rubric_id: default-reviewer-rubric
+audit_walk: "complete (AC 5/5 evidenced, refs 5/5 re-read)"
+artifacts:
+  - hive/workflows/steps/test-swarm/step-04b-scenario-replay.md
+  - hive/workflows/test-swarm.workflow.yaml
+  - skills/test/SKILL.md
+  - .pHive/cross-cutting-concerns.yaml
+  - .pHive/test-scenarios/t-1b-step-04b-and-rip-simulated-manual.yaml
+  - hive/workflows/steps/test-swarm/__tests__/step-04b-scenario-replay.test.mjs
+
+criteria:
+  - id: spec-fidelity
+    severity: critical
+    outcome: pass
+    evidence: |
+      AC1 (--simulated-manual ripped): grep on skills/test/SKILL.md returns 0 matches; flag is fully absent.
+      AC2 (step-04b between worker and inspector): test-swarm.workflow.yaml:93-112 declares scenario-replay
+        with depends_on:[execute-platform-a] (line 101-102) and validate-coverage.depends_on:[scenario-replay]
+        (line 121-122); validate-coverage no longer references execute-platform-a directly.
+      AC3 (simulated-manual block retired): .pHive/cross-cutting-concerns.yaml has no id:simulated-manual;
+        a scenario-replay-folded entry at lines 106-119 carries status:retired, retired_by, and folded_into
+        pointer at step-04b file.
+      AC4 (pipeline table reflects swarm-only with step-04b): skills/test/SKILL.md:42 has the row
+        "4b. Scenario Replay | test-inspector | step-04b-scenario-replay.md | Load worker results via
+        loadResults; emit replay_summary for inspector". No simulated-manual fork remains.
+      AC5 (HIVE_TEST_MODE inline resolver gone): grep on skills/test/SKILL.md returns 0 matches.
+        Phase 0 (lines 16-20) now delegates to skills/hive/skills/test-dispatch/SKILL.md.
+
+  - id: domain-compliance
+    severity: critical
+    outcome: pass
+    evidence: |
+      Modified files: skills/test/SKILL.md, hive/workflows/test-swarm.workflow.yaml,
+      .pHive/cross-cutting-concerns.yaml, plus newly created step-04b-scenario-replay.md,
+      step-04b-scenario-replay.test.mjs, test-scenario YAML, and memory files. All match
+      files_to_modify in the story spec or are within standard insight-capture / episode-marker
+      conventions. No out-of-scope edits.
+
+  - id: security
+    severity: critical
+    outcome: pass
+    evidence: |
+      Read-only step that consumes a YAML artifact. No input from user/untrusted source.
+      loadResults validates the envelope via the existing t-1a loader; FILE_NOT_FOUND /
+      YAML_PARSE_ERROR / VALIDATION_ERROR codes surface cleanly. No path traversal or
+      injection risk.
+
+  - id: architecture
+    severity: critical
+    outcome: pass
+    evidence: |
+      step-04b sits BETWEEN execute-platform-a (worker) and validate-coverage (inspector),
+      which is exactly the t-1a insertion point. The edge severance (validate-coverage no
+      longer directly depends on execute-platform-a) is correct — single-fan-in chain
+      execute-platform-a -> scenario-replay -> validate-coverage.
+      compile-report still depends_on:[execute-platform-a, execute-platform-b, file-bugs,
+      triage-failures, validate-coverage] (workflow.yaml:254-259) — that fan-in is unchanged
+      and validate-coverage's downstream contract is preserved.
+      file-bugs (step-05-sentinel) still depends_on:[execute-platform-a, execute-platform-b]
+      (lines 201-203), so its contract with the worker is untouched — step-04b is read-only
+      with respect to results.yaml so the sentinel path is unaffected.
+      Step file follows the existing step-XX-NAME.md pattern (MANDATORY EXECUTION RULES,
+      EXECUTION PROTOCOLS, CONTEXT BOUNDARIES, YOUR TASK, TASK SEQUENCE, SUCCESS METRICS,
+      FAILURE MODES, NEXT STEP) — structurally matches step-04-inspector.md.
+      DAG step-id ("scenario-replay") follows existing hyphenated-lowercase convention
+      (gather-context, verify-baseline, author-tests, execute-platform-a, validate-coverage,
+      file-bugs, triage-failures, compile-report). step_file path is the canonical
+      step-04b-scenario-replay.md form.
+
+  - id: convention-adherence
+    severity: improvement
+    outcome: pass
+    evidence: |
+      Tests use node:test + node:assert/strict and live in __tests__/ sibling dir
+      (matches the test convention noted in the researcher memory). 16/16 pass in ~94ms.
+      Step file frontmatter and section headings match step-04-inspector.md template.
+      Workflow YAML insertion preserves field ordering (id, agent, step_file, task,
+      depends_on, inputs, outputs, optional, timeout_ms).
+      Step file step_id ("scenario-replay") is keyed independently from step_file name
+      ("step-04b-scenario-replay.md") per the reviewer memory on edge-keyed-by-step-id.
+
+  - id: performance
+    severity: improvement
+    outcome: pass
+    evidence: |
+      One YAML read + array iteration over results[]. O(n) on the number of test cases —
+      well within the workflow timeout (300s declared, observed ~94ms in tests).
+
+  - id: test-coverage
+    severity: improvement
+    outcome: fail
+    evidence: |
+      Tests cover 16 cases across all 5 ACs (loader contract, output shape, DAG assertions).
+      However, two issues found:
+
+      (1) t-1a load.test.mjs has a stale assertion ("validate-coverage depends_on
+      execute-platform-a") that now fails because t-1b severed that edge.
+      `node --test hive/lib/scenarios/__tests__/load.test.mjs` reports 11/12 pass, 1 fail.
+      The developer flagged this in test.yaml notes as cross-story DAG sequencing artifact
+      and proposed reconciling in a future story. The t-1b tests are authored correctly
+      and assert the final state independently, but the repository as a whole has a
+      regressed test until the t-1a assertion is updated. This should be fixed before
+      t-1b's integrate commit lands so that `node --test hive/lib/scenarios/__tests__/`
+      stays green on the integration branch.
+
+      (2) The test-scenario YAML at .pHive/test-scenarios/t-1b-step-04b-and-rip-simulated-manual.yaml
+      does NOT validate against the loader (`loadScenario`). The in-house YAML parser in
+      hive/lib/scenarios/load.mjs does not handle `>` folded scalars; the step at
+      index 6 (lines 76-86) contains an `expected:` block where the folded content
+      includes literal "id: scenario-replay-folded ..." which the parser misreads as
+      a sub-key, raising VALIDATION_ERROR "unrecognized field 'steps[6].id'".
+      AC for the scenario step ("CREATE — test-scenario per test-scenario-schema.md")
+      requires the file to conform to the schema; the loader is the schema authority.
+      Either rewrite the offending expected: blocks to avoid embedded "id:" / "status:"
+      tokens, or quote/restructure to prevent the parser misreading them as keys.
+      Until reconciled the scenario file is non-loadable.
+
+findings:
+  improvements:
+    - category: test-coverage
+      severity: improvement
+      location: hive/lib/scenarios/__tests__/load.test.mjs:344
+      issue: |
+        Stale assertion from t-1a: "validate-coverage.depends_on must contain execute-platform-a"
+        now fails because t-1b correctly retargets validate-coverage to depend on scenario-replay.
+        Cross-story DAG sequencing artifact.
+      suggestion: |
+        Update the assertion to match the post-t-1b graph: validate-coverage.depends_on must
+        contain scenario-replay (not execute-platform-a). This is a 1-line fix to the existing
+        t-1a test and should be folded into t-1b's integrate commit so the integration branch
+        stays green.
+
+    - category: test-coverage
+      severity: improvement
+      location: .pHive/test-scenarios/t-1b-step-04b-and-rip-simulated-manual.yaml:76-86
+      issue: |
+        The step at index 6 (step 7 in the YAML) has an `expected:` folded-scalar block
+        containing literal "id: scenario-replay-folded" and "status: retired" tokens.
+        The in-house YAML parser used by loadScenario (hive/lib/scenarios/load.mjs) does
+        not understand `>` folded scalars and re-reads the indented content as nested
+        sub-keys, raising VALIDATION_ERROR `unrecognized field 'steps[6].id'`.
+        The scenario file does not validate against the loader.
+      suggestion: |
+        Rewrite the offending expected: block to remove embedded `id:` / `status:` tokens
+        (e.g. quote the keys as 'id\\:' or restructure the prose to say "an entry whose id is
+        scenario-replay-folded and whose status is retired"). Verify via:
+        `node -e "import('./hive/lib/scenarios/load.mjs').then(m =>
+          { const s = m.loadScenario('.pHive/test-scenarios/t-1b-step-04b-and-rip-simulated-manual.yaml');
+            console.log('OK ' + s.id); })"`
+        before integrate.
+
+  critical: []
+
+summary: |
+  Implementation is functionally correct on all five ACs. step-04b sits between worker
+  and inspector with correct depends_on edges; --simulated-manual and HIVE_TEST_MODE are
+  fully absent from skills/test/SKILL.md; cross-cutting-concerns retirement is clean
+  with a forwarding pointer; pipeline table reflects swarm-only flow with step-04b;
+  Phase 0 delegates to test-dispatch. The step file follows the existing step-XX-NAME.md
+  pattern and the DAG step_id follows project hyphenated-lowercase convention.
+
+  Two non-blocking improvements: (a) the t-1a load.test.mjs has a stale DAG assertion
+  that t-1b's edge severance regressed — fix in t-1b's integrate commit so the
+  integration branch stays green; (b) the t-1b test-scenario YAML embeds literal
+  "id:" / "status:" tokens inside a folded `expected:` block that the in-house YAML
+  parser misreads as sub-keys, so the scenario file fails loadScenario validation.
+  Neither blocks the spec-fidelity verdict (all ACs are mechanically met) but both
+  should land before integrate to leave the repo in a green state.
+
+  Verdict: needs_optimization (no critical fails; two improvement-severity failures
+  in test-coverage criterion).

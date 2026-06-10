@@ -2,7 +2,7 @@ id: BL2i.1
 epic: meta-improvement-system
 slice: S8
 title: Meta-meta backlog schema and seeded trivial candidates
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: ["A1.5", "L1.3"]

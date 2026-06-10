@@ -1,7 +1,7 @@
 id: S4.5-nail-tech-assistant-onboarding-backfill
 epic: kg-signal-revival
 title: Onboard Nail Tech Assistant + backfill (path-with-space test)
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [S4.4-signal-flayr-onboarding-backfill]

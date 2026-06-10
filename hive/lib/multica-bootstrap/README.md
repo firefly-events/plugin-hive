@@ -37,8 +37,17 @@ Returns `{ running, pid }`.
 Loads desired agents from `agentsConfigPath`, fetches current agents, resolves
 runtime ids from `GET /api/runtimes`, resolves persona instructions via
 `hive/lib/multica-agents-config`, then creates or updates only what differs.
-Returns `{ created, patched, skipped }`.
-Existing agents not listed in the config are left untouched.
+Returns `{ created, patched, skipped, removed }`.
+Existing agents not listed in the config are left untouched (logged as warnings).
+### `reconcileSkills({ serverUrl, token, workspaceId, skillsConfigPath, repoRoot, consent })`
+Loads desired skill exports from `skillsConfigPath` (`.pHive/multica/skills-export.yaml`).
+For each export entry reads `skill_ref` + all `substrate_deps` from the filesystem,
+bundles them into a single content string, computes a SHA-256 `content_hash`, and
+creates or updates the skill in Multica only when the hash or visibility differs.
+Returns `{ created, patched, skipped, removed }`.
+Skills not listed in the config are left untouched (logged as warnings, never deleted).
+Path validation runs before any network call — a missing `skill_ref` or `substrate_dep`
+aborts the full reconcile with a `VALIDATION_ERROR` rather than performing a partial import.
 ## Consent Contract
 Every state-changing operation must receive `consent: true`.
 Without consent, helpers throw:

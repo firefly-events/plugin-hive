@@ -1,0 +1,60 @@
+id: w1-1-persona-dispatchability-doc
+epic: multica-substrate-deepen
+title: Classify all 25 plugin-hive personas by Multica dispatchability
+status: pending
+complexity: low
+methodology: classic
+depends_on:
+- w0-1-codex-spike
+parallel_allowed: true
+parallel_rationale: read-only
+description: "Write a per-persona classification at\n.pHive/epics/multica-substrate-deepen/docs/persona-dispatchability.md\nusing the criterion: \"produces useful output from one bounded task input\nwithout spawning subagents.\"\n\nEach of the 25 personas in hive/agents/ gets one line: name + verdict\n(dispatchable / harness-only) + rationale.\n\nExpected exclusions per grill H3 + design discussion \xA72 Phase A:\norchestrator, team-lead, pair-programmer. Possibly peer-validator\n(verifies others' work \u2014 borderline; requires test dispatch to confirm).\n\nThe doc is consumed by W1.2 (agents.yaml expansion) to determine the\nbootstrap subset.\n"
+acceptance_criteria:
+- Doc exists at .pHive/epics/multica-substrate-deepen/docs/persona-dispatchability.md
+- All 25 personas in hive/agents/ classified with verdict + one-line rationale
+- Dispatchable subset count documented at top of file
+- Borderline cases (e.g., peer-validator) include the test-dispatch result as rationale
+- Doc reviewed by architect persona before W1.2 starts
+steps:
+- id: research
+  description: Read all 25 persona files; apply classification criterion
+  agent: researcher
+- id: implement
+  description: Write classification doc with verdicts + rationales
+  agent: technical-writer
+  depends_on:
+  - research
+- id: review
+  description: Architect reviews for criterion-application consistency
+  agent: architect
+  depends_on:
+  - implement
+- id: integrate
+  description: Commit on feat/multica-substrate-deepen
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/agents/
+    purpose: 25 persona definitions to classify
+  - path: .pHive/epics/multica-substrate-deepen/docs/grill-record.md
+    purpose: Grill H3 finding on classification criterion
+cross_cutting:
+- concern: documentation
+  action: Doc itself satisfies documentation concern
+risks:
+- severity: low
+  description: Classification disputes
+  mitigation: Architect review; user can override at any subsequent story
+metric:
+  applies: false
+  justification: Classification artifact; downstream w1-2 carries the persona-port delivery metric.
+tracker_id: plugin-hive/PLU-133
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3d)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep as the Multica-specific dispatchability inventory; first-party CC has its own later reclassification, but this document still governs the second-party agent manifest.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd

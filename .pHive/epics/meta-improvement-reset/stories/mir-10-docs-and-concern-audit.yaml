@@ -1,7 +1,7 @@
 id: mir-10-docs-and-concern-audit
 epic: meta-improvement-reset
 title: Audit cross-cutting metrics concern + docs sweep + CHANGELOG
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 tracker_id: plugin-hive/PLU-72

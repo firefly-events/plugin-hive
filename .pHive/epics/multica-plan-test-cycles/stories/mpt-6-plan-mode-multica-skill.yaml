@@ -1,0 +1,80 @@
+id: mpt-6-plan-mode-multica-skill
+epic: multica-plan-test-cycles
+title: Build plan-mode-multica atomic skill + plan dispatch-mode resolve
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- mpt-4-doc-verdict-done-signal-marker
+- mpt-5-dispatch-carrier-helper
+description: 'S4. Build skills/hive/skills/plan-mode-multica/SKILL.md, atomic and symmetric with execute-mode-multica:
+  dispatch the assembled planning personas via the mpt-5 carrier, poll to terminal, write episode markers
+  using the mpt-4 doc done-signal. Add a thin plan dispatch-mode resolve triggered by env HIVE_PLANNING_MODE
+  or root hive.config.yaml planning.mode: multica (mirroring HIVE_EXECUTION_MODE / execution.mode).'
+acceptance_criteria:
+- 'Given planning.mode: multica (or HIVE_PLANNING_MODE), when /plan Phase 0 resolves spawn, then plan-mode-multica
+  is selected.'
+- Given the skill runs, then it dispatches the planning cell via the carrier, polls to terminal, and writes
+  one episode marker per dispatched unit using the mpt-4 dialect.
+steps:
+- id: research
+  description: Explore the codebase for relevant patterns, files, and constraints.
+  agent: researcher
+- id: implement
+  description: Implement the story per spec and research findings.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Write/verify tests covering acceptance criteria.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Review implementation and tests for correctness and convention compliance.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit and push to the feature branch (fresh-checkout/rebase-push per integration principle).
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: skills/hive/skills/execute-mode-multica/SKILL.md
+    purpose: Symmetry template to mirror.
+files_to_modify:
+- file: skills/hive/skills/plan-mode-multica/SKILL.md
+  change: NEW — atomic plan dispatch mode skill.
+references:
+- path: .pHive/epics/multica-plan-test-cycles/docs/structured-outline.md
+  relevant_excerpt: Phase-to-slice mapping, file manifest, risk registry.
+- path: .pHive/epics/multica-plan-test-cycles/docs/design-discussion.md
+  relevant_excerpt: §9 locked gate decisions (full-mirror seam, squad-spike-first, plan->execute->test
+    framing).
+- path: .pHive/epics/multica-plan-test-cycles/docs/vertical-plan.md
+  relevant_excerpt: 6-slice spine S1..S6 with depends_on + working states.
+risks:
+- severity: medium
+  description: Backend split lost if carrier integration is sloppy.
+  mitigation: Reuse mpt-5 carrier which encodes the split; add a routing assertion.
+cross_cutting:
+- concern: documentation
+  action: 'Document planning.mode: multica + HIVE_PLANNING_MODE in the /plan + config reference.'
+- concern: versioning
+  action: Additive new skill + new config key -> minor bump (TPM confirms).
+metric:
+  applies: false
+  justification: New atomic dispatch skill; the deliverable is the dispatch capability itself, exercised
+    end-to-end in mpt-8/mpt-11 rather than a standalone measurable number.
+tracker_id: plugin-hive/PLU-159
+tracker_uuid: aae648ac-2937-435d-9425-8b2f78ed9f90
+tracker_url: http://localhost:3000/issue/PLU-159
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4f)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; provides the atomic plan-mode-multica skill selected by HIVE_PLANNING_MODE=multica or planning.mode: multica.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt

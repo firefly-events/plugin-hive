@@ -1,0 +1,95 @@
+id: mpt-10-wire-test-simulated-manual
+epic: multica-plan-test-cycles
+title: Wire /test --simulated-manual through test-mode-multica
+status: pending
+complexity: low
+methodology: classic
+depends_on:
+- mpt-9-test-mode-multica-skill
+description: 'S5. Wire skills/test/SKILL.md and hive/workflows/steps/test/simulated-manual.md to route
+  the --simulated-manual path through test-mode-multica when test.mode: multica is set; the verdict is
+  written to the canonical story-YAML home (mpt-3). The local executor remains the fallback when the mode
+  is unset.'
+acceptance_criteria:
+- 'Given test.mode: multica, when /test --simulated-manual <story> is invoked, then the scenario replays
+  via a Multica tester and the manual_verdict is written to the story YAML.'
+- Given test.mode unset, when /test --simulated-manual runs, then the existing local executor path is
+  used unchanged.
+steps:
+- id: research
+  description: Explore the codebase for relevant patterns, files, and constraints.
+  agent: researcher
+- id: implement
+  description: Implement the story per spec and research findings.
+  agent: developer
+  depends_on:
+  - research
+- id: scenario
+  description: Author a simulated-manual test scenario YAML under .pHive/test-scenarios/ per hive/references/test-scenario-schema.md
+    (reconciled shape from mpt-2). Set manual_verdict.scenario_ref to the scenario path.
+  agent: tester
+  depends_on:
+  - implement
+- id: test
+  description: Verify acceptance criteria and run the simulated-manual scenario.
+  agent: tester
+  depends_on:
+  - scenario
+- id: review
+  description: Review implementation and tests for correctness and convention compliance.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit and push to the feature branch (fresh-checkout/rebase-push per integration principle).
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: skills/test/SKILL.md
+    purpose: --simulated-manual entrypoint.
+files_to_modify:
+- file: skills/test/SKILL.md
+  change: Route --simulated-manual through test-mode-multica when configured.
+- file: hive/workflows/steps/test/simulated-manual.md
+  change: Add the multica dispatch branch + local fallback.
+references:
+- path: .pHive/epics/multica-plan-test-cycles/docs/structured-outline.md
+  relevant_excerpt: Phase-to-slice mapping, file manifest, risk registry.
+- path: .pHive/epics/multica-plan-test-cycles/docs/design-discussion.md
+  relevant_excerpt: §9 locked gate decisions (full-mirror seam, squad-spike-first, plan->execute->test
+    framing).
+- path: .pHive/epics/multica-plan-test-cycles/docs/vertical-plan.md
+  relevant_excerpt: 6-slice spine S1..S6 with depends_on + working states.
+risks:
+- severity: low
+  description: Regression in the local fallback path.
+  mitigation: Keep local path as default when mode unset; scenario covers both branches.
+cross_cutting:
+- concern: documentation
+  action: Document the multica vs local --simulated-manual routing in /test docs.
+- concern: versioning
+  action: Consumer-visible /test behavior behind opt-in flag -> minor bump.
+- concern: simulated-manual
+  action: 'E2E: confirm /test --simulated-manual replays via Multica tester and writes verdict to story
+    YAML.'
+metric:
+  applies: false
+  justification: Opt-in routing of --simulated-manual through Multica; success is the end-to-end verdict-write
+    behavior asserted by the scenario, not a standalone moved number.
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/mpt-10-test-via-multica.yaml
+  verdict: null
+  timestamp: null
+  agent: null
+tracker_id: plugin-hive/PLU-163
+tracker_uuid: 6819399c-dece-40f3-8899-d133085da016
+tracker_url: http://localhost:3000/issue/PLU-163
+
+# Disposition (cwfp-s4-2 audit, applied by cwfp-s5-4j)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Q3 keep-as-second-party for first release; load-bearing /test --simulated-manual carrier wires mode selection to test-mode-multica with local fallback when unset.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-2-disposition-pass-mpt

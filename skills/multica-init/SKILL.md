@@ -35,7 +35,7 @@ the current Multica API has no write endpoint for workspace repos.
 
 ## What This Skill Does
 
-Run a six-step bootstrap flow:
+Run the bootstrap flow:
 
 1. Check Multica server health with `checkHealth`.
 
@@ -47,9 +47,15 @@ Run a six-step bootstrap flow:
 
 5. Ensure the local daemon is running with `ensureDaemon`.
 
-6. Reconcile configured agents with `reconcileAgents`.
+6. Reconcile exported skills with `reconcileSkills`. This MUST precede agents — `reconcileAgents` resolves the skill names declared in `agents.yaml` to workspace skill IDs, so the skills must already exist.
 
-Step 7, repo allowlist, is deferred.
+7. Reconcile configured agents with `reconcileAgents` (also attaches each agent's declared skills by resolving names to IDs).
+
+8. Reconcile configured squads with `reconcileSquads` (squads depend on agents existing).
+
+9. Reconcile configured autopilots with `reconcileAutopilots`.
+
+Step 10, repo allowlist, is deferred.
 
 The endpoint does not exist in Multica v0.3.4.
 
@@ -129,7 +135,28 @@ Call helpers in this exact order:
 
    Continue only after the daemon is running.
 
-6. `reconcileAgents({ serverUrl, token, workspaceId, agentsConfigPath, repoRoot, consent })`
+6. `reconcileSkills({ serverUrl, token, workspaceId, skillsConfigPath, repoRoot, consent })`
+
+   Run this BEFORE `reconcileAgents`: agents reference skills by name in
+   `agents.yaml`, and those names must resolve to existing workspace skill IDs.
+
+   Default `skillsConfigPath` to `.pHive/multica/skills-export.yaml`.
+
+   If the file does not exist, skip this step silently.
+
+   For each entry, read `skill_ref` content and bundle `substrate_deps` into a single payload.
+
+   Compute `content_hash` (SHA-256) of the normalised bundle.
+
+   Create missing skills.
+
+   Update skills whose `content_hash` or `visibility` differs from the live copy.
+
+   Skip skills whose hash matches.
+
+   Leave Multica skills not listed in `skills-export.yaml` untouched (warn but never delete).
+
+7. `reconcileAgents({ serverUrl, token, workspaceId, agentsConfigPath, repoRoot, consent })`
 
    Load desired agents from `.pHive/multica/agents.yaml`.
 
@@ -143,7 +170,48 @@ Call helpers in this exact order:
 
    Skip unchanged agents.
 
+   Attach each agent's declared `skills` by resolving the names to workspace skill
+   IDs via `PUT /api/agents/{id}/skills`. The `skills` list in `agents.yaml` is
+   authoritative for the attachment. An unknown skill name fails with
+   `SKILL_NOT_FOUND` — run `reconcileSkills` first.
+
    Leave extra Multica agents untouched.
+
+8. `reconcileSquads({ serverUrl, token, workspaceId, squadsConfigPath, consent })`
+
+   Load desired squads from `.pHive/multica/squads.yaml`.
+
+   Default `squadsConfigPath` to `.pHive/multica/squads.yaml`.
+
+   Resolve leader and member names to agent IDs.
+
+   Create missing squads (with leader).
+
+   Add and remove non-leader members to match YAML.
+
+   Update drifted squad metadata (leader change, description change).
+
+   Skip unchanged squads.
+
+   Leave extra Multica squads untouched (warn, never delete).
+
+9. `reconcileAutopilots({ serverUrl, token, workspaceId, autopilotsConfigPath, consent })`
+
+   Load desired autopilots from `.pHive/multica/autopilots.yaml`.
+
+   Resolve agent names to agent IDs.
+
+   Create missing autopilots with their triggers.
+
+   Patch drifted autopilot metadata.
+
+   Reconcile triggers (add/update/delete).
+
+   Capture webhook URLs from webhook triggers and emit them in the run output. They are NOT written back to `autopilots.yaml` (server-assigned runtime values stay out of the tracked manifest).
+
+   Skip unchanged autopilots.
+
+   Leave extra Multica autopilots untouched (warn, never delete).
 
 ## Flags
 
@@ -169,7 +237,7 @@ The slug must contain only lowercase letters, numbers, and hyphens.
 
 ## Status Report Sample
 
-Print a compact final report after all six steps succeed:
+Print a compact final report after all seven steps succeed:
 
 ```text
 Multica bootstrap complete.
@@ -178,6 +246,9 @@ Multica bootstrap complete.
   Workspace: plugin-hive (PLU) - id: 21c6d282-...
   Daemon:    running, PID 94821
   Agents:    3 reconciled (1 created, 1 patched, 1 skipped)
+  Squads:    2 reconciled (1 created, 0 patched, 1 skipped)
+  Autopilots: 2 reconciled (1 created, 0 patched, 1 skipped)
+  Skills:    1 reconciled (1 created, 0 patched, 0 skipped)
 
 Run `multica daemon status` to monitor agent activity.
 ```
@@ -212,9 +283,26 @@ Agent update is skipped when desired fields match Multica state.
 
 Desired agent fields include `runtime_id`, `instructions`, `model`,
 `max_concurrent_tasks`, `visibility`, `thinking_level`, `custom_env`,
-`custom_args`, `mcp_config`, `skills`, and `description`.
+`custom_args`, `mcp_config`, and `description`.
+
+Skill attachment is reconciled separately from the agent body (the `/api/agents`
+body ignores `skills`). The skill names declared in `agents.yaml` are resolved to
+workspace skill IDs and set via the agent skills association, but only when the
+resolved ID set differs from the live attachment (order-insensitive) — so a warm
+re-run issues no skill change.
 
 Agents present in Multica but absent from `.pHive/multica/agents.yaml` are
+extras and must be left untouched.
+
+Squad creation is skipped when a squad with the desired name exists.
+
+Squad update is skipped when leader and description match Multica state.
+
+Member add is skipped when the member already belongs to the squad.
+
+Member remove fires only for members no longer in the desired YAML list.
+
+Squads present in Multica but absent from `.pHive/multica/squads.yaml` are
 extras and must be left untouched.
 
 ## References
@@ -234,6 +322,10 @@ Agent config helper:
 Agent config:
 
 `.pHive/multica/agents.yaml`
+
+Squad config:
+
+`.pHive/multica/squads.yaml`
 
 Multica adapter:
 

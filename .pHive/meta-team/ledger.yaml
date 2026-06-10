@@ -1,30 +1,133 @@
-- experiment_id: meta-2026-05-24
-  date: '2026-05-24'
-  started: '2026-05-24T08:07:28Z'
-  closed: '2026-05-24T08:22:00Z'
-  verdict: discard
-  changes_promoted: 0
+- experiment_id: meta-2026-06-09
+  date: '2026-06-09'
+  started: '2026-06-09T00:00:00Z'
+  closed: '2026-06-09T00:30:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 0
+  top_changes:
+    - ".pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md: appended indexed-for-meta-meta-optimize proving run footer line"
+  commit: 1a070c5c5dcf4e1294e5e5e35c0be10d080a619c
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 48331da5e419e19f5ab7fe233b168c82d333619a
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-09. Analysis found 0 in-scope findings: recent
+    develop changes (PR #253 research/language-strategy, PR #257 status-reconcile)
+    are all outside meta-team scope. All step files complete, agent model IDs
+    current, memory files valid. STUB_DOC hive-cloud-roadmap.md (13 lines) remains
+    out_of_scope (S16 placeholder, 12th+ consecutive deferral). Dedup pre-flight:
+    PR #252 (open, mmo-2026-04-21-001/MANIFEST.md) suppressed candidate 001. Routed
+    to step-03b backlog fallback. Selected candidate mmo-2026-04-21-002: appended
+    indexed-for-meta-meta-optimize proving run footer comment to
+    .pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md. Closure validator passed.
+    Regression watch armed for 4-hour observation window.
+- experiment_id: meta-2026-06-08
+  date: '2026-06-08'
+  started: '2026-06-08T00:00:00Z'
+  closed: '2026-06-08T00:30:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 0
+  top_changes:
+    - ".pHive/meta-team/archive/2026-04-19/MANIFEST.md: appended reviewed-on provenance line for meta-2026-06-08"
+  commit: dc6a0f3a2c2fd4725f83df9aa5c233c423899417
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: b8499673f6116e9e6b52e21a72bb4f9cd214c33a
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-08. Analysis found 0 in-scope findings:
+    all 12 step files complete, all 25 agent files valid, all workflow YAML
+    references resolve, model IDs current (claude-opus-4-8, claude-sonnet-4-6,
+    claude-haiku-4-5-20251001), agent memory frontmatter valid. Only STUB_DOC
+    hive-cloud-roadmap.md (13 lines) remains out_of_scope (S16 placeholder,
+    11th+ consecutive deferral). Zero open PRs (dedup pre-flight clean). Routed
+    to step-03b backlog fallback. Processed candidate mmo-2026-04-21-001:
+    appended reviewed-on provenance comment to .pHive/meta-team/archive/
+    2026-04-19/MANIFEST.md (4th such line). Closure validator passed.
+    Regression watch armed for 4-hour observation window.
+- experiment_id: meta-2026-0530-0605-squash
+  date: '2026-06-05'
+  started: '2026-05-30T00:00:00Z'
+  closed: '2026-06-05T00:30:00Z'
+  verdict: passed
+  changes_promoted: 8
   changes_reverted: 0
   findings_identified: 3
-  top_changes: []
-  commit: 3c6859bb107ae675201737a5d5f030e62e5abc2f
+  squashes:
+    - meta-2026-05-30
+    - meta-2026-05-31
+    - meta-2026-06-01
+    - meta-2026-06-02
+    - meta-2026-06-03
+    - meta-2026-06-04
+    - meta-2026-06-05
+  top_changes:
+    - "hive/lib/messages-session.js, hive/lib/sandcastle-worker-runner.js: DEFAULT_MODEL claude-opus-4-7 -> claude-opus-4-8 (+ JSDoc)"
+    - "hive/lib/budget-gate.js: FALLBACK_MODEL + JSDoc example claude-opus-4-7 -> claude-opus-4-8; removed the stale claude-opus-4-7 RATES_PER_MTOK key (no remaining 4-7 references in live code)"
+    - "hive/references/session-system-prompt-spec.md: two API fixture model IDs claude-opus-4-7 -> claude-opus-4-8"
+    - "hive/agents/reviewer.md, hive/agents/peer-validator.md: frontmatter kept at model: sonnet (base tier); opus is applied at runtime via hive.config.yaml model_overrides, not frontmatter — #245's frontmatter flip was reverted"
+    - ".github/scripts/sandcastle-hive-bridge.mts + skills/sandcastle-gh-init/assets/*.mts(.tpl): claudeCode(\"claude-opus-4-7\") -> claude-opus-4-8 in the shipped bridge templates"
+    - "hive/GUIDE.md: Agent Roster expanded 20 -> 25 personas; added Specialist Agents table (from meta-2026-05-30)"
+  commit: PENDING
   metrics_snapshot:
     tokens: 0
     wall_clock_ms: 0
     first_attempt_pass: true
+  kg_signal_proposals_total: 0
+  notes: |
+    SQUASH of 7 stranded nightly cycles (meta-2026-05-30 .. meta-2026-06-05),
+    collapsed into one entry per maintainer directive 2026-06-05. Each of the
+    7 nights independently re-discovered the SAME finding set — the stale
+    claude-opus-4-7 -> claude-opus-4-8 model-ID bump — because prior cycles'
+    promotions never actually landed on a base branch (PRs targeted main and
+    stranded unreviewed; DirectCommitAdapter worktree tips were discarded while
+    only the ledger append survived). This squash promotes the REAL code changes
+    once, retargeted to develop. Superseded nightly PRs #235/#236/#239/#240/#242/
+    #244/#245 closed and their meta-meta/nightly-* branches deleted. Per-night
+    bookkeeping granularity intentionally dropped; cycle-state.yaml and
+    morning-summary.md reflect the final (06-05) snapshot. Workflow hardened so
+    future cycles read open PRs + verify on-disk file state before proposing
+    (see step-02-analysis pre-flight).
+- experiment_id: meta-2026-05-29
+  date: '2026-05-29'
+  started: '2026-05-29T00:00:00Z'
+  closed: '2026-05-29T00:30:00Z'
+  verdict: passed
+  changes_promoted: 5
+  changes_reverted: 0
+  findings_identified: 4
+  top_changes:
+    - "hive/GUIDE.md, hive/references/agent-config-schema.md, hive/agents/orchestrator.md, hive/references/multica-agents-schema.md: updated stale Opus model ID from claude-opus-4-7 to claude-opus-4-8"
+    - "hive/lib/budget-gate.js: added claude-opus-4-8 rate entry to RATES_PER_MTOK (additive — prevents fallback-to-opus miscounting for new model ID)"
+  commit: 91490b37b812863ae9f1d4c01ddf3af0510e5ce4
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
   rollback_ref: 401f121e98f5b155b77bba8cbaaa8ab81da6e547
   kg_signal_proposals_total: 0
   notes: |
-    Nightly cycle meta-2026-05-24. Analysis found 3 STUB_DOC findings: (1)
+    Nightly cycle meta-2026-05-29. Analysis found 4 findings: (1)
+    SCHEMA_INCONSISTENCY — claude-opus-4-7 stale in hive/GUIDE.md,
+    hive/references/agent-config-schema.md, hive/agents/orchestrator.md,
+    hive/references/multica-agents-schema.md; updated to claude-opus-4-8.
+    (2) SCHEMA_INCONSISTENCY — hive/lib/budget-gate.js RATES_PER_MTOK
+    missing claude-opus-4-8 key; added additive entry (same rates as 4-7,
+    old key retained for backward compatibility). (3) STUB_DOC
     hive/references/hive-cloud-roadmap.md (13 lines) — S16 forward-reference
-    placeholder for the deferred Hive Cloud epic; marked out_of_scope (9th
-    consecutive deferral). (2) hive/references/ui-prompts/design-system.md
-    (19 lines) — functional prompt template, intentionally brief;
-    out_of_scope. (3) hive/references/ui-prompts/design-review-design-critique.md
-    (11 lines) — functional prompt template, intentionally brief; out_of_scope.
-    Zero proposals generated; zero changes promoted. Cycle closes as discard.
-    Closure validator passed (discard path; rollback_ref and metrics_snapshot
-    present). Regression watch: not_applicable.
+    placeholder, out_of_scope (10th+ consecutive deferral). (4) STUB_DOC
+    hive/references/ui-prompts/design-system.md (19 lines) — functional
+    prompt template, out_of_scope. Closure validator passed. Regression
+    watch armed for 4-hour observation window.
 - experiment_id: meta-2026-05-21
   date: '2026-05-21'
   started: '2026-05-21T00:00:00Z'

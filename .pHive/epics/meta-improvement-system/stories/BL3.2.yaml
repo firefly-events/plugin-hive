@@ -2,7 +2,7 @@ id: BL3.2
 epic: meta-improvement-system
 slice: S10
 title: PR-artifact promotion adapter
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: ["K.3", "BL2.6", "BL3.1", "L1.5", "L1.7", "A2.4"]

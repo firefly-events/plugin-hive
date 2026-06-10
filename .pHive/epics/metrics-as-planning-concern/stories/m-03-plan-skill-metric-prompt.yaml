@@ -1,7 +1,7 @@
 id: m-03-plan-skill-metric-prompt
 epic: metrics-as-planning-concern
 title: /plan A-step prompts for metric declaration per story
-status: completed
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [m-01-add-metrics-concern, m-02-story-schema-metric-fields]

@@ -1,7 +1,7 @@
 id: wmc-2-multica-skill-rewire
 epic: wire-execute-multica-codex
 title: Refit execute-mode-multica skill to dispatch serially + call episode-sync helpers
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: [wmc-1-execute-multica-routing]

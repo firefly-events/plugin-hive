@@ -26,6 +26,7 @@ Called once per parent workflow when `mode_decision == multica` was returned by 
 **Outputs:**
 - One episode marker per story at `${HIVE_STATE_DIR}/episodes/{epic_handle}/{story_id}/multica-run.yaml`.
 - One messages sidecar per story at `${HIVE_STATE_DIR}/episodes/{epic_handle}/{story_id}/multica-run.messages.jsonl`.
+- One team-memory note per story, when distill emits reusable signal, at `${HIVE_STATE_DIR}/team-memories/{epic_handle}/{story_id}.md`.
 - Summary returned to `/execute` with dispatched stories and terminal statuses.
 
 ## Process
@@ -43,25 +44,22 @@ Resolve Multica connection settings before touching any story:
    - find the workspace whose `slug` matches the configured workspace slug
    - use the workspace `id` for all issue and agent calls
 
-Then call:
+Then resolve the execution mode. **Three modes, in precedence order:**
 
-```js
-import { resolveAgentUuidByName } from '../../../../hive/lib/multica-story-dispatch/index.mjs';
+1. **Phase-loop mode (X — recommended for TDD)** — when `hive_config.execution?.multica?.tdd_phases` is set (a list of `{phase, agent}`). The **orchestrator itself is the stateful leader**: it runs the TDD loop, dispatching each phase to its member agent on a shared remote story branch (git hand-off). No leader agent; workers are stateless. See **Step 1-X** below. This is the preferred cross-runtime TDD path.
+2. **Squad mode** — when `execution.multica.squad` is set (a squad name). The issue is assigned to the squad; Multica's squad **leader agent** delegates phases to members. Works, but the leader is stateless and re-spawned per phase (higher cost than X). Cross-runtime, Multica-managed.
+3. **Single-agent mode** (default) — the issue is assigned to the `developer` agent, which runs the whole brief itself.
 
-const developerAgentUuid = await resolveAgentUuidByName(
-  serverUrl,
-  token,
-  workspaceId,
-  'developer',
-);
 ```
 
 On `BOOTSTRAP_REQUIRED`, abort immediately with stderr:
 
 ```text
-ERROR: Multica execution mode requires bootstrapped agents.
-       Run /hive:multica-init to create them, then retry.
-       (developer agent missing in workspace <slug>)
+ERROR: Multica execution mode requires a bootstrapped assignee.
+       Single-agent mode needs the 'developer' agent (run /hive:multica-init).
+       Phase-loop mode needs every configured phase agent to exist (execution.multica.tdd_phases).
+       Squad mode needs the configured squad to exist (execution.multica.squad).
+       (assignee missing in workspace <slug>)
 ```
 
 Exit `1`. Do NOT fall back to sequential.
@@ -71,6 +69,60 @@ Exit `1`. Do NOT fall back to sequential.
 Phase 1 dispatches stories **serially** within the current depth: dispatch story N, poll to terminal (Step 2), write the episode marker (Step 3), then advance to story N+1. This is the v1 contract — it keeps Multica daemon load bounded, makes failure isolation trivial, and matches how `meta-improvement-reset` was actually run inline on 2026-05-25.
 
 > **Phase 2 (future):** parallel-within-depth fanout is a documented option once we have evidence the daemon and agent runtime tolerate concurrent task pressure. Do not enable parallel dispatch in v1.
+
+### Step 1-X: Orchestrator-driven TDD phase loop (when `mode === 'phase-loop'`)
+
+The orchestrator is the long-lived stateful leader. For each story it runs the TDD
+phases itself, handing the work tree between phases via a **shared remote story branch**
+(each phase clones + checks out the branch, does its phase, commits, pushes). This is
+validated: naive work_dir inheritance does NOT survive re-assignment, but git hand-off
+across separate clones does.
+
+```js
+import {
+  resolveAgentUuidByName, dispatchStoryToAgent, ensureIssueBriefMatches,
+  moveOutOfBacklogIfNeeded, resolveStoryBranch, serializePhaseBrief,
+} from '../../../../hive/lib/multica-story-dispatch/index.mjs';
+import { pollTaskUntilTerminal, writeMulticaRunEpisode } from '../../../../hive/lib/multica-story-dispatch/episode-sync.mjs';
+
+const baseBranch = epic?.git_flow?.base_branch ?? 'development';
+const prefix     = hive_config?.task_tracking?.branch_prefix ?? 'fir';
+const repoUrl    = /* the target repo SSH/HTTPS url */;
+
+for (const story of unblocked_stories) {
+  const issueUuid  = /* resolve/create per Step 1.1 */;
+  const storyBranch = resolveStoryBranch(epic.name, story.id, prefix);
+  await moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, issueUuid);
+  const priorSummaries = [];
+  for (let i = 0; i < tddPhases.length; i++) {
+    const { phase, agent } = tddPhases[i];
+    const brief = serializePhaseBrief(story, phase, {
+      storyBranch, baseBranch, repoUrl, isFirst: i === 0, priorSummaries,
+    });
+    await ensureIssueBriefMatches(serverUrl, token, workspaceId, issueUuid, brief);
+    const agentUuid = await resolveAgentUuidByName(serverUrl, token, workspaceId, agent);
+    await dispatchStoryToAgent(serverUrl, token, workspaceId, issueUuid, agentUuid);
+    const terminal = await pollTaskUntilTerminal({ serverUrl, token, workspaceId, issueUuid, /* timeouts from config */ });
+    if (terminal.status !== 'completed') {
+      // abort the loop for this story; record the failing phase; do NOT run later phases
+      break;
+    }
+    priorSummaries.push(`${phase}: ${terminal.notes || 'done'}`);
+  }
+  // after all phases pass: episode marker + integrate (branch already carries every phase commit)
+  await writeMulticaRunEpisode({ hiveStateDir, epicHandle: epic.name, storyId: story.id, issueUuid, identifier, terminal, messagesCaptureMax });
+}
+```
+
+Notes:
+- **Dependency base:** if `story.depends_on` includes an un-merged story, set `baseBranch`
+  to that story's branch (`resolveStoryBranch`) so this story builds on it.
+- **Branch hand-off is the contract:** each phase MUST commit + push the story branch;
+  the next phase clones it fresh. `serializePhaseBrief` injects this git protocol.
+- **Failure isolation:** a non-`completed` phase aborts only that story's loop; later
+  phases are skipped, earlier commits remain on the branch for inspection.
+- Skip Step 1's single-dispatch steps below — they apply only to `mode === 'single'` /
+  `'squad'`.
 
 For each story in `unblocked_stories[]` at this depth:
 
@@ -85,8 +137,8 @@ For each story in `unblocked_stories[]` at this depth:
    - This ensures a newly dispatchable story is not stranded in backlog state before assignment.
 
 3. **Brief write.**
-   - Read `hive_config.agent_backends?.developer` (the `developer` role is the persona Multica's bootstrapped agent runs under). If it equals `'codex'`, pass `{ codexInstruction: true }` so the brief instructs the inner Claude Code session to use `/codex:rescue` for implementation. Otherwise omit options for backward-compatible behavior.
-   - Call `serializeStoryBrief(story, codexInstruction ? { codexInstruction: true } : {})` to produce Markdown.
+   - Read `hive_config.agent_backends?.developer` (the `developer` role is the persona Multica's bootstrapped agent runs under). If it equals `'codex'` **and we are in single-agent mode** (`assigneeKind === 'agent'`), pass `{ codexInstruction: true }` so the brief instructs the inner Claude Code session to use `/codex:rescue` for implementation. In **squad mode** the green member already runs on the native codex runtime, so do NOT inject `codexInstruction` — omit options. Otherwise omit options for backward-compatible behavior.
+   - Call `serializeStoryBrief(story, (assigneeKind === 'agent' && codexInstruction) ? { codexInstruction: true } : {})` to produce Markdown.
    - Resolve `requestedRef` from the current epic branch/ref (for example `feat/multica-integration-fixes`) and include it in the issue brief as the required repository ref for the agent task.
    - Call `ensureIssueBriefMatches(serverUrl, token, workspaceId, issueUuid, brief)`.
    - If the issue description has drifted, the helper updates it with `PUT`.
@@ -117,9 +169,71 @@ For each story in `unblocked_stories[]` at this depth:
    - Stop the task after that error. Do NOT let the agent improvise on an unknown checkout.
 
 5. **Dispatch.**
-   - Call `dispatchStoryToAgent(serverUrl, token, workspaceId, issueUuid, developerAgentUuid)`.
-   - The `PUT` returns `200` with `assignee_type` and `assignee_id` populated.
-   - Multica internally enqueues the task after assignment.
+   - Single-agent mode: `dispatchStoryToAgent(serverUrl, token, workspaceId, issueUuid, assigneeUuid)`.
+   - Squad mode: `dispatchStoryToSquad(serverUrl, token, workspaceId, issueUuid, assigneeUuid)` (import it from the same dispatch module).
+   - The `PUT` returns `200` with `assignee_type` (`agent` or `squad`) and `assignee_id` populated.
+   - Multica internally enqueues the task after assignment. In squad mode the leader receives the task and delegates to members.
+
+6. **Track.**
+   - Record `{story_id, issueUuid, identifier, dispatch_started_at}` in an in-memory map for the poll loop.
+   - Keep per-story state independent so one 4xx or terminal failure does not block sibling stories in the same depth.
+
+The dispatch fanout is **serial within the current depth** in Phase 1 (see Step 1 preamble). Do not advance to later DAG depths inside this skill; `/execute` owns DAG advancement and re-invokes this skill for the next depth.
+
+For each story in `unblocked_stories[]` at this depth:
+
+1. **Issue resolution.**
+   - If `story.tracker_id` is populated, for example `plugin-hive/PLU-42` from `/plan` Phase D, use `getStory` from `hive/adapters/multica/index.ts` to fetch by `tracker_id`.
+   - Capture the Multica issue UUID and identifier.
+   - If `story.tracker_id` is missing, use `createStory({title: story.title, body: '<brief placeholder — will be filled at step 3>', labels: []})`.
+   - Capture the new `tracker_id`, UUID, and identifier.
+
+2. **Backlog kick.**
+   - Call `moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, issueUuid)`.
+   - This ensures a newly dispatchable story is not stranded in backlog state before assignment.
+
+3. **Brief write.**
+   - Determine the dispatching persona name for this story (e.g. `backend-developer`, `researcher`). Load `.pHive/multica/agents.yaml` once per `/execute` run (cache the parsed result; do not re-read per story).
+   - Call `serializeStoryBrief(story, { dispatchingPersona, agents, agentBackends, integrationBranch })` to produce Markdown, where:
+     - `dispatchingPersona` is the persona name string
+     - `agents` is the `agents[]` array from the parsed agents.yaml
+     - `agentBackends` is `hive_config.agent_backends` (an object mapping persona name → `'codex'|'claude'`)
+     - The function applies the following decision: if `agents[persona].provider === 'codex'`, the `## Use /codex:rescue` section is **omitted** (native Codex runtime handles execution directly). If `agents[persona].provider === 'claude'` and `agentBackends[persona] === 'codex'`, the section is **embedded** (backward-compat rescue dance). Otherwise omitted.
+   - Legacy callers that pass `{ codexInstruction: true }` without `dispatchingPersona` continue to work unchanged.
+   - Resolve `requestedRef` from the current epic branch/ref (for example `feat/multica-integration-fixes`) and include it in the issue brief as the required repository ref for the agent task.
+   - Call `ensureIssueBriefMatches(serverUrl, token, workspaceId, issueUuid, brief)`.
+   - If the issue description has drifted, the helper updates it with `PUT`.
+
+4. **Clone + verify.**
+   - Standalone `multica repo checkout` is daemon-task scoped. Do not run it as an orchestrator-side pre-dispatch command unless the Multica daemon API exposes an equivalent checkout endpoint for this workflow.
+   - Preserve the auto-clone success path used by h-01-style runs: if `workdir/plugin-hive/` already exists inside the assigned task and its current branch equals `requestedRef`, skip the explicit clone and continue.
+   - Otherwise, the task brief or dispatch payload MUST instruct the agent to run this as its first repository action inside the daemon task:
+
+     ```sh
+     multica repo checkout https://github.com/firefly-events/plugin-hive --ref "${requestedRef}"
+     ```
+
+   - Post-dispatch verify before implementation work:
+
+     ```sh
+     test -d workdir/plugin-hive
+     ls -la workdir
+     ls -la workdir/plugin-hive
+     git -C workdir/plugin-hive branch --show-current
+     ```
+
+   - Fail fast if verification fails or the branch output does not equal `requestedRef`. Emit an error message that names all of:
+     - workdir path: `workdir/plugin-hive`
+     - requested ref: `${requestedRef}`
+     - actual contents: output from `ls -la workdir`, `ls -la workdir/plugin-hive`, and `git -C workdir/plugin-hive branch --show-current`
+     - suggested manual rerun command: `multica repo checkout https://github.com/firefly-events/plugin-hive --ref "${requestedRef}"`
+   - Stop the task after that error. Do NOT let the agent improvise on an unknown checkout.
+
+5. **Dispatch.**
+   - Single-agent mode: `dispatchStoryToAgent(serverUrl, token, workspaceId, issueUuid, assigneeUuid)`.
+   - Squad mode: `dispatchStoryToSquad(serverUrl, token, workspaceId, issueUuid, assigneeUuid)`.
+   - The `PUT` returns `200` with `assignee_type` (`agent` or `squad`) and `assignee_id` populated.
+   - Multica internally enqueues the task after assignment. In squad mode the leader receives the task and delegates to members.
 
 6. **Track.**
    - Record `{story_id, issueUuid, identifier, dispatch_started_at}` in an in-memory map for the poll loop.
@@ -244,6 +358,49 @@ emit_scope_drift(
 
 `delivered_scope` is sourced from the developer's done-summary captured in `terminal.notes` (one bullet per logical delivery; split on newlines/semicolons). When the parsed delivered list equals `expected_scope`, `delta_reasons` stays empty and the helper buckets to `none`. When divergence is detected (a future enhancement once we trust the parse), `delta_reasons` carries values from the cycle-state-schema enum: `rescope`, `scope-creep`, `deferred`, `blocked`, `misunderstood-ac`, `out-of-band-work`.
 
+### Step 3.5: Orchestrator insight distill
+
+After the episode marker and messages sidecar are written, run the orchestrator-side
+distill pass for the story. This closes the Multica insight-capture loop:
+
+- **mic-1 agent self-capture:** the dispatched agent writes non-obvious reusable
+  findings to `.hive/insights/{story_id}.md` inside its repository checkout before
+  finishing.
+- **mic-2 orchestrator distill:** `writeMulticaRunEpisode` invokes
+  `runMulticaInsightDistill` with the terminal `work_dir`, messages sidecar, and
+  optional distill payload. The distill reads the agent self-capture, transcript
+  tail, and git diff, then writes a team-memory note when it finds reusable signal.
+
+The canonical invocation is via the `distill` option on `writeMulticaRunEpisode`:
+
+```js
+const { distill } = await writeMulticaRunEpisode({
+  hiveStateDir,
+  epicHandle: epic_handle,
+  storyId: story.id,
+  issueUuid,
+  identifier,
+  terminal,
+  messagesCaptureMax,
+  distill: {
+    teamMemory,      // concise orchestrator-distilled note, if any
+    hiveMemories,    // optional promoted persona memories
+    diffBaseRef,     // optional base ref for git diff input
+  },
+});
+```
+
+When `distill.teamMemoryPath` is non-null, the team-memory output is:
+
+```text
+${HIVE_STATE_DIR}/team-memories/{epic_handle}/{story_id}.md
+```
+
+Distill is best-effort at the lifecycle level: it must not rewrite terminal status
+or suppress the episode marker. Surface distill failures in the caller summary/logs
+for diagnosis, but preserve the already-written `multica-run.yaml` and messages
+sidecar as the source of execution truth.
+
 ### Step 4: Sidecar deferral
 
 For each `story_id` in `appends_map`, emit:
@@ -356,4 +513,5 @@ execution:
 | Sidecars deferred in v1 | Log deferral only; no extra Multica dispatch |
 | Serial within current depth (no parallelism in v1) | `/execute` owns DAG advancement between depths; parallel-within-depth is Phase 2, see Step 1 |
 | Episode marker per story | `multica-run.yaml` plus messages sidecar |
+| Insight capture | mic-1 agent self-capture brief plus mic-2 orchestrator distill |
 | No sequential fallback | Bootstrap or setup failures abort Multica mode |

@@ -1,0 +1,78 @@
+id: w1-3-bootstrap-n-persona-reconcile
+epic: multica-substrate-deepen
+title: Refactor reconcileAgents for N-persona batch operation
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- w1-2-agents-yaml-expansion
+description: "Today's reconcileAgents in hive/lib/multica-bootstrap/ is optimized for the\n3-persona bootstrap path. With W1.2 expanding to ~20 personas, the\nper-persona round-trip (list / check / create / patch) becomes expensive\nand stateful drift becomes harder to debug.\n\nRefactor to: single `multica agent list --output json` call at start,\nin-memory diff against agents.yaml, batched upserts via `multica agent\ncreate` / `multica agent update` per delta. Idempotent on re-run.\n\nTests cover: cold bootstrap (empty workspace), warm bootstrap (some\npersonas exist), drift (persona's persona_ref or model changed),\ncleanup (persona removed from agents.yaml \u2014 left intact in Multica for\nsafety; documented).\n"
+acceptance_criteria:
+- reconcileAgents performs single list + diff + batched upsert, not N round-trips
+- Cold bootstrap from empty workspace creates all agents.yaml entries
+- Warm bootstrap with partial overlap creates only missing personas
+- Persona with changed model or persona_ref triggers update, not delete+create
+- Personas removed from agents.yaml are NOT deleted from Multica (safety; logged as warning)
+- All four scenarios covered by tests under hive/lib/multica-bootstrap/test/
+- Tests pass against in-memory Multica fixture (no live spike server needed for CI)
+steps:
+- id: research
+  description: Read current reconcileAgents + identify per-persona round-trip points
+  agent: researcher
+- id: implement
+  description: Refactor to list+diff+batched-upsert; keep public API stable
+  agent: backend-developer
+  depends_on:
+  - research
+- id: test
+  description: Write/extend bootstrap tests covering 4 scenarios
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Reviewer checks idempotence + safety semantics + API stability
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit on feat/multica-substrate-deepen
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/lib/multica-bootstrap/
+    purpose: Module to refactor
+  - path: hive/lib/multica-bootstrap/README.md
+    purpose: Public API to preserve
+cross_cutting:
+- concern: documentation
+  action: Update hive/lib/multica-bootstrap/README.md with new reconcile algorithm note
+risks:
+- severity: high
+  description: Refactor breaks idempotence; re-runs create duplicates or thrash
+  mitigation: Test 4 scenarios + dry-run-able diff before any write
+- severity: medium
+  description: Removing personas silently leaves orphans in Multica
+  mitigation: "Explicit choice \u2014 orphans logged as warning; never auto-deleted"
+metric:
+  applies: true
+  name: multica.reconcile_round_trips_per_persona
+  direction: down
+  unit: count
+  baseline: 4
+  target: 1
+  window: post-story-integrate
+  source:
+    kind: manual
+    ref: Measure via reconcileAgents debug log on warm bootstrap of 18 personas
+  verify_at: review
+  owner: reviewer
+tracker_id: plugin-hive/PLU-143
+
+# Disposition (cwfp-s4-1 audit, applied by cwfp-s5-3f)
+disposition: keep-as-second-party
+disposition_rationale: |
+  Keep because the N-persona reconciler is shipped second-party bootstrap infrastructure.
+disposition_source_slice: cc-workflows-first-party/cwfp-s4-1-disposition-pass-msd

@@ -1,7 +1,7 @@
 id: s5-readme-guide-version
 epic: multica-substrate-adoption
 title: README + GUIDE updates + version bump for Multica substrate
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s2-plan-phase-d-wiring, s3-multica-init-bootstrap]

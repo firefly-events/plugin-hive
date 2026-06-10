@@ -1,7 +1,7 @@
 id: a-35-execute-epic-create-on-fly-and-gate-lift
 epic: structural-refactor-and-gate-lift
 title: /execute epic-create-on-the-fly path + hard-gate lift to warning
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [a-05-execute-skill-split-dispatch, a-34-execute-backend-auto-resolve]

@@ -1,9 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import { runMulticaInsightDistill } from './distill.mjs';
+
 const HTTP_TIMEOUT_MS = 30_000;
 const USER_AGENT = 'hive-multica-episode-sync/0.1.0';
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
+const EPISODE_TERMINAL_STATUSES = new Set(['passed', 'failed', 'cancelled']);
+const DOC_VERDICT_COMPLETION_KINDS = new Set(['doc', 'docs', 'verdict', 'doc-verdict']);
 
 function sanitize(str, token) {
   if (str == null) return str;
@@ -212,6 +216,20 @@ function markerStatus(status) {
   return 'failed';
 }
 
+function normalizeCompletionKind(terminal) {
+  const raw =
+    terminal?.completion_kind ?? terminal?.completionKind ?? terminal?.task_kind ?? terminal?.taskKind;
+  const normalized = String(raw ?? '').trim().toLowerCase();
+  if (DOC_VERDICT_COMPLETION_KINDS.has(normalized)) return 'doc-verdict';
+  return 'code-push';
+}
+
+function booleanFrom(value, fallback = false) {
+  if (typeof value === 'boolean') return value;
+  if (value === undefined || value === null) return fallback;
+  return String(value).toLowerCase() === 'true';
+}
+
 function oneLine(value) {
   return String(value ?? '').replace(/\s*\r?\n\s*/g, ' ').trim();
 }
@@ -226,6 +244,50 @@ function repoRelative(filePath) {
   return relative || path.basename(filePath);
 }
 
+function artifactRelative(filePath) {
+  if (!filePath) return null;
+  const normalized = path.normalize(String(filePath));
+  if (path.isAbsolute(normalized)) return repoRelative(normalized);
+  return normalized.replace(/^\.[/\\]/, '');
+}
+
+function normalizeArtifactPaths(terminal, messagesPath) {
+  const paths = Array.isArray(terminal?.artifacts) ? terminal.artifacts : [];
+  const seen = new Set();
+  const normalized = [];
+  for (const artifact of [...paths, messagesPath]) {
+    const candidate = artifactRelative(artifact);
+    if (!candidate || seen.has(candidate)) continue;
+    seen.add(candidate);
+    normalized.push(candidate);
+  }
+  return normalized;
+}
+
+function deriveCompletion(terminal, status) {
+  const completionKind = normalizeCompletionKind(terminal);
+  const episodeTerminal = EPISODE_TERMINAL_STATUSES.has(status);
+  const requiresCodePushSha = completionKind !== 'doc-verdict';
+  const codePushSha = terminal?.code_push_sha ?? terminal?.codePushSha ?? null;
+  const artifactsCommitted = booleanFrom(
+    terminal?.artifacts_committed ?? terminal?.artifactsCommitted,
+    completionKind === 'doc-verdict' ? false : Boolean(codePushSha),
+  );
+  const terminalByDialect =
+    completionKind === 'doc-verdict'
+      ? artifactsCommitted && episodeTerminal
+      : Boolean(codePushSha) && episodeTerminal;
+
+  return {
+    completionKind,
+    artifactsCommitted,
+    episodeTerminal,
+    requiresCodePushSha,
+    codePushSha,
+    terminalByDialect,
+  };
+}
+
 export async function writeMulticaRunEpisode(opts) {
   const {
     hiveStateDir,
@@ -235,6 +297,7 @@ export async function writeMulticaRunEpisode(opts) {
     identifier,
     terminal,
     messagesCaptureMax,
+    distill,
   } = opts;
 
   const dir = path.join(hiveStateDir, 'episodes', epicHandle, storyId);
@@ -255,17 +318,24 @@ export async function writeMulticaRunEpisode(opts) {
     notes = notes ? `${notes}; ${indicator}` : indicator;
   }
 
-  const artifactPath = repoRelative(messagesPath);
+  const artifacts = normalizeArtifactPaths(terminal, messagesPath);
+  const completion = deriveCompletion(terminal, status);
   const marker = [
     'step: multica-run',
     `story: ${yamlScalar(storyId)}`,
     `epic: ${yamlScalar(epicHandle)}`,
     `agent: ${yamlScalar(terminal?.agent_name || 'developer')}`,
     `status: ${status}`,
+    `completion_kind: ${yamlScalar(completion.completionKind)}`,
+    `artifacts_committed: ${completion.artifactsCommitted}`,
+    `episode_terminal: ${completion.episodeTerminal}`,
+    `requires_code_push_sha: ${completion.requiresCodePushSha}`,
+    `code_push_sha: ${yamlScalar(completion.codePushSha)}`,
+    `terminal_by_dialect: ${completion.terminalByDialect}`,
     `started_at: ${yamlScalar(terminal?.started_at || now)}`,
     `completed_at: ${yamlScalar(terminal?.completed_at || now)}`,
     'artifacts:',
-    `  - ${yamlScalar(artifactPath)}`,
+    ...artifacts.map((artifactPath) => `  - ${yamlScalar(artifactPath)}`),
     'multica:',
     `  issue_id: ${yamlScalar(identifier)}`,
     `  issue_uuid: ${yamlScalar(issueUuid)}`,
@@ -280,5 +350,28 @@ export async function writeMulticaRunEpisode(opts) {
   const jsonl = messages.map((message) => JSON.stringify(message)).join('\n');
   await fs.writeFile(markerPath, marker, 'utf8');
   await fs.writeFile(messagesPath, jsonl ? `${jsonl}\n` : '', 'utf8');
-  return { markerPath, messagesPath, status, notes };
+
+  // Best-effort: the episode marker is the source of truth. A distill failure
+  // must never lose the already-written marker/messages, so swallow + record
+  // any throw and continue (matches the fire-and-forget, signal-gated design).
+  let distillResult = null;
+  if (distill) {
+    try {
+      distillResult = await runMulticaInsightDistill({
+        hiveStateDir,
+        epicHandle,
+        storyId,
+        workDir: terminal?.work_dir ?? null,
+        messagesPath,
+        ...distill,
+      });
+    } catch (error) {
+      process.stderr.write(
+        `[multica-distill] ${storyId}: distill failed — ${error?.message ?? error}\n`,
+      );
+      distillResult = { ok: false, error: String(error?.message ?? error) };
+    }
+  }
+
+  return { markerPath, messagesPath, status, notes, completion, distill: distillResult };
 }

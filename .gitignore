@@ -75,6 +75,10 @@ state/
 !.pHive/epics/smoke-test-execute-multica-codex/**
 !.pHive/episodes/smoke-test-execute-multica-codex/
 !.pHive/episodes/smoke-test-execute-multica-codex/**
+!.pHive/epics/substrate-coverage-and-test-cleanup/
+!.pHive/epics/substrate-coverage-and-test-cleanup/**
+!.pHive/episodes/substrate-coverage-and-test-cleanup/
+!.pHive/episodes/substrate-coverage-and-test-cleanup/**
 # Test scenarios (.pHive/test-scenarios/) — referenced by autonomous-cycle-loop
 # config + simulated-manual cross-cutting concern. Per-story scenarios shipped
 # alongside the stories that need them.
@@ -94,6 +98,7 @@ state/
 !.pHive/cycle-state/multica-integration-fixes.yaml
 !.pHive/cycle-state/hermes-integration-mvp.yaml
 !.pHive/cycle-state/wire-execute-multica-codex.yaml
+!.pHive/cycle-state/cc-workflows-first-party.yaml
 # /find-skills (se-5) writes ranked candidates here; track the dir marker so
 # consumer projects ship with an initialized output location.
 !.pHive/meta/
@@ -199,6 +204,23 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/episodes/multica-integration-fixes/**
 !.pHive/epics/story-loop-closure/
 !.pHive/epics/story-loop-closure/**
+!.pHive/epics/multica-substrate-deepen/
+!.pHive/epics/multica-substrate-deepen/**
+!.pHive/epics/multica-plan-test-cycles/
+!.pHive/epics/multica-plan-test-cycles/**
+!.pHive/epics/cc-workflows-first-party/
+!.pHive/epics/cc-workflows-first-party/**
+!.pHive/proposals/
+!.pHive/proposals/**
+!.pHive/epics/release-lifecycle/
+!.pHive/epics/release-lifecycle/**
+!.pHive/epics/multica-insight-capture/
+!.pHive/epics/multica-insight-capture/**
+hive/lib/.pHive/
+# Node + tsx runtime cache dirs created by vitest runs under cc-workflows
+# substrate dispatches. Stay out of commits.
+node-compile-cache/
+tsx-*/
 !.pHive/epics/kg-repair-activation/
 !.pHive/epics/kg-repair-activation/**
 !.pHive/triage/
