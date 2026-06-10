@@ -229,6 +229,10 @@ async function main() {
   if (!DRY_RUN) {
     const Database = require('better-sqlite3');
     db = new Database(DB_PATH);
+    // SQLite leaves FK enforcement off per-connection — without this, an
+    // undeclared predicate inserts silently despite the schema's
+    // REFERENCES predicates(predicate) declaration.
+    db.pragma('foreign_keys = ON');
     // idx_unique_triple is part of the canonical bootstrap DDL — see
     // hive/references/knowledge-graph-schema.md#sqlite-bootstrap.
     // Verify it exists at runtime so INSERT OR IGNORE can actually dedupe re-runs.
