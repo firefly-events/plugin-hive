@@ -97,10 +97,11 @@ PYEOF
 
   if [[ -z "${val:-}" ]]; then
     val=$(awk -v key="$key" '
-      /^paths:[[:space:]]*$/ { in_paths=1; next }
+      /^paths:[[:space:]]*(#.*)?$/ { in_paths=1; next }
       in_paths && /^[^[:space:]#][^:]*:/ { in_paths=0 }
       in_paths && $0 ~ "^[[:space:]]+" key ":[[:space:]]*" {
         sub("^[[:space:]]+" key ":[[:space:]]*", "", $0)
+        sub(/[[:space:]]*#.*$/, "", $0)
         print
         exit
       }

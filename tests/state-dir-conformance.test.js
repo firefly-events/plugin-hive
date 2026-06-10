@@ -30,6 +30,11 @@ const configModulePromise = import(
 const FIXTURE_PATH = path.join(__dirname, 'fixtures', 'state-dir-conformance.yaml');
 const { rows } = JSON.parse(fs.readFileSync(FIXTURE_PATH, 'utf8'));
 
+/**
+ * Materialize one fixture row in a fresh canonical temp dir: substitute the
+ * $TMP placeholder, create dirs/symlinks, write config_yaml to config_path,
+ * and build the per-row env. Returns { tmp, cwd, env, expected }.
+ */
 function setUpRow(row) {
   const tmp = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), 'state-dir-conformance-'))

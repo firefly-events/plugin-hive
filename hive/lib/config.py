@@ -102,6 +102,10 @@ def resolve_state_dir(
             if hive_root
             else str(cwd_path / "hive.config.yaml")
         )
+    # Relative CONFIG_FILE/HIVE_ROOT resolve against the cwd argument (the
+    # shell shim cd's to cwd first, so this keeps the runtimes conformant).
+    if not os.path.isabs(config_path):
+        config_path = str(cwd_path / config_path)
 
     # Like the shell shim, the env value is used raw (empty means unset);
     # only config-sourced values go through scalar cleaning.
@@ -124,12 +128,17 @@ def resolve_state_dir(
 
 
 def _canonicalize_path(value: str) -> str:
+    """Symlink-canonicalize a path like ``realpath -m``: existing components
+    are resolved through the filesystem, non-existent tails kept as-is."""
     return str(Path(value).resolve())
 
 
 def _read_paths_value(
     config_path: str | os.PathLike[str], key: str
 ) -> str | None:
+    """Read one ``paths.<key>`` scalar from a hive.config.yaml file: JSON
+    first, then PyYAML when available, then the line-oriented block fallback.
+    Returns a cleaned string or None when missing/empty/"null"."""
     path = Path(config_path)
     if not path.exists():
         return None
@@ -163,10 +172,15 @@ def _read_paths_value(
 
 
 def _parse_paths_block_value(raw: str, key: str) -> str | None:
-    """Line-oriented fallback mirroring the awk parse in hooks/common.sh."""
+    """Line-oriented fallback mirroring the awk parse in hooks/common.sh.
+
+    Scans the ``paths:`` block for ``key`` when neither JSON nor PyYAML
+    parsing applies. Inline ``# comments`` are stripped from the value,
+    matching YAML parsers.
+    """
     in_paths = False
     for line in raw.splitlines():
-        if re.match(r"^paths:\s*$", line):
+        if re.match(r"^paths:\s*(?:#.*)?$", line):
             in_paths = True
             continue
         if in_paths and re.match(r"^[^\s#][^:]*:", line):
@@ -174,11 +188,13 @@ def _parse_paths_block_value(raw: str, key: str) -> str | None:
         if in_paths:
             match = re.match(rf"^\s+{re.escape(key)}:\s*(.*)$", line)
             if match:
-                return match.group(1)
+                return re.sub(r"\s*#.*$", "", match.group(1))
     return None
 
 
 def _clean_paths_scalar(value: Any) -> str | None:
+    """Normalize a paths scalar: trim, strip one matching pair of surrounding
+    quotes, and map ""/"null" to None (mirrors the shell shim's awk cleanup)."""
     if value is None:
         return None
     text = str(value).strip()

@@ -34,6 +34,7 @@ COMMON_SH_PATH = ROOT / "hooks" / "common.sh"
 
 
 def _load_config_module():
+    """Import hive/lib/config.py by file path (it is not on sys.path)."""
     spec = importlib.util.spec_from_file_location("hive_lib_config", CONFIG_MODULE_PATH)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -41,6 +42,7 @@ def _load_config_module():
 
 
 def _load_fixture_rows():
+    """Parse the shared conformance fixture (JSON content in a .yaml file)."""
     return json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))["rows"]
 
 
@@ -74,6 +76,7 @@ class _RowSetup:
         }
 
     def _sub(self, value):
+        """Substitute the $TMP placeholder with this row's canonical temp dir."""
         return value.replace("$TMP", self.tmp)
 
 
@@ -106,6 +109,8 @@ class StateDirShellConformanceTest(unittest.TestCase):
         cls.config = _load_config_module()
 
     def _run_shell(self, setup):
+        """Run _resolve_state_dir from hooks/common.sh for one materialized
+        row and return its stripped stdout."""
         env = {
             "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
             "HOME": os.environ.get("HOME", setup.tmp),

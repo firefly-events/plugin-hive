@@ -181,6 +181,36 @@
       "dirs": ["$TMP/cwd"],
       "symlinks": {},
       "expected": "$TMP/cwd/.cwd-state"
+    },
+    {
+      "name": "inline-comment-value",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: .state # local state\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd"],
+      "symlinks": {},
+      "expected": "$TMP/cwd/.state"
+    },
+    {
+      "name": "commented-paths-header",
+      "env": {"CONFIG_FILE": "$TMP/hive.config.yaml"},
+      "config_yaml": "paths: # hive path overrides\n  state_dir: .state\n",
+      "config_path": "$TMP/hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd"],
+      "symlinks": {},
+      "expected": "$TMP/cwd/.state"
+    },
+    {
+      "name": "relative-config-file-under-cwd",
+      "env": {"CONFIG_FILE": "rel-hive.config.yaml"},
+      "config_yaml": "paths:\n  state_dir: .rel-state\n",
+      "config_path": "$TMP/cwd/rel-hive.config.yaml",
+      "cwd": "$TMP/cwd",
+      "dirs": ["$TMP/cwd"],
+      "symlinks": {},
+      "expected": "$TMP/cwd/.rel-state"
     }
   ]
 }

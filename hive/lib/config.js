@@ -95,11 +95,14 @@ function validateEmitLifecycleAt(value, sourcePath = 'hive.config.yaml') {
 function resolveStateDir(options = {}) {
   const cwd = options.cwd || process.cwd();
   const env = options.env || process.env;
-  const configPath =
+  let configPath =
     env.CONFIG_FILE ||
     (env.HIVE_ROOT
       ? path.join(env.HIVE_ROOT, 'hive.config.yaml')
       : path.join(cwd, 'hive.config.yaml'));
+  // Relative CONFIG_FILE/HIVE_ROOT resolve against the cwd argument (the
+  // shell shim cd's to cwd first, so this keeps the runtimes conformant).
+  if (!path.isAbsolute(configPath)) configPath = path.join(cwd, configPath);
 
   // Like the shell shim, the env value is used raw (empty means unset);
   // only config-sourced values go through scalar cleaning.
@@ -124,6 +127,11 @@ function resolveStateDir(options = {}) {
   return canonicalizePath(path.join(base, stateDir));
 }
 
+/**
+ * Symlink-canonicalize an absolute path. Like `realpath -m`: the longest
+ * existing prefix is resolved through the filesystem and any non-existent
+ * tail components are appended unchanged.
+ */
 function canonicalizePath(inputPath) {
   let current = path.normalize(inputPath);
   const pending = [];
@@ -142,6 +150,11 @@ function canonicalizePath(inputPath) {
   }
 }
 
+/**
+ * Read one `paths.<key>` scalar from a hive.config.yaml file. Tries JSON,
+ * then js-yaml when available, then the line-oriented block fallback.
+ * Returns a cleaned string or null when missing/empty/"null".
+ */
 function readPathsValue(configPath, key) {
   if (!configPath || !fs.existsSync(configPath)) return null;
   let raw;
@@ -174,26 +187,34 @@ function readPathsValue(configPath, key) {
   return cleanPathsScalar(parsePathsBlockValue(raw, key));
 }
 
-// Line-oriented fallback mirroring the awk parse in hooks/common.sh.
+/**
+ * Line-oriented fallback mirroring the awk parse in hooks/common.sh: scans
+ * the `paths:` block for `key` when neither JSON nor js-yaml parsing applies.
+ * Inline `# comments` are stripped from the value, matching YAML parsers.
+ */
 function parsePathsBlockValue(raw, key) {
   let inPaths = false;
   const keyPattern = new RegExp(
     `^\\s+${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\s*(.*)$`
   );
   for (const line of raw.split(/\r?\n/)) {
-    if (/^paths:\s*$/.test(line)) {
+    if (/^paths:\s*(?:#.*)?$/.test(line)) {
       inPaths = true;
       continue;
     }
     if (inPaths && /^[^\s#][^:]*:/.test(line)) inPaths = false;
     if (inPaths) {
       const match = line.match(keyPattern);
-      if (match) return match[1];
+      if (match) return match[1].replace(/\s*#.*$/, '');
     }
   }
   return null;
 }
 
+/**
+ * Normalize a paths scalar: trim, strip one matching pair of surrounding
+ * quotes, and map ""/"null" to null (mirrors the shell shim's awk cleanup).
+ */
 function cleanPathsScalar(value) {
   if (value === undefined || value === null) return null;
   let text = String(value).trim();
