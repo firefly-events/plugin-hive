@@ -1,7 +1,7 @@
 id: sdr-8-runstate-archival-sweep
 epic: state-dir-resolver
 title: Add suspend-aware weekly run-state archival sweep
-status: pending
+status: complete
 complexity: medium
 methodology: classic
 depends_on: [sdr-7-dag-executor-runstate-relocation]
