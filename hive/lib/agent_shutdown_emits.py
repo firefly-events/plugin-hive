@@ -23,6 +23,7 @@ Semantics:
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from hive.lib.kg_emit import emit_kg_event
@@ -50,11 +51,15 @@ REVIEWER_VERDICT_TO_OBJECT = {
 }
 
 # Closed object vocabularies per role predicate. Predicates absent from this
-# map (implemented until s8 pins its vocabulary) accept any sanitized object.
+# map accept any sanitized object.
 ALLOWED_OBJECTS = {
     "validated": frozenset({"approve", "approve-with-changes", "reject"}),
     "tested": frozenset({"pass", "fail", "inconclusive"}),
 }
+
+# The `implemented` object is open-ended (commit SHAs are arbitrary hex) but
+# shape-pinned: either the literal "wip" or an abbreviated-to-full git SHA.
+IMPLEMENTED_OBJECT_RE = re.compile(r"^(wip|[0-9a-f]{7,40})$")
 
 
 def emit_role_triple_at_shutdown(
@@ -94,6 +99,13 @@ def emit_role_triple_at_shutdown(
             "emitted": False,
             "metadata": None,
             "reason": f"object {obj!r} outside vocabulary for predicate {pred!r}",
+        }
+
+    if pred == "implemented" and not IMPLEMENTED_OBJECT_RE.fullmatch(obj):
+        return {
+            "emitted": False,
+            "metadata": None,
+            "reason": f"object {obj!r} is neither 'wip' nor a git commit SHA",
         }
 
     return emit_kg_event(
