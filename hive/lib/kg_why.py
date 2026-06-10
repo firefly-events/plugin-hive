@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import sqlite3
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
@@ -85,6 +86,7 @@ def query_kg(
 
     try:
         with sqlite3.connect(str(path)) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
             if strict:
                 if not predicate or not entity:
                     raise ValueError("--strict requires --predicate and --entity")
@@ -106,6 +108,7 @@ def query_recent_triples(db_path: str | Path | None = None) -> list[WhyTriple]:
         return []
     try:
         with sqlite3.connect(str(path)) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
             rows = conn.execute(RECENT_SQL_TEMPLATE).fetchall()
     except sqlite3.Error:
         return []
@@ -290,15 +293,22 @@ def _row_to_triple(row: Sequence[Any], via: str) -> WhyTriple:
 
 
 def _extract_chroma_response(response: Any) -> tuple[bool, list[Mapping[str, Any]]]:
-    if response is None or response is False:
+    # ChromaDB providers can raise RuntimeError ("dictionary changed size
+    # during iteration") while their response is consumed. Contain it here so
+    # free-form mode degrades to sqlite-only instead of crashing.
+    try:
+        if response is None or response is False:
+            return False, []
+        if isinstance(response, Mapping):
+            available = bool(response.get("available", True))
+            records = response.get("results", response.get("records", []))
+            return available, list(records or [])
+        if isinstance(response, list):
+            return True, list(response)
         return False, []
-    if isinstance(response, Mapping):
-        available = bool(response.get("available", True))
-        records = response.get("results", response.get("records", []))
-        return available, list(records or [])
-    if isinstance(response, list):
-        return True, response
-    return False, []
+    except RuntimeError as exc:
+        print(f"kg_why.chromadb_runtime_error reason={exc}", file=sys.stderr)
+        return False, []
 
 
 def _metadata(record: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -338,6 +348,7 @@ def _triples_for_decision_key(
         return []
     try:
         with sqlite3.connect(str(path)) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
             rows = conn.execute(
                 """
                 SELECT subject, predicate, object, valid_from, valid_until, source_epic, source_agent

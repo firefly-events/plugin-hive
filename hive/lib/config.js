@@ -39,7 +39,13 @@ function parseConfigText(raw) {
   } catch {}
 
   if (yaml) {
-    const safeLoader = typeof yaml.safeLoad === 'function' ? yaml.safeLoad : yaml.load;
+    // js-yaml 4 removed safeLoad but ships it as a throwing stub (typeof is
+    // still 'function' — verified on 4.2.0), so prefer yaml.load, which is
+    // safe by default on v4. js-yaml 3 also exposes load (full schema), so a
+    // v3 runtime takes this branch too; the pinned dependency is v4, and
+    // config files are trusted local input. safeLoad is only reached if a
+    // future runtime drops load entirely.
+    const safeLoader = typeof yaml.load === 'function' ? yaml.load : yaml.safeLoad;
     const parsed = safeLoader(raw);
     return parsed && typeof parsed === 'object' ? parsed : {};
   }
@@ -172,7 +178,13 @@ function readPathsValue(configPath, key) {
 
   if (parsed === null && yaml) {
     try {
-      const safeLoader = typeof yaml.safeLoad === 'function' ? yaml.safeLoad : yaml.load;
+      // js-yaml 4 removed safeLoad but ships it as a throwing stub (typeof is
+    // still 'function' — verified on 4.2.0), so prefer yaml.load, which is
+    // safe by default on v4. js-yaml 3 also exposes load (full schema), so a
+    // v3 runtime takes this branch too; the pinned dependency is v4, and
+    // config files are trusted local input. safeLoad is only reached if a
+    // future runtime drops load entirely.
+    const safeLoader = typeof yaml.load === 'function' ? yaml.load : yaml.safeLoad;
       const candidate = safeLoader(raw);
       if (candidate && typeof candidate === 'object') parsed = candidate;
     } catch {}

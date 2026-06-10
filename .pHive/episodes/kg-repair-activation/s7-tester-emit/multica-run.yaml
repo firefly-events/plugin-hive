@@ -1,0 +1,23 @@
+step: multica-run
+story: "s7-tester-emit"
+epic: "kg-repair-activation"
+agent: "developer"
+status: passed
+completion_kind: "code-push"
+artifacts_committed: false
+episode_terminal: true
+requires_code_push_sha: true
+code_push_sha: null
+terminal_by_dialect: false
+started_at: "2026-06-10T06:22:34Z"
+completed_at: "2026-06-10T06:25:59Z"
+artifacts:
+  - ".pHive/episodes/kg-repair-activation/s7-tester-emit/multica-run.messages.jsonl"
+multica:
+  issue_id: "PLU-91"
+  issue_uuid: "6446e202-b4aa-4611-88aa-5e6f40f3f036"
+  task_id: "da0c40f3-e769-42f7-ba7c-40a4801d2308"
+  agent_id: "d9946f9a-2747-49d4-b967-2590ffb5be43"
+  work_dir: "/Users/don/multica_workspaces/21c6d282-d6b4-4b25-8d0d-a85e96038416/da0c40f3/workdir"
+  attempts: 1
+notes: ""

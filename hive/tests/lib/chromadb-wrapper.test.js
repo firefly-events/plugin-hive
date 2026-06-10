@@ -6,16 +6,24 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 
+const { pathToFileURL } = require('node:url');
+
 const ROOT = path.join(__dirname, '..', '..', '..');
 const WRAPPER_PATH = path.join(ROOT, 'hive', 'lib', 'chromadb-wrapper.js');
 
-function clearWrapper() {
-  delete require.cache[require.resolve(WRAPPER_PATH)];
-}
+// The wrapper is an ES module (hive/lib is `"type": "module"` scope), so a
+// fresh instance per test comes from a cache-busting dynamic import instead
+// of require.cache eviction. Module-load state (RESOLVED_PORT, bootstrapDone)
+// resets with each instance.
+let wrapperLoadCount = 0;
 
 function loadWrapper() {
-  clearWrapper();
-  return require(WRAPPER_PATH);
+  wrapperLoadCount += 1;
+  return import(`${pathToFileURL(WRAPPER_PATH).href}?case=${wrapperLoadCount}`);
+}
+
+function clearWrapper() {
+  // No-op under ESM — kept so test teardown reads the same as before.
 }
 
 async function withPatchedReadFileSync(patch, fn) {
@@ -77,7 +85,7 @@ test('readDynamicPort parses port from fixture file', async () => {
     }
     return originalReadFileSync.call(fs, filePath, ...args);
   }, async () => {
-    const wrapper = loadWrapper();
+    const wrapper = await loadWrapper();
     assert.equal(wrapper.readDynamicPort(), 49152);
   });
 });
@@ -89,7 +97,7 @@ test('readDynamicPort falls back to 8000 when file absent', async () => {
     }
     return originalReadFileSync.call(fs, filePath, ...args);
   }, async () => {
-    const wrapper = loadWrapper();
+    const wrapper = await loadWrapper();
     assert.equal(wrapper.readDynamicPort(), 8000);
   });
 });
@@ -101,7 +109,7 @@ test('readDynamicPort falls back to 8000 when file content malformed', async () 
     }
     return originalReadFileSync.call(fs, filePath, ...args);
   }, async () => {
-    const wrapper = loadWrapper();
+    const wrapper = await loadWrapper();
     assert.equal(wrapper.readDynamicPort(), 8000);
   });
 });
@@ -119,7 +127,7 @@ test('ensureDecisionsCollection POSTs to correct path and body shape', async () 
   });
 
   try {
-    const wrapper = loadWrapper();
+    const wrapper = await loadWrapper();
     const result = await wrapper.ensureDecisionsCollection('127.0.0.1', port);
 
     assert.equal(result, true);
@@ -156,7 +164,7 @@ test('bootstrap is idempotent across isAvailable calls', async () => {
   });
 
   try {
-    const wrapper = loadWrapper();
+    const wrapper = await loadWrapper();
 
     assert.equal(await wrapper.isAvailable('127.0.0.1', port), true);
     assert.equal(await wrapper.isAvailable('127.0.0.1', port), true);
@@ -187,7 +195,7 @@ test('degraded heartbeat path does not bootstrap', async () => {
   });
 
   try {
-    const wrapper = loadWrapper();
+    const wrapper = await loadWrapper();
 
     assert.equal(await wrapper.isAvailable('127.0.0.1', port), false);
     assert.equal(bootstrapPosts, 0);
@@ -226,7 +234,7 @@ test('sample document write and similarity query roundtrip', async () => {
   });
 
   try {
-    const wrapper = loadWrapper();
+    const wrapper = await loadWrapper();
 
     assert.equal(
       await wrapper.index(
@@ -260,7 +268,7 @@ test('sample document write and similarity query roundtrip', async () => {
 
 test('sidecar-down calls degrade gracefully without throwing', async () => {
   const port = await getUnusedPort();
-  const wrapper = loadWrapper();
+  const wrapper = await loadWrapper();
 
   await withMutedWarn(async () => {
     assert.equal(await wrapper.isAvailable('127.0.0.1', port), false);

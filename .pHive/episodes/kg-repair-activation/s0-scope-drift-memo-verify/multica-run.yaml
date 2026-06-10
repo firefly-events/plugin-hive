@@ -1,0 +1,23 @@
+step: multica-run
+story: "s0-scope-drift-memo-verify"
+epic: "kg-repair-activation"
+agent: "developer"
+status: passed
+completion_kind: "code-push"
+artifacts_committed: false
+episode_terminal: true
+requires_code_push_sha: true
+code_push_sha: null
+terminal_by_dialect: false
+started_at: "2026-06-10T05:22:10Z"
+completed_at: "2026-06-10T05:23:25Z"
+artifacts:
+  - ".pHive/episodes/kg-repair-activation/s0-scope-drift-memo-verify/multica-run.messages.jsonl"
+multica:
+  issue_id: "PLU-81"
+  issue_uuid: "f1f7a683-773c-4f7e-9bda-1488b7fde371"
+  task_id: "5d25a23f-31a6-41ad-9ee8-723a6448432d"
+  agent_id: "d9946f9a-2747-49d4-b967-2590ffb5be43"
+  work_dir: "/Users/don/multica_workspaces/21c6d282-d6b4-4b25-8d0d-a85e96038416/5d25a23f/workdir"
+  attempts: 1
+notes: ""

@@ -83,7 +83,7 @@ For each staged insight, apply the criteria from `references/agent-memory-schema
 
 ### 3. Check for duplicates
 For each insight marked for promotion, check `~/.claude/hive/memories/{agent}/` for existing memories with similar descriptions. If a duplicate exists:
-- If the new insight is more specific or corrects the old one: promote as an `override` type, note the superseded memory
+- If the new insight is more specific or corrects the old one: promote as an `override` type, note the superseded memory. Record the pair `(prior slug, new slug)` — every override MUST be passed to `runSessionEnd` as a `supersededMemories` entry (`{ subject: <agent>, predicate: 'memory', prior_object: <prior-slug>, new_object: <new-slug>, source_agent: <agent> }`) so the KG `superseded` provenance edge is emitted (see `skills/hive/skills/session-end/SKILL.md` step 4b)
 - If the new insight adds nothing: discard
 
 ### 4. Promote kept insights

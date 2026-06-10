@@ -76,7 +76,7 @@ Check whether the KG is reachable BEFORE issuing queries:
 
 ### 3. Query the KG
 
-Issue `MemoryStore.query_decisions()` calls covering the five predicates `phase_failed`, `phase_blocked`, `superseded`, `phase_started`, and `phase_complete`. Conceptually this is **three logical groupings** (failures = `phase_failed` + `phase_blocked`; supersessions = `superseded`; lifecycle = `phase_started` + `phase_complete`); concretely it is **five single-predicate calls** because the underlying `DecisionFilter` interface accepts at most one `predicate` per call. Both framings are acceptable as long as the five predicates are covered. All calls use `as_of=now` so only currently-valid triples are returned (the SQL applies `valid_until IS NULL` for current-state queries).
+Issue `MemoryStore.query_decisions()` calls covering the eight predicates `phase_failed`, `phase_blocked`, `superseded`, `phase_started`, `phase_complete`, `validated`, `tested`, and `implemented`. Conceptually this is **four logical groupings** (failures = `phase_failed` + `phase_blocked`; supersessions = `superseded`; lifecycle = `phase_started` + `phase_complete`; role verdicts = `validated` + `tested` + `implemented`); concretely it is **eight single-predicate calls** because the underlying `DecisionFilter` interface accepts at most one `predicate` per call. Both framings are acceptable as long as the eight predicates are covered. All calls use `as_of=now` so only currently-valid triples are returned (the SQL applies `valid_until IS NULL` for current-state queries).
 
 ```
 failures   = query_decisions({ predicate: "phase_failed",   as_of: now })
@@ -84,6 +84,9 @@ failures   = query_decisions({ predicate: "phase_failed",   as_of: now })
 supersessions = query_decisions({ predicate: "superseded",   as_of: now })
 lifecycle  = query_decisions({ predicate: "phase_started",  as_of: now })
             ∪ query_decisions({ predicate: "phase_complete", as_of: now })
+role_verdicts = query_decisions({ predicate: "validated",   as_of: now })
+            ∪ query_decisions({ predicate: "tested",        as_of: now })
+            ∪ query_decisions({ predicate: "implemented",   as_of: now })
 ```
 
 > CANONICAL FIELD NAME: pass `entity` and `predicate` keys on the filter object. Do NOT use `subject` — `subject` was deprecated in 1.1.3 because it implied a column-only match; the canonical `entity` field matches against BOTH the `subject` and `object` columns. See `hive/references/memory-store-interface.md` §`query_decisions` and the design decision recorded in this story.
@@ -98,7 +101,7 @@ For each returned triple, apply the layers in order. A triple that fails any lay
 
 #### Layer 1: predicate filter
 
-The query already restricts to `phase_failed`, `phase_blocked`, `superseded`, `phase_started`, and `phase_complete`. Verify each returned triple's `predicate` is in this set; drop any stray triples (defensive — should be a no-op if the query was correctly scoped).
+The query already restricts to `phase_failed`, `phase_blocked`, `superseded`, `phase_started`, `phase_complete`, `validated`, `tested`, and `implemented`. Verify each returned triple's `predicate` is in this set; drop any stray triples (defensive — should be a no-op if the query was correctly scoped).
 
 #### Layer 2: recency window (client-side)
 
@@ -140,7 +143,7 @@ severity: critical | high | medium | low
 location: {source_epic value}        # the epic that produced these triples
 description: {one-line description e.g. "3 phase_failed triples in epic memory-redesign within 30d window"}
 evidence:
-  predicate: {phase_failed | phase_blocked | superseded | phase_started | phase_complete}
+  predicate: {phase_failed | phase_blocked | superseded | phase_started | phase_complete | validated | tested | implemented}
   source_epic: {string}
   cluster_size: {N}
   representative_triples:              # up to 3 example triples for traceability
@@ -212,7 +215,7 @@ python3 -m hive.lib.metric_increment_cli \
 
 KG availability:    available | absent | error
 Recency window:     {window_days} days (cutoff: {recency_cutoff})
-Triples retrieved:  {N} (failures: {N}, supersessions: {N}, lifecycle: {N})
+Triples retrieved:  {N} (failures: {N}, supersessions: {N}, lifecycle: {N}, role verdicts: {N})
 After recency filter: {N}
 Findings emitted:   {N}
   Local signal:       {N}
@@ -255,7 +258,7 @@ kg_signal_summary: {string summary of availability, counts, and notable clusters
 ## SUCCESS METRICS
 
 - [ ] KG availability check executed and outcome logged before any query
-- [ ] Three query groupings issued (failures: phase_failed + phase_blocked; supersessions: superseded; lifecycle: phase_started + phase_complete), each with `as_of=now` and `entity:` field semantics if entity filtering is later added (currently no entity scope is required — predicate-only)
+- [ ] Four query groupings issued (failures: phase_failed + phase_blocked; supersessions: superseded; lifecycle: phase_started + phase_complete; role verdicts: validated + tested + implemented), each with `as_of=now` and `entity:` field semantics if entity filtering is later added (currently no entity scope is required — predicate-only)
 - [ ] Recency window applied client-side using `valid_from >= recency_cutoff` (inclusive boundary, matching the §4 Layer 2 rule and the fixture's `valid_from >= cutoff` comparator)
 - [ ] Each retained triple tagged `local_signal` or `cross_project_signal` based on the `local_epics` set
 - [ ] Cross-project findings carry a `rank_score` multiplied by `0.7`
@@ -270,7 +273,7 @@ kg_signal_summary: {string summary of availability, counts, and notable clusters
 
 - `kg.sqlite` absent: log + emit empty list. Do NOT fail.
 - `kg.sqlite` present but locked or permission-denied: log the error, emit empty list. Do NOT fail. (WAL mode normally avoids reader/writer contention; this branch covers genuinely broken filesystems.)
-- Both query groupings return zero triples: emit empty list, summary notes `Triples retrieved: 0`.
+- All query groupings return zero triples: emit empty list, summary notes `Triples retrieved: 0`.
 - All retrieved triples filtered out by recency or predicate gate: emit empty list, summary notes `After recency filter: 0`.
 - Schema validation failure when shaping a finding: skip that finding with a warning, do NOT fail the whole step. Finalize the remaining findings.
 - Configuration error (`window_days` non-numeric or negative): fall back to the default `30` and log a warning.

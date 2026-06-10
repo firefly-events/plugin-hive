@@ -4,7 +4,7 @@ tracker_id: "f0b5f7c2-db3b-4472-bfd3-32ebfb5bc0ed"
 tracker_url: ""
 tracker_number: "PLU-82"
 title: "Add /hive:kg-stats skill for density + predicate breakdown"
-status: pending
+status: in_progress
 complexity: low
 methodology: classic
 depends_on: []

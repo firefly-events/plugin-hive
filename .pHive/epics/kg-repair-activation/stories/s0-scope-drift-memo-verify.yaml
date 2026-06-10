@@ -4,7 +4,7 @@ tracker_id: "f1f7a683-773c-4f7e-9bda-1488b7fde371"
 tracker_url: ""
 tracker_number: "PLU-81"
 title: "Verify scope_drift_emit_sites memory scope + cross-link"
-status: pending
+status: in_progress
 complexity: low
 methodology: classic
 depends_on: []

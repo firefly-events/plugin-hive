@@ -83,3 +83,22 @@ See `references/insight-capture.md` for the insight capture protocol.
 ## Shutdown Readiness
 
 When receiving a pre-shutdown message from the orchestrator, follow the receiver protocol in `hive/references/pre-shutdown-protocol.md`.
+
+### Shutdown emit — `implemented` role triple
+
+At shutdown — in the same call sequence as insights-before-shutdown (receiver protocol step 1b) — emit exactly ONE `implemented` triple per completed story implementation. This is a separate structured emit, NOT prose inside insight text:
+
+```bash
+python3 -m hive.lib.kg_emit_cli \
+  --subject "{story_id}" \
+  --predicate "implemented" \
+  --object "{commit_sha_or_wip}" \
+  --source-epic "{epic_id}" \
+  --source-agent "developer"
+```
+
+- `--object` must be either the short commit SHA of the pushed commit (`git rev-parse --short HEAD`, lowercase hex) or the literal `wip` when the implementation is complete but no commit was pushed. Nothing else — no branch names, no "done".
+- **Silent when no story implementation completed.** If shutdown arrives before you finished implementing, emit nothing — there must be an actual completed implementation behind the triple.
+- Exactly one emit per completed story implementation — not per file, not per commit, not retried on success.
+- The CLI is silent on knob==off and on missing kg.sqlite — do NOT branch on its exit code, and never block shutdown on this emit.
+- Python callers use `hive.lib.agent_shutdown_emits.emit_role_triple_at_shutdown` (shared by reviewer/tester/developer for `validated`/`tested`/`implemented`).

@@ -148,3 +148,22 @@ See `references/insight-capture.md` for the insight capture protocol.
 ## Shutdown Readiness
 
 When receiving a pre-shutdown message from the orchestrator, follow the receiver protocol in `hive/references/pre-shutdown-protocol.md`.
+
+### Shutdown emit — `validated` role triple
+
+At shutdown — in the same call sequence as insights-before-shutdown (receiver protocol step 1b) — emit exactly ONE `validated` triple per completed story review. This is a separate structured emit, NOT prose inside insight text:
+
+```bash
+python3 -m hive.lib.kg_emit_cli \
+  --subject "{story_id}" \
+  --predicate "validated" \
+  --object "{verdict}" \
+  --source-epic "{epic_id}" \
+  --source-agent "reviewer"
+```
+
+- `--object` must be exactly one of `approve`, `approve-with-changes`, `reject` (lowercase, case-stable). Project your rubric-computed `change_verdict` through the canonical map in `hive.lib.agent_shutdown_emits.REVIEWER_VERDICT_TO_OBJECT`: `passed` → `approve`, `needs_optimization` → `approve-with-changes`, `needs_revision` → `reject`.
+- **Silent when no review completed.** If shutdown arrives before you produced a `change_verdict`, emit nothing — there must be an actual completed review behind the triple.
+- Exactly one emit per completed story review — not per finding, not retried on success.
+- The CLI is silent on knob==off and on missing kg.sqlite — do NOT branch on its exit code, and never block shutdown on this emit.
+- Python callers use `hive.lib.agent_shutdown_emits.emit_role_triple_at_shutdown` (shared by reviewer/tester/developer for `validated`/`tested`/`implemented`).

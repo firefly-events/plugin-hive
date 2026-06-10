@@ -1,7 +1,17 @@
-'use strict';
+// ESM module: hive/lib/package.json declares `"type": "module"`, so plain
+// `.js` files in this package scope are ES modules (the previous CJS form was
+// un-loadable here — same conversion as config.js). Named exports unchanged;
+// on Node >= 20.19 `require()` of this file works via require(esm).
+import { readEmitLifecycleAt } from './config.js';
+import { kgWrite, kgSupersede } from './session-end.js';
 
-const { readEmitLifecycleAt } = require('./config');
-const { kgWrite, kgSupersede } = require('./session-end');
+// Mutable indirection so tests can stub the sqlite layer (ESM namespaces are
+// frozen — the old CJS monkey-patching of session-end exports cannot work).
+const deps = { kgWrite, kgSupersede };
+
+function _setKgDepsForTest(overrides) {
+  Object.assign(deps, overrides);
+}
 
 const KG_WRITES_TOTAL_COUNTER = 'kg_writes_total';
 const EMIT_LIFECYCLE_AT = readEmitLifecycleAt();
@@ -59,7 +69,7 @@ async function emitKgEvent({ subject, predicate, object, sourceEpic, sourceAgent
   };
 
   try {
-    await kgWrite([
+    await deps.kgWrite([
       {
         subject,
         predicate,
@@ -111,7 +121,7 @@ async function emitSupersededEvent({
   };
 
   try {
-    const result = await kgSupersede(subject, predicate, prior, next, sourceEpic, sourceAgent);
+    const result = await deps.kgSupersede(subject, predicate, prior, next, sourceEpic, sourceAgent);
     metadata.prior_valid_until_updated = Boolean(result && result.updated > 0);
   } catch (err) {
     if (isUnavailableKgError(err)) {
@@ -134,11 +144,12 @@ function resetKgWritesCounterForTest() {
   kgWriteCounter.clear();
 }
 
-module.exports = {
+export {
   KG_WRITES_TOTAL_COUNTER,
   emitKgEvent,
   emitSupersededEvent,
   getKgWritesCounterSnapshot,
   resetKgWritesCounterForTest,
   sanitizeObj,
+  _setKgDepsForTest,
 };
