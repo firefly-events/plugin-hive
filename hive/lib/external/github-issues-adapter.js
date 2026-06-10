@@ -133,8 +133,30 @@ function writeStoryYaml(storyPath, data, _deps) {
   renameFn(tmp, storyPath);
 }
 
+// Default state dir per Q2 precedence: injected _deps.stateDir (test seam)
+// > HIVE_STATE_DIR env > root-config paths.state_dir > `.pHive`. The shared
+// resolver lives in the ESM hive/lib/config.js; require(esm) loads it on
+// Node >= 22.12, and older Nodes fall back to the legacy env-or-default
+// behavior (config tier unavailable there, same as before this change).
+function defaultStateDir(_deps) {
+  if (_deps && _deps.stateDir) return _deps.stateDir;
+  try {
+    const { resolveStateDir } = require('../config.js');
+    const resolved = resolveStateDir();
+    // The resolver canonicalizes to an absolute path; story paths here have
+    // always been cwd-relative (callers and the _deps fs seams join/compare
+    // them as such), so convert back. Default stays exactly '.pHive'.
+    // realpath the cwd so symlinked working dirs (macOS /var -> /private/var)
+    // don't derail path.relative against the canonicalized resolver output.
+    const rel = path.relative(fs.realpathSync(process.cwd()), resolved);
+    return rel === '' ? '.' : rel;
+  } catch {
+    return process.env.HIVE_STATE_DIR || '.pHive';
+  }
+}
+
 function resolveStoryPath(epicId, storyId, _deps) {
-  const baseDir = (_deps && _deps.stateDir) || process.env.HIVE_STATE_DIR || '.pHive';
+  const baseDir = defaultStateDir(_deps);
   return path.join(baseDir, 'epics', epicId, 'stories', `${storyId}.yaml`);
 }
 
