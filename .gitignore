@@ -216,6 +216,8 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/release-lifecycle/**
 !.pHive/epics/multica-insight-capture/
 !.pHive/epics/multica-insight-capture/**
+!.pHive/epics/squad-leader-status-flip/
+!.pHive/epics/squad-leader-status-flip/**
 !.pHive/epics/state-dir-resolver/
 !.pHive/epics/state-dir-resolver/**
 hive/lib/.pHive/
