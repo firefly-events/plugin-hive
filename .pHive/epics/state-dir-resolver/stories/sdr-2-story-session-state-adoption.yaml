@@ -1,0 +1,78 @@
+id: sdr-2-story-session-state-adoption
+epic: state-dir-resolver
+title: Adopt state-dir resolver for story and session state
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [sdr-1-resolver-contract-conformance-fixture]
+tracker_id: "PLU-249"
+tracker_uuid: "e6170d4c-7607-4fed-8b3e-bb855b61edea"
+tracker_url: "http://localhost:8080/issues/e6170d4c-7607-4fed-8b3e-bb855b61edea"
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: |
+  Move the core story/session state readers and writers onto the Node resolver from
+  sdr-1. With a configured `paths.state_dir`, story status, session registry,
+  session episode writes, and issue closer marker reads must all use the relocated
+  epic, episode, and session tree while preserving default `.pHive` behavior.
+acceptance_criteria:
+  - "Given `paths.state_dir: custom-state` and no `HIVE_STATE_DIR`, when story status reads or writes state, then it uses `custom-state/epics/...` and `custom-state/episodes/...` rather than `.pHive`."
+  - "Given `paths.state_dir: custom-state`, when session registry and session episode writer persist state, then `sessions/index.yaml` and `episodes/` land under `custom-state`."
+  - "Given `paths.state_dir: custom-state`, when the Multica issue closer reads episode markers, then it reads from the configured state dir."
+  - "Given state-dir configuration is unset, when all four modules run, then the default `.pHive` paths remain unchanged."
+  - "Given this is a bounded slice, when the diff is reviewed, then metrics, snapshots, triage, release, handoff, scenarios, DAG executor, archival, semantic guard, and prose are untouched."
+metric:
+  applies: false
+  justification: "This story is a correctness refactor of story/session file placement; relocation regression tests, not a trending metric, verify that state lands under the configured tree."
+steps:
+  - id: research
+    description: Confirm existing call sites and tests for story status, session registry, episode writing, and issue closer marker reads.
+    agent: researcher
+  - id: implement
+    description: Adopt `resolveStateDir` in the four story/session modules while preserving existing injection seams and default behavior.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Add relocated-state unit or integration tests per module, including the default `.pHive` unset case.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify all story/session paths route through the resolver and no out-of-slice modules changed.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit the story/session adoption slice to `feat/state-dir-resolver`.
+    agent: developer
+    depends_on: [review]
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/config.js
+      purpose: Provides the Node resolver established by sdr-1.
+    - path: hive/lib/story-status.mjs
+      purpose: Core story status reader/writer currently probing `.pHive`.
+    - path: hive/lib/session-registry.js
+      purpose: Session index writer that must relocate.
+    - path: hive/lib/session-episode-writer.js
+      purpose: Episode writer that must relocate.
+    - path: hive/lib/multica-issue-closer.mjs
+      purpose: Episode marker reader that must relocate.
+files_to_modify:
+  - file: hive/lib/story-status.mjs
+    change: Adopt Node resolver; replace repo-root `.pHive` probe.
+  - file: hive/lib/session-registry.js
+    change: Resolve `sessions/index.yaml` through configured state dir.
+  - file: hive/lib/session-episode-writer.js
+    change: Resolve `episodes/` through configured state dir.
+  - file: hive/lib/multica-issue-closer.mjs
+    change: Resolve episode-marker reads through configured state dir.
+  - file: tests
+    change: Add relocated-state regression tests for each module.
+cross_cutting:
+  - concern: state-dir-relocation
+    action: "Use the sdr-1 Node resolver for the story/session cluster and assert configured and default paths."
+references:
+  - path: .pHive/epics/state-dir-resolver/docs/design-decisions.md
+    relevant_excerpt: "Q2 precedence is env override, then root `hive.config.yaml` `paths.state_dir`, then default `.pHive`."
+  - path: .pHive/epics/state-dir-resolver/docs/vertical-plan.md
+    relevant_excerpt: "Step 2 moves story status, session registry, session episode writer, and issue closer under configured `paths.state_dir`."

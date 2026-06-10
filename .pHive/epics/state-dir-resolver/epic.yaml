@@ -1,0 +1,56 @@
+name: state-dir-resolver
+title: State Dir Resolver — cross-runtime state relocation
+description: |
+  Establish a shared state-dir resolver contract across shell, Node, and Python,
+  then migrate bounded runtime clusters so configured `paths.state_dir` is honored
+  without moving intentional `.pHive` policy locks. The epic keeps default `.pHive`
+  behavior when unset, asserts Q2 env-override precedence, relocates DAG run-state
+  while preserving fixed DAG opt-in config, adds suspend-aware run archival, and
+  updates executable prose that agents directly follow.
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+version_bump: minor
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+stories:
+  - id: sdr-1-resolver-contract-conformance-fixture
+    title: Establish resolver contract and shared conformance fixture
+    complexity: high
+    depends_on: []
+  - id: sdr-2-story-session-state-adoption
+    title: Adopt state-dir resolver for story and session state
+    complexity: medium
+    depends_on: [sdr-1-resolver-contract-conformance-fixture]
+  - id: sdr-3-metrics-adoption
+    title: Adopt state-dir resolver for metrics readers and writers
+    complexity: medium
+    depends_on: [sdr-1-resolver-contract-conformance-fixture]
+  - id: sdr-4-context-snapshot-triage-adoption
+    title: Adopt state-dir resolver for context snapshot and triage
+    complexity: medium
+    depends_on: [sdr-1-resolver-contract-conformance-fixture]
+  - id: sdr-5-task-tracking-release-handoff-adoption
+    title: Adopt state-dir resolver for task tracking, release, and handoff
+    complexity: medium
+    depends_on: [sdr-1-resolver-contract-conformance-fixture]
+  - id: sdr-6-scenarios-audits-reverse-sync-adoption
+    title: Adopt state-dir resolver for scenarios, audits, and reverse sync
+    complexity: medium
+    depends_on: [sdr-1-resolver-contract-conformance-fixture]
+  - id: sdr-7-dag-executor-runstate-relocation
+    title: Relocate DAG executor run-state while fixed locks remain fixed
+    complexity: medium-high
+    depends_on: [sdr-1-resolver-contract-conformance-fixture]
+  - id: sdr-8-runstate-archival-sweep
+    title: Add suspend-aware weekly run-state archival sweep
+    complexity: medium
+    depends_on: [sdr-7-dag-executor-runstate-relocation]
+  - id: sdr-9-shell-semantic-guard-coverage
+    title: Make shell semantic guard relocated-state aware
+    complexity: low
+    depends_on: [sdr-1-resolver-contract-conformance-fixture]
+  - id: sdr-10-executable-prose-conversion
+    title: Convert executable prose to HIVE_STATE_DIR paths
+    complexity: low
+    depends_on: [sdr-1-resolver-contract-conformance-fixture]
