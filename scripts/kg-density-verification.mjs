@@ -69,9 +69,8 @@ function queryMetrics(dbPath, cutoffIso) {
     'row = conn.execute(',
     '    "SELECT COUNT(*), COUNT(DISTINCT predicate), "',
     '    "COUNT(DISTINCT source_agent) FROM triples "',
-    '    "WHERE valid_from >= ? AND source_agent IS NOT NULL", (cutoff,)).fetchone()',
-    'total = conn.execute("SELECT COUNT(*) FROM triples WHERE valid_from >= ?", (cutoff,)).fetchone()[0]',
-    'print(json.dumps({"triples": total, "predicates": row[1], "source_agents": row[2]}))',
+    '    "WHERE valid_from >= ?", (cutoff,)).fetchone()',
+    'print(json.dumps({"triples": row[0], "predicates": row[1], "source_agents": row[2]}))',
     'conn.close()',
   ].join('\n');
   const result = spawnSync('python3', ['-c', py, dbPath, cutoffIso], { encoding: 'utf8' });
