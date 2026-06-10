@@ -1,7 +1,9 @@
 /**
  * Session Registry
  *
- * Read-modify-write operations on .pHive/sessions/index.yaml.
+ * Read-modify-write operations on <state-dir>/sessions/index.yaml, where
+ * <state-dir> resolves via the sdr-1 resolver (HIVE_STATE_DIR env >
+ * paths.state_dir in hive.config.yaml > default .pHive).
  * Uses an advisory lock (sentinel file with O_EXCL) to prevent
  * concurrent writes. Fail-open: if lock cannot be acquired after
  * 10 retries (1s total), proceeds without the lock.
@@ -24,19 +26,29 @@
  * rows without this column remain valid.
  */
 
-'use strict';
+// ESM: hive/lib/package.json declares "type": "module", which made the prior
+// CJS form of this file un-loadable (same latent break sdr-1 fixed in
+// config.js). require() consumers keep working via require(esm).
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { resolveStateDir } from './config.js';
+
+const _require = createRequire(import.meta.url);
 
 let yaml;
 try {
-  yaml = require('js-yaml');
+  yaml = _require('js-yaml');
 } catch {
   throw new Error('js-yaml not available — run: npm install js-yaml');
 }
 
-const REGISTRY_PATH = path.join(process.cwd(), '.pHive', 'sessions', 'index.yaml');
+// Resolved per call (not at module load) so HIVE_STATE_DIR / hive.config.yaml
+// changes and cwd are honored at write time.
+function defaultRegistryPath() {
+  return path.join(resolveStateDir(), 'sessions', 'index.yaml');
+}
 
 /**
  * Acquire advisory lock on the registry file.
@@ -124,7 +136,7 @@ function writeRegistry(registryPath, data) {
  * @param {string} [registryPath] - override default path (for testing)
  * @returns {Promise<void>}
  */
-async function upsert(sessionId, fields, registryPath = REGISTRY_PATH) {
+async function upsert(sessionId, fields, registryPath = defaultRegistryPath()) {
   const locked = await acquireLock(registryPath);
   try {
     const data = readRegistry(registryPath);
@@ -149,7 +161,7 @@ async function upsert(sessionId, fields, registryPath = REGISTRY_PATH) {
  * @param {string} [registryPath]
  * @returns {Promise<void>}
  */
-async function update(sessionId, fields, registryPath = REGISTRY_PATH) {
+async function update(sessionId, fields, registryPath = defaultRegistryPath()) {
   const locked = await acquireLock(registryPath);
   try {
     const data = readRegistry(registryPath);
@@ -170,8 +182,8 @@ async function update(sessionId, fields, registryPath = REGISTRY_PATH) {
  * @param {string} [registryPath]
  * @returns {Object}
  */
-function read(registryPath = REGISTRY_PATH) {
+function read(registryPath = defaultRegistryPath()) {
   return readRegistry(registryPath);
 }
 
-module.exports = { upsert, update, read, REGISTRY_PATH };
+export { upsert, update, read, defaultRegistryPath };

@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { resolveStateDir } from './config.js';
 
 const HTTP_TIMEOUT_MS = 30_000;
 const USER_AGENT = 'hive-multica-issue-closer/0.1.0';
@@ -111,7 +112,10 @@ function readMarker(markerPath) {
  */
 export async function closeStoryIssue({ epic_id, story_id, repo_root, config_path } = {}) {
   const root = repo_root ?? process.cwd();
-  const markerPath = path.join(root, '.pHive', 'episodes', epic_id, story_id, 'multica-run.yaml');
+  // Episode markers live under the configured state dir (sdr-1 resolver:
+  // HIVE_STATE_DIR > paths.state_dir in hive.config.yaml > default .pHive).
+  const stateDir = resolveStateDir({ cwd: root });
+  const markerPath = path.join(stateDir, 'episodes', epic_id, story_id, 'multica-run.yaml');
 
   const marker = readMarker(markerPath);
   if (!marker || !marker.issue_id) {

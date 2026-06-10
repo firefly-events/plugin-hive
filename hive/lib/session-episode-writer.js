@@ -2,26 +2,38 @@
  * Session Episode Writer
  *
  * Writes a session episode YAML file atomically using .tmp → rename.
- * Episodes are written to: .pHive/episodes/<epic_id>/<story_id>/<step_id>.yaml
+ * Episodes are written to: <state-dir>/episodes/<epic_id>/<story_id>/<step_id>.yaml
+ * where <state-dir> resolves via the sdr-1 resolver (HIVE_STATE_DIR env >
+ * paths.state_dir in hive.config.yaml > default .pHive).
  *
  * Episode schema:
  *   session_id, epic_id, story_id, step_id, agent_name, model,
  *   status, created_at, completed_at, sse_event_count, events: []
  */
 
-'use strict';
+// ESM: hive/lib/package.json declares "type": "module", which made the prior
+// CJS form of this file un-loadable (same latent break sdr-1 fixed in
+// config.js). require() consumers keep working via require(esm).
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { resolveStateDir } from './config.js';
+
+const _require = createRequire(import.meta.url);
 
 let yaml;
 try {
-  yaml = require('js-yaml');
+  yaml = _require('js-yaml');
 } catch {
   throw new Error('js-yaml not available — run: npm install js-yaml');
 }
 
-const EPISODES_BASE = path.join(process.cwd(), '.pHive', 'episodes');
+// Resolved per call (not at module load) so HIVE_STATE_DIR / hive.config.yaml
+// changes and cwd are honored at write time.
+function defaultEpisodesBase() {
+  return path.join(resolveStateDir(), 'episodes');
+}
 
 /**
  * Write an episode YAML file for a completed session.
@@ -41,7 +53,7 @@ const EPISODES_BASE = path.join(process.cwd(), '.pHive', 'episodes');
  * @param {string} [episodesBase] - override base path (for testing)
  * @returns {string} absolute path to the written episode file
  */
-function writeEpisode(episode, episodesBase = EPISODES_BASE) {
+function writeEpisode(episode, episodesBase = defaultEpisodesBase()) {
   const { epic_id, story_id, step_id, session_id } = episode;
 
   if (!epic_id || !story_id || !step_id || !session_id) {
@@ -78,4 +90,4 @@ function writeEpisode(episode, episodesBase = EPISODES_BASE) {
   return targetPath;
 }
 
-module.exports = { writeEpisode, EPISODES_BASE };
+export { writeEpisode, defaultEpisodesBase };
