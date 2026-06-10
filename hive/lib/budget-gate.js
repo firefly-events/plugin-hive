@@ -1,4 +1,7 @@
-'use strict';
+// ESM: hive/lib/package.json declares "type": "module", which made the prior
+// CJS form of this file un-loadable as a script entry (same latent break
+// sdr-1 fixed in config.js). require() consumers keep working via
+// require(esm) on Node >= 22.12.
 
 /**
  * hive/lib/budget-gate.js
@@ -8,8 +11,11 @@
  * sandcastle worker runs. Exit 1 = run aborted; exit 0 = within budget.
  *
  * Behavior:
- *   1. Scan `.pHive/metrics/events/stop-*.jsonl` for rows whose timestamp
- *      falls on or after UTC midnight of the current calendar day.
+ *   1. Scan `<state-dir>/metrics/events/stop-*.jsonl` for rows whose
+ *      timestamp falls on or after UTC midnight of the current calendar day.
+ *      `<state-dir>` resolves via the sdr-1 resolver (HIVE_STATE_DIR env >
+ *      paths.state_dir in hive.config.yaml > default `.pHive`), matching the
+ *      shell metrics hooks that write those rows.
  *   2. For each `metric_type: "tokens"` row, compute
  *        cost = (input_tokens × rate.in + output_tokens × rate.out) / 1e6
  *      using a per-model rate-card. Unknown models fall back to opus rates
@@ -18,7 +24,7 @@
  *      Infinity (gate effectively disabled with a warning).
  *   4. If total spend ≥ limit, error + exit(1) with remaining-budget message.
  *
- * Event shape (from .pHive/metrics/events/stop-*.jsonl, per real samples):
+ * Event shape (from <state-dir>/metrics/events/stop-*.jsonl, per real samples):
  *   {
  *     "metric_type": "tokens",
  *     "value": <total tokens>,
@@ -35,11 +41,15 @@
  * canonical row; the model + per-direction token split lives in `dimensions`.
  *
  * Test seam: gate() and computeDailySpend() accept a `_deps` object so unit
- * tests inject fake fs/config without touching the real filesystem.
+ * tests inject fake fs/config without touching the real filesystem. `_deps.cwd`
+ * and `_deps.env` thread through to the state-dir resolver.
  */
 
-const fs = require('node:fs');
-const path = require('node:path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { resolveStateDir } from './config.js';
 
 // Rates are USD per million tokens. Pricing drifts; this rate-card is
 // intentionally inline so it shows up in diffs when rates change.
@@ -81,9 +91,19 @@ function isTodayUtc(isoTimestamp, midnightMs) {
   return t >= midnightMs && t < nextMidnightMs;
 }
 
+// Resolved per call (not at module load) so HIVE_STATE_DIR / hive.config.yaml
+// changes and cwd are honored at read time.
+function defaultEventsDir(_deps = {}) {
+  return path.join(
+    resolveStateDir({ cwd: _deps.cwd, env: _deps.env }),
+    'metrics',
+    'events'
+  );
+}
+
 function computeDailySpend(_deps = {}) {
   const _fs = _deps.fs || fs;
-  const eventsDir = _deps.eventsDir || path.join(process.cwd(), '.pHive', 'metrics', 'events');
+  const eventsDir = _deps.eventsDir || defaultEventsDir(_deps);
   const warn = _deps.warn || console.warn;
   const now = _deps.now || new Date();
   const midnightMs = utcMidnightToday(now);
@@ -135,7 +155,7 @@ function readDailyLimit(_deps = {}) {
   if (_deps.config && typeof _deps.config.daily_usd_limit === 'number') {
     return _deps.config.daily_usd_limit;
   }
-  const configPath = _deps.configPath || path.join(process.cwd(), 'hive.config.yaml');
+  const configPath = _deps.configPath || path.join(_deps.cwd || process.cwd(), 'hive.config.yaml');
   let contents;
   try {
     contents = _fs.readFileSync(configPath, 'utf8');
@@ -181,14 +201,11 @@ function gate(_deps = {}) {
   return { ok: true, spend, limit, remaining };
 }
 
-module.exports = {
-  computeDailySpend,
-  gate,
-  readDailyLimit,
-  _internal: { rateLookup, rowCost, utcMidnightToday, isTodayUtc, RATES_PER_MTOK },
-};
+const _internal = { rateLookup, rowCost, utcMidnightToday, isTodayUtc, RATES_PER_MTOK };
 
-if (require.main === module) {
+export { computeDailySpend, gate, readDailyLimit, _internal };
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const result = gate();
   process.exit(result.ok ? 0 : 1);
 }

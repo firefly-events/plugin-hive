@@ -1,10 +1,11 @@
-'use strict';
-
 /**
  * Tests for hive/lib/budget-gate.js
  *
  * Story: s3-gh-actions-cron-loop (sandcastle-ops-layer)
- * Run:   node --test tests/budget-gate.test.js
+ * Run:   node --test tests/budget-gate.test.mjs
+ *
+ * ESM (.mjs): budget-gate.js became an ES module when it adopted the sdr-1
+ * state-dir resolver (hive/lib package scope is "type": "module").
  *
  * No filesystem writes — tests inject `_deps.fs` (a minimal in-memory fs
  * shim implementing only readdirSync + readFileSync) and `_deps.config`.
@@ -21,13 +22,11 @@
  *   AC-budget-8  missing daily_usd_limit → limit=Infinity, gate passes
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const path = require('node:path');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
 
-const { computeDailySpend, gate, _internal } = require(
-  path.join(__dirname, '..', 'hive', 'lib', 'budget-gate.js')
-);
+import { computeDailySpend, gate, _internal } from '../hive/lib/budget-gate.js';
 
 /** Build a minimal in-memory fs shim from a file map. */
 function makeFs(files /* { name: contents } */) {
