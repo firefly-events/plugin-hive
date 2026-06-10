@@ -39,7 +39,10 @@ function parseConfigText(raw) {
   } catch {}
 
   if (yaml) {
-    const safeLoader = typeof yaml.safeLoad === 'function' ? yaml.safeLoad : yaml.load;
+    // js-yaml 4 removed safeLoad but ships it as a throwing stub (typeof is still
+    // 'function'), so prefer yaml.load — safe by default on v4 — and only fall
+    // back to safeLoad for a genuine js-yaml 3 runtime (which lacks v4's load).
+    const safeLoader = typeof yaml.load === 'function' ? yaml.load : yaml.safeLoad;
     const parsed = safeLoader(raw);
     return parsed && typeof parsed === 'object' ? parsed : {};
   }
@@ -172,7 +175,10 @@ function readPathsValue(configPath, key) {
 
   if (parsed === null && yaml) {
     try {
-      const safeLoader = typeof yaml.safeLoad === 'function' ? yaml.safeLoad : yaml.load;
+      // js-yaml 4 removed safeLoad but ships it as a throwing stub (typeof is still
+    // 'function'), so prefer yaml.load — safe by default on v4 — and only fall
+    // back to safeLoad for a genuine js-yaml 3 runtime (which lacks v4's load).
+    const safeLoader = typeof yaml.load === 'function' ? yaml.load : yaml.safeLoad;
       const candidate = safeLoader(raw);
       if (candidate && typeof candidate === 'object') parsed = candidate;
     } catch {}

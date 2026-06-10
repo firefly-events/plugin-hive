@@ -26,6 +26,15 @@ The session-end window has three phases with strict ordering:
 ### Phase B: KG Triple Write (Sequential, After A)
 4. Call `kg_write()` with triples constructed from promoted insight slugs and
    session decisions. See `hive/references/knowledge-graph-schema.md` for the contract.
+4b. **Memory replacements → `supersededMemories`.** For every Phase A promotion of
+   an `override` type (a new memory that corrects/replaces an existing one), add an
+   entry to `supersededMemories` so `runSessionEnd` emits the `superseded`
+   provenance edge: `{ subject: <agent-name>, predicate: 'memory',
+   prior_object: <replaced-slug>, new_object: <replacement-slug>,
+   source_agent: <agent-name> }`. If no overrides were promoted, pass an empty
+   array (the default). The helper sets `valid_until` on the prior `memory`
+   triple when one exists and always inserts one `superseded` edge whose object
+   is `prior->new` (see `hive/references/kg-emit.md`).
 5. **Await completion before Phase C.** compile() reads the same memory directory
    that promotion just wrote to — ordering ensures consistency.
 6. **On failure:** surface the error. KG write failure is not silently swallowed.
@@ -89,6 +98,9 @@ const { elapsed, kgError, chromadbWarning } = await runSessionEnd({
   promotedSlugs: ['avoid-x', 'prefer-y'],       // string[] — kebab-case slugs written to ~/.claude/hive/memories/{agent}/
   triples: [                                    // Array — KG triples to persist in Phase B
     { subject, predicate, object, source_agent } // valid_from defaults to now if omitted
+  ],
+  supersededMemories: [                         // Array — memory replacements from Phase A overrides (step 4b)
+    { subject, predicate: 'memory', prior_object, new_object, source_agent }
   ],
   skipCompile: false                            // boolean — true under hard-shutdown pressure
 });
