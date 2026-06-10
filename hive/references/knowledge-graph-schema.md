@@ -34,6 +34,7 @@ The L2 knowledge graph stores structured decisions and lifecycle events as subje
 | `phase_complete` | Records that a workflow phase completed successfully |
 | `phase_failed` | Records that a workflow phase failed |
 | `phase_blocked` | Records that a workflow phase is blocked and cannot proceed |
+| `phase_handoff` | Records the verdict of a phase-to-phase handoff dispatch (object is `<target>:<pass|fail|inconclusive|timeout>`) |
 
 ## valid_until Convention
 
@@ -114,7 +115,7 @@ SELECT 1 FROM predicates WHERE predicate = ?
 ```
 Unknown predicates are rejected immediately with an error naming the invalid predicate:
 ```
-Error: unknown predicate "my-custom-predicate" — must be one of: decided, superseded, assigned_to, blocked_by, depends_on, phase_started, phase_complete, phase_failed, phase_blocked
+Error: unknown predicate "my-custom-predicate" — must be one of: decided, superseded, assigned_to, blocked_by, depends_on, phase_started, phase_complete, phase_failed, phase_blocked, phase_handoff
 ```
 
 **Atomicity:** All triples in a single kg_write() call are written in a WAL transaction:
@@ -183,7 +184,8 @@ CREATE TABLE IF NOT EXISTS triples (
 CREATE TABLE IF NOT EXISTS predicates (predicate TEXT PRIMARY KEY);
 INSERT OR IGNORE INTO predicates VALUES
   ('decided'), ('superseded'), ('assigned_to'), ('blocked_by'), ('depends_on'),
-  ('phase_started'), ('phase_complete'), ('phase_failed'), ('phase_blocked');
+  ('phase_started'), ('phase_complete'), ('phase_failed'), ('phase_blocked'),
+  ('phase_handoff');
 CREATE INDEX IF NOT EXISTS idx_subject ON triples(subject);
 CREATE INDEX IF NOT EXISTS idx_object ON triples(object);
 CREATE INDEX IF NOT EXISTS idx_predicate ON triples(predicate);
