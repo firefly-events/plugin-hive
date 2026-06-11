@@ -1,7 +1,9 @@
 id: r-3-review-mode-cc-workflows
 epic: substrate-coverage-and-test-cleanup
 title: Create review-mode-cc-workflows atom — thin wrapper for solo reviewer dispatch + helper import + no-codex compliance
-status: complete
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
 complexity: medium
 methodology: classic
 depends_on:

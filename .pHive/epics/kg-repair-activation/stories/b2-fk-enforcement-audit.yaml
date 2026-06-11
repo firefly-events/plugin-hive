@@ -4,7 +4,9 @@ tracker_id: "aac670c6-91db-465c-92b5-911205531b5e"
 tracker_url: ""
 tracker_number: "PLU-84"
 title: "Audit + enable PRAGMA foreign_keys on kg.sqlite connections"
-status: complete
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
 complexity: low
 methodology: classic
 depends_on: []

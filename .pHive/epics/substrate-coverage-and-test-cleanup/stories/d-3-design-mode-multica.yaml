@@ -1,7 +1,9 @@
 id: d-3-design-mode-multica
 epic: substrate-coverage-and-test-cleanup
 title: Create design-mode-multica atom — per-persona dispatch + episode markers per persona
-status: complete
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
 complexity: medium
 methodology: classic
 depends_on:
