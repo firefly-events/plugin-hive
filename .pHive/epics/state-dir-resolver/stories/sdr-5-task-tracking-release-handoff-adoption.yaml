@@ -1,7 +1,7 @@
 id: sdr-5-task-tracking-release-handoff-adoption
 epic: state-dir-resolver
 title: Adopt state-dir resolver for task tracking, release, and handoff
-status: complete
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: [sdr-1-resolver-contract-conformance-fixture]

@@ -1,7 +1,7 @@
 id: sdr-4-context-snapshot-triage-adoption
 epic: state-dir-resolver
 title: Adopt state-dir resolver for context snapshot and triage
-status: complete
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: [sdr-1-resolver-contract-conformance-fixture]

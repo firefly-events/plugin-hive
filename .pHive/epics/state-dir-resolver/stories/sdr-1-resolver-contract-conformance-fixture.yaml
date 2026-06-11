@@ -1,7 +1,7 @@
 id: sdr-1-resolver-contract-conformance-fixture
 epic: state-dir-resolver
 title: Establish resolver contract and shared conformance fixture
-status: complete
+status: in_progress
 complexity: high
 methodology: classic
 depends_on: []

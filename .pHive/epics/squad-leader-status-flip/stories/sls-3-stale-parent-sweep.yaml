@@ -1,7 +1,7 @@
 id: sls-3-stale-parent-sweep
 epic: squad-leader-status-flip
 title: Build the stale-parent sweep script (Fork B lite)
-status: in_progress
+status: blocked
 tracker_id: plugin-hive/PLU-315
 tracker_url: http://localhost:3000/plugin-hive/issues/315
 complexity: medium
