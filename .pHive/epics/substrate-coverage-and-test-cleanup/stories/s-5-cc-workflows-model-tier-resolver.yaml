@@ -34,9 +34,9 @@ description: |
   emit `agent()` call sites.
 acceptance_criteria:
 - 'Given `hive/lib/cc-workflows-model-tier.mjs` exists, when `resolveModelTier(persona, ctx)` is invoked with `ctx.config` carrying `model_tiers` and `model_overrides`, then it returns `{tier: "sonnet"|"opus"|"haiku", source: "model_overrides"|"model_tiers"|"default"}` where the precedence is `model_overrides` > `model_tiers` > default.'
-- Given a persona has both a `model_tiers` base assignment AND a `model_overrides` entry, when the helper is invoked, then it returns the `model_overrides` value and records `source: "model_overrides"`.
-- Given a persona has only a `model_tiers` assignment, when the helper is invoked, then it returns the base tier and records `source: "model_tiers"`.
-- Given a persona is not present in either `model_tiers` or `model_overrides`, when the helper is invoked, then it returns `{tier: "sonnet", source: "default"}` AND emits a one-line WARN naming the unmapped persona.
+- 'Given a persona has both a `model_tiers` base assignment AND a `model_overrides` entry, when the helper is invoked, then it returns the `model_overrides` value and records `source: "model_overrides"`.'
+- 'Given a persona has only a `model_tiers` assignment, when the helper is invoked, then it returns the base tier and records `source: "model_tiers"`.'
+- 'Given a persona is not present in either `model_tiers` or `model_overrides`, when the helper is invoked, then it returns `{tier: "sonnet", source: "default"}` AND emits a one-line WARN naming the unmapped persona.'
 - Given `skills/hive/skills/execute-mode-cc-workflows/SKILL.md` Step 1.5 (`workflow_assembly`), when the assembled Workflow script emits one `agent()` call per `(story, step)` pair, then every `agent()` call carries an explicit `opts.model` value sourced from `cc-workflows-model-tier` resolver — no `agent()` call may omit `opts.model`.
 - Given `skills/hive/skills/plan-mode-cc-workflows/SKILL.md` (already shipped), when its `workflow_assembly` emits `agent()` calls, then every call carries `opts.model` from the helper (back-fit).
 - Given the future cc-workflows mode skills `d-4`, `dr-3`, `r-3`, `t-3` are authored in this epic, when they emit `agent()` calls, then they import and call the helper. The substrate-fitness lint introduced by `s-3-no-codex-lint` MUST be extended to check that every `agent()` call in any `*-mode-cc-workflows/SKILL.md` carries an `opts.model` resolved via the helper.

@@ -34,7 +34,7 @@ The L2 knowledge graph stores structured decisions and lifecycle events as subje
 | `phase_complete` | Records that a workflow phase completed successfully |
 | `phase_failed` | Records that a workflow phase failed |
 | `phase_blocked` | Records that a workflow phase is blocked and cannot proceed |
-| `phase_handoff` | Records the verdict of a phase-to-phase handoff dispatch (object is `<target>:<pass|fail|inconclusive|timeout>`) |
+| `phase_handoff` | Records the verdict of a phase-to-phase handoff dispatch (object is `<target>:<pass\|fail\|inconclusive\|timeout>`) |
 
 ### Role Verdict Predicates
 

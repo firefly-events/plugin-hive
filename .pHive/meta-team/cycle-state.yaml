@@ -51,7 +51,7 @@ steps:
       maintainer cycle. kg.sqlite absent. kg_signal findings=0
       miss_reason=empty_kg.
   step_03b_backlog_fallback:
-    routing: step-03b (AND-of-empty: findings=0, external=0, metric_signal=false)
+    routing: "step-03b (AND-of-empty: findings=0, external=0, metric_signal=false)"
     filtered_count: 0
     selected_candidate_id: mmo-2026-04-21-001
     selected_target: .pHive/meta-team/archive/2026-04-19/MANIFEST.md

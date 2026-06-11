@@ -16,4 +16,4 @@ Toggle OFF: 1 persona (ui-designer) × 1 issue = 1 issue, 1 episode marker.
 
 Q10 design-discussion §6 resolved "by-default" (not gated): one issue per persona. The risk note in the story yaml acknowledges that 3 issues per call may feel heavy for operators — the mitigation is a moldability note (reversible post-ship config), not a default-to-single-issue choice.
 
-Vitest resolver test path pattern: skills/hive/skills/<atom>/test/resolver.test.mjs — confirmed from design-dispatch, review-mode-multica, design-review-mode-multica precedent.
+Vitest resolver test path pattern: `skills/hive/skills/<atom>/test/resolver.test.mjs` — confirmed from design-dispatch, review-mode-multica, design-review-mode-multica precedent.

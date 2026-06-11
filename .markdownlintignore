@@ -4,3 +4,5 @@ ttd-fixture-*/
 ttd-state-*/
 chroma/
 .pHive-test/
+.pHive/
+.hive/
