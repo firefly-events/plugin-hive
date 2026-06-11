@@ -1,7 +1,7 @@
 id: d-5-wireframe-artifact-handoff
 epic: substrate-coverage-and-test-cleanup
 title: Wireframe handoff payload — PNG + .f0 + bundled constraint doc (extensible-minimum posture)
-status: complete
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on:

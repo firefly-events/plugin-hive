@@ -1,7 +1,7 @@
 id: rl-1-status-lifecycle-contract
 epic: release-lifecycle
 title: Canonical status-lifecycle contract reference
-status: shipped
+status: pending
 shipped_at: "2026-06-08T04:51:07Z"
 release_id: "v2.10.0"
 complexity: medium

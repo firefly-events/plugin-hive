@@ -1,7 +1,7 @@
 id: s-3-no-codex-lint
 epic: substrate-coverage-and-test-cleanup
 title: Multi-surface no-codex lint with AST + grep checks + helper-import assertion + npm test wiring
-status: complete
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on:

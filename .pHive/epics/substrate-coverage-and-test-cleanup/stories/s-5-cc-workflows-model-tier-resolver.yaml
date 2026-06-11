@@ -1,7 +1,7 @@
 id: s-5-cc-workflows-model-tier-resolver
 epic: substrate-coverage-and-test-cleanup
 title: Auto-resolve per-persona model tier in cc-workflows mode dispatch + helper extraction
-status: complete
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on:
