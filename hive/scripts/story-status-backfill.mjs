@@ -130,7 +130,26 @@ async function emitKgTriple(epic_id, story_id, old_status, new_status) {
 // ---------------------------------------------------------------------------
 
 const all = deriveAllStatuses({ repo_root: REPO_ROOT });
-const stale = all.filter(r => r.stale && (!EPIC_FILTER || r.epic_id === EPIC_FILTER));
+const candidates = all.filter(r => r.stale && (!EPIC_FILTER || r.epic_id === EPIC_FILTER));
+
+// No-downgrade guard: a terminal YAML status (shipped / complete / completed)
+// is operator- or /ship-owned and must never be rewritten back to a
+// non-terminal derived status. Marker gaps (e.g. Multica runs that never wrote
+// terminal markers) would otherwise clobber accurate release records — the
+// failure mode that produced the bogus reconcile PR after v2.11.0.
+const TERMINAL_YAML = new Set(['shipped', 'complete', 'completed']);
+const TERMINAL_DERIVED = new Set(['shipped', 'completed']);
+const guarded = candidates.filter(
+  r => TERMINAL_YAML.has(r.yaml_status) && !TERMINAL_DERIVED.has(r.derived_status)
+);
+const stale = candidates.filter(r => !guarded.includes(r));
+
+if (guarded.length > 0) {
+  console.warn(`\n⚠ ${guarded.length} downgrade(s) skipped (terminal YAML status outranks non-terminal derivation):`);
+  for (const r of guarded) {
+    console.warn(`  - ${r.epic_id}/${r.story_id}: ${r.yaml_status} would have become ${r.derived_status} — likely missing terminal episode marker`);
+  }
+}
 
 if (stale.length === 0) {
   console.log('All story status fields are current. Nothing to reconcile.');

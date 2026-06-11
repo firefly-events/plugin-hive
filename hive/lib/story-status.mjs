@@ -205,6 +205,19 @@ export function deriveStoryStatus({ epic_id, story_id, repo_root, _visited, _sta
     return 'deferred';
   }
 
+  // 1b. shipped projection is terminal. /ship owns complete -> shipped and only
+  // writes it after a successful release action + artifacts, so a release_id-
+  // stamped shipped status outranks episode markers: markers describe the
+  // historical run and cannot un-release a story. (Multica-mode runs may never
+  // write terminal markers — t-001 capture-gap family — which otherwise leaves
+  // shipped stories deriving as in_progress forever.)
+  if (storyText) {
+    const yamlStatus = readYamlField(storyText, 'status');
+    if (yamlStatus === 'shipped' && readYamlField(storyText, 'release_id')) {
+      return 'shipped';
+    }
+  }
+
   // Collect episode markers
   const markers = readEpisodeMarkers(stateDir, epic_id, story_id);
 
@@ -245,7 +258,7 @@ export function deriveStoryStatus({ epic_id, story_id, repo_root, _visited, _sta
         const depStatus = deriveStoryStatus({
           epic_id, story_id: dep, repo_root: repoRoot, _visited: visited, _state_dir: stateDir,
         });
-        return depStatus === 'completed';
+        return depStatus === 'completed' || depStatus === 'shipped';
       });
       if (!allDepsComplete && markers.length === 0) return 'blocked';
     }
