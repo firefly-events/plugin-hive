@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { resolveStateDir } from './config.js';
+
 const ARTIFACTS = [
   ['post-template.md', 'post.md'],
   ['video-script-template.md', 'video-script.md'],
@@ -17,11 +19,18 @@ function moduleRoot() {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 }
 
-// Honor the configured state directory (paths.state_dir) via HIVE_STATE_DIR,
-// falling back to the default `.pHive`. Keeps release artifacts under the
-// relocated state dir when a consumer overrides it.
-function stateDir() {
-  return process.env.HIVE_STATE_DIR || '.pHive';
+// Absolute state dir for repoRoot, resolved per Q2 precedence:
+// HIVE_STATE_DIR env > root-config paths.state_dir > default `.pHive`.
+function stateDir(repoRoot = process.cwd()) {
+  return resolveStateDir({ cwd: repoRoot });
+}
+
+// Repo-relative form of the state dir for human-facing trace strings
+// (sourcePath). Defaults to '.pHive', matching the pre-resolver output;
+// falls back through '..' segments when the state dir sits outside repoRoot.
+function stateDirTracePrefix(repoRoot = process.cwd()) {
+  const rel = path.relative(repoRoot, stateDir(repoRoot));
+  return rel === '' ? '.' : rel;
 }
 
 // Path-traversal guard for ids that get joined into filesystem paths
@@ -66,7 +75,7 @@ function firstSentence(text) {
   return (match?.[1] ?? compact).trim();
 }
 
-function storyFromYaml(epicId, file, text) {
+function storyFromYaml(epicId, file, text, tracePrefix = stateDirTracePrefix()) {
   const storyId = readScalar(text, 'id') ?? path.basename(file, '.yaml');
   const title = readScalar(text, 'title') ?? storyId;
   const outcome =
@@ -79,11 +88,11 @@ function storyFromYaml(epicId, file, text) {
     storyId,
     title,
     outcome: outcome || title,
-    sourcePath: `${stateDir()}/epics/${epicId}/stories/${path.basename(file)}`,
+    sourcePath: `${tracePrefix}/epics/${epicId}/stories/${path.basename(file)}`,
   };
 }
 
-function normalizeStory(story) {
+function normalizeStory(story, tracePrefix = stateDirTracePrefix()) {
   const epicId = story.epicId ?? story.epic_id ?? story.epic;
   const storyId = story.storyId ?? story.story_id ?? story.id;
   const title = story.title ?? storyId;
@@ -98,7 +107,7 @@ function normalizeStory(story) {
     storyId,
     title,
     outcome,
-    sourcePath: story.sourcePath ?? story.source_path ?? `${stateDir()}/epics/${epicId}/stories/${storyId}.yaml`,
+    sourcePath: story.sourcePath ?? story.source_path ?? `${tracePrefix}/epics/${epicId}/stories/${storyId}.yaml`,
   };
 }
 
@@ -108,9 +117,12 @@ export async function collectShippedStories({ epicIds, repoRoot = process.cwd() 
   }
 
   const stories = [];
+  const resolvedStateDir = stateDir(repoRoot);
+  const tracePrefix = stateDirTracePrefix(repoRoot);
   for (const epicId of epicIds) {
     assertSafeId('epicId', epicId);
-    const storiesDir = path.join(repoRoot, stateDir(), 'epics', epicId, 'stories');
+    // resolvedStateDir is already absolute (resolver output) — no repoRoot join.
+    const storiesDir = path.join(resolvedStateDir, 'epics', epicId, 'stories');
     let files;
     try {
       files = await fs.readdir(storiesDir);
@@ -125,7 +137,7 @@ export async function collectShippedStories({ epicIds, repoRoot = process.cwd() 
       const fullPath = path.join(storiesDir, file);
       const text = await fs.readFile(fullPath, 'utf8');
       if (readScalar(text, 'status') !== 'shipped') continue;
-      stories.push(storyFromYaml(epicId, file, text));
+      stories.push(storyFromYaml(epicId, file, text, tracePrefix));
     }
   }
 
@@ -251,7 +263,7 @@ export async function generateReleasePostArtifacts({
 }) {
   assertSafeId('releaseId', releaseId);
   const stories = shippedStories
-    ? shippedStories.map(normalizeStory)
+    ? shippedStories.map((story) => normalizeStory(story, stateDirTracePrefix(repoRoot)))
     : await collectShippedStories({ epicIds, repoRoot });
   const { values } = renderReleaseArtifacts({
     releaseId,
@@ -263,7 +275,7 @@ export async function generateReleasePostArtifacts({
     generatedAt,
   });
 
-  const outDir = path.join(repoRoot, stateDir(), 'releases', releaseId);
+  const outDir = path.join(stateDir(repoRoot), 'releases', releaseId);
   await fs.mkdir(outDir, { recursive: true });
 
   const written = [];

@@ -2,10 +2,13 @@
 /**
  * Audit multica-run.yaml episode markers for required issue linkage fields.
  *
- * Walks .pHive/episodes/<epic>/<story>/multica-run.yaml (and the legacy
- * .pHive/epics/<epic>/<story>/multica-run.yaml path) under a repo root,
+ * Walks <state-dir>/episodes/<epic>/<story>/multica-run.yaml (and the legacy
+ * <state-dir>/epics/<epic>/<story>/multica-run.yaml path) under a repo root,
  * validates that each file contains non-empty `issue_id` and
  * `issue_identifier` fields, and exits 1 with a report if any are missing.
+ *
+ * <state-dir> follows the sdr-1 resolver: HIVE_STATE_DIR env >
+ * paths.state_dir in <repo-root>/hive.config.yaml > default .pHive.
  *
  * Usage:
  *   node hive/scripts/audit-episode-markers.mjs [repo-root]
@@ -14,14 +17,16 @@
  */
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
-import { join, relative } from 'path';
+import { join, relative, resolve } from 'path';
+import { resolveStateDir } from '../lib/config.js';
 
-const repoRoot = process.argv[2] ?? process.cwd();
+const repoRoot = resolve(process.argv[2] ?? process.cwd());
+const stateDir = resolveStateDir({ cwd: repoRoot });
 
 // Search both canonical path and legacy variant.
 const searchRoots = [
-  join(repoRoot, '.pHive', 'episodes'),
-  join(repoRoot, '.pHive', 'epics'),
+  join(stateDir, 'episodes'),
+  join(stateDir, 'epics'),
 ];
 
 /**

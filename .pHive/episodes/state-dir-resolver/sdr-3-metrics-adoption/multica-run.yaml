@@ -1,0 +1,23 @@
+step: multica-run
+story: "sdr-3-metrics-adoption"
+epic: "state-dir-resolver"
+agent: "developer"
+status: passed
+completion_kind: "code-push"
+artifacts_committed: false
+episode_terminal: true
+requires_code_push_sha: true
+code_push_sha: null
+terminal_by_dialect: false
+started_at: "2026-06-10T19:26:40Z"
+completed_at: "2026-06-10T19:40:32Z"
+artifacts:
+  - "../../../Users/don/.claude/worktrees/state-dir-resolver/.pHive/episodes/state-dir-resolver/sdr-3-metrics-adoption/multica-run.messages.jsonl"
+multica:
+  issue_id: "PLU-250"
+  issue_uuid: "9b33bea7-62ea-4c1e-a58c-6d3d7ab1488a"
+  task_id: "84ca95a3-f343-4f43-a40d-1703ffe062f4"
+  agent_id: "d9946f9a-2747-49d4-b967-2590ffb5be43"
+  work_dir: "/Users/don/multica_workspaces/21c6d282-d6b4-4b25-8d0d-a85e96038416/84ca95a3/workdir"
+  attempts: 1
+notes: ""

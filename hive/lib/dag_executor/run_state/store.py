@@ -27,6 +27,8 @@ from typing import Any
 
 import yaml
 
+from hive.lib.config import resolve_state_dir
+
 from .errors import (
     InvalidRunIdError,
     RunStateFrozenError,
@@ -49,13 +51,27 @@ _RUN_ID_PATTERN = re.compile(
     r"^(?P<ulid>[0-9A-HJKMNP-TV-Z]{26})-(?P<slug>[A-Za-z0-9][A-Za-z0-9_.-]*)$"
 )
 
-_DEFAULT_RUNS_ROOT = Path(".pHive") / "runs"
+def default_runs_root(cwd: Path | None = None) -> Path:
+    """Resolve `<state-dir>/runs` per call via the sdr-1 resolver.
+
+    Precedence comes from ``hive.lib.config.resolve_state_dir``:
+    ``HIVE_STATE_DIR`` env > ``paths.state_dir`` in hive.config.yaml >
+    default ``.pHive`` under ``cwd``. Resolution happens per call (not
+    frozen at import time) so a relocated state dir takes effect without
+    re-importing. Note this relocates RUN STATE only — the executor
+    opt-in config (`.pHive/hive.config.yaml`) and graduation registry
+    (`.pHive/runtime/executor-graduated-workflows.yaml`) are fixed policy
+    locks per design-decisions Q1 and do not move with the state dir.
+    """
+
+    base = Path(cwd) if cwd is not None else Path.cwd()
+    return Path(resolve_state_dir(cwd=base, env=dict(os.environ))) / "runs"
 
 
 def runs_root(root: Path | None = None) -> Path:
-    """Resolve the runs/ root directory; defaults to `.pHive/runs/`."""
+    """Resolve the runs/ root directory; defaults to `<state-dir>/runs/`."""
 
-    return Path(root) if root is not None else _DEFAULT_RUNS_ROOT
+    return Path(root) if root is not None else default_runs_root()
 
 
 def validate_run_id(run_id: str) -> None:

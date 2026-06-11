@@ -7,8 +7,11 @@
  *
  * Flags:
  *   --epic <id>       Filter output to the named epic only
- *   --write           Persist snapshot to .pHive/context-snapshot.json (in addition to stdout)
+ *   --write           Persist snapshot to <state-dir>/context-snapshot.json (in addition to stdout)
  *   --schema-version  Print the schema_version integer and exit 0
+ *
+ * The state dir resolves via the sdr-1 resolver (HIVE_STATE_DIR >
+ * paths.state_dir in hive.config.yaml > default .pHive).
  */
 
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -24,7 +27,7 @@ function usage() {
     '',
     'Options:',
     '  --epic <id>       Filter output to a single epic',
-    '  --write           Also write snapshot to .pHive/context-snapshot.json',
+    '  --write           Also write snapshot to <state-dir>/context-snapshot.json',
     '  --schema-version  Print current schema_version and exit',
   ].join('\n');
 }
@@ -66,6 +69,7 @@ async function main() {
   }
 
   const { composeContextSnapshot } = await import('../../hive/lib/context-snapshot.mjs');
+  const { resolveStateDir } = await import('../../hive/lib/config.js');
 
   const snapshot = composeContextSnapshot({
     stateDir: REPO_ROOT,
@@ -76,7 +80,7 @@ async function main() {
   process.stdout.write(json + '\n');
 
   if (opts.write) {
-    const stateDir = join(REPO_ROOT, '.pHive');
+    const stateDir = resolveStateDir({ cwd: REPO_ROOT });
     mkdirSync(stateDir, { recursive: true });
     const outPath = join(stateDir, 'context-snapshot.json');
     writeFileSync(outPath, json + '\n', 'utf8');

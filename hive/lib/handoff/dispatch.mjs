@@ -20,6 +20,7 @@ import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { resolveStateDir } from '../config.js';
 
 const _require = createRequire(import.meta.url);
 
@@ -210,7 +211,7 @@ function writeEvidence(stateDir, storyId, target, content) {
  * @param {string}  opts.branch
  * @param {number=} opts.pr_number
  * @param {number=} opts.timeout_ms   Wall-clock limit per sub-invocation. Default: execution.terminal_handoff.timeout_seconds from hive.config.yaml, or 1800 s.
- * @param {string=} opts.state_dir    .pHive path for evidence writes. Default '.pHive'.
+ * @param {string=} opts.state_dir    State-dir path for evidence writes. Default: Q2 resolver (HIVE_STATE_DIR env > root-config paths.state_dir > '.pHive').
  * @param {string=} opts.run_id       Opaque label included in evidence filename.
  * @returns {{ ok: true, verdict: string, evidence_ref: string, duration_ms: number }
  *          |{ ok: false, reason: string, duration_ms: number, timeout_at?: string }}
@@ -221,7 +222,9 @@ export async function dispatchHandoff({
   branch,
   pr_number,
   timeout_ms,
-  state_dir = '.pHive',
+  // Lazy default: explicit injection (test seam / --state-dir) wins; the
+  // resolver runs only when the caller passes nothing.
+  state_dir = resolveStateDir(),
   run_id = '',
 }) {
   // Resolve timeout: caller override → config file → hardcoded default (1800 s)

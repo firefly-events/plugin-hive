@@ -1,0 +1,4 @@
+{
+  "type": "commonjs",
+  "description": "Scope marker: hive/lib/package.json declares type:module, which made the CJS github-issues-adapter.js unloadable (require is not defined in ES module scope). This file restores CommonJS scope for hive/lib/external/* so the documented require() entrypoints keep working."
+}

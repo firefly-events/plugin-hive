@@ -1,3 +1,5 @@
+> `$HIVE_STATE_DIR` resolves from `paths.state_dir` in `hive.config.yaml` (default `.pHive`).
+
 # Step 8: Baseline Promotion and Artifact Archival
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
@@ -19,9 +21,9 @@ Review test session results. Promote passing test patterns and verified framewor
 
 **Inputs available:**
 - Session report from step 7 (for pass/fail verdict)
-- Execution results from step 3 (`.pHive/test-artifacts/{epic-id}/{story-id}/results.yaml`)
+- Execution results from step 3 (`${HIVE_STATE_DIR}/test-artifacts/{epic-id}/{story-id}/results.yaml`)
 - Test manifest from step 2 (for framework and pattern information)
-- Current baseline at `.pHive/test-baseline/{project}/baseline-knowledge.md`
+- Current baseline at `${HIVE_STATE_DIR}/test-baseline/{project}/baseline-knowledge.md`
 
 **NOT available (do not read or assume):**
 - Bug fix implementations (fixes happen after test swarm completes)
@@ -52,7 +54,7 @@ Read the session report verdict and results.yaml. Identify:
 
 ### 2. Update baseline knowledge
 
-Read the current baseline at `.pHive/test-baseline/{project}/baseline-knowledge.md`.
+Read the current baseline at `${HIVE_STATE_DIR}/test-baseline/{project}/baseline-knowledge.md`.
 
 Update incrementally (do not overwrite):
 
@@ -94,13 +96,13 @@ Move or tag current session artifacts for long-term reference:
 
 ```bash
 # Ensure archive directory exists
-mkdir -p .pHive/test-artifacts/{epic-id}/{story-id}/archive/
+mkdir -p ${HIVE_STATE_DIR}/test-artifacts/{epic-id}/{story-id}/archive/
 
 # Copy results to archive with timestamp
-cp .pHive/test-artifacts/{epic-id}/{story-id}/results.yaml .pHive/test-artifacts/{epic-id}/{story-id}/archive/results-{timestamp}.yaml
+cp ${HIVE_STATE_DIR}/test-artifacts/{epic-id}/{story-id}/results.yaml ${HIVE_STATE_DIR}/test-artifacts/{epic-id}/{story-id}/archive/results-{timestamp}.yaml
 ```
 
-The primary artifact directory (`.pHive/test-artifacts/{epic-id}/{story-id}/`) remains intact for immediate access. The archive preserves a timestamped snapshot.
+The primary artifact directory (`${HIVE_STATE_DIR}/test-artifacts/{epic-id}/{story-id}/`) remains intact for immediate access. The archive preserves a timestamped snapshot.
 
 ### 4. Produce promotion summary
 
@@ -108,7 +110,7 @@ The primary artifact directory (`.pHive/test-artifacts/{epic-id}/{story-id}/`) r
 promotion_summary:
   story_id: "{story-id}"
   promoted_at: "{timestamp}"
-  baseline_path: ".pHive/test-baseline/{project}/baseline-knowledge.md"
+  baseline_path: "${HIVE_STATE_DIR}/test-baseline/{project}/baseline-knowledge.md"
   promoted:
     frameworks:
       - name: "{framework}"
@@ -126,7 +128,7 @@ promotion_summary:
     - item: "{what was not promoted}"
       reason: "{why — failing, skipped, transient}"
   artifacts_archived:
-    archive_path: ".pHive/test-artifacts/{epic-id}/{story-id}/archive/"
+    archive_path: "${HIVE_STATE_DIR}/test-artifacts/{epic-id}/{story-id}/archive/"
     files_archived: {count}
 ```
 

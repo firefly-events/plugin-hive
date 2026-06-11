@@ -9,8 +9,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from hive.lib.config import resolve_state_dir
 
-DEFAULT_KG_METRICS_DIR = Path(".pHive") / "metrics" / "kg"
+
+def default_kg_metrics_dir() -> Path:
+    """Resolve the default kg metrics dir per call via the sdr-1 resolver
+    (HIVE_STATE_DIR env > paths.state_dir in hive.config.yaml > .pHive),
+    so writes land in the same tree the shell metrics hooks use instead of
+    a literal cwd-relative .pHive."""
+    return Path(resolve_state_dir(cwd=Path.cwd(), env=os.environ)) / "metrics" / "kg"
 
 _buffered_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
@@ -54,7 +61,7 @@ def flush_cycle(
     proposals: int,
     hit_rate_5cycle: float,
     miss_reason: str | None = None,
-    metrics_dir: str | os.PathLike[str] = DEFAULT_KG_METRICS_DIR,
+    metrics_dir: str | os.PathLike[str] | None = None,
     timestamp: str | None = None,
 ) -> Path:
     """Flush buffered kg_write rows plus one cycle summary row.
@@ -90,6 +97,8 @@ def flush_cycle(
     if not re.fullmatch(r"[A-Za-z0-9._-]+", cycle_id):
         raise ValueError(f"cycle_id contains invalid characters: {cycle_id!r}")
 
+    if metrics_dir is None:
+        metrics_dir = default_kg_metrics_dir()
     output_dir = Path(metrics_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = (output_dir / f"{cycle_id}.jsonl").resolve()
@@ -205,7 +214,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--proposals", type=int, required=True)
     parser.add_argument("--hit-rate-5cycle", type=float, required=True)
     parser.add_argument("--miss-reason")
-    parser.add_argument("--metrics-dir", default=str(DEFAULT_KG_METRICS_DIR))
+    # Default None → flush_cycle resolves <state-dir>/metrics/kg per call.
+    parser.add_argument("--metrics-dir", default=None)
     parser.add_argument("--report-path")
     args = parser.parse_args(argv)
 

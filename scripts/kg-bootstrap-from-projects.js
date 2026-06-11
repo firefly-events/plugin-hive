@@ -21,6 +21,15 @@
  *   HIVE_PROJECTS_REGISTRY=/tmp/test.yaml node scripts/kg-bootstrap-from-projects.js
  *
  * Registry schema documented at hive/references/system-config.md.
+ *
+ * STATE-DIR CLASSIFICATION (sdr-3): maintainer-only — stays literal.
+ * Nothing in hooks/, skills/, or workflows invokes this at runtime; it is an
+ * operator bootstrap with a dry-run default and a TTY confirmation prompt.
+ * The walked `{project}/.pHive/cycle-state` paths are intentionally literal
+ * per design-decisions Q3: the projects registry records only `path` + `name`,
+ * so a registered project's configured state dir is not knowable here without
+ * resolving each project's own hive.config.yaml — out of scope for a
+ * maintainer seeding tool.
  */
 
 const path = require('path');

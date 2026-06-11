@@ -25,6 +25,13 @@
  *   `idx_unique_triple(subject, predicate, object, source_epic)` index.
  *   Without the prefix, project B's triples would be silently dropped by
  *   INSERT OR IGNORE.
+ *
+ * STATE-DIR CLASSIFICATION (sdr-3): maintainer-only — stays literal.
+ * Nothing in hooks/, skills/, or workflows invokes this at runtime; it is a
+ * one-time seeding utility run by an operator (or by the maintainer-only
+ * kg-bootstrap-from-projects.js). The default `.pHive/cycle-state` path is
+ * intentional per design-decisions Q3 (proof/one-time scripts keep literal
+ * paths); relocated projects can pass --cycle-state-dir explicitly.
  */
 
 const path = require('path');
