@@ -1,0 +1,74 @@
+episode_marker:
+  story_id: d-1-design-multi-persona-pipeline
+  epic: substrate-coverage-and-test-cleanup
+  step: implement
+  agent: developer
+  status: complete
+  timestamp: "2026-06-08T00:00:00Z"
+
+insight_capture:
+  personas:
+    - developer
+  count: 1
+  memory_path: hive/agents/memories/developer/d-1-phase-a-insert-above-not-replace.md
+
+files_modified:
+  - path: skills/design/SKILL.md
+    change: >
+      Inserted Phase 0 (design-dispatch invocation before persona phase) above existing step 1.
+      Inserted Phase A (persona pipeline assembly) above existing step 3.
+      Phase A cites hive/workflows/design-review.workflow.yaml:8-81 as orchestration template anchor.
+      Added --include-constraints flag documentation.
+      Updated steps 5/6/7 to document constraint artifact output when toggle ON.
+      Updated "What /design is NOT" to clarify Phase A toggle is the only multi-persona surface.
+      Updated Atomic-skill invariants to add Phase 0 + Phase A invariants.
+      Added accessibility-specialist + animations-specialist to See also section.
+      Downstream steps 3-7 content preserved; only Phase A inserted above step 3.
+
+ac_verification:
+  subsection_1_phase_a_structural_insert:
+    status: pass
+    evidence: >
+      Phase A block exists above step 3 in skills/design/SKILL.md.
+      Phase A cites hive/workflows/design-review.workflow.yaml:8-81 inside the block prose
+      (the 4-step assembly+serial-dispatch shape — accessibility:8, animations:28,
+      ui-designer-critique:55, synthesis:80).
+      Phase 0 invokes design-dispatch before the persona phase.
+  subsection_2_pattern_b_toggle_semantics:
+    status: pass
+    evidence: >
+      --include-constraints flag documented in the Optional flags section (default OFF).
+      Default OFF: "Phase A is a no-op. Proceed directly to step 3 (single ui-designer dispatch).
+      Legacy behavior is preserved byte-for-byte: no accessibility-specialist invocation,
+      no animations-specialist invocation."
+      Toggle ON: serial dispatch (a) accessibility-specialist → (b) animations-specialist →
+      (c) ui-designer ONCE with constraints baked into the prompt.
+  subsection_3_handoff_payload:
+    status: pass
+    evidence: >
+      Phase A prose documents: constraint artifacts (.pHive/design/<topic>/accessibility-constraints.md
+      + animations-constraints.md) are bundled with ui-designer outputs (PNG + .f0).
+      Bundled payload contract explicitly deferred to d-5: "The bundled wireframe-handoff payload
+      contract... is owned by d-5 (next story)."
+      Toggle OFF: constraint doc fields absent/empty. PNG + .f0 always ship.
+      Step 5 and step 6 document conditional inclusion of constraint paths.
+
+design_decisions:
+  - decision: Phase A is INSERT-ABOVE step 3, not a replace
+    rationale: >
+      Step 3 content (ui-designer dispatch) becomes the terminal dispatch point for both
+      toggle-off (unmodified) and toggle-on (with constraints prepended) paths.
+      Downstream steps 4-7 content preserved exactly.
+  - decision: specialist-triggers wired as direct dispatch within Phase A
+    rationale: >
+      specialist-triggers.md has no pre-existing design-time constraint trigger entry.
+      Story spec files_to_modify does not include specialist-triggers.md.
+      Implemented as direct persona spawn within Phase A block, following the pattern established
+      by design-review.workflow.yaml (the orchestration template anchor). This is architecturally
+      correct — specialist-triggers.md covers runtime append triggers; Phase A is a design-time
+      constraint-injection pass with its own flag gate.
+  - decision: "What /design is NOT" updated to clarify toggle behavior
+    rationale: >
+      Original line 137 stated /design "does not run the accessibility-specialist or
+      animations-specialist passes itself" — false when --include-constraints is on.
+      Updated to clarify Phase A toggle is the only multi-persona surface; default OFF unchanged.

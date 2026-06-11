@@ -2,7 +2,7 @@ id: L1.2
 epic: meta-improvement-system
 slice: S7
 title: Envelope loader and writer
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: ["L1.1", "C1.3", "C1.4"]

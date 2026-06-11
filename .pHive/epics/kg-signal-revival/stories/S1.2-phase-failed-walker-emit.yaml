@@ -1,7 +1,7 @@
 id: S1.2-phase-failed-walker-emit
 epic: kg-signal-revival
 title: Emit phase_failed at dag_executor walker fail path
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [S1.1-emit-foundation-knob-counter]

@@ -1,0 +1,70 @@
+id: b2-fk-enforcement-audit
+epic: kg-repair-activation
+tracker_id: "aac670c6-91db-465c-92b5-911205531b5e"
+tracker_url: ""
+tracker_number: "PLU-84"
+title: "Audit + enable PRAGMA foreign_keys on kg.sqlite connections"
+status: complete
+complexity: low
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Schema declares "predicate TEXT NOT NULL REFERENCES predicates(predicate)" but SQLite does not enforce FKs unless "PRAGMA foreign_keys = ON" runs per-connection. If FK is off, undeclared-predicate emits (e.g. phase_handoff bug) succeed silently. Audit every sqlite3.connect callsite in hive/lib/kg_*, hive/lib/dag_executor, scripts/kg-*. Ensure PRAGMA is set after every connect. Add a regression test: attempt INSERT with undeclared predicate; expect IntegrityError.
+
+acceptance_criteria:
+  - "Given every sqlite3.connect() on kg.sqlite in the repo, when audited, then each connection has \"PRAGMA foreign_keys = ON\" executed immediately after open OR uses a shared connection helper that does so."
+  - "Given an INSERT statement attempts to write a triple with an undeclared predicate, when foreign keys are ON, then the INSERT raises sqlite3.IntegrityError."
+  - "Given the regression test runs against a fresh kg.sqlite seeded from schema bootstrap, when the test attempts to insert with predicate=\"bogus_undeclared\", then sqlite3.IntegrityError is raised."
+  - "Given the audit finds connections that previously skipped the PRAGMA, when those callsites are patched, then they pass a lint test that greps for \"sqlite3.connect.*kg\" without \"PRAGMA foreign_keys\" within 10 lines."
+
+steps:
+  - id: research
+    description: Explore the codebase for relevant patterns, files, and constraints
+    agent: researcher
+  - id: implement
+    description: Implement the story according to spec and research findings
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Write tests covering acceptance criteria and verify they pass
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review implementation and tests for correctness and convention compliance
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+files_to_modify:
+  - file: hive/lib/kg_emit.py
+    change: Add PRAGMA foreign_keys = ON after sqlite3.connect
+  - file: hive/lib/kg_why.py
+    change: Same
+  - file: hive/lib/dag_executor/executor/walker.py
+    change: Same — if it opens its own connection
+  - file: scripts/kg-bootstrap-from-projects.js
+    change: Same — if not already enforced
+  - file: scripts/kg-import-cycle-state.js
+    change: Same
+  - file: tests/test_kg_fk_enforcement.py
+    change: New regression test
+
+metric:
+  applies: true
+  name: kg.fk_enforcement_coverage
+  direction: up
+  unit: percent-of-connections
+  baseline: "unknown-pending-audit"
+  target: 100
+  window: post-merge-immediate
+  source:
+    kind: sql
+    ref: "grep audit count + regression test pass"
+  verify_at: integrate
+  owner: reviewer

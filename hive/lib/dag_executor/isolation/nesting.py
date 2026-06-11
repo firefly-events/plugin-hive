@@ -21,6 +21,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from hive.lib.dag_executor.run_state.store import default_runs_root
+
 
 META_META_OPTIMIZE_WORKTREES_PREFIX = Path(".pHive") / "meta-team" / "worktrees"
 
@@ -118,7 +120,10 @@ def decide_run_worktree(
     outer = detect_outer_worktree(cwd)
     if outer is not None and is_meta_meta_optimize_worktree(outer, repo_root=main_repo):
         return WorktreeDecision(path=outer, owned_by_us=False, reused_outer=True)
-    runs_dir = runs_root if runs_root is not None else (main_repo / ".pHive" / "runs")
+    # Default resolves via the sdr-1 resolver anchored at the MAIN repo
+    # root (not cwd, which may be inside a worktree) so fresh run paths
+    # follow a relocated state dir while staying repo-anchored.
+    runs_dir = runs_root if runs_root is not None else default_runs_root(cwd=main_repo)
     return WorktreeDecision(
         path=Path(runs_dir) / run_id,
         owned_by_us=True,

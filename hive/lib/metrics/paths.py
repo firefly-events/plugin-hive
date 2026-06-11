@@ -3,18 +3,27 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from hive.lib.config import resolve_state_dir
+
 from .errors import MetricsPathBoundaryError
 
 
-PACKAGE_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = PACKAGE_DIR.parents[2]
-DEFAULT_METRICS_ROOT = PROJECT_ROOT / ".pHive" / "metrics"
-
-
 def get_metrics_root() -> Path:
+    """Resolve the metrics root, per call (not frozen at import time).
+
+    Precedence: ``METRICS_ROOT`` env (existing metrics-specific seam, used by
+    tests and the maintainer proof scripts) > ``<state-dir>/metrics``, where
+    ``<state-dir>`` comes from the sdr-1 resolver (``HIVE_STATE_DIR`` env >
+    ``paths.state_dir`` in hive.config.yaml > default ``.pHive`` under cwd).
+    The previous default was pinned to this package's repo root, which
+    diverged from the shell metrics hooks (they write relative to cwd) —
+    adopting the resolver closes that writer/reader split.
+    """
     override = os.environ.get("METRICS_ROOT")
-    root = Path(override).expanduser() if override else DEFAULT_METRICS_ROOT
-    return root.resolve()
+    if override:
+        return Path(override).expanduser().resolve()
+    state_dir = resolve_state_dir(cwd=Path.cwd(), env=os.environ)
+    return (Path(state_dir) / "metrics").resolve()
 
 
 def resolve_metrics_path(*parts: str, for_write: bool = False) -> Path:

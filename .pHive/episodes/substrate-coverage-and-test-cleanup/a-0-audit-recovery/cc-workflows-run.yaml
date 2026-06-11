@@ -1,0 +1,52 @@
+step_id: cc-workflows-run
+story_id: a-0-audit-recovery
+epic_id: substrate-coverage-and-test-cleanup
+status: passed
+verdict: pass
+timestamp: "2026-06-05T21:14:00Z"
+mode: cc-workflows
+runtime: workflows
+run_id: wf_066f4f10-1b3
+script_path: /Users/don/.claude/projects/-Users-don--claude-worktrees-substrate-coverage/a771dc45-7558-43c9-bd23-4bc2cb34e59e/workflows/scripts/execute-a-0-audit-recovery-wf_3ab80e28-9e2.js
+transcript_dir: /Users/don/.claude/projects/-Users-don--claude-worktrees-substrate-coverage/a771dc45-7558-43c9-bd23-4bc2cb34e59e/subagents/workflows/wf_066f4f10-1b3
+commit: 65224dc
+integration_branch: feat/substrate-coverage-and-test-cleanup
+agents:
+  - phase: research
+    persona: researcher
+    model: sonnet
+    verdict: pass
+  - phase: implement
+    persona: developer
+    model: sonnet
+    verdict: pass
+  - phase: test
+    persona: tester
+    model: sonnet
+    verdict: pass
+  - phase: review
+    persona: reviewer
+    model: opus
+    verdict: pass
+usage:
+  agent_count: 4
+  subagent_tokens: 217555
+  tool_uses: 47
+  duration_ms: 311571
+artifacts:
+  created:
+    - .pHive/epics/substrate-coverage-and-test-cleanup/docs/audit-recovery-decision.md
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/a-0-audit-recovery/implement.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/a-0-audit-recovery/test.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/a-0-audit-recovery/review.yaml
+  modified:
+    - .pHive/epics/substrate-coverage-and-test-cleanup/docs/design-discussion.md
+notes: |
+  First-party cc-workflows-mode dispatch executed end-to-end. Branch (a)
+  closed (no audit file found); branch (b) infeasible within budget;
+  branch (c) decision doc + verbatim §5 splice landed. All 4 phase agents
+  returned verdict=pass. Per-agent model tier set explicitly per
+  model_tiers + model_overrides (sonnet for creators/tester, opus for
+  reviewer). Substrate gap surfaced: cc-workflows mode skill does not
+  auto-resolve per-persona model tier from config — orchestrator-set
+  `model:` per agent() call is the only path until skill closes this.

@@ -10,10 +10,14 @@
  * when the sidecar is unavailable.
  */
 
-const fs = require('fs');
-const http = require('http');
-const os = require('os');
-const path = require('path');
+// ESM module: hive/lib/package.json declares `"type": "module"`, so plain
+// `.js` files in this package scope are ES modules (the previous CJS form was
+// un-loadable here — same conversion as config.js). Named exports unchanged;
+// on Node >= 20.19 `require()` of this file works via require(esm).
+import fs from 'node:fs';
+import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
 
 const DEFAULT_HOST = 'localhost';
 const DEFAULT_PORT = 8000;  // ChromaDB default HTTP port
@@ -205,4 +209,4 @@ async function index(collectionName, docId, content, metadata = {}, host = DEFAU
   });
 }
 
-module.exports = { isAvailable, query, index, ensureDecisionsCollection, readDynamicPort };
+export { isAvailable, query, index, ensureDecisionsCollection, readDynamicPort };

@@ -1,7 +1,7 @@
 id: c-5a-dispatch-module-and-config-schema
 epic: task-tracking-adapter-abi
 title: Hive-side dispatch module + hive.config.yaml task_tracking schema
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: [c-3-github-adapter-as-abi-validator, c-4-linear-adapter-as-abi-validator]

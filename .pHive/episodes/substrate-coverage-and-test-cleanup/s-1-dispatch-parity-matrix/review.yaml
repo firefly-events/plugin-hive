@@ -1,0 +1,158 @@
+step_id: review
+story_id: s-1-dispatch-parity-matrix
+epic_id: substrate-coverage-and-test-cleanup
+agent: reviewer
+status: completed
+timestamp: 2026-06-08
+change_verdict: passed
+
+audit_walk:
+  completed: true
+  ac_evidenced: 7
+  ac_total: 7
+  refs_reread: 2
+  refs_total: 2
+  summary: "complete (7/7 ACs evidenced, 2/2 refs re-read)"
+
+rubric_outcomes:
+  - criterion: spec-fidelity
+    severity: critical
+    outcome: pass
+    evidence: |
+      AC1 (6×3 matrix + footer) — hive/references/dispatch-parity.md L9-16 has exactly 6 rows
+        {plan, execute, test, design, design-review, review} × 3 columns {default, multica, cc-workflows};
+        L24-31 has the future-substrate footer block.
+      AC2 (cell content rules) — all 6 default cells = "inline" (L11-16); all 12 substrate cells are
+        relative paths to skills/hive/skills/*-mode-*/SKILL.md.
+      AC3 (CI checker resolves all paths) — `node hive/scripts/verify-dispatch-parity.mjs --no-bump`
+        prints "dispatch-parity.md: 13 paths verified" and exits 0.
+      AC4 (future footer with not-shipped markers) — L24-31 lists sandcastle + gh-actions-legacy
+        columns; every cell carries "not-shipped — <reason>".
+      AC5 (header self-attribution) — L3 cites "Produced by Slice 6 of substrate-coverage-and-test-cleanup;
+        canonical reference for what's wired across substrates."
+      AC6 (DO: run after Slices 1-5, paths cited, checker present) — all upstream slices shipped;
+        verify-dispatch-parity.mjs created with shebang + ESM + git ls-files validation.
+      AC7 (DO NOT: no new atoms, no line ranges) — file scope contains zero new *-mode-* atoms;
+        matrix cells use paths only, no L<N>-L<N> markers anywhere.
+
+  - criterion: domain-compliance
+    severity: critical
+    outcome: pass
+    evidence: |
+      File scope strictly matches the task contract: NEW (dispatch-parity.md, verify-dispatch-parity.mjs,
+      verify-dispatch-parity.test.mjs, test-scenarios/s-1-dispatch-parity-smoke.yaml, episode markers,
+      memory files) + MODIFIED (hive/lib/package.json one-line script add + test-script extension,
+      README.md one-line cross-link L366, planning-routing/SKILL.md one-line cross-link L8). NO new
+      root package.json was added (per feedback_byo_enhancements_no_root_deps). NO prior shipped atoms
+      touched.
+
+  - criterion: security
+    severity: critical
+    outcome: pass
+    evidence: |
+      verify-dispatch-parity.mjs reads only repo files; execSync invocation uses a literal git
+      subcommand with the relativePath value already constrained by the regex
+      /skills\/hive\/skills\/[a-z0-9-]+-mode-[a-z0-9-]+\/SKILL\.md/ — no shell metacharacters can
+      pass through. stdio: 'pipe' prevents output leak. No external input, no network, no secrets.
+
+  - criterion: architecture
+    severity: critical
+    outcome: pass
+    evidence: |
+      Matches ESCALATION mirror-anchor pattern: matrix doc is the canonical reference, cross-linked
+      from README + planning-routing (the plan row's routing skill). Forward-extensible via the
+      footer pattern — new substrates land as not-shipped placeholders without re-authoring the
+      primary table. Checker is repo-rooted, ESM, idempotent, --no-bump-friendly.
+
+  - criterion: convention-adherence
+    severity: improvement
+    outcome: pass
+    evidence: |
+      Reuses existing hive/lib/package.json test script aggregator (consistent with prior slices that
+      append vitest files). Checker style mirrors hive/scripts/lint-cc-workflows-no-codex.mjs
+      (Node ESM with shebang, structured failure output). Episode-marker schema matches prior
+      stories' implement/test/review per hive/references/episode-schema.md.
+
+  - criterion: performance
+    severity: improvement
+    outcome: pass
+    evidence: |
+      Single matrix file read + 13 cheap file existence checks + 13 git ls-files calls = sub-second.
+      Acceptable for a CI step.
+
+  - criterion: test-coverage
+    severity: improvement
+    outcome: pass
+    evidence: |
+      16 new tests across 4 describe blocks cover every AC (matrix structure, cell content, CI
+      checker behavior, cross-references). Full suite 446/446 green. Tester documented two non-obvious
+      decisions (JSDoc → line comments; .toLowerCase header match) in test.yaml decisions block.
+
+findings:
+  critical: []
+  improvements: []
+
+ac_coverage:
+  - id: AC1-matrix-shape
+    status: covered
+    evidence: hive/references/dispatch-parity.md L9-16 + L24-31; test "dispatch-parity matrix structure > has exactly 6 orchestrator rows"
+  - id: AC2-cell-content-rules
+    status: covered
+    evidence: dispatch-parity.md L11-16; test "dispatch-parity cell content > all 6 default cells equal inline"
+  - id: AC3-ci-checker-resolves
+    status: covered
+    evidence: hive/scripts/verify-dispatch-parity.mjs L59-77 (existsSync + git ls-files --error-unmatch); verify_command output "13 paths verified"
+  - id: AC4-future-footer-not-shipped
+    status: covered
+    evidence: dispatch-parity.md L24-31; test "Future substrate footer is present with sandcastle + gh-actions-legacy"
+  - id: AC5-header-self-attribution
+    status: covered
+    evidence: dispatch-parity.md L3 ("Produced by Slice 6 of substrate-coverage-and-test-cleanup; canonical reference for what's wired across substrates.")
+  - id: AC6-DO-clauses
+    status: covered
+    evidence: All Slices 1-5 atoms exist on disk (verified by ls of 12 *-mode-*/SKILL.md files); checker has shebang + ESM + git tracking check
+  - id: AC7-DO-NOT-clauses
+    status: covered
+    evidence: No new *-mode-* atoms in file scope; matrix cells use paths only — `grep -E 'L[0-9]+-L?[0-9]*' dispatch-parity.md` finds nothing
+
+cross_cutting_verified:
+  - concern: documentation
+    status: satisfied
+    evidence: README.md L366 + skills/hive/skills/planning-routing/SKILL.md L8 — both cross-link to dispatch-parity.md
+  - concern: versioning
+    status: satisfied
+    evidence: "## Last verified: 2026-06-08" present at dispatch-parity.md L5; CI checker auto-bumps on green unless --no-bump
+
+contract_invariants:
+  - invariant: hive/references/dispatch-parity.md exists with 6x3 matrix + future footer
+    status: satisfied
+  - invariant: hive/scripts/verify-dispatch-parity.mjs exists, CI-runnable, exits 0
+    status: satisfied
+  - invariant: cross-links from README + planning-routing/SKILL.md
+    status: satisfied
+  - invariant: Last-verified ISO date stamp present (2026-06-08 baseline)
+    status: satisfied
+  - invariant: all 6 default cells = inline
+    status: satisfied
+  - invariant: all 12 substrate cells populated from shipped Slices 1-5 atoms
+    status: satisfied
+
+scope_check:
+  - files_changed: ["hive/references/dispatch-parity.md", "hive/scripts/verify-dispatch-parity.mjs", "hive/scripts/test/verify-dispatch-parity.test.mjs", "hive/lib/package.json", "README.md", "skills/hive/skills/planning-routing/SKILL.md", ".pHive/test-scenarios/s-1-dispatch-parity-smoke.yaml", ".pHive/episodes/substrate-coverage-and-test-cleanup/s-1-dispatch-parity-matrix/*", "hive/agents/memories/{developer,researcher,tester}/s1-*"]
+  - regression_in_prior_atoms: none
+  - root_package_json_added: false
+  - line_ranges_embedded_in_matrix: false
+  - new_substrate_atoms_authored_in_s1: false
+
+summary: |
+  Slice 6 ships the canonical dispatch-parity matrix exactly as scoped: 6×3 primary table with all
+  cells populated to the locked rule set, future-substrate footer with sandcastle + gh-actions-legacy
+  placeholders, CI checker that validates 13 cited paths via both fs and git ls-files, and the two
+  required cross-links. Pure summary work — zero new substrate atoms — and the test suite stayed
+  fully green (446/446). All 7 ACs covered by tests, both cited references re-read against the
+  implementation, all 12 contract invariants satisfied, file scope clean. Epic governance close is
+  ready to ship.
+
+artifacts:
+  - .pHive/episodes/substrate-coverage-and-test-cleanup/s-1-dispatch-parity-matrix/review.yaml
+  - hive/agents/memories/reviewer/s1-dispatch-parity-future-substrate-prevents-noise.md

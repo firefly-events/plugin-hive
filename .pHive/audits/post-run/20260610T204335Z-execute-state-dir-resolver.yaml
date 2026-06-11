@@ -1,0 +1,34 @@
+run_id: execute-state-dir-resolver-20260610T204335Z204335Z
+skill: execute
+epic_id: state-dir-resolver
+gate_lift_fired: false
+methodology: classic
+methodology_source: epic-yaml
+mode_decision: multica
+mode_source: user-directive
+backend_sources:
+  sessions_enabled: default
+  parallel_teams: hive-config
+  terminal_mux: hive-config
+  executor: default
+stories_completed: [sdr-10-executable-prose-conversion, sdr-2-story-session-state-adoption, sdr-3-metrics-adoption, sdr-4-context-snapshot-triage-adoption, sdr-5-task-tracking-release-handoff-adoption, sdr-6-scenarios-audits-reverse-sync-adoption, sdr-7-dag-executor-runstate-relocation, sdr-9-shell-semantic-guard-coverage, sdr-8-runstate-archival-sweep]
+stories_failed: []
+multica_terminals: 9
+verification: >
+  cross-story tester PASS — python 350 passed / 20 failed (all 20 pre-existing
+  dag_executor workflow-YAML content assertions, files untouched by epic);
+  node 166/190 passed (24 pre-existing: ESM-scope require failures + stale
+  multica-docs-version pin), all 7 new epic node test files green; no
+  hardcoded .pHive stragglers in converted files (remaining literals are
+  docstrings, resolver fallbacks, sdr-9 guard regex, documented cross-project
+  walker paths); no conflict markers; 79 files +3948/-178.
+advisories:
+  - META_META_OPTIMIZE_WORKTREES_PREFIX in nesting.py stays literal .pHive
+    (fixed detection convention, out of scope per tester)
+nonsensical_defaults: []
+notes: >
+  Second fully Multica-driven epic (after kg-repair-activation). Two depths
+  (8 + 1 stories), serial within depth, attempts=1 on all 9 terminals.
+  Agents committed direct-on-branch; both reconciles were clean
+  fast-forwards. Issues PLU-248..256 closed manually by the driving
+  orchestrator (multica issue update --status done).

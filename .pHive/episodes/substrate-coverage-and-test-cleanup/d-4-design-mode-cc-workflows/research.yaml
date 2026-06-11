@@ -1,0 +1,161 @@
+step: research
+story_id: d-4-design-mode-cc-workflows
+epic: substrate-coverage-and-test-cleanup
+agent: researcher
+status: passed
+completed_at: "2026-06-08T00:00:00Z"
+
+findings:
+
+  # 1. plan-mode-cc-workflows canonical shape
+  plan_mode_mirror:
+    h1: "Hive Plan Mode — CC Workflows"
+    summary: >
+      Atomic skill for cc-workflows planning dispatch. Per-persona fan-out via Workflow tool.
+      One Workflow script per persona (not one script for all personas).
+    state_dir_resolution: "HIVE_STATE_DIR = hive_config.paths.state_dir || '.pHive'"
+    invocation_contract:
+      inputs: [assembled_personas[], planning_story, epic_handle, hive_config, integration_branch]
+      outer_seam_invariant: true  # fixed call signature never changes
+    step_0_precondition:
+      import_path: "../../../hive/lib/cc-workflows-preconditions.mjs"
+      call: "assertWorktreeIsolation()"
+      first_action: true
+    step_1_dispatch:
+      pattern: per_persona_serial
+      script_shape: "one meta block + one phase() per persona + one agent() per persona"
+      defensive_args: "const a = typeof args === 'string' ? JSON.parse(args) : args;"
+      opts_model_required: true
+      model_tier_import: "import { resolveModelTier } from 'hive/lib/cc-workflows-model-tier.mjs'"
+      model_tier_call: "resolveModelTier(persona, { config: hive_config })"
+      no_codex: "every agent() call uses default workflow subagent — agentType:codex forbidden"
+    step_2_poll: "per-persona poll to terminal via <task-notification> with <result>/<status>/<usage>"
+    step_3_marker:
+      path: "${HIVE_STATE_DIR}/episodes/{epic_handle}/{planning_story.id}-{persona}/cc-workflows-run.yaml"
+      sidecar: "${HIVE_STATE_DIR}/episodes/{epic_handle}/{planning_story.id}-{persona}/cc-workflows-run.messages.jsonl"
+      field_sources_agent_models: true  # records per-phase model tier with source tracing
+    step_4_sidecar_deferral: "documented no-op — mirrors execute-mode-cc-workflows structure"
+    reconciliation: "serial persona-dispatch order; orchestrator commits after skill returns"
+    configuration:
+      hive_config_key: "planning.mode: cc-workflows"
+      env_var: "HIVE_PLANNING_MODE=cc-workflows"
+    insight_capture_suffix: "MANDATORY on every agent() prompt — persona-substituted template"
+
+  # 2. design-mode-multica (d-3) persona set resolution
+  d3_persona_set:
+    toggle_off_default:
+      include_constraints: false
+      persona_set: ["ui-designer"]
+      issue_count: 1
+    toggle_on:
+      include_constraints: true
+      persona_set: ["accessibility-specialist", "animations-specialist", "ui-designer"]
+      issue_count: 3
+    dispatch_order: "accessibility-specialist → animations-specialist → ui-designer (serial)"
+    prior_outputs_map: "accumulates terminal.notes per persona; passed as context to later personas"
+    q10_contract: "one issue per persona — do NOT collapse into single bundled issue"
+    d4_difference: "d-4 uses same persona resolution but dispatches via Workflow tool, not Multica issue creation"
+
+  # 3. design-review-mode-cc-workflows (dr-3) atom anatomy
+  dr3_atom_anatomy:
+    shape: "ONE Workflow run, FOUR sequential agent() calls inside ONE phase()"
+    contrast_with_plan_mode: "plan-mode = per-persona fan-out (N runs); dr-3 = single run, N calls inside"
+    step_0_identical: "same assertWorktreeIsolation import + call"
+    step_1_dispatch:
+      model_tier_calls: 4  # all resolved before assembly
+      phase_name: "DesignReview"
+      four_agents: [accessibility-specialist, animations-specialist, ui-designer-critique, ui-designer-synthesis]
+    step_3_marker: "ONE marker capturing all 4 outputs (contrast: plan-mode = one marker per persona)"
+    insight_capture_suffix: "MANDATORY on EACH of the 4 agent() prompts"
+    field_sources_agent_models: "keyed by phase/role (DesignReview/accessibility-specialist etc.)"
+
+  # 4. review-mode-cc-workflows (r-3) solo dispatch
+  r3_solo_dispatch:
+    shape: "ONE Workflow run, ONE agent() call (solo reviewer)"
+    reduces_to_when_toggle_off: "d-4 toggle OFF reduces to same single-agent dispatch shape"
+    step_0: "identical assertWorktreeIsolation import"
+    step_1: "ONE phase() named Review, ONE agent(reviewer, opts.model=reviewerTier)"
+    marker: "ONE cc-workflows-run.yaml (not per-persona)"
+
+  # 5. design/SKILL.md Phase 0 handoff
+  design_skill_phase_0:
+    mode_decision_cc_workflows: >
+      When design-dispatch returns mode_decision=cc-workflows, /design stops inline
+      and hands off to skills/hive/skills/design-mode-cc-workflows/SKILL.md.
+      Does NOT continue inline persona phase.
+    include_constraints_toggle_flows_through: >
+      --include-constraints toggle resolved in Phase A affects persona set passed
+      to the cc-workflows atom (same toggle OFF=[ui-designer], ON=[3 personas]).
+
+  # 6. design-dispatch (d-2) contract
+  design_dispatch_contract:
+    input_key: "HIVE_DESIGN_MODE"
+    resolveMode_call: "resolveMode('HIVE_DESIGN_MODE', ctx)"
+    outputs: [mode_decision, mode_reason, runner_path, runner_reason, field_sources, gate_violations]
+    routing: "cc-workflows → forward to design-mode-cc-workflows/SKILL.md"
+
+  # 7. cc-workflows-preconditions.mjs
+  preconditions_helper:
+    export: "assertWorktreeIsolation(cwd = process.cwd())"
+    import_path_from_skill: "../../../hive/lib/cc-workflows-preconditions.mjs"
+    worktree_re: "/\\.claude\\/worktrees\\/[^/]+/"
+    throws_on_fail: true
+    error_shape: "err.precondition_failed = true; err.field_sources = { worktree_isolation: {...} }"
+
+  # 8. cc-workflows-model-tier.mjs
+  model_tier_resolver:
+    signature: "resolveModelTier(persona, { config })"
+    precedence: "model_overrides > model_tiers > default('sonnet' + WARN)"
+    returns: "{ tier: 'sonnet'|'opus'|'haiku', source: 'model_overrides'|'model_tiers'|'default' }"
+    d4_personas: [accessibility-specialist, animations-specialist, ui-designer]
+    never_read_frontmatter: true  # per feedback_frontmatter_base_tier_not_override
+
+  # 9. lint-cc-workflows-no-codex.mjs — 4 checks
+  s3_lint_checks:
+    scope: "skills/hive/skills/*-mode-cc-workflows/SKILL.md ONLY"
+    d4_in_scope: true  # design-mode-cc-workflows ends in -mode-cc-workflows
+    check_1: "agentType-literal-ast — no agentType: codex:codex-rescue in code blocks (angle-bracket placeholder exempt)"
+    check_2: "codex-rescue-grep — no codex:codex-rescue string in code blocks (placeholder exempt)"
+    check_3: "agent-backends-grep — no agent_backends in code blocks"
+    check_4: "cc-workflows-preconditions-import — file must contain 'hive/lib/cc-workflows-preconditions.mjs'"
+    all_4_must_pass: true
+
+  # 10. dispatch shape for d-4
+  d4_dispatch_shape:
+    one_workflow_run_per_design_dispatch: true
+    internal_structure: "pipeline()/phase() chain executing N personas serially"
+    n_when_toggle_off: 1  # ui-designer only
+    n_when_toggle_on: 3   # accessibility-specialist, animations-specialist, ui-designer
+    each_agent_carries: [opts.model, insight_capture_suffix]
+    no_codex_agentType: true
+
+  # 11. HIVE_DESIGN_MODE in mode-resolver.mjs
+  mode_resolver_registration:
+    HIVE_DESIGN_MODE: "registered — appears in resolver-name registry at hive/lib/mode-resolver.mjs:42"
+    recognized_modes: [sandcastle, multica, cc-workflows, sequential, auto]
+    precedence: "env > root_config > shipped_baseline > skill_override > default"
+
+  # 12. vitest runner + resolver test path
+  test_infrastructure:
+    runner: vitest
+    resolver_test_path: "skills/hive/skills/design-mode-cc-workflows/test/resolver.test.mjs"
+    reference_test_shape: "skills/hive/skills/review-mode-cc-workflows/test/resolver.test.mjs"
+    test_covers:
+      - 5-tier mode resolution (env/root_config/shipped_baseline/skill_override/default)
+      - source tracking (only winning tier in sources)
+      - per-persona dispatch shape assertions (toggle ON=3 personas, OFF=1)
+      - helper-import assertion (Check 4)
+      - opts.model on every agent() call
+      - insight-capture suffix
+      - no-codex assertions (Checks 1-3)
+      - ONE cc-workflows-run.yaml episode marker per persona
+
+validation_note:
+  checked: "vitest, hive/lib/mode-resolver.mjs, cc-workflows-preconditions.mjs, cc-workflows-model-tier.mjs"
+  source: codebase-only
+  confidence: high
+  findings: >
+    All 13 research items mapped from direct file reads. No version constraints or
+    external dependency issues found. The test reference at review-mode-cc-workflows/test/resolver.test.mjs
+    is the closest structural match for d-4's resolver test (solo = toggle-OFF shape; add
+    toggle-ON 3-persona assertions as the key difference).

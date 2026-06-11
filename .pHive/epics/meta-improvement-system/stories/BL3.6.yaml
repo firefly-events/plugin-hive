@@ -2,7 +2,7 @@ id: BL3.6
 epic: meta-improvement-system
 slice: S10
 title: First end-to-end public fixture run
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: ["K.3", "BL2.6", "BL3.2", "BL3.3", "BL3.4", "BL3.5", "L1.7"]

@@ -23,6 +23,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
+// @ts-ignore — plain-JS resolver shim (canonical impl: hive/lib/config.py)
+import { resolveStateDir } from "../config.js";
 
 export type GateMode = "warning" | "hard";
 
@@ -281,6 +283,24 @@ export class TaskTrackingDispatch {
     return { ok: true, result };
   }
 
+  /**
+   * Mark a story as needing rework. Routes to the adapter's markNeedsRework
+   * handler which sets the appropriate status and attaches the 'hive:needs-rework'
+   * label. Returns { id, status, labels[] } on success.
+   *
+   * Multica: status = 'in_review'
+   * GitHub:  status = 'open' (issue reopened)
+   *
+   * No capability gate at the dispatch level — callers opt in by checking
+   * capability('supports_needs_rework') before calling if desired.
+   */
+  async markNeedsRework(
+    params: { id: string; reason?: string },
+    options?: { skill_context?: string },
+  ): Promise<DispatchResult> {
+    return this.invoke("markNeedsRework", params, options);
+  }
+
   /** Read a field from the cached capabilities object. */
   capability(field: string): any {
     if (!this.handle) return undefined;
@@ -328,7 +348,9 @@ export class TaskTrackingDispatch {
   }
 
   private writeNoAdapterTelemetry(method: string): void {
-    const stateDir = this.config?.state_dir ?? ".pHive";
+    // Injected config.state_dir (test seam) wins; otherwise resolve per Q2:
+    // HIVE_STATE_DIR env > root-config paths.state_dir > `.pHive`.
+    const stateDir = this.config?.state_dir ?? resolveStateDir();
     const eventsDir = path.join(stateDir, "metrics", "events");
     try {
       fs.mkdirSync(eventsDir, { recursive: true });
@@ -386,7 +408,8 @@ export class TaskTrackingDispatch {
     code: string,
     skillContext: string,
   ): void {
-    const stateDir = this.config?.state_dir ?? ".pHive";
+    // Same precedence as writeNoAdapterTelemetry: injection > Q2 resolver.
+    const stateDir = this.config?.state_dir ?? resolveStateDir();
     const eventsDir = path.join(stateDir, "metrics", "events");
     try {
       fs.mkdirSync(eventsDir, { recursive: true });

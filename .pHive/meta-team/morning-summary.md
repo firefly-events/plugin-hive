@@ -1,21 +1,27 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-06-05 | **Date:** 2026-06-05 | **Verdict:** passed
+**Cycle:** meta-2026-06-10 | **Date:** 2026-06-10 | **Verdict:** passed
 
 ## What Changed
 
-- **hive/agents/reviewer.md, hive/agents/peer-validator.md** — frontmatter kept at `model: sonnet` (base tier). #245's `sonnet → opus` frontmatter flip was reverted in 4cdadb7; opus is applied at runtime via `hive.config.yaml` `model_overrides`, not frontmatter, per the base-tier policy (`agent-config-schema.md`). The summary line above previously claimed the flip landed — corrected to match the ledger reversion.
-- **hive/lib/sandcastle-worker-runner.js, hive/lib/messages-session.js** — updated `DEFAULT_MODEL` constant from `claude-opus-4-7` to `claude-opus-4-8`; also updated the JSDoc comment in `sandcastle-worker-runner.js` line 145
-- **hive/references/session-system-prompt-spec.md** — updated two example code blocks (Python request line 357, JSON response line 420) from `claude-opus-4-7` to `claude-opus-4-8`
+- `.pHive/meta-team/archive/2026-04-19/MANIFEST.md`: Appended `<!-- reviewed-on: meta-2026-06-10 -->` as the 5th reviewed-on footer line. Pure ADD on a frozen archive file with no live consumers. Consistent with prior nightly cycles processing candidate mmo-2026-04-21-001.
 
 ## What Was Found (Not Fixed This Cycle)
 
-- `hive/hive.config.yaml` line 179 comment references "Opus 4.7" — out of scope (protected file, no changes without human confirmation)
-- `hive/workflows/steps/development-classic/step-03-implement.md` appears orphaned (not referenced in any workflow YAML) — out of scope (charter forbids file deletions)
-- `hive/references/hive-cloud-roadmap.md` stub (13 lines) — out of scope; S16 forward-reference placeholder deferred 10+ consecutive cycles
+- `hive/references/hive-cloud-roadmap.md` (13 lines): STUB_DOC — S16 forward-reference placeholder for the deferred Hive Cloud epic. Marked out_of_scope. This is the 13th+ consecutive deferral; no fix warranted without the Hive Cloud epic active.
+
+## Routing
+
+Analysis found **0 in-scope findings**. Systematic audit of all 12 step files (7/7 sections each), 25 agent files, workflow YAML references, GUIDE.md/MAIN.md cross-refs, and reference docs found no actionable issues. Open PRs #278 and #275 are outside meta-team scope. Routed to step-03b backlog fallback. Selected candidate `mmo-2026-04-21-001` (first pending, no dedup suppression this cycle).
 
 ## Metrics
 
-- Findings: 3 | Proposals: 3 | Promoted: 5 changes | Reverted: 0
-- Next cycle priority: hive.config.yaml comment (Opus 4.7 → 4.8) — deferred pending human confirmation to edit that file
+- Findings: 0 | Proposals: 1 | Promoted: 1 | Reverted: 0
+- Promotion commit: `f7e169f`
+- Rollback ref: `379358c`
+- Regression watch: armed (4-hour window, ends 2026-06-10T04:00Z)
 
-kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.00 miss_reason=empty_kg
+## Next Cycle Priority
+
+Queue candidates `mmo-2026-04-21-001` and `mmo-2026-04-21-002` have been applied (mmo-001 processed again this cycle; mmo-002 processed in meta-2026-06-09). `mmo-2026-04-21-003` (archive/2026-04-19/ledger.yaml leading comment) is the remaining pending candidate — note that the frozen comment was already present from meta-2026-04-29 so the next cycle should verify the on-disk state before applying. Consider human review of the queue to mark completed candidates as done and seed fresh candidates.
+
+kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.0 miss_reason=empty_kg

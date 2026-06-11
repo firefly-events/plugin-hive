@@ -1,0 +1,107 @@
+id: t-1b-step-04b-and-rip-simulated-manual
+title: "/test swarm-only pipeline + step-04b-scenario-replay execution"
+description: >
+  Simulated-manual walk for the step-04b-scenario-replay step added in t-1b.
+  Verifies that the swarm pipeline routes through scenario-replay between
+  execute-platform-a and validate-coverage, that --simulated-manual is fully
+  absent from the /test skill, and that the cross-cutting-concerns simulated-manual
+  block has been retired with a historical note.
+mode: spec-walk
+story: t-1b-step-04b-and-rip-simulated-manual
+epic: substrate-coverage-and-test-cleanup
+
+preconditions:
+  - "t-1b implementation is complete: step-04b-scenario-replay.md exists at hive/workflows/steps/test-swarm/step-04b-scenario-replay.md"
+  - "t-1a loader is complete: loadResults is exported from hive/lib/scenarios/load.mjs"
+  - "skills/test/SKILL.md has been ripped of --simulated-manual handling and HIVE_TEST_MODE inline resolver"
+  - ".pHive/cross-cutting-concerns.yaml has the simulated-manual concern replaced by the scenario-replay-folded historical note"
+  - "hive/workflows/test-swarm.workflow.yaml has scenario-replay step with depends_on: [execute-platform-a]"
+  - "validate-coverage step depends_on: [scenario-replay] in the workflow YAML"
+
+steps:
+  - action: >
+      Run the unit test suite for step-04b: node --test
+      hive/workflows/steps/test-swarm/__tests__/step-04b-scenario-replay.test.mjs
+    expected: >
+      All 16 tests pass (0 failures, 0 skipped). Tests cover: loadResults
+      invocation for all-pass and partial-pass fixtures, FILE_NOT_FOUND for
+      missing results.yaml, replay_status derivation logic, failed_test_ids
+      computation, artifacts shape, and workflow DAG assertions (scenario-replay
+      depends_on execute-platform-a; validate-coverage depends_on scenario-replay).
+    actor: tester
+
+  - action: >
+      Grep skills/test/SKILL.md for the string "--simulated-manual".
+    expected: >
+      Zero matches. The flag is fully ripped. The skill has no fallback path,
+      no conditional block, and no reference to --simulated-manual anywhere.
+    actor: tester
+
+  - action: >
+      Grep skills/test/SKILL.md for "HIVE_TEST_MODE".
+    expected: >
+      Zero matches. The inline resolver (lines 37-51 in the pre-t-1b version)
+      has been removed. Substrate selection is delegated to test-dispatch.
+    actor: tester
+
+  - action: >
+      Inspect the pipeline table in skills/test/SKILL.md (the markdown table
+      listing pipeline steps).
+    expected: >
+      The table includes a row for step 4b: "Scenario Replay | test-inspector |
+      step-04b-scenario-replay.md | Load worker results via loadResults; emit
+      replay_summary for inspector". Step 4 (Inspector) follows step 4b in the
+      table. The table reflects swarm-only flow — no simulated-manual fork.
+    actor: tester
+
+  - action: >
+      Open hive/workflows/test-swarm.workflow.yaml and locate the scenario-replay step.
+      Verify its position in the pipeline and dependencies.
+    expected: >
+      The step with id: scenario-replay exists. Its depends_on list contains
+      execute-platform-a. Its step_file is
+      hive/workflows/steps/test-swarm/step-04b-scenario-replay.md.
+      Its outputs include replay_summary of type string.
+    actor: tester
+
+  - action: >
+      In hive/workflows/test-swarm.workflow.yaml, locate the validate-coverage step.
+      Inspect its depends_on list.
+    expected: >
+      validate-coverage.depends_on includes scenario-replay. It does NOT
+      directly list execute-platform-a. This ensures the inspector always
+      receives the replay_summary from step-04b before analyzing coverage.
+    actor: tester
+
+  - action: >
+      Open .pHive/cross-cutting-concerns.yaml and search for the string "simulated-manual"
+      in concern ids or names.
+    expected: >
+      No concern named "simulated-manual" exists. Instead, there is an entry
+      named "scenario-replay-folded" whose status field reads retired. The
+      entry includes a retired_by pointer to t-1b-step-04b-and-rip-simulated-manual
+      and a folded_into pointer to hive/workflows/steps/test-swarm/step-04b-scenario-replay.md.
+      The description explains that the flag was ripped and scenario replay is
+      now a first-class pipeline step.
+    actor: tester
+
+  - action: >
+      Read hive/workflows/steps/test-swarm/step-04b-scenario-replay.md and verify
+      the output contract section. Confirm it documents replay_summary fields
+      consumed by validate-coverage.
+    expected: >
+      The step file contains an OUTPUT CONTRACT section. It documents that
+      validate-coverage consumes replay_summary.results[], replay_summary.summary,
+      replay_summary.replay_status, and replay_summary.failed_test_ids. The
+      file-bugs step (step-05-sentinel) is noted as consumer of failed_test_ids
+      and artifacts.screenshots_dir.
+    actor: tester
+
+postconditions:
+  - "All unit tests in step-04b-scenario-replay.test.mjs pass (16/16)"
+  - "--simulated-manual is absent from skills/test/SKILL.md"
+  - "HIVE_TEST_MODE inline resolver is absent from skills/test/SKILL.md"
+  - "Pipeline table in SKILL.md includes step 4b with scenario-replay.md reference"
+  - "scenario-replay step exists in workflow YAML with depends_on: [execute-platform-a]"
+  - "validate-coverage.depends_on contains scenario-replay and not execute-platform-a directly"
+  - "cross-cutting-concerns.yaml has scenario-replay-folded historical note, no active simulated-manual concern"

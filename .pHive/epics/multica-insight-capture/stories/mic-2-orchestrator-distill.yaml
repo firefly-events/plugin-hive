@@ -1,7 +1,9 @@
 id: mic-2-orchestrator-distill
 epic: multica-insight-capture
 title: Orchestrator distills Multica insights into memory
-status: pending
+status: shipped
+shipped_at: "2026-06-08T04:51:07Z"
+release_id: "v2.10.0"
 complexity: high
 methodology: classic
 depends_on: [ mic-1-agent-self-capture-brief ]

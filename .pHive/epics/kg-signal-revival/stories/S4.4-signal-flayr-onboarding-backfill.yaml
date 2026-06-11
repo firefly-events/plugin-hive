@@ -1,7 +1,7 @@
 id: S4.4-signal-flayr-onboarding-backfill
 epic: kg-signal-revival
 title: Onboard Signal Flayr (ffe-social-engine) + backfill
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [S4.3-shindig-onboarding-backfill]

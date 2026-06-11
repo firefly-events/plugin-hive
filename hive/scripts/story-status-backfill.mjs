@@ -19,13 +19,17 @@
 'use strict';
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { join, relative, resolve, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { deriveAllStatuses } from '../lib/story-status.mjs';
+import { resolveStateDir } from '../lib/config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
+// sdr-1 resolver: HIVE_STATE_DIR env > paths.state_dir in hive.config.yaml
+// > default <REPO_ROOT>/.pHive.
+const STATE_DIR = resolveStateDir({ cwd: REPO_ROOT });
 
 // ---------------------------------------------------------------------------
 // CLI arg parsing
@@ -66,8 +70,8 @@ function getShippedBlock(epic_id, story_id) {
 // YAML rewriter — surgical status: field patch
 // ---------------------------------------------------------------------------
 
-function rewriteStoryYaml(repoRoot, epic_id, story_id, new_status) {
-  const path = join(repoRoot, '.pHive', 'epics', epic_id, 'stories', `${story_id}.yaml`);
+function rewriteStoryYaml(stateDir, epic_id, story_id, new_status) {
+  const path = join(stateDir, 'epics', epic_id, 'stories', `${story_id}.yaml`);
   if (!existsSync(path)) return false;
 
   let text = readFileSync(path, 'utf8');
@@ -162,7 +166,7 @@ if (!APPLY) {
 let fixed = 0;
 let failed = 0;
 for (const r of stale) {
-  const ok = rewriteStoryYaml(REPO_ROOT, r.epic_id, r.story_id, r.derived_status);
+  const ok = rewriteStoryYaml(STATE_DIR, r.epic_id, r.story_id, r.derived_status);
   if (ok) {
     console.log(`  ✓ ${r.epic_id}/${r.story_id}: ${r.yaml_status} → ${r.derived_status}`);
     fixed++;
@@ -175,6 +179,11 @@ for (const r of stale) {
 
 console.log(`\nReconciliation complete: ${fixed} fixed, ${failed} failed.`);
 if (fixed > 0) {
-  console.log(`\nCommit the changes:\n  git add .pHive/epics/ && git commit -m "chore: reconcile stale story status fields [skip ci]"`);
+  // Show a repo-relative path when the state dir lives inside the repo;
+  // fall back to the absolute path when it has been relocated elsewhere.
+  const epicsDir = join(STATE_DIR, 'epics');
+  const rel = relative(REPO_ROOT, epicsDir);
+  const epicsDirForGit = rel && !rel.startsWith('..') ? rel : epicsDir;
+  console.log(`\nCommit the changes:\n  git add ${epicsDirForGit}/ && git commit -m "chore: reconcile stale story status fields [skip ci]"`);
 }
 process.exit(failed > 0 ? 1 : 0);

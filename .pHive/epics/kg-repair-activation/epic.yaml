@@ -1,0 +1,67 @@
+name: kg-repair-activation
+title: KG Repair + Activation
+description: |
+  Make the hive knowledge graph at ~/.claude/hive/kg.sqlite actually useful + actively used.
+  Repair bugs (chromadb crash, undeclared phase_handoff, missing FK enforcement),
+  wire dormant predicates, add non-orchestrator source-agent emits, earn back
+  kg_signal weight in meta-optimize.
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  - id: s0-scope-drift-memo-verify
+    title: "Verify scope_drift_emit_sites memory scope + cross-link"
+    complexity: low
+    depends_on: []
+  - id: s1-kg-stats
+    title: "Add /hive:kg-stats skill for density + predicate breakdown"
+    complexity: low
+    depends_on: []
+  - id: b1-why-chromadb-fix
+    title: "Fix /hive:why ChromaDB RuntimeError propagation"
+    complexity: low
+    depends_on: []
+  - id: b2-fk-enforcement-audit
+    title: "Audit + enable PRAGMA foreign_keys on kg.sqlite connections"
+    complexity: low
+    depends_on: []
+  - id: b3-phase-handoff-declare
+    title: "Declare phase_handoff predicate in schema"
+    complexity: low
+    depends_on: []
+  - id: s2-dag-walker-emit-investigation
+    title: "Investigate where DAG walker KG emits actually land"
+    complexity: medium
+    depends_on: ["s1-kg-stats"]
+  - id: s3-phase-lifecycle-wire
+    title: "Wire phase_started + phase_complete in DAG walker"
+    complexity: medium
+    depends_on: ["s2-dag-walker-emit-investigation"]
+  - id: s4-superseded-callers-wire
+    title: "Wire superseded emits at documented-only callsites"
+    complexity: medium
+    depends_on: ["b2-fk-enforcement-audit"]
+  - id: s5-role-predicates-schema
+    title: "Add validated/tested/implemented predicates to schema"
+    complexity: medium
+    depends_on: ["s3-phase-lifecycle-wire", "s4-superseded-callers-wire"]
+  - id: s6-reviewer-emit
+    title: "Reviewer agent emits validated at shutdown"
+    complexity: low
+    depends_on: ["s5-role-predicates-schema"]
+  - id: s7-tester-emit
+    title: "Tester agent emits tested at shutdown"
+    complexity: low
+    depends_on: ["s5-role-predicates-schema"]
+  - id: s8-developer-emit
+    title: "Developer agent emits implemented at shutdown"
+    complexity: low
+    depends_on: ["s5-role-predicates-schema"]
+  - id: s9-density-verification-job
+    title: "Density-verification job + kg_signal weight-bump PR draft"
+    complexity: medium
+    depends_on: ["s6-reviewer-emit", "s7-tester-emit", "s8-developer-emit"]

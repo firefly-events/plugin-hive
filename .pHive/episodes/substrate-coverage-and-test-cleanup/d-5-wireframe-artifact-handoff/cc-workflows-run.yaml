@@ -1,0 +1,110 @@
+step_id: cc-workflows-run
+story_id: d-5-wireframe-artifact-handoff
+epic_id: substrate-coverage-and-test-cleanup
+status: passed
+verdict: pass
+timestamp: "2026-06-08T00:00:00Z"
+mode: cc-workflows
+runtime: workflows
+run_id: wf_eb6236ba-93c
+script_path: .pHive/episodes/substrate-coverage-and-test-cleanup/d-5-wireframe-artifact-handoff/workflow-script.js
+transcript_dir: /Users/don/.claude/projects/-Users-don--claude-worktrees-substrate-coverage/89885a00-d41a-456c-947b-6b7f9d5d24b3/subagents/workflows/wf_eb6236ba-93c
+commit: 88e7bf1
+integration_branch: feat/substrate-coverage-and-test-cleanup
+methodology: classic
+phases: [research, implement, test, review]
+agents:
+  - phase: research
+    persona: researcher
+    model: sonnet
+    verdict: pass
+  - phase: implement
+    persona: developer
+    model: sonnet
+    verdict: pass
+    extra: APPEND at wireframe-protocol.md:100 (after Integration with Workflows section); lines 1-99 byte-for-byte preserved
+  - phase: test
+    persona: tester
+    model: sonnet
+    verdict: pass
+    extra: 16 tests across 5 independent describe blocks; 430/430 hive/lib vitest (up from 414 after d-4)
+  - phase: review
+    persona: reviewer
+    model: opus
+    verdict: pass
+    extra: change_verdict=passed; 7/7 ACs evidenced, 7/7 refs re-read, 12/12 contract invariants verified
+field_sources:
+  agent_models:
+    research: { persona: researcher, tier: sonnet, source: orchestrator-manual }
+    implement: { persona: developer, tier: sonnet, source: orchestrator-manual }
+    test: { persona: tester, tier: sonnet, source: orchestrator-manual }
+    review: { persona: reviewer, tier: opus, source: orchestrator-manual }
+usage:
+  agent_count: 4
+  subagent_tokens: 264472
+  tool_uses: 75
+  duration_ms: 562547
+insight_capture:
+  memories_written: 4
+  personas: [researcher, developer, tester, reviewer]
+artifacts:
+  created:
+    - skills/design/test/wireframe-handoff-payload.test.mjs
+    - .pHive/test-scenarios/d-5-wireframe-handoff-payload.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/d-5-wireframe-artifact-handoff/research.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/d-5-wireframe-artifact-handoff/implement.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/d-5-wireframe-artifact-handoff/test.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/d-5-wireframe-artifact-handoff/review.yaml
+    - .pHive/episodes/substrate-coverage-and-test-cleanup/d-5-wireframe-artifact-handoff/workflow-script.js
+    - hive/agents/memories/researcher/d5-payload-contract-insert-location-and-field-naming.md
+    - hive/agents/memories/developer/d5-payload-contract-append-not-insert.md
+    - hive/agents/memories/tester/d5-payload-contract-static-analysis-target.md
+    - hive/agents/memories/reviewer/d5-extensible-minimum-as-three-orthogonal-axes.md
+  modified:
+    - hive/references/wireframe-protocol.md
+    - hive/lib/package.json
+scope_discipline:
+  files_match_spec: true
+  no_drift_outside_spec: true
+contract_invariants:
+  payload_contract_section_present: true
+  three_minimum_fields_named: true        # wireframe.png + wireframe.f0 + constraints.md
+  png_always_present: true
+  f0_always_present: true
+  constraints_md_toggle_conditional: true
+  posture_extensible_minimum: true
+  tpm_escalation_cited: true
+  q9_resolution_cited: true
+  field_named_not_file_glob: true
+  d1_d3_d4_not_modified: true             # scope discipline
+  existing_content_preserved: true        # append at line 100; lines 1-99 untouched
+  test_independence_5_describe_blocks: true
+notes: |
+  SLICE 3 COMPLETE. /design now has full substrate coverage:
+  - d-2 router (shipped)
+  - d-1 Phase 0 + Phase A persona pipeline (shipped)
+  - d-3 multica per-persona dispatch (shipped)
+  - d-4 cc-workflows per-persona Workflow tool dispatch (shipped)
+  - d-5 wireframe handoff payload contract (this story)
+
+  Epic substrate-coverage-and-test-cleanup near-complete:
+  - Slice 0 audit recovery (shipped)
+  - Slice 1 foundation s-2/s-4/s-3/s-5 (shipped)
+  - Slice 2 /test t-1/t-1a/t-1b/t-2/t-3 (shipped)
+  - Slice 3 /design d-1/d-2/d-3/d-4/d-5 (NOW COMPLETE)
+  - Slice 4 /design-review dr-1/dr-2/dr-3 (shipped)
+  - Slice 5 /review r-1/r-2/r-3 (shipped)
+  - Slice 6 governance close s-1-dispatch-parity-matrix (REMAINS — 1 story)
+
+  Key implementation decision recorded in 4 persona memories: d-5
+  is documentation-only by design. d-1 produces the constraint-notes
+  ARTIFACTS at Phase A toggle ON; d-3 + d-4 bundle them per substrate;
+  d-5 names the fields and posture. The four stories form a clean
+  producer/consumer/contract decomposition — modifying d-1/d-3/d-4
+  here would have collapsed the seam Decision Point 5 + Q9 + TPM
+  ESCALATION carved out.
+
+  Reviewer memory captures "extensible-minimum as 3 orthogonal axes"
+  pattern — minimum required + extensibility allowed + downstream-
+  consumer-driven. Pattern reusable for future contract definitions
+  (payload, schema, API).

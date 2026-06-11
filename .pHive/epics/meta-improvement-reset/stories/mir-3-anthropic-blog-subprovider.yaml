@@ -1,7 +1,7 @@
 id: mir-3-anthropic-blog-subprovider
 epic: meta-improvement-reset
 title: Add Anthropic blog subprovider to step-02b
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 tracker_id: plugin-hive/PLU-65

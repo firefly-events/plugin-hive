@@ -1,0 +1,172 @@
+id: d-1-design-multi-persona-pipeline
+epic: substrate-coverage-and-test-cleanup
+title: /design Phase A persona-pipeline insert + Pattern B with --include-constraints toggle + 3-persona handoff wiring
+status: complete
+complexity: high
+methodology: classic
+depends_on:
+- s-2-mode-resolver
+- s-4-cc-workflows-preconditions
+- s-3-no-codex-lint
+- d-2-design-dispatch-router
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: 'Insert a net-new Phase A above existing step 3 of `skills/design/SKILL.md`
+
+  (current single ui-designer dispatch at lines 55-64). Phase A is a
+
+  STRUCTURAL insert — `/design` today has no persona-assembly phase to
+
+  extend. Add Phase 0 to invoke `design-dispatch` and resolve substrate
+
+  before persona phase. Default invocation preserves legacy behavior
+
+  (single ui-designer dispatch). `--include-constraints` flag routes
+
+  through specialist-triggers to add accessibility-specialist +
+
+  animations-specialist as a constraint pass, then dispatches ui-designer
+
+  ONCE with constraints baked into the prompt. AC explicitly splits into
+
+  THREE NAMED SUBSECTIONS to prevent three-in-one verification drift
+
+  (hv-collab-review architect lock).
+
+  '
+acceptance_criteria:
+- AC Subsection 1 — Phase A structural insert. Given `skills/design/SKILL.md` is updated, when a reader scans the file, then a net-new Phase A block exists above existing step 3 (lines 55-64) AND Phase A AC cites `hive/workflows/design-review.workflow.yaml:8-81` as the orchestration template to mirror (the 4-step assembly+serial-dispatch shape — accessibility → animations → ui-designer critique → ui-designer synthesis). The structural insert prevents re-invention by anchoring on design-review.workflow.yaml.
+- AC Subsection 1 — Phase 0 wiring. Given `skills/design/SKILL.md` is updated, when /design is invoked, then Phase 0 invokes `design-dispatch` and resolves substrate BEFORE the persona phase.
+- AC Subsection 2 — Pattern B toggle semantics — default OFF. Given `/design` is invoked with NO `--include-constraints` flag, when the dispatcher runs, then it dispatches `ui-designer` ONCE only — no accessibility-specialist invocation, no animations-specialist invocation (legacy behavior preserved).
+- AC Subsection 2 — Pattern B toggle semantics — toggle ON. Given `/design --include-constraints` is invoked, when the dispatcher runs, then it routes through specialist-triggers to serially dispatch (a) accessibility-specialist producing accessibility constraint notes, (b) animations-specialist producing animation constraint notes, (c) ui-designer dispatched ONCE with constraints baked into the prompt.
+- AC Subsection 3 — 3-persona handoff payload. Given `--include-constraints` is on, when Phase A completes, then the constraint notes produced by accessibility-specialist + animations-specialist are bundled with the ui-designer outputs (PNG + .f0) as the wireframe handoff payload (the bundled payload contract is owned by d-5).
+- AC Subsection 3 — handoff bundling. Given the bundle is assembled, when downstream consumers (design-review, manual review) receive it, then the payload includes the constraint doc field when toggle was on, or omits it (empty/absent) when toggle was off — PNG + .f0 always ship.
+- Test independence. Given the three AC subsections are verified, when one subsection fails, then it does NOT block the other two from independently passing review (no cross-subsection test coupling).
+- DO. Single story with 3 AC subsections per hv-collab-review architect lock. Cite design-review.workflow.yaml:8-81 inside the AC text, not just in design_decisions.
+- DO NOT. Do not split into two stories ("phase-a-structural-insert" + "persona-pipeline-wiring") — Decision Point 5 affirms single story; splitting creates an artificial seam.
+metric:
+  applies: true
+  name: substrate_coverage.design_phase_a_toggle_routing_correctness
+  direction: up
+  unit: ratio
+  baseline: null
+  target: 1.0
+  window: story integrate step
+  source:
+    kind: manual
+    ref: vitest run skills/design/test/phase-a-toggle.test.mjs + manual /design (default + --include-constraints) smoke
+  verify_at: story integrate step
+  owner: developer
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/d-1-design-phase-a-toggle.yaml
+  verdict: null
+  timestamp: null
+  agent: null
+steps:
+- id: research
+  description: Read `skills/design/SKILL.md:55-64` (current single-dispatch shape); read `hive/workflows/design-review.workflow.yaml:8-81` (4-step orchestration template anchor); read specialist-triggers integration path for accessibility-specialist + animations-specialist routing.
+  agent: researcher
+- id: implement
+  description: Insert Phase A above step 3 in `skills/design/SKILL.md` (citing design-review.workflow.yaml:8-81); add Phase 0 invocation of `design-dispatch`; wire `--include-constraints` toggle through specialist-triggers; preserve default-off legacy behavior.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Author `skills/design/test/phase-a-toggle.test.mjs` covering (a) default-off invokes single ui-designer, (b) `--include-constraints` invokes specialists then ui-designer with constraints baked into prompt, (c) handoff bundle composition.
+  agent: tester
+  depends_on:
+  - implement
+- id: scenario
+  description: Author `.pHive/test-scenarios/d-1-design-phase-a-toggle.yaml` per test-scenario-schema.md covering /design + /design --include-constraints invocations with expected persona pipelines + handoff bundles.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Architect review on (a) Phase A structural insert citing design-review.workflow.yaml:8-81 as template, (b) toggle default-off preserving legacy behavior, (c) handoff bundle composition; reviewer cross-checks the three AC subsections verify independently.
+  agent: reviewer
+  depends_on:
+  - test
+  - scenario
+- id: integrate
+  description: 'Commit "[d-1] feat(/design): Phase A persona pipeline + Pattern B with --include-constraints toggle"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  tech_stack:
+  - language: markdown (SKILL.md), javascript (.mjs)
+  - runtime: node 20+
+  - test: vitest
+  key_files:
+  - path: skills/design/SKILL.md
+    purpose: Dispatcher (1-156) — Phase A inserted above existing step 3 (55-64); Phase 0 invocation of design-dispatch added; toggle prose added
+  - path: hive/workflows/design-review.workflow.yaml
+    purpose: 4-step orchestration template anchor (lines 8-81) cited by Phase A AC
+  - path: hive/agents/ui-designer.md
+    purpose: Persona dispatched ONCE in both default-off and toggle-on paths (with constraints baked into prompt when on)
+  - path: hive/agents/accessibility-specialist.md
+    purpose: Persona dispatched only when toggle ON
+  - path: hive/agents/animations-specialist.md
+    purpose: Persona dispatched only when toggle ON
+files_to_modify:
+- file: skills/design/SKILL.md
+  change: 'INSERT a net-new Phase A above existing step 3 (lines 55-64).
+
+    ADD Phase 0 invocation of `design-dispatch`.
+
+    WIRE `--include-constraints` toggle through specialist-triggers (default OFF preserves legacy single ui-designer; toggle ON serially dispatches accessibility → animations → ui-designer with constraints baked in).
+
+    Phase A AC inside the SKILL.md MUST cite `hive/workflows/design-review.workflow.yaml:8-81` as the orchestration template.
+
+    '
+- file: skills/design/test/phase-a-toggle.test.mjs
+  change: CREATE — vitest spec covering default-off legacy behavior + toggle-on persona pipeline + handoff bundle composition
+- file: .pHive/test-scenarios/d-1-design-phase-a-toggle.yaml
+  change: CREATE — scenario covering /design + /design --include-constraints invocations
+code_examples:
+- language: markdown
+  description: Phase A insert with template citation
+  snippet: '## Phase A — Persona assembly (mirrors design-review.workflow.yaml:8-81)
+
+    Default: dispatch ui-designer once.
+
+    With `--include-constraints`: dispatch accessibility-specialist + animations-specialist serially to produce constraint notes; then dispatch ui-designer ONCE with constraints baked into the prompt.
+
+    '
+references:
+- path: skills/design/SKILL.md
+  relevant_excerpt: 'Lines 55-64: current single ui-designer dispatch at step 3 — no persona-assembly phase to extend; d-1 is a STRUCTURAL insert.'
+- path: hive/workflows/design-review.workflow.yaml
+  relevant_excerpt: 'Lines 8-81: 4-step orchestration (accessibility:8, animations:28, ui-designer-critique:55, ui-designer-synthesis:80) with step_file references — Phase A orchestration template anchor.'
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/design-discussion.md
+  relevant_excerpt: §6 Q6 RESOLVED — Pattern B + --include-constraints toggle. Default-off keeps simple case behaviorally identical to today; toggle routes through specialist-triggers.
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/structured-outline.md
+  relevant_excerpt: 'd-1: Phase A insert + Pattern B + toggle (3 AC subsections, single story) per hv-collab-review architect lock. AC splits into THREE NAMED SUBSECTIONS (Phase A structural insert / Pattern B toggle semantics / 3-persona handoff payload).'
+cross_cutting:
+- concern: documentation
+  action: Update skills/design/SKILL.md prose section documenting Pattern B + --include-constraints toggle semantics, default behavior, and the escape hatch posture; cite design-review.workflow.yaml:8-81 as the orchestration anchor.
+- concern: versioning
+  action: Consumer-visible flag added (--include-constraints) — flag for epic-close version bump (minor — additive feature) in CHANGELOG.
+design_decisions:
+- decision: AC splits into 3 named subsections (Phase A structural insert / Pattern B toggle / 3-persona handoff)
+  rationale: hv-collab-review architect lock — prevents three-in-one verification drift in a single story; each subsection verifies independently with no cross-coupling.
+- decision: Phase A AC cites design-review.workflow.yaml:8-81 as orchestration template
+  rationale: Architect ESCALATION — the 4-step assembly+serial-dispatch shape is already proven; re-inventing creates architectural drift between Slices B and C (per design-discussion §3).
+- decision: Pattern B + --include-constraints toggle (default OFF)
+  rationale: User-locked at design-discussion §6 Q6 — default-off preserves legacy single-dispatch behavior; toggle is the composable-substrate escape hatch. Posture mismatch P1 resolved.
+- decision: ui-designer dispatched ONCE (not twice) even when toggle ON
+  rationale: Constraints are baked into the prompt before single dispatch; mirrors how design-review.workflow.yaml synthesises personas into a single ui-designer surface.
+- decision: Single story (not split into 2)
+  rationale: Decision Point 5 — structural insert and persona wiring are the same change; splitting creates an artificial seam.
+risks:
+- severity: high
+  description: Three AC subsections treated as conjoined; one failure blocks entire story for days
+  mitigation: AC explicitly asserts test-independence (one subsection failure does not block other two); architect review confirms independent verification paths (E4 elicitation)
+- severity: medium
+  description: Toggle default-off interpretation drifts from legacy behavior
+  mitigation: Snapshot baseline single ui-designer dispatch sequence pre-implementation; AC asserts default-off === legacy
+- severity: medium
+  description: Phase A re-invents an orchestration shape divergent from design-review.workflow.yaml
+  mitigation: AC explicitly cites the template; architect review verifies the 4-step shape (accessibility → animations → ui-designer critique → ui-designer synthesis) is the mirror anchor
+tracker_id: 9d9ec0ed-9325-4c71-8964-0ff57cdaab24

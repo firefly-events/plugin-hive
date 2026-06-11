@@ -1,7 +1,7 @@
 id: wmc-5-smoke-test-end-to-end
 epic: wire-execute-multica-codex
 title: Smoke-test 2-story dummy epic through real /execute → multica → /codex:rescue
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: [wmc-3-brief-codex-injection, wmc-4-scope-drift-emit]

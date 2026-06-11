@@ -1,0 +1,106 @@
+story_id: a-0-audit-recovery
+epic_id: substrate-coverage-and-test-cleanup
+step: review
+agent: reviewer
+status: completed
+verdict: pass
+date: 2026-06-05
+branch_taken: c
+rubric:
+  spec-fidelity:
+    severity: critical
+    outcome: pass
+    evidence: All 5 ACs covered; branch (c) decision-doc AC names all four required sections and all four are substantively present
+  domain-compliance:
+    severity: critical
+    outcome: pass
+    evidence: Reviewer is read-only; no file writes outside the review episode marker; implementation files unmodified
+  architecture:
+    severity: critical
+    outcome: pass
+    evidence: Single-citation acceptance is architecturally sound — runtime carrier (t-3 manual smoke) substitutes for missing audit citation with concrete assertion shape; escalation trigger defined
+  security:
+    severity: critical
+    outcome: pass
+    evidence: No security surface in a process-substrate decision doc
+  convention-adherence:
+    severity: improvement
+    outcome: pass
+    evidence: Decision doc follows the same Markdown structure as sibling design docs (front matter, numbered sections, citation-by-path conventions)
+  test-coverage:
+    severity: improvement
+    outcome: pass
+    evidence: Story metric.applies=false; runtime carrier path documented at §3 with explicit assertion list
+audit_first_walk:
+  status: complete
+  acs_covered: 5
+  acs_total: 5
+  refs_re_read: 3
+  refs_total: 3
+  notes: |
+    Re-read story spec (5 ACs), decision doc (audit-recovery-decision.md, all 4 sections),
+    design-discussion §5 Constraint 5 (line 100), and verified citation target
+    (cc-workflows-first-party-plan-mode-validation-2026-06-05.yaml exists in .pHive/audits/post-run/).
+review_checks:
+  - check: Four required sections substantively present (not stubs)
+    result: pass
+    evidence: |
+      §1 names gate-ownership invariant exposure + exhaustive search result + branch (b) infeasibility reasoning (manual Workflow-tool one-shot, no turn-key target).
+      §2 identifies cc-workflows-first-party-plan-mode-validation-2026-06-05.yaml by full path with 4 verified properties + plan-mode vs execute-mode coverage delta + informal Run 2 corroboration.
+      §3 names Slice A t-3 (test-mode-cc-workflows) as first runtime carrier with exact assertion shape (no completeStory/advanceGate/markReviewPassed calls), reinforcing carriers (d-4/dr-3/r-3), and escalation trigger.
+      §4 provides verbatim splice text + canonical marker phrase.
+  - check: Runtime carrier (Slice 2 manual smoke on bounce-back) concretely named, not waved at
+    result: pass
+    evidence: |
+      §3 names Slice A t-3 explicitly with skill name test-mode-cc-workflows; specifies the literal gate-advancement methods the assertion must rule out
+      (completeStory, advanceGate, markReviewPassed); names all four reinforcing *-mode-cc-workflows manual smokes (t-3/d-4/dr-3/r-3); defines blocking escalation trigger
+      tied to t-3 reviewer step.
+  - check: Design-discussion §5 update text is verbatim between decision-doc §4 and the actual §5 narrative
+    result: pass
+    evidence: |
+      Decision-doc §4 verbatim block matches design-discussion.md line 100 character-for-character.
+      Canonical marker phrase "Single-citation accepted; recovery rationale at audit-recovery-decision.md" present in both.
+      Splice point honored (end of Constraint 5 line, after the original Source: clause).
+  - check: Citation to plan-mode-validation audit resolves to an existing file
+    result: pass
+    evidence: |
+      ls .pHive/audits/post-run/ confirms cc-workflows-first-party-plan-mode-validation-2026-06-05.yaml is present.
+findings:
+  critical: []
+  improvements: []
+acceptance_criteria_coverage:
+  - ac: "Branch (a) — locate"
+    status: not_applicable
+    note: Branch (a) failed per pre-research; exhaustive find returned zero hits
+  - ac: "Branch (b) — re-run"
+    status: not_applicable
+    note: Branch (b) infeasible within 0.5-day budget per pre-research
+  - ac: "Branch (c) — accept-risk"
+    status: covered
+    evidence: audit-recovery-decision.md exists at the specified path; design-discussion §5 Constraint 5 updated with the verbatim canonical marker text
+  - ac: "Branch (c) decision-doc — required sections (4)"
+    status: covered
+    evidence: All four named sections (§1 risk, §2 corroboration, §3 runtime carrier, §4 §5 update) substantively present, not stubs
+  - ac: "Verification"
+    status: covered
+    evidence: ls .pHive/audits/post-run/ shows the cited plan-mode-validation audit; decision doc exists at the named path
+  - ac: "DO — try a then b then c"
+    status: covered
+    evidence: Pre-research walked branches in order; (a) and (b) exhausted before (c) taken
+  - ac: "DO NOT — no Slice 1+ story YAMLs before spike closes"
+    status: covered
+    evidence: Decision doc and §5 splice are the closure artifacts; no other story YAMLs touched
+summary: |
+  Branch (c) closure is architecturally sound and procedurally complete.
+  All four required decision-doc sections are substantive — not stubs — and each
+  delivers concrete content: §1 names the specific gate-ownership exposure with
+  search evidence and branch (b) infeasibility reasoning, §2 cites a verifiable
+  existing audit by full path with four documented properties, §3 names the
+  Slice A t-3 runtime carrier with the exact gate-advancement assertion methods
+  it must rule out, and §4 supplies a verbatim splice that matches
+  design-discussion §5 line 100 character-for-character. The runtime substitute
+  is not waved at: it names the skill (test-mode-cc-workflows), the persona
+  (tester at t-3 manual smoke), the assertion shape (no completeStory /
+  advanceGate / markReviewPassed calls), and the escalation trigger (reviewer
+  step for t-3 blocks all downstream cc-workflows stories if violated). The
+  citation in §2 resolves to an existing file on disk. Verdict: pass.

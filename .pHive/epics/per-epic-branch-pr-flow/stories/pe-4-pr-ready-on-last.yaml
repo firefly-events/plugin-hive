@@ -1,7 +1,7 @@
 id: pe-4-pr-ready-on-last
 epic: per-epic-branch-pr-flow
 title: Last-story-of-epic detection — promote draft PR to ready
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [pe-3-workflow-stack-pr]

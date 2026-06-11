@@ -17,6 +17,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveStateDir } from '../lib/config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -115,20 +116,20 @@ async function fetchIssueStatus({ serverUrl, token, workspaceId, issueId }) {
 // Story YAML helpers
 // ---------------------------------------------------------------------------
 
-function getStoryYamlPath(repoRoot, epicId, storyId) {
-  return join(repoRoot, '.pHive', 'epics', epicId, 'stories', `${storyId}.yaml`);
+function getStoryYamlPath(stateDir, epicId, storyId) {
+  return join(stateDir, 'epics', epicId, 'stories', `${storyId}.yaml`);
 }
 
-function getCurrentStoryStatus(repoRoot, epicId, storyId) {
-  const path = getStoryYamlPath(repoRoot, epicId, storyId);
+function getCurrentStoryStatus(stateDir, epicId, storyId) {
+  const path = getStoryYamlPath(stateDir, epicId, storyId);
   if (!existsSync(path)) return null;
   const text = readFileSync(path, 'utf8');
   if (hasYamlBlock(text, 'deferred')) return 'deferred';
   return readYamlField(text, 'status') || 'pending';
 }
 
-function patchStoryYaml(repoRoot, epicId, storyId, issueIdentifier) {
-  const path = getStoryYamlPath(repoRoot, epicId, storyId);
+function patchStoryYaml(stateDir, epicId, storyId, issueIdentifier) {
+  const path = getStoryYamlPath(stateDir, epicId, storyId);
   if (!existsSync(path)) return false;
 
   let text = readFileSync(path, 'utf8');
@@ -160,10 +161,14 @@ function patchStoryYaml(repoRoot, epicId, storyId, issueIdentifier) {
  * @param {string} opts.repoRoot
  * @param {string} opts.serverUrl
  * @param {string} opts.token
+ * @param {string} [opts.stateDir] - explicit state dir; defaults to the sdr-1
+ *   resolver (HIVE_STATE_DIR env > paths.state_dir in
+ *   <repoRoot>/hive.config.yaml > <repoRoot>/.pHive)
  * @returns {Promise<{checked: number, cancelled: number, patched: number, noops: number}>}
  */
-export async function run({ repoRoot, serverUrl, token }) {
-  const episodesDir = join(repoRoot, '.pHive', 'episodes');
+export async function run({ repoRoot, serverUrl, token, stateDir }) {
+  const resolvedStateDir = stateDir || resolveStateDir({ cwd: repoRoot });
+  const episodesDir = join(resolvedStateDir, 'episodes');
   let checked = 0, cancelled = 0, patched = 0, noops = 0;
 
   for (const { epicFromPath, storyFromPath, markerPath } of findMarkers(episodesDir)) {
@@ -209,7 +214,7 @@ export async function run({ repoRoot, serverUrl, token }) {
     if (status !== 'cancelled') continue;
     cancelled++;
 
-    const currentStatus = getCurrentStoryStatus(repoRoot, epicId, storyId);
+    const currentStatus = getCurrentStoryStatus(resolvedStateDir, epicId, storyId);
 
     // Allowlist — only patch pending or in_progress stories. All other
     // states (deferred, completed, failed, blocked, null, …) are noops.
@@ -218,7 +223,7 @@ export async function run({ repoRoot, serverUrl, token }) {
       continue;
     }
 
-    const ok = patchStoryYaml(repoRoot, epicId, storyId, issueIdentifier);
+    const ok = patchStoryYaml(resolvedStateDir, epicId, storyId, issueIdentifier);
     if (ok) {
       patched++;
     } else {

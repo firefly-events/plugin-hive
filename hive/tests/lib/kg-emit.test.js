@@ -5,16 +5,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ROOT = path.join(__dirname, '..', '..', '..');
-const CONFIG_PATH = path.join(ROOT, 'hive', 'lib', 'config.js');
-const EMIT_PATH = path.join(ROOT, 'hive', 'lib', 'kg-emit.js');
-const SESSION_END_PATH = path.join(ROOT, 'hive', 'lib', 'session-end.js');
+const { pathToFileURL } = require('node:url');
 
-function clearModules() {
-  for (const modulePath of [CONFIG_PATH, EMIT_PATH, SESSION_END_PATH]) {
-    delete require.cache[require.resolve(modulePath)];
-  }
-}
+const ROOT = path.join(__dirname, '..', '..', '..');
+const EMIT_PATH = path.join(ROOT, 'hive', 'lib', 'kg-emit.js');
 
 async function withConfigText(text, fn) {
   const originalExistsSync = fs.existsSync;
@@ -32,17 +26,22 @@ async function withConfigText(text, fn) {
   } finally {
     fs.existsSync = originalExistsSync;
     fs.readFileSync = originalReadFileSync;
-    clearModules();
   }
 }
 
+// kg-emit.js is an ES module (hive/lib is `"type": "module"` scope). A fresh
+// instance per test case comes from a cache-busting dynamic import — the
+// emit_lifecycle_at knob and the writes counter are module-load state. The
+// sqlite layer is stubbed through the module's _setKgDepsForTest seam (ESM
+// namespaces are frozen, so the old session-end export monkey-patch is gone).
+let emitterLoadCount = 0;
+
 function loadEmitterWithKgWrite(text, kgWrite, kgSupersede = async () => ({ updated: 0 })) {
-  clearModules();
-  return withConfigText(text, () => {
-    const sessionEnd = require(SESSION_END_PATH);
-    sessionEnd.kgWrite = kgWrite;
-    sessionEnd.kgSupersede = kgSupersede;
-    return require(EMIT_PATH);
+  return withConfigText(text, async () => {
+    emitterLoadCount += 1;
+    const emitter = await import(`${pathToFileURL(EMIT_PATH).href}?case=${emitterLoadCount}`);
+    emitter._setKgDepsForTest({ kgWrite, kgSupersede });
+    return emitter;
   });
 }
 

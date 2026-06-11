@@ -11,7 +11,17 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HIVE_ROOT="${HIVE_ROOT:-$(dirname "$SCRIPT_DIR")}"
+# shellcheck source=hooks/common.sh
+. "$HIVE_ROOT/hooks/common.sh"
+
 BYPASS_MARKER="__MESSAGES_SESSION_BYPASS__"
+
+# Escape a literal string for safe use inside an ERE alternative.
+_escape_ere() {
+  printf '%s' "$1" | sed -e 's/[][\.|$(){}?+*^]/\\&/g'
+}
 
 input=$(cat)
 
@@ -34,11 +44,22 @@ if printf '%s' "$spawn_context" | grep -Fq "$BYPASS_MARKER"; then
 fi
 
 # Pattern 1: Agent prompt references story YAML paths (story-level work).
-# Matches both the v1.2+ default (.pHive/) and the legacy state/ layout so
-# projects that haven't migrated yet are still covered by this hook.
+# Matches the v1.2+ default (.pHive/), the legacy state/ layout, and — when
+# paths.state_dir is configured (sdr-1 resolver contract) — the resolved
+# state-dir basename, so relocated-state projects stay covered by this hook.
 # The `.` and `/` in `.pHive` are escaped to avoid false positives on strings
 # like `xpHive-epics`.
-story_regex='(\.pHive|state)/epics/[^/]+/stories/[^/]+\.yaml'
+state_dir_alternatives='\.pHive|state'
+resolved_state_dir=$(_resolve_state_dir 2>/dev/null) || resolved_state_dir=""
+if [ -n "$resolved_state_dir" ]; then
+  resolved_state_basename="${resolved_state_dir##*/}"
+  if [ -n "$resolved_state_basename" ] \
+    && [ "$resolved_state_basename" != ".pHive" ] \
+    && [ "$resolved_state_basename" != "state" ]; then
+    state_dir_alternatives="${state_dir_alternatives}|$(_escape_ere "$resolved_state_basename")"
+  fi
+fi
+story_regex="(${state_dir_alternatives})/epics/[^/]+/stories/[^/]+\.yaml"
 if echo "$prompt" | grep -qiE "$story_regex"; then
   # Check if it's a single story being fully delegated
   story_count=$(echo "$prompt" | grep -oiE "$story_regex" | sort -u | wc -l | tr -d ' ')

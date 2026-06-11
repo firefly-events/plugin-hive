@@ -1,7 +1,7 @@
 id: f-02-prompt-convention-polish-visual-qa
 epic: ui-cluster-extract-config-deeper
 title: "Apply prompt-reference convention to polish-audit + visual-qa"
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [f-01-prompt-convention-brand-design]

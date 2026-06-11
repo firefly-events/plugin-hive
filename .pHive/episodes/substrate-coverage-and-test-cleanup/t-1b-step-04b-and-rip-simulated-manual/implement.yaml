@@ -1,0 +1,8 @@
+step_id: implement
+status: completed
+timestamp: "2026-06-07T00:00:00Z"
+artifacts:
+  - hive/workflows/steps/test-swarm/step-04b-scenario-replay.md
+  - hive/workflows/test-swarm.workflow.yaml
+  - skills/test/SKILL.md
+  - .pHive/cross-cutting-concerns.yaml

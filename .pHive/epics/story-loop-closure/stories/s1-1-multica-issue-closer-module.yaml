@@ -1,7 +1,7 @@
 id: s1-1-multica-issue-closer-module
 epic: story-loop-closure
 title: "S1.1 — hive/lib/multica-issue-closer.mjs module"
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s0-1-episode-marker-audit]

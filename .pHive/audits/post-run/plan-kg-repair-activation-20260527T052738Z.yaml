@@ -1,0 +1,15 @@
+run_id: plan-kg-repair-activation-20260527T052738Z
+skill: plan
+timestamp: 2026-05-27T05:27:38Z
+epic_id: kg-repair-activation
+gate_lift_fired: false
+methodology: classic
+methodology_source: hive-config
+story_specs_produced: 13
+phase_d_published: 13
+phase_d_failed: 0
+phase_d_adapter: multica
+phase_d_workspace: plugin-hive
+phase_d_tracker_range: PLU-81..PLU-93
+nonsensical_defaults: []
+warnings_emitted: 0

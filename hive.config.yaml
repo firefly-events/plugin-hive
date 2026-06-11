@@ -176,30 +176,31 @@ model_tiers:
     - test-worker
 
 # Override a specific agent's model (takes precedence over tier)
+# 2026-06-09 policy update: Fable 5 (claude-fable-5) replaces Opus for all
+# opus-level runs. Trialing Fable on the generic developer role for this repo.
 model_overrides:
-  reviewer: opus               # Opus 4.7 verifies Codex-produced work (cross-LLM gate)
-  peer-validator: opus         # peer-validator runs alongside reviewer — same tier
-  # example: researcher: opus    # promote researcher to opus for complex projects
+  peer-validator: fable        # Fable 5 — was opus
+  tpm: fable                   # Fable 5 — was opus tier
+  tester: fable                # Fable 5 — was opus pin on Multica
+  architect: fable             # Fable 5 — complex reasoning tier
+  developer: fable             # Fable 5 trial on the generic developer role
+  # reviewer: routed to codex backend below (cross-LLM gate flips direction:
+  # Fable creates, Codex reviews)
 
 # Per-persona backend routing.
-# Per feedback_codex_general_backend.md (2026-05-01 policy):
-#   Codex on (creates): researcher, developer(s), technical-writer, architect
-#   Claude on (verifies/sequences): reviewer, tester, tpm, analyst, team-lead,
-#     pair-programmer, peer-validator, all specialists, all test-* agents
+# 2026-06-09 policy (supersedes 2026-05-01 codex-creates policy):
+#   Codex token budget nearly exhausted — use Codex SPARSELY, reviews only.
+#   Claude (Fable 5 / Sonnet 4.6) on all creator + sequencing roles.
+#   Cross-LLM verification direction flipped: Claude creates, Codex reviews.
 # Personas omitted from this map default to direct TeamCreate (Claude). The plan
 # skill emits one INFO-log line per persona at spawn time documenting the route.
-# Originally wired in shipped baseline at eefbff3 (2026-04-21); reverted at
-# 59a5451 to keep shipped neutral; re-applied here in maintainer-local root.
 agent_backends:
-  researcher: codex
-  developer: codex
-  frontend-developer: codex
-  backend-developer: codex
-  technical-writer: codex
-  architect: codex
-  # ui-designer omitted — known-incompatible per skills/hive/skills/codex-invoke
-  # tpm/pair-programmer/analyst/team-lead/reviewer/tester/qa/peer-validator omitted
-  # — verifier + sequencing roles stay on Claude per 2026-05-01 policy
+  reviewer: codex
+  # researcher/developer(s)/technical-writer/architect moved OFF codex
+  # 2026-06-09 (token budget); Multica agent pins updated to match:
+  # developer/architect/tester/peer-validator/tpm -> claude-fable-5,
+  # researcher/frontend-developer/backend-developer -> claude-sonnet-4-6,
+  # reviewer -> gpt-5.4 (codex runtime)
 
 # Circuit breakers — prevent wasted time and tokens
 circuit_breakers:
@@ -246,6 +247,19 @@ external_models:
 # git_flow:
 #   default_pr_base: auto         # auto | <branch-name>; "auto" = develop if origin/develop exists, else main
 #   branch_strategy: per-epic     # per-epic | per-story (back-compat for in-flight epics)
+
+# Planning substrate routing (multica-plan-test-cycles epic).
+# Routes /plan Phase 0 persona dispatch through the Multica daemon instead of
+# direct TeamCreate. Per-persona fan-out (one Multica issue + agent UUID per
+# planning persona); Hive owns mode-resolve, polling, episode markers, and all
+# user review/sign-off gates (gates never advance from the Multica side).
+# Prereq: `/hive:multica-init` bootstrap. Env override: HIVE_PLANNING_MODE=multica.
+planning:
+  mode: multica
+  multica:
+    poll_interval_seconds: 5
+    persona_timeout_seconds: 1800   # 30-min wall clock per persona
+    messages_capture_max: 200       # last N messages into episode sidecar
 
 # Execution defaults
 execution:

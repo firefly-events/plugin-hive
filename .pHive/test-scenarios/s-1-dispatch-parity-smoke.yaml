@@ -1,0 +1,47 @@
+id: s-1-dispatch-parity-smoke
+title: "dispatch-parity matrix governance close — smoke walk"
+description: Spec-walk confirming that dispatch-parity.md is complete and verifiable; the CI checker exits 0; cross-links are reachable; and the vitest test suite covers all AC.
+mode: spec-walk
+story: s-1-dispatch-parity-matrix
+epic: substrate-coverage-and-test-cleanup
+
+preconditions:
+  - "hive/references/dispatch-parity.md is present and git-tracked"
+  - "hive/scripts/verify-dispatch-parity.mjs is present and git-tracked"
+  - "All Slices 1-5 mode atoms are git-tracked (12 SKILL.md files)"
+  - "README.md contains a dispatch-parity.md cross-link"
+  - "skills/hive/skills/planning-routing/SKILL.md contains a dispatch-parity.md cross-link"
+
+steps:
+  - action: Run node hive/scripts/verify-dispatch-parity.mjs --no-bump from repo root and inspect stdout/exit code.
+    expected: 'Script exits 0. stdout contains "dispatch-parity.md: 12 paths verified" (or higher if future paths are added). No FAIL lines in stderr.'
+    actor: tester
+
+  - action: Open hive/references/dispatch-parity.md and read the 6×3 main matrix table.
+    expected: Table has exactly 6 orchestrator rows (plan, execute, test, design, design-review, review) and 4 columns (Orchestrator + default + multica + cc-workflows). All default cells contain "inline". All multica cells contain a relative path ending in -mode-multica/SKILL.md. All cc-workflows cells contain a relative path ending in -mode-cc-workflows/SKILL.md. Total substrate cells = 18 (6 rows × 3 columns including default).
+    actor: tester
+
+  - action: Read the Future substrate section in hive/references/dispatch-parity.md.
+    expected: A separate table lists sandcastle and gh-actions-legacy columns. All cells are marked "not-shipped" with reasoning text. No cells are empty or missing.
+    actor: tester
+
+  - action: Follow the cross-link in README.md to hive/references/dispatch-parity.md.
+    expected: README.md contains a Markdown link or plain-text reference to hive/references/dispatch-parity.md. The referenced file exists on disk.
+    actor: tester
+
+  - action: Read the "## Last verified:" line in hive/references/dispatch-parity.md.
+    expected: 'Line matches the pattern "## Last verified: YYYY-MM-DD" with a valid ISO date. Date is 2026-06-08 or later (script bumps on CI green).'
+    actor: tester
+
+  - action: Run the vitest dispatch-parity test suite in isolation via npx vitest run --reporter=verbose --root . hive/scripts/test/verify-dispatch-parity.test.mjs.
+    expected: All 16 tests pass across 4 describe blocks. No skipped or failed tests.
+    actor: tester
+
+postconditions:
+  - "verify-dispatch-parity.mjs exits 0 — all cited skill paths resolve on disk and are git-tracked"
+  - "dispatch-parity.md presents 6 rows × 3 substrate columns with inline markers in default column"
+  - "Future substrate footer lists sandcastle + gh-actions-legacy as not-shipped"
+  - "README.md cross-link to dispatch-parity.md is present"
+  - "planning-routing/SKILL.md cross-link to dispatch-parity.md is present"
+  - "vitest suite: 16/16 tests pass"
+  - "Full npm test suite: 446/446 tests pass (16 test files)"

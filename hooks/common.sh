@@ -64,7 +64,10 @@ _canonicalize_path() {
 _read_paths_config() {
   local key="$1"
   local default="$2"
-  local config_path="${CONFIG_FILE:-$HIVE_ROOT/hive.config.yaml}"
+  # Config-file resolution order (canonical: hive/lib/config.py):
+  # CONFIG_FILE env > $HIVE_ROOT/hive.config.yaml when HIVE_ROOT is set and
+  # non-empty > $PWD/hive.config.yaml.
+  local config_path="${CONFIG_FILE:-${HIVE_ROOT:-$PWD}/hive.config.yaml}"
   local val=""
 
   if [[ ! -f "$config_path" ]]; then
@@ -94,10 +97,11 @@ PYEOF
 
   if [[ -z "${val:-}" ]]; then
     val=$(awk -v key="$key" '
-      /^paths:[[:space:]]*$/ { in_paths=1; next }
+      /^paths:[[:space:]]*(#.*)?$/ { in_paths=1; next }
       in_paths && /^[^[:space:]#][^:]*:/ { in_paths=0 }
       in_paths && $0 ~ "^[[:space:]]+" key ":[[:space:]]*" {
         sub("^[[:space:]]+" key ":[[:space:]]*", "", $0)
+        sub(/[[:space:]]*#.*$/, "", $0)
         print
         exit
       }
@@ -126,7 +130,12 @@ _resolve_state_dir() {
   local state_dir=""
   local target_project=""
 
-  state_dir=$(_read_paths_config "state_dir" ".pHive")
+  # HIVE_STATE_DIR env override wins over config; the value flows through the
+  # same absolute/relative resolution below (contract: sdr-1 / Q2).
+  state_dir="${HIVE_STATE_DIR:-}"
+  if [[ -z "$state_dir" ]]; then
+    state_dir=$(_read_paths_config "state_dir" ".pHive")
+  fi
   if [[ "$state_dir" == /* ]]; then
     _canonicalize_path "$state_dir"
     return

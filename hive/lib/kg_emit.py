@@ -60,6 +60,7 @@ def emit_kg_event(
         return {"emitted": False, "metadata": None}
     try:
         with sqlite3.connect(str(db_path)) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
             conn.execute(
                 """
                 INSERT OR IGNORE INTO triples
@@ -133,6 +134,7 @@ def emit_superseded(
         if not db_path.exists():
             return {"emitted": False, "metadata": None}
         with sqlite3.connect(str(db_path)) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
             cur = conn.execute(
                 """
                 UPDATE triples

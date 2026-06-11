@@ -1,0 +1,105 @@
+id: dr-2-design-review-mode-multica-smoke
+title: "/design-review via multica substrate smoke walk — dr-2 atom 4-step shape + single episode marker"
+description: >
+  Spec-walk confirming that /design-review routes through design-review-dispatch to
+  design-review-mode-multica when HIVE_DESIGN_REVIEW_MODE=multica is set, the resolver
+  returns the expected mode_decision, the atom prescribes exactly 4 agent() calls
+  inside a SINGLE Multica run (accessibility, animations, ui-designer critique,
+  ui-designer synthesis), and ONE episode marker captures all four outputs.
+  Also verifies --skip and --artifact-target flag semantics.
+mode: spec-walk
+story: dr-2-design-review-mode-multica
+epic: substrate-coverage-and-test-cleanup
+
+preconditions:
+  - "skills/hive/skills/design-review-mode-multica/SKILL.md is present and cites design-review.workflow.yaml:8-81 as the architectural anchor"
+  - "skills/hive/skills/design-review-dispatch/SKILL.md is present and names design-review-mode-multica as the multica downstream target"
+  - "hive/lib/mode-resolver.mjs is present and recognizes HIVE_DESIGN_REVIEW_MODE as a registered varName"
+  - "The vitest resolver test suite passes green (all tiers covered)"
+  - "The s-3 no-codex lint scope note is documented: dr-2 is *-mode-multica, not *-mode-cc-workflows, and is out of lint scope"
+
+steps:
+  - action: >
+      Run the vitest resolver test for design-review-mode-multica to confirm all
+      5-tier permutations resolve correctly and the raw-token footgun is covered.
+    expected: >
+      All tests pass. Each tier (env, root_config, shipped_baseline, skill_override,
+      default) resolves to the expected decision with only the winning source key in
+      sources. The raw-token footgun test confirms that passing a bare value without
+      VARNAME= falls through to the next tier.
+    actor: tester
+
+  - action: >
+      Invoke resolveMode with env set to HIVE_DESIGN_REVIEW_MODE=multica and verify
+      the returned decision and sources.
+    expected: >
+      decision equals multica and sources contains only the env key with value
+      HIVE_DESIGN_REVIEW_MODE=multica. No other tier keys appear in sources.
+    actor: tester
+
+  - action: >
+      Read design-review-mode-multica SKILL.md and confirm exactly 4 agent() calls
+      are documented: Step A (accessibility-specialist), Step B (animations-specialist),
+      Step C (ui-designer critique using design-review-design-critique.md step_file),
+      Step D (ui-designer synthesis using design-review-synthesis.md step_file).
+    expected: >
+      All four steps are present. The step_file references match the canonical paths in
+      hive/references/ui-prompts/. The workflow.yaml:8-81 architectural anchor is cited.
+      The Q11 ruling is documented as the rationale for single-run shape.
+    actor: tester
+
+  - action: >
+      Read design-review-mode-multica SKILL.md and confirm the single-run shape:
+      ONE Multica issue for the entire 4-step run, ONE episode marker (multica-run.yaml)
+      capturing all four agent() outputs, NO per-persona fan-out.
+    expected: >
+      SKILL.md states ONE Multica issue and ONE episode marker. The marker path uses
+      {unit_id} as the directory identifier (not persona name). SKILL.md explicitly
+      contrasts this shape with d-3 (design-mode-multica per-persona fan-out) and
+      documents the intentional asymmetry per the Q11 ruling.
+    actor: tester
+
+  - action: >
+      Verify --skip flag semantics: confirm SKILL.md documents --skip accessibility
+      suppresses Step A only, --skip animations suppresses Step B only, and required
+      steps C and D cannot be skipped. Pass --skip accessibility to the SKILL.md
+      invocation contract and verify the step A output is explicitly null.
+    expected: >
+      SKILL.md documents both skip values and their suppressed steps. The skipped
+      step output in the structured summary is explicitly null. The downstream steps
+      that have optional dependencies on the skipped step receive null gracefully.
+      Required steps C and D ignore skip flags and run unconditionally.
+    actor: tester
+
+  - action: >
+      Verify --artifact-target flag semantics: confirm SKILL.md documents
+      --artifact-target forwarded verbatim to Steps C and D agent prompts, and that
+      the valid values are {design|implementation}.
+    expected: >
+      SKILL.md documents --artifact-target as injected into the Step C and Step D
+      agent prompts. Both design and implementation values are listed. The flag is
+      not consumed by this atom — it is forwarded verbatim from the caller (dr-1).
+    actor: tester
+
+  - action: >
+      Run the s-3 no-codex lint and document the scope finding: dr-2 is a
+      *-mode-multica atom, not a *-mode-cc-workflows atom, and is out of the lint
+      script target glob. Confirm that the equivalent no-codex checks (no agentType,
+      no agent_backends) are covered by the resolver test suite instead.
+    expected: >
+      The lint script runs against *-mode-cc-workflows/SKILL.md files and does not
+      scan design-review-mode-multica/SKILL.md. The resolver test suite covers the
+      equivalent code-block checks for the multica atom. The SKILL.md correctly uses
+      multica-story-dispatch helpers and does not reference assertWorktreeIsolation
+      (a cc-workflows precondition). This asymmetry is documented and expected.
+    actor: tester
+
+postconditions:
+  - "All vitest resolver tests pass (5-tier coverage + footgun + 4-step shape + single-run + flag semantics)"
+  - "design-review-dispatch SKILL.md routes multica decision to design-review-mode-multica"
+  - "Atom SKILL.md documents 4 agent() calls: accessibility-specialist, animations-specialist, ui-designer critique, ui-designer synthesis"
+  - "Atom SKILL.md documents ONE Multica issue and ONE episode marker (multica-run.yaml)"
+  - "Intentional asymmetry with d-3 per-persona shape is documented (Q11 ruling)"
+  - "--skip accessibility and --skip animations suppress optional Steps A and B respectively"
+  - "--artifact-target is forwarded verbatim to Steps C and D"
+  - "s-3 lint scope is correctly documented: dr-2 is out of scope as a *-mode-multica atom"

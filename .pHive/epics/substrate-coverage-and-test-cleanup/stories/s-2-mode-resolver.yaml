@@ -1,0 +1,123 @@
+id: s-2-mode-resolver
+epic: substrate-coverage-and-test-cleanup
+title: Extract 5-tier mode-resolver helper into hive/lib/mode-resolver.mjs
+status: complete
+complexity: medium
+methodology: classic
+depends_on:
+- a-0-audit-recovery
+description: 'Extract the canonical 5-tier resolver currently inlined at
+
+  `skills/hive/skills/execute-dispatch/SKILL.md:46-101` into a shared module
+
+  `hive/lib/mode-resolver.mjs` whose signature returns `{decision, sources}`.
+
+  The `sources` field preserves the field-source telemetry that
+
+  execute-dispatch emits today (architect ESCALATION — without it callers
+
+  lose per-tier provenance). Refactor execute-dispatch Step 0 to consume the
+
+  helper. Snapshot tests against pre-refactor outputs are mandatory because
+
+  the refactor is behavior-preserving. This is Slice 1 commit #1 (LOCKED
+
+  order s-2 → s-4 → s-3).
+
+  '
+acceptance_criteria:
+- 'Given `hive/lib/mode-resolver.mjs` is imported, when the resolver is invoked, then it accepts a resolver-name string (one of `HIVE_PLAN_MODE`, `HIVE_EXECUTE_MODE`, `HIVE_TEST_MODE`, `HIVE_DESIGN_MODE`, `HIVE_DESIGN_REVIEW_MODE`, `HIVE_REVIEW_MODE`) plus a context object and returns `{decision: string, sources: {env?: string, root_config?: string, shipped_baseline?: string, skill_override?: string, default?: string}}`.'
+- Given the 5-tier precedence (env > root config > shipped baseline > skill override > default), when a value is set at multiple tiers, then the helper picks the highest-precedence tier and records the resolving tier in `sources`.
+- Given all 5 tiers are empty, when the helper is invoked, then it returns a default `decision` and `sources.default` records the default-source tag.
+- Given execute-dispatch Step 0 is refactored to consume the helper, when execute-dispatch resolves a `mode_decision`, then the emitted `{mode_decision, sources}` payload is byte-equivalent to the pre-refactor output for a representative input set captured as snapshots at `hive/lib/test/mode-resolver-execute-dispatch.snapshot.json`.
+- Given the unit test suite at `hive/lib/test/mode-resolver.test.mjs` runs, when `npm test` executes, then all 5-tier precedence cases pass AND the `sources` map records the resolving tier for each case.
+- DO. Preserve the exact `{decision, sources}` shape callers depend on. Snapshot every pre-refactor execute-dispatch output before refactor begins.
+- DO NOT. Do not change resolver semantics (no new tiers, no priority reorder, no default change) — this is a pure extract+rename.
+metric:
+  applies: true
+  name: substrate_coverage.mode_resolver_snapshot_parity
+  direction: up
+  unit: ratio
+  baseline: null
+  target: 1.0
+  window: story integrate step
+  source:
+    kind: manual
+    ref: vitest run hive/lib/test/mode-resolver.test.mjs + snapshot diff vs execute-dispatch pre-refactor outputs
+  verify_at: story integrate step
+  owner: developer
+steps:
+- id: research
+  description: Read `skills/hive/skills/execute-dispatch/SKILL.md:46-101` to map the existing 5-tier resolver; capture inputs/outputs for snapshot baseline; confirm `sources` field-source telemetry shape.
+  agent: researcher
+- id: implement
+  description: Create `hive/lib/mode-resolver.mjs` with signature `resolveMode(varName, ctx) -> {decision, sources}`; refactor execute-dispatch Step 0 to call the helper; preserve byte-for-byte output for the snapshot input set.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Author `hive/lib/test/mode-resolver.test.mjs` covering all 5 tiers (env / root config / shipped baseline / skill override / default) AND a snapshot test at `hive/lib/test/mode-resolver-execute-dispatch.snapshot.json` confirming execute-dispatch refactor is behavior-preserving. Wire to `npm test`.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Architect review on helper signature (`{decision, sources}`) preservation and execute-dispatch refactor regression posture; reviewer cross-checks no behavior drift.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: 'Commit "[s-2] feat(mode-resolver): extract 5-tier resolver into hive/lib/mode-resolver.mjs + execute-dispatch consumes it"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  tech_stack:
+  - language: javascript (.mjs)
+  - runtime: node 20+
+  - test: vitest
+  key_files:
+  - path: skills/hive/skills/execute-dispatch/SKILL.md
+    purpose: Existing inline 5-tier resolver at lines 46-101 — source of truth for helper signature + tier semantics
+  - path: hive/lib/mode-resolver.mjs
+    purpose: NEW shared helper extracted from execute-dispatch
+  - path: hive/lib/test/mode-resolver.test.mjs
+    purpose: NEW vitest spec covering all 5 tiers + the `{decision, sources}` shape
+files_to_modify:
+- file: hive/lib/mode-resolver.mjs
+  change: CREATE — exports `resolveMode(varName, ctx)` returning `{decision, sources}`
+- file: hive/lib/test/mode-resolver.test.mjs
+  change: CREATE — vitest spec covering all 5 tiers + `sources` field-source telemetry
+- file: hive/lib/test/mode-resolver-execute-dispatch.snapshot.json
+  change: CREATE — snapshot of execute-dispatch pre-refactor outputs for byte-equivalence assertion
+- file: skills/hive/skills/execute-dispatch/SKILL.md
+  change: REFACTOR Step 0 (lines 46-101) to import and call `hive/lib/mode-resolver.mjs`; preserve `{mode_decision, sources}` emit shape exactly
+code_examples:
+- language: javascript
+  description: Helper signature returning {decision, sources}
+  snippet: "// hive/lib/mode-resolver.mjs\nexport function resolveMode(varName, ctx) {\n  // 5-tier precedence: env > root config > shipped baseline > skill override > default\n  const sources = {};\n  let decision;\n  // ... tier checks populate sources[tier] and set decision\n  return { decision, sources };\n}\n"
+references:
+- path: skills/hive/skills/execute-dispatch/SKILL.md
+  relevant_excerpt: Step 0 field-source-tracking resolver at lines 46-101; canonical 5-tier env > root config > shipped baseline > skill override > default at line 50.
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/structured-outline.md
+  relevant_excerpt: 's-2: mode-resolver helper — Extract the 5-tier resolver currently inlined at execute-dispatch/SKILL.md:46-101 into hive/lib/mode-resolver.mjs. Helper signature returns `{decision, sources}` — the second value preserves the field-source telemetry execute-dispatch emits today; without it, callers lose per-tier provenance (architect ESCALATION).'
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/horizontal-plan.md
+  relevant_excerpt: L2 helper (s-2 mode-resolver.mjs) → L2 routers (test, design, design-review, review-dispatch). If routers ship first they inline-resolve and s-2 becomes post-hoc rewrite of 4 fresh files.
+cross_cutting:
+- concern: documentation
+  action: Inline doc-block at top of mode-resolver.mjs describing the 5-tier precedence and the `{decision, sources}` shape; downstream routers cite the helper by path.
+design_decisions:
+- decision: Helper signature returns `{decision, sources}` (not bare string)
+  rationale: Architect ESCALATION — without `sources`, callers lose per-tier provenance that execute-dispatch emits today. Bare return would force every consumer to re-derive the resolving tier.
+- decision: Slice 1 commit order LOCKED — s-2 lands first
+  rationale: hv-collab-review architect lock — s-4 and s-3 depend on the helper existing. Reverse order causes s-3 lint to fail on missing imports (design-discussion §6 Q12).
+- decision: Snapshot tests are mandatory for execute-dispatch refactor
+  rationale: Refactor is behavior-preserving by contract; snapshot is the regression guard.
+risks:
+- severity: medium
+  description: Refactor of execute-dispatch Step 0 introduces a behavior delta (different tier handling, different `sources` shape)
+  mitigation: Snapshot test at `hive/lib/test/mode-resolver-execute-dispatch.snapshot.json` captures pre-refactor output; CI fails on drift
+- severity: low
+  description: Future consumers (test-dispatch, design-dispatch, etc.) drift on resolver-name conventions
+  mitigation: Document the resolver-name registry (`HIVE_<SKILL>_MODE`) inline in mode-resolver.mjs; downstream router stories cite it
+tracker_id: 8ac91e24-a337-4bd7-9868-07cb26dcd383

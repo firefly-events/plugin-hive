@@ -1,7 +1,7 @@
 id: gi-2-dispatch-uses-ghcr
 epic: ghcr-sandcastle-image
 title: Hive dispatch — pull from GHCR with local-build fallback
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [gi-1-build-publish-workflow]

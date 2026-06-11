@@ -1,0 +1,132 @@
+id: dr-3-design-review-mode-cc-workflows
+epic: substrate-coverage-and-test-cleanup
+title: Create design-review-mode-cc-workflows atom preserving 4-step model + helper import + no-codex compliance
+status: complete
+complexity: medium
+methodology: classic
+depends_on:
+- s-2-mode-resolver
+- s-5-cc-workflows-model-tier-resolver
+- s-4-cc-workflows-preconditions
+- s-3-no-codex-lint
+- dr-1-design-review-dispatch-router
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: 'Create `skills/hive/skills/design-review-mode-cc-workflows/SKILL.md`.
+
+  Preserves the same 4-step model as dr-2 (4 agent() calls inside the
+
+  cc-workflows substrate). Step 0 imports
+
+  `hive/lib/cc-workflows-preconditions.mjs` and calls
+
+  `assertWorktreeIsolation()`. No Codex routing — s-3 lint enforces all
+
+  four surface checks.
+
+  '
+acceptance_criteria:
+- Given `skills/hive/skills/design-review-mode-cc-workflows/SKILL.md` is created, when the atom executes Step 0, then it imports `hive/lib/cc-workflows-preconditions.mjs` and invokes `assertWorktreeIsolation()`.
+- Given the atom preserves the 4-step model, when it runs, then it dispatches 4 agent() calls (accessibility → animations → ui-designer critique → ui-designer synthesis) via the default workflow subagent (no Codex routing).
+- Given the s-3 no-codex lint runs against the atom, when `npm test` executes, then all four checks PASS.
+- Given /design-review runs through cc-workflows substrate, when --skip is passed, then steps continue to skip per existing semantics.
+- Given /design-review runs through cc-workflows substrate, when --artifact-target is passed, then the flag continues to work end-to-end.
+- Given the vitest resolution test runs, when 5-tier permutations are exercised, then mode_decision emits correctly.
+- DO. Preserve the 4-step model from design-review.workflow.yaml in the cc-workflows substrate.
+- DO NOT. Include any Codex routing surfaces.
+metric:
+  applies: true
+  name: substrate_coverage.design_review_mode_cc_workflows_lint_pass
+  direction: up
+  unit: bool
+  baseline: 0
+  target: 1
+  window: story integrate step
+  source:
+    kind: manual
+    ref: node hive/scripts/lint-cc-workflows-no-codex.mjs (green for design-review-mode-cc-workflows)
+  verify_at: story integrate step
+  owner: developer
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/dr-3-design-review-mode-cc-workflows-smoke.yaml
+  verdict: null
+  timestamp: null
+  agent: null
+steps:
+- id: research
+  description: Read dr-2 sibling atom for 4-step shape; confirm Step 0 helper-import pattern from s-4 back-fit.
+  agent: researcher
+- id: implement
+  description: Create `skills/hive/skills/design-review-mode-cc-workflows/SKILL.md`; preserve 4 agent() calls; Step 0 imports cc-workflows-preconditions.mjs; no Codex routing.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Author resolver test at `skills/hive/skills/design-review-mode-cc-workflows/test/resolver.test.mjs`; run s-3 lint + helper-import lint and confirm green.
+  agent: tester
+  depends_on:
+  - implement
+- id: scenario
+  description: Author `.pHive/test-scenarios/dr-3-design-review-mode-cc-workflows-smoke.yaml` covering /design-review via cc-workflows.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Architect review on 4-step preservation + helper-import at Step 0 + lint compliance.
+  agent: reviewer
+  depends_on:
+  - test
+  - scenario
+- id: integrate
+  description: 'Commit "[dr-3] feat(/design-review): design-review-mode-cc-workflows atom"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  tech_stack:
+  - language: markdown (SKILL.md), javascript (.mjs)
+  - runtime: node 20+
+  - test: vitest
+  key_files:
+  - path: skills/hive/skills/design-review-mode-cc-workflows/SKILL.md
+    purpose: NEW cc-workflows atom — preserves 4-step model
+  - path: hive/workflows/design-review.workflow.yaml
+    purpose: Architectural anchor (lines 8-81)
+  - path: hive/lib/cc-workflows-preconditions.mjs
+    purpose: Helper imported at Step 0
+files_to_modify:
+- file: skills/hive/skills/design-review-mode-cc-workflows/SKILL.md
+  change: CREATE — preserves 4 agent() calls; Step 0 imports cc-workflows-preconditions.mjs; no Codex routing
+- file: skills/hive/skills/design-review-mode-cc-workflows/test/resolver.test.mjs
+  change: CREATE — vitest spec covering Phase 0c 5-tier + helper-import assertions
+- file: .pHive/test-scenarios/dr-3-design-review-mode-cc-workflows-smoke.yaml
+  change: CREATE — scenario for /design-review via cc-workflows
+code_examples:
+- language: markdown
+  description: design-review-mode-cc-workflows Step 0 + 4-step shape
+  snippet: '## Step 0 — Precondition
+
+    Call `assertWorktreeIsolation()` from `hive/lib/cc-workflows-preconditions.mjs`.
+
+    ## Steps 1-4 — 4 agent() calls preserving design-review.workflow.yaml:8-81
+
+    '
+references:
+- path: hive/workflows/design-review.workflow.yaml
+  relevant_excerpt: 'Lines 8-81: 4 steps (accessibility:8, animations:28, ui-designer-critique:55, ui-designer-synthesis:80).'
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/structured-outline.md
+  relevant_excerpt: 'dr-3: design-review-mode-cc-workflows — Same 4-step model. Imports cc-workflows-preconditions.mjs at Step 0.'
+cross_cutting:
+- concern: documentation
+  action: SKILL.md is itself the doc; cite design-review.workflow.yaml:8-81 + cc-workflows-preconditions.mjs.
+- concern: versioning
+  action: New consumer-visible skill — flag for epic-close version bump (minor — additive feature) in CHANGELOG.
+design_decisions:
+- decision: Preserve 4-step model in cc-workflows substrate (parity with dr-2 + workflow.yaml)
+  rationale: Q11 RESOLVED — workflow.yaml is the architectural anchor; both Multica and cc-workflows preserve the 4-step shape.
+risks:
+- severity: low
+  description: cc-workflows assembled script collapses 4 agent() calls into a single-shot
+  mitigation: AC asserts 4 agent() calls preserved; architect review verifies
+tracker_id: 268a513b-353f-4b8b-bb04-7b87d40e1dbd

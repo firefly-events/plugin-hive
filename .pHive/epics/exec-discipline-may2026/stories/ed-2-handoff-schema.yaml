@@ -4,7 +4,7 @@ tracker_id: "firefly-events/plugin-hive#136"
 tracker_url: https://github.com/firefly-events/plugin-hive/issues/136
 epic: exec-discipline-may2026
 title: Extend handoff + cycle-state schemas with scope-drift fields
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [ed-1-maturity-helper]

@@ -1,0 +1,56 @@
+step: test
+story: d-3-design-mode-multica
+epic: substrate-coverage-and-test-cleanup
+agent: tester
+status: completed
+started_at: "2026-06-08T00:00:00Z"
+completed_at: "2026-06-08T00:00:00Z"
+files_written:
+  - skills/hive/skills/design-mode-multica/test/resolver.test.mjs
+  - .pHive/test-scenarios/d-3-design-mode-multica-smoke.yaml
+  - hive/lib/package.json
+files_read:
+  - hive/agents/tester.md
+  - .pHive/epics/substrate-coverage-and-test-cleanup/stories/d-3-design-mode-multica.yaml
+  - skills/hive/skills/design-mode-multica/SKILL.md
+  - skills/hive/skills/design-review-mode-multica/test/resolver.test.mjs
+  - hive/lib/mode-resolver.mjs
+  - hive/lib/package.json
+  - .pHive/test-scenarios/dr-3-design-review-mode-cc-workflows-smoke.yaml
+  - .pHive/episodes/substrate-coverage-and-test-cleanup/d-3-design-mode-multica/implement.yaml
+notes: |
+  Created resolver.test.mjs with 54 tests across 12 describe blocks.
+  All 54 tests pass; full npm test suite green (350 tests, 13 files).
+
+  Coverage by acceptance criteria:
+  AC 1 (per-persona dispatch, toggle ON): covered by "d-3 per-persona dispatch shape"
+    and "d-3 --include-constraints toggle" describe blocks.
+  AC 2 (episode markers per persona): covered by "d-3 per-persona episode markers" block.
+  AC 3 (mirror execute-mode-multica): covered by "d-3 mirror anchor — execute-mode-multica"
+    and "no-codex scope" blocks.
+  AC 4 (issue count by toggle): covered by "d-3 --include-constraints toggle" block
+    (toggle ON = 3 issues, toggle OFF = 1 issue).
+  AC 5 (vitest test runs): confirmed via npm test (all green).
+  DO constraint (per-persona): covered by per-persona dispatch + episode markers blocks.
+  DO NOT constraint (no single bundled issue): covered by Q10 resolution block.
+
+  Smoke scenario: d-3-design-mode-multica-smoke.yaml covers 6 cases:
+    toggle-on-three-personas, toggle-off-ui-designer-only, bootstrap-required-abort,
+    ui-designer-failure-is-run-failure, accessibility-failure-continues-chain,
+    mode-resolution-env-wins.
+
+  package.json: appended d-3 resolver test path to vitest file list (preserves all
+    prior paths).
+
+  s-3 no-codex lint scope: OUT OF SCOPE for d-3 (multica atom, not cc-workflows).
+    Equivalent code-block constraints verified inline by the no-codex describe block.
+
+  audit-first walk: complete (AC 5/5 covered, refs 2/2 re-read — SKILL.md + mode-resolver.mjs)
+
+test_counts:
+  files: 1
+  tests: 54
+  suites: 12
+suite_green: true
+full_npm_test_green: true
+full_npm_test_count: 350

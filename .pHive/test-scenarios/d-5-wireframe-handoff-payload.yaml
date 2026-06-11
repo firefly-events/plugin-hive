@@ -1,0 +1,113 @@
+id: d-5-wireframe-handoff-payload
+title: "Wireframe handoff payload contract spec-walk — toggle-off (2 fields), toggle-on (3 fields), extensible-minimum acceptance"
+description: >
+  Spec-walk confirming that hive/references/wireframe-protocol.md documents the
+  wireframe handoff payload contract per d-5 acceptance criteria. This is a
+  spec-walk (NOT a live runtime invocation) — an operator reads wireframe-protocol.md
+  and verifies the payload contract section is described as specified.
+  Scenario (a): /design without --include-constraints (toggle OFF) → payload contains
+  PNG + .f0 only (2 minimum fields, constraints.md absent or empty).
+  Scenario (b): /design --include-constraints (toggle ON) → payload contains all 3
+  minimum fields (wireframe.png, wireframe.f0, constraints.md).
+  Scenario (c): extensible-minimum posture — a hypothetical 4th field does not violate
+  the contract (add-only posture, no breakage for existing consumers).
+mode: spec-walk
+story: d-5-wireframe-artifact-handoff
+epic: substrate-coverage-and-test-cleanup
+
+preconditions:
+  - "hive/references/wireframe-protocol.md is present and includes the Handoff Payload Contract section added by the d-5 implementation step"
+  - "The vitest wireframe-handoff-payload.test.mjs test suite passes green (5 independent describe blocks)"
+  - "skills/design/SKILL.md documents Phase A (d-1 shipped) with --include-constraints toggle"
+  - "d-3 design-mode-multica SKILL.md is present (d-3 shipped)"
+  - "d-4 design-mode-cc-workflows SKILL.md is present (d-4 shipped)"
+  - "skills/design-review/SKILL.md is present (downstream consumer)"
+
+steps:
+  - action: >
+      Run the vitest wireframe-handoff-payload test suite to confirm all five AC
+      subsections pass independently. Verify that all tests pass across 5 describe
+      blocks and that no describe block dependency exists.
+    expected: >
+      All tests pass. Subsection 1 (3 minimum fields), Subsection 2 (extensible-minimum
+      posture), Subsection 3 (toggle-conditional bundling), Subsection 4 (field-named
+      discipline), and Subsection 5 (d-1/d-3/d-4 cross-refs) each report independently.
+      Zero failures.
+    actor: tester
+
+  - action: >
+      Scenario (a) — toggle OFF: Read hive/references/wireframe-protocol.md and
+      locate the Handoff Payload Contract section. Confirm that when /design is
+      invoked WITHOUT --include-constraints, the payload is documented to contain
+      wireframe.png and wireframe.f0 (both always present), and that constraints.md
+      is documented as absent or empty in this case.
+    expected: >
+      The Handoff Payload Contract section states wireframe.png is always present.
+      wireframe.f0 is always present. constraints.md is documented as absent or
+      empty when --include-constraints flag is not set. The section does NOT say
+      constraints.md is required in all cases — only when toggle is ON.
+    actor: tester
+
+  - action: >
+      Scenario (b) — toggle ON: Read hive/references/wireframe-protocol.md and
+      locate the Handoff Payload Contract section. Confirm that when /design is
+      invoked WITH --include-constraints, the payload is documented to contain
+      all 3 minimum fields: wireframe.png, wireframe.f0, and constraints.md
+      (populated with bundled accessibility + animations notes from d-1 Phase A).
+    expected: >
+      The Handoff Payload Contract section explicitly names wireframe.png, wireframe.f0,
+      and constraints.md as the three minimum fields. The constraints.md field
+      description references --include-constraints toggle. The section attributes
+      the constraint artifact production to d-1 (Phase A) or equivalent producer
+      reference (accessibility-constraints.md + animations-constraints.md bundled).
+    actor: tester
+
+  - action: >
+      Scenario (c) — extensible-minimum posture: Read hive/references/wireframe-protocol.md
+      and confirm the posture statement explicitly allows adding a 4th field (e.g.,
+      version metadata, originating ticket ID, scenario-mapping notes) without
+      breaking existing consumers. The add-only constraint must be clear.
+    expected: >
+      The Handoff Payload Contract section uses the phrase "extensible-minimum"
+      or equivalent. It states that additional fields are add-only and reversible.
+      It explicitly says downstream consumers seeing fewer fields (the 3 minimums)
+      will not break. The posture cites the TPM escalation from outline-collab-review-record
+      or equivalent authority. A 4th hypothetical field would be additive, not breaking.
+    actor: tester
+
+  - action: >
+      Field-naming discipline: Read hive/references/wireframe-protocol.md and confirm
+      the payload contract uses named fields (wireframe.png, wireframe.f0, constraints.md)
+      rather than a file-glob pattern. Verify the rationale for field-naming is
+      documented (prevents leaking ui-designer working state into the payload).
+    expected: >
+      The section uses explicit field names, not glob patterns like *.png or **.
+      The text "field-named" (or equivalent phrasing) appears. The rationale
+      references the risk of file-glob leaking working state or equivalent.
+      Only the three named minimum fields are part of the canonical minimum set.
+    actor: tester
+
+  - action: >
+      Cross-references: Read hive/references/wireframe-protocol.md and confirm the
+      payload contract section cross-references: (1) d-1 or Phase A as the producer
+      of constituent constraint artifacts, (2) d-3 (design-mode-multica) and d-4
+      (design-mode-cc-workflows) as substrates whose per-persona outputs feed the
+      bundle, (3) Q9 resolution from design-discussion.md as authority for the
+      PNG + .f0 + constraint-doc shape.
+    expected: >
+      The section references d-1 or Phase A by name. The section references
+      cc-workflows and multica as consumer substrates or constituent artifact producers.
+      The Q9 resolution from design-discussion.md §6 is cited directly. The producer
+      chain (d-1/d-3/d-4 → d-5 bundle) is traceable from the documentation alone.
+    actor: tester
+
+postconditions:
+  - "All vitest wireframe-handoff-payload tests pass (5 independent describe blocks, 0 coupling)"
+  - "toggle-OFF: wireframe.png + wireframe.f0 present; constraints.md absent or empty"
+  - "toggle-ON: wireframe.png + wireframe.f0 + constraints.md all present"
+  - "Posture documented as extensible-minimum — add-only, not frozen"
+  - "Field-named discipline documented — no file-glob approach"
+  - "d-1 (Phase A) named as constraint artifact producer"
+  - "d-3 (multica) and d-4 (cc-workflows) referenced as consumer substrates"
+  - "Q9 resolution cited as authoritative source for the 3-field minimum shape"
+  - "s-3 no-codex lint is out of scope for d-5 (modifies wireframe-protocol.md doc, not cc-workflows atom)"

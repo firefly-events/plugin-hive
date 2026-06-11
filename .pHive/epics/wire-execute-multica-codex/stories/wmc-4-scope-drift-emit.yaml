@@ -1,7 +1,7 @@
 id: wmc-4-scope-drift-emit
 epic: wire-execute-multica-codex
 title: Emit scope_drift_score at story close in execute-mode-multica
-status: pending
+status: in_progress
 complexity: low
 methodology: classic
 depends_on: [wmc-2-multica-skill-rewire]

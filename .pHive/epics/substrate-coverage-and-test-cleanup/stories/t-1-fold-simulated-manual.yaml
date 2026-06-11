@@ -1,0 +1,160 @@
+id: t-1-fold-simulated-manual
+epic: substrate-coverage-and-test-cleanup
+title: Fold simulated-manual into the swarm pipeline as step-04b-scenario-replay and hard-rip the --simulated-manual flag
+status: complete
+complexity: medium
+methodology: classic
+depends_on:
+- s-2-mode-resolver
+- s-4-cc-workflows-preconditions
+- s-3-no-codex-lint
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: 'Convert `/test` to a swarm-only pipeline. Hard-rip the `--simulated-manual`
+
+  exclusive flag from `skills/test/SKILL.md` and rip the inline
+
+  `HIVE_TEST_MODE` resolver (delegate substrate selection to test-dispatch).
+
+  Add a new step file at `hive/workflows/steps/test-swarm/step-04b-scenario-replay.md`
+
+  that consumes existing `loadScenario` from `hive/lib/scenarios/load.mjs`
+
+  and sits between step-03-worker and step-04-inspector. Update the
+
+  pipeline table in `skills/test/SKILL.md`. Retire the simulated-manual
+
+  implementation_checklist in `.pHive/cross-cutting-concerns.yaml` and
+
+  replace with a `scenario-replay-folded` historical note. Verify the
+
+  `loadScenario` schema covers the post-worker pre-inspector state shape
+
+  BEFORE freezing AC (H3 verification gate).
+
+  '
+acceptance_criteria:
+- Given `loadScenario` schema verification runs as the first sub-step, when the schema is inspected against the post-worker pre-inspector state shape, then either (a) the schema covers the shape and AC freezes, or (b) the story splits to "add step file + extend loader" before proceeding.
+- Given `skills/test/SKILL.md` is updated, when `/test --simulated-manual` is invoked, then the dispatcher returns an "unknown flag" error (hard-rip confirmed).
+- Given `skills/test/SKILL.md` is updated, when `/test` is invoked, then Phase 0 invokes `test-dispatch` (router from t-3) and the inline `HIVE_TEST_MODE` resolver (lines 37-51) is removed.
+- Given `hive/workflows/steps/test-swarm/step-04b-scenario-replay.md` is created, when the swarm pipeline executes, then step-04b runs after step-03-worker and before step-04-inspector AND it consumes `loadScenario` from `hive/lib/scenarios/load.mjs`.
+- Given `.pHive/cross-cutting-concerns.yaml` is updated, when the file is read, then lines 99-126 (simulated-manual concern) are retired and replaced with a `scenario-replay-folded` historical note pointing at step-04b.
+- Given the pipeline table in `skills/test/SKILL.md` (lines 109-119) is updated, when a reader scans the table, then it reflects swarm-only flow with step-04b included.
+- Given the existing vitest suite runs, when `npm test` executes, then a new spec at `hive/workflows/steps/test-swarm/test/step-04b-scenario-replay.test.mjs` covers `loadScenario` invocation from the step file.
+- DO. Run the H3 verification first; split the story if the schema gap is real. Update cross-cutting-concerns.yaml in the same commit as the flag rip (lockstep per L6 cross-layer dep).
+- DO NOT. Do not delete `hive/workflows/steps/test/simulated-manual.md` in this story (deletion is a follow-up cleanup, non-blocking per outline §"Part 4 DELETE").
+metric:
+  applies: true
+  name: substrate_coverage.test_simulated_manual_flag_hard_rip
+  direction: up
+  unit: bool
+  baseline: 0
+  target: 1
+  window: story integrate step
+  source:
+    kind: manual
+    ref: /test --simulated-manual returns 'unknown flag' AND .pHive/cross-cutting-concerns.yaml simulated-manual block retired
+  verify_at: story integrate step
+  owner: developer
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/t-1-fold-simulated-manual.yaml
+  verdict: null
+  timestamp: null
+  agent: null
+steps:
+- id: research
+  description: H3 verification — inspect `hive/lib/scenarios/load.mjs` loadScenario schema against the post-worker pre-inspector state shape; if schema gap is real, surface to team-lead and split the story.
+  agent: researcher
+- id: implement
+  description: Create `hive/workflows/steps/test-swarm/step-04b-scenario-replay.md`; update `skills/test/SKILL.md` (rip flag handling 14-93, rip inline resolver 37-51, add Phase 0 test-dispatch invocation, update pipeline table 109-119); update `.pHive/cross-cutting-concerns.yaml:99-126` to scenario-replay-folded historical note.
+  agent: developer
+  depends_on:
+  - research
+- id: test
+  description: Author `hive/workflows/steps/test-swarm/test/step-04b-scenario-replay.test.mjs` covering loadScenario invocation; manually run `/test --simulated-manual` and confirm "unknown flag" return.
+  agent: tester
+  depends_on:
+  - implement
+- id: scenario
+  description: Author `.pHive/test-scenarios/t-1-fold-simulated-manual.yaml` per test-scenario-schema.md covering /test swarm-only invocation + scenario-replay execution.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Architect review on step-04b placement + cross-cutting-concerns retirement; reviewer cross-checks the pipeline table reflects swarm-only flow.
+  agent: reviewer
+  depends_on:
+  - test
+  - scenario
+- id: integrate
+  description: 'Commit "[t-1] feat(/test): swarm-only pipeline + step-04b-scenario-replay + retire --simulated-manual flag"'
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  tech_stack:
+  - language: markdown (step file), javascript (.mjs)
+  - runtime: node 20+
+  - test: vitest
+  key_files:
+  - path: skills/test/SKILL.md
+    purpose: Dispatcher requiring flag rip + Phase 0 test-dispatch invocation + pipeline table update
+  - path: hive/workflows/steps/test-swarm/step-04b-scenario-replay.md
+    purpose: NEW step file folding scenario-replay into the swarm pipeline
+  - path: hive/lib/scenarios/load.mjs
+    purpose: Existing loadScenario module — consumed by step-04b
+  - path: .pHive/cross-cutting-concerns.yaml
+    purpose: simulated-manual concern (99-126) retired + replaced with scenario-replay-folded note
+  - path: hive/workflows/test-swarm.workflow.yaml
+    purpose: 9-step workflow; step-04b insertion may require step-numbering adjustment
+files_to_modify:
+- file: skills/test/SKILL.md
+  change: RIP `--simulated-manual` flag handling (lines 14-93); RIP inline `HIVE_TEST_MODE` resolver (lines 37-51); ADD Phase 0 invocation of `test-dispatch`; UPDATE pipeline table (lines 109-119) to reflect swarm-only flow
+- file: hive/workflows/steps/test-swarm/step-04b-scenario-replay.md
+  change: CREATE — consumes `loadScenario` from `hive/lib/scenarios/load.mjs`; sits between step-03-worker and step-04-inspector
+- file: .pHive/cross-cutting-concerns.yaml
+  change: RETIRE simulated-manual concern (lines 99-126); REPLACE with a `scenario-replay-folded` historical note pointing at step-04b
+- file: hive/workflows/steps/test-swarm/test/step-04b-scenario-replay.test.mjs
+  change: CREATE — vitest spec covering loadScenario invocation from step-04b
+- file: .pHive/test-scenarios/t-1-fold-simulated-manual.yaml
+  change: CREATE — simulated-manual scenario for /test swarm-only invocation per test-scenario-schema.md
+code_examples:
+- language: markdown
+  description: step-04b-scenario-replay.md head — consumes loadScenario
+  snippet: '# step-04b-scenario-replay
+
+    Position: between step-03-worker and step-04-inspector.
+
+    Loads scenario via `hive/lib/scenarios/load.mjs` (loadScenario).
+
+    '
+references:
+- path: skills/test/SKILL.md
+  relevant_excerpt: 'Lines 14-93: --simulated-manual flag handling. Lines 37-51: inline HIVE_TEST_MODE resolver. Lines 109-119: pipeline table.'
+- path: hive/workflows/steps/test-swarm/step-06-triage.md
+  relevant_excerpt: Triage categories at line 16 (transient, story issue, human blocker); summary block at 111-114.
+- path: .pHive/cross-cutting-concerns.yaml
+  relevant_excerpt: 'Lines 99-126: simulated-manual concern with implementation_checklist referencing the --simulated-manual flag being retired.'
+- path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/structured-outline.md
+  relevant_excerpt: 't-1: fold simulated-manual into the swarm — Rip --simulated-manual flag handling (lines 14-93). Rip the inline HIVE_TEST_MODE resolver (lines 37-51). Add a Phase 0 invocation of test-dispatch. Update the pipeline table (lines 109-119).'
+cross_cutting:
+- concern: documentation
+  action: Update skills/test/SKILL.md pipeline table; retire simulated-manual block in .pHive/cross-cutting-concerns.yaml; add scenario-replay-folded historical note pointing at step-04b.
+- concern: versioning
+  action: Hard-rip of --simulated-manual is a breaking flag removal — flag in CHANGELOG entry for the epic; epic-level version bump owned by the integrating story (s-1 per epic-close pattern).
+design_decisions:
+- decision: step-04b-scenario-replay lives under `hive/workflows/steps/test-swarm/`
+  rationale: Q1 RESOLVED in design-discussion §3 — swarm-pipeline convention; `test/` houses only the legacy simulated-manual file that's being retired.
+- decision: H3 verification first; split story if schema gap
+  rationale: Decision Point 6 — accept verification gate. `loadScenario` schema must cover swarm step-04b post-worker pre-inspector state shape before AC freezes.
+- decision: Do not delete legacy simulated-manual.md in this story
+  rationale: Outline Part 4 DELETE — supersession via cross-cutting-concerns retirement is the in-scope change; physical deletion is a follow-up cleanup, non-blocking.
+risks:
+- severity: medium
+  description: loadScenario schema does NOT cover post-worker pre-inspector state shape
+  mitigation: H3 verification step runs first; if gap found, story splits into "add step file + extend loader" before proceeding (Decision Point 6)
+- severity: low
+  description: Hard-rip of `--simulated-manual` breaks documentation references beyond cross-cutting-concerns.yaml
+  mitigation: Documentation concern action lists all touchpoints; grep for `simulated-manual` references during implement step
+tracker_id: e0a61e84-214a-4db3-aec4-80e18f85aeb5

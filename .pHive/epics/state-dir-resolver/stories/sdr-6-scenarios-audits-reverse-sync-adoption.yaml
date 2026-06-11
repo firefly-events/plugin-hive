@@ -1,0 +1,81 @@
+id: sdr-6-scenarios-audits-reverse-sync-adoption
+epic: state-dir-resolver
+title: Adopt state-dir resolver for scenarios, audits, and reverse sync
+status: complete
+complexity: medium
+methodology: classic
+depends_on: [sdr-1-resolver-contract-conformance-fixture]
+tracker_id: "PLU-253"
+tracker_uuid: "036734cd-bffc-450e-b7da-6fd07218e433"
+tracker_url: "http://localhost:8080/issues/036734cd-bffc-450e-b7da-6fd07218e433"
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: |
+  Relocate scenario loading, status backfill, episode-marker audit, and reverse-sync
+  runtime state lookups. Maintainer-only proof and migration scripts remain literal
+  per Q3, and `gate-mode-audit.mjs` is explicitly classified before any change.
+acceptance_criteria:
+  - "Given a custom `paths.state_dir`, when scenario loading runs, then scenarios are read from the configured state tree."
+  - "Given a custom `paths.state_dir`, when story-status backfill, episode-marker audit, and reverse-sync run, then each script reads and writes under the configured state dir."
+  - "Given state-dir configuration is unset, when each adopted script runs, then default `.pHive` behavior remains unchanged."
+  - "Given `hive/scripts/gate-mode-audit.mjs` is classified, when it is runtime state tooling, then it adopts the resolver; when maintainer-only, the commit records why it remains literal."
+  - "Given Q3 locks maintainer proof scripts as literal, when the diff is reviewed, then `scripts/migrate-state-to-pHive.sh`, `scripts/run_first_live_cycle.py`, and `scripts/run_rollback_realism_proof.py` are unchanged."
+metric:
+  applies: false
+  justification: "This story is a path-correctness relocation for scenario and audit tooling; per-script relocation tests verify it without introducing a metric target."
+steps:
+  - id: research
+    description: Inspect existing tests and classify `gate-mode-audit.mjs` while confirming Q3 literal script exclusions.
+    agent: researcher
+  - id: implement
+    description: Adopt the Node resolver in scenario loading, status backfill, episode-marker audit, reverse-sync, and any classified runtime audit script.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Add per-script relocated-state tests, including default `.pHive` and custom state-dir cases.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify Q3 literal scripts are untouched and every adopted runtime script has relocation coverage.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit the scenarios/audits/reverse-sync adoption slice to `feat/state-dir-resolver`.
+    agent: developer
+    depends_on: [review]
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/scenarios/load.mjs
+      purpose: Scenario loader currently using direct `.pHive` joins.
+    - path: hive/scripts/story-status-backfill.mjs
+      purpose: Runtime status backfill script that must relocate.
+    - path: hive/scripts/audit-episode-markers.mjs
+      purpose: Episode-marker audit script that must relocate.
+    - path: hive/scripts/multica-reverse-sync.mjs
+      purpose: Reverse-sync script that must relocate.
+    - path: hive/scripts/gate-mode-audit.mjs
+      purpose: Script requiring explicit runtime-vs-maintainer classification.
+    - path: scripts/migrate-state-to-pHive.sh
+      purpose: Q3 literal migration script; should be read as an exclusion.
+files_to_modify:
+  - file: hive/lib/scenarios/load.mjs
+    change: Adopt Node resolver.
+  - file: hive/scripts/story-status-backfill.mjs
+    change: Adopt Node resolver.
+  - file: hive/scripts/audit-episode-markers.mjs
+    change: Adopt Node resolver.
+  - file: hive/scripts/multica-reverse-sync.mjs
+    change: Adopt Node resolver.
+  - file: hive/scripts/gate-mode-audit.mjs
+    change: Classify and relocate only if runtime.
+  - file: tests
+    change: Add per-script relocated-state regression tests.
+cross_cutting:
+  - concern: state-dir-relocation
+    action: "Relocate runtime scenario/audit scripts while preserving Q3 literal maintainer scripts."
+references:
+  - path: .pHive/epics/state-dir-resolver/docs/design-decisions.md
+    relevant_excerpt: "Q3 keeps `scripts/migrate-state-to-pHive.sh` and maintainer proof scripts literal."
+  - path: .pHive/epics/state-dir-resolver/docs/vertical-plan.md
+    relevant_excerpt: "Step 6 relocates scenarios, audits, and reverse-sync while explicitly preserving Q3 literal scripts."

@@ -4,7 +4,7 @@ tracker_id: "firefly-events/plugin-hive#144"
 tracker_url: https://github.com/firefly-events/plugin-hive/issues/144
 epic: skill-ergo-may2026
 title: Disambiguate /design vs /design-review vs /design-system descriptions
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [se-2-design-top-level]

@@ -1,7 +1,7 @@
 id: s3-multica-init-bootstrap
 epic: multica-substrate-adoption
 title: /hive:multica-init bootstrap skill (one-command Multica setup)
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s1-multica-adapter, s4-persona-agent-config]

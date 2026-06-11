@@ -1,0 +1,82 @@
+id: sdr-3-metrics-adoption
+epic: state-dir-resolver
+title: Adopt state-dir resolver for metrics readers and writers
+status: complete
+complexity: medium
+methodology: classic
+depends_on: [sdr-1-resolver-contract-conformance-fixture]
+tracker_id: "PLU-250"
+tracker_uuid: "9b33bea7-62ea-4c1e-a58c-6d3d7ab1488a"
+tracker_url: "http://localhost:8080/issues/9b33bea7-62ea-4c1e-a58c-6d3d7ab1488a"
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: |
+  Align metrics readers and writers across Node, Python, and already-resolved shell
+  hooks so metrics never split between configured and default state trees. This slice
+  closes the documented writer-moves-reader-stays-default trap and explicitly classifies
+  KG scripts before changing them.
+acceptance_criteria:
+  - "Given a custom `paths.state_dir`, when shell metrics hooks write metrics, then Node and Python metrics readers find those metrics under the same configured tree."
+  - "Given `HIVE_STATE_DIR` and config both exist, when Node and Python metrics paths resolve, then env override wins."
+  - "Given no env or config exists, when metrics readers and writers run, then default `.pHive/metrics` remains unchanged."
+  - "Given `scripts/kg-bootstrap-from-projects.js` and `scripts/kg-import-cycle-state.js` are classified, when either is a runtime consumer, then it adopts the resolver; when maintainer-only, the commit records why it remains literal."
+  - "Given this is a bounded slice, when the diff is reviewed, then non-metrics subsystems are untouched."
+metric:
+  applies: false
+  justification: "This story relocates metrics storage paths and is verified by reader/writer same-tree tests; it does not claim that any metric value should trend up or down."
+steps:
+  - id: research
+    description: Inspect metrics tests and classify the two KG scripts as runtime consumers or literal maintainer tooling.
+    agent: researcher
+  - id: implement
+    description: Adopt Node and Python resolvers in metrics modules and apply the KG classification decision.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Add Node, Python, and cross-runtime metrics tests, including env/config/default precedence.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm shell hook behavior remains compatible and readers/writers share the same resolved metrics tree.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit the metrics adoption slice to `feat/state-dir-resolver`.
+    agent: developer
+    depends_on: [review]
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/budget-gate.js
+      purpose: Node metrics consumer defaulting under `.pHive/metrics`.
+    - path: hive/lib/metrics/paths.py
+      purpose: Python metrics path helper that must become resolver-driven.
+    - path: hive/lib/kg_metrics_writer.py
+      purpose: Python KG metrics writer that must relocate.
+    - path: hooks/metrics-agent-spawn.sh
+      purpose: Existing shell resolver consumer to regression-test for same-tree behavior.
+    - path: scripts/kg-bootstrap-from-projects.js
+      purpose: KG script requiring explicit runtime-vs-maintainer classification.
+    - path: scripts/kg-import-cycle-state.js
+      purpose: KG script requiring explicit runtime-vs-maintainer classification.
+files_to_modify:
+  - file: hive/lib/budget-gate.js
+    change: Adopt Node resolver for metrics defaults.
+  - file: hive/lib/metrics/paths.py
+    change: Adopt Python resolver for metrics paths.
+  - file: hive/lib/kg_metrics_writer.py
+    change: Adopt Python resolver for `metrics/kg`.
+  - file: scripts/kg-bootstrap-from-projects.js
+    change: Classify and relocate only if runtime.
+  - file: scripts/kg-import-cycle-state.js
+    change: Classify and relocate only if runtime.
+  - file: tests
+    change: Add Node, Python, shell-regression, and cross-runtime same-tree tests.
+cross_cutting:
+  - concern: state-dir-relocation
+    action: "Assert metrics writers and readers use one resolved state tree across runtimes."
+references:
+  - path: .pHive/epics/state-dir-resolver/docs/design-decisions.md
+    relevant_excerpt: "Q3 says add targeted relocated-state regression tests and keep literal proof scripts literal."
+  - path: .pHive/epics/state-dir-resolver/docs/vertical-plan.md
+    relevant_excerpt: "Step 3 aligns metrics writers and readers across all runtimes and closes the divergence trap."

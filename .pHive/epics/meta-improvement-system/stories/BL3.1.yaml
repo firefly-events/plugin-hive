@@ -2,7 +2,7 @@ id: BL3.1
 epic: meta-improvement-system
 slice: S10
 title: Public skill scaffold and plugin registration
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: ["K.3", "BL2.6", "BL2i.5", "A2.7"]

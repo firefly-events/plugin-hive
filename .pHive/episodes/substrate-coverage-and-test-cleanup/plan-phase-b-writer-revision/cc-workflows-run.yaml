@@ -1,0 +1,26 @@
+step: cc-workflows-run
+persona: technical-writer
+planning_story: plan-phase-b-design-discussion-revision
+epic: substrate-coverage-and-test-cleanup
+status: passed
+workflow_run_id: wf_405d3206-a66
+transcript_dir: /Users/don/.claude/projects/-Users-don--claude-worktrees-substrate-coverage/0acb7214-f5d9-4448-bf7a-30c99ac0bbae/subagents/workflows/wf_405d3206-a66
+role: technical-writer
+agentType: default
+files:
+  - path: .pHive/epics/substrate-coverage-and-test-cleanup/docs/design-discussion.md
+    change: modified
+started_at: 2026-06-05T12:20:00Z
+completed_at: 2026-06-05T12:23:11Z
+usage:
+  agent_count: 1
+  subagent_tokens: 121277
+  tool_uses: 5
+  duration_ms: 191061
+notes: |
+  One revision cycle. Addressed all 12 grill findings + 12 reviewer escalation flags.
+  Resolved inline: Q1 test-swarm/ path, Q3 per-scenario t-3 dispatch, Q11 t-2 TDD methodology, V1 slice/wave vocab accepted, C2 step-file vs persona resolved.
+  Slice E grew from 3 → 4 stories (added s-4 worktree-isolation precondition helper + lint).
+  Epic total: 17 → 18 stories.
+  Scale: Large (reaffirmed).
+  6 questions remain for user gate: Q2 ABI shape (markNeedsRework recommended), Q4 missing audit recovery spike, Q6 /design Pattern B/C, Q12 s-2 ordering, Q13 d-1 split, Q14 r-1/r-2 merge.

@@ -1,0 +1,23 @@
+step: multica-run
+story: "b1-why-chromadb-fix"
+epic: "kg-repair-activation"
+agent: "developer"
+status: passed
+completion_kind: "code-push"
+artifacts_committed: false
+episode_terminal: true
+requires_code_push_sha: true
+code_push_sha: null
+terminal_by_dialect: false
+started_at: "2026-06-10T05:28:11Z"
+completed_at: "2026-06-10T05:32:26Z"
+artifacts:
+  - ".pHive/episodes/kg-repair-activation/b1-why-chromadb-fix/multica-run.messages.jsonl"
+multica:
+  issue_id: "PLU-83"
+  issue_uuid: "fcbd60a8-6a53-4b98-984a-ae96d668659d"
+  task_id: "7e9b6bd9-892b-4af9-83f9-121c4c132b37"
+  agent_id: "d9946f9a-2747-49d4-b967-2590ffb5be43"
+  work_dir: "/Users/don/multica_workspaces/21c6d282-d6b4-4b25-8d0d-a85e96038416/7e9b6bd9/workdir"
+  attempts: 1
+notes: ""
