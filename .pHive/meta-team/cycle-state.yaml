@@ -1,8 +1,8 @@
-cycle_id: meta-2026-06-10
-started: '2026-06-10T00:00:00Z'
+cycle_id: meta-2026-06-11
+started: '2026-06-11T00:00:00Z'
 status: closed
 phase: close
-closed: '2026-06-10T00:00:00Z'
+closed: '2026-06-11T00:00:00Z'
 charter_constraints:
   - operate only on hive/references/**, hive/agents/**, hive/workflows/**, hive/lib/**,
     skills/hive/agents/memories/**, .pHive/meta-team/**, .pHive/teams/**
@@ -12,11 +12,11 @@ charter_constraints:
   - no changes to hive/hive.config.yaml without human confirmation
   - no new external service integrations without human confirmation
 prior_cycle:
-  id: meta-2026-06-09
+  id: meta-2026-06-10
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-06-10T00:00:00Z'
+    started_at: '2026-06-11T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
@@ -28,15 +28,21 @@ steps:
     routing: step-03b (findings_count=0 AND external_candidates_count=0 AND metric_signal=false)
     summary: >
       Systematic audit of hive/agents/**, hive/references/**, hive/workflows/**,
-      skills/hive/agents/memories/**, and hive/MAIN.md + hive/GUIDE.md cross-refs
-      found no in-scope actionable findings. All 12 step files complete (7/7 sections
-      each). All 25 agents have valid model, color, and knowledge frontmatter. All
-      workflow step_file references resolve. No dangling GUIDE.md/MAIN.md refs.
-      Agent model IDs current. No MEMORY_GAP findings (all agents ≥1 memory). One
-      stub doc (hive-cloud-roadmap.md, 13 lines) noted out_of_scope (S16 placeholder,
-      13th+ consecutive deferral). Dedup pre-flight: open PRs #278 (feat/kg-repair-
-      activation) and #275 (chore/status-reconcile) do not touch meta-team-owned
-      paths — no suppression.
+      skills/hive/agents/memories/**, hive/MAIN.md + hive/GUIDE.md cross-refs, and
+      extended audits (6b-6f) found no in-scope actionable findings. All 12 step
+      files complete (7/7 sections each). All 25 agents have valid model, color, and
+      knowledge frontmatter. All workflow step_file references resolve. No dangling
+      GUIDE.md/MAIN.md refs. Agent model IDs current (opus/sonnet/haiku tier names;
+      budget-gate.js keys claude-opus-4-8/claude-sonnet-4-6/claude-haiku-4-5-20251001).
+      No MEMORY_GAP findings (all 25 agents >= 1 memory). Changes since last cycle:
+      lint fixes (markdown/yaml), release commits (v2.11.0), knowledge-graph-schema.md
+      pipe escape — all outside meta-team write scope or non-structural. Out-of-scope
+      observations: STUB_DOC hive-cloud-roadmap.md (13 lines, S16 placeholder, 14th+
+      consecutive deferral); STUCK_TRIAGE_ITEM t-001 (prioritized, 15d, .pHive/triage/
+      outside write scope); CI_FAILURE_PATTERN multica-reverse-sync (23 failures/7d,
+      .github/workflows/ outside write scope). Dedup pre-flight: PR #282 (chore/
+      status-reconcile-2026-06-11, base=main) does not touch meta-team-owned paths —
+      no suppression.
     findings: []
     findings_suppressed: []
   step_02b_external_research:
@@ -59,10 +65,10 @@ steps:
     summary: >
       Loaded queue-meta-meta-optimize.yaml. No little-fix tier candidates
       (filtered_count=0). First pending candidate: mmo-2026-04-21-001. Dedup gate:
-      open PRs #278 and #275 do not touch MANIFEST.md — no suppression. Target
-      confirmed at .pHive/meta-team/archive/2026-04-19/MANIFEST.md (existing
-      reviewed-on lines: meta-2026-04-22, meta-2026-05-03, meta-2026-05-08,
-      meta-2026-06-08). Will append reviewed-on line for meta-2026-06-10 (5th line).
+      PR #282 does not touch MANIFEST.md — no suppression. Target confirmed at
+      .pHive/meta-team/archive/2026-04-19/MANIFEST.md (existing reviewed-on lines:
+      meta-2026-04-22, meta-2026-05-03, meta-2026-05-08, meta-2026-06-08,
+      meta-2026-06-10). Will append reviewed-on line for meta-2026-06-11 (6th line).
   step_03c_metric_declaration:
     gate_mode: blocking
     enriched_proposals_count: 1
@@ -78,7 +84,7 @@ steps:
         action: add_entry
         file: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
         description: >
-          Appended <!-- reviewed-on: meta-2026-06-10 --> as footer line.
+          Appended <!-- reviewed-on: meta-2026-06-11 --> as footer line.
           Pure ADD on a frozen archive file with no live consumers. 1 line inserted.
         status: done
   step_05_testing:
@@ -107,7 +113,7 @@ steps:
         quality_score: 1.0
         rationale: |
           Appended exactly one HTML comment reviewed-on line to the frozen archive
-          MANIFEST.md. 1 line added, 0 lines removed. Consistent with the 4 prior
+          MANIFEST.md. 1 line added, 0 lines removed. Consistent with the 5 prior
           reviewed-on lines already in the file. Additive-only on a dormant archive
           artifact not consumed by any live workflow, skill, or runtime code. No
           cross-references broken, no schema violations.
@@ -129,12 +135,12 @@ steps:
         file: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
         verdict: pass
         status: promoted
-        commit_ref: f7e169f
-        rollback_target: 379358c
+        commit_ref: 3f0eab35211e14a9d1ad21c2342c2f7ba7063443
+        rollback_target: 97b34b2974e0e0b65207003a02ef71cf35951550
     reverted_changes: []
     insights_staged: 0
     decision: accept
-    rollback_target: 379358c
+    rollback_target: 97b34b2974e0e0b65207003a02ef71cf35951550
 summary:
   total_findings: 0
   proposals_generated: 1
@@ -144,23 +150,23 @@ summary:
   flagged_for_human: 0
   cycle_verdict: passed
 closure_evidence:
-  commit_ref: f7e169f
+  commit_ref: 3f0eab35211e14a9d1ad21c2342c2f7ba7063443
   metrics_snapshot:
     tokens: 0
     wall_clock_ms: 5000
     first_attempt_pass: true
-  rollback_ref: 379358c
+  rollback_ref: 97b34b2974e0e0b65207003a02ef71cf35951550
 decision: accept
 regression_watch:
   state: armed
-  armed_at: '2026-06-10T00:00:00Z'
+  armed_at: '2026-06-11T00:00:00Z'
 observation_window:
-  start: '2026-06-10T00:00:00Z'
-  end: '2026-06-10T04:00:00Z'
+  start: '2026-06-11T00:00:00Z'
+  end: '2026-06-11T04:00:00Z'
 findings: []
 enriched_proposals:
   - id: mmo-2026-04-21-001
-    title: Append reviewed-on provenance for meta-2026-06-10 to archived MANIFEST.md
+    title: Append reviewed-on provenance for meta-2026-06-11 to archived MANIFEST.md
     discovery_source: backlog
     candidate_id: mmo-2026-04-21-001
     target: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
@@ -176,5 +182,5 @@ changes:
   - proposal_id: mmo-2026-04-21-001
     file: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
     action: add_entry
-    description: Appended reviewed-on provenance comment for meta-2026-06-10.
+    description: Appended reviewed-on provenance comment for meta-2026-06-11.
     status: promoted
