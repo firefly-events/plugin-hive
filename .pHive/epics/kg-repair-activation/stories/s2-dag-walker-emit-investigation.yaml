@@ -4,7 +4,7 @@ tracker_id: "5fafd703-d063-48ce-9d13-a72a3691dc95"
 tracker_url: ""
 tracker_number: "PLU-86"
 title: "Investigate where DAG walker KG emits actually land"
-status: complete
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: ["s1-kg-stats"]

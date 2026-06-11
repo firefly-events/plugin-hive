@@ -1,7 +1,7 @@
 id: sdr-3-metrics-adoption
 epic: state-dir-resolver
 title: Adopt state-dir resolver for metrics readers and writers
-status: complete
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: [sdr-1-resolver-contract-conformance-fixture]

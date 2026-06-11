@@ -1,7 +1,7 @@
 id: sls-1-terminal-contract-doc
 epic: squad-leader-status-flip
 title: Author the squad-leader terminal contract reference doc
-status: in_progress
+status: pending
 tracker_id: plugin-hive/PLU-313
 tracker_url: http://localhost:3000/plugin-hive/issues/313
 complexity: low
