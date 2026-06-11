@@ -19,3 +19,6 @@ notes: |
 gate_mode_active: warning
 generated_by: /plugin-hive:execute
 generated_at: "2026-05-14T00:30:00Z"
+ship_target:
+  kind: github-release
+  notes: "Tag + GitHub release on main after develop->main merge; release-id v<version>."

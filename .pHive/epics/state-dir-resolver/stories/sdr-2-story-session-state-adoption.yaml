@@ -1,7 +1,7 @@
 id: sdr-2-story-session-state-adoption
 epic: state-dir-resolver
 title: Adopt state-dir resolver for story and session state
-status: in_progress
+status: complete
 complexity: medium
 methodology: classic
 depends_on: [sdr-1-resolver-contract-conformance-fixture]

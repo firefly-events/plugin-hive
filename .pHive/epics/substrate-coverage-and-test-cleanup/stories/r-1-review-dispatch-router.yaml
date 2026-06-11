@@ -1,7 +1,7 @@
 id: r-1-review-dispatch-router
 epic: substrate-coverage-and-test-cleanup
 title: Create review-dispatch router + wire Phase 0 into skills/review/SKILL.md + preserve scope_drift emit
-status: in_progress
+status: complete
 complexity: medium
 methodology: classic
 depends_on:

@@ -4,7 +4,7 @@ tracker_id: "e5d1f5c4-5387-491a-948d-5197ebc680b0"
 tracker_url: ""
 tracker_number: "PLU-87"
 title: "Wire phase_started + phase_complete in DAG walker"
-status: in_progress
+status: complete
 complexity: medium
 methodology: classic
 depends_on: ["s2-dag-walker-emit-investigation"]

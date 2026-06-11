@@ -1,7 +1,7 @@
 id: s-2-mode-resolver
 epic: substrate-coverage-and-test-cleanup
 title: Extract 5-tier mode-resolver helper into hive/lib/mode-resolver.mjs
-status: in_progress
+status: complete
 complexity: medium
 methodology: classic
 depends_on:
