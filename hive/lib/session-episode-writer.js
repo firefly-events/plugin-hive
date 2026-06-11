@@ -22,11 +22,18 @@ import { resolveStateDir } from './config.js';
 
 const _require = createRequire(import.meta.url);
 
-let yaml;
+// Deferred: consumers that only need the resolver helpers (e.g.
+// defaultEpisodesBase) must not crash at module load when js-yaml is absent.
+let yaml = null;
 try {
   yaml = _require('js-yaml');
 } catch {
-  throw new Error('js-yaml not available — run: npm install js-yaml');
+  yaml = null;
+}
+
+function requireYaml() {
+  if (!yaml) throw new Error('js-yaml not available — run: npm install js-yaml');
+  return yaml;
 }
 
 // Resolved per call (not at module load) so HIVE_STATE_DIR / hive.config.yaml
@@ -84,7 +91,7 @@ function writeEpisode(episode, episodesBase = defaultEpisodesBase()) {
     events: episode.events || [],
   };
 
-  fs.writeFileSync(tmpPath, yaml.dump(data, { lineWidth: 120 }), 'utf8');
+  fs.writeFileSync(tmpPath, requireYaml().dump(data, { lineWidth: 120 }), 'utf8');
   fs.renameSync(tmpPath, targetPath);
 
   return targetPath;

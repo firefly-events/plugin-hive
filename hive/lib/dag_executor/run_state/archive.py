@@ -106,6 +106,9 @@ def archive_terminal_runs(
     no-op; a destination collision is skipped, never duplicated.
     """
 
+    if threshold.total_seconds() <= 0:
+        raise ValueError("threshold must be > 0")
+
     runs_root = (
         default_runs_root() if state_dir is None else Path(state_dir) / "runs"
     )
@@ -190,6 +193,8 @@ def main(argv: list[str] | None = None) -> int:
         help="Report intended moves without modifying the filesystem",
     )
     args = parser.parse_args(argv)
+    if args.threshold_days <= 0:
+        parser.error("--threshold-days must be > 0")
 
     report = archive_terminal_runs(
         args.state_dir,

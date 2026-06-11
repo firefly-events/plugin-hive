@@ -37,11 +37,18 @@ import { resolveStateDir } from './config.js';
 
 const _require = createRequire(import.meta.url);
 
-let yaml;
+// Deferred: consumers that only need the resolver helpers (e.g.
+// defaultRegistryPath) must not crash at module load when js-yaml is absent.
+let yaml = null;
 try {
   yaml = _require('js-yaml');
 } catch {
-  throw new Error('js-yaml not available — run: npm install js-yaml');
+  yaml = null;
+}
+
+function requireYaml() {
+  if (!yaml) throw new Error('js-yaml not available — run: npm install js-yaml');
+  return yaml;
 }
 
 // Resolved per call (not at module load) so HIVE_STATE_DIR / hive.config.yaml
@@ -102,7 +109,7 @@ function readRegistry(registryPath) {
   }
   try {
     const raw = fs.readFileSync(registryPath, 'utf8');
-    const parsed = yaml.load(raw);
+    const parsed = requireYaml().load(raw);
     if (!parsed || !Array.isArray(parsed.sessions)) {
       return { created: parsed && parsed.created || new Date().toISOString(), sessions: [] };
     }
@@ -122,7 +129,7 @@ function writeRegistry(registryPath, data) {
   const dir = path.dirname(registryPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   const tmpPath = registryPath + '.tmp';
-  fs.writeFileSync(tmpPath, yaml.dump(data, { lineWidth: 120 }), 'utf8');
+  fs.writeFileSync(tmpPath, requireYaml().dump(data, { lineWidth: 120 }), 'utf8');
   fs.renameSync(tmpPath, registryPath);
 }
 

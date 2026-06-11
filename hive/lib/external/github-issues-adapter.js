@@ -145,7 +145,9 @@ function defaultStateDir(_deps) {
     const resolved = resolveStateDir();
     // The resolver canonicalizes to an absolute path; story paths here have
     // always been cwd-relative (callers and the _deps fs seams join/compare
-    // them as such), so convert back. Default stays exactly '.pHive'.
+    // them as such), so convert back. With unset config the result is exactly
+    // '.pHive'; a configured state dir may yield '.' (state dir == cwd) or a
+    // '../'-prefixed path (state dir outside cwd) — both intentional.
     // realpath the cwd so symlinked working dirs (macOS /var -> /private/var)
     // don't derail path.relative against the canonicalized resolver output.
     const rel = path.relative(fs.realpathSync(process.cwd()), resolved);
