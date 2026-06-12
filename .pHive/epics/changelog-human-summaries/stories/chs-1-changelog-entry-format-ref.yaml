@@ -1,0 +1,117 @@
+id: chs-1-changelog-entry-format-ref
+epic: changelog-human-summaries
+title: Create changelog-entry-format reference doc (mandatory single source)
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  Create `hive/references/changelog-entry-format.md` — the canonical, mandatory
+  single-source spec for human-readable CHANGELOG.md entries. Both the /ship
+  authoring step (chs-2) and any future quality language cite THIS document;
+  no format rules may be duplicated inline in skill prose (grill finding P1).
+
+  The doc must specify:
+  1. Entry shape: bold one-sentence tagline describing what the release does
+     for users, followed by Keep-a-Changelog sections (### Added / Changed /
+     Fixed) with prose bullets.
+  2. Bullet shape: each bullet leads with a human-readable outcome sentence
+     (what changed and why it matters); PR refs are suffix notation —
+     `(PR #N)` at the end of the bullet — never the bullet content itself.
+  3. Authoring source chain (adopted from release_post.mjs degradation chain):
+     `outcome ?? first sentence of description ?? title + acceptance_criteria`.
+     Story YAMLs carry no `outcome:` field today (researcher-verified), so the
+     degraded path is the expected day-one normal, not an edge case.
+  4. Degraded-source marking: bullets synthesized from title/description (not
+     a real outcome field) are annotated with an HTML comment, e.g.
+     `<!-- degraded: sourced from description -->`, so the operator review in
+     /ship knows which bullets came from thin data. Markers are stripped after
+     operator approval (approved prose is no longer degraded).
+  5. Quality criteria used by the /ship authoring review: tagline present; at
+     least one prose sentence per major change; no bullet that is only a PR
+     number; mechanical version-accounting lines are not a substitute for prose.
+  6. Exemplar: a short good-entry example and a counter-example (PR-dump style).
+
+acceptance_criteria:
+  - "Given a reader opens hive/references/changelog-entry-format.md, when they author a release entry, then tagline shape, bullet shape, PR-ref-as-suffix rule, source chain, degraded-source marking, and quality criteria are each unambiguously specified"
+  - "Given the doc exists, when chs-2 wires the /ship authoring step, then every format rule the step needs is citable from this doc (no inline duplication required)"
+  - "Doc contains one positive exemplar entry and one PR-dump counter-example"
+
+steps:
+  - id: implement
+    description: Author hive/references/changelog-entry-format.md per the six-point spec in the story description
+    agent: developer
+  - id: test
+    description: Verify the doc against acceptance criteria — every format rule present, source chain matches release_post.mjs order, exemplar + counter-example included
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review for clarity, consistency with existing strong entries (2.9.0-2.11.0 style), and single-source completeness
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    type: Claude Code plugin (markdown skill prose + reference docs)
+  key_files:
+    - path: hive/lib/release_post.mjs
+      purpose: Source of the degradation chain (lines ~81-99) the doc adopts as the authoring source chain
+    - path: CHANGELOG.md
+      purpose: Existing strong entries (2.9.0-2.11.0) define the tagline+bullets house style the doc canonicalizes
+    - path: hive/references/release-post/post-template.md
+      purpose: Sibling narrative template — different audience/surface; doc must not contradict it
+
+files_to_modify:
+  - file: hive/references/changelog-entry-format.md
+    change: create the canonical format reference
+
+code_examples:
+  - title: Existing strong entry style to canonicalize (CHANGELOG.md 2.11.0)
+    file: CHANGELOG.md
+    snippet: |
+      ## [2.11.0] - 2026-06-11
+
+      **State-dir relocation, KG signal activation, and full substrate coverage — ...**
+
+      - **State-dir resolver** (minor bump owner; PRs #276, #280): projects can now
+        relocate Hive state out of `.pHive` via `HIVE_STATE_DIR` env or
+        `paths.state_dir` in `hive.config.yaml`. ...
+
+design_decisions:
+  - decision: Format spec is a mandatory standalone reference doc, not inline skill prose
+    rationale: Two consumers (/ship authoring, operator review criteria) must agree on one format; inline copies diverge (grill P1, composable-substrate posture)
+  - decision: Degradation chain adopted verbatim from release_post.mjs ordering
+    rationale: outcome fields are absent in all sampled story YAMLs; never block, never hallucinate (TPM review position on H1)
+
+cross_cutting:
+  - concern: documentation
+    action: "Doc must be linked from skills/ship/SKILL.md (chs-2) and operations-guide (chs-3); this story only creates it and need not wire links"
+
+metric:
+  applies: false
+  justification: "Pure-substrate story — the format spec is the gate being shipped; falsifiable movement is measured on chs-2 (prose-compliant release entries), not on the spec document itself."
+
+risks:
+  - severity: low
+    description: Doc drifts from release_post.mjs if the chain there changes
+    mitigation: Doc cites release_post.mjs:81-99 as upstream source; reviewer checks citation
+
+references:
+  - path: .pHive/epics/changelog-human-summaries/docs/design-discussion.md
+    relevant_excerpt: |
+      **Story 2 — hive/references/changelog-entry-format.md (MANDATORY single source)**
+      Canonical format spec: tagline structure, bullet shape, PR-ref-as-suffix rule,
+      prose quality criteria. Both /execute (authoring) and /ship (gating) cite this
+      document. Not optional. Resolves P1.
+      (Note: user decision moved the authoring callsite to /ship; this story is unchanged.)
+  - path: .pHive/epics/changelog-human-summaries/docs/grill-record.md
+    relevant_excerpt: |
+      P1 — Format spec embedded inline in two skills' step prose with the shared
+      reference doc left optional. Question: make hive/references/changelog-entry-format.md
+      the mandatory single source?

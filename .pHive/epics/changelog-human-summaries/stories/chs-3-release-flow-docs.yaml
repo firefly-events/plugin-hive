@@ -1,0 +1,88 @@
+id: chs-3-release-flow-docs
+epic: changelog-human-summaries
+title: Document the new changelog flow in operations-guide and README
+status: pending
+complexity: low
+methodology: classic
+depends_on: [chs-2-ship-authoring-step]
+
+description: |
+  User-facing docs update for the new release flow (convention:
+  feedback_new_command_needs_user_docs — behavior changes invisible outside
+  SKILL.md don't count as shipped; grill finding C1 made this an explicit
+  story rather than an "optional" note).
+
+  Update:
+  1. Operations-guide release section: /ship now drafts the prose CHANGELOG
+     entry from shipped stories, presents it for operator approve/edit, then
+     writes it under `## [Unreleased]` — describe the operator's role in the
+     review and the degraded-source markers they may see.
+  2. README (wherever the release/ship flow is mentioned): one- or two-line
+     mention of the human-readable changelog authoring, linking
+     `hive/references/changelog-entry-format.md`.
+  3. Sweep for stale references describing the old flow (changelog entries
+     authored manually / by /execute) and align them.
+
+acceptance_criteria:
+  - "Given an operator reads the operations-guide release section, when they run /ship, then nothing in the authoring step surprises them (draft, review, degraded markers, Unreleased write are all described)"
+  - "Given the README mentions the ship/release flow, then it links hive/references/changelog-entry-format.md"
+  - "No doc retains a stale description of changelog authoring that contradicts the new /ship step"
+
+steps:
+  - id: implement
+    description: Update operations-guide release section + README; sweep stale changelog-authoring references
+    agent: developer
+  - id: test
+    description: Verify acceptance criteria — walk each updated doc against the shipped chs-2 step prose for accuracy
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review for accuracy vs chs-2 behavior and link correctness
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    type: Claude Code plugin (markdown docs)
+  key_files:
+    - path: docs/operations-guide.md
+      purpose: Primary operator documentation — release section gains the new flow description (verify exact path at research; guide may live at GUIDE.md)
+    - path: README.md
+      purpose: Quick-start surface; ship/release mention links the format doc
+    - path: skills/ship/SKILL.md
+      purpose: Source of truth for the behavior being documented (after chs-2)
+
+files_to_modify:
+  - file: docs/operations-guide.md
+    change: release section describes /ship changelog authoring
+  - file: README.md
+    change: link changelog-entry-format.md from release/ship mention
+
+design_decisions:
+  - decision: Docs update is its own story with hard dependency on chs-2
+    rationale: Docs must describe shipped behavior, not planned behavior; TPM review recommended docs as an acceptance criterion of the gate story — gate folded into chs-2, so docs became this standalone story
+
+cross_cutting:
+  - concern: documentation
+    action: "This story IS the documentation concern's deliverable for the epic"
+
+metric:
+  applies: false
+  justification: "Doc-only story with no observable runtime surface; its success is covered by chs-2's prose-compliant-release metric (operators following these docs produce the measured entry)."
+
+risks:
+  - severity: low
+    description: Operations-guide path/name assumption may be wrong
+    mitigation: Implement step locates the actual guide file before editing
+
+references:
+  - path: .pHive/epics/changelog-human-summaries/docs/grill-record.md
+    relevant_excerpt: |
+      C1 — Draft changes operator-facing release behavior but plans no user-docs
+      update; the reference doc is marked "optional". Convention:
+      feedback_new_command_needs_user_docs.
