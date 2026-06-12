@@ -82,6 +82,7 @@ Each story produces a committed, reviewed state. The orchestrator handles coordi
 - `/hive:review` — structured code/PR review
 - `/hive:test` — test swarm for coverage, execution, and bug routing
 - `/hive:status` — active epics, story progress, and drift trend
+- `/hive:ship` — cut a release: reconcile stories, author human-readable changelog prose (draft → operator review → write to `CHANGELOG.md`), verify version bump, run ship target. Changelog format rules live in [`hive/references/changelog-entry-format.md`](hive/references/changelog-entry-format.md).
 
 **Design & UI**
 - `/hive:brand-system` — colors, typography, spacing, visual guide
