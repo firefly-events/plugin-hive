@@ -4,7 +4,7 @@ tracker_id: "498bdc46-8851-48c0-8f8a-308c5565d3be"
 tracker_url: ""
 tracker_number: "PLU-85"
 title: "Declare phase_handoff predicate in schema"
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: low

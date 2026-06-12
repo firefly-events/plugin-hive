@@ -1,7 +1,7 @@
 id: rl-3-wire-status-transitions
 epic: release-lifecycle
 title: Wire explicit status transitions into workflow commands
-status: shipped
+status: blocked
 shipped_at: "2026-06-08T04:51:07Z"
 release_id: "v2.10.0"
 complexity: high

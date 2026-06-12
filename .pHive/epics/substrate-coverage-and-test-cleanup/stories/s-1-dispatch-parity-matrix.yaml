@@ -1,7 +1,7 @@
 id: s-1-dispatch-parity-matrix
 epic: substrate-coverage-and-test-cleanup
 title: Author hive/references/dispatch-parity.md — canonical 6×3 substrate matrix
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: low

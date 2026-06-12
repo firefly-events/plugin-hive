@@ -1,7 +1,7 @@
 id: dr-1-design-review-dispatch-router
 epic: substrate-coverage-and-test-cleanup
 title: Create design-review-dispatch router + wire Phase 0 into skills/design-review/SKILL.md
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: medium

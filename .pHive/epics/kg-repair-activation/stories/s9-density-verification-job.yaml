@@ -4,7 +4,7 @@ tracker_id: "ea04c21c-a772-43c3-846d-0bb63447507b"
 tracker_url: ""
 tracker_number: "PLU-93"
 title: "Density-verification job + kg_signal weight-bump PR draft"
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: medium

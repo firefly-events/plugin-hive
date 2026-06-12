@@ -1,7 +1,7 @@
 id: d-2-design-dispatch-router
 epic: substrate-coverage-and-test-cleanup
 title: Create design-dispatch router consuming mode-resolver.mjs and returning {mode_decision, sources}
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: medium

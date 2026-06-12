@@ -1,7 +1,7 @@
 id: dr-3-design-review-mode-cc-workflows
 epic: substrate-coverage-and-test-cleanup
 title: Create design-review-mode-cc-workflows atom preserving 4-step model + helper import + no-codex compliance
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: medium

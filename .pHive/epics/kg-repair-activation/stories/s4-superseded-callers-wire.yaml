@@ -4,7 +4,7 @@ tracker_id: "c9cd3a3e-ea0c-4b31-b121-5ae3fd3e1e9b"
 tracker_url: ""
 tracker_number: "PLU-88"
 title: "Wire superseded emits at documented-only callsites"
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: medium

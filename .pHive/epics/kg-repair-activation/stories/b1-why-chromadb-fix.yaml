@@ -4,7 +4,7 @@ tracker_id: "fcbd60a8-6a53-4b98-984a-ae96d668659d"
 tracker_url: ""
 tracker_number: "PLU-83"
 title: "Fix /hive:why ChromaDB RuntimeError propagation"
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: low

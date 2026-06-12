@@ -1,7 +1,7 @@
 id: sdr-2-story-session-state-adoption
 epic: state-dir-resolver
 title: Adopt state-dir resolver for story and session state
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: medium

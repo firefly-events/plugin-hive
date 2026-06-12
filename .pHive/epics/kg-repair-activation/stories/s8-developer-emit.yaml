@@ -4,7 +4,7 @@ tracker_id: "fc1e55c4-6073-4f4e-b090-b7f81c529e04"
 tracker_url: ""
 tracker_number: "PLU-92"
 title: "Developer agent emits implemented at shutdown"
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: low

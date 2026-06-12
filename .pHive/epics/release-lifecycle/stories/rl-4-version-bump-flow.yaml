@@ -1,7 +1,7 @@
 id: rl-4-version-bump-flow
 epic: release-lifecycle
 title: Version-bump intent at plan, executed late in /execute
-status: shipped
+status: blocked
 shipped_at: "2026-06-08T04:51:07Z"
 release_id: "v2.10.0"
 complexity: medium

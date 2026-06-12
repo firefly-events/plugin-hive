@@ -1,7 +1,7 @@
 id: sdr-7-dag-executor-runstate-relocation
 epic: state-dir-resolver
 title: Relocate DAG executor run-state while fixed locks remain fixed
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: medium-high

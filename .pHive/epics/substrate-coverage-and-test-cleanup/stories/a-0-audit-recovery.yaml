@@ -1,7 +1,7 @@
 id: a-0-audit-recovery
 epic: substrate-coverage-and-test-cleanup
 title: Audit recovery spike — locate, regenerate, or accept-risk the missing cc-workflows smoke audit
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: low

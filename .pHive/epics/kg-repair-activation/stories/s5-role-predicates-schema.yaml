@@ -4,7 +4,7 @@ tracker_id: "214d20e1-7660-449a-8ad5-e15698fe7609"
 tracker_url: ""
 tracker_number: "PLU-89"
 title: "Add validated/tested/implemented predicates to schema"
-status: shipped
+status: in_progress
 shipped_at: "2026-06-11T06:05:06Z"
 release_id: "v2.11.0"
 complexity: medium
