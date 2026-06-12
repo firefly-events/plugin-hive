@@ -5,6 +5,8 @@ status: pending
 complexity: low
 methodology: classic
 depends_on: [chs-2-ship-authoring-step]
+tracker_id: plugin-hive/PLU-338
+tracker_url: http://localhost:3000/plugin-hive/issues/338
 
 description: |
   User-facing docs update for the new release flow (convention:

@@ -5,6 +5,8 @@ status: pending
 complexity: medium
 methodology: classic
 depends_on: [chs-1-changelog-entry-format-ref]
+tracker_id: plugin-hive/PLU-337
+tracker_url: http://localhost:3000/plugin-hive/issues/337
 
 description: |
   Add a changelog-authoring step to `skills/ship/SKILL.md`. User decision

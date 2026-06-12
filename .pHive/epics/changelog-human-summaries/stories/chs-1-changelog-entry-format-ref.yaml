@@ -5,6 +5,8 @@ status: pending
 complexity: low
 methodology: classic
 depends_on: []
+tracker_id: plugin-hive/PLU-336
+tracker_url: http://localhost:3000/plugin-hive/issues/336
 
 description: |
   Create `hive/references/changelog-entry-format.md` — the canonical, mandatory

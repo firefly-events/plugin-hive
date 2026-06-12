@@ -5,6 +5,8 @@ status: pending
 complexity: low
 methodology: classic
 depends_on: [chs-1-changelog-entry-format-ref]
+tracker_id: plugin-hive/PLU-339
+tracker_url: http://localhost:3000/plugin-hive/issues/339
 parallel_allowed: true
 parallel_rationale: bounded-slice
 
