@@ -3,7 +3,7 @@
  *
  * Export surface:
  *   deriveStoryStatus({ epic_id, story_id, repo_root? })
- *     → 'pending' | 'in_progress' | 'completed' | 'deferred' | 'blocked' | 'failed'
+ *     → 'pending' | 'in_progress' | 'completed' | 'deferred' | 'blocked' | 'failed' | 'shipped'
  *
  *   deriveAllStatuses({ repo_root? })
  *     → Map<string, { epic_id, story_id, yaml_status, derived_status, stale }>
@@ -182,7 +182,7 @@ function isStoryBranchMerged(repoRoot, epic_id, story_id) {
  * @param {string} opts.epic_id
  * @param {string} opts.story_id
  * @param {string} [opts.repo_root] - defaults to nearest ancestor with .pHive
- * @returns {'pending'|'in_progress'|'completed'|'deferred'|'blocked'|'failed'}
+ * @returns {'pending'|'in_progress'|'completed'|'deferred'|'blocked'|'failed'|'shipped'}
  */
 export function deriveStoryStatus({ epic_id, story_id, repo_root, _visited, _state_dir }) {
   const repoRoot = repo_root || findRepoRoot(process.cwd());

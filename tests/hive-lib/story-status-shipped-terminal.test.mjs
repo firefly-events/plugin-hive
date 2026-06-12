@@ -65,6 +65,27 @@ test('shipped without release_id does NOT short-circuit (marker derivation wins)
   assert.equal(got, 'in_progress');
 });
 
+test('depends_on treats shipped dependency as complete', () => {
+  const repo = makeRepo();
+  writeStory(repo, { status: 'shipped', releaseId: 'v2.11.0', withMarker: true }); // st-1
+
+  const parentPath = path.join(repo, '.pHive', 'epics', 'demo-epic', 'stories', 'st-2.yaml');
+  fs.writeFileSync(parentPath, [
+    'id: st-2',
+    'epic: demo-epic',
+    'title: parent story',
+    'status: pending',
+    'depends_on: [st-1]',
+    'steps:',
+    '- id: implement',
+    '  agent: developer',
+    '',
+  ].join('\n'));
+
+  const got = deriveStoryStatus({ epic_id: 'demo-epic', story_id: 'st-2', repo_root: repo });
+  assert.equal(got, 'pending'); // not blocked when dep is shipped
+});
+
 test('non-shipped YAML still derives from markers as before', () => {
   const repo = makeRepo();
   writeStory(repo, { status: 'in_progress', releaseId: null, withMarker: true });

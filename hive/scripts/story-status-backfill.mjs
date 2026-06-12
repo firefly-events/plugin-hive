@@ -152,7 +152,11 @@ if (guarded.length > 0) {
 }
 
 if (stale.length === 0) {
-  console.log('All story status fields are current. Nothing to reconcile.');
+  if (guarded.length > 0) {
+    console.log(`No reconcilable stale stories. ${guarded.length} terminal downgrade rewrite(s) were skipped (see warnings above).`);
+  } else {
+    console.log('All story status fields are current. Nothing to reconcile.');
+  }
   process.exit(0);
 }
 
