@@ -1,7 +1,7 @@
 id: chs-2-ship-authoring-step
 epic: changelog-human-summaries
 title: /ship authors the prose changelog entry (draft → operator review → write)
-status: pending
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on: [chs-1-changelog-entry-format-ref]
