@@ -1,3 +1,31 @@
+- experiment_id: meta-2026-06-13
+  date: '2026-06-13'
+  started: '2026-06-13T00:00:00Z'
+  closed: '2026-06-13T00:00:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 0
+  top_changes:
+    - ".pHive/meta-team/archive/2026-04-19/MANIFEST.md: appended reviewed-on provenance line for meta-2026-06-13 (7th line)"
+  commit: e842fd9a7da1dbfb9bd499c1b6f673baca10e7a8
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 2231fc36ad6ef72b302c996eab215c16bb42aaf9
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-13. Analysis found 0 in-scope findings: all 12 step
+    files complete (7/7), all 25 agents valid, all workflow step_file refs resolve,
+    model IDs current, no MEMORY_GAP findings (all agents >=1 memory). Changes since
+    meta-2026-06-12 are fix/status-no-downgrade (PR #285) and chore/coderabbit-281-
+    followup (PR #284), both outside meta-team scope. Dedup pre-flight: 0 open PRs
+    (clean). STUB_DOC hive-cloud-roadmap.md (13 lines) remains out_of_scope (S16
+    placeholder, 15th+ consecutive deferral). Routed to step-03b backlog fallback.
+    Selected candidate mmo-2026-04-21-001 (first pending, no dedup suppression).
+    Appended reviewed-on line for meta-2026-06-13 to archived MANIFEST.md (7th line).
+    Closure validator passed. Regression watch armed for 4-hour observation window.
 - experiment_id: meta-2026-06-12
   date: '2026-06-12'
   started: '2026-06-12T00:00:00Z'
