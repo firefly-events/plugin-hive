@@ -23,6 +23,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
+// @ts-ignore — plain-JS resolver shim (canonical impl: hive/lib/config.py)
+import { resolveStateDir } from "../config.js";
 
 export type GateMode = "warning" | "hard";
 
@@ -346,7 +348,9 @@ export class TaskTrackingDispatch {
   }
 
   private writeNoAdapterTelemetry(method: string): void {
-    const stateDir = this.config?.state_dir ?? ".pHive";
+    // Injected config.state_dir (test seam) wins; otherwise resolve per Q2:
+    // HIVE_STATE_DIR env > root-config paths.state_dir > `.pHive`.
+    const stateDir = this.config?.state_dir ?? resolveStateDir();
     const eventsDir = path.join(stateDir, "metrics", "events");
     try {
       fs.mkdirSync(eventsDir, { recursive: true });
@@ -404,7 +408,8 @@ export class TaskTrackingDispatch {
     code: string,
     skillContext: string,
   ): void {
-    const stateDir = this.config?.state_dir ?? ".pHive";
+    // Same precedence as writeNoAdapterTelemetry: injection > Q2 resolver.
+    const stateDir = this.config?.state_dir ?? resolveStateDir();
     const eventsDir = path.join(stateDir, "metrics", "events");
     try {
       fs.mkdirSync(eventsDir, { recursive: true });

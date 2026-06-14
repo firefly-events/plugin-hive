@@ -1,7 +1,9 @@
 id: t-2-markNeedsRework-abi
 epic: substrate-coverage-and-test-cleanup
 title: Add markNeedsRework({id, reason}) ABI method with TDD contract-first + Multica/GitHub adapter implementations + step-06-triage emit
-status: completed
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
 complexity: high
 methodology: tdd
 depends_on:

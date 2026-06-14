@@ -46,6 +46,11 @@ didn't cover a section, write `[data not provided: <what>]` rather than dropping
 Informal but substantive — a real engineer thinking out loud. Opinionated where the
 evidence supports it; honest about uncertainty. Cite the surface behind non-obvious claims.
 
+**Prose discipline:** write the reasoning as paragraphs, not bullet fragments. Bullets are
+for genuine lists only. A brain-dump that's wall-to-wall bullets reads as a checklist, not
+thinking. (Prose-heavy planning docs are best authored by a Claude model — codex/code
+models tend to bullet-dump.)
+
 ## Output
 
 Write to `.pHive/epics/{epic-id}/docs/design-discussion.md`.

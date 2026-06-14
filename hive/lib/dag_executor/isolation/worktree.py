@@ -22,6 +22,8 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from hive.lib.dag_executor.run_state.store import default_runs_root
+
 from .errors import (
     NestedWorktreeError,
     WorktreeCollisionError,
@@ -31,9 +33,6 @@ from .errors import (
 
 if TYPE_CHECKING:
     from hive.lib.dag_executor.executor.telemetry import Telemetry
-
-
-_DEFAULT_RUNS_ROOT = Path(".pHive") / "runs"
 
 
 _NESTED_WORKTREE_HINTS = (
@@ -98,7 +97,13 @@ class WorktreeManager:
         telemetry: "Telemetry | None" = None,
     ) -> None:
         self.repo_path = Path(repo_path)
-        self.runs_root = Path(runs_root) if runs_root is not None else _DEFAULT_RUNS_ROOT
+        # Default resolves via the sdr-1 resolver anchored at the repo the
+        # manager isolates for, so worktrees follow a relocated state dir.
+        self.runs_root = (
+            Path(runs_root)
+            if runs_root is not None
+            else default_runs_root(cwd=self.repo_path)
+        )
         self.telemetry = telemetry
 
     def _path_for(self, run_id: str) -> Path:

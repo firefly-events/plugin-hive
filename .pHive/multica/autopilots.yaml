@@ -1,0 +1,13 @@
+# Multica autopilot declarations — schema: hive/references/multica-autopilots-schema.md
+schema_version: 1
+autopilots:
+  - name: run-state-archival-weekly
+    title: Run-state Archival Sweep (weekly)
+    mode: create_issue
+    agent: tpm
+    description: "Weekly suspend-aware archival of aged terminal DAG runs: run `python3 -m hive.lib.dag_executor.run_state.archive` (dry-run first, then live) and post the sweep summary. Active and suspended runs are never archived."
+    priority: low
+    triggers:
+      - kind: schedule
+        label: weekly-sunday-03utc
+        cron: "0 3 * * 0"

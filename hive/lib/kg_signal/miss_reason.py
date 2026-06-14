@@ -216,6 +216,7 @@ def _read_current_triples(db_path: Path) -> tuple[Triple, ...]:
         return ()
     try:
         with sqlite3.connect(str(db_path)) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
             columns = {row[1] for row in conn.execute("PRAGMA table_info(triples)")}
             valid_until_predicate = "AND valid_until IS NULL" if "valid_until" in columns else ""
             rows = conn.execute(

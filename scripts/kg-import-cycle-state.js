@@ -25,6 +25,13 @@
  *   `idx_unique_triple(subject, predicate, object, source_epic)` index.
  *   Without the prefix, project B's triples would be silently dropped by
  *   INSERT OR IGNORE.
+ *
+ * STATE-DIR CLASSIFICATION (sdr-3): maintainer-only — stays literal.
+ * Nothing in hooks/, skills/, or workflows invokes this at runtime; it is a
+ * one-time seeding utility run by an operator (or by the maintainer-only
+ * kg-bootstrap-from-projects.js). The default `.pHive/cycle-state` path is
+ * intentional per design-decisions Q3 (proof/one-time scripts keep literal
+ * paths); relocated projects can pass --cycle-state-dir explicitly.
  */
 
 const path = require('path');
@@ -229,6 +236,10 @@ async function main() {
   if (!DRY_RUN) {
     const Database = require('better-sqlite3');
     db = new Database(DB_PATH);
+    // SQLite leaves FK enforcement off per-connection — without this, an
+    // undeclared predicate inserts silently despite the schema's
+    // REFERENCES predicates(predicate) declaration.
+    db.pragma('foreign_keys = ON');
     // idx_unique_triple is part of the canonical bootstrap DDL — see
     // hive/references/knowledge-graph-schema.md#sqlite-bootstrap.
     // Verify it exists at runtime so INSERT OR IGNORE can actually dedupe re-runs.

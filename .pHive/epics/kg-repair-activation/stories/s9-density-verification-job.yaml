@@ -1,0 +1,68 @@
+id: s9-density-verification-job
+epic: kg-repair-activation
+tracker_id: "ea04c21c-a772-43c3-846d-0bb63447507b"
+tracker_url: ""
+tracker_number: "PLU-93"
+title: "Density-verification job + kg_signal weight-bump PR draft"
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
+complexity: medium
+methodology: classic
+depends_on: ["s6-reviewer-emit", "s7-tester-emit", "s8-developer-emit"]
+
+description: |
+  Scripted check runs (manual or scheduled) at epic-merge + 30 days. Queries kg.sqlite for: density (triples/day over last 30d), distinct firing predicates, distinct source_agents. If thresholds met (≥6/day, ≥5 predicates, ≥3 source_agents), script opens a draft PR bumping hive.config.yaml line 49 from kg_signal: 0.4 to kg_signal: 0.8. Maintainer reviews + merges. Does NOT auto-commit the weight change.
+
+acceptance_criteria:
+  - "Given scripts/kg-density-verification.mjs is run, when kg.sqlite contains 30d of triples meeting thresholds (≥6/day, ≥5 distinct firing predicates, ≥3 source_agents), then the script opens a draft PR via gh pr create with the diff bumping kg_signal: 0.4 → 0.8."
+  - "Given thresholds NOT met, when the script runs, then it prints the gap (e.g. \"density=4.2/day, target=6/day\") and exits 1 without opening a PR."
+  - "Given the script is idempotent, when run twice in succession with thresholds met, then a second open draft PR is NOT created (checks for existing open PR with same branch name first)."
+  - "Given the maintainer reviews the draft PR, when they merge it, then meta-optimize step-02c-kg-signal weighting reflects the new value on next ceremony run."
+
+steps:
+  - id: research
+    description: Explore the codebase for relevant patterns, files, and constraints
+    agent: researcher
+  - id: implement
+    description: Implement the story according to spec and research findings
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Write tests covering acceptance criteria and verify they pass
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review implementation and tests for correctness and convention compliance
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+files_to_modify:
+  - file: scripts/kg-density-verification.mjs
+    change: New script
+  - file: .github/workflows/kg-density-check.yml
+    change: Optional scheduled trigger (cron monthly) — opt-in, off by default
+  - file: tests/test_kg_density_verification.mjs
+    change: Test against a fixture sqlite meeting + not-meeting thresholds
+
+metric:
+  applies: true
+  name: kg.signal_weight
+  direction: up
+  unit: weight-coefficient
+  baseline: 0.4
+  target: 0.8
+  window: epic-merge-plus-30-days
+  source:
+    kind: manual
+    ref: "maintainer-merged PR bumping hive.config.yaml line 49"
+  verify_at: epic-merge-plus-30-days
+  owner: maintainer
+
+cross_cutting:
+  - concern: versioning
+    action: "kg_signal weight is consumer-visible in shipped baseline → check shipped baseline override; patch bump if baseline ships the change"

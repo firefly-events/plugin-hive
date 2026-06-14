@@ -14,7 +14,7 @@ preconditions:
 
 steps:
   - action: Run node hive/scripts/verify-dispatch-parity.mjs --no-bump from repo root and inspect stdout/exit code.
-    expected: Script exits 0. stdout contains "dispatch-parity.md: 12 paths verified" (or higher if future paths are added). No FAIL lines in stderr.
+    expected: 'Script exits 0. stdout contains "dispatch-parity.md: 12 paths verified" (or higher if future paths are added). No FAIL lines in stderr.'
     actor: tester
 
   - action: Open hive/references/dispatch-parity.md and read the 6×3 main matrix table.
@@ -30,7 +30,7 @@ steps:
     actor: tester
 
   - action: Read the "## Last verified:" line in hive/references/dispatch-parity.md.
-    expected: Line matches the pattern "## Last verified: YYYY-MM-DD" with a valid ISO date. Date is 2026-06-08 or later (script bumps on CI green).
+    expected: 'Line matches the pattern "## Last verified: YYYY-MM-DD" with a valid ISO date. Date is 2026-06-08 or later (script bumps on CI green).'
     actor: tester
 
   - action: Run the vitest dispatch-parity test suite in isolation via npx vitest run --reporter=verbose --root . hive/scripts/test/verify-dispatch-parity.test.mjs.

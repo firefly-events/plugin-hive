@@ -3,7 +3,7 @@
  *
  * Export surface:
  *   deriveStoryStatus({ epic_id, story_id, repo_root? })
- *     → 'pending' | 'in_progress' | 'completed' | 'deferred' | 'blocked' | 'failed'
+ *     → 'pending' | 'in_progress' | 'completed' | 'deferred' | 'blocked' | 'failed' | 'shipped'
  *
  *   deriveAllStatuses({ repo_root? })
  *     → Map<string, { epic_id, story_id, yaml_status, derived_status, stale }>
@@ -16,7 +16,9 @@
  *   5. Final workflow step has status=completed marker → completed
  *   6. Otherwise (markers exist, final step not completed) → in_progress
  *
- * Authoritative source order: git + .pHive/episodes/ > YAML status: field.
+ * Authoritative source order: git + <state-dir>/episodes/ > YAML status: field.
+ * The state dir resolves via the sdr-1 resolver (HIVE_STATE_DIR >
+ * paths.state_dir in hive.config.yaml > default .pHive).
  * The YAML status: field is advisory only (episode-schema.md, deprecated note).
  */
 
@@ -26,23 +28,34 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { resolveStateDir } from './config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ---------------------------------------------------------------------------
-// Repo root resolution
+// Repo root + state dir resolution
 // ---------------------------------------------------------------------------
 
 function findRepoRoot(startDir) {
   let dir = resolve(startDir);
   for (let i = 0; i < 20; i++) {
-    if (existsSync(join(dir, '.pHive'))) return dir;
+    // hive.config.yaml marks a project root even when the state tree is
+    // relocated away from the legacy .pHive default.
+    if (existsSync(join(dir, 'hive.config.yaml')) || existsSync(join(dir, '.pHive'))) {
+      return dir;
+    }
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
   // Fall back to two levels up from hive/lib/
   return resolve(__dirname, '..', '..');
+}
+
+// State dir for a given repo root, honoring HIVE_STATE_DIR > paths.state_dir
+// in <repoRoot>/hive.config.yaml > default <repoRoot>/.pHive (sdr-1 resolver).
+function stateDirFor(repoRoot) {
+  return resolveStateDir({ cwd: repoRoot });
 }
 
 // ---------------------------------------------------------------------------
@@ -88,8 +101,8 @@ function hasYamlBlock(text, field) {
 // Story YAML helpers
 // ---------------------------------------------------------------------------
 
-function readStoryYaml(repoRoot, epic_id, story_id) {
-  const path = join(repoRoot, '.pHive', 'epics', epic_id, 'stories', `${story_id}.yaml`);
+function readStoryYaml(stateDir, epic_id, story_id) {
+  const path = join(stateDir, 'epics', epic_id, 'stories', `${story_id}.yaml`);
   if (!existsSync(path)) return null;
   return readFileSync(path, 'utf8');
 }
@@ -115,8 +128,8 @@ function getStorySteps(storyText) {
 // Episode marker helpers
 // ---------------------------------------------------------------------------
 
-function readEpisodeMarkers(repoRoot, epic_id, story_id) {
-  const dir = join(repoRoot, '.pHive', 'episodes', epic_id, story_id);
+function readEpisodeMarkers(stateDir, epic_id, story_id) {
+  const dir = join(stateDir, 'episodes', epic_id, story_id);
   if (!existsSync(dir)) return [];
   const files = readdirSync(dir).filter(f => f.endsWith('.yaml'));
   return files.map(f => {
@@ -169,11 +182,12 @@ function isStoryBranchMerged(repoRoot, epic_id, story_id) {
  * @param {string} opts.epic_id
  * @param {string} opts.story_id
  * @param {string} [opts.repo_root] - defaults to nearest ancestor with .pHive
- * @returns {'pending'|'in_progress'|'completed'|'deferred'|'blocked'|'failed'}
+ * @returns {'pending'|'in_progress'|'completed'|'deferred'|'blocked'|'failed'|'shipped'}
  */
-export function deriveStoryStatus({ epic_id, story_id, repo_root, _visited }) {
+export function deriveStoryStatus({ epic_id, story_id, repo_root, _visited, _state_dir }) {
   const repoRoot = repo_root || findRepoRoot(process.cwd());
-  const storyText = readStoryYaml(repoRoot, epic_id, story_id);
+  const stateDir = _state_dir || stateDirFor(repoRoot);
+  const storyText = readStoryYaml(stateDir, epic_id, story_id);
 
   // Cycle protection for the recursive depends_on walk below.
   const visited = _visited || new Set();
@@ -191,8 +205,21 @@ export function deriveStoryStatus({ epic_id, story_id, repo_root, _visited }) {
     return 'deferred';
   }
 
+  // 1b. shipped projection is terminal. /ship owns complete -> shipped and only
+  // writes it after a successful release action + artifacts, so a release_id-
+  // stamped shipped status outranks episode markers: markers describe the
+  // historical run and cannot un-release a story. (Multica-mode runs may never
+  // write terminal markers — t-001 capture-gap family — which otherwise leaves
+  // shipped stories deriving as in_progress forever.)
+  if (storyText) {
+    const yamlStatus = readYamlField(storyText, 'status');
+    if (yamlStatus === 'shipped' && readYamlField(storyText, 'release_id')) {
+      return 'shipped';
+    }
+  }
+
   // Collect episode markers
-  const markers = readEpisodeMarkers(repoRoot, epic_id, story_id);
+  const markers = readEpisodeMarkers(stateDir, epic_id, story_id);
 
   // 2. Any marker failed or escalated
   if (markers.some(m => m.status === 'failed' || m.status === 'escalated')) {
@@ -229,9 +256,9 @@ export function deriveStoryStatus({ epic_id, story_id, repo_root, _visited }) {
     if (deps.length > 0) {
       const allDepsComplete = deps.every(dep => {
         const depStatus = deriveStoryStatus({
-          epic_id, story_id: dep, repo_root: repoRoot, _visited: visited,
+          epic_id, story_id: dep, repo_root: repoRoot, _visited: visited, _state_dir: stateDir,
         });
-        return depStatus === 'completed';
+        return depStatus === 'completed' || depStatus === 'shipped';
       });
       if (!allDepsComplete && markers.length === 0) return 'blocked';
     }
@@ -257,7 +284,8 @@ export function deriveStoryStatus({ epic_id, story_id, repo_root, _visited }) {
  */
 export function deriveAllStatuses({ repo_root } = {}) {
   const repoRoot = repo_root || findRepoRoot(process.cwd());
-  const epicsDir = join(repoRoot, '.pHive', 'epics');
+  const stateDir = stateDirFor(repoRoot);
+  const epicsDir = join(stateDir, 'epics');
   if (!existsSync(epicsDir)) return [];
 
   const results = [];
@@ -272,7 +300,7 @@ export function deriveAllStatuses({ repo_root } = {}) {
 
     for (const sf of storyFiles) {
       const story_id = sf.replace(/\.yaml$/, '');
-      const storyText = readStoryYaml(repoRoot, epic_id, story_id);
+      const storyText = readStoryYaml(stateDir, epic_id, story_id);
       const yaml_status = storyText ? (readYamlField(storyText, 'status') || 'pending') : 'pending';
       const derived_status = deriveStoryStatus({ epic_id, story_id, repo_root: repoRoot });
       results.push({

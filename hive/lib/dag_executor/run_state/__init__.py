@@ -46,6 +46,8 @@ from .store import (
 
 __all__ = [
     "AlreadyCompletedError",
+    "ArchiveReport",
+    "DEFAULT_THRESHOLD",
     "InvalidRunIdError",
     "NodeStatus",
     "ResumeFromInvalidStateError",
@@ -56,7 +58,10 @@ __all__ = [
     "RunStatus",
     "SCHEMA_VERSION",
     "SchemaVersionMismatchError",
+    "TERMINAL_STATUSES",
+    "archive_terminal_runs",
     "create",
+    "default_archive_dest",
     "load",
     "mark_completed",
     "mark_failed",
@@ -72,3 +77,24 @@ __all__ = [
     "unfreeze_for_resume",
     "validate_run_id",
 ]
+
+# Archive exports are lazy: eager import would re-execute archive.py under
+# `python -m hive.lib.dag_executor.run_state.archive` (the documented CLI)
+# and trip runpy's "found in sys.modules" warning.
+_ARCHIVE_EXPORTS = frozenset(
+    {
+        "ArchiveReport",
+        "DEFAULT_THRESHOLD",
+        "TERMINAL_STATUSES",
+        "archive_terminal_runs",
+        "default_archive_dest",
+    }
+)
+
+
+def __getattr__(name: str):
+    if name in _ARCHIVE_EXPORTS:
+        from . import archive as _archive
+
+        return getattr(_archive, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

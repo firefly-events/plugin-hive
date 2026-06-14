@@ -150,3 +150,22 @@ See `references/insight-capture.md` for the insight capture protocol.
 ## Shutdown Readiness
 
 When receiving a pre-shutdown message from the orchestrator, follow the receiver protocol in `hive/references/pre-shutdown-protocol.md`.
+
+### Shutdown emit — `tested` role triple
+
+At shutdown — in the same call sequence as insights-before-shutdown (receiver protocol step 1b) — emit exactly ONE `tested` triple per completed story test run. This is a separate structured emit, NOT prose inside insight text:
+
+```bash
+python3 -m hive.lib.kg_emit_cli \
+  --subject "{story_id}" \
+  --predicate "tested" \
+  --object "{verdict}" \
+  --source-epic "{epic_id}" \
+  --source-agent "tester"
+```
+
+- `--object` must be exactly one of `pass`, `fail`, `inconclusive` (lowercase, case-stable). Map your test outcome onto this vocabulary: all acceptance-criteria tests green → `pass`; one or more tests failing → `fail`; tests could not run to a verdict (environment broke, scope blocked, partial coverage with no failing signal) → `inconclusive`.
+- **Silent when no story tests completed.** If shutdown arrives before you produced a test verdict, emit nothing — there must be an actual completed test run behind the triple.
+- Exactly one emit per completed story test run — not per test case, not retried on success.
+- The CLI is silent on knob==off and on missing kg.sqlite — do NOT branch on its exit code, and never block shutdown on this emit.
+- Python callers use `hive.lib.agent_shutdown_emits.emit_role_triple_at_shutdown` (shared by reviewer/tester/developer for `validated`/`tested`/`implemented`).

@@ -1,0 +1,121 @@
+id: sls-3-stale-parent-sweep
+epic: squad-leader-status-flip
+title: Build the stale-parent sweep script (Fork B lite)
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
+tracker_id: plugin-hive/PLU-315
+tracker_url: http://localhost:3000/plugin-hive/issues/315
+complexity: medium
+methodology: tdd
+depends_on: [sls-1-terminal-contract-doc]
+
+description: |
+  Create scripts/multica-sweep-stale-parents.py (Python 3, stdlib-first per
+  charter — use subprocess against the multica CLI with --output json; no new
+  pip deps). The sweep is the backstop for leaders that fail the terminal
+  contract (sls-1), and the measurement instrument for the epic metric.
+
+  Behavior:
+  - Enumerate `multica issue list --status in_progress --output json`.
+  - For each parent issue assigned to a squad OR agent: fetch child issues
+    (issues whose parent_issue_id == parent uuid; fall back to parsing the
+    leader's "Delegated" comment mentions if the API exposes no child query)
+    and the comment thread.
+  - Classify STALE when ALL of: (a) every child is terminal (done / cancelled /
+    in_review), (b) parent updated_at older than --min-age (default 30m),
+    (c) no BLOCKED comment present (blocked-by-intent parents are reported in a
+    separate section, never auto-flipped).
+  - Default mode: report table (key, title, age, child summary, verdict).
+    --apply: flip STALE parents to done via `multica issue update`, appending
+    a sweep-attribution comment first.
+  - --json for machine-readable output.
+  - Exit 0 always in report mode; non-zero only on CLI/auth failure.
+
+  Tests (tdd): pure functions for classification take fixture JSON (no live
+  CLI in tests). Cover: all-terminal+old → STALE; one child in_progress → not
+  stale; fresh parent → not stale; BLOCKED comment → blocked section; agent
+  -assigned parent with no children → not stale (PLU-312 case).
+
+acceptance_criteria:
+  - "Given fixture data modeling PLU-277/298/302/305/308 (children terminal, parent old), when classify runs, then all five are STALE"
+  - "Given fixture data modeling PLU-312 (agent-assigned, live, no children), when classify runs, then it is NOT stale"
+  - "Given a BLOCKED comment in the thread, when classify runs, then the parent lands in the blocked section and --apply does not touch it"
+  - "Given report mode (no --apply), when run, then no issue status is mutated"
+  - "Given --apply on a STALE parent, when run, then the issue is flipped to done and a sweep-attribution comment exists"
+  - "Given `python3 -m pytest` (or the repo's test runner) on the new tests, then all pass with no live Multica calls"
+
+steps:
+  - id: test-spec
+    description: Write failing classification tests from the acceptance criteria with fixtures modeling the five stale parents + PLU-312 + blocked case
+    agent: tester
+  - id: implement
+    description: Implement the sweep script; make tests pass without modifying them
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Review for false-positive safety (quiet-age + all-terminal AND-gate), charter compliance (Python stdlib), CLI error handling
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit script + tests; run one live report-mode pass and capture output in the PR body
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  key_files:
+    - path: hive/references/squad-leader-terminal-contract.md
+      purpose: Defines terminal-for-delegation semantics the classifier implements (produced by sls-1)
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: Existing Multica API surface (Node bridge) — do NOT extend it; sweep is Python via CLI per charter
+  tech_stack:
+    language: python3-stdlib
+    cli: multica (issue list/get/update, issue comment list; --output json)
+
+files_to_modify:
+  - file: scripts/multica-sweep-stale-parents.py
+    change: new sweep script
+  - file: scripts/tests/test_multica_sweep_stale_parents.py
+    change: new classification tests with fixtures
+
+cross_cutting:
+  - concern: documentation
+    action: "Usage section in the script docstring + one-line pointer from the contract doc's backstop section"
+  - concern: versioning
+    action: "New operator-facing script — counted in epic-level version_bump decision"
+
+metric:
+  applies: true
+  name: sweep_stale_detection_accuracy
+  direction: up
+  unit: ratio
+  baseline: 0
+  target: 1.0
+  window: story-integrate
+  source:
+    kind: manual
+    ref: "Live report-mode pass at integrate: every reported STALE verified by hand against issue threads; zero false positives required"
+  verify_at: integrate
+  owner: reviewer
+
+design_decisions:
+  - decision: CLI subprocess, not HTTP client against Multica server
+    rationale: stdlib-first charter; CLI already handles auth/profile/workspace resolution
+  - decision: report-first, --apply opt-in
+    rationale: status mutation is outward-facing; mirrors the manual-confirm pattern used in the 2026-06-09 cleanup
+
+risks:
+  - severity: medium
+    description: CLI lacks a children-by-parent query; comment-mention fallback is brittle
+    mitigation: Probe `multica issue list --parent <uuid>` / JSON parent_issue_id field first; if absent, constrain fallback to leader 'Delegated' comment mention parsing and flag LOW-CONFIDENCE in report
+  - severity: low
+    description: Issue volume growth makes full-list sweep slow
+    mitigation: --status in_progress already bounds the set; fine at current scale
+
+references:
+  - path: .pHive/epics/squad-leader-status-flip/docs/design-discussion.md
+    relevant_excerpt: |
+      Fork B ACCEPT in lite form: standalone Python sweep; STALE requires BOTH
+      all-children-terminal AND minimum quiet age (default 30 min); report-first,
+      --apply opt-in.

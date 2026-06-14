@@ -1,0 +1,52 @@
+# Raw KG research: kg-repair-activation
+
+## 1. KG write surface — emit sites + helpers
+
+Observed helpers: `hive/lib/kg_emit_cli.py` is a Python CLI around `emit_kg_event`, `emit_superseded`, and `sanitize_obj` (`hive/lib/kg_emit_cli.py:25`). Required args are `--subject`, `--predicate`, `--source-epic`, `--source-agent`; it accepts `--object`/`--new-object`, `--cycle-id`, `--json`, `--no-sanitize`, and `--mode event|supersede` (`hive/lib/kg_emit_cli.py:33`, `hive/lib/kg_emit_cli.py:36`, `hive/lib/kg_emit_cli.py:41`, `hive/lib/kg_emit_cli.py:48`, `hive/lib/kg_emit_cli.py:51`, `hive/lib/kg_emit_cli.py:56`, `hive/lib/kg_emit_cli.py:61`). Contract: exits 0 except argparse and is silent on knob-off/missing sqlite (`hive/lib/kg_emit_cli.py:14`). `--mode supersede` calls `emit_superseded` (`hive/lib/kg_emit_cli.py:75`).
+
+CLI callsites found by `rg` in `skills/`, `hive/`, `scripts/`: `skills/plan/SKILL.md:247` emits `phase_blocked` at structured-outline wait gate; same paragraph says also apply to design-discussion and H/V waiting gates (`skills/plan/SKILL.md:244`, `skills/plan/SKILL.md:255`). `skills/plan/SKILL.md:326` emits `--mode supersede` with predicate `story-spec` on story overwrite (`skills/plan/SKILL.md:321`). `skills/hive/skills/escalation-backfill/SKILL.md:56` emits `phase_blocked` per canonical escalation story after backfill (`skills/hive/skills/escalation-backfill/SKILL.md:49`, `skills/hive/skills/escalation-backfill/SKILL.md:51`). `hive/workflows/steps/daily-ceremony/step-06-approve-plan.md:20` emits `phase_blocked` before plan approval wait (`hive/workflows/steps/daily-ceremony/step-06-approve-plan.md:17`). `hive/workflows/steps/meta-team-cycle/step-03-proposal.md:52` emits `--mode supersede` with predicate `proposal` when a grouped proposal replaces a prior proposal (`hive/workflows/steps/meta-team-cycle/step-03-proposal.md:49`).
+
+Direct non-CLI write paths also exist: `hive/lib/kg_emit.py` writes `INSERT OR IGNORE` and buffers metrics (`hive/lib/kg_emit.py:35`, `hive/lib/kg_emit.py:65`, `hive/lib/kg_emit.py:82`); `emit_superseded` updates prior triples and inserts `superseded` (`hive/lib/kg_emit.py:98`, `hive/lib/kg_emit.py:138`, `hive/lib/kg_emit.py:149`). DAG walker emits `phase_blocked` on skip/trigger false and `phase_failed` on failure (`hive/lib/dag_executor/executor/walker.py:944`, `hive/lib/dag_executor/executor/walker.py:954`, `hive/lib/dag_executor/executor/walker.py:968`, `hive/lib/dag_executor/executor/walker.py:1199`, `hive/lib/dag_executor/executor/walker.py:1204`). `hive/lib/handoff/dispatch.mjs` tries to emit predicate `phase_handoff`, which is not in declared schema (`hive/lib/handoff/dispatch.mjs:83`, `hive/lib/handoff/dispatch.mjs:90`; declared list at `hive/references/knowledge-graph-schema.md:183`). The remembered “3 emit sites” is for `scope_drift_score`, not KG: plan:phase-c, execute:story, review:complete (`/Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/feedback_scope_drift_emit_sites.md:10`, `/Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/feedback_scope_drift_emit_sites.md:12`). Plan S2.1 seam 3 is in the running plan skill doc, not only an external design note (`skills/plan/SKILL.md:244`).
+
+## 2. KG read surface — consumers
+
+`hive/lib/kg_why.py` reads sqlite in strict/freeform modes (`hive/lib/kg_why.py:74`, `hive/lib/kg_why.py:91`, `hive/lib/kg_why.py:96`) and merges optional ChromaDB rows (`hive/lib/kg_why.py:138`, `hive/lib/kg_why.py:142`). `/hive:why` exposes strict CLI examples and free-form fallback, but no `--json` output is documented or implemented (`skills/hive/skills/why/SKILL.md:35`, `skills/hive/skills/why/SKILL.md:46`, `skills/hive/skills/why/SKILL.md:51`; parser args at `hive/lib/kg_why.py:253`). `meta-optimize` reads KG via step-02c when `meta_optimize.kg_signal.enabled` is true (`skills/hive/skills/meta-optimize/SKILL.md:30`), querying `phase_failed`, `phase_blocked`, `superseded` (`hive/workflows/steps/meta-team-cycle/step-02c-kg-signal.md:79`). Weighting maps `kg_signal` to `kg_signal` and applies after base score (`hive/workflows/steps/meta-team-cycle/signal-weights.mjs:25`, `hive/workflows/steps/meta-team-cycle/signal-weights.mjs:87`; config demotion at `hive.config.yaml:49`). Other consumers: memory-loading appends decision context (`skills/hive/skills/memory-loading/SKILL.md:79`), session prompt builder queries sqlite by `source_epic` (`hive/lib/session-prompt-builder.js:35`), miss-reason helper reads current triples (`hive/lib/kg_signal/miss_reason.py:102`), register/bootstrap consume project registry (`skills/hive/skills/register-project/SKILL.md:66`).
+
+## 3. Schema + bootstrap
+
+Local sqlite CLI access failed in this sandbox with “unable to open database file”; schema is therefore inferred from repo DDL. `triples(subject,predicate,object,valid_from,valid_until,source_epic,source_agent)` and `predicates(predicate primary key)` are declared in bootstrap DDL (`hive/references/knowledge-graph-schema.md:172`, `hive/references/knowledge-graph-schema.md:183`). Indexes: subject, object, predicate, valid, and unique `(subject,predicate,object,source_epic)` (`hive/references/knowledge-graph-schema.md:187`, `hive/references/knowledge-graph-schema.md:191`). Kickoff initializes this schema every run (`hive/references/kickoff-protocol.md:738`). `register-project` writes only `projects.yaml` rows: name/path/registered_at (`skills/hive/skills/register-project/SKILL.md:66`; implementation at `skills/hive/skills/register-project/register-project.mjs:248`). `scripts/kg-bootstrap-from-projects.js` reads that registry, walks `.pHive/cycle-state/`, and invokes `kg-import-cycle-state.js` (`scripts/kg-bootstrap-from-projects.js:3`, `scripts/kg-bootstrap-from-projects.js:209`). `kg-import-cycle-state.js` maps canonical/legacy/v2 decisions to `decided` triples with `source_agent: orchestrator` (`scripts/kg-import-cycle-state.js:126`, `scripts/kg-import-cycle-state.js:180`, `scripts/kg-import-cycle-state.js:191`, `scripts/kg-import-cycle-state.js:200`).
+
+## 4. Predicate semantics — declared vs needed
+
+Declared meanings are in schema: `decided`, `superseded`, `assigned_to`, `blocked_by`, `depends_on`, `phase_started`, `phase_complete`, `phase_failed`, `phase_blocked` (`hive/references/knowledge-graph-schema.md:23`, `hive/references/knowledge-graph-schema.md:36`). Observed: `decided` is bootstrapped/imported live (`scripts/kg-import-cycle-state.js:182`). `superseded` has helpers and doc callsites, but user-provided DB state says none written; helper requires callers to invoke supersede mode (`hive/lib/kg_emit_cli.py:75`). `assigned_to`, `blocked_by`, `depends_on`, `phase_started`, `phase_complete` have no write path found in searched source paths; lifecycle examples are documentation only (`hive/references/knowledge-graph-schema.md:72`). `phase_failed` and `phase_blocked` write paths exist in DAG walker (`hive/lib/dag_executor/executor/walker.py:1257`, `hive/lib/dag_executor/executor/walker.py:1282`). Adding broad phase lifecycle emits is in tension with the deliberate 3-site scope-drift cut (`/Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/feedback_scope_drift_emit_sites.md:16`).
+
+## 5. /hive:why bug deep-dive
+
+Relevant lines:
+
+```text
+206 def query_chromadb(
+213     response = chromadb_query_fn(topic, limit)
+214     available, records = _extract_chroma_response(response)
+218     triples: list[WhyTriple] = []
+219     for record in records:
+220         metadata = _metadata(record)
+```
+
+Observed in this sandbox: `python3 -m hive.lib.kg_why 'test query' --limit 5` returned “No decisions found...” and did not crash. Code reading shows line 213 delegates to provider with no `RuntimeError` guard (`hive/lib/kg_why.py:213`). No local `.items()` mutation exists in `query_chromadb`; records are converted to list in `_extract_chroma_response` (`hive/lib/kg_why.py:292`, `hive/lib/kg_why.py:298`). hypothesis: the reproducible user crash is raised inside the live ChromaDB query provider called at line 213, likely while provider/library iterates a dict that mutates. One-line containment fix: catch `RuntimeError` around line 213 and return `[]` for `dictionary changed size during iteration`; do not implement here.
+
+## 6. Non-orchestrator agent emit gaps
+
+Current import path hard-codes orchestrator (`scripts/kg-import-cycle-state.js:189`, `scripts/kg-import-cycle-state.js:198`, `scripts/kg-import-cycle-state.js:211`). Reviewer/tester/developer personas produce verdict/test/implementation evidence but no KG predicates: reviewer verdict examples live in reviewer agent (`hive/agents/reviewer.md:101`), tester report fields in tester agent (`hive/agents/tester.md:119`), developer implementation evidence in developer agent (`hive/agents/developer.md:68`). hypothesis: minimal additions would need new predicates such as `validated`, `tested`, `implemented`; these are not declared in schema (`hive/references/knowledge-graph-schema.md:183`).
+
+## 7. Density math
+
+At 1.35 triples/day, reaching 6/day requires +4.65/day or 4.44x current. Non-orchestrator emits would multiply by story roles if developer/tester/reviewer each emits once per story. Supersede-on-overwrite adds sparse volume at plan/proposal/memory replacement sites (`skills/plan/SKILL.md:321`, `hive/workflows/steps/meta-team-cycle/step-03-proposal.md:49`, `hive/lib/session-end.js:69`). Broader predicates add density only if declared and consumed; current step-02c consumes only three predicates (`hive/workflows/steps/meta-team-cycle/step-02c-kg-signal.md:79`).
+
+## 8. inconsistency_risk_signals
+
+- “Add more emit sites” vs deliberate 3-site scope-drift cut (`/Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/feedback_scope_drift_emit_sites.md:10`).
+- Pinning `~/.claude/hive` vs state-dir resolver: KG is global in schema/config, while skills route project state through `paths.state_dir` (`hive/references/system-config.md:3`, `skills/execute/SKILL.md:14`).
+- Repair ChromaDB `/hive:why` vs sqlite-only fallback: why free-form always attempts ChromaDB when provider exists (`hive/lib/kg_why.py:138`).
+- `phase_handoff` emitter uses an undeclared predicate (`hive/lib/handoff/dispatch.mjs:90`, `hive/references/knowledge-graph-schema.md:183`).
+- “100% orchestrator” bootstrap conflicts with schema examples showing architect/source-agent provenance (`hive/references/knowledge-graph-schema.md:63`, `scripts/kg-import-cycle-state.js:189`).

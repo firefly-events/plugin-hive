@@ -11,13 +11,24 @@
  *   - Pre-shutdown receiver — same ordering, skipCompile: true on hard shutdown
  */
 
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
-const { index: chromadbIndex, isAvailable: chromadbAvailable } = require('./chromadb-wrapper');
+// ESM module: hive/lib/package.json declares `"type": "module"`, so plain
+// `.js` files in this package scope are ES modules (the previous CJS form was
+// un-loadable here — same conversion as config.js). Named exports unchanged;
+// on Node >= 20.19 `require()` of this file works via require(esm).
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
+import { createRequire } from 'node:module';
+import { index as chromadbIndex, isAvailable as chromadbAvailable } from './chromadb-wrapper.js';
+
+// better-sqlite3 is a CJS native addon — load it through createRequire.
+const requireCjs = createRequire(import.meta.url);
 
 const HOME = os.homedir();
-const KG_SQLITE_PATH = path.join(HOME, '.claude', 'hive', 'kg.sqlite');
+// HIVE_KG_SQLITE_PATH override mirrors hive/lib/kg_emit.py — tests and
+// sandboxed runs point both runtimes at the same fixture DB.
+const KG_SQLITE_PATH = process.env.HIVE_KG_SQLITE_PATH
+  || path.join(HOME, '.claude', 'hive', 'kg.sqlite');
 const MEMORIES_BASE = path.join(HOME, '.claude', 'hive', 'memories');
 const LATENCY_THRESHOLD_MS = 30000; // 30 seconds
 
@@ -69,7 +80,7 @@ async function runSessionEnd({
   if (supersededMemories.length > 0) {
     let emitSupersededEvent;
     try {
-      ({ emitSupersededEvent } = require('./kg-emit'));
+      ({ emitSupersededEvent } = await import('./kg-emit.js'));
     } catch (err) {
       kgError = err;
       console.error(`[session-end] kg-emit load failed: ${err.message}`);
@@ -175,7 +186,7 @@ async function kgWrite(triples, sourceEpic, sourceAgent) {
   // Dynamic require to avoid hard dependency when SQLite not available
   let sqlite3;
   try {
-    sqlite3 = require('better-sqlite3');
+    sqlite3 = requireCjs('better-sqlite3');
   } catch {
     throw new Error('better-sqlite3 not available — cannot write KG triples');
   }
@@ -183,6 +194,9 @@ async function kgWrite(triples, sourceEpic, sourceAgent) {
   let db;
   try {
     db = sqlite3(KG_SQLITE_PATH);
+    // SQLite leaves FK enforcement off per-connection — without this, an
+    // undeclared predicate inserts silently despite the schema FK.
+    db.pragma('foreign_keys = ON');
 
     // Guard: idx_unique_triple is required for INSERT OR IGNORE to dedupe re-runs.
     // Mirrors the precondition check in scripts/kg-import-cycle-state.js.
@@ -228,7 +242,7 @@ async function kgWrite(triples, sourceEpic, sourceAgent) {
 async function kgSupersede(subject, predicate, priorObject, newObject, sourceEpic, sourceAgent) {
   let sqlite3;
   try {
-    sqlite3 = require('better-sqlite3');
+    sqlite3 = requireCjs('better-sqlite3');
   } catch {
     throw new Error('better-sqlite3 not available — cannot write KG triples');
   }
@@ -241,6 +255,8 @@ async function kgSupersede(subject, predicate, priorObject, newObject, sourceEpi
       throw err;
     }
     db = sqlite3(KG_SQLITE_PATH);
+    // FK enforcement is per-connection in SQLite; see kgWrite above.
+    db.pragma('foreign_keys = ON');
 
     const hasUniqueIdx = db
       .prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_unique_triple'")
@@ -270,9 +286,12 @@ async function kgSupersede(subject, predicate, priorObject, newObject, sourceEpi
     const writeAll = db.transaction(() => {
       const now = new Date().toISOString();
       updated = updatePrior.run(now, subject, predicate, priorObject).changes;
-      if (updated > 0) {
-        insertSuperseded.run(subject, 'superseded', `${priorObject}->${newObject}`, now, sourceEpic, sourceAgent);
-      }
+      // The provenance edge is inserted unconditionally — parity with
+      // emit_superseded in hive/lib/kg_emit.py and the kg-emit.md contract
+      // ("inserts exactly one superseded provenance edge"). The prior triple
+      // may legitimately be absent (first supersession of a spec that was
+      // never KG-recorded); the edge must still land.
+      insertSuperseded.run(subject, 'superseded', `${priorObject}->${newObject}`, now, sourceEpic, sourceAgent);
     });
 
     writeAll();
@@ -295,4 +314,4 @@ async function runCompile(memoriesBase) {
   console.log(`[session-end] compile() triggered for ${memoriesBase}`);
 }
 
-module.exports = { runSessionEnd, kgWrite, kgSupersede };
+export { runSessionEnd, kgWrite, kgSupersede };

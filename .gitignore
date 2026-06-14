@@ -218,8 +218,16 @@ hive/lib/task-tracking-dispatch/.pHive-test/
 !.pHive/epics/multica-insight-capture/**
 !.pHive/epics/multica-plugin-ui/
 !.pHive/epics/multica-plugin-ui/**
+!.pHive/epics/squad-leader-status-flip/
+!.pHive/epics/squad-leader-status-flip/**
+!.pHive/epics/state-dir-resolver/
+!.pHive/epics/state-dir-resolver/**
 hive/lib/.pHive/
 # Node + tsx runtime cache dirs created by vitest runs under cc-workflows
 # substrate dispatches. Stay out of commits.
 node-compile-cache/
 tsx-*/
+!.pHive/epics/kg-repair-activation/
+!.pHive/epics/kg-repair-activation/**
+!.pHive/triage/
+!.pHive/triage/queue.yaml

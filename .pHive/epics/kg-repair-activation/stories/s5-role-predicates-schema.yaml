@@ -1,0 +1,70 @@
+id: s5-role-predicates-schema
+epic: kg-repair-activation
+tracker_id: "214d20e1-7660-449a-8ad5-e15698fe7609"
+tracker_url: ""
+tracker_number: "PLU-89"
+title: "Add validated/tested/implemented predicates to schema"
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
+complexity: medium
+methodology: classic
+depends_on: ["s3-phase-lifecycle-wire", "s4-superseded-callers-wire"]
+
+description: |
+  Add three new declared predicates — validated (reviewer), tested (tester), implemented (developer) — to hive/references/knowledge-graph-schema.md and seed them in the predicates table via kg_bootstrap. Update meta-optimize step-02c-kg-signal.md consumer query to include the new predicates (per grill P1 — contract change, not side-effect risk). No agent emits yet — s6/s7/s8 own those.
+
+acceptance_criteria:
+  - "Given hive/references/knowledge-graph-schema.md, when the predicates list is read, then validated, tested, and implemented are declared with one-line semantic descriptions."
+  - "Given an existing kg.sqlite, when the bootstrap migration runs, then the three new predicates are inserted into the predicates table (idempotent)."
+  - "Given meta-optimize step-02c-kg-signal.md, when it reads the KG, then its consumer query includes validated, tested, implemented alongside existing predicates."
+  - "Given a manual emit via kg_emit_cli with predicate=validated, when FK enforcement is on (b2), then the INSERT succeeds."
+
+steps:
+  - id: research
+    description: Explore the codebase for relevant patterns, files, and constraints
+    agent: researcher
+  - id: implement
+    description: Implement the story according to spec and research findings
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Write tests covering acceptance criteria and verify they pass
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review implementation and tests for correctness and convention compliance
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+files_to_modify:
+  - file: hive/references/knowledge-graph-schema.md
+    change: Add 3 new predicates + semantic descriptions
+  - file: hive/lib/kg_bootstrap.py
+    change: Seed 3 new predicates idempotently
+  - file: hive/workflows/steps/meta-team-cycle/step-02c-kg-signal.md
+    change: Expand consumer predicate set
+  - file: tests/test_kg_role_predicates.py
+    change: Test emit succeeds for each
+
+metric:
+  applies: true
+  name: kg.declared_predicates
+  direction: up
+  unit: predicates
+  baseline: 9
+  target: 13
+  window: story-integrate
+  source:
+    kind: sql
+    ref: "SELECT COUNT(*) FROM predicates"
+  verify_at: integrate
+  owner: reviewer
+
+cross_cutting:
+  - concern: versioning
+    action: "Schema + consumer query changes are consumer-visible → minor bump (additive)"

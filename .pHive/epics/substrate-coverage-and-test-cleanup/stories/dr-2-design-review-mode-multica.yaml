@@ -1,7 +1,9 @@
 id: dr-2-design-review-mode-multica
 epic: substrate-coverage-and-test-cleanup
 title: Create design-review-mode-multica atom preserving the 4-step workflow.yaml model with 4 agent() calls
-status: completed
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
 complexity: medium
 methodology: classic
 depends_on:

@@ -1,0 +1,23 @@
+step: multica-run
+story: "sdr-7-dag-executor-runstate-relocation"
+epic: "state-dir-resolver"
+agent: "developer"
+status: passed
+completion_kind: "code-push"
+artifacts_committed: false
+episode_terminal: true
+requires_code_push_sha: true
+code_push_sha: null
+terminal_by_dialect: false
+started_at: "2026-06-10T20:14:23Z"
+completed_at: "2026-06-10T20:22:51Z"
+artifacts:
+  - "../../../Users/don/.claude/worktrees/state-dir-resolver/.pHive/episodes/state-dir-resolver/sdr-7-dag-executor-runstate-relocation/multica-run.messages.jsonl"
+multica:
+  issue_id: "PLU-254"
+  issue_uuid: "e140bc12-3294-499a-9c29-62efce272133"
+  task_id: "01941589-ccf7-40c7-a4cd-3561d3cb5804"
+  agent_id: "d9946f9a-2747-49d4-b967-2590ffb5be43"
+  work_dir: "/Users/don/multica_workspaces/21c6d282-d6b4-4b25-8d0d-a85e96038416/01941589/workdir"
+  attempts: 1
+notes: ""

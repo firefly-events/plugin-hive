@@ -10,6 +10,6 @@ would fail with "Could not find" because it resolves to
 `hive/lib/hive/lib/task-tracking-dispatch/test/...`. The correct form is the relative
 path from the package.json dir — `npx tsx --test task-tracking-dispatch/test/...` —
 which is what `hive/lib/package.json` `test:contract` actually uses today. When a
-review criterion says "run npm test from <subdir>", actually `cd <subdir> && npm test`
+review criterion says "run npm test from `<subdir>`", actually `cd <subdir> && npm test`
 and check the exit code — passing tests when invoked manually from repo root do not
 prove the npm wiring works.

@@ -1,0 +1,70 @@
+id: s4-superseded-callers-wire
+epic: kg-repair-activation
+tracker_id: "c9cd3a3e-ea0c-4b31-b121-5ae3fd3e1e9b"
+tracker_url: ""
+tracker_number: "PLU-88"
+title: "Wire superseded emits at documented-only callsites"
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
+complexity: medium
+methodology: classic
+depends_on: ["b2-fk-enforcement-audit"]
+
+description: |
+  kg_emit_cli supports --mode supersede + kg_emit.py emit_superseded is implemented, but no live callers invoke them outside of plan/SKILL.md:326 (documented, but does the running skill actually fire it?). Confirm callsites:
+  (1) skills/plan/SKILL.md step 13 supersede on story-overwrite
+  (2) hive/workflows/steps/meta-team-cycle/step-03-proposal.md grouped-proposal replacement
+  (3) hive/lib/session-end.js memory-replacement (if applicable)
+  For each: verify the supersede emit actually fires under representative conditions; if it doesn't, fix the wiring. Add tests.
+
+acceptance_criteria:
+  - "Given /plan re-runs against an epic with existing story YAMLs, when a story is overwritten, then a superseded triple is written with subject=<story-id>, predicate=story-spec, valid_until set on the prior triple (per kg_emit_cli supersede contract)."
+  - "Given the meta-team-cycle step-03-proposal grouped-proposal path executes, when a prior proposal is replaced, then a superseded triple is written with predicate=proposal."
+  - "Given the post-merge audit, when SELECT COUNT(*) FROM triples WHERE predicate='superseded', then count > 0 (currently 0)."
+  - "Given each callsite, when a regression test runs through the supersede flow, then the test asserts the new triple is present AND the prior triple has valid_until set."
+
+steps:
+  - id: research
+    description: Explore the codebase for relevant patterns, files, and constraints
+    agent: researcher
+  - id: implement
+    description: Implement the story according to spec and research findings
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Write tests covering acceptance criteria and verify they pass
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review implementation and tests for correctness and convention compliance
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+files_to_modify:
+  - file: skills/plan/SKILL.md
+    change: Verify step 13 supersede emit fires in implementation (it is documented; confirm execution code path actually calls kg_emit_cli)
+  - file: hive/workflows/steps/meta-team-cycle/step-03-proposal.md
+    change: Verify supersede emit fires
+  - file: hive/lib/session-end.js
+    change: Audit memory-replacement path for supersede emit; wire if missing
+  - file: tests/test_supersede_emits.py
+    change: New tests for each callsite
+
+metric:
+  applies: true
+  name: kg.superseded_triples
+  direction: up
+  unit: triples
+  baseline: 0
+  target: 5
+  window: epic-merge-plus-30-days
+  source:
+    kind: sql
+    ref: "SELECT COUNT(*) FROM triples WHERE predicate='superseded'"
+  verify_at: epic-merge-plus-30-days
+  owner: maintainer

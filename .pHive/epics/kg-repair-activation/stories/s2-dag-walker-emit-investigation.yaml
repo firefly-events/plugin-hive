@@ -1,0 +1,62 @@
+id: s2-dag-walker-emit-investigation
+epic: kg-repair-activation
+tracker_id: "5fafd703-d063-48ce-9d13-a72a3691dc95"
+tracker_url: ""
+tracker_number: "PLU-86"
+title: "Investigate where DAG walker KG emits actually land"
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
+complexity: medium
+methodology: classic
+depends_on: ["s1-kg-stats"]
+
+description: |
+  Per grill finding H2: DAG walker (walker.py:944,954,968,1199,1204) emits phase_blocked + phase_failed but audited DB has only 1 phase_blocked triple from /plan, not from walker. Three possible causes: (a) same DB, just rare; (b) different DB path; (c) silently dropped (FK off, knob off, missing-sqlite swallow). Use /hive:kg-stats from s1 + manual queries to determine which. Write a findings doc; if (b) or (c), this story scopes a fix path (sequenced into s3-phase-lifecycle-wire as blocker if non-trivial).
+
+acceptance_criteria:
+  - "Given the DAG walker emit callsites at walker.py:944,954,968,1199,1204 are instrumented (temporary print or log line), when a representative DAG run executes (any /execute call), then we observe exactly which sqlite path and predicate values are written and whether INSERT succeeds."
+  - "Given the investigation completes, when findings are written to .pHive/epics/kg-repair-activation/docs/h2-investigation.md, then the doc names cause (a/b/c) + evidence (log lines, SELECT outputs) + recommended fix for s3 to consume."
+  - "Given cause (b) different-DB: docs recommend consolidation approach. Given (c) silently dropped: docs name root cause (FK / knob / swallow) and bounded fix scope."
+  - "Given cause (a) same-DB-just-rare: docs confirm s3 phase-lifecycle wiring is additive-only and recommend no extra scope."
+
+steps:
+  - id: research
+    description: Explore the codebase for relevant patterns, files, and constraints
+    agent: researcher
+  - id: implement
+    description: Implement the story according to spec and research findings
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Write tests covering acceptance criteria and verify they pass
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review implementation and tests for correctness and convention compliance
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+files_to_modify:
+  - file: hive/lib/dag_executor/executor/walker.py
+    change: Temporary instrumentation only — revert before merge
+  - file: .pHive/epics/kg-repair-activation/docs/h2-investigation.md
+    change: New findings doc
+
+metric:
+  applies: true
+  name: h2.investigation_resolved
+  direction: up
+  unit: boolean
+  baseline: 0
+  target: 1
+  window: story-integrate
+  source:
+    kind: manual
+    ref: "findings doc reviewed by maintainer"
+  verify_at: integrate
+  owner: reviewer

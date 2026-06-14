@@ -1,0 +1,95 @@
+id: sls-2-apply-squad-instructions
+epic: squad-leader-status-flip
+title: Apply the terminal contract to planning-team-squad squad.instructions
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
+tracker_id: plugin-hive/PLU-314
+tracker_url: http://localhost:3000/plugin-hive/issues/314
+complexity: low
+methodology: tdd
+depends_on: [sls-1-terminal-contract-doc]
+
+description: |
+  Append the terminal-contract section (from
+  hive/references/squad-leader-terminal-contract.md, sls-1) to the live
+  `planning-team-squad` squad.instructions in Multica workspace
+  21c6d282-d6b4-4b25-8d0d-a85e96038416, via
+  `multica squad update <squad-id> --instructions ...` (preserve existing
+  instructions content — append, don't replace).
+
+  Verification follows the PLU-293 spike pattern: create a throwaway probe
+  issue assigned to the squad whose brief asks the leader to (a) echo a
+  TERMINAL-ACK marker proving it read the contract section, and (b) execute the
+  protocol — meaning the probe issue itself must end in status `done` with a
+  final summary comment, flipped by the leader, not by the operator.
+
+  Document the re-apply procedure (one CLI command + where the canonical text
+  lives) inside the contract doc's "Applying to a squad" section so future
+  squad reconfigs can restore the contract.
+
+acceptance_criteria:
+  - "Given `multica squad get planning-team-squad`, when instructions are read, then they contain the terminal-contract section matching the canonical doc"
+  - "Given a probe issue assigned to planning-team-squad, when the leader run completes, then the probe issue status is `done` without operator intervention and the final comment includes the TERMINAL-ACK marker"
+  - "Given the canonical doc, when read, then an 'Applying to a squad' section documents the exact re-apply CLI command"
+  - "Given `multica issue list --status in_progress` after the probe run, then the probe issue does not appear"
+
+steps:
+  - id: test-spec
+    description: Define the probe-issue brief + expected observables (TERMINAL-ACK marker, final status done, summary comment) BEFORE applying instructions — this is the failing test
+    agent: tester
+  - id: implement
+    description: Append contract section to squad.instructions via multica squad update; run the probe
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Verify probe observables; confirm existing instructions content was preserved
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit the doc's Applying-to-a-squad section + probe transcript notes to the branch
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/.claude/worktrees/substrate-coverage
+  key_files:
+    - path: hive/references/squad-leader-terminal-contract.md
+      purpose: Canonical contract text to append (produced by sls-1)
+  tech_stack:
+    multica_cli: "squad update / issue create / issue comment list / issue get"
+
+cross_cutting:
+  - concern: documentation
+    action: "Add 'Applying to a squad' re-apply procedure to the contract doc"
+  - concern: versioning
+    action: "Live-squad config change, not repo surface — no independent bump beyond epic decision"
+
+metric:
+  applies: true
+  name: stale_in_progress_squad_parents
+  direction: down
+  unit: count
+  baseline: 5
+  target: 0
+  window: next-3-squad-orchestration-runs
+  source:
+    kind: manual
+    ref: "multica issue list --status in_progress — count squad-assigned parents whose children are all terminal (cross-check with scripts/multica-sweep-stale-parents.py report mode once sls-3 lands)"
+  verify_at: 2026-06-16T00:00:00Z
+  owner: reviewer
+
+risks:
+  - severity: medium
+    description: Leader honors the echo but skips the self-flip (partial compliance)
+    mitigation: Probe acceptance checks final STATUS, not just the marker; sweep (sls-3) is the standing backstop
+  - severity: low
+    description: squad update --instructions replaces instead of appends, losing existing doctrine
+    mitigation: Read current instructions first, concatenate, write back; review step diffs before/after
+
+references:
+  - path: .pHive/proposals/squad-doctrine-and-dynamic-composition.md
+    relevant_excerpt: |
+      SPIKE PASSED (PLU-293): leader echoed DOCTRINE-ACK marker that lived only
+      in squad.instructions — squad.instructions is a proven injection surface
+      for leader-binding doctrine.

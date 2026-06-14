@@ -93,3 +93,5 @@ The config is re-runnable. Disk wins when generated or checked again. Updates sh
 ## Forward link
 
 Future S3 initialization details for squad bootstrap belong in [skills/multica-init/SKILL.md](../../skills/multica-init/SKILL.md).
+
+How a squad-leader run must terminate (children-terminal check, summary comment, self status flip) is defined in [squad-leader-terminal-contract.md](squad-leader-terminal-contract.md).

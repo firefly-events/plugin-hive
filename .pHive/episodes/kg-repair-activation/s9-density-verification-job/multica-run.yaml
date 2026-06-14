@@ -1,0 +1,23 @@
+step: multica-run
+story: "s9-density-verification-job"
+epic: "kg-repair-activation"
+agent: "developer"
+status: passed
+completion_kind: "code-push"
+artifacts_committed: false
+episode_terminal: true
+requires_code_push_sha: true
+code_push_sha: null
+terminal_by_dialect: false
+started_at: "2026-06-10T06:29:59Z"
+completed_at: "2026-06-10T06:34:15Z"
+artifacts:
+  - ".pHive/episodes/kg-repair-activation/s9-density-verification-job/multica-run.messages.jsonl"
+multica:
+  issue_id: "PLU-93"
+  issue_uuid: "ea04c21c-a772-43c3-846d-0bb63447507b"
+  task_id: "a335d454-39c9-4e3f-83a1-7e38c3329a20"
+  agent_id: "d9946f9a-2747-49d4-b967-2590ffb5be43"
+  work_dir: "/Users/don/multica_workspaces/21c6d282-d6b4-4b25-8d0d-a85e96038416/a335d454/workdir"
+  attempts: 1
+notes: ""

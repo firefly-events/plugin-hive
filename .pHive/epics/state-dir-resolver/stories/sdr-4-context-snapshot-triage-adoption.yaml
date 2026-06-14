@@ -1,0 +1,76 @@
+id: sdr-4-context-snapshot-triage-adoption
+epic: state-dir-resolver
+title: Adopt state-dir resolver for context snapshot and triage
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
+complexity: medium
+methodology: classic
+depends_on: [sdr-1-resolver-contract-conformance-fixture]
+tracker_id: "PLU-251"
+tracker_uuid: "fbea0a17-e9be-45fb-a4a3-0aa3b285e393"
+tracker_url: "http://localhost:8080/issues/fbea0a17-e9be-45fb-a4a3-0aa3b285e393"
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: |
+  Relocate the context snapshot and triage skill surfaces so generated snapshots
+  and triage queue output use configured `paths.state_dir`. This slice covers the
+  runtime skill entry points only; broader executable prose conversion is deferred
+  to sdr-10.
+acceptance_criteria:
+  - "Given a custom `paths.state_dir`, when context snapshot composition runs, then snapshot state is read and written under the configured state dir."
+  - "Given a custom `paths.state_dir`, when the context-snapshot skill runner executes, then it passes the configured state dir rather than `join(REPO_ROOT, '.pHive')`."
+  - "Given a custom `paths.state_dir`, when triage queue output is written, then it lands under `<state_dir>/triage`."
+  - "Given state-dir configuration is unset, when snapshot and triage run, then default `.pHive` behavior remains unchanged."
+  - "Given this is a bounded slice, when the diff is reviewed, then task-tracking, release, handoff, scenarios, DAG executor, archival, semantic guard, and prose conversion remain untouched."
+metric:
+  applies: false
+  justification: "This story verifies correct snapshot and triage file placement under the resolver; it has no falsifiable trend metric beyond relocated-state tests."
+steps:
+  - id: research
+    description: Inspect existing snapshot and triage runner tests and identify the smallest relocated-state coverage points.
+    agent: researcher
+  - id: implement
+    description: Adopt `resolveStateDir` in context snapshot and triage runtime paths.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Add skill-runner integration tests for custom state dir and default `.pHive`.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify only runtime snapshot/triage paths changed and executable prose is left to sdr-10.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit the snapshot/triage adoption slice to `feat/state-dir-resolver`.
+    agent: developer
+    depends_on: [review]
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/config.js
+      purpose: Provides the Node resolver established by sdr-1.
+    - path: hive/lib/context-snapshot.mjs
+      purpose: Snapshot path composition must become resolver-driven.
+    - path: skills/context-snapshot/run.mjs
+      purpose: Skill runner currently passes default `.pHive`.
+    - path: skills/triage/run.mjs
+      purpose: Triage runner currently defaults queue output to `.pHive/triage`.
+files_to_modify:
+  - file: hive/lib/context-snapshot.mjs
+    change: Adopt Node resolver.
+  - file: skills/context-snapshot/run.mjs
+    change: Replace `join(REPO_ROOT, ".pHive")` with resolved state dir.
+  - file: skills/triage/run.mjs
+    change: Replace `.pHive/triage` default with resolved state dir.
+  - file: tests
+    change: Add relocated-state tests for snapshot composition and triage queue path.
+cross_cutting:
+  - concern: state-dir-relocation
+    action: "Route snapshot and triage runtime outputs through the configured state dir while preserving default `.pHive`."
+references:
+  - path: .pHive/epics/state-dir-resolver/docs/design-decisions.md
+    relevant_excerpt: "Q4 limits prose conversion to executable instructions, so this runtime slice should not sweep illustrative docs."
+  - path: .pHive/epics/state-dir-resolver/docs/vertical-plan.md
+    relevant_excerpt: "Step 4 makes context snapshot output and triage queue write under configured `paths.state_dir`."

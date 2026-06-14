@@ -1,7 +1,9 @@
 id: t-3-test-mode-cc-workflows
 epic: substrate-coverage-and-test-cleanup
 title: Create test-mode-cc-workflows atom (per-scenario dispatch) + test-dispatch router
-status: completed
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
 complexity: medium
 methodology: classic
 depends_on:

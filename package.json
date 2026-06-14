@@ -3,7 +3,7 @@
   "private": true,
   "description": "Root dependency manifest for Hive's named Node bridge surfaces.",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19"
   },
   "dependencies": {
     "@ai-hero/sandcastle": "0.5.10",

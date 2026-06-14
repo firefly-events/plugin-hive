@@ -1,7 +1,9 @@
 id: r-2-review-mode-multica
 epic: substrate-coverage-and-test-cleanup
 title: Create review-mode-multica atom — thin wrapper for solo reviewer dispatch
-status: completed
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
 complexity: low
 methodology: classic
 depends_on:
