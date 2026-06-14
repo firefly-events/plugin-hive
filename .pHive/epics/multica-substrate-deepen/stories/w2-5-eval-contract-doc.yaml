@@ -1,0 +1,75 @@
+id: w2-5-eval-contract-doc
+epic: multica-substrate-deepen
+title: Author hive/references/squad-evaluation-contract.md (substrate-signal contract)
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+description: "Author the squad-evaluation contract documenting how Hive consumes a\n\
+  squad-leader evaluation as a SUBSTRATE SIGNAL (not an authority surface).\n\n\
+  Contract content:\n\
+  - Authority model: substrate signal, NOT authority surface. Hive consumes the\n\
+    evaluation as one input among many. User retains merge authority. The\n\
+    evaluation does NOT gate merge.\n\
+  - Firing / read moment: at /execute integrate-step completion — after dispatch\n\
+    reaches terminal (completed) AND `git push` succeeds AND the PR opens. Read,\n\
+    NOT at merge time.\n\
+  - Read path: /execute (execute-mode-multica) calls the dispatch helper\n\
+    readSquadEvaluation(issueId) (W2.6), which calls adapter.getSquadActivity\n\
+    (W2.4), which reads GET /api/issues/{id}/timeline filtered to\n\
+    action=='squad_leader_evaluated'.\n\
+  - Data shape (corrected vs original PLU-105): the squad eval is an activity_log\n\
+    entry, NOT a free-text 'evaluation'. Shape:\n\
+      { actor_type, actor_id, outcome, reason, created_at }\n\
+    where outcome is the fixed enum action | no_action | failed and reason is an\n\
+    optional short string. Document the enum explicitly.\n\
+  - Storage: the read result is stored in the episode marker under an optional\n\
+    squad_evaluation field for downstream visibility (W2.7).\n\
+  - Best-effort: a null result or a read error must NOT fail /execute.\n\
+  - Posture rationale per CONTEXT.md North Star: composable substrate,\n\
+    user-directed — squad evaluation does NOT gate merge.\n\
+  - Explicitly reject the alternative authority-gate-on-merge interpretation.\n"
+acceptance_criteria:
+- Doc exists at hive/references/squad-evaluation-contract.md
+- Doc explicitly states 'substrate signal, not authority surface'
+- Doc specifies the read moment — post dispatch-terminal, post `git push`, post-PR-open, pre-merge
+- Doc specifies the corrected data shape { actor_type, actor_id, outcome, reason, created_at } with outcome enum action|no_action|failed
+- Doc states the read is best-effort (null/error does not fail /execute)
+- Doc rejects the authority-gate-on-merge interpretation explicitly
+- Doc notes the WRITE/status-flip side is owned by the squad-leader-status-flip epic, not this contract
+- Architect + peer-validator both review for posture compliance
+steps:
+- id: implement
+  description: Write contract doc per corrected shape + posture
+  agent: technical-writer
+- id: review
+  description: Architect + peer-validator review for posture + correctness + shape accuracy
+  agent: peer-validator
+  depends_on:
+  - implement
+- id: integrate
+  description: Commit on feat/multica-substrate-deepen
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/references/
+    purpose: Destination for the contract doc
+  - path: .pHive/CONTEXT.md
+    purpose: North Star posture (composable substrate, user-directed) the contract must cite
+references:
+- path: .pHive/epics/multica-substrate-deepen/stories/w2-4-adapter-abi-1-1.yaml
+  relevant_excerpt: "getSquadActivity returns { actor_type, actor_id, outcome, reason, created_at } or null; outcome enum action|no_action|failed; timeline read path"
+cross_cutting:
+- concern: documentation
+  action: Contract doc satisfies the documentation concern
+risks:
+- severity: low
+  description: Contract drifts from the W2.4 shape if authored in isolation
+  mitigation: Author after / alongside W2.4; cite the adapter return shape verbatim
+metric:
+  applies: false
+  justification: Contract doc; no measurable consumer behavior. W2.7 carries the wiring metric.
+tracker_id: plugin-hive/PLU-105

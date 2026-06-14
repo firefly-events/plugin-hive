@@ -1,0 +1,106 @@
+id: w2-4-adapter-abi-1-1
+epic: multica-substrate-deepen
+title: Adapter ABI 1.1.0 — add getSquadActivity (timeline read)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+description: "Bump the Multica adapter ABI from 1.0.0 -> 1.1.0 and add ONE new\n\
+  read method: getSquadActivity(id).\n\n\
+  W0.2 read-path finding (settled empirically 2026-06-14, the never-run spike):\n\
+  squad-leader evaluations are NOT exposed on a dedicated squad endpoint and\n\
+  are NOT on the issue GET response. They land in the unified activity_log and\n\
+  are read back via the issue timeline:\n\n\
+  - READ:  GET /api/issues/{id}/timeline  (handler ListTimeline,\n\
+    router.go:396). Returns { entries: [...], next_cursor, ... }. Each entry\n\
+    has type ('activity'|'comment'). Squad evals are activity entries with\n\
+    action == 'squad_leader_evaluated', actor_type/actor_id, created_at, and a\n\
+    details JSON blob carrying { outcome, reason }.\n\
+  - The WRITE side (POST /api/issues/{id}/squad-evaluated, what\n\
+    `multica squad activity <id> <outcome>` calls) is OUT OF SCOPE here — read\n\
+    only. The status-flip/write path belongs to the squad-leader-status-flip\n\
+    epic (sls-1..3 / PLU-313-315).\n\n\
+  getSquadActivity(id) resolves the issue UUID (existing resolveIssueUuid),\n\
+  GETs the timeline, filters to action=='squad_leader_evaluated', and returns\n\
+  the MOST RECENT match as:\n\
+    { actor_type, actor_id, outcome: 'action'|'no_action'|'failed',\n\
+      reason: <string|null>, created_at }\n\
+  or null when no eval activity exists.\n\n\
+  NOTE: outcome is a fixed enum (action|no_action|failed), NOT free text.\n\
+  The original PLU-104 spec assumed { leader, evaluation:<free text>, timestamp }\n\
+  and a dedicated squad endpoint — both wrong; corrected here.\n\n\
+  NOTE: updateIssueStatus is deliberately NOT added (read-side-only decision\n\
+  2026-06-14). The adapter already transitions to 'in_review' via\n\
+  updateStory({status:'in_review'}) inside markNeedsRework (index.ts:389) if a\n\
+  write is ever needed.\n\n\
+  capabilities() bumps to abi_version '1.1.0' and adds\n\
+  supports_squad_activity: true.\n"
+acceptance_criteria:
+- Adapter exports getSquadActivity (read-only; no updateIssueStatus)
+- getSquadActivity GETs /api/issues/{id}/timeline and filters action=='squad_leader_evaluated'
+- Returns { actor_type, actor_id, outcome, reason, created_at } for the most-recent eval, or null
+- outcome is validated against the enum action|no_action|failed
+- Method uses existing resolveIssueUuid + multicaFetch + AdapterError/error-mapping conventions
+- "capabilities() returns abi_version: '1.1.0' and supports_squad_activity: true"
+- Tests cover happy path, no-eval (empty timeline -> null), and auth failure
+- friction-notes.md updated with the ABI 1.1.0 delta + any friction found
+- Adapter README documents getSquadActivity + the timeline read path
+steps:
+- id: research
+  description: Read W0.2 timeline finding (in this story) + current adapter shape (index.ts getStory/markNeedsRework/resolveIssueUuid)
+  agent: researcher
+- id: implement
+  description: Add getSquadActivity timeline read + ABI bump + capabilities update
+  agent: backend-developer
+  depends_on:
+  - research
+- id: test
+  description: Test happy + no-eval (null) + auth-failure paths
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Reviewer checks ABI bump consistency, enum validation, error handling, read-only scope (no write method leaked in)
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit on feat/multica-substrate-deepen
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/adapters/multica/index.ts
+    purpose: "Adapter to extend — capabilities (line ~294), resolveIssueUuid, multicaFetch, markNeedsRework (~389), dispatch handler map (~399)"
+  - path: hive/adapters/multica/README.md
+    purpose: Document new method
+  - path: hive/adapters/multica/friction-notes.md
+    purpose: Record ABI 1.1.0 delta
+references:
+- path: ~/Code/spikes/multica/server/cmd/server/router.go
+  relevant_excerpt: "line 396: r.Get(\"/timeline\", h.ListTimeline); line 462: r.Post(\"/api/issues/{id}/squad-evaluated\", h.RecordSquadLeaderEvaluation)"
+- path: ~/Code/spikes/multica/server/internal/handler/activity.go
+  relevant_excerpt: "TimelineEntry { type, action, actor_type, actor_id, created_at, details }; squad eval action == 'squad_leader_evaluated' with details {outcome, reason}"
+cross_cutting:
+- concern: documentation
+  action: Update adapter README + friction-notes for ABI 1.1.0
+risks:
+- severity: low
+  description: Timeline endpoint is cursor-paginated; latest eval may not be on first page
+  mitigation: Request newest-first / sufficient page size; document the assumption; test asserts most-recent selection
+metric:
+  applies: true
+  name: multica.adapter_abi_version
+  direction: up
+  unit: version
+  baseline: '1.0.0'
+  target: '1.1.0'
+  window: post-story-integrate
+  source:
+    kind: manual
+    ref: node -e "import('./hive/adapters/multica/index.ts')" via dispatch capabilities -> abi_version
+  verify_at: review
+  owner: reviewer
+tracker_id: plugin-hive/PLU-104

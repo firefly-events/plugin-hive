@@ -69,6 +69,25 @@ stories:
   complexity: medium
   depends_on:
   - w2-2-squads-yaml
+- id: w2-4-adapter-abi-1-1
+  title: Adapter ABI 1.1.0 — add getSquadActivity (timeline read)
+  complexity: medium
+  depends_on: []
+- id: w2-5-eval-contract-doc
+  title: Author hive/references/squad-evaluation-contract.md (substrate-signal contract)
+  complexity: low
+  depends_on: []
+- id: w2-6-dispatch-read-squad-eval
+  title: Add readSquadEvaluation helper to multica-story-dispatch
+  complexity: medium
+  depends_on:
+  - w2-4-adapter-abi-1-1
+- id: w2-7-execute-mode-integrate-eval
+  title: Wire squad-evaluation read into execute-mode-multica episode marker
+  complexity: medium
+  depends_on:
+  - w2-5-eval-contract-doc
+  - w2-6-dispatch-read-squad-eval
 - id: w3-1-autopilot-schema-doc
   title: Author hive/references/multica-autopilots-schema.md
   complexity: low

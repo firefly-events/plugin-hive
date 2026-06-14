@@ -1,0 +1,78 @@
+id: w2-6-dispatch-read-squad-eval
+epic: multica-substrate-deepen
+title: Add readSquadEvaluation helper to multica-story-dispatch
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- w2-4-adapter-abi-1-1
+description: "Add a readSquadEvaluation(issueId, options) helper to\n\
+  hive/lib/multica-story-dispatch/ that:\n\n\
+  1. Calls adapter.getSquadActivity(issueId) (W2.4) to fetch the most-recent\n\
+     squad-leader evaluation from the issue timeline.\n\
+  2. Returns { evaluation: <obj|null> } where evaluation is the W2.4 shape\n\
+     { actor_type, actor_id, outcome, reason, created_at } or null when no eval\n\
+     activity exists.\n\n\
+  READ-ONLY (decision 2026-06-14): this helper does NOT call updateIssueStatus\n\
+  and does NOT transition the issue to 'in_review'. The original PLU-106\n\
+  recordSquadEvaluation (write + read) is descoped to read-only here; the status\n\
+  write is owned by the squad-leader-status-flip epic. Helper renamed\n\
+  recordSquadEvaluation -> readSquadEvaluation to reflect read-only semantics.\n\n\
+  Used by W2.7's execute integrate-step extension. Handles the same error-mapping\n\
+  conventions as serializeStoryBrief (TRANSPORT, AUTH_FAILURE wraps), and surfaces\n\
+  auth failure with the /hive:multica-init hint per existing convention.\n\n\
+  Best-effort contract: callers treat a thrown error as 'no evaluation' — the\n\
+  helper may either return { evaluation: null } on a soft miss or throw on hard\n\
+  transport/auth failure; W2.7 wraps the call so neither fails /execute.\n"
+acceptance_criteria:
+- readSquadEvaluation exported from hive/lib/multica-story-dispatch/index.mjs
+- Function calls adapter.getSquadActivity(issueId) and returns { evaluation: <obj|null> }
+- Does NOT call updateIssueStatus / does NOT write issue status (read-only)
+- Error mapping matches serializeStoryBrief conventions (TRANSPORT, AUTH_FAILURE)
+- Auth failure surfaces with the /hive:multica-init hint per existing convention
+- Tests cover happy path, no-eval (getSquadActivity -> null), and auth failure
+steps:
+- id: research
+  description: Read W2.4 getSquadActivity shape + W2.5 contract; read existing dispatch error-mapping (serializeStoryBrief) for call/wrap shape
+  agent: researcher
+- id: implement
+  description: Add readSquadEvaluation helper + wire error handling (read-only)
+  agent: backend-developer
+  depends_on:
+  - research
+- id: test
+  description: 3-path coverage (happy, null, auth fail)
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Reviewer checks error conventions, return shape, and that no write/status-flip leaked in
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit on feat/multica-substrate-deepen
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: hive/lib/multica-story-dispatch/index.mjs
+    purpose: "Module to extend — mirror serializeStoryBrief (line ~160) error-mapping; export new helper"
+  - path: hive/adapters/multica/index.ts
+    purpose: getSquadActivity provider (W2.4)
+references:
+- path: .pHive/epics/multica-substrate-deepen/stories/w2-4-adapter-abi-1-1.yaml
+  relevant_excerpt: "getSquadActivity(id) returns { actor_type, actor_id, outcome, reason, created_at } or null"
+cross_cutting:
+- concern: error-handling
+  action: Reuse TRANSPORT / AUTH_FAILURE wraps + multica-init hint per existing dispatch convention
+risks:
+- severity: low
+  description: Helper accidentally reintroduces a status write (scope creep into sls epic)
+  mitigation: Review AC explicitly asserts read-only; name is readSquadEvaluation
+metric:
+  applies: false
+  justification: Library helper; behavior is observable only through W2.7's episode-marker field. W2.7 carries the wiring metric.
+tracker_id: plugin-hive/PLU-106

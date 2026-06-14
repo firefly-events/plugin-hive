@@ -1,0 +1,96 @@
+id: w2-7-execute-mode-integrate-eval
+epic: multica-substrate-deepen
+title: Wire squad-evaluation read into execute-mode-multica episode marker
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+- w2-5-eval-contract-doc
+- w2-6-dispatch-read-squad-eval
+description: "Extend skills/hive/skills/execute-mode-multica/SKILL.md Step 3 (Episode\n\
+  marker per terminal) so that, conditional on squad presence in\n\
+  .pHive/multica/squads.yaml:\n\n\
+  1. After dispatch reaches terminal status (completed) AND `git push` succeeded\n\
+     AND the PR opened, call dispatch.readSquadEvaluation(issueId) (W2.6).\n\
+  2. Pass the returned evaluation into writeMulticaRunEpisode as a new optional\n\
+     opts field; the marker gains an optional squad_evaluation block carrying\n\
+     { actor_type, actor_id, outcome, reason, created_at } (or omitted/null).\n\
+  3. Best-effort: a null result OR a read error must NOT block /execute\n\
+     completion. Log a warning and continue.\n\n\
+  If .pHive/multica/squads.yaml is absent (consumer project has not adopted the\n\
+  squad layer), this step is a no-op — no read attempted, no marker field added.\n\n\
+  Touches: SKILL.md Step 3 prose (the writeMulticaRunEpisode call site ~line 113\n\
+  and Step 3 at ~line 304); episode-sync.mjs writeMulticaRunEpisode (line ~291)\n\
+  to accept + serialize the optional squad_evaluation block.\n\n\
+  This is the READ-side consumer only. The status-flip / squad-evaluated WRITE\n\
+  is owned by the squad-leader-status-flip epic and is out of scope.\n"
+acceptance_criteria:
+- execute-mode-multica Step 3 references readSquadEvaluation invocation, conditional on .pHive/multica/squads.yaml presence
+- writeMulticaRunEpisode accepts an optional squad_evaluation opt and serializes it into the marker when present
+- Episode marker schema extended with an optional squad_evaluation block { actor_type, actor_id, outcome, reason, created_at }
+- Squad eval read is best-effort — null result AND read errors do not fail /execute (warning logged, flow continues)
+- Absent .pHive/multica/squads.yaml => full no-op (no read, no marker field)
+- Smoke test — full /execute pass on a story dispatched to a squad shows squad_evaluation in the episode marker; a non-squad story omits it
+steps:
+- id: research
+  description: Read execute-mode-multica Step 3 + writeMulticaRunEpisode marker assembly (episode-sync.mjs) + W2.6 helper return shape
+  agent: researcher
+- id: implement
+  description: Update SKILL.md Step 3 prose; extend writeMulticaRunEpisode to accept+serialize optional squad_evaluation; gate on squads.yaml
+  agent: backend-developer
+  depends_on:
+  - research
+- id: test
+  description: Smoke test via dispatch of a trivial story to a squad (marker carries squad_evaluation) + non-squad story (omitted)
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: Architect + reviewer validate contract compliance (substrate-signal, best-effort, no-op-without-squads) + that no write/status-flip leaked in
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: Commit on feat/multica-substrate-deepen
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+  - path: skills/hive/skills/execute-mode-multica/SKILL.md
+    purpose: "Step 3 episode marker prose — writeMulticaRunEpisode call site (~113), Step 3 (~304)"
+  - path: hive/lib/multica-story-dispatch/episode-sync.mjs
+    purpose: "writeMulticaRunEpisode (~291) — extend opts + marker serialization"
+  - path: hive/lib/multica-story-dispatch/index.mjs
+    purpose: readSquadEvaluation helper (W2.6)
+  - path: .pHive/multica/squads.yaml
+    purpose: Presence gate for the conditional read
+references:
+- path: .pHive/epics/multica-substrate-deepen/stories/w2-5-eval-contract-doc.yaml
+  relevant_excerpt: "best-effort substrate signal; read at integrate-step post-push/post-PR-open; does not gate merge"
+- path: .pHive/epics/multica-substrate-deepen/stories/w2-6-dispatch-read-squad-eval.yaml
+  relevant_excerpt: "readSquadEvaluation(issueId) -> { evaluation: <obj|null> }"
+cross_cutting:
+- concern: documentation
+  action: Update execute-mode-multica SKILL.md Step 3 + episode marker schema notes
+- concern: error-handling
+  action: Best-effort wrap — warn-and-continue on null/error
+risks:
+- severity: medium
+  description: Read added on the hot path could slow or break /execute terminal handling
+  mitigation: Best-effort wrap; gated on squads.yaml; null/error never blocks; smoke test asserts non-blocking
+metric:
+  applies: true
+  name: multica.squad_evaluation_captured
+  direction: up
+  unit: bool
+  baseline: false
+  target: true
+  window: post-story-integrate
+  source:
+    kind: manual
+    ref: smoke /execute on a squad-dispatched story; assert squad_evaluation present in multica-run.yaml marker
+  verify_at: test
+  owner: tester
+tracker_id: plugin-hive/PLU-107
