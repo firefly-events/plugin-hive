@@ -235,6 +235,7 @@ export async function writeMulticaRunEpisode(opts) {
     identifier,
     terminal,
     messagesCaptureMax,
+    squad_evaluation,
   } = opts;
 
   const dir = path.join(hiveStateDir, 'episodes', epicHandle, storyId);
@@ -256,7 +257,7 @@ export async function writeMulticaRunEpisode(opts) {
   }
 
   const artifactPath = repoRelative(messagesPath);
-  const marker = [
+  const markerLines = [
     'step: multica-run',
     `story: ${yamlScalar(storyId)}`,
     `epic: ${yamlScalar(epicHandle)}`,
@@ -274,8 +275,21 @@ export async function writeMulticaRunEpisode(opts) {
     `  work_dir: ${yamlScalar(terminal?.work_dir ?? null)}`,
     `  attempts: ${Number.isFinite(terminal?.attempts) ? terminal.attempts : 1}`,
     `notes: ${yamlScalar(notes)}`,
-    '',
-  ].join('\n');
+  ];
+
+  if (squad_evaluation != null) {
+    markerLines.push(
+      'squad_evaluation:',
+      `  actor_type: ${yamlScalar(squad_evaluation.actor_type ?? null)}`,
+      `  actor_id: ${yamlScalar(squad_evaluation.actor_id ?? null)}`,
+      `  outcome: ${yamlScalar(squad_evaluation.outcome ?? null)}`,
+      `  reason: ${yamlScalar(squad_evaluation.reason ?? null)}`,
+      `  created_at: ${yamlScalar(squad_evaluation.created_at ?? null)}`,
+    );
+  }
+
+  markerLines.push('');
+  const marker = markerLines.join('\n');
 
   const jsonl = messages.map((message) => JSON.stringify(message)).join('\n');
   await fs.writeFile(markerPath, marker, 'utf8');
