@@ -2,7 +2,7 @@
 
 Implements the Hive task-tracking adapter ABI against Multica's REST API.
 
-- **ABI version:** `1.0.0`
+- **ABI version:** `1.1.0`
 - **Hierarchy:** workspace → issue, with parent issue links on create
 - **Supports parent link:** `true`
 - **Supported states:** `todo`, `in_progress`, `in_review`, `done`, `cancelled`
@@ -51,6 +51,8 @@ echo '{"method":"updateStory","params":{"id":"plugin-hive/PLU-4","status":"done"
 echo '{"method":"addComment","params":{"id":"plugin-hive/PLU-4","body":"Ready for review"}}' | ./index.ts
 
 echo '{"method":"getStory","params":{"id":"plugin-hive/PLU-4"}}' | ./index.ts
+
+echo '{"method":"getSquadActivity","params":{"id":"plugin-hive/PLU-4"}}' | ./index.ts
 ```
 
 Argv form for ad-hoc testing:
@@ -82,6 +84,36 @@ Example: `plugin-hive/PLU-4`. Multica mutations require the issue UUID, so the
 adapter resolves `PLU-4` to UUID via `GET /api/issues?workspace_id=<UUID>&identifier=PLU-4`
 and falls back to listing issues when that filter is unsupported. Resolved UUIDs
 are cached for the process lifetime.
+
+## getSquadActivity
+
+Reads the most recent squad-leader evaluation for an issue.
+
+```text
+method: "getSquadActivity"
+params: { id: "<workspace-slug>/PLU-N" }
+```
+
+Response (most recent eval found):
+
+```json
+{
+  "result": {
+    "actor_type": "agent",
+    "actor_id": "<uuid>",
+    "outcome": "action",
+    "reason": "Story meets acceptance criteria",
+    "created_at": "2026-06-10T12:00:00Z"
+  }
+}
+```
+
+Returns `null` when no evaluation exists. `outcome` is one of `action |
+no_action | failed` (validated by the adapter; unknown values throw `TRANSPORT`).
+
+Reads via `GET /api/issues/{uuid}/timeline?workspace_id={uuid}` and filters to
+`action == 'squad_leader_evaluated'` entries. The most recent by `created_at` is
+returned. Write-side (recording evaluations) is out of scope for this adapter.
 
 ## Debug
 

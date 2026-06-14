@@ -1,4 +1,4 @@
-// Integration tests for the Multica adapter — ABI 1.0.0
+// Integration tests for the Multica adapter — ABI 1.1.0
 //
 // Spawns the adapter as a child process, feeding JSON on stdin and asserting
 // JSON on stdout + exit code. Uses a mock HTTP server (node:http) on an
@@ -103,6 +103,44 @@ function defaultHandler(req: http.IncomingMessage, res: http.ServerResponse, bod
     return;
   }
 
+  // GET /api/issues/:uuid/timeline?workspace_id=... — squad activity
+  if (req.method === "GET" && url.includes(`/api/issues/${ISSUE_UUID}/timeline`)) {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        entries: [
+          {
+            type: "comment",
+            action: "created",
+            actor_type: "member",
+            actor_id: "member-old",
+            created_at: "2026-01-01T00:00:00Z",
+            details: {},
+          },
+          {
+            type: "activity",
+            action: "squad_leader_evaluated",
+            actor_type: "agent",
+            actor_id: "agent-uuid-abc",
+            created_at: "2026-06-10T12:00:00Z",
+            details: { outcome: "action", reason: "Story meets acceptance criteria" },
+          },
+          {
+            type: "activity",
+            action: "squad_leader_evaluated",
+            actor_type: "agent",
+            actor_id: "agent-uuid-xyz",
+            created_at: "2026-06-09T08:00:00Z",
+            details: { outcome: "no_action", reason: null },
+          },
+        ],
+        next_cursor: null,
+      }),
+    );
+    return;
+  }
+
+  // GET /api/issues/:uuid/timeline — GET /api/issues/:uuid/timeline (bare UUID path, no match above)
   // Fallback — 404
   res.writeHead(404, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ error: `No mock for ${req.method} ${url}` }));
@@ -337,6 +375,112 @@ describe("AC5: UNKNOWN_METHOD", () => {
       "UNKNOWN_METHOD",
       `Expected UNKNOWN_METHOD, got: ${parsed.error.code}`,
     );
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AC7: getSquadActivity — happy path (most recent eval returned)
+// ──────────────────────────────────────────────────────────────────────────────
+describe("AC7: getSquadActivity — happy path", () => {
+  it("returns most recent squad_leader_evaluated entry, exit 0", async () => {
+    const result = await runAdapter({
+      method: "getSquadActivity",
+      params: { id: "plugin-hive/PLU-1" },
+    });
+
+    assert.strictEqual(result.exitCode, 0, `Expected exit 0, got ${result.exitCode}. stderr: ${result.stderr}`);
+
+    const parsed = JSON.parse(result.stdout);
+    assert.ok(parsed.result, "Response must have 'result' key");
+    assert.strictEqual(parsed.result.actor_type, "agent");
+    assert.strictEqual(parsed.result.actor_id, "agent-uuid-abc");
+    assert.strictEqual(parsed.result.outcome, "action");
+    assert.strictEqual(parsed.result.reason, "Story meets acceptance criteria");
+    assert.strictEqual(parsed.result.created_at, "2026-06-10T12:00:00Z");
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AC8: getSquadActivity — empty timeline → null
+// ──────────────────────────────────────────────────────────────────────────────
+describe("AC8: getSquadActivity — no eval activity returns null", () => {
+  it("returns null when no squad_leader_evaluated entries exist, exit 0", async () => {
+    mockHandler = (req, res) => {
+      const url = req.url ?? "";
+      if (req.method === "GET" && url === "/api/workspaces") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify([{ id: WORKSPACE_UUID, slug: WORKSPACE_SLUG }]));
+        return;
+      }
+      if (req.method === "GET" && url.includes("/api/issues?workspace_id=") && url.includes("identifier=")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify([{ id: ISSUE_UUID, identifier: ISSUE_IDENTIFIER, title: "T", status: "todo" }]));
+        return;
+      }
+      if (req.method === "GET" && url.includes(`/api/issues/${ISSUE_UUID}/timeline`)) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ entries: [], next_cursor: null }));
+        return;
+      }
+      res.writeHead(404);
+      res.end(JSON.stringify({ error: `No mock for ${req.method} ${url}` }));
+    };
+
+    try {
+      const result = await runAdapter({
+        method: "getSquadActivity",
+        params: { id: "plugin-hive/PLU-1" },
+      });
+
+      assert.strictEqual(result.exitCode, 0, `Expected exit 0, got ${result.exitCode}. stderr: ${result.stderr}`);
+      const parsed = JSON.parse(result.stdout);
+      assert.ok("result" in parsed, "Response must have 'result' key");
+      assert.strictEqual(parsed.result, null, `Expected null, got: ${JSON.stringify(parsed.result)}`);
+    } finally {
+      mockHandler = null;
+    }
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AC9: getSquadActivity — auth failure on timeline fetch
+// ──────────────────────────────────────────────────────────────────────────────
+describe("AC9: getSquadActivity — AUTH_FAILURE on timeline fetch", () => {
+  it("exits 1 with AUTH_FAILURE when timeline endpoint returns 401", async () => {
+    mockHandler = (req, res) => {
+      const url = req.url ?? "";
+      if (req.method === "GET" && url === "/api/workspaces") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify([{ id: WORKSPACE_UUID, slug: WORKSPACE_SLUG }]));
+        return;
+      }
+      if (req.method === "GET" && url.includes("/api/issues?workspace_id=") && url.includes("identifier=")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify([{ id: ISSUE_UUID, identifier: ISSUE_IDENTIFIER, title: "T", status: "todo" }]));
+        return;
+      }
+      if (req.method === "GET" && url.includes(`/api/issues/${ISSUE_UUID}/timeline`)) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ message: "Unauthorized" }));
+        return;
+      }
+      res.writeHead(404);
+      res.end(JSON.stringify({ error: `No mock for ${req.method} ${url}` }));
+    };
+
+    try {
+      const result = await runAdapter({
+        method: "getSquadActivity",
+        params: { id: "plugin-hive/PLU-1" },
+      });
+
+      assert.strictEqual(result.exitCode, 1, `Expected exit 1, got ${result.exitCode}`);
+      const parsed = JSON.parse(result.stdout);
+      assert.ok(parsed.error, "Response must have 'error' key");
+      assert.strictEqual(parsed.error.code, "AUTH_FAILURE");
+    } finally {
+      mockHandler = null;
+    }
   });
 });
 

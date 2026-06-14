@@ -1,4 +1,4 @@
-# Multica Adapter — Friction Notes vs ABI 1.0.0
+# Multica Adapter — Friction Notes vs ABI 1.1.0
 
 Recorded during s1-multica-adapter implementation so follow-on wiring and test
 phases can pin the observed Multica contract.
@@ -46,3 +46,34 @@ missing label round-trip as an error.
 Invalid status values can produce raw database constraint failures. The adapter
 validates the enum locally: `todo`, `in_progress`, `in_review`, `done`,
 `cancelled`.
+
+---
+
+## ABI 1.1.0 delta (2026-06-14)
+
+### 8. Squad evaluations live in the timeline, not on the issue or a squad endpoint
+
+The original PLU-104 spec assumed a dedicated squad endpoint (`GET
+/api/issues/{id}/squad-activity`) and a free-text `evaluation` field. Both were
+wrong. Squad-leader evaluations land in the unified activity log and are read via:
+
+```
+GET /api/issues/{id}/timeline?workspace_id=<uuid>
+```
+
+Response: `{ entries: [...], next_cursor }`. Each entry carries `type`
+(`activity`|`comment`), `action`, `actor_type`, `actor_id`, `created_at`, and a
+`details` blob. Squad evals have `action == 'squad_leader_evaluated'` with
+`details: { outcome, reason }`.
+
+### 9. outcome is a fixed enum, not free text
+
+`outcome` is constrained to `action | no_action | failed`. The adapter validates
+this and throws `TRANSPORT` if an unexpected value is returned, rather than
+silently passing it upstream.
+
+### 10. updateIssueStatus deliberately NOT added
+
+The description note confirmed this is read-side only. `updateStory({status})`
+already covers status transitions; a separate `updateIssueStatus` would be
+redundant.

@@ -1,5 +1,5 @@
 #!/usr/bin/env -S npx tsx
-// Multica task-tracking adapter — implements Hive ABI 1.0.0
+// Multica task-tracking adapter — implements Hive ABI 1.1.0
 // Hierarchy: hierarchical-ish (workspace → issues; parent_issue_id on create)
 //
 // Wire format: JSON request on stdin → JSON response on stdout.
@@ -24,6 +24,8 @@ const STATUS_VALUES = new Set([
   "done",
   "cancelled",
 ]);
+
+const SQUAD_OUTCOME_VALUES = new Set(["action", "no_action", "failed"]);
 
 interface Request {
   method: string;
@@ -293,10 +295,11 @@ async function resolveIssueUuid(id: string): Promise<string> {
 
 async function capabilities(): Promise<any> {
   return {
-    abi_version: "1.0.0",
+    abi_version: "1.1.0",
     hierarchy: "hierarchical",
     supports_parent_link: true,
     supports_needs_rework: true,
+    supports_squad_activity: true,
     supported_labels: null,
     supported_states: Array.from(STATUS_VALUES),
     metadata: {
@@ -395,6 +398,40 @@ async function markNeedsRework(params: any): Promise<any> {
   return { id, status: statusResult.status ?? "in_review", labels };
 }
 
+async function getSquadActivity(params: any): Promise<any> {
+  const { id } = params ?? {};
+  const [issueUuid, workspaceId] = await Promise.all([resolveIssueUuid(id), getWorkspaceId()]);
+  const body = await multicaFetch(
+    `/api/issues/${encodeURIComponent(issueUuid)}/timeline?workspace_id=${encodeURIComponent(workspaceId)}`,
+  );
+  const entries: any[] = Array.isArray(body) ? body : body?.entries ?? body?.data ?? [];
+  const evals = entries.filter(
+    (e: any) => e?.type === "activity" && e?.action === "squad_leader_evaluated",
+  );
+  if (evals.length === 0) return null;
+  evals.sort((a: any, b: any) => {
+    const ta = new Date(a.created_at).getTime();
+    const tb = new Date(b.created_at).getTime();
+    return tb - ta;
+  });
+  const latest = evals[0];
+  const details = latest?.details ?? {};
+  const outcome: string | null = details?.outcome ?? null;
+  if (outcome !== null && !SQUAD_OUTCOME_VALUES.has(outcome)) {
+    throw new AdapterError(
+      "TRANSPORT",
+      `Unexpected squad_leader_evaluated outcome value: '${outcome}'`,
+    );
+  }
+  return {
+    actor_type: latest?.actor_type ?? null,
+    actor_id: latest?.actor_id ?? null,
+    outcome,
+    reason: details?.reason ?? null,
+    created_at: latest?.created_at ?? null,
+  };
+}
+
 export async function dispatch(req: Request): Promise<any> {
   const handlers: Record<string, (p: any) => Promise<any>> = {
     capabilities,
@@ -403,6 +440,7 @@ export async function dispatch(req: Request): Promise<any> {
     addComment,
     getStory,
     markNeedsRework,
+    getSquadActivity,
   };
   const h = handlers[req.method];
   if (!h) throw new AdapterError("UNKNOWN_METHOD", `Unknown method: ${req.method}`);
