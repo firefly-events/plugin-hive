@@ -1,0 +1,47 @@
+name: msd-squad-eval-readback
+title: "Squad-evaluation read-back — consume squad-leader evals as substrate signal"
+description: 'Read-back follow-on extracted from multica-substrate-deepen W2.
+
+  The parent epic deferred substrate-signal read-back "until upstream Multica adds
+  a GET squad-evaluations endpoint." W0.2 was re-settled empirically 2026-06-14:
+  squad-leader evaluations land in the unified activity_log and are readable via
+  GET /api/issues/{id}/timeline filtered to action==''squad_leader_evaluated''.
+  The deferral premise is therefore stale and the read-back is unblocked.
+
+  Scope (read-side only — the squad-evaluated WRITE/status-flip is owned by the
+  squad-leader-status-flip epic):
+  - Adapter ABI 1.1.0 getSquadActivity (timeline read).
+  - squad-evaluation contract doc (substrate signal, not authority surface).
+  - readSquadEvaluation dispatch helper.
+  - Wire best-effort read into execute-mode-multica episode marker.
+
+  Extracted into its own epic so /execute runs only these four stories without
+  re-dispatching the 19 already-shipped multica-substrate-deepen stories (which
+  carry no episode markers and would otherwise re-run).
+  '
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+git_flow:
+  base_branch: feat/multica-substrate-deepen
+  branch_strategy: per-epic
+extracted_from: multica-substrate-deepen
+stories:
+- id: w2-4-adapter-abi-1-1
+  title: Adapter ABI 1.1.0 — add getSquadActivity (timeline read)
+  complexity: medium
+  depends_on: []
+- id: w2-5-eval-contract-doc
+  title: Author hive/references/squad-evaluation-contract.md (substrate-signal contract)
+  complexity: low
+  depends_on: []
+- id: w2-6-dispatch-read-squad-eval
+  title: Add readSquadEvaluation helper to multica-story-dispatch
+  complexity: medium
+  depends_on:
+  - w2-4-adapter-abi-1-1
+- id: w2-7-execute-mode-integrate-eval
+  title: Wire squad-evaluation read into execute-mode-multica episode marker
+  complexity: medium
+  depends_on:
+  - w2-5-eval-contract-doc
+  - w2-6-dispatch-read-squad-eval
