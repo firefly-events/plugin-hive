@@ -1,5 +1,5 @@
 id: w2-6-dispatch-read-squad-eval
-epic: multica-substrate-deepen
+epic: msd-squad-eval-readback
 title: Add readSquadEvaluation helper to multica-story-dispatch
 status: pending
 complexity: medium

@@ -1,5 +1,5 @@
 id: w2-4-adapter-abi-1-1
-epic: multica-substrate-deepen
+epic: msd-squad-eval-readback
 title: Adapter ABI 1.1.0 — add getSquadActivity (timeline read)
 status: pending
 complexity: medium

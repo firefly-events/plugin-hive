@@ -1,5 +1,5 @@
 id: w2-7-execute-mode-integrate-eval
-epic: multica-substrate-deepen
+epic: msd-squad-eval-readback
 title: Wire squad-evaluation read into execute-mode-multica episode marker
 status: pending
 complexity: medium
