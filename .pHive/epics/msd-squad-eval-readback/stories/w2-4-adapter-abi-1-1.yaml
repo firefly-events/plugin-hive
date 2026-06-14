@@ -1,7 +1,7 @@
 id: w2-4-adapter-abi-1-1
 epic: msd-squad-eval-readback
 title: Adapter ABI 1.1.0 — add getSquadActivity (timeline read)
-status: pending
+status: complete
 complexity: medium
 methodology: classic
 depends_on: []
