@@ -1,7 +1,7 @@
 id: chs-4-rewrite-2-11-0-exemplar
 epic: changelog-human-summaries
 title: Rewrite the 2.11.0 entry as the in-file format exemplar
-status: in_progress
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [chs-1-changelog-entry-format-ref]
