@@ -1,0 +1,95 @@
+id: chs-4-rewrite-2-11-0-exemplar
+epic: changelog-human-summaries
+title: Rewrite the 2.11.0 entry as the in-file format exemplar
+status: in_progress
+complexity: low
+methodology: classic
+depends_on: [chs-1-changelog-entry-format-ref]
+tracker_id: plugin-hive/PLU-339
+tracker_url: http://localhost:3000/plugin-hive/issues/339
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Re-author the latest release entry (`## [2.11.0] - 2026-06-11`) in
+  CHANGELOG.md to fully conform to `hive/references/changelog-entry-format.md`.
+
+  This is a USER-AUTHORIZED ONE-TIME EXCEPTION to the append-only convention
+  (design gate 2026-06-12: "let's rewrite the last one — no upcoming releases
+  planned"). Scope is exactly one entry: 2.11.0. No other historical entry may
+  be touched.
+
+  Purpose:
+  1. Validates the format spec against a real, complex multi-epic release —
+     if the format can't express 2.11.0 cleanly, chs-1 needs revision (feed
+     that back instead of forcing it).
+  2. Leaves an in-file exemplar adjacent to where future entries are written,
+     so /ship's authoring agent and operators see the target shape in situ.
+
+  The 2.11.0 entry is already strong (tagline + detailed bullets); the rewrite
+  is a conformance pass, not a rescue: PR refs moved to suffix notation where
+  they currently lead or interrupt bullets, bullet shape aligned to the spec,
+  tagline kept or sharpened. Preserve all factual content — no information may
+  be dropped.
+
+acceptance_criteria:
+  - "Given the rewritten 2.11.0 entry, when checked against hive/references/changelog-entry-format.md quality criteria, then every rule passes (tagline, prose-per-change, PR-refs-as-suffix)"
+  - "Given a diff of the entry, then no factual content (features, PR numbers, scope) is lost — only re-expressed"
+  - "Given CHANGELOG.md, then no entry other than 2.11.0 (and ## [Unreleased]) is modified"
+
+steps:
+  - id: implement
+    description: Rewrite the 2.11.0 entry per the format doc; preserve all facts; touch nothing else
+    agent: developer
+  - id: test
+    description: Verify conformance against the format doc rule-by-rule and diff-check that no factual content was dropped and no other entry changed
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review prose quality and fact preservation; if the format could not express the entry cleanly, flag chs-1 revision instead of approving a forced fit
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    type: Claude Code plugin (markdown)
+  key_files:
+    - path: CHANGELOG.md
+      purpose: The only file touched; 2.11.0 entry starts near the top under [Unreleased]
+    - path: hive/references/changelog-entry-format.md
+      purpose: The spec (chs-1) this rewrite conforms to and validates
+
+files_to_modify:
+  - file: CHANGELOG.md
+    change: rewrite the 2.11.0 entry only
+
+design_decisions:
+  - decision: Rewrite scope is exactly one entry (2.11.0)
+    rationale: "User authorized rewriting 'the last one' at the design gate; append-only convention holds for everything else; historical cleanup remains out of scope"
+  - decision: Parallel-eligible (bounded-slice) against chs-2/chs-3
+    rationale: "Touches only CHANGELOG.md; chs-2 touches skills/ship + skills/execute, chs-3 touches docs — write surfaces are disjoint"
+
+cross_cutting:
+  - concern: documentation
+    action: "None beyond the entry itself — exemplar is self-documenting; format doc may gain a pointer to it via chs-1 review if desired"
+
+metric:
+  applies: false
+  justification: "One-time retroactive conformance rewrite with operator review at PR time; no recurring measurable moves — the recurring metric lives on chs-2 (prose-compliant future releases)."
+
+risks:
+  - severity: low
+    description: Format spec cannot cleanly express the multi-epic 2.11.0 release
+    mitigation: Review step routes the failure back to chs-1 as spec feedback instead of forcing conformance
+
+references:
+  - path: .pHive/epics/changelog-human-summaries/docs/design-discussion.md
+    relevant_excerpt: |
+      Retroactive cleanup: don't mandate it. The 0.x-1.1.x entries are weak but
+      they're historical. (User decision at gate: rewrite the LATEST entry only,
+      as exemplar — one-time append-only exception.)

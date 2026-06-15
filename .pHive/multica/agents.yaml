@@ -5,7 +5,7 @@ agents:
   - name: developer
     description: General-purpose code implementation. Deprecated — prefer backend-developer or frontend-developer.
     provider: claude
-    model: "claude-fable-5"
+    model: "claude-sonnet-4-6"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/developer.md
     custom_env: {}
@@ -55,7 +55,7 @@ agents:
   - name: architect
     description: Designs technical solutions and evaluates technology choices, with rationale for each decision.
     provider: claude
-    model: "claude-fable-5"
+    model: "claude-opus-4-8"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/architect.md
     custom_env: {}
@@ -94,7 +94,7 @@ agents:
   - name: peer-validator
     description: Cross-story validator for consistency, convention compliance, and integration risk.
     provider: claude
-    model: "claude-fable-5"
+    model: "claude-opus-4-8"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/peer-validator.md
     custom_env:
@@ -107,7 +107,7 @@ agents:
   - name: tester
     description: Writes and runs test suites against story specs and acceptance criteria.
     provider: claude
-    model: "claude-fable-5"
+    model: "claude-opus-4-8"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/tester.md
     custom_env:
@@ -120,7 +120,7 @@ agents:
   - name: tpm
     description: Technical program manager; sequences cross-system work and owns horizontal/vertical planning.
     provider: claude
-    model: "claude-fable-5"
+    model: "claude-opus-4-8"
     max_concurrent_tasks: 1
     persona_ref: hive/agents/tpm.md
     custom_env:
