@@ -1,7 +1,7 @@
 id: d-4-design-mode-cc-workflows
 epic: substrate-coverage-and-test-cleanup
 title: Create design-mode-cc-workflows atom mirroring plan-mode-cc-workflows + helper import + no-codex compliance
-status: complete
+status: in_progress
 complexity: medium
 methodology: classic
 depends_on:

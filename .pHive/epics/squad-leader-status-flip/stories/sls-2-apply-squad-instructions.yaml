@@ -1,7 +1,7 @@
 id: sls-2-apply-squad-instructions
 epic: squad-leader-status-flip
 title: Apply the terminal contract to planning-team-squad squad.instructions
-status: complete
+status: blocked
 tracker_id: plugin-hive/PLU-314
 tracker_url: http://localhost:3000/plugin-hive/issues/314
 complexity: low
