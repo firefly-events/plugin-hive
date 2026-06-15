@@ -1,0 +1,70 @@
+id: am-7-test-mode-actual-skill
+epic: actual-manual-tier
+title: test-mode-actual atomic skill (mirrors test-mode-multica)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [am-6-mode-decision-registration, am-5-mlx-qwen-sidecar, am-3-scenario-live-walk-mode]
+
+description: |
+  New atomic skill skills/hive/skills/test-mode-actual/ that owns driving the actual-manual tier
+  when mode_decision=actual — mirroring test-mode-multica's structure. It: ensures the MLX Qwen
+  sidecar is ready (am-5), loads the live-walk scenario (am-3) + overlay (am-2), invokes the am-4
+  parent executor over the flow, collects the per-step hybrid V&V report, and writes the verdict to
+  the story-YAML manual_verdict. Atomic boundary: the skill orchestrates; it does not inline the
+  runner logic.
+
+acceptance_criteria:
+  - "Given mode_decision=actual, when the skill runs for a live-walk scenario, then it ensures the MLX sidecar is ready, runs the am-4 executor over the flow, and produces a per-step report (action, vision verify, truth, pass)."
+  - "Given the run completes, the skill writes the verdict to the story-YAML manual_verdict (verdict + timestamp + agent), consistent with how simulated-manual records its verdict."
+  - "Given the MLX sidecar is not ready, the skill surfaces a clear actionable error (start the sidecar) rather than a raw model error, and does not write a false verdict."
+  - "The skill is atomic — it invokes the am-4 executor, it does not reimplement grounding/verify."
+
+steps:
+  - id: research
+    description: Read test-mode-multica SKILL.md structure + how simulated-manual writes manual_verdict, to mirror both.
+    agent: researcher
+  - id: implement
+    description: Author skills/hive/skills/test-mode-actual/SKILL.md — sidecar-ready → load scenario+overlay → run am-4 executor → collect report → write manual_verdict.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Tests/dry-run — verdict written on success; actionable error + no-verdict on sidecar-not-ready; atomic-boundary check (no inlined runner logic).
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm parity with test-mode-multica idiom + atomic boundary + manual_verdict shape.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/test-mode-multica
+      purpose: Structural mirror for the new atomic skill.
+    - path: hive/lib/actual-manual/flow-runner.mjs
+      purpose: am-4 executor the skill invokes (does not reimplement).
+
+files_to_modify:
+  - file: skills/hive/skills/test-mode-actual/SKILL.md
+    change: New atomic skill that drives the tier and writes manual_verdict.
+
+design_decisions:
+  - decision: Skill orchestrates; runner is invoked, not inlined.
+    rationale: Atomic-boundary convention (same as plan→grill, plan→design). Keeps the runner the single source of grounding/verify logic.
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Orchestration skill; its job is wiring sidecar→scenario→executor→verdict. Correct verdict-writing + error-on-not-ready are covered by tests; the substantive catch metric lives at am-4."
+
+references:
+  - path: .pHive/epics/actual-manual-tier/docs/design-discussion.md
+    relevant_excerpt: |
+      §4 New atomic skill skills/hive/skills/test-mode-actual/ mirroring test-mode-multica.
+      Verdict stays story-YAML manual_verdict.

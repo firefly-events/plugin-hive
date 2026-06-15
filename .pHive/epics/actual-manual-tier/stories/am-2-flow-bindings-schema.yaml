@@ -1,0 +1,70 @@
+id: am-2-flow-bindings-schema
+epic: actual-manual-tier
+title: Flow-bindings overlay schema + reference doc
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Define the native-dialect OVERLAY that the vision-cursor parent interprets — the thin mapping
+  from each Hive scenario step to HOW it is actuated. This is the zero-new-scenario-schema decision:
+  the scenario keeps action+expected; the overlay (flow-bindings) adds, per step, how:native|vision,
+  optional setup primitives, and an optional truth-signal. Produce a reference doc + a validated
+  schema (the spike's scenarios/flow-bindings.json is the prototype). No runtime here — schema +
+  doc + a loader/validator only, consumed by am-4 (runner) and am-8 (authoring guidance).
+
+acceptance_criteria:
+  - "Given a scenario id, when the overlay is loaded, then each step entry resolves to {how: native|vision, ...} where native carries an act (goto|fill|tapRole|tapText|wait) + args, and vision carries a target label."
+  - "Given a step, the overlay may declare setup[] (native primitives run before the action, e.g. fill caption to enable a CTA) and a truth signal (enum, e.g. cta_enabled | posted) used as the authoritative verify backstop."
+  - "Given a malformed overlay (unknown how, missing target for vision, unknown truth enum), when validated, then it fails fast with a clear error naming the scenario id + step index."
+  - "A reference doc at hive/references/actual-manual-overlay-schema.md documents the overlay shape, the native|vision split, setup, and truth-signals, with the flayr-campaign-compose example."
+
+steps:
+  - id: implement
+    description: Author hive/references/actual-manual-overlay-schema.md + a schema/validator module (hive/lib/actual-manual/bindings.{schema,loader}) modeled on the spike flow-bindings.json. Truth-signal is an extensible enum.
+    agent: developer
+  - id: test
+    description: Tests for load + fail-fast validation (unknown how, missing vision target, unknown truth enum, well-formed example).
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm the overlay stays a thin annotation (no scenario-schema duplication) and the truth enum is extensible.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/scenarios/load.mjs
+      purpose: Scenario loader the overlay sits beside; mirror its load/validate idiom.
+    - path: ~/Code/spikes/actual-manual-cursor/scenarios/flow-bindings.json
+      purpose: Prototype overlay — native|vision + setup + truth — to formalize.
+
+files_to_modify:
+  - file: hive/references/actual-manual-overlay-schema.md
+    change: New reference doc for the overlay schema.
+  - file: hive/lib/actual-manual/bindings.mjs
+    change: New overlay loader + fail-fast validator (or Python where the parse logic can be Python).
+
+design_decisions:
+  - decision: Overlay is separate from the scenario; scenario keeps action+expected unchanged.
+    rationale: expected IS the verify checkpoint already; the overlay only says how each step is actuated. Native-with-extension beats a neutral schema (less to build/rot — design-discussion §3.5).
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Schema + reference doc story; it defines the overlay contract that am-4 consumes but produces no measurable runtime behavior of its own. Effectiveness is measured at am-4."
+
+references:
+  - path: .pHive/epics/actual-manual-tier/docs/design-discussion.md
+    relevant_excerpt: |
+      §3.5 Zero new scenario schema. A thin native-dialect overlay (flow-bindings.json) maps each
+      step → native|vision + setup primitives + truth-signal. Truth authoritative; vision alongside.

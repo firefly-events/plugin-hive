@@ -1,0 +1,100 @@
+id: am-4-flow-runner-bridge
+epic: actual-manual-tier
+title: Port spike flow-runner into hive/lib/actual-manual (locate/verify/truth split)
+status: pending
+complexity: high
+methodology: classic
+depends_on: [am-1-bridge-surface-charter, am-2-flow-bindings-schema]
+
+description: |
+  Port the validated spike flow-runner (~/Code/spikes/actual-manual-cursor/arm-d-flow/flow-runner.mjs,
+  commit 7b0ff06) into the hive bridge surface as the vision-cursor PARENT executor. It consumes a
+  Hive scenario (action+expected) + the am-2 overlay, drives the flow, and emits a per-step report.
+  Carry the locked design exactly:
+    - LOCATE decoupled from "visible": grounding asks coords-only; trust the coords, click.
+    - VERIFY is hybrid: vision verify + an authoritative truth-signal when the step declares one
+      (cta_enabled=DOM, posted=network); truth authoritative, vision recorded alongside, divergence flagged.
+    - Two-pass grounding: fullPage glance → scroll target to viewport center → precise viewport
+      ground → real-mouse click; retry ≤3; DOM-snap OFF by default (SNAP_R=0).
+    - Native primitives (fill/tapRole/goto/scroll/wait) delegated to Playwright; vision only for
+      selectorless clicks + per-step verify.
+  Grounding/verify parse + truth-signal evaluation logic should be Python where it cleanly can be
+  (per charter); the Playwright/MLX I/O stays Node.
+
+acceptance_criteria:
+  - "Given the flayr-campaign-compose live-walk scenario + overlay, when the runner executes clean, then it drives all steps, vision locates + real-clicks the actual Post Now button, the network truth-signal fires, and flowPassed = true (3/3) — matching the spike."
+  - "Given a render-invisible CTA (clipped or opacity:0), when the runner executes, then vision does not find the button, no hallucinated click, the action does not fire, and the flow fails = caught (the DOM-blind native click would have published)."
+  - "Given a step with a truth-signal, the step pass is the truth-signal verdict (authoritative); the vision verify is still recorded; a divergence between them is surfaced in the report."
+  - "DOM-snap is OFF by default; the click uses pure vision coords + real pointer (page.mouse.click), so z-index/overlays apply."
+  - "The runner takes MLX endpoint + model + viewport from config/env; no hardcoded spike paths."
+
+steps:
+  - id: research
+    description: Re-read the spike runner + RESULT.md Arm D; map spike paths/env to hive config + the am-2 overlay loader.
+    agent: researcher
+  - id: implement
+    description: Port the runner into hive/lib/actual-manual/ with the locate/verify/truth split, two-pass grounding, native-primitive delegation, per-step report. Factor parseable logic to Python where clean.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Tests against the DOM-lies fixture — clean passes (posts), B2/B3 caught (no post); truth-signal authority + divergence reporting; snap-off click path. Mock/stub MLX where a live model isn't available in CI (flag the live-model gap).
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify the locked design is carried exactly (no DOM-snap default, locate≠visible, hybrid verify) and the bridge stays isolated.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/actual-manual/bindings.mjs
+      purpose: am-2 overlay loader the runner consumes to resolve each step's how/setup/truth.
+    - path: hive/lib/scenarios/load.mjs
+      purpose: loadScenario (live-walk mode from am-3) supplies action+expected per step.
+  code_examples:
+    - title: Locate decoupled from visible (spike)
+      file: ~/Code/spikes/actual-manual-cursor/arm-d-flow/flow-runner.mjs
+      snippet: |
+        // grounding asks coords-only; "did it work" is the outcome-based verify
+        async function locate(page, label, fullPage) { /* returns {found, ix, iy, W, H} */ }
+        // hybrid verify: truth-signal authoritative, vision recorded alongside
+        if (b.truth === 'posted') tp = posted;        // network truth
+        else if (b.truth === 'cta_enabled') tp = /* DOM not-disabled */;
+        rec.pass = rec.truth ? rec.truth.pass : !!rec.verify?.pass;
+
+files_to_modify:
+  - file: hive/lib/actual-manual/flow-runner.mjs
+    change: New parent executor (ported from spike).
+  - file: hive/lib/actual-manual/grounding.py
+    change: Optional — Python helpers for coord/verdict parsing + truth-signal evaluation where clean.
+
+design_decisions:
+  - decision: DOM-snap OFF by default (SNAP_R=0).
+    rationale: True-manual fidelity — the cursor clicks where vision says; a wide snap would let the DOM do the aiming. Qwen grounds ~10px, inside honest tolerance.
+
+cross_cutting: []
+
+metric:
+  applies: true
+  name: actual_manual.dom_lies_catch_rate
+  direction: up
+  unit: ratio
+  baseline: "0/3 (DOM-blind native selector, spike Arm A)"
+  target: "2/3 render-invisible CTA bugs caught (B2 clip + B3 opacity:0) AND clean control passes (posts)"
+  window: story-integrate
+  source:
+    kind: manual
+    ref: "tester runs the runner over the flayr-campaign-compose fixture (clean/B2/B3) and records flowPassed + posted per case, matching spike RESULT.md Arm D"
+  verify_at: integrate
+  owner: tester
+
+references:
+  - path: .pHive/epics/actual-manual-tier/docs/design-discussion.md
+    relevant_excerpt: |
+      §2 PARENT architecture; §3 locked decisions (model, locate≠visible, hybrid verify, two-pass
+      grounding, zero new schema). Spike Arm D commit 7b0ff06 is the reference implementation.

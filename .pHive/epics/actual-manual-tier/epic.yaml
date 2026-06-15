@@ -1,0 +1,53 @@
+name: actual-manual-tier
+title: actual-manual test tier — vision-cursor flow runner (web-first)
+description: >
+  Add an `actual-manual` test tier: a local-Qwen vision-cursor that PARENTS the native runner
+  (Playwright web), drives a full flow like a human, clicks pixel-grounded real coordinates, and
+  verifies the result of each step via a hybrid of vision + an authoritative DOM/network
+  truth-signal. Settled by the actual-manual-cursor spike (Arm D, KEEP). Web-first; Maestro/mobile
+  binding and CI MLX provisioning are explicit follow-ons (see docs/design-discussion.md §7).
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+version_bump: minor
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  - id: am-1-bridge-surface-charter
+    title: Declare vision-cursor runner as a named bridge surface (charter + dep scoping)
+    complexity: low
+    depends_on: []
+  - id: am-2-flow-bindings-schema
+    title: Flow-bindings overlay schema + reference doc
+    complexity: medium
+    depends_on: []
+  - id: am-3-scenario-live-walk-mode
+    title: Add `live-walk` scenario mode to scenarios/load.mjs
+    complexity: low
+    depends_on: []
+  - id: am-4-flow-runner-bridge
+    title: Port spike flow-runner into hive/lib/actual-manual (locate/verify/truth split)
+    complexity: high
+    depends_on: [am-1-bridge-surface-charter, am-2-flow-bindings-schema]
+  - id: am-5-mlx-qwen-sidecar
+    title: MLX Qwen2.5-VL sidecar lifecycle + readiness
+    complexity: medium
+    depends_on: [am-1-bridge-surface-charter]
+  - id: am-6-mode-decision-registration
+    title: Register mode_decision actual (env + config, env-over-config) in test-dispatch
+    complexity: medium
+    depends_on: [am-4-flow-runner-bridge]
+  - id: am-7-test-mode-actual-skill
+    title: test-mode-actual atomic skill (mirrors test-mode-multica)
+    complexity: medium
+    depends_on: [am-6-mode-decision-registration, am-5-mlx-qwen-sidecar, am-3-scenario-live-walk-mode]
+  - id: am-8-test-architect-authoring
+    title: test-architect authoring guidance for the verify/vision_tap overlay
+    complexity: low
+    depends_on: [am-2-flow-bindings-schema]
+  - id: am-9-user-docs
+    title: User docs — README Quick Start + operations-guide Commands Reference
+    complexity: low
+    depends_on: [am-7-test-mode-actual-skill]

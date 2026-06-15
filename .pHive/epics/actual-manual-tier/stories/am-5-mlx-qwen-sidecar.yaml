@@ -1,0 +1,63 @@
+id: am-5-mlx-qwen-sidecar
+epic: actual-manual-tier
+title: MLX Qwen2.5-VL sidecar lifecycle + readiness
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [am-1-bridge-surface-charter]
+
+description: |
+  The runner (am-4) needs a running MLX server serving Qwen2.5-VL-7B (4-bit) over an
+  OpenAI-compatible endpoint. Provide a Python-canonical sidecar lifecycle: start (model pinned),
+  health/readiness probe, stop, and port management that avoids 8080 (owned by Multica) — the spike
+  used 8089. The runner consumes the resolved endpoint. Local-only in this story; CI/headless
+  provisioning is an explicit follow-on (design-discussion §7).
+
+acceptance_criteria:
+  - "Given a start call, when the sidecar launches, then it serves mlx-community/Qwen2.5-VL-7B-Instruct-4bit on a configurable port (default avoiding 8080) and a readiness probe returns ready only after the model is loadable."
+  - "Given readiness, the probe does NOT use curl/wget (host policy) and reports a clear not-ready vs ready vs error state without dumping model logs into the caller."
+  - "Given stop, the sidecar shuts down cleanly and frees the port."
+  - "The model id, port, and host are config/env-driven (env-over-config), defaults documented."
+
+steps:
+  - id: implement
+    description: Python lifecycle module (start/ready/stop) wrapping mlx_vlm.server with the pinned Qwen model + port mgmt; readiness via log-state or a lightweight in-process check (no curl).
+    agent: developer
+  - id: test
+    description: Tests for port-conflict handling (8080 avoidance), readiness states, and clean stop. Gate/skip the model-load path when MLX/model unavailable; flag the CI provisioning gap.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm Python-canonical, no curl, env-over-config, and the CI gap is documented not silently assumed.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/config.py
+      purpose: Canonical config reader — resolve model/port/host with env-over-config.
+
+files_to_modify:
+  - file: hive/lib/actual-manual/mlx_sidecar.py
+    change: New Python lifecycle (start/ready/stop) for the MLX Qwen server.
+
+design_decisions:
+  - decision: Sidecar lifecycle is Python (canonical); avoids port 8080.
+    rationale: Lifecycle is business logic → Python per charter. 8080 is Multica (multica-s); spike ran Qwen on 8089.
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Process lifecycle plumbing; its correctness is readiness/stop behavior covered by tests, not a moving production metric. The model's grounding quality is a fixed spike finding (~10px), not re-measured here."
+
+references:
+  - path: .pHive/epics/actual-manual-tier/docs/design-discussion.md
+    relevant_excerpt: |
+      §3.1 Model = local Qwen2.5-VL-7B via Apple MLX. §7 open item: CI/headless MLX provisioning
+      unsolved — this story handles local lifecycle only.

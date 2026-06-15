@@ -229,5 +229,7 @@ tsx-*/
 !.pHive/epics/kg-repair-activation/**
 !.pHive/epics/changelog-human-summaries/
 !.pHive/epics/changelog-human-summaries/**
+!.pHive/epics/actual-manual-tier/
+!.pHive/epics/actual-manual-tier/**
 !.pHive/triage/
 !.pHive/triage/queue.yaml

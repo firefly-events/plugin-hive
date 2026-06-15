@@ -1,0 +1,64 @@
+id: am-1-bridge-surface-charter
+epic: actual-manual-tier
+title: Declare vision-cursor runner as a named bridge surface (charter + dep scoping)
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  The actual-manual flow-runner is Node (Playwright + an MLX HTTP client) — new Node outside the
+  existing named bridge surfaces, which the language charter forbids without an explicit bridge
+  declaration. Add a named bridge surface entry for it so am-4 can land the runner code legitimately,
+  and scope its npm dependency (playwright) in the root package.json per the dependency policy.
+  This is the no-regret foundation story: pure policy/charter + manifest, no runtime behavior.
+
+acceptance_criteria:
+  - "Given CLAUDE.md charter, when am-4 adds hive/lib/actual-manual/ Node code, then the runtime-ownership table + named-bridge-surfaces section already list it as a bridge (Node) with rationale (Playwright+MLX execution substrate, web-first, isolated behind the tier), so the new Node is policy-compliant."
+  - "Given the dependency policy, when playwright is required by the runner, then it is declared in the root package.json scoped to the actual-manual bridge surface (not an implicit transitive install)."
+  - "Given the charter, the entry states the surface is web-first and that grounding/verify logic that can be Python should be (the MLX sidecar lifecycle is Python per am-5)."
+
+steps:
+  - id: implement
+    description: Add the actual-manual bridge-surface entry to CLAUDE.md (runtime-ownership table + named-bridge-surfaces section) and scope playwright in root package.json.
+    agent: developer
+  - id: review
+    description: Verify the charter entry matches the language policy framing (bridge, not canonical) and the dep is correctly scoped + locked.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit and push to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: CLAUDE.md
+      purpose: Project charter — runtime-ownership table + named-bridge-surfaces list; the entry lands here.
+    - path: package.json
+      purpose: Root manifest — playwright dependency scoped to the new bridge surface.
+
+files_to_modify:
+  - file: CLAUDE.md
+    change: Add actual-manual vision-cursor runner to runtime-ownership table (Node / Bridge) + a named-bridge-surface subsection.
+  - file: package.json
+    change: Add playwright as a dependency scoped (comment/grouping) to the actual-manual bridge surface.
+
+design_decisions:
+  - decision: Runner is a Node bridge surface, not canonical Python.
+    rationale: Playwright is JS-native and the spike is Node; MLX is reached over HTTP. Python-first applies to business logic; this is an execution substrate isolated behind the tier (same posture as sandcastle).
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Charter + manifest substrate story; it declares policy and scopes a dependency but ships no observable runtime surface. The tier's effectiveness is measured at am-4 (the runner)."
+
+references:
+  - path: .pHive/epics/actual-manual-tier/docs/design-discussion.md
+    relevant_excerpt: |
+      §5 Language policy: the runner is a named bridge surface (Node: Playwright + MLX HTTP).
+      Must be declared in CLAUDE.md + root package.json dep-scoped. MLX sidecar lifecycle is Python.

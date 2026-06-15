@@ -1,0 +1,70 @@
+id: am-6-mode-decision-registration
+epic: actual-manual-tier
+title: Register mode_decision actual (env + config, env-over-config) in test-dispatch
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [am-4-flow-runner-bridge]
+
+description: |
+  Register `actual` as a test mode_decision the same way multica/sandcastle registered theirs:
+  resolved from HIVE_TEST_MODE=actual (env) or hive.config.yaml test.mode: actual (config), with
+  env-over-config precedence. When resolved to actual, test-dispatch routes to the am-4 vision-cursor
+  parent executor (which itself wraps the native Playwright runner). Mirror the existing
+  test-mode-multica / test-mode-cc-workflows resolution pattern exactly. Additive — other modes
+  untouched; default behavior when unset is unchanged.
+
+acceptance_criteria:
+  - "Given HIVE_TEST_MODE=actual, when test-dispatch resolves the mode, then mode_decision=actual with field_sources.test_mode=env, regardless of config."
+  - "Given config test.mode: actual and no env, then mode_decision=actual with field_sources.test_mode=config."
+  - "Given neither set, then the existing default resolution is byte-unchanged."
+  - "Given mode_decision=actual, dispatch routes to the am-4 actual-manual executor; the resolution emits one structured INFO log mirroring the multica/cc-workflows pattern."
+
+steps:
+  - id: research
+    description: Read how test-mode-multica / test-mode-cc-workflows register + how test-dispatch resolves mode (env-over-config) to mirror it.
+    agent: researcher
+  - id: implement
+    description: Add `actual` to the mode resolver + dispatch routing to the am-4 executor; one structured INFO log.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Tests for env-over-config precedence (env, config, unset) and routing-to-executor on actual; default-unchanged regression.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm parity with the multica/cc-workflows resolution idiom and additive-only behavior.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/test-dispatch
+      purpose: Where test mode is resolved + routed; add the actual branch here.
+    - path: skills/hive/skills/test-mode-multica
+      purpose: Reference registration pattern to mirror (env-over-config, structured log).
+
+files_to_modify:
+  - file: skills/hive/skills/test-dispatch/SKILL.md
+    change: Add `actual` mode resolution (env-over-config) + routing to the am-4 executor.
+
+design_decisions:
+  - decision: Mirror the multica/sandcastle registration seam exactly.
+    rationale: Consistency with existing mode_decision enums; env-over-config is the established precedence (memory: phase-d/mode patterns).
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Mode-resolution wiring; correctness is a deterministic precedence table covered by tests (env/config/unset), not a moving metric. End-to-end catch behavior is measured at am-4."
+
+references:
+  - path: .pHive/epics/actual-manual-tier/docs/design-discussion.md
+    relevant_excerpt: |
+      §4 Integration seam: registers like multica/sandcastle — mode_decision: actual via
+      HIVE_TEST_MODE=actual or hive.config.yaml test.mode: actual, env-over-config.

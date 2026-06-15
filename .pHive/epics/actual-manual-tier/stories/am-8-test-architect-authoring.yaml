@@ -1,0 +1,61 @@
+id: am-8-test-architect-authoring
+epic: actual-manual-tier
+title: test-architect authoring guidance for the verify/vision_tap overlay
+status: pending
+complexity: low
+methodology: classic
+depends_on: [am-2-flow-bindings-schema]
+
+description: |
+  Give the test-architect persona the knowledge to AUTHOR actual-manual flows — a sibling to the
+  existing maestro-cli-awareness memory. It teaches: how to map a Hive scenario's steps to the
+  overlay (native vs vision_tap), when to add setup primitives, and crucially how to choose a
+  truth-signal per step (cta_enabled/posted/...) because vision verify alone is unreliable for
+  enabled-state + ephemeral confirmations. This is what lets the architect emit native script +
+  the verify:/vision_tap overlay, per the integration plan.
+
+acceptance_criteria:
+  - "Given the test-architect persona, a new memory documents the overlay authoring: native acts for deterministic primitives, vision_tap only for selectorless clicks, setup[] to satisfy preconditions (e.g. fill before a CTA enables)."
+  - "The guidance states the hybrid-verify rule: prefer a truth-signal for enabled-state and for ephemeral/async outcomes; vision verify is the manual observation, the truth-signal is authoritative."
+  - "The guidance is sibling-consistent with the existing maestro-cli-awareness memory (same location/shape) and references the am-2 overlay schema doc."
+
+steps:
+  - id: implement
+    description: Author skills/hive/agents/memories/test-architect/actual-manual-overlay-authoring.md mirroring maestro-cli-awareness; link the am-2 schema doc.
+    agent: developer
+  - id: review
+    description: Confirm it teaches native|vision split + setup + truth-signal selection, and matches the sibling memory shape.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit and push to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/agents/memories/test-architect/maestro-cli-awareness.md
+      purpose: Sibling memory to mirror (location + shape).
+    - path: hive/references/actual-manual-overlay-schema.md
+      purpose: The am-2 overlay schema the guidance references.
+
+files_to_modify:
+  - file: skills/hive/agents/memories/test-architect/actual-manual-overlay-authoring.md
+    change: New authoring-guidance memory for the overlay.
+
+design_decisions:
+  - decision: Authoring lives as a test-architect memory, not a separate skill.
+    rationale: Mirrors maestro-cli-awareness; the architect already authors native scripts — this extends that knowledge to the overlay.
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Persona-guidance doc; it shapes how the architect authors overlays but has no independently observable runtime surface. Authoring quality surfaces downstream as am-4 run outcomes."
+
+references:
+  - path: .pHive/epics/actual-manual-tier/docs/design-discussion.md
+    relevant_excerpt: |
+      §4 test-architect authors the native script + the verify:/vision_tap overlay. Hybrid verify
+      (truth-signal authoritative) is the key lesson — vision can't read enabled-state / async toasts.

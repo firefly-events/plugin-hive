@@ -1,0 +1,64 @@
+id: am-9-user-docs
+epic: actual-manual-tier
+title: User docs — README Quick Start + operations-guide Commands Reference
+status: pending
+complexity: low
+methodology: classic
+depends_on: [am-7-test-mode-actual-skill]
+
+description: |
+  Per the "new command needs user docs" rule, the actual-manual tier is not done until it appears
+  in the user-facing docs, not just SKILL.md. Add it to the README Quick Start (or test section) and
+  the operations-guide Commands Reference: what the tier is (vision-cursor manual-fidelity testing),
+  how to enable it (HIVE_TEST_MODE=actual or test.mode: actual), the local prerequisite (MLX Qwen
+  sidecar running), and an honest scope note (web-first; Maestro/mobile + CI MLX provisioning are
+  follow-ons). Route doc production through the technical-writer per the doc-skills rule.
+
+acceptance_criteria:
+  - "Given the README, a Quick Start / testing entry describes the actual-manual tier and how to enable it (env or config), including the MLX sidecar prerequisite."
+  - "Given the operations-guide, the Commands Reference lists the actual-manual mode alongside the other test modes."
+  - "The docs carry the honest scope note: web-first; mobile/Maestro binding and CI MLX provisioning are explicit follow-ons; vision tier is a targeted escalation, Playwright stays primary."
+  - "Doc content is produced by the technical-writer (doc-skills route), not improvised inline."
+
+steps:
+  - id: implement
+    description: Technical-writer adds the actual-manual entries to README + operations-guide Commands Reference with enablement + prerequisite + scope note.
+    agent: technical-writer
+  - id: review
+    description: Verify both surfaces updated, enablement accurate (env-over-config), scope note present and honest.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit and push to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: README.md
+      purpose: Quick Start / testing section — user-facing enablement entry.
+    - path: docs/operations-guide.md
+      purpose: Commands Reference — list the actual-manual mode alongside existing test modes.
+
+files_to_modify:
+  - file: README.md
+    change: Add actual-manual tier to Quick Start / testing.
+  - file: docs/operations-guide.md
+    change: Add actual-manual to the Commands Reference.
+
+design_decisions:
+  - decision: Docs are a gating part of "done", produced by the technical-writer.
+    rationale: New top-level capability needs README + operations-guide entries (feedback: new-command-needs-user-docs); doc-type work routes through the writer.
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Documentation story; deliverable is README + operations-guide entries. Presence/accuracy is checked at review, not a moving production metric."
+
+references:
+  - path: .pHive/epics/actual-manual-tier/docs/design-discussion.md
+    relevant_excerpt: |
+      §6/§7: web-first scope + honest follow-on notes (mobile/Maestro, CI MLX). Tier is a targeted
+      escalation; Playwright stays primary.

@@ -1,0 +1,64 @@
+id: am-3-scenario-live-walk-mode
+epic: actual-manual-tier
+title: Add `live-walk` scenario mode to scenarios/load.mjs
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  The Hive scenario schema currently supports spec-walk / implementation-walk modes. The
+  actual-manual tier drives a LIVE running app, so add a third `live-walk` mode value to
+  loadScenario. A live-walk scenario does not gate on an integrate marker (it walks a running
+  app, not impl code) — it is valid whenever the scenario shape is well-formed. Purely additive;
+  existing modes untouched.
+
+acceptance_criteria:
+  - "Given a scenario with mode: live-walk, when loadScenario runs, then it loads successfully without requiring an integrate marker (unlike implementation-walk)."
+  - "Given an unknown mode value, when loadScenario runs, then it still fails as before — live-walk is added to the allowed set, nothing else loosened."
+  - "Existing spec-walk / implementation-walk behavior is byte-unchanged (regression tests pass)."
+
+steps:
+  - id: implement
+    description: Add `live-walk` to the allowed mode set in hive/lib/scenarios/load.mjs and its gating logic (no integrate-marker gate for live-walk).
+    agent: developer
+  - id: test
+    description: Tests — live-walk loads without integrate marker; unknown mode still rejected; spec-walk/impl-walk regression.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm additive-only; no change to existing mode gating.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/scenarios/load.mjs
+      purpose: loadScenario — the mode allowlist + gating logic lives here.
+
+files_to_modify:
+  - file: hive/lib/scenarios/load.mjs
+    change: Add live-walk to the mode allowlist; skip the integrate-marker gate for live-walk.
+
+design_decisions:
+  - decision: live-walk does not gate on an integrate marker.
+    rationale: It walks a running app, not implementation code; the marker is meaningless for live runs (spike validated scenario as spec-walk for this reason).
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Single-enum loader addition; correctness is a binary load/reject covered by tests, not a moving production metric. The tier's catch-rate is measured at am-4."
+
+references:
+  - path: .pHive/epics/actual-manual-tier/docs/design-discussion.md
+    relevant_excerpt: |
+      §3.5 / §4: Scenario gains a `live-walk` mode value. Purely additive; simulated-manual and
+      existing runners untouched.
