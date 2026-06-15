@@ -90,6 +90,36 @@ test('no-eval: returns { evaluation: null } when no squad_leader_evaluated entri
   assert.deepEqual(result, { evaluation: null });
 });
 
+// --- malformed outcome ---
+
+test('malformed: unknown outcome enum throws TRANSPORT', async (t) => {
+  const origFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = origFetch; });
+  globalThis.fetch = async () => ({
+    status: 200,
+    text: async () => JSON.stringify({ entries: [makeEntry({ details: { outcome: 'bogus', reason: 'x' } })] }),
+  });
+
+  await assert.rejects(
+    () => readSquadEvaluation(ISSUE_ID, makeOptions()),
+    (err) => err?.code === 'TRANSPORT' && /outcome value/.test(err.message),
+  );
+});
+
+test('malformed: missing outcome throws TRANSPORT', async (t) => {
+  const origFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = origFetch; });
+  globalThis.fetch = async () => ({
+    status: 200,
+    text: async () => JSON.stringify({ entries: [makeEntry({ details: { reason: 'no outcome' } })] }),
+  });
+
+  await assert.rejects(
+    () => readSquadEvaluation(ISSUE_ID, makeOptions()),
+    (err) => err?.code === 'TRANSPORT',
+  );
+});
+
 // --- auth failure ---
 
 test('auth failure: HTTP 401 is rethrown as AUTH_FAILURE with multica-init hint', async (t) => {

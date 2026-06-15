@@ -416,17 +416,17 @@ async function getSquadActivity(params: any): Promise<any> {
   });
   const latest = evals[0];
   const details = latest?.details ?? {};
-  const outcome: string | null = details?.outcome ?? null;
-  if (outcome !== null && !SQUAD_OUTCOME_VALUES.has(outcome)) {
+  const outcomeRaw = details?.outcome;
+  if (typeof outcomeRaw !== "string" || !SQUAD_OUTCOME_VALUES.has(outcomeRaw)) {
     throw new AdapterError(
       "TRANSPORT",
-      `Unexpected squad_leader_evaluated outcome value: '${outcome}'`,
+      `Unexpected squad_leader_evaluated outcome value: '${String(outcomeRaw)}'`,
     );
   }
   return {
     actor_type: latest?.actor_type ?? null,
     actor_id: latest?.actor_id ?? null,
-    outcome,
+    outcome: outcomeRaw,
     reason: details?.reason ?? null,
     created_at: latest?.created_at ?? null,
   };

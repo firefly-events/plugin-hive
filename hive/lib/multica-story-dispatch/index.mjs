@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 
 const HTTP_TIMEOUT_MS = 30_000;
 const USER_AGENT = 'hive-multica-story-dispatch/0.1.0';
+const SQUAD_OUTCOME_VALUES = new Set(['action', 'no_action', 'failed']);
 const AGENT_CACHE = new Map();
 
 function sanitize(str, token) {
@@ -505,12 +506,21 @@ export async function readSquadEvaluation(issueId, options = {}) {
   evals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const latest = evals[0];
   const details = latest?.details ?? {};
+  const outcome = details?.outcome;
+  if (typeof outcome !== 'string' || !SQUAD_OUTCOME_VALUES.has(outcome)) {
+    throw dispatchError(
+      'TRANSPORT',
+      `Unexpected squad_leader_evaluated outcome value: '${String(outcome)}'`,
+      undefined,
+      token,
+    );
+  }
 
   return {
     evaluation: {
       actor_type: latest?.actor_type ?? null,
       actor_id: latest?.actor_id ?? null,
-      outcome: details?.outcome ?? null,
+      outcome,
       reason: details?.reason ?? null,
       created_at: latest?.created_at ?? null,
     },

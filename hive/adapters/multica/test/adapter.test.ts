@@ -485,6 +485,62 @@ describe("AC9: getSquadActivity — AUTH_FAILURE on timeline fetch", () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
+// getSquadActivity — malformed outcome → TRANSPORT
+// ──────────────────────────────────────────────────────────────────────────────
+describe("getSquadActivity — malformed outcome rejected", () => {
+  function timelineMock(details: unknown): MockHandler {
+    return (req, res) => {
+      const url = req.url ?? "";
+      if (req.method === "GET" && url === "/api/workspaces") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify([{ id: WORKSPACE_UUID, slug: WORKSPACE_SLUG }]));
+        return;
+      }
+      if (req.method === "GET" && url.includes("/api/issues?workspace_id=") && url.includes("identifier=")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify([{ id: ISSUE_UUID, identifier: ISSUE_IDENTIFIER, title: "T", status: "todo" }]));
+        return;
+      }
+      if (req.method === "GET" && url.includes(`/api/issues/${ISSUE_UUID}/timeline`)) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ entries: [{
+          type: "activity",
+          action: "squad_leader_evaluated",
+          actor_type: "agent",
+          actor_id: "agent-uuid-abc",
+          created_at: "2026-06-10T12:00:00Z",
+          details,
+        }], next_cursor: null }));
+        return;
+      }
+      res.writeHead(404);
+      res.end(JSON.stringify({ error: `No mock for ${req.method} ${url}` }));
+    };
+  }
+
+  for (const [label, details] of [
+    ["unknown enum", { outcome: "bogus", reason: "x" }],
+    ["missing outcome", { reason: "no outcome" }],
+  ] as const) {
+    it(`exits 1 with TRANSPORT for ${label}`, async () => {
+      mockHandler = timelineMock(details);
+      try {
+        const result = await runAdapter({
+          method: "getSquadActivity",
+          params: { id: "plugin-hive/PLU-1" },
+        });
+        assert.strictEqual(result.exitCode, 1, `Expected exit 1, got ${result.exitCode}. stderr: ${result.stderr}`);
+        const parsed = JSON.parse(result.stdout);
+        assert.ok(parsed.error, "Response must have 'error' key");
+        assert.strictEqual(parsed.error.code, "TRANSPORT");
+      } finally {
+        mockHandler = null;
+      }
+    });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
 // AC6: RATE_LIMIT — 429 response
 // ──────────────────────────────────────────────────────────────────────────────
 describe("AC6: RATE_LIMIT", () => {
