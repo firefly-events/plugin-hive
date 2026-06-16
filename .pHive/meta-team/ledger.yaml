@@ -1,3 +1,30 @@
+- experiment_id: meta-2026-06-16
+  date: '2026-06-16'
+  started: '2026-06-16T00:00:00Z'
+  closed: '2026-06-16T00:00:00Z'
+  verdict: passed
+  changes_promoted: 0
+  changes_reverted: 0
+  findings_identified: 0
+  top_changes: []
+  commit: f73f3b60ea5604ddfecb015d89ecb97ca4929943
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 0
+    first_attempt_pass: true
+  rollback_ref: adcfa5af6ccbaea190522bfb7864b1e5baf89a3e
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-16. Structural audit found 0 in-scope findings:
+    all 12 step files complete (7/7), all 25 agents valid, all 13 workflow YAML
+    step_file refs resolve, no MEMORY_GAP findings (all agents >=1 memory), no
+    stale open PRs (all <7 days old). Backlog fallback: mmo-001 suppressed by
+    open PR #288 (meta-meta/nightly-20260613/MANIFEST.md), mmo-002 suppressed
+    by open PR #294 (meta-meta/nightly-20260615/AUDIT-NOTE.md), mmo-003
+    discarded at selection time (# frozen: comment already present at line 1 of
+    develop, written by meta-2026-04-29). No viable candidate. Decision: discard.
+    Cycle closes CLEAN with 0 changes promoted. Queue needs new candidates or
+    open PRs #288/#294 must merge before next cycle can promote work.
 - experiment_id: meta-2026-06-12
   date: '2026-06-12'
   started: '2026-06-12T00:00:00Z'
