@@ -70,6 +70,19 @@ If you've found that:
 
 Each story produces a committed, reviewed state. The orchestrator handles coordination; you provide judgment at the planning and review gates.
 
+### Testing
+
+`/hive:test` runs the test swarm using Playwright (web) and Maestro (mobile) by default. An additional **`actual-manual` tier** is available for vision-cursor fidelity testing — it clicks real pixel-grounded coordinates and verifies each step's outcome, catching render-fidelity failures that the DOM cannot expose.
+
+| Mode | How to enable | What it does |
+|------|--------------|--------------|
+| `simulated` (default) | no config needed | Playwright/Maestro — fast, deterministic |
+| `actual` | `HIVE_TEST_MODE=actual` or `test.mode: actual` in `hive.config.yaml` | Vision-cursor flow runner — pixel-grounded clicks + per-step outcome verification |
+
+**`actual-manual` prerequisite:** a local MLX Qwen2.5-VL sidecar must be running before invoking this tier (provides the grounding model on-device).
+
+**Scope note:** `actual-manual` is web-first (Playwright). Mobile/Maestro binding and CI MLX provisioning are explicit follow-ons. Vision is a targeted escalation — Playwright stays primary; use `actual-manual` when you suspect render-fidelity failures the DOM cannot expose.
+
 ---
 
 ## Commands

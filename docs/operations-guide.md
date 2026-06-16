@@ -171,6 +171,21 @@ All changelog entry format rules — entry shape, bullet shape, source chain, de
 | `/hive:test` | "run tests", "test swarm" | Run the test swarm pipeline |
 | `/hive:ship` | "ship it", "cut a release", "release this" | Close the lifecycle: reconcile story status, author the prose changelog entry (draft → operator review → write), verify version bump, run the project's ship target, generate release post + video script + post ideas |
 
+### Test Modes
+
+`/hive:test` supports multiple execution tiers controlled by `HIVE_TEST_MODE` (env) or `test.mode` in `hive.config.yaml` (env takes precedence).
+
+| Mode | How to enable | What runs | When to use |
+|------|--------------|-----------|-------------|
+| `simulated` (default) | no config needed | Playwright (web) / Maestro (mobile) — native DOM-driven | All standard test runs |
+| `actual` | `HIVE_TEST_MODE=actual` or `test.mode: actual` | **actual-manual** vision-cursor flow runner | Targeted escalation when render-fidelity failures are suspected that the DOM cannot expose |
+
+**`actual-manual` tier — what it does:** a vision-cursor parents the native runner. Native Playwright handles mechanical primitives (fill, click-by-selector, goto, scroll). The vision layer handles only what native cannot: (a) pixel-grounded selectorless clicks via two-pass grounding, and (b) per-step outcome verification. This catches rendering failures the DOM lies about.
+
+**`actual-manual` prerequisite:** a local [MLX Qwen2.5-VL-7B](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct) sidecar must be running before invoking this tier. The sidecar runs on-device (Apple Silicon) and provides the grounding model; no cloud call is made.
+
+**Scope note:** `actual-manual` is web-first. Mobile/Maestro binding and CI MLX provisioning are explicit follow-ons not yet implemented. Vision is a targeted escalation — Playwright stays primary for all standard test execution.
+
 ---
 
 ## Agent Roster & Model Routing
