@@ -15,11 +15,12 @@ Call this skill once at the single `/test` dispatch point where the caller has b
 
 **Inputs:** `env` with at minimum `HIVE_TEST_MODE`; parsed root `hive.config.yaml` containing `test.mode` and `paths.state_dir`; parsed consumer `.pHive/hive.config.yaml` or `None`; `scenario_path` — the resolved scenario file path or story-ID argument; `story_id` when known; `epic_id` when known; and `arguments` containing flag state (e.g. `--execution-mode`). The `--simulated-manual` flag was removed in t-1b; do not reintroduce it in downstream routers or tests.
 
-**Outputs:** `mode_decision` enum `cc-workflows | multica | default`; `sources` map covering `test_mode` so callers can attribute every resolution.
+**Outputs:** `mode_decision` enum `cc-workflows | multica | actual | default`; `sources` map covering `test_mode` so callers can attribute every resolution.
 
 `mode_decision` values:
 - `cc-workflows` — route to `skills/hive/skills/test-mode-cc-workflows/SKILL.md`
 - `multica` — route to `skills/hive/skills/test-mode-multica/SKILL.md`
+- `actual` — route to `skills/hive/skills/test-mode-actual/SKILL.md` (am-4 vision-cursor parent executor)
 - `default` — fall through to the existing local simulated-manual executor
 
 **Side effects:** emit a structured INFO line on every resolve. Emit a loud warning only when consumer config sets `test.mode` to an unknown non-empty value.
@@ -28,8 +29,8 @@ Call this skill once at the single `/test` dispatch point where the caller has b
 
 The mode selection uses these exact match conditions, in precedence order:
 
-1. **Env check:** match when `env.HIVE_TEST_MODE` (as the raw `"HIVE_TEST_MODE=value"` token) resolves to a recognized mode string (`cc-workflows`, `multica`). Env wins over every config or default input.
-2. **Config check:** match when root `hive.config.yaml` has `test.mode: cc-workflows` or `test.mode: multica` and no env override is set.
+1. **Env check:** match when `env.HIVE_TEST_MODE` (as the raw `"HIVE_TEST_MODE=value"` token) resolves to a recognized mode string (`cc-workflows`, `multica`, `actual`). Env wins over every config or default input.
+2. **Config check:** match when root `hive.config.yaml` has `test.mode: cc-workflows`, `test.mode: multica`, or `test.mode: actual` and no env override is set.
 3. **Default fall-through:** when neither env nor config selects a mode, return `mode_decision=default` so the caller invokes the existing local simulated-manual executor.
 
 ## Process
@@ -62,8 +63,8 @@ const { decision, sources } = resolveMode('HIVE_TEST_MODE', ctx);
 Precedence chain: **env > root_config > shipped_baseline > skill_override > default**. Root config corresponds to the parsed root `hive.config.yaml`; shipped baseline and skill override are additive source slots that fall through when no value is present.
 
 - `test_mode`:
-  - env path: raw `HIVE_TEST_MODE=<value>` token, recognized values: `cc-workflows`, `multica`. Unrecognized values are silently ignored per the resolver silencing rule — resolution falls through to next tier.
-  - config path: root `hive.config.yaml test.mode: <value>` — recognized values only (`cc-workflows`, `multica`)
+  - env path: raw `HIVE_TEST_MODE=<value>` token, recognized values: `cc-workflows`, `multica`, `actual`. Unrecognized values are silently ignored per the resolver silencing rule — resolution falls through to next tier.
+  - config path: root `hive.config.yaml test.mode: <value>` — recognized values only (`cc-workflows`, `multica`, `actual`)
   - shipped_baseline: falls through when absent
   - skill_override: falls through when absent
   - default: `auto` (maps to `mode_decision=default` at Step 1)
@@ -84,12 +85,12 @@ Emit one inline telemetry line covering the field resolution:
 
 When `decision` is `default` (no env/config/baseline/override matched): fall through to Step 1. `test_mode=default` does NOT trigger a "fell to defaults" warning — it is the normal non-override path and is expected for runs without explicit mode configuration.
 
-When `decision` is `cc-workflows` or `multica`: immediately set `mode_decision={decision}` and emit INFO. Proceed to Step 1.
+When `decision` is `cc-workflows`, `multica`, or `actual`: immediately set `mode_decision={decision}` and emit INFO. Proceed to Step 1.
 
 Emit a loud warning only when `test.mode` in root config is set to an unknown non-empty value that is not in the recognized set:
 
 ```
-WARNING: test.mode=<value> is not a recognized test mode. Recognized: cc-workflows, multica.
+WARNING: test.mode=<value> is not a recognized test mode. Recognized: cc-workflows, multica, actual.
          Falling through to default (local simulated-manual executor).
          Override in hive.config.yaml (test.mode) or env (HIVE_TEST_MODE).
 ```
@@ -116,6 +117,12 @@ Switch on `mode_decision`:
   ```
   Wait for the structured return from the atom skill. Forward the return summary to the caller.
 
+- **`actual`:** invoke `skills/hive/skills/test-mode-actual/SKILL.md` with the full invocation contract:
+  ```text
+  invoked with scenario_path, scenario, story, story_path, epic_handle, story_id, hive_config, integration_branch
+  ```
+  Wait for the structured return from the atom skill (am-4 vision-cursor parent executor wrapping Playwright). Forward the return summary to the caller.
+
 - **`default`:** fall through to the existing local simulated-manual executor (`hive/workflows/steps/test/simulated-manual.md`). This is the pre-dispatch path; test-dispatch does not own its lifecycle beyond forwarding.
 
 Do NOT silently fall back from `cc-workflows` or `multica` to `default` after a mode has been selected. If the chosen atom returns a `precondition_failed` error, surface it to the caller; fallback is the caller's (`/test`) responsibility, not this router's.
@@ -126,7 +133,7 @@ Return the resolution result and dispatch outcome to the caller:
 
 ```js
 {
-  mode_decision,  // 'cc-workflows' | 'multica' | 'default'
+  mode_decision,  // 'cc-workflows' | 'multica' | 'actual' | 'default'
   sources,        // { env?: string, root_config?: string, shipped_baseline?: string, skill_override?: string, default?: string }
 }
 ```
@@ -159,21 +166,21 @@ This skill is the single dispatch point for `/test` mode selection. Callers must
 
 ```yaml
 test:
-  mode: cc-workflows   # or: multica
+  mode: cc-workflows   # or: multica, actual
 ```
 
 Environment override:
 
 ```sh
-HIVE_TEST_MODE=cc-workflows
+HIVE_TEST_MODE=cc-workflows  # or: multica, actual
 ```
 
 Runtime source priority:
 
 | Tier | Source | Example |
 |---|---|---|
-| 1 (highest) | env `HIVE_TEST_MODE` | `HIVE_TEST_MODE=cc-workflows` |
-| 2 | root `hive.config.yaml` | `test.mode: multica` |
+| 1 (highest) | env `HIVE_TEST_MODE` | `HIVE_TEST_MODE=cc-workflows` (or `multica`, `actual`) |
+| 2 | root `hive.config.yaml` | `test.mode: multica` (or `cc-workflows`, `actual`) |
 | 3 | shipped baseline | additive slot, falls through when absent |
 | 4 | skill override | additive slot, falls through when absent |
 | 5 (lowest) | default | `auto` → `mode_decision=default` |
@@ -183,6 +190,7 @@ Runtime source priority:
 - `hive/lib/mode-resolver.mjs` — 5-tier resolver consumed at Step 0. `HIVE_TEST_MODE` is a registered varName in the 6-name registry.
 - `skills/hive/skills/test-mode-cc-workflows/SKILL.md` — atom for `mode_decision=cc-workflows`.
 - `skills/hive/skills/test-mode-multica/SKILL.md` — atom for `mode_decision=multica`.
+- `skills/hive/skills/test-mode-actual/SKILL.md` — atom for `mode_decision=actual` (am-4 vision-cursor parent executor).
 - `skills/test/SKILL.md` — caller; delegates to this router at `/test` Phase 0 dispatch point.
 
 Key references:
