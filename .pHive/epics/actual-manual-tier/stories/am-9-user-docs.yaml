@@ -49,7 +49,7 @@ files_to_modify:
 
 design_decisions:
   - decision: Docs are a gating part of "done", produced by the technical-writer.
-    rationale: New top-level capability needs README + operations-guide entries (feedback: new-command-needs-user-docs); doc-type work routes through the writer.
+    rationale: "New top-level capability needs README + operations-guide entries (feedback: new-command-needs-user-docs); doc-type work routes through the writer."
 
 cross_cutting: []
 

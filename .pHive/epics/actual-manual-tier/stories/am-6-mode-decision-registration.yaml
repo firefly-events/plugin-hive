@@ -55,7 +55,7 @@ files_to_modify:
 
 design_decisions:
   - decision: Mirror the multica/sandcastle registration seam exactly.
-    rationale: Consistency with existing mode_decision enums; env-over-config is the established precedence (memory: phase-d/mode patterns).
+    rationale: "Consistency with existing mode_decision enums; env-over-config is the established precedence (memory: phase-d/mode patterns)."
 
 cross_cutting: []
 
