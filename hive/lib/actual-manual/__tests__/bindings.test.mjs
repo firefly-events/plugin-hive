@@ -249,6 +249,38 @@ test('rejects overlay missing scenario field', () => {
   assert.match(err.message, /"scenario"/);
 });
 
+// ── Scenario mismatch ─────────────────────────────────────────────────────────
+
+test('rejects overlay authored for a different scenario', () => {
+  const dir = makeTmp();
+  try {
+    const filePath = writeOverlay(dir, {
+      scenario: 'other-scenario',
+      steps: [{ how: 'native', act: 'goto', args: { url: 'https://x.com' } }],
+    });
+    const err = assertThrows(() => loadBindings(filePath, 'expected-scenario'));
+    assert.equal(err.code, 'VALIDATION_ERROR');
+    assert.match(err.message, /different scenario/);
+    assert.match(err.message, /other-scenario/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('accepts overlay when no concrete scenario id is required', () => {
+  const dir = makeTmp();
+  try {
+    // loadBindings without an expected id infers from doc.scenario → no mismatch.
+    const filePath = writeOverlay(dir, {
+      scenario: 'whatever-id',
+      steps: [{ how: 'native', act: 'goto', args: { url: 'https://x.com' } }],
+    });
+    assert.doesNotThrow(() => loadBindings(filePath));
+  } finally {
+    cleanup(dir);
+  }
+});
+
 // ── Empty steps ───────────────────────────────────────────────────────────────
 
 test('rejects overlay with empty steps array', () => {

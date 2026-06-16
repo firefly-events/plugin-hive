@@ -157,6 +157,35 @@ def probe(handle: SidecarHandle) -> ProbeState:
         return "not_ready"
 
 
+def probe_ready(
+    host: str = _DEFAULT_HOST,
+    port: int = _DEFAULT_PORT,
+    timeout: float = 2.0,
+) -> dict:
+    """
+    Readiness check for an EXTERNALLY-managed sidecar, by host/port — no
+    SidecarHandle/PID required.
+
+    Used by /test actual Step 1 to confirm a separately-launched MLX server is
+    serving before scenario execution. stdlib urllib only (no curl/wget).
+
+    Returns a dict (not a bare ProbeState) so callers can surface a reason:
+        {"state": "ready",     "detail": "..."} — /v1/models returned HTTP 200
+        {"state": "not_ready", "detail": "..."} — reachable but non-200
+        {"state": "error",     "detail": "..."} — connection refused / timeout / socket error
+    """
+    url = f"http://{host}:{port}/v1/models"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            if resp.status == 200:
+                return {"state": "ready", "detail": f"{url} returned 200"}
+            return {"state": "not_ready", "detail": f"{url} returned HTTP {resp.status}"}
+    except urllib.error.HTTPError as e:
+        return {"state": "not_ready", "detail": f"{url} returned HTTP {e.code}"}
+    except (urllib.error.URLError, OSError) as e:
+        return {"state": "error", "detail": f"cannot reach {url}: {e}"}
+
+
 def wait_ready(
     handle: SidecarHandle,
     timeout: float = 120.0,
@@ -240,7 +269,10 @@ def _cli() -> None:
             try:
                 state = wait_ready(handle, timeout=args.timeout)
             except TimeoutError as e:
-                print(json.dumps({"state": "timeout", "pid": handle.pid, "error": str(e)}))
+                # Kill the started-but-never-ready server so a wedged MLX
+                # process is not orphaned on the port for the next run.
+                stop(handle)
+                print(json.dumps({"state": "timeout", "pid": handle.pid, "error": str(e), "stopped": True}))
                 sys.exit(1)
             print(json.dumps({"state": state, "pid": handle.pid, "port": cfg.port}))
             if state != "ready":

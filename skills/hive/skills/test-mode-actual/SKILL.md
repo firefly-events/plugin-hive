@@ -198,9 +198,9 @@ Load the scenario and its overlay before execution:
 Invoke the am-4 flow-runner executor:
 
 ```js
-import { runFlow } from '../../../hive/lib/actual-manual/flow-runner.mjs';
+import { runActualFlow } from '../../../hive/lib/actual-manual/flow-runner.mjs';
 
-const report = await runFlow({
+const report = await runActualFlow({
   scenario,
   overlay,
   mlxEndpoint: `http://${mlxHost}:${mlxPort}`,
@@ -210,6 +210,11 @@ const report = await runFlow({
   stepTimeoutMs: (hive_config?.test?.actual?.step_timeout_seconds ?? 30) * 1000,
 });
 ```
+
+`runActualFlow` owns the Playwright browser/context/page lifecycle and closes
+it on completion. To run against an already-authenticated page (caller owns
+teardown), pass `page` in the options object; the low-level
+`runFlow(page, scenario, overlay, opts)` export remains available for that path.
 
 `runFlow` returns the per-step report:
 

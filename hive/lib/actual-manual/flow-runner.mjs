@@ -59,13 +59,17 @@ const DEFAULTS = {
     height: Number(process.env.VIEWPORT_H ?? 800),
   },
   baseUrl: process.env.BASE_URL || 'http://localhost:3100',
+  // Per-MLX-request wall-clock timeout. Without this a wedged sidecar (TCP
+  // accepted, response never completes) hangs the whole /test actual run.
+  timeoutMs: Number(process.env.MLX_TIMEOUT_MS ?? 30000),
 };
 
 // ─── MLX helper ──────────────────────────────────────────────────────────────
 
-async function ask(b64, text, { mlx, model } = {}) {
+async function ask(b64, text, { mlx, model, timeoutMs } = {}) {
   const endpoint = mlx || DEFAULTS.mlx;
   const mdl = model || DEFAULTS.model;
+  const to = timeoutMs ?? DEFAULTS.timeoutMs;
   const body = {
     model: mdl,
     temperature: 0,
@@ -75,11 +79,23 @@ async function ask(b64, text, { mlx, model } = {}) {
       { type: 'text', text },
     ]}],
   };
-  const r = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let r;
+  try {
+    r = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      // AbortSignal.timeout throws a TimeoutError; callers (locate/verify) run
+      // inside runFlow's per-step try/catch, surfacing it via rec.actError /
+      // rec.verify.why like any other MLX failure.
+      signal: AbortSignal.timeout(to),
+    });
+  } catch (e) {
+    if (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+      throw new Error(`MLX timeout after ${to}ms (${endpoint})`);
+    }
+    throw e;
+  }
   if (!r.ok) throw new Error(`MLX ${r.status}: ${(await r.text()).slice(0, 160)}`);
   return (await r.json()).choices?.[0]?.message?.content ?? '';
 }
@@ -181,7 +197,8 @@ export async function visionTap(page, label, opts = {}) {
   const snapR = opts.snapR ?? DEFAULTS.snapR;
 
   let g = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  const maxAttempts = opts.retryLimit ?? 3;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     await settle(page);
     let loc = await locate(page, label, false, opts);
     if (!loc.found) {
@@ -190,7 +207,11 @@ export async function visionTap(page, label, opts = {}) {
         const scrollH = await page.evaluate(
           () => (document.scrollingElement || document.documentElement).scrollHeight,
         );
-        const docY = Math.round((full.iy / full.H) * scrollH);
+        // In normalized mode the model returns 0-1000 coords, NOT pixels —
+        // divide by 1000, not the full-page PNG height.
+        const coordsMode = opts.coords || DEFAULTS.coords;
+        const fracY = coordsMode === 'norm' ? (full.iy / 1000) : (full.iy / full.H);
+        const docY = Math.round(fracY * scrollH);
         await page.evaluate(
           (y) => { (document.scrollingElement || document.documentElement).scrollTo({ top: Math.max(0, y), behavior: 'instant' }); },
           docY - Math.round(vp.height / 2),
@@ -247,15 +268,24 @@ export async function native(page, step, opts = {}) {
       await page.waitForLoadState('networkidle').catch(() => {});
       break;
     }
-    case 'fill':
-      await page.locator(args.selector).first().fill(args.text || '');
+    case 'fill': {
+      // Overlay schema/tests accept `value`; runner historically read `text`.
+      // Accept both so a valid overlay never silently fills ''.
+      const text = args.text ?? args.value ?? '';
+      await page.locator(args.selector).first().fill(text);
       break;
+    }
     case 'tapRole':
       await page.getByRole(args.role, { name: new RegExp(args.name, 'i') }).first().click();
       break;
-    case 'tapText':
-      await page.getByText(new RegExp(args.name, 'i')).first().click();
+    case 'tapText': {
+      // Tests/overlays use `text`; legacy callers used `name`. Accept both so
+      // we never build /undefined/i and click an unintended element.
+      const name = args.name ?? args.text;
+      if (name == null) throw new Error('tapText requires args.text or args.name');
+      await page.getByText(new RegExp(name, 'i')).first().click();
       break;
+    }
     case 'wait':
       await page.waitForTimeout(args.ms || 300);
       break;
@@ -302,11 +332,14 @@ async function evalTruthSignal(page, signal, networkState) {
 export async function runFlow(page, scenario, binding, opts = {}) {
   const networkState = { posted: false };
 
-  page.on('request', (req) => {
+  // Named handler so we can detach it — callers may reuse an authenticated
+  // page/context across runs; an anonymous listener would accumulate.
+  const onRequest = (req) => {
     if (req.url().includes('/api/social/post') && req.method() === 'POST') {
       networkState.posted = true;
     }
-  });
+  };
+  page.on('request', onRequest);
 
   const report = [];
 
@@ -358,6 +391,8 @@ export async function runFlow(page, scenario, binding, opts = {}) {
     }
   } catch (e) {
     report.push({ fatal: String(e.message || e).split('\n')[0] });
+  } finally {
+    page.off('request', onRequest);
   }
 
   const steps = report.filter((r) => !r.fatal);
@@ -387,6 +422,73 @@ export async function runFlow(page, scenario, binding, opts = {}) {
       expected: r.expected,
     }),
   };
+}
+
+// ─── High-level actual-mode executor ──────────────────────────────────────────
+//
+// Documented /test actual entry point. Accepts the single-object shape the
+// test-mode-actual skill uses, owns Playwright browser/context/page lifecycle
+// (close in finally), maps documented option names onto the low-level runFlow
+// opts, and returns the same RunReport. The low-level runFlow(page, scenario,
+// binding, opts) stays the CLI / caller-owns-page surface.
+//
+// @param {object} options
+//   scenario       — parsed scenario object ({ id, steps })           [required]
+//   overlay        — validated binding object ({ scenario, steps })   [required]
+//   mlxEndpoint    — MLX completions URL        → opts.mlx
+//   mlxModel       — MLX model id               → opts.model
+//   snapDom        — boolean; false → snapR 0 (DOM-snap OFF per §3)
+//   retryLimit     — vision-tap attempt cap     → opts.retryLimit
+//   stepTimeoutMs  — per-MLX-request timeout    → opts.timeoutMs
+//   baseUrl/coords/viewport/headless — optional overrides
+//   page           — optional pre-built Playwright Page (caller owns teardown)
+//   onStep         — optional per-step callback
+
+export async function runActualFlow(options = {}) {
+  const {
+    scenario, overlay,
+    mlxEndpoint, mlxModel,
+    snapDom = false, retryLimit, stepTimeoutMs,
+    baseUrl, coords, viewport, headless = true,
+    page: providedPage, onStep,
+  } = options;
+
+  if (!scenario || typeof scenario !== 'object') {
+    throw new Error('runActualFlow: options.scenario (parsed scenario object) is required');
+  }
+  if (!overlay || typeof overlay !== 'object') {
+    throw new Error('runActualFlow: options.overlay (validated binding object) is required');
+  }
+
+  const opts = {
+    mlx: mlxEndpoint || DEFAULTS.mlx,
+    model: mlxModel || DEFAULTS.model,
+    coords: coords || DEFAULTS.coords,
+    snapR: snapDom ? (DEFAULTS.snapR || 12) : 0,
+    viewport: viewport || DEFAULTS.viewport,
+    baseUrl: baseUrl || DEFAULTS.baseUrl,
+    retryLimit: retryLimit ?? 3,
+    timeoutMs: stepTimeoutMs ?? DEFAULTS.timeoutMs,
+    onStep,
+  };
+
+  // Caller supplied a page → run directly; caller owns navigation + teardown.
+  if (providedPage) {
+    return runFlow(providedPage, scenario, overlay, opts);
+  }
+
+  // Otherwise own the full Playwright lifecycle.
+  const { chromium } = await import('playwright');
+  const browser = await chromium.launch({ headless });
+  try {
+    const context = await browser.newContext({ viewport: opts.viewport });
+    const page = await context.newPage();
+    await page.goto(opts.baseUrl + '/', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle').catch(() => {});
+    return await runFlow(page, scenario, overlay, opts);
+  } finally {
+    await browser.close();
+  }
 }
 
 // ─── CLI entry point ──────────────────────────────────────────────────────────

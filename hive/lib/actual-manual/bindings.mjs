@@ -116,6 +116,19 @@ export function validateBindings(doc, scenarioId) {
     );
   }
 
+  // Reject a stale overlay authored for a DIFFERENT scenario. Steps are mapped
+  // by index in runFlow, so a mismatched overlay would silently drive the live
+  // browser through the wrong actions. Only enforce when the caller passed a
+  // concrete expected id (loadBindings with scenarioId); '(unknown)' = inferred.
+  if (scenarioId && scenarioId !== '(unknown)' && doc.scenario !== scenarioId) {
+    throw makeError(
+      'VALIDATION_ERROR',
+      `scenario "${scenarioId}": overlay is for a different scenario (doc.scenario="${doc.scenario}")`,
+      scenarioId,
+      null,
+    );
+  }
+
   if (!Array.isArray(doc.steps) || doc.steps.length === 0) {
     throw makeError(
       'VALIDATION_ERROR',
