@@ -9,6 +9,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- **Actual-manual test tier — vision-cursor flow runner (web-first).** New live-runtime test tier where a vision-cursor flow runner drives the real app and a sidecar model judges pixel-level fidelity. Bridge-surface charter + dep scoping (am-1), flow-bindings overlay schema/loader/reference (am-2), `live-walk` scenario mode (am-3), spike flow-runner ported into a Hive bridge surface (am-4), MLX Qwen sidecar lifecycle + readiness probe (am-5), `actual` mode registration in test-dispatch with env-over-config precedence (am-6), `test-mode-actual` atomic skill mirroring `test-mode-multica` (am-7), test-architect overlay-authoring guidance (am-8), and README Quick Start + operations-guide docs (am-9). Executed end-to-end via local Multica (`developer` agent, single-agent mode).
+
+### Changed
+
+- **`actual-manual-tier` release finalization.** `/execute` applied the planned `minor` version bump (`2.11.0` → `2.12.0`) and kept plugin version sources in lockstep.
+
 ## [2.11.0] - 2026-06-11
 
 **State-dir relocation, KG signal activation, and full substrate coverage — configurable state directory across all three runtimes, a knowledge graph that finally emits from production, and dispatch routers for every workflow mode.**
