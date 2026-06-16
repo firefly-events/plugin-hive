@@ -39,6 +39,7 @@ bridge or shim. It must not be treated as precedent for new subsystem ownership.
 | Task-tracking adapters | Node / TypeScript | Bridge |
 | Anthropic session stack (`hive/lib/session-*`, `messages-session.js`) | Node | Bridge |
 | Sandcastle provider and worker paths (`hive/lib/sandcastle-*`) | Node | Bridge |
+| Actual-manual vision-cursor runner (`hive/lib/actual-manual/`) | Node | Bridge |
 | Claude Code hooks (`hooks/*.sh`) | Shell | Shim |
 | OS sidecar / lifecycle scripts requiring host shell behavior | Shell | Shim |
 
@@ -59,6 +60,12 @@ migration proceeds.
 - **Task-tracking adapters** (`hive/lib/task-tracking-dispatch/` + adapters) — ESM/TS
   ABI with dynamic import. Disposition: deferred (revisit when the adapter ABI language
   contract is decided).
+- **Actual-manual vision-cursor runner** (`hive/lib/actual-manual/`) — Playwright
+  browser automation + MLX HTTP client for local Qwen2.5-VL grounding. Web-first;
+  isolated behind this bridge. Grounding/verify logic that can be Python should be
+  (MLX sidecar lifecycle is Python per am-5; the in-runner MLX HTTP call stays Node).
+  Bridged-indefinite: Playwright's Node ABI and the MLX HTTP integration cannot be
+  re-expressed in Python without losing the execution substrate.
 
 ## Dependency Policy
 

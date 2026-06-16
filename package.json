@@ -12,6 +12,10 @@
     "js-yaml": "4.2.0",
     "openai": "6.42.0",
     "tsx": "4.22.4",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "playwright": "1.52.0"
+  },
+  "_surfaceScopes": {
+    "playwright": "actual-manual bridge surface (hive/lib/actual-manual/) — Playwright browser automation for vision-cursor flow runner"
   }
 }
