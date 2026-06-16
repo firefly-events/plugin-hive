@@ -13,7 +13,7 @@
  *   id: string (required, kebab-case)
  *   title: string (required, non-empty)
  *   description: string (optional)
- *   mode: 'spec-walk' | 'implementation-walk' (required)
+ *   mode: 'spec-walk' | 'implementation-walk' | 'live-walk' (required)
  *   story: string (optional — required for implementation-walk marker check)
  *   epic: string (optional — required for implementation-walk marker check)
  *   preconditions: string[] (optional)
@@ -42,7 +42,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { resolveStateDir } from '../config.js';
 
-const VALID_MODES = new Set(['spec-walk', 'implementation-walk']);
+const VALID_MODES = new Set(['spec-walk', 'implementation-walk', 'live-walk']);
 const CANONICAL_TOP_LEVEL_FIELDS = new Set([
   'id',
   'title',
