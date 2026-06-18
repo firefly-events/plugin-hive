@@ -30,7 +30,7 @@ the original user request, and on a **revision pass** a grill-record from Phase 
 5. **Dependencies and Constraints** (~20 lines) — what this rests on and must respect.
 6. **Open Questions** (~20 lines) — unresolved items needing a decision (these surface at the design gate).
 7. **Verification Strategy** (~20 lines) — how the resulting work will be proven correct.
-8. **Scale Assessment** (~30 lines) — small / medium / large, with the reasoning that drives H/V vs straight-to-stories.
+8. **Scale Assessment** (~30 lines) — small / medium / large, with the reasoning that drives H/V vs straight-to-stories. End the block with a structured scope-class hint on its own line: `SCOPE_CLASS: single-epic | multi-epic | prd` (pick one; this feeds the scope-class guard in `/plan --lite`).
 
 On a revision pass, add the grill-record consumption per the template (fold resolved
 points in; do not silently drop contested items).
@@ -54,6 +54,24 @@ models tend to bullet-dump.)
 ## Output
 
 Write to `.pHive/epics/{epic-id}/docs/design-discussion.md`.
+
+Where a design includes a visual (wireframe, diagram, or annotated screenshot), embed it using a `<figure>` slot. Place the slot on its own line between paragraphs so it degrades gracefully in terminal and grep is unaffected:
+
+```html
+<figure data-src="state/wireframes/{epic-id}/{story-id}/name.png" data-alt="Brief description">
+  <!-- placeholder: Brief description -->
+</figure>
+```
+
+Use `data-src` for a known Frame0 PNG path; use `data-placeholder="description"` (no `data-src`) when the image does not exist yet. Do not nest prose inside `<figure>`.
+
+After writing the markdown file, invoke the sidecar HTML generator to produce a `.html` sibling for browser preview:
+
+```
+lib/html-sidecar-gen generateSidecar(".pHive/epics/{epic-id}/docs/design-discussion.md")
+```
+
+The generator is non-blocking — if it fails, log a warning and continue. The `.html` file is not committed to git by default (generated on-demand).
 
 ## What this skill is NOT
 
