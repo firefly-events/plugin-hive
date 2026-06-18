@@ -477,6 +477,27 @@ function timelineUrl(serverUrl, workspaceId, issueUuid) {
   return `${trimTrailingSlash(serverUrl)}/api/issues/${encodeURIComponent(issueUuid)}/timeline?workspace_id=${encodeURIComponent(workspaceId)}`;
 }
 
+export function parseSquadActivityFromEntries(entries) {
+  const evals = entries.filter(
+    (e) => e?.type === 'activity' && e?.action === 'squad_leader_evaluated',
+  );
+  if (evals.length === 0) return null;
+  evals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const latest = evals[0];
+  const details = latest?.details ?? {};
+  const outcomeRaw = details?.outcome;
+  if (typeof outcomeRaw !== 'string' || !SQUAD_OUTCOME_VALUES.has(outcomeRaw)) {
+    throw new Error(`Unexpected squad_leader_evaluated outcome value: '${String(outcomeRaw)}'`);
+  }
+  return {
+    actor_type: latest?.actor_type ?? null,
+    actor_id: latest?.actor_id ?? null,
+    outcome: outcomeRaw,
+    reason: details?.reason ?? null,
+    created_at: latest?.created_at ?? null,
+  };
+}
+
 export async function readSquadEvaluation(issueId, options = {}) {
   const { serverUrl, token, workspaceId } = options;
   const url = timelineUrl(serverUrl, workspaceId, issueId);
@@ -497,32 +518,10 @@ export async function readSquadEvaluation(issueId, options = {}) {
   }
 
   const entries = Array.isArray(body) ? body : (body?.entries ?? body?.data ?? []);
-  const evals = entries.filter(
-    (e) => e?.type === 'activity' && e?.action === 'squad_leader_evaluated',
-  );
-
-  if (evals.length === 0) return { evaluation: null };
-
-  evals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  const latest = evals[0];
-  const details = latest?.details ?? {};
-  const outcome = details?.outcome;
-  if (typeof outcome !== 'string' || !SQUAD_OUTCOME_VALUES.has(outcome)) {
-    throw dispatchError(
-      'TRANSPORT',
-      `Unexpected squad_leader_evaluated outcome value: '${String(outcome)}'`,
-      undefined,
-      token,
-    );
+  try {
+    const evaluation = parseSquadActivityFromEntries(entries);
+    return { evaluation };
+  } catch (err) {
+    throw dispatchError('TRANSPORT', err.message, undefined, token);
   }
-
-  return {
-    evaluation: {
-      actor_type: latest?.actor_type ?? null,
-      actor_id: latest?.actor_id ?? null,
-      outcome,
-      reason: details?.reason ?? null,
-      created_at: latest?.created_at ?? null,
-    },
-  };
 }

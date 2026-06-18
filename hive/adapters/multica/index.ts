@@ -15,6 +15,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { parseSquadActivityFromEntries } from "../../lib/multica-story-dispatch/index.mjs";
+
 const DEFAULT_WORKSPACE_SLUG = "plugin-hive";
 const HTTP_TIMEOUT_MS = 30000;
 const STATUS_VALUES = new Set([
@@ -24,8 +26,6 @@ const STATUS_VALUES = new Set([
   "done",
   "cancelled",
 ]);
-
-const SQUAD_OUTCOME_VALUES = new Set(["action", "no_action", "failed"]);
 
 interface Request {
   method: string;
@@ -405,31 +405,11 @@ async function getSquadActivity(params: any): Promise<any> {
     `/api/issues/${encodeURIComponent(issueUuid)}/timeline?workspace_id=${encodeURIComponent(workspaceId)}`,
   );
   const entries: any[] = Array.isArray(body) ? body : body?.entries ?? body?.data ?? [];
-  const evals = entries.filter(
-    (e: any) => e?.type === "activity" && e?.action === "squad_leader_evaluated",
-  );
-  if (evals.length === 0) return null;
-  evals.sort((a: any, b: any) => {
-    const ta = new Date(a.created_at).getTime();
-    const tb = new Date(b.created_at).getTime();
-    return tb - ta;
-  });
-  const latest = evals[0];
-  const details = latest?.details ?? {};
-  const outcomeRaw = details?.outcome;
-  if (typeof outcomeRaw !== "string" || !SQUAD_OUTCOME_VALUES.has(outcomeRaw)) {
-    throw new AdapterError(
-      "TRANSPORT",
-      `Unexpected squad_leader_evaluated outcome value: '${String(outcomeRaw)}'`,
-    );
+  try {
+    return parseSquadActivityFromEntries(entries);
+  } catch (err: any) {
+    throw new AdapterError("TRANSPORT", err.message ?? String(err));
   }
-  return {
-    actor_type: latest?.actor_type ?? null,
-    actor_id: latest?.actor_id ?? null,
-    outcome: outcomeRaw,
-    reason: details?.reason ?? null,
-    created_at: latest?.created_at ?? null,
-  };
 }
 
 export async function dispatch(req: Request): Promise<any> {
