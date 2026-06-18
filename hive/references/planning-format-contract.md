@@ -132,14 +132,16 @@ touchpoint (see `hive/references/wireframe-protocol.md`).
 
 ```html
 <figure>
-  <img src="state/wireframes/{epic-id}/{story-id}/approved.png"
+  <img src="../../../../state/wireframes/{epic-id}/{story-id}/approved.png"
        alt="{descriptive alt text}">
   <figcaption>{caption describing the wireframe context}</figcaption>
 </figure>
 ```
 
-Use a relative path from the planning document's location. Confirm the file exists before
-writing the reference — a broken `<img src>` is worse than a placeholder.
+Use a path relative to the planning document's location. The `../../../../` prefix above
+walks up from the doc dir (`.pHive/epics/{epic-id}/docs/`) to the repo root, where
+`state/wireframes/` lives. Confirm the file exists before writing the reference — a broken
+`<img src>` is worse than a placeholder.
 
 ### Step 2b — Wireframe absent: use data-placeholder
 

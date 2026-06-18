@@ -176,6 +176,13 @@ completion are artifact-readiness signals, not user review approvals.
 
 ### Phase A: Research
 
+**`--skip-research` honor.** When `--skip-research` is set, skip the research
+substeps of this phase (step 1 codebase research + step 2 research-brief
+production) and proceed directly to Phase B (design discussion), reusing an
+existing `.pHive/epics/{epic-id}/docs/research-brief.md` if present. The
+pre-flight substeps below (0a git_flow resolution, 0 prior-decision query) still
+run — they are not research and downstream phases depend on them.
+
 0a. **Pre-flight: resolve git_flow (pe-5).** Immediately after the kickoff gate passes (and before any researcher / writer dispatch), call `resolveGitFlow({ cwd })` from `hive/lib/git_flow.mjs` (pe-1) and store the result on the planning context as `${git_flow_resolution}`. The two fields you persist downstream are `base_branch` and `branch_strategy`:
 
    ```bash
@@ -238,6 +245,14 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
    `planning.mode: cc-workflows` or `planning.mode: multica`. CC-Workflows or
    Multica planning output may feed the document, but neither must auto-advance
    user feedback, scale selection, or routing.
+
+   **`--skip-sign-off` honor.** When `--skip-sign-off` is set, do NOT wait for
+   explicit user confirmation at this gate: present the document as a summary and
+   auto-advance with the recommended scale assessment. The same skip applies to
+   the H/V review gate (step 8 / step 9) and the structured-outline sign-off gate
+   (step 10) — those steps present their summary and proceed without blocking.
+   This is the single decision-point honoring of the flag documented above; all
+   other phases run unchanged.
 
    After collecting user feedback, evaluate the scale and **announce the routing decision inline** — no separate confirmation step:
 

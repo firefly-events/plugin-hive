@@ -194,8 +194,8 @@ After collecting user feedback on the design discussion (plan skill step 5), app
 | Medium | `--gate-hv` | Run H/V planning (Phase B2), present step 9 gate to user |
 | Medium | `--fast` | Skip H/V entirely — proceed directly to Phase C (stories) |
 | Medium | `--lite` | Skip review gates + H/V + outline — proceed directly to Phase C (token-economy umbrella; design discussion still produced) |
-| Large | any | Run H/V planning (Phase B2) + structured outline (Phase B3), always present step 9 gate to user |
-| Large | `--lite` | H/V + outline still required; collaborative review gates skipped (reduced effect at large scope) |
+| Large | any (except `--lite`) | Run H/V planning (Phase B2) + structured outline (Phase B3), always present step 9 gate to user |
+| Large | `--lite` | H/V + outline still required; collaborative review gates skipped (reduced effect at large scope). This row takes precedence over `Large \| any` when `--lite` is present. |
 | Any | `--skip-sign-off` | Skip user-facing sign-off gates (design discussion, H/V, structured-outline); orchestrator auto-advances without waiting for explicit confirmation |
 | Any | `--skip-research` | Skip Phase A research entirely; proceed from team assembly directly to design discussion (use when research brief already exists or requirement is self-contained) |
 
