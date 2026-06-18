@@ -228,6 +228,18 @@ The two human gates remain unchanged: one after planning, and one after review. 
 
 **Multica dispatch (opt-in).** Set `execution.mode: multica` in hive.config.yaml or `HIVE_EXECUTION_MODE=multica` to route /execute through Multica agents. Each story dispatches as one assignment to the `developer` persona (declared in .pHive/multica/agents.yaml, bootstrapped via /hive:multica-init). One episode marker per story. Requires the spike daemon running and agents bootstrapped — fails loud otherwise.
 
+### Agent lifecycle across stories
+
+Under the Multica/sandcastle execution substrate, **each story is dispatched as a fresh agent invocation**. The agent starts with no memory of prior stories in the same epic, executes exactly the work described in its issue, then exits. Context isolation is guaranteed by the substrate — not by any Hive-level config key.
+
+This means:
+
+- **No stale context accumulates.** An agent implementing story N cannot be confused by story N−1's working state, partial writes, or in-flight tool calls.
+- **No explicit teardown is needed.** There is no long-lived teammate to respawn, recycle, or reset between stories.
+- **Continuity across stories flows through artifacts, not agent memory.** Episode markers, commits, and the knowledge graph carry state forward. A fresh agent reads those artifacts at the start of its run and picks up where the prior agent left off.
+
+**Why a respawn-per-task lifecycle mode was never built (Workstream B).** The 2026-04 plan included a Workstream B that would have added a `respawn_per_task` lifecycle option (configurable via a `teammate_lifecycle` key) for development teammates running inside a long-lived session. That design made sense against the in-session TeamCreate execution model, where a single teammate persists across stories and must be deliberately cycled to reset context. When the execution substrate moved to Multica/sandcastle — where per-story fresh-agent dispatch is native — the problem Workstream B was solving ceased to exist. Building a separate config-driven respawn mechanism would have duplicated what the substrate already guarantees for free. The feature was dropped in June 2026 and replaced with this note. There is no `teammate_lifecycle` key and no `respawn_per_task` flag; neither was ever shipped.
+
 ---
 
 ## UI Team Skills
