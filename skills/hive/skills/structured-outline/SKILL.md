@@ -66,6 +66,14 @@ findings. Build on the design discussion — don't repeat it.
 
 Write to `.pHive/epics/{epic-id}/docs/structured-outline.md` (or as the task specifies).
 
+After writing the markdown file, invoke the sidecar HTML generator to produce a `.html` sibling for browser preview:
+
+```
+lib/html-sidecar-gen generateSidecar(".pHive/epics/{epic-id}/docs/structured-outline.md")
+```
+
+The generator is non-blocking — if it fails, log a warning and continue. The `.html` file is not committed to git by default (generated on-demand).
+
 After writing the markdown file, record token metrics:
 
 ```

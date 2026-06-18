@@ -4,9 +4,9 @@ Authoritative reference for allowed embedded content, image sourcing, diagram co
 sidecar generation, and terminal-degradation expectations across all Hive planning document
 types.
 
-**Living document.** Sections marked `(S4+)` or `(S5+)` are stubs added for structural
-completeness; they will be filled in by the corresponding D-expansion slices. Do not
-restructure the document when adding content — append to the appropriate section.
+**Living document.** Sections marked `(S5+)` are stubs added for structural completeness;
+they will be filled in by the corresponding D-expansion slices. Do not restructure the
+document when adding content — append to the appropriate section.
 
 **Cross-referenced by:** `hive/agents/orchestrator.md`
 
@@ -16,12 +16,12 @@ restructure the document when adding content — append to the appropriate secti
 
 The canonical format and permitted embedded content for each planning document type.
 
-| Doc type | Canonical format | Embedded content (S1) | Sidecar | Notes |
+| Doc type | Canonical format | Embedded content | Sidecar | Notes |
 |---|---|---|---|---|
 | `design-discussion` | Markdown | `<figure>` image slots | `.html` generated on write | Wireframe slots filled from discovery protocol (§5) |
-| `structured-outline` | Markdown | `<figure>` optional; Mermaid dep map (S4+) | `.html` generated on write (S4+) | Figures optional in S1; Mermaid dep map added in S4 |
-| `horizontal-plan` | Markdown | Mermaid layer diagrams (S4+) | `.html` generated on write (S4+) | ASCII diagrams remain until S4 |
-| `vertical-plan` | Markdown | Mermaid slice diagrams (S4+) | `.html` generated on write (S4+) | ASCII diagrams remain until S4 |
+| `structured-outline` | Markdown | `<figure>` optional; Mermaid dep map | `.html` generated on write | Figures optional; Mermaid dep map in §6 of structured-outline |
+| `horizontal-plan` | Markdown | Mermaid layer diagrams | `.html` generated on write | Layer Map Diagram (§4 of horizontal-plan) uses `graph TD` per §3 |
+| `vertical-plan` | Markdown | Mermaid slice diagrams | `.html` generated on write | Overlay Diagram (§3 of vertical-plan) uses `graph TD` per §3 |
 | `PRD` | **HTML-primary** | Full HTML with sections, `<figure>`, Mermaid | `.md` sidecar (inverse direction, S5+) | Exception to markdown-canonical default; see §4 |
 
 **Default:** Markdown is canonical for all doc types except PRD. When a doc type is not
@@ -180,8 +180,9 @@ accepted limitation documented here; out of scope for S1 remediation.
 
 When adding sections in future D-expansion slices:
 
-- Append to the relevant section (e.g., add H/V Mermaid details to §3; add structured-
-  outline figure rules to the doc-type table row).
+- Append to the relevant section (e.g., add PRD details to §4 when S5 ships).
 - Do not restructure the document. Section numbers are stable references.
-- Update the doc-type table §1 to remove `(S4+)` / `(S5+)` stubs as each slice ships.
-- Each added section should note its originating slice (e.g., `<!-- Added in S4.3 -->`).
+- Update the doc-type table §1 to remove `(S5+)` stubs as each slice ships.
+- Each added section should note its originating slice (e.g., `<!-- Added in S5.x -->`).
+
+<!-- S4.3 shipped: H/V and structured-outline Mermaid/figure support and sidecar generation added. (S4+) stubs removed from doc-type table. -->

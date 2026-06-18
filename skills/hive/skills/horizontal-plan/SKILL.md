@@ -41,6 +41,14 @@ of execution (that's the vertical plan). Dense, scannable, evidence-backed.
 
 Write to `.pHive/epics/{epic-id}/docs/horizontal-plan.md`.
 
+After writing the markdown file, invoke the sidecar HTML generator to produce a `.html` sibling for browser preview:
+
+```
+lib/html-sidecar-gen generateSidecar(".pHive/epics/{epic-id}/docs/horizontal-plan.md")
+```
+
+The generator is non-blocking — if it fails, log a warning and continue. The `.html` file is not committed to git by default (generated on-demand).
+
 After writing the markdown file, record token metrics:
 
 ```
