@@ -296,6 +296,7 @@ All paths relative to repo root:
 | Design brief manifest | `.pHive/design/index.yaml` |
 
 Reference docs (read when needed, don't inline):
+- `hive/references/planning-format-contract.md` — allowed embedded content per planning doc type, image source policy, Mermaid delimiter, sidecar generation rule, wireframe discovery protocol
 - `skills/hive/references/episode-schema.md` — status marker format
 - `skills/hive/references/workflow-schema.md` — workflow step structure
 - `skills/hive/references/agent-teams-guide.md` — team mechanics and limitations
