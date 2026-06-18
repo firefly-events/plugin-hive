@@ -1,0 +1,98 @@
+id: dpt-4-wire-plan-and-provenance
+epic: dynamic-planning-team
+title: Wire classification into /plan + emit planning_team provenance
+status: in_review
+tracker_adapter: multica
+tracker_id: PLU-152
+tracker_uuid: 346778b0-25f4-4698-b8b9-da2d30bace6d
+complexity: medium
+methodology: classic
+depends_on: [dpt-3-classification-skill]
+
+description: |
+  Wire the planning-classification skill (dpt-3) into /plan Phase 0 step 1 and record its
+  decision as provenance in epic.yaml.
+
+  Two coupled changes (same skill file → one story, serial):
+
+  1. WIRING — skills/plan/SKILL.md Phase 0 step 1 currently passes
+     `assembled_personas` described as "core planning personas plus conditional
+     architect/ui-designer selected from the requirement". Replace that prose selection with
+     an atomic call to planning-classification: classify → resolve roster → pass the
+     returned assembled_personas to planning-routing (which already accepts a caller list).
+     planning-routing Step 0.1's inline two-conditional block is updated to defer to the
+     caller-supplied list; its self-assembly fallback is documented as legacy/direct-caller
+     only (the catalog is now the source of truth for /plan).
+
+  2. PROVENANCE — /plan writes a `planning_team:` block into epic.yaml (step 15, alongside
+     git_flow) capturing: matched tags, resolved roster, per-tag reasoning, confidence, and
+     gate_decisions from the classification output. Document the block in
+     hive/references/story-yaml-schema.md §6. This is the operator-visible + overridable
+     audit surface that buys back the visibility lost by classifying inline rather than via
+     /triage.
+
+  Keep the atomic boundary: /plan calls the skill and consumes output; the classification
+  logic stays in the skill (no inline copy).
+
+acceptance_criteria:
+  - "Given /plan Phase 0 step 1, when read, then it invokes planning-classification (atomic external call) and passes the returned assembled_personas to planning-routing — the prose 'conditional architect/ui-designer' selection is gone."
+  - "Given planning-routing Step 0.1, when read, then it defers to a caller-supplied assembled_personas list and its inline two-conditional self-assembly is labelled legacy/direct-caller fallback."
+  - "Given a completed /plan run, when epic.yaml is read, then it contains a `planning_team:` block with tags, roster, reasoning, confidence, gate_decisions."
+  - "Given hive/references/story-yaml-schema.md §6, when read, then the planning_team block is documented (fields + example)."
+  - "Given the atomic boundary, when /plan is grepped, then no inline copy of the classification logic exists (only the external invocation)."
+  - "Given the backend-routing constraint, when reviewed, then composition (this wiring) does not depend on or alter agent_backends routing."
+
+steps:
+  - id: research
+    description: Read /plan Phase 0 step 1 + step 15 (epic.yaml writer) and planning-routing Step 0.1 to find exact insertion/edit points.
+    agent: researcher
+  - id: implement
+    description: Edit /plan step 1 to call planning-classification; update planning-routing Step 0.1 deferral note; add planning_team block to /plan step 15 epic.yaml writer; document block in story-yaml-schema.md §6.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Covered by dpt-5. Here hand-verify the wiring reads end-to-end and the epic.yaml block shape matches the schema doc.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm atomic boundary intact, no inline logic copy, backend-routing untouched, schema doc matches emitted block.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feat/dynamic-planning-team.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Phase 0 step 1 wiring + step 15 epic.yaml provenance writer.
+    - path: skills/hive/skills/planning-routing/SKILL.md
+      purpose: Step 0.1 updated to defer to caller-supplied assembled_personas.
+    - path: hive/references/story-yaml-schema.md
+      purpose: §6 documents the new planning_team epic.yaml block.
+
+files_to_modify:
+  - file: skills/plan/SKILL.md
+    change: Step 1 invokes planning-classification; step 15 emits planning_team block.
+  - file: skills/hive/skills/planning-routing/SKILL.md
+    change: Step 0.1 defers to caller list; inline two-conditional labelled legacy fallback.
+  - file: hive/references/story-yaml-schema.md
+    change: Document planning_team block in §6.
+
+references:
+  - path: skills/plan/SKILL.md
+    relevant_excerpt: |
+      Pass three inputs: `assembled_personas` (core planning personas plus conditional
+      architect/ui-designer selected from the requirement), the root-first agent_backends
+      map, and requirement_summary. (← the prose selection being replaced.)
+
+design_decisions:
+  - decision: Wiring + provenance in one story.
+    rationale: Both edit skills/plan/SKILL.md; splitting fragments same-file work into serial sub-commits (memory feedback_git_flow_per_epic).
+
+risks:
+  - severity: medium
+    description: planning-routing default-assembly fallback could drift from the catalog over time.
+    mitigation: Catalog declared single source for /plan; fallback explicitly scoped to direct (non-/plan) callers.
