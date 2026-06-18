@@ -197,12 +197,67 @@ def load_registry(entries: list[dict[str, Any]]) -> list[RegistryEntry]:
     return result
 
 
+# ---------------------------------------------------------------------------
+# Tracked class definitions (D2): audits, episodes, metrics — report-only.
+# These classes are walked by live consumers and must never be git-rm'd this
+# epic; the sweep reports them only.
+# Globs are relative to the .pHive state root (same convention as cli.py).
+# Retention thresholds per design-decisions §open-question-rulings:
+#   90d — audits (gate-mode aggregation), episodes (story-status derivation)
+#   60d — metrics (cross-run aggregation)
+# ---------------------------------------------------------------------------
+
+TRACKED_CLASSES_RAW: list[dict] = [
+    {
+        "class_id": "audit-record",
+        "globs": ["audits/**"],
+        "classification": "tracked",
+        "active_predicate": "never-active",
+        "retention_threshold": 90,
+        "archive_action": "report",
+        "age_source": "git-last-commit",
+        "hard_exclude": False,
+    },
+    {
+        "class_id": "episode-marker",
+        "globs": ["episodes/**"],
+        "classification": "tracked",
+        "active_predicate": "never-active",
+        "retention_threshold": 90,
+        "archive_action": "report",
+        "age_source": "git-last-commit",
+        "hard_exclude": False,
+    },
+    {
+        "class_id": "metrics-record",
+        "globs": ["metrics/**"],
+        "classification": "tracked",
+        "active_predicate": "never-active",
+        "retention_threshold": 60,
+        "archive_action": "report",
+        "age_source": "git-last-commit",
+        "hard_exclude": False,
+    },
+]
+
+
+def load_tracked_classes() -> list[RegistryEntry]:
+    """Return validated registry entries for the three tracked report-only classes.
+
+    These classes (.pHive/audits/**, .pHive/episodes/**, .pHive/metrics/**)
+    are scanned by live consumers and are never git-rm'd this epic (D2).
+    """
+    return load_registry(TRACKED_CLASSES_RAW)
+
+
 __all__ = [
     "AgeSource",
     "ArchiveAction",
     "Classification",
     "RegistryEntry",
     "RegistryValidationError",
+    "TRACKED_CLASSES_RAW",
     "load_registry",
+    "load_tracked_classes",
     "validate_entry",
 ]
