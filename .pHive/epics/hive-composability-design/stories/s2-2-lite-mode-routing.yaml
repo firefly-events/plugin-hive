@@ -1,0 +1,137 @@
+id: s2-2-lite-mode-routing
+epic: hive-composability-design
+title: --lite flag routing in plan skill
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s2-1-design-discussion-split]
+
+description: |
+  Add --lite flag to the plan skill. When --lite is active:
+  - produce-doc fires (design-discussion document is produced)
+  - review-doc does NOT fire
+  - H/V planning is skipped entirely
+  - Structured outline is skipped
+
+  Full ceremony (no --lite flag) is completely unchanged.
+
+  This story depends on S2.1 (design-discussion split) being merged first —
+  --lite mode relies on the produce-doc sub-invocation existing.
+
+  Also adds --lite, --skip-sign-off, --skip-research to orchestrator.md flag table.
+
+  NOTE: skills/plan/SKILL.md is edited by S2.2, S2.3, and S3.4 — serialize merges.
+  NOTE: hive/agents/orchestrator.md is also edited by S3.4 (tier table) — coordinate.
+
+acceptance_criteria:
+  - "Given /hive:plan --lite on a single-epic requirement, then produce-doc fires, review-doc does NOT fire, H/V skipped, structured outline skipped"
+  - "Given /hive:plan (no flags), then behavior is identical to before this change"
+  - "Given skills/plan/SKILL.md $ARGUMENTS section, then --lite, --skip-sign-off, --skip-research are documented with their defaults"
+  - "Given hive/agents/orchestrator.md flag table, then --lite, --skip-sign-off, --skip-research entries added"
+
+steps:
+  - id: research
+    description: |
+      Read skills/plan/SKILL.md:
+      1. Lines 1-25: $ARGUMENTS section — understand current flag format to match
+      2. Lines 120-134: routing table — understand current routing decision format
+      3. Lines ~191-197: orchestrator.md flag table reference — note exact location
+      Read hive/agents/orchestrator.md to find the flag table at ~lines 191-197.
+    agent: researcher
+
+  - id: implement
+    description: |
+      In skills/plan/SKILL.md:
+
+      1. $ARGUMENTS section (lines ~14+): add after existing flags:
+         **`--lite`**
+         Runs a condensed planning ceremony. Produces the design-discussion document
+         (produce-doc phase) without collaborative review, H/V planning, or structured
+         outline. Scope-class guard applies: --lite is refused for multi-epic or PRD scope.
+         Full ceremony is always used when scope is large regardless of this flag.
+
+         **`--skip-sign-off`**
+         Skips the user-facing confirmation gate after produce-doc in --lite mode.
+         No effect in full mode.
+
+         **`--skip-research`**
+         Skips the researcher's codebase exploration phase. For use when codebase context
+         is already loaded in conversation. No effect on design-discussion or story output.
+
+      2. Routing table (lines ~120-134): add --lite row:
+         "Small + --lite → --lite has no effect at small scope; proceeds as small"
+         "Medium + --lite → produce-doc only, skip H/V, proceed to stories (Phase C)"
+         "Large + --lite → REFUSED: scope-class guard blocks --lite at large scope
+          (Note: large scope guard fires in S2.3; this routing row references it)"
+
+      In hive/agents/orchestrator.md flag table (~lines 191-197):
+      Add rows for --lite, --skip-sign-off, --skip-research with one-line descriptions.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Verify (manual trace — not live invocation required for this docs-only story):
+      1. Read skills/plan/SKILL.md: confirm --lite, --skip-sign-off, --skip-research documented
+      2. Read routing table: confirm --lite rows present for small/medium/large
+      3. Read orchestrator.md: confirm flag table updated
+      4. Confirm no other routing behavior changed (read entire Phase B section)
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Review:
+      - Flag descriptions are unambiguous — agent following instructions should know exactly what to skip
+      - Routing table rows cover small/medium/large for --lite
+      - Full ceremony routing unchanged (regression check)
+      - orchestrator.md flag table update is minimal and accurate
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: |
+      Commit. Note: S2.3 must be authored/merged after this. S3.4 also edits skills/plan/SKILL.md and
+      orchestrator.md — coordinate landing order to avoid conflicts.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Primary file — $ARGUMENTS section and routing table to update
+      relevant_excerpt: |
+        # Lines 14-25 approximate (verify in research):
+        # **`--fast`**
+        # Skips H/V planning entirely at medium scope...
+        # This is the flag documentation pattern to follow for --lite
+    - path: hive/agents/orchestrator.md
+      purpose: Flag table at ~lines 191-197 to update
+
+files_to_modify:
+  - file: skills/plan/SKILL.md
+    change: "Add --lite, --skip-sign-off, --skip-research to $ARGUMENTS section; add --lite routing rows to routing table"
+  - file: hive/agents/orchestrator.md
+    change: "Add --lite, --skip-sign-off, --skip-research to flag table"
+
+design_decisions:
+  - decision: --lite is a manual flag only (no auto-promotion threshold)
+    rationale: User Q1 resolution — defer auto-promotion; --lite ships as manual flag first
+  - decision: --lite at large scope is refused (not silently downgraded)
+    rationale: Multi-epic and PRD scope require full ceremony; scope guard enforces this in S2.3
+
+cross_cutting:
+  - concern: documentation
+    action: "skills/plan/SKILL.md and orchestrator.md updated with new flags — these ARE the doc changes"
+
+risks:
+  - severity: low
+    description: skills/plan/SKILL.md edited by S2.3 and S3.4 too — merge conflicts
+    mitigation: S2.2 edits $ARGUMENTS and routing table; S2.3 edits routing logic implementation; S3.4 edits --profile flag. Different sections.
+
+references:
+  - path: state/epics/hive-composability-design/docs/structured-outline.md
+    relevant_excerpt: |
+      Slice 2, Change #2: skills/plan/SKILL.md — add --lite, --skip-sign-off, --skip-research to $ARGUMENTS.
+      Routing table: add lite mode routing row.

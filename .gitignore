@@ -227,5 +227,7 @@ node-compile-cache/
 tsx-*/
 !.pHive/epics/kg-repair-activation/
 !.pHive/epics/kg-repair-activation/**
+!.pHive/epics/hive-composability-design/
+!.pHive/epics/hive-composability-design/**
 !.pHive/triage/
 !.pHive/triage/queue.yaml

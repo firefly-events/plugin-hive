@@ -1,0 +1,149 @@
+id: s1b-1-doc-token-telemetry
+epic: hive-composability-design
+title: Doc-token telemetry write probe
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Create lib/doc-token-telemetry.* — a write-side token-counting probe on planning
+  artifact writes. Data-only in v1; no read path, no dashboard. Measurement data
+  gates Slices 4–5 Decision #3 re-evaluation (whether to flip to HTML-primary for
+  any additional doc type).
+
+  Append to state/telemetry/doc-tokens.jsonl on each planning artifact write.
+  Invoke from design-discussion, structured-outline, H/V, and PRD writes.
+
+  Failure is non-blocking: skip telemetry for that write, log warning.
+
+  Parallel note: S1b has zero shared files with S1, S2, or S3. It can land before,
+  during, or after any of them. If S1b's invocation hook edits design-discussion/
+  SKILL.md in the same sprint as S1.2, serialize those edits (both are additive
+  one-liners — low conflict risk).
+
+acceptance_criteria:
+  - "Given /hive:plan run produces a design-discussion doc, then state/telemetry/doc-tokens.jsonl grows by one record"
+  - "Given each record, then it has all required fields: ts, epic_id, doc_type, format, token_count, char_count, bytes"
+  - "Given @anthropic-ai/tokenizer unavailable, then character-count fallback used (char_count / 4) with a note field indicating approximation"
+  - "Given telemetry probe failure, then planning artifact write completes normally with warning logged (non-blocking)"
+  - "Given state/telemetry/ directory absent, then it is created on first write"
+
+steps:
+  - id: research
+    description: |
+      Check:
+      1. Does @anthropic-ai/tokenizer exist as a package dependency? Run: cat package.json | grep tokenizer
+      2. What module format does lib/ use (CommonJS vs ESM)?
+      3. Confirm state/telemetry/ does not exist (to document first-run creation behavior)
+      4. Locate where design-discussion/SKILL.md instructs the writer to write the artifact —
+         identify the exact instruction step to hook into.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Step 1 — Create lib/doc-token-telemetry.js (or .ts):
+
+        Interface:
+          async recordDocWrite(params: {
+            epicId: string,
+            docType: 'design-discussion' | 'structured-outline' | 'horizontal-plan' | 'vertical-plan' | 'prd',
+            format: 'markdown-embedded-html' | 'html-primary' | 'markdown',
+            content: string,          // the markdown/html content written
+            outputPath: string        // the file written
+          }): Promise<void>
+
+        Implementation:
+          - Try @anthropic-ai/tokenizer to count tokens; on failure use Math.round(content.length / 4) approximation
+          - Build record: { ts: ISO8601, epic_id, doc_type, format, token_count, char_count: content.length, bytes: Buffer.byteLength(content), approx: boolean }
+          - Ensure state/telemetry/ exists (mkdir -p)
+          - Append JSON line to state/telemetry/doc-tokens.jsonl
+          - On any error: console.warn + return (never throw)
+
+      Step 2 — Add invocation to design-discussion/SKILL.md:
+        After the "write the document" instruction (same area as S1.2's sidecar invocation):
+          "After writing, invoke lib/doc-token-telemetry to record this write. Pass epic_id,
+           doc_type: 'design-discussion', format: 'markdown-embedded-html', content, outputPath."
+        This is one sentence addition. Serialize with S1.2's edit if same sprint.
+
+      Step 3 — Add invocation to skills/hive/skills/structured-outline/SKILL.md:
+        Same pattern — one sentence after the write instruction.
+
+      NOTE: H/V and PRD invocations are added in S4.1 and S5.1 respectively when those
+      skills are modified anyway. Do NOT edit horizontal-plan/SKILL.md or vertical-plan/SKILL.md
+      or prd/SKILL.md here.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Verify:
+      1. Produce a design-discussion doc via /hive:plan on a test epic — confirm
+         state/telemetry/doc-tokens.jsonl exists and has a new record
+      2. Check record schema: all 7 fields present (ts, epic_id, doc_type, format,
+         token_count, char_count, bytes) + optional approx flag
+      3. Simulate failure: pass null content — confirm no exception, warning in logs
+      4. Run twice — confirm records append (not overwrite)
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Review:
+      - lib/doc-token-telemetry.*: non-blocking error handling, correct schema
+      - Fallback approximation documented in code comment (why char/4: relative comparison use case)
+      - SKILL.md edits are additive one-liners only — no structural changes
+      - state/telemetry/ is in .gitignore or documented as generated data
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: Commit lib/doc-token-telemetry.*, SKILL.md additions, .gitignore addition for state/telemetry/
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/design-discussion/SKILL.md
+      purpose: Add one-line post-write telemetry invocation here
+    - path: skills/hive/skills/structured-outline/SKILL.md
+      purpose: Add one-line post-write telemetry invocation here
+    - path: state/epics/hive-composability-design/docs/structured-outline.md
+      purpose: S1b approach section defines interface, fallback strategy, and field schema
+
+files_to_modify:
+  - file: skills/hive/skills/design-discussion/SKILL.md
+    change: One-line post-write telemetry invocation (additive, no structural change)
+  - file: skills/hive/skills/structured-outline/SKILL.md
+    change: One-line post-write telemetry invocation (additive, no structural change)
+
+files_to_create:
+  - file: lib/doc-token-telemetry.js
+    change: Token-counting write probe per interface spec
+  - file: state/telemetry/doc-tokens.jsonl
+    change: Created on first write (not committed; .gitignore entry)
+
+design_decisions:
+  - decision: Character-count fallback (char_count / 4) is sufficient for v1
+    rationale: Goal is relative comparison between formats, not absolute token accounting. Consistent approximation adequate.
+  - decision: H/V and PRD invocations deferred to S4.1 and S5.1
+    rationale: Those skills are modified in those slices anyway; avoids premature edits to files not yet touched
+
+cross_cutting:
+  - concern: documentation
+    action: "SKILL.md invocation instructions added here are the documentation. No separate doc update needed."
+
+risks:
+  - severity: low
+    description: "@anthropic-ai/tokenizer package conflict"
+    mitigation: Fallback is already specified; if package unavailable, char/4 approximation is adequate for relative format comparison
+  - severity: low
+    description: state/telemetry/doc-tokens.jsonl grows unbounded over time
+    mitigation: v1 is data-only; no read path; file growth is acceptable for a development-time probe
+
+references:
+  - path: state/epics/hive-composability-design/docs/structured-outline.md
+    relevant_excerpt: |
+      Slice 1b Changes #1: record schema {ts, epic_id, doc_type, format, token_count, char_count, bytes}.
+      Fallback: char_count / 4 as token approximation — consistent approximation adequate for relative comparison.

@@ -1,0 +1,86 @@
+id: s3-4-profile-flag-orchestrator
+epic: hive-composability-design
+title: --profile flag in plan skill + orchestrator tier table
+status: pending
+complexity: low
+methodology: classic
+depends_on: [s3-3-agent-spawn-model-docs]
+
+description: |
+  Add --profile {quality|balanced|budget} flag to skills/plan/SKILL.md and update
+  hive/agents/orchestrator.md tier table to cite model-tiering-contract.md.
+
+  NOTE: skills/plan/SKILL.md is shared with S2.2 and S2.3 — serialize merges.
+  S3.4 edits the $ARGUMENTS section (--profile flag) and orchestrator.md tier table.
+  S2.2 edits $ARGUMENTS (--lite, --skip-sign-off, --skip-research) and orchestrator.md
+  flag table. These are different sections but same files — coordinate landing.
+
+acceptance_criteria:
+  - "Given skills/plan/SKILL.md $ARGUMENTS, then --profile {quality|balanced|budget} is documented"
+  - "Given orchestrator.md tier table (~lines 170-184), then it cites hive/references/model-tiering-contract.md"
+  - "Given --profile balanced (default), then plan skill behavior is identical to today"
+  - "Given --profile quality or --profile budget, then they are documented as overrides to model_profile config key"
+
+steps:
+  - id: implement
+    description: |
+      1. In skills/plan/SKILL.md $ARGUMENTS section, after --lite entries (from S2.2), add:
+         **`--profile {quality|balanced|budget}`**
+         Overrides the model_profile config key (hive.config.yaml) for this planning run.
+         quality: all personas at tier default. balanced: default (no override).
+         budget: cost-optimized; researcher/architect/tpm/explorer stay at sonnet minimum.
+         See hive/references/model-tiering-contract.md for full profile definitions.
+
+      2. In hive/agents/orchestrator.md, find the tier table at ~lines 170-184.
+         Add a reference line below the table:
+         "Model tier assignments and resolution chain: see hive/references/model-tiering-contract.md"
+         Do not modify the tier table contents — additive cross-reference only.
+
+      Coordinate: ensure S2.2 has already landed (or rebase on it) before merging this.
+    agent: developer
+
+  - id: review
+    description: |
+      Review:
+      - --profile documentation matches model-tiering-contract.md profile definitions
+      - orchestrator.md cross-reference is in the right location (after tier table)
+      - No other content changed in either file
+    agent: reviewer
+    depends_on: [implement]
+
+  - id: integrate
+    description: |
+      Commit skills/plan/SKILL.md --profile addition + orchestrator.md tier table cross-reference.
+      Note: S2.2 must be merged before this (same files edited — rebase needed).
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: $ARGUMENTS section — add --profile flag after S2.2's --lite entries
+    - path: hive/agents/orchestrator.md
+      purpose: Tier table at ~lines 170-184 — add cross-reference to model-tiering-contract.md
+    - path: hive/references/model-tiering-contract.md
+      purpose: Source of truth to cross-reference
+
+files_to_modify:
+  - file: skills/plan/SKILL.md
+    change: "Add --profile {quality|balanced|budget} to $ARGUMENTS section"
+  - file: hive/agents/orchestrator.md
+    change: "Add cross-reference to model-tiering-contract.md after tier table (~lines 170-184)"
+
+design_decisions:
+  - decision: --profile overrides config key for a single run (not persistent)
+    rationale: Config key is the persistent default; --profile is per-invocation override
+
+cross_cutting:
+  - concern: documentation
+    action: "skills/plan/SKILL.md and orchestrator.md updated. model-tiering-contract.md cross-referenced."
+
+references:
+  - path: state/epics/hive-composability-design/docs/structured-outline.md
+    relevant_excerpt: |
+      Slice 3, Change #4: skills/plan/SKILL.md --profile flag prose; orchestrator.md tier table citation.
+      Part 3b: orchestrator.md edited by S2.2 (flag table) and S3.4 (tier table) — different sections.

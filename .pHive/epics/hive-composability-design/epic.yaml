@@ -1,0 +1,118 @@
+name: hive-composability-design
+title: Hive Composability + Design-Aware Planning
+description: |
+  Four workstreams delivering composable planning modes, design-aware rich artifacts,
+  model economy tiering, and respawn-per-task lifecycle. 9 slices; min-viable-ship
+  is Slices 1+1b+2+3 (Workstreams A, C, D seed) without Workstream B.
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+
+stories:
+  # Slice 1 — Format Contract + Reference Render (Workstream D seed)
+  - id: s1-1-planning-format-contract
+    title: Planning format contract reference doc
+    complexity: low
+    depends_on: []
+
+  - id: s1-2-design-discussion-sidecar
+    title: Design-discussion figure slots + sidecar generator
+    complexity: medium
+    depends_on: []
+
+  # Slice 1b — doc-token-telemetry (parallel to Slice 1)
+  - id: s1b-1-doc-token-telemetry
+    title: Doc-token telemetry write probe
+    complexity: medium
+    depends_on: []
+
+  # Slice 2 — Lite Mode End-to-End (Workstream A)
+  - id: s2-1-design-discussion-split
+    title: Design-discussion structural split (produce-doc / review-doc)
+    complexity: high
+    depends_on: []
+
+  - id: s2-2-lite-mode-routing
+    title: --lite flag routing in plan skill
+    complexity: medium
+    depends_on: [s2-1-design-discussion-split]
+
+  - id: s2-3-scope-guard-and-gate
+    title: Scope-class guard + TUI confirmation gate
+    complexity: medium
+    depends_on: [s2-2-lite-mode-routing]
+
+  # Slice 3 — Model Tiering (Workstream C, parallel to Slice 2)
+  - id: s3-1-model-tiering-contract
+    title: Model tiering contract reference doc
+    complexity: low
+    depends_on: []
+
+  - id: s3-2-hive-config-model-profile
+    title: hive.config.yaml model_profile + model_overrides population
+    complexity: low
+    depends_on: [s3-1-model-tiering-contract]
+
+  - id: s3-3-agent-spawn-model-docs
+    title: Agent-spawn model resolution docs + Haiku/Explorer guardrail
+    complexity: low
+    depends_on: [s3-2-hive-config-model-profile]
+
+  - id: s3-4-profile-flag-orchestrator
+    title: --profile flag in plan skill + orchestrator tier table
+    complexity: low
+    depends_on: [s3-3-agent-spawn-model-docs]
+
+  # Slice 4 — Rich H/V + Structured Outline (Workstream D expansion)
+  - id: s4-1-hv-mermaid-templates
+    title: Mermaid replaces ASCII in H/V skill templates
+    complexity: medium
+    depends_on: [s1-2-design-discussion-sidecar, s1b-1-doc-token-telemetry]
+
+  - id: s4-2-structured-outline-mermaid
+    title: Structured outline Mermaid dep map + figure slots
+    complexity: low
+    depends_on: [s4-1-hv-mermaid-templates]
+
+  - id: s4-3-sidecar-gen-expansion
+    title: Sidecar generator expansion to H/V and structured-outline
+    complexity: medium
+    depends_on: [s4-2-structured-outline-mermaid]
+
+  # Slice 5 — PRD HTML Vehicle (Workstream D completion)
+  - id: s5-1-prd-html-vehicle
+    title: PRD HTML canonical output + inverse markdown sidecar
+    complexity: medium
+    depends_on: [s4-3-sidecar-gen-expansion]
+
+  # Slice 6 — Workstream B Foundation
+  - id: s6-0-memory-autonomy-yaml-refresh
+    title: "S6.0 Bookkeeping: refresh memory-autonomy story YAML statuses from git"
+    complexity: low
+    depends_on: []
+
+  - id: s6-1-story-handoff-schema
+    title: story-handoff-schema.md reference doc
+    complexity: low
+    depends_on: [s6-0-memory-autonomy-yaml-refresh]
+
+  - id: s6-2-hive-config-lifecycle-keys
+    title: hive.config.yaml planning/execution teammate_lifecycle keys
+    complexity: low
+    depends_on: [s6-1-story-handoff-schema]
+
+  - id: s6-3-respawn-docs-crossref
+    title: Respawn skill docs cross-reference to story-handoff-schema
+    complexity: low
+    depends_on: [s6-2-hive-config-lifecycle-keys]
+
+  # Slice 7 — Agent-Spawn Step 7b Two-Parameter Extension (Workstream B)
+  - id: s7-1-agent-spawn-step7b
+    title: Agent-spawn step 7b two-parameter extension + story-handoff preamble
+    complexity: medium
+    depends_on: [s6-3-respawn-docs-crossref]
+
+  # Slice 8 — Session Execute Story-Boundary Hook (Workstream B)
+  - id: s8-1-execute-story-boundary-hook
+    title: Execute story-boundary hook + handoff writer (respawn-per-task)
+    complexity: high
+    depends_on: [s7-1-agent-spawn-step7b]

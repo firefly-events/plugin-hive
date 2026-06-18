@@ -1,0 +1,80 @@
+id: s4-2-structured-outline-mermaid
+epic: hive-composability-design
+title: Structured outline Mermaid dep map + figure slots
+status: pending
+complexity: low
+methodology: classic
+depends_on: [s4-1-hv-mermaid-templates]
+
+description: |
+  Two additions to skills/hive/skills/structured-outline/SKILL.md:
+  1. Part 6 dependency map instruction: replace any ASCII guidance with Mermaid graph TD instruction
+  2. Part 3 per-phase detail: add optional <figure> slot instruction for wireframe thumbnails
+
+  The structured outline skill already produces a Mermaid dep map (this epic's
+  structured-outline.md is evidence). This story formalizes it in the skill template.
+
+acceptance_criteria:
+  - "Given structured-outline/SKILL.md Part 6 instruction, then it specifies Mermaid graph TD for the dependency map"
+  - "Given structured-outline/SKILL.md Part 3 instruction, then it includes an optional <figure> slot for wireframe thumbnails"
+  - "Given the <figure> instruction, then it references wireframe discovery protocol in planning-format-contract.md"
+  - "Given the Mermaid instruction, then it references planning-format-contract.md"
+
+steps:
+  - id: implement
+    description: |
+      Read skills/hive/skills/structured-outline/SKILL.md to find Part 6 and Part 3 sections.
+
+      1. In Part 6 (dependency map section), update or add:
+         "Produce the dependency map as a Mermaid graph TD block:
+          ```mermaid
+          graph TD
+            S1[Slice N: name]
+            ...
+          ```
+          Reference hive/references/planning-format-contract.md for Mermaid delimiter convention."
+
+      2. In Part 3 (per-phase detail), add optional <figure> instruction:
+         "Optional: if wireframes exist for this slice's stories (check
+          state/wireframes/{epic-id}/{story-id}/), include a <figure> thumbnail:
+          <figure data-placeholder='[describe what diagram/wireframe represents this slice]'>
+            <figcaption>[caption]</figcaption>
+          </figure>
+          See wireframe discovery protocol in hive/references/planning-format-contract.md."
+    agent: developer
+
+  - id: review
+    description: |
+      Review:
+      - Part 6 instruction clearly calls for Mermaid (not ASCII)
+      - Part 3 figure slot is marked optional (not required for every slice)
+      - Both additions cross-reference planning-format-contract.md
+      - No other Part content changed
+    agent: reviewer
+    depends_on: [implement]
+
+  - id: integrate
+    description: Commit structured-outline/SKILL.md Mermaid + figure additions
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/structured-outline/SKILL.md
+      purpose: Part 6 (dep map) and Part 3 (per-phase detail) — add Mermaid + figure instructions
+    - path: hive/references/planning-format-contract.md
+      purpose: Cross-reference target for both additions
+
+files_to_modify:
+  - file: skills/hive/skills/structured-outline/SKILL.md
+    change: "Part 6: Mermaid dep map instruction; Part 3: optional <figure> slot instruction"
+
+cross_cutting:
+  - concern: documentation
+    action: "structured-outline/SKILL.md updated. No other docs impacted."
+
+references:
+  - path: state/epics/hive-composability-design/docs/structured-outline.md
+    relevant_excerpt: |
+      Slice 4, Change #3: structured-outline/SKILL.md Part 6 dep map → Mermaid; Part 3 → optional figure slots.

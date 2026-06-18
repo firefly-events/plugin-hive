@@ -1,0 +1,162 @@
+id: s1-2-design-discussion-sidecar
+epic: hive-composability-design
+title: Design-discussion figure slots + sidecar generator
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Two deliverables bundled:
+
+  1. Update skills/hive/skills/design-discussion/SKILL.md — output template section only
+     (NOT the structural split; that is S2.1). Changes: add <figure> slot template to
+     the output format instruction, add structured SCOPE_CLASS hint to SCALE ASSESSMENT
+     output block, add prose instruction to invoke sidecar generator after writing.
+
+  2. Create lib/html-sidecar-gen.* — the sidecar HTML generator module.
+     Input: markdown path with embedded HTML + optional Mermaid fences.
+     Output: .html sibling — minimal CSS wrapper, Mermaid CDN script reference,
+     <figure>/<img> support. Follows state/brand/brand-guide.html precedent.
+     Failure is non-blocking.
+
+  Produce state/epics/hive-composability-design/docs/design-discussion.html as the
+  reference render artifact — this proves the format before any story depends on it.
+
+  NOTE: S1.2 and S2.1 both edit design-discussion/SKILL.md. S2.1 (structural split)
+  is the dominant change and must land after S1.2. Coordinate merge order.
+
+  NOTE: If S1b.1 also edits design-discussion/SKILL.md in the same sprint, that edit
+  serializes with this one — both are additive one-liners and low conflict risk.
+
+acceptance_criteria:
+  - "Given the design-discussion skill output, then it includes a <figure> slot template in the output format section"
+  - "Given the SCALE ASSESSMENT block in design-discussion output, then it includes SCOPE_CLASS: single-epic | multi-epic | prd structured hint"
+  - "Given lib/html-sidecar-gen.*, then generateSidecar(markdownPath) returns .html path and is non-blocking on failure"
+  - "Given state/epics/hive-composability-design/docs/design-discussion.html, then it exists and renders in browser with brand-guide.html minimal styling"
+  - "Given cat design-discussion.md, then markdown is readable and <figure> tags are visible but do not obstruct prose"
+  - "Given grep 'What Are We Doing' design-discussion.md, then it works (no HTML wrapping breaks grep)"
+  - "Given sidecar generator failure (simulated), then markdown write completes normally with warning logged"
+
+steps:
+  - id: research
+    description: |
+      Read:
+      - skills/hive/skills/design-discussion/SKILL.md — locate output template section and SCALE ASSESSMENT block
+      - state/brand/brand-guide.html — understand the HTML structure to replicate in sidecar
+      - state/epics/hive-composability-design/docs/design-discussion.md — the file to generate .html from
+      Note exact line numbers for output template and SCALE ASSESSMENT sections.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Step 1 — Update design-discussion/SKILL.md (output template section only):
+        a. In the output format instruction, add a <figure> slot template showing how image
+           placeholders appear in the document body. Example template to add:
+             <!-- Image placeholder (optional) -->
+             <figure data-placeholder="[describe what diagram/image goes here]">
+               <figcaption>[caption]</figcaption>
+             </figure>
+        b. In the SCALE ASSESSMENT output block, append the structured hint:
+             SCOPE_CLASS: single-epic | multi-epic | prd
+           after the existing SCALE assessment prose (feeds Slice 2 scope-class guard).
+        c. Add a prose instruction after the "write the document" instruction:
+             "After writing the design-discussion markdown file, invoke lib/html-sidecar-gen
+              to generate a .html sidecar at the same path with .html extension."
+        DO NOT modify the skill's structural flow, phase sections, or add/remove any other
+        behavior. This is a template-section-only change.
+
+      Step 2 — Create lib/html-sidecar-gen.js (or .ts if project uses TypeScript):
+        Interface: async generateSidecar(markdownPath: string): Promise<string>
+        - Reads the markdown file
+        - Wraps in minimal HTML: <html><head><style>/* minimal from brand-guide */</style>
+          <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+          </head><body class="planning-doc">...</body></html>
+        - Replaces ```mermaid ... ``` fences with <pre class="mermaid">...</pre>
+        - Passes <figure> elements through unchanged (they're already HTML)
+        - Writes to same directory as input with .html extension
+        - On any error: console.warn + return null (never throw — non-blocking)
+        - Returns the .html path on success, null on failure
+
+      Step 3 — Run the generator against design-discussion.md to produce the reference render:
+        node lib/html-sidecar-gen.js state/epics/hive-composability-design/docs/design-discussion.md
+        Commit the resulting design-discussion.html as the reference render artifact.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Verify:
+      1. cat state/epics/hive-composability-design/docs/design-discussion.md — readable, <figure> visible
+      2. grep "What Are We Doing" state/epics/hive-composability-design/docs/design-discussion.md — returns result
+      3. Open design-discussion.html in browser — renders with readable layout, Mermaid blocks render if present
+      4. Check SCOPE_CLASS line present in design-discussion.md SCALE ASSESSMENT block
+      5. Simulate generator failure: pass a non-existent path — confirm no exception thrown, warning logged
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Review:
+      - design-discussion/SKILL.md diff: only output template section changed, structural flow untouched
+      - lib/html-sidecar-gen.*: non-blocking error handling correct, no external deps beyond mermaid CDN
+      - design-discussion.html: minimal styling, matches brand-guide.html aesthetic
+      - SCOPE_CLASS hint placement: at end of SCALE ASSESSMENT block (feeds S2.3 cleanly)
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: |
+      Commit: design-discussion/SKILL.md template additions, lib/html-sidecar-gen.*, design-discussion.html.
+      Note in commit message: "S2.1 must rebase on this when landing structural split"
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/design-discussion/SKILL.md
+      purpose: Output template section and SCALE ASSESSMENT block to update (template-only, not structural)
+    - path: state/brand/brand-guide.html
+      purpose: Reference HTML structure for sidecar styling — replicate the minimal CSS pattern
+    - path: state/epics/hive-composability-design/docs/design-discussion.md
+      purpose: Source file for the reference render
+    - path: hive/references/planning-format-contract.md
+      purpose: (from S1.1) Format contract this story implements — verify sidecar matches it
+
+files_to_modify:
+  - file: skills/hive/skills/design-discussion/SKILL.md
+    change: "Add: <figure> slot template to output format section; SCOPE_CLASS hint to SCALE ASSESSMENT block; sidecar invocation prose instruction"
+
+files_to_create:
+  - file: lib/html-sidecar-gen.js
+    change: Sidecar HTML generator module per interface spec
+  - file: state/epics/hive-composability-design/docs/design-discussion.html
+    change: Reference render artifact — generated by running sidecar gen against design-discussion.md
+
+design_decisions:
+  - decision: Sidecar generator is built in Slice 1 (not deferred to Slice 4)
+    rationale: User chose option (a) at D6 — full lib in Slice 1 rather than manual reference render first
+  - decision: Failure is non-blocking
+    rationale: Markdown is canonical; sidecar is a convenience artifact; blocking on generator failure would break planning ceremonies
+  - decision: Mermaid via CDN script in sidecar
+    rationale: Development-time artifacts only; CDN reference acceptable per structured-outline.md security assessment
+
+cross_cutting:
+  - concern: documentation
+    action: "design-discussion/SKILL.md updated with new template instructions — this IS the doc change"
+
+risks:
+  - severity: medium
+    description: S1.2 and S2.1 both edit design-discussion/SKILL.md; merge conflict if not coordinated
+    mitigation: S1.2 edits template section only; S2.1 edits structural flow section. Different sections — low conflict. S2.1 must rebase on S1.2.
+  - severity: low
+    description: Mermaid CDN unavailability in offline environments
+    mitigation: Sidecar is browser-only/development-time; offline use is out of scope for v1. Document in format-contract.
+
+references:
+  - path: state/epics/hive-composability-design/docs/structured-outline.md
+    relevant_excerpt: |
+      Slice 1 Changes #2 and #3 — design-discussion template update and sidecar gen spec.
+      Interface: generateSidecar(markdownPath: string): Promise<string>  // non-blocking on failure
+  - path: state/brand/brand-guide.html
