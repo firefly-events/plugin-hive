@@ -1,7 +1,7 @@
 id: al-4-backfill-terminal-signal
 epic: artifact-lifecycle
 title: Add legacy merged-and-aged terminal eligibility signal
-status: pending
+status: in_review
 complexity: medium
 methodology: classic
 depends_on: [al-1-lifecycle-library-and-registry]

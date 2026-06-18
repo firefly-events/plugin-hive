@@ -1,7 +1,7 @@
 id: al-6-weekly-automation
 epic: artifact-lifecycle
 title: Schedule weekly artifact lifecycle sweep
-status: pending
+status: in_review
 complexity: medium
 methodology: classic
 depends_on: [al-3-untracked-runtime-sweep]
