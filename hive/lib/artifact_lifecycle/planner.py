@@ -26,6 +26,11 @@ from hive.lib.artifact_lifecycle.exclusions import (
 )
 from hive.lib.artifact_lifecycle.predicates import PredicateError, is_active
 from hive.lib.artifact_lifecycle.registry import ArchiveAction, Classification, RegistryEntry
+from hive.lib.artifact_lifecycle.scan_roots import (
+    ScanDiagnostic,
+    find_duplicates,
+    resolve_scan_roots,
+)
 
 
 @dataclass(frozen=True)
@@ -166,6 +171,97 @@ def plan_candidates(
     return candidates
 
 
+@dataclass(frozen=True)
+class CompatPlanResult:
+    """Result of plan_candidates_with_compat()."""
+
+    candidates: list[EvictCandidate]
+    diagnostics: list[ScanDiagnostic]
+
+
+def plan_candidates_with_compat(
+    entries: Sequence[RegistryEntry],
+    state_dir: Path,
+    repo_root: Path | None = None,
+    compat: bool = False,
+    now: datetime | None = None,
+) -> CompatPlanResult:
+    """plan_candidates extended with scan-root resolution and compat diagnostics.
+
+    When ``compat=True`` and ``repo_root`` is given, also scans legacy
+    ``.pHive`` for EVICT-action entries that are safe for legacy scanning.
+    Emits:
+      - ``duplicate`` diagnostics for artifacts found in both roots (primary
+        wins; at most one action is planned).
+      - ``skipped`` diagnostics for classes that are unsafe/unsupported for
+        legacy scanning.
+
+    Hard-exclusions from al-2 win before any duplicate or action logic.
+
+    Args:
+        entries:   Registry entries.
+        state_dir: Resolved ``paths.state_dir`` (primary scan root).
+        repo_root: Repository root for locating legacy ``.pHive``.
+        compat:    Enable compatibility scanning.
+        now:       Reference timestamp; defaults to ``datetime.now(timezone.utc)``.
+
+    Returns:
+        :class:`CompatPlanResult` with deduplicated candidates and all diagnostics.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    scan_result = resolve_scan_roots(
+        state_dir=state_dir,
+        repo_root=repo_root,
+        compat=compat,
+        entries=entries,
+    )
+
+    # Collect skipped-class diagnostics from scan root resolution.
+    diagnostics: list[ScanDiagnostic] = list(scan_result.diagnostics)
+
+    # Build sets of safe class IDs for legacy scanning.
+    # Classes that appear in `diagnostics` as "skipped" are excluded from legacy.
+    skipped_class_ids: set[str] = {
+        d.class_id for d in diagnostics if d.kind == "skipped"
+    }
+
+    primary_candidates = plan_candidates(entries, scan_result.primary.path, now=now)
+
+    if scan_result.legacy is None:
+        return CompatPlanResult(candidates=primary_candidates, diagnostics=diagnostics)
+
+    # Build legacy candidates only for safe classes.
+    safe_entries = [e for e in entries if e.class_id not in skipped_class_ids]
+    legacy_candidates = plan_candidates(safe_entries, scan_result.legacy.path, now=now)
+
+    # Dedup: primary wins.
+    primary_paths = [c.path for c in primary_candidates]
+    legacy_paths = [c.path for c in legacy_candidates]
+    merged_paths, dup_diagnostics = find_duplicates(primary_paths, legacy_paths)
+    diagnostics.extend(dup_diagnostics)
+
+    # Rebuild the candidate list preserving EvictCandidate metadata.
+    # Build a lookup: resolved path → EvictCandidate (primary preferred).
+    path_to_candidate: dict[Path, EvictCandidate] = {}
+    for c in primary_candidates:
+        if not is_hard_excluded(c.path):
+            path_to_candidate[c.path.resolve()] = c
+    for c in legacy_candidates:
+        rp = c.path.resolve()
+        if rp not in path_to_candidate and not is_hard_excluded(c.path):
+            path_to_candidate[rp] = c
+
+    final_candidates = [
+        path_to_candidate[p.resolve()]
+        for p in merged_paths
+        if p.resolve() in path_to_candidate
+    ]
+
+    return CompatPlanResult(candidates=final_candidates, diagnostics=diagnostics)
+
+
 def plan_terminal_report_candidates(
     entries: Sequence[RegistryEntry],
     state_dir: Path,
@@ -301,6 +397,7 @@ def _read_yaml(path: Path) -> dict | None:
 
 __all__ = [
     "Candidate",
+    "CompatPlanResult",
     "EvictCandidate",
     "PlanError",
     "PlannerError",
@@ -308,5 +405,6 @@ __all__ = [
     "apply_guard",
     "build_candidates",
     "plan_candidates",
+    "plan_candidates_with_compat",
     "plan_terminal_report_candidates",
 ]
