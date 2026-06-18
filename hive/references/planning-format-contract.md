@@ -17,7 +17,7 @@ The canonical format and permitted embedded content for each planning document t
 
 | Doc type | Canonical format | Embedded content | Sidecar | Notes |
 |---|---|---|---|---|
-| `design-discussion` | Markdown | `<figure>` image slots | `.html` generated on write | Wireframe slots filled from discovery protocol (§5) |
+| `design-discussion` | Markdown | `<figure>` image slots | `.html` generated on write | Wireframe slots filled from discovery protocol (§5); carries the epic concept illustration (§8) when visual mode is on |
 | `structured-outline` | Markdown | `<figure>` optional; Mermaid dep map | `.html` generated on write | Figures optional; Mermaid dep map in §6 of structured-outline |
 | `horizontal-plan` | Markdown | Mermaid layer diagrams | `.html` generated on write | Layer Map Diagram (§4 of horizontal-plan) uses `graph TD` per §3 |
 | `vertical-plan` | Markdown | Mermaid slice diagrams | `.html` generated on write | Overlay Diagram (§3 of vertical-plan) uses `graph TD` per §3 |
@@ -37,6 +37,7 @@ listed above, assume markdown-canonical with no embedded HTML.
 | Approved wireframes | UI story `<figure>` slots in design-discussion | `state/wireframes/{epic-id}/{story-id}/approved.png` |
 | Placeholder | When no approved wireframe exists | `<figure data-placeholder="...">` (see §5) |
 | Brand assets | Brand-related planning docs only | `state/brand/` |
+| Generated concept illustration | One per epic, on the design-discussion (see §8) | `.pHive/epics/{epic-id}/docs/concept-illustration.png` |
 
 ### Prohibited sources
 
@@ -44,7 +45,9 @@ listed above, assume markdown-canonical with no embedded HTML.
   are offline-readable artifacts; external image dependencies break reproducibility.
 - **Embedded base64** — bloats token count. Use file references only.
 - **Raw binary in git** — images must be generated artifacts, not committed source.
-  Exception: approved wireframes committed under `state/wireframes/` after design approval.
+  Exceptions: (a) approved wireframes committed under `state/wireframes/` after design
+  approval; (b) generated concept illustrations (§8), which are **gitignored** — referenced
+  on-demand via `<figure data-src>`, never committed.
 
 ---
 
@@ -187,6 +190,69 @@ arrows are plain text), but not visually equivalent to a rendered diagram. This 
 accepted limitation documented here; out of scope for S1 remediation.
 
 ---
+
+## 7. Visual Planning Mode <!-- Added in hive-composability-design follow-up -->
+
+Visual planning — HTML sidecar generation (§4), Mermaid diagrams (§3), `<figure>` image
+slots (§5), and the concept illustration (§8) — is **on by default**. It is a rendering
+layer over markdown-canonical docs; turning it off never changes which file is the source
+of truth.
+
+**Resolution (flag overrides config, config overrides default):**
+
+1. `--no-visual` flag on the `/plan` invocation → visual planning OFF for that run.
+2. Else `planning.visual: false` in root-resolved `hive.config.yaml` → OFF.
+3. Else → ON (absent config key means on).
+
+Store the resolved boolean as `${visual_planning}` on the planning context.
+
+**What OFF suppresses:**
+
+- HTML sidecar generation for markdown-canonical doc types (§4 standard direction). The
+  `.md` file is still written — it is the deliverable.
+- The concept illustration step (§8).
+
+**What OFF does NOT change:**
+
+- Mermaid fenced blocks (§3) stay in the markdown — they degrade to readable text (§6) and
+  cost nothing extra to emit.
+- `<figure>` slots and the wireframe discovery protocol (§5) — these are markdown content,
+  not a rendering pass.
+- **PRD stays HTML-primary (§4 exception).** PRD's canonical form is HTML; `--no-visual`
+  does not strip it. The PRD `.md` sidecar is still generated (it is the grep fallback).
+  `--no-visual` only suppresses the concept illustration for a PRD-bearing run.
+
+## 8. Concept Illustration <!-- Added in hive-composability-design follow-up -->
+
+At the end of planning, when `${visual_planning}` is ON, `/plan` generates **one**
+AI illustration per epic depicting what the planned change "looks like" — part signal
+(how the agent sized up the work), part delight. This is the only generated raster in the
+planning flow.
+
+**Generation rule:**
+
+1. Gate: run only when `${visual_planning}` is ON **and** `--lite` is not active (`--lite`
+   is token-economy; the illustration is the most expensive step, so lite skips it).
+2. Build a prompt from the finalized planning context (epic title + design-discussion goal
+   + scale assessment + the principal slices/changes). Describe a conceptual scene or
+   diagram, not a literal UI.
+3. Invoke the `openai-image` MCP tool `generate_image` with that prompt, `output_dir` set
+   to the epic docs dir, and `output_prefix: concept`. Save to
+   `.pHive/epics/{epic-id}/docs/concept-illustration.png`.
+4. Embed it on the **design-discussion** (the always-present primary artifact) as a
+   trailing section, then regenerate that doc's `.html` sidecar:
+
+   ```html
+   <figure data-src="concept-illustration.png" data-alt="Concept illustration of the planned change">
+   </figure>
+   ```
+
+5. **Non-blocking, best-effort.** If the MCP tool is unavailable, `OPENAI_API_KEY` is
+   missing, or the call errors (e.g. `403` verified-org requirement), propagate the exact
+   error message verbatim as a warning, embed a `data-placeholder` figure instead, and
+   continue. A failed illustration is never a failed plan.
+6. The PNG is **gitignored** (`.pHive/epics/**/docs/*.png`) — generated on-demand, not
+   committed, consistent with §2.
 
 ## Extension Notes
 

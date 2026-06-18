@@ -33,6 +33,13 @@ Relationship to `--fast`: `--fast` skips H/V only. `--lite` implies `--fast`'s H
 
 **Reduced effect at large scope:** At large scope, the structured outline is required regardless of `--lite`, and H/V planning is also required (same constraint as `--fast`). At large scope, `--lite`'s only active effect is disabling the collaborative review gates. No scope-class guard is enforced — `gate_mode` and existing large-scope routing govern when full ceremony is mandatory.
 
+**Interaction with visual planning:** `--lite` also suppresses the concept-illustration step (step 17b) — it is the most expensive step, so token economy skips it. `--lite` does NOT by itself turn off HTML sidecars; sidecar generation is governed by `${visual_planning}` (the `--no-visual` flag / `planning.visual` config), which is independent of `--lite`.
+
+**`--no-visual`**
+Turns **visual planning off** for this run. Visual planning (HTML sidecars, Mermaid diagrams, `<figure>` slots, and the epic concept illustration) is **on by default**. This flag is the per-run opt-out; the persistent equivalent is `planning.visual: false` in `hive.config.yaml`. Resolution is flag-over-config-over-default (see `hive/references/planning-format-contract.md §7`): store the result as `${visual_planning}` on the planning context.
+
+When OFF: skip `.html` sidecar generation for markdown-canonical docs and skip the concept-illustration step (step 17b). The markdown deliverables, Mermaid fenced blocks (readable as text), and `<figure>` slots are unaffected. PRD stays HTML-primary regardless (its HTML is canonical, not a rendering convenience) — `--no-visual` only suppresses the concept illustration on a PRD-bearing run.
+
 **`--skip-sign-off`**
 Skips user-facing sign-off gates (design discussion review at step 5, H/V gate at step 8, structured-outline sign-off at step 10). The orchestrator presents a summary but does not wait for explicit user confirmation before proceeding. Use in automated or CI planning contexts.
 
@@ -54,7 +61,7 @@ Reads `.pHive/triage/queue.yaml` and decomposes one item (the triage entry whose
 
 ## Skill Preamble
 
-See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — state-directory note, kickoff gate, persona / config / memory loading. This skill consults routing keys (`agent_backends`, `model_overrides`, `planning.collaborative_review`) so also follow the **Root-first config precedence** subsection of the prelude.
+See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — state-directory note, kickoff gate, persona / config / memory loading. This skill consults routing keys (`agent_backends`, `model_overrides`, `planning.collaborative_review`, `planning.visual`) so also follow the **Root-first config precedence** subsection of the prelude.
 
 **Kickoff gate override — gate_mode aware.** If the kickoff checks pass, proceed silently. Read `paths.gate_mode` from the root `hive.config.yaml` (consumer override layer; falls back to `hive/hive.config.yaml`; default `warning`). When `gate_mode: hard`, the prelude's hard-stop applies byte-equivalently. When `gate_mode: warning`, the hard-stop is replaced by warn-and-proceed with sane defaults:
 
@@ -668,7 +675,23 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 17. **Run agent-ready checklist.** Validate each story against the 9-point checklist in `hive/references/agent-ready-checklist.md` (including check #9: cross-cutting concerns). Flag stories that fail checks in the confirmation output.
 
-18. **Present for confirmation.** Show the dependency graph (using Mermaid format — see Diagram Format section below), story summaries, traceability results, cross-cutting concerns applied, UI detection results, checklist results, and the **metric summary** (described below). Ask for final confirmation before saving.
+17b. **Generate the epic concept illustration (visual path only).** Generate one AI illustration depicting what the planned change "looks like" — a sizing signal plus a bit of delight. This is the only generated raster in the planning flow. See `hive/references/planning-format-contract.md §8`.
+
+    **Gate.** Run only when `${visual_planning}` is ON (per the `--no-visual` flag / `planning.visual` resolution above) **AND** `--lite` is not active. If either gate fails, skip this step silently and proceed to step 18.
+
+    1. **Build the prompt** from the finalized planning context: epic title + the design-discussion goal + the resolved scale assessment + the principal slices/changes (from H/V or the story list). Ask for a conceptual scene or diagram of the change — not a literal UI screenshot. Keep it one paragraph.
+    2. **Invoke** the `openai-image` MCP tool `generate_image` with that prompt, `output_dir` = `.pHive/epics/{epic-id}/docs`, and `output_prefix: concept`. The tool writes `concept-illustration.png` (n=1, opaque). It requires `OPENAI_API_KEY`; `gpt-image-2` may return `403` without a verified OpenAI org.
+    3. **Embed** a trailing section on the design-discussion (the always-present primary artifact) and regenerate its `.html` sidecar via `lib/html-sidecar-gen`:
+
+       ```html
+       <figure data-src="concept-illustration.png" data-alt="Concept illustration of the planned change">
+       </figure>
+       ```
+
+    4. **Non-blocking, best-effort.** If the MCP tool is unavailable, `OPENAI_API_KEY` is missing, or the call errors, propagate the exact error message verbatim as a one-line warning, embed a `<figure data-placeholder="concept illustration — image generation unavailable">` instead, and continue. A failed illustration is never a failed plan.
+    5. The PNG is gitignored (`.pHive/epics/**/docs/*.png`) — generated on-demand, not committed.
+
+18. **Present for confirmation.** Show the dependency graph (using Mermaid format — see Diagram Format section below), story summaries, traceability results, cross-cutting concerns applied, UI detection results, checklist results, and the **metric summary** (described below). When step 17b produced a concept illustration, reference its path (`.pHive/epics/{epic-id}/docs/concept-illustration.png`) so the user can open it. Ask for final confirmation before saving.
 
     **Metric summary section.** After the per-story summaries, render a `METRICS:` block that lists every story along with its `metric:` decision. For stories with `metric.applies: true`, show one line per story: `<story-id> — <name> (<direction>): <baseline> → <target> over <window>; verify_at=<verify_at>`. For stories with `metric.applies: false`, group them under an `UN-FALSIFIABLE:` subsection and quote each story's full `justification` verbatim so the user can challenge thin opt-outs before approving the plan. Any story flagged by step 14a's metric review gate appears in a third `GATE_FAILURES:` subsection with the specific failing field named.
 

@@ -57,6 +57,10 @@ Every planning artifact includes a **verification strategy** — tools, platform
 
 The planning team includes: researcher, technical-writer, analyst, architect, tpm, and ui-designer (when UI work is detected).
 
+**Visual planning (on by default).** Planning docs render as HTML sidecars with Mermaid diagrams and `<figure>` image slots, and at the end of a run `/plan` generates one **concept illustration** — an AI image of what the change "looks like," part sizing signal and part delight — embedded on the design discussion. Markdown stays the source of truth; the visuals are a rendering layer. Turn it off per-run with `/hive:plan --no-visual`, or persistently with `planning.visual: false` in `hive.config.yaml`. `--lite` keeps sidecars but skips the (most expensive) illustration step. The concept illustration uses the `openai-image` MCP server and is best-effort — if `OPENAI_API_KEY` is missing or the call fails, planning continues with a placeholder. See `hive/references/planning-format-contract.md` §7–§8.
+
+Common flags: `--fast` (skip H/V at medium scope), `--lite` (token-economy: skip H/V + review gates + outline + illustration), `--no-visual` (opt out of visual planning), `--gate-hv`, `--skip-sign-off`, `--skip-research`, `--from-triage <id>`.
+
 ### Running Execution: `/hive:execute`
 
 ```
