@@ -15,7 +15,10 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { parseSquadActivityFromEntries } from "../../lib/multica-story-dispatch/index.mjs";
+import {
+  parseSquadActivityFromEntries,
+  fetchTimelineEntries,
+} from "../../lib/multica-story-dispatch/index.mjs";
 
 const DEFAULT_WORKSPACE_SLUG = "plugin-hive";
 const HTTP_TIMEOUT_MS = 30000;
@@ -401,10 +404,13 @@ async function markNeedsRework(params: any): Promise<any> {
 async function getSquadActivity(params: any): Promise<any> {
   const { id } = params ?? {};
   const [issueUuid, workspaceId] = await Promise.all([resolveIssueUuid(id), getWorkspaceId()]);
-  const body = await multicaFetch(
-    `/api/issues/${encodeURIComponent(issueUuid)}/timeline?workspace_id=${encodeURIComponent(workspaceId)}`,
+  // Follow the timeline's next_cursor across pages via the shared paginated
+  // reader so the most-recent squad_leader_evaluated entry is found even when
+  // it sits on a later page. fetchPage returns the already-parsed body.
+  const basePath = `/api/issues/${encodeURIComponent(issueUuid)}/timeline?workspace_id=${encodeURIComponent(workspaceId)}`;
+  const entries: any[] = await fetchTimelineEntries(basePath, (path: string) =>
+    multicaFetch(path),
   );
-  const entries: any[] = Array.isArray(body) ? body : body?.entries ?? body?.data ?? [];
   try {
     return parseSquadActivityFromEntries(entries);
   } catch (err: any) {

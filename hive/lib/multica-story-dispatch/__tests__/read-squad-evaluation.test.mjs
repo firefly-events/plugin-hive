@@ -62,6 +62,56 @@ test('happy path: works when timeline returns bare array', async (t) => {
   assert.equal(result.evaluation?.outcome, 'action');
 });
 
+// --- pagination ---
+
+test('pagination: most-recent eval on a LATER page is selected via next_cursor', async (t) => {
+  // Page 1 holds an older eval and a next_cursor; page 2 holds the newest eval.
+  const olderEval = makeEntry({ created_at: '2026-06-13T08:00:00Z', details: { outcome: 'no_action', reason: 'too early' } });
+  const newestEval = makeEntry({ created_at: '2026-06-15T12:00:00Z', details: { outcome: 'action', reason: 'final' } });
+
+  const origFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = origFetch; });
+
+  const seenUrls = [];
+  globalThis.fetch = async (url) => {
+    seenUrls.push(url);
+    const hasCursor = /[?&]cursor=/.test(String(url));
+    if (!hasCursor) {
+      // First page: older eval + a cursor pointing at page 2.
+      return { status: 200, text: async () => JSON.stringify({ entries: [olderEval], next_cursor: 'pg2' }) };
+    }
+    // Second page: newest eval, no further cursor.
+    return { status: 200, text: async () => JSON.stringify({ entries: [newestEval], next_cursor: null }) };
+  };
+
+  const result = await readSquadEvaluation(ISSUE_ID, makeOptions());
+
+  assert.equal(result.evaluation?.outcome, 'action');
+  assert.equal(result.evaluation?.reason, 'final');
+  assert.equal(result.evaluation?.created_at, '2026-06-15T12:00:00Z');
+  assert.equal(seenUrls.length, 2, 'both timeline pages must be fetched');
+  assert.match(String(seenUrls[1]), /cursor=pg2/, 'second request must carry the next_cursor');
+});
+
+test('pagination: camelCase nextCursor is also followed', async (t) => {
+  const olderEval = makeEntry({ created_at: '2026-06-13T08:00:00Z', details: { outcome: 'no_action', reason: 'old' } });
+  const newestEval = makeEntry({ created_at: '2026-06-16T09:00:00Z', details: { outcome: 'action', reason: 'newest' } });
+
+  const origFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = origFetch; });
+
+  globalThis.fetch = async (url) => {
+    const hasCursor = /[?&]cursor=/.test(String(url));
+    if (!hasCursor) {
+      return { status: 200, text: async () => JSON.stringify({ entries: [olderEval], nextCursor: 'next-2' }) };
+    }
+    return { status: 200, text: async () => JSON.stringify({ entries: [newestEval] }) };
+  };
+
+  const result = await readSquadEvaluation(ISSUE_ID, makeOptions());
+  assert.equal(result.evaluation?.reason, 'newest');
+});
+
 // --- no-eval path ---
 
 test('no-eval: returns { evaluation: null } when timeline is empty', async (t) => {
