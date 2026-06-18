@@ -22,6 +22,23 @@ Forces approach validation (context7 + web research) regardless of scope size or
 **`--gate-hv`**
 Retains the H/V user-facing review gate at medium scope (opt-in conservative path). Default at medium scope is to auto-proceed after collaborative review (no user gate). This flag restores the gate. No effect at large scope — the gate is always present at large scope regardless of this flag.
 
+**`--lite`**
+Token-economy umbrella flag. Composes `--fast`'s H/V skip with two additional skips:
+- `review-doc` (collaborative review gate) does NOT fire for this run — equivalent to `planning.collaborative_review = false` for this run only. The writer still revises against the grill-record.
+- Structured outline is skipped.
+- H/V planning is skipped (same effect as `--fast`).
+- Design discussion (`produce-doc`) always fires — never skipped.
+
+Relationship to `--fast`: `--fast` skips H/V only. `--lite` implies `--fast`'s H/V skip plus review-gate-off and outline-skip. Use `--lite` when you want maximum token economy without losing the design discussion artifact.
+
+**Reduced effect at large scope:** At large scope, the structured outline is required regardless of `--lite`, and H/V planning is also required (same constraint as `--fast`). At large scope, `--lite`'s only active effect is disabling the collaborative review gates. No scope-class guard is enforced — `gate_mode` and existing large-scope routing govern when full ceremony is mandatory.
+
+**`--skip-sign-off`**
+Skips user-facing sign-off gates (design discussion review at step 5, H/V gate at step 8, structured-outline sign-off at step 10). The orchestrator presents a summary but does not wait for explicit user confirmation before proceeding. Use in automated or CI planning contexts.
+
+**`--skip-research`**
+Skips Phase A research (codebase exploration and research brief production). Proceeds directly from team assembly to design discussion. Use when a research brief already exists at `.pHive/epics/{epic-id}/docs/research-brief.md` or when the requirement is self-contained.
+
 **`--from-triage <id>`**
 Reads `.pHive/triage/queue.yaml` and decomposes one item (the triage entry whose `id` matches `<id>`) into a normal planning flow. Triage is the upstream input source — this flag does NOT replace plan phases or absorb triage's intake responsibilities. Workflow:
 
@@ -209,7 +226,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 **Atomic boundary:** if grill ever appears as inline prose inside this skill, that is a regression. Phase A2 is a single skill invocation that returns a grill-record path; this skill does not duplicate grill's pass.
 
-4b. **Collaborative review gate (if enabled).** Check `hive.config.yaml → planning.collaborative_review`. If `true` (default), run the collaborative review gate (see Collaborative Review Gate section below). `SendMessage` the design discussion AND the grill-record from Phase A2 to all active team agents for review. The technical writer revises the draft to address each grill-record finding (or annotates explicitly-accepted-and-justified deviations) and incorporate team feedback. If `false`, skip the review gate; the writer still revises against the grill-record, then the document is presented directly to the user.
+4b. **Collaborative review gate (if enabled).** Check `hive.config.yaml → planning.collaborative_review`. If `true` (default), run the collaborative review gate (see Collaborative Review Gate section below). `SendMessage` the design discussion AND the grill-record from Phase A2 to all active team agents for review. The technical writer revises the draft to address each grill-record finding (or annotates explicitly-accepted-and-justified deviations) and incorporate team feedback. If `false`, skip the review gate; the writer still revises against the grill-record, then the document is presented directly to the user. Also skip if `--lite` is active — `--lite` is equivalent to `planning.collaborative_review = false` for this run only; the writer still revises against the grill-record.
 
 5. **Present design discussion to user.** Show the full document, including a summary of what the team flagged and resolved during collaborative review. The user reads it and provides feedback:
    - Affirm or correct the understanding of the goal
@@ -230,13 +247,15 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
    Small  → Proceeding directly to stories (Phase C)
    Medium → Running H/V planning, then stories (Phase B2 → C)
    Medium + --fast → Skipping H/V entirely, proceeding to stories (Phase C)
+   Medium + --lite → Skipping review gates + H/V + outline, proceeding to stories (Phase C)
    Large  → Running H/V planning + structured outline, then stories (Phase B2 → B3 → C)
+   Large  + --lite → H/V + outline still required; review gates skipped (reduced effect — see --lite docs)
    ```
 
    **Routing rules:**
    - **Small** (~5-15 min, 1-3 files, single layer): design discussion is sufficient context → Phase C
-   - **Medium** (multi-file, multiple layers, cross-stack): needs H/V planning to slice correctly → Phase B2 (unless `--fast`, which skips H/V entirely)
-   - **Large** (multi-system, migration, long-horizon): needs full H/V + structured outline with elicitation → Phase B2 + B3
+   - **Medium** (multi-file, multiple layers, cross-stack): needs H/V planning to slice correctly → Phase B2 (unless `--fast` or `--lite`, both of which skip H/V entirely; `--lite` also skips the review gate and outline)
+   - **Large** (multi-system, migration, long-horizon): needs full H/V + structured outline with elicitation → Phase B2 + B3 (`--lite` skips review gates only; H/V and outline are still required at large scope)
 
 ### Phase B2: Horizontal + Vertical Planning (medium and large scope)
 
@@ -247,7 +266,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
    The TPM is the owner of this step. The architect (if present) has already contributed their perspective in earlier phases — the TPM now sequences their inputs into an executable delivery plan.
 
-7. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the H/V outputs. `SendMessage` both documents to all active team agents. The researcher verifies findings are accurately reflected, the architect (if present) validates technical soundness, and the UI designer (if present) flags any UI layer gaps. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
+7. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the H/V outputs. `SendMessage` both documents to all active team agents. The researcher verifies findings are accurately reflected, the architect (if present) validates technical soundness, and the UI designer (if present) flags any UI layer gaps. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly. Also skip if `--lite` is active (equivalent to `planning.collaborative_review = false` for this run).
 
 8. **H/V gate (conditional).** Behavior depends on scope and flags:
 
@@ -272,7 +291,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 9. **Produce structured outline.** `SendMessage` to the technical writer with the `structured-outline` skill (`skills/hive/skills/structured-outline/SKILL.md`, which enforces all mandatory parts and the completeness gate — Risk Registry and Elicitation are not optional). Input: H/V plans + design discussion + user feedback + research brief. Output: a ~1000-line structured outline with detailed approach, file manifest, risk registry, and elicitation questions. The outline now builds ON the vertical slice plan — each phase in the outline maps to a vertical slice.
 
-9b. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the structured outline. This is the most critical review — all active team agents review the full outline. The TPM validates sequencing, the researcher confirms technical accuracy, the architect (if present) stress-tests feasibility, and the UI designer (if present) validates UI approach. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
+9b. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), and `--lite` is NOT active, run the collaborative review gate on the structured outline. This is the most critical review — all active team agents review the full outline. The TPM validates sequencing, the researcher confirms technical accuracy, the architect (if present) stress-tests feasibility, and the UI designer (if present) validates UI approach. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
 
    **UI Designer SCALE_CALL revision (step 9b only) — two-gate precedence rule:** If ui-designer emits a `SCALE_CALL` field in their step 9b review response, apply **last gate wins**:
    - **Revised to `pre-exec`:** delete any existing ui-designer escalation entry in cycle state, then write the step 9b `ESCALATION:` block as a fresh entry. Log: `"ui-designer scale call revised at step 9b to pre-exec — writing fresh escalation"`
