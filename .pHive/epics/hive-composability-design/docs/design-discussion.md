@@ -6,6 +6,38 @@
 
 ---
 
+## 0. Refresh Note (2026-06-17)
+
+This epic was planned 2026-04-17 but never committed — it lived only in the maintainer's
+primary clone working tree, blanket-ignored by `.pHive/epics/*` with no `.gitignore`
+allowlist entry (same orphan failure mode as `sandcastle-gh-issue-dispatch`). It was
+rescued into version control on `feat/hive-composability-design` (off `develop`) and the
+scope was re-evaluated against ~2 months of shipped work. Sections 1–7 below are the
+original April thinking, preserved for the audit trail. The **current** scope is:
+
+- **Workstream D (Rich Outputs) + s1b telemetry — KEPT.** Still genuinely unbuilt:
+  `hive/references/document-templates/*` are still ASCII; no HTML sidecar generator
+  exists. This is the surviving core of the epic.
+- **Workstream A (Composability) — RECONCILED.** `--fast` shipped in the meantime (it
+  skips H/V at medium scope). Kept the design-discussion produce/review split (s2-1) and
+  redefined `--lite` as a token-economy *umbrella* distinct from `--fast` (s2-2). The
+  scope-class guard (former s2-3) was dropped — shipped `gate_mode` (warning|hard) plus
+  large-scope routing already govern mandatory full ceremony.
+- **Workstream C (Model Economy) — DROPPED.** `model_overrides` + `agent_backends` +
+  the Haiku/Explorer guardrail all shipped via the routing-policy config
+  (`hive.config.yaml`, orchestrator.md). Nothing left to build.
+- **Workstream B (Respawn-per-task Lifecycle) — DROPPED as a feature.** The execution
+  substrate moved to Multica/sandcastle, where per-story fresh-agent dispatch is native,
+  so respawn-per-task is moot and the session story-boundary hook (s8-1) targeted a
+  superseded path. Replaced by one documentation story (`b-1`) that records this decision
+  in user-facing docs rather than dropping it silently.
+
+Net: 20 stories → 10. `version_bump: minor`. The §6 open questions about effort
+thresholds, sign-off-gate shape, and phase-scoped lifecycle config are resolved or moot
+under the refreshed scope.
+
+---
+
 ## 1. What Are We Doing?
 
 Two complaints that reinforce each other: hive costs too many tokens for routine work, and its planning artifacts look like wall-of-text markdown when the product's whole selling point is design fluency.

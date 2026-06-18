@@ -6,6 +6,12 @@ complexity: medium
 methodology: classic
 depends_on: [s4-2-structured-outline-mermaid]
 
+metric:
+  applies: false
+  justification: >
+    Expands the s1-2 sidecar generator to cover H/V and structured-outline docs.
+    Verified by sidecar presence across those doc types, not by a measurable trend.
+
 description: |
   Extend lib/html-sidecar-gen.* to cover H/V and structured-outline writes (not just
   design-discussion). Add sidecar invocation prose to horizontal-plan, vertical-plan,

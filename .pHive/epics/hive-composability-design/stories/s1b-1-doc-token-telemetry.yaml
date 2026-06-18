@@ -6,6 +6,20 @@ complexity: medium
 methodology: classic
 depends_on: []
 
+metric:
+  applies: true
+  name: plan.doc_token_telemetry_coverage
+  direction: up
+  unit: ratio
+  baseline: 0.0
+  target: 1.0
+  window: next-3-cycles
+  source:
+    kind: events
+    ref: ".pHive/metrics/events/*.jsonl - doc_token probe events; fraction of plan-doc productions that emit one"
+  verify_at: integrate
+  owner: reviewer
+
 description: |
   Create lib/doc-token-telemetry.* — a write-side token-counting probe on planning
   artifact writes. Data-only in v1; no read path, no dashboard. Measurement data

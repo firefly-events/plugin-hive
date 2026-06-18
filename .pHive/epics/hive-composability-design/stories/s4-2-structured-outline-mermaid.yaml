@@ -6,6 +6,12 @@ complexity: low
 methodology: classic
 depends_on: [s4-1-hv-mermaid-templates]
 
+metric:
+  applies: false
+  justification: >
+    Adds a Mermaid dependency map and figure slots to the structured-outline template.
+    A structural template change with no runtime signal to trend.
+
 description: |
   Two additions to skills/hive/skills/structured-outline/SKILL.md:
   1. Part 6 dependency map instruction: replace any ASCII guidance with Mermaid graph TD instruction

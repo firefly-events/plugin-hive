@@ -6,6 +6,14 @@ complexity: low
 methodology: classic
 depends_on: []
 
+metric:
+  applies: false
+  justification: >
+    Reference-doc story defining the planning-artifact format contract
+    (markdown-canonical + embedded HTML + generated sidecar). It adds no runtime
+    surface that emits a measurable signal; it is validated by s1-2 and the s4-x
+    stories consuming the contract.
+
 description: |
   Create hive/references/planning-format-contract.md — the authoritative reference
   defining what embedded content is allowed in each planning doc type, image source

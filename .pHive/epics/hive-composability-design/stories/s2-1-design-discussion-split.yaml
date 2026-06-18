@@ -6,6 +6,13 @@ complexity: high
 methodology: classic
 depends_on: []
 
+metric:
+  applies: false
+  justification: >
+    Refactors the design-discussion skill into separable produce-doc / review-doc
+    invocations. A backwards-compatible structural change verified by existing callers
+    still producing identical output, not by a measurable trend.
+
 description: |
   Split skills/hive/skills/design-discussion/SKILL.md into two addressable sub-invocations:
   - produce-doc: always fires (lite AND full). Produces the design-discussion document + sidecar.

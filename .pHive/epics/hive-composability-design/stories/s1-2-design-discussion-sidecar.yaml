@@ -4,7 +4,14 @@ title: Design-discussion figure slots + sidecar generator
 status: pending
 complexity: medium
 methodology: classic
-depends_on: []
+depends_on: [s1-1-planning-format-contract]
+
+metric:
+  applies: false
+  justification: >
+    Adds figure slots and an HTML sidecar generator to the design-discussion skill
+    output. Success is the sidecar artifact being produced (a structural check), not a
+    trend. Token impact of richer docs is measured separately by s1b-1.
 
 description: |
   Two deliverables bundled:

@@ -6,6 +6,13 @@ complexity: medium
 methodology: classic
 depends_on: [s1-2-design-discussion-sidecar, s1b-1-doc-token-telemetry]
 
+metric:
+  applies: false
+  justification: >
+    Replaces ASCII diagrams with Mermaid in the horizontal/vertical-plan skill
+    templates. Correctness is that the templates render valid Mermaid (a structural
+    check), not a measurable trend.
+
 description: |
   Replace ASCII art layer-map and overlay diagrams in H/V skill templates with Mermaid
   graph blocks. Also adds doc-token-telemetry invocations to H/V skill writes (carrying

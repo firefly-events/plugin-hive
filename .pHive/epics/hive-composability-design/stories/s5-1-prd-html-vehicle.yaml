@@ -6,6 +6,12 @@ complexity: medium
 methodology: classic
 depends_on: [s4-3-sidecar-gen-expansion]
 
+metric:
+  applies: false
+  justification: >
+    Adds PRD HTML canonical output with an inverse markdown sidecar. A structural
+    output-format deliverable with no runtime trend metric.
+
 description: |
   Implement PRD HTML canonical output (HTML-primary exception — the only doc type
   where HTML, not markdown, is the canonical artifact).
