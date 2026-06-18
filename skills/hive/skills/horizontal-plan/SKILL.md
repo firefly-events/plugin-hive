@@ -23,7 +23,7 @@ discussion. `$ARGUMENTS` carries the epic id.
 1. **Layer Inventory** (~30 lines) — every layer the requirement touches (backend, frontend, data, infra, etc.), one line each.
 2. **Per-Layer Requirements** (~100–200 lines) — for EACH layer: responsibility, key files/seams (real paths), what it must do overall, dependencies. This is the bulk of the document.
 3. **Cross-Layer Dependencies** (~50 lines) — how the layers depend on each other; the integration seams.
-4. **Layer Map Diagram** (~30 lines) — an ASCII/textual map of the layers and their relationships.
+4. **Layer Map Diagram** (~30 lines) — a Mermaid `graph TD` map of the layers and their relationships. Use standard fenced ` ```mermaid ``` ` blocks per `hive/references/planning-format-contract.md §3`.
 5. **Scope Summary** (~20 lines) — overall LOC/complexity sense and which layers carry the most weight.
 
 ## Completeness gate (do not skip)
@@ -40,6 +40,14 @@ of execution (that's the vertical plan). Dense, scannable, evidence-backed.
 ## Output
 
 Write to `.pHive/epics/{epic-id}/docs/horizontal-plan.md`.
+
+After writing the markdown file, record token metrics:
+
+```
+lib/doc-token-telemetry recordDocWrite({ docPath: ".pHive/epics/{epic-id}/docs/horizontal-plan.md", epicId: "{epic-id}", docType: "horizontal-plan", format: "md" })
+```
+
+The probe is non-blocking — if it fails, log a warning and continue.
 
 ## What this skill is NOT
 
