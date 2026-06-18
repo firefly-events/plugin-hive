@@ -140,9 +140,11 @@ without re-reading the older setting:
    teammate spawn through `planning-routing` -> `plan-mode-multica`, which owns
    the Multica persona dispatch, polling, and episode markers.
 
-1. **Assemble and route the planning team.** Invoke the **planning-routing** skill (atomic; `skills/hive/skills/planning-routing/SKILL.md`) — this is an **external call**, NOT inline prose copied from the routing skill.
+1. **Classify the requirement and assemble the planning team.** First, invoke the **planning-classification** skill (atomic; `skills/hive/skills/planning-classification/SKILL.md`) — this is an **external call**, NOT inline persona selection. Pass `requirement_summary` as input. Store the returned object on the planning context as `${classification_output}`; it carries `assembled_personas` (the resolved planning roster), `matched_tags`, `per_tag_reasoning`, `confidence`, and `gate_decisions`.
 
-Pass four inputs: `assembled_personas` (core planning personas plus conditional architect/ui-designer selected from the requirement), the root-first `agent_backends` map (empty map if absent per [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)), `${planning_mode_decision}` from step 0c, and `requirement_summary`.
+Then invoke the **planning-routing** skill (atomic; `skills/hive/skills/planning-routing/SKILL.md`) — also an **external call**, NOT inline prose copied from the routing skill.
+
+Pass four inputs: `assembled_personas` (taken directly from `${classification_output}.assembled_personas` — do NOT re-select personas inline; planning-classification is the single source of truth for roster composition for `/plan`), the root-first `agent_backends` map (empty map if absent per [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)), `${planning_mode_decision}` from step 0c, and `requirement_summary`.
 
 The skill builds final `routing_decisions`, spawns CC Workflows, Multica, direct, and/or Codex-backed teammates, emits exactly one structured routing INFO log per persona, and handles CC-Workflows→Codex→direct fallback, Multica→Codex→direct fallback, and Codex runtime fallback/circuit breaker behavior. When `${planning_mode_decision}.mode_decision == "cc-workflows"`, `planning-routing` invokes `skills/hive/skills/plan-mode-cc-workflows/SKILL.md` for CC-Workflows-dispatched personas. When `${planning_mode_decision}.mode_decision == "multica"`, `planning-routing` invokes `skills/hive/skills/plan-mode-multica/SKILL.md` for Multica-dispatched personas. Otherwise it preserves the existing direct/Codex routing behavior.
 
@@ -613,6 +615,15 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
       base_branch: <resolved>          # from Phase A 0a — `develop` if origin/develop existed at plan time, else `main`, else the explicit override
       branch_strategy: <resolved>      # per-epic (default) | per-story (back-compat)
 
+    # dpt-3/dpt-4: classification provenance — operator-visible audit surface
+    planning_team:
+      matched_tags: [<tags from classification_output>]
+      roster: [<assembled_personas from classification_output>]
+      per_tag_reasoning:
+        <tag>: <reasoning string from classification_output>
+      confidence: <confidence from classification_output>
+      gate_decisions: <gate_decisions map from classification_output>
+
     stories:
       - id: <story-id>
         title: <story title>
@@ -625,7 +636,9 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
       - if it does not, insert `version_bump:` immediately after `methodology:`;
       - if it already has a `git_flow:` block, update the two field values in place (do NOT duplicate the block);
       - if it does not, insert a fresh `git_flow:` block immediately after `version_bump:`;
-      - canonical field order owned by /plan is `methodology` → `version_bump` → `git_flow`; insert to preserve that order.
+      - if it already has a `planning_team:` block, overwrite it with the current classification output (do NOT duplicate the block);
+      - if it does not, insert a fresh `planning_team:` block immediately after `git_flow:`;
+      - canonical field order owned by /plan is `methodology` → `version_bump` → `git_flow` → `planning_team`; insert to preserve that order.
       - all other fields not owned by /plan (e.g. `source_issue`, `description`, free-form notes) are preserved untouched.
 
     Schema reference: `hive/references/story-yaml-schema.md` §6 "Epic index (`epic.yaml`)" documents the canonical block shape.
