@@ -231,3 +231,5 @@ tsx-*/
 !.pHive/epics/changelog-human-summaries/**
 !.pHive/triage/
 !.pHive/triage/queue.yaml
+!.pHive/epics/dynamic-planning-team/
+!.pHive/epics/dynamic-planning-team/**

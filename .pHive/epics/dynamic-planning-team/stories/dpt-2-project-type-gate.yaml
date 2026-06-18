@@ -1,0 +1,87 @@
+id: dpt-2-project-type-gate
+epic: dynamic-planning-team
+title: Add project_type gate field to project-profile.yaml + schema
+status: pending
+tracker_adapter: multica
+tracker_id: PLU-150
+tracker_uuid: 48fcb699-3d6f-4ac2-9f66-3287793e3ee9
+complexity: low
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Add an explicit project-type gate to .pHive/project-profile.yaml so the
+  planning-classification skill (dpt-3) can suppress project-inappropriate specialist
+  slots (e.g. no ui-designer / accessibility-specialist when the project has no UI).
+
+  Add a `project_type` enum (framework | consumer-app | service) AND a derived/explicit
+  `has_ui: bool`. `has_ui` is the value the `project_gate: requires_ui` check reads;
+  `project_type` is the richer field for future gates. Document both in the project-profile
+  schema so /hive:kickoff populates them going forward.
+
+  Set plugin-hive's own profile to the no-UI value (project_type: framework, has_ui: false)
+  — this generalizes today's "do not add ui-designer for backend work" prose into tracked,
+  operator-overridable state.
+
+  Absent-field behavior: when has_ui is missing, treat as unknown → conservative default
+  documented in dpt-3 (ungated tags apply; requires_ui slots resolve via tech_stack
+  heuristic fallback or stay empty). This story only defines + documents the field and the
+  absent-field contract; the consuming logic lives in dpt-3.
+
+acceptance_criteria:
+  - "Given .pHive/project-profile.yaml, when read, then it carries `project_type` (one of framework|consumer-app|service) and `has_ui` (bool)."
+  - "Given plugin-hive's profile specifically, when read, then project_type=framework and has_ui=false."
+  - "Given the project-profile schema/kickoff docs, when read, then both fields are documented including the absent-field 'unknown → conservative default' contract."
+  - "Given an existing profile lacking the fields, when the contract is read, then behavior on absence is unambiguous (no crash; documented fallback)."
+
+steps:
+  - id: research
+    description: Locate the project-profile schema/doc surface (kickoff skill + any references) and the current .pHive/project-profile.yaml.
+    agent: researcher
+  - id: implement
+    description: Add project_type + has_ui to plugin-hive's profile and to the schema/kickoff docs; document the absent-field contract.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Validate profile YAML parses; fields present + correct types; plugin-hive values are framework/false; docs mention absent-field contract.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm field naming + enum values align with design discussion D3 and won't collide with existing profile keys.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feat/dynamic-planning-team.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/project-profile.yaml
+      purpose: The profile gaining project_type + has_ui; plugin-hive set to no-UI.
+    - path: skills/kickoff/SKILL.md
+      purpose: Likely schema/population surface for project-profile fields (confirm in research).
+
+files_to_modify:
+  - file: .pHive/project-profile.yaml
+    change: Add project_type=framework, has_ui=false.
+  - file: skills/kickoff/SKILL.md
+    change: Document project_type + has_ui fields and the absent-field contract (path to confirm in research).
+
+code_examples:
+  - title: current plugin-hive profile (head)
+    file: .pHive/project-profile.yaml
+    snippet: |
+      name: plugin-hive
+      tech_stack: [node, bash, python, sqlite, yaml, markdown]
+      # add:
+      # project_type: framework
+      # has_ui: false
+
+risks:
+  - severity: low
+    description: kickoff schema surface may live in more than one doc; under-documenting causes drift.
+    mitigation: research step enumerates all profile-schema mentions before editing.
