@@ -229,5 +229,7 @@ tsx-*/
 !.pHive/epics/kg-repair-activation/**
 !.pHive/epics/hive-composability-design/
 !.pHive/epics/hive-composability-design/**
+!.pHive/epics/changelog-human-summaries/
+!.pHive/epics/changelog-human-summaries/**
 !.pHive/triage/
 !.pHive/triage/queue.yaml

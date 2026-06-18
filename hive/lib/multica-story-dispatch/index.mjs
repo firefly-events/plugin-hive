@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 
 const HTTP_TIMEOUT_MS = 30_000;
 const USER_AGENT = 'hive-multica-story-dispatch/0.1.0';
+const SQUAD_OUTCOME_VALUES = new Set(['action', 'no_action', 'failed']);
 const AGENT_CACHE = new Map();
 
 function sanitize(str, token) {
@@ -470,4 +471,58 @@ export async function moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, is
 
   await httpJson(url, { method: 'PUT', token, body: { status: 'todo' } });
   return { was_moved: true };
+}
+
+function timelineUrl(serverUrl, workspaceId, issueUuid) {
+  return `${trimTrailingSlash(serverUrl)}/api/issues/${encodeURIComponent(issueUuid)}/timeline?workspace_id=${encodeURIComponent(workspaceId)}`;
+}
+
+export async function readSquadEvaluation(issueId, options = {}) {
+  const { serverUrl, token, workspaceId } = options;
+  const url = timelineUrl(serverUrl, workspaceId, issueId);
+
+  let body;
+  try {
+    body = await httpJson(url, { token });
+  } catch (err) {
+    if (err?.code === 'HTTP_401' || err?.code === 'HTTP_403') {
+      throw dispatchError(
+        'AUTH_FAILURE',
+        err.message ?? 'Multica auth failed',
+        'Run /hive:multica-init to configure credentials',
+        token,
+      );
+    }
+    throw err;
+  }
+
+  const entries = Array.isArray(body) ? body : (body?.entries ?? body?.data ?? []);
+  const evals = entries.filter(
+    (e) => e?.type === 'activity' && e?.action === 'squad_leader_evaluated',
+  );
+
+  if (evals.length === 0) return { evaluation: null };
+
+  evals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const latest = evals[0];
+  const details = latest?.details ?? {};
+  const outcome = details?.outcome;
+  if (typeof outcome !== 'string' || !SQUAD_OUTCOME_VALUES.has(outcome)) {
+    throw dispatchError(
+      'TRANSPORT',
+      `Unexpected squad_leader_evaluated outcome value: '${String(outcome)}'`,
+      undefined,
+      token,
+    );
+  }
+
+  return {
+    evaluation: {
+      actor_type: latest?.actor_type ?? null,
+      actor_id: latest?.actor_id ?? null,
+      outcome,
+      reason: details?.reason ?? null,
+      created_at: latest?.created_at ?? null,
+    },
+  };
 }

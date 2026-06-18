@@ -37,3 +37,44 @@ items:
       - { state: inbox, at: 2026-05-27T05:30:00Z }
       - { state: clarified, at: 2026-05-27T05:30:00Z }
       - { state: prioritized, at: 2026-05-27T05:30:00Z }
+  - id: t-002
+    state: prioritized
+    kind: bug
+    title: "/hive:ship does not bump the README version badge"
+    description: |
+      The /hive:ship release flow bumps the version in three places —
+      .claude-plugin/marketplace.json, .claude-plugin/plugin.json, and
+      CHANGELOG.md — but leaves the README `[![Version]]` badge untouched.
+      Result: the README badge drifts stale every release and the public
+      GitHub web view shows the wrong version.
+
+      Repro / evidence: the 2.11.0 release commit c98116e bumped both
+      manifests + CHANGELOG but produced 0 README diff lines; the badge
+      stayed at 2.10.0. Confirmed via `git show --stat c98116e`. Fixed
+      reactively for 2.11.0 in PR #291, but the ship skill will re-drift
+      the badge on the next release unless the skill itself is fixed.
+
+      Acceptance hints:
+      - /hive:ship updates the README version badge alongside the manifests
+        in the same release commit.
+      - Badge regex/format matches the existing
+        `version-X.Y.Z-green.svg` shields.io pattern.
+      - Idempotent: re-running ship on an already-bumped repo is a no-op.
+      - Guard/verify: ship surfaces (or a release check) flags badge !=
+        manifest version so silent drift can't recur.
+
+      Source: README-revert investigation 2026-06-14 (root cause 248104f
+      re-bloat + c98116e badge skip).
+    reporter: don
+    reported_at: 2026-06-14T22:40:00Z
+    priority: p2
+    severity: moderate
+    assignee: null
+    linked_epic: null
+    linked_story: null
+    closed_reason: null
+    closed_at: null
+    state_history:
+      - { state: inbox, at: 2026-06-14T22:40:00Z }
+      - { state: clarified, at: 2026-06-14T22:40:00Z }
+      - { state: prioritized, at: 2026-06-14T22:40:00Z }

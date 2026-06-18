@@ -139,6 +139,23 @@ Planning Team ──→ Dev Team ──→ Test Swarm
   wireframes         per-story commits  session report
 ```
 
+### Shipping a Release: `/hive:ship`
+
+`/hive:ship` closes the release lifecycle after stories have executed and passed review. The command runs these steps in order:
+
+1. **Story reconciliation** — verifies which stories shipped in this run and surfaces any in unexpected states for operator triage.
+2. **Changelog authoring** — drafts a human-readable `## [Unreleased]` entry from the reconciled stories:
+   - Prose is built from the authoring source chain: `outcome` field → first sentence of `description` → title + acceptance criteria. Degrade never blocks; it never invents outcomes the story data does not support.
+   - Bullets synthesized from thin data (description or title + acceptance criteria rather than a real `outcome` field) receive a trailing `<!-- degraded: sourced from … -->` marker so the operator knows which lines deserve a closer read.
+   - If an existing `## [Unreleased]` block is present, the skill surfaces both and asks the operator to `keep` (discard the new draft for that epic) or `merge` (operator combines them). It never silently overwrites existing prose.
+   - **Operator review gate** — the draft (or merge candidate) is presented for approve/edit, judged against the format criteria in [`hive/references/changelog-entry-format.md`](../hive/references/changelog-entry-format.md). This is the quality gate; approval is final.
+   - On approval, all degraded-source markers are stripped and the entry is written under `## [Unreleased]` in `CHANGELOG.md`.
+3. **Version verification** — checks that version sources (package.json, pyproject.toml, etc.) are consistent and that the `## [Unreleased]` entry exists. Prompts the operator to apply a version bump if the sources are out of sync.
+4. **Ship target** — runs the project's configured ship command (npm publish, gh release, etc.) with explicit operator confirmation.
+5. **Release artifacts** — generates a release post, video script, and social post ideas.
+
+All changelog entry format rules — entry shape, bullet shape, source chain, degraded-source marking, and quality criteria — are the canonical responsibility of [`hive/references/changelog-entry-format.md`](../hive/references/changelog-entry-format.md).
+
 ---
 
 ## Commands Reference
@@ -152,7 +169,7 @@ Planning Team ──→ Dev Team ──→ Test Swarm
 | `/hive:status` | "what's the status" | Check active workflow state |
 | `/hive:review` | "review this code", "review my changes" | Run structured code review |
 | `/hive:test` | "run tests", "test swarm" | Run the test swarm pipeline |
-| `/hive:ship` | "ship it", "cut a release", "release this" | Close the lifecycle: reconcile story status, verify version bump, run the project's ship target, generate release post + video script + post ideas |
+| `/hive:ship` | "ship it", "cut a release", "release this" | Close the lifecycle: reconcile story status, author the prose changelog entry (draft → operator review → write), verify version bump, run the project's ship target, generate release post + video script + post ideas |
 
 ---
 
@@ -385,6 +402,18 @@ At every agent spawn, step 5 loads memories:
 
 Starter memories ship with the plugin and migrate to the live path on first `/hive:kickoff`. Export/import via MemoryBundle format enables cross-user memory sharing with provenance tracking. See `references/onboarding-guide.md`.
 
+### Agent lifecycle across stories
+
+Under the Multica/sandcastle execution substrate, **each story is dispatched as a fresh agent invocation**. The agent starts with no memory of prior stories in the same epic, executes exactly the work described in its issue, then exits. Context isolation is guaranteed by the substrate — not by any Hive-level config key.
+
+This means:
+
+- **No stale context accumulates.** An agent implementing story N cannot be confused by story N−1's working state, partial writes, or in-flight tool calls.
+- **No explicit teardown is needed.** There is no long-lived teammate to respawn, recycle, or reset between stories.
+- **Continuity across stories flows through artifacts, not agent memory.** Episode markers, commits, and the knowledge graph carry state forward. A fresh agent reads those artifacts at the start of its run and picks up where the prior agent left off.
+
+**Why a respawn-per-task lifecycle mode was never built (Workstream B).** The 2026-04 plan included a Workstream B that would have added a `respawn_per_task` lifecycle option (configurable via a `teammate_lifecycle` key) for development teammates running inside a long-lived session. That design made sense against the in-session TeamCreate execution model, where a single teammate persists across stories and must be deliberately cycled to reset context. When the execution substrate moved to Multica/sandcastle — where per-story fresh-agent dispatch is native — the problem Workstream B was solving ceased to exist. Building a separate config-driven respawn mechanism would have duplicated what the substrate already guarantees for free. The feature was dropped in June 2026 and replaced with this note. There is no `teammate_lifecycle` key and no `respawn_per_task` flag; neither was ever shipped.
+
 ---
 
 ## Configuration
@@ -495,6 +524,7 @@ See `references/error-handling.md` for the full per-phase failure playbook.
 
 | Doc | What it covers |
 |-----|---------------|
+| `references/changelog-entry-format.md` | Canonical changelog entry format — entry shape, bullet shape, authoring source chain, degraded-source marking, quality criteria |
 | `references/agent-config-schema.md` | Agent frontmatter format (official + Hive fields) |
 | `references/agent-memory-schema.md` | Memory types, TTL, loading, migration |
 | `references/team-config-schema.md` | Loadable team compositions and lifecycle |
