@@ -1,7 +1,7 @@
 id: dpt-4-wire-plan-and-provenance
 epic: dynamic-planning-team
 title: Wire classification into /plan + emit planning_team provenance
-status: pending
+status: in_review
 tracker_adapter: multica
 tracker_id: PLU-152
 tracker_uuid: 346778b0-25f4-4698-b8b9-da2d30bace6d

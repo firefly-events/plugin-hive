@@ -1,7 +1,7 @@
 id: dpt-5-tests
 epic: dynamic-planning-team
 title: Tests — map schema, fallback, project-gate, roster-only invariant
-status: pending
+status: in_review
 tracker_adapter: multica
 tracker_id: PLU-153
 tracker_uuid: 741fed99-4d79-43cc-bf81-8325c002cea5

@@ -1,7 +1,7 @@
 id: dpt-1-composition-catalog
 epic: dynamic-planning-team
 title: Add planning_composition section to specialist-triggers.md
-status: pending
+status: in_review
 tracker_adapter: multica
 tracker_id: PLU-149
 tracker_uuid: 9d8afd70-5ac4-4007-b989-d5f4e7cc1504
