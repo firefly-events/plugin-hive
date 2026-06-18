@@ -1,0 +1,47 @@
+name: artifact-lifecycle
+title: Artifact Lifecycle — untracked runtime eviction and report-only tracked inventory
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+version_bump: minor
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  - id: al-1-lifecycle-library-and-registry
+    title: Create lifecycle library and per-class registry schema
+    complexity: high
+    depends_on: []
+  - id: al-2-forever-exclusions-guard
+    title: Enforce forever-retention hard exclusions
+    complexity: medium
+    depends_on: [al-1-lifecycle-library-and-registry]
+  - id: al-3-untracked-runtime-sweep
+    title: Evict inactive untracked runtime artifacts to OS temp
+    complexity: high
+    depends_on:
+      - al-1-lifecycle-library-and-registry
+      - al-2-forever-exclusions-guard
+  - id: al-4-backfill-terminal-signal
+    title: Add legacy merged-and-aged terminal eligibility signal
+    complexity: medium
+    depends_on: [al-1-lifecycle-library-and-registry]
+  - id: al-5-report-only-tracked-classes
+    title: Register tracked consumer-scanned classes as report-only
+    complexity: medium
+    depends_on: [al-1-lifecycle-library-and-registry]
+  - id: al-6-weekly-automation
+    title: Schedule weekly artifact lifecycle sweep
+    complexity: medium
+    depends_on: [al-3-untracked-runtime-sweep]
+  - id: al-7-state-dir-scan-scope
+    title: Scan resolved state dir with legacy .pHive compatibility diagnostics
+    complexity: medium
+    depends_on: [al-1-lifecycle-library-and-registry]
+  - id: al-8-lifecycle-tests
+    title: Cover lifecycle guards, age sources, and idempotent sweep behavior
+    complexity: medium
+    depends_on:
+      - al-3-untracked-runtime-sweep
+      - al-5-report-only-tracked-classes

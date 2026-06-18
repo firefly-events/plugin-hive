@@ -239,5 +239,7 @@ tsx-*/
 
 !.pHive/triage/
 !.pHive/triage/queue.yaml
+!.pHive/epics/artifact-lifecycle/
+!.pHive/epics/artifact-lifecycle/**
 !.pHive/epics/dynamic-planning-team/
 !.pHive/epics/dynamic-planning-team/**

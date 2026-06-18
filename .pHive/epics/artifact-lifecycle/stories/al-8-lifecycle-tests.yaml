@@ -1,0 +1,90 @@
+id: al-8-lifecycle-tests
+epic: artifact-lifecycle
+title: Cover lifecycle guards, age sources, and idempotent sweep behavior
+status: in_review
+complexity: medium
+methodology: classic
+depends_on:
+  - al-3-untracked-runtime-sweep
+  - al-5-report-only-tracked-classes
+tracker_id: "PLU-274"
+tracker_uuid: "4c30c104-42b7-4e64-8fdb-abaf11371c10"
+tracker_url: "http://localhost:8080/issues/4c30c104-42b7-4e64-8fdb-abaf11371c10"
+
+description: |
+  Add the epic-level guard test suite for artifact lifecycle behavior. These
+  tests prove active and excluded artifacts are never touched, dry-run is a
+  no-op, apply mode is idempotent, and age-source selection follows D5 for
+  untracked and tracked classes.
+
+acceptance_criteria:
+  - "Given suspended and failed DAG run fixtures, in-review story/episode fixtures, and active triage fixtures, when the lifecycle sweep runs, then none are moved, removed, or reported as removable."
+  - "Given hard-excluded memory, team-memory, KG sqlite, and Chroma index fixtures, when the sweep runs in dry-run or apply mode, then no action is planned or applied."
+  - "Given eligible untracked fixtures, when dry-run runs, then the report lists candidates and fixture paths remain in place."
+  - "Given apply mode runs twice against the same eligible untracked fixtures, when the second run executes, then it is idempotent and produces no duplicate moves or errors."
+  - "Given untracked fixtures with mtime and tracked fixtures with git history, when candidate age is computed, then untracked classes use filesystem mtime and tracked report-only classes use git last-commit date."
+  - "Given tracked report-only classes under audits, episodes, and metrics, when apply mode runs, then files remain present and the report marks them report-only."
+
+metric:
+  applies: false
+  justification: "This is a correctness test story for lifecycle safety, and its outcome is the guard suite passing rather than a separate trend metric."
+
+steps:
+  - id: research
+    description: Skip; this story consolidates test cases from the implemented lifecycle stories and locked decisions.
+    agent: researcher
+  - id: implement
+    description: Add missing shared fixtures and guard tests for active state, exclusions, dry-run, idempotency, and age sources.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run the full artifact lifecycle test suite and any relevant Python lint/type checks available in the repo.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify the suite covers D1-D5, forever exclusions, active guards, and report-only tracked classes.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit the lifecycle guard test suite on feat/artifact-lifecycle.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: tests/artifact_lifecycle/test_lifecycle_guards.py
+      purpose: End-to-end guard tests for active/excluded/dry-run/idempotent behavior.
+    - path: tests/artifact_lifecycle/conftest.py
+      purpose: Shared fixture helpers for temp state roots, git fixtures, and lifecycle CLI invocation.
+    - path: hive/lib/artifact_lifecycle/age.py
+      purpose: Age-source helpers under test for mtime and git last-commit behavior.
+
+files_to_modify:
+  - file: tests/artifact_lifecycle/conftest.py
+    change: Add shared temp-root, git-repo, and lifecycle invocation fixtures.
+  - file: tests/artifact_lifecycle/test_lifecycle_guards.py
+    change: Add active-state, exclusion, dry-run, idempotency, and age-source tests.
+  - file: hive/lib/artifact_lifecycle/age.py
+    change: Add or refine age-source helpers if al-3/al-5 did not already centralize them.
+
+cross_cutting:
+  - concern: testing
+    action: Assert the safety properties that make lifecycle cleanup acceptable for unattended weekly execution.
+  - concern: metrics
+    action: Opt out with metric.applies=false because the test suite itself is the verification artifact.
+
+design_decisions:
+  - decision: Guard tests cover untracked eviction, tracked report-only behavior, hard exclusions, and D5 age-source selection.
+    rationale: D1-D5 are safety-critical and must be executable regression checks before weekly automation is trusted.
+
+risks:
+  - severity: medium
+    description: Tests could duplicate unit coverage without proving integrated CLI behavior.
+    mitigation: Include CLI-level fixture runs in addition to helper-level tests.
+
+references:
+  - path: .pHive/epics/artifact-lifecycle/docs/design-decisions.md
+    relevant_excerpt: "Untracked artifacts use mtime; tracked artifacts use git last-commit date; active and hard-excluded roots must never be touched."
+  - path: .pHive/epics/artifact-lifecycle/docs/design-discussion.md
+    relevant_excerpt: "Age alone is not a safe trigger; every artifact class needs a positive inactive predicate first, then an age threshold."
