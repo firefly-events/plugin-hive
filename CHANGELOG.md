@@ -9,6 +9,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- **Design-aware, visually rich planning artifacts (`hive-composability-design`).** Planning docs gain an HTML sidecar vehicle and Mermaid figures in place of ASCII art. New `hive/references/planning-format-contract.md` (embedded-content + image-source + Mermaid + sidecar rules with a wireframe-discovery protocol); `lib/html-sidecar-gen.js` sidecar generator wired into design-discussion, horizontal-plan, vertical-plan, and structured-outline; `lib/doc-token-telemetry.js` write probe; a canonical PRD skill (`skills/hive/skills/prd/`) emitting HTML with an inverse-markdown sidecar; design-discussion split into produce-doc / review-doc sub-invocations; and a `--lite` umbrella flag (`--skip-sign-off`, `--skip-research`) in `/plan`.
+- **Per-story agent lifecycle documentation.** Documented how the Multica / sandcastle execution substrate makes per-story fresh-agent lifecycle native, superseding the dropped respawn-per-task Workstream B.
+
+### Changed
+
+- **`hive-composability-design` release finalization.** `/execute` applied the planned `minor` version bump (`2.11.0` → `2.12.0`) and kept plugin version sources in lockstep.
+
 ## [2.11.0] - 2026-06-11
 
 **State-dir relocation, KG signal activation, and full substrate coverage — configurable state directory across all three runtimes, a knowledge graph that finally emits from production, and dispatch routers for every workflow mode.**
