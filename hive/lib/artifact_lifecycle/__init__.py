@@ -7,10 +7,27 @@ Public surface for skills, tests, and later stories:
     RegistryEntry
     Classification, ArchiveAction, AgeSource
     RegistryValidationError
+    is_hard_excluded(path: Path) -> bool
+    assert_not_hard_excluded(path: Path, action: str) -> None
+    HardExcludeError
+    build_candidates(entry, paths) -> list[Candidate]
+    apply_guard(candidate) -> None
+    Candidate
 """
 
 from __future__ import annotations
 
+from hive.lib.artifact_lifecycle.exclusions import (
+    HardExcludeError,
+    assert_not_hard_excluded,
+    is_hard_excluded,
+)
+from hive.lib.artifact_lifecycle.planner import (
+    Candidate,
+    PlanError,
+    apply_guard,
+    build_candidates,
+)
 from hive.lib.artifact_lifecycle.registry import (
     AgeSource,
     ArchiveAction,
@@ -24,9 +41,16 @@ from hive.lib.artifact_lifecycle.registry import (
 __all__ = [
     "AgeSource",
     "ArchiveAction",
+    "Candidate",
     "Classification",
+    "HardExcludeError",
+    "PlanError",
     "RegistryEntry",
     "RegistryValidationError",
+    "apply_guard",
+    "assert_not_hard_excluded",
+    "build_candidates",
+    "is_hard_excluded",
     "load_registry",
     "validate_entry",
 ]
