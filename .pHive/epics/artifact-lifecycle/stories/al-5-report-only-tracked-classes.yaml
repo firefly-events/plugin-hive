@@ -1,0 +1,89 @@
+id: al-5-report-only-tracked-classes
+epic: artifact-lifecycle
+title: Register tracked consumer-scanned classes as report-only
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [al-1-lifecycle-library-and-registry]
+tracker_id: "PLU-271"
+tracker_uuid: "0c1101b0-276b-4db0-8b55-df389c388c53"
+tracker_url: "http://localhost:8080/issues/0c1101b0-276b-4db0-8b55-df389c388c53"
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Register tracked classes that are currently scanned by live consumers and mark
+  them `archive_action: report` only. The sweep may list candidates under
+  `.pHive/audits/**`, `.pHive/episodes/**`, and `.pHive/metrics/**`, but this
+  epic must never `git rm`, move, or otherwise remove those files.
+
+acceptance_criteria:
+  - "Given registry entries for `.pHive/audits/**`, `.pHive/episodes/**`, and `.pHive/metrics/**`, when they are loaded, then each entry has `classification: tracked`, `archive_action: report`, and `age_source: git-last-commit`."
+  - "Given tracked report-only candidates satisfy terminal predicates and thresholds, when dry-run runs, then the CLI lists them as report-only with no remove or move action."
+  - "Given apply mode runs against tracked report-only classes, when candidates are found, then no `git rm`, file deletion, or move-to-temp operation occurs."
+  - "Given report-only class output is generated, when a reviewer reads it, then it names the live consumer reason: audits feed gate-mode aggregation, episodes feed story-status derivation, and metrics feed cross-run aggregation."
+  - "Given a future `retire` action is attempted for these classes in this epic, when validation runs, then it fails before planning."
+
+metric:
+  applies: false
+  justification: "This story records report-only safety policy for tracked artifacts, and verification is by registry and no-removal tests rather than a metric."
+
+steps:
+  - id: research
+    description: Skip; design-decisions.md already locks the tracked report-only classes and reasons.
+    agent: researcher
+  - id: implement
+    description: Add tracked report-only registry entries and report output formatting for audits, episodes, and metrics.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run registry and apply-mode tests proving tracked report-only files are never removed.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify D2 is reflected exactly and report-only output explains the live consumer dependency.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit report-only tracked registry entries on feat/artifact-lifecycle.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/artifact_lifecycle/registry.py
+      purpose: Adds tracked report-only class declarations.
+    - path: hive/lib/artifact_lifecycle/reporter.py
+      purpose: New or extended report output for report-only candidates.
+    - path: tests/artifact_lifecycle/test_report_only_tracked.py
+      purpose: Tests that apply mode never removes report-only tracked files.
+
+files_to_modify:
+  - file: hive/lib/artifact_lifecycle/registry.py
+    change: Register audits, episodes, and metrics classes as tracked report-only with git-last-commit age source.
+  - file: hive/lib/artifact_lifecycle/reporter.py
+    change: Emit report-only candidate output with live-consumer rationale.
+  - file: tests/artifact_lifecycle/test_report_only_tracked.py
+    change: Add registry and apply-mode no-removal tests for tracked classes.
+
+cross_cutting:
+  - concern: safety
+    action: Keep live-consumer scanned tracked classes report-only in both dry-run and apply mode.
+  - concern: metrics
+    action: Opt out with metric.applies=false because no-removal tests validate this policy.
+
+design_decisions:
+  - decision: "`.pHive/audits/**`, `.pHive/episodes/**`, and `.pHive/metrics/**` are report-only in this epic."
+    rationale: D2 says live consumers scan these working-tree corpora and removing shipped instances would shrink those inputs.
+
+risks:
+  - severity: high
+    description: A future executor path could treat report-only as removable.
+    mitigation: Add apply-mode tests that create tracked fixtures and assert contents remain after sweep execution.
+
+references:
+  - path: .pHive/epics/artifact-lifecycle/docs/design-decisions.md
+    relevant_excerpt: "Classes a live tool walks in the working tree — `.pHive/audits/**`, `.pHive/episodes/**`, `.pHive/metrics/**` — are never `git rm`'d in this epic; the sweep reports them only."
+  - path: .pHive/epics/artifact-lifecycle/docs/design-discussion.md
+    relevant_excerpt: "Episode markers and sidecars are active inputs, not just logs; status derivation reads episode evidence."

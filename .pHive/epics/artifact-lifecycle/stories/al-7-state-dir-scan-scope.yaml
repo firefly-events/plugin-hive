@@ -1,0 +1,89 @@
+id: al-7-state-dir-scan-scope
+epic: artifact-lifecycle
+title: Scan resolved state dir with legacy .pHive compatibility diagnostics
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [al-1-lifecycle-library-and-registry]
+tracker_id: "PLU-273"
+tracker_uuid: "5daf8513-c09b-4067-943b-ac5849d29459"
+tracker_url: "http://localhost:8080/issues/5daf8513-c09b-4067-943b-ac5849d29459"
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Implement lifecycle scan-root resolution. The default scan root is the
+  resolved `paths.state_dir`; compatibility mode also scans legacy hardcoded
+  repo `.pHive` and reports duplicate or skipped artifacts so current writer
+  gaps remain visible during the state-dir transition.
+
+acceptance_criteria:
+  - "Given `paths.state_dir` resolves outside repo `.pHive`, when the lifecycle planner runs with default settings, then it scans the resolved state dir."
+  - "Given compatibility scanning is enabled, when legacy `.pHive` exists, then the planner also scans legacy `.pHive` for classes that may still be written there."
+  - "Given the same artifact is visible in both resolved state dir and legacy `.pHive`, when compatibility scanning runs, then the report marks the duplicate and plans at most one action."
+  - "Given a class is unsafe or unsupported for legacy scanning, when compatibility scanning runs, then the report marks it skipped with the class ID and reason."
+  - "Given hard-excluded roots appear under either scan root, when scanning runs, then al-2 exclusions still win before any duplicate or action logic."
+
+metric:
+  applies: false
+  justification: "This scan-scope story resolves filesystem roots for safety, and duplicate/skip fixture tests verify behavior more directly than a metric."
+
+steps:
+  - id: research
+    description: Confirm existing `paths.state_dir` resolver contracts and repo `.pHive` fallback behavior.
+    agent: researcher
+  - id: implement
+    description: Add scan-root resolution, compatibility scan support, duplicate detection, and skipped-class reporting.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run fixture tests with resolved-only, legacy compatibility, duplicate, skipped, and hard-excluded paths.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify D ruling 7 is implemented and no legacy scan bypasses hard exclusions.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit scan-scope behavior on feat/artifact-lifecycle.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/artifact_lifecycle/scan_roots.py
+      purpose: New scan-root resolution and legacy compatibility scan logic.
+    - path: hive/lib/artifact_lifecycle/planner.py
+      purpose: Planner consumes scan roots and duplicate/skip diagnostics.
+    - path: tests/artifact_lifecycle/test_scan_roots.py
+      purpose: Fixture tests for resolved state dir, legacy `.pHive`, duplicates, skips, and exclusions.
+
+files_to_modify:
+  - file: hive/lib/artifact_lifecycle/scan_roots.py
+    change: Implement resolved state-dir and compatibility legacy `.pHive` scan roots.
+  - file: hive/lib/artifact_lifecycle/planner.py
+    change: Use scan roots and emit duplicate/skipped diagnostics.
+  - file: tests/artifact_lifecycle/test_scan_roots.py
+    change: Add resolved-only, compatibility, duplicate, skipped, and hard-exclude tests.
+
+cross_cutting:
+  - concern: safety
+    action: Prefer resolved `paths.state_dir` while making legacy `.pHive` gaps reportable instead of silent.
+  - concern: metrics
+    action: Opt out with metric.applies=false because root-resolution behavior is verified by deterministic fixture tests.
+
+design_decisions:
+  - decision: Default to resolved `paths.state_dir` and provide explicit legacy `.pHive` compatibility scanning.
+    rationale: D ruling 7 says this follows the future state-dir contract while accounting for current hardcoded writers.
+
+risks:
+  - severity: medium
+    description: Dual-root scans can act twice on duplicate artifacts.
+    mitigation: Duplicate detection reports both paths and allows at most one planned action per logical artifact.
+
+references:
+  - path: .pHive/epics/artifact-lifecycle/docs/design-decisions.md
+    relevant_excerpt: "Scan scope defaults to resolved `paths.state_dir` with explicit compatibility scan for legacy hardcoded `.pHive`."
+  - path: .pHive/epics/artifact-lifecycle/docs/design-discussion.md
+    relevant_excerpt: "Resolver coverage is incomplete; dual-root scans can touch stale duplicates, so diagnostics need to make that visible."

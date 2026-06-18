@@ -1,0 +1,95 @@
+id: al-1-lifecycle-library-and-registry
+epic: artifact-lifecycle
+title: Create lifecycle library and per-class registry schema
+status: pending
+complexity: high
+methodology: classic
+depends_on: []
+tracker_id: "PLU-267"
+tracker_uuid: "cc2e3e55-8f4f-4fca-8133-278198aaa447"
+tracker_url: "http://localhost:8080/issues/cc2e3e55-8f4f-4fca-8133-278198aaa447"
+
+description: |
+  Create the Python-first artifact lifecycle library skeleton under
+  `hive/lib/artifact_lifecycle/` and define the registry schema used by every
+  later story. The registry must encode the locked D1-D5 decisions: untracked
+  artifacts are eligible for `evict`, tracked classes in this epic are
+  report-only, archive actions use `evict|retire|report`, and age source is
+  declared per class.
+
+acceptance_criteria:
+  - "Given the lifecycle package is imported, when registry entries are loaded, then each class validates `class_id`, `globs`, `classification`, `active_predicate`, `retention_threshold`, `archive_action`, `age_source`, and `hard_exclude` fields."
+  - "Given a registry entry uses `archive_action`, when it is validated, then only `evict`, `retire`, and `report` are accepted and `retire` is rejected for executable sweep actions in this epic."
+  - "Given an untracked class entry, when it is validated, then its `age_source` is `mtime` and its action can be `evict` or `report`."
+  - "Given a tracked class entry, when it is validated, then its `age_source` is `git-last-commit` and its action is `report` unless a later gated epic enables `retire`."
+  - "Given the package CLI module is invoked with `--help`, when dependencies are installed, then the command exits successfully and shows `--dry-run`, `--class`, and apply-mode options without performing a sweep."
+
+metric:
+  applies: false
+  justification: "This infrastructure story establishes lifecycle registry correctness, and success is verified by schema and import tests rather than by a trend metric."
+
+steps:
+  - id: research
+    description: Confirm the existing Python packaging/test conventions and the sdr-8 prototype expectations named in the design docs.
+    agent: researcher
+  - id: implement
+    description: Create the Python package skeleton, registry data model, validation errors, and CLI placeholder without implementing sweep execution.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run targeted registry validation and CLI help tests.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify the registry schema encodes D1-D5 and does not expose tracked removal behavior.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit the registry spine on feat/artifact-lifecycle.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/artifact_lifecycle/__init__.py
+      purpose: New Python package export surface for lifecycle helpers.
+    - path: hive/lib/artifact_lifecycle/registry.py
+      purpose: Registry schema and default class declarations live here.
+    - path: hive/lib/artifact_lifecycle/cli.py
+      purpose: CLI entrypoint shape for later sweep stories.
+    - path: tests/artifact_lifecycle/test_registry.py
+      purpose: New tests for schema validation and action vocabulary.
+
+files_to_modify:
+  - file: hive/lib/artifact_lifecycle/__init__.py
+    change: Create package export surface.
+  - file: hive/lib/artifact_lifecycle/registry.py
+    change: Implement registry entry schema, enums, and validation.
+  - file: hive/lib/artifact_lifecycle/cli.py
+    change: Add argparse CLI placeholder with dry-run/class/apply flags.
+  - file: tests/artifact_lifecycle/test_registry.py
+    change: Add validation tests for required fields, archive actions, and age-source rules.
+
+cross_cutting:
+  - concern: safety
+    action: Encode D1-D5 as validation constraints before any sweep can execute.
+  - concern: metrics
+    action: Opt out with metric.applies=false because this is correctness substrate.
+
+design_decisions:
+  - decision: Python-first lifecycle library under `hive/lib/artifact_lifecycle/`.
+    rationale: The locked design names Python-first per ADR Option B and centralizes cleanup behavior in one lifecycle package.
+  - decision: Use explicit `evict`, `retire`, and `report` action verbs.
+    rationale: D4 requires non-overlapping vocabulary so OS-temp eviction is not confused with durable tracked retirement.
+
+risks:
+  - severity: high
+    description: A permissive registry can let later stories remove tracked classes despite D1/D2.
+    mitigation: Validation rejects executable `retire` behavior in this epic and tests assert tracked classes are report-only.
+
+references:
+  - path: .pHive/epics/artifact-lifecycle/docs/design-decisions.md
+    relevant_excerpt: "D1 limits this epic's spine to the untracked-runtime sweep; D4 defines `evict`, `retire`, and `report`; D5 fixes mtime for untracked artifacts and git last-commit date for tracked artifacts."
+  - path: .pHive/epics/artifact-lifecycle/docs/design-discussion.md
+    relevant_excerpt: "The proposed approach calls for a Python lifecycle library under `hive/lib/artifact_lifecycle/` with a per-class registry, planner, executor, and CLI/scheduler entrypoint."

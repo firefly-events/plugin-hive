@@ -1,0 +1,91 @@
+id: al-4-backfill-terminal-signal
+epic: artifact-lifecycle
+title: Add legacy merged-and-aged terminal eligibility signal
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [al-1-lifecycle-library-and-registry]
+tracker_id: "PLU-270"
+tracker_uuid: "81a977b9-93e4-4321-bf65-63b592bcf683"
+tracker_url: "http://localhost:8080/issues/81a977b9-93e4-4321-bf65-63b592bcf683"
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Add the D3 legacy terminal signal as an eligibility predicate reusable by
+  lifecycle classes. `/ship`-written `status: shipped` plus `release_id` remains
+  the primary terminal signal; legacy back-catalog items are eligible only when
+  their feature branch is merged to the default branch and the artifact is older
+  than its class threshold. This story adds eligibility logic only; it does not
+  execute removal.
+
+acceptance_criteria:
+  - "Given a story YAML with `/ship`-written `status: shipped` and `release_id`, when terminal eligibility is checked, then it is eligible subject to the class threshold."
+  - "Given a legacy story or epic whose feature branch is merged to the default branch and whose age source is older than the class threshold, when terminal eligibility is checked, then it is eligible subject to that class action."
+  - "Given a story with only advisory non-shipped YAML status, when terminal eligibility is checked, then it is not eligible unless the merged-and-aged legacy signal passes."
+  - "Given a candidate with a passing legacy terminal signal, when the planner computes action, then D1/D2 still control the action: untracked classes may evict and tracked classes remain report-only."
+  - "Given a feature branch is not merged to the default branch, when eligibility is checked, then the legacy signal returns inactive=false regardless of artifact age."
+
+metric:
+  applies: false
+  justification: "This eligibility helper is correctness substrate for lifecycle decisions, and it is verified by deterministic git-fixture tests rather than by a trend metric."
+
+steps:
+  - id: research
+    description: Confirm existing git helper conventions and default-branch discovery used elsewhere in the codebase.
+    agent: researcher
+  - id: implement
+    description: Implement terminal eligibility helpers for `/ship` projection and merged-plus-aged legacy backfill without adding removal behavior.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run git fixture tests for shipped projection, merged legacy branch, unmerged branch, and stale advisory status.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify the helper is an eligibility predicate only and does not bypass D1/D2 action limits.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit the terminal eligibility helper on feat/artifact-lifecycle.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/artifact_lifecycle/eligibility.py
+      purpose: New terminal eligibility helpers for shipped projection and legacy branch backfill.
+    - path: hive/lib/artifact_lifecycle/planner.py
+      purpose: Planner consumes eligibility results without changing archive-action policy.
+    - path: tests/artifact_lifecycle/test_terminal_eligibility.py
+      purpose: Git-fixture and YAML-fixture tests for D3 signals.
+
+files_to_modify:
+  - file: hive/lib/artifact_lifecycle/eligibility.py
+    change: Implement `/ship` projection and merged-to-default plus age eligibility helpers.
+  - file: hive/lib/artifact_lifecycle/planner.py
+    change: Consume terminal eligibility helpers before action planning.
+  - file: tests/artifact_lifecycle/test_terminal_eligibility.py
+    change: Add shipped, merged legacy, unmerged, and advisory-status tests.
+
+cross_cutting:
+  - concern: safety
+    action: Treat legacy branch evidence as eligibility only; archive action remains controlled by registry class policy.
+  - concern: metrics
+    action: Opt out with metric.applies=false because git/YAML fixture tests verify the behavior.
+
+design_decisions:
+  - decision: Add merged-to-default plus age as a legacy terminal signal.
+    rationale: D3 requires this backfill because most existing epics never ran `/ship` and raw YAML status may be stale.
+
+risks:
+  - severity: medium
+    description: Branch-merge detection can vary by repository default branch.
+    mitigation: Resolve the default branch once through existing git-flow conventions and cover non-default branch names in tests.
+
+references:
+  - path: .pHive/epics/artifact-lifecycle/docs/design-decisions.md
+    relevant_excerpt: "D3 adds a legacy terminal signal: feature branch merged to default branch and older than the class threshold; the action still obeys D1/D2."
+  - path: .pHive/epics/artifact-lifecycle/docs/design-discussion.md
+    relevant_excerpt: "Story specs archive only after `/ship` writes `status: shipped`, `shipped_at`, and `release_id`; non-shipped YAML `status:` is advisory and can be stale."
