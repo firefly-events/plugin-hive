@@ -11,6 +11,38 @@ type: reference
 
 ---
 
+## Planning Composition
+
+> **Lifecycle note:** This section governs **compose-at-intake** — which specialist personas join the planning team when a /plan is initiated. It is read by the planning-classification skill (dpt-3) at /plan step 1.
+> This is distinct from the **Catalog** section below, which governs **raise-at-review-gate** escalation triggers during plan review and execution. The two sections are intentionally separate: composition assembles the planning team before work begins; escalation triggers fire conditionally during or after execution. Do not add `placement` values here.
+
+```yaml
+planning_composition:
+  schema_version: "1.0.0"
+  spine: [researcher, technical-writer, tpm]
+  work_types:
+    - tag: architecture
+      specialists: [architect]
+      project_gate: ~
+    - tag: ui
+      specialists: [ui-designer]
+      project_gate: requires_ui
+    - tag: security
+      specialists: [security-reviewer]
+      project_gate: ~
+    - tag: performance
+      specialists: [performance-reviewer]
+      project_gate: ~
+    - tag: accessibility
+      specialists: [accessibility-specialist]
+      project_gate: requires_ui
+    - tag: data
+      specialists: [architect]
+      project_gate: ~
+```
+
+---
+
 ## Catalog
 
 ```yaml

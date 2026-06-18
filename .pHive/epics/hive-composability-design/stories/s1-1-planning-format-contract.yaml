@@ -1,0 +1,143 @@
+id: s1-1-planning-format-contract
+epic: hive-composability-design
+title: Planning format contract reference doc
+status: in_review
+complexity: low
+methodology: classic
+depends_on: []
+
+metric:
+  applies: false
+  justification: >
+    Reference-doc story defining the planning-artifact format contract
+    (markdown-canonical + embedded HTML + generated sidecar). It adds no runtime
+    surface that emits a measurable signal; it is validated by s1-2 and the s4-x
+    stories consuming the contract.
+
+description: |
+  Create hive/references/planning-format-contract.md — the authoritative reference
+  defining what embedded content is allowed in each planning doc type, image source
+  policy, Mermaid delimiter convention, sidecar-HTML generation rule, and terminal-
+  degradation expectations. This is a pure docs story: no code changes.
+
+  This doc is a living document — subsequent D-expansion slices (S4, S5) will add
+  sections. The initial structure must accommodate extension without restructuring.
+  Cross-reference it from hive/agents/orchestrator.md.
+
+  Key constraints from Q9 (elicitation): the doc must include a wireframe discovery
+  protocol — how the authoring agent checks state/wireframes/{epic-id}/ before
+  writing <figure> slots. Without this, every D-expansion story re-debates the issue.
+
+acceptance_criteria:
+  - "Given the file, when read, then all defined fields present: doc-type table, image source policy, Mermaid delimiter, sidecar rule, terminal-degradation expectations, wireframe discovery protocol"
+  - "Given the doc-type table, then it covers: design-discussion, structured-outline, horizontal-plan, vertical-plan, PRD"
+  - "Given the PRD row, then it is marked as HTML-primary (exception to markdown-canonical default)"
+  - "Given hive/agents/orchestrator.md, then it contains a cross-reference to this doc"
+  - "Given the sidecar rule, then it states: markdown is canonical, .html sibling is generated on skill write, sidecar not committed by default"
+  - "Given the wireframe discovery protocol, then it specifies: check state/wireframes/{epic-id}/ before writing figure slots; if absent use <figure data-placeholder=\"description\">"
+
+steps:
+  - id: implement
+    description: |
+      Create hive/references/planning-format-contract.md with these sections:
+
+      ## 1. Doc-Type Embedded Content Table
+      | Doc Type | Embedded Content Allowed |
+      For each: design-discussion (figure slots), structured-outline (figure optional + Mermaid dep map),
+      horizontal-plan (Mermaid graph TD), vertical-plan (Mermaid overlay), PRD (HTML-primary exception).
+
+      ## 2. Image Source Policy
+      - Frame0 PNGs from state/wireframes/{epic-id}/{story-id}/ when available
+      - Otherwise <figure data-placeholder="description"> — no runtime image generation
+      - Wireframe discovery protocol: check state/wireframes/{epic-id}/ before writing figure slots
+
+      ## 3. Mermaid Delimiter Convention
+      Standard fenced ```mermaid ``` blocks. No special wrapper.
+
+      ## 4. Sidecar HTML Generation Rule
+      - Markdown is canonical
+      - .html sibling generated on skill write via lib/html-sidecar-gen
+      - Sidecar not committed to git by default (generated on-demand)
+      - Failure is non-blocking: log and continue, markdown is the artifact
+
+      ## 5. Terminal Degradation Expectations
+      - markdown-embedded-HTML degrades to readable markdown with visible <figure> tags
+      - Grep works (no HTML wrapping breaks grep)
+      - Mermaid fenced blocks are readable plain text in terminal (greppable, parseable)
+      - .html sidecar is browser-only; not expected to be terminal-readable
+      - Mermaid improves human review; for agents it is equivalent to ASCII prose
+
+      ## 6. Extension Notes
+      - Future slices (S4, S5) add rows to the doc-type table
+      - PRD exception documented: PRD is the only doc type where HTML is canonical
+
+      Then add a cross-reference line to hive/agents/orchestrator.md pointing at this file.
+    agent: developer
+
+  - id: review
+    description: |
+      Verify planning-format-contract.md:
+      - All 6 sections present
+      - Doc-type table has all 5 doc types
+      - PRD marked as HTML-primary exception
+      - Wireframe discovery protocol is a concrete procedure, not just a mention
+      - orchestrator.md cross-reference added
+      - File is written in clean markdown, no broken formatting
+    agent: reviewer
+    depends_on: [implement]
+
+  - id: integrate
+    description: Commit planning-format-contract.md + orchestrator.md cross-reference change
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/agents/orchestrator.md
+      purpose: Add cross-reference to planning-format-contract.md here
+    - path: state/brand/brand-guide.html
+      purpose: Reference pattern for the only existing in-repo HTML artifact — follow this precedent
+    - path: state/epics/hive-composability-design/docs/structured-outline.md
+      purpose: S1 approach section (Part 2, Slice 1) has exact field list for this doc
+      relevant_excerpt: |
+        - Allowed embedded content per doc type: design-discussion (figure slots),
+          structured-outline (figure optional + Mermaid dep map), H/V plans (Mermaid),
+          PRD (HTML-primary exception).
+        - Image source policy: Frame0 PNGs from state/wireframes/{epic-id}/{story-id}/;
+          otherwise <figure data-placeholder="description">. No runtime image gen.
+        - Mermaid delimiter: standard fenced blocks. No special wrapper.
+        - Sidecar rule: markdown canonical; .html sibling generated on skill write.
+        - Terminal-degradation: markdown-embedded-HTML degrades gracefully; grep works.
+
+files_to_modify:
+  - file: hive/agents/orchestrator.md
+    change: Add cross-reference to hive/references/planning-format-contract.md
+
+files_to_create:
+  - file: hive/references/planning-format-contract.md
+    change: New living reference doc per spec above
+
+design_decisions:
+  - decision: Markdown-embedded-HTML with .html sidecar is the canonical planning format
+    rationale: Confirmed by user Q4; brand-guide.html provides the precedent; terminal degradation is acceptable
+  - decision: Wireframe discovery protocol included in Slice 1
+    rationale: Elicitation Q9 surfaced that omitting it causes per-story debates in D-expansion
+  - decision: Mermaid is human-facing, not agent-comprehension improvement
+    rationale: Elicitation Q2 surfaced that agents parse Mermaid prose same as ASCII; doc must not oversell
+
+cross_cutting:
+  - concern: documentation
+    action: "This story IS the documentation artifact. No secondary doc updates needed — the file created here is the reference."
+
+risks:
+  - severity: low
+    description: orchestrator.md cross-reference location may conflict with adjacent Slice 2 and Slice 3 edits
+    mitigation: Add cross-reference in a distinct section (Key References) that S2/S3 edits do not touch
+
+references:
+  - path: state/epics/hive-composability-design/docs/structured-outline.md
+    relevant_excerpt: |
+      Part 2, Slice 1 — Format Contract approach section defines exact fields required.
+  - path: state/epics/hive-composability-design/docs/design-discussion.md
+  - path: hive/references/cross-cutting-concerns.md

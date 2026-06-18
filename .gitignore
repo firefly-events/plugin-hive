@@ -227,9 +227,19 @@ node-compile-cache/
 tsx-*/
 !.pHive/epics/kg-repair-activation/
 !.pHive/epics/kg-repair-activation/**
+!.pHive/epics/hive-composability-design/
+!.pHive/epics/hive-composability-design/**
 !.pHive/epics/changelog-human-summaries/
 !.pHive/epics/changelog-human-summaries/**
+
+# Generated concept illustrations (planning-format-contract.md §8) are produced
+# on-demand and never committed. Re-ignore after the epic allowlists above so the
+# PNG is excluded even inside un-ignored epic dirs (last-match-wins).
+.pHive/epics/**/docs/*.png
+
 !.pHive/triage/
 !.pHive/triage/queue.yaml
 !.pHive/epics/artifact-lifecycle/
 !.pHive/epics/artifact-lifecycle/**
+!.pHive/epics/dynamic-planning-team/
+!.pHive/epics/dynamic-planning-team/**

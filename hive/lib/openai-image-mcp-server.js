@@ -9,8 +9,10 @@ const SERVER_VERSION = '1.0.0';
 const DEFAULT_OUTPUT_DIR = path.join(process.cwd(), '.pHive', 'brand', 'openai-image');
 const DEFAULT_GENERATE_VARIANTS = 4;
 const DEFAULT_EDIT_VARIANTS = 3;
+const DEFAULT_IMAGE_VARIANTS = 1;
 const GENERATE_TOOL = 'generate_logo_concepts';
 const EDIT_TOOL = 'edit_logo_concept';
+const IMAGE_TOOL = 'generate_image';
 
 const TOOL_DEFINITIONS = [
   {
@@ -53,6 +55,23 @@ const TOOL_DEFINITIONS = [
       additionalProperties: false,
     },
   },
+  {
+    name: IMAGE_TOOL,
+    description: 'Generate a single general-purpose illustration from a free-form prompt. Use for concept/illustration images (e.g. planning concept art) rather than logo marks.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Free-form description of the image to generate.' },
+        output_dir: { type: 'string', description: 'Optional directory for decoded PNG outputs.' },
+        output_prefix: { type: 'string', description: 'Optional filename prefix for the decoded PNG (default "image").' },
+        variants: { type: 'integer', minimum: 1, maximum: 4, description: 'Number of images to request. Default 1.' },
+        size: { type: 'string', description: 'Optional image size, for example 1024x1024.' },
+        background: { type: 'string', description: 'Optional background mode (opaque|transparent|auto). Default opaque.' },
+      },
+      required: ['prompt'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 function buildGeneratePrompt({ brand_brief, concept_direction }) {
@@ -89,6 +108,10 @@ function buildEditPrompt({ edit_instruction }) {
     '- Avoid adding presentation mockups or unrelated scene elements.',
     '- Maintain strong contrast and crisp edges.',
   ].join('\n');
+}
+
+function buildImagePrompt({ prompt }) {
+  return String(prompt || '').trim();
 }
 
 function ensureApiKey(env) {
@@ -241,6 +264,52 @@ async function editLogoConcept(args, deps) {
   }
 }
 
+async function generateImage(args, deps) {
+  const options = deps || {};
+  const apiKey = ensureApiKey(options.env);
+  const client = options.client || createOpenAIClient({
+    apiKey,
+    OpenAIClass: options.OpenAIClass,
+    requireFn: options.requireFn,
+  });
+  const prompt = buildImagePrompt(args);
+  if (!prompt) {
+    throw new Error('generate_image requires a non-empty prompt');
+  }
+  const variants = args.variants || DEFAULT_IMAGE_VARIANTS;
+  const outputDir = resolveOutputDir(args.output_dir);
+  const prefix = args.output_prefix || 'image';
+  const runId = `${prefix}-${createRunId()}`;
+
+  try {
+    const response = await client.images.generate({
+      model: 'gpt-image-2',
+      prompt,
+      n: variants,
+      size: args.size || '1024x1024',
+      background: args.background || 'opaque',
+    });
+    const images = normalizeImageOutputs({
+      data: response && response.data,
+      outputDir,
+      prefix: runId,
+      fsModule: options.fs,
+    });
+    if (images.length < 1) {
+      throw new Error(`Expected at least 1 generated image, received ${images.length}`);
+    }
+    return {
+      tool: IMAGE_TOOL,
+      prompt,
+      images,
+      output_dir: outputDir,
+      count: images.length,
+    };
+  } catch (error) {
+    throw normalizeOpenAIError(error);
+  }
+}
+
 function normalizeImageOutputs({ data, outputDir, prefix, fsModule }) {
   const items = Array.isArray(data) ? data : [];
   return items.map((entry, index) => {
@@ -295,6 +364,9 @@ async function callTool(name, args, deps) {
   }
   if (name === EDIT_TOOL) {
     return makeToolResponse(await editLogoConcept(args || {}, deps));
+  }
+  if (name === IMAGE_TOOL) {
+    return makeToolResponse(await generateImage(args || {}, deps));
   }
   throw new Error(`Unknown tool: ${name}`);
 }
@@ -403,15 +475,19 @@ function startServer() {
 module.exports = {
   DEFAULT_EDIT_VARIANTS,
   DEFAULT_GENERATE_VARIANTS,
+  DEFAULT_IMAGE_VARIANTS,
   EDIT_TOOL,
   GENERATE_TOOL,
+  IMAGE_TOOL,
   TOOL_DEFINITIONS,
   buildEditPrompt,
   buildGeneratePrompt,
+  buildImagePrompt,
   callTool,
   createOpenAIClient,
   editLogoConcept,
   ensureApiKey,
+  generateImage,
   generateLogoConcepts,
   normalizeImageOutputs,
   startServer,

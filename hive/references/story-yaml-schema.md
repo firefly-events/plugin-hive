@@ -553,6 +553,56 @@ version files and changelog release text.
 consumers treat omission as `none` and emit a one-line info log so the
 operator can decide whether to re-plan with explicit release intent.
 
+### 6.4 The `planning_team:` block
+
+Added by dpt-4-wire-plan-and-provenance. Written by `/plan` step 15 alongside `git_flow:`. Contains the operator-visible provenance of the planning team — what planning-classification matched, why, and what gate decisions it produced. This is the audit surface that makes team composition traceable and overridable.
+
+#### 6.4.1 Shape
+
+```yaml
+planning_team:
+  matched_tags: [<list of tag strings>]   # classification signals that fired
+  roster: [<list of persona names>]        # resolved assembled_personas passed to planning-routing
+  per_tag_reasoning:
+    <tag>: <one-line reasoning string>     # why this tag matched, per tag
+  confidence: <matched|low>                # classification confidence
+  gate_decisions:                          # per-tag gate outcome from classification
+    <tag>: <included|suppressed-no-ui|suppressed-unknown-ui>
+```
+
+#### 6.4.2 Field semantics
+
+| Field | Type | Description |
+|---|---|---|
+| `matched_tags` | list of strings | The classification tags that fired for this requirement. Sourced from `${classification_output}.matched_tags`. |
+| `roster` | list of strings | The resolved `assembled_personas` list passed to planning-routing. This is what was actually used for team assembly. |
+| `per_tag_reasoning` | map string→string | One-line reasoning string per matched tag explaining why the tag applied. Sourced from `${classification_output}.per_tag_reasoning`. |
+| `confidence` | enum | Classification confidence: `matched` (≥1 tag matched with clear evidence) or `low` (no tag matched, or weak/ambiguous evidence). Sourced from `${classification_output}.confidence`. |
+| `gate_decisions` | map string→enum | Per-matched-tag gate outcome, keyed by work-type tag. One of `included`, `suppressed-no-ui`, or `suppressed-unknown-ui` (the latter two from the `requires_ui` project gate). Sourced from `${classification_output}.gate_decisions`. |
+
+#### 6.4.3 Idempotency on re-plan
+
+If `epic.yaml` already contains a `planning_team:` block, `/plan` overwrites it with the current run's classification output. The canonical field order in epic.yaml is `methodology` → `version_bump` → `git_flow` → `planning_team`; if the block is absent on a re-plan, insert it immediately after `git_flow:`.
+
+#### 6.4.4 Back-compat
+
+Epics that pre-date dpt-4 have no `planning_team:` block. Downstream consumers treat its absence as unknown provenance and emit a one-line info log; they do not fail or block on its absence.
+
+#### 6.4.5 Worked example
+
+```yaml
+planning_team:
+  matched_tags: [architecture, security]
+  roster: [researcher, technical-writer, tpm, architect, security-reviewer]
+  per_tag_reasoning:
+    architecture: "requirement describes a new REST endpoint surface spanning subsystems"
+    security: "introduces auth/token handling across three services"
+  confidence: matched
+  gate_decisions:
+    architecture: included
+    security: included
+```
+
 ## 7. The `test_scenario` field group
 
 Per the `autonomous-cycle-loop` epic (story `s0-1-schema-and-config-bump`),

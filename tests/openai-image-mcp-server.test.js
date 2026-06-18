@@ -15,13 +15,15 @@ function makeTempDir() {
 test('tool list exposes the declared tool names and schemas', () => {
   const result = server.toolListResult();
   const names = result.tools.map((tool) => tool.name);
-  assert.deepEqual(names, [server.GENERATE_TOOL, server.EDIT_TOOL]);
+  assert.deepEqual(names, [server.GENERATE_TOOL, server.EDIT_TOOL, server.IMAGE_TOOL]);
   const generateTool = result.tools.find((tool) => tool.name === server.GENERATE_TOOL);
   const editTool = result.tools.find((tool) => tool.name === server.EDIT_TOOL);
+  const imageTool = result.tools.find((tool) => tool.name === server.IMAGE_TOOL);
   assert.equal(generateTool.inputSchema.required.includes('brand_brief'), true);
   assert.equal(generateTool.inputSchema.required.includes('concept_direction'), true);
   assert.equal(editTool.inputSchema.required.includes('source_images'), true);
   assert.equal(editTool.inputSchema.required.includes('edit_instruction'), true);
+  assert.deepEqual(imageTool.inputSchema.required, ['prompt']);
 });
 
 test('missing OPENAI_API_KEY returns a clear error before client creation', async () => {
@@ -94,6 +96,48 @@ test('generate tool returns 4 normalized file outputs when OpenAI responds with 
     assert.equal(image.kind, 'file');
     assert.equal(fs.existsSync(image.value), true);
   }
+});
+
+test('generate_image returns a single file output and defaults to one opaque image', async () => {
+  const outputDir = makeTempDir();
+  const pngPayload = Buffer.from('scene-binary').toString('base64');
+  const client = {
+    images: {
+      generate: async (request) => {
+        assert.equal(request.model, 'gpt-image-2');
+        assert.equal(request.n, 1);
+        assert.equal(request.background, 'opaque');
+        return { data: [{ b64_json: pngPayload }] };
+      },
+    },
+  };
+
+  const result = await server.generateImage(
+    {
+      prompt: 'An isometric illustration of three services connecting through a new API gateway.',
+      output_dir: outputDir,
+      output_prefix: 'concept',
+    },
+    { env: { OPENAI_API_KEY: 'test-key' }, client }
+  );
+
+  assert.equal(result.tool, server.IMAGE_TOOL);
+  assert.equal(result.count, 1);
+  assert.equal(result.images.length, 1);
+  assert.equal(result.images[0].kind, 'file');
+  assert.equal(fs.existsSync(result.images[0].value), true);
+  assert.match(path.basename(result.images[0].value), /^concept-/);
+});
+
+test('generate_image rejects an empty prompt and a missing API key', async () => {
+  await assert.rejects(
+    () => server.generateImage({ prompt: '   ' }, { env: { OPENAI_API_KEY: 'k' } }),
+    /requires a non-empty prompt/
+  );
+  await assert.rejects(
+    () => server.generateImage({ prompt: 'a scene' }, { env: {} }),
+    /missing OPENAI_API_KEY/
+  );
 });
 
 test('edit tool returns 2-3 normalized url outputs when OpenAI responds with urls', async () => {
