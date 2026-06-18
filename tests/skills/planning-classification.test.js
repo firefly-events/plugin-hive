@@ -274,10 +274,9 @@ test('6 — planning_team block conforming to story-yaml-schema §6.4 validates'
     per_tag_reasoning: {
       architecture: 'requirement describes structural work spanning multiple subsystems',
     },
-    confidence: 'high',
+    confidence: 'matched',
     gate_decisions: {
-      include_architect: true,
-      include_ui_designer: false,
+      architecture: 'included',
     },
   };
 
@@ -296,15 +295,19 @@ test('6 — planning_team block conforming to story-yaml-schema §6.4 validates'
     );
   }
   assert.ok(
-    ['low', 'medium', 'high'].includes(planningTeam.confidence),
-    `confidence must be low|medium|high, got "${planningTeam.confidence}"`,
+    ['matched', 'low'].includes(planningTeam.confidence),
+    `confidence must be matched|low, got "${planningTeam.confidence}"`,
   );
   assert.ok(
     typeof planningTeam.gate_decisions === 'object' && !Array.isArray(planningTeam.gate_decisions),
     'gate_decisions must be a map',
   );
+  const GATE_OUTCOMES = ['included', 'suppressed-no-ui', 'suppressed-unknown-ui'];
   for (const [, v] of Object.entries(planningTeam.gate_decisions)) {
-    assert.equal(typeof v, 'boolean', 'every gate_decisions value must be a boolean');
+    assert.ok(
+      GATE_OUTCOMES.includes(v),
+      `every gate_decisions value must be one of ${GATE_OUTCOMES.join('|')}, got "${v}"`,
+    );
   }
 
   // Spine is always present in the roster

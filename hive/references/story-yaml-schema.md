@@ -565,9 +565,9 @@ planning_team:
   roster: [<list of persona names>]        # resolved assembled_personas passed to planning-routing
   per_tag_reasoning:
     <tag>: <one-line reasoning string>     # why this tag matched, per tag
-  confidence: <low|medium|high>            # classification confidence
-  gate_decisions:                          # boolean gate outcomes from classification
-    <gate-name>: <true|false>
+  confidence: <matched|low>                # classification confidence
+  gate_decisions:                          # per-tag gate outcome from classification
+    <tag>: <included|suppressed-no-ui|suppressed-unknown-ui>
 ```
 
 #### 6.4.2 Field semantics
@@ -577,8 +577,8 @@ planning_team:
 | `matched_tags` | list of strings | The classification tags that fired for this requirement. Sourced from `${classification_output}.matched_tags`. |
 | `roster` | list of strings | The resolved `assembled_personas` list passed to planning-routing. This is what was actually used for team assembly. |
 | `per_tag_reasoning` | map string→string | One-line reasoning string per matched tag explaining why the tag applied. Sourced from `${classification_output}.per_tag_reasoning`. |
-| `confidence` | enum | Classification confidence level: `low`, `medium`, or `high`. Sourced from `${classification_output}.confidence`. |
-| `gate_decisions` | map string→bool | Boolean outcomes of any conditional gates evaluated during classification (e.g., whether architect or ui-designer was conditionally included). Sourced from `${classification_output}.gate_decisions`. |
+| `confidence` | enum | Classification confidence: `matched` (≥1 tag matched with clear evidence) or `low` (no tag matched, or weak/ambiguous evidence). Sourced from `${classification_output}.confidence`. |
+| `gate_decisions` | map string→enum | Per-matched-tag gate outcome, keyed by work-type tag. One of `included`, `suppressed-no-ui`, or `suppressed-unknown-ui` (the latter two from the `requires_ui` project gate). Sourced from `${classification_output}.gate_decisions`. |
 
 #### 6.4.3 Idempotency on re-plan
 
@@ -592,15 +592,15 @@ Epics that pre-date dpt-4 have no `planning_team:` block. Downstream consumers t
 
 ```yaml
 planning_team:
-  matched_tags: [api-design, multi-system-integration]
-  roster: [researcher, technical-writer, tpm, architect]
+  matched_tags: [architecture, security]
+  roster: [researcher, technical-writer, tpm, architect, security-reviewer]
   per_tag_reasoning:
-    api-design: "requirement describes a new REST endpoint surface"
-    multi-system-integration: "connects three existing services (auth, billing, events)"
-  confidence: high
+    architecture: "requirement describes a new REST endpoint surface spanning subsystems"
+    security: "introduces auth/token handling across three services"
+  confidence: matched
   gate_decisions:
-    include_architect: true
-    include_ui_designer: false
+    architecture: included
+    security: included
 ```
 
 ## 7. The `test_scenario` field group
