@@ -66,6 +66,14 @@ findings. Build on the design discussion — don't repeat it.
 
 Write to `.pHive/epics/{epic-id}/docs/structured-outline.md` (or as the task specifies).
 
+After writing the markdown file, record token metrics:
+
+```
+lib/doc-token-telemetry recordDocWrite({ docPath: ".pHive/epics/{epic-id}/docs/structured-outline.md", epicId: "{epic-id}", docType: "structured-outline", format: "md" })
+```
+
+The probe is non-blocking — if it fails, log a warning and continue.
+
 ## What this skill is NOT
 
 - **Not the design discussion.** That decides direction; this operationalizes it in full detail.

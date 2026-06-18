@@ -73,6 +73,14 @@ lib/html-sidecar-gen generateSidecar(".pHive/epics/{epic-id}/docs/design-discuss
 
 The generator is non-blocking — if it fails, log a warning and continue. The `.html` file is not committed to git by default (generated on-demand).
 
+After writing the markdown file, record token metrics:
+
+```
+lib/doc-token-telemetry recordDocWrite({ docPath: ".pHive/epics/{epic-id}/docs/design-discussion.md", epicId: "{epic-id}", docType: "design-discussion", format: "md" })
+```
+
+The probe is non-blocking — if it fails, log a warning and continue.
+
 ## What this skill is NOT
 
 - **Not the research brief.** That structures findings; this reasons about what to do with them.
