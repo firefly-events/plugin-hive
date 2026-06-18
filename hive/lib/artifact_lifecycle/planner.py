@@ -9,12 +9,12 @@ glob expansion + active-predicate checking + mtime age gating.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
+from hive.lib.artifact_lifecycle.age import git_commit_age_days, mtime_age_days
 from hive.lib.artifact_lifecycle.eligibility import (
     TerminalEligibility,
     check_terminal_eligibility,
@@ -353,32 +353,11 @@ def _expand_glob(root: Path, pattern: str) -> list[Path]:
 
 
 def _age_days(path: Path, now: datetime) -> float:
-    mtime = path.stat().st_mtime
-    mtime_dt = datetime.fromtimestamp(mtime, tz=timezone.utc)
-    delta = now - mtime_dt
-    return delta.total_seconds() / 86400.0
+    return mtime_age_days(path, now)
 
 
 def _git_commit_age_days(path: Path, repo_root: Path | None, now: datetime) -> float:
-    """Return age in days using git last-commit date (D5), falling back to mtime."""
-    if repo_root is not None:
-        try:
-            import subprocess
-
-            result = subprocess.run(
-                ["git", "log", "-1", "--format=%ct", "--", str(path)],
-                capture_output=True,
-                text=True,
-                cwd=repo_root,
-                timeout=10,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                ts = float(result.stdout.strip())
-                commit_dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-                return (now - commit_dt).total_seconds() / 86400.0
-        except Exception:
-            pass
-    return _age_days(path, now)
+    return git_commit_age_days(path, repo_root, now)
 
 
 def _read_yaml(path: Path) -> dict | None:
