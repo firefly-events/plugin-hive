@@ -15,13 +15,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
+from hive.lib.artifact_lifecycle.eligibility import (
+    TerminalEligibility,
+    check_terminal_eligibility,
+)
 from hive.lib.artifact_lifecycle.exclusions import (
     HardExcludeError,
     assert_not_hard_excluded,
     is_hard_excluded,
 )
 from hive.lib.artifact_lifecycle.predicates import PredicateError, is_active
-from hive.lib.artifact_lifecycle.registry import ArchiveAction, RegistryEntry
+from hive.lib.artifact_lifecycle.registry import ArchiveAction, Classification, RegistryEntry
 
 
 @dataclass(frozen=True)
@@ -162,6 +166,82 @@ def plan_candidates(
     return candidates
 
 
+def plan_terminal_report_candidates(
+    entries: Sequence[RegistryEntry],
+    state_dir: Path,
+    repo_root: Path | None = None,
+    default_branch: str = "main",
+    now: datetime | None = None,
+) -> list[Candidate]:
+    """Return REPORT candidates for tracked entries that pass terminal eligibility.
+
+    Implements D3: evaluates /ship-written and merged+age signals.  Action is
+    always REPORT (D2 — tracked classes are report-only this epic).  D1/D2 are
+    not overridden by a passing terminal signal.
+
+    Args:
+        entries:        Registry entries to evaluate (all classifications/actions
+                        accepted; non-tracked or non-REPORT entries are skipped).
+        state_dir:      Root of the .pHive state directory for glob expansion.
+        repo_root:      Repository root for git merge queries.  When None the
+                        legacy merged+age signal is disabled.
+        default_branch: Branch that feature branches must be merged into.
+        now:            Reference timestamp for age calculations.  Defaults to
+                        ``datetime.now(timezone.utc)``.
+
+    Returns:
+        List of :class:`Candidate` with ``action=REPORT``, one per eligible path.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    candidates: list[Candidate] = []
+
+    for entry in entries:
+        if entry.hard_exclude:
+            continue
+        if entry.classification is not Classification.TRACKED:
+            continue
+        if entry.archive_action is not ArchiveAction.REPORT:
+            continue
+
+        for glob_pattern in entry.globs:
+            matched = _expand_glob(state_dir, glob_pattern)
+            for path in matched:
+                if is_hard_excluded(path):
+                    continue
+
+                yaml_dict = _read_yaml(path)
+                feature_branch = yaml_dict.get("branch") if yaml_dict else None
+
+                try:
+                    age_days = _git_commit_age_days(path, repo_root, now)
+                except OSError:
+                    continue
+
+                eligibility = check_terminal_eligibility(
+                    yaml_dict=yaml_dict,
+                    repo_root=repo_root,
+                    feature_branch=feature_branch,
+                    age_days=age_days,
+                    threshold_days=entry.retention_threshold,
+                    default_branch=default_branch,
+                )
+
+                if not eligibility.eligible:
+                    continue
+
+                candidates.append(
+                    Candidate(
+                        path=path,
+                        class_id=entry.class_id,
+                        action=ArchiveAction.REPORT,
+                    )
+                )
+
+    return candidates
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -183,12 +263,50 @@ def _age_days(path: Path, now: datetime) -> float:
     return delta.total_seconds() / 86400.0
 
 
+def _git_commit_age_days(path: Path, repo_root: Path | None, now: datetime) -> float:
+    """Return age in days using git last-commit date (D5), falling back to mtime."""
+    if repo_root is not None:
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["git", "log", "-1", "--format=%ct", "--", str(path)],
+                capture_output=True,
+                text=True,
+                cwd=repo_root,
+                timeout=10,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                ts = float(result.stdout.strip())
+                commit_dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+                return (now - commit_dt).total_seconds() / 86400.0
+        except Exception:
+            pass
+    return _age_days(path, now)
+
+
+def _read_yaml(path: Path) -> dict | None:
+    """Read and parse a YAML file, returning a dict or None on failure."""
+    if not path.is_file():
+        return None
+    try:
+        import yaml  # type: ignore
+
+        with path.open("r", encoding="utf-8") as fh:
+            payload = yaml.safe_load(fh)
+        return payload if isinstance(payload, dict) else None
+    except Exception:
+        return None
+
+
 __all__ = [
     "Candidate",
     "EvictCandidate",
     "PlanError",
     "PlannerError",
+    "TerminalEligibility",
     "apply_guard",
     "build_candidates",
     "plan_candidates",
+    "plan_terminal_report_candidates",
 ]
