@@ -1,0 +1,170 @@
+id: s2-1-design-discussion-split
+epic: hive-composability-design
+title: Design-discussion structural split (produce-doc / review-doc)
+status: in_review
+complexity: high
+methodology: classic
+depends_on: []
+
+metric:
+  applies: false
+  justification: >
+    Refactors the design-discussion skill into separable produce-doc / review-doc
+    invocations. A backwards-compatible structural change verified by existing callers
+    still producing identical output, not by a measurable trend.
+
+description: |
+  Split skills/hive/skills/design-discussion/SKILL.md into two addressable sub-invocations:
+  - produce-doc: always fires (lite AND full). Produces the design-discussion document + sidecar.
+  - review-doc: fires only when planning.collaborative_review: true.
+
+  Full mode dispatches produce-doc + review-doc in sequence (backwards-compat).
+  Lite mode dispatches produce-doc only.
+
+  BREAKING CONTRACT: all callers today assume both happen in one invocation.
+  This story must enumerate all callers before landing and verify the backwards-compat
+  wrapper handles every call site. Primary caller: skills/plan/SKILL.md:108-114.
+
+  This story lands FIRST within Slice 2 (S2.2-2.4 depend on it). It must be
+  verified in isolation before S2.2-2.4 are merged against it.
+
+  NOTE: S1.2 edits design-discussion/SKILL.md first (template section only).
+  S2.1 must rebase on S1.2. The structural split is the dominant change.
+
+acceptance_criteria:
+  - "Given /hive:plan (no flags), then produce-doc fires AND review-doc fires in sequence — identical to today"
+  - "Given the skill invoked as 'design-discussion produce-doc', then only produce-doc fires"
+  - "Given the skill invoked as 'design-discussion review-doc', then only review-doc fires"
+  - "Given planning.collaborative_review: false in hive.config.yaml, then review-doc does NOT fire even in full mode"
+  - "Given all known callers of design-discussion/SKILL.md enumerated, then backwards-compat wrapper handles each"
+  - "Given a full /hive:plan run after this change, then no design-discussion doc is missing and no review fires unexpectedly"
+
+steps:
+  - id: research
+    description: |
+      CRITICAL: Enumerate ALL callers of skills/hive/skills/design-discussion/SKILL.md before touching anything.
+      Search for:
+        grep -r "design-discussion" /Users/don/Documents/plugin-hive/skills/ --include="*.md" -l
+        grep -r "design-discussion" /Users/don/Documents/plugin-hive/hive/ --include="*.md" -l
+        grep -r "design-discussion" /Users/don/Documents/plugin-hive/hive/ --include="*.yaml" -l
+      For each caller, note: what does it expect? Does it expect both produce+review or just the doc?
+      Also read current design-discussion/SKILL.md in full — understand current structure before splitting.
+      Read hive/hive.config.yaml lines 130-140 to understand planning.collaborative_review current behavior.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Restructure design-discussion/SKILL.md:
+
+      1. Add a header section defining sub-invocations:
+         ## Sub-invocations
+         This skill supports two addressable sub-invocations:
+         - `produce-doc` — produces the design-discussion document + sidecar. Always fires.
+         - `review-doc` — runs collaborative review. Fires only when planning.collaborative_review: true.
+
+      2. Mark existing "produce document" section with:
+         ## Phase: produce-doc
+         (all existing doc-production instructions stay unchanged under this header)
+
+      3. Mark existing "collaborative review" section with:
+         ## Phase: review-doc
+         (all existing review instructions stay unchanged under this header)
+
+      4. Top of skill — routing logic (prose instruction):
+         "When invoked as the full design-discussion skill:
+          - Always execute produce-doc.
+          - Check hive.config.yaml planning.collaborative_review. If true, also execute review-doc.
+          When invoked with sub-invocation 'produce-doc': execute produce-doc only.
+          When invoked with sub-invocation 'review-doc': execute review-doc only (assumes produce-doc already ran)."
+
+      5. Update any in-skill references from "this skill" to "produce-doc" or "review-doc" as appropriate.
+
+      DO NOT change the actual content of produce-doc or review-doc sections — only restructure them
+      with new headers and add routing logic at top.
+
+      After landing: run a full /hive:plan ceremony mentally trace through to verify produce-doc fires
+      and review-doc fires conditionally. Check every caller found in research step.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Test sequence (manual invocation required):
+      1. /hive:plan on a new single-epic requirement (full mode):
+         - Confirm design-discussion doc produced
+         - Confirm collaborative review fires (assuming planning.collaborative_review: true)
+         - Confirm no double-fire, no missing doc
+      2. Temporarily set planning.collaborative_review: false, re-run:
+         - Confirm design-discussion doc produced
+         - Confirm review-doc does NOT fire
+      3. Verify all callers identified in research step still work as expected
+      (Document each test result inline)
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Review:
+      - Caller enumeration is exhaustive (spot-check grep results)
+      - Backwards-compat wrapper is correct: full invocation = produce-doc + conditional review-doc
+      - Sub-invocation addressing is unambiguous
+      - No existing content removed or changed — only structural headers added
+      - This is the highest-risk change in the min-viable-ship; reviewer must be thorough
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: |
+      Commit. Note in commit message: "S2.2-2.4 must be authored/merged after this lands.
+      S1.2 must have been merged before this (this rebases on S1.2)."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/design-discussion/SKILL.md
+      purpose: Primary file to restructure — add sub-invocation headers and routing logic
+    - path: skills/plan/SKILL.md
+      purpose: Primary known caller at lines 108-114 — verify backwards-compat
+      relevant_excerpt: |
+        # lines ~108-114 (verify exact location in research step)
+        # This is where plan skill invokes design-discussion — must still work after split
+    - path: hive/hive.config.yaml
+      purpose: planning.collaborative_review at lines 134-136 — the flag that gates review-doc
+    - path: state/epics/hive-composability-design/docs/structured-outline.md
+      purpose: S2.1 approach defines the split contract and backwards-compat wrapper requirements
+
+files_to_modify:
+  - file: skills/hive/skills/design-discussion/SKILL.md
+    change: "Add sub-invocation headers (produce-doc / review-doc) + routing logic at top. NO content changes."
+
+design_decisions:
+  - decision: Full invocation still dispatches both produce-doc + review-doc (backwards-compat)
+    rationale: All callers today expect the combined behavior; breaking them would require updating every caller
+  - decision: review-doc fires conditionally on planning.collaborative_review (not on --lite)
+    rationale: Lite mode uses produce-doc only; full mode uses conditional review-doc; these are orthogonal
+
+cross_cutting:
+  - concern: documentation
+    action: "design-discussion/SKILL.md restructuring IS the documentation change. No secondary docs needed — callers enumerated in research step capture any impacted reference docs."
+
+risks:
+  - severity: high
+    description: Hidden callers not found by grep — orchestrator prose or team-lead persona may invoke skill by description rather than path
+    mitigation: Research step greps both skills/ and hive/ dirs; reviewer spot-checks; first full /hive:plan run is the detection gate
+  - severity: medium
+    description: S1.2 edits same file (template section) — merge conflict
+    mitigation: S1.2 edits output template section; S2.1 adds headers + top-level routing; different regions. S2.1 rebases on S1.2.
+
+references:
+  - path: state/epics/hive-composability-design/docs/structured-outline.md
+    relevant_excerpt: |
+      Part 2, Slice 2 Change #1: "Split into two addressable sub-invocations: produce-doc (always fires)
+      and review-doc (fires only when planning.collaborative_review: true). Top-level skill name in full
+      mode dispatches to produce-doc + review-doc in sequence (backwards-compat)."
+  - path: state/epics/hive-composability-design/docs/structured-outline.md
+    relevant_excerpt: |
+      Part 3b, Breaking contract: "Every caller of design-discussion/SKILL.md assumes doc-production
+      and review happen together. Primary caller: skills/plan/SKILL.md:108-114. Enumerate all callers
+      before S2.1 lands; backwards-compat wrapper must be verified exhaustively."

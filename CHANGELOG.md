@@ -9,6 +9,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- **Design-aware, visually rich planning artifacts (`hive-composability-design`).** Planning docs gain an HTML sidecar vehicle and Mermaid figures in place of ASCII art. New `hive/references/planning-format-contract.md` (embedded-content + image-source + Mermaid + sidecar rules with a wireframe-discovery protocol); `lib/html-sidecar-gen.js` sidecar generator wired into design-discussion, horizontal-plan, vertical-plan, and structured-outline; `lib/doc-token-telemetry.js` write probe; a canonical PRD skill (`skills/hive/skills/prd/`) emitting HTML with an inverse-markdown sidecar; design-discussion split into produce-doc / review-doc sub-invocations; and a `--lite` umbrella flag (`--skip-sign-off`, `--skip-research`) in `/plan`.
+- **Visual planning is default + opt-out.** Visual planning (sidecars, Mermaid, figure slots, concept illustration) is on by default; opt out per-run with `/plan --no-visual` or persistently via `planning.visual: false` in `hive.config.yaml` (resolution: flag → config → default-on). Markdown stays canonical; Mermaid/figure slots are unaffected; PRD stays HTML-primary. Documented in planning-format-contract §7.
+- **Epic concept illustration.** At the end of a visual `/plan` run (skipped under `--no-visual` and `--lite`), `/plan` generates one AI image of what the change "looks like" — a work-sizing signal plus delight — embedded on the design discussion and shown at confirmation. Backed by a new general-purpose `generate_image` tool on the `openai-image` MCP server (`hive/lib/openai-image-mcp-server.js`); best-effort and non-blocking (verbatim error + placeholder figure on failure). The PNG is gitignored (`.pHive/epics/**/docs/*.png`). Documented in planning-format-contract §8.
+- **Per-story agent lifecycle documentation.** Documented how the Multica / sandcastle execution substrate makes per-story fresh-agent lifecycle native, superseding the dropped respawn-per-task Workstream B.
+
+### Changed
+
+- **`hive-composability-design` release finalization.** `/execute` applied the planned `minor` version bump (`2.11.0` → `2.12.0`) and kept plugin version sources in lockstep.
+
 ## [2.11.0] - 2026-06-11
 
 **State-dir relocation, KG signal activation, and full substrate coverage — configurable state directory across all three runtimes, a knowledge graph that finally emits from production, and dispatch routers for every workflow mode.**
@@ -808,7 +819,7 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.11.0...HEAD
 [2.9.0]: https://github.com/firefly-events/plugin-hive/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/firefly-events/plugin-hive/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/firefly-events/plugin-hive/compare/v2.6.0...v2.7.0

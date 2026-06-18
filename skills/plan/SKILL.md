@@ -22,6 +22,30 @@ Forces approach validation (context7 + web research) regardless of scope size or
 **`--gate-hv`**
 Retains the H/V user-facing review gate at medium scope (opt-in conservative path). Default at medium scope is to auto-proceed after collaborative review (no user gate). This flag restores the gate. No effect at large scope — the gate is always present at large scope regardless of this flag.
 
+**`--lite`**
+Token-economy umbrella flag. Composes `--fast`'s H/V skip with two additional skips:
+- `review-doc` (collaborative review gate) does NOT fire for this run — equivalent to `planning.collaborative_review = false` for this run only. The writer still revises against the grill-record.
+- Structured outline is skipped.
+- H/V planning is skipped (same effect as `--fast`).
+- Design discussion (`produce-doc`) always fires — never skipped.
+
+Relationship to `--fast`: `--fast` skips H/V only. `--lite` implies `--fast`'s H/V skip plus review-gate-off and outline-skip. Use `--lite` when you want maximum token economy without losing the design discussion artifact.
+
+**Reduced effect at large scope:** At large scope, the structured outline is required regardless of `--lite`, and H/V planning is also required (same constraint as `--fast`). At large scope, `--lite`'s only active effect is disabling the collaborative review gates. No scope-class guard is enforced — `gate_mode` and existing large-scope routing govern when full ceremony is mandatory.
+
+**Interaction with visual planning:** `--lite` also suppresses the concept-illustration step (step 17b) — it is the most expensive step, so token economy skips it. `--lite` does NOT by itself turn off HTML sidecars; sidecar generation is governed by `${visual_planning}` (the `--no-visual` flag / `planning.visual` config), which is independent of `--lite`.
+
+**`--no-visual`**
+Turns **visual planning off** for this run. Visual planning (HTML sidecars, Mermaid diagrams, `<figure>` slots, and the epic concept illustration) is **on by default**. This flag is the per-run opt-out; the persistent equivalent is `planning.visual: false` in `hive.config.yaml`. Resolution is flag-over-config-over-default (see `hive/references/planning-format-contract.md §7`): store the result as `${visual_planning}` on the planning context.
+
+When OFF: skip `.html` sidecar generation for markdown-canonical docs and skip the concept-illustration step (step 17b). The markdown deliverables, Mermaid fenced blocks (readable as text), and `<figure>` slots are unaffected. PRD stays HTML-primary regardless (its HTML is canonical, not a rendering convenience) — `--no-visual` only suppresses the concept illustration on a PRD-bearing run.
+
+**`--skip-sign-off`**
+Skips user-facing sign-off gates (design discussion review at step 5, H/V gate at step 8, structured-outline sign-off at step 10). The orchestrator presents a summary but does not wait for explicit user confirmation before proceeding. Use in automated or CI planning contexts.
+
+**`--skip-research`**
+Skips Phase A research (codebase exploration and research brief production). Proceeds directly from team assembly to design discussion. Use when a research brief already exists at `.pHive/epics/{epic-id}/docs/research-brief.md` or when the requirement is self-contained.
+
 **`--from-triage <id>`**
 Reads `.pHive/triage/queue.yaml` and decomposes one item (the triage entry whose `id` matches `<id>`) into a normal planning flow. Triage is the upstream input source — this flag does NOT replace plan phases or absorb triage's intake responsibilities. Workflow:
 
@@ -37,7 +61,7 @@ Reads `.pHive/triage/queue.yaml` and decomposes one item (the triage entry whose
 
 ## Skill Preamble
 
-See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — state-directory note, kickoff gate, persona / config / memory loading. This skill consults routing keys (`agent_backends`, `model_overrides`, `planning.collaborative_review`) so also follow the **Root-first config precedence** subsection of the prelude.
+See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — state-directory note, kickoff gate, persona / config / memory loading. This skill consults routing keys (`agent_backends`, `model_overrides`, `planning.collaborative_review`, `planning.visual`) so also follow the **Root-first config precedence** subsection of the prelude.
 
 **Kickoff gate override — gate_mode aware.** If the kickoff checks pass, proceed silently. Read `paths.gate_mode` from the root `hive.config.yaml` (consumer override layer; falls back to `hive/hive.config.yaml`; default `warning`). When `gate_mode: hard`, the prelude's hard-stop applies byte-equivalently. When `gate_mode: warning`, the hard-stop is replaced by warn-and-proceed with sane defaults:
 
@@ -161,6 +185,13 @@ completion are artifact-readiness signals, not user review approvals.
 
 ### Phase A: Research
 
+**`--skip-research` honor.** When `--skip-research` is set, skip the research
+substeps of this phase (step 1 codebase research + step 2 research-brief
+production) and proceed directly to Phase B (design discussion), reusing an
+existing `.pHive/epics/{epic-id}/docs/research-brief.md` if present. The
+pre-flight substeps below (0a git_flow resolution, 0 prior-decision query) still
+run — they are not research and downstream phases depend on them.
+
 0a. **Pre-flight: resolve git_flow (pe-5).** Immediately after the kickoff gate passes (and before any researcher / writer dispatch), call `resolveGitFlow({ cwd })` from `hive/lib/git_flow.mjs` (pe-1) and store the result on the planning context as `${git_flow_resolution}`. The two fields you persist downstream are `base_branch` and `branch_strategy`:
 
    ```bash
@@ -211,7 +242,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 **Atomic boundary:** if grill ever appears as inline prose inside this skill, that is a regression. Phase A2 is a single skill invocation that returns a grill-record path; this skill does not duplicate grill's pass.
 
-4b. **Collaborative review gate (if enabled).** Check `hive.config.yaml → planning.collaborative_review`. If `true` (default), run the collaborative review gate (see Collaborative Review Gate section below). `SendMessage` the design discussion AND the grill-record from Phase A2 to all active team agents for review. The technical writer revises the draft to address each grill-record finding (or annotates explicitly-accepted-and-justified deviations) and incorporate team feedback. If `false`, skip the review gate; the writer still revises against the grill-record, then the document is presented directly to the user.
+4b. **Collaborative review gate (if enabled).** Check `hive.config.yaml → planning.collaborative_review`. If `true` (default), run the collaborative review gate (see Collaborative Review Gate section below). `SendMessage` the design discussion AND the grill-record from Phase A2 to all active team agents for review. The technical writer revises the draft to address each grill-record finding (or annotates explicitly-accepted-and-justified deviations) and incorporate team feedback. If `false`, skip the review gate; the writer still revises against the grill-record, then the document is presented directly to the user. Also skip if `--lite` is active — `--lite` is equivalent to `planning.collaborative_review = false` for this run only; the writer still revises against the grill-record.
 
 5. **Present design discussion to user.** Show the full document, including a summary of what the team flagged and resolved during collaborative review. The user reads it and provides feedback:
    - Affirm or correct the understanding of the goal
@@ -224,6 +255,14 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
    Multica planning output may feed the document, but neither must auto-advance
    user feedback, scale selection, or routing.
 
+   **`--skip-sign-off` honor.** When `--skip-sign-off` is set, do NOT wait for
+   explicit user confirmation at this gate: present the document as a summary and
+   auto-advance with the recommended scale assessment. The same skip applies to
+   the H/V review gate (step 8 / step 9) and the structured-outline sign-off gate
+   (step 10) — those steps present their summary and proceed without blocking.
+   This is the single decision-point honoring of the flag documented above; all
+   other phases run unchanged.
+
    After collecting user feedback, evaluate the scale and **announce the routing decision inline** — no separate confirmation step:
 
    ```
@@ -232,13 +271,15 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
    Small  → Proceeding directly to stories (Phase C)
    Medium → Running H/V planning, then stories (Phase B2 → C)
    Medium + --fast → Skipping H/V entirely, proceeding to stories (Phase C)
+   Medium + --lite → Skipping review gates + H/V + outline, proceeding to stories (Phase C)
    Large  → Running H/V planning + structured outline, then stories (Phase B2 → B3 → C)
+   Large  + --lite → H/V + outline still required; review gates skipped (reduced effect — see --lite docs)
    ```
 
    **Routing rules:**
    - **Small** (~5-15 min, 1-3 files, single layer): design discussion is sufficient context → Phase C
-   - **Medium** (multi-file, multiple layers, cross-stack): needs H/V planning to slice correctly → Phase B2 (unless `--fast`, which skips H/V entirely)
-   - **Large** (multi-system, migration, long-horizon): needs full H/V + structured outline with elicitation → Phase B2 + B3
+   - **Medium** (multi-file, multiple layers, cross-stack): needs H/V planning to slice correctly → Phase B2 (unless `--fast` or `--lite`, both of which skip H/V entirely; `--lite` also skips the review gate and outline)
+   - **Large** (multi-system, migration, long-horizon): needs full H/V + structured outline with elicitation → Phase B2 + B3 (`--lite` skips review gates only; H/V and outline are still required at large scope)
 
 ### Phase B2: Horizontal + Vertical Planning (medium and large scope)
 
@@ -249,7 +290,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
    The TPM is the owner of this step. The architect (if present) has already contributed their perspective in earlier phases — the TPM now sequences their inputs into an executable delivery plan.
 
-7. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the H/V outputs. `SendMessage` both documents to all active team agents. The researcher verifies findings are accurately reflected, the architect (if present) validates technical soundness, and the UI designer (if present) flags any UI layer gaps. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
+7. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the H/V outputs. `SendMessage` both documents to all active team agents. The researcher verifies findings are accurately reflected, the architect (if present) validates technical soundness, and the UI designer (if present) flags any UI layer gaps. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly. Also skip if `--lite` is active (equivalent to `planning.collaborative_review = false` for this run).
 
 8. **H/V gate (conditional).** Behavior depends on scope and flags:
 
@@ -274,7 +315,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 9. **Produce structured outline.** `SendMessage` to the technical writer with the `structured-outline` skill (`skills/hive/skills/structured-outline/SKILL.md`, which enforces all mandatory parts and the completeness gate — Risk Registry and Elicitation are not optional). Input: H/V plans + design discussion + user feedback + research brief. Output: a ~1000-line structured outline with detailed approach, file manifest, risk registry, and elicitation questions. The outline now builds ON the vertical slice plan — each phase in the outline maps to a vertical slice.
 
-9b. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the structured outline. This is the most critical review — all active team agents review the full outline. The TPM validates sequencing, the researcher confirms technical accuracy, the architect (if present) stress-tests feasibility, and the UI designer (if present) validates UI approach. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
+9b. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), and `--lite` is NOT active, run the collaborative review gate on the structured outline. This is the most critical review — all active team agents review the full outline. The TPM validates sequencing, the researcher confirms technical accuracy, the architect (if present) stress-tests feasibility, and the UI designer (if present) validates UI approach. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
 
    **UI Designer SCALE_CALL revision (step 9b only) — two-gate precedence rule:** If ui-designer emits a `SCALE_CALL` field in their step 9b review response, apply **last gate wins**:
    - **Revised to `pre-exec`:** delete any existing ui-designer escalation entry in cycle state, then write the step 9b `ESCALATION:` block as a fresh entry. Log: `"ui-designer scale call revised at step 9b to pre-exec — writing fresh escalation"`
@@ -647,7 +688,23 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
 17. **Run agent-ready checklist.** Validate each story against the 9-point checklist in `hive/references/agent-ready-checklist.md` (including check #9: cross-cutting concerns). Flag stories that fail checks in the confirmation output.
 
-18. **Present for confirmation.** Show the dependency graph (using Mermaid format — see Diagram Format section below), story summaries, traceability results, cross-cutting concerns applied, UI detection results, checklist results, and the **metric summary** (described below). Ask for final confirmation before saving.
+17b. **Generate the epic concept illustration (visual path only).** Generate one AI illustration depicting what the planned change "looks like" — a sizing signal plus a bit of delight. This is the only generated raster in the planning flow. See `hive/references/planning-format-contract.md §8`.
+
+    **Gate.** Run only when `${visual_planning}` is ON (per the `--no-visual` flag / `planning.visual` resolution above) **AND** `--lite` is not active. If either gate fails, skip this step silently and proceed to step 18.
+
+    1. **Build the prompt** from the finalized planning context: epic title + the design-discussion goal + the resolved scale assessment + the principal slices/changes (from H/V or the story list). Ask for a conceptual scene or diagram of the change — not a literal UI screenshot. Keep it one paragraph.
+    2. **Invoke** the `openai-image` MCP tool `generate_image` with that prompt, `output_dir` = `.pHive/epics/{epic-id}/docs`, and `output_prefix: concept`. The tool writes `concept-illustration.png` (n=1, opaque). It requires `OPENAI_API_KEY`; `gpt-image-2` may return `403` without a verified OpenAI org.
+    3. **Embed** a trailing section on the design-discussion (the always-present primary artifact) and regenerate its `.html` sidecar via `lib/html-sidecar-gen`:
+
+       ```html
+       <figure data-src="concept-illustration.png" data-alt="Concept illustration of the planned change">
+       </figure>
+       ```
+
+    4. **Non-blocking, best-effort.** If the MCP tool is unavailable, `OPENAI_API_KEY` is missing, or the call errors, propagate the exact error message verbatim as a one-line warning, embed a `<figure data-placeholder="concept illustration — image generation unavailable">` instead, and continue. A failed illustration is never a failed plan.
+    5. The PNG is gitignored (`.pHive/epics/**/docs/*.png`) — generated on-demand, not committed.
+
+18. **Present for confirmation.** Show the dependency graph (using Mermaid format — see Diagram Format section below), story summaries, traceability results, cross-cutting concerns applied, UI detection results, checklist results, and the **metric summary** (described below). When step 17b produced a concept illustration, reference its path (`.pHive/epics/{epic-id}/docs/concept-illustration.png`) so the user can open it. Ask for final confirmation before saving.
 
     **Metric summary section.** After the per-story summaries, render a `METRICS:` block that lists every story along with its `metric:` decision. For stories with `metric.applies: true`, show one line per story: `<story-id> — <name> (<direction>): <baseline> → <target> over <window>; verify_at=<verify_at>`. For stories with `metric.applies: false`, group them under an `UN-FALSIFIABLE:` subsection and quote each story's full `justification` verbatim so the user can challenge thin opt-outs before approving the plan. Any story flagged by step 14a's metric review gate appears in a third `GATE_FAILURES:` subsection with the specific failing field named.
 
