@@ -9,6 +9,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- **`msd-readback-followups` release finalization.** `/execute` applied the planned `patch` version bump (`2.11.0` → `2.11.1`) and kept plugin version sources in lockstep.
+
+### Fixed
+
+- **Squad-evaluation read path hardening** (`msd-readback-followups`, PR #290 adversarial follow-ups). Three read-side fixes to the substrate-signal squad-evaluation path (advisory-only; never gates merge): `readSquadEvaluation` now delegates to the shared `parseSquadActivityFromEntries` helper instead of duplicating timeline parse logic, and applies the same `action|no_action|failed` outcome-enum guard as the adapter (plu-341); timeline reads in both `getSquadActivity` and `readSquadEvaluation` now follow `next_cursor` across pages via a shared `fetchTimelineEntries` helper (bounded at 50 pages) so the newest `squad_leader_evaluated` entry is found even on a later page (plu-340); and a focused unit test now covers `squad_evaluation` serialization in `writeMulticaRunEpisode` (plu-342).
+
 ## [2.11.0] - 2026-06-11
 
 **State-dir relocation, KG signal activation, and full substrate coverage — configurable state directory across all three runtimes, a knowledge graph that finally emits from production, and dispatch routers for every workflow mode.**
