@@ -167,6 +167,11 @@ def validate_entry(raw: dict[str, Any]) -> RegistryEntry:
     if not isinstance(raw_threshold, int) or isinstance(raw_threshold, bool):
         raise RegistryValidationError("retention_threshold must be an integer (days)")
 
+    # hard_exclude — strict bool; reject truthy strings like "false".
+    raw_hard_exclude = raw["hard_exclude"]
+    if not isinstance(raw_hard_exclude, bool):
+        raise RegistryValidationError("hard_exclude must be a boolean")
+
     return RegistryEntry(
         class_id=raw["class_id"],
         globs=tuple(raw_globs),
@@ -175,7 +180,7 @@ def validate_entry(raw: dict[str, Any]) -> RegistryEntry:
         retention_threshold=raw_threshold,
         archive_action=action,
         age_source=age_source,
-        hard_exclude=bool(raw["hard_exclude"]),
+        hard_exclude=raw_hard_exclude,
     )
 
 

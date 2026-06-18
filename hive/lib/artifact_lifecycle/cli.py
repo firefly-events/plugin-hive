@@ -155,10 +155,17 @@ def main(argv: list[str] | None = None) -> int:
     # Resolve state dir: HIVE_STATE_DIR env > resolved config > default .pHive
     try:
         from hive.lib.config import resolve_state_dir  # type: ignore
-
-        state_dir = Path(resolve_state_dir(cwd=Path.cwd(), env=dict(os.environ)))
-    except Exception:
+    except ImportError:
         state_dir = Path.cwd() / ".pHive"
+    else:
+        try:
+            state_dir = Path(resolve_state_dir(cwd=Path.cwd(), env=dict(os.environ)))
+        except Exception as err:
+            print(
+                f"artifact-lifecycle: failed to resolve state dir: {err}",
+                file=sys.stderr,
+            )
+            return 1
 
     # Load registry and apply class filter.
     registry = _builtin_registry()

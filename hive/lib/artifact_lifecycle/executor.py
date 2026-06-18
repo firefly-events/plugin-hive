@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
+from .exclusions import assert_not_hard_excluded
 from .planner import EvictCandidate
 
 
@@ -81,6 +83,9 @@ def apply_evict(
 
     records: list[EvictRecord] = []
     for candidate in candidates:
+        # Defense in depth: enforce the forever-retention contract at the
+        # executor boundary even if a caller bypassed planner-time filtering.
+        assert_not_hard_excluded(candidate.path, action="apply(evict)")
         dest = _dest_path(candidate.path, tmp_root)
         dest.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -115,7 +120,11 @@ def _dest_path(source: Path, tmp_root: Path) -> Path:
     """
     # Use a sanitised form of the full source path to avoid collisions.
     safe = source.as_posix().lstrip("/").replace("/", "_")
-    return tmp_root / safe
+    dest = tmp_root / safe
+    if not dest.exists():
+        return dest
+    # Collision (reused path / repeated sweep): append a unique suffix.
+    return tmp_root / f"{safe}-{uuid.uuid4().hex[:8]}"
 
 
 __all__ = [

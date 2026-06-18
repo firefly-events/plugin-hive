@@ -418,9 +418,10 @@ class TestAgeSourceSelection:
         repo_story.write_text(yaml.dump({"status": "shipped", "release_id": "v1.0"}))
         git_commit_at(git_repo, repo_story, old_commit_ts)
 
-        # Fresh mtime on the state_dir copy (within threshold → would fail mtime check).
+        # Fresh mtime on the file the planner actually scans (state_dir=git_repo),
+        # within threshold → would fail an mtime check, proving git date wins.
         fresh_ts = (now - timedelta(days=1)).timestamp()
-        os.utime(story, (fresh_ts, fresh_ts))
+        os.utime(repo_story, (fresh_ts, fresh_ts))
 
         entry = _tracked_report_entry(
             globs=["epics/shipped-epic/stories/*.yaml"],

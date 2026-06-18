@@ -249,7 +249,7 @@ class TestAssertNotHardExcluded:
         kg.parent.mkdir(parents=True)
         kg.touch()
         with patch("hive.lib.artifact_lifecycle.exclusions._home", return_value=home):
-            with pytest.raises(HardExcludeError, match="kg.sqlite"):
+            with pytest.raises(HardExcludeError, match=r"kg\.sqlite"):
                 assert_not_hard_excluded(kg, action="evict")
 
     def test_no_raise_for_normal_path(self):

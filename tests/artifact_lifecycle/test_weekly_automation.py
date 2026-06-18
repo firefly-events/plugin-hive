@@ -155,5 +155,7 @@ def test_wrapper_no_fallback_deletion_on_failure(tmp_path):
     """
     result = _run_wrapper(tmp_path, mock_exit=1, mock_output="guard refused action")
     combined = result.stdout + result.stderr
-    # There should be no eviction output after a guard refusal.
-    assert "evict" not in combined.lower() or "guard" in combined.lower()
+    # There should be no eviction/deletion output after a guard refusal.
+    lowered = combined.lower()
+    assert "evict" not in lowered
+    assert " rm " not in f" {lowered} "

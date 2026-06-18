@@ -345,17 +345,30 @@ class TestPlanCandidatesCompat:
         skipped = [d for d in result.diagnostics if d.kind == "skipped"]
         assert any(d.class_id == "forever-memories" for d in skipped)
 
-    def test_hard_exclude_wins_before_duplicate_logic(self, tmp_path):
-        state_dir = tmp_path / "state"
+    def test_hard_exclude_wins_before_duplicate_logic(self, tmp_path, monkeypatch):
         repo_root = tmp_path / "repo"
-        (repo_root / ".pHive").mkdir(parents=True)
+        state_dir = repo_root / ".pHive"
         state_dir.mkdir(parents=True)
 
-        # team-memories path — should never become a candidate.
-        team_mem_primary = state_dir / ".." / ".pHive" / "team-memories" / "n.md"
-        team_mem_legacy = repo_root / ".pHive" / "team-memories" / "n.md"
+        # Hard-exclude prefix matching is repo-relative (resolved against cwd),
+        # so run from repo_root to mirror real invocation.
+        monkeypatch.chdir(repo_root)
 
-        entry = _evict_entry()
+        # A genuinely old, otherwise-evictable artifact under the forever-retained
+        # team-memories root. Absent the hard-exclude guard this would be planned.
+        team_mem_legacy = repo_root / ".pHive" / "team-memories" / "n.md"
+        _make_old_file(team_mem_legacy)
+
+        entry = RegistryEntry(
+            class_id="team-memories-test",
+            globs=("team-memories/**",),
+            classification=Classification.UNTRACKED,
+            active_predicate="never-active",
+            retention_threshold=30,
+            archive_action=ArchiveAction.EVICT,
+            age_source=AgeSource.MTIME,
+            hard_exclude=False,
+        )
         result = plan_candidates_with_compat(
             entries=[entry],
             state_dir=state_dir,
@@ -364,4 +377,6 @@ class TestPlanCandidatesCompat:
             now=_NOW,
         )
         paths_str = [str(c.path) for c in result.candidates]
+        # Hard-exclude must win: no candidate, and never a duplicate diagnostic.
         assert not any("team-memories" in p for p in paths_str)
+        assert not any(d.kind == "duplicate" for d in result.diagnostics)

@@ -130,6 +130,7 @@ def plan_candidates(
         now = datetime.now(timezone.utc)
 
     candidates: list[EvictCandidate] = []
+    seen_resolved: set[Path] = set()
 
     for entry in entries:
         if entry.hard_exclude:
@@ -142,6 +143,12 @@ def plan_candidates(
             for path in matched:
                 if is_hard_excluded(path):
                     continue
+                try:
+                    resolved = path.resolve()
+                except OSError:
+                    continue  # path disappeared between glob and resolve
+                if resolved in seen_resolved:
+                    continue  # already scheduled via another glob / alias
                 try:
                     age_days = _age_days(path, now)
                 except OSError:
@@ -167,6 +174,7 @@ def plan_candidates(
                         age_days=age_days,
                     )
                 )
+                seen_resolved.add(resolved)
 
     return candidates
 
