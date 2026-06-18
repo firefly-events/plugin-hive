@@ -4,9 +4,8 @@ Authoritative reference for allowed embedded content, image sourcing, diagram co
 sidecar generation, and terminal-degradation expectations across all Hive planning document
 types.
 
-**Living document.** Sections marked `(S5+)` are stubs added for structural completeness;
-they will be filled in by the corresponding D-expansion slices. Do not restructure the
-document when adding content — append to the appropriate section.
+**Living document.** Do not restructure when adding content — append to the appropriate
+section. Update the doc-type table §1 to remove stub markers as each slice ships.
 
 **Cross-referenced by:** `hive/agents/orchestrator.md`
 
@@ -22,7 +21,7 @@ The canonical format and permitted embedded content for each planning document t
 | `structured-outline` | Markdown | `<figure>` optional; Mermaid dep map | `.html` generated on write | Figures optional; Mermaid dep map in §6 of structured-outline |
 | `horizontal-plan` | Markdown | Mermaid layer diagrams | `.html` generated on write | Layer Map Diagram (§4 of horizontal-plan) uses `graph TD` per §3 |
 | `vertical-plan` | Markdown | Mermaid slice diagrams | `.html` generated on write | Overlay Diagram (§3 of vertical-plan) uses `graph TD` per §3 |
-| `PRD` | **HTML-primary** | Full HTML with sections, `<figure>`, Mermaid | `.md` sidecar (inverse direction, S5+) | Exception to markdown-canonical default; see §4 |
+| `PRD` | **HTML-primary** | Full HTML with sections, `<figure>`, Mermaid | `.md` sidecar (inverse direction) | Exception to markdown-canonical default; see §4 |
 
 **Default:** Markdown is canonical for all doc types except PRD. When a doc type is not
 listed above, assume markdown-canonical with no embedded HTML.
@@ -86,17 +85,28 @@ a generated artifact — never the other way around, except for PRD (see below).
 4. If `lib/html-sidecar-gen` is unavailable, the skill must log a warning and continue —
    the `.md` file is the deliverable; sidecar generation is best-effort.
 
-### PRD exception: HTML-primary (S5+)
+### PRD exception: HTML-primary <!-- Added in S5.1 -->
 
-PRD is the only document type where HTML is canonical:
+PRD is the **only** document type where HTML is canonical. The `.md` sidecar is the
+inverse direction — a stripped, grep-compatible fallback, not the source.
 
-1. Skill writes the `.html` file (full document with sections, inline Mermaid, `<figure>`).
-2. Skill invokes the inverse variant of `lib/html-sidecar-gen` to produce a `.md` sidecar.
-3. The `.md` sidecar strips HTML scaffolding to produce readable, greppable markdown.
-4. Both files are generated artifacts from the same source data — neither is hand-edited
-   after generation.
+1. Skill writes the `.html` file first. The HTML document is a full `<!DOCTYPE html>`
+   page with: a `<nav>` table of contents, named `<section id="...">` blocks per PRD
+   section, inline `<div class="mermaid">` blocks (auto-initialized via Mermaid CDN on
+   load), and `<figure>` elements following the wireframe discovery protocol (§5).
+2. Skill invokes `generateMarkdownSidecar(htmlPath)` from `lib/html-sidecar-gen` to
+   produce the `.md` sibling at the same path.
+3. The `.md` sidecar strips HTML scaffolding (head, nav, script, wrapper divs) and
+   converts block elements to markdown equivalents. `<figure>` blocks are preserved
+   as-is so `data-placeholder` attributes remain visible in terminal / grep output.
+4. Neither file is hand-edited after generation. The HTML is the deliverable; the `.md`
+   is a rendering convenience for terminal environments.
+5. Both files are committed to git for PRDs (unlike `.html` sidecars for other doc types,
+   which are generated on-demand and gitignored).
 
-This section is a stub for S5. Full PRD generation spec lives in the S5 story.
+**Canonical paths:**
+- HTML: `.pHive/epics/{epic-id}/docs/prd.html`
+- Sidecar: `.pHive/epics/{epic-id}/docs/prd.md`
 
 ---
 
@@ -163,7 +173,7 @@ not render visually.
 | `<figure data-placeholder="...">` | Visible HTML tag with attribute text | Readable — placeholder text describes expected content | Yes |
 | ` ```mermaid ``` ` fences | Plain-text code block (Mermaid source) | Readable — graph structure visible as text | Yes |
 | `.html` sidecar | Not rendered; separate file | No degradation — markdown canonical is the terminal artifact | N/A |
-| PRD `.html` (S5+) | Not rendered | Use `.md` sidecar for terminal reading | `.md` sidecar greppable |
+| PRD `.html` | Not rendered | Use `.md` sidecar for terminal reading | `.md` sidecar greppable |
 
 **Invariant:** A planning document must always be readable in a plain-text terminal viewer.
 If an element fails this test, it must either degrade gracefully (as above) or be
