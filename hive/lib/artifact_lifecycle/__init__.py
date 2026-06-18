@@ -13,6 +13,17 @@ Public surface for skills, tests, and later stories:
     build_candidates(entry, paths) -> list[Candidate]
     apply_guard(candidate) -> None
     Candidate
+
+    plan_candidates(entries, state_dir, now?) -> list[EvictCandidate]
+    EvictCandidate
+
+    dry_run(candidates) -> list[EvictRecord]
+    apply_evict(candidates, tmp_root?) -> list[EvictRecord]
+    EvictRecord
+
+    is_active(predicate_name, path) -> bool
+    resolve_predicate(name) -> Callable
+    PredicateError
 """
 
 from __future__ import annotations
@@ -22,12 +33,18 @@ from hive.lib.artifact_lifecycle.exclusions import (
     assert_not_hard_excluded,
     is_hard_excluded,
 )
+from hive.lib.artifact_lifecycle.executor import EvictRecord, ExecutorError, apply_evict
+from hive.lib.artifact_lifecycle.executor import dry_run
 from hive.lib.artifact_lifecycle.planner import (
     Candidate,
+    EvictCandidate,
     PlanError,
+    PlannerError,
     apply_guard,
     build_candidates,
+    plan_candidates,
 )
+from hive.lib.artifact_lifecycle.predicates import PredicateError, is_active, resolve_predicate
 from hive.lib.artifact_lifecycle.registry import (
     AgeSource,
     ArchiveAction,
@@ -43,14 +60,24 @@ __all__ = [
     "ArchiveAction",
     "Candidate",
     "Classification",
+    "EvictCandidate",
+    "EvictRecord",
+    "ExecutorError",
     "HardExcludeError",
     "PlanError",
+    "PlannerError",
+    "PredicateError",
     "RegistryEntry",
     "RegistryValidationError",
+    "apply_evict",
     "apply_guard",
     "assert_not_hard_excluded",
     "build_candidates",
+    "dry_run",
+    "is_active",
     "is_hard_excluded",
     "load_registry",
+    "plan_candidates",
+    "resolve_predicate",
     "validate_entry",
 ]
