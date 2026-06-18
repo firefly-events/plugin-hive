@@ -307,6 +307,14 @@ Reference docs (read when needed, don't inline):
 - `skills/hive/references/linear-commands.md` — copy-paste linearis CLI commands
 - `skills/hive/references/task-tracking-adapter.md` — full lifecycle adapter interface
 
+## Key References
+
+| Reference | Path | When to read |
+|-----------|------|-------------|
+| Planning document format contract | `hive/references/planning-format-contract.md` | Before producing or reviewing any planning document (design-discussion, structured-outline, horizontal-plan, vertical-plan, PRD) — defines figure slots, image source policy, Mermaid conventions, and HTML sidecar rules |
+
+---
+
 ## Linear board management
 
 At session start, resolve the user ID from `hive.config.yaml` (`task_tracking.linear_user_id`) or run `linearis users list --active`.
