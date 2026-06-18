@@ -1,7 +1,7 @@
 id: s4-3-sidecar-gen-expansion
 epic: hive-composability-design
 title: Sidecar generator expansion to H/V and structured-outline
-status: pending
+status: in_review
 complexity: medium
 methodology: classic
 depends_on: [s4-2-structured-outline-mermaid]
