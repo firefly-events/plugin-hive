@@ -181,6 +181,7 @@ When a planning swarm hands off to a dev swarm, the cycle state transfers as par
 | `handoff_log` | list | Per-story terminal handoff records written by `/execute` step 7c. See `Terminal handoff log` below. |
 | `routing_decisions` | list | Per-item routing records written by `/standup --interactive` Phase 1.5. See `Interactive routing decisions` below. |
 | `autonomous_cycle` | object | Per-cycle bookkeeping written by the autonomous-cycle-loop runner. Foundation field — see `Autonomous cycle bookkeeping` below. |
+| `hermes_reconciler` | object | Cross-tick persistent memory for the Hermes reconciler. Additive + absence-tolerant — see `Hermes reconciler state` below. |
 
 ## Interactive routing decisions
 
@@ -347,6 +348,68 @@ The DAG executor (epic `hive-dag-executor`, story `hde-5`) introduces a **second
 ### The two files do not mirror each other
 
 A node completing inside a single executor run writes to `run_state.yaml.node_statuses` and `run_state.yaml.output_graph` — the cycle state is unaffected. Conversely, a user-gate decision or escalation banked at planning time writes to `cycle-state.yaml` and never appears in any run_state. Code that needs to update both for the same data point is a sign of blurred ownership; route through the `hive.lib.dag_executor.run_state.store` narrow-mutation API for run-state writes and through the orchestrator's cycle-state writers for epic-level writes.
+
+## Hermes reconciler state
+
+Per the `hermes-core-loop-mvp` epic (story `s2-hermes-reconciler-state`), the cycle state document may carry an optional `hermes_reconciler:` block that the Hermes reconciler uses as cross-tick persistent memory. The block is **optional** and **additive** — pre-existing cycle states continue to validate without edits. Readers must apply safe defaults when the block or any individual field is absent.
+
+The block is implemented in `hive/lib/hermes-reconciler/state.mjs`, which provides `readHermesReconcilerState(cycleStatePath)` and `writeHermesReconcilerState(cycleStatePath, updates)`. Writes are atomic (temp file + rename) and preserve all other top-level blocks verbatim.
+
+### Shape
+
+```yaml
+hermes_reconciler:
+  gate_state: null              # "pre_approved" to enable the reconciler; null/absent → abort tick
+  in_flight_story_id: null      # story-id string of the currently dispatched story, or null
+  in_flight_task_id: null       # Multica task UUID of the active agent run, or null
+  dispatched_at: null           # ISO8601 timestamp written at dispatch (watchdog-authoritative)
+  current_phase: null           # "impl" | "review" — phase currently in flight, or null
+  stuck_after_seconds: 1800     # watchdog threshold: seconds before a dispatch is considered stuck
+  stories:
+    <story-id>:
+      phase_position: pending   # pending|dispatched_impl|impl_terminal|dispatched_review|review_terminal|done|blocked
+      attempt: 0                # dispatch attempt count (increments on each impl dispatch)
+      review_loop_count: 0      # number of review→revision loops completed for this story
+      verdict: null             # "passed" | "needs_revision" | null (set at review_terminal)
+```
+
+### Field semantics
+
+| Field | Type | Default | Mutating lifecycle event |
+|-------|------|---------|--------------------------|
+| `gate_state` | string \| null | `null` | Written by operator or gate-lift script; `null` blocks the reconciler preflight |
+| `in_flight_story_id` | string \| null | `null` | Written at dispatch (impl or review); cleared when the story reaches a terminal phase |
+| `in_flight_task_id` | string \| null | `null` | Written at dispatch (one atomic op with `in_flight_story_id`, `dispatched_at`, `current_phase`); cleared at terminal |
+| `dispatched_at` | string \| null | `null` | ISO8601; written at dispatch — the watchdog uses this to detect stuck dispatches |
+| `current_phase` | string \| null | `null` | `"impl"` when an impl agent is running; `"review"` when a review agent is running; `null` otherwise |
+| `stuck_after_seconds` | int | `1800` | Configurable watchdog threshold; rarely mutated |
+| `stories.<id>.phase_position` | string | `"pending"` | Advances through the phase state machine: `pending → dispatched_impl → impl_terminal → dispatched_review → review_terminal → done` (or `blocked`) |
+| `stories.<id>.attempt` | int | `0` | Incremented each time an impl dispatch is issued for this story |
+| `stories.<id>.review_loop_count` | int | `0` | Incremented each time a `needs_revision` verdict triggers a new impl dispatch |
+| `stories.<id>.verdict` | string \| null | `null` | Set to `"passed"` or `"needs_revision"` when a review agent reaches `review_terminal` |
+
+### `phase_position` state machine
+
+```
+pending
+  └─► dispatched_impl      (impl agent dispatched)
+        └─► impl_terminal  (agent reached terminal status)
+              └─► dispatched_review   (review agent dispatched)
+                    └─► review_terminal (review agent reached terminal status)
+                          ├─► done     (verdict: "passed")
+                          └─► dispatched_impl  (verdict: "needs_revision" — loops back)
+              └─► blocked  (max attempts exceeded or hard error)
+```
+
+### Preflight gate
+
+`gate_state: null` (or absent) → `readHermesReconcilerState` returns `{gate_state: null, ...defaults}` and the reconciler preflight returns `{wakeAgent: false}`, aborting the tick without mutation.
+
+`gate_state: "pre_approved"` → preflight proceeds to full state evaluation.
+
+### Dispatch atomicity
+
+When a story is dispatched (impl or review), the reconciler MUST write `in_flight_story_id`, `in_flight_task_id`, `dispatched_at`, and `current_phase` in a **single** `writeHermesReconcilerState` call so the file is never in a partially-written dispatch state.
 
 ## Autonomous cycle bookkeeping
 
