@@ -12,6 +12,7 @@ import {
 } from './index.mjs';
 
 import { pollTaskUntilTerminal, writeMulticaRunEpisode } from './episode-sync.mjs';
+import { readHermesReconcilerState } from '../hermes-reconciler/state.mjs';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HTTP_TIMEOUT_MS = 30_000;
@@ -122,6 +123,19 @@ function issueTaskUrl(serverUrl, workspaceId, issueUuid, suffix) {
 
 function taskMessagesUrl(serverUrl, workspaceId, taskId) {
   return `${trimTrailingSlash(serverUrl)}/api/tasks/${encodeURIComponent(taskId)}/messages?workspace_id=${encodeURIComponent(workspaceId)}`;
+}
+
+// Issue comments are keyed by the globally-unique issue UUID; no workspace_id
+// scoping (mirrors the Multica `issue comment` CLI: POST /api/issues/<id>/comments).
+function issueCommentsUrl(serverUrl, issueUuid) {
+  return `${trimTrailingSlash(serverUrl)}/api/issues/${encodeURIComponent(issueUuid)}/comments`;
+}
+
+// Resolve the cycle-state YAML for an epic. `--cycle-state <path>` overrides the
+// default `<cwd>/.pHive/cycle-state/<epic>.yaml` (used by tests + non-cwd callers).
+function resolveCycleStatePath(args, epic) {
+  if (typeof args['cycle-state'] === 'string') return args['cycle-state'];
+  return path.join(process.cwd(), '.pHive', 'cycle-state', `${epic}.yaml`);
 }
 
 // ── Task helpers ──────────────────────────────────────────────────────────────
@@ -357,33 +371,89 @@ async function cmdCancel(args, cfg) {
   succeed({ cancelled: true, task_id: id });
 }
 
+// Read-only rollup of the hermes_reconciler: block for an epic's cycle-state.
+// Backs the hermes-multica plugin's multica_list_tasks + multica_epic_status tools.
+// Local-only (no Multica creds needed) — see NO_CONFIG in main().
+async function cmdEpicStatus(args, cfg) {
+  if (!args.epic || args.epic === true) fail('MISSING_ARG', '--epic is required');
+  const epic = String(args.epic);
+  const cycleStatePath = resolveCycleStatePath(args, epic);
+
+  let state;
+  try {
+    state = readHermesReconcilerState(cycleStatePath);
+  } catch (error) {
+    // js-yaml absent or unreadable structure → surface as a typed failure.
+    fail('CYCLE_STATE_READ', error?.message || String(error));
+    return;
+  }
+
+  const stories = Object.entries(state.stories || {}).map(([storyId, s]) => ({
+    story_id: storyId,
+    phase_position: s?.phase_position ?? null,
+    attempt: s?.attempt ?? null,
+    verdict: s?.verdict ?? null,
+  }));
+
+  succeed({
+    epic,
+    gate_state: state.gate_state,
+    current_phase: state.current_phase,
+    in_flight_story_id: state.in_flight_story_id,
+    in_flight_task_id: state.in_flight_task_id,
+    dispatched_at: state.dispatched_at,
+    stories,
+  });
+}
+
+// Post a comment to a Multica issue. Backs the multica_post_comment tool.
+async function cmdComment(args, cfg) {
+  if (!args.issue) fail('MISSING_ARG', '--issue is required');
+  requireUuid('--issue', args.issue);
+  if (!args.body || args.body === true) fail('MISSING_ARG', '--body is required');
+
+  const { serverUrl, token } = cfg;
+  const created = await httpJson(issueCommentsUrl(serverUrl, args.issue), {
+    method: 'POST',
+    token,
+    body: { content: String(args.body) },
+  });
+
+  const commentId = created?.id ?? created?.comment_id ?? null;
+  succeed({ comment_id: commentId });
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
+
+// Commands that read only local state and need no Multica server credentials.
+const NO_CONFIG = new Set(['epic-status']);
+
+const USAGE = 'cli.mjs <dispatch|status|poll|episode|cancel|epic-status|comment> [options]';
 
 async function main() {
   const [, , command, ...rest] = process.argv;
   const args = parseArgs(rest);
 
   if (!command) {
-    fail(
-      'MISSING_ARG',
-      'Usage: cli.mjs <dispatch|status|poll|episode|cancel> [options]',
-    );
+    fail('MISSING_ARG', `Usage: ${USAGE}`);
   }
 
   const cfg = await loadConfig();
-  requireConfig(cfg);
+  if (!NO_CONFIG.has(command)) requireConfig(cfg);
 
   try {
     switch (command) {
-      case 'dispatch': await cmdDispatch(args, cfg); break;
-      case 'status':   await cmdStatus(args, cfg);   break;
-      case 'poll':     await cmdPoll(args, cfg);     break;
-      case 'episode':  await cmdEpisode(args, cfg);  break;
-      case 'cancel':   await cmdCancel(args, cfg);   break;
+      case 'dispatch':    await cmdDispatch(args, cfg);   break;
+      case 'status':      await cmdStatus(args, cfg);     break;
+      case 'poll':        await cmdPoll(args, cfg);       break;
+      case 'episode':     await cmdEpisode(args, cfg);    break;
+      case 'cancel':      await cmdCancel(args, cfg);     break;
+      case 'epic-status': await cmdEpicStatus(args, cfg); break;
+      case 'comment':     await cmdComment(args, cfg);    break;
       default:
         fail(
           'UNKNOWN_COMMAND',
-          `Unknown command: ${command}. Expected: dispatch|status|poll|episode|cancel`,
+          `Unknown command: ${command}. Expected: dispatch|status|poll|episode|cancel|epic-status|comment`,
         );
     }
   } catch (error) {
