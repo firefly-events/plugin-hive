@@ -1,3 +1,0 @@
-#!/bin/sh
-echo "git $@" >> "/Users/don/Documents/plugin-hive/kg-density-DhddXP/stub.log"
-if [ "$1" = "rev-parse" ]; then echo "feat/kg-repair-activation"; fi

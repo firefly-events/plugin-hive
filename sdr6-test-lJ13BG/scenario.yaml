@@ -1,8 +1,0 @@
-id: sdr6-scenario
-title: relocated-state scenario
-mode: implementation-walk
-story: s1
-epic: e1
-steps:
-  - action: do the thing
-    expected: the thing is done

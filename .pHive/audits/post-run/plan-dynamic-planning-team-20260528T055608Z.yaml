@@ -1,9 +1,0 @@
-run_id: plan-dynamic-planning-team-20260528T055608Z
-skill: plan
-timestamp: 2026-05-28T05:56:08Z
-gate_lift_fired: false
-methodology: classic
-methodology_source: epic-yaml
-story_specs_produced: 5
-nonsensical_defaults: []
-warnings_emitted: 0

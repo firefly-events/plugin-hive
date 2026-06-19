@@ -1,7 +1,0 @@
-id: s1
-status: completed
-steps:
-  - id: integrate
-shipped:
-  branch: feat/e1
-  merged_at: "2026-04-23T17:10:06-05:00"

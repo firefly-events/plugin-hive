@@ -1,5 +1,0 @@
-meta_optimize:
-  signal_weights:
-    metrics: 1.0
-    kg_signal: 0.4         # demoted pending KG repair
-    backlog: 0.2

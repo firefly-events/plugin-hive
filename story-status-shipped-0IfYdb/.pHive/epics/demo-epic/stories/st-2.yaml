@@ -1,8 +1,0 @@
-id: st-2
-epic: demo-epic
-title: parent story
-status: pending
-depends_on: [st-1]
-steps:
-- id: implement
-  agent: developer

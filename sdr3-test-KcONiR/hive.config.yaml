@@ -1,4 +1,0 @@
-paths:
-  state_dir: custom-state
-tokens:
-  daily_usd_limit: 10

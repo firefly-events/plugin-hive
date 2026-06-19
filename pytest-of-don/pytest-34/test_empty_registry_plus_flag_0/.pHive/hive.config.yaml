@@ -1,2 +1,0 @@
-executor: hive-dag
-executor_default: true
