@@ -3,6 +3,9 @@ import crypto from 'node:crypto';
 const HTTP_TIMEOUT_MS = 30_000;
 const USER_AGENT = 'hive-multica-story-dispatch/0.1.0';
 const SQUAD_OUTCOME_VALUES = new Set(['action', 'no_action', 'failed']);
+// Safety bound on timeline pagination so a misbehaving/looping API can never
+// spin forever. 50 pages is far beyond any realistic issue timeline length.
+const MAX_TIMELINE_PAGES = 50;
 const AGENT_CACHE = new Map();
 
 function sanitize(str, token) {
@@ -477,13 +480,80 @@ function timelineUrl(serverUrl, workspaceId, issueUuid) {
   return `${trimTrailingSlash(serverUrl)}/api/issues/${encodeURIComponent(issueUuid)}/timeline?workspace_id=${encodeURIComponent(workspaceId)}`;
 }
 
+// Append the pagination cursor to a timeline URL.
+// ASSUMPTION: the Multica timeline endpoint accepts a `cursor` query param and
+// returns the next page's token as `next_cursor` (camelCase `nextCursor` also
+// tolerated) on the response body. No cursor param name was already established
+// in the lib/adapter, so `cursor` is the documented convention here. If the API
+// uses a different param, change CURSOR_PARAM and the body keys in one place.
+const CURSOR_PARAM = 'cursor';
+
+function withCursor(baseUrl, cursor) {
+  const sep = baseUrl.includes('?') ? '&' : '?';
+  return `${baseUrl}${sep}${CURSOR_PARAM}=${encodeURIComponent(cursor)}`;
+}
+
+function extractEntries(body) {
+  return Array.isArray(body) ? body : (body?.entries ?? body?.data ?? []);
+}
+
+function extractNextCursor(body) {
+  if (Array.isArray(body) || body == null) return null;
+  const next = body.next_cursor ?? body.nextCursor ?? null;
+  // Treat empty string / falsy values as "no more pages".
+  return typeof next === 'string' && next.length > 0 ? next : null;
+}
+
+// Shared paginated timeline reader. Follows `next_cursor` across pages and
+// accumulates entries so the most-recent entry is found regardless of page.
+// `fetchPage(url)` must return the already-parsed response body (the caller
+// owns auth/transport error mapping). Reused by BOTH timeline call sites
+// (readSquadEvaluation here and getSquadActivity in the multica adapter) so
+// pagination lives in exactly one place — mirrors the shared
+// parseSquadActivityFromEntries factoring from plu-341.
+export async function fetchTimelineEntries(baseUrl, fetchPage) {
+  const entries = [];
+  let cursor = null;
+  for (let page = 0; page < MAX_TIMELINE_PAGES; page += 1) {
+    const url = cursor ? withCursor(baseUrl, cursor) : baseUrl;
+    const body = await fetchPage(url);
+    entries.push(...extractEntries(body));
+    cursor = extractNextCursor(body);
+    if (!cursor) return entries;
+  }
+  // Hit the safety bound: return what we have rather than loop forever. This is
+  // advisory read-side data, so a truncated read must never throw/gate.
+  return entries;
+}
+
+export function parseSquadActivityFromEntries(entries) {
+  const evals = entries.filter(
+    (e) => e?.type === 'activity' && e?.action === 'squad_leader_evaluated',
+  );
+  if (evals.length === 0) return null;
+  evals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const latest = evals[0];
+  const details = latest?.details ?? {};
+  const outcomeRaw = details?.outcome;
+  if (typeof outcomeRaw !== 'string' || !SQUAD_OUTCOME_VALUES.has(outcomeRaw)) {
+    throw new Error(`Unexpected squad_leader_evaluated outcome value: '${String(outcomeRaw)}'`);
+  }
+  return {
+    actor_type: latest?.actor_type ?? null,
+    actor_id: latest?.actor_id ?? null,
+    outcome: outcomeRaw,
+    reason: details?.reason ?? null,
+    created_at: latest?.created_at ?? null,
+  };
+}
+
 export async function readSquadEvaluation(issueId, options = {}) {
   const { serverUrl, token, workspaceId } = options;
-  const url = timelineUrl(serverUrl, workspaceId, issueId);
+  const baseUrl = timelineUrl(serverUrl, workspaceId, issueId);
 
-  let body;
+  let entries;
   try {
-    body = await httpJson(url, { token });
+    entries = await fetchTimelineEntries(baseUrl, (url) => httpJson(url, { token }));
   } catch (err) {
     if (err?.code === 'HTTP_401' || err?.code === 'HTTP_403') {
       throw dispatchError(
@@ -496,33 +566,10 @@ export async function readSquadEvaluation(issueId, options = {}) {
     throw err;
   }
 
-  const entries = Array.isArray(body) ? body : (body?.entries ?? body?.data ?? []);
-  const evals = entries.filter(
-    (e) => e?.type === 'activity' && e?.action === 'squad_leader_evaluated',
-  );
-
-  if (evals.length === 0) return { evaluation: null };
-
-  evals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  const latest = evals[0];
-  const details = latest?.details ?? {};
-  const outcome = details?.outcome;
-  if (typeof outcome !== 'string' || !SQUAD_OUTCOME_VALUES.has(outcome)) {
-    throw dispatchError(
-      'TRANSPORT',
-      `Unexpected squad_leader_evaluated outcome value: '${String(outcome)}'`,
-      undefined,
-      token,
-    );
+  try {
+    const evaluation = parseSquadActivityFromEntries(entries);
+    return { evaluation };
+  } catch (err) {
+    throw dispatchError('TRANSPORT', err.message, undefined, token);
   }
-
-  return {
-    evaluation: {
-      actor_type: latest?.actor_type ?? null,
-      actor_id: latest?.actor_id ?? null,
-      outcome,
-      reason: details?.reason ?? null,
-      created_at: latest?.created_at ?? null,
-    },
-  };
 }
