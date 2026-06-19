@@ -1,7 +1,7 @@
 id: s1-2-design-discussion-sidecar
 epic: hive-composability-design
 title: Design-discussion figure slots + sidecar generator
-status: in_review
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s1-1-planning-format-contract]

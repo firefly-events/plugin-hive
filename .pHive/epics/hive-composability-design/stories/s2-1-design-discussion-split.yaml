@@ -1,7 +1,7 @@
 id: s2-1-design-discussion-split
 epic: hive-composability-design
 title: Design-discussion structural split (produce-doc / review-doc)
-status: in_review
+status: pending
 complexity: high
 methodology: classic
 depends_on: []

@@ -1,7 +1,7 @@
 id: dpt-2-project-type-gate
 epic: dynamic-planning-team
 title: Add project_type gate field to project-profile.yaml + schema
-status: in_review
+status: pending
 tracker_adapter: multica
 tracker_id: PLU-150
 tracker_uuid: 48fcb699-3d6f-4ac2-9f66-3287793e3ee9

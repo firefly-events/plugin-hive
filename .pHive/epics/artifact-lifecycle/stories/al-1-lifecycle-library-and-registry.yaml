@@ -1,7 +1,7 @@
 id: al-1-lifecycle-library-and-registry
 epic: artifact-lifecycle
 title: Create lifecycle library and per-class registry schema
-status: in_review
+status: pending
 complexity: high
 methodology: classic
 depends_on: []

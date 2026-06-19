@@ -1,7 +1,7 @@
 id: al-7-state-dir-scan-scope
 epic: artifact-lifecycle
 title: Scan resolved state dir with legacy .pHive compatibility diagnostics
-status: in_review
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [al-1-lifecycle-library-and-registry]

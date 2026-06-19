@@ -1,7 +1,7 @@
 id: s1b-1-doc-token-telemetry
 epic: hive-composability-design
 title: Doc-token telemetry write probe
-status: in_review
+status: pending
 complexity: medium
 methodology: classic
 depends_on: []

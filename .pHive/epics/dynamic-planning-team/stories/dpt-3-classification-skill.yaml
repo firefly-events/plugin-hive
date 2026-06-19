@@ -1,7 +1,7 @@
 id: dpt-3-classification-skill
 epic: dynamic-planning-team
 title: New atomic skill planning-classification
-status: in_review
+status: blocked
 tracker_adapter: multica
 tracker_id: PLU-151
 tracker_uuid: 6378a0e4-4099-4349-b4ea-7ac6658479a9

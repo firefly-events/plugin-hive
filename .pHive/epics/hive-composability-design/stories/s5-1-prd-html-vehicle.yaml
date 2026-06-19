@@ -1,7 +1,7 @@
 id: s5-1-prd-html-vehicle
 epic: hive-composability-design
 title: PRD HTML canonical output + inverse markdown sidecar
-status: in_review
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s4-3-sidecar-gen-expansion]

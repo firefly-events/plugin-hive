@@ -1,7 +1,7 @@
 id: s4-2-structured-outline-mermaid
 epic: hive-composability-design
 title: Structured outline Mermaid dep map + figure slots
-status: in_review
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s4-1-hv-mermaid-templates]

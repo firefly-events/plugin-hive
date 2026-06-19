@@ -1,7 +1,7 @@
 id: s1-1-planning-format-contract
 epic: hive-composability-design
 title: Planning format contract reference doc
-status: in_review
+status: pending
 complexity: low
 methodology: classic
 depends_on: []

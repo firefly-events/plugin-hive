@@ -1,7 +1,7 @@
 id: al-2-forever-exclusions-guard
 epic: artifact-lifecycle
 title: Enforce forever-retention hard exclusions
-status: in_review
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [al-1-lifecycle-library-and-registry]

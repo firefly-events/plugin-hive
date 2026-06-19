@@ -1,7 +1,7 @@
 id: al-8-lifecycle-tests
 epic: artifact-lifecycle
 title: Cover lifecycle guards, age sources, and idempotent sweep behavior
-status: in_review
+status: blocked
 complexity: medium
 methodology: classic
 depends_on:

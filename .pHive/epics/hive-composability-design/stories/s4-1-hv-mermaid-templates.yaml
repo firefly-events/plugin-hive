@@ -1,7 +1,7 @@
 id: s4-1-hv-mermaid-templates
 epic: hive-composability-design
 title: Mermaid replaces ASCII in H/V skill templates
-status: in_review
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s1-2-design-discussion-sidecar, s1b-1-doc-token-telemetry]

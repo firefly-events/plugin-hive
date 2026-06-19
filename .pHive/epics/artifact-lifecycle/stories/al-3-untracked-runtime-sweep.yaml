@@ -1,7 +1,7 @@
 id: al-3-untracked-runtime-sweep
 epic: artifact-lifecycle
 title: Evict inactive untracked runtime artifacts to OS temp
-status: in_review
+status: blocked
 complexity: high
 methodology: classic
 depends_on:
