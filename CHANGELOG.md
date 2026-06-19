@@ -9,23 +9,20 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-## [2.12.0] - 2026-06-18
+## [2.12.0] - 2026-06-19
+
+**Plan and ship like a human — visually rich planning docs, human-readable release notes by default, requirement-driven planning teams, and a self-cleaning runtime.**
 
 ### Added
 
-- **Artifact lifecycle — untracked-runtime eviction + report-only tracked inventory (`artifact-lifecycle`).** New Python library `hive/lib/artifact_lifecycle/` (registry, predicates, planner, executor, exclusions, eligibility, scan-roots, age, reporter, CLI) that evicts inactive untracked runtime artifacts to OS temp under per-class retention policy, enforces forever-retention hard exclusions, registers tracked consumer-scanned classes as report-only, and backfills a legacy merged-and-aged terminal-eligibility signal. Adds a weekly scheduler wrapper (`hive/scripts/artifact-lifecycle-weekly.sh`), a `hive/references/artifact-lifecycle.md` reference, and a full pytest suite (guards, age sources, idempotent sweep, scan scoping).
-- **Design-aware, visually rich planning artifacts (`hive-composability-design`).** Planning docs gain an HTML sidecar vehicle and Mermaid figures in place of ASCII art. New `hive/references/planning-format-contract.md` (embedded-content + image-source + Mermaid + sidecar rules with a wireframe-discovery protocol); `lib/html-sidecar-gen.js` sidecar generator wired into design-discussion, horizontal-plan, vertical-plan, and structured-outline; `lib/doc-token-telemetry.js` write probe; a canonical PRD skill (`skills/hive/skills/prd/`) emitting HTML with an inverse-markdown sidecar; design-discussion split into produce-doc / review-doc sub-invocations; and a `--lite` umbrella flag (`--skip-sign-off`, `--skip-research`) in `/plan`.
-- **Visual planning is default + opt-out.** Visual planning (sidecars, Mermaid, figure slots, concept illustration) is on by default; opt out per-run with `/plan --no-visual` or persistently via `planning.visual: false` in `hive.config.yaml` (resolution: flag → config → default-on). Markdown stays canonical; Mermaid/figure slots are unaffected; PRD stays HTML-primary. Documented in planning-format-contract §7.
-- **Epic concept illustration.** At the end of a visual `/plan` run (skipped under `--no-visual` and `--lite`), `/plan` generates one AI image of what the change "looks like" — a work-sizing signal plus delight — embedded on the design discussion and shown at confirmation. Backed by a new general-purpose `generate_image` tool on the `openai-image` MCP server (`hive/lib/openai-image-mcp-server.js`); best-effort and non-blocking (verbatim error + placeholder figure on failure). The PNG is gitignored (`.pHive/epics/**/docs/*.png`). Documented in planning-format-contract §8.
-- **Per-story agent lifecycle documentation.** Documented how the Multica / sandcastle execution substrate makes per-story fresh-agent lifecycle native, superseding the dropped respawn-per-task Workstream B.
-
-### Changed
-
-- **`2.12.0` release finalization.** `/execute` applied the planned `minor` version bump (`2.11.0` → `2.12.0`) for the `artifact-lifecycle` and `hive-composability-design` epics and kept plugin version sources in lockstep.
+- **Design-aware, visually rich planning** (PR #297): planning documents now render as HTML sidecars with Mermaid figures in place of ASCII art, a canonical PRD skill emits HTML, and a visual `/plan` run closes with a generated concept image of the change — so plans read like design docs, not text dumps. Visual planning is on by default; opt out per-run with `/plan --no-visual` or persistently via `planning.visual: false`.
+- **Human-readable release notes by default** (PR #289): `/ship` now drafts each changelog bullet from story outcomes — degrading to story descriptions when a story has no outcome field — and gates on a single canonical format spec before release, so operators review prose instead of authoring notes from scratch. This 2.12.0 entry is the first written to that spec.
+- **Requirement-driven planning teams** (PR #299): `/plan` classifies a requirement into work-type tags and composes its planning team from a fixed spine plus the specialists the work actually needs, instead of a one-size-fits-all roster.
+- **Self-cleaning runtime artifacts** (PR #300): a new artifact-lifecycle sweep moves inactive untracked runtime files to OS temp under per-class retention, hard-protects memories and the knowledge graph from eviction, and keeps a report-only inventory of tracked classes — clean working trees without risking durable state. Ships with a weekly scheduler wrapper and a full test suite.
 
 ### Fixed
 
-- **Squad-evaluation read path hardening** (`msd-readback-followups`, PR #290 adversarial follow-ups). Three read-side fixes to the substrate-signal squad-evaluation path (advisory-only; never gates merge): `readSquadEvaluation` now delegates to the shared `parseSquadActivityFromEntries` helper instead of duplicating timeline parse logic, and applies the same `action|no_action|failed` outcome-enum guard as the adapter (plu-341); timeline reads in both `getSquadActivity` and `readSquadEvaluation` now follow `next_cursor` across pages via a shared `fetchTimelineEntries` helper (bounded at 50 pages) so the newest `squad_leader_evaluated` entry is found even on a later page (plu-340); and a focused unit test now covers `squad_evaluation` serialization in `writeMulticaRunEpisode` (plu-342).
+- **Squad-evaluation reads survive pagination and shape drift** (PR #298): the advisory squad-evaluation signal now pages through the issue timeline to find the newest leader verdict and shares one parser and outcome-enum guard with the adapter, so a verdict on a later page is no longer silently missed. Read-only; it never gates a merge.
 
 ## [2.11.0] - 2026-06-11
 
