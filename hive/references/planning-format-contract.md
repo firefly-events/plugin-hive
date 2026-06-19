@@ -123,9 +123,9 @@ when wireframe artifacts already exist.
 
 Look for approved wireframe files in:
 
-```
+~~~
 state/wireframes/{epic-id}/
-```
+~~~
 
 Search for files matching `{story-id}/approved.png` or `{story-id}/v*.png`. The
 `approved.png` filename indicates a wireframe that has passed the design approval
@@ -133,13 +133,13 @@ touchpoint (see `hive/references/wireframe-protocol.md`).
 
 ### Step 2a — Wireframe found: use image reference
 
-```html
+~~~html
 <figure>
   <img src="../../../../state/wireframes/{epic-id}/{story-id}/approved.png"
        alt="{descriptive alt text}">
   <figcaption>{caption describing the wireframe context}</figcaption>
 </figure>
-```
+~~~
 
 Use a path relative to the planning document's location. The `../../../../` prefix above
 walks up from the doc dir (`.pHive/epics/{epic-id}/docs/`) to the repo root, where
@@ -150,10 +150,10 @@ walks up from the doc dir (`.pHive/epics/{epic-id}/docs/`) to the repo root, whe
 
 Do **not** block document writing on wireframe availability. Use a placeholder slot:
 
-```html
+~~~html
 <figure data-placeholder="{description of expected wireframe content}">
 </figure>
-```
+~~~
 
 The `data-placeholder` attribute is the canonical signal that this image slot is unfilled.
 Sidecar generators, reviewers, and future agents use it to identify slots pending wireframe
@@ -233,8 +233,8 @@ planning flow.
 
 1. Gate: run only when `${visual_planning}` is ON **and** `--lite` is not active (`--lite`
    is token-economy; the illustration is the most expensive step, so lite skips it).
-2. Build a prompt from the finalized planning context (epic title + design-discussion goal
-   + scale assessment + the principal slices/changes). Describe a conceptual scene or
+2. Build a prompt from the finalized planning context (epic title + design-discussion goal +
+   scale assessment + the principal slices/changes). Describe a conceptual scene or
    diagram, not a literal UI.
 3. Invoke the `openai-image` MCP tool `generate_image` with that prompt, `output_dir` set
    to the epic docs dir, and `output_prefix: concept`. Save to
@@ -242,10 +242,10 @@ planning flow.
 4. Embed it on the **design-discussion** (the always-present primary artifact) as a
    trailing section, then regenerate that doc's `.html` sidecar:
 
-   ```html
+   ~~~html
    <figure data-src="concept-illustration.png" data-alt="Concept illustration of the planned change">
    </figure>
-   ```
+   ~~~
 
 5. **Non-blocking, best-effort.** If the MCP tool is unavailable, `OPENAI_API_KEY` is
    missing, or the call errors (e.g. `403` verified-org requirement), propagate the exact
