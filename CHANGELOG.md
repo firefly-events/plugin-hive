@@ -9,6 +9,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-06-18
+
 ### Added
 
 - **Artifact lifecycle — untracked-runtime eviction + report-only tracked inventory (`artifact-lifecycle`).** New Python library `hive/lib/artifact_lifecycle/` (registry, predicates, planner, executor, exclusions, eligibility, scan-roots, age, reporter, CLI) that evicts inactive untracked runtime artifacts to OS temp under per-class retention policy, enforces forever-retention hard exclusions, registers tracked consumer-scanned classes as report-only, and backfills a legacy merged-and-aged terminal-eligibility signal. Adds a weekly scheduler wrapper (`hive/scripts/artifact-lifecycle-weekly.sh`), a `hive/references/artifact-lifecycle.md` reference, and a full pytest suite (guards, age sources, idempotent sweep, scan scoping).
