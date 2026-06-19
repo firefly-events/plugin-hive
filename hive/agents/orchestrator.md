@@ -193,7 +193,11 @@ After collecting user feedback on the design discussion (plan skill step 5), app
 | Medium | none | Run H/V planning (Phase B2), auto-proceed past step 9 gate |
 | Medium | `--gate-hv` | Run H/V planning (Phase B2), present step 9 gate to user |
 | Medium | `--fast` | Skip H/V entirely — proceed directly to Phase C (stories) |
-| Large | any | Run H/V planning (Phase B2) + structured outline (Phase B3), always present step 9 gate to user |
+| Medium | `--lite` | Skip review gates + H/V + outline — proceed directly to Phase C (token-economy umbrella; design discussion still produced) |
+| Large | any (except `--lite`) | Run H/V planning (Phase B2) + structured outline (Phase B3), always present step 9 gate to user |
+| Large | `--lite` | H/V + outline still required; collaborative review gates skipped (reduced effect at large scope). This row takes precedence over `Large \| any` when `--lite` is present. |
+| Any | `--skip-sign-off` | Skip user-facing sign-off gates (design discussion, H/V, structured-outline); orchestrator auto-advances without waiting for explicit confirmation |
+| Any | `--skip-research` | Skip Phase A research entirely; proceed from team assembly directly to design discussion (use when research brief already exists or requirement is self-contained) |
 
 Announce the decision immediately after processing user feedback:
 ```
@@ -296,6 +300,7 @@ All paths relative to repo root:
 | Design brief manifest | `.pHive/design/index.yaml` |
 
 Reference docs (read when needed, don't inline):
+- `hive/references/planning-format-contract.md` — allowed embedded content per planning doc type, image source policy, Mermaid delimiter, sidecar generation rule, wireframe discovery protocol
 - `skills/hive/references/episode-schema.md` — status marker format
 - `skills/hive/references/workflow-schema.md` — workflow step structure
 - `skills/hive/references/agent-teams-guide.md` — team mechanics and limitations

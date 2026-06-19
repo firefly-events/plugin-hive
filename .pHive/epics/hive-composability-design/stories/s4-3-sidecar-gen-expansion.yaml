@@ -1,0 +1,121 @@
+id: s4-3-sidecar-gen-expansion
+epic: hive-composability-design
+title: Sidecar generator expansion to H/V and structured-outline
+status: in_review
+complexity: medium
+methodology: classic
+depends_on: [s4-2-structured-outline-mermaid]
+
+metric:
+  applies: false
+  justification: >
+    Expands the s1-2 sidecar generator to cover H/V and structured-outline docs.
+    Verified by sidecar presence across those doc types, not by a measurable trend.
+
+description: |
+  Extend lib/html-sidecar-gen.* to cover H/V and structured-outline writes (not just
+  design-discussion). Add sidecar invocation prose to horizontal-plan, vertical-plan,
+  and structured-outline skill files.
+
+  Also: update hive/references/planning-format-contract.md to reflect that H/V and
+  structured-outline now use Mermaid/figure and have sidecar generation.
+
+  Telemetry format evaluation gate: before implementing, review state/telemetry/
+  doc-tokens.jsonl data. If markdown-embedded-HTML shows a meaningful token cost
+  disadvantage vs HTML-primary in the collected data, note it as a finding — but
+  do NOT flip the format default here. That decision requires a separate sign-off.
+
+acceptance_criteria:
+  - "Given /hive:plan run producing H/V docs, then horizontal-plan.html and vertical-plan.html files exist alongside .md files"
+  - "Given /hive:plan run producing structured outline, then structured-outline.html exists alongside .md"
+  - "Given sidecar generator failure on H/V write, then .md write completes normally (non-blocking)"
+  - "Given planning-format-contract.md, then it documents H/V and structured-outline as Mermaid-bearing doc types"
+
+steps:
+  - id: research
+    description: |
+      Read:
+      1. lib/html-sidecar-gen.* (created in S1.2) — understand current invocation interface
+      2. skills/hive/skills/horizontal-plan/SKILL.md — find write instruction for invocation hookup
+      3. skills/hive/skills/vertical-plan/SKILL.md — find write instruction for invocation hookup
+      4. skills/hive/skills/structured-outline/SKILL.md — find write instruction for invocation hookup
+      5. state/telemetry/doc-tokens.jsonl — review collected data; note format cost findings
+    agent: researcher
+
+  - id: implement
+    description: |
+      1. lib/html-sidecar-gen.*: verify existing generateSidecar() handles Mermaid fences correctly
+         for H/V content. If the generator was written for design-discussion only and needs adjustment
+         for multi-section H/V docs, extend it. Interface stays the same.
+
+      2. In horizontal-plan/SKILL.md, after write instruction (near telemetry invocation from S4.1):
+         "After writing, invoke lib/html-sidecar-gen to generate a .html sidecar."
+
+      3. Same for vertical-plan/SKILL.md and structured-outline/SKILL.md.
+
+      4. Update hive/references/planning-format-contract.md doc-type table:
+         - Add Mermaid column to H/V rows (confirming Mermaid diagrams expected)
+         - Add sidecar-generated note to H/V and structured-outline rows
+         - Mark PRD row as pending (HTML-primary exception; sidecar is inverse-direction, S5)
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Verify:
+      1. Run /hive:plan — check .html sidecars exist for H/V and structured-outline outputs
+      2. Open each .html in browser — renders with Mermaid diagrams rendered
+      3. Simulate generator failure — confirm .md writes complete
+      4. Check planning-format-contract.md — H/V and structured-outline rows updated
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Review:
+      - Generator invocation additions are one-line prose additions (not structural changes)
+      - format-contract.md updates are accurate and consistent with actual output
+      - Non-blocking error handling verified
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: Commit generator extension, SKILL.md additions, planning-format-contract.md updates
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: lib/html-sidecar-gen.js
+      purpose: Sidecar generator to extend (created in S1.2)
+    - path: skills/hive/skills/horizontal-plan/SKILL.md
+      purpose: Add sidecar invocation prose after write instruction
+    - path: skills/hive/skills/vertical-plan/SKILL.md
+      purpose: Add sidecar invocation prose after write instruction
+    - path: skills/hive/skills/structured-outline/SKILL.md
+      purpose: Add sidecar invocation prose after write instruction
+    - path: hive/references/planning-format-contract.md
+      purpose: Update H/V and structured-outline rows in doc-type table
+
+files_to_modify:
+  - file: lib/html-sidecar-gen.js
+    change: Extend if needed to handle H/V multi-section content (interface unchanged)
+  - file: skills/hive/skills/horizontal-plan/SKILL.md
+    change: One-line sidecar invocation after write instruction
+  - file: skills/hive/skills/vertical-plan/SKILL.md
+    change: One-line sidecar invocation after write instruction
+  - file: skills/hive/skills/structured-outline/SKILL.md
+    change: One-line sidecar invocation after write instruction
+  - file: hive/references/planning-format-contract.md
+    change: Update H/V and structured-outline rows in doc-type table
+
+cross_cutting:
+  - concern: documentation
+    action: "planning-format-contract.md updated to reflect H/V and structured-outline sidecar coverage."
+
+references:
+  - path: state/epics/hive-composability-design/docs/structured-outline.md
+    relevant_excerpt: |
+      Slice 4, Change #4: lib/html-sidecar-gen.* extended to H/V and structured-outline writes.
+      Change #5: planning-format-contract.md updated for H/V and outline Mermaid/figure usage.

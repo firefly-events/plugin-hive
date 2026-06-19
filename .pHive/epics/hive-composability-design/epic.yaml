@@ -1,0 +1,86 @@
+name: hive-composability-design
+title: Hive Composability + Design-Aware Planning
+description: |
+  Refreshed 2026-06-17 from the 2026-04-17 plan (rescued from an untracked state).
+  The original four-workstream scope was re-evaluated against ~2 months of shipped
+  work and re-scoped down from 20 stories to 10:
+
+    - Workstream D (Rich Outputs) + s1b telemetry — KEPT. Still genuinely unbuilt:
+      document-templates remain ASCII, no HTML sidecar generator exists. This is the
+      surviving core: design-aware, visually rich planning artifacts.
+    - Workstream A (Composability) — RECONCILED with the shipped `--fast` flag.
+      Keeps the design-discussion produce/review split (s2-1) and redefines `--lite`
+      as a token-economy umbrella (s2-2). Scope-class guard dropped (gate_mode covers it).
+    - Workstream C (Model Economy) — DROPPED. model_overrides + agent_backends +
+      Haiku/Explorer guardrail all shipped via the routing-policy config.
+    - Workstream B (Respawn-per-task Lifecycle) — DROPPED as a feature. The Multica /
+      sandcastle execution substrate makes per-story fresh-agent lifecycle native, so
+      respawn-per-task is moot. Replaced by one documentation story (b-1) that records
+      this decision in user-facing docs so the gap is explained, not silent.
+
+  Min-viable-ship is Slices 1 + 1b + 4 (Workstream D end to end). A is independent and
+  shippable alongside. b-1 is a standalone doc story.
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+version_bump: minor
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  # Slice 1 — Format Contract + Reference Render (Workstream D seed)
+  - id: s1-1-planning-format-contract
+    title: Planning format contract reference doc
+    complexity: low
+    depends_on: []
+
+  - id: s1-2-design-discussion-sidecar
+    title: Design-discussion figure slots + sidecar generator
+    complexity: medium
+    depends_on: [s1-1-planning-format-contract]
+
+  # Slice 1b — doc-token-telemetry (parallel to Slice 1)
+  - id: s1b-1-doc-token-telemetry
+    title: Doc-token telemetry write probe
+    complexity: medium
+    depends_on: []
+
+  # Slice 2 — Composability (Workstream A, reconciled with shipped --fast)
+  - id: s2-1-design-discussion-split
+    title: Design-discussion structural split (produce-doc / review-doc)
+    complexity: high
+    depends_on: []
+
+  - id: s2-2-lite-mode-routing
+    title: --lite umbrella flag routing in plan skill
+    complexity: medium
+    depends_on: [s2-1-design-discussion-split]
+
+  # Slice 4 — Rich H/V + Structured Outline (Workstream D expansion)
+  - id: s4-1-hv-mermaid-templates
+    title: Mermaid replaces ASCII in H/V skill templates
+    complexity: medium
+    depends_on: [s1-2-design-discussion-sidecar, s1b-1-doc-token-telemetry]
+
+  - id: s4-2-structured-outline-mermaid
+    title: Structured outline Mermaid dep map + figure slots
+    complexity: low
+    depends_on: [s4-1-hv-mermaid-templates]
+
+  - id: s4-3-sidecar-gen-expansion
+    title: Sidecar generator expansion to H/V and structured-outline
+    complexity: medium
+    depends_on: [s4-2-structured-outline-mermaid]
+
+  # Slice 5 — PRD HTML Vehicle (Workstream D completion)
+  - id: s5-1-prd-html-vehicle
+    title: PRD HTML canonical output + inverse markdown sidecar
+    complexity: medium
+    depends_on: [s4-3-sidecar-gen-expansion]
+
+  # Slice B-doc — Multica lifecycle documentation (replaces dropped Workstream B)
+  - id: b-1-multica-lifecycle-doc
+    title: Document per-story agent lifecycle under the Multica substrate
+    complexity: low
+    depends_on: []

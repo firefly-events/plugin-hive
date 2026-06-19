@@ -1,0 +1,113 @@
+id: dpt-3-classification-skill
+epic: dynamic-planning-team
+title: New atomic skill planning-classification
+status: in_review
+tracker_adapter: multica
+tracker_id: PLU-151
+tracker_uuid: 6378a0e4-4099-4349-b4ea-7ac6658479a9
+complexity: medium
+methodology: classic
+depends_on: [dpt-1-composition-catalog, dpt-2-project-type-gate]
+
+description: |
+  Create a new atomic skill skills/hive/skills/planning-classification/SKILL.md that the
+  orchestrator invokes at /plan step 1. It classifies the requirement into work-type tags,
+  reads the planning_composition map (dpt-1), applies the project gate (dpt-2), and returns
+  the resolved planning roster + classification reasoning.
+
+  This is an atomic external skill in the same style as grill / design / planning-routing —
+  /plan calls it and consumes its output; the classification logic does NOT live inline in
+  /plan.
+
+  Contract:
+    Input:  requirement_summary, project-profile path (for has_ui / project_type gate).
+    Process:
+      1. Analyze requirement → emit 1+ work-type tags (architecture, ui, security,
+         performance, accessibility, data, infra, ...). Tags come from the catalog
+         vocabulary only.
+      2. Read planning_composition.spine + work_types from specialist-triggers.md.
+      3. resolved_roster = spine ∪ (specialists for each matched tag, after project gate).
+         project_gate: requires_ui rows resolve EMPTY when project has_ui=false.
+      4. Dedupe personas (union, stable order: spine first, then specialists by tag order).
+    Invariants (HARD):
+      - Roster-only: every chosen specialist must resolve to an existing hive/agents/*.md.
+        NEVER invent a persona. (Failure mode: improvised persona self-implements +
+        bypasses backend routing — see memory feedback_no_team_lead_intermediary.)
+      - Spine self-sufficient: low-confidence / no tag matched → spine-only roster.
+        Never block planning on a bad/empty classification. Specialists only augment.
+      - Absent has_ui: treat as unknown → conservative default (ungated tags apply;
+        requires_ui slots stay empty unless tech_stack heuristic clearly indicates UI).
+    Output:
+      - assembled_personas: [persona, ...]   (handed to planning-routing unchanged)
+      - classification: { tags: [...], per_tag_reasoning: {...}, confidence: <matched|low>,
+        gate_decisions: {...} }   (handed to the provenance writer in dpt-4)
+
+  No new package.json dependency — prefer prose-skill + existing CLI tooling (yaml read via
+  python3/node already vendored). Per memory feedback_byo_enhancements_no_root_deps.
+
+acceptance_criteria:
+  - "Given a requirement mentioning auth/secrets, when classified, then tags include `security` and the roster includes security-reviewer (project ungated)."
+  - "Given a UI requirement on a has_ui=false project (plugin-hive), when classified, then the `ui` tag's ui-designer slot resolves EMPTY and the roster is spine-only (plus any other ungated matched specialists)."
+  - "Given a requirement with no recognizable work-type, when classified, then confidence=low and assembled_personas == spine exactly."
+  - "Given a multi-tag requirement (e.g. perf + security), when classified, then the roster is the deduped union of spine + both specialists."
+  - "Given any resolved roster, when validated, then every persona resolves to an existing hive/agents/*.md (roster-only invariant holds)."
+  - "Given the skill output, when inspected, then it returns both assembled_personas and a classification object with tags + reasoning + confidence + gate_decisions."
+
+steps:
+  - id: research
+    description: Read planning-routing Step 0.1 (input contract for assembled_personas), grill/design SKILL.md for the atomic-skill authoring pattern, and the dpt-1/dpt-2 outputs.
+    agent: researcher
+  - id: implement
+    description: Author skills/hive/skills/planning-classification/SKILL.md implementing the contract + invariants above.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Covered by dpt-5 (shared test story). Here, hand-verify the four core scenarios (security, ui-gated, no-match fallback, multi-tag union) against the catalog.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm roster-only + spine-fallback invariants are unambiguous and the output contract matches what planning-routing/dpt-4 consume.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feat/dynamic-planning-team.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/hive/skills/planning-routing/SKILL.md
+      purpose: Downstream consumer — its Step 0.1 accepts a caller-supplied assembled_personas list.
+    - path: skills/grill/SKILL.md
+      purpose: Reference pattern for an atomic external skill (input → artifact/output → return).
+    - path: hive/references/specialist-triggers.md
+      purpose: Source of the planning_composition map this skill reads.
+    - path: .pHive/project-profile.yaml
+      purpose: Source of has_ui / project_type for the project gate.
+
+files_to_modify:
+  - file: skills/hive/skills/planning-classification/SKILL.md
+    change: New atomic skill (create).
+
+references:
+  - path: skills/hive/skills/planning-routing/SKILL.md
+    relevant_excerpt: |
+      Step 0.1: The caller may pass a completed `assembled_personas` list.
+      ... Routing happens only after the assembled persona list is finalized.
+      Backend routing must not change team composition.
+  - path: .pHive/epics/dynamic-planning-team/docs/design-discussion.md
+    relevant_excerpt: |
+      D2 — New atomic skill planning-classification. Invariants: roster-only,
+      spine self-sufficient (low-confidence → spine-only), project gate.
+
+design_decisions:
+  - decision: Classification is a skill, not inline /plan prose.
+    rationale: Matches atomic-call pattern; testable in isolation; reusable by future entrypoints (triage, standup).
+  - decision: No root dependency added.
+    rationale: memory feedback_byo_enhancements_no_root_deps — use vendored python3/node yaml reads.
+
+risks:
+  - severity: medium
+    description: Classifier mis-tags requirement → wrong specialists.
+    mitigation: Spine self-sufficient; provenance (dpt-4) makes the call operator-visible + overridable at confirmation gate.

@@ -31,14 +31,16 @@ INFO log requested field uses planning-routing vocabulary:
 
 ### Step 0.1: Build Team Composition
 
-The caller may pass a completed `assembled_personas` list. If asked to assemble the default planning team from `requirement_summary`, use:
+**When the caller supplies `assembled_personas`:** use the list as-is. Do not re-evaluate requirements, add or remove personas, or apply the conditional selection rules below. The caller is the source of truth for roster composition. For `/plan`, this list is always supplied by the planning-classification skill (`skills/hive/skills/planning-classification/SKILL.md`) — planning-routing receives it, never re-derives it.
+
+**Legacy / direct-caller fallback (only when `assembled_personas` is absent or empty):** If no caller-supplied list is provided, self-assemble using the rules below. This path exists for direct callers that have not yet integrated planning-classification.
 
 **Core team (always included):**
 - **researcher** (`hive/agents/researcher.md`) - codebase/web exploration, raw findings
 - **technical-writer** (`hive/agents/technical-writer.md`) - formatted docs
 - **tpm** (`hive/agents/tpm.md`) - delivery sequencing, H/V thinking
 
-**Conditional members:**
+**Conditional members (legacy fallback only — catalog is now the source of truth for /plan):**
 - **architect** (`hive/agents/architect.md`) - add for architecture decisions, multi-system integration, medium/large scale, API design, data model changes, infrastructure, or "architecture" signals.
 - **ui-designer** (`hive/agents/ui-designer.md`) - add for UI work: screens, components, visual design, wireframes, frontend flows, layout, states, or design review. Do not add for purely backend/infrastructure work.
 

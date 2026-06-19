@@ -57,6 +57,10 @@ Every planning artifact includes a **verification strategy** — tools, platform
 
 The planning team includes: researcher, technical-writer, analyst, architect, tpm, and ui-designer (when UI work is detected).
 
+**Visual planning (on by default).** Planning docs render as HTML sidecars with Mermaid diagrams and `<figure>` image slots, and at the end of a run `/plan` generates one **concept illustration** — an AI image of what the change "looks like," part sizing signal and part delight — embedded on the design discussion. Markdown stays the source of truth; the visuals are a rendering layer. Turn it off per-run with `/hive:plan --no-visual`, or persistently with `planning.visual: false` in `hive.config.yaml`. `--lite` keeps sidecars but skips the (most expensive) illustration step. The concept illustration uses the `openai-image` MCP server and is best-effort — if `OPENAI_API_KEY` is missing or the call fails, planning continues with a placeholder. See `hive/references/planning-format-contract.md` §7–§8.
+
+Common flags: `--fast` (skip H/V at medium scope), `--lite` (token-economy: skip H/V + review gates + outline + illustration), `--no-visual` (opt out of visual planning), `--gate-hv`, `--skip-sign-off`, `--skip-research`, `--from-triage <id>`.
+
 ### Running Execution: `/hive:execute`
 
 ```
@@ -401,6 +405,18 @@ At every agent spawn, step 5 loads memories:
 ### Onboarding & Federation
 
 Starter memories ship with the plugin and migrate to the live path on first `/hive:kickoff`. Export/import via MemoryBundle format enables cross-user memory sharing with provenance tracking. See `references/onboarding-guide.md`.
+
+### Agent lifecycle across stories
+
+Under the Multica/sandcastle execution substrate, **each story is dispatched as a fresh agent invocation**. The agent starts with no memory of prior stories in the same epic, executes exactly the work described in its issue, then exits. Context isolation is guaranteed by the substrate — not by any Hive-level config key.
+
+This means:
+
+- **No stale context accumulates.** An agent implementing story N cannot be confused by story N−1's working state, partial writes, or in-flight tool calls.
+- **No explicit teardown is needed.** There is no long-lived teammate to respawn, recycle, or reset between stories.
+- **Continuity across stories flows through artifacts, not agent memory.** Episode markers, commits, and the knowledge graph carry state forward. A fresh agent reads those artifacts at the start of its run and picks up where the prior agent left off.
+
+**Why a respawn-per-task lifecycle mode was never built (Workstream B).** The 2026-04 plan included a Workstream B that would have added a `respawn_per_task` lifecycle option (configurable via a `teammate_lifecycle` key) for development teammates running inside a long-lived session. That design made sense against the in-session TeamCreate execution model, where a single teammate persists across stories and must be deliberately cycled to reset context. When the execution substrate moved to Multica/sandcastle — where per-story fresh-agent dispatch is native — the problem Workstream B was solving ceased to exist. Building a separate config-driven respawn mechanism would have duplicated what the substrate already guarantees for free. The feature was dropped in June 2026 and replaced with this note. There is no `teammate_lifecycle` key and no `respawn_per_task` flag; neither was ever shipped.
 
 ---
 
