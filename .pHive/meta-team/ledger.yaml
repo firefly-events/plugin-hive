@@ -1,3 +1,35 @@
+- experiment_id: meta-2026-06-19
+  date: '2026-06-19'
+  started: '2026-06-19T00:00:00Z'
+  closed: '2026-06-19T00:00:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 0
+  top_changes:
+    - ".pHive/meta-team/archive/2026-04-19/MANIFEST.md: appended reviewed-on provenance line for meta-2026-06-19 (7th line)"
+  commit: 7813fabf93ae32cde83979fa16bebd62e309bd51
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: a6779facd04b444c4b194689b5066def86751dd8
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-19. Structural audit found 0 in-scope findings: all 12
+    step files complete (7/7), all 25 agents valid, all 13 workflow YAML step_file refs
+    resolve, model IDs current (claude-opus-4-8, claude-sonnet-4-6,
+    claude-haiku-4-5-20251001), no MEMORY_GAP findings (all 25 agents >=1 memory).
+    Stale-PR audit: open PR #302 (created 2026-06-19) and PR #303 (release) not yet
+    stale. Out-of-scope observations: STUB_DOC hive-cloud-roadmap.md (S16 placeholder,
+    16th+ consecutive deferral); STUCK_TRIAGE_ITEM t-001 (23d prioritized, KG predicate
+    design requires human decision, .pHive/triage/ outside autonomous write scope).
+    Dedup pre-flight: PRs #288 and #294 (formerly suppressing candidates 001 and 002)
+    are now closed — suppression lifted. Routed to step-03b backlog fallback. Selected
+    candidate mmo-2026-04-21-001 (first pending, no active dedup suppression). Candidate
+    003 still exhausted (# frozen: comment already present). Appended reviewed-on line
+    for meta-2026-06-19 to archived MANIFEST.md (7th such line). Closure validator
+    passed. Regression watch armed for 4-hour observation window.
 - experiment_id: meta-2026-06-16
   date: '2026-06-16'
   started: '2026-06-16T00:00:00Z'
