@@ -1,0 +1,1515 @@
+{
+  "epicId": "cwc-2026-integration",
+  "stories": [
+    {
+      "id": "s1-d3-design-for-next-model-prompts",
+      "epic": "cwc-2026-integration",
+      "slice": "S1 / D3",
+      "title": "Design-for-next-model prompt edits + CI auto-fix paragraph + README North Star",
+      "status": "pending",
+      "complexity": "low",
+      "methodology": "tdd",
+      "depends_on": [],
+      "metadata": {
+        "needs_backend": false,
+        "needs_frontend": false
+      },
+      "description": "Land CWC stage posture as prompt language across architect + tpm\npersonas; add the CI auto-fix layered ladder paragraph to\nquality-gates.md; add one paragraph to README §North Star aligning\nwith \"compose primitives, don't rebuild.\" Day-1 parallel, no\ndependencies. Reusable canonical sentence: \"Design for the next model.\nBuild things that don't quite work today on the assumption that\nthey'll start working with a model upgrade.\"\n",
+      "acceptance_criteria": [
+        "Given hive/agents/architect.md and hive/agents/tpm.md, when checked, then both contain the canonical 'design for next model' sentence in their system prompts",
+        "Given hive/references/quality-gates.md, when checked, then it documents the layered ladder: Hive fix-loop → push → CC CI auto-fix → CodeRabbit",
+        "Given README.md §North Star, when read, then it contains a one-paragraph addition aligning with the existing 'compose primitives' framing",
+        "Given persona-conformance lint, when run on architect.md and tpm.md, then both pass",
+        "Given md-link-check, when run on quality-gates.md and agent-config-schema.md, then it passes"
+      ],
+      "steps": [
+        {
+          "id": "implement",
+          "description": "1. Lift one canonical sentence about \"design for next model\" and\n   insert it into both architect.md and tpm.md system-prompt\n   sections. Reuse the same sentence verbatim in both.\n2. Add a paragraph to hive/references/quality-gates.md describing\n   the layered ladder (Hive fix-loop → push → CC CI auto-fix →\n   CodeRabbit). Cross-reference is to the CC release notes via\n   the brief, not a Hive reference.\n3. Update hive/references/agent-config-schema.md to document the\n   \"design for next model\" prompt-language slot, citing\n   architect.md + tpm.md as canonical examples.\n4. Add a single paragraph to README.md §North Star that aligns\n   with the existing \"compose primitives\" framing.\n5. Run persona-conformance lint + md-link-check.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/agents/architect.md",
+          "change": "Add canonical \"design for next model\" sentence to system prompt"
+        },
+        {
+          "file": "hive/agents/tpm.md",
+          "change": "Same canonical sentence as architect.md (reuse, no drift)"
+        },
+        {
+          "file": "hive/references/quality-gates.md",
+          "change": "Add CI auto-fix layered-ladder paragraph"
+        },
+        {
+          "file": "hive/references/agent-config-schema.md",
+          "change": "Document the prompt-language slot"
+        },
+        {
+          "file": "README.md",
+          "change": "One paragraph in §North Star"
+        }
+      ],
+      "verification": {
+        "mode": "lint+link-check",
+        "commands": [
+          "persona-conformance lint architect.md tpm.md",
+          "md-link-check hive/references/quality-gates.md hive/references/agent-config-schema.md"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Reuse one canonical sentence between architect.md and tpm.md",
+          "Keep the README addition to one paragraph; no §North Star restructure"
+        ],
+        "do_not": [
+          "Edit other personas (orchestrator, reviewer, etc.) — out of slice",
+          "Restructure §North Star or rename sections",
+          "Add code; this is prose-only"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "README.md (§North Star section, current shape)",
+          "note": "Match existing tone; \"compose Anthropic primitives, don't rebuild\""
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "Persona prompt edits + agent-config-schema.md + quality-gates.md + README §North Star paragraph all updated together; no stale wording about the prior posture remains"
+        }
+      ],
+      "risks": [
+        "(LOW) wording drift between architect.md and tpm.md — mitigation: reuse one canonical sentence verbatim"
+      ],
+      "commit_message": "docs: design-for-next-model prompts + CI auto-fix layered ladder + README North Star paragraph"
+    },
+    {
+      "id": "s10-a7-agent-spawn-flow-hook-relax",
+      "epic": "cwc-2026-integration",
+      "slice": "S10 / A7",
+      "title": "agent-spawn SKILL flow update + check-agent-misuse hook relax",
+      "status": "pending",
+      "complexity": "medium",
+      "methodology": "tdd",
+      "depends_on": [
+        "s5-a2-messages-session-loop",
+        "s7-a6-cc-session-id-correlation",
+        "s8-a4-substrate-flag-default-flip",
+        "s9-a5-cloud-mode-dead-code-gating"
+      ],
+      "metadata": {
+        "needs_backend": true,
+        "needs_frontend": false
+      },
+      "description": "Direct spawn through the Messages-API substrate; relax\nhooks/check-agent-misuse.sh for routes that go through\nmessages-session.js. SKILL.md gains a capability-check + tmux-\nfallback flow. Behavioral test must cover both known-good\n(Messages-API + TeamCreate) and known-bad (direct shell-out)\ncases. Carries cycle-state escalation `security:plan-audit`.\n",
+      "acceptance_criteria": [
+        "Given skills/hive/skills/agent-spawn/SKILL.md, when read, then it documents the flow: capability-check → Messages-API substrate → tmux fallback (when client init fails)",
+        "Given hooks/check-agent-misuse.sh, when invoked on a Messages-API-routed Agent() spawn, then it allows the call",
+        "Given the same hook invoked on a TeamCreate spawn, then it allows the call (existing fallback path)",
+        "Given the same hook invoked on the existing orchestrator-pattern catalog (story-YAML paths + execution verbs in tool_input.prompt/description), when matched, then it still blocks (catalog kept intact; relax is additive at one allow-rule, not catalog removal)",
+        "Given tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.*, when run, then all three cases pass red→green",
+        "Given a manual end-to-end smoke (sandbox repo, /hive:execute), when observed, then a research agent spawns through the Messages-API loop in default config"
+      ],
+      "steps": [
+        {
+          "id": "spec-tests-first",
+          "description": "Author tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.*:\na) Messages-API spawn — ALLOW\nb) TeamCreate spawn — ALLOW (fallback)\nc) Existing orchestrator-pattern match (story-YAML path + execution verb in tool_input.prompt/description) — BLOCK\nNote on test name: the test scope is the existing orchestrator-\npattern catalog (workflow-discipline gate). The hook does NOT\nand never did detect \"direct shell-out spawn\" — that finding\nfrom security:plan-audit is closed by scoping the test\nexplicitly to the orchestrator-pattern lane rather than adding\na new detection surface as part of this slice.\nCover the current blocked-pattern catalog (per memory\nfeedback_execute_epic_regex_false_positive.md) so the relax\ndoesn't reopen previously-blocked patterns.\n",
+          "agent": "tester"
+        },
+        {
+          "id": "implement",
+          "description": "1. Update skills/hive/skills/agent-spawn/SKILL.md flow:\n   capability-check → Messages-API substrate (default) → tmux\n   fallback when client init fails.\n2. Modify hooks/check-agent-misuse.sh: relax the \"no Agent() for\n   stories\" rule for spawn paths that route through\n   messages-session.js. Keep TeamCreate path allowed; keep\n   direct-shell-out path blocked.\n3. Run the hook behavioral test red→green.\n4. End-to-end smoke on a sandbox repo: /hive:execute spawns a\n   research agent through Messages-API.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "skills/hive/skills/agent-spawn/SKILL.md",
+          "change": "Document Messages-API substrate flow + tmux fallback"
+        },
+        {
+          "file": "hooks/check-agent-misuse.sh",
+          "change": "Relax for messages-session.js-routed Agent() spawn; keep blocked-pattern catalog intact"
+        },
+        {
+          "file": "tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.*",
+          "change": "NEW — three red→green cases (allow Messages-API / allow TeamCreate / block existing orchestrator-pattern catalog match) — scope explicit in the file name, no new detection surface introduced"
+        }
+      ],
+      "verification": {
+        "mode": "mixed (red-green for hook + lint for SKILL)",
+        "commands": [
+          "node tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.*",
+          "md-link-check skills/hive/skills/agent-spawn/SKILL.md",
+          "<manual smoke: /hive:execute on sandbox repo>"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Document the new spawn flow in agent-spawn SKILL.md",
+          "Relax check-agent-misuse for messages-session.js-routed Agent()",
+          "Cover all three behavioral cases in the test"
+        ],
+        "do_not": [
+          "Touch other hooks (stop-interrupt-capture, metrics-stop-dispatch)",
+          "Modify substrate dispatch (S8 owns that)",
+          "Loosen the blocked-pattern catalog beyond the messages-session.js path"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "hooks/check-agent-misuse.sh",
+          "note": "Current blocked-pattern catalog — the relax is additive at one allow-rule, not a wholesale rewrite"
+        },
+        {
+          "file": "skills/hive/skills/agent-spawn/SKILL.md",
+          "note": "Existing capability-check pattern from previous spawn-flow updates"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "agent-spawn SKILL.md documents the new flow inside the same slice"
+        },
+        {
+          "concern": "versioning",
+          "action": "Hook + SKILL changes are consumer-visible (different default spawn path) — flag minor semver bump at TPM gate"
+        }
+      ],
+      "risks": [
+        "(MED) hook regex blast radius — mitigation: behavioral test against current blocked-pattern catalog (per feedback_execute_epic_regex_false_positive.md)",
+        "(MED) security:plan-audit escalation — abuse cases must be in the test"
+      ],
+      "commit_message": "feat(spawn): direct through Messages-API substrate; relax misuse hook"
+    },
+    {
+      "id": "s11-c1-under-scheduler-step-metadata",
+      "epic": "cwc-2026-integration",
+      "slice": "S11 / C1",
+      "title": "under_scheduler step metadata on plan-approval (Routines bridge)",
+      "status": "pending",
+      "complexity": "medium",
+      "methodology": "tdd",
+      "depends_on": [],
+      "metadata": {
+        "needs_backend": false,
+        "needs_frontend": false
+      },
+      "description": "Make hive/workflows/daily-ceremony.workflow.yaml plan-approval step\nscheduler-friendly. Add step-level metadata\nunder_scheduler: { auto_approve: true|false }.\nIn scheduler context (Routines or any future non-tty trigger),\nauto_approve=true makes plan-approval pass through without an\ninteractive prompt. In interactive context, the step pauses as today.\nResolves binding decision `routines-auto-approve-surface` and Open\nQuestion Q1.\n",
+      "acceptance_criteria": [
+        "Given hive/workflows/daily-ceremony.workflow.yaml plan-approval step, when read, then it accepts step-level under_scheduler.auto_approve metadata",
+        "Given a workflow runner in scheduler context with auto_approve=true, when the step is reached, then it passes through without an interactive prompt",
+        "Given the same scheduler context with auto_approve=false, when reached, then the step pauses (or errors per documented contract — spec the contract during impl)",
+        "Given an interactive context, when reached, then the step pauses regardless of metadata",
+        "Given hive/references/workflow-schema.md, when read, then it documents the step-level under_scheduler key as generalizable to any future workflow with interactive pauses",
+        "Given YAML-schema lint, when run on daily-ceremony.workflow.yaml, then it passes",
+        "Given tests/hive-workflows/daily-ceremony.under-scheduler.test.*, when run, then the three runner-context cases pass red→green"
+      ],
+      "steps": [
+        {
+          "id": "spec-tests-first",
+          "description": "tests/hive-workflows/daily-ceremony.under-scheduler.test.*:\na) scheduler context + auto_approve=true → pass through\nb) scheduler context + auto_approve=false → pause (or error)\nc) interactive context → pause regardless of metadata\n",
+          "agent": "tester"
+        },
+        {
+          "id": "implement",
+          "description": "1. Modify hive/workflows/daily-ceremony.workflow.yaml plan-approval\n   step (currently around line 68): add under_scheduler block.\n2. Update hive/references/workflow-schema.md: document the new\n   step-level key (generalizable).\n3. Update the workflow runner to honor under_scheduler metadata\n   at step dispatch time. Detect scheduler context at runner\n   entry; read step metadata at step dispatch.\n4. Run YAML lint + the three runner-context tests.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/workflows/daily-ceremony.workflow.yaml",
+          "change": "Add under_scheduler.auto_approve to plan-approval step"
+        },
+        {
+          "file": "hive/references/workflow-schema.md",
+          "change": "Document step-level under_scheduler key"
+        },
+        {
+          "file": "tests/hive-workflows/daily-ceremony.under-scheduler.test.*",
+          "change": "NEW — three red→green runner-context cases"
+        }
+      ],
+      "verification": {
+        "mode": "red-green-tdd",
+        "commands": [
+          "node tests/hive-workflows/daily-ceremony.under-scheduler.test.*",
+          "yaml-schema-lint hive/workflows/daily-ceremony.workflow.yaml"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Add step-level under_scheduler key to plan-approval only",
+          "Document the key as generalizable; extending to other workflows is a follow-on cleanup",
+          "Cover all three runner-context cases"
+        ],
+        "do_not": [
+          "Recommend Routines yet (S13 / C3 owns that)",
+          "Author routines-integration.md (S12 / C2 owns that)",
+          "Add a global config flag (binding decision says workflow-level signal, not config flag)"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "hive/workflows/daily-ceremony.workflow.yaml",
+          "note": "Existing plan-approval step shape (~line 68); existing step-metadata patterns elsewhere in the file"
+        },
+        {
+          "file": "hive/references/workflow-schema.md",
+          "note": "Existing step-key documentation patterns"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "workflow-schema.md update is the doc deliverable"
+        },
+        {
+          "concern": "versioning",
+          "action": "Adds a workflow-schema field — consumer-visible if any user customizes daily-ceremony.workflow.yaml; flag minor semver bump at TPM gate"
+        }
+      ],
+      "risks": [
+        "(MED) runner doesn't respect step metadata — mitigation: integration test exercises the runner end-to-end, not just the YAML schema"
+      ],
+      "commit_message": "feat(workflow): under_scheduler step metadata on plan-approval"
+    },
+    {
+      "id": "s12-c2-routines-acr-integration-refs",
+      "epic": "cwc-2026-integration",
+      "slice": "S12 / C2",
+      "title": "routines-integration.md + code-review-integration.md ref docs (closes Q6)",
+      "status": "pending",
+      "complexity": "low",
+      "methodology": "tdd",
+      "depends_on": [
+        "s11-c1-under-scheduler-step-metadata"
+      ],
+      "metadata": {
+        "needs_backend": false,
+        "needs_frontend": false
+      },
+      "description": "Document the Routines bridge contract and resolve Open Question Q6\n(Anthropic Code Review collision tolerance). Two new ref docs +\none cross-reference update on skills/review/SKILL.md.\n",
+      "acceptance_criteria": [
+        "Given hive/references/routines-integration.md (new), when read, then it explains how Hive consumes Anthropic Routines as the cron + webhook trigger for daily-ceremony, references the under_scheduler metadata semantics from S11, and gives sandbox-repo dry-run guidance",
+        "Given hive/references/code-review-integration.md (new), when read, then it documents the verdict-mapping table (Hive's `passed | needs_optimization | needs_revision` ↔ inline PR comments) AND a clear collision-tolerance stance (resolves Q6)",
+        "Given skills/review/SKILL.md, when read, then it cross-references code-review-integration.md",
+        "Given md-link-check + structural lint, when run on both new refs and the SKILL.md change, then they pass",
+        "Given the verdict-mapping table, when read by reviewer persona, then ownership is clear: reviewer owns the mapping per outline Part 5b"
+      ],
+      "steps": [
+        {
+          "id": "implement",
+          "description": "1. Author hive/references/routines-integration.md (~50–80 lines):\n   - How Hive uses Routines as cron + webhook trigger for\n     daily-ceremony\n   - Reference under_scheduler metadata semantics from S11\n   - Sandbox-repo dry-run guidance\n   - Capability-skip when Routines is unreachable\n2. Author hive/references/code-review-integration.md (~50–80 lines):\n   - Verdict-mapping table (Hive ↔ ACR)\n   - Collision-tolerance stance: pick one — silently dedupe /\n     surface both / recommend disabling one. Take a position;\n     don't punt.\n   - \"Don't double-run\" guidance for consumers who enable both\n     Hive /review and ACR.\n3. Update skills/review/SKILL.md: add a cross-reference link.\n4. Run md-link-check + structural lint.\n",
+          "agent": "technical-writer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/references/routines-integration.md",
+          "change": "NEW — Routines bridge ref doc"
+        },
+        {
+          "file": "hive/references/code-review-integration.md",
+          "change": "NEW — ACR coexistence + verdict-mapping ref doc (closes Q6)"
+        },
+        {
+          "file": "skills/review/SKILL.md",
+          "change": "Cross-reference code-review-integration.md"
+        }
+      ],
+      "verification": {
+        "mode": "lint+link-check",
+        "commands": [
+          "md-link-check hive/references/routines-integration.md hive/references/code-review-integration.md skills/review/SKILL.md",
+          "<structural lint on both new refs>"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Take an explicit collision-tolerance stance in code-review-integration.md (Q6 resolution)",
+          "Reference the under_scheduler metadata from S11 in routines-integration.md",
+          "Cross-reference from skills/review/SKILL.md"
+        ],
+        "do_not": [
+          "Add code or config (this is docs-only)",
+          "Recommend Routines in standup yet (S13 / C3 owns that)",
+          "Add a runtime collision-disable flag (Q6 stance is doc-only; if a flag is needed, that's a follow-on slice per V-plan §6 Moldability)"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "hive/references/quality-gates.md",
+          "note": "Existing ref-doc structure for cross-domain integration topics"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "Two new refs + one SKILL.md cross-reference. No other doc updates needed in this slice"
+        }
+      ],
+      "risks": [
+        "(LOW) collision-stance disagreement at user gate — mitigation: stance is explicit so user can flag at the gate, not after merge"
+      ],
+      "commit_message": "docs(refs): add routines-integration + code-review-integration references"
+    },
+    {
+      "id": "s13-c3-standup-recommends-routines",
+      "epic": "cwc-2026-integration",
+      "slice": "S13 / C3",
+      "title": "skills/standup/SKILL.md recommends Routines as scheduler",
+      "status": "pending",
+      "complexity": "low",
+      "methodology": "tdd",
+      "depends_on": [
+        "s11-c1-under-scheduler-step-metadata",
+        "s12-c2-routines-acr-integration-refs"
+      ],
+      "metadata": {
+        "needs_backend": false,
+        "needs_frontend": false
+      },
+      "description": "Document Anthropic Routines as the canonical scheduler for the\ndaily ceremony in skills/standup/SKILL.md. Manual standup via\n/hive:standup remains supported (additive recommendation). Setup\nwalkthrough refers to routines-integration.md from S12.\n",
+      "acceptance_criteria": [
+        "Given skills/standup/SKILL.md, when read, then Anthropic Routines is documented as the recommended scheduler for the daily ceremony",
+        "Given the SKILL.md walkthrough, when followed, then it references the under_scheduler.auto_approve setup from S11 and routines-integration.md from S12",
+        "Given /hive:standup invoked manually, when run, then it still works as documented (additive)",
+        "Given md-link-check on skills/standup/SKILL.md, when run, then it passes"
+      ],
+      "steps": [
+        {
+          "id": "implement",
+          "description": "1. Update skills/standup/SKILL.md: add a Routines-as-recommended-\n   scheduler section. Setup walkthrough refers to\n   hive/references/routines-integration.md (from S12) and the\n   under_scheduler.auto_approve=true configuration (from S11).\n2. Preserve the existing manual-invocation path.\n3. Run md-link-check.\n",
+          "agent": "technical-writer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "skills/standup/SKILL.md",
+          "change": "Document Routines as recommended scheduler; reference S11 + S12"
+        }
+      ],
+      "verification": {
+        "mode": "lint+link-check",
+        "commands": [
+          "md-link-check skills/standup/SKILL.md",
+          "<manual: /hive:standup still works>"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Recommend Routines as the scheduler",
+          "Cross-reference under_scheduler metadata (S11) and routines-integration.md (S12)",
+          "Preserve manual /hive:standup"
+        ],
+        "do_not": [
+          "Add a runtime check that fails when Routines is absent (additive only)",
+          "Modify other SKILL.md files"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "skills/standup/SKILL.md",
+          "note": "Existing structure; this is an additive section, not a rewrite"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "SKILL.md update is the doc deliverable"
+        },
+        {
+          "concern": "versioning",
+          "action": "Consumer-visible recommendation change — flag minor semver bump at TPM gate alongside other Group A/C consumer-visible changes"
+        }
+      ],
+      "risks": [
+        "(LOW) none of substance"
+      ],
+      "commit_message": "docs(standup): recommend Routines scheduler; document setup"
+    },
+    {
+      "id": "s14-b1-rubric-format-reviewer-refactor",
+      "epic": "cwc-2026-integration",
+      "slice": "S14 / B1",
+      "title": "rubric-format spec + reviewer.md/peer-validator.md refactor",
+      "status": "pending",
+      "complexity": "medium",
+      "methodology": "tdd",
+      "depends_on": [
+        "s4-a1-session-spec-rewrite",
+        "s5-a2-messages-session-loop"
+      ],
+      "metadata": {
+        "needs_backend": true,
+        "needs_frontend": false
+      },
+      "description": "Define one machine-readable rubric format consumed by both\nhive/agents/reviewer.md (Outcomes loop rubric — used at S15) and\nhive/agents/peer-validator.md (post-loop deterministic gate).\nResolves binding decision `outcomes-vs-peer-validator` (stacked,\nnot redundant). Architect owns the rubric-format spec per outline\nPart 5b.\n",
+      "acceptance_criteria": [
+        "Given hive/references/rubric-format.md (new), when read, then it defines a single machine-readable rubric schema with a JSON-schema fixture",
+        "Given hive/agents/reviewer.md, when read, then change_verdict taxonomy is refactored to consume the rubric file (no conditionals)",
+        "Given hive/agents/peer-validator.md, when read, then 'deterministic pass/fail per criterion' is formalized against the same rubric file",
+        "Given the same rubric file, when consumed by reviewer (loop-context) and peer-validator (single-shot context), then verdict semantics are consistent",
+        "Given a malformed rubric, when validated against the schema, then validation catches the error",
+        "Given tests/hive-agents/rubric-format.test.*, when run, then schema-conformance + dual-consumer parse pass red→green",
+        "Given persona-conformance lint, when run on reviewer.md and peer-validator.md, then it passes"
+      ],
+      "steps": [
+        {
+          "id": "spec-tests-first",
+          "description": "tests/hive-agents/rubric-format.test.*:\na) reviewer.md and peer-validator.md both parse the same rubric file\nb) schema validation catches malformed rubrics\nc) verdict semantics are consistent across the two consumers\n",
+          "agent": "tester"
+        },
+        {
+          "id": "implement",
+          "description": "1. Author hive/references/rubric-format.md: define the schema +\n   JSON-schema fixture. Architect signs off (per outline Part 5b\n   rubric ownership).\n2. Refactor hive/agents/reviewer.md: change_verdict taxonomy\n   consumes the rubric file. Outcomes loop (S15) will use the\n   file as convergence criterion.\n3. Refactor hive/agents/peer-validator.md: deterministic pass/\n   fail formalized against the rubric file. Runs as post-loop\n   single-shot gate.\n4. Run schema-conformance test + persona-conformance lint.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/references/rubric-format.md",
+          "change": "NEW — machine-readable schema + JSON-schema fixture"
+        },
+        {
+          "file": "hive/agents/reviewer.md",
+          "change": "Refactor change_verdict to consume rubric file"
+        },
+        {
+          "file": "hive/agents/peer-validator.md",
+          "change": "Formalize \"deterministic pass/fail\" against the same file"
+        },
+        {
+          "file": "tests/hive-agents/rubric-format.test.*",
+          "change": "NEW — schema-conformance + dual-consumer parse tests"
+        }
+      ],
+      "verification": {
+        "mode": "red-green-tdd + persona-lint",
+        "commands": [
+          "node tests/hive-agents/rubric-format.test.*",
+          "persona-conformance lint hive/agents/reviewer.md hive/agents/peer-validator.md",
+          "md-link-check hive/references/rubric-format.md"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Define the rubric-format schema once and use it in both consumers",
+          "Refactor only reviewer.md and peer-validator.md (the two consumers)",
+          "Keep the schema machine-readable (consumed by code, not just humans)"
+        ],
+        "do_not": [
+          "Wrap any workflow in an Outcomes loop (S15 / B2 owns that)",
+          "Modify other reviewer personas (idiomatic-, performance-, security-) — out of slice",
+          "Add a runtime override for individual criteria — keep the schema declarative"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "hive/agents/reviewer.md",
+          "note": "Existing change_verdict taxonomy (`passed | needs_optimization | needs_revision`)"
+        },
+        {
+          "file": "hive/agents/peer-validator.md",
+          "note": "Existing \"deterministic pass/fail per criterion\" wording — formalize against the new file"
+        },
+        {
+          "file": "hive/references/session-system-prompt-spec.md",
+          "note": "§1 substrate semantics (S4) — rubric format references these for grader-context shape"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "rubric-format.md is the new ref; reviewer/peer-validator persona changes are tracked in this same slice"
+        },
+        {
+          "concern": "versioning",
+          "action": "Consumer-visible reviewer/peer-validator behavior change — flag minor semver bump at TPM gate"
+        }
+      ],
+      "risks": [
+        "(MED) rubric-format design churn — mitigation: define once and use in both places (this slice is exactly that exercise)"
+      ],
+      "commit_message": "feat(rubric): single rubric format consumed by reviewer + peer-validator"
+    },
+    {
+      "id": "s15-b2-outcomes-loop-code-review",
+      "epic": "cwc-2026-integration",
+      "slice": "S15 / B2",
+      "title": "Outcomes loop on code-review.workflow.yaml + max_outcomes_iterations + metrics",
+      "status": "pending",
+      "complexity": "high",
+      "methodology": "tdd",
+      "depends_on": [
+        "s5-a2-messages-session-loop",
+        "s14-b1-rubric-format-reviewer-refactor"
+      ],
+      "metadata": {
+        "needs_backend": true,
+        "needs_frontend": false
+      },
+      "description": "Wrap hive/workflows/code-review.workflow.yaml review step in an\nOutcomes-style loop. Loop body uses the S14 rubric file as\nconvergence criterion. peer-validator runs after loop terminates\nas deterministic single-shot gate. Add max_outcomes_iterations: 3\n(symmetric to max_fix_iterations). Instrument iteration count for\nthe queued +30-day budget tune review (rev4 risk #4 / Q7).\nCarries cycle-state escalation `performance:audit`.\n\nBUDGET POLICY: Land at max_outcomes_iterations: 3. Tune to 5 at\n+30 days post-S15 IF metric distribution shows >40% of loops\nhitting the cap. Calendar reminder owned by TPM at S15 close.\n",
+      "acceptance_criteria": [
+        "Given hive/workflows/code-review.workflow.yaml, when read, then the review step is wrapped in an Outcomes loop that consumes the rubric file from S14",
+        "Given the loop, when convergence is reached, then it terminates with verdict 'passed'",
+        "Given the loop hitting the iteration cap, when reached, then circuit_breakers.max_outcomes_iterations: 3 trips and the loop terminates with terminated_by: iter_cap",
+        "Given the loop terminates (any path), when post-loop runs, then peer-validator executes once as deterministic single-shot gate",
+        "Given the loop spawns own-context graders, when they run, then they spawn via the Messages-API substrate (S5)",
+        "Given every Outcomes invocation, when it completes, then exactly one metrics event is emitted with payload {story_id, iterations_used, terminated_by, verdict}",
+        "Given the metrics event, when ingested, then it uses the existing metrics emitter (no new sink)",
+        "Given hive/references/outcomes-integration.md (new), when read, then it documents the loop contract + budget envelope + Q7 escalation",
+        "Given hive/references/quality-gates.md, when read, then it documents the Outcomes loop ↔ peer-validator stacking"
+      ],
+      "steps": [
+        {
+          "id": "spec-tests-first",
+          "description": "a) tests/hive-workflows/code-review.outcomes-loop.test.*:\n   - loop terminates at iter_cap\n   - verdict aggregation across grader passes is correct\n   - peer-validator runs post-loop with right inputs (loop-then-gate ordering invariant)\n   - graders spawn via Messages-API substrate (S5 dependency)\nb) tests/hive-workflows/code-review.outcomes-metrics.test.*:\n   - every Outcomes invocation emits exactly one metrics event\n   - event payload includes iterations_used, terminated_by ('rubric_pass'|'iter_cap'|'budget'), and final verdict\n   - event ingestion uses the existing metrics emitter (no new sink)\n",
+          "agent": "tester"
+        },
+        {
+          "id": "implement",
+          "description": "1. Modify hive/workflows/code-review.workflow.yaml: wrap review\n   step in Outcomes loop. Loop body reads the S14 rubric file.\n   Post-loop runs peer-validator as the deterministic gate.\n2. Add circuit_breakers.max_outcomes_iterations: 3 to\n   hive/hive.config.yaml (symmetric to max_fix_iterations).\n3. Author hive/references/outcomes-integration.md: loop contract\n   + budget envelope + Q7 escalation path documented.\n4. Update hive/references/quality-gates.md: document Outcomes ↔\n   peer-validator stacking.\n5. Wire metrics instrumentation through the existing metrics\n   emitter — one event per loop completion.\n6. Run both red→green test suites + md-link-check.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/workflows/code-review.workflow.yaml",
+          "change": "Wrap review step in Outcomes loop"
+        },
+        {
+          "file": "hive/hive.config.yaml",
+          "change": "Add circuit_breakers.max_outcomes_iterations (default 3)"
+        },
+        {
+          "file": "hive/references/outcomes-integration.md",
+          "change": "NEW — loop contract + budget envelope + Q7 escalation"
+        },
+        {
+          "file": "hive/references/quality-gates.md",
+          "change": "Document Outcomes ↔ peer-validator stacking"
+        },
+        {
+          "file": "tests/hive-workflows/code-review.outcomes-loop.test.*",
+          "change": "NEW — loop contract tests"
+        },
+        {
+          "file": "tests/hive-workflows/code-review.outcomes-metrics.test.*",
+          "change": "NEW — metrics-instrumentation tests"
+        }
+      ],
+      "verification": {
+        "mode": "red-green-tdd",
+        "commands": [
+          "node tests/hive-workflows/code-review.outcomes-loop.test.*",
+          "node tests/hive-workflows/code-review.outcomes-metrics.test.*",
+          "md-link-check hive/references/outcomes-integration.md hive/references/quality-gates.md"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          {
+            "Land max_outcomes_iterations": "3 as starting point (symmetric to max_fix_iterations)"
+          },
+          "Instrument iteration count via the existing metrics emitter",
+          "Document the +30-day tune review path inside outcomes-integration.md"
+        ],
+        "do_not": [
+          "Tune max_outcomes_iterations to 5 in this slice (queued +30-day follow-up)",
+          "Wrap other workflows in Outcomes (out of slice — could be a follow-on)",
+          "Skip the metrics event (the +30-day tune decision depends on the data)"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "hive/hive.config.yaml",
+          "note": "Existing circuit_breakers.max_fix_iterations: 3 — symmetric"
+        },
+        {
+          "file": "hive/workflows/code-review.workflow.yaml",
+          "note": "Existing review-step shape — wrap, don't replace"
+        },
+        {
+          "file": "hive/references/quality-gates.md",
+          "note": "Existing gate-stacking documentation patterns"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "outcomes-integration.md is the new ref; quality-gates.md gains the stacking section in the same slice"
+        },
+        {
+          "concern": "versioning",
+          "action": "Consumer-visible workflow behavior change (Outcomes loop wrapping review) + new circuit_breaker config key — flag minor semver bump at TPM gate"
+        }
+      ],
+      "risks": [
+        "(MED) Outcomes context cost (rev4 risk #4) — mitigation: circuit breaker bounds cost; metrics instrument the budget envelope for the +30-day tune",
+        "(MED) Q7 budget envelope tunable — captured as performance:audit escalation pre-exec; tune-to-5 follow-up queued, not litigated here"
+      ],
+      "commit_message": "feat(workflow): wrap code-review in Outcomes loop with max_outcomes_iterations breaker"
+    },
+    {
+      "id": "s16-b3-dreaming-replay-meta-optimize-fifth-source",
+      "epic": "cwc-2026-integration",
+      "slice": "S16 / B3",
+      "title": "dreaming-replay.js + meta-optimize 5th proposal source",
+      "status": "pending",
+      "complexity": "high",
+      "methodology": "tdd",
+      "depends_on": [
+        "s5-a2-messages-session-loop",
+        "s11-c1-under-scheduler-step-metadata",
+        "s12-c2-routines-acr-integration-refs"
+      ],
+      "metadata": {
+        "needs_backend": true,
+        "needs_frontend": false
+      },
+      "description": "Cross-session overnight replay module. hive/lib/dreaming-replay.js\n(NEW) is invoked by a Routines-scheduled job (uses S11\nunder_scheduler + S12 routines-integration as the trigger\ncontract). Reads .pHive/episodes/**/*.yaml; emits playbook deltas\nto L1 wiki + KG. Capability-checks the Dreaming preview API\n(waitlist-gated); skips silently when unreachable.\nskills/hive/skills/meta-optimize/SKILL.md gains a 5th proposal\nsource reading dreaming-replay output (NOT session-end output —\npreserves binding decision `dreaming-module-location`).\nhive/references/hive-cloud-roadmap.md (NEW stub) preserves the\nreference-graph pointer for the deferred A8 / Hive Cloud epic.\n\nGATE: Open Question Q3 (Dreaming replay schema) primary-source\nfetch lands inside this slice as the FIRST step. If the fetched\nschema dramatically diverges from the .pHive/episodes/ shape,\nsurface to user pre-implementation; the slice may split into\n\"schema adapter\" + \"module\" sub-slices per V-plan §6 Moldability.\n",
+      "acceptance_criteria": [
+        "Given Q3 primary-source fetch, when complete, then the canonical Dreaming replay schema is captured in hive/lib/dreaming-replay.js header comment with URL + last-checked date",
+        "Given hive/lib/dreaming-replay.js, when invoked from a Routines-scheduled job, then it reads .pHive/episodes/**/*.yaml and emits playbook deltas to L1 wiki + KG",
+        "Given Dreaming preview API unreachable (waitlist-gated), when capability-check fails, then the module returns no proposals and emits no errors",
+        "Given skills/hive/skills/meta-optimize/SKILL.md, when read, then it includes a 5th proposal source reading dreaming-replay output (alongside metrics, auto-research, kg_signal, backlog)",
+        "Given the 5th source, when capability-skip activates, then it propagates cleanly (returns []; ranking unaffected)",
+        "Given hive/references/dreaming-integration.md (new), when read, then it documents the contract",
+        "Given hive/references/hive-cloud-roadmap.md (new stub, ~10 lines), when read, then it preserves the reference graph for the deferred A8 work",
+        "Given hive/hive.config.yaml, when read, then it carries meta_optimize.dreaming_source.* keys + dreaming.timeout_hours",
+        "Given tests/hive-lib/dreaming-replay.test.*, when run, then episode-walker and capability-skip pass red→green",
+        "Given an end-to-end smoke (sandbox repo), when a Routines-scheduled job runs dreaming-replay, then it emits a delta and the meta-optimize 5th source surfaces it"
+      ],
+      "steps": [
+        {
+          "id": "q3-fetch",
+          "description": "Fetch primary-source Dreaming replay schema from\nplatform.claude.com/docs/en/managed-agents/dreams. Capture URL\n+ last-checked date. If the schema dramatically diverges from\n.pHive/episodes/ shape, surface to user as architecture:cross-\nboundary escalation BEFORE proceeding.\n",
+          "agent": "researcher"
+        },
+        {
+          "id": "spec-tests-first",
+          "description": "a) tests/hive-lib/dreaming-replay.test.*:\n   - episode-walker reads fixture .pHive/episodes/ correctly\n   - playbook delta emission shape matches Q3-fetched spec\n   - capability-skip activates when Dreaming API unreachable\nb) 5th-source dispatch test:\n   - 5th source ranks alongside the 4 existing sources\n   - capability-skip propagates cleanly (returns [])\n",
+          "agent": "tester"
+        },
+        {
+          "id": "implement",
+          "description": "1. Create hive/lib/dreaming-replay.js: runDreamingReplay({\n   episodeRoot, kg, wiki }) → { playbookDeltas, capabilityErr? }.\n   Header comment cites Q3 fetch URL + last-checked date.\n2. Update skills/hive/skills/meta-optimize/SKILL.md: add the\n   5th proposal source. Source reads dreaming-replay output;\n   capability-skip path returns [] and lets the existing 4\n   sources run normally.\n3. Author hive/references/dreaming-integration.md: contract +\n   capability-skip semantics + Q3 schema citation.\n4. Author hive/references/hive-cloud-roadmap.md (~10 lines):\n   placeholder for deferred A8 work; cites cycle-state\n   architecture:stub-path escalation; references this epic's\n   design-discussion + structured-outline for context.\n5. Add hive/hive.config.yaml keys: meta_optimize.dreaming_source.*\n   + dreaming.timeout_hours.\n6. Author tests/fixtures/episodes/*.yaml fixtures.\n7. Run all red→green tests + end-to-end smoke.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/lib/dreaming-replay.js",
+          "change": "NEW — cross-session episode-walker + capability-check"
+        },
+        {
+          "file": "skills/hive/skills/meta-optimize/SKILL.md",
+          "change": "Add 5th proposal source (dreaming-replay output)"
+        },
+        {
+          "file": "hive/references/dreaming-integration.md",
+          "change": "NEW — contract + capability-skip + Q3 citation"
+        },
+        {
+          "file": "hive/references/hive-cloud-roadmap.md",
+          "change": "NEW stub (~10 lines) — deferred A8 placeholder"
+        },
+        {
+          "file": "hive/hive.config.yaml",
+          "change": "Add meta_optimize.dreaming_source.* + dreaming.timeout_hours"
+        },
+        {
+          "file": "tests/hive-lib/dreaming-replay.test.*",
+          "change": "NEW — episode-walker + capability-skip tests"
+        },
+        {
+          "file": "tests/fixtures/episodes/*.yaml",
+          "change": "NEW — episode fixtures"
+        }
+      ],
+      "verification": {
+        "mode": "red-green-tdd + end-to-end smoke",
+        "commands": [
+          "node tests/hive-lib/dreaming-replay.test.*",
+          "<5th-source dispatch test invocation>",
+          "md-link-check hive/references/dreaming-integration.md hive/references/hive-cloud-roadmap.md",
+          "<end-to-end smoke: Routines-scheduled job → dreaming-replay → meta-optimize 5th source>"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Fetch Q3 primary-source Dreaming schema FIRST; surface schema divergence pre-impl",
+          "Use hive/lib/ flat layout (not hive/lib/dreaming/) per binding decision dreaming-module-location",
+          "Capability-skip when Dreaming API unreachable (no errors)"
+        ],
+        "do_not": [
+          "Bootstrap A8 (agent_id / environment_id) — that's the Hive Cloud epic's scope; this slice's hive-cloud-roadmap.md stub preserves the pointer only",
+          "Verify Dreaming live API (waitlist-gated; capability-skip path is what we test per design-discussion §6 \"Not verifying\")",
+          {
+            "Extend session-end.js with Phase D (binding decision dreaming-module-location": "cross-session is its own module)"
+          }
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "skills/hive/skills/meta-optimize/SKILL.md",
+          "note": "Existing 4-source ranking pattern (metrics, auto-research, kg_signal, backlog) — extend, don't restructure"
+        },
+        {
+          "file": "hive/lib/session-end.js",
+          "note": "Existing per-session A→B→C — Dreaming runs CROSS-session, not as Phase D"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "dreaming-integration.md + hive-cloud-roadmap.md (stub) are the new refs; meta-optimize SKILL.md gains the 5th source documentation in the same slice"
+        },
+        {
+          "concern": "versioning",
+          "action": "Consumer-visible new module + new SKILL behavior + new config keys — flag minor semver bump at TPM gate (last commit of epic carries the bump per the cross-cutting rule)"
+        }
+      ],
+      "risks": [
+        "(MED) Dreaming waitlist gate (rev4 risk #6) — mitigation: capability-skip is the test surface",
+        "(MED) Q3 schema unknown (rev4 risk #14) — mitigation: fetch lands FIRST in this slice; surface divergence pre-impl",
+        "(LOW) Q3 may force slice split into 'schema adapter' + 'module' — bounded; surface as escalation if it triggers"
+      ],
+      "commit_message": "feat(dreaming): cross-session replay module + meta-optimize 5th proposal source"
+    },
+    {
+      "id": "s2-d2-config-token-tier-tuning",
+      "epic": "cwc-2026-integration",
+      "slice": "S2 / D2",
+      "title": "hive.config.yaml token/tier tuning + reviewer→Opus promotion",
+      "status": "pending",
+      "complexity": "low",
+      "methodology": "tdd",
+      "depends_on": [],
+      "metadata": {
+        "needs_backend": false,
+        "needs_frontend": false
+      },
+      "description": "Absorb Anthropic's doubled Opus quotas (CWC 2026-05-06) by raising\ntokens.per_*_limit values in hive/hive.config.yaml. Optionally\npromote `reviewer` to Opus tier per memory\nfeedback_codex_work_opus_review_split.md. Day-1 parallel, no\ndependencies. Config-only; no code paths change.\n",
+      "acceptance_criteria": [
+        "Given hive/hive.config.yaml, when read, then tokens.per_task_limit / tokens.per_story_limit / tokens.per_session_limit have been raised to match the new Opus quota",
+        "Given hive/hive.config.yaml, when read, then either model_overrides has reviewer on Opus, or model_tiers reflects the promotion",
+        "Given YAML-schema lint, when run on hive/hive.config.yaml, then it passes",
+        "Given the existing test suite, when run, then it passes against the new config (no regressions)",
+        "Given diff snapshot review, when applied, then no keys were removed; only additions and numeric bumps"
+      ],
+      "steps": [
+        {
+          "id": "implement",
+          "description": "1. Read hive/hive.config.yaml; locate `tokens.*` and\n   `model_tiers` / `model_overrides` blocks.\n2. Raise `tokens.per_task_limit`, `tokens.per_story_limit`,\n   `tokens.per_session_limit` to the new Opus-quota-appropriate\n   values. Document the new values in inline YAML comments.\n3. Either add `reviewer` to `model_overrides` on the Opus tier OR\n   move reviewer's row in `model_tiers` to the Opus tier. Pick\n   the convention already used by the file.\n4. Run YAML-schema lint + the existing test suite.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/hive.config.yaml",
+          "change": "Raise tokens.per_*_limit; promote reviewer to Opus tier"
+        }
+      ],
+      "verification": {
+        "mode": "lint+diff-snapshot",
+        "commands": [
+          "yaml-schema-lint hive/hive.config.yaml",
+          "git diff hive/hive.config.yaml",
+          "<existing test suite invocation>"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Raise tokens.* limits to the documented Opus quota",
+          "Promote reviewer to Opus per the existing memory feedback policy"
+        ],
+        "do_not": [
+          "Add execution.substrate keys (S8 / A4 owns those)",
+          "Add max_outcomes_iterations (S15 / B2 owns that)",
+          "Add dreaming.* keys (S16 / B3 owns those)",
+          "Touch any non-token, non-tier rows"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "hive/hive.config.yaml",
+          "note": "Existing tokens.* and model_tiers / model_overrides shape — pattern unchanged"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "If the hive.config.yaml inline comments document the per-tier rationale, update them; no separate doc edit required since this is a values-only tune"
+        }
+      ],
+      "risks": [
+        "(LOW) raising token caps too high silently swallows budget — mitigation: stay within Anthropic's published Opus limits"
+      ],
+      "commit_message": "chore(config): raise Opus token caps; promote reviewer to Opus tier"
+    },
+    {
+      "id": "s3-d1-marketplace-schema-audit",
+      "epic": "cwc-2026-integration",
+      "slice": "S3 / D1",
+      "title": "Marketplace schema discovery + audit (closes Q5)",
+      "status": "pending",
+      "complexity": "low",
+      "methodology": "tdd",
+      "depends_on": [],
+      "metadata": {
+        "needs_backend": false,
+        "needs_frontend": false
+      },
+      "description": "Validate .claude-plugin/marketplace.json against the documented\nEnterprise Plugin Marketplace schema. Closes Open Question Q5.\nDiscovery-fetch lands inside the slice as a research artifact;\nany required-field additions follow as a focused config diff.\n",
+      "acceptance_criteria": [
+        "Given hive/references/marketplace-schema.md (new), when read, then it cites the canonical Enterprise schema source URL and the last-checked date (2026-05-08)",
+        "Given tests/hive-config/marketplace-schema.test.* (new), when run in CI, then it passes against current marketplace.json or fails with a specific required-field message",
+        "Given .claude-plugin/marketplace.json, when validated, then it conforms to the discovered schema (modify only if discovery surfaces a gap)",
+        "Given md-link-check, when run on marketplace-schema.md, then it passes",
+        "Given the discovery doc, when read, then it contains a 'Distribution Security Fields' subsection enumerating each marketplace-schema field touching signing / attestation / integrity hash / code-signing key URL / version-pinning above the loose `version` field; each entry marks required|optional|absent and records an explicit accept|defer decision with rationale (closes security:plan-audit moderate finding on s3 distribution-security visibility)"
+      ],
+      "steps": [
+        {
+          "id": "implement",
+          "description": "1. Fetch the canonical Enterprise Plugin Marketplace schema (use\n   get-api-docs / firecrawl on Anthropic's marketplace docs).\n   Capture the URL + last-checked date.\n2. Write hive/references/marketplace-schema.md (~30 lines)\n   summarizing required fields, optional fields, and any Hive-\n   specific gaps. Closes Q5.\n3. Author tests/hive-config/marketplace-schema.test.* — JSON-\n   schema validator that runs in CI against marketplace.json.\n   TDD: write the test red against the discovered schema, then\n   either confirm marketplace.json passes (green) or modify\n   marketplace.json to close any gap (still green).\n4. Run md-link-check + the validator.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/references/marketplace-schema.md",
+          "change": "NEW — discovery doc citing canonical source + last-checked date"
+        },
+        {
+          "file": "tests/hive-config/marketplace-schema.test.*",
+          "change": "NEW — JSON-schema validator"
+        },
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "change": "Modify ONLY if Q5 surfaces a required-field gap"
+        }
+      ],
+      "verification": {
+        "mode": "red-green-tdd + lint",
+        "commands": [
+          "node tests/hive-config/marketplace-schema.test.*",
+          "md-link-check hive/references/marketplace-schema.md"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Capture the canonical schema source + last-checked date in the discovery doc",
+          "Validate the existing marketplace.json against that schema",
+          "Modify marketplace.json only if a required-field gap is found"
+        ],
+        "do_not": [
+          "Bump the marketplace.json version (versioning concern handles that elsewhere)",
+          "Modify plugin.json or other distribution surfaces",
+          "Silently drop optional Enterprise fields without surfacing them in the discovery doc; the doc must enumerate distribution-security fields and record an explicit accept|defer per field. Adopting deferred fields is a follow-on backlog item, not in scope here."
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": ".claude-plugin/marketplace.json",
+          "note": "Existing Hive marketplace manifest shape (currently has name, owner, metadata, categories, tags, plugins[])"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "Discovery doc hive/references/marketplace-schema.md is the documentation update; cite source URL + last-checked date so future maintainers can refresh"
+        }
+      ],
+      "risks": [
+        "(LOW) Enterprise schema isn't publicly documented at primary sources — mitigation: capture what's findable; mark unknowns explicitly in the discovery doc",
+        "(LOW) marketplace.json has a hard required-field gap → slice expands by one diff to close it — bounded risk"
+      ],
+      "commit_message": "fix(marketplace): align marketplace.json with Enterprise schema (Q5 resolved)"
+    },
+    {
+      "id": "s4-a1-session-spec-rewrite",
+      "epic": "cwc-2026-integration",
+      "slice": "S4 / A1",
+      "title": "Rewrite session-system-prompt-spec.md as Messages-API substrate abstraction",
+      "status": "pending",
+      "complexity": "medium",
+      "methodology": "tdd",
+      "depends_on": [],
+      "external_prereqs": [
+        "fix/session-runtime-coderabbit-pass branch merged to main"
+      ],
+      "metadata": {
+        "needs_backend": false,
+        "needs_frontend": false
+      },
+      "description": "Rewrite hive/references/session-system-prompt-spec.md end-to-end as\n\"Hive-internal session abstraction over Messages API.\" Resolves\ncycle-state escalation `architecture:spec-drift`. The PR-#50\nSessions-API code path is reframed inside the spec as the cloud\nadapter (behind execution.substrate: sessions-cloud). No code\nchanges here — the spec is the contract S5/A2, S6/A3, S14/B1 will\nbuild against. Hard-blocks on `fix/session-runtime-coderabbit-pass`\nmerging to main first to avoid rebase thrash on adjacent ref docs.\n",
+      "acceptance_criteria": [
+        "Given hive/references/session-system-prompt-spec.md, when read, then §1 describes substrate semantics: client.messages.create with system: + tools: + messages: history; tool_use ↔ tool_result append cycle; end_turn or budget terminator",
+        "Given the spec, when read, then §3 prior_knowledge_block placement (system: slot) and truncation rules are concrete enough that a developer can implement them",
+        "Given the spec, when read, then §6 documents the two-call merge: query_decisions({entity: story_id}) + query_decisions({entity: agent_role}); dedupe rule; merge ordering",
+        "Given the spec, when read, then it includes at least one fixture-style example of the system: + tools: + messages: shape",
+        "Given the spec, when read, then the Sessions-API path is captured behind execution.substrate: sessions-cloud as the cloud adapter footnote",
+        "Given md-link-check, when run on the spec and on cross-referencing docs (agent-spawn SKILL, design-discussion rev4), then it passes",
+        "Given architect read-through, when applied, then the spec matches design-discussion rev4 §3 Group A wording on substrate semantics"
+      ],
+      "steps": [
+        {
+          "id": "implement",
+          "description": "1. Discard the current §1 wording (system_prompt:-only path is\n   not valid per researcher SDK probe 2026-05-07; cycle-state\n   architecture:spec-drift). Rewrite §1 against the actual\n   Messages-API surface: system + tools + messages slots.\n2. Write §3 prior_knowledge_block placement (in the system: slot)\n   and truncation rules: oldest entries (by last_verified\n   timestamp) drop first when token budget trips.\n3. Write §6 two-call memory merge: query_decisions({entity:\n   story_id}) + query_decisions({entity: agent_role}). Dedupe\n   identical triples; story-id-scoped triples sort before\n   role-scoped triples.\n4. Add a fixture-style example showing system: + tools: +\n   messages: with tool_use and tool_result blocks.\n5. Add a footnote: Sessions-API path is the cloud adapter\n   (execution.substrate: sessions-cloud) — link out to\n   hive-cloud-roadmap.md (S16 stub) for forward continuity.\n6. Run md-link-check; request architect read-through.\n",
+          "agent": "technical-writer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/references/session-system-prompt-spec.md",
+          "change": "Full rewrite as Messages-API session abstraction; fold rev2/rev3 history if the file already carries it"
+        }
+      ],
+      "verification": {
+        "mode": "lint+link-check + architect-signoff",
+        "commands": [
+          "md-link-check hive/references/session-system-prompt-spec.md",
+          "<architect read-through manual gate>"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Describe Messages-API loop semantics concretely (with one fixture example)",
+          "Capture Sessions-API as cloud adapter footnote only",
+          "Resolve architecture:spec-drift escalation"
+        ],
+        "do_not": [
+          "Write any code (S5/A2 owns the implementation)",
+          "Implement prior_knowledge_block (S6/A3 owns it)",
+          "Bump plugin/marketplace versions"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "hive/references/session-system-prompt-spec.md",
+          "note": "The existing file is the migration starting point — fold prior structure where it still applies"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "Spec rewrite is itself the documentation update. Cross-reference hive-cloud-roadmap.md (S16) so the deferred A8 path stays navigable"
+        }
+      ],
+      "risks": [
+        "(MED) under-specified messages: cache-control could let A2 implementers improvise — mitigation: include the fixture example",
+        "(LOW) architect disagrees on §3+§6 shape — mitigation: review iterates inside the slice, not after"
+      ],
+      "commit_message": "docs(spec): rewrite session-system-prompt-spec as Messages-API substrate abstraction"
+    },
+    {
+      "id": "s5-a2-messages-session-loop",
+      "epic": "cwc-2026-integration",
+      "slice": "S5 / A2",
+      "title": "Build Messages-API session loop module",
+      "status": "pending",
+      "complexity": "high",
+      "methodology": "tdd",
+      "depends_on": [
+        "s4-a1-session-spec-rewrite"
+      ],
+      "metadata": {
+        "needs_backend": true,
+        "needs_frontend": false
+      },
+      "description": "Implement hive/lib/messages-session.js — caller-side session loop\nwrapping client.messages.create. Inputs: system, tools, messages\nhistory. Loop body: tool_use ↔ tool_result append cycle. Terminate\non end_turn or per-turn / per-story budget. Module makes no\nSessions-API calls. session-client.js gains a delegation entry\npoint (gated on execution.substrate === 'messages') but is NOT\nyet defaulted — A4 flips the default at S8.\n",
+      "acceptance_criteria": [
+        "Given hive/lib/messages-session.js (new), when imported, then it exposes runMessagesSession({system, tools, messages, budget}) returning {messages, stopReason, usage}",
+        "Given the loop, when a tool_use block arrives, then the caller-supplied tool registry handler is invoked; tool_result blocks are appended to messages: between API calls",
+        "Given a stop reason of end_turn, when received, then the loop terminates; usage is reported",
+        "Given per-turn or per-story budget exhaustion, when reached, then the loop terminates with stopReason: 'budget'",
+        "Given the Anthropic client unavailable, when init fails, then runMessagesSession throws MessagesApiUnavailable cleanly",
+        "Given the existing tests/sessions/* suite, when run, then it still passes (Sessions-API path is still default until S8)",
+        "Given tests/hive-lib/messages-session.test.*, when run, then all four contract tests pass red→green",
+        "Given runMessagesSession({system, tools, messages, budget}), when called, then ANTHROPIC_API_KEY (or any other credential) is NEVER propagated into system / tools / messages / tool-handler arguments — credential pickup remains the single env var read at buildClient() construction time. Contract test asserts ANTHROPIC_API_KEY=test-sentinel never appears in any captured argument outside buildClient() (closes security:plan-audit minor finding on s5 credential-propagation contract)"
+      ],
+      "steps": [
+        {
+          "id": "spec-tests-first",
+          "description": "Author tests/hive-lib/messages-session.test.* covering:\na) system + tools + messages shape sent to client.messages.create\nb) tool_use ↔ tool_result append cycle\nc) end_turn primary terminator\nd) per-turn / per-story budget secondary terminators\ne) credential-propagation guard — set ANTHROPIC_API_KEY=test-sentinel, run a session, assert the sentinel value never appears in any captured argument (system, tools, messages, handler invocation args) outside the buildClient() construction site\nAll tests should fail red because the module doesn't exist yet.\n",
+          "agent": "tester"
+        },
+        {
+          "id": "implement",
+          "description": "1. Create hive/lib/messages-session.js. Implement runMessagesSession\n   per spec §1 contract: build system + tools + messages payload;\n   call client.messages.create; iterate tool_use → caller-supplied\n   registry handler → append tool_result; terminate on end_turn\n   or budget hit.\n2. Modify hive/lib/session-client.js: add delegation entry point\n   that routes to messages-session.js when\n   execution.substrate === 'messages'. Until S8, the default is\n   still sessions-cloud — delegation is reachable via test\n   harness only.\n3. Add tests/hive-lib/session-client.runtime-fork.test.* —\n   delegation test only; full coverage lands at S8.\n4. Run all four red→green contract tests.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/lib/messages-session.js",
+          "change": "NEW — caller-side Messages-API session loop module"
+        },
+        {
+          "file": "hive/lib/session-client.js",
+          "change": "Add delegation entry point gated on execution.substrate === 'messages'"
+        },
+        {
+          "file": "tests/hive-lib/messages-session.test.*",
+          "change": "NEW — four red→green contract tests"
+        },
+        {
+          "file": "tests/hive-lib/session-client.runtime-fork.test.*",
+          "change": "NEW — delegation test only (full coverage at S8)"
+        }
+      ],
+      "verification": {
+        "mode": "red-green-tdd",
+        "commands": [
+          "node tests/hive-lib/messages-session.test.*",
+          "node tests/hive-lib/session-client.runtime-fork.test.*",
+          "<existing tests/sessions/* invocation>"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Build messages-session.js as a narrow surface — pure prompt-context + tool-dispatch glue",
+          "Add session-client.js delegation entry point (not yet default)",
+          "Cover all four loop terminators with tests"
+        ],
+        "do_not": [
+          "Flip the default substrate (S8 / A4 owns that)",
+          "Implement prior_knowledge_block (S6 / A3 owns that)",
+          "Add cc_session_id correlation (S7 / A6 owns that)",
+          "Touch session-turn-builder.js gating (S9 / A5 owns that)",
+          "Add novel orchestration logic — keep the surface narrow per design-discussion §3 risk"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "hive/references/session-system-prompt-spec.md",
+          "note": "§1 substrate semantics — the spec authored at S4 is the contract"
+        },
+        {
+          "file": "hive/lib/session-client.js",
+          "note": "Existing Sessions-API call sites — delegation pattern lives alongside, not on top of"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "session-system-prompt-spec.md (S4 deliverable) already documents the loop contract; this slice doesn't add new ref docs"
+        }
+      ],
+      "risks": [
+        "(HIGH) first integration with Messages API at scale; loop semantics are the contract for everything downstream — mitigation: exhaustive contract tests; CI smoke covers both branches",
+        "(MED) Messages API session-loop maturity (rev4 risk #8) — divergence from any future first-party 'local agent' surface — mitigation: keep surface narrow, no novel orchestration"
+      ],
+      "commit_message": "feat(lib): add Messages-API session-loop module (substrate not yet defaulted)"
+    },
+    {
+      "id": "s6-a3-prior-knowledge-block",
+      "epic": "cwc-2026-integration",
+      "slice": "S6 / A3",
+      "title": "prior_knowledge_block + two-call merge in session-prompt-builder.js",
+      "status": "pending",
+      "complexity": "medium",
+      "methodology": "tdd",
+      "depends_on": [
+        "s4-a1-session-spec-rewrite",
+        "s5-a2-messages-session-loop"
+      ],
+      "metadata": {
+        "needs_backend": true,
+        "needs_frontend": false
+      },
+      "description": "Implement prior_knowledge_block in hive/lib/session-prompt-builder.js\nper spec §3 (memory entries with truncation rules) and §6 two-call\nmerge (query_decisions({entity: story_id}) +\nquery_decisions({entity: agent_role})). Output is runtime-agnostic —\nsame block consumed by S5's Messages-API loop AND the Sessions-API\ncloud adapter. Resolves binding decision `prompt-builder-spec-gap`.\n",
+      "acceptance_criteria": [
+        "Given hive/lib/session-prompt-builder.js, when buildSystemPrompt({story_id, agent_role, kg}) is called, then it returns {system: string} containing story_context + KG block + prior_knowledge_block",
+        "Given two query_decisions calls (story_id and agent_role), when merged, then identical triples are deduped; story-id-scoped triples sort before role-scoped",
+        "Given memory entries that exceed the token budget, when truncated, then oldest (by last_verified) drop first; deterministic ordering",
+        "Given the prompt-builder output, when consumed by either Messages-API or Sessions-API, then the shape is identical (runtime-agnostic invariant)",
+        "Given tests/hive-lib/session-prompt-builder.prior-knowledge.test.*, when run, then truncation, dedupe, ordering, and runtime-agnostic shape all pass red→green",
+        "Given tests/hive-lib/messages-session.test.* re-run with prior_knowledge_block populated, when executed, then loop still terminates on end_turn",
+        "Given story_id and agent_role inputs to query_decisions, when validated, then the existing [a-zA-Z0-9\\-_] allowlist (or stronger) is applied BEFORE either value reaches the SQL builder at hive/lib/session-prompt-builder.js:32-33; an injection fixture (`'; DROP TABLE`-style and shell-meta `$(rm)`-style payloads) returns empty rows rather than executing (closes security:plan-audit moderate finding on s6 SQL/shell allowlist)"
+      ],
+      "steps": [
+        {
+          "id": "spec-tests-first",
+          "description": "Author tests/hive-lib/session-prompt-builder.prior-knowledge.test.*:\na) truncation rule (oversize memories trimmed deterministically)\nb) two-call merge (story_id ∪ agent_role, dedupe, ordering)\nc) runtime-agnostic output shape\nd) injection-allowlist guard — story_id and agent_role values containing SQL-meta or shell-meta characters are rejected/sanitized before the query_decisions call; fixture asserts `'; DROP TABLE` and `$(rm -rf /)` payloads return empty rows\nAll tests fail red until implementation lands.\n",
+          "agent": "tester"
+        },
+        {
+          "id": "implement",
+          "description": "1. Modify hive/lib/session-prompt-builder.js: extend the existing\n   output (currently story_context + KG only) to include the new\n   prior_knowledge_block. Block is placed in the system: slot.\n2. Implement the two-call merge: invoke query_decisions twice\n   (story_id, agent_role), dedupe identical triples, sort\n   story-id-scoped before role-scoped, apply truncation per\n   spec §3.\n3. Pin the fixture to the actual query_decisions return type to\n   catch any KG triple-shape divergence early.\n4. Re-run the messages-session.test suite to confirm the new\n   block doesn't break loop termination.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/lib/session-prompt-builder.js",
+          "change": "Add prior_knowledge_block output per spec §3 + §6 two-call merge"
+        },
+        {
+          "file": "tests/hive-lib/session-prompt-builder.prior-knowledge.test.*",
+          "change": "NEW — three red→green contract tests + runtime-agnostic shape test"
+        }
+      ],
+      "verification": {
+        "mode": "red-green-tdd",
+        "commands": [
+          "node tests/hive-lib/session-prompt-builder.prior-knowledge.test.*",
+          "node tests/hive-lib/messages-session.test.*"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          {
+            "Emit the prior_knowledge_block in the system": "slot, runtime-agnostic"
+          },
+          "Implement two-call merge with deterministic dedupe + ordering + truncation",
+          "Pin fixture to real query_decisions return type"
+        ],
+        "do_not": [
+          "Modify substrate dispatch (S8 / A4 owns that)",
+          "Touch session-registry.js (S7 / A6 owns cc_session_id)",
+          "Add new query types — only the two specified merge calls",
+          "Ingest external/untrusted text into the memory store or KG within this slice; memory + KG content is treated as trusted local state, and prior_knowledge_block injects {memory content} and KG triples verbatim. Future producers (Outcomes graders S15, dreaming-replay S16, any new ingestion path) must re-audit this trust boundary before landing — they cannot piggyback on the assumption pinned here."
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "hive/references/session-system-prompt-spec.md",
+          "note": "§3 prior_knowledge_block + §6 two-call merge — written at S4"
+        },
+        {
+          "file": "hive/lib/session-prompt-builder.js",
+          "note": "Existing story_context + KG output pattern — extend, don't replace"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "session-system-prompt-spec.md (S4) is the doc; if any wording in the spec turns out under-specified during implementation, surface back to the writer rather than amending unilaterally"
+        }
+      ],
+      "risks": [
+        "(MED) truncation rules subtly wrong — bounded by spec §3",
+        "(LOW–MED) real KG triple shape diverges from spec §6 — mitigation: pin fixture to actual query_decisions return type"
+      ],
+      "commit_message": "feat(lib): implement prior_knowledge_block per spec §3 + §6 two-call merge"
+    },
+    {
+      "id": "s7-a6-cc-session-id-correlation",
+      "epic": "cwc-2026-integration",
+      "slice": "S7 / A6",
+      "title": "cc_session_id correlation column on session-registry.js",
+      "status": "pending",
+      "complexity": "low",
+      "methodology": "tdd",
+      "depends_on": [
+        "s5-a2-messages-session-loop"
+      ],
+      "metadata": {
+        "needs_backend": true,
+        "needs_frontend": false
+      },
+      "description": "Add cross-system session-id correlation. Hive session_id stays\ncanonical for KG source_epic / source_session per binding decision\n`claude-code-session-id-precedence`. The CC env var\nCLAUDE_CODE_SESSION_ID is a correlation field, not a replacement.\nThis slice ships BEFORE the high-risk A4 substrate flip (S8) per\narchitect H/V-review acceptance — registry-schema-only, no\nsubstrate dependency. Closes Open Question Q4.\n",
+      "acceptance_criteria": [
+        "Given .pHive/sessions/index.yaml, when written, then it carries cc_session_id alongside session_id; Hive session_id remains canonical for KG triples",
+        "Given process.env.CLAUDE_CODE_SESSION_ID set, when a session is created, then cc_session_id is populated on the registry row",
+        "Given process.env.CLAUDE_CODE_SESSION_ID unset, when a session is created, then cc_session_id is null/absent (no error)",
+        "Given existing registry consumers, when they run, then they continue to work (additive schema change)",
+        "Given tests/hive-lib/session-registry.cc-session-id.test.*, when run, then both substrates exercise env-var pickup substrate-agnostically",
+        "Given hive/references/session-registry-schema.md, when read, then the new column is documented"
+      ],
+      "steps": [
+        {
+          "id": "spec-tests-first",
+          "description": "Author tests/hive-lib/session-registry.cc-session-id.test.*:\na) env var set → cc_session_id populated\nb) env var unset → cc_session_id null/absent\nc) Hive session_id remains canonical (KG triple subjects unchanged)\nd) Test exercises BOTH the existing Sessions-API path (still\n   default until S8) AND Messages-API under harness opt-in,\n   proving env-var pickup is substrate-agnostic.\n",
+          "agent": "tester"
+        },
+        {
+          "id": "implement",
+          "description": "1. Modify hive/lib/session-registry.js: add cc_session_id column;\n   write/read additive — existing rows remain valid.\n2. Modify hive/lib/session-client.js: read\n   process.env.CLAUDE_CODE_SESSION_ID at registry-write time;\n   stamp on the row when present; clean no-op when absent.\n   Env-var pickup is upstream of substrate selection.\n3. Update hive/references/session-registry-schema.md: document\n   the new column. Sequence after fix/session-runtime-coderabbit-pass\n   merges to avoid rebase conflict on the same file.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/lib/session-registry.js",
+          "change": "Additive schema — cc_session_id column"
+        },
+        {
+          "file": "hive/lib/session-client.js",
+          "change": "Env-var pickup at registry-write; substrate-agnostic"
+        },
+        {
+          "file": "hive/references/session-registry-schema.md",
+          "change": "Document cc_session_id column"
+        },
+        {
+          "file": "tests/hive-lib/session-registry.cc-session-id.test.*",
+          "change": "NEW — four red→green tests"
+        }
+      ],
+      "verification": {
+        "mode": "red-green-tdd",
+        "commands": [
+          "node tests/hive-lib/session-registry.cc-session-id.test.*"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Additive schema change (no breaking change to existing rows)",
+          "Env-var pickup substrate-agnostic (works on both branches)",
+          "Document the new column in the schema ref"
+        ],
+        "do_not": [
+          "Treat cc_session_id as canonical for KG (Hive session_id stays canonical)",
+          "Add new KG triple types — correlation only",
+          "Touch substrate dispatch (S8 / A4 owns that)"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "hive/lib/session-registry.js",
+          "note": "Existing column-write pattern in .pHive/sessions/index.yaml"
+        },
+        {
+          "file": "hive/references/session-registry-schema.md",
+          "note": "Existing column-doc pattern; in flight on fix/session-runtime-coderabbit-pass"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "session-registry-schema.md gains the column doc inside the same slice; no separate ref doc needed"
+        }
+      ],
+      "risks": [
+        "(LOW) merge conflict against fix/session-runtime-coderabbit-pass on session-registry-schema.md — mitigation: Group A is hard-blocked on that branch's merge"
+      ],
+      "commit_message": "feat(registry): add cc_session_id correlation column (substrate-agnostic)"
+    },
+    {
+      "id": "s8-a4-substrate-flag-default-flip",
+      "epic": "cwc-2026-integration",
+      "slice": "S8 / A4",
+      "title": "execution.substrate flag wiring + default flip to messages",
+      "status": "pending",
+      "complexity": "high",
+      "methodology": "tdd",
+      "depends_on": [
+        "s5-a2-messages-session-loop",
+        "s6-a3-prior-knowledge-block",
+        "s7-a6-cc-session-id-correlation"
+      ],
+      "metadata": {
+        "needs_backend": true,
+        "needs_frontend": false
+      },
+      "description": "Default Hive installs run on the Messages-API substrate. Add\nhive/lib/runtime-mode.js (single helper exposing cloud_mode as a\nderived getter — never stored as a separate config key). Default\nflip dispatch in session-client.js. sessions-cloud route requires\nexecution.substrate=sessions-cloud AND cloud-adapter.enabled=true;\nstartup assertion otherwise. Symmetric tolerance + precedence are\nexplicit. This is the load-bearing slice of the entire epic.\n",
+      "acceptance_criteria": [
+        "Given hive/hive.config.yaml without overrides, when Hive starts, then it routes through messages-session.js (default messages substrate)",
+        "Given execution.substrate=sessions-cloud + cloud-adapter.enabled=true, when Hive starts, then it routes through the existing Sessions-API path",
+        "Given execution.substrate=sessions-cloud + cloud-adapter.enabled=false, when Hive starts, then a startup assertion errors with a clear capability-error message",
+        "Given execution.substrate=messages + leftover cloud-adapter.enabled=true, when Hive starts, then it warns-and-ignores cloud-adapter.enabled and routes messages (symmetric tolerance)",
+        "Given the cloud_mode derived getter (runtime-mode.js), when called, then it returns true iff execution.substrate === 'sessions-cloud'; cloud_mode is never stored separately",
+        "Given the precedence chain (env HIVE_EXECUTION_SUBSTRATE > project hive.config.yaml > shipped baseline), when conflicts exist, then the resolution is logged at startup. The log line MUST NOT echo the resolved value as a free-text grep-bait substring (e.g., not `substrate=sessions-cloud`); use a structured indirection (e.g., `substrate.resolved_from=env|project|baseline`) so a multi-tenant log corpus cannot be grepped to confirm a misconfigured tenant (closes security:plan-audit minor finding on s8 log-shape hardening)",
+        "Given the existing test suite + tmux fallback test, when run, then both stay green",
+        "Given tests/hive-lib/session-client.runtime-fork.test.*, when run with full coverage, then all four state combinations + cloud_mode getter + precedence + symmetric tolerance pass"
+      ],
+      "steps": [
+        {
+          "id": "spec-tests-first",
+          "description": "Extend tests/hive-lib/session-client.runtime-fork.test.* (begun\nat S5 as delegation-only) to full coverage:\na) default config → messages route\nb) sessions-cloud + cloud-adapter.enabled=true → Sessions-API\nc) sessions-cloud + cloud-adapter.enabled=false → startup error\nd) messages + leftover cloud-adapter.enabled=true → messages + warn (symmetric tolerance)\ne) cloud_mode getter — true only when sessions-cloud, regardless of cloud-adapter.enabled\nf) precedence: env > project config > baseline; conflict logged\n",
+          "agent": "tester"
+        },
+        {
+          "id": "implement",
+          "description": "1. Add hive/hive.config.yaml keys: execution.substrate (default\n   'messages'), cloud-adapter.enabled (default false). Comment\n   each key with rationale.\n2. Create hive/lib/runtime-mode.js: single getCloudMode() helper.\n   cloud_mode := execution.substrate === 'sessions-cloud'.\n   No storage; consumers call the helper.\n3. Modify hive/lib/session-client.js: add the dispatch table at\n   init; flip default to messages; add startup assertion for\n   sessions-cloud + cloud-adapter.enabled=false.\n4. Add precedence resolution + startup log message.\n5. Run all six full-coverage tests + tmux fallback.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/hive.config.yaml",
+          "change": "Add execution.substrate (default messages) + cloud-adapter.enabled (default false)"
+        },
+        {
+          "file": "hive/lib/runtime-mode.js",
+          "change": "NEW — single getCloudMode() derived getter"
+        },
+        {
+          "file": "hive/lib/session-client.js",
+          "change": "Default-flip dispatch + startup assertion + precedence resolution"
+        },
+        {
+          "file": "tests/hive-lib/session-client.runtime-fork.test.*",
+          "change": "Full coverage of all four state combinations + getter + precedence + symmetric tolerance"
+        }
+      ],
+      "verification": {
+        "mode": "red-green-tdd (dual-branch contract + symmetric-tolerance + derived-getter + precedence)",
+        "commands": [
+          "node tests/hive-lib/session-client.runtime-fork.test.*",
+          "<existing test suite invocation>",
+          "<tmux-fallback test invocation>"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Flip the default substrate to messages",
+          "Add the substrate flag, the cloud-adapter gate, and the cloud_mode derived getter",
+          "Cover all 4 state combinations + symmetric tolerance + precedence"
+        ],
+        "do_not": [
+          "Store cloud_mode as a separate config key (would let the two get out of sync)",
+          "Modify session-turn-builder.js gating (S9 / A5 owns that)",
+          "Modify the spawn skill or hook (S10 / A7 owns that)"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "hive/hive.config.yaml",
+          "note": "Existing config-key shape; comment style; default values per memory feedback_codex_general_backend.md and feedback_codex_work_opus_review_split.md as precedent"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "Inline YAML comments in hive.config.yaml document the new keys; agent-spawn SKILL.md flow update happens at S10 / A7 (depends on this slice + S9)"
+        },
+        {
+          "concern": "versioning",
+          "action": "Adds consumer-visible config keys (execution.substrate, cloud-adapter.enabled) — flag minor semver bump at TPM gate; bump itself happens at last-commit-of-epic per the cross-cutting rule"
+        }
+      ],
+      "risks": [
+        "(HIGH) substrate dispatch wrong → default users break — mitigation: exhaustive 4-state coverage + CI smoke + tmux fallback test stays green",
+        "(MED) Sessions API stub bootstrap deferred — clear capability-error message in sessions-cloud mode points at hive-cloud-roadmap.md (S16 stub)"
+      ],
+      "commit_message": "feat(substrate): default execution.substrate=messages; sessions-cloud opt-in"
+    },
+    {
+      "id": "s9-a5-cloud-mode-dead-code-gating",
+      "epic": "cwc-2026-integration",
+      "slice": "S9 / A5",
+      "title": "Dead-code gating + cloud-adapter rot guard + SDK-version pin",
+      "status": "pending",
+      "complexity": "medium",
+      "methodology": "tdd",
+      "depends_on": [
+        "s8-a4-substrate-flag-default-flip"
+      ],
+      "metadata": {
+        "needs_backend": true,
+        "needs_frontend": false
+      },
+      "description": "Move Sessions-only event types behind cloud_mode. Add CI smoke\nagainst a recorded Sessions-API fixture so the cloud branch\ndoesn't bitrot before the future Hive Cloud epic. Add an SDK-\nversion pin test that fails loudly if @anthropic-ai/sdk bumps\nwithout a fixture refresh. Resolves cycle-state escalation\n`architecture:dead-code`.\nPRE-CONDITION (maintainer task, not a slice): maintainer records\nthe sessions-cloud fixture once from a sandbox project against\na LIVE Anthropic cloud session. Commits to\ntests/fixtures/sessions-cloud/. Procedure documented in\ntests/fixtures/sessions-cloud/README.md.\nPRE-COMMIT REDACTION REQUIRED: before the maintainer commits any\nrecorded fixture bytes, they MUST run the redaction checklist in\nREADME.md (Authorization, x-api-key, x-request-id, agent_id,\nenvironment_id, account-scoped IDs, response.id, free-text\nresponse bodies) and the redaction smoke test\ntests/hive-lib/sessions-cloud.fixture-redaction.test.* must pass\nbefore the commit lands. Closes security:plan-audit MAJOR finding.\n",
+      "acceptance_criteria": [
+        "Given execution.substrate=messages, when a session runs, then session-turn-builder.js buildToolConfirmation and buildCustomToolResult are NEVER invoked",
+        "Given execution.substrate=sessions-cloud + cloud-adapter.enabled=true, when a session runs, then both functions execute as before (parity with PR #50 behavior)",
+        "Given the recorded sessions-cloud fixture in tests/fixtures/sessions-cloud/, when sessions-cloud.fixture-rot.smoke runs in CI, then it exercises the full Sessions-API branch and passes",
+        "Given the SDK-version pin test, when @anthropic-ai/sdk version + fixture file hash diverge, then the test fails loudly with a 'maintainer must re-record' message",
+        "Given tests/fixtures/sessions-cloud/README.md, when read, then the maintainer's record-once procedure is documented",
+        "Given tests/fixtures/sessions-cloud/README.md, when read, then it includes a redaction checklist covering Authorization, x-api-key, x-request-id, agent_id, environment_id, account-scoped IDs, response.id, and free-text response bodies; the checklist is mandatory pre-commit",
+        "Given tests/hive-lib/sessions-cloud.fixture-redaction.test.* (new, may fold into rot smoke), when run against the committed fixture bytes, then it FAILS LOUDLY if any of the protected token-shapes appear (Bearer prefix, sk- prefix, agent_/env_ prefix patterns, etc.); CI gates fixture commits on this check (closes security:plan-audit MAJOR finding on s9 fixture redaction)"
+      ],
+      "steps": [
+        {
+          "id": "spec-tests-first",
+          "description": "a) tests/hive-lib/session-turn-builder.cloud-mode.test.*:\n   - buildToolConfirmation NOT invoked when substrate=messages\n   - buildToolConfirmation invoked when sessions-cloud\n   - same for buildCustomToolResult\nb) tests/hive-lib/sessions-cloud.fixture-rot.smoke.*:\n   - exercises the full Sessions-API branch against the\n     recorded fixture\n   - fails CI if the cloud branch breaks\nc) tests/hive-lib/sdk-version-fixture-pin.test.*:\n   - reads @anthropic-ai/sdk version from package-lock.json\n     AND the fixture's metadata header\n   - fails loudly when versions diverge with a maintainer-\n     directed message\nAll tests fail red until implementation lands.\n",
+          "agent": "tester"
+        },
+        {
+          "id": "implement",
+          "description": "1. Modify hive/lib/session-turn-builder.js: gate\n   buildToolConfirmation (currently lines 67-81) and\n   buildCustomToolResult (currently lines 50-57) behind a\n   cloud_mode check at every invocation site in\n   session-client.js. Use the runtime-mode.js getter from S8.\n2. Verify the maintainer fixture is in\n   tests/fixtures/sessions-cloud/; if not, halt and surface as\n   pre-condition violation.\n3. Implement the rot-smoke + SDK-pin tests.\n4. Run all three test suites red→green.\n",
+          "agent": "developer"
+        }
+      ],
+      "files_to_modify": [
+        {
+          "file": "hive/lib/session-turn-builder.js",
+          "change": "Gate buildToolConfirmation + buildCustomToolResult behind cloud_mode"
+        },
+        {
+          "file": "hive/lib/session-client.js",
+          "change": "Use runtime-mode.js getter at every gated invocation site"
+        },
+        {
+          "file": "tests/hive-lib/session-turn-builder.cloud-mode.test.*",
+          "change": "NEW — gating contract tests"
+        },
+        {
+          "file": "tests/hive-lib/sessions-cloud.fixture-rot.smoke.*",
+          "change": "NEW — CI smoke against recorded fixture"
+        },
+        {
+          "file": "tests/hive-lib/sdk-version-fixture-pin.test.*",
+          "change": "NEW — SDK-version drift guard"
+        },
+        {
+          "file": "tests/fixtures/sessions-cloud/",
+          "change": "PRE-CONDITION — maintainer-recorded fixture (one-time)"
+        },
+        {
+          "file": "tests/fixtures/sessions-cloud/README.md",
+          "change": "NEW — record-once procedure for maintainers + mandatory pre-commit redaction checklist"
+        },
+        {
+          "file": "tests/hive-lib/sessions-cloud.fixture-redaction.test.*",
+          "change": "NEW (or folded into fixture-rot.smoke) — fails loudly if any protected token-shape appears in committed fixture bytes"
+        }
+      ],
+      "verification": {
+        "mode": "red-green-tdd + CI smoke (rot guard)",
+        "commands": [
+          "node tests/hive-lib/session-turn-builder.cloud-mode.test.*",
+          "node tests/hive-lib/sessions-cloud.fixture-rot.smoke.*",
+          "node tests/hive-lib/sdk-version-fixture-pin.test.*"
+        ]
+      },
+      "scope_boundaries": {
+        "do": [
+          "Gate the two Sessions-only event-type builders behind cloud_mode",
+          "Add CI smoke against the recorded fixture",
+          "Add the SDK-version pin guard"
+        ],
+        "do_not": [
+          "Modify substrate dispatch (S8 owns that)",
+          "Modify the spawn skill or hook (S10 owns those)",
+          "Skip the SDK-version pin test as \"overkill\" — without it both fixture and rot guard go silent on SDK bumps"
+        ]
+      },
+      "reference_implementation": [
+        {
+          "file": "hive/lib/session-turn-builder.js",
+          "note": "Current buildToolConfirmation (~lines 67-81) and buildCustomToolResult (~lines 50-57) — the exact line numbers may shift after fix/session-runtime-coderabbit-pass merges; locate by name, not number"
+        },
+        {
+          "file": "hive/lib/runtime-mode.js",
+          "note": "Added at S8 — getCloudMode() is the gating predicate"
+        }
+      ],
+      "cross_cutting": [
+        {
+          "concern": "documentation",
+          "action": "tests/fixtures/sessions-cloud/README.md documents the record-once procedure; if the procedure changes during implementation, update the README in the same slice"
+        },
+        {
+          "concern": "versioning",
+          "action": "Internal-only change (no consumer-visible surface) — does NOT trigger a version bump on its own"
+        }
+      ],
+      "risks": [
+        "(MED) stale fixture creates false-green — mitigation: SDK-version pin test catches drift loudly",
+        "(LOW) maintainer hasn't recorded the fixture — mitigation: halt and surface as pre-condition violation rather than ship without it"
+      ],
+      "commit_message": "feat(substrate): gate Sessions-only event types behind cloud_mode + rot guard"
+    }
+  ]
+}

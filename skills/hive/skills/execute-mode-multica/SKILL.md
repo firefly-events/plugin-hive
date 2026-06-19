@@ -304,10 +304,10 @@ A timeout-cancelled story returns `status: 'cancelled'` and `notes: 'timeout aft
 
 ### Step 3: Episode marker per terminal
 
-Before calling `writeMulticaRunEpisode`, conditionally read the squad evaluation. Check for `.pHive/multica/squads.yaml` once per `/execute` run (cache the result — do not re-stat per story). If the file exists and `terminal.status === 'completed'`, attempt to read the squad evaluation:
+Before calling `writeMulticaRunEpisode`, conditionally read the squad evaluation. Check for `${HIVE_STATE_DIR}/multica/squads.yaml` once per `/execute` run (cache the result — do not re-stat per story). If the file exists and `terminal.status === 'completed'`, attempt to read the squad evaluation:
 
 ```js
-// squadsYamlExists: boolean cached once at run start via fs.access('.pHive/multica/squads.yaml')
+// squadsYamlExists: boolean cached once at run start via fs.access(`${hiveStateDir}/multica/squads.yaml`)
 let squadEvaluation = null;
 if (squadsYamlExists && terminal.status === 'completed') {
   try {
@@ -326,7 +326,7 @@ if (squadsYamlExists && terminal.status === 'completed') {
 }
 ```
 
-If `.pHive/multica/squads.yaml` is absent (consumer project has not adopted the squad layer), skip the read entirely — `squadEvaluation` stays `null` and no `squad_evaluation` block appears in the marker.
+If `${HIVE_STATE_DIR}/multica/squads.yaml` is absent (consumer project has not adopted the squad layer), skip the read entirely — `squadEvaluation` stays `null` and no `squad_evaluation` block appears in the marker.
 
 Call `writeMulticaRunEpisode` with the terminal state and optional squad evaluation:
 

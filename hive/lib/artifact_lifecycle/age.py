@@ -26,8 +26,16 @@ def git_commit_age_days(path: Path, repo_root: Path | None, now: datetime) -> fl
     """
     if repo_root is not None:
         try:
+            # git log runs with cwd=repo_root, so the pathspec must be
+            # repo-relative. An absolute path (allowed when state_dir lives
+            # outside the repo) is treated as an out-of-tree pathspec and
+            # exits 128, silently falling back to mtime and breaking D5.
+            try:
+                pathspec = str(path.resolve().relative_to(repo_root.resolve()))
+            except ValueError:
+                pathspec = str(path)
             result = subprocess.run(
-                ["git", "log", "-1", "--format=%ct", "--", str(path)],
+                ["git", "log", "-1", "--format=%ct", "--", pathspec],
                 capture_output=True,
                 text=True,
                 cwd=repo_root,

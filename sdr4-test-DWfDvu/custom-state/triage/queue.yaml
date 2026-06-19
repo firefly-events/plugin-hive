@@ -1,0 +1,8 @@
+version: 1
+items:
+  - id: t-001
+    state: inbox
+    kind: bug
+    title: Relocated triage item
+    reporter: operator
+    reported_at: 2026-06-10T00:00:00Z

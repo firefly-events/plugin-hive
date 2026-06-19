@@ -20,6 +20,7 @@ For a fresh kickoff, include the metrics opt-in question before scenario-specifi
 For every kickoff, populate project classification fields in `.pHive/project-profile.yaml`:
 
 - Ask: `What type of project is this?` Allowed values: `framework`, `consumer-app`, `service`.
+- A `project_type` value is **valid** only when it is exactly one of `framework`, `consumer-app`, or `service`. If the user supplies anything else, re-prompt with the allowed values until one is chosen; do not persist an out-of-set value.
 - Ask: `Does this project have a UI?` (yes/no). Persist as `has_ui: true/false`.
 - Persist both fields to `.pHive/project-profile.yaml`.
 - On re-kickoff, if these fields already exist show them and ask whether to keep or change.

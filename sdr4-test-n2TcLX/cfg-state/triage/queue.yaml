@@ -1,0 +1,20 @@
+version: 1
+items:
+  - id: t-001
+    state: inbox
+    kind: unknown
+    title: Config-tier entry
+    description: |
+      Config-tier entry
+    reporter: operator
+    reported_at: "2026-06-12T15:30:51.949Z"
+    priority: null
+    severity: null
+    assignee: null
+    linked_epic: null
+    linked_story: null
+    closed_reason: null
+    closed_at: null
+    state_history:
+      - state: inbox
+        at: 2026-06-12T15:30:51.949Z

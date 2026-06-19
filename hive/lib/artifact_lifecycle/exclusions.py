@@ -65,20 +65,25 @@ def _relative_hard_exclude_prefixes() -> list[str]:
     ]
 
 
-def _repo_relative(candidate: Path) -> Path:
-    """Best-effort repo-relative view for prefix checks.
+def _relative_prefix_matches(candidate: Path, prefix: str) -> bool:
+    """Return True if *candidate* lies at or under repo-relative *prefix*.
 
-    Absolute candidates under the repo root are rewritten relative to cwd so
-    boundary-safe prefix checks (e.g. ``.pHive/team-memories``) still match.
-    Paths outside the repo keep their absolute form so the prefix checks won't
-    spuriously match.
+    Matches the prefix as a contiguous run of path components anywhere in
+    *candidate* (so absolute paths still match when the lifecycle runs outside
+    the repo root — the old ``relative_to(Path.cwd())`` form silently missed
+    those), and as a leading run for already-relative candidates. Component-wise
+    so it stays boundary-safe (``.pHive/team-memories`` never matches a sibling
+    like ``.pHive/team-memories-archive``).
     """
-    if not candidate.is_absolute():
-        return candidate
-    try:
-        return candidate.resolve().relative_to(Path.cwd().resolve())
-    except ValueError:
-        return candidate
+    pref_parts = tuple(Path(prefix).parts)
+    cand_parts = candidate.parts
+    n = len(pref_parts)
+    if n == 0:
+        return False
+    for i in range(len(cand_parts) - n + 1):
+        if cand_parts[i : i + n] == pref_parts:
+            return True
+    return False
 
 
 class HardExcludeError(RuntimeError):
@@ -116,11 +121,10 @@ def is_hard_excluded(candidate: Path) -> bool:
         if candidate == root:
             return True
 
-    # Repo-relative prefix matching (candidate may be relative or absolute).
-    candidate_str = str(_repo_relative(candidate))
+    # Repo-relative prefix matching (candidate may be relative or absolute,
+    # and the lifecycle may run from outside the repo root).
     for prefix in _relative_hard_exclude_prefixes():
-        # Exact match or path-boundary-safe prefix match.
-        if candidate_str == prefix or candidate_str.startswith(prefix + os.sep):
+        if _relative_prefix_matches(candidate, prefix):
             return True
 
     return False
@@ -168,9 +172,8 @@ def assert_not_hard_excluded(candidate: Path, action: str = "action") -> None:
                 f"Refusing {action}: path {candidate} is hard-excluded root {root}"
             )
 
-    candidate_str = str(_repo_relative(candidate_resolved))
     for prefix in _relative_hard_exclude_prefixes():
-        if candidate_str == prefix or candidate_str.startswith(prefix + os.sep):
+        if _relative_prefix_matches(candidate_resolved, prefix):
             raise HardExcludeError(
                 f"Refusing {action}: path {candidate} is under hard-excluded root {prefix!r}"
             )

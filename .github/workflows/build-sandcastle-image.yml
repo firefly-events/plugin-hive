@@ -49,6 +49,8 @@ jobs:
         # `~/.claude/plugins/` cache during `docker build`. Sparse on
         # `.sandcastle/**` would break that copy. Flagged in gi-1 PR.
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Resolve short sha
         id: short

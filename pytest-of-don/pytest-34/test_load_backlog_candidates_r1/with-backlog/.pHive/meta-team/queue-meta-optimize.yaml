@@ -1,0 +1,8 @@
+schema_version: 1
+candidates:
+- id: mo-1
+  target: docs/guide.md
+  type: doc-note
+  description: Add a clarification
+  safety_notes: Append only
+  status: pending

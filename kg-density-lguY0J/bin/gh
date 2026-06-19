@@ -1,0 +1,6 @@
+#!/bin/sh
+echo "gh $@" >> "/Users/don/Documents/plugin-hive/kg-density-lguY0J/stub.log"
+case "$1 $2" in
+  "pr list") echo "${GH_PR_LIST_OUTPUT:-[]}" ;;
+  "pr create") echo "https://github.com/example/repo/pull/99" ;;
+esac

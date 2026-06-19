@@ -1,0 +1,10 @@
+id: st-1
+epic: demo-epic
+title: demo story
+status: shipped
+release_id: "v2.11.0"
+steps:
+- id: implement
+  agent: developer
+- id: integrate
+  agent: developer

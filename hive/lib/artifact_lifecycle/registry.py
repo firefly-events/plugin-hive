@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from .predicates import PREDICATE_REGISTRY
+
 
 class Classification(str, Enum):
     UNTRACKED = "untracked"
@@ -171,6 +173,15 @@ def validate_entry(raw: dict[str, Any]) -> RegistryEntry:
     raw_hard_exclude = raw["hard_exclude"]
     if not isinstance(raw_hard_exclude, bool):
         raise RegistryValidationError("hard_exclude must be a boolean")
+
+    # active_predicate — must resolve against the registered predicate set, so
+    # an unknown name fails fast at load instead of deep in planning.
+    raw_predicate = raw["active_predicate"]
+    if raw_predicate not in PREDICATE_REGISTRY:
+        known = sorted(PREDICATE_REGISTRY)
+        raise RegistryValidationError(
+            f"Unknown active_predicate {raw_predicate!r}. Known predicates: {known}"
+        )
 
     return RegistryEntry(
         class_id=raw["class_id"],

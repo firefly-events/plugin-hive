@@ -1,0 +1,5 @@
+mode: multica
+issue_id: test-issue-uuid
+assignee_id: agent-uuid-abc
+epic: epic-c
+story_id: s-4

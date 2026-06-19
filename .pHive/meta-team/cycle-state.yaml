@@ -59,6 +59,7 @@ steps:
     filtered_count: 0
     selected_candidate_id: null
     selected_target: null
+    selected_candidate: null
     decision: no-fallback-available
     summary: >
       Loaded queue-meta-meta-optimize.yaml. No little-fix tier candidates

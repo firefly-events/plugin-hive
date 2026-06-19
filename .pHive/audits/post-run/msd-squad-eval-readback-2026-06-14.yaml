@@ -1,0 +1,58 @@
+run_id: msd-squad-eval-readback-2026-06-14
+skill: execute
+epic_id: msd-squad-eval-readback
+execution_mode: multica
+date: "2026-06-14"
+gate_lift_fired: false
+methodology:
+  value: classic
+  source: epic-yaml
+backend_sources:
+  sessions_enabled: default
+  parallel_teams: hive-config
+  terminal_mux: default
+  executor: hive-config
+stories:
+  total: 4
+  completed: 4
+  failed: 0
+  depths:
+    - depth: 0
+      stories: [w2-4-adapter-abi-1-1, w2-5-eval-contract-doc]
+    - depth: 1
+      stories: [w2-6-dispatch-read-squad-eval]
+    - depth: 2
+      stories: [w2-7-execute-mode-integrate-eval]
+work_artifacts:
+  commits:
+    - 86bb251 w2-4 adapter ABI 1.1.0 + getSquadActivity
+    - 9d589f1 w2-5 squad-evaluation-contract.md
+    - d719f1a w2-6 readSquadEvaluation helper
+    - 0966ed4 w2-7 wire squad-eval into episode marker
+  files_modified: 9
+  insertions: 638
+  tests: "30/30 pass (adapter 11, readSquadEvaluation 8, serialize-story-brief 11)"
+tracker:
+  adapter: null
+  issues_closed_manually: [PLU-104, PLU-105, PLU-106, PLU-107]
+adversarial_review:
+  verdict: CONTRACT HOLDS
+  reviewer: independent skeptic agent + orchestrator pass
+  contract_clauses_verified: 5
+  follow_ups:
+    - severity: major
+      claim: "getSquadActivity + readSquadEvaluation fetch only first timeline page; next_cursor ignored. Latest squad_leader_evaluated on a later page returns stale/null."
+      impact: "advisory only — read is best-effort substrate signal, never gates merge; does not violate contract"
+    - severity: minor
+      claim: "readSquadEvaluation reimplements timeline-read instead of delegating to adapter.getSquadActivity; no outcome-enum guard (adapter has one)"
+    - severity: minor
+      claim: "episode-sync writeMulticaRunEpisode squad_evaluation serialization has no unit test (only story smoke-test AC)"
+nonsensical_defaults: []
+notes: |
+  Read-side only; squad-evaluated WRITE/status-flip owned by squad-leader-status-flip epic.
+  W0.2 read path settled empirically 2026-06-14: GET /api/issues/{id}/timeline
+  filtered to action=='squad_leader_evaluated'. Parent epic's deferral premise
+  ("no GET squad-evaluations endpoint") was stale.
+  Epic extracted from multica-substrate-deepen to scope /execute to these 4
+  stories (parent's 19 shipped stories carry no episode markers, would re-dispatch).
+  version_bump absent -> finalize no-op. PR not opened (awaiting maintainer go).

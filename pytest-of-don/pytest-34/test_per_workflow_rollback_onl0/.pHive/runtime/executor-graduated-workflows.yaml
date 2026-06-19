@@ -1,0 +1,10 @@
+workflows:
+  - meta-team-cycle
+  - code-review
+  - performance-audit
+  - development.tdd
+  - development.bdd
+  - development.tdd-codex
+  - ui-design
+  - design-review
+  - daily-ceremony

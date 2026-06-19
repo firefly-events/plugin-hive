@@ -1,0 +1,9 @@
+id: st-1
+epic: demo-epic
+title: demo story
+status: in_progress
+steps:
+- id: implement
+  agent: developer
+- id: integrate
+  agent: developer

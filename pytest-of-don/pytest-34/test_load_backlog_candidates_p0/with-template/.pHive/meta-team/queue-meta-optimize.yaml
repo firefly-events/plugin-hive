@@ -1,0 +1,11 @@
+schema_version: 1
+candidates:
+- id: mo-1
+  title: Clarify onboarding note
+  description: Add a short note to the README.
+  status: pending
+  priority: medium
+- id: mo-2
+  title: Document rollback owner
+  rationale: Fallback runs should name a reviewer.
+  status: done

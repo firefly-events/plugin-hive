@@ -29,7 +29,7 @@ def _untracked(**overrides) -> dict:
         "class_id": "dag-run-state",
         "globs": [".pHive/runs/**"],
         "classification": "untracked",
-        "active_predicate": "always",
+        "active_predicate": "never-active",
         "retention_threshold": 30,
         "archive_action": "evict",
         "age_source": "mtime",
@@ -44,7 +44,7 @@ def _tracked(**overrides) -> dict:
         "class_id": "episodes",
         "globs": [".pHive/episodes/**"],
         "classification": "tracked",
-        "active_predicate": "always",
+        "active_predicate": "never-active",
         "retention_threshold": 90,
         "archive_action": "report",
         "age_source": "git-last-commit",
@@ -192,6 +192,7 @@ class TestCLIHelp:
             [sys.executable, "-m", "hive.lib.artifact_lifecycle.cli", "--help"],
             capture_output=True,
             text=True,
+            timeout=30,
         )
         assert result.returncode == 0
 
@@ -203,6 +204,7 @@ class TestCLIHelp:
             [sys.executable, "-m", "hive.lib.artifact_lifecycle.cli", "--help"],
             capture_output=True,
             text=True,
+            timeout=30,
         )
         assert "--dry-run" in result.stdout
 
@@ -214,6 +216,7 @@ class TestCLIHelp:
             [sys.executable, "-m", "hive.lib.artifact_lifecycle.cli", "--help"],
             capture_output=True,
             text=True,
+            timeout=30,
         )
         assert "--class" in result.stdout
 
@@ -225,5 +228,6 @@ class TestCLIHelp:
             [sys.executable, "-m", "hive.lib.artifact_lifecycle.cli", "--help"],
             capture_output=True,
             text=True,
+            timeout=30,
         )
         assert "--apply" in result.stdout
