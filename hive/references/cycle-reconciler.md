@@ -34,6 +34,12 @@ attempt to run shell commands or open files; call the tools. (Emitting a shell c
   NOT call `writeHermesReconcilerState` (no such tool) and never assume a write happened.
 - **Default impl agent is `developer`** unless the epic config names another. Do NOT use
   `hermes` — that is not a workspace agent.
+- **Timestamps (`dispatched_at`).** You have no clock/shell. When a step writes `dispatched_at`,
+  use the **Run Time shown at the very top of this prompt**, formatted as full ISO8601 UTC with
+  the time component (e.g. `2026-06-20T18:15:37Z`) — **never** a date-only or `…T00:00:00` value.
+  `dispatched_at` is the watchdog's stuck-detection timer; a midnight/stub value silently breaks
+  rescue. If you genuinely cannot read the Run Time, omit `dispatched_at` from the patch (a later
+  tick will set it) rather than writing a placeholder.
 - **Subcommand → tool map.** In the runbook below, any `cli.mjs <subcommand>` is shorthand for
   the matching tool: `epic-status`→`multica_epic_status`, `dispatch`→`multica_dispatch_story`,
   `status`/`poll`→`multica_poll_task`, `write-state`→`multica_write_state`,
