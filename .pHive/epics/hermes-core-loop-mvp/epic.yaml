@@ -79,3 +79,19 @@ stories:
     repo: hermes-agent
     complexity: small
     depends_on: [s3-cycle-reconciler-runbook, s4-hermes-multica-plugin]
+
+  # --- Rung-3.5 follow-on (found 2026-06-19 during rung-3-full verification on Studio).
+  # Dispatch + auth + correct branch decision are PROVEN; these two close the gap that
+  # keeps the loop a one-shot dispatcher (no cross-tick state persistence) so it can
+  # progress impl -> review -> done autonomously. ---
+  - id: s6-dispatch-returns-taskid
+    title: "cli.mjs dispatch returns task_id so the reconciler can record in_flight_task_id"
+    repo: plugin-hive
+    complexity: small
+    depends_on: [s1-cli-mjs-core]
+
+  - id: s7-cli-write-state-subcommand
+    title: "cli.mjs write-state subcommand — give the reconciler a tool to persist cross-tick state"
+    repo: plugin-hive
+    complexity: medium
+    depends_on: [s1-cli-mjs-core, s2-hermes-reconciler-state]
