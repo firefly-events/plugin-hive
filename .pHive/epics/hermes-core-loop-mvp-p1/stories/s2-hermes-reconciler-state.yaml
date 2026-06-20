@@ -1,0 +1,128 @@
+id: s2-hermes-reconciler-state
+epic: hermes-core-loop-mvp
+title: "hermes_reconciler: additive block in cycle-state.yaml"
+status: pending
+complexity: small
+methodology: classic
+repo: plugin-hive
+depends_on: []
+
+description: |
+  Define and implement the hermes_reconciler: top-level block inside the
+  existing cycle-state.yaml format. This block is the cross-tick memory for
+  the Hermes reconciler — it must not overload autonomous_cycle: (which is
+  test-replay shaped with fields scenarios_run[], outcomes[], cycle_count and
+  has no per-story phase position, started_at, attempt, or verdict).
+
+  The block is additive and absence-tolerant: cycle-state.yaml files without
+  the block continue to load without error (safe defaults apply). Writes are
+  atomic (temp file + rename) to prevent partial state on crash.
+
+  Schema (all fields optional on read; safe defaults shown):
+    hermes_reconciler:
+      gate_state: null              # "pre_approved" to enable the reconciler
+      in_flight_story_id: null      # story ID currently being executed
+      in_flight_task_id: null       # Multica task UUID for the in-flight story
+      dispatched_at: null           # ISO8601 timestamp written AT DISPATCH (authoritative for watchdog)
+      current_phase: null           # "impl" | "review"
+      stuck_after_seconds: 1800     # watchdog threshold (default 30 min)
+      stories:                      # per-story reconciler state map
+        <story-id>:
+          phase_position: pending   # pending | dispatched_impl | impl_terminal |
+                                    # dispatched_review | review_terminal | done | blocked
+          attempt: 0                # impl dispatch count (incremented on loop-back)
+          review_loop_count: 0      # review loop count for this story
+          verdict: null             # last review verdict: "passed" | "needs_revision" | null
+
+  The schema document (hive/references/cycle-state-schema.md) must be updated
+  with a new hermes_reconciler: section documenting each field, its type,
+  default, and the reconciler lifecycle events that mutate it.
+
+acceptance_criteria:
+  - "Given a cycle-state.yaml with no hermes_reconciler: block, when the reconciler reader loads the file, then it returns safe defaults (gate_state: null, in_flight_story_id: null, stories: {}) without throwing."
+  - "Given a cycle-state.yaml with an existing hermes_reconciler: block, when the reconciler reader loads it, then all present fields are returned verbatim and absent optional fields use safe defaults."
+  - "Given a reconciler tick writes updated state, when the write completes, then the cycle-state.yaml file is updated atomically (write to a temp file, then rename — no partial-write window)."
+  - "Given a reconciler tick writes the hermes_reconciler: block, then all other top-level blocks in cycle-state.yaml (decisions, escalations, phase_records, handoff_log, autonomous_cycle) are preserved unchanged."
+  - "Given hermes_reconciler.gate_state is null (absent), when the reconciler preflight check runs, then it returns {wakeAgent: false} and the tick aborts without any mutation."
+  - "Given hermes_reconciler.gate_state is \"pre_approved\", when the reconciler preflight check runs, then the tick proceeds to normal state evaluation."
+  - "Given a story is dispatched (impl phase), when the reconciler writes the dispatch event, then in_flight_story_id, in_flight_task_id, dispatched_at (ISO8601), and current_phase: \"impl\" are all written in the same atomic operation."
+  - "Given hive/references/cycle-state-schema.md is opened, then it contains a hermes_reconciler: section documenting all 8+ fields with type, default, and the lifecycle event(s) that mutate each field."
+
+steps:
+  - id: research
+    description: >
+      Read hive/references/cycle-state-schema.md fully to understand the
+      existing block structure (autonomous_cycle:, handoff_log[], etc.) and
+      the additive optional block pattern used for autonomous_cycle: in story
+      s0-1. Identify the exact YAML read/write path used today (lib? inline?)
+      to know where to add the absence-tolerant reader.
+    agent: researcher
+  - id: implement
+    description: >
+      (1) Update hive/references/cycle-state-schema.md: add hermes_reconciler:
+      section with full field documentation.
+      (2) Add readHermesReconcilerState(cycleStatePath) and
+      writeHermesReconcilerState(cycleStatePath, updates) helpers — either
+      in a new hive/lib/hermes-reconciler/state.mjs or alongside the
+      cycle-state reader if one exists. readHermesReconcilerState returns safe
+      defaults when the block is absent. writeHermesReconcilerState writes
+      atomically (temp + rename) and merges only the hermes_reconciler: key.
+    agent: developer
+    depends_on: [research]
+  - id: review
+    description: >
+      Verify atomic write (temp + rename pattern). Verify absence-tolerance
+      (load a YAML without the block, confirm no throw). Verify other blocks
+      are not mutated by a write. Verify schema doc covers all 8+ fields.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit and push.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/hive/Code/plugin-hive
+  tech_stack:
+    runtime: node
+    language: esm (JavaScript)
+  key_files:
+    - path: hive/references/cycle-state-schema.md
+      purpose: >
+        Schema document to update. Already contains autonomous_cycle: block
+        (lines 351-391) as the additive optional block pattern to mirror.
+        Also contains handoff_log[] (lines 239-283) whose verdict enum
+        (needs-revision with hyphen) must be noted in the hermes_reconciler:
+        schema commentary.
+
+files_to_modify:
+  - file: hive/references/cycle-state-schema.md
+    change: Add hermes_reconciler: section after autonomous_cycle: block
+  - file: hive/lib/hermes-reconciler/state.mjs
+    change: NEW — readHermesReconcilerState + writeHermesReconcilerState helpers
+
+design_decisions:
+  - decision: hermes_reconciler: block inside cycle-state.yaml, not a new file
+    rationale: >
+      The brief's design principle is "cycle-state is the cross-tick memory."
+      A second file adds a second read per tick and breaks the single-file
+      invariant. The additive optional block pattern is already established
+      (autonomous_cycle: was added in story s0-1).
+  - decision: autonomous_cycle: is NOT extended
+    rationale: >
+      autonomous_cycle: fields are scenarios_run[], outcomes[], cycle_count —
+      test-scenario replay tracking. Adding reconciler fields (phase_position,
+      dispatched_at, attempt) would break its semantic contract and confuse
+      any code that reads autonomous_cycle:.
+  - decision: dispatched_at is the authoritative watchdog timestamp
+    rationale: >
+      writeMulticaRunEpisode is called AFTER task terminal, not at dispatch.
+      The episode marker is not an in-flight state writer. The only reliable
+      timestamp for "when did this task start" is the one the reconciler writes
+      at dispatch time into hermes_reconciler.dispatched_at.
+
+risks:
+  - severity: low
+    description: YAML library choice may differ from the rest of the codebase
+    mitigation: Research step identifies the YAML library already in use
+      (js-yaml or similar) and uses the same one.

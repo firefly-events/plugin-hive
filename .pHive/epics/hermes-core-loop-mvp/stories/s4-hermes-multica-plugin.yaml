@@ -1,0 +1,167 @@
+id: s4-hermes-multica-plugin
+epic: hermes-core-loop-mvp
+title: "hermes-multica plugin — register_tool wrappers shelling to cli.mjs"
+status: pending
+complexity: medium
+methodology: classic
+repo: hermes-agent
+depends_on: [s1-cli-mjs-core]
+
+description: |
+  Create plugins/hermes-multica/ in the hermes-agent repo. This plugin
+  exposes five Hermes tools that shell to the cli.mjs commands built in S1,
+  parse the JSON stdout, and return structured results to the Hermes agent.
+
+  The plugin follows the Hermes plugin template (plugins/spotify/ structure):
+    plugin.yaml    — name, version, kind: backend, provides_tools[]
+    __init__.py    — plugin registration
+    tools.py       — register_tool calls + handler implementations
+    client.py      — subprocess shell helper (node cli.mjs invocations)
+
+  Five tools:
+
+  multica_dispatch_story
+    → node cli.mjs dispatch --issue <uuid> [--agent <name> | --squad <name>]
+    Args: issue_id (str), agent_name (str, optional), squad_name (str, optional)
+    Returns: {status, issue_id}
+
+  multica_poll_task
+    → node cli.mjs poll --issue <uuid> [--timeout-ms <ms>]
+    Args: issue_id (str), timeout_ms (int, optional, default 60000)
+    Returns: {status, notes, task_id}
+    Note: for non-cron callers only; the reconciler tick does NOT use this.
+
+  multica_list_tasks
+    → node cli.mjs epic-status --epic <handle>
+    Args: epic_handle (str)
+    Returns: [{story_id, phase_position, attempt, verdict}]
+
+  multica_epic_status
+    → node cli.mjs epic-status --epic <handle>
+    Args: epic_handle (str)
+    Returns: rollup of story statuses + overall epic phase
+
+  multica_post_comment
+    → node cli.mjs comment --issue <uuid> --body <text>
+    Args: issue_id (str), body (str)
+    Returns: {comment_id}
+
+  All handlers parse stdout JSON, propagate stderr as a Python exception on
+  non-zero exit, and are gated by approvals.cron_mode (write operations fail
+  gracefully if cron_mode = "deny").
+
+  Note: this story depends on S1 landing in plugin-hive first. The cli.mjs
+  path used by client.py must be configurable (env var CLI_MJS_PATH or
+  hermes config field) so the plugin works whether plugin-hive is at
+  ~/Code/plugin-hive or any other path.
+
+acceptance_criteria:
+  - "Given the plugin is registered and multica_dispatch_story is called with issue_id and agent_name, then it shells to `node <cli_path> dispatch --issue <uuid> --agent <name>`, parses stdout JSON, and returns {\"status\": \"dispatched\", \"issue_id\": \"<uuid>\"} (or \"already_dispatched\" on idempotent call)."
+  - "Given the plugin is registered and multica_dispatch_story is called without both agent_name and squad_name, then it raises a ValueError with a message naming the required argument."
+  - "Given cli.mjs exits non-zero on any tool call, then the handler raises a Python exception with the stderr {code, message} payload surfaced in the exception message."
+  - "Given approvals.cron_mode is \"deny\" and multica_dispatch_story is called, then Hermes blocks the shell-out before it runs (standard cron approval gate behavior)."
+  - "Given approvals.cron_mode is \"approve\" and multica_dispatch_story is called, then the shell-out runs without an approval prompt."
+  - "Given multica_list_tasks is called with epic_handle, then it returns a list of story dicts each containing story_id, phase_position, attempt, and verdict."
+  - "Given multica_post_comment is called with issue_id and body, then a comment is posted to the Multica issue and the returned comment_id is non-null."
+  - "Given CLI_MJS_PATH env var is set, then all tool handlers resolve the cli.mjs path from that env var (not a hardcoded path)."
+  - "Given the plugin is loaded by Hermes, then all five tools appear in Hermes's tool registry and are callable from a cron agent prompt."
+  - "Given plugin.yaml is opened, then it lists all five tool names under provides_tools[] and the kind field is \"backend\"."
+
+steps:
+  - id: research
+    description: >
+      Read /Users/hive/Code/hermes-agent/plugins/spotify/__init__.py,
+      tools.py, client.py, and plugin.yaml to lock the exact plugin structure
+      and PluginContext.register_tool signature. Read
+      hermes_cli/config.py to confirm approvals.cron_mode enforcement point
+      (where the shell-out is blocked) so tools.py can rely on it rather than
+      re-implementing the check.
+    agent: researcher
+  - id: implement
+    description: >
+      Write plugins/hermes-multica/plugin.yaml, __init__.py, client.py
+      (subprocess wrapper reading CLI_MJS_PATH), and tools.py (five
+      register_tool calls + handlers). Follow the spotify plugin structure
+      exactly. All handlers parse stdout JSON; on non-zero exit raise Python
+      exception with stderr payload.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: >
+      Register the plugin in a local Hermes instance. Call each tool from
+      the Hermes REPL or a test cron job. Verify multica_dispatch_story
+      dispatches a real issue, multica_post_comment posts a visible comment,
+      and multica_epic_status returns the expected rollup.
+    agent: developer
+    depends_on: [implement]
+  - id: review
+    description: >
+      Verify CLI_MJS_PATH is not hardcoded anywhere. Verify error propagation
+      for non-zero exit. Verify all five tools appear in the registry. Verify
+      no Python business logic duplicates what cli.mjs already does.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to hermes-agent repo.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/hive/Code/hermes-agent
+  tech_stack:
+    runtime: python3
+    language: Python
+  key_files:
+    - path: plugins/spotify/__init__.py
+      purpose: Plugin registration template to mirror
+    - path: plugins/spotify/tools.py
+      purpose: register_tool call pattern to mirror
+    - path: plugins/spotify/client.py
+      purpose: HTTP/subprocess client pattern to mirror
+    - path: plugins/spotify/plugin.yaml
+      purpose: Plugin manifest schema to mirror
+    - path: hermes_cli/plugins.py
+      purpose: >
+        PluginContext.register_tool signature (lines 320-358):
+        name, toolset, schema, handler, check_fn, requires_env, is_async,
+        description, emoji, override
+    - path: hermes_cli/config.py
+      purpose: approvals.cron_mode enforcement (lines 2118-2124)
+
+files_to_modify:
+  - file: plugins/hermes-multica/plugin.yaml
+    change: NEW — plugin manifest
+  - file: plugins/hermes-multica/__init__.py
+    change: NEW — plugin registration
+  - file: plugins/hermes-multica/client.py
+    change: NEW — subprocess wrapper for cli.mjs calls
+  - file: plugins/hermes-multica/tools.py
+    change: NEW — five register_tool handlers
+
+design_decisions:
+  - decision: shell to cli.mjs, do not re-implement Multica REST in Python
+    rationale: >
+      cli.mjs (S1) is the proven, maintained Multica interface in plugin-hive.
+      Re-implementing the same REST calls in Python creates a maintenance
+      fork. The thin subprocess wrapper delegates all logic to the Node layer.
+  - decision: CLI_MJS_PATH as env var, not hardcoded
+    rationale: >
+      plugin-hive may be checked out at different paths on different machines.
+      A hardcoded path breaks portability. An env var (defaulting to
+      ~/Code/plugin-hive/hive/lib/multica-story-dispatch/cli.mjs) is
+      override-able per deployment.
+  - decision: no multica_status_task tool (not in the five)
+    rationale: >
+      The reconciler tick calls cli.mjs status directly from the cron agent
+      prompt (the runbook inlines the command). A separate Hermes tool for
+      status is not needed for the core loop MVP.
+
+risks:
+  - severity: low
+    description: >
+      The hermes-agent repo may have a different Python version or
+      dependency pinning that conflicts with a new dependency introduced
+      by the plugin.
+    mitigation: >
+      Use only stdlib + existing hermes dependencies (subprocess, json,
+      os). No new Python packages.
