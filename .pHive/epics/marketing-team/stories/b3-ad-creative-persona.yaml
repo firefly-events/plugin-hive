@@ -1,7 +1,9 @@
 id: b3-ad-creative-persona
 epic: marketing-team
 title: Author the ad-creative persona
-status: pending
+status: in_progress
+tracker_id: plugin-hive/PLU-376
+
 complexity: medium
 methodology: classic
 depends_on: []

@@ -1,7 +1,9 @@
 id: b1-marketing-strategist-persona
 epic: marketing-team
 title: Author the marketing-strategist persona (team lead)
-status: pending
+status: in_progress
+tracker_id: plugin-hive/PLU-374
+
 complexity: medium
 methodology: classic
 depends_on: []

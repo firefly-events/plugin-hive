@@ -1,7 +1,9 @@
 id: b2-marketing-copywriter-persona
 epic: marketing-team
 title: Author the marketing-copywriter persona
-status: pending
+status: in_progress
+tracker_id: plugin-hive/PLU-375
+
 complexity: medium
 methodology: classic
 depends_on: []
