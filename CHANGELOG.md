@@ -9,9 +9,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-## [2.12.0] - 2026-06-19
+## [2.12.0] - 2026-06-20
 
-**Plan and ship like a human — visually rich planning docs, human-readable release notes by default, requirement-driven planning teams, and a self-cleaning runtime.**
+**Plan and ship like a human — visually rich planning docs, human-readable release notes by default, requirement-driven planning teams, a self-cleaning runtime, and the first cut of a persistent SDLC orchestrator.**
 
 ### Added
 
@@ -19,6 +19,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - **Human-readable release notes by default** (PR #289): `/ship` now drafts each changelog bullet from story outcomes — degrading to story descriptions when a story has no outcome field — and gates on a single canonical format spec before release, so operators review prose instead of authoring notes from scratch. This 2.12.0 entry is the first written to that spec.
 - **Requirement-driven planning teams** (PR #299): `/plan` classifies a requirement into work-type tags and composes its planning team from a fixed spine plus the specialists the work actually needs, instead of a one-size-fits-all roster.
 - **Self-cleaning runtime artifacts** (PR #300): a new artifact-lifecycle sweep moves inactive untracked runtime files to OS temp under per-class retention, hard-protects memories and the knowledge graph from eviction, and keeps a report-only inventory of tracked classes — clean working trees without risking durable state. Ships with a weekly scheduler wrapper and a full test suite.
+- **Hermes SDLC reconciler — persistent-orchestrator core loop (MVP)** (PR #305): a thin `multica-story-dispatch` CLI (`cli.mjs`) gives an external Hermes cron job everything it needs to drive a Hive epic one tick at a time — dispatch the next story, poll a live task to terminal, write an episode marker, roll up `epic-status`, and post a `comment` — backed by a `hermes_reconciler` cross-tick state block in cycle-state (`state.mjs`) and a tick state-machine runbook. Dispatch now returns the Multica `task_id` and a `write-state` subcommand persists progress between ticks, so the loop advances implementation → review → done on its own instead of firing once and forgetting. Dogfooded end-to-end through Multica execution.
+- **Cleaner installs and self-pruning ship** (PR #306): an install-payload audit documents exactly what reaches a marketplace install and flags runtime/dev cruft for exclusion, and `/hive:ship` now prunes a shipped epic's worktree after marking its stories shipped — so a release leaves no stray working trees behind.
 
 ### Fixed
 
