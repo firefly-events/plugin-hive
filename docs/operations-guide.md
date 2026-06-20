@@ -174,6 +174,7 @@ All changelog entry format rules — entry shape, bullet shape, source chain, de
 | `/hive:review` | "review this code", "review my changes" | Run structured code review |
 | `/hive:test` | "run tests", "test swarm" | Run the test swarm pipeline |
 | `/hive:ship` | "ship it", "cut a release", "release this" | Close the lifecycle: reconcile story status, author the prose changelog entry (draft → operator review → write), verify version bump, run the project's ship target, generate release post + video script + post ideas |
+| `/hive:marketing-campaign` | "launch campaign", "marketing assets", "post-release campaign" | Changelog-driven campaign production: marketing-strategist derives a campaign brief from what shipped, marketing-copywriter produces copy, ad-creative produces creative concepts. Output lands in `.pHive/campaigns/<topic>/` for operator review. **Consumer-gated — not invoked for Hive's own internal work.** |
 
 ---
 
@@ -214,6 +215,22 @@ Configure tier routing in `hive.config.yaml`. Override per-agent with `model_ove
 | **Tester** | TDD or Classic test authoring and execution |
 | **Reviewer** | Code review — correctness, security, conventions, domain compliance |
 | **Pair Programmer** | Sidecar — challenges assumptions, surfaces alternatives. Does not write code. |
+
+### Marketing Agents
+
+> **Consumer-gated.** These agents are spawned only for consumer-facing epics. They are not selected for Hive's own internal development work — if dispatched to a Hive-internal epic by mistake, they stop and flag the mismatch. This gate is wired in the `/hive:ship` post-release hook and the `/hive:marketing-campaign` skill.
+
+| Agent | Role |
+|-------|------|
+| **Marketing Strategist** | Positioning, audience segmentation, go-to-market strategy, and campaign brief authoring. Owns the brief that downstream copy and creative agents consume. |
+| **Marketing Copywriter** | Ad copy, landing page copy, email sequences, social posts, taglines, and CTAs. Consumes the campaign brief from marketing-strategist. |
+| **Ad Creative** | Visual concept direction, creative briefs, and image-gen prompts for paid and organic channels. Delegates actual asset rendering to the visual-asset skill. |
+
+### Shared Skills (Agent-Facing)
+
+| Skill | Purpose |
+|-------|---------|
+| **visual-asset** | Atomic render skill — no top-level user command. Routes a visual spec (prompt + medium) to Frame0 CLI (vector/wireframe) or `openai-image` MCP (raster/ad-creative). Adaptable by ad-creative, ui-designer, logo-exploration, and marketing-campaign. Callers supply the spec and output directory; this skill owns the tool plumbing. |
 
 ### Test Swarm Agents
 

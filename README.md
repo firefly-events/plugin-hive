@@ -95,6 +95,12 @@ Each story produces a committed, reviewed state. The orchestrator handles coordi
 - `/hive:visual-qa` — compare implementation against design briefs
 - `/hive:logo-exploration` — generate logo directions and contact sheets
 
+**Marketing** _(consumer projects only — not invoked for Hive's own internal work)_
+- `/hive:marketing-campaign` — changelog-driven launch campaign: marketing-strategist derives a campaign brief from what shipped, marketing-copywriter produces copy, ad-creative produces visual concepts and image-gen prompts
+- **marketing-strategist** — positioning, audience segmentation, go-to-market strategy, and campaign brief authoring
+- **marketing-copywriter** — ad copy, landing page copy, email sequences, social posts, taglines, and CTAs
+- **ad-creative** — visual concept direction, creative briefs, and image-gen prompts for paid and organic channels
+
 **Project intelligence**
 - `/hive:context-snapshot` — JSON snapshot of epics, stories, triage, metrics
 - `/hive:metrics-check` — post-merge metric verdicts
