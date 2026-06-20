@@ -1,7 +1,9 @@
 id: b4-wire-campaign-into-ship
 epic: marketing-team
 title: Wire /marketing-campaign into the /ship post-release lifecycle (changelog-driven, consumer-gated)
-status: pending
+status: in_progress
+tracker_id: plugin-hive/PLU-379
+
 complexity: medium
 methodology: classic
 depends_on: [b5-marketing-campaign-skill]
