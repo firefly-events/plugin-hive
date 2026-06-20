@@ -1,7 +1,9 @@
 id: b6-marketing-team-docs
 epic: marketing-team
 title: User docs for the marketing team + /marketing-campaign
-status: pending
+status: in_progress
+tracker_id: plugin-hive/PLU-380
+
 complexity: low
 methodology: classic
 depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona, b4-wire-campaign-into-ship, b5-marketing-campaign-skill, b7-shared-visual-asset-skill]
