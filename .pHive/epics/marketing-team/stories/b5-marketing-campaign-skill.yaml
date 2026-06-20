@@ -1,7 +1,9 @@
 id: b5-marketing-campaign-skill
 epic: marketing-team
 title: /marketing-campaign entry skill — strategist → copy → creative, user-reviewed
-status: pending
+status: in_progress
+tracker_id: plugin-hive/PLU-378
+
 complexity: medium
 methodology: classic
 depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona, b7-shared-visual-asset-skill]
