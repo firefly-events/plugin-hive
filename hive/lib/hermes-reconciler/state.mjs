@@ -11,7 +11,6 @@
  */
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 
@@ -72,15 +71,16 @@ export function readHermesReconcilerState(cycleStatePath) {
   let text;
   try {
     text = fs.readFileSync(cycleStatePath, 'utf8');
-  } catch {
-    return applyDefaults(null);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return applyDefaults(null);
+    throw error;
   }
 
   let doc;
   try {
     doc = requireYaml().load(text);
-  } catch {
-    return applyDefaults(null);
+  } catch (error) {
+    throw new Error(`Failed to parse cycle-state YAML at ${cycleStatePath}: ${error?.message || String(error)}`);
   }
 
   return applyDefaults(doc?.hermes_reconciler ?? null);
@@ -104,15 +104,19 @@ export function writeHermesReconcilerState(cycleStatePath, updates) {
   let text;
   try {
     text = fs.readFileSync(cycleStatePath, 'utf8');
-  } catch {
-    text = null;
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      text = null;
+    } else {
+      throw error;
+    }
   }
 
   if (text) {
     try {
       doc = y.load(text) ?? {};
-    } catch {
-      doc = {};
+    } catch (error) {
+      throw new Error(`Failed to parse cycle-state YAML at ${cycleStatePath}: ${error?.message || String(error)}`);
     }
   }
 
@@ -138,8 +142,8 @@ export function writeHermesReconcilerState(cycleStatePath, updates) {
 
   const dir = path.dirname(cycleStatePath);
   const tmpPath = path.join(
-    os.tmpdir(),
-    `hermes-reconciler-${process.pid}-${Date.now()}.yaml.tmp`,
+    dir,
+    `.hermes-reconciler-${process.pid}-${Date.now()}.yaml.tmp`,
   );
 
   fs.mkdirSync(dir, { recursive: true });
