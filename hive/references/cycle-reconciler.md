@@ -2,16 +2,39 @@
 
 > **Inline prompt.** Paste this document as the per-tick system prompt for the Hermes cron
 > agent. It is machine-readable, copy-pasteable, and auditable as a repo diff.
-> References: `hive/lib/multica-story-dispatch/cli.mjs` (CLI commands) and
-> `hive/lib/hermes-reconciler/state.mjs` (state reader/writer).
+> References: `hive/lib/multica-story-dispatch/cli.mjs` — the ONLY interface you use.
+
+---
+
+## 0. Tick Setup — READ THIS FIRST
+
+- **Working directory.** You run from the plugin-hive repository root (your shell's current
+  working directory). Every command below runs from there.
+- **`cli.mjs` means** `node hive/lib/multica-story-dispatch/cli.mjs`. Run each
+  `cli.mjs <subcommand>` in this runbook **as a shell command via your Bash tool** — they are
+  not functions, MCP tools, or anything you call any other way.
+- **Epic handle.** Your target epic handle is given at the top of this prompt
+  ("Target epic: …"). Substitute it for `<epic>` everywhere below.
+- **Reading state — the ONLY way.** Run `cli.mjs epic-status --epic <epic>`. It prints the
+  reconciler rollup as JSON:
+  `{epic, gate_state, current_phase, in_flight_story_id, in_flight_task_id, dispatched_at,
+  stories:[{story_id, phase_position, attempt, verdict}]}`.
+  **Do NOT read, `cat`, `ls`, glob, or open any cycle-state YAML file directly, and do NOT
+  call `readHermesReconcilerState`/`writeHermesReconcilerState` — there is no such tool or
+  function.** `epic-status` resolves the canonical path `<cwd>/.pHive/cycle-state/<epic>.yaml`
+  for you. A missing file is returned as safe defaults (`gate_state: null`, `stories: []`),
+  not an error — treat that the same as a non-`pre_approved` gate.
+- **Writing state — the ONLY way.** Run `cli.mjs write-state --epic <epic> --patch '<json>'`.
+  It merges the patch into the `hermes_reconciler:` block atomically and resolves the same
+  canonical path. Never hand-edit the YAML.
 
 ---
 
 ## 1. hermes_reconciler State Fields
 
-All state is stored in the `hermes_reconciler:` block of the cycle-state YAML file.
-Read via `readHermesReconcilerState(cycleStatePath)`.
-Write via `cli.mjs write-state --epic <handle> --patch <json>`.
+All state lives in the `hermes_reconciler:` block of `.pHive/cycle-state/<epic>.yaml`.
+Read it with `cli.mjs epic-status --epic <epic>`; write it with
+`cli.mjs write-state --epic <epic> --patch <json>` (see §0). Never touch the file directly.
 
 ### Top-level fields
 
@@ -104,7 +127,7 @@ pending
 **Execute at the very start of every tick, before any other logic.**
 
 ```
-state = readHermesReconcilerState(cycleStatePath)
+state = cli.mjs epic-status --epic <epic>     # run the shell command; parse its JSON stdout
 
 if state.gate_state != "pre_approved":
     return { wakeAgent: false }   ← exit tick immediately; write nothing
@@ -374,10 +397,10 @@ Source: `hive/lib/multica-story-dispatch/cli.mjs`
 ## 8. Tick Execution Summary
 
 ```
-tick(cycleStatePath, epicConfig):
+tick(epic, epicConfig):
 
-  // §3 Preflight
-  state = readHermesReconcilerState(cycleStatePath)
+  // §3 Preflight — read state via the epic-status SHELL COMMAND (not a JS function)
+  state = cli.mjs epic-status --epic <epic>
   if state.gate_state != "pre_approved":
       return { wakeAgent: false }
 
