@@ -268,7 +268,12 @@ async function cmdDispatch(args, cfg) {
     issue?.assignee_id &&
     (issue?.assignee_type === 'agent' || issue?.assignee_type === 'squad')
   ) {
-    succeed({ status: 'already_dispatched', issue_id: issueUuid });
+    let task_id = null;
+    try {
+      const snapshot = await readTaskSnapshot(serverUrl, token, workspaceId, issueUuid);
+      task_id = snapshot.task_id ?? null;
+    } catch { /* best-effort */ }
+    succeed({ status: 'already_dispatched', issue_id: issueUuid, task_id });
     return;
   }
 
@@ -282,7 +287,13 @@ async function cmdDispatch(args, cfg) {
     await dispatchStoryToSquad(serverUrl, token, workspaceId, issueUuid, squadUuid);
   }
 
-  succeed({ status: 'dispatched', issue_id: issueUuid });
+  let task_id = null;
+  try {
+    const snapshot = await readTaskSnapshot(serverUrl, token, workspaceId, issueUuid);
+    task_id = snapshot.task_id ?? null;
+  } catch { /* best-effort */ }
+
+  succeed({ status: 'dispatched', issue_id: issueUuid, task_id });
 }
 
 async function cmdStatus(args, cfg) {

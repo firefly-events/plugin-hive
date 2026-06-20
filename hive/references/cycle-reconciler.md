@@ -89,9 +89,9 @@ pending
 
 | From | Condition | To | Written |
 |------|-----------|----|---------|
-| `pending` | Branch 3 fires | `dispatched_impl` | `dispatched_at`, `in_flight_story_id`, `in_flight_task_id`, `current_phase="dispatched_impl"`, `attempt=1` (or current) |
+| `pending` | Branch 3 fires | `dispatched_impl` | `dispatched_at`, `in_flight_story_id`, `in_flight_task_id` (from dispatch return), `current_phase="dispatched_impl"`, `attempt=1` (or current) |
 | `dispatched_impl` | Branch 2: task terminal | `impl_terminal` | episode marker; clear `in_flight_task_id` |
-| `impl_terminal` | Branch 3 fires | `dispatched_review` | `dispatched_at`, `in_flight_story_id`, `in_flight_task_id`, `current_phase="dispatched_review"` |
+| `impl_terminal` | Branch 3 fires | `dispatched_review` | `dispatched_at`, `in_flight_story_id`, `in_flight_task_id` (from dispatch return), `current_phase="dispatched_review"` |
 | `dispatched_review` | Branch 2: task terminal, verdict=passed | `review_terminal` → advance | episode marker; advance next story or set `epic_finalize_pr` |
 | `dispatched_review` | Branch 2: task terminal, verdict=needs-revision | `dispatched_impl` | `attempt++`; clear `in_flight_task_id`; dispatched_at cleared |
 | `review_terminal` | all stories passed | `epic_finalize_pr` | clear in-flight fields |
@@ -245,7 +245,8 @@ Select the **first actionable story** (preserve original epic ordering).
        --agent <agent-name>
        # OR --squad <squad-name>
        # Idempotent: no-ops if already in_progress for the same assignee.
-       # Returns: { status: "dispatched" | "already_dispatched", issue_id }
+       # Returns: { status: "dispatched" | "already_dispatched", issue_id, task_id }
+       # task_id is null if not yet resolvable; watchdog recovers on a later tick.
 
 3. Determine new phase_position:
    - pending       → "dispatched_impl"
@@ -254,7 +255,7 @@ Select the **first actionable story** (preserve original epic ordering).
 
 4. Write:
    hermes_reconciler.in_flight_story_id = <story-issue-uuid>
-   hermes_reconciler.in_flight_task_id  = <task-id>   # from dispatch or cli.mjs status
+   hermes_reconciler.in_flight_task_id  = <task-id>   # from dispatch return
    hermes_reconciler.dispatched_at      = <ISO8601 now>   ← watchdog timer starts HERE
    hermes_reconciler.current_phase      = <dispatched_impl | dispatched_review>
    stories[story-id].phase_position     = <dispatched_impl | dispatched_review>
@@ -357,7 +358,7 @@ Source: `hive/lib/multica-story-dispatch/cli.mjs`
 
 | Subcommand | Required Flags | Description |
 |------------|---------------|-------------|
-| `dispatch` | `--issue <uuid>` + (`--agent <name>` \| `--squad <name>`) | Dispatch story to agent or squad. Idempotent: no-ops if already `in_progress` for the same assignee. Returns `{ status: "dispatched"\|"already_dispatched", issue_id }`. |
+| `dispatch` | `--issue <uuid>` + (`--agent <name>` \| `--squad <name>`) | Dispatch story to agent or squad. Idempotent: no-ops if already `in_progress` for the same assignee. Returns `{ status: "dispatched"\|"already_dispatched", issue_id, task_id }`. `task_id` is `null` if not yet resolvable immediately after dispatch. |
 | `status` | `--issue <uuid>` | Non-blocking task snapshot (≤5 s). Returns `{ status, started_at, task_id }`. Terminal statuses: `completed`, `failed`, `cancelled`. |
 | `poll` | `--issue <uuid>` [`--timeout-ms <N>`] | Blocking poll until terminal (default timeout: 1 800 000 ms / 30 min). Returns same shape as `status`. |
 | `episode` | `--issue <uuid>` `--epic <handle>` `--story <story-id>` | Reads task messages, writes episode marker to `.pHive/`. Returns `{ written: <marker-path>, status }`. |
@@ -395,7 +396,8 @@ tick(cycleStatePath, epicConfig):
   if NOT state.in_flight_story_id:
       story = first story with phase_position in {pending, dispatched_impl (loop-back), impl_terminal}
       if story:
-          cli.mjs dispatch --issue <story.issue_uuid> --agent <agent>
+          result = cli.mjs dispatch --issue <story.issue_uuid> --agent <agent>
+          # result.task_id is available directly — no separate status call needed
           write in_flight fields + dispatched_at + current_phase, exit tick
 
   // §4 Branch 4 — Finalize
