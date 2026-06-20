@@ -19,6 +19,7 @@ advancing shipped stories.
 | `--partial` | Allow shipping only the stories that are already `complete` after reconciliation. |
 | `--release-id <id>` | Use a stable release artifact ID. Default: `<project>-<YYYYMMDD-HHMMSS>`. |
 | `--dry-run` | Stop after displaying the resolved ship plan. Do not execute, generate artifacts, or mark shipped. |
+| `--campaign` | Opt in to the post-release marketing campaign step (step 9). Equivalent to `ship.campaign: true` in `hive.config.yaml`. Default: off. Consumer projects only. |
 
 ## State Directory Resolution
 
@@ -342,6 +343,33 @@ Finally, run `/status {epic-id}` or invoke the same read-only status derivation
 path for every target epic and report the resulting shipped state. `/status`
 itself must remain read-only; do not add status writes to it.
 
+### 9. Launch Campaign (Consumer-Gated, Opt-In)
+
+Runs after stories are marked shipped. Skipped unless ALL of the following are true:
+
+1. **Consumer gate** — `project_type` in `${HIVE_STATE_DIR}/project-profile.yaml` equals `consumer-app`. If the project is Hive's own internal development work, skip this step silently.
+2. **Opt-in gate** — at least one of:
+   - `--campaign` flag was passed on the `/ship` invocation; **or**
+   - `ship.campaign: true` is set in the root `hive.config.yaml` (consumer override layer; falls back to `hive/hive.config.yaml`; default `false`/absent = off).
+
+When both gates pass, invoke `/marketing-campaign` in `--from-ship` mode, passing the changelog file as source material:
+
+```text
+/marketing-campaign --from-ship CHANGELOG.md
+```
+
+The changelog path is the same `CHANGELOG.md` written in step 3. `/marketing-campaign` owns its own user-review gate (decision gate after the creative pass) — `/ship` does not add a second prompt. `/ship` is done after handing off the changelog path; campaign output lands under `.pHive/campaigns/<topic>/` per the `/marketing-campaign` skill contract.
+
+**Sequence note:** this step runs after mark-shipped (step 8) and is independent of any worktree-prune step that may follow. If a worktree-prune step exists (added by a parallel story), it runs after this campaign-hook step.
+
+**Documenting the opt-in.** The `--campaign` flag is listed in the `/ship` argument table at the top of this skill, and `ship.campaign` is documented in this step. No other configuration schema changes are required for v1.
+
+#### `--campaign` flag documentation
+
+Add the following entry to the `/ship` **Input** flags table at the top of this skill when that table is maintained:
+
+| `--campaign` | Opt in to the post-release marketing campaign step (step 9). Equivalent to `ship.campaign: true` in `hive.config.yaml`. Default: off. |
+
 ## Output
 
 End with a compact release summary:
@@ -370,3 +398,4 @@ Excluded stories:
 - [`skills/execute/SKILL.md`](../execute/SKILL.md) - primary version bump owner and ship-time safety-net patch rules.
 - [`skills/status/SKILL.md`](../status/SKILL.md) - read-only status reporting and `deriveStoryStatus` usage.
 - [`hive/lib/release_post.mjs`](../../hive/lib/release_post.mjs) - release artifact generator.
+- [`skills/marketing-campaign/SKILL.md`](../marketing-campaign/SKILL.md) - post-release campaign skill invoked by step 9 (`--from-ship` mode); owns the user-review gate and campaign output.
