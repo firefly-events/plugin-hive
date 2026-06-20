@@ -1,7 +1,9 @@
 id: a1-audit-plugin-install-payload
 epic: plugin-hygiene
 title: Audit what ships in the plugin install payload
-status: pending
+status: in_progress
+tracker_id: plugin-hive/PLU-372
+tracker_url: http://localhost:3000/issues/PLU-372
 complexity: medium
 methodology: classic
 depends_on: []

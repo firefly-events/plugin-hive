@@ -1,7 +1,9 @@
 id: a2-ship-closes-worktrees
 epic: plugin-hygiene
 title: /ship prunes the shipped epic's worktree(s)
-status: pending
+status: in_progress
+tracker_id: plugin-hive/PLU-373
+
 complexity: medium
 methodology: classic
 depends_on: []
