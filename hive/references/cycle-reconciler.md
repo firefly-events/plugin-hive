@@ -11,7 +11,7 @@
 
 All state is stored in the `hermes_reconciler:` block of the cycle-state YAML file.
 Read via `readHermesReconcilerState(cycleStatePath)`.
-Write via `writeHermesReconcilerState(cycleStatePath, updates)`.
+Write via `cli.mjs write-state --epic <handle> --patch <json>`.
 
 ### Top-level fields
 
@@ -138,7 +138,8 @@ if stories[in_flight_story_id].attempt >= max_attempts:   # config, default 3
         phase:  state.current_phase,
         attempt: stories[in_flight_story_id].attempt
     })
-    writeHermesReconcilerState(cycleStatePath, { stories: ... })
+    cli.mjs write-state --epic <handle> --patch \
+        '{"stories": {"<in_flight_story_id>": {"phase_position": "blocked", "escalations": [...]}}}'
     ← exit tick (do NOT re-dispatch)
 ```
 
@@ -155,7 +156,8 @@ if stories[in_flight_story_id].attempt >= max_attempts:   # config, default 3
 
 4. hermes_reconciler.dispatched_at = <ISO8601 now>   ← reset watchdog timer
 
-5. writeHermesReconcilerState(cycleStatePath, { dispatched_at, stories: ... })
+5. cli.mjs write-state --epic <handle> --patch \
+       '{"dispatched_at": "<ISO8601 now>", "stories": {"<in_flight_story_id>": {"attempt": <N+1>}}}'
 ```
 
 **→ Exit tick after this step.**
@@ -217,7 +219,8 @@ If `snapshot.status` ∈ { `completed`, `failed`, `cancelled` }:
            hermes_reconciler.dispatched_at       = null
            # Branch 3 re-dispatches impl on the next tick.
 
-4. writeHermesReconcilerState(cycleStatePath, { ... })
+4. cli.mjs write-state --epic <handle> --patch \
+       '<json with updated phase_position, in_flight fields, and story patch>'
 ```
 
 **→ Exit tick after this step.**
@@ -260,7 +263,8 @@ Select the **first actionable story** (preserve original epic ordering).
    hermes_reconciler.current_phase      = <dispatched_impl | dispatched_review>
    stories[story-id].phase_position     = <dispatched_impl | dispatched_review>
 
-5. writeHermesReconcilerState(cycleStatePath, { ... })
+5. cli.mjs write-state --epic <handle> --patch \
+       '{"in_flight_story_id": "<uuid>", "in_flight_task_id": "<task-id>", "dispatched_at": "<ISO8601 now>", "current_phase": "<dispatched_impl|dispatched_review>", "stories": {"<story-id>": {"phase_position": "<dispatched_impl|dispatched_review>"}}}'
 ```
 
 **→ Exit tick after this step.**
@@ -281,8 +285,7 @@ Select the **first actionable story** (preserve original epic ordering).
    # OR equivalent Multica PR action if available.
 
 2. Write:
-   hermes_reconciler.gate_state = "finalized"
-   writeHermesReconcilerState(cycleStatePath, { gate_state: "finalized" })
+   cli.mjs write-state --epic <handle> --patch '{"gate_state": "finalized"}'
 ```
 
 **→ Exit tick after this step.**
@@ -363,6 +366,8 @@ Source: `hive/lib/multica-story-dispatch/cli.mjs`
 | `poll` | `--issue <uuid>` [`--timeout-ms <N>`] | Blocking poll until terminal (default timeout: 1 800 000 ms / 30 min). Returns same shape as `status`. |
 | `episode` | `--issue <uuid>` `--epic <handle>` `--story <story-id>` | Reads task messages, writes episode marker to `.pHive/`. Returns `{ written: <marker-path>, status }`. |
 | `cancel` | `--issue <uuid>` | Cancels the active task. Returns `{ cancelled: true, task_id }`. |
+| `epic-status` | `--epic <handle>` [`--cycle-state <path>`] | Read-only rollup of the hermes_reconciler block. Returns `{ epic, gate_state, current_phase, in_flight_story_id, in_flight_task_id, dispatched_at, stories[] }`. Local-only, no Multica creds required. |
+| `write-state` | `--epic <handle>` `--patch <json>` [`--cycle-state <path>`] | Merge a JSON patch into the hermes_reconciler block and write atomically. Top-level fields and per-story fields under `stories.<id>` are supported. Echoes the updated rollup. Local-only, no Multica creds required. |
 
 ---
 
@@ -382,7 +387,9 @@ tick(cycleStatePath, epicConfig):
           mark blocked, write escalation, exit tick
       cli.mjs cancel --issue <in_flight_story_id>
       cli.mjs dispatch --issue <in_flight_story_id> --agent <same>
-      attempt++, dispatched_at = now, write state, exit tick
+      attempt++, dispatched_at = now
+      cli.mjs write-state --epic <h> --patch '{"dispatched_at":"<now>","stories":{"<id>":{"attempt":<N+1>}}}'
+      exit tick
 
   // §4 Branch 2 — Harvest Terminal
   if state.in_flight_story_id AND state.in_flight_task_id:
@@ -390,7 +397,9 @@ tick(cycleStatePath, epicConfig):
       if snapshot.status in {completed, failed, cancelled}:
           cli.mjs episode --issue ... --epic ... --story ...
           normalize verdict (§6)
-          advance phase_position, write state, exit tick
+          advance phase_position
+          cli.mjs write-state --epic <h> --patch '<updated fields>'
+          exit tick
 
   // §4 Branch 3 — Dispatch Next
   if NOT state.in_flight_story_id:
@@ -398,12 +407,15 @@ tick(cycleStatePath, epicConfig):
       if story:
           result = cli.mjs dispatch --issue <story.issue_uuid> --agent <agent>
           # result.task_id is available directly — no separate status call needed
-          write in_flight fields + dispatched_at + current_phase, exit tick
+          cli.mjs write-state --epic <h> --patch \
+              '{"in_flight_story_id":"<uuid>","in_flight_task_id":"<tid>","dispatched_at":"<now>","current_phase":"<phase>","stories":{"<id>":{"phase_position":"<phase>"}}}'
+          exit tick
 
   // §4 Branch 4 — Finalize
   if all stories phase_position == "done":
       gh pr create ...
-      gate_state = "finalized", write state, exit tick
+      cli.mjs write-state --epic <h> --patch '{"gate_state":"finalized"}'
+      exit tick
 
   // §4 Branch 5 — No-op
   return { wakeAgent: true }

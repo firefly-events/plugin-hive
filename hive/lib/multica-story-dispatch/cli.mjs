@@ -12,7 +12,10 @@ import {
 } from './index.mjs';
 
 import { pollTaskUntilTerminal, writeMulticaRunEpisode } from './episode-sync.mjs';
-import { readHermesReconcilerState } from '../hermes-reconciler/state.mjs';
+import {
+  readHermesReconcilerState,
+  writeHermesReconcilerState,
+} from '../hermes-reconciler/state.mjs';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HTTP_TIMEOUT_MS = 30_000;
@@ -417,6 +420,78 @@ async function cmdEpicStatus(args, cfg) {
   });
 }
 
+// Valid top-level keys for the hermes_reconciler patch.
+const VALID_PATCH_KEYS = new Set([
+  'gate_state',
+  'in_flight_story_id',
+  'in_flight_task_id',
+  'dispatched_at',
+  'current_phase',
+  'stuck_after_seconds',
+  'stories',
+]);
+
+// Write a partial update to the hermes_reconciler: block of a cycle-state YAML.
+// Local-only (no Multica creds) — in the NO_CONFIG set.
+async function cmdWriteState(args) {
+  if (!args.epic || args.epic === true) fail('MISSING_ARG', '--epic is required');
+  if (!args.patch || args.patch === true) fail('MISSING_ARG', '--patch is required');
+
+  const epic = String(args.epic);
+  const cycleStatePath = resolveCycleStatePath(args, epic);
+
+  let patch;
+  try {
+    patch = JSON.parse(args.patch);
+  } catch {
+    fail('INVALID_ARG', '--patch must be valid JSON');
+    return;
+  }
+
+  if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+    fail('INVALID_ARG', '--patch must be a JSON object');
+    return;
+  }
+
+  const unknownKeys = Object.keys(patch).filter((k) => !VALID_PATCH_KEYS.has(k));
+  if (unknownKeys.length > 0) {
+    fail('INVALID_ARG', `Unknown top-level patch fields: ${unknownKeys.join(', ')}. Expected: ${[...VALID_PATCH_KEYS].join(', ')}`);
+    return;
+  }
+
+  try {
+    writeHermesReconcilerState(cycleStatePath, patch);
+  } catch (error) {
+    fail('CYCLE_STATE_WRITE', error?.message || String(error));
+    return;
+  }
+
+  let state;
+  try {
+    state = readHermesReconcilerState(cycleStatePath);
+  } catch (error) {
+    fail('CYCLE_STATE_READ', error?.message || String(error));
+    return;
+  }
+
+  const stories = Object.entries(state.stories || {}).map(([storyId, s]) => ({
+    story_id: storyId,
+    phase_position: s?.phase_position ?? null,
+    attempt: s?.attempt ?? null,
+    verdict: s?.verdict ?? null,
+  }));
+
+  succeed({
+    epic,
+    gate_state: state.gate_state,
+    current_phase: state.current_phase,
+    in_flight_story_id: state.in_flight_story_id,
+    in_flight_task_id: state.in_flight_task_id,
+    dispatched_at: state.dispatched_at,
+    stories,
+  });
+}
+
 // Post a comment to a Multica issue. Backs the multica_post_comment tool.
 async function cmdComment(args, cfg) {
   if (!args.issue) fail('MISSING_ARG', '--issue is required');
@@ -437,9 +512,9 @@ async function cmdComment(args, cfg) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 // Commands that read only local state and need no Multica server credentials.
-const NO_CONFIG = new Set(['epic-status']);
+const NO_CONFIG = new Set(['epic-status', 'write-state']);
 
-const USAGE = 'cli.mjs <dispatch|status|poll|episode|cancel|epic-status|comment> [options]';
+const USAGE = 'cli.mjs <dispatch|status|poll|episode|cancel|epic-status|comment|write-state> [options]';
 
 async function main() {
   const [, , command, ...rest] = process.argv;
@@ -459,12 +534,13 @@ async function main() {
       case 'poll':        await cmdPoll(args, cfg);       break;
       case 'episode':     await cmdEpisode(args, cfg);    break;
       case 'cancel':      await cmdCancel(args, cfg);     break;
-      case 'epic-status': await cmdEpicStatus(args, cfg); break;
-      case 'comment':     await cmdComment(args, cfg);    break;
+      case 'epic-status':  await cmdEpicStatus(args, cfg); break;
+      case 'comment':      await cmdComment(args, cfg);    break;
+      case 'write-state':  await cmdWriteState(args);      break;
       default:
         fail(
           'UNKNOWN_COMMAND',
-          `Unknown command: ${command}. Expected: dispatch|status|poll|episode|cancel|epic-status|comment`,
+          `Unknown command: ${command}. Expected: dispatch|status|poll|episode|cancel|epic-status|comment|write-state`,
         );
     }
   } catch (error) {
