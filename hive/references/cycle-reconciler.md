@@ -8,25 +8,37 @@
 
 ## 0. Tick Setup — READ THIS FIRST
 
-- **Working directory.** You run from the plugin-hive repository root (your shell's current
-  working directory). Every command below runs from there.
-- **`cli.mjs` means** `node hive/lib/multica-story-dispatch/cli.mjs`. Run each
-  `cli.mjs <subcommand>` in this runbook **as a shell command via your Bash tool** — they are
-  not functions, MCP tools, or anything you call any other way.
-- **Epic handle.** Your target epic handle is given at the top of this prompt
-  ("Target epic: …"). Substitute it for `<epic>` everywhere below.
-- **Reading state — the ONLY way.** Run `cli.mjs epic-status --epic <epic>`. It prints the
-  reconciler rollup as JSON:
+You run as an **unattended cron agent**. **Your only tools are the `hermes-multica` MCP tools
+listed below — you do NOT have a shell/Bash tool, a file reader, `cat`, `ls`, or glob.** Do not
+attempt to run shell commands or open files; call the tools. (Emitting a shell command or a
+`<invoke name="Bash">` block does nothing — there is no executor.)
+
+| Operation | MCP tool | Args |
+|-----------|----------|------|
+| Read reconciler state | `multica_epic_status` | `epic_handle` |
+| Dispatch a story | `multica_dispatch_story` | `issue_id`, `agent_name` (or `squad_name`) |
+| Poll a task to terminal | `multica_poll_task` | `issue_id`, `timeout_ms` |
+| **Persist reconciler state** | `multica_write_state` | `epic_handle`, `patch` (JSON object string) |
+| Post a comment | `multica_post_comment` | `issue_id`, `body` |
+
+- **Epic handle.** Given at the top of this prompt ("Target epic: …"); pass it as `epic_handle`
+  and substitute it for `<epic>` below.
+- **Reading state — the ONLY way.** Call `multica_epic_status` with the epic handle. It returns
   `{epic, gate_state, current_phase, in_flight_story_id, in_flight_task_id, dispatched_at,
-  stories:[{story_id, phase_position, attempt, verdict}]}`.
-  **Do NOT read, `cat`, `ls`, glob, or open any cycle-state YAML file directly, and do NOT
-  call `readHermesReconcilerState`/`writeHermesReconcilerState` — there is no such tool or
-  function.** `epic-status` resolves the canonical path `<cwd>/.pHive/cycle-state/<epic>.yaml`
-  for you. A missing file is returned as safe defaults (`gate_state: null`, `stories: []`),
-  not an error — treat that the same as a non-`pre_approved` gate.
-- **Writing state — the ONLY way.** Run `cli.mjs write-state --epic <epic> --patch '<json>'`.
-  It merges the patch into the `hermes_reconciler:` block atomically and resolves the same
-  canonical path. Never hand-edit the YAML.
+  stories:[{story_id, phase_position, attempt, verdict}]}`. A missing file comes back as safe
+  defaults (`gate_state: null`, `stories: []`) — treat that as a non-`pre_approved` gate. Do NOT
+  call `readHermesReconcilerState` (no such tool).
+- **Writing state — the ONLY way.** Call `multica_write_state` with `epic_handle` and a `patch`
+  — a JSON object string merged into the `hermes_reconciler:` block (top-level fields and/or a
+  `stories` map). **A dispatch is not durable until you have called `multica_write_state`.** Do
+  NOT call `writeHermesReconcilerState` (no such tool) and never assume a write happened.
+- **Default impl agent is `developer`** unless the epic config names another. Do NOT use
+  `hermes` — that is not a workspace agent.
+- **Subcommand → tool map.** In the runbook below, any `cli.mjs <subcommand>` is shorthand for
+  the matching tool: `epic-status`→`multica_epic_status`, `dispatch`→`multica_dispatch_story`,
+  `status`/`poll`→`multica_poll_task`, `write-state`→`multica_write_state`,
+  `comment`→`multica_post_comment`. (`episode` and `cancel` have no tool yet — if a branch needs
+  them, persist the intended phase via `multica_write_state` and note the gap in your report.)
 
 ---
 
