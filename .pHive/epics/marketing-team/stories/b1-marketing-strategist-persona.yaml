@@ -1,0 +1,92 @@
+id: b1-marketing-strategist-persona
+epic: marketing-team
+title: Author the marketing-strategist persona (team lead)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+parallel_allowed: true
+parallel_rationale: variation
+
+description: |
+  Author hive/agents/marketing-strategist.md — the lead persona of the marketing
+  team. Owns positioning, audience segmentation, go-to-market, channel strategy,
+  and the campaign brief that marketing-copywriter (b2) and ad-creative (b3)
+  consume. Consumer-projects only (hive's own work excluded), mirroring how
+  ui-designer is gated off hive work.
+
+  MUST be authored against the verified dual-runtime contract in
+  .pHive/epics/marketing-team/docs/agent-config-grounding.md — full agent config,
+  not just frontmatter. The persona is dispatched to BOTH the Claude Code Agent
+  tool and the Codex backend, so it follows the dual-dispatch mapping (§3) and
+  passes the reviewer checklist (§4) in that doc.
+
+acceptance_criteria:
+  - "Given the persona file, then frontmatter has all 5 Claude Code fields (name, description, model, color, tools) plus Hive knowledge + domain, mirroring hive/agents/ui-designer.md structure."
+  - "Given the dual-dispatch contract, then `model` is a tier word (opus|sonnet|haiku|inherit) — never a hard-coded model id — and the persona body works verbatim as a standalone system prompt (== Codex developer_instructions)."
+  - "Given tool restriction, then it is expressed BOTH as a `tools` allowlist and in prose (so the Codex path, which has no tools field, can honor it via sandbox/MCP)."
+  - "Given consumer-gating, then the persona declares it serves consumer projects only and is not selected for hive's own work."
+  - "Given the role boundary, then the persona scopes itself to strategy/positioning/GTM and explicitly hands creative execution to copywriter (b2) and ad-creative (b3)."
+  - "No behavior-critical instruction lives only in a Hive-only or Claude-Code-only field (grounding §4)."
+
+steps:
+  - id: research
+    description: |
+      Read agent-config-grounding.md (the authoring contract) and
+      hive/agents/ui-designer.md (structure + consumer-gating precedent). Note
+      the section layout (identity → Activation Protocol → What you do → Areas of
+      expertise → Quality standards → Output format → Insight capture).
+    agent: researcher
+  - id: implement
+    description: |
+      Write hive/agents/marketing-strategist.md per the grounding contract:
+      frontmatter (name marketing-strategist, description third-person with role,
+      model tier, color from palette, tools allowlist for read + brief-writing),
+      Hive knowledge/domain, and a 150–400 word body that is a valid standalone
+      system prompt. Define campaign-brief output format the team consumes.
+    agent: developer
+    depends_on: [research]
+  - id: review
+    description: |
+      Run the grounding §4 reviewer checklist. Confirm dual-backend safety
+      (body works as Codex developer_instructions), tier-word model, prose+allowlist
+      tool restriction, consumer gating, and clean role boundary vs copywriter/ad-creative.
+    agent: reviewer
+    depends_on: [implement]
+
+context:
+  codebase: /Users/don/.claude/worktrees/hive-composability-design
+  key_files:
+    - path: .pHive/epics/marketing-team/docs/agent-config-grounding.md
+      purpose: "Authoring contract — full Claude Code + Codex agent config + dual-dispatch mapping. The binding spec for this persona."
+    - path: hive/agents/ui-designer.md
+      purpose: "Structural template + consumer-only gating precedent to mirror."
+    - path: hive/references/agent-config-schema.md
+      purpose: "Canonical Hive persona schema (superset of Claude Code fields)."
+
+files_to_modify:
+  - file: hive/agents/marketing-strategist.md
+    change: "New lead persona for the marketing team."
+
+design_decisions:
+  - decision: Strategist is the team lead; brief flows to copywriter + ad-creative
+    rationale: "Mirrors /design's strategist→handoff flow; keeps creative execution out of the lead so the team has clear division of labor."
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Persona-authoring substrate; the deliverable is the agent definition. Its effect on consumer-project campaign quality is a downstream behavioral outcome, not a metric this story can falsify."
+
+risks:
+  - severity: medium
+    description: "Persona behavior-critical content placed only in a field one backend drops, causing silent divergence between Claude Code and Codex dispatch."
+    mitigation: "Grounding §3 dual-dispatch mapping + §4 reviewer checklist; body must be self-sufficient as a system prompt."
+
+references:
+  - path: .pHive/epics/marketing-team/docs/agent-config-grounding.md
+    relevant_excerpt: |
+      Author each persona as a Hive .md. The persona body is the one artifact both
+      backends consume (CC system prompt == Codex developer_instructions). model
+      stays a tier word; express tool restriction in both allowlist and prose.
