@@ -97,18 +97,18 @@ context:
 
 files_to_modify:
   - file: hive/references/cycle-state-schema.md
-    change: Add hermes_reconciler: section after autonomous_cycle: block
+    change: "Add hermes_reconciler: section after autonomous_cycle: block"
   - file: hive/lib/hermes-reconciler/state.mjs
     change: NEW — readHermesReconcilerState + writeHermesReconcilerState helpers
 
 design_decisions:
-  - decision: hermes_reconciler: block inside cycle-state.yaml, not a new file
+  - decision: "hermes_reconciler: block inside cycle-state.yaml, not a new file"
     rationale: >
       The brief's design principle is "cycle-state is the cross-tick memory."
       A second file adds a second read per tick and breaks the single-file
       invariant. The additive optional block pattern is already established
       (autonomous_cycle: was added in story s0-1).
-  - decision: autonomous_cycle: is NOT extended
+  - decision: "autonomous_cycle: is NOT extended"
     rationale: >
       autonomous_cycle: fields are scenarios_run[], outcomes[], cycle_count —
       test-scenario replay tracking. Adding reconciler fields (phase_position,

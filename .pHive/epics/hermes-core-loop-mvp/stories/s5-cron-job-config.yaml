@@ -144,7 +144,7 @@ design_decisions:
       before spawning the LLM turn). This means a gate_state=null check costs
       nothing in tokens — no LLM is invoked. Checking gate_state inside the
       prompt would still wake the agent, wasting a full LLM turn.
-  - decision: approvals.cron_mode: "approve" is a machine-level config, not per-job
+  - decision: 'approvals.cron_mode: "approve" is a machine-level config, not per-job'
     rationale: >
       The Hermes config structure has a single approvals.cron_mode field that
       applies to all cron jobs. There is no per-job approval mode in the current
