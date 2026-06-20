@@ -342,6 +342,62 @@ Finally, run `/status {epic-id}` or invoke the same read-only status derivation
 path for every target epic and report the resulting shipped state. `/status`
 itself must remain read-only; do not add status writes to it.
 
+### 9. Prune Epic Worktree(s)
+
+Runs after stories are marked shipped. Removes worktrees created for the shipped
+epic so they do not accumulate under `.claude/worktrees/`.
+
+**Enumerate candidates:**
+
+```bash
+# list worktrees, keep only this epic's under .claude/worktrees/
+git worktree list --porcelain \
+  | awk '/^worktree /{wt=$2} /^branch /{br=$2; print wt"\t"br}' \
+  | grep -F ".claude/worktrees/" \
+  | grep -E "refs/heads/feat/${EPIC_ID}$"
+```
+
+Repeat for every epic ID in the ship set.
+
+**For each candidate worktree, apply hard guards in order:**
+
+1. **Active cwd guard** — if the candidate path is a prefix of (or equal to)
+   the current working directory, do NOT remove it. Report:
+   ```text
+   Worktree {path}: skipped — this is your active session directory. Remove manually after leaving it.
+   ```
+
+2. **Dirty guard** — run `git -C {path} status --porcelain`. If output is
+   non-empty, do NOT remove. Report:
+   ```text
+   Worktree {path}: skipped — has uncommitted changes (dirty).
+   ```
+
+3. **Merged guard** — confirm the branch is fully merged into the ship target.
+   Run `git branch --merged {ship-target-ref} --list {branch-name}` from the
+   repo root. If the branch does not appear in the output, do NOT remove. Report:
+   ```text
+   Worktree {path}: skipped — branch {branch} is not fully merged into {ship-target-ref}.
+   ```
+
+4. **Remove** — all guards passed. Run:
+   ```bash
+   git worktree remove {path}
+   ```
+   Report:
+   ```text
+   Worktree {path}: removed.
+   ```
+
+After processing all candidates, run `git worktree prune` to clean up stale
+administrative files for worktrees whose directories are already gone.
+
+**Idempotency:** if no matching worktrees exist (already removed or never
+created), this step is a silent no-op. No error is raised.
+
+**`--dry-run` flag:** this step is skipped when `--dry-run` is active (step 5
+stops before execution).
+
 ## Output
 
 End with a compact release summary:
@@ -360,6 +416,10 @@ Release artifacts:
 
 Excluded stories:
 - {epic-id}/{story-id} - {status/reason}
+
+Worktree cleanup:
+- {path}: removed
+- {path}: skipped — {reason}
 ```
 
 ## Key References
