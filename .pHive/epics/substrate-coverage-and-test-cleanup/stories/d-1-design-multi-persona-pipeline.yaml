@@ -1,7 +1,9 @@
 id: d-1-design-multi-persona-pipeline
 epic: substrate-coverage-and-test-cleanup
 title: /design Phase A persona-pipeline insert + Pattern B with --include-constraints toggle + 3-persona handoff wiring
-status: complete
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
 complexity: high
 methodology: classic
 depends_on:

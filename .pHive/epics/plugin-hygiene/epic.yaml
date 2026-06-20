@@ -1,0 +1,25 @@
+name: plugin-hygiene
+title: Plugin hygiene — install-payload audit + ship worktree cleanup
+description: |
+  Two independent maintainer-facing improvements to the plugin-hive plugin
+  itself: (a) audit what tracked files ship in the install payload and flag
+  maintainer-only trees, and (b) teach /ship to prune the shipped epic's git
+  worktrees. No shared dependency — grouped because both are small plugin
+  lifecycle/hygiene tasks.
+target_codebase: /Users/don/.claude/worktrees/hive-composability-design
+methodology: classic
+version_bump: none
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  - id: a1-audit-plugin-install-payload
+    title: Audit what ships in the plugin install payload
+    complexity: medium
+    depends_on: []
+  - id: a2-ship-closes-worktrees
+    title: /ship prunes the shipped epic's worktree(s)
+    complexity: medium
+    depends_on: []

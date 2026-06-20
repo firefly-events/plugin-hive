@@ -48,7 +48,9 @@ jobs:
         # css-5/-7/-8) can install plugin-hive into the agent user's
         # `~/.claude/plugins/` cache during `docker build`. Sparse on
         # `.sandcastle/**` would break that copy. Flagged in gi-1 PR.
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Resolve short sha
         id: short
@@ -149,10 +151,10 @@ jobs:
 
       - name: Set up Docker Buildx
         # Required by docker/build-push-action for BuildKit + GHA cache.
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -164,7 +166,7 @@ jobs:
         # apt-get / npm install layers don't re-run when unchanged,
         # which is what brings the dispatch-side pull-only cost down to
         # ~20 s (vs the ~4 min cold local-build).
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ${{ steps.prep.outputs.dir }}
           file: ${{ steps.prep.outputs.dir }}/Dockerfile

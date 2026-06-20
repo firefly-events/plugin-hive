@@ -37,3 +37,114 @@ items:
       - { state: inbox, at: 2026-05-27T05:30:00Z }
       - { state: clarified, at: 2026-05-27T05:30:00Z }
       - { state: prioritized, at: 2026-05-27T05:30:00Z }
+  - id: t-002
+    state: prioritized
+    kind: bug
+    title: "/hive:ship does not bump the README version badge"
+    description: |
+      The /hive:ship release flow bumps the version in three places —
+      .claude-plugin/marketplace.json, .claude-plugin/plugin.json, and
+      CHANGELOG.md — but leaves the README `[![Version]]` badge untouched.
+      Result: the README badge drifts stale every release and the public
+      GitHub web view shows the wrong version.
+
+      Repro / evidence: the 2.11.0 release commit c98116e bumped both
+      manifests + CHANGELOG but produced 0 README diff lines; the badge
+      stayed at 2.10.0. Confirmed via `git show --stat c98116e`. Fixed
+      reactively for 2.11.0 in PR #291, but the ship skill will re-drift
+      the badge on the next release unless the skill itself is fixed.
+
+      Acceptance hints:
+      - /hive:ship updates the README version badge alongside the manifests
+        in the same release commit.
+      - Badge regex/format matches the existing
+        `version-X.Y.Z-green.svg` shields.io pattern.
+      - Idempotent: re-running ship on an already-bumped repo is a no-op.
+      - Guard/verify: ship surfaces (or a release check) flags badge !=
+        manifest version so silent drift can't recur.
+
+      Source: README-revert investigation 2026-06-14 (root cause 248104f
+      re-bloat + c98116e badge skip).
+    reporter: don
+    reported_at: 2026-06-14T22:40:00Z
+    priority: p2
+    severity: moderate
+    assignee: null
+    linked_epic: null
+    linked_story: null
+    closed_reason: null
+    closed_at: null
+    state_history:
+      - { state: inbox, at: 2026-06-14T22:40:00Z }
+      - { state: clarified, at: 2026-06-14T22:40:00Z }
+      - { state: prioritized, at: 2026-06-14T22:40:00Z }
+  - id: t-003
+    state: prioritized
+    kind: feature
+    title: "Enforce language policy — gate new non-canonical runtime files outside bridge surfaces"
+    description: |
+      The Python-first charter (CLAUDE.md / language-strategy-adr Option B) has
+      ZERO automated enforcement. It exists only as prose. Nothing blocks a new
+      .mjs/.js/.ts under hive/lib/ outside the named bridge surfaces:
+        - /plan has no language-policy check (research / design-discussion / grill)
+        - /execute has no gate
+        - no commit hook, no CI lint
+      Result: CodeRabbit (external) is currently the only thing enforcing our own
+      charter. It caught hive/lib/hermes-reconciler/*.mjs in PR #305 (L17), accepted
+      as a one-off exception 2026-06-20.
+
+      Blast radius already drifted (non-bridge JS/TS under hive/lib): external,
+      handoff, meta-team, plan-phase-d, scenarios, test — hermes-reconciler is not
+      the only one, just the one CodeRabbit flagged.
+
+      Design pass should decide enforcement points + allowlist source of truth:
+        (a) PreToolUse/commit hook flagging new .mjs/.js/.ts in hive/lib outside a
+            machine-readable bridge allowlist (derive allowlist from charter table)
+        (b) /plan design-discussion gate that flags planned non-canonical runtime
+            files before stories are written
+        (c) CI lint as backstop
+      Scope-class: new protocol/gate. Likely a small epic.
+
+      Source: PR #305 CodeRabbit L17 + diagnosis 2026-06-20.
+    reporter: don
+    reported_at: 2026-06-20T05:45:00Z
+    priority: p1
+    severity: high
+    assignee: null
+    linked_epic: null
+    linked_story: null
+    closed_reason: null
+    closed_at: null
+    state_history:
+      - { state: inbox, at: 2026-06-20T05:45:00Z }
+      - { state: clarified, at: 2026-06-20T05:45:00Z }
+      - { state: prioritized, at: 2026-06-20T05:45:00Z }
+  - id: t-004
+    state: inbox
+    kind: feature
+    title: "Migrate hive/lib/hermes-reconciler from Node (.mjs) to Python (charter-compliant)"
+    description: |
+      hermes-reconciler is a cycle-state reconciler engine = business logic, which
+      the charter designates Python-canonical. It shipped as Node (.mjs) in PR #305
+      and was accepted as a documented exception 2026-06-20. Migrate to Python in a
+      future pass so it stops being a standing charter exception.
+
+      Currently: state.mjs (read/write hermes_reconciler cycle-state block, atomic
+      write). Port to state.py with conformance parity; update callers.
+
+      Sequencing: best done AFTER t-003 (enforcement gate) lands so the bridge
+      boundary / allowlist is settled and we know whether hermes-reconciler becomes
+      a named bridge instead of a migration target.
+
+      Source: PR #305 CodeRabbit L17 exception 2026-06-20.
+    reporter: don
+    reported_at: 2026-06-20T05:45:00Z
+    priority: p3
+    severity: low
+    assignee: null
+    linked_epic: null
+    linked_story: null
+    closed_reason: null
+    closed_at: null
+    state_history:
+      - { state: inbox, at: 2026-06-20T05:45:00Z }

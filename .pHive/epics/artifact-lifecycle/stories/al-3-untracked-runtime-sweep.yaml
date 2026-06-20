@@ -1,0 +1,103 @@
+id: al-3-untracked-runtime-sweep
+epic: artifact-lifecycle
+title: Evict inactive untracked runtime artifacts to OS temp
+status: in_review
+complexity: high
+methodology: classic
+depends_on:
+  - al-1-lifecycle-library-and-registry
+  - al-2-forever-exclusions-guard
+tracker_id: "PLU-269"
+tracker_uuid: "6f74319d-1c59-4e20-9b31-0131199eb017"
+tracker_url: "http://localhost:8080/issues/6f74319d-1c59-4e20-9b31-0131199eb017"
+
+description: |
+  Implement the untracked-runtime sweep that generalizes the sdr-8 pattern. The
+  CLI plans and applies `evict` actions by moving eligible untracked artifacts to
+  OS temp, supports `--dry-run` and `--class`, and refuses active, suspended,
+  failed, unacknowledged, unconsumed, or unprocessed artifacts.
+
+acceptance_criteria:
+  - "Given a completed DAG run older than the class threshold, when apply mode runs, then the run directory is moved to OS temp and the sweep records the source and temp destination."
+  - "Given a suspended or failed DAG run of any age, when dry-run or apply mode runs, then no eviction candidate is produced."
+  - "Given runtime metrics stop/spawn streams are younger than the threshold or not marked consumed, when the sweep runs, then they are not evicted."
+  - "Given acknowledged interrupts, promoted or discarded staged insights, Chroma sidecars, context snapshots, and scratch outputs that satisfy their active predicates and thresholds, when apply mode runs for their class, then only those inactive paths are moved to OS temp."
+  - "Given `--dry-run` is passed, when the sweep finds candidates, then it reports the planned `evict` actions without moving or deleting any files."
+  - "Given `--class <class_id>` is passed, when the sweep runs, then only matching registry classes are evaluated and unknown class IDs fail with a non-zero error."
+
+metric:
+  applies: false
+  justification: "This cleanup behavior is correctness- and safety-gated, and success is verified by relocation and no-touch tests instead of a product metric."
+
+steps:
+  - id: research
+    description: Confirm concrete markers for completed DAG runs, consumed metrics, acknowledged interrupts, promoted/discarded insights, and Chroma sidecars from the registry story.
+    agent: researcher
+  - id: implement
+    description: Build planner and executor support for untracked evict actions, OS-temp destinations, dry-run, class filtering, and active predicates.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run targeted sweep tests with temporary fixture trees covering eligible, active, dry-run, and class-filter cases.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify the sweep never touches active work and implements only `evict` for untracked runtime classes.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit the untracked runtime sweep on feat/artifact-lifecycle.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/artifact_lifecycle/planner.py
+      purpose: Produces evict candidates from registry entries and active predicates.
+    - path: hive/lib/artifact_lifecycle/executor.py
+      purpose: Applies move-to-temp evictions and dry-run no-ops.
+    - path: hive/lib/artifact_lifecycle/predicates.py
+      purpose: Holds per-class inactive predicates for untracked runtime classes.
+    - path: hive/lib/artifact_lifecycle/cli.py
+      purpose: Exposes dry-run, apply, and class-scoped execution.
+    - path: tests/artifact_lifecycle/test_untracked_sweep.py
+      purpose: Fixture-based tests for active guards and OS-temp relocation.
+
+files_to_modify:
+  - file: hive/lib/artifact_lifecycle/planner.py
+    change: Implement candidate planning for untracked runtime registry classes.
+  - file: hive/lib/artifact_lifecycle/executor.py
+    change: Implement dry-run and move-to-temp apply behavior.
+  - file: hive/lib/artifact_lifecycle/predicates.py
+    change: Implement active predicates for DAG, metrics, interrupts, insights, Chroma sidecars, context snapshots, and scratch.
+  - file: hive/lib/artifact_lifecycle/cli.py
+    change: Wire dry-run/apply/class arguments into planner and executor.
+  - file: tests/artifact_lifecycle/test_untracked_sweep.py
+    change: Add relocation, dry-run, class-filter, and never-touch-active tests.
+
+cross_cutting:
+  - concern: safety
+    action: Implement positive inactive predicates before age checks and move operations.
+  - concern: metrics
+    action: Opt out with metric.applies=false because guard tests verify the lifecycle behavior directly.
+
+design_decisions:
+  - decision: Move eligible untracked runtime artifacts to OS temp with action `evict`.
+    rationale: D1 limits this epic's executable cleanup to untracked runtime artifacts and D4 states `evict` is transient OS-temp cleanup.
+  - decision: Exclude suspended and failed DAG runs from this first sweep.
+    rationale: The rulings say completed DAG runs are eligible, while suspended and failed runs are resumable and must not be archived in the first sweep.
+
+risks:
+  - severity: high
+    description: A weak active predicate can move resumable or unconsumed runtime state.
+    mitigation: Predicate tests must include suspended DAG, failed DAG, in-review story evidence, unconsumed metrics, and unacknowledged interrupts.
+  - severity: medium
+    description: OS temp can be purged, so users may misread eviction as durable archival.
+    mitigation: CLI output and action names use `evict` and describe the destination as transient temp cleanup.
+
+references:
+  - path: .pHive/epics/artifact-lifecycle/docs/design-decisions.md
+    relevant_excerpt: "Slice 1 is the untracked-runtime sweep only; action is move-to-temp; failed DAG runs are not archived in the first sweep."
+  - path: .pHive/epics/artifact-lifecycle/docs/design-discussion.md
+    relevant_excerpt: "Untracked runtime artifacts should move to OS temp and the CLI should support dry-run, apply, and class-scoped execution."

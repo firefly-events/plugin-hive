@@ -367,6 +367,8 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
      If `## [Unreleased]` already contains the appropriate category heading, append under it instead of duplicating the heading.
 
+     This entry is version accounting only — the human-readable prose entry for the release is authored in `/ship` (see `skills/ship/SKILL.md` step 3 and `hive/references/changelog-entry-format.md`).
+
    - Commit the version-source and changelog changes together in one finalize commit. Stage only the targets that exist — a literal `git add` of a missing path or an unmatched glob errors out — so build the add-list from the version sources actually present plus `CHANGELOG.md` when present:
 
      ```bash

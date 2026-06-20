@@ -9,17 +9,34 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-06-20
+
+**Plan and ship like a human — visually rich planning docs, human-readable release notes by default, requirement-driven planning teams, a self-cleaning runtime, and the first cut of a persistent SDLC orchestrator.**
+
+### Added
+
+- **Design-aware, visually rich planning** (PR #297): planning documents now render as HTML sidecars with Mermaid figures in place of ASCII art, a canonical PRD skill emits HTML, and a visual `/plan` run closes with a generated concept image of the change — so plans read like design docs, not text dumps. Visual planning is on by default; opt out per-run with `/plan --no-visual` or persistently via `planning.visual: false`.
+- **Human-readable release notes by default** (PR #289): `/ship` now drafts each changelog bullet from story outcomes — degrading to story descriptions when a story has no outcome field — and gates on a single canonical format spec before release, so operators review prose instead of authoring notes from scratch. This 2.12.0 entry is the first written to that spec.
+- **Requirement-driven planning teams** (PR #299): `/plan` classifies a requirement into work-type tags and composes its planning team from a fixed spine plus the specialists the work actually needs, instead of a one-size-fits-all roster.
+- **Self-cleaning runtime artifacts** (PR #300): a new artifact-lifecycle sweep moves inactive untracked runtime files to OS temp under per-class retention, hard-protects memories and the knowledge graph from eviction, and keeps a report-only inventory of tracked classes — clean working trees without risking durable state. Ships with a weekly scheduler wrapper and a full test suite.
+- **Hermes SDLC reconciler — persistent-orchestrator core loop (MVP)** (PR #305): a thin `multica-story-dispatch` CLI (`cli.mjs`) gives an external Hermes cron job everything it needs to drive a Hive epic one tick at a time — dispatch the next story, poll a live task to terminal, write an episode marker, roll up `epic-status`, and post a `comment` — backed by a `hermes_reconciler` cross-tick state block in cycle-state (`state.mjs`) and a tick state-machine runbook. Dispatch now returns the Multica `task_id` and a `write-state` subcommand persists progress between ticks, so the loop advances implementation → review → done on its own instead of firing once and forgetting. Dogfooded end-to-end through Multica execution.
+- **Cleaner installs and self-pruning ship** (PR #306): an install-payload audit documents exactly what reaches a marketplace install and flags runtime/dev cruft for exclusion, and `/hive:ship` now prunes a shipped epic's worktree after marking its stories shipped — so a release leaves no stray working trees behind.
+
+### Fixed
+
+- **Squad-evaluation reads survive pagination and shape drift** (PR #298): the advisory squad-evaluation signal now pages through the issue timeline to find the newest leader verdict and shares one parser and outcome-enum guard with the adapter, so a verdict on a later page is no longer silently missed. Read-only; it never gates a merge.
+
 ## [2.11.0] - 2026-06-11
 
 **State-dir relocation, KG signal activation, and full substrate coverage — configurable state directory across all three runtimes, a knowledge graph that finally emits from production, and dispatch routers for every workflow mode.**
 
-- **State-dir resolver** (minor bump owner; PRs #276, #280): projects can now relocate Hive state out of `.pHive` via `HIVE_STATE_DIR` env or `paths.state_dir` in `hive.config.yaml`. Python-canonical resolver (`hive/lib/config.py`) with an 18-row, 3-runtime (Python/Node/shell) conformance fixture; adoption across story/session state, metrics readers + writers, context snapshot, triage, task-tracking + release handoff, scenarios/audits/reverse-sync, DAG executor run-state, and the shell semantic guard; suspend-aware weekly run-state archival sweep with positive-threshold validation; executable skill/workflow prose converted to `${HIVE_STATE_DIR}` paths.
+- **State-dir resolver** (PRs #276, #280): projects can now relocate Hive state out of `.pHive` via `HIVE_STATE_DIR` env or `paths.state_dir` in `hive.config.yaml`. Python-canonical resolver (`hive/lib/config.py`) with an 18-row, 3-runtime (Python/Node/shell) conformance fixture; adoption across story/session state, metrics readers + writers, context snapshot, triage, task-tracking + release handoff, scenarios/audits/reverse-sync, DAG executor run-state, and the shell semantic guard; suspend-aware weekly run-state archival sweep with positive-threshold validation; executable skill/workflow prose converted to `${HIVE_STATE_DIR}` paths.
 - **KG repair activation** (PRs #277, #278): the kg-signal pipeline now receives real triples — `phase_started`/`phase_complete` emitted from the DAG walker (including the resume replay path), `superseded` wired at its documented callsites, new `validated`/`tested`/`implemented` role predicates emitted by reviewer/tester/developer at shutdown, `/hive:kg-stats` density + predicate-breakdown skill, ChromaDB `RuntimeError` containment in `/hive:why`, `PRAGMA foreign_keys` on every kg.sqlite connection, and a density-verification job that drafts the kg_signal weight-bump PR.
-- **Squad-leader status flip** (PR #274): squad-leader terminal contract reference with TERMINAL-ACK marker, applied to planning-team squad instructions, plus a stale-parent sweep script with classification tests.
-- **Substrate coverage & test cleanup** (PRs #254, #255): 5-tier `mode-resolver` helper, canonical 6×3 dispatch-parity matrix, design / design-review / review dispatch routers with multica + cc-workflows mode atoms, wireframe handoff payload (PNG + .f0 + constraint doc), simulated-manual folded into the test swarm as step-04b, `markNeedsRework` ABI method (contract-first TDD), multi-surface no-codex lint, cc-workflows preconditions + per-persona model-tier resolver.
+- **Squad-leader status flip** (PR #274): squad leaders now reliably signal task completion — squad-leader terminal contract reference with TERMINAL-ACK marker, applied to planning-team squad instructions, plus a stale-parent sweep script with classification tests.
+- **Substrate coverage & test cleanup** (PRs #254, #255): every workflow mode now has complete dispatch coverage across both runtimes — 5-tier `mode-resolver` helper, canonical 6×3 dispatch-parity matrix, design / design-review / review dispatch routers with multica + cc-workflows mode atoms, wireframe handoff payload (PNG + .f0 + constraint doc), simulated-manual folded into the test swarm as step-04b, `markNeedsRework` ABI method (contract-first TDD), multi-surface no-codex lint, cc-workflows preconditions + per-persona model-tier resolver.
 - **Writer doc-skills** (PR #262): every writer doc-type is now a completeness-gated skill rather than a passive template.
-- **Planning routing** (PR #273): Sonnet planning-routing path.
-- **Meta pipeline revival** (PRs #264–#272): kg-signal wired into the meta-meta nightly routing gate, five new step-02 audit finders (CodeRabbit recurring comments, stale PRs, triage-queue aging, feedback memories, CI failure tail), loosened step-02b filter, and story-status-reconcile concurrency + dedup fixes.
+- **Planning routing** (PR #273): planning now routes through Sonnet, aligning the model tier with available planning capacity.
+- **Meta pipeline revival** (PRs #264–#272): the nightly meta-improvement cycle runs with richer signal and broader coverage — kg-signal wired into the meta-meta nightly routing gate, five new step-02 audit finders (CodeRabbit recurring comments, stale PRs, triage-queue aging, feedback memories, CI failure tail), loosened step-02b filter, and story-status-reconcile concurrency + dedup fixes.
 
 ## [2.10.0] - 2026-06-08
 
@@ -808,7 +825,7 @@ Initial release: core workflow orchestration for Claude Code.
 
 ---
 
-[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/firefly-events/plugin-hive/compare/v2.11.0...HEAD
 [2.9.0]: https://github.com/firefly-events/plugin-hive/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/firefly-events/plugin-hive/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/firefly-events/plugin-hive/compare/v2.6.0...v2.7.0

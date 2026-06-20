@@ -17,6 +17,21 @@ For a fresh kickoff, include the metrics opt-in question before scenario-specifi
 - Default to off. The user must actively choose yes.
 - Persist the answer to `hive/hive.config.yaml` at `metrics.enabled` using the kickoff protocol's existing config write pattern.
 
+For every kickoff, populate project classification fields in `.pHive/project-profile.yaml`:
+
+- Ask: `What type of project is this?` Allowed values: `framework`, `consumer-app`, `service`.
+- A `project_type` value is **valid** only when it is exactly one of `framework`, `consumer-app`, or `service`. If the user supplies anything else, re-prompt with the allowed values until one is chosen; do not persist an out-of-set value.
+- Ask: `Does this project have a UI?` (yes/no). Persist as `has_ui: true/false`.
+- Persist both fields to `.pHive/project-profile.yaml`.
+- On re-kickoff, if these fields already exist show them and ask whether to keep or change.
+
+**Absent-field contract:** When `has_ui` is missing from a profile it is treated as *unknown* — a conservative default. Skills that gate on `project_gate: requires_ui` must not crash; they should apply a tech-stack heuristic fallback (e.g. check `tech_stack` for `react`, `vue`, `svelte`, etc.) or leave the slot empty rather than erroring. The field is optional in the file; the absence is meaningful and documented.
+
+`project_type` supports future gates beyond UI (e.g. `project_gate: requires_service`). Current valid values:
+- `framework` — a library/plugin/tool consumed by other projects (no end-user UI)
+- `consumer-app` — a product with a user-facing interface
+- `service` — a backend service / API with no direct UI
+
 For every kickoff, make sure the project has a concrete ship target:
 - Ask: `What does shipping mean for this project?`
 - Offer the allowed kinds: `app-store`, `vercel`, `github-release`, `npm`, `custom`.

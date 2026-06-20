@@ -1,0 +1,95 @@
+id: s6-dispatch-returns-taskid
+epic: hermes-core-loop-mvp
+title: "cli.mjs dispatch returns task_id so the reconciler can record in_flight_task_id"
+status: done
+complexity: small
+methodology: classic
+repo: plugin-hive
+depends_on: [s1-cli-mjs-core]
+
+description: |
+  RUNG-3.5 GAP #1 (found 2026-06-19 during the rung-3-full controlled cron-session
+  tick on Studio). The reconciler autonomously dispatched a real story via
+  `cli.mjs dispatch --issue <uuid> --agent developer` under the cron gate — but
+  `dispatch` returns only `{status, issue_id}` (cli.mjs:285), NO task_id. The
+  runbook's Branch 3 step 4 needs `in_flight_task_id = <task-id>` to start the
+  watchdog and let Branch 2 harvest the terminal status on the next tick. Because
+  task_id was absent, the agent would have to make a SEPARATE `cli.mjs status` call
+  (resolveTaskId, cli.mjs:193) to recover it — the runbook says "from dispatch OR
+  cli.mjs status" but the live agent skipped that follow-up, so in_flight_task_id
+  was never captured and the loop could not progress past dispatch.
+
+  FIX: make `cli.mjs dispatch` resolve and return the task_id directly, so a single
+  tool call gives the reconciler everything Branch 3 step 4 needs. After a successful
+  dispatch (status "dispatched" or "already_dispatched"), perform an internal status
+  lookup (reuse the existing resolveTaskId path) and include `task_id` in the success
+  payload. Keep it best-effort: if the task_id is not yet resolvable, return
+  `task_id: null` rather than failing the dispatch (the watchdog can recover on a
+  later tick). Update the s4 hermes-multica plugin handler (multica_dispatch_story)
+  and the runbook to reflect that dispatch now carries task_id.
+
+acceptance_criteria:
+  - "Given dispatch succeeds for a freshly assigned issue, then the success payload includes a non-null task_id alongside {status: \"dispatched\", issue_id}."
+  - "Given dispatch is called idempotently for an issue already in_progress for the same assignee, then the payload returns {status: \"already_dispatched\", issue_id, task_id} with the existing task_id."
+  - "Given the task_id is not yet resolvable immediately after dispatch, then dispatch still succeeds and returns task_id: null (no thrown error)."
+  - "Given the existing dispatch tests, then they are updated for the new payload shape and the full multica-story-dispatch suite stays green (currently 30/30)."
+  - "Given the s4 plugin handler multica_dispatch_story, then its returned payload surfaces task_id and the stale '# TODO(plugin-hive): ... not yet built' comment near it is removed (subcommands now exist)."
+  - "Given cycle-reconciler.md Branch 3 step 4, then it documents that task_id comes from the dispatch return (status follow-up no longer required as a separate manual step)."
+
+steps:
+  - id: implement
+    description: >
+      In hive/lib/multica-story-dispatch/cli.mjs cmdDispatch, after a successful
+      dispatch resolve task_id via the existing status/resolveTaskId path and add it
+      to the succeed() payload (null-tolerant). No new Multica REST logic.
+    agent: developer
+  - id: test
+    description: >
+      Update __tests__ for the new dispatch payload shape; add a case asserting
+      task_id is present on dispatch and null-tolerant when unresolved. Run the full
+      msd suite.
+    agent: developer
+    depends_on: [implement]
+  - id: review
+    description: >
+      Verify no duplicate REST logic, null-tolerance holds, idempotent path returns
+      task_id, and the runbook + s4 plugin note are consistent.
+    agent: reviewer
+    depends_on: [test]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: node
+    language: JavaScript
+  key_files:
+    - path: hive/lib/multica-story-dispatch/cli.mjs
+      purpose: "cmdDispatch (~line 271-285) + resolveTaskId (~line 193) — add task_id to dispatch payload"
+    - path: hive/lib/multica-story-dispatch/__tests__
+      purpose: dispatch payload-shape tests to update
+    - path: hive/references/cycle-reconciler.md
+      purpose: "Branch 3 step 4 — task_id now from dispatch return"
+
+files_to_modify:
+  - file: hive/lib/multica-story-dispatch/cli.mjs
+    change: dispatch resolves + returns task_id (null-tolerant)
+  - file: hive/references/cycle-reconciler.md
+    change: Branch 3 step 4 wording — task_id from dispatch return
+  - file: hive/lib/multica-story-dispatch/__tests__
+    change: update dispatch payload-shape assertions
+
+design_decisions:
+  - decision: dispatch does an internal status follow-up rather than the agent making a second call
+    rationale: >
+      A single tool call that returns everything Branch 3 needs is more robust than
+      relying on the LLM agent to remember a follow-up status call — the live rung-3
+      tick proved the agent skips it.
+  - decision: null-tolerant task_id, never fail dispatch on unresolved id
+    rationale: >
+      The watchdog can recover task_id on a later tick. Failing the dispatch over a
+      momentarily-unresolvable id would be worse than recording null.
+
+risks:
+  - severity: low
+    description: An extra status lookup per dispatch adds one round-trip.
+    mitigation: Negligible cost; dispatch is once-per-story-per-phase, not hot-path.

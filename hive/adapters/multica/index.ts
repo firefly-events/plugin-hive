@@ -1,5 +1,5 @@
 #!/usr/bin/env -S npx tsx
-// Multica task-tracking adapter — implements Hive ABI 1.0.0
+// Multica task-tracking adapter — implements Hive ABI 1.1.0
 // Hierarchy: hierarchical-ish (workspace → issues; parent_issue_id on create)
 //
 // Wire format: JSON request on stdin → JSON response on stdout.
@@ -14,6 +14,11 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
+import {
+  parseSquadActivityFromEntries,
+  fetchTimelineEntries,
+} from "../../lib/multica-story-dispatch/index.mjs";
 
 const DEFAULT_WORKSPACE_SLUG = "plugin-hive";
 const HTTP_TIMEOUT_MS = 30000;
@@ -293,10 +298,11 @@ async function resolveIssueUuid(id: string): Promise<string> {
 
 async function capabilities(): Promise<any> {
   return {
-    abi_version: "1.0.0",
+    abi_version: "1.1.0",
     hierarchy: "hierarchical",
     supports_parent_link: true,
     supports_needs_rework: true,
+    supports_squad_activity: true,
     supported_labels: null,
     supported_states: Array.from(STATUS_VALUES),
     metadata: {
@@ -395,6 +401,23 @@ async function markNeedsRework(params: any): Promise<any> {
   return { id, status: statusResult.status ?? "in_review", labels };
 }
 
+async function getSquadActivity(params: any): Promise<any> {
+  const { id } = params ?? {};
+  const [issueUuid, workspaceId] = await Promise.all([resolveIssueUuid(id), getWorkspaceId()]);
+  // Follow the timeline's next_cursor across pages via the shared paginated
+  // reader so the most-recent squad_leader_evaluated entry is found even when
+  // it sits on a later page. fetchPage returns the already-parsed body.
+  const basePath = `/api/issues/${encodeURIComponent(issueUuid)}/timeline?workspace_id=${encodeURIComponent(workspaceId)}`;
+  const entries: any[] = await fetchTimelineEntries(basePath, (path: string) =>
+    multicaFetch(path),
+  );
+  try {
+    return parseSquadActivityFromEntries(entries);
+  } catch (err: any) {
+    throw new AdapterError("TRANSPORT", err.message ?? String(err));
+  }
+}
+
 export async function dispatch(req: Request): Promise<any> {
   const handlers: Record<string, (p: any) => Promise<any>> = {
     capabilities,
@@ -403,6 +426,7 @@ export async function dispatch(req: Request): Promise<any> {
     addComment,
     getStory,
     markNeedsRework,
+    getSquadActivity,
   };
   const h = handlers[req.method];
   if (!h) throw new AdapterError("UNKNOWN_METHOD", `Unknown method: ${req.method}`);

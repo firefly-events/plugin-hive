@@ -4,7 +4,9 @@ tracker_id: "d873e322-ce5f-4dd3-b5e7-a17d291ae503"
 tracker_url: ""
 tracker_number: "PLU-90"
 title: "Reviewer agent emits validated at shutdown"
-status: complete
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
 complexity: low
 methodology: classic
 depends_on: ["s5-role-predicates-schema"]

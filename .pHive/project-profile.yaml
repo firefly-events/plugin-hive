@@ -1,5 +1,7 @@
 name: plugin-hive
 description: Hive — extensible multi-agent SDLC framework (Claude Code plugin)
+project_type: framework
+has_ui: false
 tech_stack:
   - node
   - bash

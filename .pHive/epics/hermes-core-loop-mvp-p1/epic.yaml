@@ -1,0 +1,40 @@
+name: hermes-core-loop-mvp-p1
+title: "Hermes Orchestrator Core-Loop MVP — Phase 1 (plugin-hive slice, serial)"
+description: |
+  Focused execution slice of hermes-core-loop-mvp: the plugin-hive stories only
+  (s1 cli.mjs, s2 hermes_reconciler state, s3 cycle-reconciler.md runbook).
+  Serialized (s1 -> s2 -> s3, one story per depth) so the multica execution mode
+  is honored: the ed-7 parallel-dispatch gate downgrades to local `sequential`
+  when >1 unannotated story sits at the same depth. Story bodies are identical
+  to the parent epic — same IDs, same acceptance criteria.
+
+  Source of record: .pHive/epics/hermes-core-loop-mvp/ (parent epic). s4/s5
+  (hermes-agent plugin + cron job) deferred until the hermes-agent repo resource
+  is attached.
+
+  DAG: s1 -> s2 -> s3 (serial, for clean multica dispatch).
+methodology: classic
+status: planning
+created_at: "2026-06-18"
+
+repos:
+  plugin-hive: https://github.com/firefly-events/plugin-hive.git
+
+stories:
+  - id: s1-cli-mjs-core
+    title: "cli.mjs — multica-story-dispatch thin CLI (dispatch / episode / status / cancel)"
+    repo: plugin-hive
+    complexity: medium
+    depends_on: []
+
+  - id: s2-hermes-reconciler-state
+    title: "hermes_reconciler: additive block in cycle-state.yaml"
+    repo: plugin-hive
+    complexity: small
+    depends_on: [s1-cli-mjs-core]
+
+  - id: s3-cycle-reconciler-runbook
+    title: "cycle-reconciler.md — single-step-per-tick state-machine runbook"
+    repo: plugin-hive
+    complexity: medium
+    depends_on: [s2-hermes-reconciler-state]

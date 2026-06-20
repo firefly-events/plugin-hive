@@ -3,7 +3,7 @@
  *
  * Export surface:
  *   deriveStoryStatus({ epic_id, story_id, repo_root? })
- *     → 'pending' | 'in_progress' | 'completed' | 'deferred' | 'blocked' | 'failed'
+ *     → 'pending' | 'in_progress' | 'completed' | 'deferred' | 'blocked' | 'failed' | 'shipped'
  *
  *   deriveAllStatuses({ repo_root? })
  *     → Map<string, { epic_id, story_id, yaml_status, derived_status, stale }>
@@ -182,7 +182,7 @@ function isStoryBranchMerged(repoRoot, epic_id, story_id) {
  * @param {string} opts.epic_id
  * @param {string} opts.story_id
  * @param {string} [opts.repo_root] - defaults to nearest ancestor with .pHive
- * @returns {'pending'|'in_progress'|'completed'|'deferred'|'blocked'|'failed'}
+ * @returns {'pending'|'in_progress'|'completed'|'deferred'|'blocked'|'failed'|'shipped'}
  */
 export function deriveStoryStatus({ epic_id, story_id, repo_root, _visited, _state_dir }) {
   const repoRoot = repo_root || findRepoRoot(process.cwd());
@@ -203,6 +203,19 @@ export function deriveStoryStatus({ epic_id, story_id, repo_root, _visited, _sta
   // 1. deferred: block in YAML
   if (storyText && hasYamlBlock(storyText, 'deferred')) {
     return 'deferred';
+  }
+
+  // 1b. shipped projection is terminal. /ship owns complete -> shipped and only
+  // writes it after a successful release action + artifacts, so a release_id-
+  // stamped shipped status outranks episode markers: markers describe the
+  // historical run and cannot un-release a story. (Multica-mode runs may never
+  // write terminal markers — t-001 capture-gap family — which otherwise leaves
+  // shipped stories deriving as in_progress forever.)
+  if (storyText) {
+    const yamlStatus = readYamlField(storyText, 'status');
+    if (yamlStatus === 'shipped' && readYamlField(storyText, 'release_id')) {
+      return 'shipped';
+    }
   }
 
   // Collect episode markers
@@ -245,7 +258,7 @@ export function deriveStoryStatus({ epic_id, story_id, repo_root, _visited, _sta
         const depStatus = deriveStoryStatus({
           epic_id, story_id: dep, repo_root: repoRoot, _visited: visited, _state_dir: stateDir,
         });
-        return depStatus === 'completed';
+        return depStatus === 'completed' || depStatus === 'shipped';
       });
       if (!allDepsComplete && markers.length === 0) return 'blocked';
     }

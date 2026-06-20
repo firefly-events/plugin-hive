@@ -121,7 +121,43 @@ After reconciliation:
 - If the ship set is empty, stop. Do not run a ship action, generate release
   artifacts, or mark anything shipped.
 
-### 3. Verify Planned Version Bump
+### 3. Author the Unreleased Changelog Entry
+
+Runs after reconciliation (so the ship set is final) and before version
+verification (which reads the `## [Unreleased]` section this step writes).
+
+All entry format rules — entry shape, bullet shape, the authoring source
+chain, degraded-source marking, and the quality criteria — live in
+[`hive/references/changelog-entry-format.md`](../../hive/references/changelog-entry-format.md).
+That document is the mandatory single source; do not restate its rules here or
+in operator prompts — link to it.
+
+1. **Draft.** Build a draft `## [Unreleased]` entry from the reconciled ship
+   set (the same shipped-story set later passed as `shippedStories` to
+   `generateReleasePostArtifacts` in the Announce step — one data source, two
+   consumers). Draft the tagline and one prose bullet per major change using
+   the authoring source chain and degraded-source marking defined in the
+   format reference (§3, §4). Drafting never blocks on missing story data and
+   never invents outcomes — degrade down the chain instead.
+
+2. **Check for existing manual prose.** If `## [Unreleased]` already contains
+   a hand-written prose entry for a target epic, present it alongside the
+   draft and ask the operator to choose `keep` (discard the draft for that
+   epic) or `merge` (operator combines them). Never silently overwrite a
+   manual entry.
+
+3. **Operator review — this is the quality gate.** Present the draft (or the
+   merge candidate) to the operator for approve/edit, judged against the
+   quality criteria in the format reference (§5). There is no separate
+   quality-check step later in `/ship`; approval here is final. The operator
+   may edit freely. Degraded-source markers exist precisely so this review
+   knows which bullets were synthesized from thin data.
+
+4. **Write.** On approval, strip all degraded-source markers and write the
+   approved entry under `## [Unreleased]` in `CHANGELOG.md`. The file is
+   append-only: never modify previously released entries.
+
+### 4. Verify Planned Version Bump
 
 For each target epic, read `version_bump` from
 `${HIVE_STATE_DIR}/epics/{epic-id}/epic.yaml`. Missing means `none`.
@@ -139,7 +175,11 @@ For each epic where `version_bump` is `major`, `minor`, or `patch`, verify that
 3. Verify all collected version values are in lockstep. If not, stop and report
    the mismatched path/key/value set.
 4. Verify `CHANGELOG.md` contains an `## [Unreleased]` entry for the epic that
-   names the planned bump level.
+   names the planned bump level. The prose entry was just authored in-flow by
+   step 3, so the section is expected to exist by now; the bump-level
+   accounting line itself normally comes from `/execute` step 7e. Do not
+   treat the step 3 prose entry as missing-bump evidence one way or the
+   other — this check is about the version-accounting line.
 
 If the version sources are lockstep and the changelog contains the epic bump
 entry, report the verified version and continue.
@@ -156,7 +196,8 @@ in `skills/execute/SKILL.md` step 7e:
 
 - compute the next SemVer from the current lockstep version;
 - update every discovered `version` field in every version source;
-- add the changelog entry under `## [Unreleased]`;
+- add the version-accounting changelog line under `## [Unreleased]` (the
+  human-readable prose entry was already authored in step 3);
 - commit the version-source and changelog changes with:
 
   ```bash
@@ -169,7 +210,7 @@ while the planned bump is unverified.
 `/ship` is a verifier and safety net. The normal owner of the planned version bump
 is still `/execute`.
 
-### 4. Resolve Ship Target And Dry Run
+### 5. Resolve Ship Target And Dry Run
 
 Read `${HIVE_STATE_DIR}/project-profile.yaml` and require a valid `ship_target`
 block:
@@ -231,7 +272,7 @@ This command is project-defined and may have high blast radius.
 
 Do not execute unless the typed confirmation exactly matches `ship {release-id}`.
 
-### 5. Execute Ship Action
+### 6. Execute Ship Action
 
 Run the resolved command from the repository root.
 
@@ -248,7 +289,7 @@ If the command succeeds, capture:
 - target epics;
 - shipped story IDs.
 
-### 6. Announce
+### 7. Announce
 
 Generate release artifacts under `${HIVE_STATE_DIR}/releases/{release-id}/`.
 
@@ -277,7 +318,7 @@ generated highlights must trace to the shipped stories; do not invent features.
 If artifact generation fails, stop and report the failure. Do not mark stories
 shipped until the release artifacts exist.
 
-### 7. Mark Shipped
+### 8. Mark Shipped
 
 Only after the ship action succeeds and release artifacts exist, advance every
 story in the ship set from `complete` to `shipped`.
@@ -301,6 +342,62 @@ Finally, run `/status {epic-id}` or invoke the same read-only status derivation
 path for every target epic and report the resulting shipped state. `/status`
 itself must remain read-only; do not add status writes to it.
 
+### 9. Prune Epic Worktree(s)
+
+Runs after stories are marked shipped. Removes worktrees created for the shipped
+epic so they do not accumulate under `.claude/worktrees/`.
+
+**Enumerate candidates:**
+
+```bash
+# list worktrees, keep only this epic's under .claude/worktrees/
+git worktree list --porcelain \
+  | awk '/^worktree /{wt=$2} /^branch /{br=$2; print wt"\t"br}' \
+  | grep -F ".claude/worktrees/" \
+  | grep -E "refs/heads/feat/${EPIC_ID}$"
+```
+
+Repeat for every epic ID in the ship set.
+
+**For each candidate worktree, apply hard guards in order:**
+
+1. **Active cwd guard** — if the candidate path is a prefix of (or equal to)
+   the current working directory, do NOT remove it. Report:
+   ```text
+   Worktree {path}: skipped — this is your active session directory. Remove manually after leaving it.
+   ```
+
+2. **Dirty guard** — run `git -C {path} status --porcelain`. If output is
+   non-empty, do NOT remove. Report:
+   ```text
+   Worktree {path}: skipped — has uncommitted changes (dirty).
+   ```
+
+3. **Merged guard** — confirm the branch is fully merged into the ship target.
+   Run `git branch --merged {ship-target-ref} --list {branch-name}` from the
+   repo root. If the branch does not appear in the output, do NOT remove. Report:
+   ```text
+   Worktree {path}: skipped — branch {branch} is not fully merged into {ship-target-ref}.
+   ```
+
+4. **Remove** — all guards passed. Run:
+   ```bash
+   git worktree remove {path}
+   ```
+   Report:
+   ```text
+   Worktree {path}: removed.
+   ```
+
+After processing all candidates, run `git worktree prune` to clean up stale
+administrative files for worktrees whose directories are already gone.
+
+**Idempotency:** if no matching worktrees exist (already removed or never
+created), this step is a silent no-op. No error is raised.
+
+**`--dry-run` flag:** this step is skipped when `--dry-run` is active (step 5
+stops before execution).
+
 ## Output
 
 End with a compact release summary:
@@ -319,12 +416,17 @@ Release artifacts:
 
 Excluded stories:
 - {epic-id}/{story-id} - {status/reason}
+
+Worktree cleanup:
+- {path}: removed
+- {path}: skipped — {reason}
 ```
 
 ## Key References
 
 - [`hive/references/status-lifecycle.md`](../../hive/references/status-lifecycle.md) - `/ship` owns `complete -> shipped` and the manual-complete reconciliation path.
 - [`hive/references/kickoff-protocol.md`](../../hive/references/kickoff-protocol.md) - `ship_target` schema and allowed target kinds.
+- [`hive/references/changelog-entry-format.md`](../../hive/references/changelog-entry-format.md) - mandatory single source for changelog entry format, authoring source chain, and quality criteria.
 - [`skills/execute/SKILL.md`](../execute/SKILL.md) - primary version bump owner and ship-time safety-net patch rules.
 - [`skills/status/SKILL.md`](../status/SKILL.md) - read-only status reporting and `deriveStoryStatus` usage.
 - [`hive/lib/release_post.mjs`](../../hive/lib/release_post.mjs) - release artifact generator.

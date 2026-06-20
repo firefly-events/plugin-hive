@@ -1,7 +1,9 @@
 id: sls-1-terminal-contract-doc
 epic: squad-leader-status-flip
 title: Author the squad-leader terminal contract reference doc
-status: complete
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
 tracker_id: plugin-hive/PLU-313
 tracker_url: http://localhost:3000/plugin-hive/issues/313
 complexity: low

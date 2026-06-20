@@ -11,7 +11,7 @@
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.11.0-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-2.12.0-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
@@ -84,6 +84,7 @@ Each story produces a committed, reviewed state. The orchestrator handles coordi
 - `/hive:test` — test swarm for coverage, execution, and bug routing
 - `/hive:ship` — reconcile, bump version, run the release action, mark stories shipped
 - `/hive:status` — active epics, story progress, and drift trend
+- `/hive:ship` — cut a release: reconcile stories, author human-readable changelog prose (draft → operator review → write to `CHANGELOG.md`), verify version bump, run ship target. Changelog format rules live in [`hive/references/changelog-entry-format.md`](hive/references/changelog-entry-format.md).
 
 **Design & UI**
 - `/hive:brand-system` — colors, typography, spacing, visual guide

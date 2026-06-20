@@ -1,7 +1,9 @@
 id: sdr-10-executable-prose-conversion
 epic: state-dir-resolver
 title: Convert executable prose to HIVE_STATE_DIR paths
-status: complete
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
 complexity: low
 methodology: classic
 depends_on: [sdr-1-resolver-contract-conformance-fixture]

@@ -1,7 +1,9 @@
 id: t-1b-step-04b-and-rip-simulated-manual
 epic: substrate-coverage-and-test-cleanup
 title: Create step-04b-scenario-replay step file + hard-rip --simulated-manual flag + retire cross-cutting-concerns simulated-manual block
-status: complete
+status: shipped
+shipped_at: "2026-06-11T06:05:06Z"
+release_id: "v2.11.0"
 complexity: medium
 methodology: classic
 depends_on:

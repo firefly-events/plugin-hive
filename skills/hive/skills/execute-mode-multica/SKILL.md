@@ -263,6 +263,7 @@ import {
   pollTaskUntilTerminal,
   writeMulticaRunEpisode,
 } from '../../../../hive/lib/multica-story-dispatch/episode-sync.mjs';
+import { readSquadEvaluation } from '../../../../hive/lib/multica-story-dispatch/index.mjs';
 ```
 
 Poll call shape:
@@ -303,7 +304,31 @@ A timeout-cancelled story returns `status: 'cancelled'` and `notes: 'timeout aft
 
 ### Step 3: Episode marker per terminal
 
-Call `writeMulticaRunEpisode` with the terminal state returned by polling:
+Before calling `writeMulticaRunEpisode`, conditionally read the squad evaluation. Check for `${HIVE_STATE_DIR}/multica/squads.yaml` once per `/execute` run (cache the result — do not re-stat per story). If the file exists and `terminal.status === 'completed'`, attempt to read the squad evaluation:
+
+```js
+// squadsYamlExists: boolean cached once at run start via fs.access(`${hiveStateDir}/multica/squads.yaml`)
+let squadEvaluation = null;
+if (squadsYamlExists && terminal.status === 'completed') {
+  try {
+    const { evaluation } = await readSquadEvaluation(issueUuid, {
+      serverUrl,
+      token,
+      workspaceId,
+    });
+    squadEvaluation = evaluation; // may be null if no squad_leader_evaluated entry
+  } catch (err) {
+    process.stderr.write(
+      `[multica:${story.id}] warn: readSquadEvaluation failed — ${err?.message ?? err}; continuing\n`,
+    );
+    // best-effort: null result does not block /execute completion
+  }
+}
+```
+
+If `${HIVE_STATE_DIR}/multica/squads.yaml` is absent (consumer project has not adopted the squad layer), skip the read entirely — `squadEvaluation` stays `null` and no `squad_evaluation` block appears in the marker.
+
+Call `writeMulticaRunEpisode` with the terminal state and optional squad evaluation:
 
 ```js
 const { markerPath, messagesPath, status, notes } = await writeMulticaRunEpisode({
@@ -314,6 +339,7 @@ const { markerPath, messagesPath, status, notes } = await writeMulticaRunEpisode
   identifier,              // human-readable issue ID (e.g. plugin-hive/PLU-42)
   terminal,                // object returned by pollTaskUntilTerminal in Step 2
   messagesCaptureMax,      // hive_config.execution.multica.messages_capture_max (default 200)
+  squad_evaluation: squadEvaluation, // null when absent/no-op; omitted from marker when null
 });
 ```
 
