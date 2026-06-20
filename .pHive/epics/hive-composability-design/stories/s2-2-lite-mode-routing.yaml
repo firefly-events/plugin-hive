@@ -1,7 +1,9 @@
 id: s2-2-lite-mode-routing
 epic: hive-composability-design
 title: --lite umbrella flag routing in plan skill
-status: in_review
+status: shipped
+shipped_at: "2026-06-20T19:03:12Z"
+release_id: "v2.12.0"
 complexity: medium
 methodology: classic
 depends_on: [s2-1-design-discussion-split]

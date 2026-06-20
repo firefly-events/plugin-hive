@@ -1,7 +1,9 @@
 id: b-1-multica-lifecycle-doc
 epic: hive-composability-design
 title: Document per-story agent lifecycle under the Multica substrate
-status: in_review
+status: shipped
+shipped_at: "2026-06-20T19:03:12Z"
+release_id: "v2.12.0"
 complexity: low
 methodology: classic
 depends_on: []

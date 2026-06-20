@@ -1,7 +1,9 @@
 id: al-5-report-only-tracked-classes
 epic: artifact-lifecycle
 title: Register tracked consumer-scanned classes as report-only
-status: in_review
+status: shipped
+shipped_at: "2026-06-20T19:03:12Z"
+release_id: "v2.12.0"
 complexity: medium
 methodology: classic
 depends_on: [al-1-lifecycle-library-and-registry]

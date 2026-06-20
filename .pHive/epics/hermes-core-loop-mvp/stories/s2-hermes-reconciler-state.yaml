@@ -1,7 +1,9 @@
 id: s2-hermes-reconciler-state
 epic: hermes-core-loop-mvp
 title: "hermes_reconciler: additive block in cycle-state.yaml"
-status: pending
+status: shipped
+shipped_at: "2026-06-20T19:03:12Z"
+release_id: "v2.12.0"
 complexity: small
 methodology: classic
 repo: plugin-hive
