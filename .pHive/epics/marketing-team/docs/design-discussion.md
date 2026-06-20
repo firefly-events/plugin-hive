@@ -8,11 +8,12 @@
 - Helper note: `git_flow` resolved via `hive/lib/git_flow.mjs` → `base_branch: develop`.
 
 ## §1 Goal
-Add a **marketing / advertising team** to Hive: a set of conditional personas that
-join planning + execution for **consumer-facing projects** (e.g. Shindig, Firefly
-client work) when marketing/marketing-campaign/go-to-market work is detected. Hive itself has
-no marketing surface, so the team is gated OFF for the hive plugin's own work,
-exactly as `ui-designer` is excluded from hive work today.
+Add a **marketing / advertising team** to Hive: a set of personas that generate a
+**post-release launch campaign from the changelog** for **consumer-facing projects**
+(e.g. Shindig, Firefly client work). After `/ship` releases, the team turns "what
+shipped" into a campaign (copy + creative). Hive itself has no marketing surface, so
+the team is gated OFF for the hive plugin's own work, exactly as `ui-designer` is
+excluded from hive work today.
 
 User decision (planning gate): **full team**, not a single agent.
 
@@ -35,14 +36,13 @@ team). Marketing core:
 1. **Persona files** — `hive/agents/marketing-strategist.md`, `…/marketing-copywriter.md`,
    `…/ad-creative.md`. Authored against the **verified, current agent-config specs**
    for both runtimes (see §3 Grounding) — full config, not just frontmatter.
-2. **Planning selection** — `/plan` Phase 0 assembles "conditional architect/ui-designer
-   selected from the requirement." Extend that selection to include the marketing team
-   when marketing keywords fire AND `project_type` is consumer (hive excluded).
-3. **Specialist-triggers** — register one catalog entry `marketing:campaign`
-   (`placement: pre-exec`) following the existing `placement` / `responds_with` contract.
-   The execute skill branches only on `placement` + `responds_with.type`, so new
-   triggers need only catalog entries (forward-compatibility constraint, lines 8–10
-   of `specialist-triggers.md`).
+2. **Post-ship hook (PRIMARY)** — `/ship`, after generating the changelog + marking
+   stories shipped, runs a consumer-gated, opt-in (default off) step invoking
+   `/marketing-campaign --from-ship <changelog>`. Co-edits `skills/ship/SKILL.md` with
+   Epic A's `a2` (worktree prune) — coordinate the insertion point.
+3. **Planning selection + specialist-triggers — DEFERRED (not v1).** Joining the marketing
+   personas into `/plan` via keyword detection, and any `specialist-triggers` catalog
+   entry, are out of scope for v1; the trigger is post-ship/changelog only.
 4. **Entry skill** — `/marketing-campaign` (analogous to `/design`): runs the strategist→copy→creative
    ceremony, emits a `.pHive/marketing-campaigns/<topic>/` directory + handoff index. Callable
    standalone or atomically from `/plan` on marketing-detected stories.
@@ -89,11 +89,13 @@ runtime actually consumes so the personas degrade cleanly on either backend.
 
 ## §6 Resolved decisions (maintainer, plan-time)
 1. **Skill name = `/marketing-campaign`** (dir `skills/marketing-campaign/`).
-2. **Triggers:** primary path = `/plan` → `/marketing-campaign` atomic delegation (mirrors
-   `/design`). Register exactly one specialist-trigger `marketing:campaign`
-   (`placement: pre-exec`) as a forward-compat escalation hook. `marketing:major` dropped
-   for v1. Two mechanisms stay distinct: planning-team selection (b4 part 1) is the main
-   path; the trigger (b4 part 2) is the escalation hook only.
+2. **Trigger = post-ship, changelog-driven (REFRAME).** The campaign is generated AFTER a
+   release ships, using the release **changelog** as the strategist's source material
+   (what shipped → why it matters → audience → channels). b4 adds a consumer-gated,
+   **opt-in (default off)** post-release step to `/ship` that invokes
+   `/marketing-campaign --from-ship <changelog>`. NO specialist-trigger (post-ship is a
+   `/ship` lifecycle step, not an `/execute` phase). The earlier planning-time
+   keyword-selection path is **deferred** — not v1.
 3. **Visual creative = a shared, multi-agent skill (b7).** ad-creative v1 emits creative
    concepts + image-gen **prompts** (text). The actual render capability — Frame0 CLI +
    image generation (the `openai-image` MCP / `logo-exploration` path) — is extracted as a

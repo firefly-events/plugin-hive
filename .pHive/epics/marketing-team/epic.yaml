@@ -29,10 +29,10 @@ stories:
     title: Author the ad-creative persona
     complexity: medium
     depends_on: []
-  - id: b4-wire-marketing-team-into-planning
-    title: Wire the marketing team into planning selection + specialist-triggers (consumer-gated)
+  - id: b4-wire-campaign-into-ship
+    title: Wire /marketing-campaign into the /ship post-release lifecycle (changelog-driven, consumer-gated)
     complexity: medium
-    depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona]
+    depends_on: [b5-marketing-campaign-skill]
   - id: b5-marketing-campaign-skill
     title: /marketing-campaign entry skill — strategist → copy → creative, user-reviewed
     complexity: medium
@@ -44,4 +44,4 @@ stories:
   - id: b6-marketing-team-docs
     title: User docs for the marketing team + /marketing-campaign
     complexity: low
-    depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona, b4-wire-marketing-team-into-planning, b5-marketing-campaign-skill, b7-shared-visual-asset-skill]
+    depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona, b4-wire-campaign-into-ship, b5-marketing-campaign-skill, b7-shared-visual-asset-skill]

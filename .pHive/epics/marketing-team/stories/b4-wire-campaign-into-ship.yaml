@@ -1,0 +1,127 @@
+id: b4-wire-campaign-into-ship
+epic: marketing-team
+title: Wire /marketing-campaign into the /ship post-release lifecycle (changelog-driven, consumer-gated)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [b5-marketing-campaign-skill]
+
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Maintainer reframe (#2): the marketing campaign is generated AFTER a release
+  ships, using the release CHANGELOG as its primary input — not at planning time.
+  /ship already reconciles work, verifies the version bump, runs the ship action,
+  and generates release artifacts (incl. a changelog / release notes). After that,
+  on consumer projects, /ship should hand the changelog to /marketing-campaign (b5)
+  to produce a launch/announcement campaign ("what shipped → why it matters →
+  who to tell → on which channels").
+
+  Wiring: add a post-release step at the END of skills/ship/SKILL.md (after release
+  artifacts incl. changelog are generated and stories marked shipped). The step:
+    - is consumer-gated (project_type consumer; hive's own work excluded, mirroring
+      ui-designer's gate);
+    - is OPT-IN — do NOT auto-spawn a marketing team on every ship. Gate behind a
+      `--campaign` flag and/or a `ship.campaign: true` config key (default off), or
+      a single y/N prompt — pick the least-surprising mechanism in research.
+    - invokes /marketing-campaign in --from-ship mode, passing the changelog path
+      as input, and lets that skill's own user-review gate (decision #4) handle
+      review.
+
+  NOTE — co-edits skills/ship/SKILL.md with story a2 (Epic A, worktree prune).
+  Different lifecycle steps (a2 = prune worktrees; b4 = offer campaign), both
+  appended after mark-shipped. Sequence/merge so neither clobbers the other.
+
+  DEFERRED (not v1): joining the marketing personas into /plan via keyword
+  detection (the original pre-exec/planning-selection idea) is dropped for v1 —
+  the trigger is post-ship/changelog only. specialist-triggers catalog is NOT
+  touched (post-ship is a /ship lifecycle step, not an /execute phase).
+
+acceptance_criteria:
+  - "Given a successful /ship on a consumer project WITH the campaign opt-in enabled, when ship finishes generating the changelog + marking stories shipped, then it invokes /marketing-campaign in --from-ship mode with the changelog path."
+  - "Given the campaign opt-in is NOT enabled, when /ship runs, then no marketing campaign is triggered (default behavior unchanged)."
+  - "Given /ship runs on hive's own work (project_type != consumer), then the campaign step is skipped regardless of the opt-in (consumer-gated)."
+  - "Given the post-release step, then it runs AFTER changelog generation + mark-shipped and does not interfere with story a2's worktree-prune step in the same skill."
+  - "The /ship campaign hook + opt-in mechanism are documented in skills/ship/SKILL.md."
+
+steps:
+  - id: research
+    description: |
+      Read skills/ship/SKILL.md to find where release artifacts / changelog are
+      generated and where stories are marked shipped — the post-release insertion
+      point. Confirm the changelog artifact path/shape. Decide the least-surprising
+      opt-in mechanism (flag vs config vs prompt). Confirm the consumer gating idiom
+      (reuse ui-designer's project_type gate). Coordinate the insertion point with
+      story a2 (worktree prune) so both post-ship steps coexist.
+    agent: researcher
+  - id: implement
+    description: |
+      Add the consumer-gated, opt-in post-release step to skills/ship/SKILL.md that
+      invokes /marketing-campaign --from-ship <changelog-path>. Reuse the
+      ui-designer consumer gate verbatim. Document the hook + opt-in.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Verify: opt-in on + consumer → /marketing-campaign invoked with changelog;
+      opt-in off → no trigger (unchanged ship); hive project → skipped; step runs
+      after changelog+mark-shipped and does not collide with a2's prune step.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Confirm default-off (no surprise campaigns), consumer gate matches the
+      ui-designer precedent, changelog is the input, and the ship co-edit with a2
+      is clean.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to the feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/.claude/worktrees/hive-composability-design
+  key_files:
+    - path: skills/ship/SKILL.md
+      purpose: "Owns release + changelog generation + mark-shipped; the post-release campaign hook is appended here. Co-edited by a2 (worktree prune)."
+    - path: .pHive/epics/marketing-team/stories/b5-marketing-campaign-skill.yaml
+      purpose: "The skill this hook invokes (--from-ship mode, changelog input)."
+    - path: hive/agents/ui-designer.md
+      purpose: "Consumer-only gating precedent to mirror for the hive-excluded gate."
+    - path: .pHive/epics/plugin-hygiene/stories/a2-ship-closes-worktrees.yaml
+      purpose: "Sibling /ship post-release edit (worktree prune) to coordinate insertion with."
+
+files_to_modify:
+  - file: skills/ship/SKILL.md
+    change: "Append a consumer-gated, opt-in post-release step invoking /marketing-campaign --from-ship with the changelog; document it."
+
+design_decisions:
+  - decision: Campaign is post-ship, changelog-driven (maintainer #2 reframe)
+    rationale: "A launch campaign is about what was just released; the changelog is the canonical 'what shipped' source. Planning-time keyword selection is deferred."
+  - decision: Opt-in + consumer-gated, default off
+    rationale: "Auto-spawning a marketing team on every ship is surprising and wrong for hive's own releases; gate it consumer-only and behind an explicit opt-in."
+  - decision: No specialist-trigger; this is a /ship lifecycle step
+    rationale: "The trigger catalog drives /execute phases; post-ship is /ship's lifecycle, so a direct ship step is the right surface."
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Wiring/lifecycle story — it connects ship to the campaign skill. Whether generated launch campaigns drive reach/engagement is a downstream consumer-project outcome, not falsifiable by this hook."
+
+risks:
+  - severity: medium
+    description: "Two stories (a2, b4) edit skills/ship/SKILL.md post-release region; uncoordinated edits could conflict or one could clobber the other."
+    mitigation: "b4 research coordinates the insertion point with a2; both are appends after mark-shipped; reviewer checks coexistence."
+  - severity: low
+    description: "Auto-triggering campaigns on every ship would be intrusive."
+    mitigation: "Default-off opt-in + consumer gate."
+
+references:
+  - path: skills/ship/SKILL.md
+    relevant_excerpt: |
+      /ship reconciles completed work, verifies the version bump, runs the ship
+      action, generates release artifacts (changelog), and marks stories shipped —
+      the campaign hook appends after the changelog + mark-shipped phase.

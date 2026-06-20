@@ -4,7 +4,7 @@ title: User docs for the marketing team + /marketing-campaign
 status: pending
 complexity: low
 methodology: classic
-depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona, b4-wire-marketing-team-into-planning, b5-marketing-campaign-skill, b7-shared-visual-asset-skill]
+depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona, b4-wire-campaign-into-ship, b5-marketing-campaign-skill, b7-shared-visual-asset-skill]
 
 parallel_allowed: true
 parallel_rationale: bounded-slice
