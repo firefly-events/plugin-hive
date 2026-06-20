@@ -1,7 +1,7 @@
 id: s7-cli-write-state-subcommand
 epic: hermes-core-loop-mvp
 title: "cli.mjs write-state subcommand — give the reconciler a tool to persist cross-tick state"
-status: pending
+status: done
 complexity: medium
 methodology: classic
 repo: plugin-hive
