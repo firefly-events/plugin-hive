@@ -260,16 +260,28 @@ async function cmdDispatch(args, cfg) {
   const agentName = args.agent ?? null;
   const squadName = args.squad ?? null;
   if (!agentName && !squadName) fail('MISSING_ARG', '--agent or --squad is required');
+  if (agentName && squadName) fail('INVALID_ARG', '--agent and --squad are mutually exclusive — pass exactly one');
 
   const { serverUrl, token, workspaceId } = cfg;
   const issueUuid = args.issue;
 
-  // Idempotent: if already assigned + in_progress, no-op.
+  // Resolve the requested assignee (name → UUID) up front so the idempotency
+  // check can compare against what the caller actually asked for. Without this,
+  // an issue already assigned to assignee A would short-circuit a request to
+  // reassign it to B — a false `already_dispatched` no-op (CodeRabbit #303).
+  const requestedType = agentName ? 'agent' : 'squad';
+  const requestedUuid = agentName
+    ? await resolveAgentUuidByName(serverUrl, token, workspaceId, agentName)
+    : await resolveSquadUuidByName(serverUrl, token, workspaceId, squadName);
+
+  // Idempotent ONLY when the issue is already in_progress AND already assigned to
+  // the SAME assignee the caller requested. A different assignee falls through to
+  // reassignment below.
   const issue = await httpJson(issueUrl(serverUrl, workspaceId, issueUuid), { token });
   if (
     issue?.status === 'in_progress' &&
-    issue?.assignee_id &&
-    (issue?.assignee_type === 'agent' || issue?.assignee_type === 'squad')
+    issue?.assignee_type === requestedType &&
+    issue?.assignee_id === requestedUuid
   ) {
     let task_id = null;
     try {
@@ -282,12 +294,10 @@ async function cmdDispatch(args, cfg) {
 
   await moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, issueUuid);
 
-  if (agentName) {
-    const agentUuid = await resolveAgentUuidByName(serverUrl, token, workspaceId, agentName);
-    await dispatchStoryToAgent(serverUrl, token, workspaceId, issueUuid, agentUuid);
+  if (requestedType === 'agent') {
+    await dispatchStoryToAgent(serverUrl, token, workspaceId, issueUuid, requestedUuid);
   } else {
-    const squadUuid = await resolveSquadUuidByName(serverUrl, token, workspaceId, squadName);
-    await dispatchStoryToSquad(serverUrl, token, workspaceId, issueUuid, squadUuid);
+    await dispatchStoryToSquad(serverUrl, token, workspaceId, issueUuid, requestedUuid);
   }
 
   let task_id = null;
@@ -457,6 +467,23 @@ async function cmdWriteState(args) {
   if (unknownKeys.length > 0) {
     fail('INVALID_ARG', `Unknown top-level patch fields: ${unknownKeys.join(', ')}. Expected: ${[...VALID_PATCH_KEYS].join(', ')}`);
     return;
+  }
+
+  // Validate `stories` value types so a shape like {"stories":["x"]} or
+  // {"stories":{"s1":"oops"}} is rejected cleanly here instead of corrupting
+  // (or throwing deep inside) the write. Keys are validated above; this guards values.
+  if ('stories' in patch) {
+    const s = patch.stories;
+    if (s === null || typeof s !== 'object' || Array.isArray(s)) {
+      fail('INVALID_ARG', '--patch "stories" must be an object mapping story IDs to objects');
+      return;
+    }
+    for (const [storyId, storyPatch] of Object.entries(s)) {
+      if (storyPatch === null || typeof storyPatch !== 'object' || Array.isArray(storyPatch)) {
+        fail('INVALID_ARG', `--patch "stories.${storyId}" must be an object`);
+        return;
+      }
+    }
   }
 
   try {

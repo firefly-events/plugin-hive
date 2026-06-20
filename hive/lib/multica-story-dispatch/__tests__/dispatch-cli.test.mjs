@@ -99,6 +99,11 @@ test('dispatch: already_dispatched idempotent call returns {status, issue_id, ta
   const { serverUrl, close } = await startMockServer((req, res) => {
     const ws = 'workspace_id=test-ws';
 
+    if (req.method === 'GET' && req.url === `/api/agents?${ws}`) {
+      sendJson(res, 200, { agents: [{ id: 'agent-dev-uuid', name: 'developer' }] });
+      return;
+    }
+
     if (req.url === `/api/issues/${ISSUE_UUID}?${ws}` && req.method === 'GET') {
       sendJson(res, 200, { id: ISSUE_UUID, status: 'in_progress', assignee_id: 'agent-dev-uuid', assignee_type: 'agent' });
       return;
@@ -217,4 +222,64 @@ test('dispatch: task_id is null when status lookup throws (best-effort)', async 
   } finally {
     await close();
   }
+});
+
+test('dispatch: in_progress issue assigned to a DIFFERENT agent reassigns (not already_dispatched)', async () => {
+  let putCalled = false;
+  const { serverUrl, close } = await startMockServer((req, res) => {
+    const ws = 'workspace_id=test-ws';
+
+    if (req.method === 'GET' && req.url === `/api/agents?${ws}`) {
+      sendJson(res, 200, { agents: [{ id: 'agent-dev-uuid', name: 'developer' }] });
+      return;
+    }
+
+    if (req.url === `/api/issues/${ISSUE_UUID}?${ws}`) {
+      if (req.method === 'GET') {
+        // Already in_progress, but assigned to a DIFFERENT agent than requested.
+        sendJson(res, 200, { id: ISSUE_UUID, status: 'in_progress', assignee_id: 'agent-OTHER-uuid', assignee_type: 'agent' });
+        return;
+      }
+      if (req.method === 'PUT') {
+        putCalled = true;
+        sendJson(res, 200, { id: ISSUE_UUID, status: 'in_progress', assignee_type: 'agent', assignee_id: 'agent-dev-uuid' });
+        return;
+      }
+    }
+
+    if (req.method === 'GET' && req.url === `/api/issues/${ISSUE_UUID}/active-task?${ws}`) {
+      sendJson(res, 200, { task: { id: 'task-reassigned-789', status: 'running', started_at: '2026-01-01T00:00:00Z' } });
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === `/api/issues/${ISSUE_UUID}/task-runs?${ws}`) {
+      sendJson(res, 200, { task_runs: [] });
+      return;
+    }
+
+    sendJson(res, 500, { error: `unexpected: ${req.method} ${req.url}` });
+  });
+
+  try {
+    const { stdout } = await runCli(['dispatch', '--issue', ISSUE_UUID, '--agent', 'developer'], serverUrl);
+    const result = JSON.parse(stdout);
+    assert.equal(result.status, 'dispatched', 'different assignee must reassign, not no-op');
+    assert.equal(result.task_id, 'task-reassigned-789');
+    assert.ok(putCalled, 'reassignment PUT must have been issued');
+  } finally {
+    await close();
+  }
+});
+
+test('dispatch: --agent and --squad together → INVALID_ARG (mutually exclusive)', async () => {
+  await assert.rejects(
+    runCli(['dispatch', '--issue', ISSUE_UUID, '--agent', 'developer', '--squad', 'planning'], 'http://127.0.0.1:1'),
+    (err) => {
+      assert.equal(err.code, 1);
+      const parsed = JSON.parse(err.stderr);
+      assert.equal(parsed.code, 'INVALID_ARG');
+      assert.match(parsed.message, /mutually exclusive/);
+      return true;
+    },
+  );
 });

@@ -168,6 +168,28 @@ test('write-state: JSON array patch → INVALID_ARG', () => {
   assert.equal(err.code, 'INVALID_ARG');
 });
 
+test('write-state: stories as an array → INVALID_ARG, no partial write', () => {
+  const dir = tmpDir();
+  const file = cycleStatePath(dir);
+  const res = run(['write-state', '--epic', 'ep', '--cycle-state', file, '--patch', '{"stories":["x"]}']);
+  assert.equal(res.status, 1);
+  const err = JSON.parse(res.stderr);
+  assert.equal(err.code, 'INVALID_ARG');
+  assert.match(err.message, /stories/);
+  assert.ok(!fs.existsSync(file), 'no partial write should have occurred');
+});
+
+test('write-state: per-story patch that is not an object → INVALID_ARG, no partial write', () => {
+  const dir = tmpDir();
+  const file = cycleStatePath(dir);
+  const res = run(['write-state', '--epic', 'ep', '--cycle-state', file, '--patch', '{"stories":{"s1":"oops"}}']);
+  assert.equal(res.status, 1);
+  const err = JSON.parse(res.stderr);
+  assert.equal(err.code, 'INVALID_ARG');
+  assert.match(err.message, /stories\.s1/);
+  assert.ok(!fs.existsSync(file), 'no partial write should have occurred');
+});
+
 test('write-state: unknown top-level patch key → INVALID_ARG, no partial write', () => {
   const dir = tmpDir();
   const file = cycleStatePath(dir);

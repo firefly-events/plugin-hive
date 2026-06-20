@@ -363,14 +363,14 @@ hermes_reconciler:
   in_flight_story_id: null      # story-id string of the currently dispatched story, or null
   in_flight_task_id: null       # Multica task UUID of the active agent run, or null
   dispatched_at: null           # ISO8601 timestamp written at dispatch (watchdog-authoritative)
-  current_phase: null           # "impl" | "review" — phase currently in flight, or null
+  current_phase: null           # "dispatched_impl" | "dispatched_review" — phase_position of the in-flight story, or null
   stuck_after_seconds: 1800     # watchdog threshold: seconds before a dispatch is considered stuck
   stories:
     <story-id>:
       phase_position: pending   # pending|dispatched_impl|impl_terminal|dispatched_review|review_terminal|done|blocked
       attempt: 0                # dispatch attempt count (increments on each impl dispatch)
       review_loop_count: 0      # number of review→revision loops completed for this story
-      verdict: null             # "passed" | "needs_revision" | null (set at review_terminal)
+      verdict: null             # raw "passed" | "needs_revision" | null (set at review_terminal); normalized to "needs-revision" (hyphen) before loop-back comparison — see cycle-reconciler.md §6
 ```
 
 ### Field semantics
@@ -381,12 +381,12 @@ hermes_reconciler:
 | `in_flight_story_id` | string \| null | `null` | Written at dispatch (impl or review); cleared when the story reaches a terminal phase |
 | `in_flight_task_id` | string \| null | `null` | Written at dispatch (one atomic op with `in_flight_story_id`, `dispatched_at`, `current_phase`); cleared at terminal |
 | `dispatched_at` | string \| null | `null` | ISO8601; written at dispatch — the watchdog uses this to detect stuck dispatches |
-| `current_phase` | string \| null | `null` | `"impl"` when an impl agent is running; `"review"` when a review agent is running; `null` otherwise |
+| `current_phase` | string \| null | `null` | `"dispatched_impl"` when an impl agent is running; `"dispatched_review"` when a review agent is running; `null` otherwise. Mirrors the in-flight story's `phase_position`. |
 | `stuck_after_seconds` | int | `1800` | Configurable watchdog threshold; rarely mutated |
 | `stories.<id>.phase_position` | string | `"pending"` | Advances through the phase state machine: `pending → dispatched_impl → impl_terminal → dispatched_review → review_terminal → done` (or `blocked`) |
 | `stories.<id>.attempt` | int | `0` | Incremented each time an impl dispatch is issued for this story |
 | `stories.<id>.review_loop_count` | int | `0` | Incremented each time a `needs_revision` verdict triggers a new impl dispatch |
-| `stories.<id>.verdict` | string \| null | `null` | Set to `"passed"` or `"needs_revision"` when a review agent reaches `review_terminal` |
+| `stories.<id>.verdict` | string \| null | `null` | Set to `"passed"` or raw `"needs_revision"` when a review agent reaches `review_terminal`. The reconciler normalizes the raw verdict to canonical `"needs-revision"` (hyphen) before the loop-back comparison — see `cycle-reconciler.md` §6 (`normalizeVerdict`). |
 
 ### `phase_position` state machine
 

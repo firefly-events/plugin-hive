@@ -28,6 +28,13 @@ function requireYaml() {
   return yaml;
 }
 
+// Plain object = non-null, typeof 'object', NOT an array. Arrays are objects in
+// JS, so a bare `typeof x === 'object'` would accept `[...]` and later let
+// Object.entries() treat array indices as story IDs, corrupting the contract.
+function isPlainObject(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
 const DEFAULTS = {
@@ -51,9 +58,7 @@ function applyDefaults(raw) {
     dispatched_at:       raw.dispatched_at        ?? base.dispatched_at,
     current_phase:       raw.current_phase        ?? base.current_phase,
     stuck_after_seconds: raw.stuck_after_seconds  ?? base.stuck_after_seconds,
-    stories:             raw.stories && typeof raw.stories === 'object'
-                           ? raw.stories
-                           : base.stories,
+    stories:             isPlainObject(raw.stories) ? raw.stories : base.stories,
   };
 }
 
@@ -123,9 +128,18 @@ export function writeHermesReconcilerState(cycleStatePath, updates) {
   const current = applyDefaults(doc.hermes_reconciler ?? null);
 
   // Merge updates — stories get per-story merge, top-level scalar fields get replaced.
+  // The write path is the mutation boundary: reject malformed shapes loudly rather
+  // than silently corrupting state (an array `stories`, or a per-story patch that is
+  // an array/primitive, would spread garbage into the cycle-state file).
+  if (updates.stories !== undefined && !isPlainObject(updates.stories)) {
+    throw new Error('hermes_reconciler.stories must be a mapping of story IDs to objects');
+  }
   const mergedStories = { ...current.stories };
-  if (updates.stories && typeof updates.stories === 'object') {
+  if (isPlainObject(updates.stories)) {
     for (const [storyId, storyPatch] of Object.entries(updates.stories)) {
+      if (!isPlainObject(storyPatch)) {
+        throw new Error(`hermes_reconciler.stories["${storyId}"] must be an object, got: ${Array.isArray(storyPatch) ? 'array' : typeof storyPatch}`);
+      }
       mergedStories[storyId] = { ...(mergedStories[storyId] ?? {}), ...storyPatch };
     }
   }
