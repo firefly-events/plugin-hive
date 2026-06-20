@@ -238,6 +238,8 @@ tsx-*/
 !.pHive/epics/artifact-lifecycle/**
 !.pHive/epics/dynamic-planning-team/
 !.pHive/epics/dynamic-planning-team/**
+!.pHive/epics/plugin-hygiene/
+!.pHive/epics/plugin-hygiene/**
 
 # Generated concept illustrations (planning-format-contract.md §8) are produced
 # on-demand and never committed. Re-ignore AFTER the epic allowlists above so the

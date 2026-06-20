@@ -1,0 +1,122 @@
+id: a2-ship-closes-worktrees
+epic: plugin-hygiene
+title: /ship prunes the shipped epic's worktree(s)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  After /ship successfully reconciles completed work and marks stories shipped,
+  it should clean up the git worktree(s) created for that epic. Today
+  skills/ship/SKILL.md has ZERO worktree awareness (verified: no `worktree`
+  reference in the 372-line skill), so worktrees under .claude/worktrees/
+  accumulate after every shipped epic and must be removed by hand.
+
+  Scope: prune only the SHIPPED epic's worktree(s) — those whose branch matches
+  the epic's feature branch (feat/{epic-id}) and live under .claude/worktrees/.
+  Never touch unrelated worktrees.
+
+  Hard guards (fail-closed):
+    - Remove a worktree only if it is clean (no uncommitted changes) AND its
+      branch is fully merged into the ship target. If dirty or unmerged, skip
+      it and report why — do not force-remove.
+    - Never remove the worktree that is the current working directory (the
+      active session). If ship is running inside the epic's own worktree,
+      report a note instead of self-deleting.
+    - Idempotent: re-running ship after worktrees are gone is a no-op.
+
+acceptance_criteria:
+  - "Given a shipped epic with a clean, merged worktree under .claude/worktrees/ matching feat/{epic-id}, when /ship completes, then that worktree is removed (git worktree remove) and the prune is reported."
+  - "Given a worktree with uncommitted changes or an unmerged branch, when /ship completes, then the worktree is NOT removed and ship reports the skip with the reason (dirty | unmerged)."
+  - "Given /ship is invoked from inside the epic's own worktree, when ship completes, then ship does not delete its own cwd and reports a note that manual cleanup is needed after leaving it."
+  - "Given an epic whose worktrees were already removed, when /ship re-runs, then the worktree-prune step is a clean no-op with no error."
+  - "The worktree-prune behavior is documented in skills/ship/SKILL.md (when it runs, the guards, and how to opt out if a flag is added)."
+
+steps:
+  - id: research
+    description: |
+      Read skills/ship/SKILL.md end-to-end to find the correct insertion point
+      (after reconcile + mark-shipped, near the end). Identify how the epic id /
+      feature branch is known at that point. Confirm the worktree convention
+      (.claude/worktrees/, branch naming) from EnterWorktree/ExitWorktree usage
+      and any existing worktree handling elsewhere in the codebase.
+    agent: researcher
+  - id: implement
+    description: |
+      Add a worktree-prune step to skills/ship/SKILL.md after stories are marked
+      shipped. Enumerate worktrees via `git worktree list --porcelain`, filter
+      to the epic's branch under .claude/worktrees/, apply the clean+merged and
+      not-cwd guards, then `git worktree remove`. Report pruned and skipped
+      worktrees. Keep it shell-based to match ship's existing idiom.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Verify the guards: clean+merged worktree is removed; dirty worktree is
+      skipped with reason; unmerged branch is skipped; cwd worktree is never
+      removed; re-run is a no-op. Cover via a scripted git fixture (create a
+      bare repo + worktree, exercise each branch).
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Review the prune logic for fail-closed correctness (no data loss path),
+      confirm it only targets the shipped epic's worktrees, and confirm the
+      SKILL.md documentation matches the implemented behavior.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to the feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/.claude/worktrees/hive-composability-design
+  tech_stack:
+    skill: markdown + embedded shell
+    vcs: git worktrees under .claude/worktrees/
+  key_files:
+    - path: skills/ship/SKILL.md
+      purpose: "The ship skill (372 lines, no worktree logic today) — the single file this story modifies. Prune step goes after mark-shipped."
+
+files_to_modify:
+  - file: skills/ship/SKILL.md
+    change: "Add a fail-closed worktree-prune step after stories are marked shipped; document its guards."
+
+code_examples:
+  - title: Enumerate worktrees machine-readably
+    file: skills/ship/SKILL.md
+    snippet: |
+      # list worktrees, keep only this epic's under .claude/worktrees/
+      git worktree list --porcelain \
+        | awk '/^worktree /{wt=$2} /^branch /{br=$2; print wt"\t"br}' \
+        | grep -F ".claude/worktrees/" \
+        | grep -E "refs/heads/feat/${EPIC_ID}$"
+
+design_decisions:
+  - decision: Prune only the shipped epic's worktrees, fail-closed on dirty/unmerged
+    rationale: "Worktrees can hold unpushed work; deleting broadly or force-removing risks data loss. Matching feat/{epic-id} and requiring clean+merged keeps the blast radius to work that is provably safe to discard."
+  - decision: Never remove the active cwd worktree
+    rationale: "Removing the directory the ship process runs in corrupts the session; report instead."
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Single-skill lifecycle feature; correctness is verified by the integration test covering each guard branch, not by a measurable product trend. Worktree count is operator-observable but not a falsifiable success metric for this change."
+
+risks:
+  - severity: high
+    description: "A too-broad match or force-remove could delete a worktree holding unpushed commits."
+    mitigation: "Strict feat/{epic-id} + under-.claude/worktrees/ filter, require clean+merged, never force, never remove cwd; test covers the dirty/unmerged skip paths."
+
+references:
+  - path: skills/ship/SKILL.md
+    relevant_excerpt: |
+      Ship reconciles completed work, verifies the version bump, runs the ship
+      action, generates release artifacts, and marks stories shipped — the
+      prune step appends after the mark-shipped phase.
