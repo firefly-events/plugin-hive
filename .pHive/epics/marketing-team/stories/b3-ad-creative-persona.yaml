@@ -15,6 +15,12 @@ description: |
   produces ad/marketing creative concepts and asset direction, not app screens.
   Consumes the marketing-strategist brief (b1). Consumer-projects only.
 
+  Maintainer decision #3: v1 ad-creative emits creative concepts + image-gen
+  **prompts** (text). Actual rendering is NOT in this persona — it is delegated to
+  the shared visual-asset skill (b7, Frame0 + image-gen). The persona declares b7
+  in its `skills:` frontmatter as its render backend; the prompts it writes are the
+  input b7 consumes.
+
   MUST be authored against the dual-runtime contract in
   .pHive/epics/marketing-team/docs/agent-config-grounding.md — full agent config,
   dispatched to BOTH Claude Code Agent tool and Codex backend (mapping §3, checklist §4).
@@ -29,10 +35,10 @@ acceptance_criteria:
 steps:
   - id: research
     description: |
-      Read agent-config-grounding.md + ui-designer.md. Decide (open question from
-      design-discussion §6) whether ad-creative uses the Frame0 CLI like ui-designer
-      or stays text/brief-only for v1 — default text/brief-only unless research
-      shows Frame0 fits ad creative. Note the strategist brief format (b1).
+      Read agent-config-grounding.md + ui-designer.md + the b7 shared visual-asset
+      skill interface. ad-creative v1 emits creative concepts + image-gen prompts
+      (resolved §6 #3); confirm the b7 skill-reference shape for the `skills:`
+      frontmatter. Note the strategist brief format (b1).
     agent: researcher
   - id: implement
     description: |

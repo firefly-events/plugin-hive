@@ -1,0 +1,115 @@
+id: b5-marketing-campaign-skill
+epic: marketing-team
+title: /marketing-campaign entry skill — strategist → copy → creative, user-reviewed
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona, b7-shared-visual-asset-skill]
+
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Entry skill for the marketing team, analogous to /design for the UI team.
+  /marketing-campaign runs the team ceremony: marketing-strategist produces a
+  campaign brief (positioning, audience, channels, message), then
+  marketing-copywriter and ad-creative consume it to produce copy and creative
+  concepts (+ image-gen prompts). Output lands in .pHive/campaigns/<topic>/ with a
+  handoff index, mirroring .pHive/design/ + index.yaml.
+
+  Callable standalone (`/marketing-campaign <brief>`) or atomically from /plan on a
+  marketing-detected story (`--from-plan <story-id>`), the same dual-mode contract
+  /design uses. /plan delegates to /marketing-campaign rather than inlining the
+  ceremony (atomic external call, per the /design precedent in plan step 16).
+
+  REVIEW IS A HUMAN GATE (maintainer decision #4): the skill ends by presenting the
+  brief/copy/creative to the USER for review. There is NO automated /marketing-review
+  persona or skill in v1.
+
+  CREATIVE RENDERING via the shared b7 skill: when actual visual assets (not just
+  prompts) are wanted, /marketing-campaign invokes the shared visual-asset skill
+  (b7) — it does not embed Frame0 / image-gen calls directly.
+
+acceptance_criteria:
+  - "Given a campaign brief, when /marketing-campaign runs, then strategist emits a brief, then copywriter + ad-creative emit copy + creative concepts (incl. image-gen prompts) consuming it, written under .pHive/campaigns/<topic>/."
+  - "Given the run completes, then a handoff entry is registered in .pHive/campaigns/index.yaml (topic, artifacts, status)."
+  - "Given completion, then the skill presents the artifacts to the USER for review and does not invoke any automated marketing-review step."
+  - "Given --from-plan <story-id>, when it completes, then the handoff entry exists and the marketing-detected story can proceed (blocking-gate contract mirrors /design)."
+  - "Given visual assets are requested, then /marketing-campaign delegates rendering to the shared visual-asset skill (b7), not inline Frame0/image-gen calls."
+  - "The skill is registered as skills/marketing-campaign/SKILL.md and follows sibling-skill frontmatter conventions."
+
+steps:
+  - id: research
+    description: |
+      Read skills/design/SKILL.md + the handoff-index pattern (.pHive/design/index.yaml).
+      Mirror its structure (dual-mode entry, persona ceremony, output dir, handoff
+      registration, blocking gate). Confirm the b7 shared-visual-asset skill interface
+      for the optional render step.
+    agent: researcher
+  - id: implement
+    description: |
+      Author skills/marketing-campaign/SKILL.md: frontmatter + ceremony
+      (strategist brief → copywriter + ad-creative handoff), output to
+      .pHive/campaigns/<topic>/, register .pHive/campaigns/index.yaml, end with a
+      USER review presentation (no auto-review). Delegate any visual rendering to
+      the b7 shared skill. Add the /plan step-16-style atomic delegation note.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Verify standalone + --from-plan modes produce the output dir + index entry;
+      verify the run ends at a user-review presentation; verify visual rendering is
+      delegated to b7 (not inlined). Validate SKILL.md frontmatter parses like siblings.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Confirm parity with /design's atomic-boundary discipline (ceremony lives in
+      /marketing-campaign, not inlined in /plan), the user-review gate, and the b7
+      delegation for rendering.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to the feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/.claude/worktrees/hive-composability-design
+  key_files:
+    - path: skills/design/SKILL.md
+      purpose: "Entry-skill precedent: dual-mode, persona ceremony, handoff index, blocking gate. /marketing-campaign mirrors it."
+    - path: skills/plan/SKILL.md
+      purpose: "Step 16 atomic external-call delegation pattern (/plan → /design); /marketing-campaign is the analogue."
+    - path: .pHive/epics/marketing-team/stories/b7-shared-visual-asset-skill.yaml
+      purpose: "Shared render skill /marketing-campaign delegates to for actual visual assets."
+
+files_to_modify:
+  - file: skills/marketing-campaign/SKILL.md
+    change: "New entry skill for the marketing team ceremony; ends at a user-review gate; delegates rendering to b7."
+
+design_decisions:
+  - decision: Skill name /marketing-campaign (maintainer #1)
+    rationale: "Maintainer choice; explicit over the shorter /campaign."
+  - decision: Human review gate, no automated marketing-review (maintainer #4)
+    rationale: "Maintainer will review marketing output themselves; an automated reviewer adds no value for v1."
+  - decision: Visual rendering delegated to shared b7 skill (maintainer #3)
+    rationale: "Render capability is reusable across ad-creative/ui-designer/logo-exploration; keep it out of this skill."
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "New entry skill; value is enabling the team ceremony. No falsifiable product metric — exercised by its own tests and downstream consumer campaign runs."
+
+risks:
+  - severity: low
+    description: "Skill name collision or divergence from /design conventions."
+    mitigation: "Follow sibling-skill frontmatter; reviewer checks parity with /design."
+
+references:
+  - path: skills/design/SKILL.md
+    relevant_excerpt: |
+      /design is callable standalone or atomically from /plan; emits a
+      .pHive/design/<topic>/ dir and registers a handoff in index.yaml.
+      /marketing-campaign is the marketing-team analogue, ending at a user review.

@@ -14,16 +14,24 @@ description: |
   machinery, gated to consumer projects only (hive's own work excluded, exactly
   as ui-designer is excluded — see feedback "hive has no UI").
 
+  Primary path (maintainer #2) mirrors /design: /plan detects a marketing story
+  and delegates to /marketing-campaign (b5) as an atomic external call (plan
+  step-16 pattern). The two wiring surfaces below make the personas selectable
+  and register the forward-compat escalation hook.
+
   Two wiring surfaces:
-  1. Planning-team selection: /plan Phase 0 assembles "core planning personas
-     plus conditional architect/ui-designer selected from the requirement."
-     Extend that conditional selection so the marketing team joins when
-     marketing/campaign/go-to-market keywords fire AND project_type is consumer.
-  2. Specialist-triggers catalog: add marketing trigger entries following the
-     existing placement / responds_with contract. The execute skill branches
-     ONLY on `placement` and `responds_with.type` (never on specific trigger
-     IDs — forward-compat constraint, specialist-triggers.md lines 8-10), so new
-     triggers require only catalog entries, no routing-logic changes.
+  1. Planning-team selection (MAIN PATH): /plan Phase 0 assembles "core planning
+     personas plus conditional architect/ui-designer selected from the
+     requirement." Extend that conditional selection so the marketing team joins
+     when marketing/campaign/go-to-market keywords fire AND project_type is
+     consumer.
+  2. Specialist-triggers catalog (escalation hook only): register EXACTLY ONE
+     trigger `marketing:campaign` with `placement: pre-exec`, following the
+     existing placement / responds_with contract. `marketing:major` is dropped
+     for v1 (maintainer #2). The execute skill branches ONLY on `placement` and
+     `responds_with.type` (never on specific trigger IDs — forward-compat
+     constraint, specialist-triggers.md lines 8-10), so this is a catalog-only
+     addition with no routing-logic change.
 
   Detection keywords (case-insensitive): marketing, campaign, advertisement, ad,
   go-to-market, GTM, launch, positioning, brand campaign, copywriting, tagline,
@@ -35,7 +43,8 @@ description: |
 acceptance_criteria:
   - "Given a consumer-project requirement containing marketing keywords, when /plan Phase 0 assembles the team, then the marketing personas are included in the planning team."
   - "Given the hive plugin's own work (project_type != consumer), when /plan runs with marketing keywords present, then the marketing team is NOT selected (gated off), mirroring ui-designer exclusion."
-  - "Given the specialist-triggers catalog, then marketing trigger entries exist with valid `placement` and `responds_with` fields, and execute routing consumes them without any change to its ID-agnostic branch logic."
+  - "Given the specialist-triggers catalog, then exactly one entry `marketing:campaign` (placement pre-exec) exists with valid `placement` and `responds_with` fields, and execute routing consumes it without any change to its ID-agnostic branch logic; `marketing:major` is NOT added."
+  - "Given a marketing-detected story in /plan, then /plan delegates to /marketing-campaign (b5) as an atomic external call, not inline."
   - "Given a non-marketing requirement, then no marketing persona is selected (no false-positive activation)."
 
 steps:

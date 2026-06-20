@@ -4,7 +4,8 @@ description: |
   Add a multi-persona marketing/advertising team to Hive (strategist + copywriter
   + ad-creative), selectable for consumer-facing projects when marketing/campaign
   work is detected, gated OFF for hive's own work (mirrors ui-designer). Includes
-  a /campaign entry skill (analogous to /design) and user docs. Personas are
+  a /marketing-campaign entry skill (analogous to /design), a shared visual-asset
+  render skill (Frame0 + image-gen) adaptable by multiple agents, and user docs. Personas are
   authored against verified, current Claude Code + Codex agent-config specs
   (full config, dual-dispatch safe) per .pHive/epics/marketing-team/docs/agent-config-grounding.md.
 target_codebase: /Users/don/.claude/worktrees/hive-composability-design
@@ -32,11 +33,15 @@ stories:
     title: Wire the marketing team into planning selection + specialist-triggers (consumer-gated)
     complexity: medium
     depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona]
-  - id: b5-campaign-entry-skill
-    title: /campaign entry skill — strategist → copy → creative ceremony
+  - id: b5-marketing-campaign-skill
+    title: /marketing-campaign entry skill — strategist → copy → creative, user-reviewed
     complexity: medium
-    depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona]
+    depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona, b7-shared-visual-asset-skill]
+  - id: b7-shared-visual-asset-skill
+    title: Shared visual-asset skill (Frame0 + image-gen) adaptable by multiple agents
+    complexity: medium
+    depends_on: []
   - id: b6-marketing-team-docs
-    title: User docs for the marketing team + /campaign
+    title: User docs for the marketing team + /marketing-campaign
     complexity: low
-    depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona, b4-wire-marketing-team-into-planning, b5-campaign-entry-skill]
+    depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona, b4-wire-marketing-team-into-planning, b5-marketing-campaign-skill, b7-shared-visual-asset-skill]

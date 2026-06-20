@@ -10,7 +10,7 @@
 ## §1 Goal
 Add a **marketing / advertising team** to Hive: a set of conditional personas that
 join planning + execution for **consumer-facing projects** (e.g. Shindig, Firefly
-client work) when marketing/campaign/go-to-market work is detected. Hive itself has
+client work) when marketing/marketing-campaign/go-to-market work is detected. Hive itself has
 no marketing surface, so the team is gated OFF for the hive plugin's own work,
 exactly as `ui-designer` is excluded from hive work today.
 
@@ -38,13 +38,13 @@ team). Marketing core:
 2. **Planning selection** — `/plan` Phase 0 assembles "conditional architect/ui-designer
    selected from the requirement." Extend that selection to include the marketing team
    when marketing keywords fire AND `project_type` is consumer (hive excluded).
-3. **Specialist-triggers** — add catalog entries so escalations (e.g. `marketing:major`,
-   `marketing:campaign`) follow the existing `placement` / `responds_with` contract.
+3. **Specialist-triggers** — register one catalog entry `marketing:campaign`
+   (`placement: pre-exec`) following the existing `placement` / `responds_with` contract.
    The execute skill branches only on `placement` + `responds_with.type`, so new
    triggers need only catalog entries (forward-compatibility constraint, lines 8–10
    of `specialist-triggers.md`).
-4. **Entry skill** — `/campaign` (analogous to `/design`): runs the strategist→copy→creative
-   ceremony, emits a `.pHive/campaigns/<topic>/` directory + handoff index. Callable
+4. **Entry skill** — `/marketing-campaign` (analogous to `/design`): runs the strategist→copy→creative
+   ceremony, emits a `.pHive/marketing-campaigns/<topic>/` directory + handoff index. Callable
    standalone or atomically from `/plan` on marketing-detected stories.
 5. **Docs** — README Quick Start + operations-guide entry (a new persona surface is not
    "done" without user docs).
@@ -78,20 +78,30 @@ runtime actually consumes so the personas degrade cleanly on either backend.
 | medium | `ad-creative` overlaps `ui-designer` (both visual). | Scope `ad-creative` to ad/marketing creative concepts only; product UI stays with `ui-designer`. Document the boundary in both personas. |
 | medium | Team fires on hive's own work (false positive). | Hard `project_type` consumer gate; hive excluded. Mirror the `feedback_hive_has_no_ui` precedent. |
 | medium | Persona frontmatter drifts from runtime spec → silent dispatch failure. | §3 grounding doc + B1–B3 cite verified specs; reviewer checks against it. |
-| low | Scope creep into a full 6-skill suite. | Ship 3 personas + 1 entry skill (`/campaign`) now; further skills deferred, like the UI team grew incrementally. |
+| low | Scope creep into a full 6-skill suite. | Ship 3 personas + 1 entry skill (`/marketing-campaign`) now; further skills deferred, like the UI team grew incrementally. |
 
 ## §5 Dependencies
 - `hive/agents/ui-designer.md` — mirror template + consumer-gating precedent.
 - `hive/references/specialist-triggers.md` — catalog contract for new triggers.
 - `/plan` Phase 0 conditional-persona selection + `planning-routing` skill.
-- `/design` + `skills/design/SKILL.md` — entry-skill pattern for `/campaign`.
+- `/design` + `skills/design/SKILL.md` — entry-skill pattern for `/marketing-campaign`.
 - The two agent-config research findings (§3).
 
-## §6 Open questions (for confirmation gate)
-1. `/campaign` skill name — `/campaign` vs `/marketing`? (proposed: `/campaign`)
-2. Trigger IDs — `marketing:campaign` / `marketing:major` naming + placement (`pre-exec`?).
-3. Does `ad-creative` reuse the Frame0 CLI like `ui-designer`, or stay text/brief-only v1?
-4. Should the team also register a `/marketing-review` (analogous to `/design-review`)? (proposed: defer)
+## §6 Resolved decisions (maintainer, plan-time)
+1. **Skill name = `/marketing-campaign`** (dir `skills/marketing-campaign/`).
+2. **Triggers:** primary path = `/plan` → `/marketing-campaign` atomic delegation (mirrors
+   `/design`). Register exactly one specialist-trigger `marketing:campaign`
+   (`placement: pre-exec`) as a forward-compat escalation hook. `marketing:major` dropped
+   for v1. Two mechanisms stay distinct: planning-team selection (b4 part 1) is the main
+   path; the trigger (b4 part 2) is the escalation hook only.
+3. **Visual creative = a shared, multi-agent skill (b7).** ad-creative v1 emits creative
+   concepts + image-gen **prompts** (text). The actual render capability — Frame0 CLI +
+   image generation (the `openai-image` MCP / `logo-exploration` path) — is extracted as a
+   standalone skill (`b7`) that ad-creative, ui-designer, and logo-exploration can each
+   adapt, rather than baked into one persona.
+4. **No `/marketing-review` skill — review is a human/user gate.** `/marketing-campaign`
+   ends by presenting brief/copy/creative for the user to review; no automated marketing
+   review persona/skill in v1.
 
 ## §7 Scale assessment
 **Medium.** Three persona files (variation authoring), one cross-cutting wiring story,
