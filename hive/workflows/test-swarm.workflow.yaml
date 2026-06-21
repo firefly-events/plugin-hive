@@ -310,3 +310,58 @@ steps:
         type: string
     optional: false
     timeout_ms: 300000
+
+  # Reconcile node (s7): materialise the compile-report agent's committed test
+  # report into the working tree before the gate validates it. No-op on local
+  # bindings (sha absent) — safe on both local and Multica execution paths.
+  - id: reconcile-report
+    agent: reconciler
+    node_type: reconcile
+    step_file: hive/workflows/step-files/execute/reconcile.md
+    task: >
+      Materialise the compile-report agent's committed test report so the gate
+      can validate the artifact exists and parses correctly.
+    depends_on:
+      - promote-baseline
+    inputs:
+      - name: sha
+        source: context
+        context_key: commit_sha
+        optional: true
+      - name: branch
+        source: context
+        context_key: branch
+        optional: true
+      - name: repo
+        source: context
+        context_key: repo
+        optional: true
+    outputs:
+      - name: reconcile_status
+        type: string
+    optional: true
+    timeout_ms: 120000
+
+  # Validation gate (s3): confirm the committed test report exists and parses.
+  # report_artifact_path is parameterised on the actual artifact location from
+  # SKILL.md: ${HIVE_STATE_DIR}/test-artifacts/{epic-id}/{story-id}/results.yaml
+  - id: gate-test-report
+    agent: validator
+    node_type: gate
+    gate: "session_report must not be empty"
+    depends_on:
+      - reconcile-report
+    inputs:
+      - name: session_report
+        source: step_output
+        step_id: compile-report
+        output_name: session_report
+      - name: report_artifact_path
+        source: context
+        context_key: report_artifact_path
+        optional: true
+    outputs:
+      - name: gate_passed
+        type: json
+    optional: false
+    timeout_ms: 60000

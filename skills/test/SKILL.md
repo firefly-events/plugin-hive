@@ -19,6 +19,41 @@ Before entering the swarm pipeline, invoke `skills/hive/skills/test-dispatch/SKI
 
 Switch `mode_decision` to the appropriate execution path. The swarm pipeline below is the default (`local`) path.
 
+### Phase 0b — DAG Front Door (Multica)
+
+When `mode_decision == multica`, route the test run through the DAG front door instead of the local swarm pipeline. This is the symmetric sibling of the s9 (planning-routing) and s11 (execute) DAG front-door paths.
+
+**DAG front-door invocation:**
+
+```python
+from hive.lib.dag_executor.run import run
+
+result = run(
+    "hive/workflows/test-swarm.workflow.yaml",
+    binding="multica",
+    context={
+        "story_spec": story_spec,
+        "baseline_path": baseline_path,
+        "report_artifact_path": f"{HIVE_STATE_DIR}/test-artifacts/{epic_id}/{story_id}/results.yaml",
+    },
+)
+```
+
+Emit one INFO log line at dispatch:
+
+```
+[info] test routing: graph=hive/workflows/test-swarm.workflow.yaml binding=multica reason=dag-multica
+```
+
+Graph completion is an **artifact-readiness signal only** — not a user sign-off. The calling orchestrator retains all gate checks and the final verdict presentation.
+
+**Fallback.** If the Multica binding fails:
+
+- Daemon down (ECONNREFUSED, timeout during `binding=multica` init): emit `[warn] test routing: dag-multica daemon down — falling back to local` and route through the local swarm pipeline below.
+- Dispatch error (graph-step error, node timeout): emit `[warn] test routing: dag-multica dispatch failed: {error} — falling back to local` and apply the same local fallback.
+
+**Local fallback (backend unset).** When `mode_decision != multica`, this step is skipped entirely. The existing local swarm pipeline below is unchanged — no regression.
+
 ## State Directory Resolution
 
 All state paths in this skill and its step files are written as `${HIVE_STATE_DIR}/...`. Resolve `HIVE_STATE_DIR` from `paths.state_dir` in the root `hive.config.yaml`; fall back to `.pHive` when unset.
