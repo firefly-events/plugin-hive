@@ -30,6 +30,7 @@ from .errors import (
 from .handlers import (
     AgentHandler,
     GateHandler,
+    LocalAgentSpawn,
     NodeOutput,
     PauseHandler,
     ScriptHandler,
@@ -47,6 +48,7 @@ from .walker import Walker
 __all__ = [
     "AgentHandler",
     "AgentHandlerError",
+    "LocalAgentSpawn",
     "Dispatcher",
     "DispatcherError",
     "ExecutorError",
