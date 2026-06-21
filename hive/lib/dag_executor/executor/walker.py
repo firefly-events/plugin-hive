@@ -395,6 +395,45 @@ def _resolve_one(
     return None
 
 
+def _dispatch_with_retry(
+    dispatcher: Dispatcher,
+    node: Any,
+    inputs: dict[str, Any],
+    run_id: str,
+    telemetry: Telemetry,
+) -> "NodeOutput":
+    """Dispatch a node, retrying on HandlerError up to node.retry.max_attempts.
+
+    C2: bounded retry per hde-architect design — no LOOP primitive, just
+    per-node re-dispatch. Both sequential and parallel walk paths use this
+    helper so retry semantics are identical regardless of wave size.
+    """
+    max_attempts = 1
+    if node.retry and isinstance(node.retry, dict):
+        try:
+            max_attempts = max(1, int(node.retry.get("max_attempts", 1)))
+        except (TypeError, ValueError):
+            max_attempts = 1
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return dispatcher.dispatch(node, inputs, run_id)
+        except HandlerError as exc:
+            if attempt >= max_attempts:
+                raise
+            telemetry.emit(
+                "node_retry",
+                node.id,
+                {
+                    "attempt": attempt,
+                    "max_attempts": max_attempts,
+                    "error": str(exc),
+                },
+            )
+    # Unreachable — loop always either returns or raises on the last attempt.
+    raise AssertionError("_dispatch_with_retry: unreachable")  # pragma: no cover
+
+
 class Walker:
     """Walks a Graph and dispatches each node sequentially."""
 
@@ -677,7 +716,7 @@ class Walker:
                 if is_pause:
                     state = _record_pause_suspended(state)
                     save_state(state)
-                output = dispatcher.dispatch(node, inputs, run_id)
+                output = _dispatch_with_retry(dispatcher, node, inputs, run_id, telemetry)
         except HandlerError as exc:
             if node.optional:
                 telemetry.emit(
@@ -836,11 +875,16 @@ class Walker:
         def _resolve(node):
             return _resolve_inputs(node, materialised, ctx, skipped)
 
+        # C2: wrap dispatch with retry so parallel workers honour node.retry
+        # identically to the sequential path.
+        def _retry_dispatch(node, inputs, run_id):
+            return _dispatch_with_retry(dispatcher, node, inputs, run_id, telemetry)
+
         scheduler = ParallelScheduler()
         results = scheduler.schedule_ready_nodes(
             graph=graph,
             ready_node_ids=runnable,
-            dispatcher=dispatcher.dispatch,
+            dispatcher=_retry_dispatch,
             run_id=run_id,
             resolve_inputs=_resolve,
         )

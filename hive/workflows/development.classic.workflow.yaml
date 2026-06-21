@@ -1,6 +1,6 @@
 name: development-classic
 description: Classic development workflow — implement first, then test and review.
-version: "2.0.0"
+version: "2.1.0"
 methodology: classic
 
 # ENFORCEMENT RULES:
@@ -191,6 +191,81 @@ steps:
     optional: false
     timeout_ms: 600000
 
+  # Reconcile nodes (s7): materialise each implement agent's committed work into
+  # the working tree before the test step validates it. No-op on local bindings
+  # (sha absent) — safe to insert on both local and Multica execution paths.
+  # C1: sha/branch/repo bound from the producing agent's step_output so the
+  # Multica path wires the real commit metadata (not stale context values).
+  - id: reconcile-backend
+    agent: reconciler
+    node_type: reconcile
+    step_file: hive/workflows/step-files/execute/reconcile.md
+    task: >
+      Materialise the backend-implement agent's commit before tests run.
+    depends_on:
+      - backend-implement
+    inputs:
+      - name: sha
+        source: step_output
+        step_id: backend-implement
+        output_name: commit_sha
+        optional: true
+      - name: branch
+        source: step_output
+        step_id: backend-implement
+        output_name: branch
+        optional: true
+      - name: repo
+        source: step_output
+        step_id: backend-implement
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: backend-implement
+        output_name: work_dir
+        optional: true
+    outputs:
+      - name: reconcile_status
+        type: string
+    optional: true
+    timeout_ms: 120000
+
+  - id: reconcile-frontend
+    agent: reconciler
+    node_type: reconcile
+    step_file: hive/workflows/step-files/execute/reconcile.md
+    task: >
+      Materialise the frontend-implement agent's commit before tests run.
+    depends_on:
+      - frontend-implement
+    inputs:
+      - name: sha
+        source: step_output
+        step_id: frontend-implement
+        output_name: commit_sha
+        optional: true
+      - name: branch
+        source: step_output
+        step_id: frontend-implement
+        output_name: branch
+        optional: true
+      - name: repo
+        source: step_output
+        step_id: frontend-implement
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: frontend-implement
+        output_name: work_dir
+        optional: true
+    outputs:
+      - name: reconcile_status
+        type: string
+    optional: true
+    timeout_ms: 120000
+
   - id: test
     agent: tester
     step_file: hive/workflows/steps/development-classic/step-05-test.md
@@ -204,8 +279,8 @@ steps:
       with only a "tests look good" assessment — actual test code is required.
       The review step is BLOCKED until test artifacts exist.
     depends_on:
-      - backend-implement
-      - frontend-implement
+      - reconcile-backend
+      - reconcile-frontend
     inputs:
       - name: backend_implementation
         source: step_output
@@ -234,6 +309,71 @@ steps:
     gate: "test_artifacts must not be empty"
     timeout_ms: 600000
 
+  # Reconcile node (s7) after test — materialise tester's committed work before
+  # the gate validates it. No-op on local bindings.
+  # C1: sha/branch/repo from test step_output, not context.
+  - id: reconcile-test
+    agent: reconciler
+    node_type: reconcile
+    step_file: hive/workflows/step-files/execute/reconcile.md
+    task: >
+      Materialise the test agent's commit so the gate validates committed test files.
+    depends_on:
+      - test
+    inputs:
+      - name: sha
+        source: step_output
+        step_id: test
+        output_name: commit_sha
+        optional: true
+      - name: branch
+        source: step_output
+        step_id: test
+        output_name: branch
+        optional: true
+      - name: repo
+        source: step_output
+        step_id: test
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: test
+        output_name: work_dir
+        optional: true
+    outputs:
+      - name: reconcile_status
+        type: string
+    optional: true
+    timeout_ms: 120000
+
+  # Validation gate (s3): confirm test artifacts exist before review.
+  # Bounded retry: on gate failure the test node re-runs up to max_attempts times.
+  - id: gate-code
+    agent: validator
+    node_type: gate
+    step_file: hive/workflows/step-files/execute/gate-code.md
+    gate: "test_artifacts must not be empty"
+    retry:
+      max_attempts: 3
+      on: gate_failed
+      retry_node: test
+    task: >
+      Validate that the test step produced test artifacts. Gate blocks review from
+      proceeding until committed code and tests exist in the tree.
+    depends_on:
+      - reconcile-test
+    inputs:
+      - name: test_artifacts
+        source: step_output
+        step_id: test
+        output_name: test_artifacts
+    outputs:
+      - name: gate_passed
+        type: json
+    optional: false
+    timeout_ms: 60000
+
   - id: platform-verify
     agent: tester
     step_file: hive/workflows/steps/development-classic/step-04-platform-verify.md
@@ -248,7 +388,7 @@ steps:
 
       SKIP THIS STEP if the story is single-platform or backend-only.
     depends_on:
-      - test
+      - gate-code
     inputs:
       - name: backend_implementation
         source: step_output
@@ -287,7 +427,7 @@ steps:
 
       Produce a verdict: passed, needs_optimization, or needs_revision.
     depends_on:
-      - test
+      - gate-code
       - platform-verify
     inputs:
       - name: backend_implementation

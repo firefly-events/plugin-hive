@@ -20,7 +20,7 @@ Do not call it again after successful teammate creation unless abandoning the pr
 
 **Side effects:** emits exactly one INFO log line per persona at final spawn
 decision; calls `plan-mode-cc-workflows` for CC-Workflows-routed personas;
-calls `plan-mode-multica` for Multica-routed personas; calls `TeamCreate`
+invokes the DAG front door (`hive.lib.dag_executor.run`) for Multica-routed personas; calls `TeamCreate`
 for direct-routed personas; calls `agent-spawn` -> `codex-invoke` for
 Codex-routed personas.
 
@@ -58,9 +58,12 @@ Workflow tool seam shared with `execute-mode-cc-workflows`.
 If `planning_mode_decision == multica`, route every persona in
 `assembled_personas` to `multica` with reason `no-fallback-needed`. This is a
 spawn-path override selected by `/plan`; do not filter the assembled list through
-the Codex supported/known-incompatible tables. Multica persona/provider validity is
-owned by `skills/hive/skills/plan-mode-multica/SKILL.md` and the Multica agent
-roster.
+the Codex supported/known-incompatible tables. Dispatch is via the DAG front door
+(`hive.lib.dag_executor.run`) running the plan graph
+(`hive/workflows/plan.workflow.yaml`) with `binding=multica` — not per-persona
+fan-out. The plan graph owns per-node work; the calling orchestrator retains all
+user-facing review gates (design-discussion, H/V, structured-outline sign-off).
+Graph completion is an artifact-readiness signal only — never a user sign-off.
 
 Otherwise, for each persona in `assembled_personas`, consult `agent_backends`
 using the root-first precedence contract already resolved by the caller. Compare
@@ -91,29 +94,44 @@ Use `routing_decisions` to assemble one conceptual planning team:
   per-persona Workflow tool dispatch, polling, and `cc-workflows-run.yaml`
   episode markers. Do not also create local teammates for a CC-Workflows-routed
   persona unless fallback is triggered.
-- **Multica path (`plan-mode-multica`):** when any persona is routed `multica`,
-  call `skills/hive/skills/plan-mode-multica/SKILL.md` once with the full
-  Multica-routed persona list, planning story payload, config, and integration
-  branch context. `plan-mode-multica` owns per-persona fan-out, polling, and
-  `multica-run.yaml` episode markers. Do not also create local teammates for a
-  Multica-routed persona unless fallback is triggered.
+- **DAG front-door path (plan graph):** when `planning_mode_decision == multica`
+  (any persona is routed `multica`), invoke the DAG front door to run the plan
+  graph with the Multica binding:
+
+  ```python
+  from hive.lib.dag_executor.run import run
+
+  result = run(
+      "hive/workflows/plan.workflow.yaml",
+      binding="multica",
+      context={"requirement": requirement_summary},
+  )
+  ```
+
+  The plan graph (`plan.workflow.yaml`) owns the per-node work — research,
+  design, author, reconcile, and output-validation. Graph completion is an
+  **artifact-readiness signal only**; it is NOT a user sign-off. The calling
+  orchestrator (`/plan`) retains all user-facing review gates (design-discussion,
+  H/V, structured-outline sign-off) and MUST present and wait at them locally
+  after the graph completes. Do not also create local teammates for a
+  multica-routed persona unless DAG fallback is triggered.
 - **Direct path (`TeamCreate`):** collect every persona routed `direct` and create them in one `TeamCreate` call. Use Step 0.4 and include only direct-routed personas in `## Team Members`.
 - **Codex path (`agent-spawn` -> `codex-invoke`):** for each persona routed `codex`, create a separate persistent-pane teammate through `agent-spawn`, passing full persona context, resolved paths, memory loading context, and the same planning-team coordination context direct teammates receive.
 
 Mixed teams are valid. Some planning personas may come from
-`plan-mode-cc-workflows`, some from `plan-mode-multica`, some from `TeamCreate`,
-and others from `agent-spawn` -> `codex-invoke`; they are still one planning
-team. The caller remains coordinator and uses `SendMessage` for assignments and
-review loops where local teammate handles exist, and uses the
-`plan-mode-cc-workflows` / `plan-mode-multica` summaries and episode markers for
-CC-Workflows-produced / Multica-produced work.
+`plan-mode-cc-workflows`, some from the DAG front-door path (plan graph), some
+from `TeamCreate`, and others from `agent-spawn` -> `codex-invoke`; they are
+still one planning team. The caller remains coordinator and uses `SendMessage`
+for assignments and review loops where local teammate handles exist, and uses the
+`plan-mode-cc-workflows` summaries and episode markers for CC-Workflows-produced
+work, and the DAG front door result for Multica-dispatched planning work.
 
 Emit the structured INFO log after each persona's final spawn path is known. If
 Step 0.5 handles a runtime Multica or Codex failure, update that persona's result
 to the fallback outcome instead of adding a second line.
 
 Preserve the 4-field template exactly:
-- `[info] planning routing: persona={X} requested={cc-workflows|multica|codex|direct|unset} path={plan-mode-cc-workflows|plan-mode-multica|codex-invoke|TeamCreate} reason={reason}`
+- `[info] planning routing: persona={X} requested={cc-workflows|multica|codex|direct|unset} path={plan-mode-cc-workflows|dag-plan-graph|codex-invoke|TeamCreate} reason={reason}`
 
 Valid `reason=` values:
 - `no-fallback-needed`
@@ -129,7 +147,7 @@ Valid `reason=` values:
 Examples:
 - `[info] planning routing: persona=researcher requested=cc-workflows path=plan-mode-cc-workflows reason=no-fallback-needed`
 - `[info] planning routing: persona=researcher requested=cc-workflows path=codex-invoke reason=cc-workflows-precondition-failed: claude-version-too-low`
-- `[info] planning routing: persona=researcher requested=multica path=plan-mode-multica reason=no-fallback-needed`
+- `[info] planning routing: persona=researcher requested=multica path=dag-plan-graph reason=no-fallback-needed`
 - `[info] planning routing: persona=researcher requested=multica path=codex-invoke reason=multica-daemon-down: ECONNREFUSED`
 - `[info] planning routing: persona=ui-designer requested=multica path=TeamCreate reason=multica-daemon-down: ECONNREFUSED`
 - `[info] planning routing: persona=technical-writer requested=codex path=codex-invoke reason=no-fallback-needed`
@@ -181,9 +199,9 @@ Load memories from the agent's knowledge paths. Scan existing design language be
 
 If the team is mixed, the `TeamCreate` prompt includes only direct-routed personas.
 Codex-routed personas participate via separate panes and read team context from
-their own `agent-spawn` prompt. Multica-routed personas participate through
-`plan-mode-multica` and read the planning story/config context passed to that
-mode atom.
+their own `agent-spawn` prompt. Multica-routed personas participate through the DAG front door
+(`hive.lib.dag_executor.run` + `plan.workflow.yaml`) and receive the planning
+context via the `context.requirement` field passed to the graph.
 
 **Agent-spawn compliance:** Every codex-routed teammate must follow `skills/hive/skills/agent-spawn/SKILL.md` patterns: full persona injection, path resolution (`~`, `${CLAUDE_PLUGIN_ROOT}`), memory loading, domain constraints, and required tool validation. Direct `TeamCreate` teammates still read their persona files and load knowledge paths on startup.
 
@@ -227,10 +245,10 @@ gracefully:
    where `{error}` is truncated to 120 chars.
 5. Continue the planning flow.
 
-If `plan-mode-multica` fails before or during persona dispatch because the
+If the DAG front door dispatch fails before or during graph execution because the
 Multica daemon is down or unreachable (connection refused, timeout resolving the
 server/workspace, daemon health check failure, or equivalent transport setup
-error), handle it gracefully:
+error during `binding=multica` init), handle it gracefully:
 
 1. Do not hard-fail planning-team assembly.
 2. Re-route each affected persona to Codex when that persona is supported by
@@ -243,8 +261,9 @@ error), handle it gracefully:
    where `{error}` is truncated to 120 chars.
 5. Continue the planning flow.
 
-If `plan-mode-multica` returns a non-daemon dispatch failure for any persona
-after reaching the daemon, handle it gracefully:
+If the DAG front door returns a non-daemon dispatch failure for any persona
+after reaching the daemon (graph step error, node timeout, or executor error),
+handle it gracefully:
 
 1. Do not hard-fail planning-team assembly.
 2. Re-route the failed persona to Codex when supported, otherwise direct

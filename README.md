@@ -142,6 +142,65 @@ We don't compete with them; we synthesize, in a specific shape, on a specific su
 
 ---
 
+## DAG-on-Multica Execution Substrate
+
+Hive's four core flows (`/plan`, `/execute`, `/test`, `/review`) run on a deterministic DAG executor. When you enable Multica, each agent node in the graph is dispatched as a contained Multica task — the DAG still owns flow control, gate evaluation, routing, schema validation, and resume; Multica provides only the agent-execution layer behind the `AgentSpawn` protocol seam.
+
+### How it works
+
+```
+/hive:execute
+    │
+    ▼
+DAG Executor (deterministic)
+  │  owns: flow / routing / gates / validation / resume
+  │
+  ├── agent node ──→ [AgentSpawn] ──→ Multica issue + agent run
+  │                                        (work happens here)
+  ├── reconcile node ──→ fetches agent's commit into working tree
+  └── gate node ──→ reads committed files — never trusts agent self-report
+```
+
+Every artifact-producing flow ends in a **validation gate** that reads committed files on disk. The gate only sees what was actually committed; an agent that claims success but writes nothing fails the gate.
+
+### Enabling per flow
+
+Set the mode knob in `hive.config.yaml` (or override with an env var):
+
+```yaml
+# Enable Multica for /plan
+planning:
+  mode: multica          # values: multica | local (default)
+
+# Enable Multica for /execute, /test, /review
+execution:
+  mode: multica          # values: multica | local (default)
+```
+
+**Env override** — `HIVE_EXECUTION_MODE` overrides the `execution.mode` knob for a single run:
+
+```bash
+HIVE_EXECUTION_MODE=multica /hive:execute my-epic
+```
+
+Precedence (highest → lowest):
+
+1. Explicit `binding` arg passed to the executor
+2. `HIVE_EXECUTION_MODE` env var
+3. `planning.mode` / `execution.mode` config knob
+4. Default: `local` (shells `claude --print` in-process)
+
+### Operational prerequisites
+
+Before enabling Multica mode:
+
+1. **Multica daemon running** — `multica daemon start` (or the daemon must be running in background).
+2. **Workspace config** — `~/.multica/config.json` must have `server_url`, `token`, and `workspace_id` set (or pass via `MULTICA_SERVER_URL`, `MULTICA_TOKEN`, `MULTICA_WORKSPACE_ID`).
+3. **Repo bind** — run `/hive:multica-init` to bind the project's git repository URL to the workspace. Without this, each Multica task workdir has no repo and agents cannot commit output. Binding is idempotent; run it once per project.
+4. **Codex agents for headless runs (R1)** — Multica Studio's keychain/launchd root means Claude agents 401 when running without a GUI session. Route nodes that must run headless to Codex agents via `agent_backends` in `hive.config.yaml`. See [Operations Guide — DAG-on-Multica](docs/operations-guide.md#dag-on-multica-substrate) for details.
+
+---
+
 ## Where to go deeper
 
 - **[Operations Guide](docs/operations-guide.md)**: Full detail on workflows, architecture, configuration, and advanced usage

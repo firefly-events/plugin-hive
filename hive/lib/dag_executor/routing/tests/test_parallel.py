@@ -280,6 +280,9 @@ def test_test_swarm_executes_e2e_with_parallel_platforms(tmp_path):
         "triage-failures",
         "compile-report",
         "promote-baseline",
+        "scenario-replay",
+        "reconcile-report",
+        "gate-test-report",
     }
     assert set(out.keys()) == expected_steps
     # file-bugs ran (≥1 platform succeeded) — barrier-join activated.

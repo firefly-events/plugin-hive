@@ -148,8 +148,51 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
    When `gate_violations[]` is non-empty, the dispatch has been downgraded to `sequential` by the parallel-dispatch gate (`ed-7`). Surface the warning to stdout naming every offending story ID and the reason recorded by the gate (the structured format is documented in `execute-dispatch/SKILL.md` Step 1.5). Do not re-implement the gate logic here — the dispatch skill is the single boundary for this decision per the parallel-call-sites registry (`hive/references/parallel-call-sites.md`).
 
-   Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d, `multica` -> step 6e, `cc-workflows` -> step 6f.
+   Switch `mode_decision`: `sessions` -> step 6c, `team-cmux` -> step 6b, `team` -> step 6, `sequential` -> step 7, `sandcastle` -> step 6d, `multica` -> step 5e, `cc-workflows` -> step 6f.
 5pre. **Executor cutover routing.** Use only the returned `runner_path` and `runner_reason`; do not re-evaluate the cutover tree here. If `runner_path == hive-dag`, call `hive.lib.dag_executor.run_workflow(workflow_path, dispatcher, run_state_path=..., worktree_manager=...)`; otherwise continue on the orchestrator-narrated path. Single dispatch point: this skill call is the only `/execute` policy boundary for executor-vs-orchestrator routing.
+
+5e. **DAG/Multica front-door dispatch.** Reached when `mode_decision == multica`. Route each story through the DAG run entrypoint with the Multica binding. This is the symmetric sibling of the planning-routing DAG front-door path (s9).
+
+**Methodology→graph selection.** Map the resolved `methodology` (from `--methodology`, default `classic`) to the development graph:
+
+- `classic` → `hive/workflows/development.classic.workflow.yaml`
+- `tdd` → `hive/workflows/development.tdd.workflow.yaml`
+- `bdd` → `hive/workflows/development.bdd.workflow.yaml`
+
+If the target graph file does not exist, report an error and list available graphs (files matching `hive/workflows/development.*.workflow.yaml`).
+
+**DAG front-door invocation.** For each story in `unblocked_stories[]`:
+
+```python
+from hive.lib.dag_executor.run import run
+
+result = run(
+    workflow_path,        # resolved methodology graph above
+    binding="multica",
+    context={
+        "epic_id": epic_id,
+        "story_id": story.id,
+        "methodology": methodology,
+    },
+)
+```
+
+Emit one INFO log line at dispatch:
+
+```
+[info] execute routing: story={story_id} methodology={methodology} graph={workflow_path} binding=multica reason=dag-multica
+```
+
+Graph completion is an **artifact-readiness signal only** — not a per-story done signal. Per-story completion tracking (episode markers, `completed`/`failed` sets) remains the orchestrator's responsibility per the episode-schema contract.
+
+**Depth advancement.** Collect story results and proceed to step 6g (depth-advancement loop) with `completed`/`failed` sets populated from `result`.
+
+**Fallback.** If the Multica binding fails:
+
+- Daemon down (ECONNREFUSED, timeout during `binding=multica` init): emit `[warn] execute routing: dag-multica daemon down for story={story_id} — falling back to local` and route that story through step 7 (sequential) with the local executor.
+- Dispatch error (graph-step error, node timeout): emit `[warn] execute routing: dag-multica dispatch failed for story={story_id}: {error} — falling back to local` and apply the same local fallback.
+
+**Local fallback (backend unset).** When `mode_decision != multica`, this step is skipped entirely. Existing paths (sessions → 6c, team-cmux → 6b, team → 6, sequential → 7, sandcastle → 6d, cc-workflows → 6f) are unchanged — no regression.
 
 6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
 

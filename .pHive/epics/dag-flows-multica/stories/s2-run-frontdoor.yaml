@@ -1,0 +1,82 @@
+id: s2-run-frontdoor
+epic: dag-flows-multica
+title: Production executor assembly + run/resume entrypoint
+status: pending
+complexity: high
+methodology: classic
+depends_on: [s1-local-spawn]
+
+description: |
+  Build the missing production front door for the DAG executor: one entrypoint that
+  (1) loads a graph via load_workflow, (2) assembles the Dispatcher with a real
+  AgentHandler(spawn=<binding>) plus the existing Gate/Script/Pause handlers,
+  (3) runs the graph with run_state persistence and resume, (4) selects the spawn
+  binding (local s1 vs Multica s4) by config/env. Today only StubAgentSpawn is wired
+  (tests). dag_executor/__init__.py:173-177 documents that the caller must assemble
+  this — this story IS that caller, made reusable so every skill (plan/execute/test/
+  review) invokes it the same way.
+
+  Expose both a Python callable and a thin CLI (so Node/skill prose can shell it).
+
+acceptance_criteria:
+  - "Given a *.workflow.yaml path and a binding selector, when the entrypoint runs, then it loads the graph, registers AgentHandler(spawn=selected) + Gate/Script/Pause in the Dispatcher, executes nodes in dependency order, and persists run_state."
+  - "Given a run interrupted mid-graph, when re-invoked with the same run_id, then it resumes from run_state (completed nodes not re-run)."
+  - "Given backend selection unset, when run, then the local binding (s1) is used; when planning.mode/execution.mode resolves to multica (or HIVE_*_MODE env), the Multica binding (s4) is used."
+  - "Given a graph whose agent node fails, when run, then the failure surfaces with node id + does not mark downstream nodes complete."
+
+steps:
+  - id: research
+    description: Map Dispatcher.register/dispatch, default handler map, run_state store/resume API, and how __init__.py expects assembly.
+    agent: researcher
+  - id: implement
+    description: Implement assemble_dispatcher(binding) + run_workflow(graph_path, binding_selector, run_id) + resume path + CLI shim.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Tests — full run with StubAgentSpawn over an existing workflow fixture; resume after simulated interrupt; binding selection by config/env.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm handlers untouched; binding injected not hardcoded; resume semantics correct.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/dag_executor/executor/dispatcher.py
+      purpose: Dispatcher.register(NodeType, handler) + dispatch(); default SCRIPT/GATE/PAUSE map.
+    - path: hive/lib/dag_executor/executor/handlers/agent.py
+      purpose: AgentHandler(spawn, repo_root) to register for NodeType.AGENT.
+    - path: hive/lib/dag_executor/graph/loader.py
+      purpose: load_workflow(path) / load_all_workflows(dir="hive/workflows").
+    - path: hive/lib/dag_executor/run_state/
+      purpose: store/resume/archive — persistence + resume primitives.
+    - path: hive/lib/dag_executor/__init__.py
+      purpose: "Lines 173-177 — documents caller-assembles-dispatcher contract."
+
+files_to_modify:
+  - file: hive/lib/dag_executor/
+    change: Add a run/assembly entrypoint module + CLI shim (no changes to handlers).
+
+risks:
+  - severity: high
+    description: Greenfield front door tempts re-implementing handler/agent logic.
+    mitigation: Compose existing primitives only; AgentHandler + handlers used as-is.
+  - severity: medium
+    description: Resume correctness across binding types.
+    mitigation: Resume keys on run_state node completion, binding-agnostic; tested both bindings.
+
+references:
+  - path: hive/lib/dag_executor/__init__.py
+    relevant_excerpt: |
+      The skill caller is responsible for assembling the dispatcher with the handler
+      shape it needs (real AgentHandler(spawn=...) for live runs, stubs for tests).
+
+tracker_id: PLU-383
+tracker_uuid: 43ea7cbc-d985-474f-ad20-0710d758d613
+parent_tracker_id: PLU-381

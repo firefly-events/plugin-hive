@@ -1,6 +1,10 @@
 .pHive/*
 !.pHive/multica/
 !.pHive/multica/*
+# dag-spawn-state is resume-critical: server title-dedup is the primary idempotency
+# guard but the local cache must survive across machine boundaries (H2).
+!.pHive/dag-spawn-state/
+!.pHive/dag-spawn-state/**
 # Legacy state/ — ignored completely. Harness sessions running the pre-rename
 # Stop hook may briefly recreate state/interrupts/ files until the session
 # restarts. Keeping state/ ignored prevents those files from polluting PRs.
@@ -242,6 +246,8 @@ tsx-*/
 !.pHive/epics/dynamic-planning-team/**
 !.pHive/epics/plugin-hygiene/
 !.pHive/epics/plugin-hygiene/**
+!.pHive/epics/dag-flows-multica/
+!.pHive/epics/dag-flows-multica/**
 
 # Generated concept illustrations (planning-format-contract.md §8) are produced
 # on-demand and never committed. Re-ignore AFTER the epic allowlists above so the

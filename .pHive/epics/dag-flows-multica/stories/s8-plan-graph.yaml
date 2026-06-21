@@ -1,0 +1,79 @@
+id: s8-plan-graph
+epic: dag-flows-multica
+title: Plan flow graph (plan.workflow.yaml + verbatim step_files)
+status: pending
+complexity: high
+methodology: classic
+depends_on: [s3-validation-gate, s6-multica-spawn, s7-reconcile-node]
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Author the plan flow as a DAG graph — the first real flow on the substrate, and the
+  lowest-risk (read-mostly). No plan.workflow.yaml exists today. Shape:
+    research ‖ design  →  technical-writer author  →  reconcile  →  output-validation gate
+  Single-agent nodes (researcher, architect, technical-writer); step_files carry the
+  verbatim, deterministic per-node instructions distilled from skills/plan/SKILL.md
+  (Phases A/B → decomposition). The graph IS the source of truth — not squad markdown,
+  not the skill prose as process.
+
+  The validation gate (s3) checks the committed `.pHive/epics/<id>` (epic.yaml +
+  stories/*.yaml) against the story/epic schema. User-facing review gates are NOT in
+  the graph — they stay local to the orchestrator (s9 wiring owns that boundary).
+
+acceptance_criteria:
+  - "Given hive/workflows/plan.workflow.yaml, when loaded via load_workflow, then it validates and expresses research+design parallel → author → reconcile → gate with single-agent nodes + OutputRef wiring."
+  - "Given step_files for each node, when read, then each carries verbatim per-node instructions (no skill-prose dump, no process duplication)."
+  - "Given the graph run through the front door with the Multica binding, when an agent plans a small requirement, then committed .pHive/epics output passes the validation gate E2E."
+  - "Given the user-gate boundary, when the graph completes, then no node advances a user review/sign-off (those remain orchestrator-local)."
+
+steps:
+  - id: research
+    description: Distill skills/plan/SKILL.md Phase A/B/C into the minimal node sequence + read graph/model.py fields + an existing workflow.yaml for shape.
+    agent: researcher
+  - id: implement
+    description: Author plan.workflow.yaml + step_file content files for each node.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Loader/validator test + a stubbed front-door run asserting the node order + gate target.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm single-agent nodes, verbatim step_files, gate over committed epics, no user-gate in graph.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/dag_executor/graph/model.py
+      purpose: Node/Graph/OutputRef/ConditionalEdge fields the YAML must conform to.
+    - path: hive/workflows/design-review.workflow.yaml
+      purpose: Existing graph to mirror for shape/conventions.
+    - path: skills/plan/SKILL.md
+      purpose: Source of the node sequence (Phases A/B/C) to distill into step_files.
+
+files_to_modify:
+  - file: hive/workflows/plan.workflow.yaml
+    change: New plan flow graph.
+  - file: hive/workflows/step-files/plan/
+    change: New verbatim per-node step_file content.
+
+risks:
+  - severity: medium
+    description: step_files drift from / duplicate skill prose.
+    mitigation: step_files are the deterministic per-node truth; cite source sections; covered by review.
+
+references:
+  - path: .pHive/epics/dag-flows-multica/docs/research-deepen.md
+    relevant_excerpt: |
+      /plan has no dedicated workflow YAML yet; node sequence: research+design → writer author → validate.
+
+tracker_id: PLU-389
+tracker_uuid: 1671c4c4-e8b4-45db-a622-8ed765236a00
+parent_tracker_id: PLU-381

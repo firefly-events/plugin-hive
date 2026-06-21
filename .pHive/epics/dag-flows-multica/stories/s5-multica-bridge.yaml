@@ -1,0 +1,84 @@
+id: s5-multica-bridge
+epic: dag-flows-multica
+title: Multica bridge surface — create-issue + reconcile helpers + JSON contract
+status: pending
+complexity: high
+methodology: classic
+depends_on: [s4-repo-bind]
+
+description: |
+  Add the two net-new bridge surfaces MulticaAgentSpawn needs, which do NOT exist
+  today (verified by researcher + architect):
+
+  1. **create-issue** — a `cli.mjs create-issue` subcommand + index.mjs helper that
+     POSTs /api/issues to mint a task carrying a verbatim brief (step_file_content).
+     The existing dispatch surface only UPDATES existing issues; there is no create
+     path. Prints `{id, url, ...}` JSON to stdout (the established cli.mjs contract:
+     JSON to stdout, `{code,message}` to stderr + exit 1).
+  2. **reconcile** — a `cli.mjs reconcile` subcommand + helper that fetches the
+     agent's branch (`agent/<persona>/<run>`) from the bare repo and ff-merges its
+     `code_push_sha` into the working tree, so committed work is materialised before
+     the validation gate. No such helper exists; today it is a manual git recipe.
+
+  Both are consumed by s6 (binding) + s7 (reconcile node). Keep them thin, tested,
+  JSON-contract-stable — this is the Python→Node seam.
+
+acceptance_criteria:
+  - "Given `cli.mjs create-issue --title --body[from step_file_content]`, when run, then it POSTs /api/issues and prints `{id,url}` JSON to stdout; failures print `{code,message}` to stderr + exit 1."
+  - "Given `cli.mjs reconcile --branch <agent/...> --sha <code_push_sha>`, when run, then it fetches from the bare repo and ff-merges the sha into the working tree, printing a JSON result; a non-ff situation fails with a specific code (no silent merge-commit)."
+  - "Given the JSON contract, when any subcommand succeeds, then stdout is a single `JSON.stringify(data)+'\\n'` line (parseable by Python)."
+  - "Given unit tests with a recorded API/git fixture, when run, then create-issue success/error and reconcile ff/non-ff paths are covered."
+
+steps:
+  - id: research
+    description: Read index.mjs dispatch/ensureIssueBriefMatches/serializeStoryBrief + cli.mjs subcommand dispatch + episode-sync poll return shape (code_push_sha, work_dir).
+    agent: researcher
+  - id: implement
+    description: Add create-issue (POST /api/issues) + reconcile (fetch + ff-merge) helpers + cli.mjs subcommands with the JSON stdout contract.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Unit-test both subcommands against recorded fixtures (JSON shape, error path, ff vs non-ff).
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm JSON contract stability + no silent merge-commit on non-ff + brief passed verbatim.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-story-dispatch/index.mjs
+      purpose: dispatchStoryToAgent (line ~284), serializeStoryBrief, ensureIssueBriefMatches (~270) — update-only; no create path.
+    - path: hive/lib/multica-story-dispatch/cli.mjs
+      purpose: Subcommand dispatch (dispatch|status|poll|episode|cancel|epic-status|comment|write-state); JSON stdout contract.
+    - path: hive/lib/multica-story-dispatch/episode-sync.mjs
+      purpose: pollTaskUntilTerminal (~127) returns terminal obj incl. code_push_sha, work_dir.
+
+files_to_modify:
+  - file: hive/lib/multica-story-dispatch/index.mjs
+    change: Add createIssue (POST /api/issues) + reconcileBranch (fetch + ff-merge) exports.
+  - file: hive/lib/multica-story-dispatch/cli.mjs
+    change: Add create-issue + reconcile subcommands.
+
+risks:
+  - severity: high
+    description: Non-ff reconcile silently creates a merge commit / corrupts tree.
+    mitigation: ff-only; fail loud with a specific code on non-ff; tested.
+  - severity: medium
+    description: JSON contract drift breaks the Python binding.
+    mitigation: Single stringified-JSON stdout line; contract test.
+
+references:
+  - path: hive/lib/multica-story-dispatch/cli.mjs
+    relevant_excerpt: |
+      Prints JSON.stringify(data)+'\n' to stdout; errors {code,message} to stderr, exit 1.
+
+tracker_id: PLU-386
+tracker_uuid: a9e9ed38-c0f2-435e-b089-90fe11a5fa1f
+parent_tracker_id: PLU-381

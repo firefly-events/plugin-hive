@@ -1,0 +1,64 @@
+id: s11-execute-wire
+epic: dag-flows-multica
+title: Wire /execute to the DAG front door (execution mode-resolve seam)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s10-execute-graphs]
+
+description: |
+  Route /execute through the DAG run entrypoint (s2) when the execution backend
+  resolves to DAG/Multica, selecting the methodology graph (classic/tdd/bdd from the
+  story/epic) and running stories on Multica via the binding. Preserve existing
+  execution-mode resolution + per-story completion tracking. Local fallback when the
+  backend is unset (no regression).
+
+acceptance_criteria:
+  - "Given execution.mode resolves to DAG/Multica, when /execute runs a story, then it dispatches the methodology graph (s10) via the front door."
+  - "Given a story's methodology, when /execute selects the graph, then classic/tdd/bdd route to the matching workflow.yaml."
+  - "Given backend unset, when /execute runs, then existing local execution is preserved."
+
+steps:
+  - id: research
+    description: Read skills/execute/SKILL.md mode-resolve + how methodology selects a workflow today.
+    agent: researcher
+  - id: implement
+    description: Wire execute mode-resolve to the front door + methodology→graph selection.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Test backend routing + methodology→graph mapping + local fallback.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm no regression + correct graph selection.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/execute/SKILL.md
+      purpose: Execution mode-resolve + methodology selection seam.
+
+files_to_modify:
+  - file: skills/execute/SKILL.md
+    change: Route DAG/Multica backend to the front door with methodology→graph selection.
+
+risks:
+  - severity: medium
+    description: Regressing the default local execution path.
+    mitigation: Backend-gated branch; local fallback tested.
+
+references:
+  - path: skills/execute/SKILL.md
+    relevant_excerpt: |
+      Execution mode-resolve selects the runtime; DAG/Multica is an additional backend.
+
+tracker_id: PLU-392
+tracker_uuid: 5f4b7cfa-32e7-4539-b82f-ea5ab9bb9423
+parent_tracker_id: PLU-381

@@ -5,16 +5,20 @@ return a `NodeOutput` (a thin dict-of-named-outputs wrapper) and may
 raise from the typed exception tree in `executor.errors`.
 """
 
-from .agent import AgentHandler, NodeOutput, StubAgentSpawn
+from .agent import AgentHandler, LocalAgentSpawn, MulticaAgentSpawn, NodeOutput, StubAgentSpawn
 from .gate import GateHandler
 from .pause import PauseHandler
+from .reconcile import ReconcileHandler
 from .script import ScriptHandler
 
 __all__ = [
     "AgentHandler",
     "GateHandler",
+    "LocalAgentSpawn",
+    "MulticaAgentSpawn",
     "NodeOutput",
     "PauseHandler",
+    "ReconcileHandler",
     "ScriptHandler",
     "StubAgentSpawn",
 ]

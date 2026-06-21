@@ -347,6 +347,170 @@ No new workflow is needed — the existing planning flow already has review gate
 
 ---
 
+## DAG-on-Multica Substrate
+
+Hive's four flows (`/plan`, `/execute`, `/test`, `/review`) are each backed by a YAML-described DAG graph. In **local mode** (default), the executor shells `claude --print` directly. In **Multica mode**, each agent node becomes a Multica issue; an agent run is dispatched against it, the result is reconciled back into the working tree, and a gate validates the committed files. The graphs are identical in both modes — only the `AgentSpawn` binding changes.
+
+### Architecture
+
+| Concern | Home | Deterministic? |
+|---------|------|----------------|
+| Flow, gate evaluation, routing, schema validation, resume | DAG graph + executor | Yes |
+| One node's work (implement, research, review…) | Agent behind `AgentSpawn` (local or Multica) | No — contained |
+| Which persona fills a node | Roster / workflow YAML | Yes |
+| Project output, config | Project repo `.pHive/` | n/a |
+
+The DAG executor never trusts an agent's self-report. Gates read committed files on disk after the reconcile node materializes the agent's commit. An agent that writes nothing fails the gate even if it says it succeeded.
+
+### Enabling Multica mode
+
+```yaml
+# hive.config.yaml
+planning:
+  mode: multica    # /plan personas dispatched as Multica issues
+
+execution:
+  mode: multica    # /execute, /test, /review nodes dispatched as Multica issues
+```
+
+Env override for a single run: `HIVE_EXECUTION_MODE=multica`.
+
+Precedence: explicit binding arg → `HIVE_EXECUTION_MODE` → config knob → default (`local`).
+
+### Operational prerequisites
+
+1. **Multica daemon** — `multica daemon start`. The executor calls the Multica CLI; the daemon must be running.
+2. **Workspace credentials** — `~/.multica/config.json` with `server_url`, `token`, `workspace_id` (or env vars `MULTICA_SERVER_URL`, `MULTICA_TOKEN`, `MULTICA_WORKSPACE_ID`).
+3. **Repo bind** — `/hive:multica-init` binds the project's git repository URL to the workspace. Without this, Multica task worktrees have no repo and agents cannot commit. Binding is idempotent.
+4. **Headless agents (R1)** — Multica Studio's keychain/launchd root means Claude agents 401 without a GUI session. For unattended runs, route agent nodes to Codex via `agent_backends` in `hive.config.yaml`:
+
+   ```yaml
+   agent_backends:
+     developer: codex
+     backend-developer: codex
+   ```
+
+   Codex runs headless without a keychain dependency. Gates and orchestration stay on Claude (they invoke tools and cannot be moved to Codex).
+
+### Authoring a flow graph
+
+Each flow maps to a YAML workflow file in `hive/workflows/`. The schema is the same across flows. Four node types are used:
+
+| Node type | Purpose |
+|-----------|---------|
+| `agent` | Dispatches one persona via `AgentSpawn`. Produces output dict (e.g. `commit_sha`, `epic_dir`). |
+| `reconcile` | Fetches the agent's commit into the working tree. No-op for local binding (files already on disk). |
+| `gate` | Reads committed files and asserts a condition. Fails deterministically if files are absent or malformed. Supports `retry` with `max_attempts`. |
+| `script` / `validate` | Runs a deterministic script (e.g. Python schema validation). |
+
+#### Minimal graph example
+
+```yaml
+# hive/workflows/myflow.workflow.yaml
+name: myflow
+
+nodes:
+  research:
+    node_type: agent
+    agent: researcher
+    step_file: step-files/myflow/research.md
+    depends_on: []
+
+  implement:
+    node_type: agent
+    agent: developer
+    step_file: step-files/myflow/implement.md
+    depends_on: [research]
+    inputs:
+      research_brief: "{{ research.outputs.brief }}"
+
+  reconcile:
+    node_type: reconcile
+    depends_on: [implement]
+    inputs:
+      sha: "{{ implement.outputs.commit_sha }}"   # optional — absent → no-op on local
+
+  gate-output:
+    node_type: gate
+    predicate: "output_dir must not be empty"
+    depends_on: [reconcile]
+    inputs:
+      output_dir: "{{ implement.outputs.output_dir }}"
+    retry:
+      max_attempts: 3
+      on: gate_failed
+```
+
+#### Step files
+
+Each agent node references a **step file** (`step-files/<flow>/<node>.md`). Step files are passed **verbatim** to the agent — no paraphrasing, no summarization. The agent receives the exact bytes. Write step files as self-contained briefs: they must fully specify what the agent should do, what to read, and what to commit.
+
+```markdown
+<!-- step-files/myflow/implement.md -->
+# Implement: <title>
+
+## Context
+…
+
+## Task
+…
+
+## Output contract
+Commit your changes to the branch. Output JSON: `{"commit_sha": "<sha>", "output_dir": "<path>"}`.
+```
+
+#### Reconcile node
+
+Every flow that can run on Multica must include a reconcile node **between** the last agent node and the first gate. The reconcile node calls `cli.mjs reconcile`, which fetches the agent's commit from the remote bare repo and fast-forward merges it into the working tree. Without reconcile, the gate reads stale or absent files.
+
+- If `inputs.sha` is absent or empty (local binding — files already on disk), reconcile is a no-op.
+- If `inputs.sha` is set (Multica binding — agent committed to a remote branch), reconcile fetches and merges.
+
+#### Gate node
+
+Gate predicates follow the pattern `"{output_key} must not be empty"`. The `GateHandler` asserts that the named key (from the node's inputs) is non-null and non-empty. For structural validation beyond emptiness, use a `script` node that calls `python3 -m hive.lib.dag_executor.validate_output --target <target> --epic-dir <path>`.
+
+Built-in validation targets: `plan-epic` (validates `epic.yaml` + per-story YAMLs). Add custom targets to `VALIDATORS` in `hive/lib/dag_executor/validate_output.py`.
+
+### Adding a new flow
+
+1. **Write the workflow YAML** — `hive/workflows/<flowname>.workflow.yaml`. Follow the pattern above: agent nodes → reconcile → gate.
+
+2. **Write step files** — one `.md` per agent node in `hive/workflows/step-files/<flowname>/`. Make them self-contained briefs with an explicit output contract.
+
+3. **Wire the front door** — in the CLI skill or command that invokes your flow, call `run()` from `hive.lib.dag_executor.run` with:
+   - `workflow_path` pointing to your new YAML
+   - `flow` label matching the relevant config section (use `"execution"` for execute-side flows)
+   - `episode_hook=emit_run_episode` (from `hive.lib.dag_executor.episode`) to record `dag-run.yaml` markers
+
+4. **Register a validator** (optional) — if your flow produces structured artifacts that need schema validation, add an entry to `VALIDATORS` in `validate_output.py` keyed to a `--target` name.
+
+5. **Test locally first** — run with `execution.mode: local` (default). Swap to `multica` once the graph is validated end-to-end. The graphs behave identically in both modes.
+
+### Resume
+
+If a run is interrupted, the executor records `run_state.yaml` under `.pHive/runs/{run_id}/`. On re-invoke, the `resume_run()` function:
+
+1. Loads `run_state.yaml`, checks status (SUSPENDED → resumable; COMPLETED → error).
+2. Replays completed nodes from the saved output graph (no re-dispatch).
+3. Re-executes from the first non-completed node onward.
+
+Episode markers (`dag-run.yaml`) are written to `.pHive/episodes/{flow}/{run_id}/dag-run.yaml` after a successful run and record the `run_id`, workflow name, status, completed nodes, and emit timestamp.
+
+### Existing graphs (reference)
+
+| Flow | Workflow file | Key nodes |
+|------|--------------|-----------|
+| Plan | `hive/workflows/plan.workflow.yaml` | research ‖ design → author → reconcile → output-validation |
+| Execute (TDD) | `hive/workflows/development.tdd.workflow.yaml` | research → write-brief → test-spec → implement → reconcile-implement → gate-tests → review → integrate |
+| Execute (Classic) | `hive/workflows/development.classic.workflow.yaml` | preflight → research → write-brief → implement → test → review → integrate |
+| Test swarm | `hive/workflows/test-swarm.workflow.yaml` | …12-node pipeline… → reconcile-report → gate-test-report |
+| Review | `hive/workflows/review.workflow.yaml` | reviewer → reconcile-review → gate-review-artifact |
+
+Step files live in `hive/workflows/step-files/{flow}/`.
+
+---
+
 ## Memory System
 
 Agents accumulate knowledge across sessions. The memory system uses a four-layer architecture with graceful degradation.
@@ -514,6 +678,9 @@ See `references/error-handling.md` for the full per-phase failure playbook.
 | Epic definitions | `.pHive/epics/{epic-id}/epic.yaml` | Epic index with story list |
 | Story specs | `.pHive/epics/{epic-id}/stories/{story-id}.yaml` | Self-contained story definitions |
 | Episode records | `.pHive/episodes/{epic-id}/{story-id}/{step-id}.yaml` | Progress tracking per step |
+| DAG run episodes | `.pHive/episodes/{flow}/{run-id}/dag-run.yaml` | DAG run summary (run_id, workflow, status, completed nodes) |
+| DAG run state | `.pHive/runs/{run-id}/run_state.yaml` | In-flight executor state; used for resume |
+| DAG spawn state | `.pHive/dag-spawn-state/{run-id}/{step-id}/tracker.json` | Multica issue ID per node (idempotency) |
 | Cycle state | `.pHive/cycle-state/{epic-id}.yaml` | Accumulated decisions across phases |
 | Staged insights | `.pHive/insights/{epic-id}/{story-id}/` | Insights pending session-end evaluation |
 | Agent memories | `~/.claude/hive/memories/{agent}/` | System-level, cross-project |
@@ -533,7 +700,7 @@ See `references/error-handling.md` for the full per-phase failure playbook.
 | `references/agent-memory-schema.md` | Memory types, TTL, loading, migration |
 | `references/team-config-schema.md` | Loadable team compositions and lifecycle |
 | `references/domain-access-control.md` | Per-agent write restrictions and enforcement |
-| `references/workflow-schema.md` | YAML workflow format, step fields, retry config |
+| `references/workflow-schema.md` | YAML workflow format, node types, step fields, retry config |
 | `references/methodology-routing.md` | Classic/TDD/BDD phase ordering |
 | `references/episode-schema.md` | Status marker format |
 | `references/quality-gates.md` | Three-tier gates, trust scoring, validation handshake |

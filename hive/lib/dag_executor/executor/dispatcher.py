@@ -14,7 +14,7 @@ from typing import Any, Callable, Mapping
 from hive.lib.dag_executor.graph import NodeType
 
 from .errors import DispatcherError
-from .handlers import AgentHandler, GateHandler, NodeOutput, PauseHandler, ScriptHandler
+from .handlers import AgentHandler, GateHandler, NodeOutput, PauseHandler, ReconcileHandler, ScriptHandler
 
 
 HandlerCallable = Callable[[Any, dict[str, Any], str], NodeOutput]
@@ -37,6 +37,7 @@ class Dispatcher:
             NodeType.SCRIPT: ScriptHandler().handle,
             NodeType.GATE: GateHandler().handle,
             NodeType.PAUSE: PauseHandler().handle,
+            NodeType.RECONCILE: ReconcileHandler().handle,
         }
         if handlers:
             defaults.update(handlers)
