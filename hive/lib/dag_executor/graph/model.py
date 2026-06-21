@@ -31,6 +31,7 @@ class NodeType(str, Enum):
     SCRIPT = "script"
     GATE = "gate"
     PAUSE = "pause"
+    RECONCILE = "reconcile"
 
 
 VALID_INPUT_SOURCES = ("literal", "step_output", "context")
