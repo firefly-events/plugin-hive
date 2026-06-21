@@ -266,6 +266,41 @@ function detectGitOrigin(repoRoot) {
 // `multica repo checkout`). Without a bound repo the daemon hands agents a bare
 // scaffold and file output cannot be committed. Idempotent: a no-op when the URL
 // is already present. The URL defaults to the project's `origin` remote.
+//
+// Deps (httpJson, detectGitOrigin) are injected so the bind/idempotent/
+// unresolved/consent paths are unit-testable (mirrors the reconcile*WithDeps
+// convention). `ensureRepos` below wires the real module deps.
+export async function ensureReposWithDeps({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  repoUrl,
+  repoRoot,
+  consent = false,
+  httpJson: httpJsonFn = httpJson,
+  detectGitOrigin: detectGitOriginFn = detectGitOrigin,
+} = {}) {
+  if (!token) throw bootstrapError('AUTH_REQUIRED', 'A Multica PAT is required.', 'Call ensureAuth first.');
+  if (!workspaceId) throw bootstrapError('WORKSPACE_REQUIRED', 'A workspace id is required.', 'Call ensureWorkspace first.');
+  const url = String(repoUrl || '').trim() || detectGitOriginFn(repoRoot);
+  if (!url) {
+    throw bootstrapError(
+      'REPO_URL_UNRESOLVED',
+      'Could not determine a repository URL to bind.',
+      'Pass repoUrl, or run from a git checkout that has an "origin" remote.',
+    );
+  }
+  const workspace = await httpJsonFn(serverUrl, `/api/workspaces/${encodeURIComponent(workspaceId)}`, { token });
+  const current = normalizeList(workspace?.repos, 'repos');
+  if (current.some((repo) => repo?.url === url)) {
+    return { workspaceId, repoUrl: url, bound: true, created: false };
+  }
+  assertConsent(consent, `Binding repo "${url}" to the workspace requires consent.`, 'Re-run with --yes or bind the repo manually.');
+  const next = [...current, { url }];
+  const updated = await httpJsonFn(serverUrl, `/api/workspaces/${encodeURIComponent(workspaceId)}`, { method: 'PUT', token, body: { repos: next } });
+  return { workspaceId, repoUrl: url, bound: true, created: true, repos: normalizeList(updated?.repos, 'repos') };
+}
+
 export async function ensureRepos({
   serverUrl = DEFAULT_SERVER_URL,
   token,
@@ -274,25 +309,7 @@ export async function ensureRepos({
   repoRoot,
   consent = false,
 } = {}) {
-  if (!token) throw bootstrapError('AUTH_REQUIRED', 'A Multica PAT is required.', 'Call ensureAuth first.');
-  if (!workspaceId) throw bootstrapError('WORKSPACE_REQUIRED', 'A workspace id is required.', 'Call ensureWorkspace first.');
-  const url = String(repoUrl || '').trim() || detectGitOrigin(repoRoot);
-  if (!url) {
-    throw bootstrapError(
-      'REPO_URL_UNRESOLVED',
-      'Could not determine a repository URL to bind.',
-      'Pass repoUrl, or run from a git checkout that has an "origin" remote.',
-    );
-  }
-  const workspace = await httpJson(serverUrl, `/api/workspaces/${encodeURIComponent(workspaceId)}`, { token });
-  const current = normalizeList(workspace?.repos, 'repos');
-  if (current.some((repo) => repo?.url === url)) {
-    return { workspaceId, repoUrl: url, bound: true, created: false };
-  }
-  assertConsent(consent, `Binding repo "${url}" to the workspace requires consent.`, 'Re-run with --yes or bind the repo manually.');
-  const next = [...current, { url }];
-  const updated = await httpJson(serverUrl, `/api/workspaces/${encodeURIComponent(workspaceId)}`, { method: 'PUT', token, body: { repos: next } });
-  return { workspaceId, repoUrl: url, bound: true, created: true, repos: normalizeList(updated?.repos, 'repos') };
+  return ensureReposWithDeps({ serverUrl, token, workspaceId, repoUrl, repoRoot, consent });
 }
 export async function ensureDaemon({ consent = false } = {}) {
   try {
