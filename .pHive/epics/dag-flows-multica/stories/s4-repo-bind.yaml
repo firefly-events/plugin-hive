@@ -4,7 +4,7 @@ title: Finish Multica repo-binding (wire ensureRepos + un-defer multica-init)
 status: pending
 complexity: low
 methodology: classic
-depends_on: [s0-multica-upgrade]
+depends_on: [s0-multica-upgrade, s0b-pull-studio-fork]
 parallel_allowed: true
 parallel_rationale: bounded-slice
 

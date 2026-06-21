@@ -20,6 +20,10 @@ stories:
     title: Upgrade local Multica (server + CLI) to latest + re-verify endpoints
     complexity: low
     depends_on: []
+  - id: s0b-pull-studio-fork
+    title: Pull firefly-events/multica fork from the Studio + run as local runtime
+    complexity: medium
+    depends_on: []
   - id: s1-local-spawn
     title: Local AgentSpawn binding (wraps agent-spawn Step 7)
     complexity: medium
@@ -35,7 +39,7 @@ stories:
   - id: s4-repo-bind
     title: Finish Multica repo-binding (wire ensureRepos + un-defer multica-init)
     complexity: low
-    depends_on: [s0-multica-upgrade]
+    depends_on: [s0-multica-upgrade, s0b-pull-studio-fork]
   - id: s5-multica-bridge
     title: Multica bridge surface — create-issue + reconcile helpers + JSON contract
     complexity: high
