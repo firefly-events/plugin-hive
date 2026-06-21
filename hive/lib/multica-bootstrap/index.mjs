@@ -250,6 +250,50 @@ export async function ensureWorkspace({
   const created = await httpJson(serverUrl, '/api/workspaces', { method: 'POST', token, body: { name: DEFAULT_WORKSPACE_NAME, slug } });
   return { workspaceId: created.id, issuePrefix: created.issue_prefix, created: true };
 }
+function detectGitOrigin(repoRoot) {
+  try {
+    const out = childProcess.execSync('git remote get-url origin', {
+      cwd: repoRoot || process.cwd(),
+      stdio: ['ignore', 'pipe', 'ignore'],
+      encoding: 'utf8',
+    });
+    return String(out || '').trim();
+  } catch {
+    return '';
+  }
+}
+// Bind a git repo to the workspace so each task workdir is a real checkout (via
+// `multica repo checkout`). Without a bound repo the daemon hands agents a bare
+// scaffold and file output cannot be committed. Idempotent: a no-op when the URL
+// is already present. The URL defaults to the project's `origin` remote.
+export async function ensureRepos({
+  serverUrl = DEFAULT_SERVER_URL,
+  token,
+  workspaceId,
+  repoUrl,
+  repoRoot,
+  consent = false,
+} = {}) {
+  if (!token) throw bootstrapError('AUTH_REQUIRED', 'A Multica PAT is required.', 'Call ensureAuth first.');
+  if (!workspaceId) throw bootstrapError('WORKSPACE_REQUIRED', 'A workspace id is required.', 'Call ensureWorkspace first.');
+  const url = String(repoUrl || '').trim() || detectGitOrigin(repoRoot);
+  if (!url) {
+    throw bootstrapError(
+      'REPO_URL_UNRESOLVED',
+      'Could not determine a repository URL to bind.',
+      'Pass repoUrl, or run from a git checkout that has an "origin" remote.',
+    );
+  }
+  const workspace = await httpJson(serverUrl, `/api/workspaces/${encodeURIComponent(workspaceId)}`, { token });
+  const current = normalizeList(workspace?.repos, 'repos');
+  if (current.some((repo) => repo?.url === url)) {
+    return { workspaceId, repoUrl: url, bound: true, created: false };
+  }
+  assertConsent(consent, `Binding repo "${url}" to the workspace requires consent.`, 'Re-run with --yes or bind the repo manually.');
+  const next = [...current, { url }];
+  const updated = await httpJson(serverUrl, `/api/workspaces/${encodeURIComponent(workspaceId)}`, { method: 'PUT', token, body: { repos: next } });
+  return { workspaceId, repoUrl: url, bound: true, created: true, repos: normalizeList(updated?.repos, 'repos') };
+}
 export async function ensureDaemon({ consent = false } = {}) {
   try {
     const status = childProcess.execSync('multica daemon status', {
