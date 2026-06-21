@@ -1,0 +1,66 @@
+id: s12-test-flow
+epic: dag-flows-multica
+title: Test flow graph (extend test-swarm.workflow.yaml + reconcile + gate + wire)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s3-validation-gate, s6-multica-spawn, s7-reconcile-node]
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Bring /test onto the substrate. test-swarm.workflow.yaml already exists (researcher):
+  EXTEND it with a reconcile node + a validation gate over the committed test report
+  artifact, and wire /test to the DAG front door when the backend resolves to
+  DAG/Multica. Minimal-then-deepen (TPM-endorsed): a single producer band
+  (context→author→execute→triage→report) + gate; deepen later. Local fallback preserved.
+
+acceptance_criteria:
+  - "Given test-swarm.workflow.yaml extended, when loaded, then it validates with a reconcile node before a gate that checks the committed test report exists + parses."
+  - "Given /test with the DAG/Multica backend, when run on a real target, then the report is produced + passes the gate E2E."
+  - "Given backend unset, when /test runs, then existing local behaviour is preserved."
+
+steps:
+  - id: research
+    description: Read test-swarm.workflow.yaml + skills/test/SKILL.md flow + report artifact location.
+    agent: researcher
+  - id: implement
+    description: Extend the graph (reconcile + gate) + wire /test to the front door.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Loader/validator test + a stubbed run asserting report gate.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm reconcile-before-gate + report validation + no regression.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/workflows/test-swarm.workflow.yaml
+      purpose: Existing test graph to extend.
+    - path: skills/test/SKILL.md
+      purpose: Source of the test flow node sequence + report artifact.
+
+files_to_modify:
+  - file: hive/workflows/test-swarm.workflow.yaml
+    change: Add reconcile + gate nodes.
+  - file: skills/test/SKILL.md
+    change: Route DAG/Multica backend to the front door.
+
+risks:
+  - severity: low
+    description: Report-artifact path assumptions wrong.
+    mitigation: Gate parameterised on the actual report path; researched first.
+
+references:
+  - path: .pHive/epics/dag-flows-multica/docs/research-deepen.md
+    relevant_excerpt: |
+      /test matches test-swarm.workflow.yaml (exists).

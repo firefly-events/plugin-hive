@@ -242,6 +242,8 @@ tsx-*/
 !.pHive/epics/dynamic-planning-team/**
 !.pHive/epics/plugin-hygiene/
 !.pHive/epics/plugin-hygiene/**
+!.pHive/epics/dag-flows-multica/
+!.pHive/epics/dag-flows-multica/**
 
 # Generated concept illustrations (planning-format-contract.md §8) are produced
 # on-demand and never committed. Re-ignore AFTER the epic allowlists above so the
