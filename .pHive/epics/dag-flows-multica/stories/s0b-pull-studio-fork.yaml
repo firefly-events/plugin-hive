@@ -65,7 +65,7 @@ context:
 
 risks:
   - severity: high
-    description: Studio unreachable / SSH auth issues block the exact-code pull (memory: SSH probe lies, Keychain GUI-session caveat).
+    description: "Studio unreachable / SSH auth issues block the exact-code pull (memory ref: SSH probe lies, Keychain GUI-session caveat)."
     mitigation: Fall back to firefly-events GitHub clone (loses unpushed commits) — documented; do not probe Keychain.
   - severity: medium
     description: Fork build deps differ from brew (Go toolchain / build steps) on this machine.
