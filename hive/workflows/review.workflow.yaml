@@ -1,0 +1,92 @@
+name: review
+description: >
+  Review flow graph — reviewer producer → reconcile → validation gate over
+  the committed review artifact. Bounded retry on reviewer node (no LOOP primitive).
+  Shape mirrors plan.workflow.yaml and test-swarm.workflow.yaml conventions.
+version: "1.0.0"
+
+steps:
+  # ── Reviewer producer: run structured code review + commit artifact ──────────
+  - id: reviewer
+    agent: reviewer
+    node_type: agent
+    step_file: hive/workflows/step-files/review/reviewer.md
+    task: >
+      Run a structured code review on the provided diff / PR / branch.
+      Produce a review artifact (verdict + findings) and commit it to the working
+      tree so the reconcile + gate nodes can validate it.
+    depends_on: []
+    inputs:
+      - name: diff_target
+        source: context
+        context_key: diff_target
+        optional: true
+      - name: pr_number
+        source: context
+        context_key: pr_number
+        optional: true
+      - name: branch
+        source: context
+        context_key: branch
+        optional: true
+    outputs:
+      - name: review_artifact
+        type: string
+      - name: commit_sha
+        type: string
+    retry:
+      max_attempts: 3
+    timeout_ms: 1800000
+
+  # ── Reconcile (s7): materialise the reviewer's committed artifact before gate ─
+  - id: reconcile-review
+    agent: reconciler
+    node_type: reconcile
+    step_file: hive/workflows/step-files/review/reconcile.md
+    task: >
+      Materialise the reviewer's committed review artifact so the gate can
+      validate it exists and contains a non-empty verdict.
+    depends_on:
+      - reviewer
+    inputs:
+      - name: sha
+        source: step_output
+        step_id: reviewer
+        output_name: commit_sha
+        optional: true
+      - name: branch
+        source: context
+        context_key: branch
+        optional: true
+      - name: repo
+        source: context
+        context_key: repo
+        optional: true
+    outputs:
+      - name: reconcile_status
+        type: string
+    optional: true
+    timeout_ms: 120000
+
+  # ── Validation gate (s3): confirm review artifact exists and is non-empty ────
+  - id: gate-review-artifact
+    agent: validator
+    node_type: gate
+    gate: "review_artifact must not be empty"
+    step_file: hive/workflows/step-files/review/gate-review.md
+    depends_on:
+      - reconcile-review
+    inputs:
+      - name: review_artifact
+        source: step_output
+        step_id: reviewer
+        output_name: review_artifact
+      - name: review_artifact_path
+        source: context
+        context_key: review_artifact_path
+        optional: true
+    outputs:
+      - name: gate_passed
+        type: json
+    optional: false
+    timeout_ms: 60000
