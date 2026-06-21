@@ -65,10 +65,9 @@ def resolve_spawn_binding(
         return name, _BINDING_FACTORIES[name](repo_root=repo_root)
 
     if name == "multica":
-        raise NotImplementedError(
-            "multica spawn binding not built yet (story s6-multica-spawn). "
-            "Register it via run.register_binding('multica', factory)."
-        )
+        from hive.lib.dag_executor.executor import MulticaAgentSpawn
+
+        return "multica", MulticaAgentSpawn(repo_root=repo_root)
 
     raise ValueError(
         f"unknown spawn binding {name!r} "

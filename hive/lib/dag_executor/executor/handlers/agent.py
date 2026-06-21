@@ -227,6 +227,182 @@ class LocalAgentSpawn:
         return result
 
 
+class MulticaAgentSpawn:
+    """Multica-routed AgentSpawn binding — s6-multica-spawn.
+
+    Each call:
+      1. Resolves (or reuses) a Multica tracker issue keyed on
+         (run_id, step_id) for idempotency — never mints a duplicate on
+         resume.
+      2. Dispatches the issue to the named agent via cli.mjs dispatch.
+      3. Polls to terminal via cli.mjs poll.
+      4. Raises AgentHandlerError on non-completed terminal status.
+      5. Returns a dict with code_push_sha + work_dir (and ancillary ids).
+
+    Python→Node bridge: shells hive/lib/multica-story-dispatch/cli.mjs
+    subcommands and parses their JSON stdout.
+    """
+
+    _DEFAULT_TIMEOUT_MS = 3_600_000
+    _FAST_CMD_TIMEOUT_S = 120.0
+
+    def __init__(
+        self,
+        *,
+        cli_path: str | Path | None = None,
+        repo_root: Path | str | None = None,
+        timeout_ms: int = _DEFAULT_TIMEOUT_MS,
+        node_bin: str = "node",
+    ) -> None:
+        self._cli_path = Path(cli_path) if cli_path else self._default_cli_path()
+        self._repo_root = (
+            Path(repo_root).resolve() if repo_root else Path.cwd().resolve()
+        )
+        self._timeout_ms = timeout_ms
+        self._node_bin = node_bin
+
+    @staticmethod
+    def _default_cli_path() -> Path:
+        # agent.py is at hive/lib/dag_executor/executor/handlers/agent.py
+        # cli.mjs  is at hive/lib/multica-story-dispatch/cli.mjs
+        # handlers/ → ../../.. → hive/lib/
+        here = Path(__file__).resolve().parent
+        return (here / "../../../multica-story-dispatch/cli.mjs").resolve()
+
+    # ------------------------------------------------------------------
+    # AgentSpawn Protocol
+    # ------------------------------------------------------------------
+
+    def __call__(
+        self,
+        agent: str,
+        step_file_content: str,
+        inputs: dict[str, Any],
+        run_id: str,
+        step_id: str,
+    ) -> dict[str, Any]:
+        tracker_id = self._resolve_tracker_id(
+            run_id, step_id, agent, step_file_content
+        )
+        self._dispatch(tracker_id, agent)
+        terminal = self._poll(tracker_id)
+        status = terminal.get("status", "")
+        if status != "completed":
+            raise AgentHandlerError(
+                f"multica task {tracker_id!r} for step {step_id!r} "
+                f"terminal with status {status!r}: {terminal.get('notes', '')}"
+            )
+        return {
+            "code_push_sha": terminal.get("code_push_sha"),
+            "work_dir": terminal.get("work_dir"),
+            "task_id": terminal.get("task_id"),
+            "agent_id": terminal.get("agent_id"),
+            "tracker_id": tracker_id,
+        }
+
+    # ------------------------------------------------------------------
+    # Idempotency
+    # ------------------------------------------------------------------
+
+    def _tracker_state_path(self, run_id: str, step_id: str) -> Path:
+        return (
+            self._repo_root
+            / ".pHive"
+            / "dag-spawn-state"
+            / run_id
+            / step_id
+            / "tracker.json"
+        )
+
+    def _resolve_tracker_id(
+        self,
+        run_id: str,
+        step_id: str,
+        agent: str,
+        step_file_content: str,
+    ) -> str:
+        state_path = self._tracker_state_path(run_id, step_id)
+        if state_path.exists():
+            try:
+                data = json.loads(state_path.read_text(encoding="utf-8"))
+                existing = data.get("tracker_id")
+                if existing:
+                    return str(existing)
+            except (ValueError, OSError):
+                pass
+
+        title = f"[dag:{run_id}:{step_id}] {agent}"
+        # cli.mjs requires non-empty --body; use a placeholder when no step_file
+        # was provided (step_file_content is ""). This does NOT violate the VERBATIM
+        # rule — verbatim means no paraphrasing of non-empty content.
+        body = step_file_content or f"(no step_file provided — run {run_id} step {step_id})"
+        result = self._run_cli_fast(
+            ["create-issue", "--title", title, "--body", body]
+        )
+        tracker_id = result.get("id")
+        if not tracker_id:
+            raise AgentHandlerError(
+                f"multica create-issue returned no id for step {step_id!r}: {result!r}"
+            )
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(
+            json.dumps(
+                {"tracker_id": tracker_id, "run_id": run_id, "step_id": step_id}
+            ),
+            encoding="utf-8",
+        )
+        return str(tracker_id)
+
+    # ------------------------------------------------------------------
+    # CLI dispatch + poll
+    # ------------------------------------------------------------------
+
+    def _dispatch(self, tracker_id: str, agent: str) -> None:
+        self._run_cli_fast(
+            ["dispatch", "--issue", tracker_id, "--agent", agent]
+        )
+
+    def _poll(self, tracker_id: str) -> dict[str, Any]:
+        poll_timeout_s = self._timeout_ms / 1000.0 + 120.0
+        return self._run_cli(
+            ["poll", "--issue", tracker_id, "--timeout-ms", str(self._timeout_ms)],
+            timeout_s=poll_timeout_s,
+        )
+
+    def _run_cli_fast(self, args: list[str]) -> dict[str, Any]:
+        return self._run_cli(args, timeout_s=self._FAST_CMD_TIMEOUT_S)
+
+    def _run_cli(self, args: list[str], *, timeout_s: float) -> dict[str, Any]:
+        cmd = [self._node_bin, str(self._cli_path)] + args
+        try:
+            result = subprocess.run(
+                cmd,
+                text=True,
+                capture_output=True,
+                timeout=timeout_s,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise AgentHandlerError(
+                f"cli.mjs {args[0]!r} process timed out after {timeout_s:.0f}s"
+            ) from exc
+        if result.returncode != 0:
+            raise AgentHandlerError(
+                f"cli.mjs {args[0]!r} exited {result.returncode}: "
+                f"{result.stderr.strip()}"
+            )
+        try:
+            data = json.loads(result.stdout)
+        except ValueError as exc:
+            raise AgentHandlerError(
+                f"cli.mjs {args[0]!r} returned non-JSON: {result.stdout[:200]!r}"
+            ) from exc
+        if not isinstance(data, dict):
+            raise AgentHandlerError(
+                f"cli.mjs {args[0]!r} returned non-dict ({type(data).__name__})"
+            )
+        return data
+
+
 class AgentHandler:
     """Dispatches agent nodes through the agent-spawn chain unchanged."""
 

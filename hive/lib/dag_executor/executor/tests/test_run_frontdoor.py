@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from hive.lib.dag_executor.executor import LocalAgentSpawn, StubAgentSpawn
+from hive.lib.dag_executor.executor import LocalAgentSpawn, MulticaAgentSpawn, StubAgentSpawn
 from hive.lib.dag_executor.graph import NodeType
 from hive.lib.dag_executor.run import (
     assemble_dispatcher,
@@ -63,9 +63,11 @@ def test_resolve_binding_explicit_beats_env():
     assert name == "local"
 
 
-def test_resolve_binding_multica_not_built():
-    with pytest.raises(NotImplementedError, match="s6-multica-spawn"):
-        resolve_spawn_binding("multica", env={})
+def test_resolve_binding_multica_resolves(tmp_path):
+    # s6: multica binding is now built — resolves to MulticaAgentSpawn
+    name, spawn = resolve_spawn_binding("multica", env={}, repo_root=tmp_path)
+    assert name == "multica"
+    assert isinstance(spawn, MulticaAgentSpawn)
 
 
 def test_resolve_binding_unknown_raises():
