@@ -1,0 +1,105 @@
+name: plan
+description: >
+  Plan flow graph — decompose a requirement into a committed epic with
+  dependency-tracked stories.
+  Shape: research ‖ design → author → reconcile → output-validation gate.
+  User-facing review gates (design-discussion, H/V, structured-outline sign-off)
+  are NOT in this graph — they remain orchestrator-local (s9 wiring owns that
+  boundary).
+version: "1.0.0"
+
+steps:
+  # ── Phase A: research (runs in parallel with design) ────────────────────────
+  - id: research
+    agent: researcher
+    node_type: agent
+    step_file: hive/workflows/step-files/plan/research.md
+    depends_on: []
+    inputs:
+      - name: requirement
+        source: context
+        context_key: requirement
+    outputs:
+      - name: research_brief
+        type: string
+    timeout_ms: 1800000
+
+  # ── Phase B: design discussion (runs in parallel with research) ──────────────
+  - id: design
+    agent: architect
+    node_type: agent
+    step_file: hive/workflows/step-files/plan/design.md
+    depends_on: []
+    inputs:
+      - name: requirement
+        source: context
+        context_key: requirement
+    outputs:
+      - name: design_discussion
+        type: string
+    timeout_ms: 1800000
+
+  # ── Phase C: story decomposition + epic authoring ───────────────────────────
+  - id: author
+    agent: technical-writer
+    node_type: agent
+    step_file: hive/workflows/step-files/plan/author.md
+    depends_on:
+      - research
+      - design
+    inputs:
+      - name: research_brief
+        source: step_output
+        step_id: research
+        output_name: research_brief
+      - name: design_discussion
+        source: step_output
+        step_id: design
+        output_name: design_discussion
+      - name: requirement
+        source: context
+        context_key: requirement
+    outputs:
+      - name: epic_dir
+        type: string
+      - name: commit_sha
+        type: string
+    timeout_ms: 3600000
+
+  # ── Reconcile: materialise author's committed work before gate ───────────────
+  - id: reconcile
+    agent: reconcile-handler
+    node_type: reconcile
+    depends_on:
+      - author
+    inputs:
+      - name: sha
+        source: step_output
+        step_id: author
+        output_name: commit_sha
+        optional: true
+      - name: epic_dir
+        source: step_output
+        step_id: author
+        output_name: epic_dir
+    outputs:
+      - name: reconcile_status
+        type: string
+    timeout_ms: 120000
+
+  # ── Output-validation gate: s3 checks committed epic + stories ───────────────
+  - id: output-validation
+    agent: researcher
+    node_type: gate
+    gate: "epic_dir must not be empty"
+    depends_on:
+      - reconcile
+    inputs:
+      - name: epic_dir
+        source: step_output
+        step_id: author
+        output_name: epic_dir
+    outputs:
+      - name: validation_result
+        type: string
+    timeout_ms: 60000
