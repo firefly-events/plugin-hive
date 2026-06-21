@@ -1,7 +1,7 @@
 id: s3-cycle-reconciler-runbook
 epic: hermes-core-loop-mvp
 title: "cycle-reconciler.md — single-step-per-tick state-machine runbook"
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 repo: plugin-hive

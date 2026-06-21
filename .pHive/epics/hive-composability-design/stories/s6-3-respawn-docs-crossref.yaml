@@ -1,7 +1,7 @@
 id: s6-3-respawn-docs-crossref
 epic: hive-composability-design
 title: Respawn skill docs cross-reference to story-handoff-schema
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s6-2-hive-config-lifecycle-keys]

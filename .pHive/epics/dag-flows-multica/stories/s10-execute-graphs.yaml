@@ -1,7 +1,7 @@
 id: s10-execute-graphs
 epic: dag-flows-multica
 title: Execute/develop flow graphs (extend development.*.workflow.yaml + reconcile + gate)
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [s3-validation-gate, s6-multica-spawn, s7-reconcile-node]

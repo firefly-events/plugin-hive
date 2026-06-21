@@ -1,7 +1,7 @@
 id: s7-1-agent-spawn-step7b
 epic: hive-composability-design
 title: Agent-spawn step 7b two-parameter extension + story-handoff preamble
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s6-3-respawn-docs-crossref]

@@ -1,7 +1,7 @@
 id: s8-1-execute-story-boundary-hook
 epic: hive-composability-design
 title: Execute story-boundary hook + handoff writer (respawn-per-task)
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [s7-1-agent-spawn-step7b]

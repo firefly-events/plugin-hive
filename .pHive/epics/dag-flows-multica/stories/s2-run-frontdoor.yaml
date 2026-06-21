@@ -1,7 +1,7 @@
 id: s2-run-frontdoor
 epic: dag-flows-multica
 title: Production executor assembly + run/resume entrypoint
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [s1-local-spawn]
