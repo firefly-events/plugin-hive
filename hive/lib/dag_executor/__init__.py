@@ -201,12 +201,21 @@ def run_workflow(
     )
 
 
+from hive.lib.dag_executor.frontdoor import (
+    assemble_dispatcher,
+    resolve_spawn_binding,
+    run_frontdoor,
+)
+
 __all__ = [
     "CONSUMER_CONFIG_PATH",
     "EXECUTOR_HIVE_DAG",
     "GRADUATED_REGISTRY_PATH",
+    "assemble_dispatcher",
     "executor_enabled_for",
     "is_workflow_graduated",
     "load_executor_config",
+    "resolve_spawn_binding",
+    "run_frontdoor",
     "run_workflow",
 ]

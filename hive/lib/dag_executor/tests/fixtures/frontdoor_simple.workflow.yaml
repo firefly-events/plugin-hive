@@ -1,0 +1,13 @@
+name: frontdoor-simple
+methodology: classic
+description: |
+  Minimal 2-node agent fixture for frontdoor integration tests (s2-run-frontdoor).
+steps:
+  - id: first
+    agent: developer
+    task: "First step — no upstream deps"
+    depends_on: []
+  - id: second
+    agent: developer
+    task: "Second step — depends on first"
+    depends_on: [first]
