@@ -97,6 +97,39 @@ def test_swarm_workflow_gate_depends_on_reconcile():
         )
 
 
+def test_reconcile_report_wired_from_compile_report():
+    """reconcile-report must pull all commit metadata from compile-report (not promote-baseline)."""
+    data = swarm_workflow_data()
+    steps = {s["id"]: s for s in data["steps"]}
+    assert "reconcile-report" in steps, "reconcile-report node missing from test-swarm workflow"
+    node = steps["reconcile-report"]
+    depends_on = node.get("depends_on", [])
+    assert "compile-report" in depends_on, (
+        f"reconcile-report must depend on compile-report; depends_on={depends_on}"
+    )
+    assert "promote-baseline" not in depends_on, (
+        f"reconcile-report must NOT depend on promote-baseline; depends_on={depends_on}"
+    )
+    for inp in node.get("inputs", []):
+        if inp["name"] in ("sha", "branch", "repo", "work_dir"):
+            assert inp.get("step_id") == "compile-report", (
+                f"reconcile-report input '{inp['name']}' must source from compile-report "
+                f"(step_id={inp.get('step_id')!r})"
+            )
+
+
+def test_gate_test_report_downstream_of_reconcile_report():
+    """gate-test-report must list reconcile-report in its depends_on."""
+    data = swarm_workflow_data()
+    steps = {s["id"]: s for s in data["steps"]}
+    assert "gate-test-report" in steps, "gate-test-report node missing from test-swarm workflow"
+    assert "reconcile-report" in steps, "reconcile-report node missing from test-swarm workflow"
+    gate_deps = steps["gate-test-report"].get("depends_on", [])
+    assert "reconcile-report" in gate_deps, (
+        f"gate-test-report must depend on reconcile-report; depends_on={gate_deps}"
+    )
+
+
 def test_swarm_workflow_gate_checks_session_report():
     """Gate node must reference session_report to validate the test report artifact."""
     data = swarm_workflow_data()

@@ -317,7 +317,7 @@ steps:
   # Reconcile node (s7): materialise the compile-report agent's committed test
   # report into the working tree before the gate validates it. No-op on local
   # bindings (sha absent) — safe on both local and Multica execution paths.
-  # C1: sha/branch/repo from promote-baseline step_output, not context.
+  # C1 fixed: sha/branch/repo from compile-report step_output (the actual report producer).
   - id: reconcile-report
     agent: reconciler
     node_type: reconcile
@@ -326,26 +326,26 @@ steps:
       Materialise the compile-report agent's committed test report so the gate
       can validate the artifact exists and parses correctly.
     depends_on:
-      - promote-baseline
+      - compile-report
     inputs:
       - name: sha
         source: step_output
-        step_id: promote-baseline
+        step_id: compile-report
         output_name: commit_sha
         optional: true
       - name: branch
         source: step_output
-        step_id: promote-baseline
+        step_id: compile-report
         output_name: branch
         optional: true
       - name: repo
         source: step_output
-        step_id: promote-baseline
+        step_id: compile-report
         output_name: repo
         optional: true
       - name: work_dir
         source: step_output
-        step_id: promote-baseline
+        step_id: compile-report
         output_name: work_dir
         optional: true
     outputs:
