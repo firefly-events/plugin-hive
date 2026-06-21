@@ -18,6 +18,8 @@ spy that records the exact invocation shape (asserted by
 
 from __future__ import annotations
 
+import json
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Protocol
@@ -87,6 +89,142 @@ class StubAgentSpawn:
             }
         )
         return dict(self.canned_outputs.get(step_id, {}))
+
+
+class LocalAgentSpawn:
+    """Default production AgentSpawn binding — wraps Step 7 of agent-spawn/SKILL.md.
+
+    Dispatches via the local one-shot path (`claude --print`). This is the
+    fallback binding; MulticaAgentSpawn (s4) is the swap-in sibling for
+    Multica-routed runs.
+
+    Risk #2 HIGH defense (mirrors AgentHandler contract):
+      * `agent` is forwarded RAW. No pre-resolution; the agent-spawn chain
+        handles persona resolution at runtime.
+      * `step_file_content` is embedded VERBATIM in the prompt body. No
+        paraphrasing, trimming, or summarisation.
+
+    The agent is expected to respond with a JSON object whose keys match the
+    node's declared OutputRef names. Markdown code fences (```json … ```) are
+    stripped before parsing.
+    """
+
+    _DEFAULT_TIMEOUT_MS = 300_000
+
+    def __init__(
+        self,
+        *,
+        timeout_ms: int = _DEFAULT_TIMEOUT_MS,
+        claude_bin: str = "claude",
+    ) -> None:
+        self._timeout_ms = timeout_ms
+        self._claude_bin = claude_bin
+
+    # ------------------------------------------------------------------
+    # AgentSpawn Protocol
+    # ------------------------------------------------------------------
+
+    def __call__(
+        self,
+        agent: str,
+        step_file_content: str,
+        inputs: dict[str, Any],
+        run_id: str,
+        step_id: str,
+    ) -> dict[str, Any]:
+        prompt = self.build_prompt(agent, step_file_content, inputs, run_id, step_id)
+        raw = self._invoke_claude(prompt, step_id)
+        return self._parse_json_output(raw, step_id)
+
+    # ------------------------------------------------------------------
+    # Prompt construction (exposed for testability)
+    # ------------------------------------------------------------------
+
+    def build_prompt(
+        self,
+        agent: str,
+        step_file_content: str,
+        inputs: dict[str, Any],
+        run_id: str,
+        step_id: str,
+    ) -> str:
+        """Build the one-shot prompt passed to `claude --print`.
+
+        step_file_content is embedded verbatim — no transformation.
+        agent is the raw persona string — no pre-resolution.
+        """
+        parts: list[str] = [
+            f"# Agent: {agent}",
+            f"run_id: {run_id}  step_id: {step_id}",
+        ]
+        if inputs:
+            parts.append(
+                "## Inputs\n```json\n" + json.dumps(inputs, indent=2) + "\n```"
+            )
+        if step_file_content:
+            parts.append("## Task\n" + step_file_content)
+        parts.append(
+            "## Output format\n"
+            "Respond with a JSON object whose keys are the declared output names "
+            "for this step. Output ONLY the JSON object — no preamble, no prose."
+        )
+        return "\n\n".join(parts)
+
+    # ------------------------------------------------------------------
+    # Subprocess dispatch
+    # ------------------------------------------------------------------
+
+    def _invoke_claude(self, prompt: str, step_id: str) -> str:
+        timeout_s = self._timeout_ms / 1000.0
+        try:
+            result = subprocess.run(
+                [self._claude_bin, "--print"],
+                input=prompt,
+                text=True,
+                capture_output=True,
+                timeout=timeout_s,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise AgentHandlerError(
+                f"local agent-spawn timed out after {self._timeout_ms} ms "
+                f"for step {step_id!r}"
+            ) from exc
+        if result.returncode != 0:
+            raise AgentHandlerError(
+                f"claude --print exited {result.returncode} for step {step_id!r}: "
+                f"{result.stderr.strip()}"
+            )
+        return result.stdout
+
+    # ------------------------------------------------------------------
+    # Output parsing
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _parse_json_output(raw: str, step_id: str) -> dict[str, Any]:
+        text = raw.strip()
+        # Strip markdown code fences (```json … ``` or ``` … ```)
+        if text.startswith("```"):
+            lines = text.splitlines()
+            end = len(lines)
+            for i in range(1, len(lines)):
+                if lines[i].strip() == "```":
+                    end = i
+                    break
+            text = "\n".join(lines[1:end]).strip()
+        try:
+            result = json.loads(text)
+        except ValueError as exc:
+            raise AgentHandlerError(
+                f"local agent-spawn for step {step_id!r} returned non-JSON: "
+                f"{text[:200]!r}"
+            ) from exc
+        if not isinstance(result, dict):
+            raise AgentHandlerError(
+                f"local agent-spawn for step {step_id!r} returned "
+                f"non-dict JSON ({type(result).__name__})"
+            )
+        return result
 
 
 class AgentHandler:
