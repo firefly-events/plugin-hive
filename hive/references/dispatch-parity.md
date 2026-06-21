@@ -2,13 +2,13 @@
 
 Produced by Slice 6 of substrate-coverage-and-test-cleanup; canonical reference for what's wired across substrates. Each cell carries either a relative path to the active mode-atom skill, the marker `inline` for default-path dispatch through the orchestrator skill itself, or `N/A — reasoning` when the cell has no shipped substrate.
 
-## Last verified: 2026-06-08
+## Last verified: 2026-06-21
 
 ## Matrix
 
 | Orchestrator | default | multica | cc-workflows |
 |---|---|---|---|
-| plan | inline | skills/hive/skills/plan-mode-multica/SKILL.md | skills/hive/skills/plan-mode-cc-workflows/SKILL.md |
+| plan | inline | hive/lib/dag_executor/run.py + hive/workflows/plan.workflow.yaml (s9) | skills/hive/skills/plan-mode-cc-workflows/SKILL.md |
 | execute | inline | skills/hive/skills/execute-mode-multica/SKILL.md | skills/hive/skills/execute-mode-cc-workflows/SKILL.md |
 | test | inline | skills/hive/skills/test-mode-multica/SKILL.md | skills/hive/skills/test-mode-cc-workflows/SKILL.md |
 | design | inline | skills/hive/skills/design-mode-multica/SKILL.md | skills/hive/skills/design-mode-cc-workflows/SKILL.md |
