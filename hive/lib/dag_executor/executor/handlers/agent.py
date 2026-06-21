@@ -294,6 +294,12 @@ class MulticaAgentSpawn:
             )
         return {
             "code_push_sha": terminal.get("code_push_sha"),
+            # commit_sha is the graph-canonical alias for code_push_sha so
+            # reconcile nodes can bind output_name: commit_sha without a
+            # name-mismatch silent no-op (C1 fix).
+            "commit_sha": terminal.get("code_push_sha"),
+            "branch": terminal.get("branch"),
+            "repo": terminal.get("repo"),
             "work_dir": terminal.get("work_dir"),
             "task_id": terminal.get("task_id"),
             "agent_id": terminal.get("agent_id"),

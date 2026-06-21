@@ -78,6 +78,23 @@ steps:
         step_id: author
         output_name: commit_sha
         optional: true
+      # C1: wire branch + repo + work_dir from author's Multica outputs so the
+      # reconcile handler can ff-merge the committed epic before the gate runs.
+      - name: branch
+        source: step_output
+        step_id: author
+        output_name: branch
+        optional: true
+      - name: repo
+        source: step_output
+        step_id: author
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: author
+        output_name: work_dir
+        optional: true
       - name: epic_dir
         source: step_output
         step_id: author
@@ -87,11 +104,13 @@ steps:
         type: string
     timeout_ms: 120000
 
-  # ── Output-validation gate: s3 checks committed epic + stories ───────────────
+  # ── Output-validation gate: s3 schema-validates committed epic + stories ─────
   - id: output-validation
     agent: researcher
     node_type: gate
-    gate: "epic_dir must not be empty"
+    # C3: "must be valid plan-epic" triggers validate_output.py schema check
+    # (not just presence). A non-empty but schema-invalid epic now FAILS here.
+    gate: "epic_dir must be valid plan-epic"
     depends_on:
       - reconcile
     inputs:

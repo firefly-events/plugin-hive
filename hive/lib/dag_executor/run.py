@@ -105,8 +105,12 @@ def resolve_spawn_binding(
     ``MulticaAgentSpawn`` (registered by s6-multica-spawn).
     """
     env = env if env is not None else dict(os.environ)
+    # C4: per-flow env var takes precedence over the global HIVE_EXECUTION_MODE.
+    # Precedence: explicit arg > HIVE_{FLOW}_MODE > HIVE_EXECUTION_MODE > config knob > local.
+    per_flow_var = f"HIVE_{flow.upper()}_MODE"
     name = (
         binding
+        or env.get(per_flow_var)
         or env.get("HIVE_EXECUTION_MODE")
         or _read_mode_knob(repo_root, flow=flow)
         or "local"

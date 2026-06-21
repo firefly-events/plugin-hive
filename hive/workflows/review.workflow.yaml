@@ -54,13 +54,22 @@ steps:
         step_id: reviewer
         output_name: commit_sha
         optional: true
+      # C1: wire branch + repo from reviewer step_output so the Multica path
+      # passes the real commit metadata to the reconcile handler.
       - name: branch
-        source: context
-        context_key: branch
+        source: step_output
+        step_id: reviewer
+        output_name: branch
         optional: true
       - name: repo
-        source: context
-        context_key: repo
+        source: step_output
+        step_id: reviewer
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: reviewer
+        output_name: work_dir
         optional: true
     outputs:
       - name: reconcile_status

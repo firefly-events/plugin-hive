@@ -194,6 +194,8 @@ steps:
   # Reconcile nodes (s7): materialise each implement agent's committed work into
   # the working tree before the test step validates it. No-op on local bindings
   # (sha absent) — safe to insert on both local and Multica execution paths.
+  # C1: sha/branch/repo bound from the producing agent's step_output so the
+  # Multica path wires the real commit metadata (not stale context values).
   - id: reconcile-backend
     agent: reconciler
     node_type: reconcile
@@ -204,16 +206,24 @@ steps:
       - backend-implement
     inputs:
       - name: sha
-        source: context
-        context_key: commit_sha
+        source: step_output
+        step_id: backend-implement
+        output_name: commit_sha
         optional: true
       - name: branch
-        source: context
-        context_key: branch
+        source: step_output
+        step_id: backend-implement
+        output_name: branch
         optional: true
       - name: repo
-        source: context
-        context_key: repo
+        source: step_output
+        step_id: backend-implement
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: backend-implement
+        output_name: work_dir
         optional: true
     outputs:
       - name: reconcile_status
@@ -231,16 +241,24 @@ steps:
       - frontend-implement
     inputs:
       - name: sha
-        source: context
-        context_key: commit_sha
+        source: step_output
+        step_id: frontend-implement
+        output_name: commit_sha
         optional: true
       - name: branch
-        source: context
-        context_key: branch
+        source: step_output
+        step_id: frontend-implement
+        output_name: branch
         optional: true
       - name: repo
-        source: context
-        context_key: repo
+        source: step_output
+        step_id: frontend-implement
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: frontend-implement
+        output_name: work_dir
         optional: true
     outputs:
       - name: reconcile_status
@@ -293,6 +311,7 @@ steps:
 
   # Reconcile node (s7) after test — materialise tester's committed work before
   # the gate validates it. No-op on local bindings.
+  # C1: sha/branch/repo from test step_output, not context.
   - id: reconcile-test
     agent: reconciler
     node_type: reconcile
@@ -303,16 +322,24 @@ steps:
       - test
     inputs:
       - name: sha
-        source: context
-        context_key: commit_sha
+        source: step_output
+        step_id: test
+        output_name: commit_sha
         optional: true
       - name: branch
-        source: context
-        context_key: branch
+        source: step_output
+        step_id: test
+        output_name: branch
         optional: true
       - name: repo
-        source: context
-        context_key: repo
+        source: step_output
+        step_id: test
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: test
+        output_name: work_dir
         optional: true
     outputs:
       - name: reconcile_status

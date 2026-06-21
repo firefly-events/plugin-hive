@@ -108,6 +108,8 @@ steps:
 
   # Reconcile node (s7) after implement — materialise the developer's committed
   # work into the working tree before the gate validates it.
+  # C1: sha/branch/repo from implement step_output (not context) so the Multica
+  # path wires the real commit metadata from MulticaAgentSpawn's return value.
   - id: reconcile-implement
     agent: reconciler
     node_type: reconcile
@@ -118,16 +120,24 @@ steps:
       - implement
     inputs:
       - name: sha
-        source: context
-        context_key: commit_sha
+        source: step_output
+        step_id: implement
+        output_name: commit_sha
         optional: true
       - name: branch
-        source: context
-        context_key: branch
+        source: step_output
+        step_id: implement
+        output_name: branch
         optional: true
       - name: repo
-        source: context
-        context_key: repo
+        source: step_output
+        step_id: implement
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: implement
+        output_name: work_dir
         optional: true
     outputs:
       - name: reconcile_status
