@@ -64,3 +64,7 @@ references:
   - path: skills/plan/SKILL.md
     relevant_excerpt: |
       CC-Workflows/Multica completion are artifact-readiness signals, not user review approvals.
+
+tracker_id: PLU-390
+tracker_uuid: ac947f84-efb2-4789-b6df-876099d826e6
+parent_tracker_id: PLU-381

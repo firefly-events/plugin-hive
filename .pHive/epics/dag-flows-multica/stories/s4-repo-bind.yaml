@@ -4,7 +4,7 @@ title: Finish Multica repo-binding (wire ensureRepos + un-defer multica-init)
 status: pending
 complexity: low
 methodology: classic
-depends_on: []
+depends_on: [s0-multica-upgrade]
 parallel_allowed: true
 parallel_rationale: bounded-slice
 
@@ -71,3 +71,7 @@ references:
     relevant_excerpt: |
       Step 10, repo allowlist, is deferred. The endpoint does not exist in Multica
       v0.3.4. (STALE — PUT /api/workspaces {repos} returns 200 as of 2026-06-21.)
+
+tracker_id: PLU-385
+tracker_uuid: 1432b3b0-59dc-4b3a-88f9-ccba7729cc70
+parent_tracker_id: PLU-381

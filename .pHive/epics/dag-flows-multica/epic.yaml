@@ -16,6 +16,10 @@ git_flow:
   branch_strategy: per-epic
 
 stories:
+  - id: s0-multica-upgrade
+    title: Upgrade local Multica (server + CLI) to latest + re-verify endpoints
+    complexity: low
+    depends_on: []
   - id: s1-local-spawn
     title: Local AgentSpawn binding (wraps agent-spawn Step 7)
     complexity: medium
@@ -31,7 +35,7 @@ stories:
   - id: s4-repo-bind
     title: Finish Multica repo-binding (wire ensureRepos + un-defer multica-init)
     complexity: low
-    depends_on: []
+    depends_on: [s0-multica-upgrade]
   - id: s5-multica-bridge
     title: Multica bridge surface — create-issue + reconcile helpers + JSON contract
     complexity: high

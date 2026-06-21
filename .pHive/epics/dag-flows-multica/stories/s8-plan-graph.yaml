@@ -73,3 +73,7 @@ references:
   - path: .pHive/epics/dag-flows-multica/docs/research-deepen.md
     relevant_excerpt: |
       /plan has no dedicated workflow YAML yet; node sequence: research+design → writer author → validate.
+
+tracker_id: PLU-389
+tracker_uuid: 1671c4c4-e8b4-45db-a622-8ed765236a00
+parent_tracker_id: PLU-381

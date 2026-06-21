@@ -66,3 +66,7 @@ references:
   - path: hive/lib/dag_executor/executor/handlers/gate.py
     relevant_excerpt: |
       Success: NodeOutput(outputs={"gate_passed": True}); Failure: raise GateFailedError(...).
+
+tracker_id: PLU-384
+tracker_uuid: f7ccc9d5-73ae-4e8b-ba4e-070b33ac7574
+parent_tracker_id: PLU-381

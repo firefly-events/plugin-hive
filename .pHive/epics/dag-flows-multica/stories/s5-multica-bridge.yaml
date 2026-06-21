@@ -78,3 +78,7 @@ references:
   - path: hive/lib/multica-story-dispatch/cli.mjs
     relevant_excerpt: |
       Prints JSON.stringify(data)+'\n' to stdout; errors {code,message} to stderr, exit 1.
+
+tracker_id: PLU-386
+tracker_uuid: a9e9ed38-c0f2-435e-b089-90fe11a5fa1f
+parent_tracker_id: PLU-381

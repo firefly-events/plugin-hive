@@ -71,3 +71,7 @@ references:
     relevant_excerpt: |
       The spawn callable is injected. In production it points at the agent-spawn
       dispatch (Step 7 of the skill). node.step_file content is read VERBATIM.
+
+tracker_id: PLU-382
+tracker_uuid: 71863dfc-7afd-4956-87db-99978ec9e15c
+parent_tracker_id: PLU-381

@@ -65,3 +65,7 @@ references:
     relevant_excerpt: |
       Reconcile should be its own SCRIPT node, not hidden in the binding, so the
       validation gate provably runs post-harvest.
+
+tracker_id: PLU-388
+tracker_uuid: c4468fc1-377e-4480-832a-59e2526cee6b
+parent_tracker_id: PLU-381
