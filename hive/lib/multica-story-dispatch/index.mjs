@@ -99,6 +99,10 @@ function issueUrl(serverUrl, workspaceId, issueUuid) {
   return `${trimTrailingSlash(serverUrl)}/api/issues/${encodeURIComponent(issueUuid)}?workspace_id=${encodeURIComponent(workspaceId)}`;
 }
 
+function issuesCreateUrl(serverUrl, workspaceId) {
+  return `${trimTrailingSlash(serverUrl)}/api/issues?workspace_id=${encodeURIComponent(workspaceId)}`;
+}
+
 function agentsUrl(serverUrl, workspaceId) {
   return `${trimTrailingSlash(serverUrl)}/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`;
 }
@@ -545,6 +549,54 @@ export function parseSquadActivityFromEntries(entries) {
     reason: details?.reason ?? null,
     created_at: latest?.created_at ?? null,
   };
+}
+
+// POST /api/issues — mint a new issue carrying the provided brief as its description.
+// Returns {id, url, ...} from the API response.
+export async function createIssue(serverUrl, token, workspaceId, title, description) {
+  const created = await httpJson(issuesCreateUrl(serverUrl, workspaceId), {
+    method: 'POST',
+    token,
+    body: { title, description },
+  });
+  return created;
+}
+
+// Fetch the agent branch from the remote repo and fast-forward-merge the target sha
+// into the working tree at workDir. Fails with code NON_FF if the merge would not be
+// a fast-forward. repoUrl may be a bare repo path or a remote URL.
+export async function reconcileBranch(repoUrl, branch, sha, workDir) {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const execAsync = promisify(execFile);
+
+  const run = (cmd, args, cwd) =>
+    execAsync(cmd, args, { cwd: cwd ?? workDir }).then((r) => r.stdout.trim());
+
+  // Fetch the branch from the remote so FETCH_HEAD resolves to the tip.
+  await run('git', ['fetch', repoUrl, branch]);
+
+  // Verify the target sha is reachable (fetch may have retrieved it).
+  try {
+    await run('git', ['cat-file', '-e', sha]);
+  } catch {
+    throw dispatchError(
+      'SHA_NOT_FOUND',
+      `sha ${sha} not found after fetching branch ${branch} from ${repoUrl}`,
+    );
+  }
+
+  // Attempt ff-only merge. If it fails it is a non-ff situation — bail loudly.
+  try {
+    const out = await run('git', ['merge', '--ff-only', sha]);
+    return { merged: true, sha, output: out };
+  } catch (err) {
+    throw dispatchError(
+      'NON_FF',
+      `fast-forward merge of ${sha} into working tree failed (non-ff): ${err?.message ?? String(err)}`,
+      `Run 'git log --oneline HEAD..${sha}' in ${workDir} to inspect the divergence.`,
+    );
+  }
 }
 
 export async function readSquadEvaluation(issueId, options = {}) {
