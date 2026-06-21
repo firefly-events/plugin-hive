@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from hive.lib.dag_executor.executor import LocalAgentSpawn, MulticaAgentSpawn, StubAgentSpawn
+from hive.lib.dag_executor.executor.errors import AgentHandlerError
 from hive.lib.dag_executor.graph import NodeType
 from hive.lib.dag_executor.run import (
     assemble_dispatcher,
@@ -124,3 +125,46 @@ def test_run_persists_run_state(tmp_path):
     # run_id omitted -> run_workflow generates a schema-valid <ULID>-<slug> id
     run(wf, spawn=stub, run_state_path=state)
     assert state.exists(), "run_state file should be written when run_state_path is set"
+
+
+# ---- L1: episode_hook fires on failure ----------------------------------------
+
+class _FailingSpawn:
+    """AgentSpawn that always raises AgentHandlerError on first node dispatch."""
+
+    def __call__(
+        self,
+        agent: str,
+        step_file_content: str,
+        inputs: dict,
+        run_id: str,
+        step_id: str,
+    ) -> dict:
+        raise AgentHandlerError("intentional spawn failure")
+
+
+def test_run_episode_hook_called_with_failed_status_on_exception(tmp_path):
+    """L1: when run_workflow raises, episode_hook is called with status='failed'."""
+    wf = _write_workflow(tmp_path)
+    hook_calls: list[dict] = []
+
+    def episode_hook(**kwargs):
+        hook_calls.append(dict(kwargs))
+
+    with pytest.raises(AgentHandlerError, match="intentional spawn failure"):
+        run(wf, spawn=_FailingSpawn(), run_id="fail-run", episode_hook=episode_hook)
+
+    assert len(hook_calls) == 1, "episode_hook must be called exactly once on failure"
+    assert hook_calls[0]["status"] == "failed"
+    assert hook_calls[0]["run_id"] == "fail-run"
+
+
+def test_run_episode_hook_exception_does_not_suppress_original_error(tmp_path):
+    """L1: if episode_hook itself raises on failure, the original exception still propagates."""
+    wf = _write_workflow(tmp_path)
+
+    def bad_hook(**kwargs):
+        raise ValueError("hook error")
+
+    with pytest.raises(AgentHandlerError, match="intentional spawn failure"):
+        run(wf, spawn=_FailingSpawn(), run_id="fail-run2", episode_hook=bad_hook)

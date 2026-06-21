@@ -214,6 +214,84 @@ def test_cli_non_json_stdout_raises(tmp_path):
             spawn("developer", "brief", {}, "run-bad", "step-bad")
 
 
+# ── H1/H2: server-side dedup (absent-state resume) ────────────────────────────
+
+def test_server_dedup_absent_state_passes_dedup_title_flag(tmp_path):
+    """Cross-machine resume: local state absent → create-issue called with --dedup-title.
+
+    Verifies H1+H2: the server is the authoritative idempotency source. When the local
+    tracker.json is missing (different CI worker / fresh clone), create-issue is re-called
+    but --dedup-title ensures the server can return the existing issue instead of minting
+    a duplicate. The returned tracker_id must match the server's existing issue.
+    """
+    spawn = _make_spawn(tmp_path)
+
+    # First run — normal path; creates issue and writes local state cache.
+    first_effects = [
+        _make_subprocess_result(_create_issue_result("issue-xmachine")),
+        _make_subprocess_result(_dispatch_result()),
+        _make_subprocess_result(_completed_poll_result()),
+    ]
+    with patch("subprocess.run", side_effect=first_effects):
+        spawn("developer", "brief", {}, "run-xm", "step-Y")
+
+    # Simulate fresh clone / different CI worker: delete the local cache.
+    state_file = (
+        tmp_path / ".pHive" / "dag-spawn-state" / "run-xm" / "step-Y" / "tracker.json"
+    )
+    state_file.unlink()
+
+    # Resume: create-issue is re-called (no local cache), but --dedup-title must be
+    # present so the server can return the existing issue instead of minting a duplicate.
+    resume_effects = [
+        _make_subprocess_result(_create_issue_result("issue-xmachine")),  # server dedup
+        _make_subprocess_result(_dispatch_result()),
+        _make_subprocess_result(_completed_poll_result()),
+    ]
+    with patch("subprocess.run", side_effect=resume_effects) as mock_run:
+        result = spawn("developer", "brief", {}, "run-xm", "step-Y")
+
+    create_calls = [c for c in mock_run.call_args_list if c[0][0][2] == "create-issue"]
+    assert len(create_calls) == 1, "create-issue must be called on absent-state resume"
+    cmd = create_calls[0][0][0]
+    assert "--dedup-title" in cmd, "--dedup-title flag must be passed to create-issue"
+    # Server returned the existing id — no duplicate minted.
+    assert result["tracker_id"] == "issue-xmachine"
+
+
+def test_intent_marker_written_before_create_issue(tmp_path):
+    """H1 belt-and-suspenders: intent marker (no tracker_id) is written before the network call."""
+    spawn = _make_spawn(tmp_path)
+    state_path = tmp_path / ".pHive" / "dag-spawn-state" / "run-h1" / "step-Z" / "tracker.json"
+
+    marker_at_create_time: dict = {}
+
+    def capture_intent(*args, **kwargs):
+        # On the create-issue call, read the state file (should already be written).
+        cmd = args[0]
+        if len(cmd) > 2 and cmd[2] == "create-issue":
+            try:
+                marker_at_create_time.update(
+                    __import__("json").loads(state_path.read_text(encoding="utf-8"))
+                )
+            except (OSError, ValueError):
+                pass
+        return _make_subprocess_result(
+            _create_issue_result() if len(cmd) > 2 and cmd[2] == "create-issue"
+            else _dispatch_result() if len(cmd) > 2 and cmd[2] == "dispatch"
+            else _completed_poll_result()
+        )
+
+    with patch("subprocess.run", side_effect=capture_intent):
+        spawn("developer", "brief", {}, "run-h1", "step-Z")
+
+    assert "run_id" in marker_at_create_time, "intent marker must exist before create-issue"
+    assert "tracker_id" not in marker_at_create_time, "intent marker must not have tracker_id yet"
+    # After full completion, state file must contain tracker_id.
+    final = __import__("json").loads(state_path.read_text(encoding="utf-8"))
+    assert final.get("tracker_id") == "issue-uuid-1"
+
+
 # ── R1 smoke: gated on real Multica runtime ────────────────────────────────────
 
 _HAS_MULTICA = bool(os.environ.get("MULTICA_SERVER_URL"))

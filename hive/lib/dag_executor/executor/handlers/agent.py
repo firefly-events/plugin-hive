@@ -321,6 +321,14 @@ class MulticaAgentSpawn:
         agent: str,
         step_file_content: str,
     ) -> str:
+        """Resolve (or create-and-cache) the Multica tracker issue id for this step.
+
+        Idempotency is layered:
+        - Primary: server-side title dedup via ``--dedup-title`` (durable, cross-machine).
+        - Secondary: local ``tracker.json`` cache for fast-path resume without a list call.
+        - Belt-and-suspenders (H1): intent marker written before the network call so a
+          same-machine crash between create-issue success and state write leaves a trace.
+        """
         state_path = self._tracker_state_path(run_id, step_id)
         if state_path.exists():
             try:
@@ -336,15 +344,29 @@ class MulticaAgentSpawn:
         # was provided (step_file_content is ""). This does NOT violate the VERBATIM
         # rule — verbatim means no paraphrasing of non-empty content.
         body = step_file_content or f"(no step_file provided — run {run_id} step {step_id})"
+
+        # Write intent marker BEFORE the network call (H1 belt-and-suspenders).
+        # If the process dies after create-issue returns but before the state write,
+        # this marker ensures resume finds a file and re-attempts with server dedup.
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(
+            json.dumps({"run_id": run_id, "step_id": step_id}),
+            encoding="utf-8",
+        )
+
+        # --dedup-title makes the Multica server the authoritative idempotency source:
+        # cli.mjs lists existing issues and returns the matching one instead of creating
+        # a duplicate. This is the primary guard for cross-machine resume (H2).
         result = self._run_cli_fast(
-            ["create-issue", "--title", title, "--body", body]
+            ["create-issue", "--title", title, "--body", body, "--dedup-title", title]
         )
         tracker_id = result.get("id")
         if not tracker_id:
             raise AgentHandlerError(
                 f"multica create-issue returned no id for step {step_id!r}: {result!r}"
             )
-        state_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Overwrite intent marker with resolved tracker_id (fast-path cache).
         state_path.write_text(
             json.dumps(
                 {"tracker_id": tracker_id, "run_id": run_id, "step_id": step_id}

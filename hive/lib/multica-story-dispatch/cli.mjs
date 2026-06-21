@@ -538,15 +538,23 @@ async function cmdComment(args, cfg) {
   succeed({ comment_id: commentId });
 }
 
-// POST /api/issues — mint a new issue.
-// --title <string>  — required
-// --body <string>   — required; passed verbatim as the issue description (step_file_content)
+// POST /api/issues — mint a new issue (or return existing one when --dedup-title matches).
+// --title <string>       — required
+// --body <string>        — required; passed verbatim as the issue description (step_file_content)
+// --dedup-title <string> — optional; when set, lists existing issues first and returns any
+//                          whose title exactly matches this key instead of creating a duplicate.
+//                          Primary idempotency guard for DAG-on-Multica cross-machine resume.
 async function cmdCreateIssue(args, cfg) {
   if (!args.title || args.title === true) fail('MISSING_ARG', '--title is required');
   if (!args.body || args.body === true) fail('MISSING_ARG', '--body is required');
 
   const { serverUrl, token, workspaceId } = cfg;
-  const created = await createIssue(serverUrl, token, workspaceId, String(args.title), String(args.body));
+  const dedupTitle = typeof args['dedup-title'] === 'string' ? String(args['dedup-title']) : null;
+  const created = await createIssue(
+    serverUrl, token, workspaceId,
+    String(args.title), String(args.body),
+    { dedupTitle },
+  );
 
   const id = created?.id ?? null;
   const url = created?.url ?? null;

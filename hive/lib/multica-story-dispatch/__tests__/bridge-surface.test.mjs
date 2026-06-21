@@ -131,6 +131,37 @@ test('create-issue: missing --body fails with MISSING_ARG', async () => {
   assert.equal(result.code, 'MISSING_ARG');
 });
 
+test('create-issue: --dedup-title returns existing issue without POSTing a new one', async () => {
+  let postCount = 0;
+  const existingIssue = { id: 'existing-uuid', url: 'https://example.com/i/existing-uuid', title: '[dag:run1:stepA] developer', status: 'todo' };
+
+  const { serverUrl, close } = await startMockServer((req, res, body) => {
+    if (req.method === 'GET' && req.url.startsWith('/api/issues')) {
+      // Return a list containing an issue whose title matches the dedup key.
+      sendJson(res, 200, [existingIssue]);
+      return;
+    }
+    if (req.method === 'POST' && req.url.startsWith('/api/issues')) {
+      postCount++;
+      sendJson(res, 201, { id: 'new-uuid', url: 'https://example.com/i/new-uuid' });
+      return;
+    }
+    sendJson(res, 404, { error: 'not found' });
+  });
+
+  try {
+    const { stdout } = await runCli(
+      ['create-issue', '--title', '[dag:run1:stepA] developer', '--body', 'brief', '--dedup-title', '[dag:run1:stepA] developer'],
+      { serverUrl },
+    );
+    const result = JSON.parse(stdout.trim());
+    assert.equal(result.id, 'existing-uuid', 'must return existing issue id, not create a new one');
+    assert.equal(postCount, 0, 'must NOT POST a new issue when dedup match found');
+  } finally {
+    await close();
+  }
+});
+
 // ── reconcile tests ──────────────────────────────────────────────────────────
 
 async function setupGitFixture() {
@@ -233,4 +264,36 @@ test('reconcile: missing --sha fails with MISSING_ARG', async () => {
   const err = await runCliExpectFail(['reconcile', '--repo', '/tmp/x', '--branch', 'b']);
   const result = JSON.parse(err.stderr.trim());
   assert.equal(result.code, 'MISSING_ARG');
+});
+
+test('reconcile: sha present as git object but not reachable from FETCH_HEAD fails with SHA_NOT_FOUND', async () => {
+  // M1 regression test: old code used `git cat-file -e` which only proves the object
+  // exists locally (passes even for stale objects from a prior fetch of a different
+  // branch). New code uses `git merge-base --is-ancestor sha FETCH_HEAD` which proves
+  // the sha is actually reachable from the branch we just fetched.
+  //
+  // Setup: fetch agent branch so agentSha is in the object DB, then call reconcile
+  // with --branch main so FETCH_HEAD = baseSha. agentSha is NOT an ancestor of baseSha
+  // (it's a descendant), so the reachability check must fail with SHA_NOT_FOUND.
+  const { tmpDir, bareDir, workDir, agentSha } = await setupGitFixture();
+  try {
+    // Pre-fetch agent branch: agentSha now lives in workDir's object store.
+    await execAsync('git', ['-C', workDir, 'fetch', bareDir, 'agent/developer/run1']);
+
+    // Reconcile with --branch main (FETCH_HEAD will be baseSha after the fetch).
+    // agentSha is ahead of baseSha, so it is NOT an ancestor of FETCH_HEAD(=baseSha).
+    // Old cat-file -e would pass (object exists); new merge-base check must fail.
+    const err = await runCliExpectFail([
+      'reconcile',
+      '--repo', bareDir,
+      '--branch', 'main',
+      '--sha', agentSha,
+      '--work-dir', workDir,
+    ]);
+    assert.equal(err.code, 1);
+    const result = JSON.parse(err.stderr.trim());
+    assert.equal(result.code, 'SHA_NOT_FOUND');
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
 });

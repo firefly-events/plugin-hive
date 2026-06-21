@@ -203,13 +203,27 @@ def run(
     graph = load_workflow(wf_path)
     effective_run_id = run_id or make_run_id(graph.workflow_name)
 
-    outputs = run_workflow(
-        wf_path,
-        dispatcher,
-        run_id=effective_run_id,
-        run_state_path=run_state_path,
-        context=context,
-    )
+    try:
+        outputs = run_workflow(
+            wf_path,
+            dispatcher,
+            run_id=effective_run_id,
+            run_state_path=run_state_path,
+            context=context,
+        )
+    except Exception:
+        if episode_hook is not None:
+            try:
+                episode_hook(
+                    run_id=effective_run_id,
+                    workflow=graph.workflow_name,
+                    flow=flow,
+                    outputs={},
+                    status="failed",
+                )
+            except Exception:
+                pass
+        raise
 
     if episode_hook is not None:
         episode_hook(
