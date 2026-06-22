@@ -377,3 +377,23 @@ def test_materialise_idempotent_when_epic_already_present(tmp_path):
             run_id="run-1",
         )
     assert out.meta.get("epic_copied") is False
+
+
+@pytest.mark.parametrize("evil", ["/etc/cron.d/x", "../../escape", "../sibling"])
+def test_materialise_rejects_unsafe_epic_dir(tmp_path, evil):
+    """epic_dir is upstream agent output (#13 outputs.yaml / harvest). An absolute
+    path or a `..` traversal must NOT let copytree write outside repo_root —
+    arbitrary filesystem write (Codex review of #316). Reject loud instead.
+    """
+    repo_root = tmp_path / "repo_root"
+    repo_root.mkdir()
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+
+    handler = _handler_with_root(tmp_path, repo_root)
+    with pytest.raises(ReconcileHandlerError, match="unsafe epic_dir"):
+        handler.handle(
+            _reconcile_node(),
+            inputs={"work_dir": str(work_dir), "epic_dir": evil},
+            run_id="run-1",
+        )

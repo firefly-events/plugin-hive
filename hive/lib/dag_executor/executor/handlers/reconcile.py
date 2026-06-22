@@ -95,7 +95,18 @@ class ReconcileHandler:
         """
         if self._repo_root is None or not epic_dir:
             return False
-        dest = self._repo_root / epic_dir
+        # epic_dir is UPSTREAM AGENT OUTPUT (harvest / #13 outputs.yaml), not a
+        # trusted constant. An absolute path or a ``..`` traversal would make
+        # ``shutil.copytree`` write OUTSIDE repo_root — arbitrary filesystem
+        # write driven by whatever the agent emitted. Require a relative path
+        # that resolves within repo_root; reject loud otherwise. (Codex #316.)
+        rel = Path(epic_dir)
+        dest = self._repo_root / rel
+        if rel.is_absolute() or not dest.resolve().is_relative_to(self._repo_root):
+            raise ReconcileHandlerError(
+                f"reconcile node {node_id!r}: refusing unsafe epic_dir "
+                f"{epic_dir!r} — must be a relative path inside repo_root"
+            )
         if (dest / "epic.yaml").exists():
             return False  # git reconcile already materialised it
         src = self._find_epic_source(work_dir, epic_dir)
