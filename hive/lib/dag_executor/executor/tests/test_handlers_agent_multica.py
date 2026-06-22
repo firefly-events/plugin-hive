@@ -535,3 +535,32 @@ def test_branch_contract_targets_epic_branch(tmp_path):
 # that marker UNCONDITIONALLY on every Claude Code Stop event (normal session end
 # included), so every agent work_dir has it, successful ones too. The marker is
 # not a failure signal; that detection was reverted.
+
+
+# ── #22: under-run guard (Multica binding) ────────────────────────────────────
+
+def test_under_run_raises_when_no_declared_output(tmp_path):
+    """A Multica agent that 'completes' but produces none of its declared
+    semantic outputs must raise (so the node's retry re-dispatches), not limp on
+    with only commit metadata."""
+    from types import SimpleNamespace
+    from hive.lib.dag_executor.executor.handlers.agent import AgentHandler
+
+    spawn = _make_spawn(tmp_path)  # real MulticaAgentSpawn
+    side_effects = [
+        _make_subprocess_result(_create_issue_result()),
+        _make_subprocess_result(_dispatch_result()),
+        # completed, work_dir empty of artifacts -> only metadata harvested
+        _make_subprocess_result(_completed_poll_result(work_dir=str(tmp_path / "empty"))),
+    ]
+    (tmp_path / "empty").mkdir()
+    node = SimpleNamespace(
+        id="author",
+        agent="technical-writer",
+        step_file="",
+        outputs=[SimpleNamespace(name="epic_dir"), SimpleNamespace(name="commit_sha")],
+    )
+    handler = AgentHandler(spawn=spawn)
+    with patch("subprocess.run", side_effect=side_effects):
+        with pytest.raises(AgentHandlerError, match="under-run"):
+            handler.handle(node, inputs={}, run_id="run-1")

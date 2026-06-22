@@ -27,6 +27,36 @@ from typing import Any, Callable, Protocol
 from ..errors import AgentHandlerError
 
 
+# Spawn-supplied metadata keys (commit/task bookkeeping derived from the agent's
+# git HEAD + Multica task record) — present even when the agent produced no real
+# work, so they are EXCLUDED from the #22 under-run check, which looks only at a
+# node's declared SEMANTIC outputs.
+_SPAWN_METADATA_OUTPUTS = frozenset(
+    {
+        "code_push_sha",
+        "commit_sha",
+        "branch",
+        "repo",
+        "work_dir",
+        "task_id",
+        "agent_id",
+        "tracker_id",
+    }
+)
+
+
+def _output_is_empty(value: Any) -> bool:
+    """True when a harvested output carries no real value (None / empty
+    string / empty collection). ``False`` (a real bool) is NOT empty."""
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip() == ""
+    if isinstance(value, (list, tuple, dict, set)):
+        return len(value) == 0
+    return False
+
+
 @dataclass
 class NodeOutput:
     """Materialised outputs from a single node, keyed by output name.
@@ -942,6 +972,33 @@ class AgentHandler:
             raise AgentHandlerError(
                 f"agent-spawn returned non-dict outputs for node {node.id!r}"
             )
+
+        # #22: under-run guard (Multica binding only). A Multica agent can report
+        # 'completed' yet end its session without producing its work (observed on
+        # the heaviest plan node, the author, intermittently). The spawn still
+        # returns commit/task METADATA derived from git HEAD, so the run limps on
+        # and fails two nodes later with a confusing "input epic_dir ... was not
+        # produced". Detect it here: if EVERY declared SEMANTIC output (excluding
+        # spawn metadata) is empty, raise AgentHandlerError so a node-level
+        # `retry:` re-dispatches — the under-run is transient and a fresh agent
+        # run usually produces the work. Scoped to MulticaAgentSpawn: local/test
+        # spawns return canned/explicit outputs and an empty one is intentional.
+        # (NOT keyed off the .pHive/interrupts forced_stop marker, which is
+        # written on every Stop event and is not a failure signal.)
+        if isinstance(self._spawn, MulticaAgentSpawn):
+            declared = [
+                getattr(o, "name", None)
+                for o in (getattr(node, "outputs", None) or [])
+            ]
+            semantic = [
+                n for n in declared if n and n not in _SPAWN_METADATA_OUTPUTS
+            ]
+            if semantic and all(_output_is_empty(outputs.get(n)) for n in semantic):
+                raise AgentHandlerError(
+                    f"node {node.id!r}: agent reported completed but produced none "
+                    f"of its declared outputs {semantic} (under-run) — retrying if "
+                    f"the node allows"
+                )
 
         # hde-4 Risk #9 guard: when this node ran in a parallel branch
         # context, two siblings could both want to write the SAME
