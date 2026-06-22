@@ -530,6 +530,24 @@ def test_branch_contract_targets_epic_branch(tmp_path):
     assert "auto-created" in contract  # warns against the agent/<persona>/<task> branch
 
 
+def test_branch_contract_empty_without_resolvable_remote(tmp_path):
+    """CodeRabbit review of #316: a repo with NO origin remote (and no resolvable
+    default) must NOT get a contract — its `git fetch origin {branch}` would
+    misdirect the run. Even on a non-'main' branch, no remote default => "".
+    """
+    import subprocess as sp
+    repo = tmp_path / "noremote"
+    repo.mkdir()
+    def git(*a): sp.run(["git", "-C", str(repo), *a], check=True, capture_output=True)
+    git("init", "-q"); git("config", "user.email", "t@t"); git("config", "user.name", "t")
+    git("checkout", "-q", "-b", "feat/orphan")
+    (repo / "f").write_text("x"); git("add", "-A"); git("commit", "-q", "-m", "c")
+    # No `git remote add origin` — origin/HEAD and origin/{main,master,develop} all unresolvable.
+
+    spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs", repo_root=repo)
+    assert spawn._branch_contract() == "", "no resolvable remote default -> no directive"
+
+
 # NOTE: a prior #21 attempt keyed agent failure off a `.pHive/interrupts/*.yaml`
 # `forced_stop` marker. That was wrong — hooks/stop-interrupt-capture.sh writes
 # that marker UNCONDITIONALLY on every Claude Code Stop event (normal session end

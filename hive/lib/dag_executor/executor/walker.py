@@ -891,6 +891,11 @@ class Walker:
 
         # Apply results serially in deterministic node-id order so
         # state, materialised, and telemetry mutations are reproducible.
+        # #26 / CodeRabbit: a fatal non-optional gate failure is deferred until
+        # AFTER every sibling result in this wave is recorded — the siblings
+        # already executed, so their completion/skip state must persist for
+        # resume + telemetry before we halt the run.
+        fatal_gate_error: BaseException | None = None
         for node_id in sorted(results):
             result: ScheduleResult = results[node_id]
             node = graph.nodes[node_id]
@@ -947,7 +952,9 @@ class Walker:
                     source_epic=_source_epic(ctx),
                 )
                 save_state(state)
-                raise err
+                if fatal_gate_error is None:
+                    fatal_gate_error = err
+                continue
 
             payload = {
                 "optional": bool(getattr(node, "optional", False)),
@@ -960,6 +967,11 @@ class Walker:
             skipped.add(node_id)
             state = _record_skipped(state, node_id, payload, source_epic=_source_epic(ctx))
             save_state(state)
+
+        # All sibling results are now recorded; halt the run on the first fatal
+        # non-optional gate failure observed in this wave (#26 / CodeRabbit).
+        if fatal_gate_error is not None:
+            raise fatal_gate_error
 
         return state
 

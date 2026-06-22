@@ -705,6 +705,11 @@ class MulticaAgentSpawn:
                 if _git("rev-parse", "--verify", "--quiet", f"origin/{cand}") is not None:
                     default = cand
                     break
+        if default is None:
+            # No resolvable remote default (no origin remote / bare local repo).
+            # The contract's `git fetch origin {branch}` would misdirect a run in
+            # a repo without an origin — emit nothing. (CodeRabbit review of #316.)
+            return ""
         if branch == default:
             return ""  # default branch — no epic-branch directive
         return (
