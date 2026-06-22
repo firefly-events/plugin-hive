@@ -79,7 +79,31 @@ def test_step_file_content_passed_verbatim_to_create_issue(tmp_path):
     create_call = mock_run.call_args_list[0]
     cmd = create_call[0][0]
     body_idx = cmd.index("--body") + 1
-    assert cmd[body_idx] == content, "step_file_content must reach cli.mjs --body verbatim"
+    # step_file_content must reach the body VERBATIM (no paraphrase/trim). It is
+    # now framed under a `## Task` heading so inputs can precede it (#12), so
+    # assert verbatim containment rather than exact equality.
+    assert content in cmd[body_idx], "step_file_content must reach cli.mjs --body verbatim"
+
+
+def test_inputs_reach_create_issue_body(tmp_path):
+    """#12: the node's inputs (requirement, upstream outputs) must be sent to
+    the Multica agent via the issue body — not just the step_file. Otherwise the
+    agent has no requirement and can only improvise from the repo.
+    """
+    spawn = _make_spawn(tmp_path)
+    side_effects = [
+        _make_subprocess_result(_create_issue_result()),
+        _make_subprocess_result(_dispatch_result()),
+        _make_subprocess_result(_completed_poll_result()),
+    ]
+    inputs = {"requirement": "Build tic-tac-toe in vanilla JS", "research_brief": "BRIEF-MARKER"}
+    with patch("subprocess.run", side_effect=side_effects) as mock_run:
+        spawn("technical-writer", "## author the epic", inputs, "run-1", "author")
+
+    cmd = mock_run.call_args_list[0][0][0]
+    body = cmd[cmd.index("--body") + 1]
+    assert "Build tic-tac-toe in vanilla JS" in body
+    assert "BRIEF-MARKER" in body
 
 
 def test_raw_agent_name_forwarded_to_dispatch(tmp_path):

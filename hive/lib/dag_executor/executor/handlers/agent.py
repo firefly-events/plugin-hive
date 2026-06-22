@@ -282,7 +282,7 @@ class MulticaAgentSpawn:
         step_id: str,
     ) -> dict[str, Any]:
         tracker_id = self._resolve_tracker_id(
-            run_id, step_id, agent, step_file_content
+            run_id, step_id, agent, step_file_content, inputs
         )
         self._dispatch(tracker_id, agent)
         terminal = self._poll(tracker_id)
@@ -443,6 +443,7 @@ class MulticaAgentSpawn:
         step_id: str,
         agent: str,
         step_file_content: str,
+        inputs: dict[str, Any] | None = None,
     ) -> str:
         """Resolve (or create-and-cache) the Multica tracker issue id for this step.
 
@@ -463,10 +464,23 @@ class MulticaAgentSpawn:
                 pass
 
         title = f"[dag:{run_id}:{step_id}] {agent}"
-        # cli.mjs requires non-empty --body; use a placeholder when no step_file
-        # was provided (step_file_content is ""). This does NOT violate the VERBATIM
-        # rule — verbatim means no paraphrasing of non-empty content.
-        body = step_file_content or f"(no step_file provided — run {run_id} step {step_id})"
+        # #12: the issue body IS the agent's brief. It must carry the node's
+        # `inputs` — the requirement and upstream outputs (research_brief,
+        # design_discussion, ...) — not just the step_file. Without them the
+        # Multica agent has no requirement and can only improvise from the repo.
+        # Mirror LocalAgentSpawn.build_prompt: inputs as a JSON block + the
+        # verbatim step_file. (Dedup is on the title, so a richer body is safe.)
+        body_parts: list[str] = []
+        if inputs:
+            body_parts.append(
+                "## Inputs\n```json\n" + json.dumps(inputs, indent=2) + "\n```"
+            )
+        if step_file_content:
+            body_parts.append("## Task\n" + step_file_content)
+        # cli.mjs requires non-empty --body; use a placeholder when both are empty.
+        body = "\n\n".join(body_parts) or (
+            f"(no step_file provided — run {run_id} step {step_id})"
+        )
 
         # Write intent marker BEFORE the network call (H1 belt-and-suspenders).
         # If the process dies after create-issue returns but before the state write,
