@@ -530,29 +530,8 @@ def test_branch_contract_targets_epic_branch(tmp_path):
     assert "auto-created" in contract  # warns against the agent/<persona>/<task> branch
 
 
-def test_was_force_stopped_detects_marker(tmp_path):
-    """#21: a forced_stop interrupt marker in the work_dir is detected so the
-    handler can raise + the node can retry."""
-    wd = tmp_path / "work"
-    interrupts = wd / ".pHive/interrupts"
-    interrupts.mkdir(parents=True)
-    (interrupts / "2026-06-22T150654Z.yaml").write_text(
-        'interrupted_at: "2026-06-22T150654Z"\ninterruption_type: forced_stop\n',
-        encoding="utf-8",
-    )
-    assert MulticaAgentSpawn._was_force_stopped(str(wd)) is True
-
-
-def test_was_force_stopped_nested_checkout(tmp_path):
-    wd = tmp_path / "work"
-    interrupts = wd / "ttt-throwaway/.pHive/interrupts"
-    interrupts.mkdir(parents=True)
-    (interrupts / "x.yaml").write_text("interruption_type: forced_stop\n", encoding="utf-8")
-    assert MulticaAgentSpawn._was_force_stopped(str(wd)) is True
-
-
-def test_was_force_stopped_false_when_clean(tmp_path):
-    wd = tmp_path / "work"
-    (wd / ".pHive/epics").mkdir(parents=True)
-    assert MulticaAgentSpawn._was_force_stopped(str(wd)) is False
-    assert MulticaAgentSpawn._was_force_stopped(None) is False
+# NOTE: a prior #21 attempt keyed agent failure off a `.pHive/interrupts/*.yaml`
+# `forced_stop` marker. That was wrong — hooks/stop-interrupt-capture.sh writes
+# that marker UNCONDITIONALLY on every Claude Code Stop event (normal session end
+# included), so every agent work_dir has it, successful ones too. The marker is
+# not a failure signal; that detection was reverted.

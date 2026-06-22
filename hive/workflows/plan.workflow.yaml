@@ -22,9 +22,10 @@ steps:
     outputs:
       - name: research_brief
         type: string
-    # #21: Multica intermittently force-stops an agent and reports "completed"
-    # with no work. The AGENT handler raises on that interrupt marker; this
-    # bounded retry re-dispatches so a transient flake self-heals.
+    # Bounded retry re-dispatches on a transient AGENT failure (Multica task
+    # terminal status != completed -> AgentHandlerError). Does NOT cover the
+    # "completed but produced nothing" author under-run (no exception raised);
+    # that is an agent-reliability issue tracked separately, not a force-stop.
     retry:
       max_attempts: 3
       on: agent_failed
@@ -43,7 +44,7 @@ steps:
     outputs:
       - name: design_discussion
         type: string
-    retry:  # #21 — see research node
+    retry:  # bounded retry on transient AGENT failure (status != completed)
       max_attempts: 3
       on: agent_failed
     timeout_ms: 1800000
@@ -73,7 +74,7 @@ steps:
         type: string
       - name: commit_sha
         type: string
-    retry:  # #21 — author is the heaviest node + the one observed force-stopping
+    retry:  # author is heaviest; retry transient AGENT failures (not under-runs)
       max_attempts: 4
       on: agent_failed
     timeout_ms: 3600000
