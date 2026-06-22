@@ -282,7 +282,7 @@ class MulticaAgentSpawn:
         step_id: str,
     ) -> dict[str, Any]:
         tracker_id = self._resolve_tracker_id(
-            run_id, step_id, agent, step_file_content
+            run_id, step_id, agent, step_file_content, inputs
         )
         self._dispatch(tracker_id, agent)
         terminal = self._poll(tracker_id)
@@ -292,7 +292,7 @@ class MulticaAgentSpawn:
                 f"multica task {tracker_id!r} for step {step_id!r} "
                 f"terminal with status {status!r}: {terminal.get('notes', '')}"
             )
-        return {
+        outputs = {
             "code_push_sha": terminal.get("code_push_sha"),
             # commit_sha is the graph-canonical alias for code_push_sha so
             # reconcile nodes can bind output_name: commit_sha without a
@@ -305,6 +305,194 @@ class MulticaAgentSpawn:
             "agent_id": terminal.get("agent_id"),
             "tracker_id": tracker_id,
         }
+        # #7: Multica's task API does NOT report the agent's commit/push, so the
+        # poll terminal carries no code_push_sha/branch/repo — leaving the
+        # reconcile node with nothing to ff-merge (the committed epic never
+        # reaches the gate's repo_root). Derive the real commit metadata from
+        # the git HEAD of the agent's isolated work_dir checkout, and point
+        # reconcile at that local checkout as the fetch source (no dependency on
+        # the agent having pushed to a remote).
+        for key, value in self._harvest_git_state(terminal.get("work_dir")).items():
+            if value is not None:
+                outputs[key] = value
+        # Surface the agent's committed planning artifacts as named outputs so
+        # downstream nodes can consume them in-memory. Multica agents deliver
+        # research/design/plan artifacts as FILES committed in their isolated
+        # work_dir (e.g. .pHive/epics/<id>/docs/research-brief.md), not as
+        # in-graph outputs. Without this, a graph edge like
+        # ``author.research_brief <- research.research_brief`` resolves to
+        # nothing and the run fails (the binding otherwise returns only commit
+        # metadata). Harvest the files and key them so they match the graph's
+        # declared output names.
+        for key, value in self._harvest_artifacts(terminal.get("work_dir")).items():
+            outputs.setdefault(key, value)
+        return outputs
+
+    @staticmethod
+    def _find_repo_checkout(work_dir: str | None) -> Path | None:
+        """The git checkout dir inside the agent's work_dir (the dir itself, or
+        a single repo subdir under it). ``None`` if no checkout is found."""
+        if not work_dir:
+            return None
+        wd = Path(work_dir)
+        try:
+            if (wd / ".git").exists():
+                return wd
+            for child in sorted(p for p in wd.iterdir() if p.is_dir()):
+                if (child / ".git").exists():
+                    return child
+        except OSError:
+            return None
+        return None
+
+    @staticmethod
+    def _committed_phive_paths(repo_dir: Path) -> list[str] | None:
+        """Repo-relative ``.pHive/epics/...`` paths the agent ADDED/changed on
+        its branch versus the base branch — i.e. THIS run's output, not epics
+        that already existed in a consumer project's repo (#1 review fix).
+
+        Returns ``None`` when git or a base ref can't be resolved, so the caller
+        can fall back to a worktree scan.
+        """
+
+        def _git(*args: str) -> str | None:
+            try:
+                result = subprocess.run(
+                    ["git", "-C", str(repo_dir), *args],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+            except (OSError, subprocess.SubprocessError):
+                return None
+            return result.stdout.strip() if result.returncode == 0 else None
+
+        base = None
+        for ref in ("origin/HEAD", "origin/main", "main", "origin/master", "master"):
+            if _git("rev-parse", "--verify", "--quiet", ref) is not None:
+                base = ref
+                break
+        if base is None:
+            return None
+        merge_base = _git("merge-base", base, "HEAD")
+        if not merge_base:
+            return None
+        diff = _git("diff", "--name-only", "--diff-filter=ACMR", merge_base, "HEAD")
+        if diff is None:
+            return None
+        return [
+            line for line in diff.splitlines() if line.startswith(".pHive/epics/")
+        ]
+
+    @staticmethod
+    def _harvest_artifacts(work_dir: str | None) -> dict[str, Any]:
+        """Read the planning artifacts the agent committed in its work_dir and
+        surface them as named outputs (file-stored, passed in-memory).
+
+        - ``.pHive/epics/<id>/docs/<name>.md`` -> output ``<name>`` with hyphens
+          converted to underscores so it matches the graph's ``output_name``
+          (e.g. ``research-brief.md`` -> ``research_brief``).
+        - ``.pHive/epics/<id>/epic.yaml`` -> output ``epic_dir`` set to the
+          repo-relative epic directory (``.pHive/epics/<id>``).
+
+        Scoped to the files THIS agent committed on its branch (vs the base), so
+        a consumer repo's pre-existing ``.pHive/epics/*`` are NOT harvested as
+        this run's output (#1 review fix). Best-effort: read errors are skipped.
+        """
+        out: dict[str, Any] = {}
+        repo_dir = MulticaAgentSpawn._find_repo_checkout(work_dir)
+        if repo_dir is None:
+            return out
+
+        rels = MulticaAgentSpawn._committed_phive_paths(repo_dir)
+        if rels is None:
+            # git/base unavailable — fall back to a worktree scan (correct for a
+            # fresh single-epic repo; may over-scope a multi-epic consumer repo).
+            try:
+                rels = [
+                    str(p.relative_to(repo_dir))
+                    for p in repo_dir.glob(".pHive/epics/*/docs/*.md")
+                ] + [
+                    str(p.relative_to(repo_dir))
+                    for p in repo_dir.glob(".pHive/epics/*/epic.yaml")
+                ]
+            except OSError:
+                return out
+
+        for rel in sorted(rels):
+            parts = Path(rel).parts
+            if (
+                len(parts) >= 5
+                and parts[0] == ".pHive"
+                and parts[1] == "epics"
+                and parts[3] == "docs"
+                and rel.endswith(".md")
+            ):
+                try:
+                    out[Path(rel).stem.replace("-", "_")] = (
+                        repo_dir / rel
+                    ).read_text(encoding="utf-8")
+                except OSError:
+                    continue
+            elif (
+                len(parts) == 4
+                and parts[0] == ".pHive"
+                and parts[1] == "epics"
+                and parts[3] == "epic.yaml"
+            ):
+                out.setdefault(
+                    "epic_dir", str(Path(parts[0], parts[1], parts[2]))
+                )
+        return out
+
+    @staticmethod
+    def _harvest_git_state(work_dir: str | None) -> dict[str, Any]:
+        """Derive the agent's commit metadata from the git HEAD of its work_dir
+        checkout (#7).
+
+        Multica's task API does not report what the agent committed/pushed, so
+        the poll terminal has no sha/branch/repo. The agent's isolated work_dir
+        IS a real git checkout sitting on the branch + commit it produced, so we
+        read it directly:
+
+        - ``code_push_sha`` / ``commit_sha`` <- ``git rev-parse HEAD``
+        - ``branch`` <- ``git rev-parse --abbrev-ref HEAD``
+        - ``repo`` / ``work_dir`` <- the checkout path, so the reconcile node
+          fetches the branch from this LOCAL checkout (no remote-push
+          dependency; reconcileBranch accepts a local repo path).
+
+        Best-effort: returns ``{}`` if no checkout/git is found so it never
+        masks a real task result.
+        """
+        out: dict[str, Any] = {}
+        repo_dir = MulticaAgentSpawn._find_repo_checkout(work_dir)
+        if repo_dir is None:
+            return out
+
+        def _git(*args: str) -> str | None:
+            try:
+                result = subprocess.run(
+                    ["git", "-C", str(repo_dir), *args],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+            except (OSError, subprocess.SubprocessError):
+                return None
+            if result.returncode != 0:
+                return None
+            return result.stdout.strip() or None
+
+        sha = _git("rev-parse", "HEAD")
+        branch = _git("rev-parse", "--abbrev-ref", "HEAD")
+        if sha:
+            out["code_push_sha"] = sha
+            out["commit_sha"] = sha
+        if branch and branch != "HEAD":
+            out["branch"] = branch
+        out["repo"] = str(repo_dir)
+        out["work_dir"] = str(repo_dir)
+        return out
 
     # ------------------------------------------------------------------
     # Idempotency
@@ -326,6 +514,7 @@ class MulticaAgentSpawn:
         step_id: str,
         agent: str,
         step_file_content: str,
+        inputs: dict[str, Any] | None = None,
     ) -> str:
         """Resolve (or create-and-cache) the Multica tracker issue id for this step.
 
@@ -346,10 +535,23 @@ class MulticaAgentSpawn:
                 pass
 
         title = f"[dag:{run_id}:{step_id}] {agent}"
-        # cli.mjs requires non-empty --body; use a placeholder when no step_file
-        # was provided (step_file_content is ""). This does NOT violate the VERBATIM
-        # rule — verbatim means no paraphrasing of non-empty content.
-        body = step_file_content or f"(no step_file provided — run {run_id} step {step_id})"
+        # #12: the issue body IS the agent's brief. It must carry the node's
+        # `inputs` — the requirement and upstream outputs (research_brief,
+        # design_discussion, ...) — not just the step_file. Without them the
+        # Multica agent has no requirement and can only improvise from the repo.
+        # Mirror LocalAgentSpawn.build_prompt: inputs as a JSON block + the
+        # verbatim step_file. (Dedup is on the title, so a richer body is safe.)
+        body_parts: list[str] = []
+        if inputs:
+            body_parts.append(
+                "## Inputs\n```json\n" + json.dumps(inputs, indent=2) + "\n```"
+            )
+        if step_file_content:
+            body_parts.append("## Task\n" + step_file_content)
+        # cli.mjs requires non-empty --body; use a placeholder when both are empty.
+        body = "\n\n".join(body_parts) or (
+            f"(no step_file provided — run {run_id} step {step_id})"
+        )
 
         # Write intent marker BEFORE the network call (H1 belt-and-suspenders).
         # If the process dies after create-issue returns but before the state write,
@@ -431,6 +633,16 @@ class MulticaAgentSpawn:
         return data
 
 
+def default_plugin_root() -> Path:
+    """The plugin install root, derived from this module's location
+    (``<plugin>/hive/lib/dag_executor/executor/handlers/agent.py``). Production
+    wiring (``assemble_dispatcher``) passes this into ``AgentHandler`` so
+    plugin-shipped step_files resolve for a consumer project. Kept out of the
+    handler's default so rootless/repo_root-only callers keep legacy behavior.
+    """
+    return Path(__file__).resolve().parents[5]
+
+
 class AgentHandler:
     """Dispatches agent nodes through the agent-spawn chain unchanged."""
 
@@ -438,39 +650,79 @@ class AgentHandler:
         self,
         spawn: AgentSpawn,
         repo_root: Path | str | None = None,
+        plugin_root: Path | str | None = None,
     ) -> None:
         self._spawn = spawn
         self._repo_root = Path(repo_root) if repo_root is not None else None
+        # step_files are plugin-shipped content (e.g.
+        # ``hive/workflows/step-files/plan/research.md``) installed WITH the
+        # plugin — they do NOT live inside a consumer project's ``repo_root``.
+        # When ``plugin_root`` is supplied (production wires it via
+        # ``assemble_dispatcher`` -> ``default_plugin_root()``), step_files
+        # resolve against it first, with ``repo_root`` as a fallback.
+        #
+        # It is NOT defaulted here on purpose: a rootless caller (no repo_root,
+        # no plugin_root — e.g. a test passing an absolute step_file) must keep
+        # the legacy "read the path as given" behavior, and a repo_root-only
+        # caller must keep the original absolute-escapes-repo_root guard. An
+        # always-on plugin_root would break both.
+        self._plugin_root = (
+            Path(plugin_root).resolve() if plugin_root is not None else None
+        )
 
     def _read_step_file(self, step_file: str) -> str:
         """Read the step_file's content verbatim. No transformation.
 
-        When ``repo_root`` is configured, ``step_file`` MUST resolve inside
-        that root. ``..`` segments and absolute paths that escape the root
-        are rejected up-front so an attacker-controlled or malformed
-        workflow cannot inject arbitrary file content into agent input.
+        ``step_file`` paths in plugin workflows are relative to the plugin
+        root (where the workflow graph and step-files ship). Resolve against
+        the plugin root first, then fall back to ``repo_root`` for
+        project-local workflows. In every case the resolved path MUST stay
+        inside the root it matched — ``..`` segments and absolute paths that
+        escape every allowed root are rejected so a malformed or
+        attacker-controlled workflow cannot inject arbitrary file content.
         """
         path = Path(step_file)
+        roots: list[Path] = []
+        if self._plugin_root is not None:
+            roots.append(self._plugin_root.resolve())
         if self._repo_root is not None:
-            root = self._repo_root.resolve()
+            roots.append(self._repo_root.resolve())
+
+        last_not_found: Exception | None = None
+        for root in roots:
             candidate = (
                 path if path.is_absolute() else (root / path)
             ).resolve()
             try:
                 candidate.relative_to(root)
-            except ValueError as exc:
+            except ValueError:
+                continue  # escapes this root — try the next allowed root
+            try:
+                return candidate.read_text(encoding="utf-8")
+            except FileNotFoundError as exc:
+                last_not_found = exc
+                continue  # not under this root — try the next
+            except OSError as exc:
                 raise AgentHandlerError(
-                    f"step_file escapes repo_root: {step_file}"
+                    f"failed to read step_file {step_file}: {exc}"
                 ) from exc
-            path = candidate
-        try:
-            return path.read_text(encoding="utf-8")
-        except FileNotFoundError as exc:
-            raise AgentHandlerError(f"step_file not found: {step_file}") from exc
-        except OSError as exc:
-            raise AgentHandlerError(
-                f"failed to read step_file {step_file}: {exc}"
-            ) from exc
+
+        if not roots:
+            # No configured root — legacy as-given resolution.
+            try:
+                return path.read_text(encoding="utf-8")
+            except FileNotFoundError as exc:
+                raise AgentHandlerError(
+                    f"step_file not found: {step_file}"
+                ) from exc
+            except OSError as exc:
+                raise AgentHandlerError(
+                    f"failed to read step_file {step_file}: {exc}"
+                ) from exc
+
+        raise AgentHandlerError(
+            f"step_file not found: {step_file}"
+        ) from last_not_found
 
     def handle(
         self,

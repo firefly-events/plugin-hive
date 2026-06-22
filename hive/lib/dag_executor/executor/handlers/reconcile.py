@@ -42,9 +42,14 @@ class ReconcileHandler:
         cli_path: str | Path | None = None,
         node_bin: str = "node",
         timeout_ms: int = _DEFAULT_TIMEOUT_MS,
+        repo_root: Path | str | None = None,
     ) -> None:
         self._cli_path = Path(cli_path) if cli_path else self._default_cli_path()
         self._node_bin = node_bin
+        # The merge TARGET: the executor's repo_root (the project tree the
+        # downstream gate validates). The agent's work_dir is only the fetch
+        # SOURCE. See handle() / #8.
+        self._repo_root = Path(repo_root).resolve() if repo_root is not None else None
         self._timeout_ms = timeout_ms
 
     @staticmethod
@@ -78,9 +83,18 @@ class ReconcileHandler:
                 f"reconcile node {node.id!r}: 'repo' input required when sha is set"
             )
 
+        # #8: the ff-merge must run in the executor's repo_root (the project the
+        # gate validates), fetching FROM the agent's committed repo (`repo`).
+        # Previously --work-dir was wired to the agent's own work_dir, so the
+        # merge ran inside the agent's repo (which already held the commit ->
+        # "Already up to date") and never materialised the work into repo_root.
+        # Fall back to the work_dir input only when no repo_root is configured
+        # (e.g. local binding, where the agent already worked in the tree).
+        merge_target = str(self._repo_root) if self._repo_root else work_dir
+
         args = ["reconcile", "--repo", repo, "--branch", branch, "--sha", sha]
-        if work_dir:
-            args += ["--work-dir", work_dir]
+        if merge_target:
+            args += ["--work-dir", merge_target]
 
         cmd = [self._node_bin, str(self._cli_path)] + args
         timeout_s = self._timeout_ms / 1000.0
