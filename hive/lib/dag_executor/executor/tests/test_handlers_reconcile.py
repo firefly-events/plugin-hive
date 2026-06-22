@@ -112,6 +112,30 @@ def test_ff_merge_passes_work_dir_when_provided(tmp_path):
     assert cmd[wd_idx] == "/some/work/dir"
 
 
+def test_repo_root_is_merge_target_overriding_work_dir_input(tmp_path):
+    """#8: when repo_root is configured (production), the ff-merge target is
+    repo_root — the tree the downstream gate validates — NOT the agent's
+    work_dir input, which is only the fetch source. Otherwise the merge runs in
+    the agent's own repo (already has the commit) and the epic never lands where
+    the gate looks.
+    """
+    project = tmp_path / "project"
+    handler = ReconcileHandler(cli_path=(tmp_path / "cli.mjs"), repo_root=project)
+    inputs = {
+        "sha": "deadbeef",
+        "branch": "agent/xyz",
+        "repo": "/agent/work/repo",     # fetch source (agent work_dir)
+        "work_dir": "/agent/work/repo",  # must NOT become the merge target
+    }
+    with patch("subprocess.run", return_value=_ok_result()) as mock_run:
+        handler.handle(_reconcile_node(), inputs=inputs, run_id="run-z")
+
+    cmd = mock_run.call_args[0][0]
+    wd_idx = cmd.index("--work-dir") + 1
+    assert cmd[wd_idx] == str(project.resolve())
+    assert cmd[wd_idx] != "/agent/work/repo"
+
+
 def test_ff_merge_omits_work_dir_when_absent(tmp_path):
     handler = _make_handler(tmp_path)
     inputs = {

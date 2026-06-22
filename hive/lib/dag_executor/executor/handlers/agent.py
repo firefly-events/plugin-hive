@@ -329,6 +329,62 @@ class MulticaAgentSpawn:
         return outputs
 
     @staticmethod
+    def _find_repo_checkout(work_dir: str | None) -> Path | None:
+        """The git checkout dir inside the agent's work_dir (the dir itself, or
+        a single repo subdir under it). ``None`` if no checkout is found."""
+        if not work_dir:
+            return None
+        wd = Path(work_dir)
+        try:
+            if (wd / ".git").exists():
+                return wd
+            for child in sorted(p for p in wd.iterdir() if p.is_dir()):
+                if (child / ".git").exists():
+                    return child
+        except OSError:
+            return None
+        return None
+
+    @staticmethod
+    def _committed_phive_paths(repo_dir: Path) -> list[str] | None:
+        """Repo-relative ``.pHive/epics/...`` paths the agent ADDED/changed on
+        its branch versus the base branch — i.e. THIS run's output, not epics
+        that already existed in a consumer project's repo (#1 review fix).
+
+        Returns ``None`` when git or a base ref can't be resolved, so the caller
+        can fall back to a worktree scan.
+        """
+
+        def _git(*args: str) -> str | None:
+            try:
+                result = subprocess.run(
+                    ["git", "-C", str(repo_dir), *args],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+            except (OSError, subprocess.SubprocessError):
+                return None
+            return result.stdout.strip() if result.returncode == 0 else None
+
+        base = None
+        for ref in ("origin/HEAD", "origin/main", "main", "origin/master", "master"):
+            if _git("rev-parse", "--verify", "--quiet", ref) is not None:
+                base = ref
+                break
+        if base is None:
+            return None
+        merge_base = _git("merge-base", base, "HEAD")
+        if not merge_base:
+            return None
+        diff = _git("diff", "--name-only", "--diff-filter=ACMR", merge_base, "HEAD")
+        if diff is None:
+            return None
+        return [
+            line for line in diff.splitlines() if line.startswith(".pHive/epics/")
+        ]
+
+    @staticmethod
     def _harvest_artifacts(work_dir: str | None) -> dict[str, Any]:
         """Read the planning artifacts the agent committed in its work_dir and
         surface them as named outputs (file-stored, passed in-memory).
@@ -339,26 +395,54 @@ class MulticaAgentSpawn:
         - ``.pHive/epics/<id>/epic.yaml`` -> output ``epic_dir`` set to the
           repo-relative epic directory (``.pHive/epics/<id>``).
 
-        Best-effort: read errors are skipped so harvesting never masks a real
-        task result.
+        Scoped to the files THIS agent committed on its branch (vs the base), so
+        a consumer repo's pre-existing ``.pHive/epics/*`` are NOT harvested as
+        this run's output (#1 review fix). Best-effort: read errors are skipped.
         """
         out: dict[str, Any] = {}
-        if not work_dir:
+        repo_dir = MulticaAgentSpawn._find_repo_checkout(work_dir)
+        if repo_dir is None:
             return out
-        wd = Path(work_dir)
-        try:
-            for md in sorted(wd.glob("**/.pHive/epics/*/docs/*.md")):
+
+        rels = MulticaAgentSpawn._committed_phive_paths(repo_dir)
+        if rels is None:
+            # git/base unavailable — fall back to a worktree scan (correct for a
+            # fresh single-epic repo; may over-scope a multi-epic consumer repo).
+            try:
+                rels = [
+                    str(p.relative_to(repo_dir))
+                    for p in repo_dir.glob(".pHive/epics/*/docs/*.md")
+                ] + [
+                    str(p.relative_to(repo_dir))
+                    for p in repo_dir.glob(".pHive/epics/*/epic.yaml")
+                ]
+            except OSError:
+                return out
+
+        for rel in sorted(rels):
+            parts = Path(rel).parts
+            if (
+                len(parts) >= 5
+                and parts[0] == ".pHive"
+                and parts[1] == "epics"
+                and parts[3] == "docs"
+                and rel.endswith(".md")
+            ):
                 try:
-                    out[md.stem.replace("-", "_")] = md.read_text(encoding="utf-8")
+                    out[Path(rel).stem.replace("-", "_")] = (
+                        repo_dir / rel
+                    ).read_text(encoding="utf-8")
                 except OSError:
                     continue
-            for epic_yaml in sorted(wd.glob("**/.pHive/epics/*/epic.yaml")):
-                epic_dir = epic_yaml.parent
-                repo_root = epic_dir.parents[2]  # parent of the `.pHive` dir
-                out["epic_dir"] = str(epic_dir.relative_to(repo_root))
-                break
-        except OSError:
-            pass
+            elif (
+                len(parts) == 4
+                and parts[0] == ".pHive"
+                and parts[1] == "epics"
+                and parts[3] == "epic.yaml"
+            ):
+                out.setdefault(
+                    "epic_dir", str(Path(parts[0], parts[1], parts[2]))
+                )
         return out
 
     @staticmethod
@@ -381,20 +465,7 @@ class MulticaAgentSpawn:
         masks a real task result.
         """
         out: dict[str, Any] = {}
-        if not work_dir:
-            return out
-        wd = Path(work_dir)
-        repo_dir: Path | None = None
-        try:
-            if (wd / ".git").exists():
-                repo_dir = wd
-            else:
-                for child in sorted(p for p in wd.iterdir() if p.is_dir()):
-                    if (child / ".git").exists():
-                        repo_dir = child
-                        break
-        except OSError:
-            return out
+        repo_dir = MulticaAgentSpawn._find_repo_checkout(work_dir)
         if repo_dir is None:
             return out
 
@@ -562,6 +633,16 @@ class MulticaAgentSpawn:
         return data
 
 
+def default_plugin_root() -> Path:
+    """The plugin install root, derived from this module's location
+    (``<plugin>/hive/lib/dag_executor/executor/handlers/agent.py``). Production
+    wiring (``assemble_dispatcher``) passes this into ``AgentHandler`` so
+    plugin-shipped step_files resolve for a consumer project. Kept out of the
+    handler's default so rootless/repo_root-only callers keep legacy behavior.
+    """
+    return Path(__file__).resolve().parents[5]
+
+
 class AgentHandler:
     """Dispatches agent nodes through the agent-spawn chain unchanged."""
 
@@ -576,13 +657,17 @@ class AgentHandler:
         # step_files are plugin-shipped content (e.g.
         # ``hive/workflows/step-files/plan/research.md``) installed WITH the
         # plugin — they do NOT live inside a consumer project's ``repo_root``.
-        # Resolve them against the plugin root by default (derived from this
-        # module's install location); ``repo_root`` remains a fallback so
-        # project-local workflow step_files still resolve.
+        # When ``plugin_root`` is supplied (production wires it via
+        # ``assemble_dispatcher`` -> ``default_plugin_root()``), step_files
+        # resolve against it first, with ``repo_root`` as a fallback.
+        #
+        # It is NOT defaulted here on purpose: a rootless caller (no repo_root,
+        # no plugin_root — e.g. a test passing an absolute step_file) must keep
+        # the legacy "read the path as given" behavior, and a repo_root-only
+        # caller must keep the original absolute-escapes-repo_root guard. An
+        # always-on plugin_root would break both.
         self._plugin_root = (
-            Path(plugin_root).resolve()
-            if plugin_root is not None
-            else Path(__file__).resolve().parents[5]
+            Path(plugin_root).resolve() if plugin_root is not None else None
         )
 
     def _read_step_file(self, step_file: str) -> str:

@@ -388,3 +388,44 @@ def test_r1_codex_headless_smoke(tmp_path):
     assert set(materialised) == {"step_one", "step_two"}, (
         f"expected both steps to complete, got: {set(materialised)}"
     )
+
+
+def test_harvest_artifacts_scoped_to_committed_epic(tmp_path):
+    """#1: the agent's work_dir is a fresh checkout of the (possibly consumer)
+    repo, so it may already contain OTHER epics. The harvest must surface only
+    the epic THIS agent committed on its branch, not pre-existing ones.
+    """
+    import subprocess as sp
+
+    work_dir = tmp_path / "task-work"
+    repo = work_dir / "the-project"
+    repo.mkdir(parents=True)
+
+    def git(*args):
+        sp.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    git("branch", "-m", "main")
+
+    # Pre-existing epic on main (NOT this run's output)
+    old = repo / ".pHive/epics/old-epic/docs"
+    old.mkdir(parents=True)
+    (old / "research-brief.md").write_text("OLD BRIEF — must not surface", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "pre-existing epic")
+
+    # This agent's branch + its own epic
+    git("checkout", "-q", "-b", "feat/new-epic")
+    new = repo / ".pHive/epics/new-epic/docs"
+    new.mkdir(parents=True)
+    (new / "research-brief.md").write_text("NEW BRIEF", encoding="utf-8")
+    (repo / ".pHive/epics/new-epic/epic.yaml").write_text("name: new-epic\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "author new epic")
+
+    out = MulticaAgentSpawn._harvest_artifacts(str(work_dir))
+    assert out["research_brief"] == "NEW BRIEF", "must harvest THIS run's brief"
+    assert "OLD BRIEF" not in out["research_brief"]
+    assert out["epic_dir"] == ".pHive/epics/new-epic"
