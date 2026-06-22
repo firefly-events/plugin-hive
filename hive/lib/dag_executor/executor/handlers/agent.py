@@ -305,6 +305,16 @@ class MulticaAgentSpawn:
             "agent_id": terminal.get("agent_id"),
             "tracker_id": tracker_id,
         }
+        # #7: Multica's task API does NOT report the agent's commit/push, so the
+        # poll terminal carries no code_push_sha/branch/repo — leaving the
+        # reconcile node with nothing to ff-merge (the committed epic never
+        # reaches the gate's repo_root). Derive the real commit metadata from
+        # the git HEAD of the agent's isolated work_dir checkout, and point
+        # reconcile at that local checkout as the fetch source (no dependency on
+        # the agent having pushed to a remote).
+        for key, value in self._harvest_git_state(terminal.get("work_dir")).items():
+            if value is not None:
+                outputs[key] = value
         # Surface the agent's committed planning artifacts as named outputs so
         # downstream nodes can consume them in-memory. Multica agents deliver
         # research/design/plan artifacts as FILES committed in their isolated
@@ -349,6 +359,68 @@ class MulticaAgentSpawn:
                 break
         except OSError:
             pass
+        return out
+
+    @staticmethod
+    def _harvest_git_state(work_dir: str | None) -> dict[str, Any]:
+        """Derive the agent's commit metadata from the git HEAD of its work_dir
+        checkout (#7).
+
+        Multica's task API does not report what the agent committed/pushed, so
+        the poll terminal has no sha/branch/repo. The agent's isolated work_dir
+        IS a real git checkout sitting on the branch + commit it produced, so we
+        read it directly:
+
+        - ``code_push_sha`` / ``commit_sha`` <- ``git rev-parse HEAD``
+        - ``branch`` <- ``git rev-parse --abbrev-ref HEAD``
+        - ``repo`` / ``work_dir`` <- the checkout path, so the reconcile node
+          fetches the branch from this LOCAL checkout (no remote-push
+          dependency; reconcileBranch accepts a local repo path).
+
+        Best-effort: returns ``{}`` if no checkout/git is found so it never
+        masks a real task result.
+        """
+        out: dict[str, Any] = {}
+        if not work_dir:
+            return out
+        wd = Path(work_dir)
+        repo_dir: Path | None = None
+        try:
+            if (wd / ".git").exists():
+                repo_dir = wd
+            else:
+                for child in sorted(p for p in wd.iterdir() if p.is_dir()):
+                    if (child / ".git").exists():
+                        repo_dir = child
+                        break
+        except OSError:
+            return out
+        if repo_dir is None:
+            return out
+
+        def _git(*args: str) -> str | None:
+            try:
+                result = subprocess.run(
+                    ["git", "-C", str(repo_dir), *args],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+            except (OSError, subprocess.SubprocessError):
+                return None
+            if result.returncode != 0:
+                return None
+            return result.stdout.strip() or None
+
+        sha = _git("rev-parse", "HEAD")
+        branch = _git("rev-parse", "--abbrev-ref", "HEAD")
+        if sha:
+            out["code_push_sha"] = sha
+            out["commit_sha"] = sha
+        if branch and branch != "HEAD":
+            out["branch"] = branch
+        out["repo"] = str(repo_dir)
+        out["work_dir"] = str(repo_dir)
         return out
 
     # ------------------------------------------------------------------

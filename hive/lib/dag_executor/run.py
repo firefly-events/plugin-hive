@@ -142,9 +142,16 @@ def assemble_dispatcher(spawn: Any, *, repo_root: Path | str | None = None) -> A
     AGENT handler needs the runtime spawn dependency injected here.
     """
     from hive.lib.dag_executor.executor import AgentHandler, Dispatcher
+    from hive.lib.dag_executor.executor.handlers.reconcile import ReconcileHandler
 
     dispatcher = Dispatcher()
     dispatcher.register(NodeType.AGENT, AgentHandler(spawn, repo_root=repo_root).handle)
+    # Reconcile must ff-merge the agent's commit into repo_root (the tree the
+    # gate validates), so it needs repo_root injected like the AGENT handler
+    # (#8). Overrides the Dispatcher default which has no repo_root.
+    dispatcher.register(
+        NodeType.RECONCILE, ReconcileHandler(repo_root=repo_root).handle
+    )
     return dispatcher
 
 
