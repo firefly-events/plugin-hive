@@ -422,6 +422,17 @@ class MulticaAgentSpawn:
                 return None
             return result.stdout.strip() if result.returncode == 0 else None
 
+        # Guard: only diff when repo_dir IS the git worktree root. When Multica
+        # gives a node no checkout, ``_find_repo_checkout`` returns the dir that
+        # merely *holds* ``.pHive/epics`` (no ``.git`` of its own). If that dir
+        # happens to nest inside an unrelated parent repo (a consumer's repo, or
+        # a pytest basetemp under this repo), ``git -C`` walks UP to the parent
+        # and we would harvest the PARENT's committed epics as this run's output.
+        # Return None so the caller falls back to the git-less worktree scan.
+        toplevel = _git("rev-parse", "--show-toplevel")
+        if toplevel is None or Path(toplevel).resolve() != repo_dir.resolve():
+            return None
+
         base = None
         for ref in ("origin/HEAD", "origin/main", "main", "origin/master", "master"):
             if _git("rev-parse", "--verify", "--quiet", ref) is not None:
