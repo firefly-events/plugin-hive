@@ -138,7 +138,7 @@ files_to_modify:
     change: "Add: story-boundary hook with lifecycle check; handoff writer block; spawn call update for handoff_summary_path"
 
 design_decisions:
-  - decision: execution.teammate_lifecycle: respawn_per_task is the NEW default
+  - decision: "execution.teammate_lifecycle: respawn_per_task is the NEW default"
     rationale: Approved at structured-outline sign-off; token savings is intended default for all execution
   - decision: Handoff writer gathers from state/insights/ and state/episodes/ (not agent memory directly)
     rationale: These state paths are the canonical artifact store; handoff must reference files, not ephemeral context

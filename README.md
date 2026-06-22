@@ -137,7 +137,7 @@ Then opt in through `hive.config.yaml` or `HIVE_EXECUTION_MODE` when you want `/
 
 Hive stands on the shoulders of the agentic-engineering community. We borrow patterns and posture from camps that came before us:
 
-- **[IndyDevDan](https://www.youtube.com/@indydevdan)** — agentic engineering as a *practice*; videos, principles, taste
+- **[IndyDevDan](https://www.youtube.com/@indydevdan)** — agentic engineering as a _practice_; videos, principles, taste
 - **[QRSPI](https://github.com/matanshavit/qrspi)** — 8-phase Claude Code workflow (Question · Research · Structure · Plan · Implement); builder workflows and real-world patterns
 - **[BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)** — structured multi-agent methodology and role taxonomy
 - **[archon](https://github.com/coleam00/archon)** — orchestration runtime and agent-execution patterns

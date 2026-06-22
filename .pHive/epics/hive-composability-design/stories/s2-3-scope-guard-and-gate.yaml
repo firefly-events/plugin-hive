@@ -133,7 +133,7 @@ cross_cutting:
 risks:
   - severity: medium
     description: SCOPE_CLASS parsing — the guard reads a structured hint from prose output; LLM output may not always emit it in exact format
-    mitigation: Guard reads for 'SCOPE_CLASS: single-epic|multi-epic|prd' pattern; case-insensitive; fails open on any parse failure
+    mitigation: "Guard reads for 'SCOPE_CLASS: single-epic|multi-epic|prd' pattern; case-insensitive; fails open on any parse failure"
 
 references:
   - path: state/epics/hive-composability-design/docs/structured-outline.md
