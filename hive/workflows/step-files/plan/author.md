@@ -90,6 +90,29 @@ task-tracking dispatch module. Write `tracker_id` back into story YAMLs. If
   e.g. `.pHive/epics/my-feature`
 - `commit_sha`: git SHA of the commit (empty string under local binding)
 
+## DAG executor outputs (required under the Multica binding)
+
+You commit the epic to `feat/{epic_id}` and push it — that branch, NOT your
+working checkout, is where the epic lives. The DAG executor cannot guess which
+branch you used, so it cannot reconcile your work into the project tree unless
+you REPORT it. Before finishing, WRITE these to `.pHive/dag-outputs/outputs.yaml`
+(create the directory) in your working copy, as a flat `key: value` YAML map:
+
+```yaml
+epic_dir: .pHive/epics/{epic_id}
+commit_sha: <the full SHA of your [plan-graph] commit>
+branch: feat/{epic_id}
+```
+
+- `branch` MUST be the exact branch you committed + pushed the epic to
+  (`feat/{epic_id}`, or the resolved `git_flow.base_branch`). The executor's
+  reconcile step fetches THIS branch at `commit_sha` and fast-forward-merges it
+  into the project tree the validation gate checks. An empty/wrong `branch` is
+  the single most common reason a completed plan run fails downstream with
+  "epic.yaml not found".
+- Push the branch to `origin` so reconcile can fetch it (you already do this in
+  step 6). This file is gitignored execution scratch — do not commit it.
+
 ## Constraints
 
 - Do NOT present anything to the user or wait for sign-off. User gates are
