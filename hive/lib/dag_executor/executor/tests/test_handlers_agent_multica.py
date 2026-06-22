@@ -447,3 +447,28 @@ def test_harvest_node_outputs_reads_declared_outputs(tmp_path):
     assert got["needs_backend"] is False
     assert got["preflight_status"] == "READY"
     assert MulticaAgentSpawn._harvest_node_outputs(None) == {}
+
+
+def test_branch_contract_targets_epic_branch(tmp_path):
+    """#15: on a non-default (epic) branch, the binding injects a checkout
+    directive so the agent bases its commit on that branch (not the daemon's
+    main-based auto-branch). Empty on the default branch."""
+    import subprocess as sp
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    def git(*a): sp.run(["git","-C",str(repo),*a], check=True, capture_output=True)
+    git("init","-q"); git("config","user.email","t@t"); git("config","user.name","t")
+    git("branch","-m","main")
+    (repo/"f").write_text("x"); git("add","-A"); git("commit","-q","-m","c")
+    git("remote","add","origin",str(repo))  # so origin/main resolves as default
+    git("fetch","-q","origin")
+
+    spawn_default = MulticaAgentSpawn(cli_path=tmp_path/"cli.mjs", repo_root=repo)
+    assert spawn_default._branch_contract() == "", "default branch -> no directive"
+
+    git("checkout","-q","-b","feat/my-epic")
+    spawn_epic = MulticaAgentSpawn(cli_path=tmp_path/"cli.mjs", repo_root=repo)
+    contract = spawn_epic._branch_contract()
+    assert "feat/my-epic" in contract
+    assert "git checkout" in contract
+    assert "auto-created" in contract  # warns against the agent/<persona>/<task> branch

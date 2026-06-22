@@ -562,6 +562,59 @@ class MulticaAgentSpawn:
             / "tracker.json"
         )
 
+    def _branch_contract(self) -> str:
+        """Brief preamble telling the agent to base its work on the executor's
+        target branch (#15), when ``repo_root`` is on a non-default (epic)
+        branch. Empty on the default branch (e.g. plan, which creates its own
+        epic branch) — preserving that flow. Best-effort: returns "" if git
+        can't resolve the branch.
+        """
+        if self._repo_root is None or not (self._repo_root / ".git").exists():
+            # No git checkout (e.g. unit tests with a plain tmp repo_root) — skip
+            # entirely so we don't issue subprocess calls a test's mock expects
+            # to be cli.mjs invocations.
+            return ""
+
+        def _git(*args: str) -> str | None:
+            try:
+                result = subprocess.run(
+                    ["git", "-C", str(self._repo_root), *args],
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+            except (OSError, subprocess.SubprocessError):
+                return None
+            return result.stdout.strip() if result.returncode == 0 else None
+
+        branch = _git("rev-parse", "--abbrev-ref", "HEAD")
+        if not branch or branch == "HEAD":
+            return ""
+        default = None
+        head = _git("rev-parse", "--abbrev-ref", "origin/HEAD")
+        if head and "/" in head:
+            default = head.split("/", 1)[1]
+        if default is None:
+            for cand in ("main", "master", "develop"):
+                if _git("rev-parse", "--verify", "--quiet", f"origin/{cand}") is not None:
+                    default = cand
+                    break
+        if branch == default:
+            return ""  # default branch — no epic-branch directive
+        return (
+            "## Repo branch contract — FIRST ACTION (overrides the daemon's auto-checkout)\n\n"
+            f"The DAG executor reconciles your commit FROM the `{branch}` branch (the epic "
+            "branch). The Multica daemon auto-checks-out the repo's default branch; you must "
+            f"move to `{branch}` before doing any work:\n\n"
+            "```bash\n"
+            f"git fetch origin {branch}\n"
+            f"git checkout {branch} 2>/dev/null || git checkout -b {branch} origin/{branch}\n"
+            "```\n\n"
+            f"Do ALL work and commits on `{branch}`. Do NOT commit on the daemon's "
+            "auto-created `agent/<persona>/<task>` branch — commits there will not reconcile "
+            "into the run."
+        )
+
     def _resolve_tracker_id(
         self,
         run_id: str,
@@ -596,6 +649,18 @@ class MulticaAgentSpawn:
         # Mirror LocalAgentSpawn.build_prompt: inputs as a JSON block + the
         # verbatim step_file. (Dedup is on the title, so a richer body is safe.)
         body_parts: list[str] = []
+        # #15: when repo_root is on a non-default (epic) branch, the executor
+        # reconciles the agent's commit FROM that branch. The Multica daemon
+        # auto-checks-out the repo's DEFAULT branch (main) and creates an
+        # agent/<persona>/<task> branch off it, so the agent's commit diverges
+        # from the epic branch and reconcile (ff-only) fails. Inject a branch
+        # contract telling the agent to base its work on the target branch
+        # (mirrors the proven multica-story-dispatch Integration Contract). On
+        # the default branch (e.g. plan, which CREATES its own epic branch) this
+        # is empty, preserving that flow.
+        contract = self._branch_contract()
+        if contract:
+            body_parts.append(contract)
         if inputs:
             body_parts.append(
                 "## Inputs\n```json\n" + json.dumps(inputs, indent=2) + "\n```"
