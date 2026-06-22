@@ -148,3 +148,84 @@ items:
     closed_at: null
     state_history:
       - { state: inbox, at: 2026-06-20T05:45:00Z }
+  - id: t-005
+    state: prioritized
+    kind: feature
+    title: "Add a bounded converge-loop primitive to the DAG graph model (review↔fix until gate-clean)"
+    description: |
+      The graph model (hive/lib/dag_executor/graph/model.py) locks out cycles
+      entirely (model.py:34 — no LOOP primitive). The dag-flows-multica epic added
+      only the DEGENERATE loop case: `Node.retry.max_attempts` (s10/C2), which
+      re-runs the SAME node a fixed N times with the SAME inputs.
+
+      That cannot express a finalize-to-clean process: review → fix → re-review,
+      repeating an UNKNOWN number of rounds until a gate predicate passes, with the
+      review's FINDINGS flowing into the fix node each round. The process is fixed
+      (always review→fix), only the data (findings) and iteration count are
+      data-dependent. That is a runbook with a guarded cycle — it belongs in the
+      DAG, not a squad (a squad is for emergent, can't-pre-draw processes).
+
+      Build: a bounded-loop / fixpoint construct in the graph model + walker —
+      a back-edge `producer → (gate: clean? exit : corrector → producer)` with:
+      - a gate/exit predicate evaluated each iteration (reuse the s3/C3
+        validate_output gate semantics),
+      - a `max_iterations` safety cap (hard stop, fail-loud like Node.retry
+        exhaustion — no infinite loops),
+      - findings/outputs from the gate+corrector flowing back into the producer's
+        inputs on the next iteration.
+      Generalizes Node.retry (same-node/fixed-N) to multi-node/data-dependent-exit.
+      Must NOT reintroduce unbounded cycles into the topological walk — the cap +
+      the typed loop construct keep termination provable.
+
+      Source: dag-flows-multica PR #310 review-convergence was driven BY HAND this
+      session (orchestrator looped Codex-review->fix->re-review) precisely because
+      the DAG cannot express it yet. See project_dag_flows_multica_shipped memory.
+    reporter: system
+    reported_at: 2026-06-21T22:30:00Z
+    priority: p2
+    severity: low
+    assignee: null
+    linked_epic: null
+    linked_story: null
+    closed_reason: null
+    closed_at: null
+    state_history:
+      - { state: inbox, at: 2026-06-21T22:30:00Z }
+      - { state: clarified, at: 2026-06-21T22:30:00Z }
+      - { state: prioritized, at: 2026-06-21T22:30:00Z }
+  - id: t-006
+    state: prioritized
+    kind: feature
+    title: "Rebuild review.workflow.yaml as a converge-loop (review<->fix until gate-clean) on the t-005 primitive"
+    description: |
+      Once the bounded converge-loop primitive (t-005) exists, make the review flow
+      USE it. Today hive/workflows/review.workflow.yaml is a single linear pass
+      (reviewer -> reconcile -> gate) with only bounded Node.retry on the reviewer
+      node — it reviews once, it does not drive fixes to closure.
+
+      Target shape: `review -> (gate: clean? done : fix -> review)` bounded by
+      max_iterations, where the reviewer's findings feed the fix node and the gate
+      is the s3 schema/criteria validation. This makes the substrate FINALIZE its
+      own work — the loop this session ran by hand becomes a declarative graph.
+
+      Depends on t-005 (the primitive). Likely also wants the Multica Codex
+      `reviewer` agent as the review node (cross-LLM verification — creators run
+      claude, reviewer must be a different model; see feedback_codex_general_backend
+      memory). Scope check at planning: does the same converge-loop also belong in
+      /test (test->fix->retest) and the execute methodology graphs' gate-fail path?
+
+      Source: project_dag_flows_multica_shipped — the finalize-to-clean process is
+      the identified next step after the substrate ships.
+    reporter: system
+    reported_at: 2026-06-21T22:30:00Z
+    priority: p2
+    severity: low
+    assignee: null
+    linked_epic: null
+    linked_story: t-005
+    closed_reason: null
+    closed_at: null
+    state_history:
+      - { state: inbox, at: 2026-06-21T22:30:00Z }
+      - { state: clarified, at: 2026-06-21T22:30:00Z }
+      - { state: prioritized, at: 2026-06-21T22:30:00Z }

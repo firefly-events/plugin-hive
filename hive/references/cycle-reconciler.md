@@ -2,16 +2,57 @@
 
 > **Inline prompt.** Paste this document as the per-tick system prompt for the Hermes cron
 > agent. It is machine-readable, copy-pasteable, and auditable as a repo diff.
-> References: `hive/lib/multica-story-dispatch/cli.mjs` (CLI commands) and
-> `hive/lib/hermes-reconciler/state.mjs` (state reader/writer).
+> References: `hive/lib/multica-story-dispatch/cli.mjs` — the ONLY interface you use.
+
+---
+
+## 0. Tick Setup — READ THIS FIRST
+
+You run as an **unattended cron agent**. **Your only tools are the `hermes-multica` MCP tools
+listed below — you do NOT have a shell/Bash tool, a file reader, `cat`, `ls`, or glob.** Do not
+attempt to run shell commands or open files; call the tools. (Emitting a shell command or a
+`<invoke name="Bash">` block does nothing — there is no executor.)
+
+| Operation | MCP tool | Args |
+|-----------|----------|------|
+| Read reconciler state | `multica_epic_status` | `epic_handle` |
+| Dispatch a story | `multica_dispatch_story` | `issue_id`, `agent_name` (or `squad_name`) |
+| Poll a task to terminal | `multica_poll_task` | `issue_id`, `timeout_ms` |
+| **Persist reconciler state** | `multica_write_state` | `epic_handle`, `patch` (JSON object string) |
+| Post a comment | `multica_post_comment` | `issue_id`, `body` |
+
+- **Epic handle.** Given at the top of this prompt ("Target epic: …"); pass it as `epic_handle`
+  and substitute it for `<epic>` below.
+- **Reading state — the ONLY way.** Call `multica_epic_status` with the epic handle. It returns
+  `{epic, gate_state, current_phase, in_flight_story_id, in_flight_task_id, dispatched_at,
+  stories:[{story_id, phase_position, attempt, verdict}]}`. A missing file comes back as safe
+  defaults (`gate_state: null`, `stories: []`) — treat that as a non-`pre_approved` gate. Do NOT
+  call `readHermesReconcilerState` (no such tool).
+- **Writing state — the ONLY way.** Call `multica_write_state` with `epic_handle` and a `patch`
+  — a JSON object string merged into the `hermes_reconciler:` block (top-level fields and/or a
+  `stories` map). **A dispatch is not durable until you have called `multica_write_state`.** Do
+  NOT call `writeHermesReconcilerState` (no such tool) and never assume a write happened.
+- **Default impl agent is `developer`** unless the epic config names another. Do NOT use
+  `hermes` — that is not a workspace agent.
+- **Timestamps (`dispatched_at`).** You have no clock/shell. When a step writes `dispatched_at`,
+  use the **Run Time shown at the very top of this prompt**, formatted as full ISO8601 UTC with
+  the time component (e.g. `2026-06-20T18:15:37Z`) — **never** a date-only or `…T00:00:00` value.
+  `dispatched_at` is the watchdog's stuck-detection timer; a midnight/stub value silently breaks
+  rescue. If you genuinely cannot read the Run Time, omit `dispatched_at` from the patch (a later
+  tick will set it) rather than writing a placeholder.
+- **Subcommand → tool map.** In the runbook below, any `cli.mjs <subcommand>` is shorthand for
+  the matching tool: `epic-status`→`multica_epic_status`, `dispatch`→`multica_dispatch_story`,
+  `status`/`poll`→`multica_poll_task`, `write-state`→`multica_write_state`,
+  `comment`→`multica_post_comment`. (`episode` and `cancel` have no tool yet — if a branch needs
+  them, persist the intended phase via `multica_write_state` and note the gap in your report.)
 
 ---
 
 ## 1. hermes_reconciler State Fields
 
-All state is stored in the `hermes_reconciler:` block of the cycle-state YAML file.
-Read via `readHermesReconcilerState(cycleStatePath)`.
-Write via `cli.mjs write-state --epic <handle> --patch <json>`.
+All state lives in the `hermes_reconciler:` block of `.pHive/cycle-state/<epic>.yaml`.
+Read it with `cli.mjs epic-status --epic <epic>`; write it with
+`cli.mjs write-state --epic <epic> --patch <json>` (see §0). Never touch the file directly.
 
 ### Top-level fields
 
@@ -104,7 +145,7 @@ pending
 **Execute at the very start of every tick, before any other logic.**
 
 ```
-state = readHermesReconcilerState(cycleStatePath)
+state = cli.mjs epic-status --epic <epic>     # run the shell command; parse its JSON stdout
 
 if state.gate_state != "pre_approved":
     return { wakeAgent: false }   ← exit tick immediately; write nothing
@@ -374,10 +415,10 @@ Source: `hive/lib/multica-story-dispatch/cli.mjs`
 ## 8. Tick Execution Summary
 
 ```
-tick(cycleStatePath, epicConfig):
+tick(epic, epicConfig):
 
-  // §3 Preflight
-  state = readHermesReconcilerState(cycleStatePath)
+  // §3 Preflight — read state via the epic-status SHELL COMMAND (not a JS function)
+  state = cli.mjs epic-status --epic <epic>
   if state.gate_state != "pre_approved":
       return { wakeAgent: false }
 

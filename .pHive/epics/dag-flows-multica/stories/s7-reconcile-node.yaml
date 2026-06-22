@@ -1,0 +1,71 @@
+id: s7-reconcile-node
+epic: dag-flows-multica
+title: Reconcile SCRIPT node (fetch + ff-merge agent commits before the gate)
+status: blocked
+complexity: medium
+methodology: classic
+depends_on: [s5-multica-bridge, s6-multica-spawn]
+
+description: |
+  Add a reusable reconcile SCRIPT node that materialises a Multica agent's committed
+  work into the working tree BEFORE the validation gate runs. Architect finding: the
+  straw-man hid reconcile inside the binding; it must be its own node so graphs
+  explicitly sequence agent → reconcile → gate, and the gate provably validates real
+  files (not an empty tree — R5).
+
+  The node calls the s5 `cli.mjs reconcile` helper with the `code_push_sha` + agent
+  branch captured by s6's binding (passed via node inputs/outputs). For the LOCAL
+  binding the node is a no-op (work is already in the tree). Graphs reference this node
+  type between any Multica agent node and its downstream gate.
+
+acceptance_criteria:
+  - "Given a graph node of the reconcile type with inputs {branch, sha}, when run, then it invokes cli.mjs reconcile and ff-merges the agent commit into the working tree; the subsequent gate sees the committed files."
+  - "Given the local binding (no Multica commit), when the reconcile node runs, then it is a clean no-op."
+  - "Given a non-ff or missing sha, when reconcile runs, then the node fails loud (the gate must not run against a stale/empty tree)."
+  - "Given the dispatcher, when a reconcile node is encountered, then it dispatches to a registered handler (ScriptHandler or a dedicated reconcile handler) without changes to AgentHandler/GateHandler."
+
+steps:
+  - id: research
+    description: Read ScriptHandler + dispatcher registration + how node inputs/outputs flow, to decide reconcile-as-script vs dedicated handler.
+    agent: researcher
+  - id: implement
+    description: Implement the reconcile node (script invoking s5 reconcile) + local no-op path; register/dispatch.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Tests — ff-merge materialises files; local no-op; non-ff fails; gate-after-reconcile sees files.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm node is explicit in the graph (not hidden), fails loud, no handler regressions.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/dag_executor/executor/handlers/script.py
+      purpose: ScriptHandler — candidate host for the reconcile node.
+    - path: hive/lib/dag_executor/executor/dispatcher.py
+      purpose: Handler registration/dispatch by NodeType.
+    - path: hive/lib/multica-story-dispatch/cli.mjs
+      purpose: reconcile subcommand (from s5) invoked by the node.
+
+risks:
+  - severity: high
+    description: Gate validates an empty/stale tree if reconcile is skipped or silent.
+    mitigation: Reconcile is an explicit graph node before the gate; fails loud on non-ff/missing sha.
+
+references:
+  - path: .pHive/epics/dag-flows-multica/docs/architect-review.md
+    relevant_excerpt: |
+      Reconcile should be its own SCRIPT node, not hidden in the binding, so the
+      validation gate provably runs post-harvest.
+
+tracker_id: PLU-388
+tracker_uuid: c4468fc1-377e-4480-832a-59e2526cee6b
+parent_tracker_id: PLU-381

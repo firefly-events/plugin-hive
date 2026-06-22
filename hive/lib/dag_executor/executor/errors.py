@@ -32,6 +32,10 @@ class ScriptHandlerError(HandlerError):
     """Script handler subprocess failed or exceeded its timeout."""
 
 
+class ReconcileHandlerError(HandlerError):
+    """Reconcile handler failed: non-ff merge, missing sha, or cli.mjs error."""
+
+
 class GateFailedError(HandlerError):
     """A gate node's predicate did not hold."""
 

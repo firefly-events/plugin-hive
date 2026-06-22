@@ -1,0 +1,67 @@
+id: s15-docs
+epic: dag-flows-multica
+title: Document the DAG-on-Multica substrate (README + operations-guide)
+status: blocked
+complexity: low
+methodology: classic
+depends_on: [s14-backend-episodes]
+parallel_allowed: true
+parallel_rationale: read-only
+
+description: |
+  Document the new substrate so it is operable. README + operations-guide: what
+  DAG-on-Multica is (DAG owns flow/gates; Multica = agent execution behind AgentSpawn),
+  how to enable it per flow (mode knobs / env), the repo-bind + Codex-headless
+  operational prereqs (R1), the graph/step_file authoring model, and how to add a new
+  flow. Split out of s14 so docs do not block ship (TPM). Routed to technical-writer
+  (feedback_doc_skills_route_through_writer / feedback_hive_has_no_ui).
+
+acceptance_criteria:
+  - "Given the README, when read, then a DAG-on-Multica section explains the substrate + how to enable each flow + the operational prereqs (repo-bind, Codex-headless)."
+  - "Given the operations-guide, when read, then it documents authoring a flow graph (workflow.yaml + step_files + reconcile + gate) and adding a new flow."
+  - "Given a new maintainer, when following the docs, then they can enable a flow on Multica without reading the source."
+
+steps:
+  - id: research
+    description: Gather the shipped substrate behavior (bindings, front door, gate, reconcile, mode knobs) from s1-s14.
+    agent: researcher
+  - id: implement
+    description: Write README + operations-guide sections (technical-writer).
+    agent: technical-writer
+    depends_on: [research]
+  - id: review
+    description: Verify accuracy against shipped behavior + completeness.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: README.md
+      purpose: Add DAG-on-Multica substrate section + enablement.
+    - path: docs/operations-guide.md
+      purpose: Authoring-a-flow + add-a-new-flow guide.
+
+files_to_modify:
+  - file: README.md
+    change: DAG-on-Multica substrate + per-flow enablement + prereqs.
+  - file: docs/operations-guide.md
+    change: Flow-graph authoring + add-a-flow guide.
+
+risks:
+  - severity: low
+    description: Docs drift from shipped behavior.
+    mitigation: Written last (after s14), verified against shipped code.
+
+references:
+  - path: .pHive/epics/dag-flows-multica/docs/design-discussion.md
+    relevant_excerpt: |
+      DAG owns flow/gates/routing/schema-validation/resume; Multica = contained agent execution.
+
+tracker_id: PLU-396
+tracker_uuid: 227f8ad5-b02f-4ebb-ad17-b027664f4275
+parent_tracker_id: PLU-381

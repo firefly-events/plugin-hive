@@ -127,6 +127,8 @@ def test_reserved_event_types_are_authoritative():
         "pause_resumed",
         "pause_rejected",
         "pause_timeout",
+        # C2: bounded retry re-dispatch
+        "node_retry",
     }
     assert RESERVED_EVENT_TYPES == expected
 

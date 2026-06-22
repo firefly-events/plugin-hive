@@ -1,0 +1,112 @@
+id: s3-1-model-tiering-contract
+epic: hive-composability-design
+title: Model tiering contract reference doc
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  Create hive/references/model-tiering-contract.md — the authoritative reference defining
+  quality/balanced/budget profile definitions, per-tier persona assignments, resolution
+  chain, and Explorer/research Haiku-refusal rule with rationale.
+
+  Pure docs story. No code changes. S3.2 populates hive.config.yaml with the profiles
+  defined here; S3.3 adds the refusal check to agent-spawn; this doc is the source of
+  truth for both.
+
+acceptance_criteria:
+  - "Given the file, when read, then it defines three profiles: quality, balanced, budget"
+  - "Given the resolution chain, then it is: frontmatter model: → model_overrides[profile][persona] → tier default"
+  - "Given the Explorer/Haiku refusal rule, then it states: if resolved model is Haiku AND persona is explorer/researcher-type, error and stop (not a documentation suggestion — an enforced rule)"
+  - "Given the budget profile exception, then it documents: researcher, architect, tpm, explorer always stay at sonnet minimum regardless of budget profile"
+  - "Given hive.config.yaml model_tiers, then this doc is consistent with the tier assignments already defined there"
+
+steps:
+  - id: research
+    description: |
+      Read hive/hive.config.yaml lines 45-100 — model_tiers section.
+      Understand the current opus/sonnet/haiku tier assignments per persona.
+      These become the basis for the quality/balanced/budget profile definitions.
+      Note which personas are currently in which tier.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Create hive/references/model-tiering-contract.md with these sections:
+
+      ## 1. Profile Definitions
+      quality:    All personas use their tier-default model. No overrides.
+      balanced:   Balanced cost/quality. Some personas may use one tier lower.
+                  (Define specifics based on current model_tiers assignments.)
+      budget:     Cost-optimized. Personas use lowest viable model.
+                  Exception: researcher, architect, tpm, explorer stay at sonnet minimum.
+
+      ## 2. Per-Tier Persona Assignments
+      Table: persona → quality model → balanced model → budget model
+      Base this on hive.config.yaml model_tiers entries.
+
+      ## 3. Resolution Chain
+      1. Check agent frontmatter for model: field. If present, use it. (Highest priority.)
+      2. Check hive.config.yaml model_overrides[current_profile][persona_name]. If present, use it.
+      3. Fall back to hive.config.yaml model_tiers tier default for this persona.
+
+      ## 4. Explorer/Research Haiku Refusal
+      Rule: if the resolved model is any Haiku variant AND the persona type is
+      explorer, researcher, or any persona whose role requires broad context gathering,
+      refuse with error: "Model resolution for {persona} resolved to Haiku. Explorer and
+      research personas require minimum Sonnet for context-gathering quality. Update
+      model_overrides or frontmatter to assign Sonnet or higher."
+
+      Rationale: broad context requirement — these personas read large codebases; Haiku
+      context window and reasoning quality are inadequate for reliable exploration.
+      This rule is enforced by agent-spawn (S3.3), not just documented.
+
+      ## 5. Config Key Reference
+      Documents: model_profile top-level key, model_overrides structure per profile.
+    agent: developer
+    depends_on: [research]
+
+  - id: review
+    description: |
+      Review:
+      - Profile definitions are internally consistent with hive.config.yaml model_tiers
+      - Resolution chain is unambiguous (agent following it should produce the same result every time)
+      - Haiku refusal rule names the affected persona types explicitly
+      - Budget exception for researcher/architect/tpm/explorer is clearly stated
+    agent: reviewer
+    depends_on: [implement]
+
+  - id: integrate
+    description: Commit hive/references/model-tiering-contract.md
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/hive.config.yaml
+      purpose: Existing model_tiers assignments (lines 45-100) — base profile definitions on these
+
+files_to_create:
+  - file: hive/references/model-tiering-contract.md
+    change: New reference doc per spec above
+
+design_decisions:
+  - decision: budget profile keeps researcher/architect/tpm/explorer at sonnet minimum
+    rationale: Structured-outline Slice 3 approach — these personas have broad context requirements that Haiku cannot reliably serve
+  - decision: Haiku refusal is enforced (not advisory)
+    rationale: User feedback memory — Haiku usage rules require never using Haiku for Explorer/research agents
+
+cross_cutting:
+  - concern: documentation
+    action: "This story IS the documentation artifact."
+
+references:
+  - path: state/epics/hive-composability-design/docs/structured-outline.md
+    relevant_excerpt: |
+      Slice 3, Change #1: quality/balanced/budget profile definitions. Per-tier persona assignments.
+      Explorer/research Haiku-refusal rule. Resolution chain: frontmatter model: wins.
+  - path: /Users/don/.claude/projects/-Users-don-Documents-plugin-hive/memory/feedback_no_haiku_agents.md
+    relevant_excerpt: |
+      Haiku OK for small tasks; never for Explorer/research agents. (Apply as enforced rule, not advisory.)

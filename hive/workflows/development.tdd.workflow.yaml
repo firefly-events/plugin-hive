@@ -1,6 +1,6 @@
 name: development-tdd
 description: TDD development workflow — tests first, then implement to make them pass.
-version: "1.0.0"
+version: "1.1.0"
 methodology: tdd
 
 # AGENT ROUTING:
@@ -106,6 +106,73 @@ steps:
     optional: false
     timeout_ms: 600000
 
+  # Reconcile node (s7) after implement — materialise the developer's committed
+  # work into the working tree before the gate validates it.
+  # C1: sha/branch/repo from implement step_output (not context) so the Multica
+  # path wires the real commit metadata from MulticaAgentSpawn's return value.
+  - id: reconcile-implement
+    agent: reconciler
+    node_type: reconcile
+    step_file: hive/workflows/step-files/execute/reconcile.md
+    task: >
+      Materialise the implement agent's commit so the gate validates committed code.
+    depends_on:
+      - implement
+    inputs:
+      - name: sha
+        source: step_output
+        step_id: implement
+        output_name: commit_sha
+        optional: true
+      - name: branch
+        source: step_output
+        step_id: implement
+        output_name: branch
+        optional: true
+      - name: repo
+        source: step_output
+        step_id: implement
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: implement
+        output_name: work_dir
+        optional: true
+    outputs:
+      - name: reconcile_status
+        type: string
+    optional: true
+    timeout_ms: 120000
+
+  # Validation gate (s3): confirm implementation exists before review.
+  # Bounded retry: on gate failure the implement node re-runs up to max_attempts
+  # times (single-pass TDD red→green correction; no LOOP primitive).
+  - id: gate-tests
+    agent: validator
+    node_type: gate
+    step_file: hive/workflows/step-files/execute/gate-tests.md
+    gate: "implementation must not be empty"
+    retry:
+      max_attempts: 3
+      on: gate_failed
+      retry_node: implement
+    task: >
+      Validate that the implement step produced an implementation artifact.
+      Gate blocks review from proceeding until committed code exists in the tree.
+    depends_on:
+      - reconcile-implement
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+    outputs:
+      - name: gate_passed
+        type: json
+    optional: false
+    timeout_ms: 60000
+
   - id: review
     agent: reviewer
     step_file: hive/workflows/steps/development-classic/step-06-review.md
@@ -115,7 +182,7 @@ steps:
       Verify tests are meaningful (not trivially passing). Produce a verdict:
       passed, needs_optimization, or needs_revision.
     depends_on:
-      - implement
+      - gate-tests
     inputs:
       - name: implementation
         source: step_output

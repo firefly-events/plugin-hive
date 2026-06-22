@@ -1,0 +1,104 @@
+id: s6-0-memory-autonomy-yaml-refresh
+epic: hive-composability-design
+title: "S6.0 Bookkeeping: refresh memory-autonomy story YAML statuses from git"
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  MANDATORY BOOKKEEPING before any Workstream B (Slices 6-8) story YAML authoring.
+
+  The memory-autonomy-foundation epic story YAMLs have status: pending in their files
+  but multiple stories are already merged in git. This mismatch corrupts the B dep-graph
+  if Slices 6-8 story YAMLs cite depends_on from memory-autonomy without knowing which
+  are actually merged.
+
+  This story refreshes all memory-autonomy story YAML status fields from git log.
+  No code changes. This is a one-PR YAML-status update.
+
+  Known merges from structured-outline (verify each):
+  - S7 session-prompt-spec: MERGED at 204a1b6
+  - S9 story-execution-migration: MERGED at 967a1d4
+  - kg-write-path + kg-read-path: STATUS UNVERIFIED — must verify here
+
+acceptance_criteria:
+  - "Given memory-autonomy-foundation story YAML files, then status fields match actual git merge state"
+  - "Given S7 (session-prompt-spec) YAML, then status: completed (merged at 204a1b6)"
+  - "Given S9 (story-execution-migration) YAML, then status: completed (merged at 967a1d4)"
+  - "Given kg-write-path and kg-read-path YAMLs, then status reflects actual git state (completed if merged, pending if not)"
+  - "Given this story complete, then S6.1 story YAML may cite memory-autonomy depends_on with accurate status knowledge"
+
+steps:
+  - id: research
+    description: |
+      Run:
+        git log --oneline /Users/don/Documents/plugin-hive/state/epics/memory-autonomy-foundation/
+        git log --oneline --all | grep -i "memory-autonomy\|kg-write\|kg-read\|session-prompt\|story-execution"
+      List all memory-autonomy story YAML files:
+        ls /Users/don/Documents/plugin-hive/state/epics/memory-autonomy-foundation/stories/
+      For each story YAML, note current status field.
+      For each commit in git log, identify which story it corresponds to.
+      Produce a mapping: story-id → current YAML status → actual git status.
+    agent: researcher
+
+  - id: implement
+    description: |
+      For each memory-autonomy story YAML where status in file does not match git reality:
+      - If story's changes are present in main branch (merged): update status: completed
+      - If story is in a feature branch but not merged: update status: in_progress or pending (as appropriate)
+      - If story is pending with no git evidence: leave as pending
+
+      Do NOT change anything else in the YAML files — status field only.
+      Do NOT guess: every status change must be supported by a specific commit in git log.
+    agent: developer
+    depends_on: [research]
+
+  - id: review
+    description: |
+      Verify:
+      - Every status change has a git commit citation in the commit message
+      - No story marked completed without a corresponding merge commit
+      - S7 and S9 are confirmed completed (known merged)
+      - kg-write-path and kg-read-path status accurately reflects git (this is the unverified case)
+    agent: reviewer
+    depends_on: [implement]
+
+  - id: integrate
+    description: |
+      Commit with message: "S6.0 bookkeeping: refresh memory-autonomy story YAML statuses from git.
+      Enables Workstream B (Slices 6-8) story YAML authoring with accurate dep-graph."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: state/epics/memory-autonomy-foundation/stories/
+      purpose: All story YAMLs to check and update
+    - path: state/epics/hive-composability-design/docs/structured-outline.md
+      purpose: Part 9 cross-epic table lists known merge statuses to verify against
+
+files_to_modify:
+  - file: state/epics/memory-autonomy-foundation/stories/*.yaml
+    change: status field updates only, for any story where status != actual git state
+
+design_decisions:
+  - decision: This is a mandatory gate — no B story YAML authoring without this complete
+    rationale: Stale YAML statuses in depends_on chains corrupt the dep-graph; S6.0 closes this before it can propagate
+
+cross_cutting:
+  - concern: documentation
+    action: "Story YAML status fields updated to match git reality. No other doc changes."
+
+risks:
+  - severity: medium
+    description: kg-write-path and kg-read-path may be partially merged — commits exist but features incomplete
+    mitigation: Research step checks git log carefully; status = completed only if changes are in main branch
+
+references:
+  - path: state/epics/hive-composability-design/docs/structured-outline.md
+    relevant_excerpt: |
+      Part 9: memory-autonomy S7 MERGED at 204a1b6 (SATISFIED). S9 MERGED at 967a1d4 (SATISFIED).
+      kg-write-path + kg-read-path: STATUS UNVERIFIED — verify before S7.
+      S6.0: mandatory bookkeeping PR before any B story YAML authored.

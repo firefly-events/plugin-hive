@@ -1,0 +1,85 @@
+id: s0b-pull-studio-fork
+epic: dag-flows-multica
+title: Pull the firefly-events/multica platform fork from the Mac Studio + run it as the local runtime
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Pre-execution prep (user-requested 2026-06-21): develop the bridge (s4/s5/s6) against
+  the EXACT Multica code the live runtime uses, not upstream brew. The local machine
+  runs upstream multica-ai 0.3.26 (via s0); the live runtime is the FFE platform fork on
+  the Mac Studio (~/Code/spikes/multica, origin firefly-events/multica.git) which may
+  carry local-only / unpushed commits + FFE-specific changes.
+
+  Pull the fork's exact working tree off the Studio over SSH/rsync (captures local-only
+  state), build it locally, and run that build as the local Multica daemon IN PLACE OF
+  the brew upstream binary — so s4/s5/s6 target the real API. Then re-verify the
+  epic-critical surfaces against the fork build and document any fork-vs-upstream deltas.
+
+  NOTE (user 2026-06-21): the fork already merged upstream latest as recently as ~1h ago,
+  so the fork build is ~0.3.26 (matching the local brew from s0) PLUS the FFE-specific
+  delta. Expect minimal upstream drift; the value here is the FFE delta + any local-only/
+  unpushed commits, not a version gap.
+
+  SSH note (memory reference_studio_multica_runtime_auth): use the studio-multica host;
+  tunnels via bare `ssh -N studio-multica` (config has the forwards); ControlPath=none
+  caveat. Do NOT probe Keychain/credentials (classifier blocks it).
+
+acceptance_criteria:
+  - "Given the Studio is reachable, when the pull runs, then the firefly-events/multica fork working tree (from ~/Code/spikes/multica on the Studio) is rsync'd locally, including any local-only/unpushed commits, into a known path."
+  - "Given the pulled fork, when built locally, then a runnable multica binary is produced and `multica --version` reports the fork's commit (distinct from / reconciled with upstream e1c67543)."
+  - "Given the fork build, when run as the local daemon (brew daemon stopped), then /health is 200 and the PLU workspace + agents are intact."
+  - "Given the fork runtime, when the epic-critical surfaces are re-verified (repo add/checkout, issue create, dispatch/poll), then any fork-vs-upstream contract delta is documented for s4/s5/s6."
+  - "Given a need to revert, when documented, then switching back to the brew upstream daemon is a one-step rollback."
+
+steps:
+  - id: research
+    description: Confirm Studio reachability (studio-multica) + the fork path/build method; identify local-only commits not on firefly-events GitHub; decide local run path + how to swap off the brew binary.
+    agent: researcher
+  - id: implement
+    description: rsync the fork tree from the Studio; build locally; stop brew daemon; run the fork build as the local daemon; document the runtime swap + rollback.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Smoke — fork /health 200, version=fork commit, PLU workspace+agents intact, one dispatch→poll, repo add + issue create round-trip; capture deltas vs upstream.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm exact-code parity with Studio + deltas documented + clean rollback path; no half-swapped runtime.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit any runtime-swap notes / version-pin reconciliation to the feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/epics/dag-flows-multica/docs/s0-upgrade-verify.md
+      purpose: Upstream 0.3.26 verify + native-repo drift; baseline to diff the fork against.
+    - path: hive/lib/multica-story-dispatch/cli.mjs
+      purpose: Bridge contract that must match the fork runtime's API.
+
+risks:
+  - severity: high
+    description: "Studio unreachable / SSH auth issues block the exact-code pull (memory ref: SSH probe lies, Keychain GUI-session caveat)."
+    mitigation: Fall back to firefly-events GitHub clone (loses unpushed commits) — documented; do not probe Keychain.
+  - severity: medium
+    description: Fork build deps differ from brew (Go toolchain / build steps) on this machine.
+    mitigation: research step confirms build method before swapping off brew; brew binary stays as one-step rollback.
+  - severity: medium
+    description: Fork-vs-upstream API drift silently breaks bridge assumptions.
+    mitigation: Re-verify epic-critical surfaces against the fork + document deltas before s4/s5/s6.
+
+references:
+  - path: .pHive/epics/dag-flows-multica/docs/s0-upgrade-verify.md
+    relevant_excerpt: |
+      Local brew runs UPSTREAM multica-ai 0.3.26. Live runtime = FFE fork on the Studio
+      (firefly-events/multica + local-only hermes commits). Pull the fork to develop exact.
+
+tracker_id: PLU-398
+tracker_uuid: 51ecbaa1-eebb-4ecd-b530-5b265caa2a38
+parent_tracker_id: PLU-381

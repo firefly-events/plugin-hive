@@ -1,0 +1,90 @@
+id: b3-ad-creative-persona
+epic: marketing-team
+title: Author the ad-creative persona
+status: in_progress
+tracker_id: plugin-hive/PLU-376
+
+complexity: medium
+methodology: classic
+depends_on: []
+
+parallel_allowed: true
+parallel_rationale: variation
+
+description: |
+  Author hive/agents/ad-creative.md — visual ad concept + creative direction for
+  marketing campaigns. DISTINCT from ui-designer (which owns product UI): ad-creative
+  produces ad/marketing creative concepts and asset direction, not app screens.
+  Consumes the marketing-strategist brief (b1). Consumer-projects only.
+
+  Maintainer decision #3: v1 ad-creative emits creative concepts + image-gen
+  **prompts** (text). Actual rendering is NOT in this persona — it is delegated to
+  the shared visual-asset skill (b7, Frame0 + image-gen). The persona declares b7
+  in its `skills:` frontmatter as its render backend; the prompts it writes are the
+  input b7 consumes.
+
+  MUST be authored against the dual-runtime contract in
+  .pHive/epics/marketing-team/docs/agent-config-grounding.md — full agent config,
+  dispatched to BOTH Claude Code Agent tool and Codex backend (mapping §3, checklist §4).
+
+acceptance_criteria:
+  - "Given the persona file, then frontmatter has all 5 Claude Code fields plus Hive knowledge + domain, mirroring hive/agents/ui-designer.md."
+  - "Given the dual-dispatch contract, then `model` is a tier word and the body works verbatim as a standalone system prompt (== Codex developer_instructions)."
+  - "Given tool restriction, then it is expressed both as a `tools` allowlist and in prose."
+  - "Given the boundary with ui-designer, then the persona explicitly scopes to ad/marketing creative concepts and defers product-UI work to ui-designer (boundary documented in BOTH personas — note added to ui-designer.md is in scope)."
+  - "No behavior-critical instruction lives only in a Hive-only or Claude-Code-only field (grounding §4)."
+
+steps:
+  - id: research
+    description: |
+      Read agent-config-grounding.md + ui-designer.md + the b7 shared visual-asset
+      skill interface. ad-creative v1 emits creative concepts + image-gen prompts
+      (resolved §6 #3); confirm the b7 skill-reference shape for the `skills:`
+      frontmatter. Note the strategist brief format (b1).
+    agent: researcher
+  - id: implement
+    description: |
+      Write hive/agents/ad-creative.md per the grounding contract. Add a one-line
+      boundary note to hive/agents/ui-designer.md pointing product-UI vs ad-creative
+      so the two visual personas don't collide. Define creative-concept output format.
+    agent: developer
+    depends_on: [research]
+  - id: review
+    description: Run grounding §4 reviewer checklist; confirm the ui-designer boundary is documented in both personas and dual-backend safety holds.
+    agent: reviewer
+    depends_on: [implement]
+
+context:
+  codebase: /Users/don/.claude/worktrees/hive-composability-design
+  key_files:
+    - path: .pHive/epics/marketing-team/docs/agent-config-grounding.md
+      purpose: "Authoring contract — full CC + Codex config + dual-dispatch mapping."
+    - path: hive/agents/ui-designer.md
+      purpose: "Structural template, consumer-gating precedent, AND the persona whose boundary must be disambiguated (product UI vs ad creative)."
+
+files_to_modify:
+  - file: hive/agents/ad-creative.md
+    change: "New ad-creative persona."
+  - file: hive/agents/ui-designer.md
+    change: "Add a one-line boundary note (product UI vs ad/marketing creative)."
+
+design_decisions:
+  - decision: ad-creative is marketing creative, NOT product UI
+    rationale: "Avoids overlap with ui-designer; the boundary is documented in both personas so planning selection and reviewers route correctly."
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Persona-authoring substrate; deliverable is the agent definition. Creative quality is a downstream consumer-project outcome, not falsifiable here."
+
+risks:
+  - severity: medium
+    description: "ad-creative and ui-designer both 'visual' → ambiguous selection."
+    mitigation: "Explicit boundary note in both personas; b4 wiring keeps marketing selection orthogonal to UI detection."
+
+references:
+  - path: .pHive/epics/marketing-team/docs/agent-config-grounding.md
+    relevant_excerpt: |
+      model stays a tier word; tool restriction in both allowlist and prose; body
+      self-sufficient as a system prompt for the Codex developer_instructions path.

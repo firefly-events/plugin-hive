@@ -1,0 +1,126 @@
+id: s3-2-hive-config-model-profile
+epic: hive-composability-design
+title: hive.config.yaml model_profile + model_overrides population
+status: blocked
+complexity: low
+methodology: classic
+depends_on: [s3-1-model-tiering-contract]
+
+description: |
+  Populate hive.config.yaml with two new keys:
+  1. model_profile: balanced (top-level default)
+  2. model_overrides: {} at lines 45-68 populated with per-profile mappings per
+     the model-tiering-contract.md definitions from S3.1.
+
+  Budget exceptions (researcher, architect, tpm, explorer: stay at sonnet minimum)
+  must be reflected in the budget profile overrides.
+
+acceptance_criteria:
+  - "Given hive.config.yaml, then it parses as valid YAML after this change"
+  - "Given model_profile: balanced is top-level key, then it is present with value 'balanced'"
+  - "Given model_overrides structure, then it has quality, balanced, and budget sub-keys"
+  - "Given model_overrides.budget, then researcher, architect, tpm, explorer are assigned sonnet (not haiku)"
+  - "Given existing model_tiers content, then it is unchanged by this story"
+
+steps:
+  - id: research
+    description: |
+      Read hive/hive.config.yaml lines 1-100 in full.
+      Note: exact location of model_overrides (currently empty {}) at lines 45-68.
+      Note: exact location of model_tiers section.
+      Note: all persona names in model_tiers (will need them for overrides table).
+      Read hive/references/model-tiering-contract.md (just created in S3.1) for profile definitions.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Edit hive/hive.config.yaml:
+
+      1. Add model_profile: balanced near top-level, after the model_tiers section or in a
+         logical grouping with other model-related keys.
+
+      2. Populate model_overrides with three profile sub-keys:
+         model_overrides:
+           quality:
+             # quality: all personas use their tier default — no overrides needed
+             # (empty or commented section)
+           balanced:
+             # balanced: default — no overrides from tier default
+             # (empty or match current model_tiers assignments)
+           budget:
+             # budget: cost-optimized tier
+             # Exception: these stay at sonnet minimum
+             researcher: claude-sonnet-4-6
+             architect: claude-sonnet-4-6
+             tpm: claude-sonnet-4-6
+             explorer: claude-sonnet-4-6
+             # All other personas: can use haiku (their tier default under budget)
+             # (add haiku mappings for non-exception personas per model-tiering-contract.md)
+
+      Use the exact model IDs from the env section (the model named in the system prompt):
+      Opus: claude-opus-4-7, Sonnet: claude-sonnet-4-6, Haiku: claude-haiku-4-5-20251001
+
+      Do NOT change any existing content — additive edits only.
+    agent: developer
+    depends_on: [research]
+
+  - id: test
+    description: |
+      Verify:
+      1. cat hive/hive.config.yaml | python3 -c "import sys,yaml; yaml.safe_load(sys.stdin); print('valid')"
+         (or any YAML parser available) — confirm valid YAML
+      2. Confirm model_profile: balanced present
+      3. Confirm model_overrides.budget.researcher = sonnet (not haiku)
+      4. Confirm existing model_tiers section unchanged
+    agent: tester
+    depends_on: [implement]
+
+  - id: review
+    description: |
+      Review:
+      - YAML parses without error
+      - Budget exception personas are all assigned sonnet minimum
+      - model_profile default is 'balanced' (not budget — balanced is appropriate default)
+      - Change is additive — no existing keys removed or modified
+    agent: reviewer
+    depends_on: [test]
+
+  - id: integrate
+    description: Commit hive/hive.config.yaml model_profile + model_overrides population
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/hive.config.yaml
+      purpose: Primary file — add model_profile key and populate model_overrides
+    - path: hive/references/model-tiering-contract.md
+      purpose: Source of truth for profile definitions and budget exceptions
+
+files_to_modify:
+  - file: hive/hive.config.yaml
+    change: "Add model_profile: balanced top-level; populate model_overrides with quality/balanced/budget sub-keys"
+
+design_decisions:
+  - decision: Default profile is 'balanced', not 'quality'
+    rationale: Token economy — quality is available as an explicit --profile choice; balanced is the right default
+  - decision: Additive only — existing model_tiers unchanged
+    rationale: model_tiers defines base assignments; model_overrides overrides per-profile; both coexist
+
+cross_cutting:
+  - concern: documentation
+    action: "model-tiering-contract.md (S3.1) documents this structure. hive.config.yaml comments explain each profile."
+
+risks:
+  - severity: low
+    description: YAML parse error from incorrect indentation
+    mitigation: Test step validates YAML parse before review
+
+references:
+  - path: hive/references/model-tiering-contract.md
+  - path: state/epics/hive-composability-design/docs/structured-outline.md
+    relevant_excerpt: |
+      Slice 3, Change #2: hive.config.yaml — add model_profile: balanced top-level key.
+      Populate model_overrides at lines 45-68 with per-profile mappings.
+      Budget exceptions: researcher, architect, tpm, explorer all stay at sonnet minimum.

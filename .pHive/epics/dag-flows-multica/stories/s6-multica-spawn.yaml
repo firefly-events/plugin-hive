@@ -1,0 +1,84 @@
+id: s6-multica-spawn
+epic: dag-flows-multica
+title: MulticaAgentSpawn binding (Python) + Codex-headless smoke
+status: blocked
+complexity: high
+methodology: classic
+depends_on: [s2-run-frontdoor, s5-multica-bridge]
+
+description: |
+  Implement the MulticaAgentSpawn binding satisfying the AgentSpawn Protocol — the
+  swap-in sibling to the local binding (s1). Each call:
+    1. resolve agent uuid by name (resolveAgentUuidByName),
+    2. mint a Multica task carrying step_file_content VERBATIM as the brief
+       (cli.mjs create-issue from s5) — idempotent on (run_id, step_id): reuse a
+       prior tracker_id rather than minting a duplicate on resume,
+    3. dispatch (dispatchStoryToAgent) + moveOutOfBacklogIfNeeded,
+    4. poll to terminal (pollTaskUntilTerminal) — capture code_push_sha + work_dir,
+    5. return the outputs dict (committed files are the real contract; the dict
+       carries refs/sha for the reconcile node + gate).
+  Python→Node: shell cli.mjs subcommands, parse the JSON stdout contract.
+
+  Reconcile is NOT done here — it is a separate SCRIPT node (s7) so the gate provably
+  runs post-harvest. This binding stops at "task terminal + sha captured."
+
+  DE-RISK R1: include a smoke test/run proving a Codex agent completes the trivial
+  2-node graph headless (Claude agents 401 headless on Studio; only Codex runs
+  unattended). Catch a dead Multica runtime on the cheapest graph before any real flow.
+
+acceptance_criteria:
+  - "Given (agent, step_file_content, inputs, run_id, step_id), when called, then it resolves the agent, mints a task with step_file_content as the verbatim brief, dispatches, polls to terminal, and returns a dict including code_push_sha + work_dir."
+  - "Given a resumed run with the same (run_id, step_id), when called again, then it reuses the existing tracker_id and does NOT mint a duplicate Multica issue."
+  - "Given a Codex agent, when the trivial 2-node graph runs through the production front door with this binding selected, then it completes headless and the run passes (R1 smoke)."
+  - "Given a terminal-failed task, when polled, then the binding surfaces the failure (does not return success on a failed/cancelled task — no trust in self-report)."
+
+steps:
+  - id: research
+    description: Confirm resolveAgentUuidByName / dispatchStoryToAgent / pollTaskUntilTerminal signatures + the s5 create-issue JSON shape + how tracker_id is persisted for idempotency.
+    agent: researcher
+  - id: implement
+    description: Implement MulticaAgentSpawn (Python) shelling cli.mjs; idempotency on run_id+step_id; surface terminal-failure.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Unit tests (mock cli.mjs JSON) for call shape, idempotency, failure surfacing; + the Codex-headless smoke run (gated/operational).
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm verbatim brief, no reconcile here, failure not masked, idempotency keyed correctly.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/dag_executor/executor/handlers/agent.py
+      purpose: AgentSpawn Protocol to satisfy (sibling to s1 local binding).
+    - path: hive/lib/multica-story-dispatch/cli.mjs
+      purpose: dispatch/poll/create-issue subcommands shelled by the binding.
+    - path: hive/lib/multica-story-dispatch/episode-sync.mjs
+      purpose: pollTaskUntilTerminal return shape (code_push_sha, work_dir, status).
+
+risks:
+  - severity: high
+    description: R1 — Multica 401s Claude agents headless; binding could hang/fail on a dead runtime.
+    mitigation: Route creators to Codex agents for headless; smoke on 2-node graph first; surface 401 clearly.
+  - severity: high
+    description: Resume mints duplicate issues.
+    mitigation: Idempotency keyed on run_id+step_id, reuse tracker_id (feedback_handrolled_multica_driver_gotchas).
+  - severity: medium
+    description: Returning success on a failed task (the self-report trap).
+    mitigation: Map terminal status; non-passed → raise/propagate.
+
+references:
+  - path: hive/lib/dag_executor/executor/handlers/agent.py
+    relevant_excerpt: |
+      __call__(agent, step_file_content, inputs, run_id, step_id) -> dict. step_file_content VERBATIM.
+
+tracker_id: PLU-387
+tracker_uuid: fbfa5fca-3629-49fe-908b-21e6f7583702
+parent_tracker_id: PLU-381

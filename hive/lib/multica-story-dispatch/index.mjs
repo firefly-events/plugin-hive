@@ -99,6 +99,10 @@ function issueUrl(serverUrl, workspaceId, issueUuid) {
   return `${trimTrailingSlash(serverUrl)}/api/issues/${encodeURIComponent(issueUuid)}?workspace_id=${encodeURIComponent(workspaceId)}`;
 }
 
+function issuesCreateUrl(serverUrl, workspaceId) {
+  return `${trimTrailingSlash(serverUrl)}/api/issues?workspace_id=${encodeURIComponent(workspaceId)}`;
+}
+
 function agentsUrl(serverUrl, workspaceId) {
   return `${trimTrailingSlash(serverUrl)}/api/agents?workspace_id=${encodeURIComponent(workspaceId)}`;
 }
@@ -545,6 +549,72 @@ export function parseSquadActivityFromEntries(entries) {
     reason: details?.reason ?? null,
     created_at: latest?.created_at ?? null,
   };
+}
+
+// List existing issues and return the first whose title exactly matches `titleKey`,
+// or null if none found. Used for server-side idempotency dedup before issue creation.
+async function findIssueByTitle(serverUrl, token, workspaceId, titleKey) {
+  const body = await httpJson(issuesCreateUrl(serverUrl, workspaceId), { token });
+  const issues = normalizeList(body, 'issues');
+  return issues.find((i) => i?.title === titleKey) ?? null;
+}
+
+// POST /api/issues — mint a new issue carrying the provided brief as its description.
+// When `dedupTitle` is provided, lists existing issues first and returns any matching
+// one instead of creating a duplicate (server-side idempotency guard for cross-machine
+// resume). Returns {id, url, ...} from the API response.
+export async function createIssue(serverUrl, token, workspaceId, title, description, { dedupTitle = null } = {}) {
+  if (dedupTitle) {
+    const existing = await findIssueByTitle(serverUrl, token, workspaceId, dedupTitle);
+    if (existing?.id) return existing;
+  }
+  const created = await httpJson(issuesCreateUrl(serverUrl, workspaceId), {
+    method: 'POST',
+    token,
+    body: { title, description },
+  });
+  return created;
+}
+
+// Fetch the agent branch from the remote repo and fast-forward-merge the target sha
+// into the working tree at workDir. Fails with code NON_FF if the merge would not be
+// a fast-forward. repoUrl may be a bare repo path or a remote URL.
+export async function reconcileBranch(repoUrl, branch, sha, workDir) {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const execAsync = promisify(execFile);
+
+  const run = (cmd, args, cwd) =>
+    execAsync(cmd, args, { cwd: cwd ?? workDir }).then((r) => r.stdout.trim());
+
+  // Fetch the branch from the remote so FETCH_HEAD resolves to the tip.
+  await run('git', ['fetch', repoUrl, branch]);
+
+  // Verify the target sha is reachable from FETCH_HEAD (not just present as an object).
+  // `cat-file -e` only proves the object exists locally (could be a stale fetch); it does
+  // NOT prove the sha is an ancestor of the branch tip we just fetched. Using
+  // `merge-base --is-ancestor` catches the case where the sha was downloaded by a prior
+  // fetch of a different branch but is not reachable from the current FETCH_HEAD.
+  try {
+    await run('git', ['merge-base', '--is-ancestor', sha, 'FETCH_HEAD']);
+  } catch {
+    throw dispatchError(
+      'SHA_NOT_FOUND',
+      `sha ${sha} is not reachable from FETCH_HEAD of branch ${branch} from ${repoUrl}`,
+    );
+  }
+
+  // Attempt ff-only merge. If it fails it is a non-ff situation — bail loudly.
+  try {
+    const out = await run('git', ['merge', '--ff-only', sha]);
+    return { merged: true, sha, output: out };
+  } catch (err) {
+    throw dispatchError(
+      'NON_FF',
+      `fast-forward merge of ${sha} into working tree failed (non-ff): ${err?.message ?? String(err)}`,
+      `Run 'git log --oneline HEAD..${sha}' in ${workDir} to inspect the divergence.`,
+    );
+  }
 }
 
 export async function readSquadEvaluation(issueId, options = {}) {

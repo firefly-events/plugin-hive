@@ -1,7 +1,7 @@
 id: chs-1-changelog-entry-format-ref
 epic: changelog-human-summaries
 title: Create changelog-entry-format reference doc (mandatory single source)
-status: in_progress
+status: pending
 complexity: low
 methodology: classic
 depends_on: []

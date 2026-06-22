@@ -11,7 +11,7 @@
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.12.0-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-2.12.1-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
@@ -95,6 +95,12 @@ Each story produces a committed, reviewed state. The orchestrator handles coordi
 - `/hive:visual-qa` — compare implementation against design briefs
 - `/hive:logo-exploration` — generate logo directions and contact sheets
 
+**Marketing** _(consumer projects only — not invoked for Hive's own internal work)_
+- `/hive:marketing-campaign` — changelog-driven launch campaign: marketing-strategist derives a campaign brief from what shipped, marketing-copywriter produces copy, ad-creative produces visual concepts and image-gen prompts
+- **marketing-strategist** — positioning, audience segmentation, go-to-market strategy, and campaign brief authoring
+- **marketing-copywriter** — ad copy, landing page copy, email sequences, social posts, taglines, and CTAs
+- **ad-creative** — visual concept direction, creative briefs, and image-gen prompts for paid and organic channels
+
 **Project intelligence**
 - `/hive:context-snapshot` — JSON snapshot of epics, stories, triage, metrics
 - `/hive:metrics-check` — post-merge metric verdicts
@@ -131,7 +137,7 @@ Then opt in through `hive.config.yaml` or `HIVE_EXECUTION_MODE` when you want `/
 
 Hive stands on the shoulders of the agentic-engineering community. We borrow patterns and posture from camps that came before us:
 
-- **[IndyDevDan](https://www.youtube.com/@indydevdan)** — agentic engineering as a *practice*; videos, principles, taste
+- **[IndyDevDan](https://www.youtube.com/@indydevdan)** — agentic engineering as a _practice_; videos, principles, taste
 - **[QRSPI](https://github.com/matanshavit/qrspi)** — 8-phase Claude Code workflow (Question · Research · Structure · Plan · Implement); builder workflows and real-world patterns
 - **[BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)** — structured multi-agent methodology and role taxonomy
 - **[archon](https://github.com/coleam00/archon)** — orchestration runtime and agent-execution patterns
@@ -139,6 +145,65 @@ Hive stands on the shoulders of the agentic-engineering community. We borrow pat
 - **[Andrej Karpathy](https://karpathy.ai)** — the intellectual current of software 2.0/3.0
 
 We don't compete with them; we synthesize, in a specific shape, on a specific surface (Claude Code), and put it in the open. Where their patterns show up in Hive, the credit travels with the claim.
+
+---
+
+## DAG-on-Multica Execution Substrate
+
+Hive's four core flows (`/plan`, `/execute`, `/test`, `/review`) run on a deterministic DAG executor. When you enable Multica, each agent node in the graph is dispatched as a contained Multica task — the DAG still owns flow control, gate evaluation, routing, schema validation, and resume; Multica provides only the agent-execution layer behind the `AgentSpawn` protocol seam.
+
+### How it works
+
+```
+/hive:execute
+    │
+    ▼
+DAG Executor (deterministic)
+  │  owns: flow / routing / gates / validation / resume
+  │
+  ├── agent node ──→ [AgentSpawn] ──→ Multica issue + agent run
+  │                                        (work happens here)
+  ├── reconcile node ──→ fetches agent's commit into working tree
+  └── gate node ──→ reads committed files — never trusts agent self-report
+```
+
+Every artifact-producing flow ends in a **validation gate** that reads committed files on disk. The gate only sees what was actually committed; an agent that claims success but writes nothing fails the gate.
+
+### Enabling per flow
+
+Set the mode knob in `hive.config.yaml` (or override with an env var):
+
+```yaml
+# Enable Multica for /plan
+planning:
+  mode: multica          # values: multica | local (default)
+
+# Enable Multica for /execute, /test, /review
+execution:
+  mode: multica          # values: multica | local (default)
+```
+
+**Env override** — `HIVE_EXECUTION_MODE` overrides the `execution.mode` knob for a single run:
+
+```bash
+HIVE_EXECUTION_MODE=multica /hive:execute my-epic
+```
+
+Precedence (highest → lowest):
+
+1. Explicit `binding` arg passed to the executor
+2. `HIVE_EXECUTION_MODE` env var
+3. `planning.mode` / `execution.mode` config knob
+4. Default: `local` (shells `claude --print` in-process)
+
+### Operational prerequisites
+
+Before enabling Multica mode:
+
+1. **Multica daemon running** — `multica daemon start` (or the daemon must be running in background).
+2. **Workspace config** — `~/.multica/config.json` must have `server_url`, `token`, and `workspace_id` set (or pass via `MULTICA_SERVER_URL`, `MULTICA_TOKEN`, `MULTICA_WORKSPACE_ID`).
+3. **Repo bind** — run `/hive:multica-init` to bind the project's git repository URL to the workspace. Without this, each Multica task workdir has no repo and agents cannot commit output. Binding is idempotent; run it once per project.
+4. **Codex agents for headless runs (R1)** — Multica Studio's keychain/launchd root means Claude agents 401 when running without a GUI session. Route nodes that must run headless to Codex agents via `agent_backends` in `hive.config.yaml`. See [Operations Guide — DAG-on-Multica](docs/operations-guide.md#dag-on-multica-substrate) for details.
 
 ---
 

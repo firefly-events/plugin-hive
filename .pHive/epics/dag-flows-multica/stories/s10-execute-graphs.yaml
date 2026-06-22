@@ -1,0 +1,82 @@
+id: s10-execute-graphs
+epic: dag-flows-multica
+title: Execute/develop flow graphs (extend development.*.workflow.yaml + reconcile + gate)
+status: blocked
+complexity: high
+methodology: classic
+depends_on: [s3-validation-gate, s6-multica-spawn, s7-reconcile-node]
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Bring the run/develop flow onto the substrate. Graphs already partly exist
+  (development.bdd.workflow.yaml; researcher notes /execute maps to
+  development.*.workflow.yaml) — EXTEND them for classic + tdd methodologies, insert a
+  reconcile node (s7) after each agent node, and point a validation gate (s3) at the
+  committed code/tests. This is the write-heavy generalization proof: same substrate,
+  very different flow from plan.
+
+  LOOP CONSTRAINT (architect): the graph model has no LOOP primitive. TDD
+  red→green→refactor has no multi-node loop home. Per the epic open-question default:
+  single-pass nodes + bounded `Node.retry` for self-correction on gate fail (developer
+  re-runs up to N on a failing test/review gate). True multi-node loops deferred. If
+  the user overrides at sign-off, adjust here.
+
+acceptance_criteria:
+  - "Given development.classic + development.tdd workflow graphs, when loaded, then they validate and express the methodology step order (research→[test-spec]→implement→[test]→review→integrate) with reconcile nodes before gates."
+  - "Given a story run through the tdd graph on Multica, when complete, then committed code+tests pass the validation gate E2E."
+  - "Given a failing gate, when bounded retry is configured, then the producing node re-runs up to N times before the run fails (no infinite loop, no LOOP primitive used)."
+  - "Given bdd, when run, then the existing development.bdd.workflow.yaml is reused/extended consistently (not re-authored)."
+
+steps:
+  - id: research
+    description: Read development.*.workflow.yaml + skills/execute/SKILL.md methodology steps + Node.retry semantics in model.py.
+    agent: researcher
+  - id: implement
+    description: Extend/author classic+tdd graphs + step_files; insert reconcile + gate nodes; configure bounded retry.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Loader/validator tests for each methodology graph + a stubbed run asserting order + retry bound + gate target.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm reconcile-before-gate, bounded retry (no loop), bdd reuse, single-agent nodes.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/workflows/development.bdd.workflow.yaml
+      purpose: Existing methodology graph to extend; pattern for classic/tdd.
+    - path: skills/execute/SKILL.md
+      purpose: Source of execute methodology step order.
+    - path: hive/lib/dag_executor/graph/model.py
+      purpose: "Node.retry (bounded) — model.py:34 locks out LOOP."
+
+files_to_modify:
+  - file: hive/workflows/development.classic.workflow.yaml
+    change: New/extended classic graph with reconcile + gate.
+  - file: hive/workflows/development.tdd.workflow.yaml
+    change: New/extended tdd graph with reconcile + gate + bounded retry.
+  - file: hive/workflows/step-files/execute/
+    change: Verbatim per-node step_files.
+
+risks:
+  - severity: medium
+    description: No LOOP primitive for TDD red/green/refactor.
+    mitigation: Single-pass + bounded retry default (epic open-Q); loops deferred.
+
+references:
+  - path: .pHive/epics/dag-flows-multica/docs/architect-review.md
+    relevant_excerpt: |
+      model.py:34 locks out LOOP; plan/test/review map via when/skip_when/retry; TDD loop needs bounded-retry vs unroll decision.
+
+tracker_id: PLU-391
+tracker_uuid: 9cd8bacc-085f-48b1-abdf-32a1d0f9497e
+parent_tracker_id: PLU-381

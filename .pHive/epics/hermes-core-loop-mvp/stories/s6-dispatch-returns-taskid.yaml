@@ -1,7 +1,9 @@
 id: s6-dispatch-returns-taskid
 epic: hermes-core-loop-mvp
 title: "cli.mjs dispatch returns task_id so the reconciler can record in_flight_task_id"
-status: done
+status: shipped
+shipped_at: "2026-06-20T19:03:12Z"
+release_id: "v2.12.0"
 complexity: small
 methodology: classic
 repo: plugin-hive

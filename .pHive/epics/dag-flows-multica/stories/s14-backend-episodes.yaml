@@ -1,0 +1,67 @@
+id: s14-backend-episodes
+epic: dag-flows-multica
+title: Unify backend selection + episode markers + resume across all flows
+status: blocked
+complexity: medium
+methodology: classic
+depends_on: [s9-plan-wire, s11-execute-wire, s12-test-flow, s13-review-flow]
+
+description: |
+  Generalize the substrate now that all four flows run on it. (1) Unify backend/binding
+  selection so plan/execute/test/review resolve the local-vs-Multica binding the same
+  way (one resolver, driven by the existing mode knobs + env), removing per-flow
+  divergence. (2) Emit episode markers (multica-run.yaml via the bridge episode
+  surface) for every DAG-on-Multica flow so runs are observable + auditable. (3) Prove
+  resume works across every flow (interrupt mid-graph → re-run resumes from run_state).
+
+acceptance_criteria:
+  - "Given any of the four flows, when its backend resolves, then a single shared resolver selects the binding (no per-flow copy of the logic)."
+  - "Given a DAG-on-Multica run of each flow, when nodes complete, then episode markers are written via the bridge episode surface."
+  - "Given an interrupted run of each flow, when re-invoked with the same run_id, then it resumes from run_state without re-running completed nodes."
+
+steps:
+  - id: research
+    description: Audit the four wirings (s9/s11/s12/s13) for duplicated backend-selection + episode logic; read run_state/resume + episode-sync.
+    agent: researcher
+  - id: implement
+    description: Extract a shared backend/binding resolver; wire episode emission per flow; verify resume.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Tests — shared resolver across flows; episode markers written; resume per flow.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm DRY resolver + episode coverage + resume across all four flows.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/dag_executor/run_state/resume.py
+      purpose: Resume primitive proven across flows.
+    - path: hive/lib/multica-story-dispatch/episode-sync.mjs
+      purpose: Episode marker surface.
+
+files_to_modify:
+  - file: hive/lib/dag_executor/
+    change: Shared backend/binding resolver + episode emission hook.
+
+risks:
+  - severity: medium
+    description: Per-flow drift if resolver not centralized.
+    mitigation: Single resolver consumed by all four wirings; tested across flows.
+
+references:
+  - path: .pHive/epics/dag-flows-multica/docs/tpm-sequencing.md
+    relevant_excerpt: |
+      Split overloaded s12: backend-unify+episodes vs docs (docs don't block ship).
+
+tracker_id: PLU-395
+tracker_uuid: f7901aff-aea8-4c69-97a2-32bca698658e
+parent_tracker_id: PLU-381

@@ -65,6 +65,8 @@ RESERVED_EVENT_TYPES = frozenset(
         "pause_resumed",
         "pause_rejected",
         "pause_timeout",
+        # C2: bounded retry re-dispatch (one event per retry attempt)
+        "node_retry",
     }
 )
 

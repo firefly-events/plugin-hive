@@ -9,6 +9,8 @@ import {
   moveOutOfBacklogIfNeeded,
   dispatchStoryToAgent,
   dispatchStoryToSquad,
+  createIssue,
+  reconcileBranch,
 } from './index.mjs';
 
 import { pollTaskUntilTerminal, writeMulticaRunEpisode } from './episode-sync.mjs';
@@ -536,12 +538,50 @@ async function cmdComment(args, cfg) {
   succeed({ comment_id: commentId });
 }
 
+// POST /api/issues — mint a new issue (or return existing one when --dedup-title matches).
+// --title <string>       — required
+// --body <string>        — required; passed verbatim as the issue description (step_file_content)
+// --dedup-title <string> — optional; when set, lists existing issues first and returns any
+//                          whose title exactly matches this key instead of creating a duplicate.
+//                          Primary idempotency guard for DAG-on-Multica cross-machine resume.
+async function cmdCreateIssue(args, cfg) {
+  if (!args.title || args.title === true) fail('MISSING_ARG', '--title is required');
+  if (!args.body || args.body === true) fail('MISSING_ARG', '--body is required');
+
+  const { serverUrl, token, workspaceId } = cfg;
+  const dedupTitle = typeof args['dedup-title'] === 'string' ? String(args['dedup-title']) : null;
+  const created = await createIssue(
+    serverUrl, token, workspaceId,
+    String(args.title), String(args.body),
+    { dedupTitle },
+  );
+
+  const id = created?.id ?? null;
+  const url = created?.url ?? null;
+  succeed({ id, url, ...created });
+}
+
+// Fetch an agent branch from the remote bare repo and ff-merge a specific sha.
+// --repo <url|path>  — remote repo URL or bare repo path (required)
+// --branch <ref>     — agent branch to fetch, e.g. agent/developer/<run> (required)
+// --sha <sha>        — code_push_sha to ff-merge into work_dir (required)
+// --work-dir <path>  — working tree directory (default: cwd)
+async function cmdReconcile(args, _cfg) {
+  if (!args.repo || args.repo === true) fail('MISSING_ARG', '--repo is required');
+  if (!args.branch || args.branch === true) fail('MISSING_ARG', '--branch is required');
+  if (!args.sha || args.sha === true) fail('MISSING_ARG', '--sha is required');
+
+  const workDir = typeof args['work-dir'] === 'string' ? args['work-dir'] : process.cwd();
+  const result = await reconcileBranch(String(args.repo), String(args.branch), String(args.sha), workDir);
+  succeed(result);
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 // Commands that read only local state and need no Multica server credentials.
-const NO_CONFIG = new Set(['epic-status', 'write-state']);
+const NO_CONFIG = new Set(['epic-status', 'write-state', 'reconcile']);
 
-const USAGE = 'cli.mjs <dispatch|status|poll|episode|cancel|epic-status|comment|write-state> [options]';
+const USAGE = 'cli.mjs <dispatch|status|poll|episode|cancel|epic-status|comment|write-state|create-issue|reconcile> [options]';
 
 async function main() {
   const [, , command, ...rest] = process.argv;
@@ -563,11 +603,13 @@ async function main() {
       case 'cancel':      await cmdCancel(args, cfg);     break;
       case 'epic-status':  await cmdEpicStatus(args, cfg); break;
       case 'comment':      await cmdComment(args, cfg);    break;
-      case 'write-state':  await cmdWriteState(args);      break;
+      case 'write-state':   await cmdWriteState(args);         break;
+      case 'create-issue':  await cmdCreateIssue(args, cfg);  break;
+      case 'reconcile':     await cmdReconcile(args, cfg);     break;
       default:
         fail(
           'UNKNOWN_COMMAND',
-          `Unknown command: ${command}. Expected: dispatch|status|poll|episode|cancel|epic-status|comment|write-state`,
+          `Unknown command: ${command}. Expected: dispatch|status|poll|episode|cancel|epic-status|comment|write-state|create-issue|reconcile`,
         );
     }
   } catch (error) {
