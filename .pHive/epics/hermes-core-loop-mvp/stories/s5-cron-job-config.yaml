@@ -1,0 +1,170 @@
+id: s5-cron-job-config
+epic: hermes-core-loop-mvp
+title: "Reconciler cron job + Hermes config (approvals, gate_state preflight)"
+status: blocked
+complexity: small
+methodology: classic
+repo: hermes-agent
+depends_on: [s3-cycle-reconciler-runbook, s4-hermes-multica-plugin]
+
+description: |
+  Register the Hermes reconciler cron job and apply the required config changes
+  to make the core loop operational.
+
+  Three deliverables:
+
+  1. Cron job entry in ~/.hermes/cron/jobs.json:
+       {
+         "id": "hermes-reconciler",
+         "name": "Hermes SDLC Reconciler",
+         "no_agent": false,
+         "prompt": "<inlined cycle-reconciler.md content>",
+         "script": "~/.hermes/scripts/hermes-reconciler-preflight.py",
+         "context_from": [],
+         "schedule": { "kind": "cron", "expr": "* * * * *" },
+         "enabled_toolsets": ["hermes-multica"],
+         "workdir": "/Users/hive/Code/plugin-hive",
+         "deliver": null
+       }
+     - no_agent: false → full agent turn (not a data-collection script)
+     - prompt inlines the full cycle-reconciler.md content (S3 output)
+     - script runs the gate_state preflight before the agent wakes (see below)
+     - enabled_toolsets includes the hermes-multica plugin (S4 output)
+
+  2. gate_state preflight script at ~/.hermes/scripts/hermes-reconciler-preflight.py:
+     Reads the cycle-state.yaml for the target epic, checks
+     hermes_reconciler.gate_state. If not "pre_approved", emits
+     {"wakeAgent": false} to stdout and exits 0. If "pre_approved", emits
+     {} (empty object, allowing the agent to wake).
+     The script accepts --epic <handle> as a CLI argument, or reads
+     HERMES_RECONCILER_EPIC from env.
+
+  3. Config change in ~/.hermes/config.yaml:
+     Set approvals.cron_mode: "approve" (default is "deny", which silently
+     blocks all CLI shell-outs from cron jobs — required for multica_dispatch_story
+     and all other hermes-multica tool calls to run unattended).
+
+acceptance_criteria:
+  - "Given the cron job is registered and hermes_reconciler.gate_state is null in the target epic's cycle-state.yaml, when the scheduler fires the hermes-reconciler job, then the preflight script emits {\"wakeAgent\": false}, the agent does not wake, and no mutation occurs."
+  - "Given hermes_reconciler.gate_state is \"pre_approved\" in cycle-state.yaml, when the scheduler fires the hermes-reconciler job, then the preflight script emits {}, the agent wakes, and the cron prompt (inlined cycle-reconciler.md) is executed."
+  - "Given approvals.cron_mode is \"approve\" in ~/.hermes/config.yaml and the agent calls multica_dispatch_story, then the tool executes without an approval prompt."
+  - "Given approvals.cron_mode is not set (default \"deny\") and the agent calls multica_dispatch_story, then the tool call is blocked by Hermes (standard approval gate)."
+  - "Given the preflight script is called with --epic hermes-core-loop-mvp, when it reads cycle-state.yaml and the file does not exist or lacks hermes_reconciler:, then it emits {\"wakeAgent\": false} (safe default — don't fire on missing state)."
+  - "Given the cron job JSON is opened, then no_agent is false, schedule.kind is \"cron\", enabled_toolsets includes \"hermes-multica\", and prompt contains the full inlined cycle-reconciler.md text."
+  - "Given the cron job fires and the hermes-multica plugin is not registered, then the agent receives a tool-not-found error and exits the tick without partial mutation (no half-written cycle-state)."
+  - "Given scripts must reside in HERMES_HOME/scripts/ (cron/scheduler.py constraint), when the preflight script path is specified in the job JSON, then it resolves to ~/.hermes/scripts/hermes-reconciler-preflight.py."
+
+steps:
+  - id: research
+    description: >
+      Read /Users/hive/.hermes/cron/jobs.json to confirm the current job
+      schema (especially script, context_from, enabled_toolsets, deliver
+      fields). Read cron/scheduler.py lines 919-932 to confirm that scripts
+      must live in HERMES_HOME/scripts/ and that the script output gate
+      ({wakeAgent: false}) is correctly interpreted. Confirm that
+      approvals.cron_mode: "approve" in ~/.hermes/config.yaml is the correct
+      location (not a per-job field).
+    agent: researcher
+  - id: implement
+    description: >
+      (1) Write ~/.hermes/scripts/hermes-reconciler-preflight.py.
+          Args: --epic <handle> or HERMES_RECONCILER_EPIC env var.
+          Reads cycle-state.yaml for the epic, checks gate_state,
+          emits {wakeAgent: false} or {} accordingly.
+      (2) Add the hermes-reconciler job to ~/.hermes/cron/jobs.json.
+          Inline the full cycle-reconciler.md (S3) into the prompt field.
+          Set workdir, enabled_toolsets, schedule.
+      (3) Set approvals.cron_mode: "approve" in ~/.hermes/config.yaml.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: >
+      (1) Run the preflight script directly with gate_state=null: confirm
+          {wakeAgent: false} is emitted.
+      (2) Set gate_state: pre_approved in a test cycle-state.yaml and run
+          the preflight script: confirm {} is emitted.
+      (3) Trigger the cron job manually (or wait for the next tick) with
+          gate_state=null: confirm the agent does not wake.
+      (4) Set gate_state: pre_approved and trigger: confirm the agent wakes
+          and executes at least one tick transition.
+    agent: developer
+    depends_on: [implement]
+  - id: review
+    description: >
+      Verify the preflight script handles missing cycle-state.yaml (safe
+      default: wakeAgent false). Verify approvals.cron_mode is set.
+      Verify the job JSON no_agent is false. Verify the inlined prompt
+      contains the complete cycle-reconciler.md without truncation.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: >
+      Commit the preflight script and job JSON changes to hermes-agent.
+      (Config change at ~/.hermes/config.yaml is a local machine change
+      and does not go in the repo — document in a setup note.)
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/hive/Code/hermes-agent
+  tech_stack:
+    runtime: python3
+    language: Python (preflight script)
+  key_files:
+    - path: /Users/hive/.hermes/cron/jobs.json
+      purpose: Live cron job registry — add hermes-reconciler entry here
+    - path: /Users/hive/Code/hermes-agent/cron/scheduler.py
+      purpose: >
+        Confirms wakeAgent: false gate (lines 1012-1454), HERMES_HOME/scripts/
+        constraint for script paths (lines 919-932), and context_from behavior.
+    - path: /Users/hive/Code/hermes-agent/hermes_cli/config.py
+      purpose: approvals.cron_mode location (lines 2118-2124)
+    - path: hive/references/cycle-reconciler.md
+      purpose: S3 output — full content is inlined into the cron job prompt field
+
+files_to_modify:
+  - file: ~/.hermes/scripts/hermes-reconciler-preflight.py
+    change: NEW — gate_state preflight script
+  - file: ~/.hermes/cron/jobs.json
+    change: Add hermes-reconciler job entry
+  - file: ~/.hermes/config.yaml
+    change: Set approvals.cron_mode to "approve"
+
+design_decisions:
+  - decision: no_agent is false (full agent turn, not data-collection script)
+    rationale: >
+      The reconciler tick must make decisions: which story to dispatch, whether
+      the watchdog fires, whether to finalize. These decisions require the
+      Hermes agent. A data-collection script (no_agent: true) cannot call tools
+      or reason about state — it can only produce static output for the next
+      agent turn. The preflight script handles only the lightweight gate check.
+  - decision: gate_state preflight lives in a script, not inline in the prompt
+    rationale: >
+      The script runs before the agent wakes (the scheduler checks script output
+      before spawning the LLM turn). This means a gate_state=null check costs
+      nothing in tokens — no LLM is invoked. Checking gate_state inside the
+      prompt would still wake the agent, wasting a full LLM turn.
+  - decision: 'approvals.cron_mode: "approve" is a machine-level config, not per-job'
+    rationale: >
+      The Hermes config structure has a single approvals.cron_mode field that
+      applies to all cron jobs. There is no per-job approval mode in the current
+      schema. This is a deliberate choice: set it at the machine level, document
+      that it unlocks all cron tool calls (not just the reconciler).
+
+risks:
+  - severity: medium
+    description: >
+      approvals.cron_mode: "approve" unlocks all cron tool calls, not just the
+      reconciler. Any other cron job on this machine also gets unattended
+      approval. This is a broader security surface than strictly necessary.
+    mitigation: >
+      Document the change explicitly in a setup note. Accept the tradeoff for
+      MVP. A per-job approval mode is a Hermes enhancement request for a
+      follow-on epic.
+  - severity: low
+    description: >
+      The inlined cycle-reconciler.md prompt may exceed Hermes's context
+      window if the runbook grows large.
+    mitigation: >
+      Keep cycle-reconciler.md tightly scoped (S3 AC: machine-readable,
+      auditable). Review step verifies the prompt field is not truncated.

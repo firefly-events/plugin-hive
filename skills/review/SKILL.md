@@ -47,11 +47,50 @@ Capture the response as `{ mode_decision, mode_reason, runner_path, runner_reaso
 
 Branch on `mode_decision`:
 
-- **`multica`** → hand off to `skills/hive/skills/review-mode-multica/SKILL.md` (forward all arguments + `field_sources`) and **stop**. Do not continue to Phase 1 below.
+- **`multica`** → route through the DAG front door (see **Phase 0b** below) and **stop**. Do not continue to Phase 1 below.
 - **`cc-workflows`** → hand off to `skills/hive/skills/review-mode-cc-workflows/SKILL.md` (forward all arguments + `field_sources`) and **stop**. Do not continue to Phase 1 below.
 - **any other value** (`sequential`, `team`, `team-cmux`, `sessions`, `sandcastle`) → continue inline with the steps below. The solo reviewer pattern (Steps 1–6) is the authoritative inline path.
 
-> `review-mode-multica` and `review-mode-cc-workflows` are forward declarations — their skill files ship in later slices. A missing skill file is not an error at dispatch resolution time; the dispatch skill itself is what this story delivers.
+> `review-mode-cc-workflows` is a forward declaration — its skill file ships in a later slice. A missing skill file is not an error at dispatch resolution time.
+
+### Phase 0b — DAG Front Door (Multica)
+
+When `mode_decision == multica`, route the review run through the DAG front door
+instead of the local solo reviewer pipeline. This is the symmetric sibling of the
+s9 (planning-routing), s11 (execute), and s12 (test) DAG front-door paths.
+
+**DAG front-door invocation:**
+
+```python
+from hive.lib.dag_executor.run import run
+
+result = run(
+    "hive/workflows/review.workflow.yaml",
+    binding="multica",
+    context={
+        "diff_target": diff_target,
+        "pr_number": pr_number,
+        "branch": branch,
+        "review_artifact_path": f"{HIVE_STATE_DIR}/review-artifacts/{epic_id}/{story_id}/review.yaml",
+    },
+)
+```
+
+Emit one INFO log line at dispatch:
+
+```
+[info] review routing: graph=hive/workflows/review.workflow.yaml binding=multica reason=dag-multica
+```
+
+Graph completion is an **artifact-readiness signal only** — not a user sign-off. The
+calling orchestrator retains all gate checks and the final verdict presentation.
+
+**Fallback.** If the Multica binding fails:
+
+- Daemon down (ECONNREFUSED, timeout during `binding=multica` init): emit `[warn] review routing: dag-multica daemon down — falling back to local` and route through the local solo reviewer pipeline below.
+- Dispatch error (graph-step error, node timeout): emit `[warn] review routing: dag-multica dispatch failed: {error} — falling back to local` and apply the same local fallback.
+
+**Local fallback (backend unset).** When `mode_decision != multica`, this step is skipped entirely. The existing local solo reviewer pipeline below is unchanged — no regression.
 
 ### Phase 1 — Inline solo reviewer (default path)
 

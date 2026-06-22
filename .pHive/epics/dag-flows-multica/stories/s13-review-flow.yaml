@@ -1,0 +1,76 @@
+id: s13-review-flow
+epic: dag-flows-multica
+title: Review flow graph (new review.workflow.yaml + reconcile + gate + wire)
+status: blocked
+complexity: medium
+methodology: classic
+depends_on: [s3-validation-gate, s6-multica-spawn, s7-reconcile-node]
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  Bring /review onto the substrate. No review.workflow.yaml exists (researcher) —
+  author one: a reviewer producer node → reconcile → validation gate over the committed
+  review artifact, and wire /review to the DAG front door when the backend resolves to
+  DAG/Multica. Minimal-then-deepen.
+
+  LOOP CONSTRAINT (architect): review→revise has no loop primitive. Per the epic
+  open-question default, use bounded `Node.retry` for revise-on-gate-fail; defer a true
+  review↔revise loop. Adjust if the user overrides at sign-off.
+
+acceptance_criteria:
+  - "Given review.workflow.yaml, when loaded, then it validates with reviewer → reconcile → gate over the committed review artifact."
+  - "Given /review with the DAG/Multica backend, when run on a branch/PR/diff, then the review artifact is produced + passes the gate E2E."
+  - "Given a revise need, when bounded retry is configured, then the review node re-runs up to N times (no loop primitive)."
+  - "Given backend unset, when /review runs, then existing local behaviour is preserved."
+
+steps:
+  - id: research
+    description: Read skills/review/SKILL.md flow + review artifact shape; check design-review.workflow.yaml for conventions.
+    agent: researcher
+  - id: implement
+    description: Author review.workflow.yaml + step_files + reconcile + gate; wire /review to the front door; bounded retry.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Loader/validator test + stubbed run asserting artifact gate + retry bound.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm reconcile-before-gate + bounded retry (no loop) + no regression.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: skills/review/SKILL.md
+      purpose: Source of the review flow node sequence + artifact.
+    - path: hive/workflows/design-review.workflow.yaml
+      purpose: Existing review-adjacent graph for conventions.
+
+files_to_modify:
+  - file: hive/workflows/review.workflow.yaml
+    change: New review flow graph.
+  - file: skills/review/SKILL.md
+    change: Route DAG/Multica backend to the front door.
+  - file: hive/workflows/step-files/review/
+    change: Verbatim per-node step_files.
+
+risks:
+  - severity: medium
+    description: review→revise loop unsupported.
+    mitigation: Bounded retry default; loop deferred (epic open-Q).
+
+references:
+  - path: .pHive/epics/dag-flows-multica/docs/research-deepen.md
+    relevant_excerpt: |
+      /review has no dedicated workflow YAML yet.
+
+tracker_id: PLU-394
+tracker_uuid: 0a0a9c7a-f564-4abe-baf8-560e8ffff2f0
+parent_tracker_id: PLU-381

@@ -30,8 +30,9 @@ configuration, or missing agents.
 
 Do not use it for general task-tracking operations.
 
-Do not use it to manage repository allowlists. That step is deferred because
-the current Multica API has no write endpoint for workspace repos.
+Use it to bind the project repository to the workspace (Step 10, `ensureRepos`)
+so each task workdir is a real checkout. The `PUT /api/workspaces {repos}`
+endpoint is available as of Multica 0.3.26.
 
 ## What This Skill Does
 
@@ -55,15 +56,11 @@ Run the bootstrap flow:
 
 9. Reconcile configured autopilots with `reconcileAutopilots`.
 
-Step 10, repo allowlist, is deferred.
-
-The endpoint does not exist in Multica v0.3.4.
-
-Do not stub this step.
-
-Do not no-op this step.
-
-Do not mention success for repo allowlisting.
+10. Bind the project repository to the workspace with `ensureRepos` (consent-gated;
+    defaults to the `origin` remote, override with an explicit `repoUrl`). Without a
+    bound repo, the daemon hands agents a bare scaffold and file output cannot be
+    committed. Idempotent — a no-op when the repo URL is already bound. Report the
+    bound URL (or the idempotent skip) in the status summary.
 
 ## Plugin discovery
 

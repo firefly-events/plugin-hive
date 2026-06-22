@@ -1,0 +1,130 @@
+id: s7-cli-write-state-subcommand
+epic: hermes-core-loop-mvp
+title: "cli.mjs write-state subcommand — give the reconciler a tool to persist cross-tick state"
+status: shipped
+shipped_at: "2026-06-20T19:03:12Z"
+release_id: "v2.12.0"
+complexity: medium
+methodology: classic
+repo: plugin-hive
+depends_on: [s1-cli-mjs-core, s2-hermes-reconciler-state]
+
+description: |
+  RUNG-3.5 GAP #2 (found 2026-06-19, rung-3-full controlled tick on Studio) — THE
+  blocker for multi-tick progression. The runbook instructs the reconciler to call
+  `writeHermesReconcilerState(cycleStatePath, {...})` at the end of every branch that
+  mutates state (Branch 1/2/3/4). But that is a JavaScript library function in
+  hive/lib/hermes-reconciler/state.mjs — there is NO tool or CLI surface the LLM agent
+  can invoke. The agent's only option is to hand-edit the cycle-state YAML, which is
+  fragile (block reflow, quoting) and which the live agent simply did not do: it
+  dispatched the story correctly but left cycle-state at pending/in_flight:null, so the
+  loop became a one-shot dispatcher that never advances impl→review→done.
+
+  FIX: add a `write-state` subcommand to cli.mjs that wraps writeHermesReconcilerState,
+  giving the agent a reliable, structured way to persist the exact field updates each
+  branch prescribes. The subcommand is LOCAL-ONLY (no Multica creds) — add it to the
+  NO_CONFIG set, same pattern as epic-status. It reads the cycle-state for the epic,
+  applies a JSON patch of updates (top-level hermes_reconciler fields and/or per-story
+  fields), writes via writeHermesReconcilerState (absence-tolerant), and echoes the
+  resulting rollup. Then update cycle-reconciler.md so every "writeHermesReconcilerState(...)"
+  step is expressed as a concrete `cli.mjs write-state` invocation the agent can run.
+
+  Also drop the now-stale TODO/"wrapper shape only — pending" notes in the s4 plugin
+  (hermes-agent: plugins/hermes-multica/tools.py + client.py) — the epic-status/comment
+  subcommands they reference now exist.
+
+acceptance_criteria:
+  - "Given `cli.mjs write-state --epic <h> --patch <json>` where patch sets top-level fields (e.g. in_flight_story_id, in_flight_task_id, dispatched_at, current_phase, gate_state), then those fields are persisted to the epic cycle-state and the command echoes the updated rollup."
+  - "Given a patch that updates a per-story field (e.g. stories.<uuid>.phase_position, attempt, verdict), then only that story's named fields change and other stories/fields are preserved."
+  - "Given the cycle-state file does not yet exist, then write-state creates it from safe defaults plus the patch (absence-tolerant, mirrors readHermesReconcilerState defaults)."
+  - "Given write-state is invoked with no Multica credentials in the environment, then it still succeeds (it is in the NO_CONFIG set, local-only like epic-status)."
+  - "Given an invalid patch (missing --epic, malformed JSON, or unknown top-level shape), then it fails with a structured {code, message} on stderr and a non-zero exit (no partial write)."
+  - "Given js-yaml is not installed, then write-state fails with the same clear 'js-yaml not available' error state.mjs already raises (it depends on state.mjs)."
+  - "Given the unknown-command help text, then it lists write-state alongside the existing subcommands; the full multica-story-dispatch suite stays green with new write-state tests added."
+  - "Given cycle-reconciler.md, then every writeHermesReconcilerState(...) step in Branches 1-4 is rewritten as a concrete `cli.mjs write-state --epic <h> --patch <json>` call."
+  - "Given plugins/hermes-multica/tools.py and client.py (hermes-agent), then the stale '# TODO(plugin-hive): ... not yet built' comments and 'wrapper shape only — pending' caveats are removed."
+
+steps:
+  - id: implement
+    description: >
+      Add cmdWriteState to cli.mjs: parse --epic + --patch (JSON), resolve cycle-state
+      path (reuse resolveCycleStatePath), apply patch over readHermesReconcilerState
+      result, persist via writeHermesReconcilerState, succeed() with the rollup. Add
+      'write-state' to NO_CONFIG and the USAGE/UNKNOWN_COMMAND strings.
+    agent: developer
+  - id: test
+    description: >
+      Subprocess tests: top-level patch, per-story patch (preserve siblings),
+      create-on-missing, no-creds success, malformed-patch error, help lists write-state.
+      Run full msd suite.
+    agent: developer
+    depends_on: [implement]
+  - id: runbook
+    description: >
+      Rewrite each writeHermesReconcilerState(...) step in cycle-reconciler.md Branches
+      1-4 as a concrete cli.mjs write-state invocation with the exact field patch.
+    agent: technical-writer
+    depends_on: [implement]
+  - id: plugin-cleanup
+    description: >
+      In hermes-agent plugins/hermes-multica/tools.py + client.py, remove the stale
+      TODO comments and 'wrapper shape only — pending' caveats (subcommands now exist).
+    agent: developer
+    depends_on: [implement]
+  - id: review
+    description: >
+      Verify NO_CONFIG local-only behavior, patch isolation (no sibling clobber),
+      absence-tolerance, structured errors, and runbook↔CLI consistency.
+    agent: reviewer
+    depends_on: [test, runbook, plugin-cleanup]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  tech_stack:
+    runtime: node
+    language: JavaScript
+  key_files:
+    - path: hive/lib/multica-story-dispatch/cli.mjs
+      purpose: "add cmdWriteState; NO_CONFIG set; USAGE/UNKNOWN_COMMAND; resolveCycleStatePath reuse"
+    - path: hive/lib/hermes-reconciler/state.mjs
+      purpose: "readHermesReconcilerState / writeHermesReconcilerState — wrapped by write-state"
+    - path: hive/references/cycle-reconciler.md
+      purpose: "Branches 1-4 writeHermesReconcilerState steps → concrete write-state calls"
+    - path: hive/lib/multica-story-dispatch/__tests__
+      purpose: new write-state subprocess tests
+
+files_to_modify:
+  - file: hive/lib/multica-story-dispatch/cli.mjs
+    change: NEW cmdWriteState + NO_CONFIG/USAGE wiring
+  - file: hive/references/cycle-reconciler.md
+    change: writeHermesReconcilerState steps → cli.mjs write-state invocations
+  - file: hive/lib/multica-story-dispatch/__tests__
+    change: NEW write-state tests
+
+design_decisions:
+  - decision: write-state wraps the existing state.mjs functions, no new persistence logic
+    rationale: >
+      state.mjs already owns absence-tolerant read/write of the hermes_reconciler block.
+      A CLI wrapper exposes it to the agent without forking the persistence path.
+  - decision: local-only via NO_CONFIG (no Multica creds), same as epic-status
+    rationale: >
+      Cross-tick state is a local YAML concern; requiring Multica creds to write it would
+      be wrong and would block cron ticks that legitimately have no network need.
+  - decision: JSON --patch rather than many typed flags
+    rationale: >
+      Branches write heterogeneous field sets (top-level + per-story); a single JSON patch
+      maps directly to the runbook's "write {...}" steps and keeps the CLI surface small.
+
+risks:
+  - severity: medium
+    description: >
+      A patch that clobbers sibling stories or top-level fields would corrupt cross-tick
+      memory and desync the loop.
+    mitigation: >
+      Apply the patch as a deep merge over the read state (never a wholesale replace);
+      test sibling-preservation explicitly.
+  - severity: low
+    description: js-yaml dependency must be present (state.mjs requires it).
+    mitigation: >
+      Same BYO install already documented for s2 (npm install --no-save js-yaml@4.2.0);
+      surface the existing clear error if absent.

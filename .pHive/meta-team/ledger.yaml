@@ -1,3 +1,36 @@
+- experiment_id: meta-2026-06-20
+  date: '2026-06-20'
+  started: '2026-06-20T00:00:00Z'
+  closed: '2026-06-20T00:00:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 0
+  top_changes:
+    - ".pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md: appended indexed-for-meta-meta-optimize proving run footer line for meta-2026-06-20 (3rd such line)"
+  commit: 31f9b85403de7fac6b13a89e174068da364cbb43
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 0381e01e10cba0197eec6309b83f016afd386f88
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-20. Analysis found 0 in-scope findings: all 12 step
+    files complete (7/7), all 25 agents valid, all 13 workflow YAML step_file refs
+    resolve, model IDs current (claude-opus-4-8, claude-sonnet-4-6,
+    claude-haiku-4-5-20251001), no MEMORY_GAP findings (all agents >=1 memory).
+    Since last cycle (adcfa5af): orchestrator.md gained --lite/--skip-sign-off/
+    --skip-research flag rows (content add, no schema inconsistency); new substantive
+    reference files artifact-lifecycle.md, cycle-reconciler.md, planning-format-
+    contract.md all >100 lines (not stubs). STUB_DOC hive-cloud-roadmap.md (13 lines)
+    remains out_of_scope (S16 placeholder, 17th+ consecutive deferral). Dedup
+    pre-flight: open PR #304 (meta-meta/nightly-20260619) covers candidate 001
+    (MANIFEST.md) — suppressed. Routed to step-03b backlog fallback. Candidate 003
+    discarded at selection (# frozen: comment already present, written meta-2026-04-29).
+    Selected candidate mmo-2026-04-21-002: appended indexed-for-meta-meta-optimize
+    proving run footer for meta-2026-06-20 to AUDIT-NOTE.md (3rd such footer).
+    Closure validator passed. Regression watch armed for 4-hour observation window.
 - experiment_id: meta-2026-06-16
   date: '2026-06-16'
   started: '2026-06-16T00:00:00Z'

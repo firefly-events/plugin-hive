@@ -1,0 +1,116 @@
+id: a1-audit-plugin-install-payload
+epic: plugin-hygiene
+title: Audit what ships in the plugin install payload
+status: shipped
+shipped_at: "2026-06-20T19:03:12Z"
+release_id: "v2.12.0"
+tracker_id: plugin-hive/PLU-372
+tracker_url: http://localhost:3000/issues/PLU-372
+complexity: medium
+methodology: classic
+depends_on: []
+
+parallel_allowed: true
+parallel_rationale: read-only
+
+description: |
+  Evaluate exactly what files land on a consumer's machine when plugin-hive is
+  installed, and whether any tracked directories are maintainer-only and should
+  NOT ship.
+
+  Mechanism context: a Claude Code plugin is delivered by cloning the plugin
+  repo at a version ref. Therefore `.gitignore`d paths never ship (verified) —
+  the real exposure is the inverse: *tracked* maintainer-only trees that are
+  force-allowlisted back into the repo and thus install for every consumer.
+
+  The repo's `.gitignore` blanket-ignores `.pHive/*` then re-allowlists many
+  per-epic planning/audit trees (`!.pHive/epics/<id>/**`, `!.pHive/episodes/...`,
+  meta-team, teams, team-memories). Those, plus `docs/reports/**`, audit YAMLs,
+  and metrics events, are tracked and ship to every installer. This story
+  quantifies that payload and recommends remediation. It is read-only:
+  it produces a report; any fixes are follow-on stories gated on its findings.
+
+acceptance_criteria:
+  - "Given the tracked file set at a release ref, when the audit runs, then the report enumerates every tracked top-level path AND every allowlisted `.pHive/**` subtree that installs with the plugin."
+  - "Given the inventory, when each path is classified, then each is labelled runtime-required | maintainer-only | ambiguous, with a one-line reason."
+  - "Given maintainer-only paths, then the report quantifies their size (file count + bytes) and total payload size, and ranks the largest contributors."
+  - "Given each maintainer-only / ambiguous path, then the report gives a concrete remediation option: untrack (git rm --cached + ignore), move out of the plugin payload, or add a packaging allowlist (e.g. a `files` manifest), with the trade-off named."
+  - "The report does NOT modify .gitignore or untrack anything — remediation is deferred to follow-on stories."
+
+steps:
+  - id: research
+    description: |
+      Determine the install delivery mechanism (how Claude Code marketplace
+      fetches plugin-hive — git clone at ref vs packaged tarball vs `files`
+      allowlist). Confirm whether the whole tracked tree ships or a subset.
+      Enumerate the tracked file set: `git ls-files` grouped by top-level dir,
+      and resolve which `.pHive/**` subtrees survive the .gitignore allowlist.
+    agent: researcher
+  - id: implement
+    description: |
+      Write the audit report to .pHive/audits/plugin-install-payload/report.md:
+      inventory table (path, tracked?, ships?, classification, size), payload
+      size totals, largest contributors, and a remediation section with one
+      concrete option per flagged path. Reference the .gitignore allowlist
+      lines by number so a follow-on fix story can act precisely.
+    agent: developer
+    depends_on: [research]
+  - id: review
+    description: |
+      Verify the inventory is exhaustive (no tracked top-level dir omitted),
+      classifications are defensible, and every flagged path has an actionable
+      remediation. Confirm the report made no repo mutations.
+    agent: reviewer
+    depends_on: [implement]
+
+context:
+  codebase: /Users/don/.claude/worktrees/hive-composability-design
+  tech_stack:
+    delivery: Claude Code plugin (marketplace)
+    packaging: git-tracked tree
+  key_files:
+    - path: .gitignore
+      purpose: "Defines the allowlist that force-tracks maintainer-only .pHive trees back into the shipped payload — primary subject of the audit."
+    - path: .claude-plugin/plugin.json
+      purpose: "Plugin manifest; check whether it declares any packaging/files allowlist that scopes what installs."
+    - path: .claude-plugin/marketplace.json
+      purpose: "Marketplace entry; confirms the install delivery path."
+
+files_to_modify:
+  - file: .pHive/audits/plugin-install-payload/report.md
+    change: write the audit report (new file)
+
+code_examples:
+  - title: Allowlist pattern that re-tracks ignored .pHive trees
+    file: .gitignore
+    snippet: |
+      .pHive/*
+      !.pHive/epics/
+      .pHive/epics/*
+      !.pHive/epics/meta-improvement-system/
+      !.pHive/epics/meta-improvement-system/**
+      # ... many per-epic allowlist pairs follow — each ships to consumers
+
+design_decisions:
+  - decision: Read-only audit, no remediation in this story
+    rationale: "Findings (which dirs, how big, ship-mechanism) are unknown until measured; fixes are cheap once scoped but risky to guess. Audit-then-fix avoids speculative untracking."
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Read-only audit story; its deliverable is the report itself. Any payload-size reduction is realized by the follow-on remediation stories this audit produces, which will carry their own size-delta metrics."
+
+risks:
+  - severity: medium
+    description: "Marketplace may ship a packaged subset (not the full tracked tree), making the allowlist exposure smaller than assumed."
+    mitigation: "Confirm the delivery mechanism in the research step before classifying; report the actual mechanism explicitly."
+
+references:
+  - path: .gitignore
+    relevant_excerpt: |
+      .pHive/* with per-epic `!.pHive/epics/<id>/**` allowlist pairs — these
+      force maintainer planning/audit trees back into the tracked payload.
+  - path: CLAUDE.md
+    relevant_excerpt: |
+      Hive is packaged as a Claude Code plugin; canonical state lives under .pHive/.

@@ -119,6 +119,8 @@ steps:
       criteria. Map each requirement to its covering test(s). Identify gaps
       with specificity and severity classification. Produce a coverage report.
     depends_on:
+      - author-tests
+      - gather-context
       - scenario-replay
     inputs:
       - name: test_manifest
@@ -136,6 +138,7 @@ steps:
         source: step_output
         step_id: scenario-replay
         output_name: replay_summary
+        optional: true
     outputs:
       - name: coverage_report
         type: string
@@ -310,3 +313,67 @@ steps:
         type: string
     optional: false
     timeout_ms: 300000
+
+  # Reconcile node (s7): materialise the compile-report agent's committed test
+  # report into the working tree before the gate validates it. No-op on local
+  # bindings (sha absent) — safe on both local and Multica execution paths.
+  # C1 fixed: sha/branch/repo from compile-report step_output (the actual report producer).
+  - id: reconcile-report
+    agent: reconciler
+    node_type: reconcile
+    step_file: hive/workflows/step-files/execute/reconcile.md
+    task: >
+      Materialise the compile-report agent's committed test report so the gate
+      can validate the artifact exists and parses correctly.
+    depends_on:
+      - compile-report
+    inputs:
+      - name: sha
+        source: step_output
+        step_id: compile-report
+        output_name: commit_sha
+        optional: true
+      - name: branch
+        source: step_output
+        step_id: compile-report
+        output_name: branch
+        optional: true
+      - name: repo
+        source: step_output
+        step_id: compile-report
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: compile-report
+        output_name: work_dir
+        optional: true
+    outputs:
+      - name: reconcile_status
+        type: string
+    optional: true
+    timeout_ms: 120000
+
+  # Validation gate (s3): confirm the committed test report exists and parses.
+  # report_artifact_path is parameterised on the actual artifact location from
+  # SKILL.md: ${HIVE_STATE_DIR}/test-artifacts/{epic-id}/{story-id}/results.yaml
+  - id: gate-test-report
+    agent: validator
+    node_type: gate
+    gate: "session_report must not be empty"
+    depends_on:
+      - reconcile-report
+    inputs:
+      - name: session_report
+        source: step_output
+        step_id: compile-report
+        output_name: session_report
+      - name: report_artifact_path
+        source: context
+        context_key: report_artifact_path
+        optional: true
+    outputs:
+      - name: gate_passed
+        type: json
+    optional: false
+    timeout_ms: 60000
