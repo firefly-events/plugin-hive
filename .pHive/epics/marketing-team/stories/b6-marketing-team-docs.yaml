@@ -1,7 +1,7 @@
 id: b6-marketing-team-docs
 epic: marketing-team
 title: User docs for the marketing team + /marketing-campaign
-status: in_progress
+status: blocked
 tracker_id: plugin-hive/PLU-380
 
 complexity: low
