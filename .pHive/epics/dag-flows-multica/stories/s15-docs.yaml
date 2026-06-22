@@ -1,7 +1,7 @@
 id: s15-docs
 epic: dag-flows-multica
 title: Document the DAG-on-Multica substrate (README + operations-guide)
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s14-backend-episodes]

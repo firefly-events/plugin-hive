@@ -1,7 +1,7 @@
 id: s5-multica-bridge
 epic: dag-flows-multica
 title: Multica bridge surface — create-issue + reconcile helpers + JSON contract
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [s4-repo-bind]

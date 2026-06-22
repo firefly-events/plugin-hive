@@ -1,7 +1,7 @@
 id: s6-2-hive-config-lifecycle-keys
 epic: hive-composability-design
 title: hive.config.yaml planning/execution teammate_lifecycle keys
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s6-1-story-handoff-schema]

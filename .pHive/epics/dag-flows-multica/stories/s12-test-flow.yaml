@@ -1,7 +1,7 @@
 id: s12-test-flow
 epic: dag-flows-multica
 title: Test flow graph (extend test-swarm.workflow.yaml + reconcile + gate + wire)
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s3-validation-gate, s6-multica-spawn, s7-reconcile-node]

@@ -1,7 +1,7 @@
 id: s3-3-agent-spawn-model-docs
 epic: hive-composability-design
 title: Agent-spawn model resolution docs + Haiku/Explorer guardrail
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s3-2-hive-config-model-profile]

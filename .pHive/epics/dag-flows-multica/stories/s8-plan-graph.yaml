@@ -1,7 +1,7 @@
 id: s8-plan-graph
 epic: dag-flows-multica
 title: Plan flow graph (plan.workflow.yaml + verbatim step_files)
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [s3-validation-gate, s6-multica-spawn, s7-reconcile-node]

@@ -1,7 +1,7 @@
 id: s14-backend-episodes
 epic: dag-flows-multica
 title: Unify backend selection + episode markers + resume across all flows
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s9-plan-wire, s11-execute-wire, s12-test-flow, s13-review-flow]

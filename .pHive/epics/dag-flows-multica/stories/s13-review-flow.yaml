@@ -1,7 +1,7 @@
 id: s13-review-flow
 epic: dag-flows-multica
 title: Review flow graph (new review.workflow.yaml + reconcile + gate + wire)
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s3-validation-gate, s6-multica-spawn, s7-reconcile-node]

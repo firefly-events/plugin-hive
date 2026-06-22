@@ -1,7 +1,7 @@
 id: s5-cron-job-config
 epic: hermes-core-loop-mvp
 title: "Reconciler cron job + Hermes config (approvals, gate_state preflight)"
-status: pending
+status: blocked
 complexity: small
 methodology: classic
 repo: hermes-agent

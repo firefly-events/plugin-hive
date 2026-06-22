@@ -1,7 +1,7 @@
 id: s9-plan-wire
 epic: dag-flows-multica
 title: Wire /plan to the DAG front door (planning-routing seam)
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s8-plan-graph]

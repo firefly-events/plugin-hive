@@ -1,7 +1,7 @@
 id: s7-reconcile-node
 epic: dag-flows-multica
 title: Reconcile SCRIPT node (fetch + ff-merge agent commits before the gate)
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 depends_on: [s5-multica-bridge, s6-multica-spawn]

@@ -1,7 +1,7 @@
 id: s6-multica-spawn
 epic: dag-flows-multica
 title: MulticaAgentSpawn binding (Python) + Codex-headless smoke
-status: pending
+status: blocked
 complexity: high
 methodology: classic
 depends_on: [s2-run-frontdoor, s5-multica-bridge]

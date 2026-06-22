@@ -1,7 +1,7 @@
 id: s6-1-story-handoff-schema
 epic: hive-composability-design
 title: story-handoff-schema.md reference doc
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on: [s6-0-memory-autonomy-yaml-refresh]
