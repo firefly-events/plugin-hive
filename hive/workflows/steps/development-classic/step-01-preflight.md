@@ -103,13 +103,25 @@ output graph; downstream `when:` predicates
 (`$preflight.output.needs_frontend == true`) gate on it. Determine the booleans
 from the story: prefer explicit `story.metadata.needs_backend` /
 `needs_frontend` when present, otherwise INFER from the story's acceptance
-criteria and domain (a browser/UI/HTML/CSS/DOM story needs frontend; an
-API/database/server story needs backend). Do NOT default a clearly-frontend or
-clearly-backend story to `false`.
+criteria and domain:
+
+- A browser/UI/HTML/CSS/DOM/component story needs **frontend**.
+- An API/database/server/endpoint story needs **backend**.
+- **Pure logic, algorithm, data-model, library, module, or utility code with no
+  DOM and no server (e.g. a `game.js` rules module, a parser, a calculator) is
+  BACKEND** — `needs_backend: true`. "Backend" here means non-UI implementation
+  code, not just servers. Do not leave such a story with both booleans `false`.
+
+**Critical invariant: any story that writes or modifies implementation code MUST
+set at least one of `needs_backend` / `needs_frontend` to `true`.** Both `false`
+means NO implement node runs — the code never gets written, the test/review/
+integrate phases run against an empty implementation, and the story silently
+ships nothing. Only a pure docs / config / metadata story (no code at all) may
+have both `false`. When in doubt for a code story, set `needs_backend: true`.
 
 Missing/omitted booleans default to `false` (predicate evaluator's fail-closed
-semantics), which causes the corresponding implement node to skip — the
-canonical empty-domain behaviour.
+semantics), which causes the corresponding implement node to skip. That default
+is correct ONLY for a genuinely empty domain — never for a code-writing story.
 
 ## SUCCESS METRICS
 
