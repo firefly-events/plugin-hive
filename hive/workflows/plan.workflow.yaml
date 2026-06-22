@@ -22,6 +22,12 @@ steps:
     outputs:
       - name: research_brief
         type: string
+    # #21: Multica intermittently force-stops an agent and reports "completed"
+    # with no work. The AGENT handler raises on that interrupt marker; this
+    # bounded retry re-dispatches so a transient flake self-heals.
+    retry:
+      max_attempts: 3
+      on: agent_failed
     timeout_ms: 1800000
 
   # ── Phase B: design discussion (runs in parallel with research) ──────────────
@@ -37,6 +43,9 @@ steps:
     outputs:
       - name: design_discussion
         type: string
+    retry:  # #21 — see research node
+      max_attempts: 3
+      on: agent_failed
     timeout_ms: 1800000
 
   # ── Phase C: story decomposition + epic authoring ───────────────────────────
@@ -64,6 +73,9 @@ steps:
         type: string
       - name: commit_sha
         type: string
+    retry:  # #21 — author is the heaviest node + the one observed force-stopping
+      max_attempts: 4
+      on: agent_failed
     timeout_ms: 3600000
 
   # ── Reconcile: materialise author's committed work before gate ───────────────

@@ -292,6 +292,18 @@ class MulticaAgentSpawn:
                 f"multica task {tracker_id!r} for step {step_id!r} "
                 f"terminal with status {status!r}: {terminal.get('notes', '')}"
             )
+        # #21: Multica can report a force-stopped run as "completed". The agent
+        # writes a `.pHive/interrupts/<ts>.yaml` with `interruption_type:
+        # forced_stop` and produces NONE of its work. Treat that as a failed
+        # attempt (raise AgentHandlerError) so a node-level `retry:` re-dispatches
+        # it, instead of returning empty outputs that surface two nodes later as
+        # a confusing "input X ... was not produced".
+        if self._was_force_stopped(terminal.get("work_dir")):
+            raise AgentHandlerError(
+                f"multica task {tracker_id!r} for step {step_id!r} reported "
+                f"'completed' but was force-stopped (interrupt marker present, "
+                f"no work produced) — retrying if the node allows"
+            )
         outputs = {
             "code_push_sha": terminal.get("code_push_sha"),
             # commit_sha is the graph-canonical alias for code_push_sha so
@@ -336,6 +348,42 @@ class MulticaAgentSpawn:
         for key, value in self._harvest_artifacts(terminal.get("work_dir")).items():
             outputs.setdefault(key, value)
         return outputs
+
+    @staticmethod
+    def _was_force_stopped(work_dir: str | None) -> bool:
+        """True if the agent's work_dir holds a forced_stop interrupt marker.
+
+        Multica writes ``.pHive/interrupts/<ts>.yaml`` with
+        ``interruption_type: forced_stop`` when a run is killed, yet the task API
+        may still report ``completed``. Best-effort: any read/parse error is
+        treated as "no marker" so this never masks a genuine completion.
+        """
+        if not work_dir:
+            return False
+        wd = Path(work_dir)
+        try:
+            markers = sorted(wd.glob("**/.pHive/interrupts/*.yaml"))
+        except OSError:
+            return False
+        for path in markers:
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            try:
+                import yaml
+
+                data = yaml.safe_load(text)
+            except Exception:  # noqa: BLE001 — best-effort parse
+                # Fall back to a substring check if YAML parsing fails.
+                if "forced_stop" in text:
+                    return True
+                continue
+            if isinstance(data, dict) and str(
+                data.get("interruption_type", "")
+            ).strip().lower() == "forced_stop":
+                return True
+        return False
 
     @staticmethod
     def _find_repo_checkout(work_dir: str | None) -> Path | None:
