@@ -127,6 +127,30 @@ def test_must_not_equal_is_case_insensitive():
         )
 
 
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        {},  # output key absent — upstream produced no verdict
+        {"review_verdict": None},
+        {"review_verdict": ""},
+        {"review_verdict": "   "},
+    ],
+)
+def test_must_not_equal_blocks_on_missing_or_empty_value(inputs):
+    """A 'must not equal' gate must FAIL when the named value is absent/empty
+    (Codex review of #316): `inputs.get(name)` -> None coerces to "none", which
+    !=  the bad value, so the gate would PASS and integrate would run with NO
+    verdict at all. A verdict gate cannot pass without a verdict — mirrors the
+    #26 silent-skip lesson (fail loud, never silently ship).
+    """
+    with pytest.raises(GateFailedError):
+        GateHandler().handle(
+            _gate_node("review_verdict must not equal needs_revision"),
+            inputs=inputs,
+            run_id="rid-1",
+        )
+
+
 # --- #19: plan-epic schema gate anchors epic_dir to repo_root ---------------
 
 

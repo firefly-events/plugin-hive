@@ -102,6 +102,18 @@ class GateHandler:
             name = match.group("name")
             expected = match.group("expected")
             value = inputs.get(name)
+            # A "must not equal" gate exists to BLOCK a bad value (e.g. a
+            # needs_revision review must not integrate). A missing/empty value is
+            # NOT a safe pass: it means the upstream node produced no verdict at
+            # all (crash, empty harvest, unbound edge) — fail loud rather than
+            # silently ship, mirroring the #26 silent-skip lesson. Without this,
+            # `inputs.get(name)` -> None -> "none" != expected -> the gate passes
+            # and integrate runs on no evidence.
+            if _is_empty(value) or not str(value).strip():
+                raise GateFailedError(
+                    f"gate node {node.id!r}: {name!r} produced no value — a "
+                    f"{predicate!r} gate cannot pass without a verdict"
+                )
             if str(value).strip().lower() == expected.strip().lower():
                 raise GateFailedError(
                     f"gate node {node.id!r}: {name!r} is {value!r} — must not equal "
