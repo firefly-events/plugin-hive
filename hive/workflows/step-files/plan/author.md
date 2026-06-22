@@ -38,11 +38,25 @@ Flag unmapped capabilities as GAPS before proceeding.
 
 ### 3. Write story YAMLs (SKILL.md §Phase C, step 13)
 
-For each story, write `.pHive/epics/{epic_id}/stories/{story_id}.yaml`. Each story
-must be self-contained: inline `relevant_excerpt` in references, `snippet` in
-code_examples, `purpose` in key_files. Steps must match the resolved methodology
-template. Emit `parallel_allowed: true` + `parallel_rationale` only when the story
-satisfies the bounded-slice/variation/read-only criteria.
+For each story, write `.pHive/epics/{epic_id}/stories/{story_id}.yaml`.
+
+REQUIRED fields on every story (the output-validation gate rejects the plan
+otherwise — `target: plan-epic` schema):
+
+- `id` — the story slug (matches the filename and the epic `stories[].id`).
+- `title` — one-line summary.
+- `acceptance_criteria` — a NON-EMPTY list of concrete, checkable criteria
+  (Given/When/Then or equivalent). Never omit this and never leave it empty.
+- `steps` — a NON-EMPTY list of the workflow steps for the resolved
+  methodology (e.g. research/implement/test/review/integrate), each with an
+  `id`, `description`, and `agent`.
+- `depends_on` — list of upstream story ids (may be empty `[]`).
+
+Each story must be self-contained: inline `relevant_excerpt` in references,
+`snippet` in code_examples, `purpose` in key_files. Steps must match the
+resolved methodology template. Emit `parallel_allowed: true` +
+`parallel_rationale` only when the story satisfies the
+bounded-slice/variation/read-only criteria.
 
 ### 4. Evaluate cross-cutting concerns (SKILL.md §Phase C, step 14)
 
