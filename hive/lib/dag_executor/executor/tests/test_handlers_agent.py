@@ -89,6 +89,45 @@ def test_missing_step_file_raises_agent_handler_error(tmp_path: Path):
         handler.handle(_make_node(step_file=str(missing)), inputs={}, run_id="rid-1")
 
 
+def test_step_file_resolves_from_plugin_root_not_repo_root(tmp_path: Path):
+    """A plugin-shipped step_file lives under the plugin root, NOT the
+    consumer project's repo_root. It must resolve from plugin_root even when
+    repo_root (a different project dir) does not contain it. Guards the
+    consumer-project case: planning a separate repo with the installed plugin.
+    """
+    plugin_root = tmp_path / "plugin"
+    rel = Path("hive/workflows/step-files/plan/research.md")
+    full = plugin_root / rel
+    full.parent.mkdir(parents=True)
+    full.write_text("plan research step", encoding="utf-8")
+
+    repo_root = tmp_path / "consumer-project"  # does NOT contain the step_file
+    repo_root.mkdir()
+
+    spy = StubAgentSpawn()
+    handler = AgentHandler(spawn=spy, repo_root=repo_root, plugin_root=plugin_root)
+    handler.handle(_make_node(step_file=str(rel)), inputs={}, run_id="rid-1")
+
+    assert spy.calls[0]["step_file_content"] == "plan research step"
+
+
+def test_step_file_outside_all_roots_raises(tmp_path: Path):
+    """An absolute path escaping every allowed root (plugin_root + repo_root)
+    must NOT be read — preserves the no-arbitrary-file-read guard.
+    """
+    plugin_root = tmp_path / "plugin"
+    plugin_root.mkdir()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    secret = tmp_path / "outside" / "secret.md"
+    secret.parent.mkdir(parents=True)
+    secret.write_text("should not be read", encoding="utf-8")
+
+    handler = AgentHandler(spawn=StubAgentSpawn(), repo_root=repo_root, plugin_root=plugin_root)
+    with pytest.raises(AgentHandlerError):
+        handler.handle(_make_node(step_file=str(secret)), inputs={}, run_id="rid-1")
+
+
 def test_inputs_propagate_to_spawn():
     spy = StubAgentSpawn()
     handler = AgentHandler(spawn=spy)

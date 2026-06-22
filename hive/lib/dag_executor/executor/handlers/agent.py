@@ -292,7 +292,7 @@ class MulticaAgentSpawn:
                 f"multica task {tracker_id!r} for step {step_id!r} "
                 f"terminal with status {status!r}: {terminal.get('notes', '')}"
             )
-        return {
+        outputs = {
             "code_push_sha": terminal.get("code_push_sha"),
             # commit_sha is the graph-canonical alias for code_push_sha so
             # reconcile nodes can bind output_name: commit_sha without a
@@ -305,6 +305,51 @@ class MulticaAgentSpawn:
             "agent_id": terminal.get("agent_id"),
             "tracker_id": tracker_id,
         }
+        # Surface the agent's committed planning artifacts as named outputs so
+        # downstream nodes can consume them in-memory. Multica agents deliver
+        # research/design/plan artifacts as FILES committed in their isolated
+        # work_dir (e.g. .pHive/epics/<id>/docs/research-brief.md), not as
+        # in-graph outputs. Without this, a graph edge like
+        # ``author.research_brief <- research.research_brief`` resolves to
+        # nothing and the run fails (the binding otherwise returns only commit
+        # metadata). Harvest the files and key them so they match the graph's
+        # declared output names.
+        for key, value in self._harvest_artifacts(terminal.get("work_dir")).items():
+            outputs.setdefault(key, value)
+        return outputs
+
+    @staticmethod
+    def _harvest_artifacts(work_dir: str | None) -> dict[str, Any]:
+        """Read the planning artifacts the agent committed in its work_dir and
+        surface them as named outputs (file-stored, passed in-memory).
+
+        - ``.pHive/epics/<id>/docs/<name>.md`` -> output ``<name>`` with hyphens
+          converted to underscores so it matches the graph's ``output_name``
+          (e.g. ``research-brief.md`` -> ``research_brief``).
+        - ``.pHive/epics/<id>/epic.yaml`` -> output ``epic_dir`` set to the
+          repo-relative epic directory (``.pHive/epics/<id>``).
+
+        Best-effort: read errors are skipped so harvesting never masks a real
+        task result.
+        """
+        out: dict[str, Any] = {}
+        if not work_dir:
+            return out
+        wd = Path(work_dir)
+        try:
+            for md in sorted(wd.glob("**/.pHive/epics/*/docs/*.md")):
+                try:
+                    out[md.stem.replace("-", "_")] = md.read_text(encoding="utf-8")
+                except OSError:
+                    continue
+            for epic_yaml in sorted(wd.glob("**/.pHive/epics/*/epic.yaml")):
+                epic_dir = epic_yaml.parent
+                repo_root = epic_dir.parents[2]  # parent of the `.pHive` dir
+                out["epic_dir"] = str(epic_dir.relative_to(repo_root))
+                break
+        except OSError:
+            pass
+        return out
 
     # ------------------------------------------------------------------
     # Idempotency
@@ -438,39 +483,75 @@ class AgentHandler:
         self,
         spawn: AgentSpawn,
         repo_root: Path | str | None = None,
+        plugin_root: Path | str | None = None,
     ) -> None:
         self._spawn = spawn
         self._repo_root = Path(repo_root) if repo_root is not None else None
+        # step_files are plugin-shipped content (e.g.
+        # ``hive/workflows/step-files/plan/research.md``) installed WITH the
+        # plugin — they do NOT live inside a consumer project's ``repo_root``.
+        # Resolve them against the plugin root by default (derived from this
+        # module's install location); ``repo_root`` remains a fallback so
+        # project-local workflow step_files still resolve.
+        self._plugin_root = (
+            Path(plugin_root).resolve()
+            if plugin_root is not None
+            else Path(__file__).resolve().parents[5]
+        )
 
     def _read_step_file(self, step_file: str) -> str:
         """Read the step_file's content verbatim. No transformation.
 
-        When ``repo_root`` is configured, ``step_file`` MUST resolve inside
-        that root. ``..`` segments and absolute paths that escape the root
-        are rejected up-front so an attacker-controlled or malformed
-        workflow cannot inject arbitrary file content into agent input.
+        ``step_file`` paths in plugin workflows are relative to the plugin
+        root (where the workflow graph and step-files ship). Resolve against
+        the plugin root first, then fall back to ``repo_root`` for
+        project-local workflows. In every case the resolved path MUST stay
+        inside the root it matched — ``..`` segments and absolute paths that
+        escape every allowed root are rejected so a malformed or
+        attacker-controlled workflow cannot inject arbitrary file content.
         """
         path = Path(step_file)
+        roots: list[Path] = []
+        if self._plugin_root is not None:
+            roots.append(self._plugin_root.resolve())
         if self._repo_root is not None:
-            root = self._repo_root.resolve()
+            roots.append(self._repo_root.resolve())
+
+        last_not_found: Exception | None = None
+        for root in roots:
             candidate = (
                 path if path.is_absolute() else (root / path)
             ).resolve()
             try:
                 candidate.relative_to(root)
-            except ValueError as exc:
+            except ValueError:
+                continue  # escapes this root — try the next allowed root
+            try:
+                return candidate.read_text(encoding="utf-8")
+            except FileNotFoundError as exc:
+                last_not_found = exc
+                continue  # not under this root — try the next
+            except OSError as exc:
                 raise AgentHandlerError(
-                    f"step_file escapes repo_root: {step_file}"
+                    f"failed to read step_file {step_file}: {exc}"
                 ) from exc
-            path = candidate
-        try:
-            return path.read_text(encoding="utf-8")
-        except FileNotFoundError as exc:
-            raise AgentHandlerError(f"step_file not found: {step_file}") from exc
-        except OSError as exc:
-            raise AgentHandlerError(
-                f"failed to read step_file {step_file}: {exc}"
-            ) from exc
+
+        if not roots:
+            # No configured root — legacy as-given resolution.
+            try:
+                return path.read_text(encoding="utf-8")
+            except FileNotFoundError as exc:
+                raise AgentHandlerError(
+                    f"step_file not found: {step_file}"
+                ) from exc
+            except OSError as exc:
+                raise AgentHandlerError(
+                    f"failed to read step_file {step_file}: {exc}"
+                ) from exc
+
+        raise AgentHandlerError(
+            f"step_file not found: {step_file}"
+        ) from last_not_found
 
     def handle(
         self,
