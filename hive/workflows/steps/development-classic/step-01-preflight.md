@@ -84,13 +84,32 @@ fields on this step's output graph:
 
 ```yaml
 preflight_status: string         # "READY" | "BLOCKED — <reason>"
-needs_backend: bool              # from story.metadata.needs_backend, default false
-needs_frontend: bool             # from story.metadata.needs_frontend, default false
+needs_backend: bool              # whether backend implementation work is required
+needs_frontend: bool             # whether frontend implementation work is required
 ```
 
-Missing booleans default to `false` (predicate evaluator's fail-closed
-semantics) which causes both implement nodes to skip — the canonical
-empty-domain behaviour.
+**Emit these for the DAG executor by WRITING them to
+`.pHive/dag-outputs/outputs.yaml`** (create the directory) in your working
+copy, as a flat `key: value` YAML map — e.g.:
+
+```yaml
+preflight_status: READY
+needs_backend: false
+needs_frontend: true
+```
+
+The executor reads this file from your work_dir and merges it onto this step's
+output graph; downstream `when:` predicates
+(`$preflight.output.needs_frontend == true`) gate on it. Determine the booleans
+from the story: prefer explicit `story.metadata.needs_backend` /
+`needs_frontend` when present, otherwise INFER from the story's acceptance
+criteria and domain (a browser/UI/HTML/CSS/DOM story needs frontend; an
+API/database/server story needs backend). Do NOT default a clearly-frontend or
+clearly-backend story to `false`.
+
+Missing/omitted booleans default to `false` (predicate evaluator's fail-closed
+semantics), which causes the corresponding implement node to skip — the
+canonical empty-domain behaviour.
 
 ## SUCCESS METRICS
 

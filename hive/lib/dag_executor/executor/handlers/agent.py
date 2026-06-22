@@ -315,6 +315,15 @@ class MulticaAgentSpawn:
         for key, value in self._harvest_git_state(terminal.get("work_dir")).items():
             if value is not None:
                 outputs[key] = value
+        # #13: the GENERAL output channel. Multica agents emit a node's declared
+        # SEMANTIC outputs (booleans/strings/paths like ``needs_frontend``,
+        # ``test_artifacts``, ``implementation`` — values, not files) by writing
+        # ``.pHive/dag-outputs/outputs.yaml`` in their isolated work_dir. Read it
+        # and merge (authoritative — declared outputs override file-inference).
+        # This supersedes the plan-specific docs harvest below for any node that
+        # writes the file; the docs harvest stays as a fallback.
+        for key, value in self._harvest_node_outputs(terminal.get("work_dir")).items():
+            outputs[key] = value
         # Surface the agent's committed planning artifacts as named outputs so
         # downstream nodes can consume them in-memory. Multica agents deliver
         # research/design/plan artifacts as FILES committed in their isolated
@@ -383,6 +392,51 @@ class MulticaAgentSpawn:
         return [
             line for line in diff.splitlines() if line.startswith(".pHive/epics/")
         ]
+
+    @staticmethod
+    def _harvest_node_outputs(work_dir: str | None) -> dict[str, Any]:
+        """Read the node's declared SEMANTIC outputs that the agent wrote to
+        ``.pHive/dag-outputs/outputs.yaml`` (or ``.json``) in its work_dir (#13).
+
+        This is the general output channel for the Multica binding: an agent
+        emits decision/value outputs (``needs_frontend: true``,
+        ``test_artifacts: <path>``, ...) the graph's ``when:`` predicates and
+        downstream input bindings consume — values that are NOT files and so are
+        not captured by the plan docs harvest. The file lives in the ephemeral
+        Multica work_dir and is gitignored, so it never enters the project repo.
+
+        Best-effort: any parse/read error yields ``{}`` so it never masks a real
+        task result.
+        """
+        out: dict[str, Any] = {}
+        if not work_dir:
+            return out
+        wd = Path(work_dir)
+        try:
+            candidates = sorted(wd.glob("**/.pHive/dag-outputs/outputs.yaml")) + sorted(
+                wd.glob("**/.pHive/dag-outputs/outputs.json")
+            )
+        except OSError:
+            return out
+        for path in candidates:
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            data: Any = None
+            try:
+                if path.suffix == ".json":
+                    data = json.loads(text)
+                else:
+                    import yaml
+
+                    data = yaml.safe_load(text)
+            except (ValueError, Exception):  # noqa: BLE001 — best-effort parse
+                continue
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    out[str(key)] = value
+        return out
 
     @staticmethod
     def _harvest_artifacts(work_dir: str | None) -> dict[str, Any]:

@@ -152,3 +152,22 @@ path binds to this JSON. Both must agree.
 - If **passed**: skip step 7 (optimize), go to `step-08-integrate.md`
 - If **needs_optimization**: go to `step-07-optimize.md`
 - If **needs_revision**: route to fix loop (orchestrator handles)
+
+
+## DAG executor outputs (required)
+
+Before finishing, WRITE this step's declared outputs to
+`.pHive/dag-outputs/outputs.yaml` (create the directory) in your working copy,
+as a flat `key: value` YAML map. The DAG executor reads this file from your
+work_dir and merges it onto this step's output graph so downstream nodes can
+consume the values; without it those edges resolve to nothing and the run
+fails. This file is gitignored execution scratch — do not commit it.
+
+```yaml
+review_verdict: <value>
+review_findings: <value>
+```
+
+Use concrete values: for path/artifact outputs give the repo-relative path you
+wrote; for verdict/status give the literal string; for summaries give a short
+string (or a path to the file you wrote). Do not omit a declared key.

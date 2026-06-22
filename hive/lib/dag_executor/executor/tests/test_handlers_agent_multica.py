@@ -429,3 +429,21 @@ def test_harvest_artifacts_scoped_to_committed_epic(tmp_path):
     assert out["research_brief"] == "NEW BRIEF", "must harvest THIS run's brief"
     assert "OLD BRIEF" not in out["research_brief"]
     assert out["epic_dir"] == ".pHive/epics/new-epic"
+
+
+def test_harvest_node_outputs_reads_declared_outputs(tmp_path):
+    """#13: an agent's declared SEMANTIC outputs (needs_frontend, etc.) are
+    written to .pHive/dag-outputs/outputs.yaml in its work_dir and surfaced as
+    named outputs — the general channel for non-file values."""
+    work_dir = tmp_path / "task-work"
+    out_dir = work_dir / "the-project" / ".pHive" / "dag-outputs"
+    out_dir.mkdir(parents=True)
+    (out_dir / "outputs.yaml").write_text(
+        "preflight_status: READY\nneeds_backend: false\nneeds_frontend: true\n",
+        encoding="utf-8",
+    )
+    got = MulticaAgentSpawn._harvest_node_outputs(str(work_dir))
+    assert got["needs_frontend"] is True
+    assert got["needs_backend"] is False
+    assert got["preflight_status"] == "READY"
+    assert MulticaAgentSpawn._harvest_node_outputs(None) == {}
