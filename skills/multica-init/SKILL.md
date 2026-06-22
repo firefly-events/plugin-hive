@@ -34,6 +34,21 @@ Use it to bind the project repository to the workspace (Step 10, `ensureRepos`)
 so each task workdir is a real checkout. The `PUT /api/workspaces {repos}`
 endpoint is available as of Multica 0.3.26.
 
+> **One repo per workspace.** Bootstrap a *dedicated* workspace per project
+> (the default — `ensureWorkspace` keys on the project `--workspace-slug`). The
+> DAG agent-spawn binding does not pass a per-task repo selector, so the daemon
+> cannot reliably pick a target when a workspace has more than one bound repo:
+> a planning/execution task may check out the wrong repo and write its `.pHive`
+> output into it. Do **not** share one workspace across multiple project repos.
+> (True multi-repo targeting is a Multica daemon feature, tracked separately.)
+>
+> **Plugin-shipped assets.** The agent personas and exported skills referenced
+> by `agents.yaml` / `skills-export.yaml` live in the **plugin install**, not in
+> a consumer project's repo. `reconcileSkills` / `reconcileAgents` resolve those
+> `skill_ref` / `persona_ref` / `substrate_dep` paths against the plugin root by
+> default (`pluginRoot`), so a consumer project can bootstrap the Hive roster
+> without copying the plugin's source into the project tree.
+
 ## What This Skill Does
 
 Run the bootstrap flow:
