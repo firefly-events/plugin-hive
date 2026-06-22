@@ -2,20 +2,23 @@
 
 ## OUTPUT FORMAT (executor contract)
 
-Step output is a JSON object matching this schema. The DAG executor
-binds downstream `when:` predicates to these fields; missing fields
-fail-closed (downstream skips with a `predicate_evaluated` warning
-event per `hive/references/predicate-grammar.md`).
+Step output is a JSON object matching this schema. The DAG executor binds
+the gate-review node and downstream `when:` predicates to these fields. The
+field names below are the SINGLE canonical schema — they match the `review`
+node's declared outputs in `development.classic.workflow.yaml`
+(`review_verdict`, `review_findings`). A missing `review_verdict` fail-closes:
+gate-review BLOCKS integrate rather than shipping an unreviewed change (see
+`hive/references/predicate-grammar.md`).
 
 ```yaml
 output_format:
-  change_verdict: str   # one of: passed | needs_optimization | needs_revision
-  critical_findings: list  # [{category: str, file: str, line: int, message: str}]
-  needs_fix_loop: bool  # true when change_verdict != "passed"
+  review_verdict: str    # one of: passed | needs_optimization | needs_revision
+  review_findings: str   # human-readable findings, each citing file:line
 ```
 
-Predicates referencing the change-level verdict MUST use the explicit
-field name `$step.output.change_verdict`. Bare `$step.output.verdict`
+Predicates and the gate-review node reference `$step.output.review_verdict` —
+the classic workflow gates integrate on
+`review_verdict must not equal needs_revision`. Bare `$step.output.verdict`
 is undefined under this contract and fail-closes to False — see
 predicate-grammar.md Risk #13.
 
@@ -117,17 +120,14 @@ predicates skip with a warning — see `hive/references/predicate-grammar.md`.
 
 ```json
 {
-  "change_verdict": "passed | needs_optimization | needs_revision",
-  "critical_findings": [
-    {"category": "security", "file": "file.ts", "line": 42, "message": "..."}
-  ],
-  "needs_fix_loop": false
+  "review_verdict": "passed | needs_optimization | needs_revision",
+  "review_findings": "security — file.ts:42 — <message>; convention — other.ts:10 — <message>"
 }
 ```
 
-Set `needs_fix_loop: true` whenever `change_verdict != "passed"`. The
-orchestrator-narrated path consumes the prose section; the executor
-path binds to this JSON. Both must agree.
+`review_verdict` drives the gate-review node — a `needs_revision` verdict
+BLOCKS integrate. The orchestrator-narrated path consumes the prose section;
+the executor path binds to this JSON. Both must agree.
 
 ## SUCCESS METRICS
 
