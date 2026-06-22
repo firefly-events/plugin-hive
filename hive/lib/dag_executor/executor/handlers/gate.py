@@ -23,6 +23,18 @@ _NOT_EMPTY = re.compile(r"^(?P<name>[\w.-]+)\s+must\s+not\s+be\s+empty$", re.IGN
 _MUST_BE_VALID = re.compile(
     r"^(?P<name>[\w.-]+)\s+must\s+be\s+valid\s+(?P<target>[\w-]+)$", re.IGNORECASE
 )
+# #16: verdict/value gate — "review_verdict must equal passed". Fails loud when
+# the value differs, so a divergent review blocks downstream integration.
+_MUST_EQUAL = re.compile(
+    r"^(?P<name>[\w.-]+)\s+must\s+equal\s+(?P<expected>[\w.-]+)$", re.IGNORECASE
+)
+# #16: negated form — "review_verdict must not equal needs_revision". Blocks only
+# the named bad value (a needs_revision review must not silently integrate) while
+# letting every other verdict (passed, needs_optimization) proceed.
+_MUST_NOT_EQUAL = re.compile(
+    r"^(?P<name>[\w.-]+)\s+must\s+not\s+equal\s+(?P<expected>[\w.-]+)$",
+    re.IGNORECASE,
+)
 
 
 def _is_empty(value: Any) -> bool:
@@ -56,6 +68,35 @@ class GateHandler:
             if _is_empty(value):
                 raise GateFailedError(
                     f"gate node {node.id!r}: {name!r} is empty (predicate {predicate!r})"
+                )
+            return NodeOutput(outputs={"gate_passed": True}, meta={"predicate": predicate})
+
+        # Verdict/value check: "{name} must equal {expected}" (#16). Blocks the
+        # run (fail loud) when the value differs — e.g. a needs_revision review
+        # must not silently integrate.
+        match = _MUST_EQUAL.match(predicate)
+        if match:
+            name = match.group("name")
+            expected = match.group("expected")
+            value = inputs.get(name)
+            if str(value).strip().lower() != expected.strip().lower():
+                raise GateFailedError(
+                    f"gate node {node.id!r}: {name!r} is {value!r}, expected "
+                    f"{expected!r} (predicate {predicate!r})"
+                )
+            return NodeOutput(outputs={"gate_passed": True}, meta={"predicate": predicate})
+
+        # Negated verdict check: "{name} must not equal {expected}" (#16). Blocks
+        # only the named bad value; every other value passes.
+        match = _MUST_NOT_EQUAL.match(predicate)
+        if match:
+            name = match.group("name")
+            expected = match.group("expected")
+            value = inputs.get(name)
+            if str(value).strip().lower() == expected.strip().lower():
+                raise GateFailedError(
+                    f"gate node {node.id!r}: {name!r} is {value!r} — must not equal "
+                    f"{expected!r} (predicate {predicate!r})"
                 )
             return NodeOutput(outputs={"gate_passed": True}, meta={"predicate": predicate})
 

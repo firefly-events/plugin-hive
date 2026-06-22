@@ -73,3 +73,55 @@ def test_gate_unknown_predicate_raises_with_hde3a_pointer():
 def test_empty_predicate_raises():
     with pytest.raises(GateFailedError):
         GateHandler().handle(_gate_node(""), inputs={}, run_id="rid-1")
+
+
+# --- #16: verdict gates (must equal / must not equal) ----------------------
+
+
+def test_must_equal_passes_on_match():
+    out = GateHandler().handle(
+        _gate_node("review_verdict must equal passed"),
+        inputs={"review_verdict": "passed"},
+        run_id="rid-1",
+    )
+    assert out.outputs["gate_passed"] is True
+
+
+def test_must_equal_fails_on_mismatch():
+    with pytest.raises(GateFailedError):
+        GateHandler().handle(
+            _gate_node("review_verdict must equal passed"),
+            inputs={"review_verdict": "needs_revision"},
+            run_id="rid-1",
+        )
+
+
+def test_must_not_equal_blocks_named_value():
+    """A needs_revision review must not silently integrate (#16)."""
+    with pytest.raises(GateFailedError):
+        GateHandler().handle(
+            _gate_node("review_verdict must not equal needs_revision"),
+            inputs={"review_verdict": "needs_revision"},
+            run_id="rid-1",
+        )
+
+
+def test_must_not_equal_passes_other_verdicts():
+    """passed and needs_optimization both proceed past the gate."""
+    handler = GateHandler()
+    for verdict in ("passed", "needs_optimization"):
+        out = handler.handle(
+            _gate_node("review_verdict must not equal needs_revision"),
+            inputs={"review_verdict": verdict},
+            run_id="rid-1",
+        )
+        assert out.outputs["gate_passed"] is True
+
+
+def test_must_not_equal_is_case_insensitive():
+    with pytest.raises(GateFailedError):
+        GateHandler().handle(
+            _gate_node("review_verdict must not equal needs_revision"),
+            inputs={"review_verdict": "NEEDS_REVISION"},
+            run_id="rid-1",
+        )
