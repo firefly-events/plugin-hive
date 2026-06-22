@@ -12,6 +12,7 @@ are the resolved input values from the materialised output graph.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
 
 from ..errors import GateFailedError
@@ -47,6 +48,14 @@ def _is_empty(value: Any) -> bool:
 
 class GateHandler:
     """Evaluates simple presence-style gate predicates."""
+
+    def __init__(self, repo_root: Path | str | None = None) -> None:
+        # Schema-validation predicates (e.g. "epic_dir must be valid plan-epic")
+        # check a path the agent committed into repo_root and reconcile merged
+        # there. The executor's cwd is the plugin/driver dir, NOT the consumer
+        # project, so a repo-relative epic_dir must be anchored to repo_root.
+        # None keeps legacy cwd-relative behavior for local/test callers.
+        self._repo_root = Path(repo_root) if repo_root is not None else None
 
     def handle(
         self,
@@ -115,7 +124,15 @@ class GateHandler:
             kwargs: dict[str, Any] = {}
             # Map known schema targets to their required kwargs
             if target == "plan-epic":
-                kwargs["epic_dir"] = value
+                # Anchor a repo-relative epic_dir to repo_root (the tree the
+                # agent committed into and reconcile materialised). Without this
+                # the gate resolves against the driver cwd and fails with
+                # "epic.yaml not found ... (nothing committed?)" even though the
+                # epic IS present in repo_root.
+                epic_dir_value = value
+                if self._repo_root is not None and not Path(str(value)).is_absolute():
+                    epic_dir_value = str(self._repo_root / str(value))
+                kwargs["epic_dir"] = epic_dir_value
             else:
                 # Generic fallback: pass value as positional first kwarg by name
                 kwargs[name] = value
