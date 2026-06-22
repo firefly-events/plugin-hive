@@ -92,6 +92,14 @@ needs_frontend: bool             # whether frontend implementation work is requi
 `.pHive/dag-outputs/outputs.yaml`** (create the directory) in your working
 copy, as a flat `key: value` YAML map — e.g.:
 
+> **Write it in YOUR OWN working directory, every run, no exceptions.** The path
+> is `.pHive/dag-outputs/outputs.yaml` RELATIVE to your current repo checkout
+> (after any `git checkout`). Do NOT search other workspaces, do NOT `cat` or
+> reuse an `outputs.yaml` from another task's work_dir, and do NOT skip the write
+> because a file "already exists" somewhere else — the executor harvests ONLY the
+> file in the work_dir of THIS task. A stale sibling file from a previous run is
+> NOT yours. If you do not create this file here, the run fails as an under-run.
+
 ```yaml
 preflight_status: READY
 needs_backend: false
