@@ -471,6 +471,22 @@ def test_harvest_artifacts_surfaces_uncommitted_brief(tmp_path):
     assert "OLD BRIEF" not in out.get("research_brief", "")
 
 
+def test_harvest_artifacts_no_git_checkout(tmp_path):
+    """Multica does not always materialise a repo checkout for a node — a design
+    task can run with the repo absent, writing .pHive/epics/... directly at the
+    work_dir root (no .git). Harvest must still surface the artifact.
+    """
+    work_dir = tmp_path / "task-work"
+    docs = work_dir / ".pHive/epics/ttt-game/docs"
+    docs.mkdir(parents=True)
+    (docs / "design-discussion.md").write_text("DESIGN DISCUSSION", encoding="utf-8")
+
+    out = MulticaAgentSpawn._harvest_artifacts(str(work_dir))
+    assert out.get("design_discussion") == "DESIGN DISCUSSION", (
+        "must surface design discussion even without a git checkout"
+    )
+
+
 def test_harvest_node_outputs_reads_declared_outputs(tmp_path):
     """#13: an agent's declared SEMANTIC outputs (needs_frontend, etc.) are
     written to .pHive/dag-outputs/outputs.yaml in its work_dir and surfaced as

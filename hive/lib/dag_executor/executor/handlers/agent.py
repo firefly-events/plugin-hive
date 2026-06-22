@@ -339,16 +339,32 @@ class MulticaAgentSpawn:
 
     @staticmethod
     def _find_repo_checkout(work_dir: str | None) -> Path | None:
-        """The git checkout dir inside the agent's work_dir (the dir itself, or
-        a single repo subdir under it). ``None`` if no checkout is found."""
+        """The dir holding the agent's planning artifacts inside its work_dir.
+
+        Prefer a git checkout (the work_dir itself or a single repo subdir under
+        it). But Multica does not always materialise a checkout for every node —
+        a design/research task can run with the repo absent, in which case the
+        agent writes ``.pHive/epics/...`` directly under the work_dir root (no
+        ``.git``). Fall back to whichever dir actually contains ``.pHive/epics``
+        so the git-less worktree scan in ``_harvest_artifacts`` can still surface
+        the brief/discussion. ``None`` if nothing is found.
+        """
         if not work_dir:
             return None
         wd = Path(work_dir)
         try:
+            children = sorted(p for p in wd.iterdir() if p.is_dir())
+            # 1. git checkout — preferred (enables committed-path scoping)
             if (wd / ".git").exists():
                 return wd
-            for child in sorted(p for p in wd.iterdir() if p.is_dir()):
+            for child in children:
                 if (child / ".git").exists():
+                    return child
+            # 2. no checkout — locate the dir that holds the written artifacts
+            if (wd / ".pHive" / "epics").is_dir():
+                return wd
+            for child in children:
+                if (child / ".pHive" / "epics").is_dir():
                     return child
         except OSError:
             return None
