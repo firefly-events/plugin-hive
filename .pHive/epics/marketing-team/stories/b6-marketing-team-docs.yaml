@@ -1,0 +1,76 @@
+id: b6-marketing-team-docs
+epic: marketing-team
+title: User docs for the marketing team + /marketing-campaign
+status: in_progress
+tracker_id: plugin-hive/PLU-380
+
+complexity: low
+methodology: classic
+depends_on: [b1-marketing-strategist-persona, b2-marketing-copywriter-persona, b3-ad-creative-persona, b4-wire-campaign-into-ship, b5-marketing-campaign-skill, b7-shared-visual-asset-skill]
+
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  A new persona surface + skill is not "done" until users can discover it
+  (feedback: new command/persona needs user docs — SKILL.md/persona files alone
+  are insufficient). Document the marketing team and the /marketing-campaign skill in the
+  README Quick Start and the operations-guide Commands/Personas reference.
+
+acceptance_criteria:
+  - "Given the README, then the marketing team (3 personas) and /marketing-campaign appear in the Quick Start / capabilities list with a one-line description each."
+  - "Given the operations guide, then /marketing-campaign is listed in the Commands Reference and the three personas in the personas/agents reference, including the consumer-only gating note."
+  - "Given the docs, then they state the team is conditional + consumer-gated (excluded from hive's own work), matching the b4 wiring."
+  - "Given the shared visual-asset skill (b7), then it gets a brief note in the operations-guide skills/agents reference describing it as an agent-facing render skill adaptable by ad-creative/ui-designer/logo-exploration (no top-level command)."
+
+steps:
+  - id: research
+    description: Locate the README Quick Start section and the operations-guide Commands/Personas reference; match their existing entry format (e.g. how /design + ui-designer are listed).
+    agent: researcher
+  - id: implement
+    description: Add marketing-team + /marketing-campaign entries to README and operations-guide in the established format, routed through the technical-writer.
+    agent: technical-writer
+    depends_on: [research]
+  - id: review
+    description: Confirm entries match house format, gating note is present, and nothing claims unconditional/hive activation.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit and push to the feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/.claude/worktrees/hive-composability-design
+  key_files:
+    - path: README.md
+      purpose: "Quick Start / capabilities list where new personas + skills are surfaced."
+    - path: hive/agents/ui-designer.md
+      purpose: "Reference for how the analogous UI persona/skill is documented (gating language to mirror)."
+
+files_to_modify:
+  - file: README.md
+    change: "Add marketing team + /marketing-campaign to Quick Start / capabilities."
+  - file: docs/operations-guide.md
+    change: "Add /marketing-campaign to Commands Reference; personas to the agents reference (confirm exact path during research)."
+
+design_decisions:
+  - decision: Docs gate the epic's completeness
+    rationale: "Per maintainer feedback, a new persona/command isn't shipped until README + operations-guide list it."
+
+cross_cutting: []
+
+metric:
+  applies: false
+  justification: "Documentation story; deliverable is discoverability. No falsifiable product metric."
+
+risks:
+  - severity: low
+    description: "operations-guide path/section may differ from assumption."
+    mitigation: "Research step confirms the exact file + section before writing."
+
+references:
+  - path: README.md
+    relevant_excerpt: |
+      Quick Start lists Hive's commands/personas; the marketing team + /marketing-campaign
+      are added here in the same format as the UI team + /design.

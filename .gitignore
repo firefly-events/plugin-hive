@@ -244,6 +244,8 @@ tsx-*/
 !.pHive/epics/artifact-lifecycle/**
 !.pHive/epics/dynamic-planning-team/
 !.pHive/epics/dynamic-planning-team/**
+!.pHive/epics/marketing-team/
+!.pHive/epics/marketing-team/**
 !.pHive/epics/plugin-hygiene/
 !.pHive/epics/plugin-hygiene/**
 !.pHive/epics/dag-flows-multica/
