@@ -394,6 +394,48 @@ class MulticaAgentSpawn:
         ]
 
     @staticmethod
+    def _uncommitted_phive_paths(repo_dir: Path) -> list[str]:
+        """Repo-relative ``.pHive/epics/...`` paths the agent WROTE but did not
+        commit (untracked or modified). Plan research/design agents write the
+        brief/discussion file but the author node is the one that commits — so
+        under the Multica binding the intermediate artifact lives only in the
+        producing agent's worktree, uncommitted. ``_committed_phive_paths``
+        returns ``[]`` (not ``None``) when the agent made no commit at all, which
+        skips the worktree fallback; this captures that case precisely without
+        over-scoping a consumer repo's pre-existing COMMITTED epics. Empty on any
+        git failure.
+        """
+        try:
+            result = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_dir),
+                    "status",
+                    "--porcelain",
+                    "--untracked-files=all",  # list files, not collapsed dirs
+                    "--",
+                    ".pHive/epics",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return []
+        if result.returncode != 0:
+            return []
+        paths: list[str] = []
+        for line in result.stdout.splitlines():
+            # porcelain v1: 2 status chars + space + path (renames use ` -> `)
+            rel = line[3:].strip() if len(line) > 3 else ""
+            if " -> " in rel:
+                rel = rel.split(" -> ", 1)[1]
+            if rel.startswith(".pHive/epics/"):
+                paths.append(rel)
+        return paths
+
+    @staticmethod
     def _harvest_node_outputs(work_dir: str | None) -> dict[str, Any]:
         """Read the node's declared SEMANTIC outputs that the agent wrote to
         ``.pHive/dag-outputs/outputs.yaml`` (or ``.json``) in its work_dir (#13).
@@ -472,6 +514,13 @@ class MulticaAgentSpawn:
                 ]
             except OSError:
                 return out
+
+        # Union in artifacts the agent wrote but did NOT commit (plan
+        # research/design write the brief; only the author node commits). Without
+        # this, a no-commit producer yields an empty committed-diff -> the
+        # downstream ``research_brief`` edge resolves to nothing and the run
+        # fails at the author node.
+        rels = sorted(set(rels) | set(MulticaAgentSpawn._uncommitted_phive_paths(repo_dir)))
 
         for rel in sorted(rels):
             parts = Path(rel).parts

@@ -431,6 +431,46 @@ def test_harvest_artifacts_scoped_to_committed_epic(tmp_path):
     assert out["epic_dir"] == ".pHive/epics/new-epic"
 
 
+def test_harvest_artifacts_surfaces_uncommitted_brief(tmp_path):
+    """Real failure mode: plan research/design write the brief but do NOT commit
+    (only the author node commits). A no-commit producer yields an empty
+    committed-diff, so the brief must be surfaced from the worktree (untracked),
+    while a pre-existing COMMITTED epic from another run must NOT leak in.
+    """
+    import subprocess as sp
+
+    work_dir = tmp_path / "task-work"
+    repo = work_dir / "ttt-throwaway"
+    repo.mkdir(parents=True)
+
+    def git(*args):
+        sp.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    git("branch", "-m", "main")
+
+    # Pre-existing COMMITTED epic on main (NOT this run's output)
+    old = repo / ".pHive/epics/old-epic/docs"
+    old.mkdir(parents=True)
+    (old / "research-brief.md").write_text("OLD BRIEF — must not surface", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "pre-existing epic")
+
+    # This agent's branch — writes its brief but DOES NOT COMMIT
+    git("checkout", "-q", "-b", "agent/researcher/abc")
+    new = repo / ".pHive/epics/ttt-game/docs"
+    new.mkdir(parents=True)
+    (new / "research-brief.md").write_text("UNCOMMITTED BRIEF", encoding="utf-8")
+
+    out = MulticaAgentSpawn._harvest_artifacts(str(work_dir))
+    assert out.get("research_brief") == "UNCOMMITTED BRIEF", (
+        "must surface the uncommitted brief the author node depends on"
+    )
+    assert "OLD BRIEF" not in out.get("research_brief", "")
+
+
 def test_harvest_node_outputs_reads_declared_outputs(tmp_path):
     """#13: an agent's declared SEMANTIC outputs (needs_frontend, etc.) are
     written to .pHive/dag-outputs/outputs.yaml in its work_dir and surfaced as
