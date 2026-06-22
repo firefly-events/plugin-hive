@@ -541,19 +541,29 @@ def test_branch_contract_targets_epic_branch(tmp_path):
 
 def test_under_run_raises_when_no_declared_output(tmp_path):
     """A Multica agent that 'completes' but produces none of its declared
-    semantic outputs must raise (so the node's retry re-dispatches), not limp on
-    with only commit metadata."""
+    semantic outputs must raise after a bounded number of re-dispatch attempts
+    (under-run self-heal), not limp on with only commit metadata."""
     from types import SimpleNamespace
     from hive.lib.dag_executor.executor.handlers.agent import AgentHandler
 
     spawn = _make_spawn(tmp_path)  # real MulticaAgentSpawn
-    side_effects = [
-        _make_subprocess_result(_create_issue_result()),
-        _make_subprocess_result(_dispatch_result()),
-        # completed, work_dir empty of artifacts -> only metadata harvested
-        _make_subprocess_result(_completed_poll_result(work_dir=str(tmp_path / "empty"))),
-    ]
     (tmp_path / "empty").mkdir()
+
+    dispatch_count = [0]
+
+    def side_effect(*args, **kwargs):
+        cmd = args[0]
+        sub = cmd[2]
+        if sub == "create-issue":
+            return _make_subprocess_result(_create_issue_result())
+        if sub == "dispatch":
+            dispatch_count[0] += 1
+            return _make_subprocess_result(_dispatch_result())
+        # every poll returns completed with an empty work_dir -> under-run
+        return _make_subprocess_result(
+            _completed_poll_result(work_dir=str(tmp_path / "empty"))
+        )
+
     node = SimpleNamespace(
         id="author",
         agent="technical-writer",
@@ -561,6 +571,8 @@ def test_under_run_raises_when_no_declared_output(tmp_path):
         outputs=[SimpleNamespace(name="epic_dir"), SimpleNamespace(name="commit_sha")],
     )
     handler = AgentHandler(spawn=spawn)
-    with patch("subprocess.run", side_effect=side_effects):
+    with patch("subprocess.run", side_effect=side_effect):
         with pytest.raises(AgentHandlerError, match="under-run"):
             handler.handle(node, inputs={}, run_id="run-1")
+    # re-dispatched the bounded number of times before giving up
+    assert dispatch_count[0] == 3, "under-run must re-dispatch up to 3 times"

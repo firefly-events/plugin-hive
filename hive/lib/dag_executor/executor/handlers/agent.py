@@ -953,51 +953,60 @@ class AgentHandler:
         if node.step_file:
             step_file_content = self._read_step_file(node.step_file)
 
-        try:
-            outputs = self._spawn(
-                agent=node.agent,
-                step_file_content=step_file_content,
-                inputs=dict(inputs),
-                run_id=run_id,
-                step_id=node.id,
-            )
-        except AgentHandlerError:
-            raise
-        except Exception as exc:  # pragma: no cover — exercised in tests
-            raise AgentHandlerError(
-                f"agent-spawn dispatch failed for node {node.id!r}: {exc}"
-            ) from exc
+        # #22: under-run guard with built-in re-dispatch (Multica binding only).
+        # A Multica agent can report 'completed' yet end its session without
+        # producing its work (it does the bootstrap 'multica issue get' but its
+        # turn ends before writing outputs.yaml / committing). The spawn still
+        # returns commit/task METADATA from git HEAD, so the run would otherwise
+        # limp on and fail a downstream node with a confusing "input X was not
+        # produced". An under-run is transient — a fresh agent run usually
+        # produces the work — so re-dispatch a bounded number of times here
+        # (covers ALL Multica agent nodes; no per-node `retry:` needed). Scoped to
+        # MulticaAgentSpawn: local/test spawns return canned/explicit outputs and
+        # an empty one is intentional. (NOT keyed off the forced_stop interrupt
+        # marker, which is written on every Stop event and is not a failure
+        # signal.)
+        is_multica = isinstance(self._spawn, MulticaAgentSpawn)
+        semantic_outputs = [
+            getattr(o, "name", None)
+            for o in (getattr(node, "outputs", None) or [])
+            if getattr(o, "name", None)
+            and getattr(o, "name", None) not in _SPAWN_METADATA_OUTPUTS
+        ]
+        max_under_run_attempts = 3 if (is_multica and semantic_outputs) else 1
 
-        if not isinstance(outputs, dict):
-            raise AgentHandlerError(
-                f"agent-spawn returned non-dict outputs for node {node.id!r}"
-            )
+        outputs: dict[str, Any] = {}
+        for attempt in range(1, max_under_run_attempts + 1):
+            try:
+                outputs = self._spawn(
+                    agent=node.agent,
+                    step_file_content=step_file_content,
+                    inputs=dict(inputs),
+                    run_id=run_id,
+                    step_id=node.id,
+                )
+            except AgentHandlerError:
+                raise
+            except Exception as exc:  # pragma: no cover — exercised in tests
+                raise AgentHandlerError(
+                    f"agent-spawn dispatch failed for node {node.id!r}: {exc}"
+                ) from exc
 
-        # #22: under-run guard (Multica binding only). A Multica agent can report
-        # 'completed' yet end its session without producing its work (observed on
-        # the heaviest plan node, the author, intermittently). The spawn still
-        # returns commit/task METADATA derived from git HEAD, so the run limps on
-        # and fails two nodes later with a confusing "input epic_dir ... was not
-        # produced". Detect it here: if EVERY declared SEMANTIC output (excluding
-        # spawn metadata) is empty, raise AgentHandlerError so a node-level
-        # `retry:` re-dispatches — the under-run is transient and a fresh agent
-        # run usually produces the work. Scoped to MulticaAgentSpawn: local/test
-        # spawns return canned/explicit outputs and an empty one is intentional.
-        # (NOT keyed off the .pHive/interrupts forced_stop marker, which is
-        # written on every Stop event and is not a failure signal.)
-        if isinstance(self._spawn, MulticaAgentSpawn):
-            declared = [
-                getattr(o, "name", None)
-                for o in (getattr(node, "outputs", None) or [])
-            ]
-            semantic = [
-                n for n in declared if n and n not in _SPAWN_METADATA_OUTPUTS
-            ]
-            if semantic and all(_output_is_empty(outputs.get(n)) for n in semantic):
+            if not isinstance(outputs, dict):
+                raise AgentHandlerError(
+                    f"agent-spawn returned non-dict outputs for node {node.id!r}"
+                )
+
+            under_run = bool(semantic_outputs) and all(
+                _output_is_empty(outputs.get(n)) for n in semantic_outputs
+            )
+            if not (is_multica and under_run):
+                break
+            if attempt >= max_under_run_attempts:
                 raise AgentHandlerError(
                     f"node {node.id!r}: agent reported completed but produced none "
-                    f"of its declared outputs {semantic} (under-run) — retrying if "
-                    f"the node allows"
+                    f"of its declared outputs {semantic_outputs} after "
+                    f"{max_under_run_attempts} attempts (under-run)"
                 )
 
         # hde-4 Risk #9 guard: when this node ran in a parallel branch
