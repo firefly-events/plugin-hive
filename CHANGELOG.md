@@ -9,6 +9,19 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.12.1] - 2026-06-21
+
+**The substrate that runs Hive's own flows now runs on Multica — and the team that announces a release now has a home.** This release lands the DAG-on-Multica execution substrate (Hive's deterministic flow engine running its agent work through Multica) and a consumer-gated marketing team, both reviewed cross-LLM (Codex) before merge.
+
+### Added
+
+- **DAG-on-Multica execution substrate** (epic `dag-flows-multica`, PR #310). Hive's DAG executor now runs plan / execute (classic·tdd·bdd) / test / review flows on a shared substrate where the DAG owns flow, gates, routing, schema-validation, and resume, while Multica provides agent execution behind the `AgentSpawn` Protocol. Includes the `MulticaAgentSpawn` binding (idempotent on run_id+step_id, surfaces terminal failures), an explicit reconcile node (ff-merges agent commits before the gate), real schema-validation gates (`validate_output`), bounded per-node retry (`Node.retry`, executed by the walker), a unified per-flow backend resolver (`HIVE_{FLOW}_MODE`), episode markers, and cross-flow resume.
+- **Consumer-gated marketing team** (epic `marketing-team`, PR #307). New `marketing-strategist`, `marketing-copywriter`, and `ad-creative` personas plus a `/marketing-campaign` skill that turns a changelog into a launch campaign under `.pHive/campaigns/<topic>/`. Wired as a `/ship` step-9 hook that is double-gated (consumer-app project + explicit `--campaign`/`ship.campaign` opt-in) and a silent no-op for Hive's own internal work.
+
+### Fixed
+
+- Resolved two pre-existing `dag_executor` test failures (a `daily-ceremony` dangling dependency ref and a `test-swarm` skip-cascade when an opt-in node is absent).
+
 ## [2.12.0] - 2026-06-20
 
 **Plan and ship like a human — visually rich planning docs, human-readable release notes by default, requirement-driven planning teams, a self-cleaning runtime, and the first cut of a persistent SDLC orchestrator.**
