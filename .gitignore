@@ -62,6 +62,8 @@ state/
 !.pHive/epics/sandcastle-gh-issue-dispatch/**
 !.pHive/epics/exec-discipline-may2026/
 !.pHive/epics/exec-discipline-may2026/**
+!.pHive/epics/exec-followons/
+!.pHive/epics/exec-followons/**
 !.pHive/epics/skill-ergo-may2026/
 !.pHive/epics/skill-ergo-may2026/**
 !.pHive/epics/per-epic-branch-pr-flow/
