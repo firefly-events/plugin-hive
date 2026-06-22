@@ -1,8 +1,8 @@
-cycle_id: meta-2026-06-20
-started: '2026-06-20T00:00:00Z'
+cycle_id: meta-2026-06-22
+started: '2026-06-22T00:00:00Z'
 status: closed
 phase: close
-closed: '2026-06-20T00:00:00Z'
+closed: '2026-06-22T00:00:00Z'
 charter_constraints:
   - operate only on hive/references/**, hive/agents/**, hive/workflows/**, hive/lib/**,
     skills/hive/agents/memories/**, .pHive/meta-team/**, .pHive/teams/**
@@ -12,36 +12,59 @@ charter_constraints:
   - no changes to hive/hive.config.yaml without human confirmation
   - no new external service integrations without human confirmation
 prior_cycle:
-  id: meta-2026-06-16
+  id: meta-2026-06-20
   outcome: passed
 steps:
   step_01_boot:
-    started_at: '2026-06-20T00:00:00Z'
+    started_at: '2026-06-22T00:00:00Z'
     baseline_available: true
     run_id: meta-2026-05-01
     events_path: .pHive/metrics/events/meta-2026-05-01.jsonl
     prior_cycle_status: closed
   step_02_analysis:
-    findings_count: 0
+    findings_count: 4
     metric_signal: false
     external_candidates_count: 0
-    routing: step-03b (findings_count=0 AND external_candidates_count=0 AND metric_signal=false)
+    routing: step-03 (findings_count=4 > 0)
     summary: >
-      Structural audit of hive/agents/**, hive/references/**, hive/workflows/steps/meta-team-cycle/**,
-      skills/hive/agents/memories/**, hive/GUIDE.md. Since last cycle (meta-2026-06-16 / rollback_ref
-      adcfa5af): orchestrator.md gained new --lite/--skip-sign-off/--skip-research planning-flag rows
-      and a planning-format-contract reference entry (content addition, no schema inconsistency).
-      New reference files artifact-lifecycle.md (102 lines), cycle-reconciler.md (422 lines),
-      planning-format-contract.md (266 lines) all substantive — not stubs. All 12 step files present
-      with 7-section schema. All 25 agents have valid frontmatter. No MEMORY_GAP (all 25 agents >=1
-      memory). Model IDs current (budget-gate.js: claude-opus-4-8, claude-sonnet-4-6,
-      claude-haiku-4-5-20251001). STUB_DOC hive-cloud-roadmap.md (13 lines) remains out_of_scope
-      (S16 placeholder, 17th+ consecutive deferral). Dedup pre-flight: open PR #304
-      (meta-meta/nightly-20260619) covers candidate 001 (MANIFEST.md) — suppressed.
-    findings: []
-    findings_suppressed:
-      - location: .pHive/meta-team/archive/2026-04-19/MANIFEST.md
-        reason: candidate mmo-2026-04-21-001 already proposed in open PR #304 (meta-meta/nightly-20260619)
+      In-flight PR pre-flight: 0 open PRs against develop or main — clean dedup gate.
+      Since last cycle (meta-2026-06-20 / commit 6e9319b7): PR #314 (feat/dag-step-file-plugin-root)
+      merged 3 new marketing agent personas into hive/agents/ (ad-creative.md,
+      marketing-copywriter.md, marketing-strategist.md) and updated ui-designer.md.
+      SCHEMA_INCONSISTENCY: hive/GUIDE.md still says "25 Personas" but there are now 28 agent
+      files; the 3 new marketing agents are absent from all roster tables (Model Tier Routing,
+      agent section tables). MEMORY_GAP × 3: ad-creative, marketing-copywriter, marketing-strategist
+      have no starter memory directories under skills/hive/agents/memories/. All 12 step files
+      complete (7/7 sections). All 28 agents have valid frontmatter. All workflow YAML step_file
+      refs resolve. Model IDs current (claude-opus-4-8, claude-sonnet-4-6, claude-haiku-4-5-20251001).
+      STUB_DOC hive-cloud-roadmap.md (13 lines) remains out_of_scope (S16 placeholder, 18th+
+      consecutive deferral).
+    findings:
+      - id: finding-1
+        category: SCHEMA_INCONSISTENCY
+        severity: medium
+        location: hive/GUIDE.md
+        description: "Agent Roster heading says 25 Personas; 3 new marketing agents absent from all roster tables"
+        evidence: "Line 201: '## Agent Roster (25 Personas)'; hive/agents/ contains 28 .md files; ad-creative, marketing-copywriter, marketing-strategist not in Model Tier Routing or any section table"
+      - id: finding-2
+        category: MEMORY_GAP
+        severity: low
+        location: skills/hive/agents/memories/ad-creative/
+        description: "New agent ad-creative has no starter memory directory"
+        evidence: "hive/agents/ad-creative.md exists; skills/hive/agents/memories/ad-creative/ absent"
+      - id: finding-3
+        category: MEMORY_GAP
+        severity: low
+        location: skills/hive/agents/memories/marketing-copywriter/
+        description: "New agent marketing-copywriter has no starter memory directory"
+        evidence: "hive/agents/marketing-copywriter.md exists; skills/hive/agents/memories/marketing-copywriter/ absent"
+      - id: finding-4
+        category: MEMORY_GAP
+        severity: low
+        location: skills/hive/agents/memories/marketing-strategist/
+        description: "New agent marketing-strategist has no starter memory directory"
+        evidence: "hive/agents/marketing-strategist.md exists; skills/hive/agents/memories/marketing-strategist/ absent"
+    findings_suppressed: []
   step_02b_external_research:
     external_research_candidates_count: 0
     summary: >
@@ -50,65 +73,118 @@ steps:
   step_02c_kg_signal:
     kg_findings_count: 0
     summary: >
-      Step 02c runs via /meta-optimize SKILL routing only; skipped for
-      maintainer cycle. kg.sqlite absent. kg_signal findings=0
-      miss_reason=empty_kg.
-  step_03b_backlog_fallback:
-    routing: "step-03b (AND-of-empty: findings=0, external=0, metric_signal=false)"
-    filtered_count: 0
-    selected_candidate_id: mmo-2026-04-21-002
-    selected_target: .pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md
-    decision: selected
-    summary: >
-      Loaded queue-meta-meta-optimize.yaml (3 candidates, all status: pending).
-      Candidate 001 (MANIFEST.md) suppressed by open PR #304 (mmo-2026-04-21-001).
-      Candidate 003 (ledger.yaml) discarded at selection time: '# frozen:' comment
-      already present at line 1 of develop (written by meta-2026-04-29). Per
-      candidate safety notes, discard when target is no longer in expected pre-change
-      state. Candidate 002 (AUDIT-NOTE.md): no open PR covers this file; target exists;
-      current footers are meta-2026-06-09 and meta-2026-06-12; append meta-2026-06-20
-      footer is a deterministic ADD. Selected.
+      kg.sqlite absent. kg_signal findings=0 miss_reason=empty_kg.
+  step_03_proposal:
+    routing: "step-03 (findings_count=4 > 0)"
+    proposals:
+      - proposal_id: prop-1
+        finding_id: finding-1
+        target: hive/GUIDE.md
+        action: "Update roster count 25→28; add 3 marketing agents to Model Tier Routing (Sonnet row) and add Marketing Agents section"
+        verdict: accept
+      - proposal_id: prop-2
+        finding_id: finding-2
+        target: skills/hive/agents/memories/ad-creative/
+        action: "Create starter memory directory with one pitfall memory"
+        verdict: accept
+      - proposal_id: prop-3
+        finding_id: finding-3
+        target: skills/hive/agents/memories/marketing-copywriter/
+        action: "Create starter memory directory with one pattern memory"
+        verdict: accept
+      - proposal_id: prop-4
+        finding_id: finding-4
+        target: skills/hive/agents/memories/marketing-strategist/
+        action: "Create starter memory directory with one pattern memory"
+        verdict: accept
   step_04_implementation:
-    worktree: .pHive/meta-team/worktrees/meta-2026-06-20/
-    change: "Appended '<!-- indexed-for-meta-meta-optimize proving run: meta-2026-06-20 -->' footer to AUDIT-NOTE.md (3rd such line)"
-    diff_lines: +1
+    worktree: .pHive/meta-team/worktrees/meta-2026-06-22/
+    changes:
+      - file: hive/GUIDE.md
+        type: update
+        description: "Updated Agent Roster heading 25→28; added marketing-strategist, marketing-copywriter, ad-creative to Sonnet tier row; added Marketing Agents section with 3 rows"
+        diff_lines: "+9 -2"
+      - file: skills/hive/agents/memories/ad-creative/prompt-specificity-drives-asset-quality.md
+        type: create
+        description: "Starter pitfall memory: vague image-gen prompts produce generic assets; anchor prompts to brief"
+        diff_lines: "+26"
+      - file: skills/hive/agents/memories/marketing-copywriter/brief-before-copy.md
+        type: create
+        description: "Starter pattern memory: read full campaign brief before writing any copy"
+        diff_lines: "+26"
+      - file: skills/hive/agents/memories/marketing-strategist/positioning-before-brief.md
+        type: create
+        description: "Starter pattern memory: lock positioning statement before writing campaign brief"
+        diff_lines: "+19"
   step_05_testing:
     verdict: pass
-    diff_scope: "+1 line, single file, append-only"
-    notes: "Diff verified: exactly one line added at EOF of AUDIT-NOTE.md. No other files modified. Frozen archive; no live consumers."
+    diff_scope: "+80 lines across 4 files, all additive, no deletions of substantive content"
+    notes: "GUIDE.md diff verified: 9 insertions 2 deletions (count + table rows). 3 new memory files: pure additions. No live workflows or runtime code consume these paths."
   step_06_evaluation:
     verdict: accept
-    baseline_run_id: meta-2026-05-01
-    notes: "Append-only, deterministic, reversible. Consistent with prior mmo-002 cycles (meta-2026-06-09, meta-2026-06-12)."
+    notes: "All 4 changes address real findings from structural audit. All are additive. All within charter scope. No schema breaks. Consistent with prior GUIDE.md + memory-starter patterns."
   step_07_promotion:
     adapter: DirectCommitAdapter
     repo_path: /home/user/plugin-hive
+    target_branch: meta-meta/nightly-20260622
     status: promoted
-    commit_ref: 31f9b85403de7fac6b13a89e174068da364cbb43
-    rollback_target: 0381e01e10cba0197eec6309b83f016afd386f88
+    commit_ref: 327925bb10d75742767c6053f322059acd757c29
+    rollback_target: 5b2e3ce2f2d459cc4449927889ce3f2c53aa2b1c
 summary:
-  total_findings: 0
-  proposals_generated: 1
-  changes_attempted: 1
-  changes_promoted: 1
+  total_findings: 4
+  proposals_generated: 4
+  changes_attempted: 4
+  changes_promoted: 4
   changes_reverted: 0
   flagged_for_human: 0
   cycle_verdict: passed
 closure_evidence:
-  commit_ref: 31f9b85403de7fac6b13a89e174068da364cbb43
+  commit_ref: 327925bb10d75742767c6053f322059acd757c29
   metrics_snapshot:
     tokens: 0
     wall_clock_ms: 5000
     first_attempt_pass: true
-  rollback_ref: 0381e01e10cba0197eec6309b83f016afd386f88
+  rollback_ref: 5b2e3ce2f2d459cc4449927889ce3f2c53aa2b1c
 decision: accept
 regression_watch:
   state: armed
-  armed_at: '2026-06-20T00:00:00Z'
-  observation_window_end: '2026-06-20T04:00:00Z'
-findings: []
+  armed_at: '2026-06-22T00:00:00Z'
+  observation_window_end: '2026-06-22T04:00:00Z'
+findings:
+  - id: finding-1
+    category: SCHEMA_INCONSISTENCY
+    severity: medium
+    location: hive/GUIDE.md
+    description: "Agent Roster heading says 25 Personas; 3 new marketing agents absent from all roster tables"
+  - id: finding-2
+    category: MEMORY_GAP
+    severity: low
+    location: skills/hive/agents/memories/ad-creative/
+    description: "New agent ad-creative has no starter memory directory"
+  - id: finding-3
+    category: MEMORY_GAP
+    severity: low
+    location: skills/hive/agents/memories/marketing-copywriter/
+    description: "New agent marketing-copywriter has no starter memory directory"
+  - id: finding-4
+    category: MEMORY_GAP
+    severity: low
+    location: skills/hive/agents/memories/marketing-strategist/
+    description: "New agent marketing-strategist has no starter memory directory"
 changes:
-  - file: .pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md
-    type: append
-    description: "Appended indexed-for-meta-meta-optimize proving run footer line for meta-2026-06-20 (3rd such line)"
-    commit_ref: 31f9b85403de7fac6b13a89e174068da364cbb43
+  - file: hive/GUIDE.md
+    type: update
+    description: "Updated Agent Roster heading 25→28; added 3 marketing agents to Sonnet tier; added Marketing Agents section"
+    commit_ref: 327925bb10d75742767c6053f322059acd757c29
+  - file: skills/hive/agents/memories/ad-creative/prompt-specificity-drives-asset-quality.md
+    type: create
+    description: "Starter pitfall memory for ad-creative"
+    commit_ref: 327925bb10d75742767c6053f322059acd757c29
+  - file: skills/hive/agents/memories/marketing-copywriter/brief-before-copy.md
+    type: create
+    description: "Starter pattern memory for marketing-copywriter"
+    commit_ref: 327925bb10d75742767c6053f322059acd757c29
+  - file: skills/hive/agents/memories/marketing-strategist/positioning-before-brief.md
+    type: create
+    description: "Starter pattern memory for marketing-strategist"
+    commit_ref: 327925bb10d75742767c6053f322059acd757c29
