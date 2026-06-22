@@ -1,7 +1,9 @@
 id: s6-multica-spawn
 epic: dag-flows-multica
 title: MulticaAgentSpawn binding (Python) + Codex-headless smoke
-status: blocked
+status: shipped
+shipped_at: "2026-06-22T01:30:00Z"
+release_id: "v2.12.1"
 complexity: high
 methodology: classic
 depends_on: [s2-run-frontdoor, s5-multica-bridge]

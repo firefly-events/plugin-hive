@@ -1,7 +1,9 @@
 id: b4-wire-campaign-into-ship
 epic: marketing-team
 title: Wire /marketing-campaign into the /ship post-release lifecycle (changelog-driven, consumer-gated)
-status: in_progress
+status: shipped
+shipped_at: "2026-06-22T01:30:00Z"
+release_id: "v2.12.1"
 tracker_id: plugin-hive/PLU-379
 
 complexity: medium

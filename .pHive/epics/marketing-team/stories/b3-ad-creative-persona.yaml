@@ -1,7 +1,9 @@
 id: b3-ad-creative-persona
 epic: marketing-team
 title: Author the ad-creative persona
-status: in_progress
+status: shipped
+shipped_at: "2026-06-22T01:30:00Z"
+release_id: "v2.12.1"
 tracker_id: plugin-hive/PLU-376
 
 complexity: medium

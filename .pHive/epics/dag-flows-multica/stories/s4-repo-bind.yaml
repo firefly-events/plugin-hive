@@ -1,7 +1,9 @@
 id: s4-repo-bind
 epic: dag-flows-multica
 title: Finish Multica repo-binding (wire ensureRepos + un-defer multica-init)
-status: blocked
+status: shipped
+shipped_at: "2026-06-22T01:30:00Z"
+release_id: "v2.12.1"
 complexity: low
 methodology: classic
 depends_on: [s0-multica-upgrade, s0b-pull-studio-fork]
