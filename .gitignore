@@ -262,3 +262,5 @@ tsx-*/
 # on-demand and never committed. Re-ignore AFTER the epic allowlists above so the
 # PNG is excluded even inside un-ignored epic dirs (last-match-wins).
 .pHive/epics/**/docs/*.png
+!.pHive/epics/hermes-orchestrator-skills-local/
+!.pHive/epics/hermes-orchestrator-skills-local/**

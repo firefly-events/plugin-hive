@@ -1,0 +1,66 @@
+id: h-03-gate-state-latch
+epic: hermes-orchestrator-skills-local
+title: Harden the gate_state pre_approved latch + epic-of-record pointer
+status: pending
+complexity: medium
+methodology: classic
+side: plugin-hive
+depends_on: []
+
+description: |
+  The autonomy boundary. reconcile-tick and kickoff-exec may advance work ONLY
+  when the epic's hermes_reconciler.gate_state == "pre_approved". That flag is
+  written by a human approval action (post-plan), and is the single mechanism that
+  keeps lights-on execution bounded by "a human approved THIS epic to run."
+
+  This story pins the contract: the gate_state field semantics + transitions
+  (null -> pre_approved by human; -> halted on review-verdict-await; back to
+  pre_approved on human continue), an epic-of-record pointer so a tick knows which
+  epic it owns, and the write path (cli.mjs write-state — never touch YAML directly).
+
+acceptance_criteria:
+  - "Given an epic with gate_state null, when reconcile-tick/kickoff-exec evaluate it, then they refuse to advance and report 'not approved'."
+  - "Given a human approval action, when applied, then gate_state becomes pre_approved via cli.mjs write-state and persists across ticks."
+  - "Given a review-terminal verdict awaiting human action, when reached, then gate_state transitions to a halted/awaiting value that blocks further advance until the human continues."
+  - "Given multiple open epics, when a tick runs, then the epic-of-record pointer unambiguously selects which epic this Hermes instance reconciles."
+  - "Given any state change, when written, then it goes through cli.mjs write-state (single durable-write path) and is documented in cycle-reconciler state schema."
+
+steps:
+  - id: research
+    description: Read hermes_reconciler state fields + write-state in cli.mjs/state.mjs; identify where gate_state + epic-of-record live.
+    agent: researcher
+  - id: implement
+    description: Define + enforce gate_state transitions and the epic-of-record pointer; extend write-state if needed; update the cycle-reconciler state schema doc.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Tests for each transition (null refuse, approve, halt-on-verdict, continue) + epic selection.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm no direct-YAML writes; transitions complete + documented.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/hermes-orchestrator-skills.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/references/cycle-reconciler.md
+      purpose: §1 hermes_reconciler state fields incl gate_state; transitions to formalize.
+    - path: hive/lib/multica-story-dispatch/cli.mjs
+      purpose: write-state subcommand — the only durable state writer.
+
+risks:
+  - severity: high
+    description: A loophole letting advance proceed without pre_approved breaks the whole human-gate north star.
+    mitigation: Refuse-by-default; test the null path explicitly; reconcile-tick/kickoff-exec read this latch first, before any dispatch.
+
+references:
+  - path: .pHive/epics/hermes-orchestrator-skills/docs/design-discussion.md
+    relevant_excerpt: |
+      §3: gate_state: pre_approved is the load-bearing latch ... keeps lights-on
+      autonomy bounded by "human approved this epic to run."
