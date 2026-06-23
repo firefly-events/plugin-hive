@@ -402,7 +402,7 @@ def test_harvest_artifacts_scoped_to_committed_epic(tmp_path):
     repo.mkdir(parents=True)
 
     def git(*args):
-        sp.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+        sp.run(["git", "-C", str(repo), *args], check=True, capture_output=True)  # noqa: S603,S607
 
     git("init", "-q")
     git("config", "user.email", "t@t")
@@ -444,7 +444,7 @@ def test_harvest_artifacts_surfaces_uncommitted_brief(tmp_path):
     repo.mkdir(parents=True)
 
     def git(*args):
-        sp.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+        sp.run(["git", "-C", str(repo), *args], check=True, capture_output=True)  # noqa: S603,S607
 
     git("init", "-q")
     git("config", "user.email", "t@t")
@@ -512,11 +512,16 @@ def test_branch_contract_targets_epic_branch(tmp_path):
     import subprocess as sp
     repo = tmp_path / "proj"
     repo.mkdir()
-    def git(*a): sp.run(["git","-C",str(repo),*a], check=True, capture_output=True)
-    git("init","-q"); git("config","user.email","t@t"); git("config","user.name","t")
-    git("branch","-m","main")
-    (repo/"f").write_text("x"); git("add","-A"); git("commit","-q","-m","c")
-    git("remote","add","origin",str(repo))  # so origin/main resolves as default
+    def git(*a):
+        sp.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: S603,S607
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    git("branch", "-m", "main")
+    (repo / "f").write_text("x")
+    git("add", "-A")
+    git("commit", "-q", "-m", "c")
+    git("remote", "add", "origin", str(repo))  # so origin/main resolves as default
     git("fetch","-q","origin")
 
     spawn_default = MulticaAgentSpawn(cli_path=tmp_path/"cli.mjs", repo_root=repo)
@@ -538,10 +543,15 @@ def test_branch_contract_empty_without_resolvable_remote(tmp_path):
     import subprocess as sp
     repo = tmp_path / "noremote"
     repo.mkdir()
-    def git(*a): sp.run(["git", "-C", str(repo), *a], check=True, capture_output=True)
-    git("init", "-q"); git("config", "user.email", "t@t"); git("config", "user.name", "t")
+    def git(*a):
+        sp.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: S603,S607
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
     git("checkout", "-q", "-b", "feat/orphan")
-    (repo / "f").write_text("x"); git("add", "-A"); git("commit", "-q", "-m", "c")
+    (repo / "f").write_text("x")
+    git("add", "-A")
+    git("commit", "-q", "-m", "c")
     # No `git remote add origin` — origin/HEAD and origin/{main,master,develop} all unresolvable.
 
     spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs", repo_root=repo)

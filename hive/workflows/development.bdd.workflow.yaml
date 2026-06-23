@@ -135,7 +135,11 @@ steps:
     outputs:
       - name: reconcile_status
         type: string
-    optional: true
+    # NON-optional barrier: ReconcileHandler is a clean no-op when sha is absent
+    # (local binding), so this never spuriously fails there. With a real sha, a
+    # materialisation failure MUST fail the run loud — not be downgraded — or
+    # review/test downstream read a stale tree.
+    optional: false
     timeout_ms: 120000
 
   - id: test

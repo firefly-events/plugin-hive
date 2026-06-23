@@ -609,9 +609,9 @@ class MulticaAgentSpawn:
             return out
 
         rels = MulticaAgentSpawn._committed_phive_paths(repo_dir)
-        if rels is None:
-            # git/base unavailable — fall back to a worktree scan (correct for a
-            # fresh single-epic repo; may over-scope a multi-epic consumer repo).
+        if rels is None and not (repo_dir / ".git").exists():
+            # No git at all (fresh single-epic worktree) — a glob scan is correct
+            # here; there is no pre-existing history to confuse it with.
             try:
                 rels = [
                     str(p.relative_to(repo_dir))
@@ -622,6 +622,12 @@ class MulticaAgentSpawn:
                 ]
             except OSError:
                 return out
+        elif rels is None:
+            # FAIL CLOSED: a real git checkout with no resolvable base ref cannot
+            # safely tell THIS run's committed files from a consumer repo's
+            # pre-existing epics — scanning all of them would over-harvest and
+            # falsely satisfy declared outputs. Harvest nothing committed.
+            rels = []
 
         # Union in artifacts the agent wrote but did NOT commit (plan
         # research/design write the brief; only the author node commits). Without

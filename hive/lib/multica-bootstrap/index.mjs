@@ -335,8 +335,10 @@ export function seedConsumerGitignoreWithDeps({ repoRoot = process.cwd(), fs: fs
   let content = '';
   try {
     content = fsFn.readFileSync(gitignorePath, 'utf8');
-  } catch {
-    // file does not exist — will create it
+  } catch (error) {
+    // Only a missing file is benign (we'll create it). A permissions/I/O error
+    // must NOT be treated as empty — that would overwrite an existing .gitignore.
+    if (error?.code !== 'ENOENT') throw error;
   }
   const lines = content === '' ? [] : content.split('\n');
   // Remove trailing empty element from a newline-terminated file so we don't

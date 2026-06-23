@@ -1211,9 +1211,13 @@ def _per_node_reconcile(
     execution path), this materialises the committed work into repo_root
     before any downstream node — especially the review agent — is
     dispatched. No-op when commit_sha is absent (local binding; work is
-    already in the tree). FAIL LOUD when a commit IS present but cannot be
-    materialised: the reconcile HandlerError is recorded in telemetry and then
-    re-raised, so the run halts rather than letting review read a stale tree.
+    already in the tree).
+
+    Best-effort early materialisation only: a HandlerError here is recorded in
+    telemetry but NOT re-raised. The authoritative, fail-loud, resume-safe
+    barrier is the graph's NON-optional reconcile node (review/test depend on
+    it) — raising from this inline call would happen outside the walker's
+    node-failure recording, leaving resume to re-expose a stale tree (#5).
     """
     sha = (output.outputs or {}).get("commit_sha") or ""
     if not sha:
@@ -1239,17 +1243,15 @@ def _per_node_reconcile(
             {"per_node_reconcile": True},
         )
     except HandlerError as exc:
-        # The implement node produced a real commit (sha present) but it could
-        # NOT be materialised into repo_root. Proceeding would let the downstream
-        # review run on a STALE tree — silently passing code it never saw, the
-        # exact failure s2 exists to prevent. Record, then FAIL LOUD instead of
-        # swallowing (NON_FF on the Multica substrate reaches this path).
+        # Best-effort only — record but do NOT re-raise (raising here is outside
+        # the walker's node-failure recording and would make resume re-expose a
+        # stale tree, #5). The non-optional graph reconcile node is the
+        # authoritative fail-loud barrier that downstream review/test depend on.
         telemetry.emit(
             "node_failed",
             reconcile_node.id,
             {"per_node_reconcile": True, "error": str(exc)},
         )
-        raise
 
 
 def _maybe_open_worktree(worktree_manager: Any | None, run_id: str):

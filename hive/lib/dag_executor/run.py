@@ -135,11 +135,22 @@ def resolve_spawn_binding(
     )
 
 
-def assemble_dispatcher(spawn: Any, *, repo_root: Path | str | None = None) -> Any:
+def assemble_dispatcher(
+    spawn: Any,
+    *,
+    repo_root: Path | str | None = None,
+    plugin_root: Path | str | None = None,
+) -> Any:
     """Build a Dispatcher with a real AgentHandler bound to `spawn`.
 
     Gate/Script/Pause handlers come from the Dispatcher's defaults; only the
     AGENT handler needs the runtime spawn dependency injected here.
+
+    ``plugin_root`` defaults to the shipped plugin root ONLY when ``repo_root``
+    is set (a consumer project, where plugin-shipped step_files must resolve
+    against the plugin). A rootless caller (``repo_root=None``) keeps the legacy
+    as-given step_file path so a custom relative ``step_file`` is not silently
+    redirected into the plugin tree.
     """
     from hive.lib.dag_executor.executor import AgentHandler, Dispatcher
     from hive.lib.dag_executor.executor.handlers.agent import default_plugin_root
@@ -150,10 +161,15 @@ def assemble_dispatcher(spawn: Any, *, repo_root: Path | str | None = None) -> A
     # Pass the plugin root explicitly so plugin-shipped step_files resolve for a
     # consumer project (repo_root != plugin). Not defaulted inside AgentHandler
     # so rootless/test callers keep legacy absolute-path behavior (#3 review).
+    effective_plugin_root = (
+        Path(plugin_root).resolve()
+        if plugin_root is not None
+        else (default_plugin_root() if repo_root is not None else None)
+    )
     dispatcher.register(
         NodeType.AGENT,
         AgentHandler(
-            spawn, repo_root=repo_root, plugin_root=default_plugin_root()
+            spawn, repo_root=repo_root, plugin_root=effective_plugin_root
         ).handle,
     )
     # Reconcile must ff-merge the agent's commit into repo_root (the tree the

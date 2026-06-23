@@ -319,10 +319,12 @@ def test_walker_inline_reconcile_noop_without_commit_sha():
     )
 
 
-def test_walker_inline_reconcile_failure_aborts_before_review(tmp_path):
-    """When the implement commit cannot be materialised (reconcile raises), the
-    walker must FAIL LOUD — not swallow and let review run on a stale tree it
-    never saw. NON_FF on the Multica substrate reaches this path."""
+def test_nonoptional_reconcile_node_failure_aborts_before_review(tmp_path):
+    """The authoritative barrier is the graph's NON-optional reconcile node:
+    when materialisation fails (e.g. NON_FF on the Multica substrate), that node
+    fails the run so the downstream review never reads a stale tree. (The inline
+    _per_node_reconcile is best-effort only — it must NOT be the thing that
+    raises, to keep resume state consistent, #5.)"""
     review_dispatched: list[str] = []
 
     def agent_handler(node, inputs, run_id):
@@ -342,7 +344,19 @@ def test_walker_inline_reconcile_failure_aborts_before_review(tmp_path):
 
     nodes = [
         Node(id="implement", agent="developer", node_type=NodeType.AGENT),
-        Node(id="review", agent="reviewer", node_type=NodeType.AGENT, depends_on=["implement"]),
+        Node(
+            id="reconcile-implement",
+            agent="reconciler",
+            node_type=NodeType.RECONCILE,
+            depends_on=["implement"],
+            optional=False,
+        ),
+        Node(
+            id="review",
+            agent="reviewer",
+            node_type=NodeType.AGENT,
+            depends_on=["reconcile-implement"],
+        ),
     ]
     g = _graph_with(nodes)
     dispatcher = Dispatcher(handlers={
@@ -352,7 +366,7 @@ def test_walker_inline_reconcile_failure_aborts_before_review(tmp_path):
     with pytest.raises(HandlerError, match="NON_FF"):
         Walker().walk(g, dispatcher, "rid-fail", Telemetry(run_id="rid-fail"))
     assert review_dispatched == [], (
-        "review must NOT run when reconcile failed — no stale-tree review"
+        "review must NOT run when the non-optional reconcile node failed"
     )
 
 
