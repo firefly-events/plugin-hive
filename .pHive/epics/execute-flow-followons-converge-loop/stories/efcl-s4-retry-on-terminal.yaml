@@ -1,7 +1,7 @@
 id: efcl-s4-retry-on-terminal
 epic: execute-flow-followons-converge-loop
 title: "Verify and fix: re-dispatching a terminal Multica issue actually restarts the agent"
-status: pending
+status: complete
 complexity: medium
 methodology: classic
 needs_backend: true
