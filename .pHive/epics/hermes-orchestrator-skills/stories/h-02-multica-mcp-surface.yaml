@@ -1,0 +1,71 @@
+id: h-02-multica-mcp-surface
+epic: hermes-orchestrator-skills
+title: Confirm or expose the multica_* MCP tool surface over cli.mjs
+status: pending
+complexity: medium
+methodology: classic
+side: plugin-hive
+depends_on: []
+parallel_allowed: true
+parallel_rationale: bounded-slice
+files_to_modify:
+  - file: hive/lib/multica-story-dispatch/mcp-tools.mjs
+    change: expose dispatch/poll/epic-status/write-state (+ episode, comment, cancel) as MCP tools wrapping cli.mjs, IF the fork does not already register them
+
+description: |
+  cycle-reconciler.md treats multica_dispatch_story / multica_poll_task /
+  multica_epic_status / multica_write_state as "the ONLY interface you use" — but
+  whether those MCP wrappers exist in the Studio fork or must be built is the
+  central plan-off-repo-bridge reconcile.
+
+  Resolve it: check the fork's registered MCP tools. If present, document the ABI
+  (names, args, return shapes) so the skills bind to a pinned contract. If absent,
+  build a thin MCP wrapper over the existing cli.mjs subcommands (no new business
+  logic — cli.mjs stays the single boundary). Either way the output is a pinned
+  tool ABI the orchestrator skills call.
+
+acceptance_criteria:
+  - "Given the Studio fork, when checked, then the existence/absence of each multica_* MCP tool is recorded with its arg + return shape."
+  - "Given absence, when h-02 implements, then a thin MCP layer exposes dispatch, poll, epic-status, write-state, episode, comment, and cancel by delegating to cli.mjs with no duplicated logic."
+  - "Given the wrapper, when a tool is invoked, then its result is byte-equivalent to the matching cli.mjs subcommand output (parity test)."
+  - "Given the ABI, when documented, then h-04/h-05/h-07 can bind to stable tool names + signatures."
+
+steps:
+  - id: research
+    description: Enumerate the fork's registered MCP tools; map each to the corresponding cli.mjs subcommand; note gaps.
+    agent: researcher
+  - id: implement
+    description: If gaps exist, add hive/lib/multica-story-dispatch/mcp-tools.mjs wrapping cli.mjs subcommands as MCP tools. Document the pinned ABI.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Parity tests — each MCP tool result matches its cli.mjs subcommand for representative inputs.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm no business logic duplicated outside cli.mjs; ABI is stable + documented.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/hermes-orchestrator-skills.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-story-dispatch/cli.mjs
+      purpose: The single boundary the MCP layer wraps; subcommands dispatch/status/poll/episode/cancel/epic-status/comment/write-state/create-issue/reconcile.
+    - path: hive/references/cycle-reconciler.md
+      purpose: Names the four core multica_* tools and their arg expectations.
+
+risks:
+  - severity: medium
+    description: An MCP wrapper that re-implements logic instead of delegating diverges from cli.mjs over time.
+    mitigation: Wrapper must shell to cli.mjs (or import its functions) — parity test enforces equivalence.
+
+references:
+  - path: hive/lib/multica-story-dispatch/index.mjs
+    relevant_excerpt: |
+      exports: dispatchStoryToAgent, pollTaskUntilTerminal, createIssue,
+      reconcileBranch — the functions cli.mjs already composes.
