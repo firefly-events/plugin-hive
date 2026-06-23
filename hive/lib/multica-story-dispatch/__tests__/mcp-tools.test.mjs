@@ -57,7 +57,11 @@ class McpClient {
   send(method, params) {
     const id = this._nextId++;
     return new Promise((resolve, reject) => {
-      this._pending.set(id, resolve);
+      const wrappedResolve = (msg) => {
+        clearTimeout(timeout);
+        resolve(msg);
+      };
+      this._pending.set(id, wrappedResolve);
       const timeout = setTimeout(() => {
         this._pending.delete(id);
         reject(new Error(`Timeout waiting for response to ${method} (id=${id})`));

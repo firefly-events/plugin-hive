@@ -60,6 +60,10 @@ export const VALID_GATE_STATES = new Set([
   'pre_approved',
   'review_awaiting_human',
   'finalized',
+  // Terminal: a human rejected a review verdict (distinct from `finalized`,
+  // which is success-terminal). The reconcile loop does not auto-resume from
+  // `rejected` — re-approval (write gate_state back to `pre_approved`) is required.
+  'rejected',
 ]);
 
 // Plain object = non-null, typeof 'object', NOT an array. Arrays are objects in

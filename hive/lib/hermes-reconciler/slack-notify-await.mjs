@@ -2,9 +2,9 @@
  * hermes-reconciler/slack-notify-await.mjs — Slack notify-and-await human-gate transport.
  *
  * Surface-verdict hook for reconcile-tick. On review_terminal or error conditions:
- *   1. Latches gate_state to 'awaiting' FIRST (fail-safe — gate is halted even if Slack fails).
+ *   1. Latches gate_state to 'review_awaiting_human' FIRST (fail-safe — gate is halted even if Slack fails).
  *   2. Posts a Slack message with context + decision needed.
- *   3. Returns { halted: true, gate_state: 'awaiting' }.
+ *   3. Returns { halted: true, gate_state: 'review_awaiting_human' }.
  *
  * Human response resolves the gate via resolveGate():
  *   approve / continue → gate_state: pre_approved
@@ -12,7 +12,7 @@
  *   revise             → gate_state: pre_approved, story rolled back to dispatched_impl, attempt++
  *
  * Slack webhook URL from opts.slackWebhookUrl or HERMES_SLACK_WEBHOOK_URL env var.
- * Slack-unreachable path: gate stays awaiting + error thrown (tick halts visibly; never auto-advance).
+ * Slack-unreachable path: gate stays review_awaiting_human + error thrown (tick halts visibly; never auto-advance).
  */
 
 import http from 'node:http';
@@ -127,32 +127,32 @@ export function buildErrorMessage({ epicHandle, storyId, errorKind, details }) {
 /**
  * Called by reconcile-tick when review_terminal is reached.
  *
- * Writes gate_state: 'awaiting' BEFORE attempting Slack post.
- * On Slack failure the gate remains awaiting and the error propagates — tick halts.
+ * Writes gate_state: 'review_awaiting_human' BEFORE attempting Slack post.
+ * On Slack failure the gate remains review_awaiting_human and the error propagates — tick halts.
  * Never auto-advances the gate.
  *
  * @param {string} cycleStatePath  Absolute path to the cycle-state YAML file.
  * @param {{ epicHandle: string, storyId: string, verdict: string, episodeSummary?: string, diff?: string }} context
  * @param {{ slackWebhookUrl?: string }} [opts]
- * @returns {Promise<{ halted: true, gate_state: 'awaiting' }>}
+ * @returns {Promise<{ halted: true, gate_state: 'review_awaiting_human' }>}
  */
 export async function surfaceVerdictHook(cycleStatePath, context, opts = {}) {
   // Step 1 — latch gate FIRST (fail-safe)
-  writeHermesReconcilerState(cycleStatePath, { gate_state: 'awaiting' });
+  writeHermesReconcilerState(cycleStatePath, { gate_state: 'review_awaiting_human' });
 
   // Step 2 — post to Slack (failure halts tick; gate already latched)
   const webhookUrl = opts.slackWebhookUrl ?? process.env.HERMES_SLACK_WEBHOOK_URL;
   if (!webhookUrl) {
     throw new Error(
       'Slack notify-await: HERMES_SLACK_WEBHOOK_URL is not configured. ' +
-      'gate_state is now "awaiting" — tick is halted. Configure the webhook and retry.',
+      'gate_state is now "review_awaiting_human" — tick is halted. Configure the webhook and retry.',
     );
   }
 
   const message = buildVerdictMessage(context);
   await postSlack(webhookUrl, message);
 
-  return { halted: true, gate_state: 'awaiting' };
+  return { halted: true, gate_state: 'review_awaiting_human' };
 }
 
 // ── Hook: surface error ───────────────────────────────────────────────────────
@@ -164,25 +164,25 @@ export async function surfaceVerdictHook(cycleStatePath, context, opts = {}) {
  * @param {string} cycleStatePath
  * @param {{ epicHandle: string, storyId?: string, errorKind: string, details?: string }} context
  * @param {{ slackWebhookUrl?: string }} [opts]
- * @returns {Promise<{ halted: true, gate_state: 'awaiting' }>}
+ * @returns {Promise<{ halted: true, gate_state: 'review_awaiting_human' }>}
  */
 export async function surfaceErrorHook(cycleStatePath, context, opts = {}) {
   // Step 1 — latch gate FIRST (fail-safe)
-  writeHermesReconcilerState(cycleStatePath, { gate_state: 'awaiting' });
+  writeHermesReconcilerState(cycleStatePath, { gate_state: 'review_awaiting_human' });
 
   // Step 2 — post to Slack
   const webhookUrl = opts.slackWebhookUrl ?? process.env.HERMES_SLACK_WEBHOOK_URL;
   if (!webhookUrl) {
     throw new Error(
       'Slack notify-await: HERMES_SLACK_WEBHOOK_URL is not configured. ' +
-      'gate_state is now "awaiting" — tick is halted. Configure the webhook and retry.',
+      'gate_state is now "review_awaiting_human" — tick is halted. Configure the webhook and retry.',
     );
   }
 
   const message = buildErrorMessage(context);
   await postSlack(webhookUrl, message);
 
-  return { halted: true, gate_state: 'awaiting' };
+  return { halted: true, gate_state: 'review_awaiting_human' };
 }
 
 // ── Gate resolution ───────────────────────────────────────────────────────────
@@ -190,7 +190,7 @@ export async function surfaceErrorHook(cycleStatePath, context, opts = {}) {
 const VALID_ACTIONS = new Set(['approve', 'continue', 'reject', 'revise']);
 
 /**
- * Resolve the awaiting gate based on a human Slack action.
+ * Resolve the review_awaiting_human gate based on a human Slack action.
  *
  * approve / continue  → gate_state: pre_approved  (tick resumes)
  * reject              → gate_state: rejected       (epic halted permanently)

@@ -493,6 +493,17 @@ async function cmdWriteState(args) {
     }
   }
 
+  // Validate epic_of_record at the same boundary as gate_state — the ownership
+  // pin must be null or a non-empty string; anything else weakens the tick-preflight
+  // contract that reads it.
+  if ('epic_of_record' in patch) {
+    const eor = patch.epic_of_record;
+    if (eor !== null && (typeof eor !== 'string' || eor.trim() === '')) {
+      fail('INVALID_ARG', '--patch "epic_of_record" must be null or a non-empty string');
+      return;
+    }
+  }
+
   // Validate `stories` value types so a shape like {"stories":["x"]} or
   // {"stories":{"s1":"oops"}} is rejected cleanly here instead of corrupting
   // (or throwing deep inside) the write. Keys are validated above; this guards values.

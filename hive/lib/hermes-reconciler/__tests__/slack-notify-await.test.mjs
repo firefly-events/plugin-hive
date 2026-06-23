@@ -126,7 +126,7 @@ test('buildErrorMessage: works without storyId', () => {
 
 // ── surfaceVerdictHook ────────────────────────────────────────────────────────
 
-test('surfaceVerdictHook: writes gate_state=awaiting before Slack post', async (t) => {
+test('surfaceVerdictHook: writes gate_state=review_awaiting_human before Slack post', async (t) => {
   const { server, url, received } = await mockSlackServer();
   t.after(() => server.close());
 
@@ -142,14 +142,14 @@ test('surfaceVerdictHook: writes gate_state=awaiting before Slack post', async (
   );
 
   assert.equal(result.halted, true);
-  assert.equal(result.gate_state, 'awaiting');
+  assert.equal(result.gate_state, 'review_awaiting_human');
 
   const state = readHermesReconcilerState(statePath);
-  assert.equal(state.gate_state, 'awaiting');
+  assert.equal(state.gate_state, 'review_awaiting_human');
   assert.equal(received.length, 1, 'Slack should have received exactly one request');
 });
 
-test('surfaceVerdictHook: gate stays awaiting when Slack returns non-2xx', async (t) => {
+test('surfaceVerdictHook: gate stays review_awaiting_human when Slack returns non-2xx', async (t) => {
   const { server, url } = await mockSlackServer({ statusCode: 500, body: 'error' });
   t.after(() => server.close());
 
@@ -165,9 +165,9 @@ test('surfaceVerdictHook: gate stays awaiting when Slack returns non-2xx', async
     /HTTP 500/,
   );
 
-  // Gate must be 'awaiting' even though Slack failed — no auto-advance
+  // Gate must be 'review_awaiting_human' even though Slack failed — no auto-advance
   const state = readHermesReconcilerState(statePath);
-  assert.equal(state.gate_state, 'awaiting');
+  assert.equal(state.gate_state, 'review_awaiting_human');
 });
 
 test('surfaceVerdictHook: throws and halts when Slack URL not configured', async () => {
@@ -181,9 +181,9 @@ test('surfaceVerdictHook: throws and halts when Slack URL not configured', async
       () => surfaceVerdictHook(statePath, { epicHandle: 'e', storyId: 's1', verdict: 'passed' }),
       /HERMES_SLACK_WEBHOOK_URL/,
     );
-    // Gate must still be latched to awaiting
+    // Gate must still be latched to review_awaiting_human
     const state = readHermesReconcilerState(statePath);
-    assert.equal(state.gate_state, 'awaiting');
+    assert.equal(state.gate_state, 'review_awaiting_human');
   } finally {
     if (savedEnv !== undefined) process.env.HERMES_SLACK_WEBHOOK_URL = savedEnv;
   }
@@ -211,7 +211,7 @@ test('surfaceVerdictHook: Slack message contains verdict context', async (t) => 
 
 // ── surfaceErrorHook ──────────────────────────────────────────────────────────
 
-test('surfaceErrorHook: writes gate_state=awaiting and posts error message', async (t) => {
+test('surfaceErrorHook: writes gate_state=review_awaiting_human and posts error message', async (t) => {
   const { server, url, received } = await mockSlackServer();
   t.after(() => server.close());
 
@@ -225,15 +225,15 @@ test('surfaceErrorHook: writes gate_state=awaiting and posts error message', asy
   );
 
   assert.equal(result.halted, true);
-  assert.equal(result.gate_state, 'awaiting');
+  assert.equal(result.gate_state, 'review_awaiting_human');
   const state = readHermesReconcilerState(statePath);
-  assert.equal(state.gate_state, 'awaiting');
+  assert.equal(state.gate_state, 'review_awaiting_human');
   assert.equal(received.length, 1);
   const payload = JSON.parse(received[0].body);
   assert.match(payload.text, /dispatch_failure/);
 });
 
-test('surfaceErrorHook: gate stays awaiting when Slack unreachable', async () => {
+test('surfaceErrorHook: gate stays review_awaiting_human when Slack unreachable', async () => {
   // Use a port that nothing is listening on
   const dir = tmpDir();
   const statePath = cycleStatePath(dir);
@@ -247,7 +247,7 @@ test('surfaceErrorHook: gate stays awaiting when Slack unreachable', async () =>
   );
 
   const state = readHermesReconcilerState(statePath);
-  assert.equal(state.gate_state, 'awaiting');
+  assert.equal(state.gate_state, 'review_awaiting_human');
 });
 
 // ── resolveGate ───────────────────────────────────────────────────────────────
@@ -255,7 +255,7 @@ test('surfaceErrorHook: gate stays awaiting when Slack unreachable', async () =>
 test('resolveGate: approve → gate_state=pre_approved', () => {
   const dir = tmpDir();
   const statePath = cycleStatePath(dir);
-  writeHermesReconcilerState(statePath, { gate_state: 'awaiting' });
+  writeHermesReconcilerState(statePath, { gate_state: 'review_awaiting_human' });
 
   const result = resolveGate(statePath, { action: 'approve' });
 
@@ -267,7 +267,7 @@ test('resolveGate: approve → gate_state=pre_approved', () => {
 test('resolveGate: continue → gate_state=pre_approved', () => {
   const dir = tmpDir();
   const statePath = cycleStatePath(dir);
-  writeHermesReconcilerState(statePath, { gate_state: 'awaiting' });
+  writeHermesReconcilerState(statePath, { gate_state: 'review_awaiting_human' });
 
   const result = resolveGate(statePath, { action: 'continue' });
 
@@ -278,7 +278,7 @@ test('resolveGate: continue → gate_state=pre_approved', () => {
 test('resolveGate: reject → gate_state=rejected, no further advance possible', () => {
   const dir = tmpDir();
   const statePath = cycleStatePath(dir);
-  writeHermesReconcilerState(statePath, { gate_state: 'awaiting' });
+  writeHermesReconcilerState(statePath, { gate_state: 'review_awaiting_human' });
 
   const result = resolveGate(statePath, { action: 'reject' });
 
@@ -290,7 +290,7 @@ test('resolveGate: revise → gate_state=pre_approved, story back to dispatched_
   const dir = tmpDir();
   const statePath = cycleStatePath(dir);
   writeHermesReconcilerState(statePath, {
-    gate_state: 'awaiting',
+    gate_state: 'review_awaiting_human',
     stories: { 's1': { phase_position: 'review_terminal', attempt: 2 } },
   });
 
@@ -309,7 +309,7 @@ test('resolveGate: revise clears in-flight fields so Branch 3 re-dispatches', ()
   const dir = tmpDir();
   const statePath = cycleStatePath(dir);
   writeHermesReconcilerState(statePath, {
-    gate_state: 'awaiting',
+    gate_state: 'review_awaiting_human',
     in_flight_story_id: 's1',
     in_flight_task_id: 'task-xyz',
     dispatched_at: '2026-01-01T00:00:00Z',

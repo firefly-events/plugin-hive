@@ -198,21 +198,33 @@ const TOOL_DEFINITIONS = [
  * payload from cli.mjs stderr — never swallows error details.
  */
 async function callCli(subcommand, cliArgs) {
+  let stdout;
   try {
-    const { stdout } = await execFileAsync(
+    ({ stdout } = await execFileAsync(
       process.execPath,
       [CLI_PATH, subcommand, ...cliArgs],
       { timeout: 300_000 },
-    );
-    const raw = stdout.replace(/\n$/, '');
-    return { raw, parsed: JSON.parse(raw) };
+    ));
   } catch (err) {
+    // Command failure: non-zero exit, timeout, or spawn error. cli.mjs emits a
+    // {code, message} JSON payload on stderr — surface it; never swallow.
     const stderrText = (err.stderr ? String(err.stderr) : '').trim();
     let errPayload = null;
     try { errPayload = JSON.parse(stderrText); } catch { /* fall through */ }
     const message = (errPayload?.message ?? stderrText) || err.message || String(err);
     const code = errPayload?.code ?? `CLI_${subcommand.replace(/-/g, '_').toUpperCase()}_FAILED`;
     throw Object.assign(new Error(message), { code });
+  }
+  // Zero-exit but non-JSON stdout is its own failure mode — distinguish it from a
+  // command failure so callers get a clear, typed error instead of a generic one.
+  const raw = stdout.replace(/\n$/, '');
+  try {
+    return { raw, parsed: JSON.parse(raw) };
+  } catch (parseErr) {
+    throw Object.assign(
+      new Error(`cli.mjs ${subcommand} exited 0 but returned non-JSON stdout: ${raw.slice(0, 200)}`),
+      { code: 'CLI_NON_JSON_OUTPUT' },
+    );
   }
 }
 
