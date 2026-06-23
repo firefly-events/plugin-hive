@@ -2,6 +2,7 @@ id: h-02-multica-mcp-surface
 epic: hermes-orchestrator-skills-local
 title: Confirm or expose the multica_* MCP tool surface over cli.mjs
 status: pending
+tracker_id: 85dbbe74-bb9a-4487-9e0d-c8123833303f
 complexity: medium
 methodology: classic
 side: plugin-hive

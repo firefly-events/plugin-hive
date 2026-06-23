@@ -2,6 +2,7 @@ id: h-03-gate-state-latch
 epic: hermes-orchestrator-skills-local
 title: Harden the gate_state pre_approved latch + epic-of-record pointer
 status: pending
+tracker_id: a01baca5-31e1-4bc6-81e5-29cc08f81252
 complexity: medium
 methodology: classic
 side: plugin-hive

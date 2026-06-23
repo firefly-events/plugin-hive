@@ -2,6 +2,7 @@ id: h-06-slack-notify-await
 epic: hermes-orchestrator-skills-local
 title: Slack notify-and-await human-gate transport
 status: pending
+tracker_id: 93c33699-85fb-4a59-ba45-1534f9b09585
 complexity: high
 methodology: classic
 side: plugin-hive
