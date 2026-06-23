@@ -148,6 +148,7 @@ def _canned_outputs(
     findings_count: int,
     metric_signal: bool,
     external_candidates_count: int,
+    kg_findings_count: int = 0,
 ) -> dict[str, dict[str, Any]]:
     """Per-step canned outputs that satisfy the structural output_format
     contract on step-02-analysis + step-02b-external-research and keep
@@ -159,6 +160,7 @@ def _canned_outputs(
     external_candidates = [
         {"id": f"ext-{n}"} for n in range(external_candidates_count)
     ]
+    kg_findings = [{"id": f"kg-{n}"} for n in range(kg_findings_count)]
     return {
         "boot": {
             "cycle_id": "cycle-acceptance",
@@ -175,6 +177,13 @@ def _canned_outputs(
             "external_research_candidates": external_candidates,
             "research_summary": "summary",
             "external_candidates_count": external_candidates_count,
+        },
+        "kg-signal": {
+            "kg_findings": kg_findings,
+            "kg_findings_count": kg_findings_count,
+        },
+        "metric-declaration": {
+            "enriched_proposals": [],
         },
         "proposal": {
             "approved_proposals": [],

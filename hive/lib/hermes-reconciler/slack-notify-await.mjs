@@ -17,6 +17,7 @@
 
 import http from 'node:http';
 import https from 'node:https';
+import path from 'node:path';
 import { URL } from 'node:url';
 import { readHermesReconcilerState, writeHermesReconcilerState } from './state.mjs';
 
@@ -80,8 +81,43 @@ function fenceSafe(v) {
   return String(v).replace(/`{3,}/g, (m) => 'ʼ'.repeat(m.length));
 }
 
+const ACTION_LABELS = { approve: 'Approve', continue: 'Continue', revise: 'Revise', reject: 'Reject' };
+
+/**
+ * Encode gate action context into a Slack button value string (JSON).
+ * Format: {"a":<action>,"e":<epicHandle>,"s":<storyId>}
+ * Parse back with parseGateAction().
+ */
+function encodeGateAction(action, epicHandle, storyId) {
+  return JSON.stringify({ a: action, e: epicHandle, s: storyId ?? null });
+}
+
+/**
+ * Build a Block Kit actions block containing the gate resolution buttons.
+ * @param {string[]} actions  Ordered list of action strings.
+ * @param {string} epicHandle
+ * @param {string|null} storyId
+ */
+function buildGateActionsBlock(actions, epicHandle, storyId) {
+  return {
+    type: 'actions',
+    elements: actions.map((action) => {
+      const el = {
+        type: 'button',
+        text: { type: 'plain_text', text: ACTION_LABELS[action] ?? action, emoji: false },
+        action_id: 'hive_gate_resolve',
+        value: encodeGateAction(action, epicHandle, storyId),
+      };
+      if (action === 'approve') el.style = 'primary';
+      if (action === 'reject') el.style = 'danger';
+      return el;
+    }),
+  };
+}
+
 /**
  * Build a Slack message payload for a review_terminal verdict.
+ * Returns { text, blocks } — text is a plain-text fallback; blocks is Block Kit.
  * Follows standup-slack-format.md conventions: no ANSI, markdown only, ##/### headings, - lists.
  */
 export function buildVerdictMessage({ epicHandle, storyId, verdict, episodeSummary, diff }) {
@@ -111,11 +147,48 @@ export function buildVerdictMessage({ epicHandle, storyId, verdict, episodeSumma
     decisionBlock,
   ].join('\n');
 
-  return { text };
+  // Block Kit representation — buttons encode the gate action for the Studio receiver.
+  const actions = normalizedVerdict === 'needs-revision'
+    ? ['approve', 'revise', 'reject']
+    : ['approve', 'continue', 'revise', 'reject'];
+
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `Review Verdict — ${normalizedVerdict.toUpperCase()}`, emoji: true },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Epic:* \`${mrkdwnInline(epicHandle)}\`` },
+        { type: 'mrkdwn', text: `*Story:* \`${mrkdwnInline(storyId)}\`` },
+        { type: 'mrkdwn', text: `*Verdict:* \`${normalizedVerdict}\`` },
+      ],
+    },
+  ];
+
+  if (episodeSummary) {
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*Episode Summary*\n${mrkdwnInline(episodeSummary.trim())}` },
+    });
+  }
+
+  if (diff) {
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*Diff*\n\`\`\`\n${fenceSafe(diff.trim())}\n\`\`\`` },
+    });
+  }
+
+  blocks.push(buildGateActionsBlock(actions, epicHandle, storyId));
+
+  return { text, blocks };
 }
 
 /**
  * Build a Slack message payload for an error condition (dispatch failure, daemon down, etc.).
+ * Returns { text, blocks } — text is a plain-text fallback; blocks is Block Kit.
  */
 export function buildErrorMessage({ epicHandle, storyId, errorKind, details }) {
   const storyLine = storyId ? `\n- Story: \`${mrkdwnInline(storyId)}\`` : '';
@@ -136,7 +209,89 @@ export function buildErrorMessage({ epicHandle, storyId, errorKind, details }) {
     `- \`reject\` — halt this epic permanently`,
   ].join('\n');
 
-  return { text };
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: 'Hermes Error — Action Required', emoji: true },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Epic:* \`${mrkdwnInline(epicHandle)}\`` },
+        ...(storyId ? [{ type: 'mrkdwn', text: `*Story:* \`${mrkdwnInline(storyId)}\`` }] : []),
+        { type: 'mrkdwn', text: `*Error:* \`${mrkdwnInline(errorKind ?? 'unknown_error')}\`` },
+      ],
+    },
+  ];
+
+  if (details) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Details*\n\`\`\`\n${fenceSafe(String(details).trim().slice(0, 1500))}\n\`\`\``,
+      },
+    });
+  }
+
+  blocks.push(buildGateActionsBlock(['continue', 'reject'], epicHandle, storyId));
+
+  return { text, blocks };
+}
+
+// ── Gate action encoding ──────────────────────────────────────────────────────
+
+/**
+ * Parse a Slack button value produced by buildVerdictMessage / buildErrorMessage
+ * back into { action, epicHandle, storyId }.
+ *
+ * Throws on malformed input so the Studio receiver can reject bad payloads early.
+ *
+ * @param {string} buttonValue  The `value` field from a Slack interaction payload action.
+ * @returns {{ action: string, epicHandle: string, storyId: string|null }}
+ */
+export function parseGateAction(buttonValue) {
+  let parsed;
+  try {
+    parsed = JSON.parse(buttonValue);
+  } catch {
+    throw new Error(`parseGateAction: invalid button value (expected JSON): ${buttonValue}`);
+  }
+  const { a: action, e: epicHandle, s: storyId } = parsed ?? {};
+  if (!action || typeof action !== 'string') {
+    throw new Error(`parseGateAction: missing or invalid "a" (action) in value: ${buttonValue}`);
+  }
+  if (!epicHandle || typeof epicHandle !== 'string') {
+    throw new Error(`parseGateAction: missing or invalid "e" (epicHandle) in value: ${buttonValue}`);
+  }
+  return { action, epicHandle, storyId: (storyId && typeof storyId === 'string') ? storyId : null };
+}
+
+// ── resolveGate invoker ───────────────────────────────────────────────────────
+
+/**
+ * Thin entrypoint for the Studio HTTP receiver: resolves the cycle-state path
+ * from epicHandle and delegates to resolveGate().
+ *
+ * The Studio receiver verifies the Slack request signature BEFORE calling this.
+ * This function owns only: path resolution + resolveGate delegation.
+ *
+ * @param {{ epicHandle: string, storyId?: string|null, action: string }} params
+ * @param {{ cycleStateDirPath?: string }} [opts]  Overrides HERMES_CYCLE_STATE_DIR env var.
+ * @returns {{ resolved: true, gate_state: string, action: string, [key: string]: unknown }}
+ */
+export function resolveGateInvoker({ epicHandle, storyId, action }, { cycleStateDirPath } = {}) {
+  const dir = cycleStateDirPath ?? process.env.HERMES_CYCLE_STATE_DIR;
+  if (!dir) {
+    throw new Error(
+      'resolveGateInvoker: cycleStateDirPath not provided and HERMES_CYCLE_STATE_DIR is not set',
+    );
+  }
+  if (!epicHandle || typeof epicHandle !== 'string') {
+    throw new Error('resolveGateInvoker: epicHandle must be a non-empty string');
+  }
+  const cycleStatePath = path.join(dir, `${epicHandle}.yaml`);
+  return resolveGate(cycleStatePath, { storyId: storyId ?? undefined, action });
 }
 
 // ── Hook: surface verdict ─────────────────────────────────────────────────────

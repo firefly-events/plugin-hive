@@ -74,15 +74,22 @@ def test_backend_first_sequencing():
 
 
 def test_downstream_test_joins_on_both_implement_nodes():
-    """The `test` step's depends_on lists both implement nodes — that
+    """The `test` step's depends_on covers both implement paths — that
     multi-upstream join is what enables the
     `none_failed_min_one_success` trigger_rule cascade for empty-domain
-    stories."""
+    stories. reconcile-backend and reconcile-frontend are the immediate
+    predecessors of `test`; they materialise each implement agent's
+    commit and sit directly between the implement nodes and `test`."""
 
     graph = load_workflow(CLASSIC)
     test_deps = graph.nodes["test"].depends_on
-    assert "backend-implement" in test_deps
-    assert "frontend-implement" in test_deps
+    # The reconcile-* nodes are the direct parents of `test`.
+    # They sit between backend/frontend-implement and `test`.
+    assert "reconcile-backend" in test_deps
+    assert "reconcile-frontend" in test_deps
+    # The implement nodes feed into the reconcile nodes (not test directly).
+    assert "backend-implement" in graph.nodes["reconcile-backend"].depends_on
+    assert "frontend-implement" in graph.nodes["reconcile-frontend"].depends_on
 
 
 def test_step_files_split_per_domain():

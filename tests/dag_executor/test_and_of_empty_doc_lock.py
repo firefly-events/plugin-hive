@@ -93,12 +93,13 @@ def test_doc_encodes_and_of_empty_rule(doc: Path):
 
 
 def test_workflow_yaml_when_predicates_match_canonical_form():
-    """The canonical 3-clause OR / AND predicates wired in
+    """The canonical 4-clause OR / AND predicates wired in
     meta-team-cycle.workflow.yaml are the executor-facing encoding of
     the AND-of-empty rule. They must NOT silently regress to a
     single-signal `metric_signal == true` form (the brief's literal
     AC #5/#6 wording, which would re-introduce the meta-2026-04-29
-    conflation bug)."""
+    conflation bug). The 4th clause ($kg-signal.output.kg_findings_count)
+    was added when step-02c KG-signal was wired in (commit 5b8a318b)."""
 
     text = (REPO_ROOT / "hive/workflows/meta-team-cycle.workflow.yaml").read_text(
         encoding="utf-8"
@@ -106,19 +107,22 @@ def test_workflow_yaml_when_predicates_match_canonical_form():
     expected_or = (
         '"$analysis.output.findings_count > 0 || '
         "$analysis.output.metric_signal == true || "
-        '$external-research.output.external_candidates_count > 0"'
+        "$external-research.output.external_candidates_count > 0 || "
+        '$kg-signal.output.kg_findings_count > 0"'
     )
     expected_and = (
         '"$analysis.output.findings_count == 0 && '
         "$analysis.output.metric_signal == false && "
-        '$external-research.output.external_candidates_count == 0"'
+        "$external-research.output.external_candidates_count == 0 && "
+        '$kg-signal.output.kg_findings_count == 0"'
     )
     assert expected_or in text, (
         "step-03 `when:` predicate has drifted from the canonical "
-        "AND-of-empty (OR-of-non-empty) form. See "
+        "AND-of-empty (OR-of-non-empty) 4-clause form (findings_count, "
+        "metric_signal, external_candidates_count, kg_findings_count). See "
         "feedback_metric_signal_findings_conflation."
     )
     assert expected_and in text, (
         "step-03b `when:` predicate has drifted from the canonical "
-        "AND-of-empty form. See feedback_metric_signal_findings_conflation."
+        "AND-of-empty 4-clause form. See feedback_metric_signal_findings_conflation."
     )
