@@ -1,0 +1,47 @@
+name: hermes-production-readiness
+title: Hermes Production Readiness — wire the lights-on loop
+description: |
+  Follow-on to hermes-orchestrator-skills (v2.13.1, PR #321). That epic built the 5
+  orchestrator skills + the gate contract + MCP tools + the OUTBOUND Slack human gate.
+  This epic wires the RUNTIME PLUMBING those skills assume so a Hermes cron actually runs
+  the lights-on loop on Studio: human gates only planning + review (model b: passed work
+  auto-advances), orchestrator + agents own the rest.
+
+  Source of contract: hive/lib/hermes-reconciler/state.mjs (gate_state + epic_of_record),
+  slack-notify-await.mjs (resolveGate + surface hooks), multica-story-dispatch/cli.mjs +
+  mcp-tools.mjs (7 tools), hive/references/orchestrator-skills/*.md (runbooks).
+  Skills live on Studio at ~/Code/hermes-agent/skills/orchestration/.
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+version_bump: minor
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+scope_decisions:
+  loop_closer: hpr-1 (inbound Slack -> resolveGate) is the highest-value build — without it the gate latches but cannot be resolved from Slack.
+  review_model: "b — passed + ff-merge-verified verdicts auto-advance; only non-pass/unverified/error surface to the human."
+  runtime_home: "Studio (mac.lan, user hive) — Hermes drives Studio's multica daemon + workspace, not the MacBook. Most stories carry a Studio/ops slice alongside the repo slice."
+
+stories:
+  - id: hpr-1-inbound-slack-resolve-gate
+    title: Inbound Slack action → resolveGate (the loop-closer)
+    complexity: high
+    depends_on: [hpr-3-slack-app-and-secrets]
+  - id: hpr-2-cron-tick-scheduler
+    title: Cron tick scheduler firing reconcile-tick over the epic-of-record
+    complexity: medium
+    depends_on: [hpr-5-studio-runtime-plumbing]
+  - id: hpr-3-slack-app-and-secrets
+    title: Slack app + webhook + secrets configuration
+    complexity: medium
+    depends_on: []
+  - id: hpr-4-epic-approval-bootstrap
+    title: Epic approval bootstrap (the human "go")
+    complexity: low
+    depends_on: [hpr-3-slack-app-and-secrets]
+  - id: hpr-5-studio-runtime-plumbing
+    title: Studio runtime plumbing + daemon autostart
+    complexity: high
+    depends_on: []
