@@ -47,7 +47,7 @@ surface-verdict(epic_handle, story_id, verdict, episode_summary, diff):
 
   // Step 2 — post Slack message
   message = buildVerdictMessage(epic_handle, story_id, verdict, episode_summary, diff)
-  result  = multica_slack_notify(message)
+  result  = slack_post(message)
 
   if result.error:
       // Slack failed — gate is already "review_awaiting_human"; log the error; DO NOT continue tick.
@@ -101,7 +101,7 @@ surface-error(epic_handle, story_id, error_kind, details):
 
   // Step 2 — post Slack message
   message = buildErrorMessage(epic_handle, story_id, error_kind, details)
-  result  = multica_slack_notify(message)
+  result  = slack_post(message)
 
   if result.error:
       log("WARN: Slack notify failed: " + result.error + ". Gate is 'review_awaiting_human'. Tick halted.")
@@ -156,22 +156,32 @@ When the human responds via Slack, call `resolve-gate` with the epic handle, sto
 
 | Action | Result |
 |--------|--------|
-| `approve` or `continue` | `gate_state → pre_approved` — next tick resumes from current story position |
-| `revise` | `gate_state → pre_approved`, story `phase_position → dispatched_impl`, `attempt++`, in-flight fields cleared — next tick re-dispatches impl |
+| `approve` | `gate_state → pre_approved`; surfaced story `phase_position → done`, in-flight cleared — accept the verdict, story complete |
+| `continue` | `gate_state → pre_approved` — error-ack resume from current state; **no story completed** |
+| `revise` | `gate_state → pre_approved`, story `phase_position → dispatched_impl`, `attempt++`, in-flight cleared — next tick re-dispatches impl |
 | `reject` | `gate_state → rejected` — epic halted permanently; no further advance |
+
+`approve` and `continue` differ: `approve` answers a review verdict (mark the story done);
+`continue` answers an error surface (resume without completing anything).
 
 ```
 resolve-gate(epic_handle, story_id, action):
 
   validate action ∈ {approve, continue, reject, revise}
 
+  // Precondition: only a gate that is actually awaiting a human is resolvable.
+  // Refuse if gate_state != "review_awaiting_human" (a stale/misdirected action
+  // must not resume a terminated epic or re-approve one that never halted).
+  state = multica_epic_status(epic_handle)
+  if state.gate_state != "review_awaiting_human":
+      throw "nothing awaiting human resolution"
+
   if action == "reject":
       multica_write_state(epic_handle, '{"gate_state": "rejected"}')
       return { resolved: true, gate_state: "rejected" }
 
   if action == "revise":
-      // Read current attempt to increment
-      state = multica_epic_status(epic_handle)
+      if story_id not in state.stories: throw "unknown story"
       new_attempt = state.stories[story_id].attempt + 1
       multica_write_state(epic_handle, '{
         "gate_state": "pre_approved",
@@ -182,7 +192,17 @@ resolve-gate(epic_handle, story_id, action):
       }')
       return { resolved: true, gate_state: "pre_approved", action: "revise" }
 
-  // approve or continue
+  if action == "approve":
+      // Accept the verdict — mark the surfaced in-flight story done + clear in-flight.
+      story = state.in_flight_story_id
+      multica_write_state(epic_handle, '{
+        "gate_state": "pre_approved",
+        "in_flight_story_id": null, "in_flight_task_id": null, "dispatched_at": null,
+        "stories": {"<story>": {"phase_position": "done"}}
+      }')
+      return { resolved: true, gate_state: "pre_approved", action: "approve", story_done: <story> }
+
+  // continue — error-ack resume; completes no story
   multica_write_state(epic_handle, '{"gate_state": "pre_approved"}')
   return { resolved: true, gate_state: "pre_approved" }
 ```
@@ -227,13 +247,12 @@ exit tick
 
 ## 7. MCP Tool Reference
 
-| Tool | Args | Notes |
+| Tool / surface | Args | Notes |
 |------|------|-------|
-| `multica_write_state` | `epic_handle`, `patch` (JSON string) | Atomic write; use for all gate_state transitions |
-| `multica_slack_notify` | `message` ({ text: string }) | Studio fork Slack integration; reads webhook from `HERMES_SLACK_WEBHOOK_URL` |
-| `multica_epic_status` | `epic_handle` | Read gate_state + stories for resolve-gate revise path |
+| `multica_write_state` (MCP) | `epic_handle`, `patch` (JSON string) | Atomic write; use for all gate_state transitions |
+| `multica_epic_status` (MCP) | `epic_handle` | Read gate_state + stories for resolve-gate revise path |
+| Slack post (**not MCP**) | `message` ({ text: string }) | Direct HTTP POST to `HERMES_SLACK_WEBHOOK_URL` (`{"text": "<message>"}`), done by `slack-notify-await.mjs` |
 
-`multica_slack_notify` is the Studio fork's Slack MCP surface. If it is absent in your
-environment, post to the Slack webhook directly via an HTTP POST to `HERMES_SLACK_WEBHOOK_URL`
-with `{"text": "<message>"}`. The gate_state write is always first regardless of which Slack
-surface is available.
+The Slack post is **not** an MCP tool — it is a direct HTTP POST to the webhook in
+`HERMES_SLACK_WEBHOOK_URL`, performed by `slack-notify-await.mjs`. The gate_state write
+(`multica_write_state`) is always first, so the gate stays latched even if the Slack post fails.

@@ -222,19 +222,23 @@ else if state.current_phase == "dispatched_review":
         // Branch 3 or 4 fires on next tick (next story or finalize)
 
     else:
-        // Non-passing verdict — L-3: human gate, no auto-loop
+        // Non-passing verdict — L-3: human gate, no auto-loop.
+        // Latch the gate FIRST (fail-safe), THEN notify. surface_verdict_hook also
+        // latches review_awaiting_human internally (idempotent) before posting to
+        // Slack, so the gate stays halted even if the notification fails.
+        multica_write_state(epic_handle, patch={
+            "gate_state":         "review_awaiting_human",
+            "in_flight_task_id":  null,
+            "dispatched_at":      null
+        })
         surface_verdict_hook({
             epic: epic_handle,
             story_id: state.in_flight_story_id,
             verdict: normalized,
             episode_path: episode.written
         })
-        multica_write_state(epic_handle, patch={
-            "gate_state":         "review_awaiting_human",
-            "in_flight_task_id":  null,
-            "dispatched_at":      null
-        })
-        // HALT — do not dispatch revision; human must set gate_state=pre_approved
+        // HALT — do not dispatch revision; human resolves via resolve-gate
+        // (approve marks the story done; revise re-dispatches; reject halts)
 ```
 
 **→ Exit tick.**
