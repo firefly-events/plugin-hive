@@ -73,7 +73,7 @@ surface-verdict(epic_handle, story_id, verdict, episode_summary, diff):
 
 ### Diff
 ```
-<diff>
+<diff_text>
 ```
 
 ### Decision Required
@@ -198,9 +198,9 @@ resolve-gate(epic_handle, story_id, action):
       multica_write_state(epic_handle, '{
         "gate_state": "pre_approved",
         "in_flight_story_id": null, "in_flight_task_id": null, "dispatched_at": null,
-        "stories": {"<story>": {"phase_position": "done"}}
+        "stories": {"<story_id>": {"phase_position": "done"}}
       }')
-      return { resolved: true, gate_state: "pre_approved", action: "approve", story_done: <story> }
+      return { resolved: true, gate_state: "pre_approved", action: "approve", story_done: <story_id> }
 
   // continue — error-ack resume; completes no story
   multica_write_state(epic_handle, '{"gate_state": "pre_approved"}')

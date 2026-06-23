@@ -44,7 +44,7 @@ silently breaks rescue.
 
 ### L-2: Verify, don't trust — agents over-claim "pushed"
 
-An implementation agent saying "I pushed to feat/<branch>" is not evidence. Before
+An implementation agent saying "I pushed to feat/<branch_name>" is not evidence. Before
 advancing a story from `review_terminal` to `done`, confirm the branch is an
 **ff-merge ancestor of the epic branch HEAD**. Only a confirmed ff-merge is durable.
 
