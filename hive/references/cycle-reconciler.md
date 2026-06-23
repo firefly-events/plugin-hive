@@ -58,13 +58,40 @@ Read it with `cli.mjs epic-status --epic <epic>`; write it with
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `gate_state` | string\|null | `null` | Preflight gate. Must be `"pre_approved"` to proceed. |
+| `gate_state` | string\|null | `null` | Autonomy latch. Only `"pre_approved"` allows a tick to advance work. See gate_state values below. |
+| `epic_of_record` | string\|null | `null` | Epic handle this Hermes instance reconciles. Set once at human approval alongside `gate_state=pre_approved`. A tick MUST validate this matches its target before advancing. |
 | `in_flight_story_id` | string\|null | `null` | Issue UUID of the currently dispatched story. |
 | `in_flight_task_id` | string\|null | `null` | Task ID of the in-flight agent task. |
 | `dispatched_at` | string\|null | `null` | ISO 8601 timestamp written at dispatch — source of the watchdog timer. **Never overwritten by a post-terminal episode marker.** |
 | `current_phase` | string\|null | `null` | The `phase_position` value of the in-flight story at time of dispatch. |
 | `stuck_after_seconds` | number | `1800` | Watchdog threshold in seconds (30 min default). |
 | `stories` | object | `{}` | Map of `story_id → StoryState`. |
+
+
+### gate_state values
+
+| Value | Set by | Tick behavior |
+|-------|--------|---------------|
+| `null` | factory default / reset | Refuse to advance; report "not approved" |
+| `"pre_approved"` | human approval via `write-state` | Proceed normally |
+| `"review_awaiting_human"` | reconciler on `review_terminal` non-passed verdict | Halt; wait for human to set `pre_approved` |
+| `"finalized"` | reconciler Branch 4 after PR created | No further ticks |
+
+**Transitions (write-state is the ONLY write path):**
+
+```
+null -> pre_approved
+    human: cli.mjs write-state --patch '{"gate_state":"pre_approved","epic_of_record":"<handle>"}'
+
+pre_approved -> review_awaiting_human
+    reconciler: Branch 2, review_terminal, verdict != passed
+
+review_awaiting_human -> pre_approved
+    human continues: cli.mjs write-state --patch '{"gate_state":"pre_approved"}'
+
+pre_approved -> finalized
+    reconciler: Branch 4, after all stories done + PR created
+```
 
 ### Per-story fields (`stories.<story-id>`)
 
@@ -253,12 +280,14 @@ If `snapshot.status` ∈ { `completed`, `failed`, `cancelled` }:
                hermes_reconciler.in_flight_task_id  = null
                hermes_reconciler.dispatched_at       = null
 
-       if normalized == "needs-revision":
-           stories[story-id].phase_position = "dispatched_impl"
-           stories[story-id].attempt++
-           hermes_reconciler.in_flight_task_id  = null
-           hermes_reconciler.dispatched_at       = null
-           # Branch 3 re-dispatches impl on the next tick.
+       else:
+           # Any non-passed verdict (needs-revision, unknown, etc.) requires human decision.
+           # Surface the verdict and halt by transitioning gate_state.
+           hermes_reconciler.gate_state        = "review_awaiting_human"
+           hermes_reconciler.in_flight_task_id = null
+           hermes_reconciler.dispatched_at      = null
+           # Human must: (1) review verdict, (2) decide next action, (3) set gate_state=pre_approved
+           # via: cli.mjs write-state --epic <handle> --patch '{"gate_state":"pre_approved"}'
 
 4. cli.mjs write-state --epic <handle> --patch \
        '<json with updated phase_position, in_flight fields, and story patch>'
@@ -419,8 +448,10 @@ tick(epic, epicConfig):
 
   // §3 Preflight — read state via the epic-status SHELL COMMAND (not a JS function)
   state = cli.mjs epic-status --epic <epic>
+  if state.epic_of_record != null AND state.epic_of_record != <epic>:
+      return { wakeAgent: false }   // wrong instance
   if state.gate_state != "pre_approved":
-      return { wakeAgent: false }
+      return { wakeAgent: false }   // not approved
 
   // §4 Branch 1 — Watchdog
   if state.in_flight_story_id AND elapsed(state.dispatched_at) > state.stuck_after_seconds:
@@ -438,7 +469,10 @@ tick(epic, epicConfig):
       if snapshot.status in {completed, failed, cancelled}:
           cli.mjs episode --issue ... --epic ... --story ...
           normalize verdict (§6)
-          advance phase_position
+          if current_phase == "dispatched_review" AND normalized != "passed":
+              gate_state = "review_awaiting_human"   // halt; human must continue
+          else:
+              advance phase_position
           cli.mjs write-state --epic <h> --patch '<updated fields>'
           exit tick
 
