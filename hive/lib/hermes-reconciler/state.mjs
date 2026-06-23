@@ -5,9 +5,33 @@
  * load fine and readHermesReconcilerState() returns safe defaults.
  * Writes are atomic (temp file + rename) and preserve all other top-level blocks.
  *
+ * ## gate_state semantics
+ *
+ * gate_state is the autonomy latch. Only `pre_approved` allows a tick to advance work.
+ *
+ * | Value                   | Set by                         | Tick behavior                                    |
+ * |-------------------------|--------------------------------|--------------------------------------------------|
+ * | null                    | initial / factory default      | Not approved; tick refuses to advance            |
+ * | "pre_approved"          | human approval via write-state | Approved to run; tick proceeds normally          |
+ * | "review_awaiting_human" | reconciler on review_terminal  | Review verdict needs human decision; tick halted |
+ * | "finalized"             | reconciler Branch 4            | Epic complete; no further ticks                  |
+ *
+ * Transitions (write-state is the ONLY write path):
+ *   null -> pre_approved           human: cli.mjs write-state --patch '{"gate_state":"pre_approved","epic_of_record":"<handle>"}'
+ *   pre_approved -> review_awaiting_human  reconciler: Branch 2, review_terminal, verdict != passed
+ *   review_awaiting_human -> pre_approved  human continues: cli.mjs write-state --patch '{"gate_state":"pre_approved"}'
+ *   pre_approved -> finalized       reconciler: Branch 4, after all stories done + PR created
+ *
+ * ## epic_of_record
+ *
+ * When a Hermes instance manages multiple epics, epic_of_record pins which epic this
+ * hermes_reconciler block owns. Set once at human approval alongside gate_state=pre_approved.
+ * A tick must validate epic_of_record matches its target before advancing.
+ *
  * Exports:
- *   readHermesReconcilerState(cycleStatePath) → HermesReconcilerState
- *   writeHermesReconcilerState(cycleStatePath, updates) → void
+ *   VALID_GATE_STATES -- Set of allowed gate_state string values (null is the absence value, not a member)
+ *   readHermesReconcilerState(cycleStatePath) -> HermesReconcilerState
+ *   writeHermesReconcilerState(cycleStatePath, updates) -> void
  */
 
 import fs from 'node:fs';
@@ -28,6 +52,16 @@ function requireYaml() {
   return yaml;
 }
 
+/**
+ * Allowed string values for gate_state. null (absent / not approved) is valid but is
+ * represented as the JS null literal, not as a string in this set.
+ */
+export const VALID_GATE_STATES = new Set([
+  'pre_approved',
+  'review_awaiting_human',
+  'finalized',
+]);
+
 // Plain object = non-null, typeof 'object', NOT an array. Arrays are objects in
 // JS, so a bare `typeof x === 'object'` would accept `[...]` and later let
 // Object.entries() treat array indices as story IDs, corrupting the contract.
@@ -35,10 +69,11 @@ function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
-// ── Defaults ──────────────────────────────────────────────────────────────────
+// -- Defaults --
 
 const DEFAULTS = {
   gate_state: null,
+  epic_of_record: null,
   in_flight_story_id: null,
   in_flight_task_id: null,
   dispatched_at: null,
@@ -53,6 +88,7 @@ function applyDefaults(raw) {
 
   return {
     gate_state:          raw.gate_state          ?? base.gate_state,
+    epic_of_record:      raw.epic_of_record      ?? base.epic_of_record,
     in_flight_story_id:  raw.in_flight_story_id  ?? base.in_flight_story_id,
     in_flight_task_id:   raw.in_flight_task_id   ?? base.in_flight_task_id,
     dispatched_at:       raw.dispatched_at        ?? base.dispatched_at,
@@ -62,7 +98,7 @@ function applyDefaults(raw) {
   };
 }
 
-// ── Read ──────────────────────────────────────────────────────────────────────
+// -- Read --
 
 /**
  * Read the hermes_reconciler: block from a cycle-state YAML file.
@@ -91,7 +127,7 @@ export function readHermesReconcilerState(cycleStatePath) {
   return applyDefaults(doc?.hermes_reconciler ?? null);
 }
 
-// ── Write ─────────────────────────────────────────────────────────────────────
+// -- Write --
 
 /**
  * Merge updates into the hermes_reconciler: block and write back atomically.

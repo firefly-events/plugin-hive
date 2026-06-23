@@ -17,6 +17,7 @@ import { pollTaskUntilTerminal, writeMulticaRunEpisode } from './episode-sync.mj
 import {
   readHermesReconcilerState,
   writeHermesReconcilerState,
+  VALID_GATE_STATES,
 } from '../hermes-reconciler/state.mjs';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -431,6 +432,7 @@ async function cmdEpicStatus(args, cfg) {
   succeed({
     epic,
     gate_state: state.gate_state,
+    epic_of_record: state.epic_of_record,
     current_phase: state.current_phase,
     in_flight_story_id: state.in_flight_story_id,
     in_flight_task_id: state.in_flight_task_id,
@@ -442,6 +444,7 @@ async function cmdEpicStatus(args, cfg) {
 // Valid top-level keys for the hermes_reconciler patch.
 const VALID_PATCH_KEYS = new Set([
   'gate_state',
+  'epic_of_record',
   'in_flight_story_id',
   'in_flight_task_id',
   'dispatched_at',
@@ -476,6 +479,18 @@ async function cmdWriteState(args) {
   if (unknownKeys.length > 0) {
     fail('INVALID_ARG', `Unknown top-level patch fields: ${unknownKeys.join(', ')}. Expected: ${[...VALID_PATCH_KEYS].join(', ')}`);
     return;
+  }
+
+  // Validate gate_state value — must be null or one of the allowed string values.
+  if ('gate_state' in patch) {
+    const gs = patch.gate_state;
+    if (gs !== null && !VALID_GATE_STATES.has(gs)) {
+      fail(
+        'INVALID_ARG',
+        `--patch "gate_state" must be null or one of: ${[...VALID_GATE_STATES].join(', ')}. Got: ${JSON.stringify(gs)}`,
+      );
+      return;
+    }
   }
 
   // Validate `stories` value types so a shape like {"stories":["x"]} or
@@ -520,6 +535,7 @@ async function cmdWriteState(args) {
   succeed({
     epic,
     gate_state: state.gate_state,
+    epic_of_record: state.epic_of_record,
     current_phase: state.current_phase,
     in_flight_story_id: state.in_flight_story_id,
     in_flight_task_id: state.in_flight_task_id,
