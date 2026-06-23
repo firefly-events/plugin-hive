@@ -99,6 +99,45 @@ steps:
     optional: false
     timeout_ms: 600000
 
+  # Reconcile node (s2): materialise the implement agent's committed work into
+  # the working tree before test and review run. No-op on local bindings
+  # (sha absent). C1: sha/branch/repo bound from implement step_output so the
+  # Multica path wires the real commit metadata.
+  - id: reconcile-implement
+    agent: reconciler
+    node_type: reconcile
+    step_file: hive/workflows/step-files/execute/reconcile.md
+    task: >
+      Materialise the implement agent's commit before test and review run.
+    depends_on:
+      - implement
+    inputs:
+      - name: sha
+        source: step_output
+        step_id: implement
+        output_name: commit_sha
+        optional: true
+      - name: branch
+        source: step_output
+        step_id: implement
+        output_name: branch
+        optional: true
+      - name: repo
+        source: step_output
+        step_id: implement
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: implement
+        output_name: work_dir
+        optional: true
+    outputs:
+      - name: reconcile_status
+        type: string
+    optional: true
+    timeout_ms: 120000
+
   - id: test
     agent: tester
     task: >
@@ -107,7 +146,7 @@ steps:
       the behavior contract. Use existing test patterns from the research brief.
       Verify all tests pass.
     depends_on:
-      - implement
+      - reconcile-implement
     inputs:
       - name: behavior_specs
         source: step_output
@@ -139,6 +178,7 @@ steps:
       a verdict: passed, needs_optimization, or needs_revision.
     depends_on:
       - test
+      - reconcile-implement
     inputs:
       - name: implementation
         source: step_output
@@ -166,6 +206,36 @@ steps:
         type: string
     optional: false
     timeout_ms: 300000
+
+  # #16: enforce the review verdict. A needs_revision review must NOT silently
+  # integrate. This gate fails the run when review_verdict == needs_revision,
+  # surfacing the review findings. (Auto-fix-and-re-review is the bounded
+  # converge-loop follow-on, t-005/t-006.)
+  - id: gate-review
+    node_type: gate
+    # needs_revision BLOCKS integrate; passed and needs_optimization both proceed
+    # (optimize is a refinement path, not a blocker).
+    gate: "review_verdict must not equal needs_revision"
+    # Bounded-retry contract (test_classic_gate_has_bounded_retry). The walker
+    # re-dispatches the SAME gate node, so re-evaluating an unchanged verdict
+    # just fails identically — max_attempts:1 = fail loud immediately, no wasted
+    # re-dispatch. Auto-fix-and-re-review (retry_node: review + a fix step) is
+    # the bounded converge-loop follow-on, t-005/t-006.
+    retry:
+      max_attempts: 1
+      on: gate_failed
+      retry_node: review
+    depends_on:
+      - review
+    inputs:
+      - name: review_verdict
+        source: step_output
+        step_id: review
+        output_name: review_verdict
+    outputs:
+      - name: gate_passed
+        type: json
+    timeout_ms: 30000
 
   - id: optimize
     agent: developer
@@ -202,6 +272,7 @@ steps:
       files changed.
     depends_on:
       - review
+      - gate-review
     inputs:
       - name: implementation
         source: step_output

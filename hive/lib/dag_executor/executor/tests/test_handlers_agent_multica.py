@@ -594,3 +594,179 @@ def test_under_run_raises_when_no_declared_output(tmp_path):
             handler.handle(node, inputs={}, run_id="run-1")
     # re-dispatched the bounded number of times before giving up
     assert dispatch_count[0] == 3, "under-run must re-dispatch up to 3 times"
+
+
+def test_under_run_recovers_via_reharvest_without_redispatch(tmp_path):
+    """efcl-s4 — the under-run is usually a RACE: the poll reports 'completed'
+    before the agent's commit / outputs.yaml has landed, so the harvest at poll
+    time reads an empty tree. A blind re-dispatch lands in a NEW empty work_dir
+    and abandons the good one. The guard must re-harvest the SAME work_dir first;
+    when the late commit has landed it recovers WITHOUT spending a re-dispatch."""
+    from types import SimpleNamespace
+    from hive.lib.dag_executor.executor.handlers.agent import (
+        AgentHandler,
+        MulticaAgentSpawn,
+    )
+
+    (tmp_path / "wd").mkdir()
+
+    class _RaceSpawn(MulticaAgentSpawn):
+        """__call__ harvests empty (race); a later re-read of the SAME work_dir
+        surfaces the declared outputs that the agent committed post-terminal."""
+
+        def reharvest(self, work_dir, base=None):
+            out = dict(base or {})
+            out["epic_dir"] = ".pHive/epics/execute-flow-followons-converge-loop"
+            out["commit_sha"] = "4dcd26e"
+            return out
+
+    spawn = _RaceSpawn(cli_path=tmp_path / "cli.mjs", repo_root=tmp_path)
+
+    dispatch_count = [0]
+
+    def side_effect(*args, **kwargs):
+        sub = args[0][2]
+        if sub == "create-issue":
+            return _make_subprocess_result(_create_issue_result())
+        if sub == "dispatch":
+            dispatch_count[0] += 1
+            return _make_subprocess_result(_dispatch_result())
+        return _make_subprocess_result(
+            _completed_poll_result(work_dir=str(tmp_path / "wd"))
+        )
+
+    node = SimpleNamespace(
+        id="author",
+        agent="technical-writer",
+        step_file="",
+        outputs=[SimpleNamespace(name="epic_dir"), SimpleNamespace(name="commit_sha")],
+    )
+    handler = AgentHandler(spawn=spawn)
+    with patch("subprocess.run", side_effect=side_effect):
+        result = handler.handle(node, inputs={}, run_id="run-1")
+
+    # Recovered on the FIRST attempt — the re-harvest surfaced the good output,
+    # so NO second dispatch was spent abandoning the work_dir that held it.
+    assert dispatch_count[0] == 1, "reharvest must recover before re-dispatching"
+    assert result.outputs["epic_dir"].endswith("execute-flow-followons-converge-loop")
+    assert result.outputs["commit_sha"] == "4dcd26e"
+
+
+def test_output_contract_injected_into_multica_brief(tmp_path):
+    """#13-enforce — a Multica node that declares semantic outputs must receive a
+    hard OUTPUT CONTRACT naming those exact keys in its issue brief, so a flaky
+    agent turn cannot silently end without writing outputs.yaml (the dominant,
+    difficulty-independent under-run cause). The step content is still verbatim."""
+    from types import SimpleNamespace
+    from hive.lib.dag_executor.executor.handlers.agent import AgentHandler
+
+    spawn = _make_spawn(tmp_path)
+    (tmp_path / "empty").mkdir()
+
+    def side_effect(*args, **kwargs):
+        sub = args[0][2]
+        if sub == "create-issue":
+            return _make_subprocess_result(_create_issue_result())
+        if sub == "dispatch":
+            return _make_subprocess_result(_dispatch_result())
+        return _make_subprocess_result(
+            _completed_poll_result(work_dir=str(tmp_path / "empty"))
+        )
+
+    node = SimpleNamespace(
+        id="author",
+        agent="technical-writer",
+        step_file="",
+        outputs=[SimpleNamespace(name="epic_dir"), SimpleNamespace(name="commit_sha")],
+    )
+    handler = AgentHandler(spawn=spawn)
+    with patch("subprocess.run", side_effect=side_effect) as mock_run:
+        # under-run raise is fine here — we only inspect the issue brief it built
+        with pytest.raises(AgentHandlerError):
+            handler.handle(node, inputs={}, run_id="run-1")
+
+    create_call = next(
+        c for c in mock_run.call_args_list if c[0][0][2] == "create-issue"
+    )
+    cmd = create_call[0][0]
+    body = cmd[cmd.index("--body") + 1]
+    assert "OUTPUT CONTRACT" in body
+    assert "outputs.yaml" in body
+    assert "`epic_dir`" in body
+    # commit_sha is spawn metadata (derived from git HEAD), not a SEMANTIC output
+    # the agent writes — it must NOT appear in the contract's required keys.
+    assert "`commit_sha`" not in body
+
+
+def test_output_contract_absent_for_metadata_only_node(tmp_path):
+    """A node with no SEMANTIC outputs (only spawn metadata) gets NO contract —
+    there is nothing for the agent to write to outputs.yaml."""
+    from types import SimpleNamespace
+    from hive.lib.dag_executor.executor.handlers.agent import AgentHandler
+
+    spawn = _make_spawn(tmp_path)
+    node = SimpleNamespace(
+        id="integrate",
+        agent="developer",
+        step_file="",
+        outputs=[SimpleNamespace(name="commit_sha")],  # metadata-only → not semantic
+    )
+    side_effects = [
+        _make_subprocess_result(_create_issue_result()),
+        _make_subprocess_result(_dispatch_result()),
+        _make_subprocess_result(_completed_poll_result()),
+    ]
+    handler = AgentHandler(spawn=spawn)
+    with patch("subprocess.run", side_effect=side_effects) as mock_run:
+        handler.handle(node, inputs={}, run_id="run-1")
+
+    cmd = mock_run.call_args_list[0][0][0]
+    body = cmd[cmd.index("--body") + 1]
+    assert "OUTPUT CONTRACT" not in body
+
+
+def test_partial_outputs_treated_as_under_run(tmp_path):
+    """CodeRabbit #318 — the #13 contract requires EVERY declared output. A node
+    that fills only SOME of its declared semantic outputs is incomplete and must
+    under-run (never flow a partial outputs.yaml downstream), so a recovery that
+    leaves any key empty is rejected and the guard exhausts its retries."""
+    from types import SimpleNamespace
+    from hive.lib.dag_executor.executor.handlers.agent import (
+        AgentHandler,
+        MulticaAgentSpawn,
+    )
+
+    class _PartialSpawn(MulticaAgentSpawn):
+        # Only ever surfaces ONE of the two declared semantic outputs.
+        def reharvest(self, work_dir, base=None):
+            out = dict(base or {})
+            out["epic_dir"] = ".pHive/epics/x"  # but never story_index
+            return out
+
+    spawn = _PartialSpawn(cli_path=tmp_path / "cli.mjs", repo_root=tmp_path)
+    (tmp_path / "wd").mkdir()
+    dispatch_count = [0]
+
+    def side_effect(*args, **kwargs):
+        sub = args[0][2]
+        if sub == "create-issue":
+            return _make_subprocess_result(_create_issue_result())
+        if sub == "dispatch":
+            dispatch_count[0] += 1
+            return _make_subprocess_result(_dispatch_result())
+        return _make_subprocess_result(
+            _completed_poll_result(work_dir=str(tmp_path / "wd"))
+        )
+
+    node = SimpleNamespace(
+        id="author",
+        agent="technical-writer",
+        step_file="",
+        outputs=[SimpleNamespace(name="epic_dir"), SimpleNamespace(name="story_index")],
+    )
+    handler = AgentHandler(spawn=spawn)
+    with patch("subprocess.run", side_effect=side_effect):
+        with pytest.raises(AgentHandlerError, match="under-run"):
+            handler.handle(node, inputs={}, run_id="run-1")
+    # the partial recovery (epic_dir set, story_index empty) is never accepted
+    assert dispatch_count[0] == 3
