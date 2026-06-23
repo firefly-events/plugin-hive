@@ -35,6 +35,13 @@ class ReconcileHandler:
       timeout_ms — subprocess timeout in milliseconds (default 120 s)
     """
 
+    # Re-entrancy: per-node invocation within a parallel dispatch group is safe.
+    # The local-binding path (no sha) is a no-op; the copytree path uses
+    # dirs_exist_ok=True (idempotent). The git ff-merge path calls cli.mjs as a
+    # blocking subprocess; concurrent calls to the same work-dir would contend on
+    # .git/index.lock, but no current workflow dispatches two reconcile nodes in
+    # the same parallel wave. Walker._per_node_reconcile serializes them.
+
     _DEFAULT_TIMEOUT_MS = 120_000
 
     def __init__(

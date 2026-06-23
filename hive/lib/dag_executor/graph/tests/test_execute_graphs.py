@@ -28,6 +28,7 @@ WORKFLOWS_DIR = REPO_ROOT / "hive" / "workflows"
 
 CLASSIC_PATH = WORKFLOWS_DIR / "development.classic.workflow.yaml"
 TDD_PATH = WORKFLOWS_DIR / "development.tdd.workflow.yaml"
+BDD_PATH = WORKFLOWS_DIR / "development.bdd.workflow.yaml"
 
 
 # ---------------------------------------------------------------------------
@@ -300,3 +301,60 @@ def test_gate_retry_bound_is_finite():
                 assert 1 <= attempts <= 10, (
                     f"{gate_id}: max_attempts={attempts} out of bounds [1, 10]"
                 )
+
+
+# ---------------------------------------------------------------------------
+# efcl-s2: reconcile wiring between implement and review (AC4)
+# ---------------------------------------------------------------------------
+
+
+def _ancestors(graph: Graph, node_id: str) -> set[str]:
+    """Return all transitive ancestors of node_id (via depends_on edges)."""
+    visited: set[str] = set()
+    queue = list(graph.nodes[node_id].depends_on) if node_id in graph.nodes else []
+    while queue:
+        nid = queue.pop()
+        if nid in visited:
+            continue
+        visited.add(nid)
+        if nid in graph.nodes:
+            queue.extend(graph.nodes[nid].depends_on)
+    return visited
+
+
+@pytest.mark.parametrize("workflow_path,implement_id", [
+    pytest.param(CLASSIC_PATH, "backend-implement", id="classic-backend"),
+    pytest.param(CLASSIC_PATH, "frontend-implement", id="classic-frontend"),
+    pytest.param(TDD_PATH, "implement", id="tdd"),
+    pytest.param(BDD_PATH, "implement", id="bdd"),
+])
+def test_reconcile_wired_between_implement_and_review(workflow_path, implement_id):
+    """Every methodology graph must have a RECONCILE node in the transitive
+    ancestor chain of review that is also a transitive descendant of the
+    implement node — per-node reconcile between implement and review (AC4).
+    """
+    graph = load_workflow(workflow_path)
+    assert "review" in graph.nodes, f"review node missing in {workflow_path.name}"
+    assert implement_id in graph.nodes, (
+        f"{implement_id!r} missing in {workflow_path.name}"
+    )
+
+    review_ancestors = _ancestors(graph, "review")
+    implement_descendants: set[str] = set()
+    queue = [implement_id]
+    while queue:
+        nid = queue.pop()
+        for successor_id, successor in graph.nodes.items():
+            if nid in successor.depends_on and successor_id not in implement_descendants:
+                implement_descendants.add(successor_id)
+                queue.append(successor_id)
+
+    reconcile_between = [
+        nid for nid in review_ancestors & implement_descendants
+        if graph.nodes[nid].node_type == NodeType.RECONCILE
+    ]
+    assert reconcile_between, (
+        f"{workflow_path.name}: no RECONCILE node found in the path from "
+        f"{implement_id!r} to review — AC4 requires reconcile wiring between "
+        f"implement and review"
+    )

@@ -169,3 +169,151 @@ def test_every_emitted_event_carries_run_id():
     tel = Telemetry(run_id="rid-xyz")
     Walker().walk(g, _stub_dispatcher({"a": {}}), "rid-xyz", tel)
     assert all(e["run_id"] == "rid-xyz" for e in tel.events)
+
+
+# ── s2 / efcl-s2: implement sentinel visible to review via reconcile ──────────
+
+
+def _reconcile_node(node_id: str, depends_on: list[str] | None = None) -> Node:
+    return Node(
+        id=node_id,
+        agent="reconciler",
+        node_type=NodeType.RECONCILE,
+        depends_on=depends_on or [],
+    )
+
+
+def test_implement_sentinel_visible_in_review_via_reconcile_node(tmp_path):
+    """Graph: implement → reconcile-implement → review.
+
+    The implement node writes a sentinel file to work_dir. The reconcile
+    node (stub) copies work_dir contents to repo_root. The review node
+    asserts the sentinel file is readable in repo_root before integrate.
+    """
+    import shutil
+    from pathlib import Path
+
+    work_dir = tmp_path / "work_dir"
+    work_dir.mkdir()
+    sentinel = work_dir / "sentinel.txt"
+    sentinel.write_text("implement output", encoding="utf-8")
+
+    repo_root = tmp_path / "repo_root"
+    repo_root.mkdir()
+
+    review_saw_sentinel: list[bool] = []
+
+    def agent_handler(node, inputs, run_id):
+        if node.id == "implement":
+            return NodeOutput(outputs={"implementation": "done", "work_dir": str(work_dir)})
+        if node.id == "review":
+            review_saw_sentinel.append((repo_root / "sentinel.txt").exists())
+            return NodeOutput(outputs={"review_verdict": "passed"})
+        return NodeOutput(outputs={})
+
+    def reconcile_handler(node, inputs, run_id):
+        wdir = Path(inputs.get("work_dir") or "")
+        if wdir.is_dir():
+            shutil.copytree(str(wdir), str(repo_root), dirs_exist_ok=True)
+        return NodeOutput(outputs={}, meta={"reconcile": "done"})
+
+    nodes = [
+        Node(id="implement", agent="developer", node_type=NodeType.AGENT),
+        Node(
+            id="reconcile-implement",
+            agent="reconciler",
+            node_type=NodeType.RECONCILE,
+            depends_on=["implement"],
+            inputs=[
+                InputBinding(
+                    name="work_dir",
+                    source="step_output",
+                    step_id="implement",
+                    output_name="work_dir",
+                    optional=True,
+                ),
+            ],
+        ),
+        Node(
+            id="review",
+            agent="reviewer",
+            node_type=NodeType.AGENT,
+            depends_on=["reconcile-implement"],
+        ),
+    ]
+    g = _graph_with(nodes)
+    dispatcher = Dispatcher(handlers={
+        NodeType.AGENT: agent_handler,
+        NodeType.RECONCILE: reconcile_handler,
+    })
+    Walker().walk(g, dispatcher, "rid-sentinel", Telemetry(run_id="rid-sentinel"))
+    assert review_saw_sentinel == [True], (
+        "review must see implement's sentinel file after reconcile materialises it"
+    )
+
+
+def test_walker_inline_reconcile_fires_after_implement(tmp_path):
+    """Walker's per-node reconcile fires for implement nodes with commit_sha.
+
+    Graph: implement → review (no explicit reconcile node). The walker's
+    inline _per_node_reconcile must invoke the dispatcher's reconcile handler
+    with the implement node's commit_sha before review is dispatched.
+    """
+    reconcile_calls: list[str] = []
+
+    def agent_handler(node, inputs, run_id):
+        if node.id == "implement":
+            return NodeOutput(outputs={
+                "implementation": "done",
+                "commit_sha": "abc1234",
+                "branch": "agent/impl/x",
+                "repo": "git@github.com:org/repo.git",
+                "work_dir": str(tmp_path / "work"),
+            })
+        return NodeOutput(outputs={"review_verdict": "passed"})
+
+    def reconcile_handler(node, inputs, run_id):
+        reconcile_calls.append(inputs.get("sha", ""))
+        return NodeOutput(outputs={}, meta={"reconcile": "done"})
+
+    nodes = [
+        Node(id="implement", agent="developer", node_type=NodeType.AGENT),
+        Node(id="review", agent="reviewer", node_type=NodeType.AGENT, depends_on=["implement"]),
+    ]
+    g = _graph_with(nodes)
+    dispatcher = Dispatcher(handlers={
+        NodeType.AGENT: agent_handler,
+        NodeType.RECONCILE: reconcile_handler,
+    })
+    Walker().walk(g, dispatcher, "rid-inline", Telemetry(run_id="rid-inline"))
+    assert reconcile_calls == ["abc1234"], (
+        "walker must invoke per-node reconcile with commit_sha after implement terminates"
+    )
+
+
+def test_walker_inline_reconcile_noop_without_commit_sha():
+    """Walker's per-node reconcile is a no-op when implement returns no commit_sha."""
+    reconcile_calls: list[str] = []
+
+    def agent_handler(node, inputs, run_id):
+        if node.id == "implement":
+            return NodeOutput(outputs={"implementation": "done"})
+        return NodeOutput(outputs={})
+
+    def reconcile_handler(node, inputs, run_id):
+        reconcile_calls.append(node.id)
+        return NodeOutput(outputs={})
+
+    nodes = [
+        Node(id="implement", agent="developer", node_type=NodeType.AGENT),
+        Node(id="review", agent="reviewer", node_type=NodeType.AGENT, depends_on=["implement"]),
+    ]
+    g = _graph_with(nodes)
+    dispatcher = Dispatcher(handlers={
+        NodeType.AGENT: agent_handler,
+        NodeType.RECONCILE: reconcile_handler,
+    })
+    Walker().walk(g, dispatcher, "rid-noop", Telemetry(run_id="rid-noop"))
+    assert reconcile_calls == [], (
+        "per-node reconcile must be a no-op when no commit_sha is present"
+    )

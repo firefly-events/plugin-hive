@@ -36,7 +36,7 @@ from typing import Any
 
 import yaml
 
-from hive.lib.dag_executor.graph import Graph, InputBinding, Node
+from hive.lib.dag_executor.graph import Graph, InputBinding, Node, NodeType
 from hive.lib.dag_executor.routing import (
     ActivationDecision,
     ParallelScheduler,
@@ -765,6 +765,11 @@ class Walker:
                 ) from exc
             raise
 
+        # Per-node reconcile: materialise implement commits into repo_root
+        # before downstream nodes (especially review) are dispatched.
+        if _is_implement_node(node):
+            _per_node_reconcile(dispatcher, node, output, run_id, telemetry)
+
         materialised[node_id] = output
         if is_pause:
             state = _record_pause_resumed(state)
@@ -968,6 +973,16 @@ class Walker:
             state = _record_skipped(state, node_id, payload, source_epic=_source_epic(ctx))
             save_state(state)
 
+        # Per-node reconcile for completed implement nodes in this wave.
+        # Serialized to avoid concurrent git operations on the same work-dir.
+        for node_id in sorted(results):
+            if results[node_id].status == "completed":
+                impl_node = graph.nodes[node_id]
+                if _is_implement_node(impl_node):
+                    _per_node_reconcile(
+                        dispatcher, impl_node, results[node_id].output, run_id, telemetry
+                    )
+
         # All sibling results are now recorded; halt the run on the first fatal
         # non-optional gate failure observed in this wave (#26 / CodeRabbit).
         if fatal_gate_error is not None:
@@ -1157,6 +1172,71 @@ class Walker:
         state = mark_completed(state)
         save(state, root=runs_root)
         return state
+
+
+def _is_implement_node(node) -> bool:
+    """Return True iff this is an implement-type agent node.
+
+    Matches ids: 'implement', 'backend-implement', 'frontend-implement'.
+    Excludes reconcile/gate/pause/script nodes by checking the node_type.
+    """
+    nt = getattr(node, "node_type", None)
+    if nt is None:
+        return False
+    if hasattr(nt, "value"):
+        if nt.value != "agent":
+            return False
+    elif str(nt).lower() != "agent":
+        return False
+    nid = getattr(node, "id", "") or ""
+    return nid == "implement" or nid.endswith("-implement")
+
+
+def _per_node_reconcile(
+    dispatcher: Any,
+    node: Any,
+    output: NodeOutput,
+    run_id: str,
+    telemetry: Telemetry,
+) -> None:
+    """Invoke reconcile inline after an implement node terminates.
+
+    When commit_sha is present in the implement node's output (Multica
+    execution path), this materialises the committed work into repo_root
+    before any downstream node — especially the review agent — is
+    dispatched. No-op when commit_sha is absent (local binding; work is
+    already in the tree). Non-fatal: a reconcile HandlerError is recorded
+    in telemetry but does NOT abort the run.
+    """
+    sha = (output.outputs or {}).get("commit_sha") or ""
+    if not sha:
+        return
+
+    reconcile_node = Node(
+        id=f"per-node-reconcile-{node.id}",
+        agent="reconciler",
+        node_type=NodeType.RECONCILE,
+        depends_on=[],
+    )
+    reconcile_inputs: dict[str, Any] = {
+        "sha": sha,
+        "branch": (output.outputs or {}).get("branch") or "",
+        "repo": (output.outputs or {}).get("repo") or "",
+        "work_dir": (output.outputs or {}).get("work_dir") or "",
+    }
+    try:
+        dispatcher.dispatch(reconcile_node, reconcile_inputs, run_id)
+        telemetry.emit(
+            "node_completed",
+            reconcile_node.id,
+            {"per_node_reconcile": True},
+        )
+    except HandlerError as exc:
+        telemetry.emit(
+            "node_failed",
+            reconcile_node.id,
+            {"per_node_reconcile": True, "error": str(exc)},
+        )
 
 
 def _maybe_open_worktree(worktree_manager: Any | None, run_id: str):
