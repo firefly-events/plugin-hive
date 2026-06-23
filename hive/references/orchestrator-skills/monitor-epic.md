@@ -4,7 +4,8 @@
 > Paste as context when a human or cron heartbeat requests an epic status view.
 > References: `hive/lib/multica-story-dispatch/cli.mjs` (epic-status subcommand),
 > `hive/lib/context-snapshot.mjs` (composeContextSnapshot API).
-> MCP surface: `multica_epic_status` (state read) + `multica_context_snapshot` (episodes/triage/metrics).
+> hermes-multica MCP tools used: `multica_epic_status` (state read), `multica_poll_task`.
+> Episode/triage/metric data is NOT an MCP tool — call `composeContextSnapshot` (`hive/lib/context-snapshot.mjs`) directly.
 
 ---
 

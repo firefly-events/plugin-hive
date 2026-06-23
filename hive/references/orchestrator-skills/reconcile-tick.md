@@ -365,7 +365,7 @@ function surface_verdict_hook(payload):
         "\nSet `gate_state = \"pre_approved\"` to continue after your review."
     )
     // h-06 (slack-notify-await.md) provides the Slack transport.
-    // To wire it: replace or augment this stub with multica_slack_notify.
+    // To wire it: call the slack-notify-await surface-verdict hook (slack-notify-await.mjs), not an MCP tool.
 ```
 
 The hook is intentionally minimal. **Never** auto-dispatch a revision from inside this

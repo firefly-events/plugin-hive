@@ -8,7 +8,9 @@
 > - `hive/references/orchestrator-skills/slack-notify-await.md` — human gate transport
 > - `hive/lib/hermes-reconciler/slack-notify-await.mjs` — backing JS module
 > MCP surface: `multica_dispatch_story`, `multica_poll_task`, `multica_write_state`,
-> `multica_post_comment`, `multica_slack_notify`.
+> `multica_post_comment`. The Slack notify is the slack-notify-await transport (HTTP webhook), not an MCP tool;
+> reading the last planning comment uses `multica issue get` / the `multica_poll_task` result — there is no
+> get-comment MCP tool.
 
 ---
 
@@ -314,7 +316,7 @@ These fields live in the `hermes_reconciler:` block under `planning:`:
 | `planning_requirement` | string | — | Verbatim requirement text that started this plan run |
 | `planning_issue_id` | string\|null | Multica issue UUID | The dispatched planning agent issue |
 | `planning_current_gate` | string\|null | `design_discussion`, `hv_plan`, `structured_outline`, `confirm` | Gate currently awaiting human input |
-| `gate_state` | string\|null | `null`, `pre_approved`, `awaiting`, `rejected` | Execution gate — set by kickoff-exec, NOT by kickoff-plan |
+| `gate_state` | string\|null | `null`, `pre_approved`, `review_awaiting_human`, `finalized`, `rejected` | Execution gate — set by kickoff-exec, NOT by kickoff-plan |
 
 `kickoff-plan` never writes `gate_state: pre_approved`. That is the execution gate and belongs to
 the separate human approval step that enables `kickoff-exec`.

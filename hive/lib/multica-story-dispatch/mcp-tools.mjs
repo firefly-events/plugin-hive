@@ -197,13 +197,13 @@ const TOOL_DEFINITIONS = [
  * On non-zero exit, throws an Error whose message carries the {code, message}
  * payload from cli.mjs stderr — never swallows error details.
  */
-async function callCli(subcommand, cliArgs) {
+async function callCli(subcommand, cliArgs, { timeoutMs = 300_000 } = {}) {
   let stdout;
   try {
     ({ stdout } = await execFileAsync(
       process.execPath,
       [CLI_PATH, subcommand, ...cliArgs],
-      { timeout: 300_000 },
+      { timeout: timeoutMs },
     ));
   } catch (err) {
     // Command failure: non-zero exit, timeout, or spawn error. cli.mjs emits a
@@ -230,47 +230,91 @@ async function callCli(subcommand, cliArgs) {
 
 // ── Tool dispatch ───────────────────────────────────────────────────────────
 
+// Required-arg guard: a thin MCP server must not coerce null/undefined into
+// "null"/undefined CLI flags (which corrupt comments/episode metadata or cause
+// spawn-level errors). Reject malformed calls with a typed error up front.
+function requireArgs(toolName, a, fields) {
+  for (const f of fields) {
+    const v = a[f];
+    if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) {
+      throw Object.assign(
+        new Error(`${toolName}: required argument "${f}" is missing or empty`),
+        { code: 'INVALID_ARGS' },
+      );
+    }
+  }
+}
+
+// `poll` waits up to 30 min CLI-side by default; the execFile wrapper must outlast
+// that (plus a buffer) or the MCP poll is killed early regardless of timeout_ms.
+const POLL_DEFAULT_TIMEOUT_MS = 1_800_000;
+const EXEC_TIMEOUT_BUFFER_MS = 60_000;
+
 async function invokeTool(name, args) {
   const a = args ?? {};
   switch (name) {
     case 'multica_dispatch_story': {
-      const flags = ['--issue', a.issue_id];
+      requireArgs(name, a, ['issue_id']);
+      if (!a.agent_name && !a.squad_name) {
+        throw Object.assign(
+          new Error(`${name}: one of "agent_name" or "squad_name" is required`),
+          { code: 'INVALID_ARGS' },
+        );
+      }
+      const flags = ['--issue', String(a.issue_id)];
       if (a.agent_name) flags.push('--agent', String(a.agent_name));
       if (a.squad_name) flags.push('--squad', String(a.squad_name));
       return callCli('dispatch', flags);
     }
 
     case 'multica_poll_task': {
-      const flags = ['--issue', a.issue_id];
-      if (a.timeout_ms != null) flags.push('--timeout-ms', String(a.timeout_ms));
-      return callCli('poll', flags);
+      requireArgs(name, a, ['issue_id']);
+      const flags = ['--issue', String(a.issue_id)];
+      let requested = POLL_DEFAULT_TIMEOUT_MS;
+      if (a.timeout_ms != null) {
+        const n = Number(a.timeout_ms);
+        if (!Number.isFinite(n) || n <= 0) {
+          throw Object.assign(
+            new Error(`${name}: "timeout_ms" must be a positive number`),
+            { code: 'INVALID_ARGS' },
+          );
+        }
+        requested = n;
+        flags.push('--timeout-ms', String(n));
+      }
+      return callCli('poll', flags, { timeoutMs: requested + EXEC_TIMEOUT_BUFFER_MS });
     }
 
     case 'multica_epic_status': {
-      const flags = ['--epic', a.epic_handle];
+      requireArgs(name, a, ['epic_handle']);
+      const flags = ['--epic', String(a.epic_handle)];
       if (a.cycle_state_path) flags.push('--cycle-state', String(a.cycle_state_path));
       return callCli('epic-status', flags);
     }
 
     case 'multica_write_state': {
+      requireArgs(name, a, ['epic_handle', 'patch']);
       const patch = typeof a.patch === 'string' ? a.patch : JSON.stringify(a.patch);
-      const flags = ['--epic', a.epic_handle, '--patch', patch];
+      const flags = ['--epic', String(a.epic_handle), '--patch', patch];
       if (a.cycle_state_path) flags.push('--cycle-state', String(a.cycle_state_path));
       return callCli('write-state', flags);
     }
 
     case 'multica_post_comment':
-      return callCli('comment', ['--issue', a.issue_id, '--body', String(a.body)]);
+      requireArgs(name, a, ['issue_id', 'body']);
+      return callCli('comment', ['--issue', String(a.issue_id), '--body', String(a.body)]);
 
     case 'multica_episode':
+      requireArgs(name, a, ['issue_id', 'epic', 'story']);
       return callCli('episode', [
-        '--issue', a.issue_id,
+        '--issue', String(a.issue_id),
         '--epic', String(a.epic),
         '--story', String(a.story),
       ]);
 
     case 'multica_cancel':
-      return callCli('cancel', ['--issue', a.issue_id]);
+      requireArgs(name, a, ['issue_id']);
+      return callCli('cancel', ['--issue', String(a.issue_id)]);
 
     default:
       throw Object.assign(new Error(`Unknown tool: ${name}`), { code: 'UNKNOWN_TOOL' });

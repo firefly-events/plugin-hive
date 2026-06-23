@@ -3,7 +3,8 @@
 > **Inline prompt.** This runbook defines the Slack notify-and-await human-gate transport.
 > Paste as context alongside reconcile-tick when a surface-verdict or surface-error hook fires.
 > References: `hive/lib/hermes-reconciler/slack-notify-await.mjs` — backing JS module.
-> MCP surface: `multica_slack_notify` (Slack post) + `multica_write_state` (gate latch).
+> hermes-multica MCP tool used: `multica_write_state` (gate latch). The Slack post itself is an HTTP webhook
+> (`HERMES_SLACK_WEBHOOK_URL`) handled by `slack-notify-await.mjs` — it is NOT an MCP tool.
 
 ---
 
@@ -13,9 +14,9 @@ This skill is the **concrete channel for the human review gate** (and error/appr
 When reconcile-tick reaches `review_terminal` — or any error condition requiring human action —
 it calls this skill instead of auto-advancing. The skill:
 
-1. Latches `gate_state: "awaiting"` via `multica_write_state` **before** attempting Slack.
+1. Latches `gate_state: "review_awaiting_human"` via `multica_write_state` **before** attempting Slack.
 2. Posts a Slack message with the verdict/error context and the decision needed.
-3. Returns `{ halted: true, gate_state: "awaiting" }`. The tick exits. Nothing advances.
+3. Returns `{ halted: true, gate_state: "review_awaiting_human" }`. The tick exits. Nothing advances.
 
 The human reads the Slack message and responds. A follow-up trigger (incoming Slack action or
 manual `resolve-gate` call) invokes this skill's resolution path to lift the gate.
@@ -41,7 +42,7 @@ surface-verdict(epic_handle, story_id, verdict, episode_summary, diff):
   // Step 1 — latch gate FIRST (fail-safe, before Slack is attempted)
   multica_write_state(
     epic_handle: <epic_handle>,
-    patch: '{"gate_state": "awaiting"}'
+    patch: '{"gate_state": "review_awaiting_human"}'
   )
 
   // Step 2 — post Slack message
@@ -49,12 +50,12 @@ surface-verdict(epic_handle, story_id, verdict, episode_summary, diff):
   result  = multica_slack_notify(message)
 
   if result.error:
-      // Slack failed — gate is already "awaiting"; log the error; DO NOT continue tick.
-      log("WARN: Slack notify failed: " + result.error + ". Gate is 'awaiting'. Tick halted.")
+      // Slack failed — gate is already "review_awaiting_human"; log the error; DO NOT continue tick.
+      log("WARN: Slack notify failed: " + result.error + ". Gate is 'review_awaiting_human'. Tick halted.")
       exit tick with error
 
   // Step 3 — halt
-  return { halted: true, gate_state: "awaiting" }
+  return { halted: true, gate_state: "review_awaiting_human" }
   exit tick (do NOT proceed to any other branch)
 ```
 
@@ -95,7 +96,7 @@ surface-error(epic_handle, story_id, error_kind, details):
   // Step 1 — latch gate FIRST
   multica_write_state(
     epic_handle: <epic_handle>,
-    patch: '{"gate_state": "awaiting"}'
+    patch: '{"gate_state": "review_awaiting_human"}'
   )
 
   // Step 2 — post Slack message
@@ -103,11 +104,11 @@ surface-error(epic_handle, story_id, error_kind, details):
   result  = multica_slack_notify(message)
 
   if result.error:
-      log("WARN: Slack notify failed: " + result.error + ". Gate is 'awaiting'. Tick halted.")
+      log("WARN: Slack notify failed: " + result.error + ". Gate is 'review_awaiting_human'. Tick halted.")
       exit tick with error
 
   // Step 3 — halt
-  return { halted: true, gate_state: "awaiting" }
+  return { halted: true, gate_state: "review_awaiting_human" }
   exit tick
 ```
 
@@ -137,12 +138,12 @@ Reply with one of:
 
 | Failure mode | Behavior |
 |-------------|----------|
-| Slack webhook returns non-2xx | Gate stays `awaiting`. Error logged. Tick halts. |
-| Slack unreachable (timeout / ECONNREFUSED) | Gate stays `awaiting`. Error logged. Tick halts. |
-| `HERMES_SLACK_WEBHOOK_URL` not configured | Gate stays `awaiting`. Error thrown. Tick halts. |
+| Slack webhook returns non-2xx | Gate stays `review_awaiting_human`. Error logged. Tick halts. |
+| Slack unreachable (timeout / ECONNREFUSED) | Gate stays `review_awaiting_human`. Error logged. Tick halts. |
+| `HERMES_SLACK_WEBHOOK_URL` not configured | Gate stays `review_awaiting_human`. Error thrown. Tick halts. |
 | **Never** | Auto-advance without human confirmation. |
 
-`gate_state: "awaiting"` is always written **before** the Slack call. Even if the Slack call
+`gate_state: "review_awaiting_human"` is always written **before** the Slack call. Even if the Slack call
 throws, the gate is already latched. The tick will not advance on the next cron run because
 `gate_state != "pre_approved"` fails the §3 preflight check in reconcile-tick.
 

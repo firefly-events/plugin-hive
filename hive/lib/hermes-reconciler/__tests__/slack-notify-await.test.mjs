@@ -327,9 +327,37 @@ test('resolveGate: revise clears in-flight fields so Branch 3 re-dispatches', ()
 test('resolveGate: revise throws if storyId missing', () => {
   const dir = tmpDir();
   const statePath = cycleStatePath(dir);
+  // Precondition: gate must be awaiting a human before any action is resolvable.
+  writeHermesReconcilerState(statePath, { gate_state: 'review_awaiting_human' });
   assert.throws(
     () => resolveGate(statePath, { action: 'revise' }),
     /storyId is required/,
+  );
+});
+
+test('resolveGate: refuses to transition when gate is not review_awaiting_human', () => {
+  const dir = tmpDir();
+  const statePath = cycleStatePath(dir);
+  // gate_state is null (never halted) — a stale action must not resume the cycle.
+  assert.throws(
+    () => resolveGate(statePath, { action: 'approve' }),
+    /not "review_awaiting_human"/,
+  );
+  // finalized (terminal) must also refuse.
+  writeHermesReconcilerState(statePath, { gate_state: 'finalized' });
+  assert.throws(
+    () => resolveGate(statePath, { action: 'approve' }),
+    /not "review_awaiting_human"/,
+  );
+});
+
+test('resolveGate: revise throws if story not found in state', () => {
+  const dir = tmpDir();
+  const statePath = cycleStatePath(dir);
+  writeHermesReconcilerState(statePath, { gate_state: 'review_awaiting_human' });
+  assert.throws(
+    () => resolveGate(statePath, { action: 'revise', storyId: 'ghost-story' }),
+    /not found in reconciler state/,
   );
 });
 

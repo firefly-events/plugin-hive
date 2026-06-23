@@ -6,7 +6,9 @@
 > - `hive/references/orchestrator-skills/slack-notify-await.md` — alert transport (h-06 surface)
 > - `hive/references/orchestrator-skills/monitor-epic.md` — epic-level reads (composable with this skill)
 > - Research brief §7: meta nightly is a RemoteTrigger routine, NOT a repo workflow.
-> MCP surface: `multica_routine_status`, `multica_daemon_status`, `multica_slack_notify`.
+> No hermes-multica MCP tool covers health checks. Use `multica daemon status --output json` (CLI) for daemon
+> health, RemoteTrigger routine inspection (`multica routine get <name> --output json`) for routines, and the
+> slack-notify-await transport (HTTP webhook, `HERMES_SLACK_WEBHOOK_URL`) for alerts — none are MCP tools.
 
 ---
 
