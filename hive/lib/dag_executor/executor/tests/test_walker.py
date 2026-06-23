@@ -319,6 +319,43 @@ def test_walker_inline_reconcile_noop_without_commit_sha():
     )
 
 
+def test_walker_inline_reconcile_failure_aborts_before_review(tmp_path):
+    """When the implement commit cannot be materialised (reconcile raises), the
+    walker must FAIL LOUD — not swallow and let review run on a stale tree it
+    never saw. NON_FF on the Multica substrate reaches this path."""
+    review_dispatched: list[str] = []
+
+    def agent_handler(node, inputs, run_id):
+        if node.id == "implement":
+            return NodeOutput(outputs={
+                "implementation": "done",
+                "commit_sha": "abc1234",
+                "branch": "agent/impl/x",
+                "repo": "git@github.com:org/repo.git",
+                "work_dir": str(tmp_path / "work"),
+            })
+        review_dispatched.append(node.id)
+        return NodeOutput(outputs={"review_verdict": "passed"})
+
+    def reconcile_handler(node, inputs, run_id):
+        raise HandlerError("NON_FF: cannot fast-forward")
+
+    nodes = [
+        Node(id="implement", agent="developer", node_type=NodeType.AGENT),
+        Node(id="review", agent="reviewer", node_type=NodeType.AGENT, depends_on=["implement"]),
+    ]
+    g = _graph_with(nodes)
+    dispatcher = Dispatcher(handlers={
+        NodeType.AGENT: agent_handler,
+        NodeType.RECONCILE: reconcile_handler,
+    })
+    with pytest.raises(HandlerError, match="NON_FF"):
+        Walker().walk(g, dispatcher, "rid-fail", Telemetry(run_id="rid-fail"))
+    assert review_dispatched == [], (
+        "review must NOT run when reconcile failed — no stale-tree review"
+    )
+
+
 # ── s2 / efcl-s2: parallel dispatch group serialization + idempotency ─────────
 
 
