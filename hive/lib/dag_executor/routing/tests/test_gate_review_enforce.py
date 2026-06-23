@@ -106,6 +106,45 @@ def test_gate_review_allows_integrate_on_passed(workflow_path):
     assert "integrate" in calls, "integrate must run when review passed"
 
 
+_CANONICAL_PREDICATE = "review_verdict must not equal needs_revision"
+
+
+@pytest.mark.parametrize("workflow_path", METHODOLOGIES)
+def test_gate_review_predicate_matches_classic_verbatim(workflow_path):
+    """AC-1/AC-2: gate-review predicate must be byte-for-byte the classic string.
+
+    Guards the medium-risk "subtle predicate difference passes on a lenient
+    matcher" gap: assert the exact predicate text, not just that a gate exists.
+    """
+    graph = load_workflow(workflow_path)
+    node = graph.nodes.get("gate-review")
+    assert node is not None, (
+        f"gate-review node must exist in {workflow_path.name}"
+    )
+    assert node.node_type is NodeType.GATE, (
+        f"gate-review must be a gate node in {workflow_path.name}; got {node.node_type}"
+    )
+    assert node.gate == _CANONICAL_PREDICATE, (
+        f"gate-review predicate in {workflow_path.name} must match classic "
+        f"verbatim {_CANONICAL_PREDICATE!r}; got {node.gate!r}"
+    )
+
+
+@pytest.mark.parametrize("workflow_path", METHODOLOGIES)
+def test_integrate_depends_on_gate_review(workflow_path):
+    """AC-1/AC-2: integrate must depend on gate-review so the gate is interposed
+    between review and integrate (not bypassed via a direct review->integrate edge)."""
+    graph = load_workflow(workflow_path)
+    integrate = graph.nodes.get("integrate")
+    assert integrate is not None, (
+        f"integrate node must exist in {workflow_path.name}"
+    )
+    assert "gate-review" in integrate.depends_on, (
+        f"integrate.depends_on in {workflow_path.name} must include 'gate-review'; "
+        f"got {integrate.depends_on!r}"
+    )
+
+
 @pytest.mark.parametrize("workflow_path", METHODOLOGIES)
 def test_gate_review_has_max_attempts_1(workflow_path):
     """gate-review bounded-retry: max_attempts must be exactly 1 in all three graphs."""
