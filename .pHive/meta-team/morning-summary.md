@@ -1,71 +1,27 @@
-# meta-meta-optimize Morning Summary — 2026-06-20
+# Hive Meta-Team — Nightly Cycle Report
+**Cycle:** meta-2026-06-22 | **Date:** 2026-06-22 | **Verdict:** passed
 
-**Cycle:** meta-2026-06-20
-**Verdict:** passed
-**Branch:** meta-meta/nightly-20260620
-**Decision:** accept (1 change promoted)
+## What Changed
 
----
+PR #314 (feat/dag-step-file-plugin-root) introduced 3 new marketing agent personas but the agent roster doc and memory infrastructure were not updated. This cycle closes those gaps:
 
-## What Changed Tonight
-
-- **`.pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md`** — appended
-  `<!-- indexed-for-meta-meta-optimize proving run: meta-2026-06-20 -->` as the
-  3rd dated footer line. Pure ADD on a frozen archive artifact; no live consumers.
-  commit: `31f9b85403de7fac6b13a89e174068da364cbb43`
-
----
+- **hive/GUIDE.md** — Agent Roster heading updated from `(25 Personas)` to `(28 Personas)`; `marketing-strategist`, `marketing-copywriter`, and `ad-creative` added to the Sonnet tier row in the Model Tier Routing table; new `### Marketing Agents` section added after Specialist Agents listing all 3 with roles and tier.
+- **skills/hive/agents/memories/ad-creative/prompt-specificity-drives-asset-quality.md** — Starter pitfall memory: vague image-gen prompts produce generic assets; always anchor to brief's audience, tone, visual style, and CTA before writing a prompt.
+- **skills/hive/agents/memories/marketing-copywriter/brief-before-copy.md** — Starter pattern memory: read and internalize the full campaign brief before writing any copy; includes channel-specific length and CTA-style table.
+- **skills/hive/agents/memories/marketing-strategist/positioning-before-brief.md** — Starter pattern memory: lock the positioning statement before writing any brief section; explains the cascade failure mode when positioning is deferred.
 
 ## What Was Found (Not Fixed This Cycle)
 
-- **STUB_DOC** `hive/references/hive-cloud-roadmap.md` (13 lines) — S16
-  forward-reference placeholder for deferred Hive Cloud epic. 17th+ consecutive
-  deferral; remains out_of_scope until the epic activates.
-
----
+- **STUB_DOC** `hive/references/hive-cloud-roadmap.md` (13 lines) — S16 forward-reference placeholder for the deferred Hive Cloud epic. 18th+ consecutive deferral; still out_of_scope without the Hive Cloud epic active.
 
 ## Metrics
 
-- Findings: 0 actionable | Proposals: 1 | Promoted: 1 | Reverted: 0
-- Candidate: mmo-2026-04-21-002 (AUDIT-NOTE.md proving-run footer)
-- commit_ref: `31f9b85403de7fac6b13a89e174068da364cbb43`
-- rollback_ref: `0381e01e10cba0197eec6309b83f016afd386f88`
+- Findings: 4 | Proposals: 4 | Promoted: 4 | Reverted: 0
+- Commit: `327925bb` | Rollback target: `5b2e3ce2`
+- Regression watch: armed, 4-hour observation window ending 2026-06-22T04:00:00Z
 
----
+## Next Cycle Priority
 
-## Dedup Note
-
-PR #304 (meta-meta/nightly-20260619, MANIFEST.md) is open — candidate 001
-suppressed. Candidate 003 (ledger.yaml frozen-comment) remains spent. This cycle
-consumed candidate 002 (AUDIT-NOTE.md, 3rd footer). After PR #304 merges,
-candidates 001 and 002 remain reusable for future dated-footer appends.
-
-## Out-of-scope observations
-
-1. **STUCK_TRIAGE_ITEM** `t-001` (26+ days in `prioritized`) — orphaned KG
-   predicates `assigned_to`, `blocked_by`, `depends_on` need design decision.
-   Requires human decision; outside autonomous write scope.
-
-2. **TRIAGE_ITEM** `t-003` (language-policy enforcement gate) — filed 2026-06-20
-   as chore follow-up to CLAUDE.md policy. Outside meta-team write scope for now.
-
----
-
-## Regression Watch
-
-Armed for 4-hour observation window (until 04:00 UTC 2026-06-20).
-Rollback available via `DirectCommitAdapter.rollback()` targeting
-`0381e01e10cba0197eec6309b83f016afd386f88` if the watch trips.
-
----
-
-## Next Cycle Guidance
-
-Queue has two reusable candidates (001: MANIFEST.md, 002: AUDIT-NOTE.md) and one
-spent candidate (003). Consider adding fresh candidates to the backlog —
-the 3-entry queue will exhaust quickly now that 001 and 002 cycle through. The
-STUCK_TRIAGE_ITEM t-001 for KG predicate design should be reviewed by a human.
-
----
+Verify the new marketing agents have adequate memory coverage after a few real uses, and check whether any additional GUIDE.md workflow descriptions need updating to reflect the new marketing team persona flow.
 
 kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.0 miss_reason=empty_kg
