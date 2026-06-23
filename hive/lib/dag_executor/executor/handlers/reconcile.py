@@ -17,6 +17,7 @@ raised loud; the gate must never run against a stale tree.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -59,6 +60,67 @@ class ReconcileHandler:
         here = Path(__file__).resolve().parent
         return (here / "../../../multica-story-dispatch/cli.mjs").resolve()
 
+    @staticmethod
+    def _find_epic_source(work_dir: str, epic_dir: str) -> Path | None:
+        """Locate the agent's written epic dir inside its work_dir — the work_dir
+        itself, or a single repo-checkout subdir under it (Multica nests the
+        checkout, e.g. ``<work_dir>/ttt-throwaway/``). Returns the dir that
+        actually contains ``<epic_dir>/epic.yaml``, or ``None``.
+        """
+        if not work_dir or not epic_dir:
+            return None
+        wd = Path(work_dir)
+        try:
+            candidates = [wd] + sorted(p for p in wd.iterdir() if p.is_dir())
+        except OSError:
+            return None
+        for base in candidates:
+            src = base / epic_dir
+            if (src / "epic.yaml").exists():
+                return src
+        return None
+
+    def _materialize_epic_if_missing(
+        self, node_id: str, work_dir: str, epic_dir: str
+    ) -> bool:
+        """Copy the agent's epic into repo_root when git did not.
+
+        Multica agents commit inconsistently — a plan author can WRITE the epic
+        (epic.yaml + stories) but leave it untracked, so its HEAD is the base
+        commit and the ff-merge is a no-op that materialises nothing. The
+        downstream output-validation gate then fails ``epic.yaml not found in
+        repo_root``. When the epic is absent from repo_root after the git step,
+        copy it straight from the agent's work_dir checkout. Idempotent: skips
+        when the epic is already present (the agent DID commit and git merged it).
+        """
+        if self._repo_root is None or not epic_dir:
+            return False
+        # epic_dir is UPSTREAM AGENT OUTPUT (harvest / #13 outputs.yaml), not a
+        # trusted constant. An absolute path or a ``..`` traversal would make
+        # ``shutil.copytree`` write OUTSIDE repo_root — arbitrary filesystem
+        # write driven by whatever the agent emitted. Require a relative path
+        # that resolves within repo_root; reject loud otherwise. (Codex #316.)
+        rel = Path(epic_dir)
+        dest = self._repo_root / rel
+        if rel.is_absolute() or not dest.resolve().is_relative_to(self._repo_root):
+            raise ReconcileHandlerError(
+                f"reconcile node {node_id!r}: refusing unsafe epic_dir "
+                f"{epic_dir!r} — must be a relative path inside repo_root"
+            )
+        if (dest / "epic.yaml").exists():
+            return False  # git reconcile already materialised it
+        src = self._find_epic_source(work_dir, epic_dir)
+        if src is None:
+            return False
+        try:
+            shutil.copytree(src, dest, dirs_exist_ok=True)
+        except OSError as exc:
+            raise ReconcileHandlerError(
+                f"reconcile node {node_id!r}: failed to copy uncommitted epic "
+                f"{src} -> {dest}: {exc}"
+            ) from exc
+        return True
+
     def handle(
         self,
         node: Any,
@@ -69,10 +131,16 @@ class ReconcileHandler:
         branch = inputs.get("branch") or ""
         repo = inputs.get("repo") or ""
         work_dir = inputs.get("work_dir") or ""
+        epic_dir = inputs.get("epic_dir") or ""
 
-        # Local binding: no sha means work is already in the tree — clean no-op.
+        # Local binding: no sha means work is already in the tree — clean no-op,
+        # but still materialise an uncommitted epic from the work_dir if one is
+        # named and missing from repo_root (Multica agents write-without-commit).
         if not sha:
-            return NodeOutput(outputs={}, meta={"reconcile": "noop"})
+            copied = self._materialize_epic_if_missing(node.id, work_dir, epic_dir)
+            return NodeOutput(
+                outputs={}, meta={"reconcile": "noop", "epic_copied": copied}
+            )
 
         if not branch:
             raise ReconcileHandlerError(
@@ -132,7 +200,17 @@ class ReconcileHandler:
                 f"({type(data).__name__})"
             )
 
+        # Even after a successful git step the epic may be absent from repo_root
+        # — the agent wrote it untracked, so its HEAD was the base commit and the
+        # ff-merge was a no-op. Copy it from the work_dir checkout when missing
+        # (idempotent: skipped when git already materialised the committed epic).
+        copied = self._materialize_epic_if_missing(node.id, work_dir, epic_dir)
+
         return NodeOutput(
             outputs=data,
-            meta={"returncode": result.returncode, "stderr": result.stderr},
+            meta={
+                "returncode": result.returncode,
+                "stderr": result.stderr,
+                "epic_copied": copied,
+            },
         )

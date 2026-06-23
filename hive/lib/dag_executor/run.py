@@ -143,6 +143,7 @@ def assemble_dispatcher(spawn: Any, *, repo_root: Path | str | None = None) -> A
     """
     from hive.lib.dag_executor.executor import AgentHandler, Dispatcher
     from hive.lib.dag_executor.executor.handlers.agent import default_plugin_root
+    from hive.lib.dag_executor.executor.handlers.gate import GateHandler
     from hive.lib.dag_executor.executor.handlers.reconcile import ReconcileHandler
 
     dispatcher = Dispatcher()
@@ -161,6 +162,10 @@ def assemble_dispatcher(spawn: Any, *, repo_root: Path | str | None = None) -> A
     dispatcher.register(
         NodeType.RECONCILE, ReconcileHandler(repo_root=repo_root).handle
     )
+    # The output-validation gate schema-validates the epic the agent committed
+    # into repo_root; without repo_root it resolves epic_dir against the driver
+    # cwd and fails even though reconcile materialised the epic (#19).
+    dispatcher.register(NodeType.GATE, GateHandler(repo_root=repo_root).handle)
     return dispatcher
 
 

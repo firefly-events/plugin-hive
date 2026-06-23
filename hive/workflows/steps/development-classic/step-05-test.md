@@ -98,3 +98,22 @@ Check that every acceptance criterion has at least one test:
 **Gating:** All tests pass. Test artifacts exist. Coverage map is complete.
 **Next:** Load `workflows/steps/development-classic/step-06-review.md`
 **If gating fails:** Report failing tests. Fix or report implementation bug.
+
+
+## DAG executor outputs (required)
+
+Before finishing, WRITE this step's declared outputs to
+`.pHive/dag-outputs/outputs.yaml` (create the directory) in your working copy,
+as a flat `key: value` YAML map. The DAG executor reads this file from your
+work_dir and merges it onto this step's output graph so downstream nodes can
+consume the values; without it those edges resolve to nothing and the run
+fails. This file is gitignored execution scratch — do not commit it.
+
+```yaml
+test_results: <value>
+test_artifacts: <value>
+```
+
+Use concrete values: for path/artifact outputs give the repo-relative path you
+wrote; for verdict/status give the literal string; for summaries give a short
+string (or a path to the file you wrote). Do not omit a declared key.

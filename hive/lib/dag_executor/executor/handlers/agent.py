@@ -27,6 +27,36 @@ from typing import Any, Callable, Protocol
 from ..errors import AgentHandlerError
 
 
+# Spawn-supplied metadata keys (commit/task bookkeeping derived from the agent's
+# git HEAD + Multica task record) — present even when the agent produced no real
+# work, so they are EXCLUDED from the #22 under-run check, which looks only at a
+# node's declared SEMANTIC outputs.
+_SPAWN_METADATA_OUTPUTS = frozenset(
+    {
+        "code_push_sha",
+        "commit_sha",
+        "branch",
+        "repo",
+        "work_dir",
+        "task_id",
+        "agent_id",
+        "tracker_id",
+    }
+)
+
+
+def _output_is_empty(value: Any) -> bool:
+    """True when a harvested output carries no real value (None / empty
+    string / empty collection). ``False`` (a real bool) is NOT empty."""
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip() == ""
+    if isinstance(value, (list, tuple, dict, set)):
+        return len(value) == 0
+    return False
+
+
 @dataclass
 class NodeOutput:
     """Materialised outputs from a single node, keyed by output name.
@@ -315,6 +345,15 @@ class MulticaAgentSpawn:
         for key, value in self._harvest_git_state(terminal.get("work_dir")).items():
             if value is not None:
                 outputs[key] = value
+        # #13: the GENERAL output channel. Multica agents emit a node's declared
+        # SEMANTIC outputs (booleans/strings/paths like ``needs_frontend``,
+        # ``test_artifacts``, ``implementation`` — values, not files) by writing
+        # ``.pHive/dag-outputs/outputs.yaml`` in their isolated work_dir. Read it
+        # and merge (authoritative — declared outputs override file-inference).
+        # This supersedes the plan-specific docs harvest below for any node that
+        # writes the file; the docs harvest stays as a fallback.
+        for key, value in self._harvest_node_outputs(terminal.get("work_dir")).items():
+            outputs[key] = value
         # Surface the agent's committed planning artifacts as named outputs so
         # downstream nodes can consume them in-memory. Multica agents deliver
         # research/design/plan artifacts as FILES committed in their isolated
@@ -330,16 +369,32 @@ class MulticaAgentSpawn:
 
     @staticmethod
     def _find_repo_checkout(work_dir: str | None) -> Path | None:
-        """The git checkout dir inside the agent's work_dir (the dir itself, or
-        a single repo subdir under it). ``None`` if no checkout is found."""
+        """The dir holding the agent's planning artifacts inside its work_dir.
+
+        Prefer a git checkout (the work_dir itself or a single repo subdir under
+        it). But Multica does not always materialise a checkout for every node —
+        a design/research task can run with the repo absent, in which case the
+        agent writes ``.pHive/epics/...`` directly under the work_dir root (no
+        ``.git``). Fall back to whichever dir actually contains ``.pHive/epics``
+        so the git-less worktree scan in ``_harvest_artifacts`` can still surface
+        the brief/discussion. ``None`` if nothing is found.
+        """
         if not work_dir:
             return None
         wd = Path(work_dir)
         try:
+            children = sorted(p for p in wd.iterdir() if p.is_dir())
+            # 1. git checkout — preferred (enables committed-path scoping)
             if (wd / ".git").exists():
                 return wd
-            for child in sorted(p for p in wd.iterdir() if p.is_dir()):
+            for child in children:
                 if (child / ".git").exists():
+                    return child
+            # 2. no checkout — locate the dir that holds the written artifacts
+            if (wd / ".pHive" / "epics").is_dir():
+                return wd
+            for child in children:
+                if (child / ".pHive" / "epics").is_dir():
                     return child
         except OSError:
             return None
@@ -367,6 +422,17 @@ class MulticaAgentSpawn:
                 return None
             return result.stdout.strip() if result.returncode == 0 else None
 
+        # Guard: only diff when repo_dir IS the git worktree root. When Multica
+        # gives a node no checkout, ``_find_repo_checkout`` returns the dir that
+        # merely *holds* ``.pHive/epics`` (no ``.git`` of its own). If that dir
+        # happens to nest inside an unrelated parent repo (a consumer's repo, or
+        # a pytest basetemp under this repo), ``git -C`` walks UP to the parent
+        # and we would harvest the PARENT's committed epics as this run's output.
+        # Return None so the caller falls back to the git-less worktree scan.
+        toplevel = _git("rev-parse", "--show-toplevel")
+        if toplevel is None or Path(toplevel).resolve() != repo_dir.resolve():
+            return None
+
         base = None
         for ref in ("origin/HEAD", "origin/main", "main", "origin/master", "master"):
             if _git("rev-parse", "--verify", "--quiet", ref) is not None:
@@ -383,6 +449,93 @@ class MulticaAgentSpawn:
         return [
             line for line in diff.splitlines() if line.startswith(".pHive/epics/")
         ]
+
+    @staticmethod
+    def _uncommitted_phive_paths(repo_dir: Path) -> list[str]:
+        """Repo-relative ``.pHive/epics/...`` paths the agent WROTE but did not
+        commit (untracked or modified). Plan research/design agents write the
+        brief/discussion file but the author node is the one that commits — so
+        under the Multica binding the intermediate artifact lives only in the
+        producing agent's worktree, uncommitted. ``_committed_phive_paths``
+        returns ``[]`` (not ``None``) when the agent made no commit at all, which
+        skips the worktree fallback; this captures that case precisely without
+        over-scoping a consumer repo's pre-existing COMMITTED epics. Empty on any
+        git failure.
+        """
+        try:
+            result = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_dir),
+                    "status",
+                    "--porcelain",
+                    "--untracked-files=all",  # list files, not collapsed dirs
+                    "--",
+                    ".pHive/epics",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return []
+        if result.returncode != 0:
+            return []
+        paths: list[str] = []
+        for line in result.stdout.splitlines():
+            # porcelain v1: 2 status chars + space + path (renames use ` -> `)
+            rel = line[3:].strip() if len(line) > 3 else ""
+            if " -> " in rel:
+                rel = rel.split(" -> ", 1)[1]
+            if rel.startswith(".pHive/epics/"):
+                paths.append(rel)
+        return paths
+
+    @staticmethod
+    def _harvest_node_outputs(work_dir: str | None) -> dict[str, Any]:
+        """Read the node's declared SEMANTIC outputs that the agent wrote to
+        ``.pHive/dag-outputs/outputs.yaml`` (or ``.json``) in its work_dir (#13).
+
+        This is the general output channel for the Multica binding: an agent
+        emits decision/value outputs (``needs_frontend: true``,
+        ``test_artifacts: <path>``, ...) the graph's ``when:`` predicates and
+        downstream input bindings consume — values that are NOT files and so are
+        not captured by the plan docs harvest. The file lives in the ephemeral
+        Multica work_dir and is gitignored, so it never enters the project repo.
+
+        Best-effort: any parse/read error yields ``{}`` so it never masks a real
+        task result.
+        """
+        out: dict[str, Any] = {}
+        if not work_dir:
+            return out
+        wd = Path(work_dir)
+        try:
+            candidates = sorted(wd.glob("**/.pHive/dag-outputs/outputs.yaml")) + sorted(
+                wd.glob("**/.pHive/dag-outputs/outputs.json")
+            )
+        except OSError:
+            return out
+        for path in candidates:
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            data: Any = None
+            try:
+                if path.suffix == ".json":
+                    data = json.loads(text)
+                else:
+                    import yaml
+
+                    data = yaml.safe_load(text)
+            except (ValueError, Exception):  # noqa: BLE001 — best-effort parse
+                continue
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    out[str(key)] = value
+        return out
 
     @staticmethod
     def _harvest_artifacts(work_dir: str | None) -> dict[str, Any]:
@@ -418,6 +571,13 @@ class MulticaAgentSpawn:
                 ]
             except OSError:
                 return out
+
+        # Union in artifacts the agent wrote but did NOT commit (plan
+        # research/design write the brief; only the author node commits). Without
+        # this, a no-commit producer yields an empty committed-diff -> the
+        # downstream ``research_brief`` edge resolves to nothing and the run
+        # fails at the author node.
+        rels = sorted(set(rels) | set(MulticaAgentSpawn._uncommitted_phive_paths(repo_dir)))
 
         for rel in sorted(rels):
             parts = Path(rel).parts
@@ -508,6 +668,64 @@ class MulticaAgentSpawn:
             / "tracker.json"
         )
 
+    def _branch_contract(self) -> str:
+        """Brief preamble telling the agent to base its work on the executor's
+        target branch (#15), when ``repo_root`` is on a non-default (epic)
+        branch. Empty on the default branch (e.g. plan, which creates its own
+        epic branch) — preserving that flow. Best-effort: returns "" if git
+        can't resolve the branch.
+        """
+        if self._repo_root is None or not (self._repo_root / ".git").exists():
+            # No git checkout (e.g. unit tests with a plain tmp repo_root) — skip
+            # entirely so we don't issue subprocess calls a test's mock expects
+            # to be cli.mjs invocations.
+            return ""
+
+        def _git(*args: str) -> str | None:
+            try:
+                result = subprocess.run(
+                    ["git", "-C", str(self._repo_root), *args],
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+            except (OSError, subprocess.SubprocessError):
+                return None
+            return result.stdout.strip() if result.returncode == 0 else None
+
+        branch = _git("rev-parse", "--abbrev-ref", "HEAD")
+        if not branch or branch == "HEAD":
+            return ""
+        default = None
+        head = _git("rev-parse", "--abbrev-ref", "origin/HEAD")
+        if head and "/" in head:
+            default = head.split("/", 1)[1]
+        if default is None:
+            for cand in ("main", "master", "develop"):
+                if _git("rev-parse", "--verify", "--quiet", f"origin/{cand}") is not None:
+                    default = cand
+                    break
+        if default is None:
+            # No resolvable remote default (no origin remote / bare local repo).
+            # The contract's `git fetch origin {branch}` would misdirect a run in
+            # a repo without an origin — emit nothing. (CodeRabbit review of #316.)
+            return ""
+        if branch == default:
+            return ""  # default branch — no epic-branch directive
+        return (
+            "## Repo branch contract — FIRST ACTION (overrides the daemon's auto-checkout)\n\n"
+            f"The DAG executor reconciles your commit FROM the `{branch}` branch (the epic "
+            "branch). The Multica daemon auto-checks-out the repo's default branch; you must "
+            f"move to `{branch}` before doing any work:\n\n"
+            "```bash\n"
+            f"git fetch origin {branch}\n"
+            f"git checkout {branch} 2>/dev/null || git checkout -b {branch} origin/{branch}\n"
+            "```\n\n"
+            f"Do ALL work and commits on `{branch}`. Do NOT commit on the daemon's "
+            "auto-created `agent/<persona>/<task>` branch — commits there will not reconcile "
+            "into the run."
+        )
+
     def _resolve_tracker_id(
         self,
         run_id: str,
@@ -542,6 +760,18 @@ class MulticaAgentSpawn:
         # Mirror LocalAgentSpawn.build_prompt: inputs as a JSON block + the
         # verbatim step_file. (Dedup is on the title, so a richer body is safe.)
         body_parts: list[str] = []
+        # #15: when repo_root is on a non-default (epic) branch, the executor
+        # reconciles the agent's commit FROM that branch. The Multica daemon
+        # auto-checks-out the repo's DEFAULT branch (main) and creates an
+        # agent/<persona>/<task> branch off it, so the agent's commit diverges
+        # from the epic branch and reconcile (ff-only) fails. Inject a branch
+        # contract telling the agent to base its work on the target branch
+        # (mirrors the proven multica-story-dispatch Integration Contract). On
+        # the default branch (e.g. plan, which CREATES its own epic branch) this
+        # is empty, preserving that flow.
+        contract = self._branch_contract()
+        if contract:
+            body_parts.append(contract)
         if inputs:
             body_parts.append(
                 "## Inputs\n```json\n" + json.dumps(inputs, indent=2) + "\n```"
@@ -739,25 +969,61 @@ class AgentHandler:
         if node.step_file:
             step_file_content = self._read_step_file(node.step_file)
 
-        try:
-            outputs = self._spawn(
-                agent=node.agent,
-                step_file_content=step_file_content,
-                inputs=dict(inputs),
-                run_id=run_id,
-                step_id=node.id,
-            )
-        except AgentHandlerError:
-            raise
-        except Exception as exc:  # pragma: no cover — exercised in tests
-            raise AgentHandlerError(
-                f"agent-spawn dispatch failed for node {node.id!r}: {exc}"
-            ) from exc
+        # #22: under-run guard with built-in re-dispatch (Multica binding only).
+        # A Multica agent can report 'completed' yet end its session without
+        # producing its work (it does the bootstrap 'multica issue get' but its
+        # turn ends before writing outputs.yaml / committing). The spawn still
+        # returns commit/task METADATA from git HEAD, so the run would otherwise
+        # limp on and fail a downstream node with a confusing "input X was not
+        # produced". An under-run is transient — a fresh agent run usually
+        # produces the work — so re-dispatch a bounded number of times here
+        # (covers ALL Multica agent nodes; no per-node `retry:` needed). Scoped to
+        # MulticaAgentSpawn: local/test spawns return canned/explicit outputs and
+        # an empty one is intentional. (NOT keyed off the forced_stop interrupt
+        # marker, which is written on every Stop event and is not a failure
+        # signal.)
+        is_multica = isinstance(self._spawn, MulticaAgentSpawn)
+        semantic_outputs = [
+            getattr(o, "name", None)
+            for o in (getattr(node, "outputs", None) or [])
+            if getattr(o, "name", None)
+            and getattr(o, "name", None) not in _SPAWN_METADATA_OUTPUTS
+        ]
+        max_under_run_attempts = 3 if (is_multica and semantic_outputs) else 1
 
-        if not isinstance(outputs, dict):
-            raise AgentHandlerError(
-                f"agent-spawn returned non-dict outputs for node {node.id!r}"
+        outputs: dict[str, Any] = {}
+        for attempt in range(1, max_under_run_attempts + 1):
+            try:
+                outputs = self._spawn(
+                    agent=node.agent,
+                    step_file_content=step_file_content,
+                    inputs=dict(inputs),
+                    run_id=run_id,
+                    step_id=node.id,
+                )
+            except AgentHandlerError:
+                raise
+            except Exception as exc:  # pragma: no cover — exercised in tests
+                raise AgentHandlerError(
+                    f"agent-spawn dispatch failed for node {node.id!r}: {exc}"
+                ) from exc
+
+            if not isinstance(outputs, dict):
+                raise AgentHandlerError(
+                    f"agent-spawn returned non-dict outputs for node {node.id!r}"
+                )
+
+            under_run = bool(semantic_outputs) and all(
+                _output_is_empty(outputs.get(n)) for n in semantic_outputs
             )
+            if not (is_multica and under_run):
+                break
+            if attempt >= max_under_run_attempts:
+                raise AgentHandlerError(
+                    f"node {node.id!r}: agent reported completed but produced none "
+                    f"of its declared outputs {semantic_outputs} after "
+                    f"{max_under_run_attempts} attempts (under-run)"
+                )
 
         # hde-4 Risk #9 guard: when this node ran in a parallel branch
         # context, two siblings could both want to write the SAME

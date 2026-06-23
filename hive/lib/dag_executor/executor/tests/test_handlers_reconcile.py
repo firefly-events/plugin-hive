@@ -290,3 +290,110 @@ def test_gate_after_reconcile_receives_merged_outputs(tmp_path):
     gate_inputs = dict(reconcile_out.outputs)
     gate_out = GateHandler().handle(gate_node, inputs=gate_inputs, run_id="seq-1")
     assert gate_out.outputs.get("gate_passed") is True
+
+
+# ── #20: materialise uncommitted epic into repo_root ──────────────────────────
+
+def _handler_with_root(tmp_path, repo_root):
+    from pathlib import Path
+    return ReconcileHandler(cli_path=tmp_path / "cli.mjs", repo_root=repo_root)
+
+
+def _seed_uncommitted_epic(work_dir, nested="ttt-throwaway"):
+    """Agent wrote the epic into a (nested) checkout but did NOT commit it."""
+    base = work_dir / nested if nested else work_dir
+    epic = base / ".pHive/epics/ttt-game"
+    (epic / "stories").mkdir(parents=True)
+    (epic / "epic.yaml").write_text("name: ttt-game\n", encoding="utf-8")
+    (epic / "stories" / "s1.yaml").write_text("id: s1\n", encoding="utf-8")
+
+
+def test_noop_materialises_uncommitted_epic(tmp_path):
+    """sha empty (HEAD == base) but the agent wrote an untracked epic — copy it
+    into repo_root so the downstream gate finds it (#20)."""
+    repo_root = tmp_path / "repo_root"
+    repo_root.mkdir()
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    _seed_uncommitted_epic(work_dir)
+
+    handler = _handler_with_root(tmp_path, repo_root)
+    out = handler.handle(
+        _reconcile_node(),
+        inputs={"work_dir": str(work_dir), "epic_dir": ".pHive/epics/ttt-game"},
+        run_id="run-1",
+    )
+    assert out.meta.get("epic_copied") is True
+    assert (repo_root / ".pHive/epics/ttt-game/epic.yaml").exists()
+    assert (repo_root / ".pHive/epics/ttt-game/stories/s1.yaml").exists()
+
+
+def test_merge_path_materialises_when_repo_root_missing_epic(tmp_path):
+    """sha set, git step ok, but the epic is absent from repo_root (untracked
+    HEAD==base no-op merge) — fall back to copying from the work_dir checkout."""
+    repo_root = tmp_path / "repo_root"
+    repo_root.mkdir()
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    _seed_uncommitted_epic(work_dir)
+
+    handler = _handler_with_root(tmp_path, repo_root)
+    with patch("subprocess.run", return_value=_ok_result()):
+        out = handler.handle(
+            _reconcile_node(),
+            inputs={
+                "sha": "b635fb5",
+                "branch": "agent/technical-writer/x",
+                "repo": "git@github.com:org/ttt.git",
+                "work_dir": str(work_dir),
+                "epic_dir": ".pHive/epics/ttt-game",
+            },
+            run_id="run-1",
+        )
+    assert out.meta.get("epic_copied") is True
+    assert (repo_root / ".pHive/epics/ttt-game/epic.yaml").exists()
+
+
+def test_materialise_idempotent_when_epic_already_present(tmp_path):
+    """When git already materialised the committed epic, do not re-copy."""
+    repo_root = tmp_path / "repo_root"
+    (repo_root / ".pHive/epics/ttt-game").mkdir(parents=True)
+    (repo_root / ".pHive/epics/ttt-game/epic.yaml").write_text("name: ttt-game\n", encoding="utf-8")
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    _seed_uncommitted_epic(work_dir)
+
+    handler = _handler_with_root(tmp_path, repo_root)
+    with patch("subprocess.run", return_value=_ok_result()):
+        out = handler.handle(
+            _reconcile_node(),
+            inputs={
+                "sha": "abc123",
+                "branch": "agent/dev",
+                "repo": "git@github.com:org/ttt.git",
+                "work_dir": str(work_dir),
+                "epic_dir": ".pHive/epics/ttt-game",
+            },
+            run_id="run-1",
+        )
+    assert out.meta.get("epic_copied") is False
+
+
+@pytest.mark.parametrize("evil", ["/etc/cron.d/x", "../../escape", "../sibling"])
+def test_materialise_rejects_unsafe_epic_dir(tmp_path, evil):
+    """epic_dir is upstream agent output (#13 outputs.yaml / harvest). An absolute
+    path or a `..` traversal must NOT let copytree write outside repo_root —
+    arbitrary filesystem write (Codex review of #316). Reject loud instead.
+    """
+    repo_root = tmp_path / "repo_root"
+    repo_root.mkdir()
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+
+    handler = _handler_with_root(tmp_path, repo_root)
+    with pytest.raises(ReconcileHandlerError, match="unsafe epic_dir"):
+        handler.handle(
+            _reconcile_node(),
+            inputs={"work_dir": str(work_dir), "epic_dir": evil},
+            run_id="run-1",
+        )

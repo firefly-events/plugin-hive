@@ -429,3 +429,168 @@ def test_harvest_artifacts_scoped_to_committed_epic(tmp_path):
     assert out["research_brief"] == "NEW BRIEF", "must harvest THIS run's brief"
     assert "OLD BRIEF" not in out["research_brief"]
     assert out["epic_dir"] == ".pHive/epics/new-epic"
+
+
+def test_harvest_artifacts_surfaces_uncommitted_brief(tmp_path):
+    """Real failure mode: plan research/design write the brief but do NOT commit
+    (only the author node commits). A no-commit producer yields an empty
+    committed-diff, so the brief must be surfaced from the worktree (untracked),
+    while a pre-existing COMMITTED epic from another run must NOT leak in.
+    """
+    import subprocess as sp
+
+    work_dir = tmp_path / "task-work"
+    repo = work_dir / "ttt-throwaway"
+    repo.mkdir(parents=True)
+
+    def git(*args):
+        sp.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    git("branch", "-m", "main")
+
+    # Pre-existing COMMITTED epic on main (NOT this run's output)
+    old = repo / ".pHive/epics/old-epic/docs"
+    old.mkdir(parents=True)
+    (old / "research-brief.md").write_text("OLD BRIEF — must not surface", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "pre-existing epic")
+
+    # This agent's branch — writes its brief but DOES NOT COMMIT
+    git("checkout", "-q", "-b", "agent/researcher/abc")
+    new = repo / ".pHive/epics/ttt-game/docs"
+    new.mkdir(parents=True)
+    (new / "research-brief.md").write_text("UNCOMMITTED BRIEF", encoding="utf-8")
+
+    out = MulticaAgentSpawn._harvest_artifacts(str(work_dir))
+    assert out.get("research_brief") == "UNCOMMITTED BRIEF", (
+        "must surface the uncommitted brief the author node depends on"
+    )
+    assert "OLD BRIEF" not in out.get("research_brief", "")
+
+
+def test_harvest_artifacts_no_git_checkout(tmp_path):
+    """Multica does not always materialise a repo checkout for a node — a design
+    task can run with the repo absent, writing .pHive/epics/... directly at the
+    work_dir root (no .git). Harvest must still surface the artifact.
+    """
+    work_dir = tmp_path / "task-work"
+    docs = work_dir / ".pHive/epics/ttt-game/docs"
+    docs.mkdir(parents=True)
+    (docs / "design-discussion.md").write_text("DESIGN DISCUSSION", encoding="utf-8")
+
+    out = MulticaAgentSpawn._harvest_artifacts(str(work_dir))
+    assert out.get("design_discussion") == "DESIGN DISCUSSION", (
+        "must surface design discussion even without a git checkout"
+    )
+
+
+def test_harvest_node_outputs_reads_declared_outputs(tmp_path):
+    """#13: an agent's declared SEMANTIC outputs (needs_frontend, etc.) are
+    written to .pHive/dag-outputs/outputs.yaml in its work_dir and surfaced as
+    named outputs — the general channel for non-file values."""
+    work_dir = tmp_path / "task-work"
+    out_dir = work_dir / "the-project" / ".pHive" / "dag-outputs"
+    out_dir.mkdir(parents=True)
+    (out_dir / "outputs.yaml").write_text(
+        "preflight_status: READY\nneeds_backend: false\nneeds_frontend: true\n",
+        encoding="utf-8",
+    )
+    got = MulticaAgentSpawn._harvest_node_outputs(str(work_dir))
+    assert got["needs_frontend"] is True
+    assert got["needs_backend"] is False
+    assert got["preflight_status"] == "READY"
+    assert MulticaAgentSpawn._harvest_node_outputs(None) == {}
+
+
+def test_branch_contract_targets_epic_branch(tmp_path):
+    """#15: on a non-default (epic) branch, the binding injects a checkout
+    directive so the agent bases its commit on that branch (not the daemon's
+    main-based auto-branch). Empty on the default branch."""
+    import subprocess as sp
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    def git(*a): sp.run(["git","-C",str(repo),*a], check=True, capture_output=True)
+    git("init","-q"); git("config","user.email","t@t"); git("config","user.name","t")
+    git("branch","-m","main")
+    (repo/"f").write_text("x"); git("add","-A"); git("commit","-q","-m","c")
+    git("remote","add","origin",str(repo))  # so origin/main resolves as default
+    git("fetch","-q","origin")
+
+    spawn_default = MulticaAgentSpawn(cli_path=tmp_path/"cli.mjs", repo_root=repo)
+    assert spawn_default._branch_contract() == "", "default branch -> no directive"
+
+    git("checkout","-q","-b","feat/my-epic")
+    spawn_epic = MulticaAgentSpawn(cli_path=tmp_path/"cli.mjs", repo_root=repo)
+    contract = spawn_epic._branch_contract()
+    assert "feat/my-epic" in contract
+    assert "git checkout" in contract
+    assert "auto-created" in contract  # warns against the agent/<persona>/<task> branch
+
+
+def test_branch_contract_empty_without_resolvable_remote(tmp_path):
+    """CodeRabbit review of #316: a repo with NO origin remote (and no resolvable
+    default) must NOT get a contract — its `git fetch origin {branch}` would
+    misdirect the run. Even on a non-'main' branch, no remote default => "".
+    """
+    import subprocess as sp
+    repo = tmp_path / "noremote"
+    repo.mkdir()
+    def git(*a): sp.run(["git", "-C", str(repo), *a], check=True, capture_output=True)
+    git("init", "-q"); git("config", "user.email", "t@t"); git("config", "user.name", "t")
+    git("checkout", "-q", "-b", "feat/orphan")
+    (repo / "f").write_text("x"); git("add", "-A"); git("commit", "-q", "-m", "c")
+    # No `git remote add origin` — origin/HEAD and origin/{main,master,develop} all unresolvable.
+
+    spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs", repo_root=repo)
+    assert spawn._branch_contract() == "", "no resolvable remote default -> no directive"
+
+
+# NOTE: a prior #21 attempt keyed agent failure off a `.pHive/interrupts/*.yaml`
+# `forced_stop` marker. That was wrong — hooks/stop-interrupt-capture.sh writes
+# that marker UNCONDITIONALLY on every Claude Code Stop event (normal session end
+# included), so every agent work_dir has it, successful ones too. The marker is
+# not a failure signal; that detection was reverted.
+
+
+# ── #22: under-run guard (Multica binding) ────────────────────────────────────
+
+def test_under_run_raises_when_no_declared_output(tmp_path):
+    """A Multica agent that 'completes' but produces none of its declared
+    semantic outputs must raise after a bounded number of re-dispatch attempts
+    (under-run self-heal), not limp on with only commit metadata."""
+    from types import SimpleNamespace
+    from hive.lib.dag_executor.executor.handlers.agent import AgentHandler
+
+    spawn = _make_spawn(tmp_path)  # real MulticaAgentSpawn
+    (tmp_path / "empty").mkdir()
+
+    dispatch_count = [0]
+
+    def side_effect(*args, **kwargs):
+        cmd = args[0]
+        sub = cmd[2]
+        if sub == "create-issue":
+            return _make_subprocess_result(_create_issue_result())
+        if sub == "dispatch":
+            dispatch_count[0] += 1
+            return _make_subprocess_result(_dispatch_result())
+        # every poll returns completed with an empty work_dir -> under-run
+        return _make_subprocess_result(
+            _completed_poll_result(work_dir=str(tmp_path / "empty"))
+        )
+
+    node = SimpleNamespace(
+        id="author",
+        agent="technical-writer",
+        step_file="",
+        outputs=[SimpleNamespace(name="epic_dir"), SimpleNamespace(name="commit_sha")],
+    )
+    handler = AgentHandler(spawn=spawn)
+    with patch("subprocess.run", side_effect=side_effect):
+        with pytest.raises(AgentHandlerError, match="under-run"):
+            handler.handle(node, inputs={}, run_id="run-1")
+    # re-dispatched the bounded number of times before giving up
+    assert dispatch_count[0] == 3, "under-run must re-dispatch up to 3 times"

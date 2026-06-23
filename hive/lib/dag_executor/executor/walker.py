@@ -891,6 +891,11 @@ class Walker:
 
         # Apply results serially in deterministic node-id order so
         # state, materialised, and telemetry mutations are reproducible.
+        # #26 / CodeRabbit: a fatal non-optional gate failure is deferred until
+        # AFTER every sibling result in this wave is recorded — the siblings
+        # already executed, so their completion/skip state must persist for
+        # resume + telemetry before we halt the run.
+        fatal_gate_error: BaseException | None = None
         for node_id in sorted(results):
             result: ScheduleResult = results[node_id]
             node = graph.nodes[node_id]
@@ -915,6 +920,42 @@ class Walker:
             # hde-4 semantics: failure does NOT cascade as failure;
             # the join's trigger_rule decides downstream activation.
             err = result.error
+
+            # #26: a failed non-optional GATE must HALT the run, not degrade to
+            # SKIPPED. A gate exists to BLOCK downstream on failure — the hde-4
+            # "failure→skipped, trigger_rule decides" rule is correct for
+            # parallel BRANCH nodes (one branch failing must not cascade) but
+            # defeats a gate: when gate-review raised in a wave alongside
+            # codex-review/dev-standby, it was silently downgraded to SKIPPED and
+            # integrate's none_failed_min_one_success join ran anyway, shipping a
+            # needs_revision review. Re-raise so the gate is fatal, matching the
+            # sequential path's non-optional behaviour.
+            if (
+                err is not None
+                and _is_gate_node(node)
+                and not getattr(node, "optional", False)
+            ):
+                telemetry.emit(
+                    "node_failed",
+                    node.id,
+                    {"optional": False, "error": str(err), "parallel": True},
+                )
+                node_statuses[node_id] = NodeStatus.FAILED
+                state = _record_failure(
+                    state,
+                    node_id,
+                    {
+                        "node_id": node_id,
+                        "error_class": type(err).__name__,
+                        "message": str(err),
+                    },
+                    source_epic=_source_epic(ctx),
+                )
+                save_state(state)
+                if fatal_gate_error is None:
+                    fatal_gate_error = err
+                continue
+
             payload = {
                 "optional": bool(getattr(node, "optional", False)),
                 "error": str(err) if err is not None else "",
@@ -926,6 +967,11 @@ class Walker:
             skipped.add(node_id)
             state = _record_skipped(state, node_id, payload, source_epic=_source_epic(ctx))
             save_state(state)
+
+        # All sibling results are now recorded; halt the run on the first fatal
+        # non-optional gate failure observed in this wave (#26 / CodeRabbit).
+        if fatal_gate_error is not None:
+            raise fatal_gate_error
 
         return state
 
@@ -1169,6 +1215,17 @@ def _is_pause_node(node) -> bool:
     if hasattr(nt, "value"):
         return nt.value == "pause"
     return str(nt).lower() == "pause"
+
+
+def _is_gate_node(node) -> bool:
+    """Whether `node` is a gate node — by enum value or string."""
+
+    nt = getattr(node, "node_type", None)
+    if nt is None:
+        return False
+    if hasattr(nt, "value"):
+        return nt.value == "gate"
+    return str(nt).lower() == "gate"
 
 
 def _record_pause_suspended(state):

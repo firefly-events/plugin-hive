@@ -84,13 +84,52 @@ fields on this step's output graph:
 
 ```yaml
 preflight_status: string         # "READY" | "BLOCKED — <reason>"
-needs_backend: bool              # from story.metadata.needs_backend, default false
-needs_frontend: bool             # from story.metadata.needs_frontend, default false
+needs_backend: bool              # whether backend implementation work is required
+needs_frontend: bool             # whether frontend implementation work is required
 ```
 
-Missing booleans default to `false` (predicate evaluator's fail-closed
-semantics) which causes both implement nodes to skip — the canonical
-empty-domain behaviour.
+**Emit these for the DAG executor by WRITING them to
+`.pHive/dag-outputs/outputs.yaml`** (create the directory) in your working
+copy, as a flat `key: value` YAML map — e.g.:
+
+> **Write it in YOUR OWN working directory, every run, no exceptions.** The path
+> is `.pHive/dag-outputs/outputs.yaml` RELATIVE to your current repo checkout
+> (after any `git checkout`). Do NOT search other workspaces, do NOT `cat` or
+> reuse an `outputs.yaml` from another task's work_dir, and do NOT skip the write
+> because a file "already exists" somewhere else — the executor harvests ONLY the
+> file in the work_dir of THIS task. A stale sibling file from a previous run is
+> NOT yours. If you do not create this file here, the run fails as an under-run.
+
+```yaml
+preflight_status: READY
+needs_backend: false
+needs_frontend: true
+```
+
+The executor reads this file from your work_dir and merges it onto this step's
+output graph; downstream `when:` predicates
+(`$preflight.output.needs_frontend == true`) gate on it. Determine the booleans
+from the story: prefer explicit `story.metadata.needs_backend` /
+`needs_frontend` when present, otherwise INFER from the story's acceptance
+criteria and domain:
+
+- A browser/UI/HTML/CSS/DOM/component story needs **frontend**.
+- An API/database/server/endpoint story needs **backend**.
+- **Pure logic, algorithm, data-model, library, module, or utility code with no
+  DOM and no server (e.g. a `game.js` rules module, a parser, a calculator) is
+  BACKEND** — `needs_backend: true`. "Backend" here means non-UI implementation
+  code, not just servers. Do not leave such a story with both booleans `false`.
+
+**Critical invariant: any story that writes or modifies implementation code MUST
+set at least one of `needs_backend` / `needs_frontend` to `true`.** Both `false`
+means NO implement node runs — the code never gets written, the test/review/
+integrate phases run against an empty implementation, and the story silently
+ships nothing. Only a pure docs / config / metadata story (no code at all) may
+have both `false`. When in doubt for a code story, set `needs_backend: true`.
+
+Missing/omitted booleans default to `false` (predicate evaluator's fail-closed
+semantics), which causes the corresponding implement node to skip. That default
+is correct ONLY for a genuinely empty domain — never for a code-writing story.
 
 ## SUCCESS METRICS
 

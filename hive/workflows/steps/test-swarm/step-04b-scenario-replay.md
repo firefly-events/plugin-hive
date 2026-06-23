@@ -160,6 +160,32 @@ replay_summary:
 
 `file-bugs` (step-05-sentinel) consumes `failed_test_ids` and `artifacts.screenshots_dir` from the same object.
 
+## DAG executor outputs (required)
+
+Before finishing, WRITE this step's declared output to
+`.pHive/dag-outputs/outputs.yaml` (create the directory) in your working copy,
+as a flat `key: value` YAML map. The DAG executor reads this file from your
+work_dir and merges it onto this step's output graph so downstream nodes
+(`validate-coverage`, `file-bugs`) can consume the value; without it those edges
+resolve to nothing and the run fails. This file is gitignored execution scratch —
+do not commit it.
+
+```yaml
+replay_summary:
+  summary:
+    total: <int>
+    passed: <int>
+    failed: <int>
+    skipped: <int>
+  replay_status: "<all_pass | partial_pass | all_fail | all_skipped>"
+  failed_test_ids: [<ids, or empty list>]
+  results: [<the per-test result objects you replayed>]
+```
+
+Use the concrete values you computed in steps 3–5 (the same structured
+`replay_summary` block). Do NOT fabricate `replay_status` — it must derive from
+`summary.failed`. Do not omit the key.
+
 ## SUCCESS METRICS
 
 - [ ] `results.yaml` loaded without error via `loadResults`
