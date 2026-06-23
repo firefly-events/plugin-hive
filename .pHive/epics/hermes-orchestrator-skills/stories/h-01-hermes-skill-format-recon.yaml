@@ -1,7 +1,7 @@
 id: h-01-hermes-skill-format-recon
 epic: hermes-orchestrator-skills
 title: Recon and spec the Hermes-agent native skill registry format
-status: complete
+status: shipped
 complexity: medium
 methodology: classic
 side: studio
@@ -65,3 +65,5 @@ references:
     relevant_excerpt: |
       §9 gap 2: Hermes-agent skill consumption format on Studio — confirm the
       pattern or whether Hermes has a native skill registry.
+shipped_at: "2026-06-23T18:40:00-05:00"
+release_id: "v2.13.1"

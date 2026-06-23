@@ -1,7 +1,7 @@
 id: h-06-slack-notify-await
 epic: hermes-orchestrator-skills
 title: Slack notify-and-await human-gate transport
-status: complete
+status: shipped
 tracker_id: 93c33699-85fb-4a59-ba45-1534f9b09585
 complexity: high
 methodology: classic
@@ -70,3 +70,5 @@ references:
     relevant_excerpt: |
       Review gate = Slack notify-and-await; generalizes to errors/approvals
       (notify + await action). Discord deferred.
+shipped_at: "2026-06-23T18:40:00-05:00"
+release_id: "v2.13.1"

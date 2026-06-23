@@ -1,7 +1,7 @@
 id: h-07-kickoff-exec-skill
 epic: hermes-orchestrator-skills
 title: Author the kickoff-exec skill (start the reconcile loop, gated)
-status: complete
+status: shipped
 complexity: medium
 methodology: classic
 side: plugin-hive
@@ -61,3 +61,5 @@ references:
     relevant_excerpt: |
       S6: kickoff-exec (start loop over a pre_approved epic; refuse otherwise).
       h-07 depends on real gate transport (h-06) + machine (h-05).
+shipped_at: "2026-06-23T18:40:00-05:00"
+release_id: "v2.13.1"

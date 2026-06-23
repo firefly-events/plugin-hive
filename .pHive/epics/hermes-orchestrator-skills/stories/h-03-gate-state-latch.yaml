@@ -1,7 +1,7 @@
 id: h-03-gate-state-latch
 epic: hermes-orchestrator-skills
 title: Harden the gate_state pre_approved latch + epic-of-record pointer
-status: complete
+status: shipped
 tracker_id: a01baca5-31e1-4bc6-81e5-29cc08f81252
 complexity: medium
 methodology: classic
@@ -65,3 +65,5 @@ references:
     relevant_excerpt: |
       §3: gate_state: pre_approved is the load-bearing latch ... keeps lights-on
       autonomy bounded by "human approved this epic to run."
+shipped_at: "2026-06-23T18:40:00-05:00"
+release_id: "v2.13.1"
