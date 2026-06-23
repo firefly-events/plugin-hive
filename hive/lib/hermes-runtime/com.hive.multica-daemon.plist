@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Hive multica daemon autostart service (launchd / macOS).
+       Install: cp this file to ~/Library/LaunchAgents/ then
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hive.multica-daemon.plist
+       Verify: launchctl print gui/$(id -u)/com.hive.multica-daemon
+       Remove: launchctl bootout gui/$(id -u)/com.hive.multica-daemon -->
+  <key>Label</key>
+  <string>com.hive.multica-daemon</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/multica</string>
+    <string>daemon</string>
+    <string>start</string>
+    <string>--foreground</string>
+  </array>
+
+  <!-- Run as the installing user; no privileged escalation needed. -->
+  <key>UserName</key>
+  <string>hive</string>
+
+  <!-- Restart automatically on exit (covers daemon crash or reboot). -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Wait 5 s before first launch to let network/mounts settle. -->
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+
+  <!-- Capture daemon stdout/stderr for post-mortem inspection. -->
+  <key>StandardOutPath</key>
+  <string>/tmp/multica-daemon.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/multica-daemon.stderr.log</string>
+
+  <!-- Ensure PATH contains the Node.js + multica binaries. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+  </dict>
+</dict>
+</plist>

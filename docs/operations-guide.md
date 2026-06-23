@@ -744,6 +744,102 @@ registered in the hermes runtime config (`~/.hermes/config.yaml` → `mcp_server
 
 ---
 
+## Studio Runtime Setup (hpr-5)
+
+The lights-on loop runs on Studio (mac.lan, user `hive`). The multica daemon and
+Hermes MCP wiring must survive reboots without manual intervention.
+
+### 1. Daemon autostart (launchd)
+
+Install the bundled launchd service template:
+
+```bash
+cp hive/lib/hermes-runtime/com.hive.multica-daemon.plist \
+   ~/Library/LaunchAgents/com.hive.multica-daemon.plist
+
+# Bootstrap (first install):
+launchctl bootstrap gui/$(id -u) \
+  ~/Library/LaunchAgents/com.hive.multica-daemon.plist
+
+# Verify:
+launchctl print gui/$(id -u)/com.hive.multica-daemon
+multica daemon status --output json
+```
+
+The plist uses `KeepAlive: true` — the daemon restarts automatically after a crash
+or reboot. Logs: `/tmp/multica-daemon.stdout.log` and `.stderr.log`.
+
+To remove: `launchctl bootout gui/$(id -u)/com.hive.multica-daemon`.
+
+### 2. Hermes MCP config (`~/.hermes/config.yaml`)
+
+Populate from the template:
+
+```bash
+mkdir -p ~/.hermes
+cp hive/lib/hermes-runtime/hermes-config.template.yaml ~/.hermes/config.yaml
+# Edit: replace <PLUGIN_HIVE_PATH> with the absolute path to the Studio checkout,
+# e.g. /Users/hive/Code/plugin-hive
+```
+
+The `mcp_servers.multica` stanza wires `node mcp-tools.mjs` with the correct `cwd`
+so all 7 MCP tools resolve. Verify:
+
+```bash
+node /Users/hive/Code/plugin-hive/hive/lib/multica-story-dispatch/mcp-tools.mjs
+# Should start and report its capabilities (Ctrl-C to exit)
+```
+
+### 3. Health probe
+
+```bash
+# Quick check:
+hive/lib/hermes-runtime/health-probe.sh
+
+# Structured output (for scripts / watch-cron):
+hive/lib/hermes-runtime/health-probe.sh --json
+```
+
+Exit 0 = healthy; exit 1 = unhealthy. The probe is read-only and safe to run
+at any cadence. `watch-cron` uses this to decide whether to skip a tick.
+
+### 4. Workspace bind
+
+The Studio plugin-hive checkout the daemon operates on must be on `develop` (or the
+active epic branch). Document the bind:
+
+| Field | Value |
+|-------|-------|
+| Path | `/Users/hive/Code/plugin-hive` |
+| Branch | `develop` (or active epic branch) |
+| Workspace slug | configured in `.pHive/multica/agents.yaml` |
+
+Pin this in the Hermes config `cwd` field (see template above) so agents always
+operate on the documented tree.
+
+### 5. Restart-recovery check
+
+After any reboot or `launchctl stop com.hive.multica-daemon`:
+
+```bash
+# 1. Confirm daemon restarted automatically (give launchd ~10 s):
+launchctl print gui/$(id -u)/com.hive.multica-daemon | grep state
+multica daemon status --output json
+
+# 2. Confirm MCP tools callable (all 7 must respond):
+hive/lib/hermes-runtime/health-probe.sh
+
+# 3. Confirm health probe exits 0:
+echo "exit code: $?"
+```
+
+### 6. Environment variables (Slack + Multica)
+
+See `hive/lib/hermes-runtime/env-contract.md` for the full variable list.
+Store secrets in the Studio keychain or a root-only env file — never in the repo.
+
+---
+
 ## Further Reading
 
 | Doc | What it covers |
