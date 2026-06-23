@@ -1,7 +1,7 @@
 id: h-01-hermes-skill-format-recon
 epic: hermes-orchestrator-skills
 title: Recon and spec the Hermes-agent native skill registry format
-status: pending
+status: done
 complexity: medium
 methodology: classic
 side: studio
