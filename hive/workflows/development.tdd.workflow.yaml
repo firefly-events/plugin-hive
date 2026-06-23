@@ -207,6 +207,36 @@ steps:
     optional: false
     timeout_ms: 300000
 
+  # #16: enforce the review verdict. A needs_revision review must NOT silently
+  # integrate. This gate fails the run when review_verdict == needs_revision,
+  # surfacing the review findings. (Auto-fix-and-re-review is the bounded
+  # converge-loop follow-on, t-005/t-006.)
+  - id: gate-review
+    node_type: gate
+    # needs_revision BLOCKS integrate; passed and needs_optimization both proceed
+    # (optimize is a refinement path, not a blocker).
+    gate: "review_verdict must not equal needs_revision"
+    # Bounded-retry contract (test_classic_gate_has_bounded_retry). The walker
+    # re-dispatches the SAME gate node, so re-evaluating an unchanged verdict
+    # just fails identically — max_attempts:1 = fail loud immediately, no wasted
+    # re-dispatch. Auto-fix-and-re-review (retry_node: review + a fix step) is
+    # the bounded converge-loop follow-on, t-005/t-006.
+    retry:
+      max_attempts: 1
+      on: gate_failed
+      retry_node: review
+    depends_on:
+      - review
+    inputs:
+      - name: review_verdict
+        source: step_output
+        step_id: review
+        output_name: review_verdict
+    outputs:
+      - name: gate_passed
+        type: json
+    timeout_ms: 30000
+
   - id: optimize
     agent: developer
     step_file: hive/workflows/steps/development-classic/step-07-optimize.md
@@ -244,6 +274,7 @@ steps:
       files changed.
     depends_on:
       - review
+      - gate-review
     inputs:
       - name: implementation
         source: step_output
