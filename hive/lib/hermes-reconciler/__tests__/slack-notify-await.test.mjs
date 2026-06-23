@@ -264,15 +264,44 @@ test('resolveGate: approve → gate_state=pre_approved', () => {
   assert.equal(readHermesReconcilerState(statePath).gate_state, 'pre_approved');
 });
 
-test('resolveGate: continue → gate_state=pre_approved', () => {
+test('resolveGate: approve marks the surfaced in-flight story done and clears in-flight', () => {
   const dir = tmpDir();
   const statePath = cycleStatePath(dir);
-  writeHermesReconcilerState(statePath, { gate_state: 'review_awaiting_human' });
+  writeHermesReconcilerState(statePath, {
+    gate_state: 'review_awaiting_human',
+    in_flight_story_id: 's-42',
+    in_flight_task_id: 't-99',
+    stories: { 's-42': { phase_position: 'dispatched_review' } },
+  });
+
+  const result = resolveGate(statePath, { action: 'approve' });
+
+  assert.equal(result.gate_state, 'pre_approved');
+  assert.equal(result.story_done, 's-42');
+  const state = readHermesReconcilerState(statePath);
+  assert.equal(state.gate_state, 'pre_approved');
+  assert.equal(state.stories['s-42'].phase_position, 'done');
+  assert.equal(state.in_flight_story_id, null);
+  assert.equal(state.in_flight_task_id, null);
+});
+
+test('resolveGate: continue → gate_state=pre_approved, no story completed', () => {
+  const dir = tmpDir();
+  const statePath = cycleStatePath(dir);
+  writeHermesReconcilerState(statePath, {
+    gate_state: 'review_awaiting_human',
+    in_flight_story_id: 's-7',
+    stories: { 's-7': { phase_position: 'dispatched_impl' } },
+  });
 
   const result = resolveGate(statePath, { action: 'continue' });
 
   assert.equal(result.gate_state, 'pre_approved');
-  assert.equal(readHermesReconcilerState(statePath).gate_state, 'pre_approved');
+  const state = readHermesReconcilerState(statePath);
+  assert.equal(state.gate_state, 'pre_approved');
+  // continue is an error-ack resume — it must NOT complete the story.
+  assert.equal(state.stories['s-7'].phase_position, 'dispatched_impl');
+  assert.equal(state.in_flight_story_id, 's-7');
 });
 
 test('resolveGate: reject → gate_state=rejected, no further advance possible', () => {

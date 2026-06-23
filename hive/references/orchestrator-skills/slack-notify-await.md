@@ -195,23 +195,25 @@ In the reconcile-tick `review_terminal` branch (§4 Branch 2), replace the direc
 advance with:
 
 ```diff
-- if normalized == "passed":
--     stories[story-id].phase_position = "done"
--     ...advance or finalize...
-+ if normalized == "passed":
-+     call surface-verdict(epic_handle, story_id, "passed", episode_summary, diff)
-+     exit tick   ← human must approve before advancing to done
+  if normalized == "passed":
++     if NOT ff_merge_verified(story-id):     # never trust a claimed push (§5)
++         call surface-verdict(epic_handle, story_id, "push_unverified", episode_summary, diff)
++         exit tick   ← halt for human
+      stories[story-id].phase_position = "done"   # passed + verified → auto-advance
+      ...advance or finalize...
 
 - if normalized == "needs-revision":
 -     stories[story-id].phase_position = "dispatched_impl"
 -     ...
 + if normalized == "needs-revision":
 +     call surface-verdict(epic_handle, story_id, "needs-revision", episode_summary, diff)
-+     exit tick   ← human must choose revise/reject (not auto-loop)
++     exit tick   ← human chooses approve (mark done) / revise / reject (not auto-loop)
 ```
 
-The gate_state latch from surface-verdict ensures the next tick's §3 preflight check blocks
-until the human responds via resolve-gate.
+A `passed` + ff-merge-verified verdict advances to `done` with no human gate — the human
+reviews only the exceptions (non-passing, unverified, or error). For the gated cases, the
+gate_state latch from surface-verdict ensures the next tick's §3 preflight check blocks
+until the human responds via resolve-gate (`approve` marks the surfaced story done).
 
 For error conditions (dispatch failure, daemon not responding, max-attempts exceeded on a story
 the operator must review), replace any silent retry or auto-escalation with:

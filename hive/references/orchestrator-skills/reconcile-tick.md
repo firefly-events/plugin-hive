@@ -20,8 +20,10 @@ reconcile-tick is the **advance core**. On each tick it:
 2. Evaluates the five-branch decision tree in strict priority order.
 3. Takes exactly **one** action (the first matching branch), writes state via
    `multica_write_state`, and exits.
-4. Never auto-advances past `review_terminal` — surfaces the verdict to a human-gate
-   hook and halts with `gate_state = "review_awaiting_human"`.
+4. Auto-advances **only** a `passed` + ff-merge-verified verdict (marks the story
+   `done`). Every non-passing or unverified verdict surfaces to a human-gate hook
+   and halts with `gate_state = "review_awaiting_human"` — and never auto-loops a
+   revision. (The human reviews the exceptions; passing work flows through.)
 5. Never marks a story done on an agent's claimed "pushed" status alone — verifies
    via ff-merge before advancing.
 

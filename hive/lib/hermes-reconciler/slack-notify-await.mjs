@@ -267,7 +267,26 @@ export function resolveGate(cycleStatePath, { storyId, action }) {
     return { resolved: true, gate_state: 'pre_approved', action: 'revise', attempt: newAttempt };
   }
 
-  // approve or continue
+  if (action === 'approve') {
+    // Approve = accept the review verdict as-is and mark the surfaced story done.
+    // (Under the passed-auto-advance model, the human gate is only reached for a
+    // non-passing/unverified verdict; approving it completes that story.)
+    const storyDone = current.in_flight_story_id ?? null;
+    const patch = {
+      gate_state: 'pre_approved',
+      in_flight_story_id: null,
+      in_flight_task_id: null,
+      dispatched_at: null,
+    };
+    if (storyDone) {
+      patch.stories = { [storyDone]: { phase_position: 'done' } };
+    }
+    writeHermesReconcilerState(cycleStatePath, patch);
+    return { resolved: true, gate_state: 'pre_approved', action, story_done: storyDone };
+  }
+
+  // continue — acknowledge an error and resume from the current state; no story
+  // is completed (the error hook, not a verdict, surfaced this gate).
   writeHermesReconcilerState(cycleStatePath, { gate_state: 'pre_approved' });
   return { resolved: true, gate_state: 'pre_approved', action };
 }
