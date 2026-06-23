@@ -323,6 +323,54 @@ export async function ensureRepos({
 } = {}) {
   return ensureReposWithDeps({ serverUrl, token, workspaceId, repoUrl, repoRoot, consent });
 }
+
+const GITIGNORE_LINE = '.pHive/dag-outputs/';
+
+// Append-if-absent: seeds .pHive/dag-outputs/ into the consumer repo's .gitignore.
+// Placement: immediately after the last existing .pHive/ ignore entry; at end of
+// file if none found. Exact string match guard prevents duplicates.
+// fs dep is injected for unit-testability.
+export function seedConsumerGitignoreWithDeps({ repoRoot = process.cwd(), fs: fsFn = fs } = {}) {
+  const gitignorePath = path.join(repoRoot, '.gitignore');
+  let content = '';
+  try {
+    content = fsFn.readFileSync(gitignorePath, 'utf8');
+  } catch {
+    // file does not exist — will create it
+  }
+  const lines = content === '' ? [] : content.split('\n');
+  // Remove trailing empty element from a newline-terminated file so we don't
+  // count a phantom blank line at the end as "last line".
+  const trailingNewline = content.endsWith('\n');
+  const normalised = trailingNewline && lines[lines.length - 1] === '' ? lines.slice(0, -1) : lines;
+
+  if (normalised.some((l) => l === GITIGNORE_LINE)) {
+    return { seeded: false, path: gitignorePath };
+  }
+
+  // Find insertion point: after the last line that starts with .pHive
+  let insertAfter = -1;
+  for (let i = 0; i < normalised.length; i++) {
+    if (normalised[i].startsWith('.pHive')) insertAfter = i;
+  }
+
+  const next = normalised.slice();
+  if (insertAfter >= 0) {
+    next.splice(insertAfter + 1, 0, GITIGNORE_LINE);
+  } else {
+    next.push(GITIGNORE_LINE);
+  }
+
+  const newContent = next.join('\n') + '\n';
+  fsFn.mkdirSync(path.dirname(gitignorePath), { recursive: true });
+  fsFn.writeFileSync(gitignorePath, newContent, 'utf8');
+  return { seeded: true, path: gitignorePath };
+}
+
+export function seedConsumerGitignore({ repoRoot = process.cwd() } = {}) {
+  return seedConsumerGitignoreWithDeps({ repoRoot });
+}
+
 export async function ensureDaemon({ consent = false } = {}) {
   try {
     const status = childProcess.execSync('multica daemon status', {
