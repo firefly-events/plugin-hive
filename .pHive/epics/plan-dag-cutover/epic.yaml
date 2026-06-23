@@ -1,0 +1,56 @@
+name: plan-dag-cutover
+title: "Wire /plan to the DAG executor (command cutover + conditional gates)"
+description: |
+  Close the last gap between the deterministic plan graph and the user's /plan command.
+  hive/workflows/plan.workflow.yaml already runs end-to-end but is only reachable via
+  manual invocation. This epic routes /plan through the DAG executor when configured,
+  mirroring /execute's cutover — additively and graduation-registry-gated so the default
+  orchestrator-narrated path has zero regression.
+
+  The distinguishing complexity beyond the /execute analog is conditional user-facing gates:
+  the DAG executor runs nodes to completion, but /plan has human-in-the-loop review gates
+  (design-discussion, H/V slicing, structured-outline). The solution is a new conditional
+  user_gate node type that evaluates a per-gate predicate: auto-passes when confident,
+  halts (pause/resume) on real doubt. Reject is terminal — revise-in-loop is deferred to
+  the t-005 converge-loop epic.
+
+  Scoped to the filesystem binding in this epic. A binding-aware multica pause surface
+  (issue-comment sentinel bridge) is a named precondition for multica deployment, not
+  in scope here.
+
+methodology: classic
+version_bump: minor
+
+git_flow:
+  base_branch: feat/plan-dag-cutover
+  branch_strategy: single-epic-branch
+
+stories:
+  - id: s1-plan-dispatch
+    title: "plan-dispatch atomic skill — runner resolution for the planning flow"
+    complexity: low
+    depends_on: []
+
+  - id: s2-plan-cutover
+    title: "/plan cutover — route to DAG executor when runner_path == hive-dag"
+    complexity: low
+    depends_on:
+      - s1-plan-dispatch
+
+  - id: s3-conditional-user-gate
+    title: "conditional user-gate node type — evaluate predicate, auto-pass or halt-surface-resume"
+    complexity: high
+    depends_on:
+      - s2-plan-cutover
+
+  - id: s4-gate-signals
+    title: "emit gate signals — confidence and open_questions_count in design/H-V/SO nodes"
+    complexity: low
+    depends_on:
+      - s3-conditional-user-gate
+
+  - id: s5-tests-and-schema
+    title: "tests, schema doc, graduation registry — cutover acceptance + parity + Order 10"
+    complexity: low
+    depends_on:
+      - s4-gate-signals

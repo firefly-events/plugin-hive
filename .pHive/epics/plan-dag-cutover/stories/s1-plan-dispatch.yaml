@@ -1,0 +1,129 @@
+id: s1-plan-dispatch
+epic: plan-dag-cutover
+title: "plan-dispatch atomic skill — runner resolution for the planning flow"
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  Add a new atomic sub-skill `skills/hive/skills/plan-dispatch/SKILL.md` that
+  resolves `runner_path` for the planning flow, mirroring the role
+  `skills/hive/skills/execute-dispatch/SKILL.md` plays for execution.
+
+  The skill is a **sibling**, not a refactor of `execute-dispatch`. It consumes
+  the existing `executor_enabled_for("plan")` reader helper from
+  `hive/lib/dag_executor/__init__.py` (the same shared surface that
+  `execute-dispatch` uses) and does not touch any code path that `/execute`
+  consumes. This keeps the `/execute` blast radius at zero.
+
+  Resolution logic (in precedence order):
+  1. `env.HIVE_PLANNING_MODE` exactly equals `hive-dag` → `runner_path: hive-dag`,
+     `runner_reason: planning-mode-override-env`
+  2. `.pHive/hive.config.yaml` key `planning.mode: hive-dag` →
+     `runner_path: hive-dag`, `runner_reason: planning-mode-override-config`
+  3. `executor_enabled_for("plan")` returns True (all five graduation-registry
+     conditions met: config present, `executor: hive-dag`, `executor_default: true`,
+     registry readable, `plan` listed) → `runner_path: hive-dag`,
+     `runner_reason: graduated-registry`
+  4. None of the above → `runner_path: orchestrator-narrated`,
+     `runner_reason: default`
+
+  Output contract (single output block):
+  - `runner_path: hive-dag | orchestrator-narrated`
+  - `runner_reason: <string from above>`
+
+  The Python layer already supports `flow="planning"` in
+  `run.py:resolve_spawn_binding()` (reads `HIVE_PLANNING_MODE` and
+  `planning.mode`). This story wires the SKILL.md surface; the Python layer
+  needs no change.
+
+  Also add `plan` to the graduation registry comment block in
+  `.pHive/runtime/executor-graduated-workflows.yaml` as a placeholder entry
+  (commented-out, not yet active) so reviewers can see the intended Order 10
+  slot. The actual uncommented graduation is story s5's responsibility.
+
+acceptance_criteria:
+  - "Given env HIVE_PLANNING_MODE=hive-dag (no other planning config), when plan-dispatch resolves, then runner_path is hive-dag and runner_reason is planning-mode-override-env."
+  - "Given .pHive/hive.config.yaml has planning.mode: hive-dag and env is unset, when plan-dispatch resolves, then runner_path is hive-dag and runner_reason is planning-mode-override-config."
+  - "Given HIVE_PLANNING_MODE=hive-dag AND planning.mode: orchestrator-narrated (env wins), when plan-dispatch resolves, then runner_path is hive-dag and runner_reason is planning-mode-override-env."
+  - "Given executor_enabled_for(plan) returns True (all five conditions met including plan in registry), when plan-dispatch resolves with no env/config override, then runner_path is hive-dag and runner_reason is graduated-registry."
+  - "Given planning config is unset and plan is not in the graduation registry, when plan-dispatch resolves, then runner_path is orchestrator-narrated and runner_reason is default."
+  - "Given execution.mode: sandcastle is set (unrelated /execute config), when plan-dispatch resolves, then it is unaffected — no cross-contamination between flows."
+  - "No changes to skills/hive/skills/execute-dispatch/SKILL.md or any file consumed by /execute; /execute dispatch parity verified unchanged."
+
+steps:
+  - id: research
+    description: "Read skills/hive/skills/execute-dispatch/SKILL.md (full file) to capture the exact input/output contract, resolution-precedence wording, and output-block format. Read hive/lib/dag_executor/__init__.py executor_enabled_for() to confirm the five-condition check. Read hive/lib/dag_executor/run.py resolve_spawn_binding() to confirm flow=planning support. Note verbatim wording patterns."
+    agent: researcher
+  - id: implement
+    description: "Write skills/hive/skills/plan-dispatch/SKILL.md as a new atomic skill file. Mirror execute-dispatch structure (header, inputs, resolution-precedence steps, output contract). Add the HIVE_PLANNING_MODE env override, planning.mode config override, executor_enabled_for(plan) graduated-registry check, and orchestrator-narrated default. Add commented-out Order-10 placeholder entry in .pHive/runtime/executor-graduated-workflows.yaml."
+    agent: developer
+    depends_on:
+      - research
+  - id: test
+    description: "Write tests covering the 7 AC cases: env override wins, config override wins, env beats config, graduated-registry path, default path, cross-flow isolation, execute-dispatch parity unchanged. Tests may be prose-verification test scripts or unit tests against the reader helper depending on the sub-skill test convention."
+    agent: tester
+    depends_on:
+      - implement
+  - id: review
+    description: "Verify skills/hive/skills/execute-dispatch/SKILL.md is byte-identical before/after (no regressions). Confirm plan-dispatch output contract is a strict subset of execute-dispatch (runner_path, runner_reason). Confirm no new grammar or evaluator surface introduced."
+    agent: reviewer
+    depends_on:
+      - test
+  - id: integrate
+    description: "Commit on feat/plan-dag-cutover branch with prefix [plan-graph]."
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  tech_stack:
+    runtime: python
+    language: python-and-skill-md
+  key_files:
+    - path: skills/hive/skills/execute-dispatch/SKILL.md
+      purpose: "Template for plan-dispatch structure — read-only reference. Must not be modified."
+    - path: hive/lib/dag_executor/__init__.py
+      purpose: "Contains executor_enabled_for(workflow_name) — the shared reader helper plan-dispatch consumes."
+    - path: hive/lib/dag_executor/run.py
+      purpose: "resolve_spawn_binding(flow='planning') confirms Python layer already supports HIVE_PLANNING_MODE."
+    - path: .pHive/runtime/executor-graduated-workflows.yaml
+      purpose: "Graduation registry — add commented-out Order 10 placeholder for plan workflow."
+    - path: .pHive/hive.config.yaml
+      purpose: "Consumer config — planning.mode key tested here but NOT modified in this story."
+
+files_to_modify:
+  - file: skills/hive/skills/plan-dispatch/SKILL.md
+    change: "NEW — atomic plan-dispatch sub-skill with resolution precedence and output contract"
+  - file: .pHive/runtime/executor-graduated-workflows.yaml
+    change: "MODIFY — add commented-out Order 10 placeholder entry for plan workflow"
+
+design_decisions:
+  - decision: "Sibling skill (plan-dispatch) rather than extending execute-dispatch"
+    rationale: "execute-dispatch is coupled to execution-mode semantics (stories, parallel teams, sessions, cmux). A sibling keeps /execute blast-radius at zero and follows the posture already prescribed in execute-dispatch/SKILL.md lines 210-214 (others use executor_enabled_for only as reader helper)."
+  - decision: "Consume executor_enabled_for(plan) unchanged — no new Python code"
+    rationale: "The five-condition check in __init__.py already covers plan workflow. Adding Python for a capability the library already exposes is unnecessary scope."
+
+cross_cutting:
+  - concern: documentation
+    action: "New plan-dispatch SKILL.md is self-documenting. Add a reference entry to hive/references/workflow-schema.md cutover section pointing at plan-dispatch as the planning runner resolver (parallel to the execute-dispatch reference already there)."
+  - concern: versioning
+    action: "New consumer-visible config key planning.mode: hive-dag qualifies as a minor additive feature. Flag at minor semver level for the epic's version bump in s5."
+
+metric:
+  applies: false
+  justification: "Pure dispatch-routing addition. No observable user-facing metric at this story boundary; the cutover behavior surfaces in s2 when /plan actually routes to the executor."
+
+risks:
+  - severity: low
+    description: "executor_enabled_for() five-condition check includes plan-in-registry; plan is not yet in the registry. The graduated-registry path (AC4) must be tested with a mock registry that lists plan."
+    mitigation: "Tester uses a fixture that temporarily adds plan to the registry for that AC case only."
+
+references:
+  - path: "skills/hive/skills/execute-dispatch/SKILL.md"
+    relevant_excerpt: "Lines 210-214: 'Other orchestration surfaces that need to know whether the executor is enabled for a specific workflow use executor_enabled_for only as the reader helper — they do not replicate the five-condition logic.' This is the posture that makes plan-dispatch a sibling, not a shared lib helper."
+  - path: "hive/lib/dag_executor/__init__.py"
+    relevant_excerpt: "executor_enabled_for(workflow_name) — checks .pHive/hive.config.yaml for executor: hive-dag + executor_default: true + graduation registry."
+  - path: "research-brief.md §PATTERNS_OBSERVED"
+    relevant_excerpt: "Pattern: flow parameter for planning vs execution — resolve_spawn_binding() already reads HIVE_PLANNING_MODE and planning.mode for flow='planning'. Python layer is already wired."
