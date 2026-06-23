@@ -1153,6 +1153,12 @@ class Walker:
                     ) from exc
                 raise
 
+            # Mirror walk(): materialise implement outputs into repo_root before
+            # downstream nodes run, so a resumed/replayed run doesn't let review
+            # read a stale tree (parity with the inline path; CodeRabbit #318).
+            if _is_implement_node(node):
+                _per_node_reconcile(dispatcher, node, output, run_id, telemetry)
+
             materialised[node_id] = output
             if is_pause:
                 state = _record_pause_resumed(state)

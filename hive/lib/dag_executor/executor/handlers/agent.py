@@ -1058,8 +1058,15 @@ class AgentHandler:
         def _filled(o: dict[str, Any]) -> int:
             return sum(1 for n in semantic_outputs if not _output_is_empty(o.get(n)))
 
+        def _missing(o: dict[str, Any]) -> list[str]:
+            return [n for n in semantic_outputs if _output_is_empty(o.get(n))]
+
         outputs: dict[str, Any] = {}
         attempt_work_dirs: list[str] = []
+        # Each work_dir's OWN attempt outputs (sha/branch/repo/work_dir). When a
+        # prior work_dir is recovered below, it must keep ITS attempt's metadata,
+        # not the latest attempt's — else reconcile/copy target the wrong tree.
+        attempt_outputs_by_work_dir: dict[str, dict[str, Any]] = {}
         for attempt in range(1, max_under_run_attempts + 1):
             try:
                 outputs = self._spawn(
@@ -1082,12 +1089,15 @@ class AgentHandler:
                 )
 
             wd = outputs.get("work_dir")
-            if isinstance(wd, str) and wd and wd not in attempt_work_dirs:
-                attempt_work_dirs.append(wd)
+            if isinstance(wd, str) and wd:
+                if wd not in attempt_work_dirs:
+                    attempt_work_dirs.append(wd)
+                attempt_outputs_by_work_dir[wd] = dict(outputs)
 
-            under_run = bool(semantic_outputs) and all(
-                _output_is_empty(outputs.get(n)) for n in semantic_outputs
-            )
+            # The injected #13 contract requires EVERY declared output; a partial
+            # outputs.yaml is incomplete and must not flow downstream. Treat a run
+            # missing ANY semantic output as an under-run (not only all-empty).
+            under_run = bool(_missing(outputs))
             if not (is_multica and under_run):
                 break
 
@@ -1098,13 +1108,17 @@ class AgentHandler:
             # (observed: 3 attempts each in a distinct work_dir, only the first
             # actually held the authored epic). Before spending a re-dispatch,
             # re-harvest every work_dir seen so far — a late-landing commit now
-            # surfaces — and keep whichever fills the most declared outputs.
+            # surfaces — seeding each candidate with ITS OWN attempt metadata so a
+            # recovered earlier work_dir doesn't inherit a later attempt's tree.
             recovered: dict[str, Any] | None = None
             for prior in attempt_work_dirs:
-                cand = self._spawn.reharvest(prior, base=outputs)
+                cand = self._spawn.reharvest(
+                    prior, base=attempt_outputs_by_work_dir.get(prior)
+                )
                 if _filled(cand) > _filled(recovered or {}):
                     recovered = cand
-            if recovered is not None and _filled(recovered) > 0:
+            # Accept only a COMPLETE recovery — every declared output present.
+            if recovered is not None and not _missing(recovered):
                 outputs = recovered
                 break
 

@@ -723,3 +723,50 @@ def test_output_contract_absent_for_metadata_only_node(tmp_path):
     cmd = mock_run.call_args_list[0][0][0]
     body = cmd[cmd.index("--body") + 1]
     assert "OUTPUT CONTRACT" not in body
+
+
+def test_partial_outputs_treated_as_under_run(tmp_path):
+    """CodeRabbit #318 — the #13 contract requires EVERY declared output. A node
+    that fills only SOME of its declared semantic outputs is incomplete and must
+    under-run (never flow a partial outputs.yaml downstream), so a recovery that
+    leaves any key empty is rejected and the guard exhausts its retries."""
+    from types import SimpleNamespace
+    from hive.lib.dag_executor.executor.handlers.agent import (
+        AgentHandler,
+        MulticaAgentSpawn,
+    )
+
+    class _PartialSpawn(MulticaAgentSpawn):
+        # Only ever surfaces ONE of the two declared semantic outputs.
+        def reharvest(self, work_dir, base=None):
+            out = dict(base or {})
+            out["epic_dir"] = ".pHive/epics/x"  # but never story_index
+            return out
+
+    spawn = _PartialSpawn(cli_path=tmp_path / "cli.mjs", repo_root=tmp_path)
+    (tmp_path / "wd").mkdir()
+    dispatch_count = [0]
+
+    def side_effect(*args, **kwargs):
+        sub = args[0][2]
+        if sub == "create-issue":
+            return _make_subprocess_result(_create_issue_result())
+        if sub == "dispatch":
+            dispatch_count[0] += 1
+            return _make_subprocess_result(_dispatch_result())
+        return _make_subprocess_result(
+            _completed_poll_result(work_dir=str(tmp_path / "wd"))
+        )
+
+    node = SimpleNamespace(
+        id="author",
+        agent="technical-writer",
+        step_file="",
+        outputs=[SimpleNamespace(name="epic_dir"), SimpleNamespace(name="story_index")],
+    )
+    handler = AgentHandler(spawn=spawn)
+    with patch("subprocess.run", side_effect=side_effect):
+        with pytest.raises(AgentHandlerError, match="under-run"):
+            handler.handle(node, inputs={}, run_id="run-1")
+    # the partial recovery (epic_dir set, story_index empty) is never accepted
+    assert dispatch_count[0] == 3
