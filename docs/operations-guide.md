@@ -708,6 +708,42 @@ See `references/error-handling.md` for the full per-phase failure playbook.
 
 ---
 
+## Hermes Orchestrator Skills (lights-on loop)
+
+The Hive orchestrator is codified as a set of **Hermes-side skills** so a persistent
+Hermes cron can run the software factory toward the north star: **a human gates only
+planning and review; the orchestrator and agents own the rest.** The skills are
+native hermes-agent `SKILL.md` files under `skills/orchestration/` in the
+hermes-agent repo, ported from the canonical runbook sources in plugin-hive at
+`hive/references/orchestrator-skills/`. Format + binding spec:
+`.pHive/epics/hermes-orchestrator-skills/docs/hermes-skill-format-spec.md`.
+
+| Skill | Human gate | Wraps | Source runbook |
+|-------|-----------|-------|----------------|
+| `monitor-epic` | none (read-only) | epic-status + context-snapshot + poll | `orchestrator-skills/monitor-epic.md` |
+| `reconcile-tick` | **review verdict** | 7-position phase machine; watchdog; ff-merge verify | `orchestrator-skills/reconcile-tick.md` |
+| `kickoff-plan` | **plan approval** | starts `/plan`, routes gates to human | `orchestrator-skills/kickoff-plan.md` |
+| `kickoff-exec` | none (epic pre-approved) | starts the reconcile loop over a `pre_approved` epic | `orchestrator-skills/kickoff-exec.md` |
+| `watch-cron` | none (alert-only) | RemoteTrigger routines + `multica daemon status` health | `orchestrator-skills/watch-cron.md` |
+
+**The loop:** a human approves an epic (`gate_state: pre_approved`, the latch in
+`hive/lib/hermes-reconciler/state.mjs`) → `kickoff-exec` starts → `reconcile-tick`
+advances each story implementation → review → **halts at `review_terminal`** and
+surfaces the verdict to the human via the Slack notify-and-await transport
+(`hive/lib/hermes-reconciler/slack-notify-await.mjs`) → human continues/rejects →
+loop resumes. `monitor-epic` + `watch-cron` provide read-only visibility throughout.
+
+**Invariants:** the tick never auto-advances past a review verdict, never marks a
+story done on an agent's claimed "pushed" status (verifies ff-merge), never advances
+an epic that is not `pre_approved`, and **never mints stories** — backlog authorship
+stays human-gated via `/plan` and `/triage --hand-off` only.
+
+**MCP binding:** the skills reach the tracker through `multica_*` MCP tools
+(`hive/lib/multica-story-dispatch/mcp-tools.mjs`, a thin wrapper over `cli.mjs`),
+registered in the hermes runtime config (`~/.hermes/config.yaml` → `mcp_servers.multica`).
+
+---
+
 ## Further Reading
 
 | Doc | What it covers |

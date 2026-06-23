@@ -1,0 +1,67 @@
+id: h-09-watch-cron-skill
+epic: hermes-orchestrator-skills-local
+title: Author the watch-cron skill (routine + daemon health)
+status: pending
+complexity: low
+methodology: classic
+side: plugin-hive
+depends_on: [h-06-slack-notify-await]
+parallel_allowed: true
+parallel_rationale: bounded-slice
+files_to_modify:
+  - file: hive/references/orchestrator-skills/watch-cron.md
+    change: write the canonical watch-cron runbook source
+
+description: |
+  The health watch. watch-cron monitors the RemoteTrigger routines (meta nightly,
+  autonomous standup loop) and multica daemon status, surfacing failures/stalls via
+  the h-06 Slack surface. Read-only + alerting only — it does not restart or mutate.
+
+  Carries the memory-known caveats: meta nightly is a RemoteTrigger routine (not a
+  repo workflow) and must read open PRs + target develop; the Studio daemon needs a
+  GUI Aqua session to read Keychain, so "daemon down" may mean "session lost" not
+  "crashed" — surface that distinction.
+
+acceptance_criteria:
+  - "Given the routines + daemon, when watch-cron runs, then it reports each routine's last-run status + daemon health."
+  - "Given a failed/stalled routine or a down daemon, when detected, then it alerts via the Slack surface (no auto-restart)."
+  - "Given a daemon that is down, when reported, then the alert distinguishes 'session/Keychain lost' from 'process crashed' where determinable."
+  - "Given healthy state, when run, then it is quiet (no noise alerts)."
+
+steps:
+  - id: research
+    description: Identify the RemoteTrigger routines + daemon status checks; map health signals.
+    agent: researcher
+  - id: implement
+    description: Write hive/references/orchestrator-skills/watch-cron.md — checks, health mapping, alert-on-failure via Slack.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Tests for healthy-quiet, failed-routine alert, daemon-down alert with cause distinction.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm read-only (no restart/mutate); alerts route through h-06.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/hermes-orchestrator-skills.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/references/routines-integration.md
+      purpose: External-coordinator routine integration; the scheduler-as-trigger contract.
+
+risks:
+  - severity: low
+    description: Noise-alerting on transient blips.
+    mitigation: Alert on failure/stall only; healthy state stays quiet.
+
+references:
+  - path: .pHive/epics/hermes-orchestrator-skills/docs/research-brief.md
+    relevant_excerpt: |
+      §7: Meta nightly = a RemoteTrigger routine, not a repo workflow; daemon must
+      be GUI-session-bootstrapped on Studio to read Keychain.
