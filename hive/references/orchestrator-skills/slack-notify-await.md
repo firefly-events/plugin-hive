@@ -123,7 +123,7 @@ surface-error(epic_handle, story_id, error_kind, details):
 
 ### Details
 ```
-<details>
+<details_text>
 ```
 
 ### Decision Required
