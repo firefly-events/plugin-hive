@@ -429,6 +429,8 @@ steps:
     depends_on:
       - gate-code
       - platform-verify
+      - reconcile-backend
+      - reconcile-frontend
     inputs:
       - name: backend_implementation
         source: step_output

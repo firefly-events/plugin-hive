@@ -99,6 +99,45 @@ steps:
     optional: false
     timeout_ms: 600000
 
+  # Reconcile node (s2): materialise the implement agent's committed work into
+  # the working tree before test and review run. No-op on local bindings
+  # (sha absent). C1: sha/branch/repo bound from implement step_output so the
+  # Multica path wires the real commit metadata.
+  - id: reconcile-implement
+    agent: reconciler
+    node_type: reconcile
+    step_file: hive/workflows/step-files/execute/reconcile.md
+    task: >
+      Materialise the implement agent's commit before test and review run.
+    depends_on:
+      - implement
+    inputs:
+      - name: sha
+        source: step_output
+        step_id: implement
+        output_name: commit_sha
+        optional: true
+      - name: branch
+        source: step_output
+        step_id: implement
+        output_name: branch
+        optional: true
+      - name: repo
+        source: step_output
+        step_id: implement
+        output_name: repo
+        optional: true
+      - name: work_dir
+        source: step_output
+        step_id: implement
+        output_name: work_dir
+        optional: true
+    outputs:
+      - name: reconcile_status
+        type: string
+    optional: true
+    timeout_ms: 120000
+
   - id: test
     agent: tester
     task: >
@@ -107,7 +146,7 @@ steps:
       the behavior contract. Use existing test patterns from the research brief.
       Verify all tests pass.
     depends_on:
-      - implement
+      - reconcile-implement
     inputs:
       - name: behavior_specs
         source: step_output
@@ -139,6 +178,7 @@ steps:
       a verdict: passed, needs_optimization, or needs_revision.
     depends_on:
       - test
+      - reconcile-implement
     inputs:
       - name: implementation
         source: step_output

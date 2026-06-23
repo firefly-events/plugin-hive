@@ -183,6 +183,7 @@ steps:
       passed, needs_optimization, or needs_revision.
     depends_on:
       - gate-tests
+      - reconcile-implement
     inputs:
       - name: implementation
         source: step_output
