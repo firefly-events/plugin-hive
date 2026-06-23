@@ -57,6 +57,33 @@ def _output_is_empty(value: Any) -> bool:
     return False
 
 
+def _output_contract_preamble(output_names: list[str]) -> str:
+    """A hard, agent-facing instruction prepended to a Multica node's brief so a
+    flaky agent turn cannot silently end without emitting the node's declared
+    outputs.
+
+    The #22 under-run failures were intermittent and difficulty-independent: the
+    agent finished its turn (any node, any story — even a trivial preflight)
+    without writing ``.pHive/dag-outputs/outputs.yaml`` (#13), so the harvest came
+    back empty and the node failed. Re-dispatching a fresh agent re-rolled the
+    same dice. Naming the exact required keys up front and gating "your turn is
+    not done until they exist" converts a forgotten write into an explicit,
+    checkable obligation the agent must satisfy before stopping.
+    """
+    keys = ", ".join(f"`{n}`" for n in output_names)
+    return (
+        "## OUTPUT CONTRACT (#13 — MANDATORY)\n\n"
+        "Before you end your turn you MUST write the file "
+        "`.pHive/dag-outputs/outputs.yaml` in your work_dir. It MUST be valid "
+        f"YAML and MUST contain these top-level keys: {keys}. Each value is the "
+        "real result this node produced (a path, sha, boolean, or short string "
+        "— never a placeholder). If that file is missing, or is missing any of "
+        "those keys, your work is INCOMPLETE and will be DISCARDED — do not stop "
+        "until it exists with every key.\n\n"
+        "---\n\n"
+    )
+
+
 @dataclass
 class NodeOutput:
     """Materialised outputs from a single node, keyed by output name.
@@ -1015,6 +1042,19 @@ class AgentHandler:
         ]
         max_under_run_attempts = 3 if (is_multica and semantic_outputs) else 1
 
+        # #13-enforce: prepend a hard output-contract to the brief for Multica
+        # nodes that declare semantic outputs, so an intermittently-flaky agent
+        # turn cannot silently end without emitting outputs.yaml — the dominant
+        # #22 under-run cause, independent of story difficulty (observed on a
+        # trivial preflight as readily as on an architectural implement). The
+        # step content itself is still passed VERBATIM after the contract; local
+        # and test spawns consume canned outputs and get no contract.
+        effective_step_file = step_file_content
+        if is_multica and semantic_outputs:
+            effective_step_file = (
+                _output_contract_preamble(semantic_outputs) + step_file_content
+            )
+
         def _filled(o: dict[str, Any]) -> int:
             return sum(1 for n in semantic_outputs if not _output_is_empty(o.get(n)))
 
@@ -1024,7 +1064,7 @@ class AgentHandler:
             try:
                 outputs = self._spawn(
                     agent=node.agent,
-                    step_file_content=step_file_content,
+                    step_file_content=effective_step_file,
                     inputs=dict(inputs),
                     run_id=run_id,
                     step_id=node.id,
