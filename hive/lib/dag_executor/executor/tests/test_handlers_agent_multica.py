@@ -594,3 +594,59 @@ def test_under_run_raises_when_no_declared_output(tmp_path):
             handler.handle(node, inputs={}, run_id="run-1")
     # re-dispatched the bounded number of times before giving up
     assert dispatch_count[0] == 3, "under-run must re-dispatch up to 3 times"
+
+
+def test_under_run_recovers_via_reharvest_without_redispatch(tmp_path):
+    """efcl-s4 — the under-run is usually a RACE: the poll reports 'completed'
+    before the agent's commit / outputs.yaml has landed, so the harvest at poll
+    time reads an empty tree. A blind re-dispatch lands in a NEW empty work_dir
+    and abandons the good one. The guard must re-harvest the SAME work_dir first;
+    when the late commit has landed it recovers WITHOUT spending a re-dispatch."""
+    from types import SimpleNamespace
+    from hive.lib.dag_executor.executor.handlers.agent import (
+        AgentHandler,
+        MulticaAgentSpawn,
+    )
+
+    (tmp_path / "wd").mkdir()
+
+    class _RaceSpawn(MulticaAgentSpawn):
+        """__call__ harvests empty (race); a later re-read of the SAME work_dir
+        surfaces the declared outputs that the agent committed post-terminal."""
+
+        def reharvest(self, work_dir, base=None):
+            out = dict(base or {})
+            out["epic_dir"] = ".pHive/epics/execute-flow-followons-converge-loop"
+            out["commit_sha"] = "4dcd26e"
+            return out
+
+    spawn = _RaceSpawn(cli_path=tmp_path / "cli.mjs", repo_root=tmp_path)
+
+    dispatch_count = [0]
+
+    def side_effect(*args, **kwargs):
+        sub = args[0][2]
+        if sub == "create-issue":
+            return _make_subprocess_result(_create_issue_result())
+        if sub == "dispatch":
+            dispatch_count[0] += 1
+            return _make_subprocess_result(_dispatch_result())
+        return _make_subprocess_result(
+            _completed_poll_result(work_dir=str(tmp_path / "wd"))
+        )
+
+    node = SimpleNamespace(
+        id="author",
+        agent="technical-writer",
+        step_file="",
+        outputs=[SimpleNamespace(name="epic_dir"), SimpleNamespace(name="commit_sha")],
+    )
+    handler = AgentHandler(spawn=spawn)
+    with patch("subprocess.run", side_effect=side_effect):
+        result = handler.handle(node, inputs={}, run_id="run-1")
+
+    # Recovered on the FIRST attempt — the re-harvest surfaced the good output,
+    # so NO second dispatch was spent abandoning the work_dir that held it.
+    assert dispatch_count[0] == 1, "reharvest must recover before re-dispatching"
+    assert result.outputs["epic_dir"].endswith("execute-flow-followons-converge-loop")
+    assert result.outputs["commit_sha"] == "4dcd26e"

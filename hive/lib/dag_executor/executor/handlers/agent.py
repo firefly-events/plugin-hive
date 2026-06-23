@@ -367,6 +367,30 @@ class MulticaAgentSpawn:
             outputs.setdefault(key, value)
         return outputs
 
+    def reharvest(
+        self, work_dir: str | None, base: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Re-read a node's harvested outputs from an EXISTING work_dir WITHOUT
+        re-dispatching.
+
+        The #22 under-run guard uses this to recover from a race: the poll can
+        report ``completed`` BEFORE the agent's commit / ``outputs.yaml`` has
+        landed, so the harvest at poll time reads an empty tree. A blind
+        re-dispatch then lands in a NEW empty work_dir and abandons the good
+        one. Re-reading the SAME work_dir surfaces the late-landing work.
+        """
+        outputs: dict[str, Any] = dict(base or {})
+        if not work_dir:
+            return outputs
+        for key, value in self._harvest_git_state(work_dir).items():
+            if value is not None:
+                outputs[key] = value
+        for key, value in self._harvest_node_outputs(work_dir).items():
+            outputs[key] = value
+        for key, value in self._harvest_artifacts(work_dir).items():
+            outputs.setdefault(key, value)
+        return outputs
+
     @staticmethod
     def _find_repo_checkout(work_dir: str | None) -> Path | None:
         """The dir holding the agent's planning artifacts inside its work_dir.
@@ -991,7 +1015,11 @@ class AgentHandler:
         ]
         max_under_run_attempts = 3 if (is_multica and semantic_outputs) else 1
 
+        def _filled(o: dict[str, Any]) -> int:
+            return sum(1 for n in semantic_outputs if not _output_is_empty(o.get(n)))
+
         outputs: dict[str, Any] = {}
+        attempt_work_dirs: list[str] = []
         for attempt in range(1, max_under_run_attempts + 1):
             try:
                 outputs = self._spawn(
@@ -1013,11 +1041,33 @@ class AgentHandler:
                     f"agent-spawn returned non-dict outputs for node {node.id!r}"
                 )
 
+            wd = outputs.get("work_dir")
+            if isinstance(wd, str) and wd and wd not in attempt_work_dirs:
+                attempt_work_dirs.append(wd)
+
             under_run = bool(semantic_outputs) and all(
                 _output_is_empty(outputs.get(n)) for n in semantic_outputs
             )
             if not (is_multica and under_run):
                 break
+
+            # #22 efcl-s4: an under-run is usually a RACE, not a no-op — the poll
+            # reported 'completed' before the agent's commit / outputs.yaml had
+            # landed, so the harvest at poll time read an empty tree. A blind
+            # re-dispatch lands in a NEW empty work_dir and ABANDONS the good one
+            # (observed: 3 attempts each in a distinct work_dir, only the first
+            # actually held the authored epic). Before spending a re-dispatch,
+            # re-harvest every work_dir seen so far — a late-landing commit now
+            # surfaces — and keep whichever fills the most declared outputs.
+            recovered: dict[str, Any] | None = None
+            for prior in attempt_work_dirs:
+                cand = self._spawn.reharvest(prior, base=outputs)
+                if _filled(cand) > _filled(recovered or {}):
+                    recovered = cand
+            if recovered is not None and _filled(recovered) > 0:
+                outputs = recovered
+                break
+
             if attempt >= max_under_run_attempts:
                 raise AgentHandlerError(
                     f"node {node.id!r}: agent reported completed but produced none "
