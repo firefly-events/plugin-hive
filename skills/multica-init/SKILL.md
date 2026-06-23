@@ -77,6 +77,15 @@ Run the bootstrap flow:
     committed. Idempotent — a no-op when the repo URL is already bound. Report the
     bound URL (or the idempotent skip) in the status summary.
 
+11. Seed `.pHive/dag-outputs/` into the consumer repo's `.gitignore` with
+    `seedConsumerGitignore`. Append-if-absent: if the exact line `.pHive/dag-outputs/`
+    is already present the step is a no-op. If `.gitignore` does not exist it is
+    created. The line is placed immediately after the last existing `.pHive/` ignore
+    entry so related entries stay grouped; if none are present the line is appended at
+    the end of the file. This prevents DAG execution scratch from leaking onto consumer
+    feature branches. Always runs unconditionally — no consent gate required (non-destructive
+    local file write).
+
 ## Plugin discovery
 
 Claude-provider agents pick up Claude Code plugins via `custom_env.CLAUDE_PLUGIN_PATH` (default `${HOME}/.claude/plugins`). `reconcileAgents` expands `${HOME}`, `$HOME`, and leading `~` to the bootstrap user's home directory before sending the value to Multica — Claude Code does not perform tilde expansion on env values, so the stored value must be absolute. The agent runtime then resolves slash commands like `/hive:status` from that path. Override per-agent in `.pHive/multica/agents.yaml` if the daemon runs as a different user than the plugin install location implies. This convention follows the source-backed rationale in `.pHive/upstream-watch/multica-plugin-loading.md`, and preserves the single-writer invariant: only `multica-init` mutates Multica-side agent state.
@@ -225,6 +234,27 @@ Call helpers in this exact order:
 
    Leave extra Multica autopilots untouched (warn, never delete).
 
+10. `ensureRepos({ serverUrl, token, workspaceId, repoUrl, repoRoot, consent })`
+
+    Bind the project repository to the workspace.
+
+    Default `repoUrl` to the `origin` remote of `repoRoot`.
+
+    If the URL is already bound, skip silently.
+
+    If not bound, ask for consent before sending the PUT unless `--yes` was supplied.
+
+    Report the bound URL or the idempotent skip in the status summary.
+
+11. `seedConsumerGitignore({ repoRoot })`
+
+    Append `.pHive/dag-outputs/` to the consumer repo's `.gitignore` if not already
+    present (exact line match). If `.gitignore` does not exist, create it. Place the
+    entry immediately after the last existing `.pHive/` ignore entry so related entries
+    stay grouped; if none are present append at the end of the file.
+
+    No consent gate — this is a non-destructive local file write.
+
 ## Flags
 
 `--yes`
@@ -305,6 +335,8 @@ re-run issues no skill change.
 
 Agents present in Multica but absent from `.pHive/multica/agents.yaml` are
 extras and must be left untouched.
+
+`.gitignore` seeding is skipped when `.pHive/dag-outputs/` (exact line) is already present.
 
 Squad creation is skipped when a squad with the desired name exists.
 
