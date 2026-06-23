@@ -1,3 +1,37 @@
+- experiment_id: meta-2026-06-22
+  date: '2026-06-22'
+  started: '2026-06-22T00:00:00Z'
+  closed: '2026-06-22T00:00:00Z'
+  verdict: passed
+  changes_promoted: 4
+  changes_reverted: 0
+  findings_identified: 4
+  top_changes:
+    - "hive/GUIDE.md: updated Agent Roster heading 25→28; added marketing-strategist, marketing-copywriter, ad-creative to Sonnet tier row; added Marketing Agents section"
+    - "skills/hive/agents/memories/ad-creative/prompt-specificity-drives-asset-quality.md: starter pitfall memory (vague prompts produce generic assets; anchor to brief)"
+    - "skills/hive/agents/memories/marketing-copywriter/brief-before-copy.md: starter pattern memory (read campaign brief before writing any copy)"
+    - "skills/hive/agents/memories/marketing-strategist/positioning-before-brief.md: starter pattern memory (lock positioning before writing brief)"
+  commit: 327925bb10d75742767c6053f322059acd757c29
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 5b2e3ce2f2d459cc4449927889ce3f2c53aa2b1c
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-22. Analysis found 4 in-scope findings. Dedup pre-flight:
+    0 open PRs against develop or main — clean gate. Since last cycle (meta-2026-06-20 /
+    commit 6e9319b7): PR #314 (feat/dag-step-file-plugin-root) merged 3 new marketing agent
+    personas (ad-creative, marketing-copywriter, marketing-strategist) into hive/agents/.
+    Finding 1 (SCHEMA_INCONSISTENCY medium): hive/GUIDE.md "Agent Roster (25 Personas)"
+    not updated after new agents added; all 3 marketing agents absent from Model Tier
+    Routing and section tables. Fixed: count 25→28, added agents to Sonnet row, added
+    Marketing Agents section. Findings 2-4 (MEMORY_GAP low): ad-creative,
+    marketing-copywriter, marketing-strategist had no starter memory directories. Fixed:
+    created one starter .md per agent (pitfall for ad-creative, patterns for copywriter
+    and strategist). STUB_DOC hive-cloud-roadmap.md (13 lines) remains out_of_scope
+    (S16 placeholder, 18th+ consecutive deferral). Closure validator passed. Regression
+    watch armed for 4-hour observation window.
 - experiment_id: meta-2026-06-20
   date: '2026-06-20'
   started: '2026-06-20T00:00:00Z'
