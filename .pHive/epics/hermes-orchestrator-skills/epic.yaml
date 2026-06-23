@@ -8,7 +8,7 @@ description: |
   (~/Code/hermes-agent, Studio) is the consumer, ported in its native skill format.
 target_codebase: /Users/don/Documents/plugin-hive
 methodology: classic
-version_bump: minor
+version_bump: patch
 
 git_flow:
   base_branch: develop
