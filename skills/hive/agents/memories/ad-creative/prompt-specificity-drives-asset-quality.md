@@ -15,7 +15,7 @@ Without them, image generators default to stock-photo aesthetics that pass no br
 Before writing any image-gen prompt:
 1. Read the marketing-strategist's campaign brief — specifically the positioning statement and visual direction sections.
 2. Extract the four anchors above.
-3. Open every prompt with `[audience] [tone] [style]` before describing the subject.
+3. Open every prompt with `[audience] [tone] [style] [primary CTA object]` before describing the subject.
 
 Example of a weak prompt that produces generic output:
 > "A person holding a coffee cup in a cozy setting"

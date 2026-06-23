@@ -119,7 +119,7 @@ steps:
   step_05_testing:
     verdict: pass
     diff_scope: "+80 lines across 4 files, all additive, no deletions of substantive content"
-    notes: "GUIDE.md diff verified: 9 insertions 2 deletions (count + table rows). 3 new memory files: pure additions. No live workflows or runtime code consume these paths."
+    notes: "GUIDE.md diff verified: 9 insertions 2 deletions (count + table rows). 3 new memory files: pure additions. The GUIDE.md update is doc-only; the new memory files are loaded by the agent prelude during agent initialization."
   step_06_evaluation:
     verdict: accept
     notes: "All 4 changes address real findings from structural audit. All are additive. All within charter scope. No schema breaks. Consistent with prior GUIDE.md + memory-starter patterns."
