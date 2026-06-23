@@ -88,7 +88,7 @@ export function buildVerdictMessage({ epicHandle, storyId, verdict, episodeSumma
   const normalizedVerdict = verdict?.replace('_', '-').toLowerCase() ?? 'unknown';
   const decisionBlock = normalizedVerdict === 'needs-revision'
     ? 'Reply with one of:\n- `approve` — accept the review verdict as-is and mark done\n- `revise` — send the story back for a new implementation attempt\n- `reject` — halt this epic permanently'
-    : 'Reply with one of:\n- `approve` (or `continue`) — advance to the next story\n- `revise` — send back for revision\n- `reject` — halt this epic permanently';
+    : 'Reply with one of:\n- `approve` — advance to the next story\n- `revise` — send back for revision\n- `reject` — halt this epic permanently';
 
   const summarySection = episodeSummary
     ? `\n### Episode Summary\n${mrkdwnInline(episodeSummary.trim())}`

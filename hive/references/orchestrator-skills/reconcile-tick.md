@@ -181,6 +181,7 @@ normalized = raw_verdict.replace("_", "-").toLowerCase()
 if state.current_phase == "dispatched_impl":
     // Advance to impl_terminal; Branch 3 dispatches review on next tick
     multica_write_state(epic_handle, patch={
+        "in_flight_story_id": null,
         "in_flight_task_id": null,
         "stories": {
             state.in_flight_story_id: {
@@ -340,7 +341,10 @@ function ff_merge_verified(story_id):
         return false   // agent gave no sha; cannot verify
 
     // Check reachability: is claimed_sha an ancestor of the epic branch HEAD?
-    result = shell("git merge-base --is-ancestor <claimed_sha> origin/<epic_branch>")
+    // Fetch first so we compare against the fresh remote tip (FETCH_HEAD), not a
+    // stale remote-tracking ref — matches multica-story-dispatch/index.mjs.
+    shell("git fetch <repoUrl> <branch>")
+    result = shell("git merge-base --is-ancestor <claimed_sha> FETCH_HEAD")
     return result.exit_code == 0
 ```
 
@@ -359,15 +363,16 @@ whether the hook succeeds.
 
 ```
 function surface_verdict_hook(payload):
-    // payload: { epic, story_id, verdict, episode_path?, reason? }
+    // payload: { epicHandle, storyId, verdict, episodeSummary?, diff? }
+    // (field names match slack-notify-await.mjs buildVerdictMessage)
 
     // Default stub: post a Multica comment on the epic issue
-    multica_post_comment(epic_handle, body=
+    multica_post_comment(payload.epicHandle, body=
         "## Hermes: Verdict Requires Human Review\n\n" +
-        "- Story: " + payload.story_id + "\n" +
+        "- Story: " + payload.storyId + "\n" +
         "- Verdict: **" + payload.verdict + "**\n" +
-        (payload.reason ? "- Reason: " + payload.reason + "\n" : "") +
-        (payload.episode_path ? "- Episode: `" + payload.episode_path + "`\n" : "") +
+        (payload.episodeSummary ? "- Episode: " + payload.episodeSummary + "\n" : "") +
+        (payload.diff ? "- Diff:\n```\n" + payload.diff + "\n```\n" : "") +
         "\nSet `gate_state = \"pre_approved\"` to continue after your review."
     )
     // h-06 (slack-notify-await.md) provides the Slack transport.

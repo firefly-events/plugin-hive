@@ -154,6 +154,20 @@ function validateReconcilerUpdates(updates) {
   if (!isPlainObject(updates)) {
     throw new Error('hermes_reconciler updates must be an object');
   }
+  const VALID_UPDATE_KEYS = new Set([
+    'gate_state',
+    'epic_of_record',
+    'in_flight_story_id',
+    'in_flight_task_id',
+    'current_phase',
+    'dispatched_at',
+    'stuck_after_seconds',
+    'stories',
+  ]);
+  const unknownKeys = Object.keys(updates).filter((k) => !VALID_UPDATE_KEYS.has(k));
+  if (unknownKeys.length > 0) {
+    throw new Error(`Unknown top-level hermes_reconciler fields: ${unknownKeys.join(', ')}`);
+  }
   if ('gate_state' in updates && updates.gate_state !== null && !VALID_GATE_STATES.has(updates.gate_state)) {
     throw new Error(
       `hermes_reconciler.gate_state must be null or one of: ${[...VALID_GATE_STATES].join(', ')}. Got: ${JSON.stringify(updates.gate_state)}`,

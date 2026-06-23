@@ -261,6 +261,12 @@ async function invokeTool(name, args) {
           { code: 'INVALID_ARGS' },
         );
       }
+      if (a.agent_name && a.squad_name) {
+        throw Object.assign(
+          new Error(`${name}: "agent_name" and "squad_name" are mutually exclusive`),
+          { code: 'INVALID_ARGS' },
+        );
+      }
       const flags = ['--issue', String(a.issue_id)];
       if (a.agent_name) flags.push('--agent', String(a.agent_name));
       if (a.squad_name) flags.push('--squad', String(a.squad_name));

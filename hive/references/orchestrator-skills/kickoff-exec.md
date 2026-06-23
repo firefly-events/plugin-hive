@@ -68,7 +68,7 @@ kickoff-exec(epic_handle, epic_config, now):
       return { started: false, reason: "not_approved", gate_state: state.gate_state }
 
   // Step 3 — epic_of_record guard (prevents wrong-instance hijack)
-  if state.epic_of_record != null AND state.epic_of_record != epic_handle:
+  if state.epic_of_record != epic_handle:
       report "REFUSED: epic_of_record '" + state.epic_of_record + "' does not match target '" + epic_handle + "'. " +
              "This Hermes instance is not the owner of this epic."
       return { started: false, reason: "wrong_epic_of_record", epic_of_record: state.epic_of_record }

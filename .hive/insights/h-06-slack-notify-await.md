@@ -2,11 +2,11 @@
 
 ## Fail-safe ordering is non-negotiable
 
-Write `gate_state: awaiting` via `multica_write_state` **before** attempting the Slack post.
+Write `gate_state: review_awaiting_human` via `multica_write_state` **before** attempting the Slack post.
 If Slack fails after the gate is written, the tick halts with the gate latched. If Slack is
 called first and it fails, the gate is still `pre_approved` and the tick would silently continue
 on the next cron run — defeating the entire human-gate north star. The test for this ordering
-is: kill the Slack endpoint after the gate write; the gate must still be `awaiting`.
+is: kill the Slack endpoint after the gate write; the gate must still be `review_awaiting_human`.
 
 ## Slack failure must propagate as an error
 
@@ -42,16 +42,16 @@ then select based on `new URL(webhookUrl).protocol`. This matters for local/test
 that mock Slack with a plain HTTP server. Production Slack webhooks are always HTTPS, but tests
 are always HTTP — hard-coding `https` breaks the entire test suite.
 
-## gate_state='awaiting' is not in h-03's original schema
+## gate_state='review_awaiting_human' is not in h-03's original schema
 
-h-03 describes `null → pre_approved` and `pre_approved → halted/awaiting` but the exact string
-`"awaiting"` is implied, not named explicitly. h-06 is the first story to write `gate_state:
-"awaiting"` as a durable state. The `"rejected"` terminal state is also first introduced here.
+h-03 describes `null → pre_approved` and `pre_approved → halted/review_awaiting_human` but the exact string
+`"review_awaiting_human"` is implied, not named explicitly. h-06 is the first story to write `gate_state:
+"review_awaiting_human"` as a durable state. The `"rejected"` terminal state is also first introduced here.
 Both should be added to the cycle-state schema doc and the gate_state transition table in h-03.
 
 ## No-Slack guard: webhook URL missing must not silently succeed
 
 When `HERMES_SLACK_WEBHOOK_URL` is unset, throw immediately (after writing `gate_state:
-awaiting`). A missing webhook on a production Studio is a misconfiguration, not a recoverable
+review_awaiting_human`). A missing webhook on a production Studio is a misconfiguration, not a recoverable
 condition — failing loud is correct. If the intention is "post to stdout instead of Slack," that
 should be an explicit opt-in flag, not the default when the env var is absent.

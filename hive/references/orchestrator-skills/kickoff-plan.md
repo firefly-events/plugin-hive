@@ -105,7 +105,21 @@ kickoff-plan(epic_handle, requirement):
   )
 
   if result.error:
-      call surface-error(epic_handle, null, "DISPATCH_FAILED", result.error) // via slack-notify-await
+      // Stay inside the PLANNING state machine — do NOT route through
+      // slack-notify-await's surface-error (that latches the *execution* gate_state).
+      // Mark the planning issue failed and open the planning human gate instead.
+      multica_write_state(
+        epic_handle: <epic_handle>,
+        patch: '{
+          "planning_gate_state": "gate_awaiting",
+          "planning_current_gate": "dispatch_failed"
+        }'
+      )
+      multica_post_comment(
+        <planning_issue_id>,
+        "PLANNING_GATE: dispatch_failed\n\nPlanning dispatch failed: <result.error>. " +
+        "Awaiting human reply (revise to retry, reject to stop)."
+      )
       exit
 
   // Step 3 — persist planning issue ID
@@ -144,10 +158,13 @@ poll-planning-issue(epic_handle):
       call surface-error(epic_handle, null, "PLANNING_FAILED", task.error)
       return
 
-  // Non-terminal: check for a gate comment
-  last_comment = multica_get_last_comment(state.planning_issue_id)
+  // Non-terminal: check for a gate comment.
+  // There is no get-comment MCP tool — inspect the latest comment carried on the
+  // multica_poll_task result (or the issue-get payload) instead.
+  comments   = task.comments ?? issue_get(state.planning_issue_id).comments ?? []
+  last_comment = comments[-1]   // most recent comment, or null if none yet
 
-  if last_comment matches /^PLANNING_GATE: (\w+)/m:
+  if last_comment != null and last_comment.body matches /^PLANNING_GATE: (\w+)/m:
       gate_id = match[1]
       call surface-planning-gate(epic_handle, gate_id, last_comment.body)
       return
@@ -216,10 +233,10 @@ must actively respond. An automated approval is the same as auto-advancing the g
 resolve-planning-gate(epic_handle, gate_id, action, human_feedback):
 
   validate action ∈ {approve, revise, reject}
+  state = multica_epic_status(epic_handle)
 
   if action == "reject":
       multica_write_state(epic_handle, '{"planning_gate_state": "rejected"}')
-      state = multica_epic_status(epic_handle)
       multica_post_comment(state.planning_issue_id, "Planning rejected by human. Stopping.")
       return { resolved: true, planning_gate_state: "rejected" }
 

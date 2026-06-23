@@ -18,12 +18,13 @@ field** from the patch — a later tick that does have the Run Time will fill it
 midnight/stub value (`2026-06-23T00:00:00Z`) sets the watchdog timer to midnight, making
 every task appear stuck after 30 min and triggering spurious rescues.
 
-## 3. Surface-verdict hook must be called before writing gate_state
+## 3. Surface-verdict hook writes gate_state before posting to Slack
 
-The stub calls `multica_post_comment` first, then `multica_write_state`. That order matters:
-if the write succeeds but the comment fails, the human will see the gate change with no
-explanation. In practice, write-state is near-infallible (local file operation) while the
-comment post is a network call — failing fast before the write gives you a clean retry.
+The hook writes gate_state first, then posts to Slack; Slack failures still propagate.
+That order matters: if the comment posted first but the write failed, the human would see
+an explanation for a gate change that never durably happened. In practice, write-state is
+near-infallible (local file operation) while the Slack post is a network call — writing
+before the network keeps the persisted gate_state consistent even when the post fails.
 The h-06 Slack transport follows the same ordering convention.
 
 ## 4. `in_flight_task_id: null` is a valid intermediate state
