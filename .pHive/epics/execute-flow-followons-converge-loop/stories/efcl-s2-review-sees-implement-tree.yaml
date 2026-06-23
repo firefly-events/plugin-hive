@@ -1,0 +1,129 @@
+id: efcl-s2-review-sees-implement-tree
+epic: execute-flow-followons-converge-loop
+title: Make each implement node's output visible to review before integrate runs
+status: pending
+complexity: medium
+methodology: classic
+needs_backend: true
+depends_on: []
+description: >
+  During execute, the review node ran on a fresh checkout that could not see implement
+  output until integrate pushed it, so review could pass code it never read. The fix:
+  after each implement node terminates, make its committed output reachable by the review
+  node before integrate. Preferred mechanism is a per-node reconcile (mirroring the
+  existing reconcile handler in executor/handlers/reconcile.py, which already materializes
+  committed work before a gate and guards unsafe epic_dir per 7ab05505). This touches
+  walker/reconcile wiring plus classic/tdd/bdd methodology graphs. Story opens with a
+  re-entrancy spike: confirm the reconcile handler is safe to invoke per-node within a
+  parallel dispatch group (idempotent copytree, no shared-lock contention). If the spike
+  shows re-entrancy is not cheaply safe, story falls back to per-node push to the epic
+  branch and accepts the posture cost.
+acceptance_criteria:
+- "Given an implement node that has committed output to the work_dir, when review runs, then the review agent's checkout contains that implement output before integrate is dispatched"
+- "Given the reconcile handler invoked per-node (after implement, before review), when two implement nodes are in the same parallel dispatch group, then their reconciles do not produce interleaved or corrupted output in the review checkout"
+- "Given the re-entrancy spike result, when it shows reconcile is not idempotent per-node, then the story falls back to per-node push and the commit message notes the fallback"
+- "Given classic, tdd, and bdd methodology graphs after this story commits, when reviewed, then each has reconcile wiring between implement and review"
+- "Given a walker integration test, when the implement node commits a sentinel file and review runs, then the test asserts that sentinel file is readable in the review agent's checkout"
+steps:
+- id: research
+  description: >
+    Read executor/handlers/reconcile.py in full to understand the copytree logic,
+    epic_dir guard (7ab05505), and whether concurrent invocations contend on any shared
+    lock or state. Read walker.py _dispatch_with_retry (line ~405) and the existing
+    reconcile node wiring in classic/tdd/bdd graphs to understand where reconcile currently
+    fires (pre-gate only). Assess re-entrancy: can reconcile be called per implement node
+    within a parallel dispatch group without interleaving? Produce a spike verdict
+    (re-entrant-safe / fallback-needed) with evidence from the handler code.
+  agent: researcher
+- id: implement
+  description: >
+    Based on the spike verdict from research: if re-entrant-safe, wire a per-node reconcile
+    invocation into the walker after each implement node terminates (before review is
+    dispatched). Update classic, tdd, and bdd methodology graphs to declare the per-node
+    reconcile step. If fallback needed, implement per-node push to the epic branch from
+    within the walker dispatch path (not the agent). In either case, add a walker integration
+    test that commits a sentinel file in an implement-node mock and asserts the sentinel is
+    readable in the review-node checkout before integrate is dispatched.
+  agent: backend-developer
+  depends_on:
+  - research
+- id: test
+  description: >
+    Run the new walker integration test (sentinel file readable in review checkout). Run the
+    full dag_executor test suite to confirm no regressions in reconcile, walker, or gate
+    handling. Confirm the per-node reconcile does not re-copy already-merged artifacts
+    when called a second time (idempotency check).
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: >
+    Review the walker/reconcile wiring change: confirm it does not absorb flow logic into
+    the agent or into Multica (posture invariant from design discussion). Review the parallel
+    dispatch group race analysis from the spike — confirm the chosen mechanism handles the
+    case where two implement nodes in the same wave both trigger per-node reconcile.
+    Review the methodology graph changes (classic/tdd/bdd) for structural soundness.
+    Review the integration test: it must assert presence of the sentinel file, not just
+    absence of error.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: >
+    Commit "[efcl-s2] feat(executor): per-node reconcile so review sees implement tree
+    before integrate; walker+graph wiring, integration test" on feat/dag-execute-node-outputs.
+    Commit message notes whether per-node reconcile or per-node push was used (fallback
+    verdict from spike).
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/hive/multica_workspaces/7ba0ade0-21cd-4e54-98a0-72a242ddf9e9/2a6865ff/workdir/plugin-hive
+  key_files:
+  - path: hive/lib/dag_executor/executor/handlers/reconcile.py
+    purpose: "Existing reconcile handler; re-entrancy spike target. Guards unsafe epic_dir (7ab05505)"
+  - path: hive/lib/dag_executor/executor/walker.py
+    purpose: "_dispatch_with_retry (line ~405); where per-node reconcile wiring lands"
+  - path: hive/workflows/development.classic.workflow.yaml
+    purpose: "Methodology graph update: add per-node reconcile step between implement and review"
+  - path: hive/workflows/development.tdd.workflow.yaml
+    purpose: "Methodology graph update: same"
+  - path: hive/workflows/development.bdd.workflow.yaml
+    purpose: "Methodology graph update: same"
+files_to_modify:
+- file: hive/lib/dag_executor/executor/walker.py
+  change: "ADD per-node reconcile invocation after each implement node terminates (before review dispatch)"
+- file: hive/lib/dag_executor/executor/handlers/reconcile.py
+  change: "CONFIRM or ADD idempotency guard for per-node invocation (if needed per spike)"
+- file: hive/workflows/development.classic.workflow.yaml
+  change: "ADD per-node reconcile step between implement and review"
+- file: hive/workflows/development.tdd.workflow.yaml
+  change: "ADD per-node reconcile step between implement and review"
+- file: hive/workflows/development.bdd.workflow.yaml
+  change: "ADD per-node reconcile step between implement and review"
+design_decisions:
+- decision: Prefer per-node reconcile over per-node push from inside the implement agent
+  rationale: "Reconcile already exists (reconcile.py), already guards unsafe epic_dir (7ab05505), and keeps 'Multica only executes' intact. Pushing from inside the implement agent leaks flow control into the agent. Per design discussion §3 Story 2."
+- decision: Re-entrancy spike gates the mechanism choice
+  rationale: "Per [grill H1]: current reconcile runs pre-gate only; we cannot assume it is re-entrant mid-flow for free. Spike runs first in research; fallback to per-node push if reconcile is not cheaply re-entrant."
+- decision: Integration test asserts presence not absence-of-error
+  rationale: "Per design discussion §7: silent {} from harvest (agent.py:512) makes absence-of-error look like success. The test must assert the sentinel file is readable."
+cross_cutting:
+- concern: documentation
+  action: "Update any reference doc describing the execute flow or reconcile handler to note that reconcile now fires per implement node, not only pre-gate."
+- concern: metrics
+  action: "applies: false — this is a correctness fix. Review passing code it could never read is a posture flaw, not a throughput metric. No quantitative outcome to declare beyond the integration test assertion."
+risks:
+- severity: medium
+  description: "Two implement nodes in the same parallel dispatch group trigger concurrent reconciles that interleave, corrupting the review checkout."
+  mitigation: "Re-entrancy spike (research step) explicitly checks for shared-lock contention. If found, fallback to per-node push eliminates the race. Per [grill V1] in design discussion."
+- severity: medium
+  description: "Per-node reconcile materializes a half-written implement tree into review's checkout if implement terminates before fully committing."
+  mitigation: "Reconcile already rejects unsafe epic_dir (7ab05505). Per-node invocation fires only after the implement handler signals completion, not mid-commit."
+references:
+- path: hive/lib/dag_executor/executor/handlers/reconcile.py
+  relevant_excerpt: "copytree with epic_dir safety guard (7ab05505); currently invoked pre-gate only"
+- path: hive/lib/dag_executor/executor/walker.py
+  relevant_excerpt: "_dispatch_with_retry at line ~405; re-dispatches same node on HandlerError"
+- path: .pHive/epics/execute-flow-followons-converge-loop/docs/design-discussion.md
+  relevant_excerpt: "Story 2: per-node reconcile is the preferred fix; spike confirms re-entrancy; fallback is per-node push. [grill H1] resolved: spike runs first."

@@ -128,6 +128,7 @@ test('cold path — creates skill with bundled substrate when workspace is empty
     httpJsonFn,
     loadSkillsExportConfigFn: loadFn,
     repoRoot,
+    pluginRoot: repoRoot,
   });
 
   assert.equal(result.created.length, 1, 'should create 1 skill');
@@ -175,6 +176,7 @@ test('warm idempotent path — re-run with no changes skips all skills', async (
     httpJsonFn,
     loadSkillsExportConfigFn: loadFn,
     repoRoot,
+    pluginRoot: repoRoot,
   });
 
   assert.equal(result.created.length, 0);
@@ -208,6 +210,7 @@ test('warm path when server omits content_hash — falls back to normalized cont
     httpJsonFn,
     loadSkillsExportConfigFn: loadFn,
     repoRoot,
+    pluginRoot: repoRoot,
   });
 
   assert.equal(result.skipped.length, 1, 'should skip when content matches despite missing content_hash');
@@ -244,6 +247,7 @@ test('drift path — SKILL.md edit triggers update (content_hash change)', async
     httpJsonFn,
     loadSkillsExportConfigFn: loadFn,
     repoRoot,
+    pluginRoot: repoRoot,
   });
 
   assert.equal(result.patched.length, 1, 'should patch 1 skill after content change');
@@ -293,6 +297,7 @@ test('substrate-dep change — prelude.md edit triggers update', async () => {
     httpJsonFn,
     loadSkillsExportConfigFn: loadFn,
     repoRoot,
+    pluginRoot: repoRoot,
   });
 
   assert.equal(result.patched.length, 1, 'substrate change should trigger update');
@@ -338,6 +343,7 @@ test('removed entry — orphan in Multica logs warning but is not deleted', asyn
       httpJsonFn,
       loadSkillsExportConfigFn: loadFn,
       repoRoot,
+      pluginRoot: repoRoot,
     });
 
     assert.equal(result.removed.length, 1, 'should report 1 removed skill');

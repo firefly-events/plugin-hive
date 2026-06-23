@@ -1,0 +1,88 @@
+id: efcl-s5-dag-outputs-gitignore
+epic: execute-flow-followons-converge-loop
+title: Seed .pHive/dag-outputs/ gitignore into consumer repos at repo-bind / multica-init
+status: pending
+complexity: low
+methodology: classic
+needs_backend: true
+depends_on: []
+parallel_allowed: true
+parallel_rationale: bounded-slice
+description: >
+  Preflight outputs.yaml (.pHive/dag-outputs/outputs.yaml) leaked onto the consumer
+  project feature branch because .pHive/dag-outputs/ is not in the consumer repo's
+  .gitignore. The line was added to plugin-hive's own .gitignore but is not seeded
+  into consumer repos at repo-bind time. This story adds an append-if-absent write
+  of ".pHive/dag-outputs/" to the consumer repo's .gitignore inside the multica-init
+  skill (or the repo-bind script, whichever is the canonical consumer-repo bootstrap
+  entry point). Idempotent: repeated multica-init runs must not duplicate the line.
+acceptance_criteria:
+- "Given a consumer repo that has never run multica-init, when multica-init runs, then .gitignore in the consumer repo contains .pHive/dag-outputs/ after the run"
+- "Given a consumer repo that already has .pHive/dag-outputs/ in .gitignore, when multica-init runs again, then the line is not duplicated"
+- "Given a consumer repo that has no .gitignore, when multica-init runs, then .gitignore is created and contains .pHive/dag-outputs/"
+- "Given the seed operation, when it runs, then it appends .pHive/dag-outputs/ immediately after existing .pHive/ ignore entries (not at arbitrary position)"
+steps:
+- id: implement
+  description: >
+    Find the canonical consumer-repo bootstrap entry point: read skills/hive/skills/
+    multica-init/ (or the repo-bind script) to locate where consumer repo .gitignore is
+    written or modified. Add an append-if-absent write: check if .pHive/dag-outputs/ is
+    already present in .gitignore before appending. If .gitignore does not exist, create
+    it. Place the entry near existing .pHive/ ignore entries for grouping.
+  agent: backend-developer
+- id: test
+  description: >
+    Test three cases against the modified multica-init or repo-bind script: (1) consumer
+    repo with no .gitignore — assert .gitignore is created with .pHive/dag-outputs/;
+    (2) consumer repo with .gitignore that lacks the line — assert line is appended once;
+    (3) consumer repo with .gitignore that already has the line — assert no duplicate.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: >
+    Review the append-if-absent logic: confirm the check is string-exact (not substring
+    match that could miss a variant like .pHive/dag-outputs or .pHive/dag-outputs/**).
+    Confirm the three idempotency cases are covered by tests. Confirm placement near
+    existing .pHive/ entries.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: >
+    Commit "[efcl-s5] fix(multica-init): seed .pHive/dag-outputs/ gitignore into consumer
+    repos at repo-bind (append-if-absent, idempotent)" on feat/dag-execute-node-outputs.
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/hive/multica_workspaces/7ba0ade0-21cd-4e54-98a0-72a242ddf9e9/2a6865ff/workdir/plugin-hive
+  key_files:
+  - path: skills/hive/skills/multica-init/
+    purpose: "Consumer repo bootstrap entry point — where .gitignore seeding should land"
+  - path: .gitignore
+    purpose: "Reference: the .pHive/dag-outputs/ line that already exists in plugin-hive's own .gitignore"
+files_to_modify:
+- file: skills/hive/skills/multica-init/SKILL.md
+  change: "ADD append-if-absent .pHive/dag-outputs/ seed step to the consumer repo .gitignore setup section"
+design_decisions:
+- decision: Append-if-absent (not overwrite)
+  rationale: "Per design discussion §4: repeated multica-init runs must not duplicate the line. Overwriting the whole .gitignore would destroy consumer customizations."
+- decision: Seed in multica-init (not plugin-hive's own .gitignore only)
+  rationale: "The leak was on the consumer project branch — plugin-hive's own .gitignore was already fixed. Consumer repos need the line seeded at bootstrap time."
+cross_cutting:
+- concern: documentation
+  action: "Update multica-init SKILL.md to describe the gitignore seeding step. If there is a consumer quickstart or setup guide that lists what multica-init does, add a bullet for the .pHive/dag-outputs/ seed."
+- concern: versioning
+  action: "Minor bump may be warranted if multica-init is a consumer-facing skill. Flag for TPM review: the behavior change (seeding .gitignore) is additive and non-breaking for consumers."
+- concern: metrics
+  action: "applies: false — this is a one-line config fix. No measurable throughput outcome."
+risks:
+- severity: low
+  description: Append-if-absent check uses substring match, missing .pHive/dag-outputs (no trailing slash variant) and seeding a duplicate with the trailing slash.
+  mitigation: Review step checks the exact string comparison used in the append guard.
+references:
+- path: .gitignore
+  relevant_excerpt: ".pHive/dag-outputs/ entry already present in plugin-hive's own .gitignore — use this as the canonical line to seed into consumer repos."
+- path: .pHive/epics/execute-flow-followons-converge-loop/docs/design-discussion.md
+  relevant_excerpt: "Story 5: seed .pHive/dag-outputs/ ignore at repo-bind / multica-init. Idempotent: append-if-absent. Already fixed in plugin-hive's own .gitignore."

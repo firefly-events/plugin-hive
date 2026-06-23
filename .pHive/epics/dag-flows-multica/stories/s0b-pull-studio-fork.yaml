@@ -1,7 +1,9 @@
 id: s0b-pull-studio-fork
 epic: dag-flows-multica
 title: Pull the firefly-events/multica platform fork from the Mac Studio + run it as the local runtime
-status: pending
+status: shipped
+shipped_at: "2026-06-22T01:30:00Z"
+release_id: "v2.12.1"
 complexity: medium
 methodology: classic
 depends_on: []

@@ -135,16 +135,53 @@ def resolve_spawn_binding(
     )
 
 
-def assemble_dispatcher(spawn: Any, *, repo_root: Path | str | None = None) -> Any:
+def assemble_dispatcher(
+    spawn: Any,
+    *,
+    repo_root: Path | str | None = None,
+    plugin_root: Path | str | None = None,
+) -> Any:
     """Build a Dispatcher with a real AgentHandler bound to `spawn`.
 
     Gate/Script/Pause handlers come from the Dispatcher's defaults; only the
     AGENT handler needs the runtime spawn dependency injected here.
+
+    ``plugin_root`` defaults to the shipped plugin root ONLY when ``repo_root``
+    is set (a consumer project, where plugin-shipped step_files must resolve
+    against the plugin). A rootless caller (``repo_root=None``) keeps the legacy
+    as-given step_file path so a custom relative ``step_file`` is not silently
+    redirected into the plugin tree.
     """
     from hive.lib.dag_executor.executor import AgentHandler, Dispatcher
+    from hive.lib.dag_executor.executor.handlers.agent import default_plugin_root
+    from hive.lib.dag_executor.executor.handlers.gate import GateHandler
+    from hive.lib.dag_executor.executor.handlers.reconcile import ReconcileHandler
 
     dispatcher = Dispatcher()
-    dispatcher.register(NodeType.AGENT, AgentHandler(spawn, repo_root=repo_root).handle)
+    # Pass the plugin root explicitly so plugin-shipped step_files resolve for a
+    # consumer project (repo_root != plugin). Not defaulted inside AgentHandler
+    # so rootless/test callers keep legacy absolute-path behavior (#3 review).
+    effective_plugin_root = (
+        Path(plugin_root).resolve()
+        if plugin_root is not None
+        else (default_plugin_root() if repo_root is not None else None)
+    )
+    dispatcher.register(
+        NodeType.AGENT,
+        AgentHandler(
+            spawn, repo_root=repo_root, plugin_root=effective_plugin_root
+        ).handle,
+    )
+    # Reconcile must ff-merge the agent's commit into repo_root (the tree the
+    # gate validates), so it needs repo_root injected like the AGENT handler
+    # (#8). Overrides the Dispatcher default which has no repo_root.
+    dispatcher.register(
+        NodeType.RECONCILE, ReconcileHandler(repo_root=repo_root).handle
+    )
+    # The output-validation gate schema-validates the epic the agent committed
+    # into repo_root; without repo_root it resolves epic_dir against the driver
+    # cwd and fails even though reconcile materialised the epic (#19).
+    dispatcher.register(NodeType.GATE, GateHandler(repo_root=repo_root).handle)
     return dispatcher
 
 

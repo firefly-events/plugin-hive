@@ -36,7 +36,7 @@ from typing import Any
 
 import yaml
 
-from hive.lib.dag_executor.graph import Graph, InputBinding, Node
+from hive.lib.dag_executor.graph import Graph, InputBinding, Node, NodeType
 from hive.lib.dag_executor.routing import (
     ActivationDecision,
     ParallelScheduler,
@@ -765,6 +765,11 @@ class Walker:
                 ) from exc
             raise
 
+        # Per-node reconcile: materialise implement commits into repo_root
+        # before downstream nodes (especially review) are dispatched.
+        if _is_implement_node(node):
+            _per_node_reconcile(dispatcher, node, output, run_id, telemetry)
+
         materialised[node_id] = output
         if is_pause:
             state = _record_pause_resumed(state)
@@ -891,6 +896,11 @@ class Walker:
 
         # Apply results serially in deterministic node-id order so
         # state, materialised, and telemetry mutations are reproducible.
+        # #26 / CodeRabbit: a fatal non-optional gate failure is deferred until
+        # AFTER every sibling result in this wave is recorded — the siblings
+        # already executed, so their completion/skip state must persist for
+        # resume + telemetry before we halt the run.
+        fatal_gate_error: BaseException | None = None
         for node_id in sorted(results):
             result: ScheduleResult = results[node_id]
             node = graph.nodes[node_id]
@@ -915,6 +925,42 @@ class Walker:
             # hde-4 semantics: failure does NOT cascade as failure;
             # the join's trigger_rule decides downstream activation.
             err = result.error
+
+            # #26: a failed non-optional GATE must HALT the run, not degrade to
+            # SKIPPED. A gate exists to BLOCK downstream on failure — the hde-4
+            # "failure→skipped, trigger_rule decides" rule is correct for
+            # parallel BRANCH nodes (one branch failing must not cascade) but
+            # defeats a gate: when gate-review raised in a wave alongside
+            # codex-review/dev-standby, it was silently downgraded to SKIPPED and
+            # integrate's none_failed_min_one_success join ran anyway, shipping a
+            # needs_revision review. Re-raise so the gate is fatal, matching the
+            # sequential path's non-optional behaviour.
+            if (
+                err is not None
+                and _is_gate_node(node)
+                and not getattr(node, "optional", False)
+            ):
+                telemetry.emit(
+                    "node_failed",
+                    node.id,
+                    {"optional": False, "error": str(err), "parallel": True},
+                )
+                node_statuses[node_id] = NodeStatus.FAILED
+                state = _record_failure(
+                    state,
+                    node_id,
+                    {
+                        "node_id": node_id,
+                        "error_class": type(err).__name__,
+                        "message": str(err),
+                    },
+                    source_epic=_source_epic(ctx),
+                )
+                save_state(state)
+                if fatal_gate_error is None:
+                    fatal_gate_error = err
+                continue
+
             payload = {
                 "optional": bool(getattr(node, "optional", False)),
                 "error": str(err) if err is not None else "",
@@ -926,6 +972,21 @@ class Walker:
             skipped.add(node_id)
             state = _record_skipped(state, node_id, payload, source_epic=_source_epic(ctx))
             save_state(state)
+
+        # Per-node reconcile for completed implement nodes in this wave.
+        # Serialized to avoid concurrent git operations on the same work-dir.
+        for node_id in sorted(results):
+            if results[node_id].status == "completed":
+                impl_node = graph.nodes[node_id]
+                if _is_implement_node(impl_node):
+                    _per_node_reconcile(
+                        dispatcher, impl_node, results[node_id].output, run_id, telemetry
+                    )
+
+        # All sibling results are now recorded; halt the run on the first fatal
+        # non-optional gate failure observed in this wave (#26 / CodeRabbit).
+        if fatal_gate_error is not None:
+            raise fatal_gate_error
 
         return state
 
@@ -1092,6 +1153,12 @@ class Walker:
                     ) from exc
                 raise
 
+            # Mirror walk(): materialise implement outputs into repo_root before
+            # downstream nodes run, so a resumed/replayed run doesn't let review
+            # read a stale tree (parity with the inline path; CodeRabbit #318).
+            if _is_implement_node(node):
+                _per_node_reconcile(dispatcher, node, output, run_id, telemetry)
+
             materialised[node_id] = output
             if is_pause:
                 state = _record_pause_resumed(state)
@@ -1111,6 +1178,80 @@ class Walker:
         state = mark_completed(state)
         save(state, root=runs_root)
         return state
+
+
+def _is_implement_node(node) -> bool:
+    """Return True iff this is an implement-type agent node.
+
+    Matches ids: 'implement', 'backend-implement', 'frontend-implement'.
+    Excludes reconcile/gate/pause/script nodes by checking the node_type.
+    """
+    nt = getattr(node, "node_type", None)
+    if nt is None:
+        return False
+    if hasattr(nt, "value"):
+        if nt.value != "agent":
+            return False
+    elif str(nt).lower() != "agent":
+        return False
+    nid = getattr(node, "id", "") or ""
+    return nid == "implement" or nid.endswith("-implement")
+
+
+def _per_node_reconcile(
+    dispatcher: Any,
+    node: Any,
+    output: NodeOutput,
+    run_id: str,
+    telemetry: Telemetry,
+) -> None:
+    """Invoke reconcile inline after an implement node terminates.
+
+    When commit_sha is present in the implement node's output (Multica
+    execution path), this materialises the committed work into repo_root
+    before any downstream node — especially the review agent — is
+    dispatched. No-op when commit_sha is absent (local binding; work is
+    already in the tree).
+
+    Best-effort early materialisation only: a HandlerError here is recorded in
+    telemetry but NOT re-raised. The authoritative, fail-loud, resume-safe
+    barrier is the graph's NON-optional reconcile node (review/test depend on
+    it) — raising from this inline call would happen outside the walker's
+    node-failure recording, leaving resume to re-expose a stale tree (#5).
+    """
+    sha = (output.outputs or {}).get("commit_sha") or ""
+    if not sha:
+        return
+
+    reconcile_node = Node(
+        id=f"per-node-reconcile-{node.id}",
+        agent="reconciler",
+        node_type=NodeType.RECONCILE,
+        depends_on=[],
+    )
+    reconcile_inputs: dict[str, Any] = {
+        "sha": sha,
+        "branch": (output.outputs or {}).get("branch") or "",
+        "repo": (output.outputs or {}).get("repo") or "",
+        "work_dir": (output.outputs or {}).get("work_dir") or "",
+    }
+    try:
+        dispatcher.dispatch(reconcile_node, reconcile_inputs, run_id)
+        telemetry.emit(
+            "node_completed",
+            reconcile_node.id,
+            {"per_node_reconcile": True},
+        )
+    except HandlerError as exc:
+        # Best-effort only — record but do NOT re-raise (raising here is outside
+        # the walker's node-failure recording and would make resume re-expose a
+        # stale tree, #5). The non-optional graph reconcile node is the
+        # authoritative fail-loud barrier that downstream review/test depend on.
+        telemetry.emit(
+            "node_failed",
+            reconcile_node.id,
+            {"per_node_reconcile": True, "error": str(exc)},
+        )
 
 
 def _maybe_open_worktree(worktree_manager: Any | None, run_id: str):
@@ -1169,6 +1310,17 @@ def _is_pause_node(node) -> bool:
     if hasattr(nt, "value"):
         return nt.value == "pause"
     return str(nt).lower() == "pause"
+
+
+def _is_gate_node(node) -> bool:
+    """Whether `node` is a gate node — by enum value or string."""
+
+    nt = getattr(node, "node_type", None)
+    if nt is None:
+        return False
+    if hasattr(nt, "value"):
+        return nt.value == "gate"
+    return str(nt).lower() == "gate"
 
 
 def _record_pause_suspended(state):

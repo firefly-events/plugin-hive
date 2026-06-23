@@ -340,7 +340,14 @@ async function cmdPoll(args, cfg) {
     issueUuid: args.issue,
     maxWallClockMs,
   });
-  succeed(terminal);
+  // The DAG AgentSpawn binding consumes only the terminal status + commit
+  // metadata (code_push_sha / branch / repo / work_dir / ids). The full
+  // `messages` array (up to messagesCaptureMax) can be megabytes for a task
+  // with many tool calls and bloats — sometimes truncates/breaks — the JSON
+  // the Python binding parses from stdout. Drop it from the poll payload;
+  // message capture for episodes is owned by the episode command.
+  const { messages: _messages, ...lean } = terminal;
+  succeed(lean);
 }
 
 async function cmdEpisode(args, cfg) {

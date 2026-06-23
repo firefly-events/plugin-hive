@@ -228,7 +228,10 @@ steps:
     outputs:
       - name: reconcile_status
         type: string
-    optional: true
+    # NON-optional barrier: ReconcileHandler no-ops cleanly when sha is absent
+    # (local binding); with a real sha a materialisation failure MUST fail loud
+    # so downstream test/review never read a stale tree.
+    optional: false
     timeout_ms: 120000
 
   - id: reconcile-frontend
@@ -263,7 +266,10 @@ steps:
     outputs:
       - name: reconcile_status
         type: string
-    optional: true
+    # NON-optional barrier: ReconcileHandler no-ops cleanly when sha is absent
+    # (local binding); with a real sha a materialisation failure MUST fail loud
+    # so downstream test/review never read a stale tree.
+    optional: false
     timeout_ms: 120000
 
   - id: test
@@ -344,7 +350,10 @@ steps:
     outputs:
       - name: reconcile_status
         type: string
-    optional: true
+    # NON-optional barrier: ReconcileHandler no-ops cleanly when sha is absent
+    # (local binding); with a real sha a materialisation failure MUST fail loud
+    # so downstream test/review never read a stale tree.
+    optional: false
     timeout_ms: 120000
 
   # Validation gate (s3): confirm test artifacts exist before review.
@@ -429,6 +438,8 @@ steps:
     depends_on:
       - gate-code
       - platform-verify
+      - reconcile-backend
+      - reconcile-frontend
     inputs:
       - name: backend_implementation
         source: step_output
@@ -589,6 +600,36 @@ steps:
     skip_when: "no test swarm is running for this story"
     timeout_ms: 1800000
 
+  # #16: enforce the review verdict. A needs_revision review must NOT silently
+  # integrate. This gate fails the run when review_verdict == needs_revision,
+  # surfacing the review findings. (Auto-fix-and-re-review is the bounded
+  # converge-loop follow-on, t-005/t-006.)
+  - id: gate-review
+    node_type: gate
+    # needs_revision BLOCKS integrate; passed and needs_optimization both proceed
+    # (optimize is a refinement path, not a blocker).
+    gate: "review_verdict must not equal needs_revision"
+    # Bounded-retry contract (test_classic_gate_has_bounded_retry). The walker
+    # re-dispatches the SAME gate node, so re-evaluating an unchanged verdict
+    # just fails identically — max_attempts:1 = fail loud immediately, no wasted
+    # re-dispatch. Auto-fix-and-re-review (retry_node: review + a fix step) is
+    # the bounded converge-loop follow-on, t-005/t-006.
+    retry:
+      max_attempts: 1
+      on: gate_failed
+      retry_node: review
+    depends_on:
+      - review
+    inputs:
+      - name: review_verdict
+        source: step_output
+        step_id: review
+        output_name: review_verdict
+    outputs:
+      - name: gate_passed
+        type: json
+    timeout_ms: 30000
+
   - id: integrate
     agent: developer
     step_file: hive/workflows/steps/development-classic/step-08-integrate.md
@@ -601,6 +642,7 @@ steps:
       - review
       - codex-review
       - dev-standby
+      - gate-review
     inputs:
       - name: backend_implementation
         source: step_output

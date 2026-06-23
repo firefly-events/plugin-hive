@@ -1,7 +1,9 @@
 id: b7-shared-visual-asset-skill
 epic: marketing-team
 title: Shared visual-asset skill (Frame0 + image-gen) adaptable by multiple agents
-status: in_progress
+status: shipped
+shipped_at: "2026-06-22T01:30:00Z"
+release_id: "v2.12.1"
 tracker_id: plugin-hive/PLU-377
 
 complexity: medium

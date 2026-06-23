@@ -4,6 +4,7 @@
 # dag-spawn-state is resume-critical: server title-dedup is the primary idempotency
 # guard but the local cache must survive across machine boundaries (H2).
 !.pHive/dag-spawn-state/
+.pHive/dag-outputs/
 !.pHive/dag-spawn-state/**
 # Legacy state/ — ignored completely. Harness sessions running the pre-rename
 # Stop hook may briefly recreate state/interrupts/ files until the session
@@ -61,6 +62,8 @@ state/
 !.pHive/epics/sandcastle-gh-issue-dispatch/**
 !.pHive/epics/exec-discipline-may2026/
 !.pHive/epics/exec-discipline-may2026/**
+!.pHive/epics/exec-followons/
+!.pHive/epics/exec-followons/**
 !.pHive/epics/skill-ergo-may2026/
 !.pHive/epics/skill-ergo-may2026/**
 !.pHive/epics/per-epic-branch-pr-flow/
@@ -250,6 +253,8 @@ tsx-*/
 !.pHive/epics/plugin-hygiene/**
 !.pHive/epics/dag-flows-multica/
 !.pHive/epics/dag-flows-multica/**
+!.pHive/epics/execute-flow-followons-converge-loop/
+!.pHive/epics/execute-flow-followons-converge-loop/**
 
 # Generated concept illustrations (planning-format-contract.md §8) are produced
 # on-demand and never committed. Re-ignore AFTER the epic allowlists above so the

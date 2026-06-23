@@ -1,7 +1,9 @@
 id: b1-marketing-strategist-persona
 epic: marketing-team
 title: Author the marketing-strategist persona (team lead)
-status: in_progress
+status: shipped
+shipped_at: "2026-06-22T01:30:00Z"
+release_id: "v2.12.1"
 tracker_id: plugin-hive/PLU-374
 
 complexity: medium

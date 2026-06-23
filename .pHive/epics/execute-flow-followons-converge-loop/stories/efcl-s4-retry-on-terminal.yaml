@@ -1,0 +1,109 @@
+id: efcl-s4-retry-on-terminal
+epic: execute-flow-followons-converge-loop
+title: "Verify and fix: re-dispatching a terminal Multica issue actually restarts the agent"
+status: complete
+complexity: medium
+methodology: classic
+needs_backend: true
+depends_on: []
+description: >
+  The #22-redux under-run guard in the DAG executor re-dispatches a node up to 3x
+  reusing the cached tracker id (local tracker.json + server --dedup-title).
+  Whether dispatch on an already-terminal Multica issue restarts the agent or silently
+  no-ops is unknown from the executor side — it depends on Multica server semantics.
+  This story is investigation-first: drive one real terminal Multica issue through the
+  dispatch path and observe the outcome. If re-dispatch restarts the agent, no code
+  change is needed. If it no-ops, the fix is to reset the issue status to a runnable
+  state before re-dispatch (preferred: preserves the cached tracker id and
+  --dedup-title idempotency). Fallback if status-reset cannot restart: mint a fresh
+  tracker id (weakens _resolve_tracker_id resume guarantee; accepted only if
+  status-reset fails the observation). Code change (if any) lands only after the
+  observation result is recorded.
+acceptance_criteria:
+- "Given a real terminal Multica issue driven through the _dispatch path, when the observation is recorded, then the story commit includes the observation result as evidence (restarted / no-ops)"
+- "Given observation result = no-ops, when the fix lands, then re-dispatching a terminal issue via the under-run guard produces a new agent run (not a silent reuse of the stale terminal result)"
+- "Given the preferred fix (status-reset before dispatch), when applied, then the cached tracker id and --dedup-title idempotency are preserved"
+- "Given observation result = restarts correctly, when reviewed, then no executor code change is made and the story commit records the observation only"
+- "Given the fallback fix (fresh tracker id), when needed, then the commit message explicitly notes that dedup guarantee is weakened and why status-reset was insufficient"
+steps:
+- id: research
+  description: >
+    Read agent.py _dispatch (line ~820) and _resolve_tracker_id (line ~729) to understand
+    the full dispatch path: how the cached tracker id is resolved, how --dedup-title works,
+    and where the under-run guard fires (up to 3x re-dispatch). Drive one real terminal
+    Multica issue through the dispatch path using the CLI directly (cli.mjs dispatch
+    --issue <terminal_tracker_id> --agent <agent>). Observe: does the agent re-run?
+    Record the observation as structured evidence: issue id, pre-dispatch status,
+    CLI response, post-dispatch status, agent re-ran (yes/no).
+  agent: researcher
+- id: implement
+  description: >
+    If observation = restarts correctly: write the observation evidence to a doc in
+    .pHive/epics/execute-flow-followons-converge-loop/docs/retry-on-terminal-observation.md
+    and make no code changes. If observation = no-ops: implement the preferred fix
+    (reset issue status to a runnable state before re-dispatch in the _dispatch path);
+    write the observation evidence doc; commit both. If status-reset fix fails a follow-up
+    observation, fall back to fresh tracker id with explicit dedup-weakening note in
+    the commit message.
+  agent: backend-developer
+  depends_on:
+  - research
+- id: test
+  description: >
+    If no code change: verify the observation doc is present and records evidence.
+    If code change (status-reset fix): write an integration test that mocks a terminal
+    Multica issue and asserts the _dispatch path triggers a status reset before the
+    dispatch call. Run the full dag_executor test suite for regressions in
+    _resolve_tracker_id and the under-run guard.
+  agent: tester
+  depends_on:
+  - implement
+- id: review
+  description: >
+    Review the observation evidence doc: confirm it records the actual CLI response,
+    pre/post status, and agent re-ran verdict. If code change: review the status-reset
+    fix for dedup safety — confirm the cached tracker id is preserved and --dedup-title
+    idempotency is not broken. If fresh-id fallback was used: confirm the commit message
+    explicitly notes the dedup-weakening.
+  agent: reviewer
+  depends_on:
+  - test
+- id: integrate
+  description: >
+    Commit "[efcl-s4] fix(executor): verify + fix terminal-issue re-dispatch (observation:
+    <restarted|no-ops>, fix: <status-reset|fresh-id|none>)" on feat/dag-execute-node-outputs.
+  agent: developer
+  depends_on:
+  - review
+context:
+  codebase: /Users/hive/multica_workspaces/7ba0ade0-21cd-4e54-98a0-72a242ddf9e9/2a6865ff/workdir/plugin-hive
+  key_files:
+  - path: hive/lib/dag_executor/executor/handlers/agent.py
+    purpose: "_dispatch at line ~820 (cli.mjs dispatch call); _resolve_tracker_id at line ~729 (cached tracker id + --dedup-title)"
+files_to_modify:
+- file: .pHive/epics/execute-flow-followons-converge-loop/docs/retry-on-terminal-observation.md
+  change: "CREATE observation evidence doc: issue id, pre-dispatch status, CLI response, post-dispatch status, agent re-ran verdict"
+- file: hive/lib/dag_executor/executor/handlers/agent.py
+  change: "CONDITIONAL: if no-ops observed, ADD status-reset before dispatch in _dispatch path (preferred) or fresh-id mint (fallback)"
+design_decisions:
+- decision: Observation-first before any code change
+  rationale: "Story 4 is undefined until observed per design discussion §4. Writing a fix before the observation is confirmed wastes effort and may fix the wrong thing."
+- decision: Prefer status-reset over fresh tracker id
+  rationale: "Cross-machine dedup (--dedup-title) is a hard constraint per [grill U2]. Fresh tracker id forces a re-run but weakens _resolve_tracker_id's resume guarantee — easy to break cross-machine dedup while fixing re-dispatch. Status-reset preserves both."
+cross_cutting:
+- concern: documentation
+  action: "Record the observation in .pHive/epics/execute-flow-followons-converge-loop/docs/retry-on-terminal-observation.md regardless of outcome. If a code fix lands, update any reference doc that describes the under-run guard or _dispatch semantics."
+- concern: metrics
+  action: "applies: false — this is a correctness investigation. The observable is binary (restarts / no-ops), not a throughput or latency metric. No quantitative outcome to declare."
+risks:
+- severity: high
+  description: "If _dispatch has been silently no-oping on terminal issues, past runs that appeared retried may not have actually re-run. The under-run guard's 3x re-dispatch produced stale terminal results."
+  mitigation: "Observation step surfaces this immediately. The fix (if needed) is contained to the dispatch path; no retroactive correction of past runs."
+- severity: high
+  description: "Status-reset fix breaks --dedup-title idempotency, allowing a second dispatch to create a duplicate tracker issue on a cross-machine resume."
+  mitigation: "Review step explicitly checks the cached tracker id is preserved post-fix. If dedup is broken, fall back to fresh-id with explicit note rather than shipping a broken dedup."
+references:
+- path: hive/lib/dag_executor/executor/handlers/agent.py
+  relevant_excerpt: "_dispatch at line ~820: cli.mjs dispatch --issue <tracker_id> --agent <agent>. _resolve_tracker_id at line ~729: local tracker.json + server --dedup-title. Under-run guard re-dispatches up to 3x reusing same id."
+- path: .pHive/epics/execute-flow-followons-converge-loop/docs/design-discussion.md
+  relevant_excerpt: "Story 4: investigation-first. Preferred fix: reset issue status before re-dispatch to preserve dedup. Fallback: fresh tracker id (weakens dedup). [grill U2]: preserve _resolve_tracker_id dedup as hard constraint."

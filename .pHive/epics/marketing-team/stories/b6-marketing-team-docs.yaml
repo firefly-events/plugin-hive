@@ -1,7 +1,9 @@
 id: b6-marketing-team-docs
 epic: marketing-team
 title: User docs for the marketing team + /marketing-campaign
-status: in_progress
+status: shipped
+shipped_at: "2026-06-22T01:30:00Z"
+release_id: "v2.12.1"
 tracker_id: plugin-hive/PLU-380
 
 complexity: low

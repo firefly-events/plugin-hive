@@ -38,11 +38,42 @@ Flag unmapped capabilities as GAPS before proceeding.
 
 ### 3. Write story YAMLs (SKILL.md §Phase C, step 13)
 
-For each story, write `.pHive/epics/{epic_id}/stories/{story_id}.yaml`. Each story
-must be self-contained: inline `relevant_excerpt` in references, `snippet` in
-code_examples, `purpose` in key_files. Steps must match the resolved methodology
-template. Emit `parallel_allowed: true` + `parallel_rationale` only when the story
-satisfies the bounded-slice/variation/read-only criteria.
+For each story, write `.pHive/epics/{epic_id}/stories/{story_id}.yaml`.
+
+**YAML quoting (the output-validation gate rejects malformed YAML).** Any scalar
+value that contains a colon followed by a space (`:` then space), a leading `>`/`|`/`&`/`*`/`#`/`-`, or a
+section glyph like `§…:` MUST be double-quoted — otherwise YAML parses the inner
+colon as a mapping and the gate fails the whole plan with "mapping values are not
+allowed here". This bites `source:`, `purpose:`, `relevant_excerpt:`, and
+acceptance-criteria lines most often. Example:
+
+```yaml
+# WRONG — inner colon makes this invalid YAML
+source: design_discussion §Key decision: dual-target without a build step
+# RIGHT
+source: "design_discussion §Key decision: dual-target without a build step"
+```
+
+When in doubt, quote the value. Block scalars (`>`/`|`) are fine for multi-line
+prose but the FIRST line after them must not reintroduce an unquoted colon.
+
+REQUIRED fields on every story (the output-validation gate rejects the plan
+otherwise — `target: plan-epic` schema):
+
+- `id` — the story slug (matches the filename and the epic `stories[].id`).
+- `title` — one-line summary.
+- `acceptance_criteria` — a NON-EMPTY list of concrete, checkable criteria
+  (Given/When/Then or equivalent). Never omit this and never leave it empty.
+- `steps` — a NON-EMPTY list of the workflow steps for the resolved
+  methodology (e.g. research/implement/test/review/integrate), each with an
+  `id`, `description`, and `agent`.
+- `depends_on` — list of upstream story ids (may be empty `[]`).
+
+Each story must be self-contained: inline `relevant_excerpt` in references,
+`snippet` in code_examples, `purpose` in key_files. Steps must match the
+resolved methodology template. Emit `parallel_allowed: true` +
+`parallel_rationale` only when the story satisfies the
+bounded-slice/variation/read-only criteria.
 
 ### 4. Evaluate cross-cutting concerns (SKILL.md §Phase C, step 14)
 
@@ -75,6 +106,29 @@ task-tracking dispatch module. Write `tracker_id` back into story YAMLs. If
 - `epic_dir`: repo-root-relative path to the committed epic directory,
   e.g. `.pHive/epics/my-feature`
 - `commit_sha`: git SHA of the commit (empty string under local binding)
+
+## DAG executor outputs (required under the Multica binding)
+
+You commit the epic to `feat/{epic_id}` and push it — that branch, NOT your
+working checkout, is where the epic lives. The DAG executor cannot guess which
+branch you used, so it cannot reconcile your work into the project tree unless
+you REPORT it. Before finishing, WRITE these to `.pHive/dag-outputs/outputs.yaml`
+(create the directory) in your working copy, as a flat `key: value` YAML map:
+
+```yaml
+epic_dir: .pHive/epics/{epic_id}
+commit_sha: <the full SHA of your [plan-graph] commit>
+branch: feat/{epic_id}
+```
+
+- `branch` MUST be the exact branch you committed + pushed the epic to
+  (`feat/{epic_id}`, or the resolved `git_flow.base_branch`). The executor's
+  reconcile step fetches THIS branch at `commit_sha` and fast-forward-merges it
+  into the project tree the validation gate checks. An empty/wrong `branch` is
+  the single most common reason a completed plan run fails downstream with
+  "epic.yaml not found".
+- Push the branch to `origin` so reconcile can fetch it (you already do this in
+  step 6). This file is gitignored execution scratch — do not commit it.
 
 ## Constraints
 

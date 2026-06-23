@@ -9,6 +9,23 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-06-23
+
+**Hardening the substrate by running it on itself.** The DAG-on-Multica execution path got tougher the only honest way — by dogfooding a real epic through it and fixing what broke. This release lands the execute-flow follow-ons (gate-review across every methodology, review-sees-implement-tree, output-channel coverage), the executor-reliability fixes that dogfooding surfaced, a Simplicity/KISS standard for the dev personas, and step-file plugin-root resolution. Reviewed cross-LLM (Codex + CodeRabbit), including a comprehensive pass that caught a silent-stale-review hole before release.
+
+### Added
+
+- **Execute-flow follow-ons** (epic `execute-flow-followons-converge-loop`, PR #318). The gate-review node (a review verdict of `needs_revision` blocks integrate) is mirrored into the tdd and bdd methodology workflows, not just classic; each implement node now reconciles its output into the working tree so review reads the real implemented code *before* integrate (`review-sees-implement-tree`); and the Multica `#13` output channel is seeded into consumer repos' `.gitignore` at repo-bind.
+- **Node-output harvest + the `#13` output channel** (PR #316). The general channel by which a Multica agent emits a node's declared semantic outputs (`.pHive/dag-outputs/outputs.yaml`, harvested by the executor), plus committed-artifact and git-state harvest.
+- **Simplicity (KISS) quality standard** for the developer personas and the idiomatic-reviewer (PR #317) — choose the simplest implementation that satisfies the acceptance criteria; a reviewer should not be able to delete code and keep all criteria passing.
+- **Step-file plugin-root resolution** (PR #314).
+
+### Fixed
+
+- **Under-run reliability on Multica** (PR #318). A flaky agent turn that ended without writing its declared `outputs.yaml` caused intermittent, difficulty-independent node failures. The under-run guard now re-harvests every work_dir seen before re-dispatching (recovering a commit that landed after the poll reported terminal), enforces the *full* declared-output set (a partial `outputs.yaml` no longer flows downstream), and every Multica dispatch carries a hard output-contract naming the required keys.
+- **Per-node reconcile fails loud** (PR #318). A reconcile that cannot materialise the implement commit (e.g. a non-fast-forward) now halts the run instead of silently letting review read a stale tree.
+- **Meta structural-audit cycle** (PR #315).
+
 ## [2.12.1] - 2026-06-21
 
 **The substrate that runs Hive's own flows now runs on Multica — and the team that announces a release now has a home.** This release lands the DAG-on-Multica execution substrate (Hive's deterministic flow engine running its agent work through Multica) and a consumer-gated marketing team, both reviewed cross-LLM (Codex) before merge.

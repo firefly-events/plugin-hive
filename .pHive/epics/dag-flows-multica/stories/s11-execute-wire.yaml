@@ -1,7 +1,9 @@
 id: s11-execute-wire
 epic: dag-flows-multica
 title: Wire /execute to the DAG front door (execution mode-resolve seam)
-status: blocked
+status: shipped
+shipped_at: "2026-06-22T01:30:00Z"
+release_id: "v2.12.1"
 complexity: medium
 methodology: classic
 depends_on: [s10-execute-graphs]

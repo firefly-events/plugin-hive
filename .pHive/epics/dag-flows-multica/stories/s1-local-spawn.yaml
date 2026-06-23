@@ -1,7 +1,9 @@
 id: s1-local-spawn
 epic: dag-flows-multica
 title: Local AgentSpawn binding (wraps agent-spawn Step 7)
-status: pending
+status: shipped
+shipped_at: "2026-06-22T01:30:00Z"
+release_id: "v2.12.1"
 complexity: medium
 methodology: classic
 depends_on: []

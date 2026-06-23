@@ -22,6 +22,13 @@ steps:
     outputs:
       - name: research_brief
         type: string
+    # Bounded retry re-dispatches on a transient AGENT failure (Multica task
+    # terminal status != completed -> AgentHandlerError). Does NOT cover the
+    # "completed but produced nothing" author under-run (no exception raised);
+    # that is an agent-reliability issue tracked separately, not a force-stop.
+    retry:
+      max_attempts: 3
+      on: agent_failed
     timeout_ms: 1800000
 
   # ── Phase B: design discussion (runs in parallel with research) ──────────────
@@ -37,6 +44,9 @@ steps:
     outputs:
       - name: design_discussion
         type: string
+    retry:  # bounded retry on transient AGENT failure (status != completed)
+      max_attempts: 3
+      on: agent_failed
     timeout_ms: 1800000
 
   # ── Phase C: story decomposition + epic authoring ───────────────────────────
@@ -64,6 +74,9 @@ steps:
         type: string
       - name: commit_sha
         type: string
+    retry:  # author is heaviest; retry transient AGENT failures (not under-runs)
+      max_attempts: 4
+      on: agent_failed
     timeout_ms: 3600000
 
   # ── Reconcile: materialise author's committed work before gate ───────────────

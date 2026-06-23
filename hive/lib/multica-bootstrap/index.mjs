@@ -3,7 +3,19 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseAgentsConfig, resolveAgentInstructions } from '../multica-agents-config/index.mjs';
+// Plugin install root, derived from this module's own location
+// (<plugin>/hive/lib/multica-bootstrap/index.mjs). Skill/persona/substrate
+// assets referenced by agents.yaml + skills-export.yaml are PLUGIN-shipped and
+// live here — NOT inside a consumer project's repoRoot. Resolving them against
+// this root (instead of repoRoot) is what lets a consumer's /multica-init
+// bootstrap the Hive roster without copying the plugin's source into the project
+// (#2; mirrors the AgentHandler step_file plugin-root fix #3).
+const PLUGIN_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../..',
+);
 const DEFAULT_SERVER_URL = 'http://127.0.0.1:8080';
 const DEFAULT_CONFIG_PATH = path.join(os.homedir(), '.multica', 'config.json');
 const DEFAULT_TOKEN_NAME = 'hive-bootstrap';
@@ -311,6 +323,56 @@ export async function ensureRepos({
 } = {}) {
   return ensureReposWithDeps({ serverUrl, token, workspaceId, repoUrl, repoRoot, consent });
 }
+
+const GITIGNORE_LINE = '.pHive/dag-outputs/';
+
+// Append-if-absent: seeds .pHive/dag-outputs/ into the consumer repo's .gitignore.
+// Placement: immediately after the last existing .pHive/ ignore entry; at end of
+// file if none found. Exact string match guard prevents duplicates.
+// fs dep is injected for unit-testability.
+export function seedConsumerGitignoreWithDeps({ repoRoot = process.cwd(), fs: fsFn = fs } = {}) {
+  const gitignorePath = path.join(repoRoot, '.gitignore');
+  let content = '';
+  try {
+    content = fsFn.readFileSync(gitignorePath, 'utf8');
+  } catch (error) {
+    // Only a missing file is benign (we'll create it). A permissions/I/O error
+    // must NOT be treated as empty — that would overwrite an existing .gitignore.
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  const lines = content === '' ? [] : content.split('\n');
+  // Remove trailing empty element from a newline-terminated file so we don't
+  // count a phantom blank line at the end as "last line".
+  const trailingNewline = content.endsWith('\n');
+  const normalised = trailingNewline && lines[lines.length - 1] === '' ? lines.slice(0, -1) : lines;
+
+  if (normalised.some((l) => l === GITIGNORE_LINE)) {
+    return { seeded: false, path: gitignorePath };
+  }
+
+  // Find insertion point: after the last line that starts with .pHive
+  let insertAfter = -1;
+  for (let i = 0; i < normalised.length; i++) {
+    if (normalised[i].startsWith('.pHive')) insertAfter = i;
+  }
+
+  const next = normalised.slice();
+  if (insertAfter >= 0) {
+    next.splice(insertAfter + 1, 0, GITIGNORE_LINE);
+  } else {
+    next.push(GITIGNORE_LINE);
+  }
+
+  const newContent = next.join('\n') + '\n';
+  fsFn.mkdirSync(path.dirname(gitignorePath), { recursive: true });
+  fsFn.writeFileSync(gitignorePath, newContent, 'utf8');
+  return { seeded: true, path: gitignorePath };
+}
+
+export function seedConsumerGitignore({ repoRoot = process.cwd() } = {}) {
+  return seedConsumerGitignoreWithDeps({ repoRoot });
+}
+
 export async function ensureDaemon({ consent = false } = {}) {
   try {
     const status = childProcess.execSync('multica daemon status', {
@@ -339,6 +401,9 @@ export async function reconcileAgentsWithDeps({
   workspaceId,
   agentsConfigPath,
   repoRoot = process.cwd(),
+  // Persona instruction files (persona_ref) are plugin-shipped — resolve them
+  // against the plugin root, not the (possibly consumer) repoRoot (#2).
+  pluginRoot = PLUGIN_ROOT,
   consent = false,
   httpJsonFn = httpJson,
   resolveInstructionsFn = resolveAgentInstructions,
@@ -429,7 +494,7 @@ export async function reconcileAgentsWithDeps({
 
   for (const agent of desiredAgents) {
     const runtimeId = providerToRuntimeId.get(agent.provider);
-    const instructions = agent.persona_ref ? resolveInstructionsFn(agent, repoRoot) : agent.instructions;
+    const instructions = agent.persona_ref ? resolveInstructionsFn(agent, pluginRoot) : agent.instructions;
     const payload = buildAgentPayload(agent, runtimeId, instructions);
     const existing = existingByName.get(agent.name);
     let agentId;
@@ -474,9 +539,10 @@ export async function reconcileAgents({
   workspaceId,
   agentsConfigPath,
   repoRoot = process.cwd(),
+  pluginRoot = PLUGIN_ROOT,
   consent = false,
 } = {}) {
-  return reconcileAgentsWithDeps({ serverUrl, token, workspaceId, agentsConfigPath, repoRoot, consent });
+  return reconcileAgentsWithDeps({ serverUrl, token, workspaceId, agentsConfigPath, repoRoot, pluginRoot, consent });
 }
 
 async function loadSquadsConfig(squadsConfigPath) {
@@ -981,6 +1047,9 @@ export async function reconcileSkillsWithDeps({
   workspaceId,
   skillsConfigPath,
   repoRoot = process.cwd(),
+  // Skill/substrate assets are plugin-shipped — resolve them against the plugin
+  // root, not the (possibly consumer) repoRoot (#2).
+  pluginRoot = PLUGIN_ROOT,
   consent = false,
   httpJsonFn = httpJson,
   loadSkillsExportConfigFn = null,
@@ -1012,7 +1081,7 @@ export async function reconcileSkillsWithDeps({
   const desiredExports = Array.isArray(config?.exports) ? config.exports : [];
 
   // Validate all paths before any network call — fail fast, no partial imports
-  validateSkillsExport(desiredExports, repoRoot);
+  validateSkillsExport(desiredExports, pluginRoot);
 
   const existingBody = await httpJsonFn(serverUrl, `/api/skills?workspace_id=${encodeURIComponent(workspaceId)}`, { token });
   const existingSkills = normalizeList(existingBody, 'skills');
@@ -1024,7 +1093,7 @@ export async function reconcileSkillsWithDeps({
   const skipped = [];
 
   for (const entry of desiredExports) {
-    const bundledContent = bundleSkillContent(repoRoot, entry.skill_ref, entry.substrate_deps ?? []);
+    const bundledContent = bundleSkillContent(pluginRoot, entry.skill_ref, entry.substrate_deps ?? []);
     const contentHash = computeContentHash(bundledContent);
     const payload = buildSkillPayload(entry, bundledContent, contentHash);
     const existing = existingByName.get(entry.multica_name);
@@ -1066,7 +1135,8 @@ export async function reconcileSkills({
   workspaceId,
   skillsConfigPath,
   repoRoot = process.cwd(),
+  pluginRoot = PLUGIN_ROOT,
   consent = false,
 } = {}) {
-  return reconcileSkillsWithDeps({ serverUrl, token, workspaceId, skillsConfigPath, repoRoot, consent });
+  return reconcileSkillsWithDeps({ serverUrl, token, workspaceId, skillsConfigPath, repoRoot, pluginRoot, consent });
 }
