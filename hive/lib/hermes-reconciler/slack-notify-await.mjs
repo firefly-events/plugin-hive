@@ -1,0 +1,240 @@
+/**
+ * hermes-reconciler/slack-notify-await.mjs — Slack notify-and-await human-gate transport.
+ *
+ * Surface-verdict hook for reconcile-tick. On review_terminal or error conditions:
+ *   1. Latches gate_state to 'awaiting' FIRST (fail-safe — gate is halted even if Slack fails).
+ *   2. Posts a Slack message with context + decision needed.
+ *   3. Returns { halted: true, gate_state: 'awaiting' }.
+ *
+ * Human response resolves the gate via resolveGate():
+ *   approve / continue → gate_state: pre_approved
+ *   reject             → gate_state: rejected
+ *   revise             → gate_state: pre_approved, story rolled back to dispatched_impl, attempt++
+ *
+ * Slack webhook URL from opts.slackWebhookUrl or HERMES_SLACK_WEBHOOK_URL env var.
+ * Slack-unreachable path: gate stays awaiting + error thrown (tick halts visibly; never auto-advance).
+ */
+
+import http from 'node:http';
+import https from 'node:https';
+import { URL } from 'node:url';
+import { readHermesReconcilerState, writeHermesReconcilerState } from './state.mjs';
+
+// ── Slack HTTP ────────────────────────────────────────────────────────────────
+
+function postSlack(webhookUrl, payload, { timeoutMs = 10_000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(payload);
+    const parsed = new URL(webhookUrl);
+    const transport = parsed.protocol === 'http:' ? http : https;
+    const defaultPort = parsed.protocol === 'http:' ? 80 : 443;
+    const options = {
+      hostname: parsed.hostname,
+      path: parsed.pathname + (parsed.search || ''),
+      port: parsed.port || defaultPort,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    };
+
+    const req = transport.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve({ statusCode: res.statusCode, body: data });
+        } else {
+          reject(new Error(`Slack webhook returned HTTP ${res.statusCode}: ${data.slice(0, 200)}`));
+        }
+      });
+    });
+
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`Slack webhook timed out after ${timeoutMs}ms`));
+    });
+
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+// ── Message builders ──────────────────────────────────────────────────────────
+
+/**
+ * Build a Slack message payload for a review_terminal verdict.
+ * Follows standup-slack-format.md conventions: no ANSI, markdown only, ##/### headings, - lists.
+ */
+export function buildVerdictMessage({ epicHandle, storyId, verdict, episodeSummary, diff }) {
+  const normalizedVerdict = verdict?.replace('_', '-').toLowerCase() ?? 'unknown';
+  const decisionBlock = normalizedVerdict === 'needs-revision'
+    ? 'Reply with one of:\n- `approve` — accept the review verdict as-is and mark done\n- `revise` — send the story back for a new implementation attempt\n- `reject` — halt this epic permanently'
+    : 'Reply with one of:\n- `approve` (or `continue`) — advance to the next story\n- `revise` — send back for revision\n- `reject` — halt this epic permanently';
+
+  const summarySection = episodeSummary
+    ? `\n### Episode Summary\n${episodeSummary.trim()}`
+    : '';
+
+  const diffSection = diff
+    ? `\n### Diff\n\`\`\`\n${diff.trim()}\n\`\`\``
+    : '';
+
+  const text = [
+    `## Review Verdict — ${normalizedVerdict.toUpperCase()}`,
+    ``,
+    `- Epic: \`${epicHandle}\``,
+    `- Story: \`${storyId}\``,
+    `- Verdict: \`${normalizedVerdict}\``,
+    summarySection,
+    diffSection,
+    ``,
+    `### Decision Required`,
+    decisionBlock,
+  ].join('\n');
+
+  return { text };
+}
+
+/**
+ * Build a Slack message payload for an error condition (dispatch failure, daemon down, etc.).
+ */
+export function buildErrorMessage({ epicHandle, storyId, errorKind, details }) {
+  const storyLine = storyId ? `\n- Story: \`${storyId}\`` : '';
+  const detailsSection = details
+    ? `\n### Details\n\`\`\`\n${String(details).trim().slice(0, 1500)}\n\`\`\``
+    : '';
+
+  const text = [
+    `## Hermes Error — Action Required`,
+    ``,
+    `- Epic: \`${epicHandle}\`${storyLine}`,
+    `- Error: \`${errorKind ?? 'unknown_error'}\``,
+    detailsSection,
+    ``,
+    `### Decision Required`,
+    `Reply with one of:`,
+    `- \`continue\` — acknowledge and resume from current state`,
+    `- \`reject\` — halt this epic permanently`,
+  ].join('\n');
+
+  return { text };
+}
+
+// ── Hook: surface verdict ─────────────────────────────────────────────────────
+
+/**
+ * Called by reconcile-tick when review_terminal is reached.
+ *
+ * Writes gate_state: 'awaiting' BEFORE attempting Slack post.
+ * On Slack failure the gate remains awaiting and the error propagates — tick halts.
+ * Never auto-advances the gate.
+ *
+ * @param {string} cycleStatePath  Absolute path to the cycle-state YAML file.
+ * @param {{ epicHandle: string, storyId: string, verdict: string, episodeSummary?: string, diff?: string }} context
+ * @param {{ slackWebhookUrl?: string }} [opts]
+ * @returns {Promise<{ halted: true, gate_state: 'awaiting' }>}
+ */
+export async function surfaceVerdictHook(cycleStatePath, context, opts = {}) {
+  // Step 1 — latch gate FIRST (fail-safe)
+  writeHermesReconcilerState(cycleStatePath, { gate_state: 'awaiting' });
+
+  // Step 2 — post to Slack (failure halts tick; gate already latched)
+  const webhookUrl = opts.slackWebhookUrl ?? process.env.HERMES_SLACK_WEBHOOK_URL;
+  if (!webhookUrl) {
+    throw new Error(
+      'Slack notify-await: HERMES_SLACK_WEBHOOK_URL is not configured. ' +
+      'gate_state is now "awaiting" — tick is halted. Configure the webhook and retry.',
+    );
+  }
+
+  const message = buildVerdictMessage(context);
+  await postSlack(webhookUrl, message);
+
+  return { halted: true, gate_state: 'awaiting' };
+}
+
+// ── Hook: surface error ───────────────────────────────────────────────────────
+
+/**
+ * Called by reconcile-tick when an error condition occurs (dispatch failure, daemon down, etc.).
+ * Same fail-safe contract as surfaceVerdictHook.
+ *
+ * @param {string} cycleStatePath
+ * @param {{ epicHandle: string, storyId?: string, errorKind: string, details?: string }} context
+ * @param {{ slackWebhookUrl?: string }} [opts]
+ * @returns {Promise<{ halted: true, gate_state: 'awaiting' }>}
+ */
+export async function surfaceErrorHook(cycleStatePath, context, opts = {}) {
+  // Step 1 — latch gate FIRST (fail-safe)
+  writeHermesReconcilerState(cycleStatePath, { gate_state: 'awaiting' });
+
+  // Step 2 — post to Slack
+  const webhookUrl = opts.slackWebhookUrl ?? process.env.HERMES_SLACK_WEBHOOK_URL;
+  if (!webhookUrl) {
+    throw new Error(
+      'Slack notify-await: HERMES_SLACK_WEBHOOK_URL is not configured. ' +
+      'gate_state is now "awaiting" — tick is halted. Configure the webhook and retry.',
+    );
+  }
+
+  const message = buildErrorMessage(context);
+  await postSlack(webhookUrl, message);
+
+  return { halted: true, gate_state: 'awaiting' };
+}
+
+// ── Gate resolution ───────────────────────────────────────────────────────────
+
+const VALID_ACTIONS = new Set(['approve', 'continue', 'reject', 'revise']);
+
+/**
+ * Resolve the awaiting gate based on a human Slack action.
+ *
+ * approve / continue  → gate_state: pre_approved  (tick resumes)
+ * reject              → gate_state: rejected       (epic halted permanently)
+ * revise              → gate_state: pre_approved   (tick resumes; story rolls back to
+ *                       dispatched_impl with attempt++ so reconcile-tick re-dispatches impl)
+ *
+ * @param {string} cycleStatePath
+ * @param {{ storyId?: string, action: 'approve'|'continue'|'reject'|'revise' }} params
+ * @returns {{ resolved: true, gate_state: string, action: string }}
+ */
+export function resolveGate(cycleStatePath, { storyId, action }) {
+  if (!VALID_ACTIONS.has(action)) {
+    throw new Error(`resolveGate: unknown action "${action}". Valid: approve, continue, reject, revise.`);
+  }
+
+  if (action === 'reject') {
+    writeHermesReconcilerState(cycleStatePath, { gate_state: 'rejected' });
+    return { resolved: true, gate_state: 'rejected', action };
+  }
+
+  if (action === 'revise') {
+    if (!storyId) {
+      throw new Error('resolveGate: storyId is required for action "revise"');
+    }
+    const current = readHermesReconcilerState(cycleStatePath);
+    const currentStory = current.stories?.[storyId] ?? {};
+    const newAttempt = (currentStory.attempt ?? 0) + 1;
+
+    writeHermesReconcilerState(cycleStatePath, {
+      gate_state: 'pre_approved',
+      in_flight_story_id: null,
+      in_flight_task_id: null,
+      dispatched_at: null,
+      stories: {
+        [storyId]: {
+          phase_position: 'dispatched_impl',
+          attempt: newAttempt,
+        },
+      },
+    });
+    return { resolved: true, gate_state: 'pre_approved', action: 'revise', attempt: newAttempt };
+  }
+
+  // approve or continue
+  writeHermesReconcilerState(cycleStatePath, { gate_state: 'pre_approved' });
+  return { resolved: true, gate_state: 'pre_approved', action };
+}
