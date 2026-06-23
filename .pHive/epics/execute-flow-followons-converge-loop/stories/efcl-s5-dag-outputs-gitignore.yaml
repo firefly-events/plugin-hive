@@ -1,7 +1,7 @@
 id: efcl-s5-dag-outputs-gitignore
 epic: execute-flow-followons-converge-loop
 title: Seed .pHive/dag-outputs/ gitignore into consumer repos at repo-bind / multica-init
-status: pending
+status: shipped
 complexity: low
 methodology: classic
 needs_backend: true
@@ -86,3 +86,5 @@ references:
   relevant_excerpt: ".pHive/dag-outputs/ entry already present in plugin-hive's own .gitignore — use this as the canonical line to seed into consumer repos."
 - path: .pHive/epics/execute-flow-followons-converge-loop/docs/design-discussion.md
   relevant_excerpt: "Story 5: seed .pHive/dag-outputs/ ignore at repo-bind / multica-init. Idempotent: append-if-absent. Already fixed in plugin-hive's own .gitignore."
+shipped_at: "2026-06-23T15:10:43Z"
+release_id: v2.13.0

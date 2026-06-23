@@ -1,0 +1,72 @@
+id: h-10-studio-port-and-docs
+epic: hermes-orchestrator-skills
+title: Port the 5 skills into Hermes native format on Studio + parity tests + docs
+status: complete
+complexity: high
+methodology: classic
+side: studio
+depends_on:
+  - h-01-hermes-skill-format-recon
+  - h-04-monitor-epic-skill
+  - h-05-reconcile-tick-skill
+  - h-07-kickoff-exec-skill
+  - h-08-kickoff-plan-skill
+  - h-09-watch-cron-skill
+
+description: |
+  Packaging + delivery. Take the canonical runbook sources built in plugin-hive
+  (monitor-epic, reconcile-tick, kickoff-exec, kickoff-plan, watch-cron) and port
+  them into Hermes-agent native skill format (per h-01 spec) on Studio. Register
+  each in Hermes' skill registry, bind to the pinned multica_* MCP ABI (h-02), and
+  run parity tests proving the ported skills behave like their plugin-hive sources.
+  Document the lights-on loop end to end.
+
+  This is the seam where plugin-hive (source of contract) meets Hermes (consumer).
+  Execute-time reconcile against the live fork lives here.
+
+acceptance_criteria:
+  - "Given the 5 canonical sources + the h-01 format spec, when ported, then each is registered in Hermes' native skill registry on Studio and invocable on a tick."
+  - "Given a ported skill, when run against a fixture, then its behavior matches the plugin-hive canonical source (parity)."
+  - "Given a human, when reading the docs, then README + operations-guide describe the full lights-on loop: approve epic -> kickoff-exec -> reconcile-tick advances -> review verdict halts to Slack -> human continues; watch-cron + monitor-epic provide visibility."
+  - "Given the gate contract, when documented, then it is explicit that Hermes reads freely, advances approved work, halts at review for the human, never mints stories."
+
+steps:
+  - id: research
+    description: Confirm the h-01 native format + h-02 ABI on Studio; map each canonical source to a native skill.
+    agent: researcher
+  - id: implement
+    description: Port + register the 5 skills in Hermes native format on Studio; bind to multica_* MCP tools; write README + operations-guide loop docs.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Parity tests per ported skill against the plugin-hive sources; one end-to-end dry run of the loop on a fixture epic.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm all 5 registered + parity-green; docs cover the gate contract + full loop.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit plugin-hive docs on feat/hermes-orchestrator-skills; Hermes-side port committed in ~/Code/hermes-agent on Studio.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  note: Implementation spans Studio (~/Code/hermes-agent port) + plugin-hive (docs).
+  key_files:
+    - path: README.md
+      purpose: Add the lights-on loop + Hermes orchestrator skills to user-facing docs.
+    - path: docs/operations-guide.md
+      purpose: Commands/loop reference for the orchestrator skills.
+
+risks:
+  - severity: medium
+    description: Native-format port diverges from the canonical plugin-hive source over time (two copies).
+    mitigation: Parity tests pin equivalence; plugin-hive remains source of truth, Hermes is generated/ported from it.
+
+references:
+  - path: .pHive/epics/hermes-orchestrator-skills/docs/vertical-plan.md
+    relevant_excerpt: |
+      S7: port all 5 canonical sources into Hermes native format on Studio +
+      parity tests + README/operations-guide entries.

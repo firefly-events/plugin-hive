@@ -5,6 +5,12 @@
       "args": [
         "hive/lib/openai-image-mcp-server.js"
       ]
+    },
+    "hermes-multica": {
+      "command": "node",
+      "args": [
+        "hive/lib/multica-story-dispatch/mcp-tools.mjs"
+      ]
     }
   }
 }

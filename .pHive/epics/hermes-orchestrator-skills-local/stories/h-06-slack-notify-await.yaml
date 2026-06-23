@@ -1,0 +1,72 @@
+id: h-06-slack-notify-await
+epic: hermes-orchestrator-skills-local
+title: Slack notify-and-await human-gate transport
+status: pending
+tracker_id: 93c33699-85fb-4a59-ba45-1534f9b09585
+complexity: high
+methodology: classic
+side: plugin-hive
+depends_on: []
+
+description: |
+  The human-gate transport. When reconcile-tick hits a review_terminal verdict — or
+  any point needing human action (an error, an approval-to-continue) — Hermes reaches
+  out via Slack and AWAITS action before proceeding. Same pattern for both: notify +
+  await action (the user: "you notify about the error and wait, await action").
+
+  This implements the surface-verdict hook seam left by h-05. It is the concrete
+  channel for the human review gate (and error/approval requests). Generalizes the
+  existing /standup --format slack convention (standup-slack-format.md) into an
+  interactive notify-await surface: post a message with the verdict/context + the
+  decision needed, then block the tick (via gate_state awaiting per h-03) until the
+  human responds; the response resolves the gate (continue / reject / revise).
+
+acceptance_criteria:
+  - "Given a review_terminal verdict, when the hook fires, then a Slack message posts the story, verdict, diff/episode summary, and the decision needed."
+  - "Given the message posted, when the human has not yet acted, then the epic stays in gate_state awaiting and no further work advances."
+  - "Given a human Slack action (approve/continue, reject, revise), when received, then gate_state resolves accordingly and the next tick proceeds on that decision."
+  - "Given an error condition (dispatch failure, daemon down), when it occurs, then the same notify-await surface posts the error and awaits action — not a silent retry loop."
+  - "Given Slack is unreachable, when the hook fires, then the tick fails safe (halts + logs) rather than auto-advancing without the gate."
+
+steps:
+  - id: research
+    description: Review standup-slack-format.md + any existing Slack wiring; design the notify-await contract (post + poll-for-response + gate resolution).
+    agent: researcher
+  - id: implement
+    description: Build the Slack notify-await surface + wire it as the reconcile-tick surface-verdict hook; route errors/approvals through the same path.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Tests for verdict post, await-blocks-advance, each human action resolving the gate, error-path notify, and Slack-unreachable fail-safe.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm fail-safe-halts (never auto-advance on transport failure); both verdict + error paths covered.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/hermes-orchestrator-skills.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/references/standup-slack-format.md
+      purpose: Existing Slack output conventions to generalize into an interactive surface.
+    - path: hive/references/cycle-reconciler.md
+      purpose: Defines where the review verdict + error conditions arise in the tick.
+
+risks:
+  - severity: high
+    description: A notify-and-continue (not notify-and-await) would defeat the human gate.
+    mitigation: The gate blocks on gate_state awaiting; test asserts no advance until a human action resolves it.
+  - severity: medium
+    description: Slack credentials/secret handling on Studio.
+    mitigation: Reuse Studio secret store conventions; do not hardcode tokens.
+
+references:
+  - path: .pHive/epics/hermes-orchestrator-skills/docs/design-discussion.md
+    relevant_excerpt: |
+      Review gate = Slack notify-and-await; generalizes to errors/approvals
+      (notify + await action). Discord deferred.
