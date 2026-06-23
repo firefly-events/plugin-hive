@@ -41,7 +41,7 @@ Flag unmapped capabilities as GAPS before proceeding.
 For each story, write `.pHive/epics/{epic_id}/stories/{story_id}.yaml`.
 
 **YAML quoting (the output-validation gate rejects malformed YAML).** Any scalar
-value that contains a colon-space (`: `), a leading `>`/`|`/`&`/`*`/`#`/`-`, or a
+value that contains a colon followed by a space (`:` then space), a leading `>`/`|`/`&`/`*`/`#`/`-`, or a
 section glyph like `§…:` MUST be double-quoted — otherwise YAML parses the inner
 colon as a mapping and the gate fails the whole plan with "mapping values are not
 allowed here". This bites `source:`, `purpose:`, `relevant_excerpt:`, and
