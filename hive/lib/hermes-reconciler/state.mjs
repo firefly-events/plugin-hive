@@ -14,12 +14,14 @@
  * | null                    | initial / factory default      | Not approved; tick refuses to advance            |
  * | "pre_approved"          | human approval via write-state | Approved to run; tick proceeds normally          |
  * | "review_awaiting_human" | reconciler on review_terminal  | Review verdict needs human decision; tick halted |
- * | "finalized"             | reconciler Branch 4            | Epic complete; no further ticks                  |
+ * | "finalized"             | reconciler Branch 4            | Epic complete (success); no further ticks        |
+ * | "rejected"              | human rejects a review verdict | Terminal (rejected); tick does NOT auto-resume   |
  *
  * Transitions (write-state is the ONLY write path):
  *   null -> pre_approved           human: cli.mjs write-state --patch '{"gate_state":"pre_approved","epic_of_record":"<handle>"}'
  *   pre_approved -> review_awaiting_human  reconciler: Branch 2, review_terminal, verdict != passed
  *   review_awaiting_human -> pre_approved  human continues: cli.mjs write-state --patch '{"gate_state":"pre_approved"}'
+ *   review_awaiting_human -> rejected      human rejects: tick does not auto-resume; re-approval (-> pre_approved) required
  *   pre_approved -> finalized       reconciler: Branch 4, after all stories done + PR created
  *
  * ## epic_of_record
