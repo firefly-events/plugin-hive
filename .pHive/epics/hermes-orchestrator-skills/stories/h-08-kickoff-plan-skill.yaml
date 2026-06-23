@@ -1,7 +1,7 @@
 id: h-08-kickoff-plan-skill
 epic: hermes-orchestrator-skills
 title: Author the kickoff-plan skill (start /plan, route gates to human)
-status: pending
+status: complete
 complexity: medium
 methodology: classic
 side: plugin-hive

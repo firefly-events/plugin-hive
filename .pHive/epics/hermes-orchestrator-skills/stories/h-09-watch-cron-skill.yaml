@@ -1,7 +1,7 @@
 id: h-09-watch-cron-skill
 epic: hermes-orchestrator-skills
 title: Author the watch-cron skill (routine + daemon health)
-status: pending
+status: complete
 complexity: low
 methodology: classic
 side: plugin-hive

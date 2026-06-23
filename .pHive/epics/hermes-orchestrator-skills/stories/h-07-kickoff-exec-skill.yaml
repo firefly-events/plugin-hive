@@ -1,7 +1,7 @@
 id: h-07-kickoff-exec-skill
 epic: hermes-orchestrator-skills
 title: Author the kickoff-exec skill (start the reconcile loop, gated)
-status: pending
+status: complete
 complexity: medium
 methodology: classic
 side: plugin-hive

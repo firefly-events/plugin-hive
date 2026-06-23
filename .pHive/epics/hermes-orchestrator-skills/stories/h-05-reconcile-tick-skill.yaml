@@ -1,7 +1,7 @@
 id: h-05-reconcile-tick-skill
 epic: hermes-orchestrator-skills
 title: Formalize reconcile-tick from the cycle-reconciler runbook
-status: pending
+status: complete
 complexity: high
 methodology: classic
 side: plugin-hive

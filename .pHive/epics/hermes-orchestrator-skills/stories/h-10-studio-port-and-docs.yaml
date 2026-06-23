@@ -1,7 +1,7 @@
 id: h-10-studio-port-and-docs
 epic: hermes-orchestrator-skills
 title: Port the 5 skills into Hermes native format on Studio + parity tests + docs
-status: done
+status: complete
 complexity: high
 methodology: classic
 side: studio

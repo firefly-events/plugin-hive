@@ -9,6 +9,18 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.13.1] - 2026-06-23
+
+**Codifying the orchestrator so a persistent Hermes cron can run the loop.** This release turns the Hive orchestrator from a thing a human drives into a contract a Hermes agent drives — five Hermes-side skill runbooks plus the gate, MCP, and Slack plumbing they stand on. The north star is a lights-on software factory where the human is in the loop only at planning and review; the orchestrator and agents own everything between.
+
+### Added
+
+- **Hermes orchestrator skills** (epic `hermes-orchestrator-skills`, PR #321). Five Hermes-side runbooks — `monitor-epic`, `reconcile-tick`, `kickoff-plan`, `kickoff-exec`, `watch-cron` — that codify the cycle-reconciler's 7-position phase machine (pending → dispatched_impl → impl_terminal → dispatched_review → review_terminal → done) as the contract a Hermes cron uses to drive the forked Multica instance, gating humans only at planning and at the review verdict.
+- **Multica MCP surface** (`h-02`). A JSON-RPC 2.0 stdio MCP server (`mcp-tools.mjs`) wrapping the dispatch `cli.mjs` subcommands as seven tools — `multica_dispatch_story`, `multica_poll_task`, `multica_epic_status`, `multica_write_state`, `multica_post_comment`, `multica_episode`, `multica_cancel` — so Hermes invokes the bridge as native tools instead of shelling out.
+- **gate_state latch + epic_of_record** (`h-03`). The cross-tick autonomy contract: a `gate_state` enum (`pre_approved` / `review_awaiting_human` / `finalized` / `rejected`) latches the human review gate across reconciler ticks, and `epic_of_record` pins the reconciler's target epic. Writes are validated at a single state-write boundary with an advisory lock around the read-modify-write.
+- **Slack notify-and-await human gate** (`h-06`). The outbound half of the review gate: surfaces a verdict or error to Slack and resolves the gate via `resolveGate` (approve → story done, revise → re-dispatch, reject, continue), with the passed-verdict auto-advance model (model "b" — ff-merge-verified passes advance automatically; only non-pass/unverified/error surface to the human).
+- **Studio port + operations guide** (`h-01`, `h-10`). The five runbooks ported to the Hermes-agent native `SKILL.md` format on Studio, the Multica MCP server wired into the Hermes runtime config, and the end-to-end lights-on loop documented in the operations guide.
+
 ## [2.13.0] - 2026-06-23
 
 **Hardening the substrate by running it on itself.** The DAG-on-Multica execution path got tougher the only honest way — by dogfooding a real epic through it and fixing what broke. This release lands the execute-flow follow-ons (gate-review across every methodology, review-sees-implement-tree, output-channel coverage), the executor-reliability fixes that dogfooding surfaced, a Simplicity/KISS standard for the dev personas, and step-file plugin-root resolution. Reviewed cross-LLM (Codex + CodeRabbit), including a comprehensive pass that caught a silent-stale-review hole before release.
