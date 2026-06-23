@@ -650,3 +650,76 @@ def test_under_run_recovers_via_reharvest_without_redispatch(tmp_path):
     assert dispatch_count[0] == 1, "reharvest must recover before re-dispatching"
     assert result.outputs["epic_dir"].endswith("execute-flow-followons-converge-loop")
     assert result.outputs["commit_sha"] == "4dcd26e"
+
+
+def test_output_contract_injected_into_multica_brief(tmp_path):
+    """#13-enforce — a Multica node that declares semantic outputs must receive a
+    hard OUTPUT CONTRACT naming those exact keys in its issue brief, so a flaky
+    agent turn cannot silently end without writing outputs.yaml (the dominant,
+    difficulty-independent under-run cause). The step content is still verbatim."""
+    from types import SimpleNamespace
+    from hive.lib.dag_executor.executor.handlers.agent import AgentHandler
+
+    spawn = _make_spawn(tmp_path)
+    (tmp_path / "empty").mkdir()
+
+    def side_effect(*args, **kwargs):
+        sub = args[0][2]
+        if sub == "create-issue":
+            return _make_subprocess_result(_create_issue_result())
+        if sub == "dispatch":
+            return _make_subprocess_result(_dispatch_result())
+        return _make_subprocess_result(
+            _completed_poll_result(work_dir=str(tmp_path / "empty"))
+        )
+
+    node = SimpleNamespace(
+        id="author",
+        agent="technical-writer",
+        step_file="",
+        outputs=[SimpleNamespace(name="epic_dir"), SimpleNamespace(name="commit_sha")],
+    )
+    handler = AgentHandler(spawn=spawn)
+    with patch("subprocess.run", side_effect=side_effect) as mock_run:
+        # under-run raise is fine here — we only inspect the issue brief it built
+        with pytest.raises(AgentHandlerError):
+            handler.handle(node, inputs={}, run_id="run-1")
+
+    create_call = next(
+        c for c in mock_run.call_args_list if c[0][0][2] == "create-issue"
+    )
+    cmd = create_call[0][0]
+    body = cmd[cmd.index("--body") + 1]
+    assert "OUTPUT CONTRACT" in body
+    assert "outputs.yaml" in body
+    assert "`epic_dir`" in body
+    # commit_sha is spawn metadata (derived from git HEAD), not a SEMANTIC output
+    # the agent writes — it must NOT appear in the contract's required keys.
+    assert "`commit_sha`" not in body
+
+
+def test_output_contract_absent_for_metadata_only_node(tmp_path):
+    """A node with no SEMANTIC outputs (only spawn metadata) gets NO contract —
+    there is nothing for the agent to write to outputs.yaml."""
+    from types import SimpleNamespace
+    from hive.lib.dag_executor.executor.handlers.agent import AgentHandler
+
+    spawn = _make_spawn(tmp_path)
+    node = SimpleNamespace(
+        id="integrate",
+        agent="developer",
+        step_file="",
+        outputs=[SimpleNamespace(name="commit_sha")],  # metadata-only → not semantic
+    )
+    side_effects = [
+        _make_subprocess_result(_create_issue_result()),
+        _make_subprocess_result(_dispatch_result()),
+        _make_subprocess_result(_completed_poll_result()),
+    ]
+    handler = AgentHandler(spawn=spawn)
+    with patch("subprocess.run", side_effect=side_effects) as mock_run:
+        handler.handle(node, inputs={}, run_id="run-1")
+
+    cmd = mock_run.call_args_list[0][0][0]
+    body = cmd[cmd.index("--body") + 1]
+    assert "OUTPUT CONTRACT" not in body
