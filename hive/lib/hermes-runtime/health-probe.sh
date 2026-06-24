@@ -27,6 +27,18 @@ if ! command -v multica &>/dev/null; then
   exit 1
 fi
 
+# ── 1b. Check node is on PATH ───────────────────────────────────────────────
+# The probe parses/escapes status JSON via node below; without it the script
+# would die with a shell error instead of returning structured unhealthy JSON.
+if ! command -v node &>/dev/null; then
+  if $JSON_MODE; then
+    printf '{"healthy":false,"reason":"node runtime not found on PATH"}\n'
+  else
+    echo "UNHEALTHY: node runtime not found on PATH" >&2
+  fi
+  exit 1
+fi
+
 # ── 2. Query daemon status ───────────────────────────────────────────────────
 STATUS_JSON=$(multica daemon status --output json 2>/dev/null) || {
   if $JSON_MODE; then

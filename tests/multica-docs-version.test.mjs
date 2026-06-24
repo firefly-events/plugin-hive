@@ -49,17 +49,27 @@ test('multica docs and version release metadata are aligned', async () => {
     readText('GUIDE.md'),
   ]);
 
-  assert.equal(pluginJson.version, '2.6.0', 'AC3+5 plugin.json version');
-  assert.equal(marketplaceJson.version, '2.6.0', 'AC4 marketplace outer version');
-  assert.equal(marketplaceJson.plugins[0].version, '2.6.0', 'AC4 marketplace plugin version');
+  // Version metadata must be in lockstep across all sources. Pin to
+  // plugin.json as the source of truth rather than a frozen literal, so this
+  // contract holds at every release (it previously asserted 2.6.0 and silently
+  // went stale after that bump).
+  const version = pluginJson.version;
+  assert.match(version, /^\d+\.\d+\.\d+$/, 'AC3+5 plugin.json version is semver');
+  assert.equal(marketplaceJson.version, version, 'AC4 marketplace outer version matches plugin.json');
+  assert.equal(marketplaceJson.plugins[0].version, version, 'AC4 marketplace plugin version matches plugin.json');
 
   const badgeLine = readme
     .split('\n')
     .find((line) => line.includes('img.shields.io/badge/version-'));
 
   assert.ok(badgeLine, 'AC5 README version badge line exists');
-  assert.match(badgeLine, /version-2\.6\.0-green/, 'AC5 README version badge is 2.6.0');
+  assert.ok(
+    badgeLine.includes(`version-${version}-green`),
+    `AC5 README version badge matches plugin.json (${version})`,
+  );
 
+  // The 2.6.0 changelog section is a historical anchor for the Multica-docs
+  // epic (multica-init bootstrap + sandcastle cleanup) — assert it never regresses.
   const changelogSection = extractChangelogSection(changelog, '2.6.0');
   assert.match(changelogSection, /multica/i, 'AC6 2.6.0 section mentions Multica');
   assert.match(changelogSection, /\/hive:multica-init/, 'AC6 2.6.0 section mentions bootstrap command');

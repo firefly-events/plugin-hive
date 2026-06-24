@@ -4,8 +4,10 @@
 # every <PLACEHOLDER> with the real value for that Studio install.
 # This file is the single-source template; no host-specific secrets live here.
 #
-# After populating, verify all 7 MCP tools are callable:
-#   node <PLUGIN_HIVE_PATH>/hive/lib/multica-story-dispatch/mcp-tools.mjs
+# After populating, verify the MCP server starts. Run from the checkout root so
+# the configured cwd / relative cli.mjs resolution is exercised, not bypassed by
+# an absolute path:
+#   cd <PLUGIN_HIVE_PATH> && node hive/lib/multica-story-dispatch/mcp-tools.mjs
 #   (the process should start and print its capabilities, then exit or wait for stdin)
 
 mcp_servers:
