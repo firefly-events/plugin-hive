@@ -92,17 +92,22 @@ steps:
         type: string
       - name: commit_sha
         type: string
+      - name: branch
+        type: string
+      - name: repo
+        type: string
+      - name: work_dir
+        type: string
     retry:  # author is heaviest; retry transient AGENT failures (not under-runs)
       max_attempts: 4
       on: agent_failed
     timeout_ms: 3600000
 
-  # ── Phase C.5: H/V user-gate (confidence-scored, s4 fills signals) ─────────
-  - id: hv-gate
+  # ── Phase C.5: H/V signal producer (confidence-scored) ─────────────────────
+  - id: hv
     agent: technical-writer
-    node_type: user_gate
-    # Placeholder auto_pass_when — s4 replaces with real confidence predicate
-    auto_pass_when: "$hv.output.first_run == false && $hv.output.confidence >= 80"
+    node_type: agent
+    step_file: hive/workflows/step-files/plan/hv.md
     depends_on:
       - author
     inputs:
@@ -111,16 +116,42 @@ steps:
         step_id: author
         output_name: epic_dir
     outputs:
+      - name: confidence
+        type: json
+      - name: first_run
+        type: json
+    timeout_ms: 1800000
+
+  # ── Phase C.6: H/V user-gate (confidence-scored) ───────────────────────────
+  - id: hv-gate
+    agent: technical-writer
+    node_type: user_gate
+    auto_pass_when: "$hv.output.first_run == false && $hv.output.confidence >= 80"
+    depends_on:
+      - hv
+    inputs:
+      - name: epic_dir
+        source: step_output
+        step_id: author
+        output_name: epic_dir
+      - name: confidence
+        source: step_output
+        step_id: hv
+        output_name: confidence
+      - name: first_run
+        source: step_output
+        step_id: hv
+        output_name: first_run
+    outputs:
       - name: gate_verdict
         type: string
     timeout_ms: 1800000
 
-  # ── Phase C.6: SO user-gate (open-questions-driven, s4 fills signals) ──────
-  - id: so-gate
+  # ── Phase C.7: SO signal producer (open-questions-driven) ──────────────────
+  - id: so
     agent: technical-writer
-    node_type: user_gate
-    # Placeholder auto_pass_when — s4 replaces with real predicate
-    auto_pass_when: "$so.output.first_run == false && $so.output.open_questions_count == 0"
+    node_type: agent
+    step_file: hive/workflows/step-files/plan/so.md
     depends_on:
       - author
     inputs:
@@ -128,6 +159,39 @@ steps:
         source: step_output
         step_id: author
         output_name: epic_dir
+    outputs:
+      - name: open_questions
+        type: json
+      - name: open_questions_count
+        type: json
+      - name: first_run
+        type: json
+    timeout_ms: 1800000
+
+  # ── Phase C.8: SO user-gate (open-questions-driven) ────────────────────────
+  - id: so-gate
+    agent: technical-writer
+    node_type: user_gate
+    auto_pass_when: "$so.output.first_run == false && $so.output.open_questions_count == 0"
+    depends_on:
+      - so
+    inputs:
+      - name: epic_dir
+        source: step_output
+        step_id: author
+        output_name: epic_dir
+      - name: open_questions
+        source: step_output
+        step_id: so
+        output_name: open_questions
+      - name: open_questions_count
+        source: step_output
+        step_id: so
+        output_name: open_questions_count
+      - name: first_run
+        source: step_output
+        step_id: so
+        output_name: first_run
     outputs:
       - name: gate_verdict
         type: string

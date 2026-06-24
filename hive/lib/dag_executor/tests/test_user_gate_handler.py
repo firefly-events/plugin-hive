@@ -75,6 +75,91 @@ def test_auto_pass_when_true_proceeds_without_sentinel(tmp_path: Path) -> None:
     mock_generate.assert_not_called()
 
 
+def test_hv_first_run_halts_even_with_high_confidence(tmp_path: Path) -> None:
+    handler = UserGateHandler(runs_root=tmp_path, telemetry=_FakeTelemetry())
+    node = _make_node(
+        auto_pass_when="$hv.output.first_run == false && $hv.output.confidence >= 80"
+    )
+
+    with patch("hive.lib.dag_executor.executor.handlers.user_gate.wait_for_signal") as mock_wait:
+        mock_wait.return_value = _approved()
+        handler.handle(
+            node,
+            _output_graph(hv={"first_run": True, "confidence": 100}),
+            "run-001",
+        )
+
+    mock_wait.assert_called_once()
+
+
+def test_hv_low_confidence_halts_on_non_first_run(tmp_path: Path) -> None:
+    handler = UserGateHandler(runs_root=tmp_path, telemetry=_FakeTelemetry())
+    node = _make_node(
+        auto_pass_when="$hv.output.first_run == false && $hv.output.confidence >= 80"
+    )
+
+    with patch("hive.lib.dag_executor.executor.handlers.user_gate.wait_for_signal") as mock_wait:
+        mock_wait.return_value = _approved()
+        handler.handle(
+            node,
+            _output_graph(hv={"first_run": False, "confidence": 79}),
+            "run-001",
+        )
+
+    mock_wait.assert_called_once()
+
+
+def test_so_zero_open_questions_auto_passes_on_non_first_run(tmp_path: Path) -> None:
+    handler = UserGateHandler(runs_root=tmp_path, telemetry=_FakeTelemetry())
+    node = _make_node(
+        auto_pass_when="$so.output.first_run == false && $so.output.open_questions_count == 0"
+    )
+
+    with patch("hive.lib.dag_executor.executor.handlers.user_gate.generate") as mock_generate:
+        result = handler.handle(
+            node,
+            _output_graph(so={"first_run": False, "open_questions_count": 0}),
+            "run-001",
+        )
+
+    assert result.outputs["user_gate"] == "passed"
+    mock_generate.assert_not_called()
+
+
+def test_so_open_questions_halts(tmp_path: Path) -> None:
+    handler = UserGateHandler(runs_root=tmp_path, telemetry=_FakeTelemetry())
+    node = _make_node(
+        auto_pass_when="$so.output.first_run == false && $so.output.open_questions_count == 0"
+    )
+
+    with patch("hive.lib.dag_executor.executor.handlers.user_gate.wait_for_signal") as mock_wait:
+        mock_wait.return_value = _approved()
+        handler.handle(
+            node,
+            _output_graph(so={"first_run": False, "open_questions_count": 1}),
+            "run-001",
+        )
+
+    mock_wait.assert_called_once()
+
+
+def test_so_first_run_halts_even_with_zero_open_questions(tmp_path: Path) -> None:
+    handler = UserGateHandler(runs_root=tmp_path, telemetry=_FakeTelemetry())
+    node = _make_node(
+        auto_pass_when="$so.output.first_run == false && $so.output.open_questions_count == 0"
+    )
+
+    with patch("hive.lib.dag_executor.executor.handlers.user_gate.wait_for_signal") as mock_wait:
+        mock_wait.return_value = _approved()
+        handler.handle(
+            node,
+            _output_graph(so={"first_run": True, "open_questions_count": 0}),
+            "run-001",
+        )
+
+    mock_wait.assert_called_once()
+
+
 def test_auto_pass_when_false_suspends(tmp_path: Path) -> None:
     telemetry = _FakeTelemetry()
     handler = UserGateHandler(runs_root=tmp_path, telemetry=telemetry)
@@ -217,6 +302,12 @@ def test_plan_workflow_parses_with_user_gate_nodes() -> None:
     assert graph.nodes["design-gate"].auto_pass_when is None
     assert "design-gate" in graph.nodes["author"].depends_on
     assert "design" not in graph.nodes["author"].depends_on
+    assert graph.nodes["hv-gate"].auto_pass_when == (
+        "$hv.output.first_run == false && $hv.output.confidence >= 80"
+    )
+    assert graph.nodes["so-gate"].auto_pass_when == (
+        "$so.output.first_run == false && $so.output.open_questions_count == 0"
+    )
     assert set(graph.nodes["reconcile"].depends_on) >= {"hv-gate", "so-gate"}
 
 
