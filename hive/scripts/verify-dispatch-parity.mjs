@@ -31,6 +31,7 @@ const repoRoot = resolve(__dirname, '..', '..');
 const matrixPath = resolve(repoRoot, 'hive', 'references', 'dispatch-parity.md');
 
 const noBump = process.argv.includes('--no-bump');
+const planningMode = process.env.HIVE_PLANNING_MODE || '';
 
 // Read the dispatch-parity.md file
 let content;
@@ -55,6 +56,65 @@ if (allMatches.length === 0) {
 const uniquePaths = [...new Set(allMatches.map(m => m[0]))];
 
 const failures = [];
+
+function parseMainMatrixRows(markdown) {
+  const lines = markdown.split('\n');
+  const rows = [];
+  let inMatrix = false;
+  let headerParsed = false;
+
+  for (const line of lines) {
+    if (line.startsWith('## Matrix')) {
+      inMatrix = true;
+      continue;
+    }
+    if (inMatrix && line.startsWith('## ')) break;
+    if (!inMatrix || !line.startsWith('|')) continue;
+    if (/^\|[\s\-|]+\|$/.test(line)) continue;
+    if (!headerParsed) {
+      headerParsed = true;
+      continue;
+    }
+
+    const cells = line.split('|').slice(1, -1).map((cell) => cell.trim());
+    if (cells.length === 4) {
+      rows.push({
+        orchestrator: cells[0],
+        default: cells[1],
+        multica: cells[2],
+        ccWorkflows: cells[3],
+      });
+    }
+  }
+
+  return rows;
+}
+
+function assertExecuteDispatchUnaffectedByPlanningEnv(markdown) {
+  const executeRow = parseMainMatrixRows(markdown).find(
+    (row) => row.orchestrator === 'execute'
+  );
+  if (!executeRow) {
+    failures.push({ path: 'execute row', reason: 'missing from dispatch matrix' });
+    return;
+  }
+  if (planningMode === 'hive-dag') {
+    if (executeRow.multica !== 'skills/hive/skills/execute-mode-multica/SKILL.md') {
+      failures.push({
+        path: 'execute multica cell',
+        reason: 'changed while HIVE_PLANNING_MODE=hive-dag was set',
+      });
+    }
+    if (executeRow.ccWorkflows !== 'skills/hive/skills/execute-mode-cc-workflows/SKILL.md') {
+      failures.push({
+        path: 'execute cc-workflows cell',
+        reason: 'changed while HIVE_PLANNING_MODE=hive-dag was set',
+      });
+    }
+  }
+}
+
+assertExecuteDispatchUnaffectedByPlanningEnv(content);
 
 for (const relativePath of uniquePaths) {
   const absolutePath = resolve(repoRoot, relativePath);

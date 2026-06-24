@@ -9,6 +9,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-06-23
+
+**Plan DAG cutover — `/plan` can now graduate onto Hive's deterministic DAG executor behind the same default-off controls as `/execute`.**
+
+### Added
+
+- **Plan-dispatch and `/plan` DAG routing.** `/plan` now resolves a single runner path through `plan-dispatch`, honoring `HIVE_PLANNING_MODE=hive-dag`, consumer `planning.mode: hive-dag`, and the executor graduation registry before falling back to the narrated orchestrator path.
+- **`user_gate` node type and gate signals.** The plan workflow now carries human review checkpoints with conditional auto-pass predicates for H/V confidence and structured-outline open questions, including fail-closed missing-signal semantics and signed approve/reject sentinel handling.
+- **Plan workflow graduation.** `plan` is active as Order 10 in the executor graduation registry, gated by consumer `executor_default: true`.
+- **Schema and parity coverage.** Workflow schema docs now define `user_gate`, and new acceptance/parity tests cover plan cutover, user-gate behavior, plan spine execution, and `/execute` dispatch parity with `HIVE_PLANNING_MODE=hive-dag` set.
+
 ## [2.12.1] - 2026-06-21
 
 **The substrate that runs Hive's own flows now runs on Multica — and the team that announces a release now has a home.** This release lands the DAG-on-Multica execution substrate (Hive's deterministic flow engine running its agent work through Multica) and a consumer-gated marketing team, both reviewed cross-LLM (Codex) before merge.

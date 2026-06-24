@@ -58,5 +58,4 @@ workflows:
   # Order 10 (plan-dag-cutover): planning flow graduation. Activates
   # executor_enabled_for('plan') → True, enabling the hive-dag runner
   # path for /plan via plan-dispatch/SKILL.md graduated-registry branch.
-  # Uncomment when plan-dag cutover is cleared for production.
-  # - plan
+  - plan

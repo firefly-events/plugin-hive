@@ -250,6 +250,69 @@ The hard ceiling is a security floor — a forgotten "no timeout" pause cannot h
 | Reject sentinel verified | `SUSPENDED` → `FAILED` (via `mark_failed`) | `pause_rejected` (payload carries the reason) |
 | Timeout elapsed | `SUSPENDED` → `FAILED` (via `mark_failed`) | `pause_timeout` |
 
+## Conditional User Gates (`node_type: user_gate`)
+
+A `node_type: user_gate` step is a human review checkpoint with an optional
+machine predicate. It auto-passes only when `auto_pass_when` evaluates true;
+otherwise it suspends with the same signed sentinel mechanism as
+`node_type: pause`.
+
+```yaml
+steps:
+  - id: hv-gate
+    agent: technical-writer
+    node_type: user_gate
+    auto_pass_when: "$hv.output.first_run == false && $hv.output.confidence >= 80"
+    depends_on:
+      - hv
+    timeout_ms: 1800000
+```
+
+### `auto_pass_when` grammar
+
+`auto_pass_when` uses the existing strict predicate grammar. No new operators
+or functions are introduced for user gates.
+
+```ebnf
+auto_pass_when = predicate ;
+predicate      = comparison , { ( "&&" | "||" ) , comparison } ;
+comparison     = dotpath , operator , literal ;
+dotpath        = "$" , step_id , ".output." , output_name ;
+operator       = "==" | "!=" | ">=" | ">" | "<=" | "<" ;
+literal        = string | number | boolean ;
+boolean        = "true" | "false" ;
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `node_type` | string | `agent` | Set to `user_gate` for a conditional human gate. |
+| `auto_pass_when` | string | null | Predicate over prior node outputs. If true, the gate proceeds without sentinel files. If false or absent, the gate suspends. |
+| `timeout_ms` | int | pause hard ceiling | Maximum wait for a human approve/reject sentinel, capped by the pause security ceiling. |
+
+Absent-dotpath behavior is fail-closed: when a predicate references a missing
+output such as `$hv.output.confidence`, the predicate evaluates false and the
+gate halts. Missing confidence, missing open-questions counts, and missing
+first-run signals never auto-pass.
+
+### Actor contract
+
+The `.approve` and `.reject` sentinels MUST be written by a human reviewer.
+CI automation, agent loops, scheduled jobs, and other automated pipelines are
+explicitly excluded from writing user-gate sentinels. The executor verifies the
+sentinel token, but it cannot prove who wrote the file; the human-only rule is
+an operational contract.
+
+### Binding scope
+
+The shipped binding is filesystem-only: sentinel files live under the local
+`.pHive/runs/{run_id}/pause/` tree or the configured run-state root. A Multica
+sentinel bridge is a named precondition before deploying `user_gate` approval
+semantics through a remote Multica UI or API surface.
+
+This preserves the gate-ownership invariant from `/plan`: external execution
+substrates may produce artifacts, but user review and sign-off remains owned by
+the orchestrator/operator boundary.
+
 ## Scheduler Overrides (`under_scheduler`)
 
 Steps that normally require an interactive pause may declare an `under_scheduler` block to define non-interactive behavior when the workflow is running in scheduler context.
