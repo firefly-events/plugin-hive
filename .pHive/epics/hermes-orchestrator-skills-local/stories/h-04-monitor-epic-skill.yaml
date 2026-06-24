@@ -1,7 +1,7 @@
 id: h-04-monitor-epic-skill
 epic: hermes-orchestrator-skills-local
 title: Author the monitor-epic orchestrator skill (read-only)
-status: pending
+status: blocked
 complexity: medium
 methodology: classic
 side: plugin-hive
