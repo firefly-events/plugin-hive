@@ -1,7 +1,7 @@
 id: hpr-1-inbound-slack-resolve-gate
 epic: hermes-production-readiness
 title: Inbound Slack action → resolveGate (the loop-closer)
-status: pending
+status: complete
 complexity: high
 methodology: classic
 depends_on: [hpr-3-slack-app-and-secrets]

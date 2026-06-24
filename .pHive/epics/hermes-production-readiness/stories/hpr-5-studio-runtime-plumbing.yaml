@@ -1,7 +1,7 @@
 id: hpr-5-studio-runtime-plumbing
 epic: hermes-production-readiness
 title: Studio runtime plumbing + daemon autostart
-status: pending
+status: complete
 complexity: high
 methodology: classic
 depends_on: []
