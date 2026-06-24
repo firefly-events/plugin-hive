@@ -52,7 +52,8 @@ def test_plan_stays_narrated_when_registry_does_not_list_plan(tmp_path: Path) ->
 def test_default_narrated_plan_skill_path_remains_present() -> None:
     """The cutover branch still falls through to the narrated path by default."""
 
-    skill = Path("skills/plan/SKILL.md").read_text(encoding="utf-8")
+    repo_root = Path(__file__).resolve().parents[4]
+    skill = (repo_root / "skills" / "plan" / "SKILL.md").read_text(encoding="utf-8")
     assert "runner_path == hive-dag" in skill
     assert "runner_path == orchestrator-narrated" in skill
     assert "Continue Phase A using the returned active planning team handles" in skill

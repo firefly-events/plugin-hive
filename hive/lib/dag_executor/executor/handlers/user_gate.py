@@ -136,7 +136,10 @@ class UserGateHandler:
             self.telemetry.emit(
                 "pause_suspended",
                 node.id,
-                {"token": token, "timeout_seconds": timeout_seconds, "reason": reason},
+                # Do not emit `token` — it is the signed resume credential that
+                # wait_for_signal() trusts as approval proof. Logging it would let
+                # anyone with telemetry + pause-dir access forge .approve/.reject.
+                {"timeout_seconds": timeout_seconds, "reason": reason},
             )
 
         try:

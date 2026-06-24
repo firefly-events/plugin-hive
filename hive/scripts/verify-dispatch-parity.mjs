@@ -99,17 +99,22 @@ function assertExecuteDispatchUnaffectedByPlanningEnv(markdown) {
     return;
   }
   if (planningMode === 'hive-dag') {
-    if (executeRow.multica !== 'skills/hive/skills/execute-mode-multica/SKILL.md') {
-      failures.push({
-        path: 'execute multica cell',
-        reason: 'changed while HIVE_PLANNING_MODE=hive-dag was set',
-      });
-    }
-    if (executeRow.ccWorkflows !== 'skills/hive/skills/execute-mode-cc-workflows/SKILL.md') {
-      failures.push({
-        path: 'execute cc-workflows cell',
-        reason: 'changed while HIVE_PLANNING_MODE=hive-dag was set',
-      });
+    // Assert the WHOLE execute row against the canonical baseline — not just the
+    // multica/ccWorkflows cells. A regression in the `default` cell must also fail,
+    // otherwise this check can't prove zero effect on /execute dispatch parity.
+    const EXPECTED_EXECUTE_ROW = {
+      orchestrator: 'execute',
+      default: 'inline',
+      multica: 'skills/hive/skills/execute-mode-multica/SKILL.md',
+      ccWorkflows: 'skills/hive/skills/execute-mode-cc-workflows/SKILL.md',
+    };
+    for (const cell of Object.keys(EXPECTED_EXECUTE_ROW)) {
+      if (executeRow[cell] !== EXPECTED_EXECUTE_ROW[cell]) {
+        failures.push({
+          path: `execute ${cell} cell`,
+          reason: `changed to "${executeRow[cell]}" (expected "${EXPECTED_EXECUTE_ROW[cell]}") while HIVE_PLANNING_MODE=hive-dag was set`,
+        });
+      }
     }
   }
 }

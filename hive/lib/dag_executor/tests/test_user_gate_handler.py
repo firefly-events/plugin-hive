@@ -291,7 +291,8 @@ def test_narrated_path_without_user_gate_never_invokes_handler() -> None:
 
 
 def test_plan_workflow_parses_with_user_gate_nodes() -> None:
-    workflow_path = Path("hive/workflows/plan.workflow.yaml")
+    repo_root = Path(__file__).resolve().parents[4]
+    workflow_path = repo_root / "hive/workflows" / "plan.workflow.yaml"
     graph = load_workflow(workflow_path)
 
     user_gate_nodes = [
@@ -365,6 +366,7 @@ def test_user_gate_run_state_suspends_then_resumes(tmp_path: Path) -> None:
         run_state_path=state_root,
     )
     thread.join(timeout=5)
+    assert not thread.is_alive(), "approval helper thread did not finish in time"
 
     assert captured_status["mid_gate"] == RunStatus.SUSPENDED
     assert load(run_id, root=state_root).status == RunStatus.COMPLETED

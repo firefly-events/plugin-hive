@@ -55,8 +55,13 @@ steps:
     agent: architect
     node_type: user_gate
     # No auto_pass_when → always-halt (design lacks full research context)
+    # Depends on research too: `author` requires research, so if research fails
+    # (recorded skipped, not fatal, in the parallel-wave executor) this gate must
+    # NOT become ready — otherwise the run suspends for human review on an
+    # already-doomed path that `author` can never resume.
     depends_on:
       - design
+      - research
     inputs:
       - name: design_discussion
         source: step_output
