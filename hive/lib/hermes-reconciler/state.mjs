@@ -229,11 +229,18 @@ function withCycleStateLock(cycleStatePath, fn, { timeoutMs = 5000, staleMs = 30
   }
 }
 
-export function writeHermesReconcilerState(cycleStatePath, updates) {
+/**
+ * Transactional read-modify-write under a single lock. `mutator(current)` receives
+ * the freshly-read, defaults-applied state and returns the `updates` patch to merge
+ * — or throws to abort the write (e.g. a precondition failure). Because the read,
+ * the mutator's precondition check, and the write all execute inside one
+ * `withCycleStateLock`, no concurrent writer can slip between a precondition check
+ * and the write it guards (closes the resolveGate check-then-write TOCTOU).
+ */
+export function mutateHermesReconcilerState(cycleStatePath, mutator) {
   const y = requireYaml();
-  validateReconcilerUpdates(updates);
 
-  withCycleStateLock(cycleStatePath, () => {
+  return withCycleStateLock(cycleStatePath, () => {
     let doc = {};
     let text;
     try {
@@ -255,6 +262,11 @@ export function writeHermesReconcilerState(cycleStatePath, updates) {
     }
 
     const current = applyDefaults(doc.hermes_reconciler ?? null);
+
+    // Compute the patch INSIDE the lock so any precondition the mutator enforces
+    // is atomic with the write.
+    const updates = mutator(current) ?? {};
+    validateReconcilerUpdates(updates);
 
     // Merge updates — stories get per-story merge, top-level scalar fields get replaced.
     // The write path is the mutation boundary: reject malformed shapes loudly rather
@@ -292,5 +304,13 @@ export function writeHermesReconcilerState(cycleStatePath, updates) {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(tmpPath, serialized, 'utf8');
     fs.renameSync(tmpPath, cycleStatePath);
+    return merged;
   });
+}
+
+export function writeHermesReconcilerState(cycleStatePath, updates) {
+  // Validate eagerly for callers passing a static patch; mutate re-validates the
+  // resolved patch inside the lock (cheap, pure).
+  validateReconcilerUpdates(updates);
+  return mutateHermesReconcilerState(cycleStatePath, () => updates);
 }

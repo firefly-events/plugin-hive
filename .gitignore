@@ -255,12 +255,10 @@ tsx-*/
 !.pHive/epics/dag-flows-multica/**
 !.pHive/epics/execute-flow-followons-converge-loop/
 !.pHive/epics/execute-flow-followons-converge-loop/**
-!.pHive/epics/hermes-orchestrator-skills/
-!.pHive/epics/hermes-orchestrator-skills/**
 
 # Generated concept illustrations (planning-format-contract.md §8) are produced
 # on-demand and never committed. Re-ignore AFTER the epic allowlists above so the
 # PNG is excluded even inside un-ignored epic dirs (last-match-wins).
 .pHive/epics/**/docs/*.png
-!.pHive/epics/hermes-orchestrator-skills-local/
-!.pHive/epics/hermes-orchestrator-skills-local/**
+!.pHive/epics/hermes-production-readiness/
+!.pHive/epics/hermes-production-readiness/**

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Hive multica daemon autostart service (launchd / macOS).
+       Install: cp this file to ~/Library/LaunchAgents/ then
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hive.multica-daemon.plist
+       Verify: launchctl print gui/$(id -u)/com.hive.multica-daemon
+       Remove: launchctl bootout gui/$(id -u)/com.hive.multica-daemon -->
+  <key>Label</key>
+  <string>com.hive.multica-daemon</string>
+
+  <!-- Resolve the multica binary via PATH (set in EnvironmentVariables below)
+       rather than a hardcoded prefix: Intel Homebrew installs to
+       /usr/local/bin, Apple Silicon to /opt/homebrew/bin. The /bin/sh wrapper
+       lets launchd pick whichever exists on this host. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>exec multica daemon start --foreground</string>
+  </array>
+
+  <!-- LaunchAgents always run as the bootstrapping user (the owner of
+       ~/Library/LaunchAgents); UserName is ignored by launchctl bootstrap, so
+       it is intentionally omitted. -->
+
+  <!-- Start at login/boot (initial launch); KeepAlive then covers crash/exit. -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Restart automatically on exit (covers daemon crash or reboot). -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Wait 5 s before first launch to let network/mounts settle. -->
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+
+  <!-- Capture daemon stdout/stderr for post-mortem inspection. -->
+  <key>StandardOutPath</key>
+  <string>/tmp/multica-daemon.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/multica-daemon.stderr.log</string>
+
+  <!-- Ensure PATH contains the Node.js + multica binaries. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+  </dict>
+</dict>
+</plist>

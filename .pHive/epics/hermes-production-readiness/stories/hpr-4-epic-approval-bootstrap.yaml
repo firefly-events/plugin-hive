@@ -1,0 +1,75 @@
+id: hpr-4-epic-approval-bootstrap
+epic: hermes-production-readiness
+title: Epic approval bootstrap (the human "go")
+status: complete
+complexity: low
+methodology: classic
+depends_on: [hpr-3-slack-app-and-secrets]
+
+description: |
+  The human "go" — the gated entrypoint that admits one epic into the autonomous loop.
+  It sets the chosen epic's initial gate_state to pre_approved and registers
+  epic_of_record so the cron (hpr-2) knows which epic to drive. This is the ONLY way an
+  epic enters lights-on operation: Hermes must NEVER self-issue this (it would let the
+  orchestrator approve its own work, defeating the human-at-planning-and-review gate).
+
+  Thin wrapper over the existing write boundary: cli.mjs write-state /
+  multica_write_state already validate gate_state + epic_of_record. This story adds the
+  human-facing bootstrap that resolves the epic handle, echoes what it will do, requires
+  explicit confirmation, then writes {gate_state: pre_approved, epic_of_record: <handle>}
+  to the epic's cycle-state. Optionally posts a Slack "epic X is now lights-on" notice
+  (uses hpr-3 bot token).
+
+acceptance_criteria:
+  - "Given a chosen epic handle, when the human runs the bootstrap and confirms, then the epic's cycle-state gets gate_state: pre_approved + epic_of_record: <handle> via the validated write boundary."
+  - "Given the bootstrap is invoked, when it runs, then it echoes the resolved epic_of_record and requires an explicit human confirmation before writing (no silent arm)."
+  - "Given an invalid/unknown epic handle, when bootstrap runs, then it errors with no state write."
+  - "The bootstrap is human-invoked only; there is no code path by which a Hermes tick or agent can call it to self-approve (documented + structurally enforced — it is not part of the reconcile-tick surface)."
+  - "Given a successful bootstrap, when done, then an optional Slack notice confirms the epic is now in the autonomous loop."
+
+steps:
+  - id: implement
+    description: Build the bootstrap entrypoint — resolve epic handle, echo + confirm, write {gate_state: pre_approved, epic_of_record} via cli.mjs write-state / multica_write_state. Optional Slack notice. Keep it OFF the reconcile-tick surface.
+    agent: developer
+  - id: test
+    description: Test happy path (writes pre_approved + epic_of_record), confirm-gate (no write without confirm), invalid handle (no write). Assert the entrypoint is not reachable from the tick surface.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify the human-only invariant + validated write boundary reuse + confirm gate.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + document the bootstrap as the single human-go entrypoint in operations-guide.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-story-dispatch/cli.mjs
+      purpose: write-state subcommand — validated write boundary for gate_state + epic_of_record this bootstrap reuses.
+    - path: hive/lib/hermes-reconciler/state.mjs
+      purpose: VALID_GATE_STATES (pre_approved is the autonomy latch) + epic_of_record semantics.
+    - path: hive/references/orchestrator-skills/kickoff-exec.md
+      purpose: kickoff-exec assumes an epic is already pre_approved — this story is what does the approving.
+
+cross_cutting:
+  - concern: security
+    action: "Human-only entrypoint; structurally excluded from the reconcile-tick surface so the orchestrator cannot self-approve."
+
+metric:
+  applies: false
+  justification: "One-shot human-invoked control action (sets a latch); its correctness is binary and asserted by hpr-4's own tests, and its downstream effect (an epic actually advancing unattended) is measured by hpr-2's unattended_tick_advances metric — a separate runtime metric here would just duplicate that."
+
+risks:
+  - severity: low
+    description: Bootstrap mis-targets an epic → wrong epic goes autonomous.
+    mitigation: echo resolved epic_of_record + explicit confirm before write.
+  - severity: medium
+    description: A code path lets Hermes self-approve.
+    mitigation: keep bootstrap off the tick surface; test asserts non-reachability.
+
+references:
+  - path: hive/references/orchestrator-skills/slack-notify-await.md
+    relevant_excerpt: "pre_approved is the autonomy latch; null -> pre_approved is a human action via write-state."

@@ -9,6 +9,27 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.13.2] - 2026-06-24
+
+**Wiring the lights-on loop's runtime — first autonomous stories.** Partial delivery of the `hermes-production-readiness` epic: the loop-closer's inbound transport and the human "go" entrypoint, plus the Studio runtime templates. Executed through the DAG-on-Multica path (which also surfaced — and got fixed — a per-story `story_spec` scoping gap in the launcher).
+
+### Added
+
+- **Inbound Slack → resolveGate, repo slice** (`hpr-1`). `slack-notify-await.mjs` now emits Slack **Block Kit** blocks with gate-action buttons (`approve` / `revise` / `reject`, encoding `{epic_handle, story_id, action}` in the button value) alongside the plain-text fallback, plus `parseGateAction()` and `resolveGateInvoker()` — the thin, tested entrypoint a Studio HTTP receiver calls (only **after verifying the Slack request signature**) to drive `resolveGate`. The receiver itself (hermes-agent HTTP endpoint + HMAC signature verification over the raw request body, before any cycle-state read/write) remains the Studio-side follow-up.
+- **Epic-approval bootstrap** (`hpr-4`). `epic-bootstrap.mjs` — the gated human "go" that latches a chosen epic's initial `gate_state: pre_approved` + `epic_of_record` through the validated write boundary, with an optional Slack notice. Human-invoked only; structurally off the reconcile-tick surface so the orchestrator can never self-approve.
+- **Studio runtime plumbing templates** (`hpr-5`). A launchd daemon-autostart plist, a health-probe script, the `~/.hermes/config.yaml` MCP-wiring template, and an env-contract doc, plus a Studio Runtime Setup section in the operations guide. The live Studio runtime was verified durable (`RunAtLoad` + `KeepAlive`, all services loaded).
+- **Slack app + secrets** (`hpr-3`). A reproducible Slack-app runbook (`slack-app-runbook.md`) covering app creation, the `chat:write` scope, the four `HERMES_SLACK_*` values, root-only `secrets.env` storage, and rotation. The app was provisioned and **outbound posting verified live** (webhook 200/ok); secrets stored on Studio at `chmod 600`. The inbound receiver + live-process activation (gateway sources `secrets.env`, requires a Hermes restart) are documented as follow-ups.
+
+### Security
+
+- **Path-traversal hardening.** Epic handles compose filesystem paths (`<dir>/<handle>.yaml`); both composers — `validateEpicHandle` (`epic-bootstrap.mjs`) and `resolveGateInvoker` (`slack-notify-await.mjs`) — now reject any handle that is not a `[a-z0-9-]` slug, so a hostile inbound payload cannot escape the cycle-state dir.
+- **Gate-transition atomicity.** `resolveGate`'s precondition check and transition now run inside one locked read-modify-write (`mutateHermesReconcilerState`), closing a check-then-write race where a concurrent reconcile-tick could let a stale Slack click clobber a terminal transition.
+- **Webhook target constraint.** Outbound Slack posts now require `https` to a Slack host (loopback `http` permitted only for tests), preventing a misconfigured/injected webhook URL from exfiltrating verdict context.
+
+### Notes
+
+- Deferred to a follow-up: the hpr-1 **Studio-side receiver** (hermes-agent HTTP endpoint + signature verification), the **live-process activation** of hpr-3's secrets (gateway restart), and an out-of-scope **executor-graph cascade-skip** change the hpr-1 run produced (isolated for its own review, not shipped here).
+
 ## [2.13.1] - 2026-06-23
 
 **Codifying the orchestrator so a persistent Hermes cron can run the loop.** This release turns the Hive orchestrator from a thing a human drives into a contract a Hermes agent drives — five Hermes-side skill runbooks plus the gate, MCP, and Slack plumbing they stand on. The north star is a lights-on software factory where the human is in the loop only at planning and review; the orchestrator and agents own everything between.
