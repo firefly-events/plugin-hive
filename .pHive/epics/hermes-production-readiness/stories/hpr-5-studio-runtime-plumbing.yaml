@@ -1,7 +1,9 @@
 id: hpr-5-studio-runtime-plumbing
 epic: hermes-production-readiness
 title: Studio runtime plumbing + daemon autostart
-status: complete
+status: shipped
+shipped_at: "2026-06-24T03:39:00Z"
+release_id: "v2.13.2"
 complexity: high
 methodology: classic
 depends_on: []

@@ -1,7 +1,9 @@
 id: hpr-1-inbound-slack-resolve-gate
 epic: hermes-production-readiness
 title: Inbound Slack action → resolveGate (the loop-closer)
-status: complete
+status: shipped
+shipped_at: "2026-06-24T03:39:00Z"
+release_id: "v2.13.2"
 complexity: high
 methodology: classic
 depends_on: [hpr-3-slack-app-and-secrets]
