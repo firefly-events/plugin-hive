@@ -14,7 +14,8 @@ Design locks (per hde-1 acceptance criteria and design_decisions):
     are distinct fields. Per-step optional means "if this step fails,
     continue"; per-input optional means "if upstream skipped, pass null".
     They MUST NOT be collapsed.
-  * `NodeType` enum is exactly {AGENT, SCRIPT, GATE, PAUSE}. No LOOP.
+  * `NodeType` enum is exactly {AGENT, SCRIPT, GATE, PAUSE, RECONCILE,
+    USER_GATE}. No LOOP.
   * Additive fields (`when`, `tools`, `disallowed_tools`) round-trip on
     the model but are not enforced here.
 """
@@ -32,6 +33,7 @@ class NodeType(str, Enum):
     GATE = "gate"
     PAUSE = "pause"
     RECONCILE = "reconcile"
+    USER_GATE = "user_gate"
 
 
 VALID_INPUT_SOURCES = ("literal", "step_output", "context")
@@ -129,6 +131,7 @@ class Node:
     disallowed_tools: list[str] | None = None
     when: str | None = None
     depends_on: list[str] = field(default_factory=list)
+    auto_pass_when: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -158,6 +161,8 @@ class Node:
             out["disallowed_tools"] = list(self.disallowed_tools)
         if self.when is not None:
             out["when"] = self.when
+        if self.auto_pass_when is not None:
+            out["auto_pass_when"] = self.auto_pass_when
         return out
 
 

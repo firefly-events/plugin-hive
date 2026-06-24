@@ -2,10 +2,10 @@ name: plan
 description: >
   Plan flow graph — decompose a requirement into a committed epic with
   dependency-tracked stories.
-  Shape: research ‖ design → author → reconcile → output-validation gate.
-  User-facing review gates (design-discussion, H/V, structured-outline sign-off)
-  are NOT in this graph — they remain orchestrator-local (s9 wiring owns that
-  boundary).
+  Shape: research ‖ design → design-gate → author → user gates → reconcile
+  → output-validation gate.
+  User-facing review gates halt through user_gate pause sentinels on the
+  graduated DAG path; the default narrated path remains orchestrator-local.
 version: "1.0.0"
 
 steps:
@@ -49,6 +49,24 @@ steps:
       on: agent_failed
     timeout_ms: 1800000
 
+  # ── Phase B.5: design user-gate (always-halt — design runs parallel to research
+  #   and cannot emit a trustworthy confidence score; human review required) ───
+  - id: design-gate
+    agent: architect
+    node_type: user_gate
+    # No auto_pass_when → always-halt (design lacks full research context)
+    depends_on:
+      - design
+    inputs:
+      - name: design_discussion
+        source: step_output
+        step_id: design
+        output_name: design_discussion
+    outputs:
+      - name: gate_verdict
+        type: string
+    timeout_ms: 1800000
+
   # ── Phase C: story decomposition + epic authoring ───────────────────────────
   - id: author
     agent: technical-writer
@@ -56,7 +74,7 @@ steps:
     step_file: hive/workflows/step-files/plan/author.md
     depends_on:
       - research
-      - design
+      - design-gate
     inputs:
       - name: research_brief
         source: step_output
@@ -79,12 +97,49 @@ steps:
       on: agent_failed
     timeout_ms: 3600000
 
+  # ── Phase C.5: H/V user-gate (confidence-scored, s4 fills signals) ─────────
+  - id: hv-gate
+    agent: technical-writer
+    node_type: user_gate
+    # Placeholder auto_pass_when — s4 replaces with real confidence predicate
+    auto_pass_when: "$hv.output.first_run == false && $hv.output.confidence >= 80"
+    depends_on:
+      - author
+    inputs:
+      - name: epic_dir
+        source: step_output
+        step_id: author
+        output_name: epic_dir
+    outputs:
+      - name: gate_verdict
+        type: string
+    timeout_ms: 1800000
+
+  # ── Phase C.6: SO user-gate (open-questions-driven, s4 fills signals) ──────
+  - id: so-gate
+    agent: technical-writer
+    node_type: user_gate
+    # Placeholder auto_pass_when — s4 replaces with real predicate
+    auto_pass_when: "$so.output.first_run == false && $so.output.open_questions_count == 0"
+    depends_on:
+      - author
+    inputs:
+      - name: epic_dir
+        source: step_output
+        step_id: author
+        output_name: epic_dir
+    outputs:
+      - name: gate_verdict
+        type: string
+    timeout_ms: 1800000
+
   # ── Reconcile: materialise author's committed work before gate ───────────────
   - id: reconcile
     agent: reconcile-handler
     node_type: reconcile
     depends_on:
-      - author
+      - hv-gate
+      - so-gate
     inputs:
       - name: sha
         source: step_output
