@@ -98,6 +98,28 @@ test('buildVerdictMessage: omits diff and episode sections when absent', () => {
   assert.doesNotMatch(text, /Diff/);
 });
 
+test('buildVerdictMessage: clamps oversized diff/summary so no section exceeds Slack 3000-char limit', () => {
+  const huge = 'x'.repeat(20000);
+  const { blocks } = buildVerdictMessage({
+    epicHandle: 'my-epic',
+    storyId: 'h-06',
+    verdict: 'needs_revision',
+    episodeSummary: huge,
+    diff: huge,
+  });
+  const sectionTexts = blocks
+    .filter((b) => b.type === 'section' && b.text?.type === 'mrkdwn')
+    .map((b) => b.text.text);
+  // At least the summary + diff sections present.
+  const big = sectionTexts.filter((t) => /Episode Summary|Diff/.test(t));
+  assert.ok(big.length >= 2, 'expected episode-summary and diff sections');
+  for (const t of sectionTexts) {
+    assert.ok(t.length <= 3000, `section text must stay <= 3000 (Slack limit), got ${t.length}`);
+  }
+  // Truncation is signalled, not silent.
+  assert.ok(big.some((t) => /truncated/.test(t)), 'oversized content must be marked truncated');
+});
+
 // ── buildErrorMessage ─────────────────────────────────────────────────────────
 
 test('buildErrorMessage: includes epic, errorKind, details, and decision prompt', () => {

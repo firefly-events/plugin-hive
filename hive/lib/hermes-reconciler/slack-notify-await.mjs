@@ -110,6 +110,20 @@ function fenceSafe(v) {
   return String(v).replace(/`{3,}/g, (m) => 'ʼ'.repeat(m.length));
 }
 
+// Slack Block Kit caps a `section` text at 3000 chars. An unbounded review diff
+// or episode summary would otherwise push a section past that limit, Slack would
+// reject the WHOLE post (invalid_blocks), and the human would never see the gate
+// prompt (the tick stays halted but blind). Clamp content below the limit with
+// headroom for the label + code-fence wrapper, and mark the truncation. Clamp
+// AFTER escaping so the final string length is what Slack receives.
+const SLACK_SECTION_TEXT_MAX = 2800;
+function clampForSlack(s, max = SLACK_SECTION_TEXT_MAX) {
+  const str = String(s);
+  if (str.length <= max) return str;
+  const omitted = str.length - max;
+  return `${str.slice(0, max)}\n… (truncated — ${omitted} chars omitted; see full output in the episode/run log)`;
+}
+
 const ACTION_LABELS = { approve: 'Approve', continue: 'Continue', revise: 'Revise', reject: 'Reject' };
 
 /**
@@ -156,11 +170,11 @@ export function buildVerdictMessage({ epicHandle, storyId, verdict, episodeSumma
     : 'Reply with one of:\n- `approve` — advance to the next story\n- `revise` — send back for revision\n- `reject` — halt this epic permanently';
 
   const summarySection = episodeSummary
-    ? `\n### Episode Summary\n${mrkdwnInline(episodeSummary.trim())}`
+    ? `\n### Episode Summary\n${clampForSlack(mrkdwnInline(episodeSummary.trim()))}`
     : '';
 
   const diffSection = diff
-    ? `\n### Diff\n\`\`\`\n${fenceSafe(diff.trim())}\n\`\`\``
+    ? `\n### Diff\n\`\`\`\n${clampForSlack(fenceSafe(diff.trim()))}\n\`\`\``
     : '';
 
   const text = [
@@ -199,14 +213,14 @@ export function buildVerdictMessage({ epicHandle, storyId, verdict, episodeSumma
   if (episodeSummary) {
     blocks.push({
       type: 'section',
-      text: { type: 'mrkdwn', text: `*Episode Summary*\n${mrkdwnInline(episodeSummary.trim())}` },
+      text: { type: 'mrkdwn', text: `*Episode Summary*\n${clampForSlack(mrkdwnInline(episodeSummary.trim()))}` },
     });
   }
 
   if (diff) {
     blocks.push({
       type: 'section',
-      text: { type: 'mrkdwn', text: `*Diff*\n\`\`\`\n${fenceSafe(diff.trim())}\n\`\`\`` },
+      text: { type: 'mrkdwn', text: `*Diff*\n\`\`\`\n${clampForSlack(fenceSafe(diff.trim()))}\n\`\`\`` },
     });
   }
 
