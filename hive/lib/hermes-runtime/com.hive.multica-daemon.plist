@@ -26,6 +26,10 @@
        ~/Library/LaunchAgents); UserName is ignored by launchctl bootstrap, so
        it is intentionally omitted. -->
 
+  <!-- Start at login/boot (initial launch); KeepAlive then covers crash/exit. -->
+  <key>RunAtLoad</key>
+  <true/>
+
   <!-- Restart automatically on exit (covers daemon crash or reboot). -->
   <key>KeepAlive</key>
   <true/>

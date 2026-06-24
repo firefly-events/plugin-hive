@@ -12,10 +12,10 @@ the Hermes runtime.
 
 | Variable | Required by | Description |
 |----------|-------------|-------------|
-| `HERMES_SLACK_WEBHOOK_URL` | `slack-notify-await.mjs` (existing) | Incoming webhook URL for outbound verdict/error posts. |
-| `HERMES_SLACK_SIGNING_SECRET` | hpr-1 inbound receiver | Slack app signing secret (HMAC-SHA256 request verification). |
-| `HERMES_SLACK_BOT_TOKEN` | hpr-1 confirmation posts, hpr-4 bootstrap notice | Bot OAuth token (`xoxb-`). Required scopes: `chat:write`. |
-| `HERMES_SLACK_CHANNEL_ID` | hpr-4 bootstrap notice (optional) | Channel ID for the "epic X is now lights-on" notice. |
+| `HERMES_SLACK_WEBHOOK_URL` | `slack-notify-await.mjs` outbound posts **and** `epic-bootstrap.mjs` (hpr-4) lights-on notice | Incoming webhook URL for outbound verdict/error/bootstrap posts. The hpr-4 bootstrap notice posts via this webhook — it does **not** use the bot token or channel ID. |
+| `HERMES_SLACK_SIGNING_SECRET` | hpr-1 inbound receiver (deferred, Studio-side) | Slack app signing secret (HMAC-SHA256 request verification). |
+| `HERMES_SLACK_BOT_TOKEN` | hpr-1 inbound confirmation posts (deferred, Studio-side) | Bot OAuth token (`xoxb-`). Required scopes: `chat:write`. |
+| `HERMES_SLACK_CHANNEL_ID` | hpr-1 inbound confirmation thread (deferred, Studio-side; optional) | Channel ID for confirmation replies. |
 
 Rotation: re-generate in the Slack app settings → update Studio keychain/env → no code change required.
 

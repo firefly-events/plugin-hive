@@ -19,14 +19,41 @@ import http from 'node:http';
 import https from 'node:https';
 import path from 'node:path';
 import { URL } from 'node:url';
-import { readHermesReconcilerState, writeHermesReconcilerState } from './state.mjs';
+import {
+  writeHermesReconcilerState,
+  mutateHermesReconcilerState,
+} from './state.mjs';
 
 // ── Slack HTTP ────────────────────────────────────────────────────────────────
+
+/**
+ * Constrain the webhook target. Verdict/error payloads carry repo context and
+ * diffs, so a misconfigured or injected webhook URL must not be able to POST that
+ * to an arbitrary host (SSRF / exfiltration). Require https to a Slack host;
+ * permit http only to loopback for test injection.
+ */
+export function assertSlackWebhookUrl(parsed) {
+  const host = parsed.hostname;
+  const isLoopback = host === '127.0.0.1' || host === 'localhost' || host === '::1';
+  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopback)) {
+    throw new Error(
+      `Slack webhook must use https (got ${parsed.protocol}//${host}); ` +
+      'http is permitted only for loopback test injection.',
+    );
+  }
+  const isSlackHost = host === 'hooks.slack.com' || host.endsWith('.slack.com');
+  if (!isSlackHost && !isLoopback) {
+    throw new Error(
+      `Slack webhook host not allowed: ${host}. Expected hooks.slack.com (or loopback for tests).`,
+    );
+  }
+}
 
 function postSlack(webhookUrl, payload, { timeoutMs = 10_000 } = {}) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify(payload);
     const parsed = new URL(webhookUrl);
+    assertSlackWebhookUrl(parsed);
     const transport = parsed.protocol === 'http:' ? http : https;
     const defaultPort = parsed.protocol === 'http:' ? 80 : 443;
     const options = {
@@ -388,70 +415,74 @@ export function resolveGate(cycleStatePath, { storyId, action }) {
     throw new Error(`resolveGate: unknown action "${action}". Valid: approve, continue, reject, revise.`);
   }
 
-  // Precondition: only a gate that is actually awaiting a human may be resolved.
-  // Without this, a stale or misdirected Slack action could transition from
-  // null / pre_approved / finalized / rejected straight to pre_approved —
-  // resuming a terminated epic or re-approving one that never halted for review.
-  const current = readHermesReconcilerState(cycleStatePath);
-  if (current.gate_state !== 'review_awaiting_human') {
-    throw new Error(
-      `resolveGate: gate_state is ${JSON.stringify(current.gate_state)}, not "review_awaiting_human" — ` +
-      'nothing is awaiting human resolution. Refusing to transition.',
-    );
-  }
-
-  if (action === 'reject') {
-    writeHermesReconcilerState(cycleStatePath, { gate_state: 'rejected' });
-    return { resolved: true, gate_state: 'rejected', action };
-  }
-
-  if (action === 'revise') {
-    if (!storyId) {
-      throw new Error('resolveGate: storyId is required for action "revise"');
-    }
-    if (!current.stories || !(storyId in current.stories)) {
+  // Precondition + transition run inside ONE locked read-modify-write
+  // (mutateHermesReconcilerState). Without the shared lock, a concurrent
+  // reconcile-tick writer could change gate_state between an unlocked
+  // "is it awaiting a human?" check and the write that resolves it — a stale
+  // Slack click could then clobber a terminal/finalized transition back to
+  // pre_approved, resuming a terminated epic.
+  let result;
+  mutateHermesReconcilerState(cycleStatePath, (current) => {
+    if (current.gate_state !== 'review_awaiting_human') {
       throw new Error(
-        `resolveGate: story "${storyId}" not found in reconciler state — refusing to revise an unknown story.`,
+        `resolveGate: gate_state is ${JSON.stringify(current.gate_state)}, not "review_awaiting_human" — ` +
+        'nothing is awaiting human resolution. Refusing to transition.',
       );
     }
-    const currentStory = current.stories[storyId] ?? {};
-    const newAttempt = (currentStory.attempt ?? 0) + 1;
 
-    writeHermesReconcilerState(cycleStatePath, {
-      gate_state: 'pre_approved',
-      in_flight_story_id: null,
-      in_flight_task_id: null,
-      dispatched_at: null,
-      stories: {
-        [storyId]: {
-          phase_position: 'dispatched_impl',
-          attempt: newAttempt,
-        },
-      },
-    });
-    return { resolved: true, gate_state: 'pre_approved', action: 'revise', attempt: newAttempt };
-  }
-
-  if (action === 'approve') {
-    // Approve = accept the review verdict as-is and mark the surfaced story done.
-    // (Under the passed-auto-advance model, the human gate is only reached for a
-    // non-passing/unverified verdict; approving it completes that story.)
-    const storyDone = current.in_flight_story_id ?? null;
-    const patch = {
-      gate_state: 'pre_approved',
-      in_flight_story_id: null,
-      in_flight_task_id: null,
-      dispatched_at: null,
-    };
-    if (storyDone) {
-      patch.stories = { [storyDone]: { phase_position: 'done' } };
+    if (action === 'reject') {
+      result = { resolved: true, gate_state: 'rejected', action };
+      return { gate_state: 'rejected' };
     }
-    writeHermesReconcilerState(cycleStatePath, patch);
-    return { resolved: true, gate_state: 'pre_approved', action, story_done: storyDone };
-  }
 
-  // continue — acknowledge an error and resume from the current state; no story
-  // is completed (the error hook, not a verdict, surfaced this gate).
-  writeHermesReconcilerState(cycleStatePath, { gate_state: 'pre_approved' });
-  return { resolved: true, gate_state: 'pre_approved', action };
+    if (action === 'revise') {
+      if (!storyId) {
+        throw new Error('resolveGate: storyId is required for action "revise"');
+      }
+      if (!current.stories || !(storyId in current.stories)) {
+        throw new Error(
+          `resolveGate: story "${storyId}" not found in reconciler state — refusing to revise an unknown story.`,
+        );
+      }
+      const currentStory = current.stories[storyId] ?? {};
+      const newAttempt = (currentStory.attempt ?? 0) + 1;
+      result = { resolved: true, gate_state: 'pre_approved', action: 'revise', attempt: newAttempt };
+      return {
+        gate_state: 'pre_approved',
+        in_flight_story_id: null,
+        in_flight_task_id: null,
+        dispatched_at: null,
+        stories: {
+          [storyId]: {
+            phase_position: 'dispatched_impl',
+            attempt: newAttempt,
+          },
+        },
+      };
+    }
+
+    if (action === 'approve') {
+      // Approve = accept the review verdict as-is and mark the surfaced story done.
+      // (Under the passed-auto-advance model, the human gate is only reached for a
+      // non-passing/unverified verdict; approving it completes that story.)
+      const storyDone = current.in_flight_story_id ?? null;
+      const patch = {
+        gate_state: 'pre_approved',
+        in_flight_story_id: null,
+        in_flight_task_id: null,
+        dispatched_at: null,
+      };
+      if (storyDone) {
+        patch.stories = { [storyDone]: { phase_position: 'done' } };
+      }
+      result = { resolved: true, gate_state: 'pre_approved', action, story_done: storyDone };
+      return patch;
+    }
+
+    // continue — acknowledge an error and resume from the current state; no story
+    // is completed (the error hook, not a verdict, surfaced this gate).
+    result = { resolved: true, gate_state: 'pre_approved', action };
+    return { gate_state: 'pre_approved' };
+  });
+  return result;
 }

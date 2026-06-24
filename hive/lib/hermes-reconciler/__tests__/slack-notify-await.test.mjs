@@ -560,6 +560,28 @@ test('resolveGateInvoker: uses HERMES_CYCLE_STATE_DIR env when no opts provided'
   }
 });
 
+test('resolveGateInvoker: rejects epicHandle with path separators / non-slug, writes nothing', () => {
+  const dir = tmpDir();
+  for (const bad of ['../escape', 'team/epic', 'a\\b', 'UPPER', 'under_score', '', '-leading']) {
+    assert.throws(
+      () => resolveGateInvoker({ epicHandle: bad, action: 'approve' }, { cycleStateDirPath: dir }),
+      /slug|path separators|non-empty/i,
+      `expected rejection for handle: ${JSON.stringify(bad)}`,
+    );
+  }
+  // No state file may be created anywhere under the cycle-state dir.
+  assert.deepEqual(fs.readdirSync(dir), []);
+});
+
+test('resolveGateInvoker: rejects overlong epicHandle, writes nothing', () => {
+  const dir = tmpDir();
+  assert.throws(
+    () => resolveGateInvoker({ epicHandle: 'a'.repeat(200), action: 'approve' }, { cycleStateDirPath: dir }),
+    /slug|path separators/i,
+  );
+  assert.deepEqual(fs.readdirSync(dir), []);
+});
+
 test('resolveGateInvoker: propagates resolveGate error for wrong gate_state', () => {
   const dir = tmpDir();
   assert.throws(

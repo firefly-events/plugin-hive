@@ -86,6 +86,20 @@ function postSlackNotice(webhookUrl, epicHandle) {
       reject(new Error(`Invalid Slack webhook URL: ${webhookUrl}`));
       return;
     }
+    // Constrain the target (SSRF guard): https to a Slack host, http only to
+    // loopback for test injection. The notice carries epic context.
+    {
+      const host = parsed.hostname;
+      const isLoopback = host === '127.0.0.1' || host === 'localhost' || host === '::1';
+      if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopback)) {
+        reject(new Error(`Slack webhook must use https (got ${parsed.protocol}//${host}); http only for loopback.`));
+        return;
+      }
+      if (!(host === 'hooks.slack.com' || host.endsWith('.slack.com') || isLoopback)) {
+        reject(new Error(`Slack webhook host not allowed: ${host}. Expected hooks.slack.com (or loopback for tests).`));
+        return;
+      }
+    }
     const transport = parsed.protocol === 'http:' ? http : https;
     const defaultPort = parsed.protocol === 'http:' ? 80 : 443;
     const options = {

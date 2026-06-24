@@ -13,7 +13,7 @@ description: |
   Skills live on Studio at ~/Code/hermes-agent/skills/orchestration/.
 target_codebase: /Users/don/Documents/plugin-hive
 methodology: classic
-version_bump: minor
+version_bump: patch
 
 git_flow:
   base_branch: develop
