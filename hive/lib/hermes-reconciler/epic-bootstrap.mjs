@@ -90,7 +90,9 @@ function postSlackNotice(webhookUrl, epicHandle) {
     // loopback for test injection. The notice carries epic context.
     {
       const host = parsed.hostname;
-      const isLoopback = host === '127.0.0.1' || host === 'localhost' || host === '::1';
+      // Node's URL.hostname keeps IPv6 brackets ("[::1]"), so match both forms.
+      const isLoopback =
+        host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]';
       if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopback)) {
         reject(new Error(`Slack webhook must use https (got ${parsed.protocol}//${host}); http only for loopback.`));
         return;

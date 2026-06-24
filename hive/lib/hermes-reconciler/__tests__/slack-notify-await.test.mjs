@@ -562,7 +562,10 @@ test('resolveGateInvoker: uses HERMES_CYCLE_STATE_DIR env when no opts provided'
 
 test('resolveGateInvoker: rejects epicHandle with path separators / non-slug, writes nothing', () => {
   const dir = tmpDir();
-  for (const bad of ['../escape', 'team/epic', 'a\\b', 'UPPER', 'under_score', '', '-leading']) {
+  for (const bad of [
+    '../escape', 'team/epic', 'a\\b', 'UPPER', 'under_score', '', '-leading',
+    '/tmp/evil', '/etc/passwd', 'a/../../etc', '..',
+  ]) {
     assert.throws(
       () => resolveGateInvoker({ epicHandle: bad, action: 'approve' }, { cycleStateDirPath: dir }),
       /slug|path separators|non-empty/i,
