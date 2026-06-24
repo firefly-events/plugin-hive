@@ -1,3 +1,34 @@
+- experiment_id: meta-2026-06-23
+  date: '2026-06-23'
+  started: '2026-06-23T00:00:00Z'
+  closed: '2026-06-23T00:00:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 0
+  top_changes:
+    - ".pHive/meta-team/archive/2026-04-19/MANIFEST.md: appended reviewed-on provenance line for meta-2026-06-23 (7th such line)"
+  commit: 3c2671d5a71193abaa3799e8c13fca649301aa5a
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 4fb03b652d176b3d51556165d775162325879e85
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-23. Analysis found 0 in-scope findings: all 12 step
+    files complete (7/7), all 28 agents valid, all workflow step_file refs resolve,
+    model IDs current (claude-opus-4-8, claude-sonnet-4-6, claude-haiku-4-5-20251001),
+    no MEMORY_GAP (all 28 agents >=1 memory). Since last cycle (meta-2026-06-22 /
+    commit 327925bb): PR #316 (DAG executor) and PR #317 (KISS dev personas) outside
+    meta-team write scope. STUB_DOC hive-cloud-roadmap.md (13 lines) remains
+    out_of_scope (S16 placeholder, 18th+ consecutive deferral). Dedup pre-flight:
+    open PR #318 (feat/exec-followons) covers executor code — no archive overlap.
+    PR #304 (meta-meta/nightly-20260619, covered MANIFEST.md) is no longer open —
+    candidate 001 no longer suppressed. Routed to step-03b backlog fallback. Selected
+    candidate mmo-2026-04-21-001: appended reviewed-on: meta-2026-06-23 to MANIFEST.md
+    (7th reviewed-on line). Closure validator passed. Regression watch armed for 4-hour
+    observation window.
 - experiment_id: meta-2026-06-22
   date: '2026-06-22'
   started: '2026-06-22T00:00:00Z'
