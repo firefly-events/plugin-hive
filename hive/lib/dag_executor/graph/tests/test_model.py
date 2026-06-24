@@ -13,7 +13,7 @@ from hive.lib.dag_executor.graph import (
 
 
 def test_node_type_enum_values():
-    assert {nt.value for nt in NodeType} == {"agent", "script", "gate", "pause", "reconcile"}
+    assert {nt.value for nt in NodeType} == {"agent", "script", "gate", "pause", "reconcile", "user_gate"}
 
 
 def test_input_binding_equality_and_per_input_optional():
