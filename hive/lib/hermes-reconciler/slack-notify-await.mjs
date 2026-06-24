@@ -17,15 +17,45 @@
 
 import http from 'node:http';
 import https from 'node:https';
+import path from 'node:path';
 import { URL } from 'node:url';
-import { readHermesReconcilerState, writeHermesReconcilerState } from './state.mjs';
+import {
+  writeHermesReconcilerState,
+  mutateHermesReconcilerState,
+} from './state.mjs';
 
 // ── Slack HTTP ────────────────────────────────────────────────────────────────
+
+/**
+ * Constrain the webhook target. Verdict/error payloads carry repo context and
+ * diffs, so a misconfigured or injected webhook URL must not be able to POST that
+ * to an arbitrary host (SSRF / exfiltration). Require https to a Slack host;
+ * permit http only to loopback for test injection.
+ */
+export function assertSlackWebhookUrl(parsed) {
+  const host = parsed.hostname;
+  // Node's URL.hostname keeps IPv6 brackets ("[::1]"), so match both forms.
+  const isLoopback =
+    host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]';
+  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopback)) {
+    throw new Error(
+      `Slack webhook must use https (got ${parsed.protocol}//${host}); ` +
+      'http is permitted only for loopback test injection.',
+    );
+  }
+  const isSlackHost = host === 'hooks.slack.com' || host.endsWith('.slack.com');
+  if (!isSlackHost && !isLoopback) {
+    throw new Error(
+      `Slack webhook host not allowed: ${host}. Expected hooks.slack.com (or loopback for tests).`,
+    );
+  }
+}
 
 function postSlack(webhookUrl, payload, { timeoutMs = 10_000 } = {}) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify(payload);
     const parsed = new URL(webhookUrl);
+    assertSlackWebhookUrl(parsed);
     const transport = parsed.protocol === 'http:' ? http : https;
     const defaultPort = parsed.protocol === 'http:' ? 80 : 443;
     const options = {
@@ -80,8 +110,57 @@ function fenceSafe(v) {
   return String(v).replace(/`{3,}/g, (m) => 'ʼ'.repeat(m.length));
 }
 
+// Slack Block Kit caps a `section` text at 3000 chars. An unbounded review diff
+// or episode summary would otherwise push a section past that limit, Slack would
+// reject the WHOLE post (invalid_blocks), and the human would never see the gate
+// prompt (the tick stays halted but blind). Clamp content below the limit with
+// headroom for the label + code-fence wrapper, and mark the truncation. Clamp
+// AFTER escaping so the final string length is what Slack receives.
+const SLACK_SECTION_TEXT_MAX = 2800;
+function clampForSlack(s, max = SLACK_SECTION_TEXT_MAX) {
+  const str = String(s);
+  if (str.length <= max) return str;
+  const omitted = str.length - max;
+  return `${str.slice(0, max)}\n… (truncated — ${omitted} chars omitted; see full output in the episode/run log)`;
+}
+
+const ACTION_LABELS = { approve: 'Approve', continue: 'Continue', revise: 'Revise', reject: 'Reject' };
+
+/**
+ * Encode gate action context into a Slack button value string (JSON).
+ * Format: {"a":<action>,"e":<epicHandle>,"s":<storyId>}
+ * Parse back with parseGateAction().
+ */
+function encodeGateAction(action, epicHandle, storyId) {
+  return JSON.stringify({ a: action, e: epicHandle, s: storyId ?? null });
+}
+
+/**
+ * Build a Block Kit actions block containing the gate resolution buttons.
+ * @param {string[]} actions  Ordered list of action strings.
+ * @param {string} epicHandle
+ * @param {string|null} storyId
+ */
+function buildGateActionsBlock(actions, epicHandle, storyId) {
+  return {
+    type: 'actions',
+    elements: actions.map((action) => {
+      const el = {
+        type: 'button',
+        text: { type: 'plain_text', text: ACTION_LABELS[action] ?? action, emoji: false },
+        action_id: 'hive_gate_resolve',
+        value: encodeGateAction(action, epicHandle, storyId),
+      };
+      if (action === 'approve') el.style = 'primary';
+      if (action === 'reject') el.style = 'danger';
+      return el;
+    }),
+  };
+}
+
 /**
  * Build a Slack message payload for a review_terminal verdict.
+ * Returns { text, blocks } — text is a plain-text fallback; blocks is Block Kit.
  * Follows standup-slack-format.md conventions: no ANSI, markdown only, ##/### headings, - lists.
  */
 export function buildVerdictMessage({ epicHandle, storyId, verdict, episodeSummary, diff }) {
@@ -91,11 +170,11 @@ export function buildVerdictMessage({ epicHandle, storyId, verdict, episodeSumma
     : 'Reply with one of:\n- `approve` — advance to the next story\n- `revise` — send back for revision\n- `reject` — halt this epic permanently';
 
   const summarySection = episodeSummary
-    ? `\n### Episode Summary\n${mrkdwnInline(episodeSummary.trim())}`
+    ? `\n### Episode Summary\n${clampForSlack(mrkdwnInline(episodeSummary.trim()))}`
     : '';
 
   const diffSection = diff
-    ? `\n### Diff\n\`\`\`\n${fenceSafe(diff.trim())}\n\`\`\``
+    ? `\n### Diff\n\`\`\`\n${clampForSlack(fenceSafe(diff.trim()))}\n\`\`\``
     : '';
 
   const text = [
@@ -111,11 +190,48 @@ export function buildVerdictMessage({ epicHandle, storyId, verdict, episodeSumma
     decisionBlock,
   ].join('\n');
 
-  return { text };
+  // Block Kit representation — buttons encode the gate action for the Studio receiver.
+  const actions = normalizedVerdict === 'needs-revision'
+    ? ['approve', 'revise', 'reject']
+    : ['approve', 'continue', 'revise', 'reject'];
+
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `Review Verdict — ${normalizedVerdict.toUpperCase()}`, emoji: true },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Epic:* \`${mrkdwnInline(epicHandle)}\`` },
+        { type: 'mrkdwn', text: `*Story:* \`${mrkdwnInline(storyId)}\`` },
+        { type: 'mrkdwn', text: `*Verdict:* \`${normalizedVerdict}\`` },
+      ],
+    },
+  ];
+
+  if (episodeSummary) {
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*Episode Summary*\n${clampForSlack(mrkdwnInline(episodeSummary.trim()))}` },
+    });
+  }
+
+  if (diff) {
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*Diff*\n\`\`\`\n${clampForSlack(fenceSafe(diff.trim()))}\n\`\`\`` },
+    });
+  }
+
+  blocks.push(buildGateActionsBlock(actions, epicHandle, storyId));
+
+  return { text, blocks };
 }
 
 /**
  * Build a Slack message payload for an error condition (dispatch failure, daemon down, etc.).
+ * Returns { text, blocks } — text is a plain-text fallback; blocks is Block Kit.
  */
 export function buildErrorMessage({ epicHandle, storyId, errorKind, details }) {
   const storyLine = storyId ? `\n- Story: \`${mrkdwnInline(storyId)}\`` : '';
@@ -136,7 +252,99 @@ export function buildErrorMessage({ epicHandle, storyId, errorKind, details }) {
     `- \`reject\` — halt this epic permanently`,
   ].join('\n');
 
-  return { text };
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: 'Hermes Error — Action Required', emoji: true },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Epic:* \`${mrkdwnInline(epicHandle)}\`` },
+        ...(storyId ? [{ type: 'mrkdwn', text: `*Story:* \`${mrkdwnInline(storyId)}\`` }] : []),
+        { type: 'mrkdwn', text: `*Error:* \`${mrkdwnInline(errorKind ?? 'unknown_error')}\`` },
+      ],
+    },
+  ];
+
+  if (details) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Details*\n\`\`\`\n${fenceSafe(String(details).trim().slice(0, 1500))}\n\`\`\``,
+      },
+    });
+  }
+
+  blocks.push(buildGateActionsBlock(['continue', 'reject'], epicHandle, storyId));
+
+  return { text, blocks };
+}
+
+// ── Gate action encoding ──────────────────────────────────────────────────────
+
+/**
+ * Parse a Slack button value produced by buildVerdictMessage / buildErrorMessage
+ * back into { action, epicHandle, storyId }.
+ *
+ * Throws on malformed input so the Studio receiver can reject bad payloads early.
+ *
+ * @param {string} buttonValue  The `value` field from a Slack interaction payload action.
+ * @returns {{ action: string, epicHandle: string, storyId: string|null }}
+ */
+export function parseGateAction(buttonValue) {
+  let parsed;
+  try {
+    parsed = JSON.parse(buttonValue);
+  } catch {
+    throw new Error(`parseGateAction: invalid button value (expected JSON): ${buttonValue}`);
+  }
+  const { a: action, e: epicHandle, s: storyId } = parsed ?? {};
+  if (!action || typeof action !== 'string') {
+    throw new Error(`parseGateAction: missing or invalid "a" (action) in value: ${buttonValue}`);
+  }
+  if (!epicHandle || typeof epicHandle !== 'string') {
+    throw new Error(`parseGateAction: missing or invalid "e" (epicHandle) in value: ${buttonValue}`);
+  }
+  return { action, epicHandle, storyId: (storyId && typeof storyId === 'string') ? storyId : null };
+}
+
+// ── resolveGate invoker ───────────────────────────────────────────────────────
+
+// Epic handles compose a filesystem path (`<dir>/<handle>.yaml`). Constrain to a
+// slug so a hostile inbound Slack payload cannot traverse out of the cycle-state
+// dir (e.g. `../other`). Mirrors the bootstrap CLI's epic-handle validation.
+const EPIC_HANDLE_RE = /^[a-z0-9](?:[a-z0-9-]{0,127})$/;
+
+/**
+ * Thin entrypoint for the Studio HTTP receiver: resolves the cycle-state path
+ * from epicHandle and delegates to resolveGate().
+ *
+ * The Studio receiver verifies the Slack request signature BEFORE calling this.
+ * This function owns only: path resolution + resolveGate delegation.
+ *
+ * @param {{ epicHandle: string, storyId?: string|null, action: string }} params
+ * @param {{ cycleStateDirPath?: string }} [opts]  Overrides HERMES_CYCLE_STATE_DIR env var.
+ * @returns {{ resolved: true, gate_state: string, action: string, [key: string]: unknown }}
+ */
+export function resolveGateInvoker({ epicHandle, storyId, action }, { cycleStateDirPath } = {}) {
+  const dir = cycleStateDirPath ?? process.env.HERMES_CYCLE_STATE_DIR;
+  if (!dir) {
+    throw new Error(
+      'resolveGateInvoker: cycleStateDirPath not provided and HERMES_CYCLE_STATE_DIR is not set',
+    );
+  }
+  if (!epicHandle || typeof epicHandle !== 'string') {
+    throw new Error('resolveGateInvoker: epicHandle must be a non-empty string');
+  }
+  if (!EPIC_HANDLE_RE.test(epicHandle)) {
+    throw new Error(
+      'resolveGateInvoker: epicHandle must be a slug ([a-z0-9-]) without path separators',
+    );
+  }
+  const cycleStatePath = path.join(dir, `${epicHandle}.yaml`);
+  return resolveGate(cycleStatePath, { storyId: storyId ?? undefined, action });
 }
 
 // ── Hook: surface verdict ─────────────────────────────────────────────────────
@@ -223,70 +431,74 @@ export function resolveGate(cycleStatePath, { storyId, action }) {
     throw new Error(`resolveGate: unknown action "${action}". Valid: approve, continue, reject, revise.`);
   }
 
-  // Precondition: only a gate that is actually awaiting a human may be resolved.
-  // Without this, a stale or misdirected Slack action could transition from
-  // null / pre_approved / finalized / rejected straight to pre_approved —
-  // resuming a terminated epic or re-approving one that never halted for review.
-  const current = readHermesReconcilerState(cycleStatePath);
-  if (current.gate_state !== 'review_awaiting_human') {
-    throw new Error(
-      `resolveGate: gate_state is ${JSON.stringify(current.gate_state)}, not "review_awaiting_human" — ` +
-      'nothing is awaiting human resolution. Refusing to transition.',
-    );
-  }
-
-  if (action === 'reject') {
-    writeHermesReconcilerState(cycleStatePath, { gate_state: 'rejected' });
-    return { resolved: true, gate_state: 'rejected', action };
-  }
-
-  if (action === 'revise') {
-    if (!storyId) {
-      throw new Error('resolveGate: storyId is required for action "revise"');
-    }
-    if (!current.stories || !(storyId in current.stories)) {
+  // Precondition + transition run inside ONE locked read-modify-write
+  // (mutateHermesReconcilerState). Without the shared lock, a concurrent
+  // reconcile-tick writer could change gate_state between an unlocked
+  // "is it awaiting a human?" check and the write that resolves it — a stale
+  // Slack click could then clobber a terminal/finalized transition back to
+  // pre_approved, resuming a terminated epic.
+  let result;
+  mutateHermesReconcilerState(cycleStatePath, (current) => {
+    if (current.gate_state !== 'review_awaiting_human') {
       throw new Error(
-        `resolveGate: story "${storyId}" not found in reconciler state — refusing to revise an unknown story.`,
+        `resolveGate: gate_state is ${JSON.stringify(current.gate_state)}, not "review_awaiting_human" — ` +
+        'nothing is awaiting human resolution. Refusing to transition.',
       );
     }
-    const currentStory = current.stories[storyId] ?? {};
-    const newAttempt = (currentStory.attempt ?? 0) + 1;
 
-    writeHermesReconcilerState(cycleStatePath, {
-      gate_state: 'pre_approved',
-      in_flight_story_id: null,
-      in_flight_task_id: null,
-      dispatched_at: null,
-      stories: {
-        [storyId]: {
-          phase_position: 'dispatched_impl',
-          attempt: newAttempt,
-        },
-      },
-    });
-    return { resolved: true, gate_state: 'pre_approved', action: 'revise', attempt: newAttempt };
-  }
-
-  if (action === 'approve') {
-    // Approve = accept the review verdict as-is and mark the surfaced story done.
-    // (Under the passed-auto-advance model, the human gate is only reached for a
-    // non-passing/unverified verdict; approving it completes that story.)
-    const storyDone = current.in_flight_story_id ?? null;
-    const patch = {
-      gate_state: 'pre_approved',
-      in_flight_story_id: null,
-      in_flight_task_id: null,
-      dispatched_at: null,
-    };
-    if (storyDone) {
-      patch.stories = { [storyDone]: { phase_position: 'done' } };
+    if (action === 'reject') {
+      result = { resolved: true, gate_state: 'rejected', action };
+      return { gate_state: 'rejected' };
     }
-    writeHermesReconcilerState(cycleStatePath, patch);
-    return { resolved: true, gate_state: 'pre_approved', action, story_done: storyDone };
-  }
 
-  // continue — acknowledge an error and resume from the current state; no story
-  // is completed (the error hook, not a verdict, surfaced this gate).
-  writeHermesReconcilerState(cycleStatePath, { gate_state: 'pre_approved' });
-  return { resolved: true, gate_state: 'pre_approved', action };
+    if (action === 'revise') {
+      if (!storyId) {
+        throw new Error('resolveGate: storyId is required for action "revise"');
+      }
+      if (!current.stories || !(storyId in current.stories)) {
+        throw new Error(
+          `resolveGate: story "${storyId}" not found in reconciler state — refusing to revise an unknown story.`,
+        );
+      }
+      const currentStory = current.stories[storyId] ?? {};
+      const newAttempt = (currentStory.attempt ?? 0) + 1;
+      result = { resolved: true, gate_state: 'pre_approved', action: 'revise', attempt: newAttempt };
+      return {
+        gate_state: 'pre_approved',
+        in_flight_story_id: null,
+        in_flight_task_id: null,
+        dispatched_at: null,
+        stories: {
+          [storyId]: {
+            phase_position: 'dispatched_impl',
+            attempt: newAttempt,
+          },
+        },
+      };
+    }
+
+    if (action === 'approve') {
+      // Approve = accept the review verdict as-is and mark the surfaced story done.
+      // (Under the passed-auto-advance model, the human gate is only reached for a
+      // non-passing/unverified verdict; approving it completes that story.)
+      const storyDone = current.in_flight_story_id ?? null;
+      const patch = {
+        gate_state: 'pre_approved',
+        in_flight_story_id: null,
+        in_flight_task_id: null,
+        dispatched_at: null,
+      };
+      if (storyDone) {
+        patch.stories = { [storyDone]: { phase_position: 'done' } };
+      }
+      result = { resolved: true, gate_state: 'pre_approved', action, story_done: storyDone };
+      return patch;
+    }
+
+    // continue — acknowledge an error and resume from the current state; no story
+    // is completed (the error hook, not a verdict, surfaced this gate).
+    result = { resolved: true, gate_state: 'pre_approved', action };
+    return { gate_state: 'pre_approved' };
+  });
+  return result;
 }

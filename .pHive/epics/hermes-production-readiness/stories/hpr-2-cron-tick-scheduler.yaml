@@ -1,0 +1,93 @@
+id: hpr-2-cron-tick-scheduler
+epic: hermes-production-readiness
+title: Cron tick scheduler firing reconcile-tick over the epic-of-record
+status: blocked
+complexity: medium
+methodology: classic
+depends_on: [hpr-5-studio-runtime-plumbing]
+
+description: |
+  The durable scheduler that fires reconcile-tick on a cadence, turning the
+  kickoff-exec loop from a thing-you-start into a thing-that-runs-unattended. Each
+  fire: read epic_of_record from cycle-state, run one reconcile-tick (the 7-position
+  phase machine advance), persist. The loop is the heart of lights-on operation.
+
+  Must be idempotent and gate-aware: a tick that finds gate_state ==
+  review_awaiting_human HALTS (does nothing but wait); a tick that finds pre_approved
+  RESUMES. The advisory lock (withCycleStateLock in state.mjs) already guards
+  concurrent state writes — the cron must skip (not block-forever) if a prior tick
+  still holds the lock, so overlapping fires never double-advance.
+
+  Mechanism (decide in research): Hermes-native scheduler if hermes-agent has one,
+  else host launchd/cron on Studio invoking a tick entrypoint. Either way the tick
+  body is the reconcile-tick runbook driven through the MCP surface / cli.mjs reconcile.
+
+acceptance_criteria:
+  - "Given an epic with epic_of_record set and gate_state pre_approved, when the cron fires, then exactly one reconcile-tick runs and the phase advances per the 7-position machine."
+  - "Given gate_state == review_awaiting_human, when the cron fires, then the tick is a no-op (halts) and leaves state unchanged until a human resolves the gate."
+  - "Given a prior tick still holds the cycle-state lock, when the next cron fire overlaps, then the new fire skips cleanly (no double-advance, no deadlock)."
+  - "Given the scheduler is installed, when Studio restarts, then the cron resumes firing without manual re-arm (depends on hpr-5 autostart)."
+  - "Given a tick errors mid-run, when it fails, then the error is logged and the next fire still runs (one bad tick does not wedge the loop)."
+
+steps:
+  - id: research
+    description: Decide scheduler mechanism (Hermes-native vs launchd/cron on Studio). Read reconcile-tick.md + cli.mjs reconcile + watch-cron.md. Confirm lock-skip semantics in state.mjs.
+    agent: researcher
+  - id: implement
+    description: Build the tick entrypoint (resolve epic_of_record → one reconcile-tick → persist; gate-aware halt/resume; lock-skip). Install the schedule on Studio (survives restart via hpr-5).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Unit/integration test the tick entrypoint — pre_approved advances, review_awaiting_human halts, lock-held skips, error isolates. Smoke-test the installed schedule fires on Studio.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review idempotency + gate-awareness + restart durability; confirm no double-advance path.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit the tick entrypoint + schedule config; document the cadence + halt/resume in operations-guide.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/references/orchestrator-skills/reconcile-tick.md
+      purpose: the 7-position phase machine this cron drives each fire.
+    - path: hive/references/orchestrator-skills/watch-cron.md
+      purpose: routine/daemon monitoring runbook — the cron's companion.
+    - path: hive/lib/hermes-reconciler/state.mjs
+      purpose: withCycleStateLock advisory lock (skip semantics) + epic_of_record read.
+    - path: hive/lib/multica-story-dispatch/cli.mjs
+      purpose: reconcile subcommand — the tick body driver.
+
+cross_cutting:
+  - concern: idempotency
+    action: "Lock-skip on overlap; gate-aware halt/resume; one bad tick must not wedge the loop."
+
+metric:
+  applies: true
+  name: hermes.unattended_tick_advances
+  direction: up
+  unit: ticks-without-human
+  baseline: "0 (no scheduler)"
+  target: ">=1 epic advanced through multiple phases with zero human action between planning and review gates"
+  window: story-integrate
+  source:
+    kind: manual
+    ref: "Studio: bootstrap a test epic (hpr-4), confirm the cron advances it across phases unattended, halting only at the review gate."
+  verify_at: integrate
+  owner: tester
+
+risks:
+  - severity: medium
+    description: Overlapping fires double-advance state.
+    mitigation: lock-skip via withCycleStateLock; tick is idempotent.
+  - severity: low
+    description: A wedged tick silently stops the loop.
+    mitigation: per-fire error isolation + watch-cron monitoring surfaces a stalled loop.
+
+references:
+  - path: hive/references/orchestrator-skills/kickoff-exec.md
+    relevant_excerpt: "kickoff-exec starts the reconciler loop; this story makes that loop durable + scheduled."

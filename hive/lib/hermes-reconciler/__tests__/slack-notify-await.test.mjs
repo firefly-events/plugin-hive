@@ -12,6 +12,8 @@ import {
   surfaceVerdictHook,
   surfaceErrorHook,
   resolveGate,
+  parseGateAction,
+  resolveGateInvoker,
 } from '../slack-notify-await.mjs';
 import { readHermesReconcilerState, writeHermesReconcilerState } from '../state.mjs';
 
@@ -94,6 +96,28 @@ test('buildVerdictMessage: omits diff and episode sections when absent', () => {
   });
   assert.doesNotMatch(text, /Episode Summary/);
   assert.doesNotMatch(text, /Diff/);
+});
+
+test('buildVerdictMessage: clamps oversized diff/summary so no section exceeds Slack 3000-char limit', () => {
+  const huge = 'x'.repeat(20000);
+  const { blocks } = buildVerdictMessage({
+    epicHandle: 'my-epic',
+    storyId: 'h-06',
+    verdict: 'needs_revision',
+    episodeSummary: huge,
+    diff: huge,
+  });
+  const sectionTexts = blocks
+    .filter((b) => b.type === 'section' && b.text?.type === 'mrkdwn')
+    .map((b) => b.text.text);
+  // At least the summary + diff sections present.
+  const big = sectionTexts.filter((t) => /Episode Summary|Diff/.test(t));
+  assert.ok(big.length >= 2, 'expected episode-summary and diff sections');
+  for (const t of sectionTexts) {
+    assert.ok(t.length <= 3000, `section text must stay <= 3000 (Slack limit), got ${t.length}`);
+  }
+  // Truncation is signalled, not silent.
+  assert.ok(big.some((t) => /truncated/.test(t)), 'oversized content must be marked truncated');
 });
 
 // ── buildErrorMessage ─────────────────────────────────────────────────────────
@@ -396,5 +420,200 @@ test('resolveGate: throws on unknown action', () => {
   assert.throws(
     () => resolveGate(statePath, { action: 'snooze' }),
     /unknown action/,
+  );
+});
+
+// ── Block Kit emission ────────────────────────────────────────────────────────
+
+test('buildVerdictMessage: returns blocks array with gate action buttons', () => {
+  const { blocks } = buildVerdictMessage({
+    epicHandle: 'my-epic',
+    storyId: 'h-06',
+    verdict: 'passed',
+  });
+  assert.ok(Array.isArray(blocks), 'blocks must be an array');
+  const actionsBlock = blocks.find((b) => b.type === 'actions');
+  assert.ok(actionsBlock, 'must include an actions block');
+  assert.ok(Array.isArray(actionsBlock.elements) && actionsBlock.elements.length > 0, 'actions block must have elements');
+});
+
+test('buildVerdictMessage: button values round-trip through parseGateAction', () => {
+  const { blocks } = buildVerdictMessage({
+    epicHandle: 'my-epic',
+    storyId: 'h-06',
+    verdict: 'passed',
+  });
+  const actionsBlock = blocks.find((b) => b.type === 'actions');
+  for (const el of actionsBlock.elements) {
+    const parsed = parseGateAction(el.value);
+    assert.equal(parsed.epicHandle, 'my-epic');
+    assert.equal(parsed.storyId, 'h-06');
+    assert.ok(parsed.action, 'action must be present');
+  }
+});
+
+test('buildVerdictMessage: needs-revision verdict omits continue button', () => {
+  const { blocks } = buildVerdictMessage({
+    epicHandle: 'my-epic',
+    storyId: 'h-06',
+    verdict: 'needs_revision',
+  });
+  const actionsBlock = blocks.find((b) => b.type === 'actions');
+  const actions = actionsBlock.elements.map((el) => parseGateAction(el.value).action);
+  assert.ok(!actions.includes('continue'), 'needs-revision should not have continue button');
+  assert.ok(actions.includes('approve'), 'needs-revision must have approve');
+  assert.ok(actions.includes('revise'), 'needs-revision must have revise');
+  assert.ok(actions.includes('reject'), 'needs-revision must have reject');
+});
+
+test('buildVerdictMessage: retains text fallback alongside blocks', () => {
+  const result = buildVerdictMessage({
+    epicHandle: 'my-epic',
+    storyId: 'h-06',
+    verdict: 'passed',
+  });
+  assert.ok(typeof result.text === 'string' && result.text.length > 0, 'text fallback must be present');
+  assert.ok(Array.isArray(result.blocks), 'blocks must be present');
+});
+
+test('buildErrorMessage: returns blocks array with continue + reject buttons', () => {
+  const { blocks } = buildErrorMessage({
+    epicHandle: 'my-epic',
+    storyId: 'h-06',
+    errorKind: 'dispatch_failure',
+    details: 'timeout',
+  });
+  assert.ok(Array.isArray(blocks), 'blocks must be an array');
+  const actionsBlock = blocks.find((b) => b.type === 'actions');
+  assert.ok(actionsBlock, 'must include an actions block');
+  const actions = actionsBlock.elements.map((el) => parseGateAction(el.value).action);
+  assert.ok(actions.includes('continue'), 'error message must have continue button');
+  assert.ok(actions.includes('reject'), 'error message must have reject button');
+});
+
+test('buildErrorMessage: button values round-trip through parseGateAction', () => {
+  const { blocks } = buildErrorMessage({
+    epicHandle: 'my-epic',
+    storyId: 'h-06',
+    errorKind: 'daemon_down',
+  });
+  const actionsBlock = blocks.find((b) => b.type === 'actions');
+  for (const el of actionsBlock.elements) {
+    const parsed = parseGateAction(el.value);
+    assert.equal(parsed.epicHandle, 'my-epic');
+    assert.ok(parsed.action, 'action must be present');
+  }
+});
+
+// ── parseGateAction ───────────────────────────────────────────────────────────
+
+test('parseGateAction: parses a valid encoded button value', () => {
+  const value = JSON.stringify({ a: 'approve', e: 'my-epic', s: 'h-06' });
+  const result = parseGateAction(value);
+  assert.equal(result.action, 'approve');
+  assert.equal(result.epicHandle, 'my-epic');
+  assert.equal(result.storyId, 'h-06');
+});
+
+test('parseGateAction: throws on non-JSON input', () => {
+  assert.throws(() => parseGateAction('not-json'), /invalid button value/);
+});
+
+test('parseGateAction: throws when action field missing', () => {
+  assert.throws(
+    () => parseGateAction(JSON.stringify({ e: 'my-epic', s: 'h-06' })),
+    /missing or invalid.*action/,
+  );
+});
+
+test('parseGateAction: throws when epicHandle field missing', () => {
+  assert.throws(
+    () => parseGateAction(JSON.stringify({ a: 'approve', s: 'h-06' })),
+    /missing or invalid.*epicHandle/,
+  );
+});
+
+test('parseGateAction: returns null storyId when absent', () => {
+  const value = JSON.stringify({ a: 'continue', e: 'my-epic', s: null });
+  const result = parseGateAction(value);
+  assert.equal(result.storyId, null);
+});
+
+// ── resolveGateInvoker ────────────────────────────────────────────────────────
+
+test('resolveGateInvoker: resolves gate via cycleStateDirPath', () => {
+  const dir = tmpDir();
+  const statePath = path.join(dir, 'my-epic.yaml');
+  writeHermesReconcilerState(statePath, { gate_state: 'review_awaiting_human' });
+
+  const result = resolveGateInvoker(
+    { epicHandle: 'my-epic', action: 'approve' },
+    { cycleStateDirPath: dir },
+  );
+  assert.equal(result.resolved, true);
+  assert.equal(result.gate_state, 'pre_approved');
+});
+
+test('resolveGateInvoker: throws when cycleStateDirPath missing and env not set', () => {
+  const saved = process.env.HERMES_CYCLE_STATE_DIR;
+  delete process.env.HERMES_CYCLE_STATE_DIR;
+  try {
+    assert.throws(
+      () => resolveGateInvoker({ epicHandle: 'my-epic', action: 'approve' }),
+      /HERMES_CYCLE_STATE_DIR/,
+    );
+  } finally {
+    if (saved !== undefined) process.env.HERMES_CYCLE_STATE_DIR = saved;
+  }
+});
+
+test('resolveGateInvoker: uses HERMES_CYCLE_STATE_DIR env when no opts provided', () => {
+  const dir = tmpDir();
+  const statePath = path.join(dir, 'my-epic.yaml');
+  writeHermesReconcilerState(statePath, { gate_state: 'review_awaiting_human' });
+  const saved = process.env.HERMES_CYCLE_STATE_DIR;
+  process.env.HERMES_CYCLE_STATE_DIR = dir;
+  try {
+    const result = resolveGateInvoker({ epicHandle: 'my-epic', action: 'reject' });
+    assert.equal(result.gate_state, 'rejected');
+  } finally {
+    if (saved === undefined) delete process.env.HERMES_CYCLE_STATE_DIR;
+    else process.env.HERMES_CYCLE_STATE_DIR = saved;
+  }
+});
+
+test('resolveGateInvoker: rejects epicHandle with path separators / non-slug, writes nothing', () => {
+  const dir = tmpDir();
+  for (const bad of [
+    '../escape', 'team/epic', 'a\\b', 'UPPER', 'under_score', '', '-leading',
+    '/tmp/evil', '/etc/passwd', 'a/../../etc', '..',
+  ]) {
+    assert.throws(
+      () => resolveGateInvoker({ epicHandle: bad, action: 'approve' }, { cycleStateDirPath: dir }),
+      /slug|path separators|non-empty/i,
+      `expected rejection for handle: ${JSON.stringify(bad)}`,
+    );
+  }
+  // No state file may be created anywhere under the cycle-state dir.
+  assert.deepEqual(fs.readdirSync(dir), []);
+});
+
+test('resolveGateInvoker: rejects overlong epicHandle, writes nothing', () => {
+  const dir = tmpDir();
+  assert.throws(
+    () => resolveGateInvoker({ epicHandle: 'a'.repeat(200), action: 'approve' }, { cycleStateDirPath: dir }),
+    /slug|path separators/i,
+  );
+  assert.deepEqual(fs.readdirSync(dir), []);
+});
+
+test('resolveGateInvoker: propagates resolveGate error for wrong gate_state', () => {
+  const dir = tmpDir();
+  assert.throws(
+    () => resolveGateInvoker(
+      { epicHandle: 'my-epic', action: 'approve' },
+      { cycleStateDirPath: dir },
+    ),
+    /not "review_awaiting_human"/,
   );
 });

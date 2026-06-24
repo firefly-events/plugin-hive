@@ -1,7 +1,7 @@
 id: h-09-watch-cron-skill
 epic: hermes-orchestrator-skills
 title: Author the watch-cron skill (routine + daemon health)
-status: complete
+status: shipped
 complexity: low
 methodology: classic
 side: plugin-hive
@@ -65,3 +65,5 @@ references:
     relevant_excerpt: |
       §7: Meta nightly = a RemoteTrigger routine, not a repo workflow; daemon must
       be GUI-session-bootstrapped on Studio to read Keychain.
+shipped_at: "2026-06-23T18:40:00-05:00"
+release_id: "v2.13.1"

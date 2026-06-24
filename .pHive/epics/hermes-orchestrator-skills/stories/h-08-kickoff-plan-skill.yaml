@@ -1,7 +1,7 @@
 id: h-08-kickoff-plan-skill
 epic: hermes-orchestrator-skills
 title: Author the kickoff-plan skill (start /plan, route gates to human)
-status: complete
+status: shipped
 complexity: medium
 methodology: classic
 side: plugin-hive
@@ -62,3 +62,5 @@ references:
     relevant_excerpt: |
       Gate ownership invariant: Multica-dispatched planning may produce artifacts
       but never advances user review/sign-off gates.
+shipped_at: "2026-06-23T18:40:00-05:00"
+release_id: "v2.13.1"

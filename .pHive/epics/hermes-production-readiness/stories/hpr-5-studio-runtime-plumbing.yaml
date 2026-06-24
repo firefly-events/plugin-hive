@@ -1,0 +1,96 @@
+id: hpr-5-studio-runtime-plumbing
+epic: hermes-production-readiness
+title: Studio runtime plumbing + daemon autostart
+status: complete
+complexity: high
+methodology: classic
+depends_on: []
+
+description: |
+  Foundation story (no deps). Make the Studio runtime that the loop runs on durable and
+  reproducible. Today the multica daemon + Hermes MCP wiring are hand-started; a restart
+  breaks the lights-on loop. This story plumbs them to survive reboots.
+
+  Scope (Studio host, user hive; mostly ops + SSH studio-multica):
+  - multica daemon autostart + health check (launchd/service) so the daemon is up after
+    reboot; a health probe the cron (hpr-2) and watch-cron can read.
+  - Hermes config ~/.hermes/config.yaml: mcp_servers.multica → node
+    <repo>/hive/lib/multica-story-dispatch/mcp-tools.mjs, with the correct cwd/env so the
+    7 MCP tools resolve. Durable (committed in hermes-agent or a documented template).
+  - Workspace bind: the Studio plugin-hive checkout the daemon + agents operate on,
+    pinned + documented (which branch, which path).
+  - Survive-restart verification: reboot (or daemon kill) → daemon + MCP wiring come back
+    without manual steps.
+
+  Repo-side deliverable = the operations-guide runbook + any committed service/config
+  templates (no host-specific secrets). Host-side = the installed launchd/service + the
+  populated ~/.hermes/config.yaml on Studio.
+
+acceptance_criteria:
+  - "Given Studio reboots, when it comes back, then the multica daemon is running without manual start (autostart via launchd/service)."
+  - "Given the Hermes runtime starts, when it loads ~/.hermes/config.yaml, then mcp_servers.multica resolves node mcp-tools.mjs with correct cwd/env and all 7 MCP tools are callable."
+  - "Given the daemon is up, when a health probe runs, then it reports healthy (a signal hpr-2/watch-cron can consume)."
+  - "Given the workspace bind, when an agent operates, then it acts on the documented plugin-hive checkout + branch (no ambiguity about which tree)."
+  - "A runbook documents daemon autostart, the config template, the workspace bind, and the restart-recovery check — reproducible on a fresh Studio."
+
+steps:
+  - id: research
+    description: Inventory the current Studio runtime (daemon start, ~/.hermes/config.yaml, workspace path/branch). Pick autostart mechanism (launchd). Reference reference_studio_* memories + multica-init.
+    agent: researcher
+  - id: implement
+    description: Install daemon autostart + health probe; populate ~/.hermes/config.yaml mcp_servers.multica; pin workspace bind; commit config/service templates (no secrets) to the repo.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Restart-recovery check — kill daemon / reboot, confirm daemon + MCP wiring return; confirm all 7 MCP tools callable; health probe green.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review durability (survives restart), config correctness (cwd/env), and that no host secrets are committed.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit runbook + templates; document the Studio runtime contract in operations-guide.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-story-dispatch/mcp-tools.mjs
+      purpose: the MCP server ~/.hermes/config.yaml must point at (node mcp-tools.mjs).
+    - path: skills/multica-init/SKILL.md
+      purpose: existing bootstrap flow (daemon ensure, workspace) to build the autostart on top of.
+  studio_files:
+    - path: ~/.hermes/config.yaml (Studio)
+      purpose: mcp_servers.multica wiring lives here; durable population is the core deliverable.
+
+cross_cutting:
+  - concern: reliability
+    action: "Autostart + health probe so the loop survives Studio restarts; documented restart-recovery check."
+
+metric:
+  applies: true
+  name: hermes.runtime_survives_restart
+  direction: up
+  unit: boolean
+  baseline: "0 (hand-started; restart breaks the loop)"
+  target: "1 (daemon + MCP wiring auto-recover after reboot/daemon-kill, all 7 tools callable)"
+  window: story-integrate
+  source:
+    kind: manual
+    ref: "Studio restart-recovery check: kill daemon / reboot, confirm autostart + MCP tools without manual steps."
+  verify_at: integrate
+  owner: tester
+
+risks:
+  - severity: medium
+    description: Config drift between repo template and the live Studio ~/.hermes/config.yaml.
+    mitigation: commit a template + document the bind; runbook is the single source.
+  - severity: low
+    description: Autostart races the workspace mount / network on boot.
+    mitigation: health probe + retry; cron tolerates a not-yet-ready daemon (skips, retries next fire).
+
+references:
+  - path: hive/references/orchestrator-skills/watch-cron.md
+    relevant_excerpt: "watch-cron monitors daemon status — this story provides the durable daemon + health signal it watches."

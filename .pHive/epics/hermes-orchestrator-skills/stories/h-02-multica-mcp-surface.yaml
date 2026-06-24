@@ -1,7 +1,7 @@
 id: h-02-multica-mcp-surface
 epic: hermes-orchestrator-skills
 title: Confirm or expose the multica_* MCP tool surface over cli.mjs
-status: complete
+status: shipped
 tracker_id: 85dbbe74-bb9a-4487-9e0d-c8123833303f
 complexity: medium
 methodology: classic
@@ -70,3 +70,5 @@ references:
     relevant_excerpt: |
       exports: dispatchStoryToAgent, pollTaskUntilTerminal, createIssue,
       reconcileBranch — the functions cli.mjs already composes.
+shipped_at: "2026-06-23T18:40:00-05:00"
+release_id: "v2.13.1"

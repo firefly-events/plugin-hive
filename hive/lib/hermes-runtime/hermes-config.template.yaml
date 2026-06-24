@@ -1,0 +1,37 @@
+# ~/.hermes/config.yaml — Hermes runtime config template (Studio host).
+#
+# USAGE: copy to ~/.hermes/config.yaml on the Studio host, then replace
+# every <PLACEHOLDER> with the real value for that Studio install.
+# This file is the single-source template; no host-specific secrets live here.
+#
+# After populating, verify the MCP server starts. Run from the checkout root so
+# the configured cwd / relative cli.mjs resolution is exercised, not bypassed by
+# an absolute path:
+#   cd <PLUGIN_HIVE_PATH> && node hive/lib/multica-story-dispatch/mcp-tools.mjs
+#   (the process should start and print its capabilities, then exit or wait for stdin)
+
+mcp_servers:
+  multica:
+    # Invoke the MCP server via Node.js.
+    command: node
+    args:
+      # Absolute path to mcp-tools.mjs in the Studio plugin-hive checkout.
+      # Default Studio checkout path: /Users/hive/Code/plugin-hive
+      # Adjust if the checkout lives elsewhere.
+      - <PLUGIN_HIVE_PATH>/hive/lib/multica-story-dispatch/mcp-tools.mjs
+    env:
+      # Optional: override cli.mjs location if not adjacent to mcp-tools.mjs.
+      # CLI_MJS_PATH: <PLUGIN_HIVE_PATH>/hive/lib/multica-story-dispatch/cli.mjs
+
+      # Pass through MULTICA_API_URL if the daemon listens on a non-default port.
+      # MULTICA_API_URL: http://127.0.0.1:7842
+
+      # Working directory for the MCP server process.
+      # Must be the plugin-hive repo root so relative paths in cli.mjs resolve.
+      PWD: <PLUGIN_HIVE_PATH>
+    # cwd is set separately by some Hermes runtimes; set it to the repo root.
+    cwd: <PLUGIN_HIVE_PATH>
+
+# Hermes agent identity + workspace (populated by hermes-agent setup, not this template).
+# agent: ...
+# workspace: ...
