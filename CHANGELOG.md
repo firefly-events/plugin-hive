@@ -18,10 +18,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - **Inbound Slack → resolveGate, repo slice** (`hpr-1`). `slack-notify-await.mjs` now emits Slack **Block Kit** blocks with gate-action buttons (`approve` / `revise` / `reject`, encoding `{epic_handle, story_id, action}` in the button value) alongside the plain-text fallback, plus `parseGateAction()` and `resolveGateInvoker()` — the thin, tested entrypoint a Studio HTTP receiver calls to drive `resolveGate`. The receiver itself (hermes-agent HTTP endpoint + signature verification) remains the Studio-side follow-up.
 - **Epic-approval bootstrap** (`hpr-4`). `epic-bootstrap.mjs` — the gated human "go" that latches a chosen epic's initial `gate_state: pre_approved` + `epic_of_record` through the validated write boundary, with an optional Slack notice. Human-invoked only; structurally off the reconcile-tick surface so the orchestrator can never self-approve.
 - **Studio runtime plumbing templates** (`hpr-5`). A launchd daemon-autostart plist, a health-probe script, the `~/.hermes/config.yaml` MCP-wiring template, and an env-contract doc, plus a Studio Runtime Setup section in the operations guide. The live Studio runtime was verified durable (`RunAtLoad` + `KeepAlive`, all services loaded).
+- **Slack app + secrets** (`hpr-3`). A reproducible Slack-app runbook (`slack-app-runbook.md`) covering app creation, the `chat:write` scope, the four `HERMES_SLACK_*` values, root-only `secrets.env` storage, and rotation. The app was provisioned and **outbound posting verified live** (webhook 200/ok); secrets stored on Studio at `chmod 600`. The inbound receiver + live-process activation (gateway sources `secrets.env`, requires a Hermes restart) are documented as follow-ups.
 
 ### Notes
 
-- Deferred to a follow-up: `hpr-3` (Slack app + secrets — needs a human Slack-admin step), the hpr-1 Studio-side receiver, and an out-of-scope executor-graph cascade-skip change the hpr-1 run produced (isolated for its own review, not shipped here).
+- Deferred to a follow-up: the hpr-1 **Studio-side receiver** (hermes-agent HTTP endpoint + signature verification), the **live-process activation** of hpr-3's secrets (gateway restart), and an out-of-scope **executor-graph cascade-skip** change the hpr-1 run produced (isolated for its own review, not shipped here).
 
 ## [2.13.1] - 2026-06-23
 
