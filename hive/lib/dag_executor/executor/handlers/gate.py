@@ -142,8 +142,22 @@ class GateHandler:
                 # "epic.yaml not found ... (nothing committed?)" even though the
                 # epic IS present in repo_root.
                 epic_dir_value = value
-                if self._repo_root is not None and not Path(str(value)).is_absolute():
-                    epic_dir_value = str(self._repo_root / str(value))
+                if self._repo_root is not None:
+                    root = self._repo_root.resolve()
+                    candidate = Path(str(value))
+                    if not candidate.is_absolute():
+                        candidate = root / candidate
+                    resolved = candidate.resolve()
+                    # Reject an agent-emitted epic_dir that escapes repo_root
+                    # (e.g. ``../outside``) before it reaches schema validation.
+                    try:
+                        resolved.relative_to(root)
+                    except ValueError as exc:
+                        raise GateFailedError(
+                            f"gate node {node.id!r}: refusing unsafe {name!r} "
+                            f"{value!r} — must resolve inside repo_root"
+                        ) from exc
+                    epic_dir_value = str(resolved)
                 kwargs["epic_dir"] = epic_dir_value
             else:
                 # Generic fallback: pass value as positional first kwarg by name

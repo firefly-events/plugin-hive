@@ -1,7 +1,7 @@
 id: efcl-s1-gate-review-mirror
 epic: execute-flow-followons-converge-loop
 title: Mirror gate-review node into tdd and bdd methodology workflows
-status: pending
+status: shipped
 complexity: low
 methodology: classic
 needs_backend: true
@@ -115,3 +115,5 @@ references:
   relevant_excerpt: "gate-review node at line ~596: node_type gate, predicate 'review_verdict must not equal needs_revision', retry max_attempts 1, on gate_failed, retry_node review. integrate.depends_on includes gate-review at line ~622."
 - path: .pHive/epics/execute-flow-followons-converge-loop/docs/design-discussion.md
   relevant_excerpt: "Story 1: copy classic gate-review node verbatim into tdd and bdd; parametrize test_gate_review_enforce.py over all three. No executor code changes."
+shipped_at: "2026-06-23T15:10:43Z"
+release_id: v2.13.0

@@ -1,7 +1,7 @@
 id: efcl-s2-review-sees-implement-tree
 epic: execute-flow-followons-converge-loop
 title: Make each implement node's output visible to review before integrate runs
-status: pending
+status: shipped
 complexity: medium
 methodology: classic
 needs_backend: true
@@ -127,3 +127,5 @@ references:
   relevant_excerpt: "_dispatch_with_retry at line ~405; re-dispatches same node on HandlerError"
 - path: .pHive/epics/execute-flow-followons-converge-loop/docs/design-discussion.md
   relevant_excerpt: "Story 2: per-node reconcile is the preferred fix; spike confirms re-entrancy; fallback is per-node push. [grill H1] resolved: spike runs first."
+shipped_at: "2026-06-23T15:10:43Z"
+release_id: v2.13.0

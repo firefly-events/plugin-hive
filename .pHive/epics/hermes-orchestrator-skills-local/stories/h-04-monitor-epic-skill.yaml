@@ -1,0 +1,69 @@
+id: h-04-monitor-epic-skill
+epic: hermes-orchestrator-skills-local
+title: Author the monitor-epic orchestrator skill (read-only)
+status: blocked
+complexity: medium
+methodology: classic
+side: plugin-hive
+depends_on: [h-02-multica-mcp-surface]
+parallel_allowed: true
+parallel_rationale: bounded-slice
+files_to_modify:
+  - file: hive/references/orchestrator-skills/monitor-epic.md
+    change: write the canonical monitor-epic runbook source
+
+description: |
+  The "what's happening" surface. Given an epic handle, monitor-epic emits a status
+  digest with no human gate: per-story phase positions, in-flight task + age vs the
+  watchdog, recent episodes, open triage, and metric verdicts. Pure compose over
+  epic-status + context-snapshot.mjs + poll. Used for a human glance and as a cron
+  heartbeat (watch-cron and reconcile-tick read it too).
+
+  Authored as a canonical runbook source in plugin-hive (source of contract);
+  h-10 ports it into Hermes native format on Studio.
+
+acceptance_criteria:
+  - "Given an epic handle, when monitor-epic runs, then it returns phase position per story, in-flight task id + dispatched_at age, recent episodes, open triage, and metric verdicts."
+  - "Given no in-flight task, when run, then it reports idle cleanly (no error)."
+  - "Given the digest, when produced, then it makes ZERO state writes (read-only invariant)."
+  - "Given a stale in-flight task (age > watchdog), when run, then the digest flags it as potentially stuck."
+
+steps:
+  - id: research
+    description: Map epic-status + composeContextSnapshot fields to the digest; confirm read-only paths.
+    agent: researcher
+  - id: implement
+    description: Write hive/references/orchestrator-skills/monitor-epic.md — the canonical runbook (logic + exact tool calls + output shape).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Test the digest composition against a fixture epic state (idle, in-flight, stale cases). No-write assertion.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm read-only; output covers all required fields; binds to pinned h-02 ABI.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feat/hermes-orchestrator-skills.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/context-snapshot.mjs
+      purpose: composeContextSnapshot — epics/stories/episodes/triage/metric verdicts; built for external coordinators.
+    - path: hive/lib/multica-story-dispatch/cli.mjs
+      purpose: epic-status + poll subcommands.
+
+risks:
+  - severity: low
+    description: Digest sprawls into a full dump.
+    mitigation: Bound to the named fields; it is a glance surface, not a report.
+
+references:
+  - path: hive/references/cycle-reconciler.md
+    relevant_excerpt: |
+      multica_epic_status returns {epic, gate_state, current_phase,
+      in_flight_story_id, in_flight_task_id, dispatched_at, stories...}.

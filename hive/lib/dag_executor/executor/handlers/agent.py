@@ -57,6 +57,33 @@ def _output_is_empty(value: Any) -> bool:
     return False
 
 
+def _output_contract_preamble(output_names: list[str]) -> str:
+    """A hard, agent-facing instruction prepended to a Multica node's brief so a
+    flaky agent turn cannot silently end without emitting the node's declared
+    outputs.
+
+    The #22 under-run failures were intermittent and difficulty-independent: the
+    agent finished its turn (any node, any story — even a trivial preflight)
+    without writing ``.pHive/dag-outputs/outputs.yaml`` (#13), so the harvest came
+    back empty and the node failed. Re-dispatching a fresh agent re-rolled the
+    same dice. Naming the exact required keys up front and gating "your turn is
+    not done until they exist" converts a forgotten write into an explicit,
+    checkable obligation the agent must satisfy before stopping.
+    """
+    keys = ", ".join(f"`{n}`" for n in output_names)
+    return (
+        "## OUTPUT CONTRACT (#13 — MANDATORY)\n\n"
+        "Before you end your turn you MUST write the file "
+        "`.pHive/dag-outputs/outputs.yaml` in your work_dir. It MUST be valid "
+        f"YAML and MUST contain these top-level keys: {keys}. Each value is the "
+        "real result this node produced (a path, sha, boolean, or short string "
+        "— never a placeholder). If that file is missing, or is missing any of "
+        "those keys, your work is INCOMPLETE and will be DISCARDED — do not stop "
+        "until it exists with every key.\n\n"
+        "---\n\n"
+    )
+
+
 @dataclass
 class NodeOutput:
     """Materialised outputs from a single node, keyed by output name.
@@ -367,6 +394,30 @@ class MulticaAgentSpawn:
             outputs.setdefault(key, value)
         return outputs
 
+    def reharvest(
+        self, work_dir: str | None, base: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Re-read a node's harvested outputs from an EXISTING work_dir WITHOUT
+        re-dispatching.
+
+        The #22 under-run guard uses this to recover from a race: the poll can
+        report ``completed`` BEFORE the agent's commit / ``outputs.yaml`` has
+        landed, so the harvest at poll time reads an empty tree. A blind
+        re-dispatch then lands in a NEW empty work_dir and abandons the good
+        one. Re-reading the SAME work_dir surfaces the late-landing work.
+        """
+        outputs: dict[str, Any] = dict(base or {})
+        if not work_dir:
+            return outputs
+        for key, value in self._harvest_git_state(work_dir).items():
+            if value is not None:
+                outputs[key] = value
+        for key, value in self._harvest_node_outputs(work_dir).items():
+            outputs[key] = value
+        for key, value in self._harvest_artifacts(work_dir).items():
+            outputs.setdefault(key, value)
+        return outputs
+
     @staticmethod
     def _find_repo_checkout(work_dir: str | None) -> Path | None:
         """The dir holding the agent's planning artifacts inside its work_dir.
@@ -558,9 +609,9 @@ class MulticaAgentSpawn:
             return out
 
         rels = MulticaAgentSpawn._committed_phive_paths(repo_dir)
-        if rels is None:
-            # git/base unavailable — fall back to a worktree scan (correct for a
-            # fresh single-epic repo; may over-scope a multi-epic consumer repo).
+        if rels is None and not (repo_dir / ".git").exists():
+            # No git at all (fresh single-epic worktree) — a glob scan is correct
+            # here; there is no pre-existing history to confuse it with.
             try:
                 rels = [
                     str(p.relative_to(repo_dir))
@@ -571,6 +622,12 @@ class MulticaAgentSpawn:
                 ]
             except OSError:
                 return out
+        elif rels is None:
+            # FAIL CLOSED: a real git checkout with no resolvable base ref cannot
+            # safely tell THIS run's committed files from a consumer repo's
+            # pre-existing epics — scanning all of them would over-harvest and
+            # falsely satisfy declared outputs. Harvest nothing committed.
+            rels = []
 
         # Union in artifacts the agent wrote but did NOT commit (plan
         # research/design write the brief; only the author node commits). Without
@@ -991,12 +1048,36 @@ class AgentHandler:
         ]
         max_under_run_attempts = 3 if (is_multica and semantic_outputs) else 1
 
+        # #13-enforce: prepend a hard output-contract to the brief for Multica
+        # nodes that declare semantic outputs, so an intermittently-flaky agent
+        # turn cannot silently end without emitting outputs.yaml — the dominant
+        # #22 under-run cause, independent of story difficulty (observed on a
+        # trivial preflight as readily as on an architectural implement). The
+        # step content itself is still passed VERBATIM after the contract; local
+        # and test spawns consume canned outputs and get no contract.
+        effective_step_file = step_file_content
+        if is_multica and semantic_outputs:
+            effective_step_file = (
+                _output_contract_preamble(semantic_outputs) + step_file_content
+            )
+
+        def _filled(o: dict[str, Any]) -> int:
+            return sum(1 for n in semantic_outputs if not _output_is_empty(o.get(n)))
+
+        def _missing(o: dict[str, Any]) -> list[str]:
+            return [n for n in semantic_outputs if _output_is_empty(o.get(n))]
+
         outputs: dict[str, Any] = {}
+        attempt_work_dirs: list[str] = []
+        # Each work_dir's OWN attempt outputs (sha/branch/repo/work_dir). When a
+        # prior work_dir is recovered below, it must keep ITS attempt's metadata,
+        # not the latest attempt's — else reconcile/copy target the wrong tree.
+        attempt_outputs_by_work_dir: dict[str, dict[str, Any]] = {}
         for attempt in range(1, max_under_run_attempts + 1):
             try:
                 outputs = self._spawn(
                     agent=node.agent,
-                    step_file_content=step_file_content,
+                    step_file_content=effective_step_file,
                     inputs=dict(inputs),
                     run_id=run_id,
                     step_id=node.id,
@@ -1013,11 +1094,40 @@ class AgentHandler:
                     f"agent-spawn returned non-dict outputs for node {node.id!r}"
                 )
 
-            under_run = bool(semantic_outputs) and all(
-                _output_is_empty(outputs.get(n)) for n in semantic_outputs
-            )
+            wd = outputs.get("work_dir")
+            if isinstance(wd, str) and wd:
+                if wd not in attempt_work_dirs:
+                    attempt_work_dirs.append(wd)
+                attempt_outputs_by_work_dir[wd] = dict(outputs)
+
+            # The injected #13 contract requires EVERY declared output; a partial
+            # outputs.yaml is incomplete and must not flow downstream. Treat a run
+            # missing ANY semantic output as an under-run (not only all-empty).
+            under_run = bool(_missing(outputs))
             if not (is_multica and under_run):
                 break
+
+            # #22 efcl-s4: an under-run is usually a RACE, not a no-op — the poll
+            # reported 'completed' before the agent's commit / outputs.yaml had
+            # landed, so the harvest at poll time read an empty tree. A blind
+            # re-dispatch lands in a NEW empty work_dir and ABANDONS the good one
+            # (observed: 3 attempts each in a distinct work_dir, only the first
+            # actually held the authored epic). Before spending a re-dispatch,
+            # re-harvest every work_dir seen so far — a late-landing commit now
+            # surfaces — seeding each candidate with ITS OWN attempt metadata so a
+            # recovered earlier work_dir doesn't inherit a later attempt's tree.
+            recovered: dict[str, Any] | None = None
+            for prior in attempt_work_dirs:
+                cand = self._spawn.reharvest(
+                    prior, base=attempt_outputs_by_work_dir.get(prior)
+                )
+                if _filled(cand) > _filled(recovered or {}):
+                    recovered = cand
+            # Accept only a COMPLETE recovery — every declared output present.
+            if recovered is not None and not _missing(recovered):
+                outputs = recovered
+                break
+
             if attempt >= max_under_run_attempts:
                 raise AgentHandlerError(
                     f"node {node.id!r}: agent reported completed but produced none "

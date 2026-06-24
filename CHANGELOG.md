@@ -9,16 +9,55 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-## [2.13.0] - 2026-06-23
+## [2.13.2] - 2026-06-24
 
-**Plan DAG cutover — `/plan` can now graduate onto Hive's deterministic DAG executor behind the same default-off controls as `/execute`.**
+**Wiring the lights-on loop's runtime — first autonomous stories.** Partial delivery of the `hermes-production-readiness` epic: the loop-closer's inbound transport and the human "go" entrypoint, plus the Studio runtime templates. Executed through the DAG-on-Multica path (which also surfaced — and got fixed — a per-story `story_spec` scoping gap in the launcher).
 
 ### Added
 
-- **Plan-dispatch and `/plan` DAG routing.** `/plan` now resolves a single runner path through `plan-dispatch`, honoring `HIVE_PLANNING_MODE=hive-dag`, consumer `planning.mode: hive-dag`, and the executor graduation registry before falling back to the narrated orchestrator path.
-- **`user_gate` node type and gate signals.** The plan workflow now carries human review checkpoints with conditional auto-pass predicates for H/V confidence and structured-outline open questions, including fail-closed missing-signal semantics and signed approve/reject sentinel handling.
-- **Plan workflow graduation.** `plan` is active as Order 10 in the executor graduation registry, gated by consumer `executor_default: true`.
-- **Schema and parity coverage.** Workflow schema docs now define `user_gate`, and new acceptance/parity tests cover plan cutover, user-gate behavior, plan spine execution, and `/execute` dispatch parity with `HIVE_PLANNING_MODE=hive-dag` set.
+- **Inbound Slack → resolveGate, repo slice** (`hpr-1`). `slack-notify-await.mjs` now emits Slack **Block Kit** blocks with gate-action buttons (`approve` / `revise` / `reject`, encoding the gate action as compact keys `{a: action, e: epic_handle, s: story_id}` in the button value) alongside the plain-text fallback, plus `parseGateAction()` and `resolveGateInvoker()` — the thin, tested entrypoint a Studio HTTP receiver calls (only **after verifying the Slack request signature**) to drive `resolveGate`. The receiver itself (hermes-agent HTTP endpoint + HMAC signature verification over the raw request body, before any cycle-state read/write) remains the Studio-side follow-up.
+- **Epic-approval bootstrap** (`hpr-4`). `epic-bootstrap.mjs` — the gated human "go" that latches a chosen epic's initial `gate_state: pre_approved` + `epic_of_record` through the validated write boundary, with an optional Slack notice. Human-invoked only; structurally off the reconcile-tick surface so the orchestrator can never self-approve.
+- **Studio runtime plumbing templates** (`hpr-5`). A launchd daemon-autostart plist, a health-probe script, the `~/.hermes/config.yaml` MCP-wiring template, and an env-contract doc, plus a Studio Runtime Setup section in the operations guide. The live Studio runtime was verified durable (`RunAtLoad` + `KeepAlive`, all services loaded).
+- **Slack app + secrets** (`hpr-3`). A reproducible Slack-app runbook (`slack-app-runbook.md`) covering app creation, the `chat:write` scope, the four `HERMES_SLACK_*` values, root-only `secrets.env` storage, and rotation. The app was provisioned and **outbound posting verified live** (webhook 200/ok); secrets stored on Studio at `chmod 600`. The inbound receiver + live-process activation (gateway sources `secrets.env`, requires a Hermes restart) are documented as follow-ups.
+
+### Security
+
+- **Path-traversal hardening.** Epic handles compose filesystem paths (`<dir>/<handle>.yaml`); both composers — `validateEpicHandle` (`epic-bootstrap.mjs`) and `resolveGateInvoker` (`slack-notify-await.mjs`) — now reject any handle that is not a `[a-z0-9-]` slug, so a hostile inbound payload cannot escape the cycle-state dir.
+- **Gate-transition atomicity.** `resolveGate`'s precondition check and transition now run inside one locked read-modify-write (`mutateHermesReconcilerState`), closing a check-then-write race where a concurrent reconcile-tick could let a stale Slack click clobber a terminal transition.
+- **Webhook target constraint.** Outbound Slack posts now require `https` to a Slack host (loopback `http` permitted only for tests), preventing a misconfigured/injected webhook URL from exfiltrating verdict context.
+
+### Notes
+
+- Deferred to a follow-up: the hpr-1 **Studio-side receiver** (hermes-agent HTTP endpoint + signature verification), the **live-process activation** of hpr-3's secrets (gateway restart), and an out-of-scope **executor-graph cascade-skip** change the hpr-1 run produced (isolated for its own review, not shipped here).
+
+## [2.13.1] - 2026-06-23
+
+**Codifying the orchestrator so a persistent Hermes cron can run the loop.** This release turns the Hive orchestrator from a thing a human drives into a contract a Hermes agent drives — five Hermes-side skill runbooks plus the gate, MCP, and Slack plumbing they stand on. The north star is a lights-on software factory where the human is in the loop only at planning and review; the orchestrator and agents own everything between.
+
+### Added
+
+- **Hermes orchestrator skills** (epic `hermes-orchestrator-skills`, PR #321). Five Hermes-side runbooks — `monitor-epic`, `reconcile-tick`, `kickoff-plan`, `kickoff-exec`, `watch-cron` — that codify the cycle-reconciler's 7-position phase machine (pending → dispatched_impl → impl_terminal → dispatched_review → review_terminal → done) as the contract a Hermes cron uses to drive the forked Multica instance, gating humans only at planning and at the review verdict.
+- **Multica MCP surface** (`h-02`). A JSON-RPC 2.0 stdio MCP server (`mcp-tools.mjs`) wrapping the dispatch `cli.mjs` subcommands as seven tools — `multica_dispatch_story`, `multica_poll_task`, `multica_epic_status`, `multica_write_state`, `multica_post_comment`, `multica_episode`, `multica_cancel` — so Hermes invokes the bridge as native tools instead of shelling out.
+- **gate_state latch + epic_of_record** (`h-03`). The cross-tick autonomy contract: a `gate_state` enum (`pre_approved` / `review_awaiting_human` / `finalized` / `rejected`) latches the human review gate across reconciler ticks, and `epic_of_record` pins the reconciler's target epic. Writes are validated at a single state-write boundary with an advisory lock around the read-modify-write.
+- **Slack notify-and-await human gate** (`h-06`). The outbound half of the review gate: surfaces a verdict or error to Slack and resolves the gate via `resolveGate` (approve → story done, revise → re-dispatch, reject, continue), with the passed-verdict auto-advance model (model "b" — ff-merge-verified passes advance automatically; only non-pass/unverified/error surface to the human).
+- **Studio port + operations guide** (`h-01`, `h-10`). The five runbooks ported to the Hermes-agent native `SKILL.md` format on Studio, the Multica MCP server wired into the Hermes runtime config, and the end-to-end lights-on loop documented in the operations guide.
+
+## [2.13.0] - 2026-06-23
+
+**Hardening the substrate by running it on itself.** The DAG-on-Multica execution path got tougher the only honest way — by dogfooding a real epic through it and fixing what broke. This release lands the execute-flow follow-ons (gate-review across every methodology, review-sees-implement-tree, output-channel coverage), the executor-reliability fixes that dogfooding surfaced, a Simplicity/KISS standard for the dev personas, and step-file plugin-root resolution. Reviewed cross-LLM (Codex + CodeRabbit), including a comprehensive pass that caught a silent-stale-review hole before release.
+
+### Added
+
+- **Execute-flow follow-ons** (epic `execute-flow-followons-converge-loop`, PR #318). The gate-review node (a review verdict of `needs_revision` blocks integrate) is mirrored into the tdd and bdd methodology workflows, not just classic; each implement node now reconciles its output into the working tree so review reads the real implemented code *before* integrate (`review-sees-implement-tree`); and the Multica `#13` output channel is seeded into consumer repos' `.gitignore` at repo-bind.
+- **Node-output harvest + the `#13` output channel** (PR #316). The general channel by which a Multica agent emits a node's declared semantic outputs (`.pHive/dag-outputs/outputs.yaml`, harvested by the executor), plus committed-artifact and git-state harvest.
+- **Simplicity (KISS) quality standard** for the developer personas and the idiomatic-reviewer (PR #317) — choose the simplest implementation that satisfies the acceptance criteria; a reviewer should not be able to delete code and keep all criteria passing.
+- **Step-file plugin-root resolution** (PR #314).
+
+### Fixed
+
+- **Under-run reliability on Multica** (PR #318). A flaky agent turn that ended without writing its declared `outputs.yaml` caused intermittent, difficulty-independent node failures. The under-run guard now re-harvests every work_dir seen before re-dispatching (recovering a commit that landed after the poll reported terminal), enforces the *full* declared-output set (a partial `outputs.yaml` no longer flows downstream), and every Multica dispatch carries a hard output-contract naming the required keys.
+- **Per-node reconcile fails loud** (PR #318). A reconcile that cannot materialise the implement commit (e.g. a non-fast-forward) now halts the run instead of silently letting review read a stale tree.
+- **Meta structural-audit cycle** (PR #315).
 
 ## [2.12.1] - 2026-06-21
 

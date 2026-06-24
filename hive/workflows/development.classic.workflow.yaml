@@ -228,7 +228,10 @@ steps:
     outputs:
       - name: reconcile_status
         type: string
-    optional: true
+    # NON-optional barrier: ReconcileHandler no-ops cleanly when sha is absent
+    # (local binding); with a real sha a materialisation failure MUST fail loud
+    # so downstream test/review never read a stale tree.
+    optional: false
     timeout_ms: 120000
 
   - id: reconcile-frontend
@@ -263,7 +266,10 @@ steps:
     outputs:
       - name: reconcile_status
         type: string
-    optional: true
+    # NON-optional barrier: ReconcileHandler no-ops cleanly when sha is absent
+    # (local binding); with a real sha a materialisation failure MUST fail loud
+    # so downstream test/review never read a stale tree.
+    optional: false
     timeout_ms: 120000
 
   - id: test
@@ -344,7 +350,10 @@ steps:
     outputs:
       - name: reconcile_status
         type: string
-    optional: true
+    # NON-optional barrier: ReconcileHandler no-ops cleanly when sha is absent
+    # (local binding); with a real sha a materialisation failure MUST fail loud
+    # so downstream test/review never read a stale tree.
+    optional: false
     timeout_ms: 120000
 
   # Validation gate (s3): confirm test artifacts exist before review.
@@ -429,6 +438,8 @@ steps:
     depends_on:
       - gate-code
       - platform-verify
+      - reconcile-backend
+      - reconcile-frontend
     inputs:
       - name: backend_implementation
         source: step_output

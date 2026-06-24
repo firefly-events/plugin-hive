@@ -1,7 +1,7 @@
 id: efcl-s4-retry-on-terminal
 epic: execute-flow-followons-converge-loop
 title: "Verify and fix: re-dispatching a terminal Multica issue actually restarts the agent"
-status: pending
+status: shipped
 complexity: medium
 methodology: classic
 needs_backend: true
@@ -107,3 +107,5 @@ references:
   relevant_excerpt: "_dispatch at line ~820: cli.mjs dispatch --issue <tracker_id> --agent <agent>. _resolve_tracker_id at line ~729: local tracker.json + server --dedup-title. Under-run guard re-dispatches up to 3x reusing same id."
 - path: .pHive/epics/execute-flow-followons-converge-loop/docs/design-discussion.md
   relevant_excerpt: "Story 4: investigation-first. Preferred fix: reset issue status before re-dispatch to preserve dedup. Fallback: fresh tracker id (weakens dedup). [grill U2]: preserve _resolve_tracker_id dedup as hard constraint."
+shipped_at: "2026-06-23T15:10:43Z"
+release_id: v2.13.0

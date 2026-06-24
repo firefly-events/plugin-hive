@@ -708,6 +708,139 @@ See `references/error-handling.md` for the full per-phase failure playbook.
 
 ---
 
+## Hermes Orchestrator Skills (lights-on loop)
+
+The Hive orchestrator is codified as a set of **Hermes-side skills** so a persistent
+Hermes cron can run the software factory toward the north star: **a human gates only
+planning and review; the orchestrator and agents own the rest.** The skills are
+native hermes-agent `SKILL.md` files under `skills/orchestration/` in the
+hermes-agent repo, ported from the canonical runbook sources in plugin-hive at
+`hive/references/orchestrator-skills/`. Format + binding spec:
+`.pHive/epics/hermes-orchestrator-skills/docs/hermes-skill-format-spec.md`.
+
+| Skill | Human gate | Wraps | Source runbook |
+|-------|-----------|-------|----------------|
+| `monitor-epic` | none (read-only) | epic-status + context-snapshot + poll | `orchestrator-skills/monitor-epic.md` |
+| `reconcile-tick` | **review verdict** | 7-position phase machine; watchdog; ff-merge verify | `orchestrator-skills/reconcile-tick.md` |
+| `kickoff-plan` | **plan approval** | starts `/plan`, routes gates to human | `orchestrator-skills/kickoff-plan.md` |
+| `kickoff-exec` | none (epic pre-approved) | starts the reconcile loop over a `pre_approved` epic | `orchestrator-skills/kickoff-exec.md` |
+| `watch-cron` | none (alert-only) | RemoteTrigger routines + `multica daemon status` health | `orchestrator-skills/watch-cron.md` |
+
+**The loop:** a human approves an epic (`gate_state: pre_approved`, the latch in
+`hive/lib/hermes-reconciler/state.mjs`) → `kickoff-exec` starts → `reconcile-tick`
+advances each story implementation → review → **halts at `review_terminal`** and
+surfaces the verdict to the human via the Slack notify-and-await transport
+(`hive/lib/hermes-reconciler/slack-notify-await.mjs`) → human continues/rejects →
+loop resumes. `monitor-epic` + `watch-cron` provide read-only visibility throughout.
+
+**Invariants:** the tick never auto-advances past a review verdict, never marks a
+story done on an agent's claimed "pushed" status (verifies ff-merge), never advances
+an epic that is not `pre_approved`, and **never mints stories** — backlog authorship
+stays human-gated via `/plan` and `/triage --hand-off` only.
+
+**MCP binding:** the skills reach the tracker through `multica_*` MCP tools
+(`hive/lib/multica-story-dispatch/mcp-tools.mjs`, a thin wrapper over `cli.mjs`),
+registered in the hermes runtime config (`~/.hermes/config.yaml` → `mcp_servers.multica`).
+
+---
+
+## Studio Runtime Setup (hpr-5)
+
+The lights-on loop runs on Studio (mac.lan, user `hive`). The multica daemon and
+Hermes MCP wiring must survive reboots without manual intervention.
+
+### 1. Daemon autostart (launchd)
+
+Install the bundled launchd service template:
+
+```bash
+cp hive/lib/hermes-runtime/com.hive.multica-daemon.plist \
+   ~/Library/LaunchAgents/com.hive.multica-daemon.plist
+
+# Bootstrap (first install):
+launchctl bootstrap gui/$(id -u) \
+  ~/Library/LaunchAgents/com.hive.multica-daemon.plist
+
+# Verify:
+launchctl print gui/$(id -u)/com.hive.multica-daemon
+multica daemon status --output json
+```
+
+The plist uses `KeepAlive: true` — the daemon restarts automatically after a crash
+or reboot. Logs: `/tmp/multica-daemon.stdout.log` and `.stderr.log`.
+
+To remove: `launchctl bootout gui/$(id -u)/com.hive.multica-daemon`.
+
+### 2. Hermes MCP config (`~/.hermes/config.yaml`)
+
+Populate from the template:
+
+```bash
+mkdir -p ~/.hermes
+cp hive/lib/hermes-runtime/hermes-config.template.yaml ~/.hermes/config.yaml
+# Edit: replace <PLUGIN_HIVE_PATH> with the absolute path to the Studio checkout,
+# e.g. /Users/hive/Code/plugin-hive
+```
+
+The `mcp_servers.multica` stanza wires `node mcp-tools.mjs` with the correct `cwd`
+so all 7 MCP tools resolve. Verify:
+
+```bash
+node /Users/hive/Code/plugin-hive/hive/lib/multica-story-dispatch/mcp-tools.mjs
+# Should start and report its capabilities (Ctrl-C to exit)
+```
+
+### 3. Health probe
+
+```bash
+# Quick check:
+hive/lib/hermes-runtime/health-probe.sh
+
+# Structured output (for scripts / watch-cron):
+hive/lib/hermes-runtime/health-probe.sh --json
+```
+
+Exit 0 = healthy; exit 1 = unhealthy. The probe is read-only and safe to run
+at any cadence. `watch-cron` uses this to decide whether to skip a tick.
+
+### 4. Workspace bind
+
+The Studio plugin-hive checkout the daemon operates on must be on `develop` (or the
+active epic branch). Document the bind:
+
+| Field | Value |
+|-------|-------|
+| Path | `/Users/hive/Code/plugin-hive` |
+| Branch | `develop` (or active epic branch) |
+| Workspace slug | configured in `.pHive/multica/agents.yaml` |
+
+Pin this in the Hermes config `cwd` field (see template above) so agents always
+operate on the documented tree.
+
+### 5. Restart-recovery check
+
+After any reboot or `launchctl stop com.hive.multica-daemon`:
+
+```bash
+# 1. Confirm daemon restarted automatically (give launchd ~10 s):
+launchctl print gui/$(id -u)/com.hive.multica-daemon | grep state
+multica daemon status --output json
+
+# 2. Confirm the multica daemon is healthy (probe checks daemon status, not
+#    individual MCP tool invocation):
+hive/lib/hermes-runtime/health-probe.sh
+
+# 3. Confirm health probe exits 0:
+echo "exit code: $?"
+```
+
+### 6. Environment variables (Slack + Multica)
+
+See `hive/lib/hermes-runtime/env-contract.md` for the full variable list.
+Store secrets in the Studio keychain or a root-only env file — never in the repo.
+
+---
+
 ## Further Reading
 
 | Doc | What it covers |
