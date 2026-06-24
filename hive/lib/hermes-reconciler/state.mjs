@@ -75,6 +75,25 @@ function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
+// Recursive deep merge: nested plain-object fields merge by key instead of
+// being replaced wholesale. Non-object patch values (scalars, null, arrays)
+// replace the target value — null is a deliberate clear, arrays are replaced
+// (not concatenated). Inputs are never mutated; a fresh object is returned.
+// Without this, a per-story patch like {verdict:{notes:"x"}} would clobber the
+// whole verdict object, dropping sibling keys (status, etc.).
+function deepMerge(target, patch) {
+  const base = isPlainObject(target) ? target : {};
+  const out = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (isPlainObject(value) && isPlainObject(out[key])) {
+      out[key] = deepMerge(out[key], value);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 // -- Defaults --
 
 const DEFAULTS = {
@@ -268,7 +287,8 @@ export function mutateHermesReconcilerState(cycleStatePath, mutator) {
     const updates = mutator(current) ?? {};
     validateReconcilerUpdates(updates);
 
-    // Merge updates — stories get per-story merge, top-level scalar fields get replaced.
+    // Merge updates — stories get per-story DEEP merge (nested fields like
+    // verdict.* merge by key, not replace), top-level scalar fields get replaced.
     // The write path is the mutation boundary: reject malformed shapes loudly rather
     // than silently corrupting state (an array `stories`, or a per-story patch that is
     // an array/primitive, would spread garbage into the cycle-state file).
@@ -281,7 +301,7 @@ export function mutateHermesReconcilerState(cycleStatePath, mutator) {
         if (!isPlainObject(storyPatch)) {
           throw new Error(`hermes_reconciler.stories["${storyId}"] must be an object, got: ${Array.isArray(storyPatch) ? 'array' : typeof storyPatch}`);
         }
-        mergedStories[storyId] = { ...(mergedStories[storyId] ?? {}), ...storyPatch };
+        mergedStories[storyId] = deepMerge(mergedStories[storyId] ?? {}, storyPatch);
       }
     }
 
