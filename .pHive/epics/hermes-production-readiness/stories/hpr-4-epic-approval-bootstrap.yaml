@@ -29,7 +29,7 @@ acceptance_criteria:
 
 steps:
   - id: implement
-    description: Build the bootstrap entrypoint — resolve epic handle, echo + confirm, write {gate_state: pre_approved, epic_of_record} via cli.mjs write-state / multica_write_state. Optional Slack notice. Keep it OFF the reconcile-tick surface.
+    description: "Build the bootstrap entrypoint — resolve epic handle, echo + confirm, write {gate_state: pre_approved, epic_of_record} via cli.mjs write-state / multica_write_state. Optional Slack notice. Keep it OFF the reconcile-tick surface."
     agent: developer
   - id: test
     description: Test happy path (writes pre_approved + epic_of_record), confirm-gate (no write without confirm), invalid handle (no write). Assert the entrypoint is not reachable from the tick surface.
