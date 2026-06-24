@@ -51,9 +51,16 @@ HEALTHY=$(node -e "
   }
 " 2>/dev/null) || HEALTHY=false
 
+# Escape STATUS_JSON as a JSON *string* for the unhealthy payload: the daemon
+# output may be empty or malformed on the failure path, so interpolating it raw
+# would emit invalid JSON and break watch-cron/script consumers.
+STATUS_JSON_ESCAPED=$(printf '%s' "$STATUS_JSON" \
+  | node -e "process.stdout.write(JSON.stringify(require('fs').readFileSync('/dev/stdin','utf8')))" 2>/dev/null) \
+  || STATUS_JSON_ESCAPED='""'
+
 if [[ "$HEALTHY" != "true" ]]; then
   if $JSON_MODE; then
-    printf '{"healthy":false,"reason":"daemon reports non-running state","daemon_status":%s}\n' "$STATUS_JSON"
+    printf '{"healthy":false,"reason":"daemon reports non-running state","daemon_status_raw":%s}\n' "$STATUS_JSON_ESCAPED"
   else
     echo "UNHEALTHY: daemon reports non-running state"
     echo "daemon status: $STATUS_JSON"

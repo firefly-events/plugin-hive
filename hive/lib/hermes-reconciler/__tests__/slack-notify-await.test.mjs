@@ -549,12 +549,14 @@ test('resolveGateInvoker: uses HERMES_CYCLE_STATE_DIR env when no opts provided'
   const dir = tmpDir();
   const statePath = path.join(dir, 'my-epic.yaml');
   writeHermesReconcilerState(statePath, { gate_state: 'review_awaiting_human' });
+  const saved = process.env.HERMES_CYCLE_STATE_DIR;
   process.env.HERMES_CYCLE_STATE_DIR = dir;
   try {
     const result = resolveGateInvoker({ epicHandle: 'my-epic', action: 'reject' });
     assert.equal(result.gate_state, 'rejected');
   } finally {
-    delete process.env.HERMES_CYCLE_STATE_DIR;
+    if (saved === undefined) delete process.env.HERMES_CYCLE_STATE_DIR;
+    else process.env.HERMES_CYCLE_STATE_DIR = saved;
   }
 });
 

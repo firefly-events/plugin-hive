@@ -269,6 +269,11 @@ export function parseGateAction(buttonValue) {
 
 // ── resolveGate invoker ───────────────────────────────────────────────────────
 
+// Epic handles compose a filesystem path (`<dir>/<handle>.yaml`). Constrain to a
+// slug so a hostile inbound Slack payload cannot traverse out of the cycle-state
+// dir (e.g. `../other`). Mirrors the bootstrap CLI's epic-handle validation.
+const EPIC_HANDLE_RE = /^[a-z0-9](?:[a-z0-9-]{0,127})$/;
+
 /**
  * Thin entrypoint for the Studio HTTP receiver: resolves the cycle-state path
  * from epicHandle and delegates to resolveGate().
@@ -289,6 +294,11 @@ export function resolveGateInvoker({ epicHandle, storyId, action }, { cycleState
   }
   if (!epicHandle || typeof epicHandle !== 'string') {
     throw new Error('resolveGateInvoker: epicHandle must be a non-empty string');
+  }
+  if (!EPIC_HANDLE_RE.test(epicHandle)) {
+    throw new Error(
+      'resolveGateInvoker: epicHandle must be a slug ([a-z0-9-]) without path separators',
+    );
   }
   const cycleStatePath = path.join(dir, `${epicHandle}.yaml`);
   return resolveGate(cycleStatePath, { storyId: storyId ?? undefined, action });

@@ -120,12 +120,20 @@ function postSlackNotice(webhookUrl, epicHandle) {
 
 // ── Validate epic handle ──────────────────────────────────────────────────────
 
+// The epic handle composes a filesystem path (`.pHive/cycle-state/<handle>.yaml`
+// in resolveCycleStatePath). Reject path separators and traversal sequences so a
+// handle can only ever reference a file inside the intended cycle-state dir.
+const EPIC_HANDLE_RE = /^[a-z0-9](?:[a-z0-9-]{0,127})$/;
+
 function validateEpicHandle(handle) {
   if (!handle || handle === true) {
     return '--epic is required';
   }
   if (typeof handle !== 'string' || handle.trim() === '') {
     return '--epic must be a non-empty string';
+  }
+  if (!EPIC_HANDLE_RE.test(handle)) {
+    return '--epic must be a slug ([a-z0-9-]) without path separators';
   }
   return null;
 }

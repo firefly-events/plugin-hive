@@ -119,6 +119,22 @@ test('empty string epic handle: exits with error, no write', () => {
   assert.ok(!fs.existsSync(file));
 });
 
+test('epic handle with path traversal tokens is rejected', () => {
+  const file = tmpCycleStatePath('unused3');
+  const res = runBootstrap(['--epic', '../escape', '--cycle-state', file], { input: 'yes\n' });
+  assert.equal(res.status, 1);
+  assert.match(res.stderr, /slug|path separators/i);
+  assert.ok(!fs.existsSync(file));
+});
+
+test('epic handle containing slash is rejected', () => {
+  const file = tmpCycleStatePath('unused4');
+  const res = runBootstrap(['--epic', 'team/epic', '--cycle-state', file], { input: 'yes\n' });
+  assert.equal(res.status, 1);
+  assert.match(res.stderr, /slug|path separators/i);
+  assert.ok(!fs.existsSync(file));
+});
+
 // ── Dry run ───────────────────────────────────────────────────────────────────
 
 test('--dry-run: echoes plan and exits without writing state', () => {

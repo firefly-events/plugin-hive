@@ -826,7 +826,8 @@ After any reboot or `launchctl stop com.hive.multica-daemon`:
 launchctl print gui/$(id -u)/com.hive.multica-daemon | grep state
 multica daemon status --output json
 
-# 2. Confirm MCP tools callable (all 7 must respond):
+# 2. Confirm the multica daemon is healthy (probe checks daemon status, not
+#    individual MCP tool invocation):
 hive/lib/hermes-runtime/health-probe.sh
 
 # 3. Confirm health probe exits 0:
