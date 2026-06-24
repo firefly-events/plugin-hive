@@ -1,4 +1,0 @@
-preflight_status: READY
-needs_backend: true
-needs_frontend: false
-implementation: "hpr-1 REPO slice: Block Kit gate buttons (buildVerdictMessage/buildErrorMessage emit blocks with action buttons encoding {a,e,s}), parseGateAction(), resolveGateInvoker() wired to resolveGate() via HERMES_CYCLE_STATE_DIR. Pre-existing test failures fixed: cascade-skip when predicates on reconcile/gate nodes, 4-clause predicate lock update, canned outputs for kg-signal and metric-declaration nodes."

@@ -202,11 +202,6 @@ steps:
     step_file: hive/workflows/step-files/execute/reconcile.md
     task: >
       Materialise the backend-implement agent's commit before tests run.
-    # Mirror the backend-implement when: predicate so this node skips when
-    # needs_backend is false — preserving the empty-domain cascade skip through
-    # the test/review pipeline (none_failed_min_one_success on test's two
-    # reconcile upstreams cascades SKIP when both reconcile nodes skip).
-    when: "$preflight.output.needs_backend == true"
     depends_on:
       - backend-implement
     inputs:
@@ -230,6 +225,9 @@ steps:
         step_id: backend-implement
         output_name: work_dir
         optional: true
+    outputs:
+      - name: reconcile_status
+        type: string
     # NON-optional barrier: ReconcileHandler no-ops cleanly when sha is absent
     # (local binding); with a real sha a materialisation failure MUST fail loud
     # so downstream test/review never read a stale tree.
@@ -242,9 +240,6 @@ steps:
     step_file: hive/workflows/step-files/execute/reconcile.md
     task: >
       Materialise the frontend-implement agent's commit before tests run.
-    # Mirror the frontend-implement when: predicate so this node skips when
-    # needs_frontend is false.
-    when: "$preflight.output.needs_frontend == true"
     depends_on:
       - frontend-implement
     inputs:
@@ -268,6 +263,9 @@ steps:
         step_id: frontend-implement
         output_name: work_dir
         optional: true
+    outputs:
+      - name: reconcile_status
+        type: string
     # NON-optional barrier: ReconcileHandler no-ops cleanly when sha is absent
     # (local binding); with a real sha a materialisation failure MUST fail loud
     # so downstream test/review never read a stale tree.
@@ -326,10 +324,6 @@ steps:
     step_file: hive/workflows/step-files/execute/reconcile.md
     task: >
       Materialise the test agent's commit so the gate validates committed test files.
-    # Skip when no domain was implemented — mirrors the implement nodes' when:
-    # predicates so the gate-code/review pipeline cascades SKIP for empty-domain
-    # stories (reconcile-test is single-upstream, so trigger_rule won't skip it).
-    when: "$preflight.output.needs_backend == true || $preflight.output.needs_frontend == true"
     depends_on:
       - test
     inputs:
@@ -353,6 +347,9 @@ steps:
         step_id: test
         output_name: work_dir
         optional: true
+    outputs:
+      - name: reconcile_status
+        type: string
     # NON-optional barrier: ReconcileHandler no-ops cleanly when sha is absent
     # (local binding); with a real sha a materialisation failure MUST fail loud
     # so downstream test/review never read a stale tree.
@@ -373,9 +370,6 @@ steps:
     task: >
       Validate that the test step produced test artifacts. Gate blocks review from
       proceeding until committed code and tests exist in the tree.
-    # Skip when no domain was implemented — mirrors reconcile-test's when:
-    # predicate so gate-code cascades SKIP for empty-domain stories.
-    when: "$preflight.output.needs_backend == true || $preflight.output.needs_frontend == true"
     depends_on:
       - reconcile-test
     inputs:
@@ -612,7 +606,6 @@ steps:
   # converge-loop follow-on, t-005/t-006.)
   - id: gate-review
     node_type: gate
-    when: "$preflight.output.needs_backend == true || $preflight.output.needs_frontend == true"
     # needs_revision BLOCKS integrate; passed and needs_optimization both proceed
     # (optimize is a refinement path, not a blocker).
     gate: "review_verdict must not equal needs_revision"
