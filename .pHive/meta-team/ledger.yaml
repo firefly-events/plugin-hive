@@ -1,3 +1,33 @@
+- experiment_id: meta-2026-06-25
+  date: '2026-06-25'
+  started: '2026-06-25T00:00:00Z'
+  closed: '2026-06-25T00:00:00Z'
+  verdict: passed
+  changes_promoted: 1
+  changes_reverted: 0
+  findings_identified: 0
+  top_changes:
+    - ".pHive/meta-team/archive/2026-04-19/MANIFEST.md: appended reviewed-on provenance line for meta-2026-06-25 (9th such line)"
+  commit: 0d452b7c18eff33ab28c4da442853567a25802c1
+  metrics_snapshot:
+    tokens: 0
+    wall_clock_ms: 5000
+    first_attempt_pass: true
+  rollback_ref: 95afe53cf9355eccf5d8bfe890783c8aaa0ff1d4
+  kg_signal_proposals_total: 0
+  notes: |
+    Nightly cycle meta-2026-06-25. Analysis found 0 in-scope findings: all 12 step
+    files complete (7/7), all 28 agents valid, all workflow step_file refs resolve,
+    model IDs current (claude-opus-4-8, claude-sonnet-4-6, claude-haiku-4-5-20251001),
+    no MEMORY_GAP (all 28 agents >=1 memory). Since last cycle (meta-2026-06-24 /
+    commit 0d452b7c): PR #332 (chore/track-brand-system) opened against main — brand
+    asset changes, outside meta-team write scope. Story reconcile commits updated
+    .pHive/epics/ story YAMLs — outside meta-team write scope. STUB_DOC
+    hive-cloud-roadmap.md (13 lines) remains out_of_scope (S16 placeholder, 20th+
+    consecutive deferral). Dedup pre-flight: no open PRs cover meta-team archive
+    paths. Routed to step-03b backlog fallback. Selected candidate mmo-2026-04-21-001:
+    appended reviewed-on: meta-2026-06-25 to MANIFEST.md (9th reviewed-on line).
+    Closure validator passed. Regression watch armed for 4-hour observation window.
 - experiment_id: meta-2026-06-24
   date: '2026-06-24'
   started: '2026-06-24T00:00:00Z'

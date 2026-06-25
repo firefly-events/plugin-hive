@@ -1,11 +1,11 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-06-24 | **Date:** 2026-06-24 | **Verdict:** PASSED
+**Cycle:** meta-2026-06-25 | **Date:** 2026-06-25 | **Verdict:** PASSED
 
 ---
 
 ## What Changed Tonight
 
-- **.pHive/meta-team/archive/2026-04-19/MANIFEST.md** — Appended `<!-- reviewed-on: meta-2026-06-24 -->` provenance line (8th reviewed-on line; archive maintenance)
+- **.pHive/meta-team/archive/2026-04-19/MANIFEST.md** — Appended `<!-- reviewed-on: meta-2026-06-25 -->` provenance line (9th reviewed-on line; archive maintenance)
 
 ---
 
@@ -13,7 +13,7 @@
 
 - No new issues found. Codebase is in good shape.
 
-_(Noted: `hive/references/hive-cloud-roadmap.md` remains a 13-line STUB_DOC placeholder — out of scope for meta-team; 19th+ consecutive deferral.)_
+_(Noted: `hive/references/hive-cloud-roadmap.md` remains a 13-line STUB_DOC placeholder — out of scope for meta-team; 20th+ consecutive deferral.)_
 
 ---
 
