@@ -5,7 +5,7 @@ Covers the 7-AC truth table for ``resolve_plan_runner``:
     AC1  env HIVE_PLANNING_MODE=hive-dag                     → hive-dag / planning-mode-override-env
     AC2  planning.mode: hive-dag in .pHive/hive.config.yaml  → hive-dag / planning-mode-override-config
     AC3  env beats config when both set                       → env wins  / planning-mode-override-env
-    AC4  executor_enabled_for('plan') True                   → hive-dag  / graduated-registry
+    AC4  is_workflow_graduated('plan') True (registry-only)  → hive-dag  / graduated-registry
     AC5  no planning config at all                            → orchestrator-narrated / default
     AC6  execution.mode: sandcastle does NOT affect result    → orchestrator-narrated / default
     AC7  execute-dispatch/SKILL.md byte-identical (no drift)  → file unchanged
@@ -27,7 +27,7 @@ import pytest
 from hive.lib.dag_executor import (
     CONSUMER_CONFIG_PATH,
     GRADUATED_REGISTRY_PATH,
-    executor_enabled_for,
+    is_workflow_graduated,
 )
 
 
@@ -45,10 +45,14 @@ def resolve_plan_runner(
     Precedence (stop at first match):
       1. env.HIVE_PLANNING_MODE == "hive-dag"         → planning-mode-override-env
       2. .pHive/hive.config.yaml planning.mode == "hive-dag" → planning-mode-override-config
-      3. executor_enabled_for("plan")                 → graduated-registry
+      3. is_workflow_graduated("plan")               → graduated-registry
       4. default                                      → orchestrator-narrated / default
 
     Returns (runner_path, runner_reason).
+
+    NOTE: step 3 is registry-only. Plan graduation MUST stay isolated from
+    execute-flow keys (executor_default), so it uses is_workflow_graduated()
+    rather than executor_enabled_for() (which gates on executor_default).
     """
     # Step 1: env override
     if env.get("HIVE_PLANNING_MODE", "").strip() == "hive-dag":
@@ -66,8 +70,9 @@ def resolve_plan_runner(
         except (OSError, yaml.YAMLError):
             pass
 
-    # Step 3: graduated registry
-    if executor_enabled_for("plan", repo_root):
+    # Step 3: graduated registry — registry-only (literal "plan"). MUST NOT read
+    # execute-flow keys (executor_default) per the plan-dispatch isolation contract.
+    if is_workflow_graduated("plan", repo_root):
         return "hive-dag", "graduated-registry"
 
     # Step 4: default
@@ -156,13 +161,23 @@ def test_ac3_env_beats_config(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# AC4: executor_enabled_for('plan') True → graduated-registry
+# AC4: is_workflow_graduated('plan') True → graduated-registry (registry-only)
 # ---------------------------------------------------------------------------
 
 
 def test_ac4_graduated_registry_plan(tmp_path: Path) -> None:
-    """AC4: executor_enabled_for('plan') True → hive-dag / graduated-registry."""
-    _write_consumer_config(tmp_path, "executor: hive-dag\nexecutor_default: on\n")
+    """AC4: 'plan' in the graduation registry → hive-dag / graduated-registry."""
+    _write_registry(tmp_path, ["plan"])
+    runner_path, runner_reason = resolve_plan_runner(env={}, repo_root=tmp_path)
+    assert runner_path == "hive-dag"
+    assert runner_reason == "graduated-registry"
+
+
+def test_ac4_graduation_isolated_from_executor_default(tmp_path: Path) -> None:
+    """Isolation: executor_default is an execute-flow key and MUST NOT gate plan
+    graduation. With 'plan' in the registry, planning routes to hive-dag even when
+    executor_default is off."""
+    _write_consumer_config(tmp_path, "executor: hive-dag\nexecutor_default: off\n")
     _write_registry(tmp_path, ["plan"])
     runner_path, runner_reason = resolve_plan_runner(env={}, repo_root=tmp_path)
     assert runner_path == "hive-dag"
@@ -171,7 +186,6 @@ def test_ac4_graduated_registry_plan(tmp_path: Path) -> None:
 
 def test_ac4_graduated_registry_plan_not_listed(tmp_path: Path) -> None:
     """plan not in registry → falls through to default."""
-    _write_consumer_config(tmp_path, "executor: hive-dag\nexecutor_default: on\n")
     _write_registry(tmp_path, ["code-review", "daily-ceremony"])
     runner_path, runner_reason = resolve_plan_runner(env={}, repo_root=tmp_path)
     assert runner_path == "orchestrator-narrated"
@@ -201,7 +215,7 @@ def test_ac6_execution_mode_sandcastle_no_effect(tmp_path: Path) -> None:
         tmp_path,
         "execution:\n  mode: sandcastle\nexecutor: hive-dag\nexecutor_default: on\n",
     )
-    # Registry has code-review but NOT plan — executor_enabled_for('plan') must be False.
+    # Registry has code-review but NOT plan — is_workflow_graduated('plan') must be False.
     _write_registry(tmp_path, ["code-review"])
     runner_path, runner_reason = resolve_plan_runner(env={}, repo_root=tmp_path)
     assert runner_path == "orchestrator-narrated"

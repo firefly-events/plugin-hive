@@ -27,7 +27,7 @@ Evaluate the following in precedence order, stop at the first match. Default OFF
 
 1. **Env override.** If `env.HIVE_PLANNING_MODE` exactly equals `hive-dag` (case-sensitive, no leading/trailing whitespace after strip), return `runner_path=hive-dag` and `runner_reason=planning-mode-override-env`.
 2. **Config override.** If consumer `.pHive/hive.config.yaml` has `planning.mode: hive-dag`, return `runner_path=hive-dag` and `runner_reason=planning-mode-override-config`.
-3. **Graduated registry.** If `executor_enabled_for('plan')` returns `True`, return `runner_path=hive-dag` and `runner_reason=graduated-registry`.
+3. **Graduated registry.** If `is_workflow_graduated('plan')` returns `True` (the literal workflow name `plan` is in the graduation registry), return `runner_path=hive-dag` and `runner_reason=graduated-registry`. This is a registry-only check — do NOT use `executor_enabled_for('plan')` here, because that also gates on `executor_default`, an execute-flow key the isolation contract forbids reading.
 4. **Default.** Return `runner_path=orchestrator-narrated` and `runner_reason=default`.
 
 Env beats config when both are set: `HIVE_PLANNING_MODE=hive-dag` with `planning.mode: hive-dag` in config — env wins, reason is `planning-mode-override-env`.
@@ -36,7 +36,7 @@ Env beats config when both are set: `HIVE_PLANNING_MODE=hive-dag` with `planning
 
 `execution.mode` (the execute-dispatch field) and `HIVE_EXECUTION_MODE` have no effect on plan-dispatch resolution. This skill MUST NOT read or be influenced by any execute-flow config keys (`HIVE_EXECUTION_MODE`, `execution.mode`, `executor`, `executor_default`). These are execute-dispatch–only inputs and must remain fully isolated from the planning flow.
 
-`executor_enabled_for('plan')` checks the graduation registry for the literal workflow name `plan`. This is the only graduation check for this skill; per-workflow gating for execute-flow workflows does not apply here.
+`is_workflow_graduated('plan')` checks the graduation registry for the literal workflow name `plan` — registry membership only, with no dependency on `executor_default` or any other execute-flow key. This is the only graduation check for this skill. (Do not substitute `executor_enabled_for('plan')`: it additionally requires `executor_default`, which would couple `/plan` to the execute-flow kill-switch and break this isolation contract.)
 
 ## Single Dispatch Point
 
