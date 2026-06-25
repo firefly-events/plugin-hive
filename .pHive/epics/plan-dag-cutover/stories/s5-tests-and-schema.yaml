@@ -1,7 +1,7 @@
 id: s5-tests-and-schema
 epic: plan-dag-cutover
 title: "tests, schema doc, graduation registry — cutover acceptance + parity + Order 10"
-status: pending
+status: in_progress
 complexity: low
 methodology: classic
 depends_on:

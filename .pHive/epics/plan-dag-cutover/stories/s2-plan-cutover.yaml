@@ -1,7 +1,7 @@
 id: s2-plan-cutover
 epic: plan-dag-cutover
 title: "/plan cutover — route to DAG executor when runner_path == hive-dag"
-status: pending
+status: blocked
 complexity: low
 methodology: classic
 depends_on:
