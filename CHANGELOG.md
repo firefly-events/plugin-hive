@@ -23,9 +23,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   for human review when not. Pause/resume contract preserves graph state across the gate.
   Reject is terminal (converge-loop deferred).
 
-- **Gate signals** (`s4`). Design, H/V, and structured-outline nodes now emit
-  `confidence` and `open_questions_count` into node output, feeding the `user_gate`
-  predicate evaluation.
+- **Gate signals** (`s4`). H/V nodes emit `confidence`; structured-outline nodes
+  emit `open_questions_count`. These feed the respective `user_gate` predicate
+  evaluations (Design nodes do not emit scored signals).
 
 - **Plan cutover test suite + graduation** (`s5`). Cutover acceptance tests,
   `UserGateHandler` unit tests (7 ACs), spine-parity test for `plan.workflow.yaml`

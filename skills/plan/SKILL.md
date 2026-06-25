@@ -157,7 +157,7 @@ the parsed consumer `.pHive/hive.config.yaml`. Consume `runner_path` and
 
    result = dag_executor.run(
        workflow_path='hive/workflows/plan.workflow.yaml',
-       binding=runner_reason,
+       binding="local",
        flow='planning',
        context={'requirement': requirement},
        run_state_path=run_state_path,
