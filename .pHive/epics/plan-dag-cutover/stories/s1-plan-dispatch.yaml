@@ -1,7 +1,7 @@
 id: s1-plan-dispatch
 epic: plan-dag-cutover
 title: "plan-dispatch atomic skill — runner resolution for the planning flow"
-status: pending
+status: complete
 complexity: low
 methodology: classic
 depends_on: []

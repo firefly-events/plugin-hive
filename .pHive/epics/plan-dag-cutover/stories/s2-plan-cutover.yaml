@@ -1,7 +1,11 @@
 id: s2-plan-cutover
 epic: plan-dag-cutover
 title: "/plan cutover — route to DAG executor when runner_path == hive-dag"
+<<<<<<< HEAD
 status: blocked
+=======
+status: complete
+>>>>>>> 18e1ed2e (chore(release): apply ship-time version safety net for plan-dag-cutover)
 complexity: low
 methodology: classic
 depends_on:
