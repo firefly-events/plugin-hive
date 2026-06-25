@@ -1,11 +1,7 @@
 id: s5-tests-and-schema
 epic: plan-dag-cutover
 title: "tests, schema doc, graduation registry — cutover acceptance + parity + Order 10"
-<<<<<<< HEAD
-status: in_progress
-=======
 status: complete
->>>>>>> 18e1ed2e (chore(release): apply ship-time version safety net for plan-dag-cutover)
 complexity: low
 methodology: classic
 depends_on:
