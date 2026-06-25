@@ -1,7 +1,9 @@
 id: s4-gate-signals
 epic: plan-dag-cutover
 title: "emit gate signals — confidence and open_questions_count in design/H-V/SO nodes"
-status: complete
+status: shipped
+shipped_at: "2026-06-25T03:35:00Z"
+release_id: v2.13.3
 complexity: low
 methodology: classic
 depends_on:

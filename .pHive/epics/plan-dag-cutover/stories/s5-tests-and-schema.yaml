@@ -1,7 +1,9 @@
 id: s5-tests-and-schema
 epic: plan-dag-cutover
 title: "tests, schema doc, graduation registry — cutover acceptance + parity + Order 10"
-status: complete
+status: shipped
+shipped_at: "2026-06-25T03:35:00Z"
+release_id: v2.13.3
 complexity: low
 methodology: classic
 depends_on:

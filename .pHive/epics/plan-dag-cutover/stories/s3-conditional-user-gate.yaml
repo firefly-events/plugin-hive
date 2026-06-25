@@ -1,7 +1,9 @@
 id: s3-conditional-user-gate
 epic: plan-dag-cutover
 title: "conditional user-gate node type — evaluate predicate, auto-pass or halt-surface-resume"
-status: complete
+status: shipped
+shipped_at: "2026-06-25T03:35:00Z"
+release_id: v2.13.3
 complexity: high
 methodology: classic
 depends_on:
