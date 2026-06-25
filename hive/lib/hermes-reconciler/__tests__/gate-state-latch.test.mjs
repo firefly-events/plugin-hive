@@ -72,6 +72,47 @@ test('writeHermesReconcilerState persists epic_of_record', () => {
   assert.equal(state.epic_of_record, 'hermes-orchestrator-skills');
 });
 
+// ── state.mjs: per-story DEEP merge (regression: nested clobber) ─────────────
+
+test('stories: top-level field patch preserves sibling fields', () => {
+  const file = tmpFile();
+  writeHermesReconcilerState(file, {
+    stories: { s3: { phase_position: 'impl', attempt: 2 } },
+  });
+  writeHermesReconcilerState(file, { stories: { s3: { phase_position: 'done' } } });
+  const s3 = readHermesReconcilerState(file).stories.s3;
+  assert.equal(s3.phase_position, 'done');
+  assert.equal(s3.attempt, 2, 'sibling field must survive a partial story patch');
+});
+
+test('stories: nested object patch deep-merges instead of replacing (verdict.* keeps siblings)', () => {
+  const file = tmpFile();
+  writeHermesReconcilerState(file, {
+    stories: { s3: { phase_position: 'impl', verdict: { status: 'pass', notes: 'looks good' } } },
+  });
+  // Patch ONLY verdict.notes — status must survive (the reported bug).
+  writeHermesReconcilerState(file, { stories: { s3: { verdict: { notes: 'updated' } } } });
+  const s3 = readHermesReconcilerState(file).stories.s3;
+  assert.equal(s3.phase_position, 'impl');
+  assert.deepEqual(s3.verdict, { status: 'pass', notes: 'updated' });
+});
+
+test('stories: null patch clears a nested field (deliberate clear, not merge)', () => {
+  const file = tmpFile();
+  writeHermesReconcilerState(file, { stories: { s3: { verdict: { status: 'pass' } } } });
+  writeHermesReconcilerState(file, { stories: { s3: { verdict: null } } });
+  assert.equal(readHermesReconcilerState(file).stories.s3.verdict, null);
+});
+
+test('stories: patching one story leaves other stories untouched', () => {
+  const file = tmpFile();
+  writeHermesReconcilerState(file, { stories: { s3: { phase_position: 'impl' } } });
+  writeHermesReconcilerState(file, { stories: { s4: { phase_position: 'plan' } } });
+  const stories = readHermesReconcilerState(file).stories;
+  assert.equal(stories.s3.phase_position, 'impl');
+  assert.equal(stories.s4.phase_position, 'plan');
+});
+
 // ── state.mjs: gate_state default ────────────────────────────────────────────
 
 test('readHermesReconcilerState returns gate_state: null (not approved) when file absent', () => {

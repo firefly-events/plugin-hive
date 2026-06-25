@@ -1,7 +1,9 @@
 id: hpr-4-epic-approval-bootstrap
 epic: hermes-production-readiness
 title: Epic approval bootstrap (the human "go")
-status: complete
+status: shipped
+shipped_at: "2026-06-24T03:39:00Z"
+release_id: "v2.13.2"
 complexity: low
 methodology: classic
 depends_on: [hpr-3-slack-app-and-secrets]

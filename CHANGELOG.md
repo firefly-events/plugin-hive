@@ -9,6 +9,30 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- **`/plan` DAG executor routing** (epic `plan-dag-cutover`, PR #327). Routes `/plan`
+  through the deterministic DAG executor when configured, mirroring the `/execute`
+  cutover. Activation is graduation-registry-gated (`planning.mode: hive-dag` or
+  `HIVE_PLANNING_MODE=hive-dag`), so the default orchestrator-narrated path has zero
+  regression. Resolved by new `plan-dispatch` atomic skill (`is_workflow_graduated('plan')`
+  registry-only check, isolated from execute-flow keys).
+
+- **Conditional `user_gate` node type** (`s3`). New DAG node type that evaluates an
+  `auto_pass_when` predicate at runtime — auto-passes when confident, halts the executor
+  for human review when not. Pause/resume contract preserves graph state across the gate.
+  Reject is terminal (converge-loop deferred).
+
+- **Gate signals** (`s4`). H/V nodes emit `confidence`; structured-outline nodes
+  emit `open_questions_count`. These feed the respective `user_gate` predicate
+  evaluations (Design nodes do not emit scored signals).
+
+- **Plan cutover test suite + graduation** (`s5`). Cutover acceptance tests,
+  `UserGateHandler` unit tests (7 ACs), spine-parity test for `plan.workflow.yaml`
+  with `user_gate` nodes, execute dispatch-parity guard. `plan` registered as Order 10
+  in `.pHive/runtime/executor-graduated-workflows.yaml`. `user_gate` node type
+  documented in `hive/references/workflow-schema.md`.
+
 ## [2.13.2] - 2026-06-24
 
 **Wiring the lights-on loop's runtime — first autonomous stories.** Partial delivery of the `hermes-production-readiness` epic: the loop-closer's inbound transport and the human "go" entrypoint, plus the Studio runtime templates. Executed through the DAG-on-Multica path (which also surfaced — and got fixed — a per-story `story_spec` scoping gap in the launcher).

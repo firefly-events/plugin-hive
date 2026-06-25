@@ -1,0 +1,16 @@
+step_id: implement
+status: completed
+timestamp: "2026-06-24T08:05:00Z"
+artifacts:
+  - hive/lib/dag_executor/__tests__/test_plan_cutover_acceptance.py
+  - hive/lib/dag_executor/__tests__/test_user_gate_handler.py
+  - hive/lib/dag_executor/__tests__/test_plan_spine_parity.py
+  - hive/scripts/verify-dispatch-parity.mjs
+  - hive/scripts/test/verify-dispatch-parity.test.mjs
+  - .pHive/runtime/executor-graduated-workflows.yaml
+  - hive/references/workflow-schema.md
+  - hive/references/dispatch-parity.md
+  - .claude-plugin/plugin.json
+  - .claude-plugin/marketplace.json
+  - README.md
+  - CHANGELOG.md

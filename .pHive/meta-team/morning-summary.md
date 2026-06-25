@@ -1,11 +1,11 @@
 # Hive Meta-Team — Nightly Cycle Report
-**Cycle:** meta-2026-06-23 | **Date:** 2026-06-23 | **Verdict:** PASSED
+**Cycle:** meta-2026-06-24 | **Date:** 2026-06-24 | **Verdict:** PASSED
 
 ---
 
 ## What Changed Tonight
 
-- **.pHive/meta-team/archive/2026-04-19/MANIFEST.md** — Appended `<!-- reviewed-on: meta-2026-06-23 -->` provenance line (7th reviewed-on line; archive maintenance)
+- **.pHive/meta-team/archive/2026-04-19/MANIFEST.md** — Appended `<!-- reviewed-on: meta-2026-06-24 -->` provenance line (8th reviewed-on line; archive maintenance)
 
 ---
 
@@ -13,7 +13,7 @@
 
 - No new issues found. Codebase is in good shape.
 
-_(Noted: `hive/references/hive-cloud-roadmap.md` remains a 13-line STUB_DOC placeholder — out of scope for meta-team; 18th+ consecutive deferral.)_
+_(Noted: `hive/references/hive-cloud-roadmap.md` remains a 13-line STUB_DOC placeholder — out of scope for meta-team; 19th+ consecutive deferral.)_
 
 ---
 
@@ -33,6 +33,6 @@ _(Noted: `hive/references/hive-cloud-roadmap.md` remains a 13-line STUB_DOC plac
 | Changes reverted | 0 |
 | Flagged for human | 0 |
 
-**Next cycle priority:** mmo-2026-04-21-002 — append footer to `.pHive/meta-team/archive/2026-04-19/AUDIT-NOTE.md`
+**Next cycle priority:** mmo-2026-04-21-001 still pending; if suppressed by open PR, try mmo-2026-04-21-002 (AUDIT-NOTE.md footer)
 
-kg-signal: findings=0 proposals=0 miss_reason=empty_kg
+kg-signal: findings=0 proposals=0 hit_rate_5cycle=0.0 miss_reason=empty_kg

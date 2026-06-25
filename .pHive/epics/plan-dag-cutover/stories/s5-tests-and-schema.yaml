@@ -1,0 +1,186 @@
+id: s5-tests-and-schema
+epic: plan-dag-cutover
+title: "tests, schema doc, graduation registry — cutover acceptance + parity + Order 10"
+status: complete
+complexity: low
+methodology: classic
+depends_on:
+  - s4-gate-signals
+
+description: |
+  Close the epic with four deliverables:
+
+  1. **Cutover acceptance test** — verify that `/plan` routes to the DAG
+     executor if and only if the graduation conditions are met, and that the
+     default narrated path is byte-for-byte unchanged otherwise.
+
+  2. **UserGateHandler unit tests** — full coverage of the handler contract
+     landed in s3/s4:
+     - auto-pass predicate True → proceed (no sentinel written)
+     - halt predicate False → suspend (sentinel dirs written, state saved)
+     - always-halt (no auto_pass_when) → always suspend
+     - `.approve` sentinel → Walker.replay() resumes forward
+     - `.reject` sentinel → run aborted (terminal failure)
+     - absent-dotpath fail direction for EACH gate predicate (confidence,
+       open_questions_count, first_run) → halts, never auto-passes
+
+  3. **Spine-parity test for plan.workflow.yaml** — verify the plan workflow
+     graph (with the inserted user_gate nodes from s3/s4) runs under the
+     executor and produces a parity-clean spine result. This is the required
+     prerequisite before adding `plan` to the graduation registry.
+
+  4. **`/execute` dispatch-parity guard** — verify that the s1 plan-dispatch
+     sibling skill leaves `/execute` behavior untouched. Run the existing
+     execute-dispatch test suite and add one explicit parity assertion
+     confirming that execute-dispatch's output is unchanged when
+     `HIVE_PLANNING_MODE=hive-dag` is set.
+
+  After all tests pass:
+
+  5. **Graduate `plan` workflow** — uncomment the Order 10 placeholder entry
+     in `.pHive/runtime/executor-graduated-workflows.yaml` (added in s1).
+     `plan` becomes the 10th workflow in the graduation registry. This
+     activates the executor path for consumers who set `executor_default: true`.
+
+  6. **Schema documentation** — add a `user_gate` node type section to
+     `hive/references/workflow-schema.md`:
+     - EBNF and field table for `auto_pass_when`
+     - Absent-dotpath fail-direction note (halts, never auto-passes)
+     - Actor contract: `.approve`/`.reject` MUST be written by a human reviewer;
+       CI automation is explicitly excluded
+     - Binding scope note: filesystem binding only; multica sentinel bridge is
+       a named precondition for multica deployment
+     - Cross-reference to the gate-ownership invariant amendment note
+
+  7. **Version bump** — bump `.claude-plugin/plugin.json` and
+     `.claude-plugin/marketplace.json` to the next minor version (additive
+     feature: new consumer-visible config key, new node type, new command
+     routing). Update README version badge. Add CHANGELOG.md entry dated
+     2026-06-23 covering: plan-dispatch skill, /plan DAG routing, user_gate
+     node type, gate signals, graduation of plan workflow.
+     The version bump commit MUST be the LAST commit on the feat/plan-dag-cutover
+     branch.
+
+acceptance_criteria:
+  - "Cutover acceptance test: given executor_default=true and plan in registry, when /plan runs under hive-dag, then the DAG executor is invoked (verified by intercepting run() call or checking run_state files). Given executor_default=false or plan not in registry, when /plan runs, then the narrated path runs unchanged."
+  - "UserGateHandler auto-pass test: given auto_pass_when predicate evaluates True, then no sentinel dirs are written and execution proceeds to the next node."
+  - "UserGateHandler halt test: given auto_pass_when predicate evaluates False, then sentinel dirs are written and wait_for_signal() is called."
+  - "UserGateHandler always-halt test: given no auto_pass_when field, then the handler always suspends."
+  - "UserGateHandler approve test: given .approve sentinel is written, then Walker.replay() resumes and the successor node executes."
+  - "UserGateHandler reject test: given .reject sentinel is written, then the run raises a terminal failure (not continued)."
+  - "Absent-dotpath fail-closed test: for each of (confidence, open_questions_count, first_run), given the dotpath is absent in the node output, then the gate halts — verified for all three gate predicates."
+  - "Spine-parity test: plan.workflow.yaml with user_gate nodes passes spine-parity under the executor before graduation."
+  - "/execute dispatch-parity guard: execute-dispatch test suite passes 100% with HIVE_PLANNING_MODE=hive-dag set; the planning env var has zero effect on /execute behavior."
+  - "plan is listed as Order 10 in .pHive/runtime/executor-graduated-workflows.yaml (uncommented, active)."
+  - "hive/references/workflow-schema.md contains a user_gate section covering auto_pass_when EBNF, absent-dotpath behavior, actor contract, and binding scope."
+  - "Plugin version is bumped and CHANGELOG.md contains a dated entry covering all five epic stories."
+
+steps:
+  - id: research
+    description: "Read the existing cutover acceptance test pattern (test_cutover_acceptance_* in hive/lib/dag_executor/__tests__/) to confirm the test structure. Read verify-dispatch-parity.mjs to confirm the parity check mechanism. Read hive/references/workflow-schema.md to identify the insertion point for the user_gate section. Read .claude-plugin/plugin.json to confirm current version."
+    agent: researcher
+  - id: implement
+    description: |
+      1. Write cutover acceptance test for /plan (mirrors test_cutover_acceptance_* for execute).
+      2. Write UserGateHandler unit tests (7 test cases covering ACs 2-7).
+      3. Write spine-parity test for plan.workflow.yaml with user_gate nodes.
+      4. Add /execute dispatch-parity guard (one assertion + HIVE_PLANNING_MODE env set).
+      5. Uncomment Order 10 entry for plan in .pHive/runtime/executor-graduated-workflows.yaml.
+      6. Add user_gate section to hive/references/workflow-schema.md.
+      7. Bump plugin version in .claude-plugin/plugin.json and .claude-plugin/marketplace.json; update README badge; add CHANGELOG.md entry.
+    agent: developer
+    depends_on:
+      - research
+  - id: test
+    description: "Run the full test suite: cutover acceptance, user_gate unit tests, spine-parity, /execute parity guard. Confirm all 12 ACs pass. Confirm no regressions in existing execute-dispatch tests."
+    agent: tester
+    depends_on:
+      - implement
+  - id: review
+    description: "Verify: absent-dotpath test covers all three gate predicates; graduation entry is uncommented and in correct order; schema doc covers actor contract and binding scope; version bump is the last commit on the branch; CHANGELOG entry is dated and accurate."
+    agent: reviewer
+    depends_on:
+      - test
+  - id: integrate
+    description: "Final commit on feat/plan-dag-cutover branch with prefix [plan-graph]. Version bump commit must be last."
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  tech_stack:
+    runtime: python
+    language: python-and-skill-md
+  key_files:
+    - path: "hive/lib/dag_executor/__tests__/"
+      purpose: "Existing test location. New tests go here. Cutover acceptance pattern lives here."
+    - path: "verify-dispatch-parity.mjs"
+      purpose: "/execute dispatch-parity check script. Add /plan-planning-env guard."
+    - path: ".pHive/runtime/executor-graduated-workflows.yaml"
+      purpose: "Graduation registry. Uncomment Order 10 plan entry (added as placeholder in s1)."
+    - path: hive/references/workflow-schema.md
+      purpose: "Schema docs. Add user_gate node type section."
+    - path: .claude-plugin/plugin.json
+      purpose: "Plugin version — bump to next minor version."
+    - path: .claude-plugin/marketplace.json
+      purpose: "Marketplace version — bump to match plugin.json."
+    - path: README.md
+      purpose: "Version badge — update to match plugin.json."
+    - path: CHANGELOG.md
+      purpose: "Changelog — add dated entry for the epic."
+
+files_to_modify:
+  - file: "hive/lib/dag_executor/__tests__/test_plan_cutover_acceptance.py"
+    change: "NEW — /plan cutover acceptance test"
+  - file: "hive/lib/dag_executor/__tests__/test_user_gate_handler.py"
+    change: "NEW — UserGateHandler unit tests (7 cases)"
+  - file: "hive/lib/dag_executor/__tests__/test_plan_spine_parity.py"
+    change: "NEW — spine-parity test for plan.workflow.yaml with user_gate nodes"
+  - file: "verify-dispatch-parity.mjs"
+    change: "MODIFY — add /execute parity guard assertion with HIVE_PLANNING_MODE=hive-dag env"
+  - file: .pHive/runtime/executor-graduated-workflows.yaml
+    change: "MODIFY — uncomment Order 10 plan entry"
+  - file: hive/references/workflow-schema.md
+    change: "MODIFY — add user_gate node type section with auto_pass_when EBNF, actor contract, absent-dotpath behavior, binding scope"
+  - file: .claude-plugin/plugin.json
+    change: "MODIFY — minor version bump"
+  - file: .claude-plugin/marketplace.json
+    change: "MODIFY — minor version bump to match"
+  - file: README.md
+    change: "MODIFY — version badge update"
+  - file: CHANGELOG.md
+    change: "MODIFY — add dated entry for plan-dag-cutover epic"
+
+design_decisions:
+  - decision: "Graduate plan only after spine-parity passes on the new topology"
+    rationale: "The user_gate node insertions in s3 change the plan graph topology. Graduating the workflow before parity passes would mean the registry points at a graph that has not been validated under the executor. Ordering: land user_gate topology (s3) -> fill signals (s4) -> prove parity (s5) -> then graduate (s5)."
+  - decision: "Version bump commit is the LAST commit on the feature branch"
+    rationale: "The version must reflect the full landed state, not a partial state. Landing it last ensures the version number corresponds to the complete epic."
+
+cross_cutting:
+  - concern: documentation
+    action: "The user_gate schema section in workflow-schema.md IS the primary documentation deliverable. Also confirm that all prior stories' documentation cross-cutting actions are complete before this story's review step."
+  - concern: versioning
+    action: "This story owns the version bump. Minor semver increment (new consumer-visible config key planning.mode, new node_type user_gate, new /plan routing behavior)."
+
+metric:
+  applies: false
+  justification: "Test and schema story — ships the evidence framework (tests) and the reference documentation. No new measurable outcome is introduced here; the observable planning-flow metric belongs to a post-epic retro after production data is available."
+
+risks:
+  - severity: medium
+    description: "Absent-dotpath evaluator behavior may not be easily testable if the evaluator swallows null comparisons silently. The test may need to introspect the evaluator's null-handling code path."
+    mitigation: "If the evaluator does not fail closed on null == 0, the SO gate predicate must be rewritten to open_questions_count >= 1 (auto-halt posture, inverting direction). The test confirms which direction is safe BEFORE graduation."
+  - severity: low
+    description: "verify-dispatch-parity.mjs may not have a mechanism to set env vars per-assertion."
+    mitigation: "Researcher confirms the parity script's mechanism. If env injection is not supported, implement the guard as a standalone Python test instead."
+
+references:
+  - path: "hive/lib/dag_executor/__tests__/"
+    relevant_excerpt: "Contains test_cutover_acceptance_* tests — the pattern to mirror for the /plan acceptance test."
+  - path: ".pHive/runtime/executor-graduated-workflows.yaml"
+    relevant_excerpt: "Graduation registry. Comment: 'added during cutover events per the locked Order 1-9 sequence.' plan becomes Order 10."
+  - path: "design-discussion.md §7"
+    relevant_excerpt: "VERIFICATION PLAN: Tools: pytest (hive/lib/dag_executor/__tests__), node verify-dispatch-parity.mjs. Automated: cutover-acceptance test; user_gate handler unit tests; predicate-fail-closed test; spine-parity for plan.workflow.yaml; dispatch-parity check. Not verifying: t-005 converge-loop (explicitly out of scope); grammar extensions (none being made)."
+  - path: "design-discussion.md §4"
+    relevant_excerpt: "[medium] Absent-dotpath fail direction must be safe for ALL three gates, not just confidence. Story 5 must pin the evaluator's absent-dotpath semantics and add a test that a missing scalar halts (never auto-passes) for every gate."

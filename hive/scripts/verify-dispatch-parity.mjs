@@ -31,6 +31,7 @@ const repoRoot = resolve(__dirname, '..', '..');
 const matrixPath = resolve(repoRoot, 'hive', 'references', 'dispatch-parity.md');
 
 const noBump = process.argv.includes('--no-bump');
+const planningMode = process.env.HIVE_PLANNING_MODE || '';
 
 // Read the dispatch-parity.md file
 let content;
@@ -55,6 +56,70 @@ if (allMatches.length === 0) {
 const uniquePaths = [...new Set(allMatches.map(m => m[0]))];
 
 const failures = [];
+
+function parseMainMatrixRows(markdown) {
+  const lines = markdown.split('\n');
+  const rows = [];
+  let inMatrix = false;
+  let headerParsed = false;
+
+  for (const line of lines) {
+    if (line.startsWith('## Matrix')) {
+      inMatrix = true;
+      continue;
+    }
+    if (inMatrix && line.startsWith('## ')) break;
+    if (!inMatrix || !line.startsWith('|')) continue;
+    if (/^\|[\s\-|]+\|$/.test(line)) continue;
+    if (!headerParsed) {
+      headerParsed = true;
+      continue;
+    }
+
+    const cells = line.split('|').slice(1, -1).map((cell) => cell.trim());
+    if (cells.length === 4) {
+      rows.push({
+        orchestrator: cells[0],
+        default: cells[1],
+        multica: cells[2],
+        ccWorkflows: cells[3],
+      });
+    }
+  }
+
+  return rows;
+}
+
+function assertExecuteDispatchUnaffectedByPlanningEnv(markdown) {
+  const executeRow = parseMainMatrixRows(markdown).find(
+    (row) => row.orchestrator === 'execute'
+  );
+  if (!executeRow) {
+    failures.push({ path: 'execute row', reason: 'missing from dispatch matrix' });
+    return;
+  }
+  if (planningMode === 'hive-dag') {
+    // Assert the WHOLE execute row against the canonical baseline — not just the
+    // multica/ccWorkflows cells. A regression in the `default` cell must also fail,
+    // otherwise this check can't prove zero effect on /execute dispatch parity.
+    const EXPECTED_EXECUTE_ROW = {
+      orchestrator: 'execute',
+      default: 'inline',
+      multica: 'skills/hive/skills/execute-mode-multica/SKILL.md',
+      ccWorkflows: 'skills/hive/skills/execute-mode-cc-workflows/SKILL.md',
+    };
+    for (const cell of Object.keys(EXPECTED_EXECUTE_ROW)) {
+      if (executeRow[cell] !== EXPECTED_EXECUTE_ROW[cell]) {
+        failures.push({
+          path: `execute ${cell} cell`,
+          reason: `changed to "${executeRow[cell]}" (expected "${EXPECTED_EXECUTE_ROW[cell]}") while HIVE_PLANNING_MODE=hive-dag was set`,
+        });
+      }
+    }
+  }
+}
+
+assertExecuteDispatchUnaffectedByPlanningEnv(content);
 
 for (const relativePath of uniquePaths) {
   const absolutePath = resolve(repoRoot, relativePath);

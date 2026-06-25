@@ -2,10 +2,10 @@ name: plan
 description: >
   Plan flow graph — decompose a requirement into a committed epic with
   dependency-tracked stories.
-  Shape: research ‖ design → author → reconcile → output-validation gate.
-  User-facing review gates (design-discussion, H/V, structured-outline sign-off)
-  are NOT in this graph — they remain orchestrator-local (s9 wiring owns that
-  boundary).
+  Shape: research ‖ design → design-gate → author → user gates → reconcile
+  → output-validation gate.
+  User-facing review gates halt through user_gate pause sentinels on the
+  graduated DAG path; the default narrated path remains orchestrator-local.
 version: "1.0.0"
 
 steps:
@@ -49,6 +49,29 @@ steps:
       on: agent_failed
     timeout_ms: 1800000
 
+  # ── Phase B.5: design user-gate (always-halt — design runs parallel to research
+  #   and cannot emit a trustworthy confidence score; human review required) ───
+  - id: design-gate
+    agent: architect
+    node_type: user_gate
+    # No auto_pass_when → always-halt (design lacks full research context)
+    # Depends on research too: `author` requires research, so if research fails
+    # (recorded skipped, not fatal, in the parallel-wave executor) this gate must
+    # NOT become ready — otherwise the run suspends for human review on an
+    # already-doomed path that `author` can never resume.
+    depends_on:
+      - design
+      - research
+    inputs:
+      - name: design_discussion
+        source: step_output
+        step_id: design
+        output_name: design_discussion
+    outputs:
+      - name: gate_verdict
+        type: string
+    timeout_ms: 1800000
+
   # ── Phase C: story decomposition + epic authoring ───────────────────────────
   - id: author
     agent: technical-writer
@@ -56,7 +79,7 @@ steps:
     step_file: hive/workflows/step-files/plan/author.md
     depends_on:
       - research
-      - design
+      - design-gate
     inputs:
       - name: research_brief
         source: step_output
@@ -74,17 +97,118 @@ steps:
         type: string
       - name: commit_sha
         type: string
+      - name: branch
+        type: string
+      - name: repo
+        type: string
+      - name: work_dir
+        type: string
     retry:  # author is heaviest; retry transient AGENT failures (not under-runs)
       max_attempts: 4
       on: agent_failed
     timeout_ms: 3600000
+
+  # ── Phase C.5: H/V signal producer (confidence-scored) ─────────────────────
+  - id: hv
+    agent: technical-writer
+    node_type: agent
+    step_file: hive/workflows/step-files/plan/hv.md
+    depends_on:
+      - author
+    inputs:
+      - name: epic_dir
+        source: step_output
+        step_id: author
+        output_name: epic_dir
+    outputs:
+      - name: confidence
+        type: json
+      - name: first_run
+        type: json
+    timeout_ms: 1800000
+
+  # ── Phase C.6: H/V user-gate (confidence-scored) ───────────────────────────
+  - id: hv-gate
+    agent: technical-writer
+    node_type: user_gate
+    auto_pass_when: "$hv.output.first_run == false && $hv.output.confidence >= 80"
+    depends_on:
+      - hv
+    inputs:
+      - name: epic_dir
+        source: step_output
+        step_id: author
+        output_name: epic_dir
+      - name: confidence
+        source: step_output
+        step_id: hv
+        output_name: confidence
+      - name: first_run
+        source: step_output
+        step_id: hv
+        output_name: first_run
+    outputs:
+      - name: gate_verdict
+        type: string
+    timeout_ms: 1800000
+
+  # ── Phase C.7: SO signal producer (open-questions-driven) ──────────────────
+  - id: so
+    agent: technical-writer
+    node_type: agent
+    step_file: hive/workflows/step-files/plan/so.md
+    depends_on:
+      - author
+    inputs:
+      - name: epic_dir
+        source: step_output
+        step_id: author
+        output_name: epic_dir
+    outputs:
+      - name: open_questions
+        type: json
+      - name: open_questions_count
+        type: json
+      - name: first_run
+        type: json
+    timeout_ms: 1800000
+
+  # ── Phase C.8: SO user-gate (open-questions-driven) ────────────────────────
+  - id: so-gate
+    agent: technical-writer
+    node_type: user_gate
+    auto_pass_when: "$so.output.first_run == false && $so.output.open_questions_count == 0"
+    depends_on:
+      - so
+    inputs:
+      - name: epic_dir
+        source: step_output
+        step_id: author
+        output_name: epic_dir
+      - name: open_questions
+        source: step_output
+        step_id: so
+        output_name: open_questions
+      - name: open_questions_count
+        source: step_output
+        step_id: so
+        output_name: open_questions_count
+      - name: first_run
+        source: step_output
+        step_id: so
+        output_name: first_run
+    outputs:
+      - name: gate_verdict
+        type: string
+    timeout_ms: 1800000
 
   # ── Reconcile: materialise author's committed work before gate ───────────────
   - id: reconcile
     agent: reconcile-handler
     node_type: reconcile
     depends_on:
-      - author
+      - hv-gate
+      - so-gate
     inputs:
       - name: sha
         source: step_output

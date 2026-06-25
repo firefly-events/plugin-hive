@@ -10,6 +10,7 @@ from .gate import GateHandler
 from .pause import PauseHandler
 from .reconcile import ReconcileHandler
 from .script import ScriptHandler
+from .user_gate import UserGateHandler
 
 __all__ = [
     "AgentHandler",
@@ -21,4 +22,5 @@ __all__ = [
     "ReconcileHandler",
     "ScriptHandler",
     "StubAgentSpawn",
+    "UserGateHandler",
 ]
