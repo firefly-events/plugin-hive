@@ -245,6 +245,24 @@ describe('verify-dispatch-parity CI checker', () => {
     }
     expect(stdout).toMatch(/dispatch-parity\.md: \d+ paths verified/);
   });
+
+  it('HIVE_PLANNING_MODE=hive-dag has zero effect on /execute dispatch parity', () => {
+    let stdout = '';
+    try {
+      stdout = execSync(`node ${JSON.stringify(CHECKER_PATH)} --no-bump`, {
+        cwd: PROJECT_ROOT,
+        encoding: 'utf8',
+        stdio: 'pipe',
+        env: {
+          ...process.env,
+          HIVE_PLANNING_MODE: 'hive-dag',
+        },
+      });
+    } catch (err) {
+      throw new Error(err.stderr || err.message);
+    }
+    expect(stdout).toMatch(/dispatch-parity\.md: \d+ paths verified/);
+  });
 });
 
 // ---------------------------------------------------------------------------

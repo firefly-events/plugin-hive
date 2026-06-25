@@ -1,0 +1,129 @@
+id: s2-plan-cutover
+epic: plan-dag-cutover
+title: "/plan cutover — route to DAG executor when runner_path == hive-dag"
+status: pending
+complexity: low
+methodology: classic
+depends_on:
+  - s1-plan-dispatch
+
+description: |
+  Insert a 5pre-equivalent dispatch boundary into `skills/plan/SKILL.md` at
+  step 0c (lines ~139-173: the persona-dispatch mode resolver). When
+  `plan-dispatch` returns `runner_path: hive-dag`, call the DAG executor
+  instead of the orchestrator-narrated phases. Otherwise the existing
+  cc-workflows / multica / default branches run unchanged — zero regression
+  to the default path.
+
+  Insertion point: BEFORE the existing step 0c persona-dispatch modes. If
+  `runner_path == hive-dag`, bypass step 1 (team assembly) and all Phase A
+  phases entirely — the DAG executor handles research, design, and author
+  nodes internally.
+
+  The call expression (mirroring /execute step 5pre/5e):
+  ```
+  hive.lib.dag_executor.run(
+    workflow_path="hive/workflows/plan.workflow.yaml",
+    binding="multica",          # or resolved binding
+    flow="planning",
+    context={"requirement": requirement},
+    run_state_path=<resolved run_state_path>
+  )
+  ```
+
+  The existing orchestrator-narrated persona-dispatch (cc-workflows / multica /
+  default) remains the ONLY active path for un-graduated consumers because
+  `plan-dispatch` returns `orchestrator-narrated` by default (story s1).
+  No consumer sees any change unless they opt in via `planning.mode: hive-dag`
+  or `HIVE_PLANNING_MODE=hive-dag`.
+
+  The `run_state_path` must be resolved before the call so the pause/resume
+  checkpoint substrate (hde-5) can save and reload state across gate halts.
+  Emit a telemetry line `[plan-dag] routing to hive-dag executor` when the
+  hive-dag branch fires.
+
+acceptance_criteria:
+  - "Given HIVE_PLANNING_MODE=hive-dag and a requirement string, when /plan is invoked, then plan-dispatch is called and its runner_path is consulted before any persona-dispatch step."
+  - "Given runner_path == hive-dag, when /plan dispatches, then hive.lib.dag_executor.run() is called with workflow_path=hive/workflows/plan.workflow.yaml, flow=planning, and context containing the requirement."
+  - "Given runner_path == orchestrator-narrated (default, unset env/config, plan not in registry), when /plan dispatches, then the existing cc-workflows / multica / default step 0c branches run byte-for-byte unchanged — no change in behavior."
+  - "Given runner_path == hive-dag, when /plan dispatches, then step 1 team assembly and Phase A persona spawning are bypassed entirely."
+  - "Given runner_path == hive-dag, when the executor call is made, then run_state_path is provided (not empty/None) so pause/resume checkpoints can be written."
+  - "Given the executor call raises an exception, when /plan is in hive-dag mode, then the error propagates clearly (no silent swallow) and the run is marked failed."
+  - "A telemetry line [plan-dag] routing to hive-dag executor is emitted exactly when the hive-dag branch fires, and is absent on the orchestrator-narrated path."
+
+steps:
+  - id: research
+    description: "Read skills/plan/SKILL.md step 0c (lines ~139-173) in full to identify exact insertion line, wording of the existing dispatch branches, and the mechanism used to pass 'requirement' context forward. Read skills/execute/SKILL.md step 5pre and 5e to capture the exact call expression and error-handling pattern."
+    agent: researcher
+  - id: implement
+    description: "Edit skills/plan/SKILL.md: insert the hive-dag check at step 0c before the existing persona-dispatch modes. The check calls plan-dispatch, reads runner_path, and branches. On hive-dag branch: resolve run_state_path, emit telemetry, call run(). On orchestrator-narrated branch: fall through to existing step 0c modes unchanged. No other file is modified in this story."
+    agent: developer
+    depends_on:
+      - research
+  - id: test
+    description: "Write tests covering all 7 AC cases. Focus on: (a) the branching logic (correct branch fires for each runner_path value), (b) the executor call receives the correct arguments, (c) the narrated path is byte-identical pre/post diff. Regression: run existing /plan narrated-path tests and confirm zero changes."
+    agent: tester
+    depends_on:
+      - implement
+  - id: review
+    description: "Verify the insertion is additive (narrated path unmodified), the call expression matches /execute's 5pre pattern exactly (no invented args), and the error-propagation behavior is explicit. Confirm run_state_path is never None/empty."
+    agent: reviewer
+    depends_on:
+      - test
+  - id: integrate
+    description: "Commit on feat/plan-dag-cutover branch with prefix [plan-graph]."
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  tech_stack:
+    runtime: python
+    language: python-and-skill-md
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: "Primary edit target. Step 0c (lines ~139-173) is the insertion point for the hive-dag check."
+    - path: skills/execute/SKILL.md
+      purpose: "Template for the 5pre cutover pattern (step 5pre line 152, step 5e). Read-only reference."
+    - path: hive/lib/dag_executor/run.py
+      purpose: "run() front-door entry point. Signature: run(workflow_path, binding, flow, context, run_state_path)."
+    - path: skills/hive/skills/plan-dispatch/SKILL.md
+      purpose: "The new dispatch skill from s1 — called at the top of step 0c to get runner_path."
+
+files_to_modify:
+  - file: skills/plan/SKILL.md
+    change: "MODIFY — insert hive-dag check at step 0c before existing persona-dispatch modes"
+
+design_decisions:
+  - decision: "Single dispatch boundary — call plan-dispatch once, read runner_path, branch"
+    rationale: "Mirrors /execute step 5pre posture. Re-evaluating runner_path inline or checking the config again downstream would create dual-gate confusion. One call, one branch."
+  - decision: "bypass step 1 and Phase A entirely on hive-dag path"
+    rationale: "The DAG executor owns research and design nodes. Spawning persona teams AND running the executor would double the work and introduce race conditions on artifacts."
+  - decision: "Zero regression on narrated path — additive insertion only"
+    rationale: "The narrated path is the default for all un-graduated consumers. Any behavioral change there would break existing /plan flows with no opt-in signal."
+
+cross_cutting:
+  - concern: documentation
+    action: "Update skills/plan/SKILL.md inline commentary to reference plan-dag-cutover epic for the new hive-dag branch. Update hive/references/workflow-schema.md cutover section to document the plan 5pre-equivalent insertion point."
+  - concern: versioning
+    action: "New /plan behavior (hive-dag routing) is consumer-visible when opted in. Flag as minor additive for the epic version bump in s5."
+
+metric:
+  applies: false
+  justification: "Routing-only story — the new path calls the executor but the executor already runs plans end-to-end. No new measurable outcome at this boundary; observability belongs to the executor run itself."
+
+risks:
+  - severity: medium
+    description: "The run_state_path resolution may not be established at step 0c in the current SKILL.md flow; it may be set up later in the narrated path for a different purpose."
+    mitigation: "Researcher checks where run_state_path is first set in the narrated path. If it is not available at 0c, implement a resolver call (resolve_run_state_path()) before the executor call, consistent with how hde-5 sets it up."
+  - severity: low
+    description: "Binding value passed to run() — the requirement says binding='multica' but the active binding may differ (filesystem vs multica). Hard-coding 'multica' would be wrong under the filesystem binding."
+    mitigation: "Implement resolves the binding from context (same resolution used by /execute 5e) rather than hard-coding it."
+
+references:
+  - path: "skills/execute/SKILL.md"
+    relevant_excerpt: "Step 5pre (line 152): 'if runner_path == hive-dag: call hive.lib.dag_executor.run_workflow(plan, binding, flow, context)'. Step 5e mirrors error propagation. This is the exact pattern to replicate for /plan."
+  - path: "skills/plan/SKILL.md"
+    relevant_excerpt: "Step 0c (lines ~139-173): persona-dispatch mode resolver. Modes today: cc-workflows, multica, default. The hive-dag check is inserted BEFORE line 139 (before any mode check)."
+  - path: "research-brief.md §CONSTRAINTS"
+    relevant_excerpt: "Constraint: skills/plan/SKILL.md step 0c insertion point — the DAG cutover for plan must be checked BEFORE the existing step 0c persona dispatch modes."

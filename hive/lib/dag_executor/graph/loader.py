@@ -89,6 +89,7 @@ def _build_node(raw: dict[str, Any]) -> Node:
         ),
         when=raw.get("when"),
         depends_on=[str(d) for d in depends_on_raw],
+        auto_pass_when=raw.get("auto_pass_when"),
     )
 
 

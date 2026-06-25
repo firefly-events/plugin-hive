@@ -6,9 +6,9 @@ Verifies:
        plan-mode-multica dispatch.
   AC2: When backend is unset (default mode), existing direct/local behaviour is
        preserved — no DAG dispatch.
-  AC3: plan.workflow.yaml does NOT contain user-facing review gate nodes
-       (design-discussion, H/V, outline sign-off), enforcing the gate-ownership
-       invariant (gates stay orchestrator-local).
+  AC3: plan.workflow.yaml does NOT contain retired narrated-path review step IDs
+       while allowing executor-owned user_gate sentinels on the graduated DAG
+       path.
 """
 
 from __future__ import annotations
@@ -123,7 +123,7 @@ def test_local_fallback_not_dag_when_unset():
     )
 
 
-# ── AC3: gate-ownership invariant — plan.workflow.yaml has no user gates ─────
+# ── AC3: gate-ownership invariant — scoped by execution path ─────────────────
 
 
 def test_plan_workflow_exists():
@@ -131,30 +131,36 @@ def test_plan_workflow_exists():
 
 
 def test_plan_workflow_no_user_facing_review_gates():
-    """plan.workflow.yaml must not contain user-facing review gate step IDs."""
+    """plan.workflow.yaml must not contain retired narrated-path review step IDs."""
     data = plan_workflow_data()
     steps = {step["id"] for step in data.get("steps", [])}
     forbidden = {
         "design-discussion-review",
         "hv-review",
-        "hv-gate",
         "outline-sign-off",
         "user-sign-off",
         "design-review-gate",
     }
     overlap = steps & forbidden
     assert not overlap, (
-        f"plan.workflow.yaml contains user-facing review gate step(s): {overlap}. "
-        "User gates must remain orchestrator-local (gate-ownership invariant, s9)."
+        f"plan.workflow.yaml contains retired narrated-path review step(s): {overlap}. "
+        "Review-gate ownership is scoped by execution path: user_gate sentinels "
+        "belong to the graduated DAG path, while the default narrated path remains "
+        "orchestrator-local."
     )
 
 
 def test_plan_workflow_artifact_readiness_comment_present():
-    """plan.workflow.yaml header must state that user gates are NOT in the graph."""
+    """plan.workflow.yaml header must document the scoped review-gate ownership."""
     raw = PLAN_WORKFLOW.read_text(encoding="utf-8")
-    assert "User-facing review gates" in raw and "NOT in this graph" in raw, (
-        "plan.workflow.yaml must document that user-facing review gates are NOT "
-        "in the graph (orchestrator-local invariant)"
+    assert (
+        "User-facing review gates halt through user_gate pause sentinels" in raw
+        and "graduated DAG path" in raw
+        and "default narrated path remains orchestrator-local" in raw
+    ), (
+        "plan.workflow.yaml must document scoped review-gate ownership: user_gate "
+        "sentinels belong to the graduated DAG path, while the default narrated "
+        "path remains orchestrator-local."
     )
 
 

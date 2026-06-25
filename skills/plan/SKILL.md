@@ -136,12 +136,44 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
     Place the new entries immediately after the last existing `!.pHive/epics/<name>/**` line in `.gitignore`. Commit `.gitignore` together with the first epic artifact so the dir is tracked from inception.
 
-0c. **Resolve planning dispatch mode before teammate spawn.** Read the plan dispatch
-mode with env-over-config precedence and store it as `${planning_mode_decision}`
-on the planning context. CC Workflows and Multica are sibling overrides; env wins
-over config within each, and CC Workflows wins over Multica when both are set
-(env-over-env, config-over-config) so the maintainer can flip a single knob
-without re-reading the older setting:
+0c. **Resolve planning dispatch mode before teammate spawn.** Two-phase gate: first
+check the executor cutover, then fall through to the orchestrator-narrated
+persona-dispatch modes.
+
+**Executor cutover (hive-dag path).** Invoke
+`skills/hive/skills/plan-dispatch/SKILL.md` (atomic, read-only) passing `env` and
+the parsed consumer `.pHive/hive.config.yaml`. Consume `runner_path` and
+`runner_reason`. If `runner_path == hive-dag`:
+
+1. Emit:
+   ```
+   [plan-dag] routing to hive-dag executor reason={runner_reason}
+   ```
+2. Resolve `run_state_path` as `${HIVE_STATE_DIR}/dag-runs/plan/{epic-id}/`. Create
+   the directory if absent. `run_state_path` must not be empty or `None`.
+3. Call:
+   ```python
+   from hive.lib import dag_executor
+
+   result = dag_executor.run(
+       workflow_path='hive/workflows/plan.workflow.yaml',
+       binding=runner_reason,
+       flow='planning',
+       context={'requirement': requirement},
+       run_state_path=run_state_path,
+   )
+   ```
+4. Propagate errors — do not catch or swallow exceptions. Any error from the
+   executor halts `/plan` and surfaces to the user.
+5. Return `result` as `/plan`'s output. Do not proceed to the persona-dispatch modes
+   below.
+
+**Orchestrator-narrated path** (`runner_path == orchestrator-narrated`): Read the
+plan dispatch mode with env-over-config precedence and store it as
+`${planning_mode_decision}` on the planning context. CC Workflows and Multica are
+sibling overrides; env wins over config within each, and CC Workflows wins over
+Multica when both are set (env-over-env, config-over-config) so the maintainer can
+flip a single knob without re-reading the older setting:
 
    1. If `HIVE_PLANNING_MODE=cc-workflows`, set
       `{ mode_decision: "cc-workflows", field_sources: { planning_mode: "env" } }`.

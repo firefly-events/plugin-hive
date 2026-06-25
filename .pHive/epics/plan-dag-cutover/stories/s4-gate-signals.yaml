@@ -1,0 +1,153 @@
+id: s4-gate-signals
+epic: plan-dag-cutover
+title: "emit gate signals — confidence and open_questions_count in design/H-V/SO nodes"
+status: pending
+complexity: low
+methodology: classic
+depends_on:
+  - s3-conditional-user-gate
+
+description: |
+  Wire the concrete predicate signals that the `user_gate` nodes (from s3)
+  evaluate. Each plan-graph node that feeds a gate must declare the signal
+  as a node `output`, and the gate's `auto_pass_when` predicate must read
+  that signal via the existing frozen grammar.
+
+  Three gates, three signal contracts:
+
+  **Design gate (always-halt)**
+  - No signal needed. The design node has `auto_pass_when` absent (None).
+  - Story s3 already inserted this gate. No change needed for the design
+    node's `outputs` block; it runs parallel to research and cannot emit
+    a trustworthy confidence value.
+
+  **H/V gate (confidence-scored)**
+  - The H/V (horizontal/vertical slicing) step-file must declare a
+    `confidence` output (integer 0–100) that the step agent emits.
+  - The user_gate predicate: `auto_pass_when: "$hv.output.confidence >= 80"`
+  - Auto-passes when confidence >= 80; halts when < 80 (or when the dotpath
+    is absent — fails closed per the absent-dotpath rule pinned in s5).
+  - Fail-safe: on the FIRST planning run for a new requirement (no prior
+    confidence baseline), the H/V gate always halts regardless of emitted
+    score. Implemented by adding a `first_run` boolean output from the H/V
+    node and composing the predicate:
+    `auto_pass_when: "$hv.output.first_run == false && $hv.output.confidence >= 80"`
+
+  **SO gate (open-questions-driven)**
+  - The structured-outline (SO) step-file must declare an `open_questions`
+    list output AND a companion `open_questions_count` integer scalar.
+  - The integer companion is required because the frozen predicate grammar
+    forbids function calls — `len(open_questions) == 0` is illegal.
+  - The user_gate predicate: `auto_pass_when: "$so.output.open_questions_count == 0"`
+  - Auto-passes when no open questions; halts when open_questions_count > 0
+    (or absent — fails closed).
+  - Fail-safe: same first-run guard:
+    `auto_pass_when: "$so.output.first_run == false && $so.output.open_questions_count == 0"`
+
+  Changes:
+  1. H/V step-file (`hive/workflows/steps/plan/` or equivalent path, confirmed
+     by researcher): add `confidence: int` (0-100), `first_run: bool`, and emit
+     both in step output.
+  2. SO step-file: add `open_questions: list[str]`, `open_questions_count: int`,
+     `first_run: bool`, and emit all three in step output.
+  3. `hive/workflows/plan.workflow.yaml` — update the H/V and SO node `outputs`
+     blocks to declare the new signals. Fill in the `auto_pass_when` values on
+     the H/V and SO user_gate nodes that s3 inserted as placeholders.
+
+  The design gate node in plan.workflow.yaml is already correct (no auto_pass_when,
+  always-halt). No change to the design step-file or the design gate node.
+
+  Only research-grounded gates (H/V and SO, both downstream of author in the
+  plan graph) use confidence-based auto-pass. The design gate always halts
+  because it runs parallel to research and cannot emit a trustworthy confidence.
+
+acceptance_criteria:
+  - "Given the H/V step-file runs and the plan is not a first-run, when confidence >= 80, then the H/V user_gate node auto-passes (no human halt)."
+  - "Given the H/V step-file runs and the plan IS a first-run (first_run=true), when the H/V gate evaluates, then it always halts regardless of emitted confidence value."
+  - "Given the H/V step-file runs and the plan is not a first-run, when confidence < 80, then the H/V user_gate node halts and surfaces the artifact for human review."
+  - "Given the SO step-file runs and open_questions_count == 0 and first_run=false, when the SO gate evaluates, then it auto-passes."
+  - "Given the SO step-file runs and open_questions_count > 0, when the SO gate evaluates, then it halts regardless of first_run value."
+  - "Given the H/V or SO step-file emits a missing/absent dotpath for the gate signal, when the gate predicate evaluates, then it halts (fails closed — confirmed by s5 tests)."
+  - "The design gate in plan.workflow.yaml has no auto_pass_when field (None) and always halts — no signal emitted by the design node changes this."
+  - "plan.workflow.yaml node outputs blocks for H/V and SO nodes declare confidence, open_questions, open_questions_count, and first_run as named outputs."
+  - "The predicate grammar is not extended — auto_pass_when uses only existing grammar operators ($dotpath, ==, >=, &&, integer literals, boolean literals)."
+
+steps:
+  - id: research
+    description: "Locate the H/V (horizontal/vertical slicing) and structured-outline (SO) step-files in hive/workflows/steps/plan/ or the equivalent location. Read their current outputs blocks and agent prompt to confirm what they currently emit. Read plan.workflow.yaml to confirm the placeholder user_gate nodes from s3 and their current auto_pass_when values. Read the frozen predicate grammar (predicate-grammar.md) to confirm operator set."
+    agent: researcher
+  - id: implement
+    description: |
+      1. Edit the H/V step-file: add confidence (int 0-100), first_run (bool), and emit both. Document scoring rubric in step prose.
+      2. Edit the SO step-file: add open_questions (list[str]), open_questions_count (int), first_run (bool), and emit all three.
+      3. Edit plan.workflow.yaml: update outputs blocks for H/V and SO nodes. Fill in auto_pass_when on the H/V and SO user_gate placeholder nodes from s3. Confirm design gate node has no auto_pass_when.
+    agent: developer
+    depends_on:
+      - research
+  - id: test
+    description: "Write tests for all 9 AC cases. Include: auto-pass at confidence >= 80 (non-first-run), first-run halt override, confidence < 80 halt, SO zero-questions pass, SO nonzero-questions halt, absent-dotpath fails closed (this AC is shared with s5 — coordinate to avoid duplication). Confirm design gate still always-halts."
+    agent: tester
+    depends_on:
+      - implement
+  - id: review
+    description: "Verify: no new grammar constructs (only existing operators used); first_run guard is present on both H/V and SO predicates; design gate has no auto_pass_when; plan.workflow.yaml is valid YAML and all new outputs blocks parse correctly."
+    agent: reviewer
+    depends_on:
+      - test
+  - id: integrate
+    description: "Commit on feat/plan-dag-cutover branch with prefix [plan-graph]."
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  tech_stack:
+    runtime: python
+    language: python-and-skill-md
+  key_files:
+    - path: hive/workflows/plan.workflow.yaml
+      purpose: "Update outputs blocks and auto_pass_when on H/V and SO user_gate placeholder nodes from s3."
+    - path: hive/workflows/steps/plan/
+      purpose: "H/V and SO step-files live here (path confirmed by researcher). Both need new output fields."
+    - path: hive/references/predicate-grammar.md
+      purpose: "Frozen predicate grammar — verify no new constructs are introduced."
+
+files_to_modify:
+  - file: "hive/workflows/steps/plan/<hv-step-file>.md"
+    change: "MODIFY — add confidence (int), first_run (bool) to step outputs"
+  - file: "hive/workflows/steps/plan/<so-step-file>.md"
+    change: "MODIFY — add open_questions (list), open_questions_count (int), first_run (bool) to step outputs"
+  - file: hive/workflows/plan.workflow.yaml
+    change: "MODIFY — update H/V and SO node outputs blocks; fill auto_pass_when on H/V and SO user_gate nodes"
+
+design_decisions:
+  - decision: "companion integer scalar (open_questions_count) rather than list length in predicate"
+    rationale: "The frozen grammar forbids function calls. len(open_questions) == 0 is illegal. The companion integer is the only grammar-compatible route. The SO step emits both for human readability (list) and machine-evaluability (count)."
+  - decision: "first_run fail-safe on both H/V and SO gates"
+    rationale: "An over-confident agent on the first planning run for a new requirement could silently skip human review. The first_run guard prevents consecutive auto-passes from removing the human entirely on novel requirements."
+  - decision: "design gate always-halts with no auto_pass_when (no signal needed)"
+    rationale: "The design node runs parallel to research (research_brief joins at author). It cannot emit a trustworthy confidence because it does not have the full research context yet. The always-halt posture for the design gate is a fundamental design invariant, not a temporary restriction."
+
+cross_cutting:
+  - concern: documentation
+    action: "Update hive/references/workflow-schema.md to document the gate signal contract (confidence, open_questions_count, first_run) and their predicate patterns. Add a table mapping each gate to its predicate, fail-direction, and first-run behavior."
+
+metric:
+  applies: false
+  justification: "Signal-emission story — the signals are infrastructure for the gates. The observable metric (reduction in unnecessary gate halts during planning) requires production data across multiple plan runs with the graduated path active. Deferred to post-epic retro."
+
+risks:
+  - severity: medium
+    description: "Absent-dotpath fail direction for open_questions_count == 0. A missing/null dotpath could evaluate open (null == 0 could be True under some evaluator implementations)."
+    mitigation: "s5 must pin the evaluator's null-comparison behavior and verify that missing open_questions_count halts. If null == 0 evaluates True, the predicate must be rewritten to fail closed (e.g. gate on open_questions_count >= 1 to auto-halt, inverting the signal direction)."
+  - severity: low
+    description: "H/V and SO step-file paths are uncertain — confirmed by researcher in the research step. If step-files are not in hive/workflows/steps/plan/, the research step must report the correct path before implement proceeds."
+    mitigation: "Research step locates both step-files before implement begins."
+
+references:
+  - path: "hive/references/predicate-grammar.md"
+    relevant_excerpt: "Frozen EBNF — six comparison ops, && / ||, dotpaths, numeric/bool literals. No function calls, no parentheses, no string literals. Culturally locked — extending it requires an epic, not a story."
+  - path: "design-discussion.md §3"
+    relevant_excerpt: "Because the grammar forbids len(...), each gate also emits a companion scalar the predicate can read directly — open_questions_count (int) so SO's predicate is $so.output.open_questions_count == 0, and H/V's is $hv.output.confidence >= 80."
+  - path: "design-discussion.md §4"
+    relevant_excerpt: "[medium] Confidence auto-pass needs a fail-safe. Design gate is always-halt precisely because the design node runs parallel to research. H/V and SO gates run downstream of author, so their confidence IS research-grounded. Story 4 should carry a fail-safe (first-run halt / cap) so an over-confident agent cannot silently skip the human indefinitely."

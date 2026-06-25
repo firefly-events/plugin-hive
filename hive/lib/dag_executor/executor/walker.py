@@ -63,6 +63,7 @@ _PHASE_COMPLETE_SLUG = "completed"
 _PHASE_BLOCKED_TRIGGER_RULE_SKIP = "trigger-rule-skip"
 _PHASE_BLOCKED_UPSTREAM_FAILED = "upstream-failed"
 _PHASE_BLOCKED_UPSTREAM_SKIPPED = "upstream-skipped"
+_USER_GATE_OUTPUT_GRAPH_INPUT = "__output_graph"
 
 
 def _normalise_scheduler_flag(raw: Any) -> bool:
@@ -277,6 +278,34 @@ def _evaluate_when_predicate(
     # subscribe to evaluator-level events.
     telemetry.emit("predicate_evaluated", node.id, payload)
     return bool(result)
+
+
+def _user_gate_will_halt(node: Node, materialised: dict[str, NodeOutput]) -> bool:
+    """Return True when a user_gate needs pause-style run suspension."""
+
+    predicate_text = getattr(node, "auto_pass_when", None)
+    if not predicate_text or not str(predicate_text).strip():
+        return True
+
+    ast = parse_predicate(str(predicate_text).strip())
+    if isinstance(ast, Skipped):
+        return True
+    return not bool(eval_predicate(ast, _output_graph_view(materialised)))
+
+
+def _resolve_dispatch_inputs(
+    node: Node,
+    materialised: dict[str, NodeOutput],
+    context: dict[str, Any],
+    skipped: set[str] | None = None,
+) -> dict[str, Any]:
+    """Resolve inputs, adding the output-graph view needed by user_gate."""
+
+    inputs = _resolve_inputs(node, materialised, context, skipped)
+    if _is_user_gate_node(node):
+        inputs = dict(inputs)
+        inputs[_USER_GATE_OUTPUT_GRAPH_INPUT] = _output_graph_view(materialised)
+    return inputs
 
 
 def _trigger_rule_decision(
@@ -552,15 +581,18 @@ class Walker:
                     processed.add(node_id)
                 continue
 
-            # Multi-node wave. Pause nodes always serialise — they
-            # freeze run state, which is incompatible with sibling
-            # dispatch on a thread pool. Filter pauses out into a
-            # serial micro-wave processed first; the remainder runs
-            # under ParallelScheduler.
-            pause_ids = [nid for nid in wave if _is_pause_node(graph.nodes[nid])]
-            parallel_ids = [nid for nid in wave if nid not in pause_ids]
+            # Multi-node wave. Pause and user_gate nodes always serialise —
+            # they freeze run state (halt for human review), which is
+            # incompatible with sibling dispatch on a thread pool. Filter
+            # pauses/user_gates out into a serial micro-wave processed
+            # first; the remainder runs under ParallelScheduler.
+            sequential_ids = [
+                nid for nid in wave
+                if _is_pause_node(graph.nodes[nid]) or _is_user_gate_node(graph.nodes[nid])
+            ]
+            parallel_ids = [nid for nid in wave if nid not in sequential_ids]
 
-            for node_id in pause_ids:
+            for node_id in sequential_ids:
                 state, processed_one = self._dispatch_one_sequential(
                     node_id=node_id,
                     graph=graph,
@@ -688,14 +720,17 @@ class Walker:
             save_state(state)
             return state, True
 
-        inputs = _resolve_inputs(node, materialised, ctx, skipped)
+        inputs = _resolve_dispatch_inputs(node, materialised, ctx, skipped)
 
         telemetry.emit("node_started", node.id, {})
         state = _record_running(state, node_id, source_epic=_source_epic(ctx))
         save_state(state)
 
         scheduler_pause = _scheduler_pause_decision(node, ctx, step_metadata)
-        is_pause = _is_pause_node(node) and scheduler_pause is None
+        is_pause = (
+            _is_pause_node(node)
+            or (_is_user_gate_node(node) and _user_gate_will_halt(node, materialised))
+        ) and scheduler_pause is None
 
         try:
             if scheduler_pause == "auto_approve":
@@ -878,7 +913,7 @@ class Walker:
         # from the workers' perspective (all upstreams are terminal by
         # wave construction).
         def _resolve(node):
-            return _resolve_inputs(node, materialised, ctx, skipped)
+            return _resolve_dispatch_inputs(node, materialised, ctx, skipped)
 
         # C2: wrap dispatch with retry so parallel workers honour node.retry
         # identically to the sequential path.
@@ -1079,7 +1114,7 @@ class Walker:
                 save(state, root=runs_root)
                 continue
 
-            inputs = _resolve_inputs(node, materialised, ctx, skipped_set)
+            inputs = _resolve_dispatch_inputs(node, materialised, ctx, skipped_set)
 
             telemetry.emit("node_started", node.id, {"replay": True})
             _emit_phase_started(node_id, _source_epic(ctx))
@@ -1087,7 +1122,10 @@ class Walker:
             save(state, root=runs_root)
 
             scheduler_pause = _scheduler_pause_decision(node, ctx, step_metadata)
-            is_pause = _is_pause_node(node) and scheduler_pause is None
+            is_pause = (
+                _is_pause_node(node)
+                or (_is_user_gate_node(node) and _user_gate_will_halt(node, materialised))
+            ) and scheduler_pause is None
 
             try:
                 if scheduler_pause == "auto_approve":
@@ -1310,6 +1348,22 @@ def _is_pause_node(node) -> bool:
     if hasattr(nt, "value"):
         return nt.value == "pause"
     return str(nt).lower() == "pause"
+
+
+def _is_user_gate_node(node) -> bool:
+    """Whether `node` is a user_gate node — by enum value or string.
+
+    user_gate nodes are sequential barriers (same treatment as pause):
+    they evaluate a predicate and may halt for human review, which is
+    incompatible with parallel wave dispatch.
+    """
+
+    nt = getattr(node, "node_type", None)
+    if nt is None:
+        return False
+    if hasattr(nt, "value"):
+        return nt.value == "user_gate"
+    return str(nt).lower() == "user_gate"
 
 
 def _is_gate_node(node) -> bool:

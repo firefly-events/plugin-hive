@@ -25,6 +25,8 @@ state/
 # Then re-ignore every child of those dirs except the meta-improvement-system subtree.
 .pHive/epics/*
 .pHive/episodes/*
+!.pHive/epics/plan-dag-cutover/
+!.pHive/epics/plan-dag-cutover/**
 !.pHive/epics/meta-improvement-system/
 !.pHive/epics/meta-improvement-system/**
 !.pHive/episodes/meta-improvement-system/

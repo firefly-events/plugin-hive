@@ -210,6 +210,7 @@ Before enabling Multica mode:
 ## Where to go deeper
 
 - **[Operations Guide](docs/operations-guide.md)**: Full detail on workflows, architecture, configuration, and advanced usage
+- **[Dispatch Parity Matrix](hive/references/dispatch-parity.md)**: Canonical wiring map for default, Multica, and CC Workflows dispatch surfaces.
 - **[Contributing](CONTRIBUTING.md)**: How to contribute to Hive
 - **[Changelog](CHANGELOG.md)**: Version history and migration notes
 
