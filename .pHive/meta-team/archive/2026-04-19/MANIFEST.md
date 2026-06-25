@@ -39,3 +39,4 @@ current plan.
 <!-- reviewed-on: meta-2026-06-11 -->
 <!-- reviewed-on: meta-2026-06-23 -->
 <!-- reviewed-on: meta-2026-06-24 -->
+<!-- reviewed-on: meta-2026-06-25 -->
