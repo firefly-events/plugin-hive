@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hive Design Tokens</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Montserrat', system-ui, sans-serif;
+      background: #290E43;
+      color: #FFF1CF;
+      min-height: 100vh;
+      padding: 40px 24px;
+    }
+
+    .page-header {
+      margin-bottom: 40px;
+      border-bottom: 1px solid rgba(255, 205, 97, 0.3);
+      padding-bottom: 24px;
+    }
+
+    .page-header h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-style: italic;
+      font-size: 40px;
+      color: #FFCD61;
+      letter-spacing: -0.5px;
+    }
+
+    .page-header p {
+      font-size: 14px;
+      color: rgba(255, 241, 207, 0.6);
+      margin-top: 8px;
+      font-weight: 400;
+    }
+
+    .section {
+      background: rgba(255, 241, 207, 0.05);
+      border: 1px solid rgba(255, 205, 97, 0.15);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 32px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #FFCD61;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255, 205, 97, 0.2);
+    }
+
+    /* COLOR TOKENS */
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .color-card {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .color-swatch {
+      height: 120px;
+      position: relative;
+    }
+
+    .contrast-badges {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      display: flex;
+      gap: 4px;
+    }
+
+    .badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .badge-pass { background: rgba(0,180,0,0.85); color: white; }
+    .badge-fail { background: rgba(200,0,0,0.85); color: white; }
+
+    .color-info {
+      background: rgba(255, 241, 207, 0.07);
+      padding: 14px 16px;
+    }
+
+    .color-token-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #FFCD61;
+      margin-bottom: 4px;
+    }
+
+    .color-display-name {
+      font-size: 12px;
+      color: rgba(255, 241, 207, 0.7);
+      margin-bottom: 6px;
+      font-style: italic;
+    }
+
+    .color-hex {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: rgba(255, 241, 207, 0.9);
+      margin-bottom: 8px;
+    }
+
+    .color-usage {
+      font-size: 11px;
+      color: rgba(255, 241, 207, 0.55);
+      line-height: 1.5;
+    }
+
+    /* TYPOGRAPHY TOKENS */
+    .type-scale-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+
+    .type-scale-row {
+      display: flex;
+      align-items: baseline;
+      gap: 20px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 241, 207, 0.08);
+    }
+
+    .type-scale-row:last-child {
+      border-bottom: none;
+    }
+
+    .type-token-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: rgba(255, 205, 97, 0.8);
+      width: 100px;
+      flex-shrink: 0;
+    }
+
+    .type-px-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: rgba(255, 241, 207, 0.4);
+      width: 32px;
+      flex-shrink: 0;
+    }
+
+    .type-sample-text {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 500;
+      color: #FFF1CF;
+      line-height: 1.2;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .font-family-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .font-family-card {
+      background: rgba(58, 37, 95, 0.4);
+      border: 1px solid rgba(255, 241, 207, 0.1);
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .font-family-token {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: #FFCD61;
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+
+    .font-sample-heading {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 28px;
+      color: #FFF1CF;
+      margin-bottom: 4px;
+    }
+
+    .font-sample-body {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 400;
+      font-size: 14px;
+      color: rgba(255, 241, 207, 0.75);
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .font-sample-mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 400;
+      font-size: 14px;
+      color: #FFCD61;
+      background: rgba(41, 14, 67, 0.8);
+      padding: 12px;
+      border-radius: 8px;
+      line-height: 1.6;
+    }
+
+    .font-name-label {
+      font-size: 11px;
+      color: rgba(255, 241, 207, 0.4);
+      margin-top: 8px;
+    }
+
+    /* SPACING TOKENS */
+    .spacing-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .spacing-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .spacing-box {
+      background: linear-gradient(135deg, #A12468, #3A255F);
+      border-radius: 4px;
+      min-width: 4px;
+      min-height: 4px;
+    }
+
+    .spacing-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: rgba(255, 205, 97, 0.8);
+      text-align: center;
+    }
+
+    .spacing-token {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      color: rgba(255, 241, 207, 0.4);
+      text-align: center;
+    }
+
+    /* BORDER RADIUS TOKENS */
+    .radius-row {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .radius-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .radius-box {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #3A255F, #A12468);
+      border: 2px solid rgba(255, 205, 97, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .radius-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: #FFCD61;
+      text-align: center;
+    }
+
+    .radius-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      color: rgba(255, 241, 207, 0.4);
+    }
+
+    /* RAW JSON */
+    details {
+      border: 1px solid rgba(255, 205, 97, 0.2);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    summary {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #FFCD61;
+      padding: 16px 24px;
+      cursor: pointer;
+      background: rgba(255, 241, 207, 0.04);
+      user-select: none;
+    }
+
+    summary:hover {
+      background: rgba(255, 241, 207, 0.08);
+    }
+
+    summary::marker {
+      color: #FFCD61;
+    }
+
+    .raw-json {
+      background: #290E43;
+      padding: 24px;
+      overflow-x: auto;
+    }
+
+    .raw-json pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: rgba(255, 241, 207, 0.8);
+      line-height: 1.7;
+      white-space: pre;
+    }
+
+    .raw-json code {
+      font-family: inherit;
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="page-header">
+    <h1>Hive</h1>
+    <p>Design Tokens — W3C Format · v0.1.0-draft · 2026-04-30</p>
+  </header>
+
+  <!-- COLOR TOKENS -->
+  <section class="section">
+    <div class="section-label">Color Tokens</div>
+    <div class="color-grid">
+
+      <div class="color-card">
+        <div class="color-swatch" style="background: #3A255F;">
+          <div class="contrast-badges">
+            <span class="badge badge-pass" title="vs white">AA /#FFF</span>
+            <span class="badge badge-fail" title="vs black">— /#000</span>
+          </div>
+        </div>
+        <div class="color-info">
+          <div class="color-token-name">color.primary</div>
+          <div class="color-display-name">Night Jar Purple</div>
+          <div class="color-hex">#3A255F</div>
+          <div class="color-usage">Primary brand identity — headings, primary buttons, key UI surfaces. Composable substrate accent.</div>
+        </div>
+      </div>
+
+      <div class="color-card">
+        <div class="color-swatch" style="background: #A12468;">
+          <div class="contrast-badges">
+            <span class="badge badge-pass" title="vs white">AA /#FFF</span>
+            <span class="badge badge-fail" title="vs black">— /#000</span>
+          </div>
+        </div>
+        <div class="color-info">
+          <div class="color-token-name">color.secondary</div>
+          <div class="color-display-name">Pixie Purple</div>
+          <div class="color-hex">#A12468</div>
+          <div class="color-usage">Energy and active states — highlights, active swarm indicators, secondary CTAs, link hover.</div>
+        </div>
+      </div>
+
+      <div class="color-card">
+        <div class="color-swatch" style="background: #FFCD61;">
+          <div class="contrast-badges">
+            <span class="badge badge-fail" title="vs white">— /#FFF</span>
+            <span class="badge badge-pass" title="vs black">AA /#000</span>
+          </div>
+        </div>
+        <div class="color-info">
+          <div class="color-token-name">color.accent</div>
+          <div class="color-display-name">Moth Gold</div>
+          <div class="color-hex">#FFCD61</div>
+          <div class="color-usage">The point of light — primary CTAs against dark surfaces, illuminated dividers, status accents, the firefly's bulb.</div>
+        </div>
+      </div>
+
+      <div class="color-card">
+        <div class="color-swatch" style="background: #290E43;">
+          <div class="contrast-badges">
+            <span class="badge badge-pass" title="vs white">AA /#FFF</span>
+            <span class="badge badge-fail" title="vs black">— /#000</span>
+          </div>
+        </div>
+        <div class="color-info">
+          <div class="color-token-name">color.neutral</div>
+          <div class="color-display-name">Roku Plum</div>
+          <div class="color-hex">#290E43</div>
+          <div class="color-usage">Body text on light surfaces, deep navigation chrome, code-block backgrounds.</div>
+        </div>
+      </div>
+
+      <div class="color-card">
+        <div class="color-swatch" style="background: #FFF1CF;">
+          <div class="contrast-badges">
+            <span class="badge badge-fail" title="vs white">— /#FFF</span>
+            <span class="badge badge-pass" title="vs black">AA /#000</span>
+          </div>
+        </div>
+        <div class="color-info">
+          <div class="color-token-name">color.surface</div>
+          <div class="color-display-name">White Wine</div>
+          <div class="color-hex">#FFF1CF</div>
+          <div class="color-usage">Warm light surface — cards, callouts, brand-aligned backgrounds.</div>
+        </div>
+      </div>
+
+      <div class="color-card">
+        <div class="color-swatch" style="background: #FFFFFF; border-bottom: 1px solid rgba(0,0,0,0.08);">
+          <div class="contrast-badges">
+            <span class="badge badge-fail" title="vs white">— /#FFF</span>
+            <span class="badge badge-pass" title="vs black">AA /#000</span>
+          </div>
+        </div>
+        <div class="color-info">
+          <div class="color-token-name">color.surface-alt</div>
+          <div class="color-display-name">Hive White</div>
+          <div class="color-hex">#FFFFFF</div>
+          <div class="color-usage">Pure white for technical contexts — docs, terminal panels, code blocks where maximum contrast is required.</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- TYPOGRAPHY TOKENS -->
+  <section class="section">
+    <div class="section-label">Typography Tokens</div>
+
+    <div class="type-scale-list">
+      <div class="type-scale-row">
+        <span class="type-token-label">scale-xs</span>
+        <span class="type-px-label">12px</span>
+        <span class="type-sample-text" style="font-size: 12px;">Composable substrate. User-directed. Built in production, shared in public.</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="type-token-label">scale-sm</span>
+        <span class="type-px-label">14px</span>
+        <span class="type-sample-text" style="font-size: 14px;">Composable substrate. User-directed. Built in production, shared in public.</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="type-token-label">scale-base</span>
+        <span class="type-px-label">16px</span>
+        <span class="type-sample-text" style="font-size: 16px;">Composable substrate. User-directed.</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="type-token-label">scale-lg</span>
+        <span class="type-px-label">20px</span>
+        <span class="type-sample-text" style="font-size: 20px;">Composable substrate. User-directed.</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="type-token-label">scale-xl</span>
+        <span class="type-px-label">24px</span>
+        <span class="type-sample-text" style="font-size: 24px;">Composable substrate.</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="type-token-label">scale-2xl</span>
+        <span class="type-px-label">32px</span>
+        <span class="type-sample-text" style="font-size: 32px;">Composable substrate.</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="type-token-label">scale-3xl</span>
+        <span class="type-px-label">40px</span>
+        <span class="type-sample-text" style="font-size: 40px;">User-directed.</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="type-token-label">scale-4xl</span>
+        <span class="type-px-label">56px</span>
+        <span class="type-sample-text" style="font-size: 56px;">Hive</span>
+      </div>
+    </div>
+
+    <div class="font-family-grid">
+      <div class="font-family-card">
+        <div class="font-family-token">typography.font-heading</div>
+        <div class="font-sample-heading">Montserrat Bold</div>
+        <div class="font-sample-body">We built Hive while shipping our own products. Here's what's in it.</div>
+        <div class="font-name-label">Heading + Body · Montserrat · 400/500/600/700</div>
+      </div>
+
+      <div class="font-family-card">
+        <div class="font-family-token">typography.font-body</div>
+        <div class="font-sample-heading" style="font-weight: 400; font-size: 22px; font-style: italic;">Montserrat Regular Italic</div>
+        <div class="font-sample-body">BMAD codified multi-agent methodology with role clarity. Hive borrows that spirit and packages it as a Claude Code plugin.</div>
+        <div class="font-name-label">Body text · Montserrat · Regular 400</div>
+      </div>
+
+      <div class="font-family-card">
+        <div class="font-family-token">typography.font-mono</div>
+        <div class="font-sample-mono">$ claude plugin install plugin-hive
+$ /plugin-hive:kickoff
+→ scaffolding workflows...
+→ team: [architect, tpm, writer]</div>
+        <div class="font-name-label">Code · JetBrains Mono · 400/700</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SPACING TOKENS -->
+  <section class="section">
+    <div class="section-label">Spacing Tokens</div>
+    <div class="spacing-row">
+
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: 4px; height: 48px;"></div>
+        <div class="spacing-label">4px</div>
+        <div class="spacing-token">spacing.1</div>
+      </div>
+
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: 8px; height: 48px;"></div>
+        <div class="spacing-label">8px</div>
+        <div class="spacing-token">spacing.2</div>
+      </div>
+
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: 12px; height: 48px;"></div>
+        <div class="spacing-label">12px</div>
+        <div class="spacing-token">spacing.3</div>
+      </div>
+
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: 16px; height: 48px;"></div>
+        <div class="spacing-label">16px</div>
+        <div class="spacing-token">spacing.4</div>
+      </div>
+
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: 24px; height: 48px;"></div>
+        <div class="spacing-label">24px</div>
+        <div class="spacing-token">spacing.6</div>
+      </div>
+
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: 32px; height: 48px;"></div>
+        <div class="spacing-label">32px</div>
+        <div class="spacing-token">spacing.8</div>
+      </div>
+
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: 48px; height: 48px;"></div>
+        <div class="spacing-label">48px</div>
+        <div class="spacing-token">spacing.12</div>
+      </div>
+
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: 64px; height: 48px;"></div>
+        <div class="spacing-label">64px</div>
+        <div class="spacing-token">spacing.16</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- BORDER RADIUS TOKENS -->
+  <section class="section">
+    <div class="section-label">Border Radius Tokens</div>
+    <div class="radius-row">
+
+      <div class="radius-item">
+        <div class="radius-box" style="border-radius: 4px;"></div>
+        <div class="radius-label">border-radius.small</div>
+        <div class="radius-value">4px</div>
+      </div>
+
+      <div class="radius-item">
+        <div class="radius-box" style="border-radius: 8px;"></div>
+        <div class="radius-label">border-radius.medium</div>
+        <div class="radius-value">8px</div>
+      </div>
+
+      <div class="radius-item">
+        <div class="radius-box" style="border-radius: 16px;"></div>
+        <div class="radius-label">border-radius.large</div>
+        <div class="radius-value">16px</div>
+      </div>
+
+      <div class="radius-item">
+        <div class="radius-box" style="border-radius: 9999px;"></div>
+        <div class="radius-label">border-radius.full</div>
+        <div class="radius-value">9999px</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- RAW TOKENS.JSON -->
+  <details>
+    <summary>Raw tokens.json</summary>
+    <div class="raw-json">
+      <pre><code>{
+  "color": {
+    "primary":     { "value": "#3A255F", "type": "color" },
+    "secondary":   { "value": "#A12468", "type": "color" },
+    "accent":      { "value": "#FFCD61", "type": "color" },
+    "neutral":     { "value": "#290E43", "type": "color" },
+    "surface":     { "value": "#FFF1CF", "type": "color" },
+    "surface-alt": { "value": "#FFFFFF", "type": "color" }
+  },
+  "typography": {
+    "font-heading": { "value": "Montserrat",    "type": "fontFamily" },
+    "font-body":    { "value": "Montserrat",    "type": "fontFamily" },
+    "font-mono":    { "value": "JetBrains Mono","type": "fontFamily" },
+    "scale-xs":     { "value": "12px", "type": "dimension" },
+    "scale-sm":     { "value": "14px", "type": "dimension" },
+    "scale-base":   { "value": "16px", "type": "dimension" },
+    "scale-lg":     { "value": "20px", "type": "dimension" },
+    "scale-xl":     { "value": "24px", "type": "dimension" },
+    "scale-2xl":    { "value": "32px", "type": "dimension" },
+    "scale-3xl":    { "value": "40px", "type": "dimension" },
+    "scale-4xl":    { "value": "56px", "type": "dimension" }
+  },
+  "spacing": {
+    "1":  { "value": "4px",  "type": "dimension" },
+    "2":  { "value": "8px",  "type": "dimension" },
+    "3":  { "value": "12px", "type": "dimension" },
+    "4":  { "value": "16px", "type": "dimension" },
+    "6":  { "value": "24px", "type": "dimension" },
+    "8":  { "value": "32px", "type": "dimension" },
+    "12": { "value": "48px", "type": "dimension" },
+    "16": { "value": "64px", "type": "dimension" }
+  },
+  "border-radius": {
+    "small":  { "value": "4px",    "type": "dimension" },
+    "medium": { "value": "8px",    "type": "dimension" },
+    "large":  { "value": "16px",   "type": "dimension" },
+    "full":   { "value": "9999px", "type": "dimension" }
+  }
+}</code></pre>
+    </div>
+  </details>
+
+</body>
+</html>

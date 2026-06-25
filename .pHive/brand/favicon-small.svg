@@ -1,0 +1,17 @@
+<svg viewBox="0 0 64 64" width="64" height="64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Hive favicon (small) — simplified Concept 4 for 16/32px sizes: main hex + dots only, no partials -->
+  <g transform="translate(32, 32)" fill="none" stroke="#3A255F" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Main hex (centered on origin) — pointy-top, edge length 22 -->
+    <polygon points="0,-22 19.05,-11 19.05,11 0,22 -19.05,11 -19.05,-11"
+             stroke-width="4"/>
+    <!-- Vertex dots — bolder for small-size legibility -->
+    <g stroke="none">
+      <circle cx="0"      cy="-22" r="6" fill="#FFCD61"/>
+      <circle cx="19.05"  cy="-11" r="6" fill="#A12468"/>
+      <circle cx="19.05"  cy="11"  r="6" fill="#3A255F"/>
+      <circle cx="0"      cy="22"  r="6" fill="#FFCD61"/>
+      <circle cx="-19.05" cy="11"  r="6" fill="#A12468"/>
+      <circle cx="-19.05" cy="-11" r="6" fill="#3A255F"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,212 @@
+# Hive Brand System
+# Sub-brand under Firefly Events. Inherits Firefly palette + Montserrat typography.
+# Extends with: Hive sub-mark direction (hex / coordinated points of light) +
+# voice guideline (missing in parent Firefly guide).
+#
+# References:
+#   - .pHive/brand/firefly/firefly-spec.yaml  (parent brand profile)
+#   - .pHive/brand/vision.md                  (positioning)
+#   - .pHive/brand/value-prop.md              (segments + statements)
+#   - README.md                                (canonical North Star)
+
+meta:
+  name: Hive
+  parent_brand: Firefly Events
+  positioning: "Composable substrate for the agentic SDLC — user-directed, disciplined, kickoff to ship."
+  north_star: "Lights-on software factory. Two touchpoints: standup + issues queue."
+  audience:
+    - solo agentic builders / indie devs using Claude Code
+    - small product teams in AI-era companies adopting agentic SDLC
+  not_for:
+    - monetization
+    - enterprise sales
+  inspirations:
+    - IndyDevDan
+    - QRISPY
+    - BMAD
+    - archon
+    - Karpathy
+
+colors:
+  primary:
+    name: "Night Jar Purple"
+    hex: "#3A255F"
+    rgb: "rgb(58, 37, 95)"
+    cmyk: "cmyk(90, 100, 29, 24)"
+    pms: "PMS 2695 C"
+    usage: "Primary brand identity — headings, primary buttons, key UI surfaces. Composable substrate accent. Inherited from Firefly."
+  secondary:
+    name: "Pixie Purple"
+    hex: "#A12468"
+    rgb: "rgb(161, 36, 104)"
+    cmyk: "cmyk(36, 99, 33, 7)"
+    pms: "PMS 234 C"
+    usage: "Energy and active states — highlights, active swarm indicators, secondary CTAs, link hover. Inherited from Firefly."
+  accent:
+    name: "Moth Gold"
+    hex: "#FFCD61"
+    rgb: "rgb(255, 205, 97)"
+    cmyk: "cmyk(0, 20, 72, 0)"
+    pms: "PMS 1225 C"
+    usage: "The point of light — primary CTAs against dark surfaces, illuminated dividers, status accents, the firefly's bulb. Inherited from Firefly."
+  neutral:
+    name: "Roku Plum"
+    hex: "#290E43"
+    rgb: "rgb(41, 14, 67)"
+    cmyk: "cmyk(89, 100, 33, 49)"
+    pms: "PMS 5255 C"
+    usage: "Body text on light surfaces, deep navigation chrome, code-block backgrounds. Inherited from Firefly."
+  surface:
+    name: "White Wine"
+    hex: "#FFF1CF"
+    rgb: "rgb(255, 241, 207)"
+    cmyk: "cmyk(0, 4, 21, 0)"
+    pms: "PMS 9080 C"
+    usage: "Warm light surface — cards, callouts, brand-aligned backgrounds. Inherited from Firefly."
+  surface_alt:
+    name: "Hive White"
+    hex: "#FFFFFF"
+    rgb: "rgb(255, 255, 255)"
+    cmyk: "cmyk(0, 0, 0, 0)"
+    pms: "—"
+    usage: "Pure white for technical contexts — docs, terminal panels, code blocks where maximum contrast is required. Hive-specific extension."
+
+typography:
+  heading_font: "Montserrat"
+  body_font: "Montserrat"
+  mono_font: "JetBrains Mono"
+  fallback_stack: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+  google_fonts: true
+  scale: [12, 14, 16, 20, 24, 32, 40, 56]
+  weights:
+    - weight: 400
+      name: "Regular"
+      usage: "Body text, captions, mono code"
+    - weight: 500
+      name: "Medium"
+      usage: "Labels, navigation, italic emphasis"
+    - weight: 600
+      name: "SemiBold"
+      usage: "Subheadings, callouts"
+    - weight: 700
+      name: "Bold"
+      usage: "Headings, CTAs, brand wordmark"
+  brand_pairing:
+    title:        { weight: Bold,         italic: false, size_px: 22 }
+    h1:           { weight: Medium,       italic: true,  size_px: 18 }
+    h2:           { weight: Bold,         italic: false, size_px: 16 }
+    sub_heading:  { weight: Regular,      italic: true,  size_px: 16 }
+    body:         { weight: Regular,      italic: false, size_px: 12 }
+  usage_guidance: |
+    Inherits the full Montserrat type scale defined in Firefly's 2023 brand guide.
+    Hive extends the parent system with JetBrains Mono for code, terminal output,
+    and any monospace technical content. The italic Montserrat treatment from the
+    Firefly wordmark carries through to the Hive sub-mark for consistency.
+
+spacing:
+  base: 4
+  scale: [4, 8, 12, 16, 24, 32, 48, 64]
+
+radius:
+  small: 4
+  medium: 8
+  large: 16
+  full: 9999
+
+logo:
+  parent_lockup_rule: |
+    Hive is a sub-brand. When co-branded, the Firefly wordmark or firefly-mark
+    appears alongside Hive separated by a vertical rule, not stacked. Hive
+    never replaces the Firefly mark; it sits beside it.
+  sub_mark_direction: |
+    The Hive mark riffs on hive geometry — a hexagon or hex-cluster — without
+    abandoning the firefly silhouette. The visual idea is *coordinated points of
+    light*: many fireflies, structured into a hive. This pulls double duty:
+    - Hex evokes the swarm, the structure, the multi-agent pattern
+    - The firefly silhouette keeps continuity with the parent brand
+  concepts:
+    - id: wordmark
+      name: "Wordmark"
+      description: "Pure type — 'Hive' set in Montserrat Bold Italic, mirroring the Firefly wordmark cadence."
+    - id: wordmark_with_hex
+      name: "Wordmark + Hex"
+      description: "Wordmark with a small filled hexagon to the left, gold stroke, plum fill — single point of light in the hive."
+    - id: monogram_hex
+      name: "Hex Monogram"
+      description: "A hexagon containing a stylized 'H' — works as favicon, app icon, and avatar at any scale. Densest mark; reads at favicon scale."
+    - id: hex_with_adjacent_cells_forming
+      name: "Hex with Adjacent Cells Forming"
+      description: "Regular pointy-top hex with vertex dots, flanked by two partial adjacent cells drawn at the same edge length: NE neighbor almost outlined, SE neighbor barely begun. Reads as cohesive hive geometry expanding outward, not decoration."
+    - id: badge_firefly_in_hex
+      name: "Firefly-in-Hex Badge"
+      description: "Hex enclosure with the Firefly silhouette inside, wordmark below. Strongest co-brand lockup."
+    - id: constellation_lockup
+      name: "Constellation Lockup"
+      description: "Six dots at hex vertices form a constellation; the 'Hive' wordmark sits inside the hex space the dots define. Reads as 'Hive is what the swarm produces.' Most narrative-rich mark."
+  rules:
+    - "Logo mark may be used alone at small sizes (favicon, avatar, status bar)."
+    - "Wordmark variant must always be Montserrat Bold Italic, kerning intact, no manual letterspacing."
+    - "Never tilt, rotate, stretch, or recolor outside the approved palette."
+    - "Clear space around the mark equals the height of the lowercase 'h' in 'Hive'."
+
+personality:
+  statement: "Composable substrate. User-directed. Built in production, shared in public."
+  tone: "Confident, technical, generous with credit, postmortem-cadenced rather than launch-day-loud."
+  voice_principles:
+    - "Show the work; don't sell it."
+    - "Credit the camps that came before — IndyDevDan, QRISPY, BMAD, archon, Karpathy."
+    - "Fewer adjectives, more verbs."
+    - "Honest about what's not yet done; the North Star is a trajectory, not an arrival."
+    - "Builder-to-builder. No marketing speak. No 10x developer claims."
+    - "Use the word 'we' deliberately. We means Firefly. We means contributors. Be clear which."
+
+voice_guideline:
+  do:
+    - "Lead with what the framework does, not what it could do."
+    - "Anchor every claim in something on disk — a skill, a workflow, a shipped product."
+    - "Name the inspirations explicitly when their patterns show up in a feature."
+    - "Use 'composable substrate' / 'user-directed' / 'kickoff to ship' as house language. Reuse, don't paraphrase. 'Disciplined' survives per audit §5.5 co-equal-differentiator decision."
+    - "Default to active voice."
+  dont:
+    - "Don't say 'revolutionary', 'game-changing', 'AI-powered', or any phrase a launch deck would use."
+    - "Don't compare Hive against the inspirations. They are camps to learn from, not competitors."
+    - "Don't promise lights-on yet — the North Star is a trajectory, not a current state."
+    - "Don't bury the credit list at the bottom. Credit travels with the claim it stands on."
+    - "Don't write in the cadence of 'we're excited to announce'. Postmortem cadence is the house style."
+  examples:
+    instead_of_this:
+      - input: "We're thrilled to introduce the revolutionary AI-powered SDLC framework."
+        rewrite: "We built Hive while shipping our own products. Here's what's in it."
+      - input: "Unlike BMAD, Hive offers superior orchestration."
+        rewrite: "BMAD codified multi-agent methodology with role clarity. Hive borrows that spirit and packages it as a Claude Code plugin."
+      - input: "Get started in minutes with our easy-to-use CLI."
+        rewrite: "Install with `claude plugin install plugin-hive`. Run `/plugin-hive:kickoff`. The plugin scaffolds the rest."
+
+motifs:
+  - "Flowing wave / liquid gradient (purple → plum → gold) — inherited from Firefly"
+  - "Linear contour patterns in gold thin lines — inherited from Firefly"
+  - "Hex geometry — Hive's contribution; coordinated points of light"
+  - "Single-point-of-light: a gold dot or wedge against deep purple — the firefly bulb, repeated as a swarm marker"
+
+accessibility:
+  contrast_targets:
+    - "All body text must meet WCAG AA (4.5:1) on its surface."
+    - "All large display text must meet WCAG AA (3:1) on its surface."
+    - "CTAs (Moth Gold on Roku Plum or Night Jar) and (White Wine on Roku Plum) are AA-validated."
+  color_blind_safety: "Never rely on Pixie Purple vs Night Jar Purple alone to communicate state — pair with iconography or text label."
+
+status:
+  version: "0.1.0-draft"
+  generated: "2026-04-29"
+  primary_logo: hex_with_adjacent_cells_forming  # Concept 4 — locked 2026-04-30
+  primary_logo_locked_at: "2026-04-30"
+  primary_logo_rationale: |
+    Reads cleanly at glance: central hex of vertex dots + two ghosted partial neighbor cells (NE almost outlined,
+    SW barely begun). Cohesive hive geometry — the swarm is set, the next cells are coalescing. Carries the
+    "coordinated points of light" idea forward without requiring the firefly silhouette inside the mark.
+    Concept 5 (firefly-in-hex) retained as the strongest co-brand lockup for Firefly contexts.
+  next_actions:
+    - "Derive favicon + app icon from Concept 4 (square crop or use Concept 3 'H' monogram)"
+    - "Derive social cards (Twitter 1200×675, LinkedIn 1200×627) using Concept 4 mark + wordmark"
+    - "Run /hive:design-system to generate W3C tokens.json from this YAML"
+    - "Adopt voice_guideline in CONTRIBUTING.md, README Hive section, and any future blog posts"

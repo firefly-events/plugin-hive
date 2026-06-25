@@ -196,6 +196,16 @@ __pycache__/
 .pHive/brand/logo-explorations/**/*.png
 # To track additional brand assets (e.g., finalized logo package), add an
 # explicit allow-rule here, like: `!.pHive/brand/logo/` and `!.pHive/brand/logo/**`.
+# Canonical brand identity system — tracked so squad agents and tooling read the
+# real palette + voice (without these, runtime agents fall back to schema defaults).
+!.pHive/brand/brand-system.yaml
+!.pHive/brand/tokens.json
+!.pHive/brand/brand-guide.html
+!.pHive/brand/tokens-preview.html
+!.pHive/brand/favicon.svg
+!.pHive/brand/favicon-small.svg
+!.pHive/brand/favicons/
+!.pHive/brand/favicons/**
 
 # Local dev — better-sqlite3 transient install for kg bootstrap (BYO enhancement)
 node_modules/
