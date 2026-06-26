@@ -1,7 +1,0 @@
-# Insights — b3-phase-handoff-declare
-
-- The story named `hive/lib/kg_bootstrap.py` as if it existed; it did not. Bootstrap DDL previously lived only in the schema doc and was copy-pasted into `tests/test_kg_fk_enforcement.py` (`_BOOTSTRAP_DDL`) and test fixtures. I created `kg_bootstrap.py` as the canonical Python bootstrap/migration entrypoint (`python3 -m hive.lib.kg_bootstrap [db_path]`). Future schema changes should land there first; the doc DDL and the FK-test copy must be kept in sync manually — consider a conformance test that diffs them.
-- `INSERT OR IGNORE` does NOT suppress FK violations — only uniqueness conflicts. With `PRAGMA foreign_keys = ON`, an undeclared predicate raises `sqlite3.IntegrityError` even through `OR IGNORE`. That is exactly why declaring the predicate (not catch-and-swallow) is the right fix.
-- Because all bootstrap statements are idempotent, "migration" == "re-run bootstrap". No separate migration script or version table needed at current schema complexity.
-- The FK lint in `test_kg_fk_enforcement.py` globs `hive/lib/kg_*.py` — any new KG module opening sqlite must set `PRAGMA foreign_keys = ON` within 10 lines of `sqlite3.connect(` or CI fails.
-- The epic branch was checked out by a peer agent's worktree, so `git checkout feat/kg-repair-activation` failed with "already used by worktree". Workaround: local branch from `origin/feat/kg-repair-activation`, push via `git push origin HEAD:feat/kg-repair-activation`.

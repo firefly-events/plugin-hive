@@ -1,9 +1,0 @@
-config:
-  MD013: false  # line-length — not enforced
-  MD033: false  # no-inline-html — Mermaid diagrams and badges use HTML
-  MD041: false  # first-line-heading — not required for all files
-ignores:
-  # Machine-written runtime/state artifacts — not authored docs.
-  - ".pHive/**"
-  - ".hive/**"
-  - "node_modules/**"

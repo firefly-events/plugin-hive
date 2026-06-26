@@ -1,6 +1,0 @@
-step_id: implement
-status: completed
-timestamp: "2026-06-05T00:00:00Z"
-artifacts:
-  - .pHive/epics/substrate-coverage-and-test-cleanup/docs/audit-recovery-decision.md
-  - .pHive/epics/substrate-coverage-and-test-cleanup/docs/design-discussion.md

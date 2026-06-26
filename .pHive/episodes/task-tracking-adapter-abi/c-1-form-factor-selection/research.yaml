@@ -1,8 +1,0 @@
-step_id: research
-story_id: c-1-form-factor-selection
-epic_id: task-tracking-adapter-abi
-agent: researcher
-status: completed
-artifacts:
-  - path: .pHive/epics/task-tracking-adapter-abi/docs/c-1-research-brief.md
-key_finding: "CLI and MCP tied on 3 of 5 axes — AC §5 triggers mandatory dual sketch. TS invocation 0.39ns vs CLI cold 52ms. No dynamic dispatch infra in Hive today."

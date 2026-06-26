@@ -1,9 +1,0 @@
-run_id: plan-changelog-human-summaries-20260612T143500Z
-skill: plan
-timestamp: "2026-06-12T14:35:00Z"
-gate_lift_fired: false
-methodology: classic
-methodology_source: hive-config
-story_specs_produced: 4
-nonsensical_defaults: []
-warnings_emitted: 0
