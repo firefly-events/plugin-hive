@@ -1,0 +1,58 @@
+name: plugin-hygiene-remediation
+title: Plugin Hygiene Remediation — trim consumer install payload
+description: >
+  Two-phase remediation of the 2026-06-19 install-payload audit. Slice A (s1-s5)
+  untracks maintainer-only files so they stop shipping to consumers (~55% payload
+  cut). Slice B (s6-s8) relocates them to a separate plugin-hive-internal repo and
+  reworks the multica-dispatch write paths. Slice A ships independently of B.
+target_codebase: /Users/don/Documents/plugin-hive
+methodology: classic
+version_bump: patch
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+planning_team:
+  matched_tags: [packaging, repo-hygiene, runtime-coupling, migration]
+  roster: [researcher, technical-writer, tpm]
+  per_tag_reasoning:
+    packaging: "consumer install payload is git-clone-delivered; no native manifest"
+    runtime-coupling: "untrack must not break daemon/dispatch write paths or skill reads"
+    migration: "Slice B moves trees to a separate repo with history preservation"
+  confidence: high
+  gate_decisions: {}
+
+stories:
+  - id: s1-untrack-manifest
+    title: Produce canonical untrack manifest (read-only classification)
+    complexity: low
+    depends_on: []
+  - id: s2-untrack-pure
+    title: Untrack pure maintainer-only trees + blanket gitignore
+    complexity: medium
+    depends_on: [s1-untrack-manifest]
+  - id: s3-untrack-runtime-coupled
+    title: Untrack historical contents of runtime-coupled trees, keep parent dirs
+    complexity: high
+    depends_on: [s1-untrack-manifest, s2-untrack-pure]
+  - id: s4-gitignore-litter
+    title: Add gitignore rules for test-runner litter
+    complexity: low
+    depends_on: [s3-untrack-runtime-coupled]
+  - id: s5-verify-clean-clone
+    title: Verify fresh-clone payload cut + no runtime read breakage
+    complexity: medium
+    depends_on: [s4-gitignore-litter]
+  - id: s6-internal-repo-migrate
+    title: Stand up plugin-hive-internal, history-preserving move of maintainer trees
+    complexity: high
+    depends_on: [s5-verify-clean-clone]
+  - id: s7-rework-multica-write-paths
+    title: Config-resolve multica-dispatch write paths (cycle-state, episodes)
+    complexity: high
+    depends_on: [s6-internal-repo-migrate]
+  - id: s8-readme-pointer-xref
+    title: README pointer to internal repo + epic-link cross-reference strategy
+    complexity: medium
+    depends_on: [s7-rework-multica-write-paths]

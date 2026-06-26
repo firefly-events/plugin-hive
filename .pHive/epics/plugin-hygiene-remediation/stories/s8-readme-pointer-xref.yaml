@@ -1,0 +1,77 @@
+id: s8-readme-pointer-xref
+epic: plugin-hygiene-remediation
+title: README pointer to internal repo + epic-link cross-reference strategy
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s7-rework-multica-write-paths]
+
+description: |
+  Slice B's closeout. With plugin-hive-internal verified (s6) and write paths decoupled
+  (s7), replace the maintainer trees' in-repo working-tree copies with a documented pointer
+  to the internal repo, and resolve the broken-link problem: .pHive/epics/<id>/ references
+  in comments, issues, and docs that no longer resolve in a fresh clone. Add a README
+  section explaining where maintainer planning history lives and how to access it. Provide a
+  link-rewrite or redirect convention (e.g. a documented base-URL substitution) so existing
+  references can be followed to the internal repo. This is the story that makes the
+  separate-repo split real for a fresh consumer clone.
+
+acceptance_criteria:
+  - "Given the main repo README, when a contributor reads it, then it states maintainer planning/history lives in plugin-hive-internal with access instructions."
+  - "Given the old in-repo maintainer working-tree copies, when this story completes, then they are removed from the main checkout (now sourced from the internal repo)."
+  - "Given an existing .pHive/epics/<id>/ reference, when followed via the documented xref convention, then it resolves to the internal-repo location (mapping from s6)."
+  - "Given a fresh clone of the main repo, when payload is measured, then it matches the Slice A target and contains no maintainer historical trees."
+  - "Given runtime, when dag_executor / multica dispatch / consumer skills run, then no missing-tree error occurs (KEEP-TRACKED trees still in main repo; moved trees were maintainer-only or s7-decoupled)."
+
+steps:
+  - id: implement
+    description: Add README "maintainer internal repo" section + xref convention; remove the moved working-tree copies from the main checkout using the s6 mapping.
+    agent: developer
+  - id: test
+    description: Fresh-clone the main repo; assert moved trees absent, KEEP-TRACKED present, a sample xref resolves, runtime smoke passes.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm no consumer-runtime tree was removed; confirm README instructions are followable; confirm xref convention is concrete, not hand-wavy.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: README.md
+      purpose: Gets the maintainer-internal-repo pointer section
+    - path: .pHive/epics/plugin-hygiene-remediation/docs/internal-repo-migration.md
+      purpose: old→new path mapping from s6 powering the xref convention
+
+files_to_modify:
+  - file: README.md
+    change: Add maintainer internal-repo pointer + xref convention section
+  - file: .gitignore
+    change: Finalize ignore of the moved trees now sourced externally
+
+metric:
+  applies: true
+  name: maintainer_trees_in_main_checkout
+  direction: down
+  unit: count
+  baseline: 14
+  target: 0
+  window: story-integrate
+  source:
+    kind: manual
+    ref: "count of FULL_UNTRACK maintainer trees present in a fresh main-repo clone"
+  verify_at: integrate
+  owner: tester
+
+risks:
+  - severity: high
+    description: Removing a working-tree copy that was actually KEEP-TRACKED (consumer-needed) breaks runtime.
+    mitigation: Only FULL_UNTRACK + moved trees are removed; tester runtime-smokes a fresh clone before merge.
+  - severity: medium
+    description: Xref convention is documented but unusable in practice (links still dead).
+    mitigation: Test resolves a real sample reference end-to-end via the convention.

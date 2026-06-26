@@ -1,0 +1,58 @@
+id: s4-gitignore-litter
+epic: plugin-hygiene-remediation
+title: Add gitignore rules for test-runner litter
+status: pending
+complexity: low
+methodology: classic
+depends_on: [s3-untrack-runtime-coupled]
+
+description: |
+  Test and runtime harnesses litter the repo root with hundreds of scratch dirs that
+  show up as untracked noise and risk being accidentally committed. ~905 such dirs were
+  cleaned live during this epic's setup. Add gitignore patterns so they never reappear:
+  pytest-of-don/, h03-gate-latch-*, h03-multi-epic-*, h03-*, hpr4-*, slack-notify-test-*,
+  hermes-cli-test-*, hermes-no-exist-*, hermes-write-state-test-*, hermes-*-test-*,
+  .pHive/dag-spawn-state/, marketing/out/ (generated mp4/png). Root-cause note: the
+  better long-term fix is pointing these harnesses at a tmp dir, but ignoring is the
+  cheap stop-gap and is in scope here.
+
+acceptance_criteria:
+  - "Given the litter patterns, when added to .gitignore, then re-running the offending test/harness leaves `git status` clean of those dirs."
+  - "Given the patterns, when checked against real tracked files, then no legitimately-tracked path matches (no over-broad glob)."
+  - "Given marketing/out generated assets, when ignored, then any intentionally-tracked marketing source under marketing/ is unaffected."
+
+steps:
+  - id: implement
+    description: Append a clearly-commented "test-runner litter" block to .gitignore with the observed patterns.
+    agent: developer
+  - id: test
+    description: Touch a sample dir per pattern, assert git ignores it; grep tracked files to confirm no false-positive match.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm globs are bounded (no bare `*-test-*` that could catch real code).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .gitignore
+      purpose: Append the litter-ignore block
+
+files_to_modify:
+  - file: .gitignore
+    change: Add test-runner litter ignore patterns
+
+metric:
+  applies: false
+  justification: "Repo-hygiene gitignore rule with no consumer-facing surface; its effect (clean working tree) is a maintainer-side convenience, not a measurable install-payload or runtime change."
+
+risks:
+  - severity: medium
+    description: Over-broad glob (e.g. h03-*) silently ignores a real future file/dir.
+    mitigation: Anchor patterns at repo root; reviewer checks globs against tracked-file list.

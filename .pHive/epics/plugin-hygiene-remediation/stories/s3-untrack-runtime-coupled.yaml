@@ -1,0 +1,88 @@
+id: s3-untrack-runtime-coupled
+epic: plugin-hygiene-remediation
+title: Untrack historical contents of runtime-coupled trees, keep parent dirs
+status: pending
+complexity: high
+methodology: classic
+depends_on: [s1-untrack-manifest, s2-untrack-pure]
+
+description: |
+  The largest payload contributors (.pHive/epics 5.5MB, .pHive/episodes 1.8MB) are
+  runtime-coupled: the dag_executor diffs git for epic paths and consumer /plan writes
+  new epic dirs. The fix is NOT to ignore the parent dir — it is to drop the maintainer's
+  HISTORICAL CONTENTS while keeping the parent negation so consumer runtime writes still
+  flow. Mechanism: keep `!.pHive/epics/` + `!.pHive/episodes/` (and the `.pHive/X/*`
+  ignore beneath), REMOVE the ~40+ per-item maintainer negations (lines ~28-92), and
+  `git rm --cached -r` the maintainer's historical epic/episode/cycle-state/
+  specialist-phases/audits/triage contents. Consumer /plan self-allowlists its own new
+  dirs via existing step 0b behavior — unchanged. Per manifest UNTRACK_CONTENTS_KEEP_PARENT.
+
+acceptance_criteria:
+  - "Given the per-item maintainer negation rules, when removed, then `!.pHive/epics/` and `!.pHive/episodes/` parent negations remain so the dirs are not blanket-ignored."
+  - "Given a simulated consumer /plan run that writes a new epic dir + appends its own negation rule, when `git status` runs, then the new dir is tracked (self-allowlist path still works)."
+  - "Given dag_executor change-detection (agent.py git-diff of .pHive/epics/), when run after untrack, then it still detects newly-written epic files (not masked by ignore)."
+  - "Given the maintainer's 44 historical epic dirs + 14 episode dirs, when git rm --cached completes, then they are gone from the index, present on disk."
+  - "Given this epic's own dir (.pHive/epics/plugin-hygiene-remediation/), when untracking historical epics, then it stays tracked (active work, allowlisted)."
+
+steps:
+  - id: implement
+    description: Remove per-item maintainer negations (keep parent + this epic's allowlist); git rm --cached -r maintainer historical contents of epics/episodes/cycle-state/specialist-phases/audits/triage.
+    agent: developer
+  - id: test
+    description: Run consumer-/plan-write simulation (new epic dir + negation → tracked); run dag_executor change-detect smoke against a fresh write; assert parent negations intact.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Audit the .gitignore diff line-by-line; confirm only maintainer per-item negations removed, parents + consumer negations + this-epic allowlist preserved.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .gitignore
+      purpose: Per-item maintainer negations (lines ~28-92) removed; parents kept
+    - path: hive/lib/dag_executor/executor/handlers/agent.py
+      purpose: "git-diffs .pHive/epics/ to detect agent writes (line ~501) — must still work"
+    - path: skills/plan/SKILL.md
+      purpose: "Step 0b appends per-epic negation on new epics — the consumer self-allowlist path"
+
+code_examples:
+  - title: Consumer self-allowlist pattern /plan already uses (step 0b)
+    file: skills/plan/SKILL.md
+    snippet: |
+      !.pHive/epics/{epic-id}/
+      !.pHive/epics/{epic-id}/**
+
+files_to_modify:
+  - file: .gitignore
+    change: Remove ~40+ per-item maintainer epic/episode negations; keep parents + this-epic allowlist
+
+metric:
+  applies: true
+  name: consumer_install_payload_bytes
+  direction: down
+  unit: bytes
+  baseline: 15500000
+  target: 7500000
+  window: story-integrate
+  source:
+    kind: manual
+    ref: "fresh git clone of feature branch → du -sb; compared to develop clone (s5 measures end-to-end)"
+  verify_at: s5-verify-clean-clone
+  owner: tester
+
+risks:
+  - severity: high
+    description: Removing parent negation by mistake blanket-ignores epics/episodes, breaking consumer /plan + executor change detection.
+    mitigation: Tests assert parent negations intact and a simulated consumer write stays tracked.
+  - severity: medium
+    description: This epic's own dir gets caught in the historical untrack, losing the active plan.
+    mitigation: Explicit allowlist for plugin-hygiene-remediation retained; tester asserts it stays tracked.
+  - severity: medium
+    description: .pHive/epics/<id>/ links in old comments/issues break in fresh clones.
+    mitigation: Accepted for Slice A (maintainer keeps trees locally); Slice B s8 resolves via internal-repo URLs.

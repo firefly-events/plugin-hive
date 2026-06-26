@@ -1,0 +1,60 @@
+id: s1-untrack-manifest
+epic: plugin-hygiene-remediation
+title: Produce canonical untrack manifest (read-only classification)
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: read-only
+
+description: |
+  Produce the single source-of-truth manifest that s2/s3 consume: every repo tree
+  classified as FULL-UNTRACK, UNTRACK-CONTENTS-KEEP-PARENT, or KEEP-TRACKED, each with
+  a deciding runtime reference. The 2026-06-25 research pass already gathered the data
+  (docs/research-brief.md) — this story freezes it into a checked, machine-readable
+  manifest the untrack stories execute against, and re-verifies each KEEP-TRACKED ref
+  still resolves (guards against the classification going stale before s2/s3 run).
+
+acceptance_criteria:
+  - "Given the research brief, when the manifest is written, then every tree in the audit's maintainer-only + ambiguous lists appears exactly once with a classification and a deciding ref (file:line for runtime-coupled/keep, 'no runtime ref' for pure)."
+  - "Given a KEEP-TRACKED entry, when its deciding ref is re-grepped, then the reference still resolves in HEAD (else the entry is re-classified and the change noted)."
+  - "Given the manifest, when read by a human, then the must-preserve gitignore negation list is enumerated explicitly."
+
+steps:
+  - id: research
+    description: Re-verify each KEEP-TRACKED / runtime-coupled deciding ref in research-brief.md still resolves at HEAD.
+    agent: researcher
+  - id: implement
+    description: Write docs/untrack-manifest.yaml (FULL_UNTRACK[], UNTRACK_CONTENTS_KEEP_PARENT[], KEEP_TRACKED[], MUST_PRESERVE_NEGATIONS[]).
+    agent: developer
+    depends_on: [research]
+  - id: review
+    description: Confirm manifest covers every tree the audit flagged; no tree unclassified.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Commit manifest to feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/epics/plugin-hygiene-remediation/docs/research-brief.md
+      purpose: Source classification data this manifest formalizes
+    - path: .pHive/audits/plugin-install-payload/report.md
+      purpose: Original audit; the universe of trees to classify
+
+files_to_modify:
+  - file: .pHive/epics/plugin-hygiene-remediation/docs/untrack-manifest.yaml
+    change: Create machine-readable untrack manifest
+
+metric:
+  applies: false
+  justification: "Read-only classification artifact; it produces no observable consumer surface — the payload reduction it enables is measured at s5."
+
+risks:
+  - severity: medium
+    description: Stale classification — a tree marked maintainer-only gains a runtime reader between research and untrack.
+    mitigation: Re-verify refs at HEAD in the research step; s5 fresh-clone smoke is the backstop.

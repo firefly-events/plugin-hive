@@ -1,0 +1,91 @@
+id: s7-rework-multica-write-paths
+epic: plugin-hygiene-remediation
+title: Config-resolve multica-dispatch write paths (cycle-state, episodes)
+status: pending
+complexity: high
+methodology: classic
+depends_on: [s6-internal-repo-migrate]
+
+description: |
+  Research found dag_executor/episode.py already writes via resolve_state_dir (sdr-1) — no
+  change needed there. The gap is the Node bridge multica-story-dispatch, which HARDCODES
+  .pHive/ paths: cycle-state (mcp-tools.mjs:83, cli.mjs:143) and episodes
+  (distill.mjs:103, episode-sync.mjs:304). For the separate-repo end state to hold, these
+  writes must resolve their base through the canonical config reader (the sdr-1 resolver
+  conformance surface) rather than assuming a hardcoded repo-root .pHive. This keeps run-log
+  writes flowing to the consumer's state dir wherever it resolves, decoupled from the
+  tracked location. Conform the Node bridge to hive/lib/config.py state-dir behavior via the
+  shared conformance fixture (per the charter's cross-runtime conformance clause).
+
+acceptance_criteria:
+  - "Given multica-story-dispatch write callsites, when refactored, then none hardcode a literal '.pHive' base — all resolve through the state-dir resolver."
+  - "Given the Python resolve_state_dir and the Node resolver, when both run against the shared conformance fixture, then they agree on the resolved path."
+  - "Given a dispatch run with a non-default state dir (env/config override), when episodes + cycle-state are written, then they land under the resolved dir, not repo-root .pHive."
+  - "Given existing dispatch behavior with default config, when run after the change, then output paths are byte-identical to before (no regression for the default case)."
+
+steps:
+  - id: research
+    description: Map every hardcoded .pHive write in multica-story-dispatch; confirm the Node-side state-dir resolver shim and the conformance fixture location.
+    agent: researcher
+  - id: implement
+    description: Replace hardcoded .pHive bases with state-dir-resolved paths in mcp-tools.mjs, cli.mjs, distill.mjs, episode-sync.mjs.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run the cross-runtime conformance fixture (Python vs Node agree); test default-config byte-identical output + an overridden-state-dir case.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm no write path still assumes repo-root .pHive; confirm conformance fixture genuinely covers these callsites.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: hive/lib/multica-story-dispatch/mcp-tools.mjs
+      purpose: "cycle-state read+write (line ~83) — hardcoded .pHive base"
+    - path: hive/lib/multica-story-dispatch/cli.mjs
+      purpose: "cycle-state write (line ~143)"
+    - path: hive/lib/multica-story-dispatch/distill.mjs
+      purpose: "episodes messages.jsonl write (line ~103)"
+    - path: hive/lib/multica-story-dispatch/episode-sync.mjs
+      purpose: "episode dir write (line ~304)"
+    - path: hive/lib/config.py
+      purpose: Canonical state-dir resolver (sdr-1); Node side must conform via shared fixture
+
+files_to_modify:
+  - file: hive/lib/multica-story-dispatch/mcp-tools.mjs
+    change: Resolve cycle-state base via state-dir resolver
+  - file: hive/lib/multica-story-dispatch/cli.mjs
+    change: Resolve cycle-state base via state-dir resolver
+  - file: hive/lib/multica-story-dispatch/distill.mjs
+    change: Resolve episodes base via state-dir resolver
+  - file: hive/lib/multica-story-dispatch/episode-sync.mjs
+    change: Resolve episodes base via state-dir resolver
+
+metric:
+  applies: true
+  name: hardcoded_phive_write_sites
+  direction: down
+  unit: count
+  baseline: 4
+  target: 0
+  window: story-integrate
+  source:
+    kind: manual
+    ref: "grep -rn \"'.pHive\" hive/lib/multica-story-dispatch/ for write callsites"
+  verify_at: integrate
+  owner: reviewer
+
+risks:
+  - severity: high
+    description: Changing write paths breaks live multica dispatch (episode sync, cycle-state persistence) for current consumers.
+    mitigation: Default-config byte-identical assertion + conformance fixture; this is a bridge surface (charter) so conformance is mandatory.
+  - severity: medium
+    description: Node and Python resolvers drift, splitting where runs land.
+    mitigation: Shared conformance fixture is the gate; Python is resolver-primary per charter.

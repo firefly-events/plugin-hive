@@ -1,0 +1,65 @@
+id: s6-internal-repo-migrate
+epic: plugin-hygiene-remediation
+title: Stand up plugin-hive-internal, history-preserving move of maintainer trees
+status: pending
+complexity: high
+methodology: classic
+depends_on: [s5-verify-clean-clone]
+
+description: |
+  Slice B's foundation. Slice A untracked maintainer trees but they still live on disk in
+  the main checkout and in git history. Move them to a private plugin-hive-internal repo
+  with history preserved, so the durable home is outside the consumer-facing repo. Use a
+  history-preserving extraction (git filter-repo --path or subtree split) over the
+  FULL_UNTRACK + UNTRACK_CONTENTS trees, push to the new private repo, and confirm the
+  history (per-epic commit lineage) survived. The main repo's working-tree copies are NOT
+  deleted in this story — s8 swaps them for a pointer once the internal repo is verified.
+
+acceptance_criteria:
+  - "Given the maintainer trees, when filter-repo/subtree extraction runs, then plugin-hive-internal contains them with their original commit history (spot-check 3 epics' lineage)."
+  - "Given the new repo, when pushed, then it is private and the maintainer can clone it standalone."
+  - "Given the extraction, when complete, then the main repo working tree is unchanged (no destructive removal yet — s8 owns that)."
+  - "Given cross-references, when the internal repo is built, then a mapping of old .pHive/epics/<id>/ paths to internal-repo paths is recorded for s8."
+
+steps:
+  - id: research
+    description: Decide extraction tool (git filter-repo vs subtree split) and repo topology (single internal repo vs submodule); record decision + rationale.
+    agent: researcher
+  - id: implement
+    description: Run history-preserving extraction; create + push private plugin-hive-internal; record old→new path mapping.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Clone plugin-hive-internal standalone; assert tree presence + spot-check commit lineage for 3 epics; assert main repo working tree unchanged.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm history actually preserved (not a flat snapshot); confirm no secrets/tokens leaked into the new repo during extraction.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Record extraction commands + mapping in docs/; commit on feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/epics/plugin-hygiene-remediation/docs/untrack-manifest.yaml
+      purpose: Defines which trees move to the internal repo
+
+files_to_modify:
+  - file: .pHive/epics/plugin-hygiene-remediation/docs/internal-repo-migration.md
+    change: Record extraction tool decision, commands, and old→new path mapping
+
+metric:
+  applies: false
+  justification: "Sets up the external plugin-hive-internal repo; payload is already cut at Slice A. The observable consumer change (in-repo trees replaced by a pointer) lands at s8 where it is verified."
+
+risks:
+  - severity: high
+    description: filter-repo history rewrite is destructive if run against the main repo by mistake.
+    mitigation: Run extraction in a throwaway clone, never the working checkout; reviewer confirms.
+  - severity: high
+    description: Secrets embedded in historical maintainer files leak into the new repo.
+    mitigation: Reviewer scans extracted history for tokens/keys before the repo is shared.

@@ -1,0 +1,74 @@
+id: s2-untrack-pure
+epic: plugin-hygiene-remediation
+title: Untrack pure maintainer-only trees + blanket gitignore
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s1-untrack-manifest]
+
+description: |
+  Stop shipping the pure maintainer-only trees (no runtime reader) to consumers.
+  `git rm --cached -r` each FULL_UNTRACK tree from the manifest, then add a blanket
+  ignore so they stay untracked. Files remain on disk for the maintainer — only the
+  git index entry is dropped. Per manifest FULL_UNTRACK list:
+  .pHive/proposals, .pHive/research, .pHive/research-drafts, .pHive/meta-team,
+  .pHive/upstream-watch, .pHive/teams, .pHive/CONTEXT.md, .hive/insights,
+  maintainer-skills, tests, scripts, .github, docs/reports, and lint configs
+  (.coderabbit.yaml, .markdownlint*, .yamllint.yml).
+
+acceptance_criteria:
+  - "Given the FULL_UNTRACK manifest list, when git rm --cached runs, then each tree is removed from the index but still present on disk."
+  - "Given .gitignore after edit, when `git status` runs, then none of the untracked trees reappear as untracked noise (blanket ignore covers them)."
+  - "Given a MUST_PRESERVE negation, when .gitignore is rewritten, then every preserved negation still resolves (hive.config.yaml, runtime/, project-profile.yaml, metrics/, test-scenarios/, cycle-state/)."
+  - "Given the existing per-epic negation rules for maintainer epics, when this story completes, then they are NOT yet touched (s3 owns runtime-coupled trees)."
+
+steps:
+  - id: implement
+    description: git rm --cached -r each FULL_UNTRACK tree; add blanket-ignore block to .gitignore; preserve MUST_PRESERVE negations.
+    agent: developer
+  - id: test
+    description: Assert each untracked tree is gone from `git ls-files` but present on disk; assert MUST_PRESERVE paths still tracked.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Diff-review .gitignore — confirm no consumer-side negation dropped, no runtime-coupled tree untracked early.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit on feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .gitignore
+      purpose: The 172-negation allowlist being trimmed; consumer negations must survive
+    - path: .pHive/epics/plugin-hygiene-remediation/docs/untrack-manifest.yaml
+      purpose: Authoritative FULL_UNTRACK + MUST_PRESERVE lists
+
+files_to_modify:
+  - file: .gitignore
+    change: Add blanket-ignore for FULL_UNTRACK trees; preserve consumer negations
+
+metric:
+  applies: true
+  name: tracked_maintainer_bytes
+  direction: down
+  unit: bytes
+  baseline: 8600000
+  target: 4000000
+  window: story-integrate
+  source:
+    kind: manual
+    ref: "git ls-files -z | xargs -0 du -c | tail -1 — before/after on FULL_UNTRACK trees"
+  verify_at: integrate
+  owner: tester
+
+risks:
+  - severity: high
+    description: Rewriting .gitignore drops a consumer-side negation (e.g. runtime/, hive.config.yaml), breaking consumer installs.
+    mitigation: Allowlist-aware edit driven by manifest MUST_PRESERVE list; tester asserts those paths still tracked.
+  - severity: low
+    description: A tree on disk has no other copy; untrack feels like deletion to the maintainer.
+    mitigation: git rm --cached only drops index entry; files stay. History remains in prior commits until Slice B moves them.

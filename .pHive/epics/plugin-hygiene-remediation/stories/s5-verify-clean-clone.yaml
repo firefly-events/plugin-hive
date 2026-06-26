@@ -1,0 +1,78 @@
+id: s5-verify-clean-clone
+epic: plugin-hygiene-remediation
+title: Verify fresh-clone payload cut + no runtime read breakage
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s4-gitignore-litter]
+
+description: |
+  Slice A's acceptance gate. Clone the feature branch into a throwaway dir and prove two
+  things: (1) the consumer payload actually shrank to the target, and (2) no runtime read
+  broke — every KEEP-TRACKED tree from the manifest is present in the fresh clone, and a
+  representative consumer flow (a dry /plan that reads project-profile.yaml +
+  cross-cutting-concerns.yaml + multica config, and a dag_executor import that calls
+  resolve_state_dir) runs without a missing-file error. This is the falsification step for
+  the whole untrack: if a tree was mis-classified, it surfaces here, not in a consumer's install.
+
+acceptance_criteria:
+  - "Given a fresh clone of the feature branch, when `du -sb` is measured, then total tracked payload <= 8 MB (down from ~15.5 MB), reported against the develop baseline."
+  - "Given the fresh clone, when each KEEP-TRACKED manifest path is checked, then all are present (metrics/, test-scenarios/, multica/, team-memories/, project-profile.yaml, cross-cutting-concerns.yaml, hive.config.yaml, runtime/)."
+  - "Given the fresh clone, when a dry consumer /plan preflight runs, then it reads project-profile + cross-cutting-concerns without a missing-file error."
+  - "Given the fresh clone, when `python3 -c 'import hive.lib.dag_executor...'` + resolve_state_dir runs, then it succeeds (no dependency on an untracked maintainer tree)."
+  - "Given the fresh clone, when the 44 historical maintainer epic dirs are checked, then they are ABSENT (confirming the cut landed)."
+
+steps:
+  - id: implement
+    description: Script a throwaway clone of the feature branch; measure du; assert KEEP-TRACKED present + maintainer-historical absent; run the two smoke flows.
+    agent: developer
+  - id: test
+    description: Run the verification script; capture before/after payload numbers; assert all criteria pass.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm the smoke flows genuinely exercise reads (not no-ops); confirm baseline comparison is apples-to-apples (same ref strategy).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit verification script + recorded numbers to docs/; commit on feature branch.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/plugin-hive
+  key_files:
+    - path: .pHive/epics/plugin-hygiene-remediation/docs/untrack-manifest.yaml
+      purpose: KEEP-TRACKED list to assert present in fresh clone
+    - path: hive/lib/config.py
+      purpose: resolve_state_dir — exercised by the dag_executor smoke
+    - path: skills/plan/SKILL.md
+      purpose: Preflight reads that the dry-/plan smoke must satisfy
+
+files_to_modify:
+  - file: .pHive/epics/plugin-hygiene-remediation/docs/verify-payload.sh
+    change: Create fresh-clone verification script
+  - file: .pHive/epics/plugin-hygiene-remediation/docs/payload-before-after.md
+    change: Record measured payload reduction
+
+metric:
+  applies: true
+  name: consumer_install_payload_bytes
+  direction: down
+  unit: bytes
+  baseline: 15500000
+  target: 7500000
+  window: story-integrate
+  source:
+    kind: manual
+    ref: "verify-payload.sh: du -sb on fresh clone of feature branch vs develop"
+  verify_at: integrate
+  owner: tester
+
+risks:
+  - severity: high
+    description: A mis-classified tree (consumer-read but untracked) only surfaces as a runtime error in a real install.
+    mitigation: This story IS the mitigation — fresh-clone smoke of the actual consumer read paths before merge.
+  - severity: low
+    description: Payload number not reproducible across machines (timestamps, OS).
+    mitigation: Measure tracked bytes via git ls-files, not working-tree du, for determinism.
