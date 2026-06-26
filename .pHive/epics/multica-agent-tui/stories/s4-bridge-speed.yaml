@@ -1,0 +1,85 @@
+id: s4-bridge-speed
+epic: multica-agent-tui
+title: Speed up bridge ingest (keep-alive HTTP, worker queue, drop dup path)
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s2-bridge-discrete-messages]
+
+description: |
+  Fix gap 5 (bridge slow). Profile first, then apply the high-confidence wins:
+    - Use a module-level requests.Session() for keep-alive connection reuse on
+      both the Multica HTTP calls and the hermes api_server SSE calls (avoids a
+      fresh TCP+TLS handshake per PATCH/POST).
+    - Move per-message handling OFF the WS-receive thread onto a small worker
+      queue so concurrent threads don't serialize behind one long hermes turn.
+    - Remove the now-dead non-stream hermes_respond() path (stream_hermes is the
+      live path after s2) to cut a code branch and a 1800s-timeout footgun.
+    - Tune PATCH throttling (coalesce assistant deltas) so streaming stays smooth
+      without hammering the server.
+  Goal is perceived latency from "user sends" → "first assistant delta visible".
+
+acceptance_criteria:
+  - "Given a baseline measurement captured before changes, when the changes land, then time-to-first-visible-delta is measurably reduced (record before/after ms in the episode)."
+  - "Given two threads receiving messages near-simultaneously, when processed, then they are handled concurrently (one slow turn does not block the other)."
+  - "Given the refactor, when complete, then the dead non-stream hermes_respond path is removed and no caller references it."
+  - "Given keep-alive sessions, when many PATCHes fire in a turn, then connections are reused (no per-call handshake)."
+
+steps:
+  - id: research
+    description: Add lightweight timing around WS-recv → placeholder post → first delta → final. Capture a baseline. Identify serialization points in run_ws/handle_message.
+    agent: researcher
+  - id: implement
+    description: Introduce requests.Session() reuse, a worker-queue dispatch off the WS thread, remove hermes_respond, coalesce delta PATCHes. Keep idempotency + loop-guard.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Re-measure time-to-first-delta vs baseline; drive 2 concurrent threads and confirm overlap; confirm no functional regression in discrete-message output from s2.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Check thread-safety of the worker queue + shared session-store/bridge-status under concurrency; no lost messages.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push; restart bridge; record before/after numbers in episode.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/hive/Code/spikes/multica
+  key_files:
+    - path: docs/hive-plugin/hermes_bridge.py
+      purpose: run_ws (WS loop), handle_message (per-msg), http_* helpers, hermes_respond (to delete)
+
+files_to_modify:
+  - file: docs/hive-plugin/hermes_bridge.py
+    change: requests.Session keep-alive; worker-queue off WS thread; remove hermes_respond; coalesce PATCHes
+
+risks:
+  - severity: medium
+    description: Concurrency over shared _session_cache / bridge-status dicts could race
+    mitigation: Guard shared state with a lock; per-thread keying; review gate stresses concurrency
+  - severity: low
+    description: Removing hermes_respond could break an unseen caller
+    mitigation: grep for callers before delete; stream path is the only live one post-s2
+
+metric:
+  applies: true
+  name: hermes_bridge.time_to_first_delta_ms
+  direction: down
+  unit: ms
+  baseline: "measured in research step (pre-change)"
+  target: "≥30% reduction vs baseline"
+  window: same-thread A/B before vs after deploy
+  source:
+    kind: manual
+    ref: "Bridge timing logs around WS-recv → first assistant delta"
+  verify_at: integrate
+  owner: tester
+
+references:
+  - path: .pHive/epics/multica-agent-tui/docs/design-discussion.md
+    relevant_excerpt: |
+      Gap 5 — sync requests, single-threaded WS handler, per-0.4s HTTP PATCH.
+      Fixes: drop redundant non-stream path; requests.Session keep-alive; worker queue; reuse connections.

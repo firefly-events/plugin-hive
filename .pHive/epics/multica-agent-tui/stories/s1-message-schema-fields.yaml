@@ -1,0 +1,87 @@
+id: s1-message-schema-fields
+epic: multica-agent-tui
+title: Add Role + usage + model fields to hive message/thread schema
+status: pending
+complexity: medium
+methodology: classic
+depends_on: []
+
+description: |
+  Foundation story. Add the data fields every other slice needs to the Multica
+  fork's hive plugin message + thread schema:
+    - message.Role (string; "assistant" | "tool" | "reasoning" | "user";
+      default "assistant" for back-compat)
+    - message.TokensUsed (int, nullable) + message.ContextWindow (int, nullable)
+    - thread.Model (string, nullable) + thread.TokensTotal (int, nullable)
+  This is a SQL migration + Go store/struct + WS broadcast payload + the
+  TypeScript interfaces consumed by HermesChat.tsx. No behavior change yet —
+  later stories populate and render these fields.
+
+acceptance_criteria:
+  - "Given the existing hive messages table, when the migration runs, then a new Role column exists defaulting to 'assistant' and nullable TokensUsed/ContextWindow columns exist, with no data loss on existing rows."
+  - "Given the thread table, when the migration runs, then nullable Model and TokensTotal columns exist."
+  - "Given a message create/list/patch API call, when it round-trips, then Role/TokensUsed/ContextWindow are serialized in JSON and broadcast in the hive:message:* WS payload."
+  - "Given HermesChat.tsx, when it compiles, then the HermesMessage/HermesThread TS interfaces include the new optional fields (Role, TokensUsed, ContextWindow, Model, TokensTotal)."
+
+steps:
+  - id: research
+    description: Read server/internal/hive/{store,router}.go + migrations/ dir + the TS interfaces in packages/hive/HermesChat.tsx. Identify the migration numbering convention and the message/thread struct + JSON tags.
+    agent: researcher
+  - id: implement
+    description: Add the migration (next number in server/internal/hive/migrations/), extend Go structs + JSON tags + store read/write, include fields in the WS broadcast payload, add the optional fields to the TS interfaces.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run the hive store integration tests (store_integration_test.go) + a migration up/down check on a scratch DB. Verify existing rows survive and default Role='assistant'.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify back-compat (defaults, nullability), JSON tag correctness, WS payload includes new fields, no breaking change to existing consumers.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push to the epic branch in the fork repo.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/hive/Code/spikes/multica
+  key_files:
+    - path: server/internal/hive/store.go
+      purpose: Go message/thread structs + read/write; add fields here
+    - path: server/internal/hive/router.go
+      purpose: create/list/patch handlers + WS broadcast payload
+    - path: server/internal/hive/migrations/
+      purpose: SQL migrations dir — add the next-numbered up/down pair
+    - path: packages/hive/HermesChat.tsx
+      purpose: HermesMessage/HermesThread TS interfaces (top of file)
+
+files_to_modify:
+  - file: server/internal/hive/migrations/NNN_message_role_usage.up.sql
+    change: add Role/TokensUsed/ContextWindow to messages; Model/TokensTotal to threads
+  - file: server/internal/hive/migrations/NNN_message_role_usage.down.sql
+    change: reverse the above
+  - file: server/internal/hive/store.go
+    change: extend structs + JSON tags + read/write
+  - file: server/internal/hive/router.go
+    change: include new fields in handlers + WS broadcast payload
+  - file: packages/hive/HermesChat.tsx
+    change: add optional fields to HermesMessage/HermesThread interfaces
+
+risks:
+  - severity: medium
+    description: Live-fork migration on an existing DB could fail or lose data
+    mitigation: Nullable columns + default Role='assistant'; test up/down on scratch DB copy first
+  - severity: low
+    description: WS payload shape change could confuse older frontend builds
+    mitigation: All new fields optional; frontend reads defensively
+
+metric:
+  applies: false
+  justification: "Schema-foundation story with no observable runtime surface of its own; its value is verified downstream when s2/s5/s7/s8 populate and render the new fields."
+
+references:
+  - path: .pHive/epics/multica-agent-tui/docs/research-brief.md
+    relevant_excerpt: |
+      Go server message schema = {ID,ThreadID,AuthorID,Body,CreatedAt} — no model/usage fields.
+      Gaps 1/2/3 need a Role field + usage/model fields added here.

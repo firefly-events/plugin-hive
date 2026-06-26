@@ -1,0 +1,74 @@
+id: s6-markdown-rendering
+epic: multica-agent-tui
+title: Render message bodies as markdown (code blocks, lists, inline)
+status: pending
+complexity: low
+methodology: classic
+depends_on: [s5-frontend-role-rendering]
+
+description: |
+  Adjacent freebie Don approved. Today HermesChat.tsx renders {msg.Body} as raw
+  plaintext — but hermes replies are markdown-heavy (code fences, lists, headings),
+  so they look broken. Render assistant message bodies as markdown with safe
+  defaults: GitHub-flavored markdown, fenced code blocks (with a mono style and
+  ideally syntax highlight), lists, links, inline code. Sanitize to prevent XSS.
+  Tool/reasoning compact lines stay plaintext.
+
+acceptance_criteria:
+  - "Given an assistant message containing a fenced code block, when rendered, then it shows as a formatted code block (monospace, distinct background), not literal backticks."
+  - "Given markdown lists / headings / inline code / links, when rendered, then they display formatted."
+  - "Given a message with raw HTML or a script tag in the body, when rendered, then it is sanitized (no script execution / injection)."
+  - "Given tool/reasoning status lines, when rendered, then they remain compact plaintext (markdown not applied there)."
+  - "Given the web build, when it compiles, then the markdown dependency is declared in the package and bundles cleanly."
+
+steps:
+  - id: research
+    description: Check whether the monorepo already vendors a markdown renderer (react-markdown / marked / a UI md component) to reuse before adding a dep. Inspect packages/ui for an existing Markdown component.
+    agent: researcher
+  - id: implement
+    description: Render assistant Body via the chosen markdown component (prefer an existing one; else add react-markdown + remark-gfm + sanitize). Scope it to assistant/user bubbles only.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Render messages with code fences, lists, links, and an XSS attempt; confirm formatting + sanitization; confirm tool lines unaffected.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify sanitization, no perf regression on long threads, dep declared per the fork's dependency policy.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push; rebuild web.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/hive/Code/spikes/multica
+  key_files:
+    - path: packages/hive/HermesChat.tsx
+      purpose: bubble body render — swap raw {msg.Body} for markdown
+    - path: packages/ui
+      purpose: check for an existing Markdown component to reuse
+
+files_to_modify:
+  - file: packages/hive/HermesChat.tsx
+    change: render assistant/user Body as sanitized markdown
+  - file: packages/hive/package.json
+    change: add markdown dep IF no existing renderer to reuse
+
+risks:
+  - severity: low
+    description: Adding a markdown dep where one already exists = bloat
+    mitigation: Research step checks packages/ui first; reuse if present
+  - severity: medium
+    description: Unsanitized markdown -> XSS
+    mitigation: Use a sanitizing renderer / rehype-sanitize; explicit test case
+
+metric:
+  applies: false
+  justification: "Rendering-quality change with a binary formatted/sanitized acceptance check; no meaningful numeric trend to track."
+
+references:
+  - path: .pHive/epics/multica-agent-tui/docs/design-discussion.md
+    relevant_excerpt: |
+      Markdown rendering (adjacent freebie): frontend renders raw plaintext today; hermes replies markdown-heavy.

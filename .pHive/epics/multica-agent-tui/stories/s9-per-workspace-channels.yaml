@@ -1,0 +1,93 @@
+id: s9-per-workspace-channels
+epic: multica-agent-tui
+title: One bridge multiplexes N workspaces (per-workspace channels)
+status: pending
+complexity: high
+methodology: classic
+depends_on: [s4-bridge-speed]
+
+description: |
+  Fix gap 6. Today the bridge serves exactly one workspace via HERMES_WORKSPACE_ID
+  and a single WS subscription. Per Don's decision: ONE bridge process that
+  multiplexes N workspaces (channels), rather than one process per workspace.
+  Each workspace is an independent channel: its own WS subscription, its own
+  thread→session mapping namespace, and its own bridge-status entry — but all
+  inside one process sharing the s4 worker-queue + keep-alive HTTP sessions.
+
+  Config moves from a single HERMES_WORKSPACE_ID to a list (e.g.
+  HERMES_WORKSPACES = [{id, slug}, ...] or a config file). session-store.json and
+  bridge-status are keyed by workspace_id. Loop-guard (bot user id) and PAT may be
+  per-workspace or shared — resolve in research.
+
+acceptance_criteria:
+  - "Given two configured workspaces, when the bridge starts, then it subscribes to both WS channels in one process and serves messages in each independently."
+  - "Given a message in workspace A and another in workspace B, when processed, then each reply lands in the correct workspace's thread (no cross-talk)."
+  - "Given thread→session mappings, when persisted, then they are namespaced per workspace (no collision between workspaces sharing a thread-id space)."
+  - "Given one workspace's WS drops, when it reconnects, then the other workspace's channel is unaffected (isolated reconnect/backoff)."
+  - "Given bridge-status, when read, then it reports per-workspace channel health."
+
+steps:
+  - id: research
+    description: Read run_ws + _load_env + session-store + bridge-status. Decide config shape (list vs file), per-ws vs shared PAT/bot-id, and how to run N WS subscriptions concurrently (threads/async) on top of the s4 worker queue.
+    agent: researcher
+  - id: implement
+    description: Generalize config to a workspace list; spawn a WS subscriber per workspace with isolated reconnect; namespace session-store + bridge-status by workspace_id; route handled messages to the right workspace's HTTP calls.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Configure 2 workspaces; drive messages in both; assert correct routing, no cross-talk, namespaced mappings, isolated reconnect when one channel drops.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Check isolation (one bad channel can't take down others), shared-state thread-safety with s4 queue, config back-compat (single-workspace still works).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push; update the bridge launch config/service on Studio for the workspace list; restart.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/hive/Code/spikes/multica
+  key_files:
+    - path: docs/hive-plugin/hermes_bridge.py
+      purpose: run_ws (single-WS loop), _load_env (HERMES_WORKSPACE_ID), session-store + bridge-status keying
+
+code_examples:
+  - title: Current single-workspace subscription
+    file: docs/hive-plugin/hermes_bridge.py
+    snippet: |
+      ws_url = f"{CONFIG['HERMES_SERVER_WS']}/ws?workspace_id={CONFIG['HERMES_WORKSPACE_ID']}"
+      # one workspace, one subscription -> generalize to N channels
+
+files_to_modify:
+  - file: docs/hive-plugin/hermes_bridge.py
+    change: multi-workspace config + per-workspace WS subscriber + namespaced state
+
+risks:
+  - severity: medium
+    description: Shared mutable state (session cache, bridge status) across channels can race
+    mitigation: Namespace by workspace_id + lock; build on s4's concurrency-safe worker queue
+  - severity: medium
+    description: One workspace's failure cascading to others
+    mitigation: Isolated per-channel reconnect/backoff + try/except boundaries per channel
+
+metric:
+  applies: true
+  name: hermes_bridge.workspaces_served_concurrently
+  direction: up
+  unit: count
+  baseline: 1
+  target: 2
+  window: post-deploy verification with 2 configured workspaces
+  source:
+    kind: manual
+    ref: "Configure 2 workspaces; confirm both channels serve without cross-talk"
+  verify_at: integrate
+  owner: tester
+
+references:
+  - path: .pHive/epics/multica-agent-tui/docs/design-discussion.md
+    relevant_excerpt: |
+      Gap 6 — bridge serves single HERMES_WORKSPACE_ID. Don: "one bridge, multiplex N workspaces".
+      Per-workspace keying + isolated reconnect; build on s4 worker queue.

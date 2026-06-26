@@ -1,0 +1,78 @@
+id: s3-session-naming
+epic: multica-agent-tui
+title: Name hermes sessions to the Multica thread + tag source=multica
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  Fix gap 4. The bridge creates a hermes session per thread titled
+  "hive:<thread_id>" (raw UUID) and these already appear in the hermes session
+  store (so they show in `hermes dashboard` / `hermes sessions`) — just ugly.
+  Change session creation to title the session with the Multica thread's human
+  Title and tag source="multica" so the conversations are recognizable in the
+  Hermes web UI alongside native hermes sessions. Keep title synced if the thread
+  is renamed.
+
+acceptance_criteria:
+  - "Given a new Multica thread titled 'Deploy planning', when the bridge creates its hermes session, then the session title is 'Deploy planning' (or a clear Multica-prefixed variant), not 'hive:<uuid>'."
+  - "Given the created session, when listed via hermes sessions / dashboard, then source is 'multica' (or equivalently tagged) so it is distinguishable."
+  - "Given a thread renamed in Multica, when the next message is processed, then the hermes session title is updated to match (best-effort, no error if unsupported)."
+  - "Given an existing session created before this change, when reprocessed, then it is not duplicated (thread→session mapping preserved)."
+
+steps:
+  - id: research
+    description: Read get_or_create_session + _find_existing_session in hermes_bridge.py and the hermes api_server /api/sessions create+patch schema (title, source fields confirmed available in api_server.py).
+    agent: researcher
+  - id: implement
+    description: Pass the Multica thread Title (fetch from thread record) as session title + source=multica on create; add a best-effort title sync on rename. Keep session-store.json mapping intact.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Create a titled thread, confirm hermes session title + source via the sessions API; rename and confirm sync; confirm no duplicate session created.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify mapping idempotency, graceful handling if api_server lacks a patch-title route.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push to epic branch; restart bridge.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/hive/Code/spikes/multica
+  key_files:
+    - path: docs/hive-plugin/hermes_bridge.py
+      purpose: get_or_create_session() — currently titles "hive:<thread_id>"
+    - path: /Users/hive/Code/hermes-agent/gateway/platforms/api_server.py
+      purpose: /api/sessions create/list exposes title + source fields
+
+code_examples:
+  - title: Current ugly title
+    file: docs/hive-plugin/hermes_bridge.py
+    snippet: |
+      resp = requests.post(f"{API}/api/sessions", json={
+          "title": f"hive:{thread_id}",   # -> want the Multica thread Title
+          "system_prompt": system_prompt})
+
+files_to_modify:
+  - file: docs/hive-plugin/hermes_bridge.py
+    change: title sessions with Multica thread Title + source=multica; sync on rename
+
+risks:
+  - severity: low
+    description: Thread title may be empty/unset at session-create time
+    mitigation: Fallback to "Multica thread <short-id>" when Title blank
+
+metric:
+  applies: false
+  justification: "Cosmetic naming/tagging of hermes sessions; correctness is a binary observed-in-UI check covered by the acceptance criteria, not a trend worth a numeric envelope."
+
+references:
+  - path: .pHive/epics/multica-agent-tui/docs/research-brief.md
+    relevant_excerpt: |
+      Sessions ARE created in the hermes store (title hive:<thread_id>) so they already appear
+      in hermes dashboard — just badly named. Fix title + source.

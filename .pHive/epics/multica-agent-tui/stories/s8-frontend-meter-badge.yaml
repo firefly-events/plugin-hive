@@ -1,0 +1,89 @@
+id: s8-frontend-meter-badge
+epic: multica-agent-tui
+title: Context meter + model badge in thread header
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s1-message-schema-fields, s7-bridge-usage-model]
+
+description: |
+  Display half of gaps 2 (context meter) + 3 (model badge). With usage + model now
+  flowing onto thread/message (s1 schema, s7 ingest), render them in HermesChat.tsx:
+    - Context meter: a small bar/figure in the thread header showing tokens used vs
+      context window (e.g. "18.2k / 200k · 9%"), driven by thread.TokensTotal /
+      thread.ContextWindow (or the latest message's ContextWindow).
+    - Model badge: a compact pill next to the bridge-health dot showing thread.Model
+      (e.g. "gpt-5.5").
+  Match the existing header layout (the bridge-health dot lives there already).
+  Degrade gracefully when fields are null (hide meter/badge, no layout shift).
+
+acceptance_criteria:
+  - "Given a thread with usage data, when viewed, then the header shows a context meter with used/window and a percentage."
+  - "Given a thread with a known model, when viewed, then a model badge (e.g. gpt-5.5) appears near the bridge-health indicator."
+  - "Given a thread with null usage/model (legacy or pre-first-turn), when viewed, then meter/badge are hidden cleanly with no layout break."
+  - "Given the meter approaches the window limit, when rendered, then it visually signals high usage (color shift) — nice-to-have, not blocking."
+
+steps:
+  - id: research
+    description: Read the thread header block in HermesChat.tsx (where bridgeHealth dot + title render). Confirm thread.Model / TokensTotal / ContextWindow arrive on the thread/message types from s1.
+    agent: researcher
+  - id: implement
+    description: Add a ContextMeter component + model pill to the header; wire to thread/message fields; handle null. Reuse existing Tailwind tokens + the rounded-full pill style already used by bridgeHealth.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Render threads with full data, partial data, and null; confirm meter math, badge text, graceful hiding, no layout shift.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Check number formatting (k/M), null-safety, design consistency with the existing health pill.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push; rebuild web.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/hive/Code/spikes/multica
+  key_files:
+    - path: packages/hive/HermesChat.tsx
+      purpose: thread header (bridgeHealth pill + title) — add meter + model badge here
+
+code_examples:
+  - title: Existing header pill to sit beside
+    file: packages/hive/HermesChat.tsx
+    snippet: |
+      <div className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] ${bridgeHealth.textClass}`}>
+        <span className={`size-2 rounded-full ${bridgeHealth.dotClass}`} />
+        <span>{bridgeHealth.label}</span>
+      </div>
+
+files_to_modify:
+  - file: packages/hive/HermesChat.tsx
+    change: add context meter + model badge to thread header; null-safe
+
+risks:
+  - severity: low
+    description: Token/window numbers could be stale between turns
+    mitigation: Drive from latest message + thread running total; refresh on WS/poll like other fields
+
+metric:
+  applies: true
+  name: hermes_chat.context_meter_visible
+  direction: up
+  unit: boolean
+  baseline: 0
+  target: 1
+  window: first turn with usage data after deploy
+  source:
+    kind: manual
+    ref: "Open a Hermes thread post-turn; confirm meter + model badge render with correct numbers"
+  verify_at: integrate
+  owner: tester
+
+references:
+  - path: .pHive/epics/multica-agent-tui/docs/design-discussion.md
+    relevant_excerpt: |
+      Gap 2 context meter: render tokens used / window in thread header.
+      Gap 3 model badge: small pill next to bridge-health dot.

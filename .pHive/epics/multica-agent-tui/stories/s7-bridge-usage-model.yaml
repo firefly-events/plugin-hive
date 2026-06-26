@@ -1,0 +1,94 @@
+id: s7-bridge-usage-model
+epic: multica-agent-tui
+title: Bridge forwards usage tokens + model from hermes SSE to server
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s1-message-schema-fields, s2-bridge-discrete-messages]
+
+description: |
+  Ingest half of gaps 2 (context meter) + 3 (model badge). The hermes api server
+  already returns usage (token counts) on the run/assistant completion event and
+  exposes the session model + model_context_length. The bridge ignores both.
+  Capture them and write to the Multica server fields added in s1:
+    - On assistant.completed / run.completed: read usage (total/prompt/completion
+      tokens) + context window -> PATCH the assistant message's TokensUsed +
+      ContextWindow, and update the thread's TokensTotal (running) + Model.
+    - Capture session Model at session create/first turn (from the session record
+      or completion payload) -> thread.Model.
+  Confirm exact usage sub-key names against a live SSE before wiring (research step).
+
+acceptance_criteria:
+  - "Given an assistant turn completes, when the bridge processes the completion event, then the assistant message has TokensUsed and ContextWindow populated."
+  - "Given a thread's session, when the model is known, then thread.Model is set (e.g. gpt-5.5) and updated if the model changes."
+  - "Given multiple turns, when they accumulate, then thread.TokensTotal reflects a running total (monotonic per session window semantics)."
+  - "Given the usage payload is absent/malformed for a turn, when processed, then the bridge degrades gracefully (no crash; fields left null)."
+
+steps:
+  - id: research
+    description: Capture one live SSE stream from gateway/platforms/api_server.py and record the exact usage payload keys + where model/model_context_length surface. Confirm against _run_agent return + completion event.
+    agent: researcher
+  - id: implement
+    description: Parse usage + model from the completion event; PATCH message TokensUsed/ContextWindow; update thread Model/TokensTotal via the hive API. Guard all reads defensively.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Run a turn; assert message + thread fields populated with sane numbers; simulate a missing-usage turn and confirm graceful null handling.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Verify running-total semantics, null-safety, no extra latency added to the stream hot path.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push; restart bridge.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/hive/Code/spikes/multica
+  key_files:
+    - path: docs/hive-plugin/hermes_bridge.py
+      purpose: stream_hermes completion handling — capture usage/model here
+    - path: /Users/hive/Code/hermes-agent/gateway/platforms/api_server.py
+      purpose: emits usage on completion; exposes session model + model_context_length
+
+code_examples:
+  - title: api_server attaches usage on completion (target to read)
+    file: /Users/hive/Code/hermes-agent/gateway/platforms/api_server.py
+    snippet: |
+      result, usage = await self._run_agent(...)
+      # ... completion event payload includes {"usage": usage}
+      # session record carries {"model": ..., title, source}
+
+files_to_modify:
+  - file: docs/hive-plugin/hermes_bridge.py
+    change: read usage+model from SSE completion; PATCH message + thread fields
+
+risks:
+  - severity: medium
+    description: Exact usage key names unconfirmed until a live capture
+    mitigation: Research step captures a real stream first; defensive .get() with fallbacks
+  - severity: low
+    description: Running-total semantics across session compaction could double-count
+    mitigation: Prefer the api_server's cumulative window count if provided; else delta-sum with care
+
+metric:
+  applies: true
+  name: hermes_chat.usage_fields_populated_rate
+  direction: up
+  unit: fraction
+  baseline: 0.0
+  target: 1.0
+  window: first 10 assistant turns after deploy
+  source:
+    kind: manual
+    ref: "Inspect message.TokensUsed + thread.Model across 10 turns"
+  verify_at: integrate
+  owner: tester
+
+references:
+  - path: .pHive/epics/multica-agent-tui/docs/research-brief.md
+    relevant_excerpt: |
+      api_server.py already emits usage + session model/title/source. Bridge ignores them.
+      Gaps 2/3 ingest = read usage + model, write to server fields from s1.

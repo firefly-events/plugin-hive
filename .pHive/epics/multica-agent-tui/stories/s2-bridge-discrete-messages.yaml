@@ -1,0 +1,103 @@
+id: s2-bridge-discrete-messages
+epic: multica-agent-tui
+title: Bridge emits discrete assistant + compact tool/thinking messages
+status: pending
+complexity: high
+methodology: classic
+depends_on: [s1-message-schema-fields]
+
+description: |
+  Fix gap 1 (the core "hard to follow" complaint). Today handle_message() posts
+  ONE placeholder and PATCHes it for the whole turn, so a multi-step hermes reply
+  collapses into one ever-growing bubble. Rework the bridge's SSE consumption so a
+  turn becomes discrete messages at a "typical chat" granularity (per Don): the
+  assistant text is its own streamed bubble; tool calls and thinking show as
+  COMPACT status messages (one line each, e.g. "🔧 Read(file.md)" /
+  "💭 thinking…"), not verbose dumps.
+
+  The hermes api server SSE already emits the needed events — the bridge currently
+  ignores them:
+    - reasoning.available  -> compact Role="reasoning" status message (collapsed)
+    - tool.started         -> compact Role="tool" status message "<tool>(<arg preview>)"
+    - tool.completed       -> optionally update the tool message (✓/duration); keep terse
+    - assistant.delta..completed -> Role="assistant" message, streamed via PATCH into ITS OWN bubble
+  Use the message Role field added in s1. Keep idempotency + loop-guard intact.
+
+acceptance_criteria:
+  - "Given a hermes turn that calls 2 tools then answers, when the bridge processes it, then the thread shows ≥3 discrete messages (tool status lines + one assistant bubble), not one merged blob."
+  - "Given an assistant text reply, when it streams, then only the assistant message is PATCH-updated with deltas — tool/reasoning messages are posted once and not retro-grown."
+  - "Given tool/reasoning events, when rendered, then each is a single compact line (tool name + short arg preview), never a full args/result dump."
+  - "Given the bot's own posted messages, when the WS echoes them, then the loop-guard still skips them (no infinite loop)."
+  - "Given a turn with no tool calls, when processed, then exactly one assistant message appears (no empty tool/reasoning noise)."
+
+steps:
+  - id: research
+    description: Re-read hermes_bridge.py handle_message + stream_hermes, and gateway/platforms/api_server.py SSE emit sites to confirm exact event names + payload shape for tool.started/tool.completed/reasoning.available/assistant.*.
+    agent: researcher
+  - id: implement
+    description: Rework handle_message/stream_hermes to create discrete messages keyed by SSE event boundary with the right Role; stream only the assistant message; post compact one-line tool/reasoning messages. Reuse http_post/http_patch.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Drive a live thread (or replay a captured SSE) that includes ≥2 tool calls; assert message count + roles + that only the assistant bubble was PATCHed. Confirm no-tool turns stay single-message.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Check idempotency/loop-guard intact, compact rendering contract honored, no regression to bridge-status thread state transitions.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push to epic branch in the fork; restart the bridge process on Studio to apply.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/hive/Code/spikes/multica
+  key_files:
+    - path: docs/hive-plugin/hermes_bridge.py
+      purpose: handle_message() + stream_hermes() — the collapse-into-one logic to rework
+    - path: /Users/hive/Code/hermes-agent/gateway/platforms/api_server.py
+      purpose: authoritative SSE event emitter (tool.started/completed, reasoning.available, assistant.delta/completed, run.completed)
+
+code_examples:
+  - title: Current single-message PATCH collapse (the thing to change)
+    file: docs/hive-plugin/hermes_bridge.py
+    snippet: |
+      # handle_message posts ONE placeholder then streams into it:
+      placeholder = http_post("/api/plugins/hive/hermes-messages",
+          {"thread_id": thread_id, "workspace_id": WS, "body": "…"})
+      reply_msg_id = placeholder.get("ID","")
+      def _patch(text): http_patch(".../hermes-messages/"+reply_msg_id, {"body": text})
+      final_text = stream_hermes(thread_id, body, _patch)  # all deltas -> one bubble
+
+files_to_modify:
+  - file: docs/hive-plugin/hermes_bridge.py
+    change: rework handle_message + stream_hermes to emit discrete role-tagged messages; stream only assistant
+
+risks:
+  - severity: medium
+    description: Over-chatty tool messages could clutter the thread
+    mitigation: Compact one-line contract + skip empty/no-tool turns; review gate checks density
+  - severity: medium
+    description: SSE event ordering / interleaving could mis-assign deltas to the wrong message
+    mitigation: Track active assistant message id per run; deltas only target it
+
+metric:
+  applies: true
+  name: hermes_chat.messages_per_turn_legibility
+  direction: up
+  unit: discrete-messages
+  baseline: 1
+  target: 3
+  window: first live multi-tool turn after deploy
+  source:
+    kind: manual
+    ref: "Observe a thread with a 2-tool turn in the Hermes tab; count discrete messages"
+  verify_at: integrate
+  owner: tester
+
+references:
+  - path: .pHive/epics/multica-agent-tui/docs/design-discussion.md
+    relevant_excerpt: |
+      Gap 1 — bridge collapses a whole turn into one repeatedly-PATCHed message.
+      Don: "typical experience.. not overly verbose on tool calls and thinking but nice to see what's being done".

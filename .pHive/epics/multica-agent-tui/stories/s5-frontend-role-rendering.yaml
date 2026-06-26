@@ -1,0 +1,82 @@
+id: s5-frontend-role-rendering
+epic: multica-agent-tui
+title: Render assistant bubbles vs compact tool/thinking status lines
+status: pending
+complexity: medium
+methodology: classic
+depends_on: [s1-message-schema-fields, s2-bridge-discrete-messages]
+
+description: |
+  Frontend half of gap 1. HermesChat.tsx currently renders every message as the
+  same chat bubble (own=right, other=left). Now that s2 posts role-tagged messages
+  (assistant / tool / reasoning), render them differently:
+    - Role=assistant  -> normal chat bubble (as today)
+    - Role=tool       -> compact inline status line (muted, monospace-ish,
+                         e.g. "🔧 Read(file.md) ✓") — NOT a full bubble
+    - Role=reasoning  -> subtle collapsed "💭 thinking…" line (muted, optional expand)
+    - Role=user       -> own bubble (as today)
+  Match the existing design language (Tailwind classes already in the file). Keep
+  scroll-to-bottom, typing indicator, and pagination working.
+
+acceptance_criteria:
+  - "Given a thread with assistant + tool + reasoning messages, when rendered, then assistant shows as a bubble while tool/reasoning show as compact muted status lines distinct from bubbles."
+  - "Given a tool status line, when shown, then it is a single compact row (icon + tool + short arg), not a large bubble, and does not break the message list layout."
+  - "Given messages without a Role (legacy rows defaulting to assistant), when rendered, then they appear as normal assistant bubbles (back-compat)."
+  - "Given streaming assistant deltas, when they arrive, then only the assistant bubble grows; tool/reasoning lines stay static."
+
+steps:
+  - id: research
+    description: Read the message-render block in HermesChat.tsx (the messages.map around line 490-520) + the Tailwind tokens used. Confirm the Role field arrives on HermesMessage (from s1).
+    agent: researcher
+  - id: implement
+    description: Branch the render on msg.Role; add compact tool/reasoning row components; keep assistant/user bubbles. Reuse existing classes (bg-muted, text-muted-foreground, etc.).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Render a thread containing all roles (seed via bridge or fixture); visually confirm layout; confirm legacy no-Role rows still render as bubbles; confirm streaming still targets only assistant.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Check design-language consistency, no layout break, accessibility of the collapsed reasoning line.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit + push; rebuild web (pnpm).
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/hive/Code/spikes/multica
+  key_files:
+    - path: packages/hive/HermesChat.tsx
+      purpose: messages.map render block — branch on Role here
+
+code_examples:
+  - title: Current single render path (all msgs same bubble)
+    file: packages/hive/HermesChat.tsx
+    snippet: |
+      {messages.map((msg) => {
+        const isOwn = msg.AuthorID === userId;
+        return (<div className={isOwn ? "items-end" : "items-start"}>
+          <div className={isOwn ? "bg-primary..." : "bg-muted..."}>{msg.Body}</div>
+        </div>);
+      })}
+
+files_to_modify:
+  - file: packages/hive/HermesChat.tsx
+    change: branch render on msg.Role; add compact tool/reasoning rows
+
+risks:
+  - severity: low
+    description: Role values from bridge must match the frontend's expected enum
+    mitigation: Default unknown roles to assistant-bubble rendering; align enum with s1/s2
+
+metric:
+  applies: false
+  justification: "Pure presentation branch over the Role field; correctness is the visual acceptance check, and the legibility trend is already metered on s2 (messages_per_turn)."
+
+references:
+  - path: .pHive/epics/multica-agent-tui/docs/design-discussion.md
+    relevant_excerpt: |
+      Gap 1 display: render assistant vs compact tool-status. Don wants "nice to see what's being done"
+      without verbose tool/thinking dumps.

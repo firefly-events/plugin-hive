@@ -1,0 +1,53 @@
+name: multica-agent-tui
+title: Multica Hermes-tab chat refine
+description: >
+  Close the 6 known UX gaps in the Multica fork's Hermes tab chat so it reads
+  like the Hermes web UI session view — discrete turn/tool messages, context
+  meter, model badge, sessions surfaced + named to Multica, faster bridge,
+  per-workspace channels — plus markdown rendering. Impl lands in the Multica
+  fork repo (/Users/hive/Code/spikes/multica/), NOT plugin-hive.
+target_codebase: /Users/hive/Code/spikes/multica
+methodology: classic
+version_bump: none   # all impl lands in the Multica fork, not plugin-hive
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+
+stories:
+  - id: s1-message-schema-fields
+    title: Add Role + usage + model fields to hive message/thread schema
+    complexity: medium
+    depends_on: []
+  - id: s2-bridge-discrete-messages
+    title: Bridge emits discrete assistant + compact tool/thinking messages
+    complexity: high
+    depends_on: [s1-message-schema-fields]
+  - id: s3-session-naming
+    title: Name hermes sessions to the Multica thread + tag source=multica
+    complexity: low
+    depends_on: []
+  - id: s4-bridge-speed
+    title: Speed up bridge ingest (keep-alive HTTP, worker queue, drop dup path)
+    complexity: medium
+    depends_on: [s2-bridge-discrete-messages]
+  - id: s5-frontend-role-rendering
+    title: Render assistant bubbles vs compact tool/thinking status lines
+    complexity: medium
+    depends_on: [s1-message-schema-fields, s2-bridge-discrete-messages]
+  - id: s6-markdown-rendering
+    title: Render message bodies as markdown (code blocks, lists, inline)
+    complexity: low
+    depends_on: [s5-frontend-role-rendering]
+  - id: s7-bridge-usage-model
+    title: Bridge forwards usage tokens + model from hermes SSE to server
+    complexity: medium
+    depends_on: [s1-message-schema-fields, s2-bridge-discrete-messages]
+  - id: s8-frontend-meter-badge
+    title: Context meter + model badge in thread header
+    complexity: medium
+    depends_on: [s1-message-schema-fields, s7-bridge-usage-model]
+  - id: s9-per-workspace-channels
+    title: One bridge multiplexes N workspaces (per-workspace channels)
+    complexity: high
+    depends_on: [s4-bridge-speed]
