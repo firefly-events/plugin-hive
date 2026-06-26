@@ -131,10 +131,11 @@ function taskMessagesUrl(serverUrl, workspaceId, taskId) {
   return `${trimTrailingSlash(serverUrl)}/api/tasks/${encodeURIComponent(taskId)}/messages?workspace_id=${encodeURIComponent(workspaceId)}`;
 }
 
-// Issue comments are keyed by the globally-unique issue UUID; no workspace_id
-// scoping (mirrors the Multica `issue comment` CLI: POST /api/issues/<id>/comments).
-function issueCommentsUrl(serverUrl, issueUuid) {
-  return `${trimTrailingSlash(serverUrl)}/api/issues/${encodeURIComponent(issueUuid)}/comments`;
+// Issue comments are keyed by the globally-unique issue UUID, but the server
+// still requires workspace_id scoping on the request (POST /api/issues/<id>/comments
+// rejects with "workspace_id or workspace_slug is required" otherwise).
+function issueCommentsUrl(serverUrl, workspaceId, issueUuid) {
+  return `${trimTrailingSlash(serverUrl)}/api/issues/${encodeURIComponent(issueUuid)}/comments?workspace_id=${encodeURIComponent(workspaceId)}`;
 }
 
 // Resolve the cycle-state YAML for an epic. `--cycle-state <path>` overrides the
@@ -561,8 +562,10 @@ async function cmdComment(args, cfg) {
   requireUuid('--issue', args.issue);
   if (!args.body || args.body === true) fail('MISSING_ARG', '--body is required');
 
-  const { serverUrl, token } = cfg;
-  const created = await httpJson(issueCommentsUrl(serverUrl, args.issue), {
+  // workspaceId is guaranteed present: `comment` is not in NO_CONFIG, so
+  // requireConfig() has already enforced it before we reach here.
+  const { serverUrl, token, workspaceId } = cfg;
+  const created = await httpJson(issueCommentsUrl(serverUrl, workspaceId, args.issue), {
     method: 'POST',
     token,
     body: { content: String(args.body) },
