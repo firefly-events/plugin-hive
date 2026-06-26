@@ -1,0 +1,75 @@
+# Canonical untrack manifest — plugin-hygiene-remediation (s1)
+# Corrected at execution: single-repo constraint. Trees the maintainer repo needs
+# tracked for its OWN CI/dev (tests, .github, scripts, maintainer-skills, lint) are
+# DEFERRED to Slice B (separate repo) — git rm --cached on a single repo deletes
+# them from develop on merge, breaking CI.
+version: 2
+corrected_for: single-repo-ci-safety
+
+slice_a:
+  # FULL untrack — pure maintainer docs, no runtime/CI reader
+  full_untrack:
+    - .pHive/proposals/
+    - .pHive/research/
+    - .pHive/research-drafts/
+    - .pHive/upstream-watch/
+    - .hive/insights/
+  # UNTRACK historical contents, KEEP parent dir negation (runtime write/read target;
+  # consumer self-allowlists its own new dirs)
+  untrack_contents_keep_parent:
+    - tree: .pHive/epics/
+      keep: [plugin-hygiene-remediation]          # active branch epic
+      parent_negations_keep: ["!.pHive/epics/", ".pHive/epics/*"]
+    - tree: .pHive/episodes/
+      keep: []
+      parent_negations_keep: ["!.pHive/episodes/", ".pHive/episodes/*"]
+    - tree: .pHive/cycle-state/
+      keep: []                                      # consumer writes own at runtime
+      parent_negations_keep: ["!.pHive/cycle-state/", ".pHive/cycle-state/*"]
+    - tree: .pHive/specialist-phases/
+      keep: []
+      parent_negations_keep: ["!.pHive/specialist-phases/", ".pHive/specialist-phases/*"]
+    - tree: .pHive/audits/
+      keep: [post-run, plugin-install-payload]      # post-run=telemetry corpus; this audit
+      parent_negations_keep: ["!.pHive/audits/", ".pHive/audits/*"]
+
+slice_b_deferred:
+  # Maintainer repo needs these tracked for its own CI/dev; they leave only when a
+  # separate plugin-hive-internal repo exists to hold them (s6-s8).
+  - tests/
+  - .github/
+  - scripts/
+  - maintainer-skills/
+  - .pHive/meta-team/        # read by maintainer-skills/meta-optimize/run.py
+  - .pHive/triage/           # /triage consumer skill writes; maintainer queue is small
+  - .coderabbit.yaml
+  - .markdownlint.json
+  - .markdownlintignore
+  - .yamllint.yml
+  - docs/reports/
+
+keep_tracked:
+  # Consumer runtime READS these — never untrack (research-confirmed)
+  - { path: .pHive/metrics/, ref: "scope_drift_reader.py:37, skill_candidate_mine.py:9" }
+  - { path: .pHive/test-scenarios/, ref: "skills/plan/SKILL.md:641 writes scenario_ref" }
+  - { path: .pHive/team-memories/, ref: "artifact_lifecycle/exclusions.py:64" }
+  - { path: .pHive/multica/, ref: "multica-bootstrap/index.mjs:415,566,734 mandatory config" }
+  - { path: .pHive/teams/, ref: "tiny; intentionally tracked template" }
+  - { path: .pHive/project-profile.yaml, ref: "skill_candidate_mine, meta-optimize, plan, design, kickoff" }
+  - { path: .pHive/cross-cutting-concerns.yaml, ref: "skills/plan/SKILL.md step 3 loads" }
+  - { path: .pHive/CONTEXT.md, ref: "gitignore comment: intentional exemplar for downstream consumers" }
+  - { path: .pHive/hive.config.yaml, ref: "hive/lib/config.py consumer config" }
+  - { path: .pHive/runtime/executor-graduated-workflows.yaml, ref: "executor DAG dispatch flag" }
+  - { path: .pHive/audits/post-run/, ref: "plan+execute telemetry corpus" }
+
+must_preserve_gitignore_negations:
+  - "!.pHive/hive.config.yaml"
+  - "!.pHive/runtime/ + !.pHive/runtime/executor-graduated-workflows.yaml"
+  - "!.pHive/cycle-state/ (parent)"
+  - "!.pHive/metrics/ + !.pHive/metrics/**"
+  - "!.pHive/test-scenarios/ + !.pHive/test-scenarios/**"
+  - "!.pHive/audits/post-run/ + !.pHive/audits/post-run/**"
+  - "!.pHive/multica/, !.pHive/teams/, !.pHive/team-memories/"
+  - "!.pHive/meta/ + !.pHive/meta/.gitkeep"
+  - "!.pHive/brand/ tree, !.pHive/CONTEXT.md"
+  - "!.pHive/epics/plugin-hygiene-remediation/ (+**)"
