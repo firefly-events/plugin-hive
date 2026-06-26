@@ -25,69 +25,9 @@ state/
 # Then re-ignore every child of those dirs except the meta-improvement-system subtree.
 .pHive/epics/*
 .pHive/episodes/*
-!.pHive/epics/plan-dag-cutover/
-!.pHive/epics/plan-dag-cutover/**
-!.pHive/epics/meta-improvement-system/
-!.pHive/epics/meta-improvement-system/**
-!.pHive/episodes/meta-improvement-system/
-!.pHive/episodes/meta-improvement-system/**
 # Hive composability audit + 2.0 milestone epics — planning + audit trail tracked
 # at the maintainer level so the audit recommendation, follow-on epics, and
 # cycle-state stay reviewable.
-!.pHive/epics/hive-composability-audit/
-!.pHive/epics/hive-composability-audit/**
-!.pHive/epics/catalog-hygiene-and-borrows/
-!.pHive/epics/catalog-hygiene-and-borrows/**
-!.pHive/epics/structural-refactor-and-gate-lift/
-!.pHive/epics/structural-refactor-and-gate-lift/**
-!.pHive/epics/task-tracking-adapter-abi/
-!.pHive/epics/task-tracking-adapter-abi/**
-!.pHive/epics/ui-cluster-extract-config-deeper/
-!.pHive/epics/ui-cluster-extract-config-deeper/**
-!.pHive/epics/sandcastle-adoption-followon/
-!.pHive/epics/sandcastle-adoption-followon/**
-!.pHive/episodes/sandcastle-adoption-followon/
-!.pHive/episodes/sandcastle-adoption-followon/**
-!.pHive/epics/brand-system-2.0-update/
-!.pHive/epics/brand-system-2.0-update/**
-!.pHive/epics/kg-signal-revival/
-!.pHive/epics/kg-signal-revival/**
-!.pHive/epics/sandcastle-ops-layer/
-!.pHive/epics/sandcastle-ops-layer/**
-!.pHive/epics/meta-hive-grooming-may2026/
-!.pHive/epics/meta-hive-grooming-may2026/**
-!.pHive/epics/ui-logo-imagegen-integration/
-!.pHive/epics/ui-logo-imagegen-integration/**
-!.pHive/epics/claude-in-sandcastle-switch/
-!.pHive/epics/claude-in-sandcastle-switch/**
-!.pHive/epics/sandcastle-gh-issue-dispatch/
-!.pHive/epics/sandcastle-gh-issue-dispatch/**
-!.pHive/epics/exec-discipline-may2026/
-!.pHive/epics/exec-discipline-may2026/**
-!.pHive/epics/exec-followons/
-!.pHive/epics/exec-followons/**
-!.pHive/epics/skill-ergo-may2026/
-!.pHive/epics/skill-ergo-may2026/**
-!.pHive/epics/per-epic-branch-pr-flow/
-!.pHive/epics/per-epic-branch-pr-flow/**
-!.pHive/epics/ghcr-sandcastle-image/
-!.pHive/epics/ghcr-sandcastle-image/**
-!.pHive/epics/hermes-integration-mvp/
-!.pHive/epics/hermes-integration-mvp/**
-!.pHive/episodes/hermes-integration-mvp/
-!.pHive/episodes/hermes-integration-mvp/**
-!.pHive/epics/wire-execute-multica-codex/
-!.pHive/epics/wire-execute-multica-codex/**
-!.pHive/episodes/wire-execute-multica-codex/
-!.pHive/episodes/wire-execute-multica-codex/**
-!.pHive/epics/smoke-test-execute-multica-codex/
-!.pHive/epics/smoke-test-execute-multica-codex/**
-!.pHive/episodes/smoke-test-execute-multica-codex/
-!.pHive/episodes/smoke-test-execute-multica-codex/**
-!.pHive/epics/substrate-coverage-and-test-cleanup/
-!.pHive/epics/substrate-coverage-and-test-cleanup/**
-!.pHive/episodes/substrate-coverage-and-test-cleanup/
-!.pHive/episodes/substrate-coverage-and-test-cleanup/**
 # Test scenarios (.pHive/test-scenarios/) — referenced by autonomous-cycle-loop
 # config + simulated-manual cross-cutting concern. Per-story scenarios shipped
 # alongside the stories that need them.
@@ -98,16 +38,6 @@ state/
 # infrastructure rationale as the epics/ and episodes/ subtrees above).
 !.pHive/cycle-state/
 .pHive/cycle-state/*
-!.pHive/cycle-state/meta-improvement-system.yaml
-!.pHive/cycle-state/ui-cluster-extract-config-deeper.yaml
-!.pHive/cycle-state/sandcastle-adoption-followon.yaml
-!.pHive/cycle-state/brand-system-2.0-update.yaml
-!.pHive/cycle-state/kg-signal-revival.yaml
-!.pHive/cycle-state/skill-ergo-may2026.yaml
-!.pHive/cycle-state/multica-integration-fixes.yaml
-!.pHive/cycle-state/hermes-integration-mvp.yaml
-!.pHive/cycle-state/wire-execute-multica-codex.yaml
-!.pHive/cycle-state/cc-workflows-first-party.yaml
 # /find-skills (se-5) writes ranked candidates here; track the dir marker so
 # consumer projects ship with an initialized output location.
 !.pHive/meta/
@@ -117,16 +47,6 @@ state/
 # the major-severity pre-exec gate resolution + minor post-run informational audit.
 !.pHive/specialist-phases/
 .pHive/specialist-phases/*
-!.pHive/specialist-phases/security:plan-audit/
-!.pHive/specialist-phases/security:plan-audit/sandcastle-adoption-followon/
-!.pHive/specialist-phases/security:plan-audit/sandcastle-adoption-followon/**
-!.pHive/specialist-phases/security:plan-audit/kg-signal-revival/
-!.pHive/specialist-phases/security:plan-audit/kg-signal-revival/**
-!.pHive/specialist-phases/performance:audit/
-!.pHive/specialist-phases/performance:audit/sandcastle-adoption-followon/
-!.pHive/specialist-phases/performance:audit/sandcastle-adoption-followon/**
-!.pHive/specialist-phases/performance:audit/kg-signal-revival/
-!.pHive/specialist-phases/performance:audit/kg-signal-revival/**
 # Metrics carrier (.pHive/metrics/) — authored by S2 stories of the
 # meta-improvement-system epic; contains schema docs and, from C1.4 on,
 # fixtures consumed by hive/lib/metrics/ unit tests.
@@ -140,16 +60,10 @@ state/
 # MVL proof artifacts — only the canonical mvl-proof folder ships with the repo.
 !.pHive/audits/
 .pHive/audits/*
-!.pHive/audits/mvl-proof/
-!.pHive/audits/mvl-proof/**
-!.pHive/audits/mvs-proof/
-!.pHive/audits/mvs-proof/**
 # Post-run audits for /plan + /execute (gate-mode telemetry). Tracked so
 # cross-run aggregation (hive/scripts/gate-mode-audit.mjs) sees a stable corpus.
 !.pHive/audits/post-run/
 !.pHive/audits/post-run/**
-!.pHive/audits/smoke-test/
-!.pHive/audits/smoke-test/**
 !.pHive/audits/plugin-install-payload/
 !.pHive/audits/plugin-install-payload/**
 # Consumer-side executor flag (hde-9a Q4 lock). Tracked because the maintainer
@@ -203,66 +117,20 @@ node_modules/
 # Task-tracking-dispatch test fixture artifacts (generated by tests, not source)
 hive/lib/task-tracking-dispatch/.pHive-test/
 
-!.pHive/epics/multica-substrate-adoption/
-!.pHive/epics/multica-substrate-adoption/**
-!.pHive/epics/multica-execute-routing/
-!.pHive/epics/multica-execute-routing/**
-!.pHive/epics/multica-integration-fixes/
-!.pHive/epics/multica-integration-fixes/**
-!.pHive/epics/meta-improvement-reset/
-!.pHive/epics/meta-improvement-reset/**
-!.pHive/episodes/multica-integration-fixes/
-!.pHive/episodes/multica-integration-fixes/**
-!.pHive/epics/story-loop-closure/
-!.pHive/epics/story-loop-closure/**
-!.pHive/epics/multica-substrate-deepen/
-!.pHive/epics/multica-substrate-deepen/**
-!.pHive/epics/multica-plan-test-cycles/
-!.pHive/epics/multica-plan-test-cycles/**
-!.pHive/epics/cc-workflows-first-party/
-!.pHive/epics/cc-workflows-first-party/**
 !.pHive/proposals/
 !.pHive/proposals/**
-!.pHive/epics/release-lifecycle/
-!.pHive/epics/release-lifecycle/**
-!.pHive/epics/multica-insight-capture/
-!.pHive/epics/multica-insight-capture/**
-!.pHive/epics/squad-leader-status-flip/
-!.pHive/epics/squad-leader-status-flip/**
-!.pHive/epics/state-dir-resolver/
-!.pHive/epics/state-dir-resolver/**
 hive/lib/.pHive/
 # Node + tsx runtime cache dirs created by vitest runs under cc-workflows
 # substrate dispatches. Stay out of commits.
 node-compile-cache/
 tsx-*/
-!.pHive/epics/kg-repair-activation/
-!.pHive/epics/kg-repair-activation/**
-!.pHive/epics/hive-composability-design/
-!.pHive/epics/hive-composability-design/**
-!.pHive/epics/changelog-human-summaries/
-!.pHive/epics/changelog-human-summaries/**
 
 !.pHive/triage/
 !.pHive/triage/queue.yaml
-!.pHive/epics/artifact-lifecycle/
-!.pHive/epics/artifact-lifecycle/**
-!.pHive/epics/dynamic-planning-team/
-!.pHive/epics/dynamic-planning-team/**
-!.pHive/epics/marketing-team/
-!.pHive/epics/marketing-team/**
-!.pHive/epics/plugin-hygiene/
-!.pHive/epics/plugin-hygiene/**
-!.pHive/epics/dag-flows-multica/
-!.pHive/epics/dag-flows-multica/**
-!.pHive/epics/execute-flow-followons-converge-loop/
-!.pHive/epics/execute-flow-followons-converge-loop/**
 
 # Generated concept illustrations (planning-format-contract.md §8) are produced
 # on-demand and never committed. Re-ignore AFTER the epic allowlists above so the
 # PNG is excluded even inside un-ignored epic dirs (last-match-wins).
 .pHive/epics/**/docs/*.png
-!.pHive/epics/hermes-production-readiness/
-!.pHive/epics/hermes-production-readiness/**
 !.pHive/epics/plugin-hygiene-remediation/
 !.pHive/epics/plugin-hygiene-remediation/**

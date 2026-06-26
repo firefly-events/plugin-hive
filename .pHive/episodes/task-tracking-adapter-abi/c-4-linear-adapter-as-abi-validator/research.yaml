@@ -1,8 +1,0 @@
-step_id: research
-story_id: c-4-linear-adapter-as-abi-validator
-epic_id: task-tracking-adapter-abi
-agent: researcher
-status: completed
-artifacts:
-  - path: .pHive/epics/task-tracking-adapter-abi/docs/c-4-research-brief.md
-key_finding: "Linear auth header raw (NO Bearer). Rate-limit signal in GraphQL body (HTTP 200/400, not 429). linkStories = 1 call (issueUpdate parentId). supported_states is DYNAMIC (team WorkflowState). Story IDs native TEAM-123. Reuse __setFetch + mapHttpError patterns from c-3."

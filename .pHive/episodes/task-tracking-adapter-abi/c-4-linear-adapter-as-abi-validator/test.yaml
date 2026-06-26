@@ -1,7 +1,0 @@
-step_id: test
-story_id: c-4-linear-adapter-as-abi-validator
-epic_id: task-tracking-adapter-abi
-agent: tester
-status: completed
-verdict: 10/10 PASS (after auth-ordering fix)
-test_results: "33/33 unit tests pass; T4 auth fix verified; AUTH_FAILURE now precedes LINEAR_TEAM check"

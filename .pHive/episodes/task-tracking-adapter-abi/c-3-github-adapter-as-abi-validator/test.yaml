@@ -1,7 +1,0 @@
-step_id: test
-story_id: c-3-github-adapter-as-abi-validator
-epic_id: task-tracking-adapter-abi
-agent: tester
-status: completed
-verdict: 7/8 PASS (T2 typescript devDep missing — tooling gap, non-blocking)
-test_results: "25/25 unit tests pass; capabilities + UNKNOWN_METHOD smoke tests pass; listOpen subset confirmed correct"
