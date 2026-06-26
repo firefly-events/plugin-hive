@@ -132,3 +132,16 @@ tsx-*/
 !.pHive/epics/plugin-hygiene-remediation/**
 # Maintainer dev insights — local-only, not consumer payload (plugin-hygiene s2)
 .hive/
+
+# Test-runner litter (plugin-hygiene s4) — harnesses spray scratch dirs at repo root.
+# Root-anchored so they never match real tracked paths. NOTE: .pHive/dag-spawn-state/
+# is intentionally tracked (resume-critical, see top of file) — deliberately NOT here.
+/pytest-of-*/
+/h03-*/
+/hpr4-*/
+/slack-notify-test-*/
+/hermes-cli-test-*/
+/hermes-no-exist-*/
+/hermes-write-state-test-*/
+/hermes-*-test-*/
+/marketing/out/
