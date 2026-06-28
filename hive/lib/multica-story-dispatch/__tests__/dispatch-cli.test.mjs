@@ -271,6 +271,157 @@ test('dispatch: in_progress issue assigned to a DIFFERENT agent reassigns (not a
   }
 });
 
+test('dispatch: spent issue (terminal task) without --rerun fails STALE_TERMINAL_TASK', async () => {
+  let putCalled = false;
+  const { serverUrl, close } = await startMockServer((req, res) => {
+    const ws = 'workspace_id=test-ws';
+
+    if (req.method === 'GET' && req.url === `/api/agents?${ws}`) {
+      sendJson(res, 200, { agents: [{ id: 'agent-dev-uuid', name: 'developer' }] });
+      return;
+    }
+
+    if (req.url === `/api/issues/${ISSUE_UUID}?${ws}`) {
+      if (req.method === 'GET') {
+        // Not in_progress — a done issue whose run already finished.
+        sendJson(res, 200, { id: ISSUE_UUID, status: 'done', assignee_type: 'agent', assignee_id: 'agent-dev-uuid' });
+        return;
+      }
+      if (req.method === 'PUT') {
+        putCalled = true; // must NOT happen
+        sendJson(res, 200, { id: ISSUE_UUID });
+        return;
+      }
+    }
+
+    // The latest task is terminal → re-dispatch would no-op.
+    if (req.method === 'GET' && req.url === `/api/issues/${ISSUE_UUID}/active-task?${ws}`) {
+      sendJson(res, 200, {});
+      return;
+    }
+    if (req.method === 'GET' && req.url === `/api/issues/${ISSUE_UUID}/task-runs?${ws}`) {
+      sendJson(res, 200, { task_runs: [{ id: 'task-old-terminal', status: 'completed', completed_at: '2026-01-01T00:00:00Z' }] });
+      return;
+    }
+
+    sendJson(res, 500, { error: `unexpected: ${req.method} ${req.url}` });
+  });
+
+  try {
+    await assert.rejects(
+      runCli(['dispatch', '--issue', ISSUE_UUID, '--agent', 'developer'], serverUrl),
+      (err) => {
+        assert.equal(err.code, 1);
+        const parsed = JSON.parse(err.stderr);
+        assert.equal(parsed.code, 'STALE_TERMINAL_TASK');
+        assert.match(parsed.message, /--rerun/);
+        return true;
+      },
+    );
+    assert.equal(putCalled, false, 'no assignment PUT may fire when the guard trips');
+  } finally {
+    await close();
+  }
+});
+
+test('dispatch: in_progress + same assignee but terminal latest task is NOT already_dispatched', async () => {
+  // The guard must run before the idempotency short-circuit: a finished run can leave
+  // the issue in_progress with the same assignee, and that must not report success.
+  let putCalled = false;
+  const { serverUrl, close } = await startMockServer((req, res) => {
+    const ws = 'workspace_id=test-ws';
+
+    if (req.method === 'GET' && req.url === `/api/agents?${ws}`) {
+      sendJson(res, 200, { agents: [{ id: 'agent-dev-uuid', name: 'developer' }] });
+      return;
+    }
+    if (req.url === `/api/issues/${ISSUE_UUID}?${ws}` && req.method === 'GET') {
+      sendJson(res, 200, { id: ISSUE_UUID, status: 'in_progress', assignee_type: 'agent', assignee_id: 'agent-dev-uuid' });
+      return;
+    }
+    if (req.method === 'GET' && req.url === `/api/issues/${ISSUE_UUID}/active-task?${ws}`) {
+      sendJson(res, 200, { task: { id: 'task-done-1', status: 'completed', started_at: '2026-01-01T00:00:00Z' } });
+      return;
+    }
+    if (req.method === 'GET' && req.url === `/api/issues/${ISSUE_UUID}/task-runs?${ws}`) {
+      sendJson(res, 200, { task_runs: [] });
+      return;
+    }
+    if (req.method === 'PUT') { putCalled = true; sendJson(res, 200, { id: ISSUE_UUID }); return; }
+    sendJson(res, 500, { error: `unexpected: ${req.method} ${req.url}` });
+  });
+
+  try {
+    await assert.rejects(
+      runCli(['dispatch', '--issue', ISSUE_UUID, '--agent', 'developer'], serverUrl),
+      (err) => {
+        assert.equal(err.code, 1);
+        assert.equal(JSON.parse(err.stderr).code, 'STALE_TERMINAL_TASK');
+        return true;
+      },
+    );
+    assert.equal(putCalled, false, 'must not no-op as already_dispatched when the latest task is terminal');
+  } finally {
+    await close();
+  }
+});
+
+test('dispatch: spent issue with --rerun resets and reports redispatched with a fresh task_id', async () => {
+  let resetSeen = false;
+  let assignSeen = false;
+  let activeTaskCalls = 0;
+  const { serverUrl, close } = await startMockServer((req, res, body) => {
+    const ws = 'workspace_id=test-ws';
+
+    if (req.method === 'GET' && req.url === `/api/agents?${ws}`) {
+      sendJson(res, 200, { agents: [{ id: 'agent-dev-uuid', name: 'developer' }] });
+      return;
+    }
+
+    if (req.url === `/api/issues/${ISSUE_UUID}?${ws}`) {
+      if (req.method === 'GET') {
+        sendJson(res, 200, { id: ISSUE_UUID, status: 'done', assignee_type: 'agent', assignee_id: 'agent-dev-uuid' });
+        return;
+      }
+      if (req.method === 'PUT') {
+        if (body && body.assignee_id === null && body.status === 'todo') resetSeen = true;
+        else if (body && body.assignee_id === 'agent-dev-uuid') assignSeen = true;
+        sendJson(res, 200, { id: ISSUE_UUID });
+        return;
+      }
+    }
+
+    if (req.method === 'GET' && req.url === `/api/issues/${ISSUE_UUID}/active-task?${ws}`) {
+      activeTaskCalls++;
+      // First read (guard) → stale terminal. After reset+assign → a fresh running task.
+      if (activeTaskCalls === 1) {
+        sendJson(res, 200, { task: { id: 'task-old-terminal', status: 'completed', started_at: '2026-01-01T00:00:00Z' } });
+      } else {
+        sendJson(res, 200, { task: { id: 'task-fresh-999', status: 'running', started_at: '2026-02-02T00:00:00Z' } });
+      }
+      return;
+    }
+    if (req.method === 'GET' && req.url === `/api/issues/${ISSUE_UUID}/task-runs?${ws}`) {
+      sendJson(res, 200, { task_runs: [] });
+      return;
+    }
+
+    sendJson(res, 500, { error: `unexpected: ${req.method} ${req.url}` });
+  });
+
+  try {
+    const { stdout } = await runCli(['dispatch', '--issue', ISSUE_UUID, '--agent', 'developer', '--rerun'], serverUrl);
+    const result = JSON.parse(stdout);
+    assert.equal(result.status, 'redispatched');
+    assert.equal(result.issue_id, ISSUE_UUID);
+    assert.equal(result.task_id, 'task-fresh-999', 'must report the fresh task, not the stale terminal one');
+    assert.ok(resetSeen, 'a reset PUT (assignee cleared + status todo) must fire');
+    assert.ok(assignSeen, 'an assignment PUT must fire after reset');
+  } finally {
+    await close();
+  }
+});
+
 test('dispatch: --agent and --squad together → INVALID_ARG (mutually exclusive)', async () => {
   await assert.rejects(
     runCli(['dispatch', '--issue', ISSUE_UUID, '--agent', 'developer', '--squad', 'planning'], 'http://127.0.0.1:1'),

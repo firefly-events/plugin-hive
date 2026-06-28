@@ -41,15 +41,14 @@ Analyze the approved stories for independence:
 - **Dependent stories:** must execute in dependency order
 
 Decision matrix:
-- If 2+ independent stories AND `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`: use TeamCreate for parallel execution
-- If all stories are dependent (chain): execute sequentially using the Agent tool
-- If mixed: group independent stories into a parallel batch, chain dependent stories sequentially
+- If 2+ independent stories AND `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`: spawn each story as an `Agent(name:)` teammate for parallel execution (research preview — NOT GA; requires flag)
+- If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is unset: sequential execution is the guaranteed floor — handle ONE story at a time, each delegated via `Agent(name: "<story-id>")`. Reserve bare `Agent` for workflow substeps INSIDE a story teammate, never for whole-story delegation.
+- If all stories are dependent (chain): execute sequentially, one story at a time, each via `Agent(name: "<story-id>")`
+- If mixed: group independent stories into a parallel batch (flag required), chain dependent stories sequentially
 
 ### 2. Set up parallel execution (if applicable)
-For parallel teams:
-- Use `TeamCreate` to create a team for the session
-- Create tasks for each independent story using `TaskCreate`
-- Spawn teammates using the Agent tool with `team_name` and `name` parameters
+For parallel execution (requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`):
+- Spawn each independent story as a named teammate: `Agent(name: "<story-id>")` — the implicit session team is used automatically
 - Each teammate receives: story spec, cycle state, relevant agent memories, development workflow
 
 ### 3. Execute each story through its development workflow

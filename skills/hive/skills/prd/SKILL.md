@@ -87,7 +87,7 @@ Include a `<nav>` table of contents that links to each section id.
 
 ## HTML document structure
 
-Write the PRD as a complete `<!DOCTYPE html>` document. Use `lib/html-sidecar-gen`'s
+Write the PRD as a complete `<!DOCTYPE html>` document. Use `hive.lib.html_sidecar_gen`'s
 CSS and Mermaid initialization patterns for visual consistency with other Hive HTML
 sidecars, or replicate the same structure directly:
 
@@ -98,7 +98,7 @@ sidecars, or replicate the same structure directly:
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PRD: {epic title}</title>
-  <style>/* same CSS as lib/html-sidecar-gen.js CSS constant */</style>
+  <style>/* same CSS as hive.lib.html_sidecar_gen CSS constant */</style>
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
     mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
@@ -141,11 +141,12 @@ section rather than omitting it — a visible gap is a signal, not a defect.
    .pHive/epics/{epic-id}/docs/prd.html
    ```
 
-2. Generate the markdown sidecar (inverse direction):
-   ```js
-   const { generateMarkdownSidecar } = require('lib/html-sidecar-gen');
-   await generateMarkdownSidecar('.pHive/epics/{epic-id}/docs/prd.html');
-   // produces .pHive/epics/{epic-id}/docs/prd.md
+2. Generate the markdown sidecar (inverse direction).
+
+   ```python
+   from hive.lib.html_sidecar_gen import generate_markdown_sidecar
+   generate_markdown_sidecar('.pHive/epics/{epic-id}/docs/prd.html')
+   # produces .pHive/epics/{epic-id}/docs/prd.md
    ```
    Non-blocking — log a warning and continue if it fails.
 

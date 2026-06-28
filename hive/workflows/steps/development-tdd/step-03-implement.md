@@ -47,6 +47,8 @@ c. Run the full test suite:
 d. If the test now passes: move to next
 e. If it still fails: iterate on implementation (NOT on the test)
 
+**Maintain working notes during execution.** For a multi-phase story, keep a running scratchpad at `.pHive/task-notes/{story-id}/` — record which tests are satisfied, partial progress, and open questions so you stay coherent across phases. Read your own notes back when resuming. These notes are ephemeral working memory: WRITE-during-execution, DISCARD-at-story-close. They are NOT memory — they never enter insight staging or memory promotion (see `references/agent-memory-schema.md` → Ephemeral Working Memory).
+
 ### 3. Verify all tests pass
 After implementing for all tests:
 - Run full suite one more time

@@ -7,7 +7,7 @@ description: Run agent-team story dispatch on cmux panes. One pane per story, DA
 
 Atomic skill, NOT inline `/execute` prose. Runs the team-on-cmux execution mode for a workflow. The caller (the dispatch skill plus `/execute`) selects this mode and hands off the inputs below; this skill owns the lifecycle of cmux surfaces from spawn to close.
 
-See `references/team-execution.md` for the full cmux-variant TeamCreate prompt template — this skill does NOT duplicate it.
+See `references/team-execution.md` for the full cmux-variant `Agent(name:)` prompt template — this skill does NOT duplicate it.
 
 ## Invocation contract
 
@@ -69,4 +69,4 @@ Mandatory cleanup branch — runs on BOTH terminal paths:
 - All stories complete (success): close every tracked surface via `cmux close-surface`, then return control to the caller for the parent's summary step.
 - Failure termination (per Step 3): close every tracked surface via `cmux close-surface` BEFORE emitting the failure summary. Prevents leaked panes on partial-failure runs.
 
-Follow `references/team-execution.md` for cmux-variant TeamCreate prompt details and the per-story commit pattern (`hive-{story-id}` branch + commit on review pass).
+Follow `references/team-execution.md` for cmux-variant `Agent(name:)` prompt details and the per-story commit pattern (`hive-{story-id}` branch + commit on review pass).

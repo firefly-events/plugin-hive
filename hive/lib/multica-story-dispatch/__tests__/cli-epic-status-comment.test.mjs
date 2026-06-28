@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -113,6 +113,48 @@ test('comment: non-UUID --issue → INVALID_ARG', () => {
   const res = run(['comment', '--issue', 'not-a-uuid', '--body', 'x']);
   assert.equal(res.status, 1);
   assert.match(res.stderr, /INVALID_ARG/);
+});
+
+// Uses async spawn (NOT spawnSync) so the in-process capture server's event
+// loop stays free to accept the child cli's connection.
+function runAsync(argv, env) {
+  return new Promise((resolve) => {
+    const child = spawn('node', [CLI, ...argv], { env });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.on('data', (d) => (stderr += d));
+    child.on('close', (status) => resolve({ status, stdout, stderr }));
+  });
+}
+
+test('comment: POST URL carries workspace_id (server requires workspace scoping)', async () => {
+  const http = await import('node:http');
+  let captured = null;
+  const server = http.createServer((req, res) => {
+    captured = req.url;
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ id: 'comment-123' }));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const { port } = server.address();
+  try {
+    const res = await runAsync(
+      ['comment', '--issue', '11111111-2222-3333-4444-555555555555', '--body', 'hello'],
+      {
+        ...process.env,
+        MULTICA_SERVER_URL: `http://127.0.0.1:${port}`,
+        MULTICA_TOKEN: 'test-token',
+        MULTICA_WORKSPACE_ID: 'ws-abc',
+      },
+    );
+    assert.equal(res.status, 0, res.stderr);
+    assert.match(captured, /\/api\/issues\/11111111-2222-3333-4444-555555555555\/comments\?/);
+    assert.match(captured, /workspace_id=ws-abc/);
+    assert.deepEqual(JSON.parse(res.stdout), { comment_id: 'comment-123' });
+  } finally {
+    server.close();
+  }
 });
 
 test('unknown command lists the two new subcommands', () => {

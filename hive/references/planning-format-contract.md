@@ -71,6 +71,28 @@ in GitHub markdown and HTML sidecar viewers.
 Skills that emit Mermaid must reference this document in their prose instruction:
 > "Use standard fenced ` ```mermaid ``` ` blocks per `hive/references/planning-format-contract.md §3`."
 
+### Accessibility and caption conventions
+
+Every Mermaid block emitted by a planning skill must open with `accTitle` and `accDescr`
+directives — they provide accessible names for screen readers and are used by the HTML
+sidecar renderer to build the `<figcaption>` title:
+
+~~~markdown
+```mermaid
+graph TD
+accTitle: Layer Map Diagram
+accDescr: Relationships between the architectural layers of the system
+  S1[Story 1] --> S2[Story 2]
+```
+~~~
+
+The HTML sidecar renderer wraps every pre-rendered diagram in
+`<figure class="diagram"><figcaption>` using the nearest preceding section heading as
+the caption title. When the source contains the `‖` parallel-marker glyph (used in
+`/plan` dependency graphs — see `skills/plan/SKILL.md §18`), the renderer also appends a
+legend: `‖ = parallel to its peers` — co-located in the `<figcaption>` per §6b Q6 of
+the design discussion.
+
 ---
 
 ## 4. Sidecar-HTML Generation Rule
@@ -81,11 +103,11 @@ a generated artifact — never the other way around, except for PRD (see below).
 ### Standard direction: markdown → HTML
 
 1. Skill writes the `.md` file.
-2. Skill invokes `lib/html-sidecar-gen` to produce the `.html` sibling at the same path.
+2. Skill invokes `python -m hive.lib.html_sidecar_gen` to produce the `.html` sibling at the same path.
 3. The `.html` sidecar is **not committed to git by default**. It is generated on-demand.
    Add `*.html` (or the specific sidecar path pattern) to `.gitignore` for planning doc
    directories. The sidecar is a rendering convenience, not a versioned artifact.
-4. If `lib/html-sidecar-gen` is unavailable, the skill must log a warning and continue —
+4. If `hive.lib.html_sidecar_gen` is unavailable, the skill must log a warning and continue —
    the `.md` file is the deliverable; sidecar generation is best-effort.
 
 ### PRD exception: HTML-primary <!-- Added in S5.1 -->
@@ -97,7 +119,7 @@ inverse direction — a stripped, grep-compatible fallback, not the source.
    page with: a `<nav>` table of contents, named `<section id="...">` blocks per PRD
    section, inline `<div class="mermaid">` blocks (auto-initialized via Mermaid CDN on
    load), and `<figure>` elements following the wireframe discovery protocol (§5).
-2. Skill invokes `generateMarkdownSidecar(htmlPath)` from `lib/html-sidecar-gen` to
+2. Skill invokes `generate_markdown_sidecar(html_path)` from `hive.lib.html_sidecar_gen` to
    produce the `.md` sibling at the same path.
 3. The `.md` sidecar strips HTML scaffolding (head, nav, script, wrapper divs) and
    converts block elements to markdown equivalents. `<figure>` blocks are preserved
@@ -221,6 +243,30 @@ Store the resolved boolean as `${visual_planning}` on the planning context.
 - **PRD stays HTML-primary (§4 exception).** PRD's canonical form is HTML; `--no-visual`
   does not strip it. The PRD `.md` sidecar is still generated (it is the grep fallback).
   `--no-visual` only suppresses the concept illustration for a PRD-bearing run.
+
+### 7.1 Sidecar Retention (`sidecar_retention`)
+
+Controls whether planning HTML sidecars are committed to git or left transient.
+
+**Values:**
+
+| Value | Behavior | Recommended for |
+|---|---|---|
+| `committed` | Allowlists `*.html` + `index.html` under the epic docs dir in `.gitignore` | Group / shared projects — committed sidecars make the plan browsable without a re-run |
+| `transient` | Ignores `*.html` and `index.html` under the epic; regenerate on demand | Solo projects — committed HTML is clutter when only one person needs the plan |
+| `commit-docs-only` | Allowlists story doc sidecars; excludes `index.html` and PNGs | Docs-heavy projects that want per-story sidecars but not the top-level index or illustrations |
+
+**Resolution precedence (first match wins):**
+
+1. Per-epic answer to the `/plan` retention question (step 14c).
+2. `planning.sidecar_retention` in root-resolved `hive.config.yaml`.
+3. Shipped default: `committed`.
+
+**Persistence:** The resolved value is written to `epic.yaml` as `sidecar_retention: <value>` (immediately after `version_bump:`). On re-plan the field is updated in place.
+
+**`.gitignore` policy:** `/plan` step 15 drives the repo root `.gitignore` based on the resolved value immediately after writing `epic.yaml`. See `skills/plan/SKILL.md` step 15 for the exact block shapes per value.
+
+**Config key:** `planning.sidecar_retention` in `hive.config.yaml` (schema version 1.2+). Absent key falls through to the `committed` default.
 
 ## 8. Concept Illustration <!-- Added in hive-composability-design follow-up -->
 

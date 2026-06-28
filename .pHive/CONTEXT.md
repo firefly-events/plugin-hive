@@ -14,7 +14,7 @@ This file is the project's domain glossary. Schema: [`hive/references/context-md
 - **Kickoff Gate** — initialization check that skills perform before running (verifies `.pHive/project-profile.yaml` + `hive.config.yaml`). See [`hive/references/skill-prelude.md`](../hive/references/skill-prelude.md). Five read-only-shaped skill modes (status, review, test, standup, design-review implementation target) lift the gate to a warning instead of hard-blocking — see story `w1-warning-lift`.
 - **Persona** — an agent identity defined at `hive/agents/{name}.md`. Roster includes researcher, developer (frontend/backend), tester, reviewer, peer-validator, architect, analyst, tpm, ui-designer, technical-writer, pair-programmer, team-lead, plus specialists.
 - **Roster** — the set of personas available to spawn. Agents off the roster are forbidden — see `feedback_use_roster_agents` memo.
-- **Backend** — execution backend for an agent. Either direct (Claude via TeamCreate) or `codex` (codex-rescue subagent). Routing controlled by `agent_backends` in root `hive.config.yaml`.
+- **Backend** — execution backend for an agent. Either direct (Claude via `Agent(name:)`) or `codex` (codex-rescue subagent). Routing controlled by `agent_backends` in root `hive.config.yaml`.
 - **Substrate** — a foundational layer that other things depend on. Examples: skill-prelude.md (W0 substrate for W1/W2), CONTEXT.md (substrate for Grill atomic skill).
 - **Episode** — a step-completion record at `.pHive/episodes/{epic-id}/{story-id}/{step-id}.yaml`. Marks a workflow step's status.
 - **Cycle state** — accumulated cross-phase decisions for an epic at `.pHive/cycle-state/{epic-id}.yaml`. Includes escalations consumed by specialist teams.

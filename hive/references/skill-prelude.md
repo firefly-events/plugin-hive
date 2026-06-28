@@ -51,7 +51,7 @@ Skills that consult routing-relevant keys (`agent_backends`, `model_overrides`, 
 
 - Read ROOT `hive.config.yaml` first for those keys.
 - For any key missing from the root file, fall through to the shipped baseline at `hive/hive.config.yaml` (neutral consumer-safe defaults).
-- **Graceful fallback:** if the root `hive.config.yaml` is absent or its `agent_backends:` key is missing, proceed with an EMPTY routing map — all personas default to direct TeamCreate, no backend routing applied. Do NOT crash and do NOT substitute values from the shipped baseline for `agent_backends` specifically (that would reintroduce the consumer-pollution bug Slice 0 fixed).
+- **Graceful fallback:** if the root `hive.config.yaml` is absent or its `agent_backends:` key is missing, proceed with an EMPTY routing map — all personas default to direct `Agent(name:)` dispatch, no backend routing applied. Do NOT crash and do NOT substitute values from the shipped baseline for `agent_backends` specifically (that would reintroduce the consumer-pollution bug Slice 0 fixed).
 - Reference [`state-boundary.md`](state-boundary.md) for the two-file precedence contract.
 
 This subsection is opt-in — skills that don't touch routing keys can rely on the basic step 2 above.

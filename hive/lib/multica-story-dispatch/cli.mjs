@@ -11,6 +11,8 @@ import {
   dispatchStoryToSquad,
   createIssue,
   reconcileBranch,
+  renderIntegrationContract,
+  resetIssueForRerun,
 } from './index.mjs';
 
 import { pollTaskUntilTerminal, writeMulticaRunEpisode } from './episode-sync.mjs';
@@ -131,10 +133,11 @@ function taskMessagesUrl(serverUrl, workspaceId, taskId) {
   return `${trimTrailingSlash(serverUrl)}/api/tasks/${encodeURIComponent(taskId)}/messages?workspace_id=${encodeURIComponent(workspaceId)}`;
 }
 
-// Issue comments are keyed by the globally-unique issue UUID; no workspace_id
-// scoping (mirrors the Multica `issue comment` CLI: POST /api/issues/<id>/comments).
-function issueCommentsUrl(serverUrl, issueUuid) {
-  return `${trimTrailingSlash(serverUrl)}/api/issues/${encodeURIComponent(issueUuid)}/comments`;
+// Issue comments are keyed by the globally-unique issue UUID, but the server
+// still requires workspace_id scoping on the request (POST /api/issues/<id>/comments
+// rejects with "workspace_id or workspace_slug is required" otherwise).
+function issueCommentsUrl(serverUrl, workspaceId, issueUuid) {
+  return `${trimTrailingSlash(serverUrl)}/api/issues/${encodeURIComponent(issueUuid)}/comments?workspace_id=${encodeURIComponent(workspaceId)}`;
 }
 
 // Resolve the cycle-state YAML for an epic. `--cycle-state <path>` overrides the
@@ -181,6 +184,14 @@ function resolveTaskStatus(task) {
   return String(task?.status ?? task?.state ?? '').toLowerCase();
 }
 
+// A task in one of these states will never produce more work. Re-dispatching an
+// issue whose latest task is terminal must spawn a NEW run, not return this one.
+const TERMINAL_TASK_STATUSES = new Set(['completed', 'failed', 'cancelled', 'canceled']);
+
+function isTerminalStatus(status) {
+  return TERMINAL_TASK_STATUSES.has(String(status ?? '').toLowerCase());
+}
+
 // Non-blocking snapshot: two GETs, returns immediately (<5s).
 async function readTaskSnapshot(serverUrl, token, workspaceId, issueUuid) {
   const [activeBody, runsBody] = await Promise.all([
@@ -198,6 +209,21 @@ async function readTaskSnapshot(serverUrl, token, workspaceId, issueUuid) {
     started_at: task.started_at ?? null,
     task_id: resolveTaskId(task),
   };
+}
+
+// After a rerun reset+reassign, the daemon needs a moment to spawn the new task.
+// Poll briefly for a snapshot whose task_id differs from the stale terminal one
+// (priorTaskId) so we report the FRESH run, not the old one. Bounded + best-effort:
+// if nothing fresh appears in the window, return whatever the latest snapshot is.
+async function waitForFreshTask(serverUrl, token, workspaceId, issueUuid, priorTaskId, maxWaitMs = 15_000) {
+  const deadline = Date.now() + maxWaitMs;
+  let snapshot = await readTaskSnapshot(serverUrl, token, workspaceId, issueUuid);
+  while (Date.now() < deadline) {
+    if (snapshot.task_id && snapshot.task_id !== priorTaskId) return snapshot;
+    await new Promise((r) => setTimeout(r, 1000));
+    snapshot = await readTaskSnapshot(serverUrl, token, workspaceId, issueUuid);
+  }
+  return snapshot;
 }
 
 // Reads the latest task run and fetches its messages, building a terminal-shaped object.
@@ -277,22 +303,70 @@ async function cmdDispatch(args, cfg) {
     ? await resolveAgentUuidByName(serverUrl, token, workspaceId, agentName)
     : await resolveSquadUuidByName(serverUrl, token, workspaceId, squadName);
 
-  // Idempotent ONLY when the issue is already in_progress AND already assigned to
-  // the SAME assignee the caller requested. A different assignee falls through to
-  // reassignment below.
+  // Read the issue and its latest task snapshot up front so the spent-issue guard
+  // runs BEFORE the idempotency short-circuit. A finished run can leave the issue
+  // `in_progress` with the same assignee; if the guard ran after the idempotency
+  // return, that case would falsely report `already_dispatched` and `--rerun` could
+  // never force a fresh run (Codex review). Snapshot read is best-effort.
   const issue = await httpJson(issueUrl(serverUrl, workspaceId, issueUuid), { token });
-  if (
+  let snapshot0 = null;
+  try {
+    snapshot0 = await readTaskSnapshot(serverUrl, token, workspaceId, issueUuid);
+  } catch { /* best-effort; treat as no snapshot */ }
+
+  // Spent-issue guard: an issue whose latest task is terminal (completed/failed/
+  // cancelled) will NOT spawn a fresh run on a plain re-PUT of the same assignee —
+  // the daemon sees no actionable transition, so the dispatch silently no-ops and
+  // the snapshot returns the stale terminal task as if it were new. Refuse to report
+  // a false success. `--rerun` opts into a real fresh run by resetting the issue to a
+  // clean dispatchable state first. Checked BEFORE idempotency so a terminal-but-
+  // still-in_progress issue cannot slip through as `already_dispatched`.
+  let didReset = false;
+  let priorTaskId = null;
+  if (snapshot0 && isTerminalStatus(snapshot0.status)) {
+    if (!args.rerun) {
+      fail(
+        'STALE_TERMINAL_TASK',
+        `issue ${issueUuid} already has a terminal task ${snapshot0.task_id ?? '(unknown)'} ` +
+          `(status=${snapshot0.status}); re-dispatch would be a no-op. Pass --rerun to force a fresh run.`,
+      );
+    }
+    priorTaskId = snapshot0.task_id ?? null;
+    await resetIssueForRerun(serverUrl, token, workspaceId, issueUuid);
+    didReset = true;
+  } else if (
+    // Idempotent ONLY when the issue is already in_progress, assigned to the SAME
+    // assignee requested, AND its latest task is non-terminal (terminal handled above).
     issue?.status === 'in_progress' &&
     issue?.assignee_type === requestedType &&
     issue?.assignee_id === requestedUuid
   ) {
-    let task_id = null;
-    try {
-      const snapshot = await readTaskSnapshot(serverUrl, token, workspaceId, issueUuid);
-      task_id = snapshot.task_id ?? null;
-    } catch { /* best-effort */ }
-    succeed({ status: 'already_dispatched', issue_id: issueUuid, task_id });
+    succeed({
+      status: 'already_dispatched',
+      issue_id: issueUuid,
+      task_id: snapshot0?.task_id ?? null,
+    });
     return;
+  }
+
+  // Integration contract injection: when --integration-branch is passed, ensure the
+  // issue body carries the single-shared-branch contract before dispatch. Issues filed
+  // by /plan Phase D predate the contract, so the agent would otherwise clone the daemon
+  // default base (main) and commit to a throwaway agent/<task> branch that never pushes —
+  // breaking the dependency chain. Append idempotently (skip if already present).
+  const integrationBranch = args['integration-branch'] ?? null;
+  if (integrationBranch) {
+    const contractHeading = '## Integration Contract — single shared branch';
+    const currentDesc = String(issue?.description ?? '');
+    if (!currentDesc.includes(contractHeading)) {
+      const contract = renderIntegrationContract(integrationBranch, args['story-id'] ?? null);
+      const newDesc = `${currentDesc.trimEnd()}\n\n${contract}\n`;
+      await httpJson(issueUrl(serverUrl, workspaceId, issueUuid), {
+        method: 'PUT',
+        token,
+        body: { description: newDesc },
+      });
+    }
   }
 
   await moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, issueUuid);
@@ -305,11 +379,32 @@ async function cmdDispatch(args, cfg) {
 
   let task_id = null;
   try {
-    const snapshot = await readTaskSnapshot(serverUrl, token, workspaceId, issueUuid);
+    // On a rerun, wait for the daemon to spawn the NEW task so we don't report the
+    // stale terminal one. On a first dispatch, a single snapshot is enough.
+    const snapshot = didReset
+      ? await waitForFreshTask(serverUrl, token, workspaceId, issueUuid, priorTaskId)
+      : await readTaskSnapshot(serverUrl, token, workspaceId, issueUuid);
     task_id = snapshot.task_id ?? null;
   } catch { /* best-effort */ }
 
-  succeed({ status: 'dispatched', issue_id: issueUuid, task_id });
+  // On a rerun, a missing or unchanged task_id means the fresh run never appeared in
+  // the wait window. Do NOT report `redispatched` with the stale id — that would be
+  // the exact false-success this fix exists to prevent. Fail typed so callers can
+  // retry or poll. The reset itself already succeeded.
+  if (didReset && (!task_id || task_id === priorTaskId)) {
+    fail(
+      'FRESH_TASK_TIMEOUT',
+      `issue ${issueUuid} was reset for rerun but no fresh task appeared before the deadline ` +
+        `(last task_id=${task_id ?? '(none)'}, prior=${priorTaskId ?? '(none)'}). ` +
+        `Reset succeeded — re-run \`dispatch --rerun\` or poll the issue.`,
+    );
+  }
+
+  succeed({
+    status: didReset ? 'redispatched' : 'dispatched',
+    issue_id: issueUuid,
+    task_id,
+  });
 }
 
 async function cmdStatus(args, cfg) {
@@ -561,8 +656,10 @@ async function cmdComment(args, cfg) {
   requireUuid('--issue', args.issue);
   if (!args.body || args.body === true) fail('MISSING_ARG', '--body is required');
 
-  const { serverUrl, token } = cfg;
-  const created = await httpJson(issueCommentsUrl(serverUrl, args.issue), {
+  // workspaceId is guaranteed present: `comment` is not in NO_CONFIG, so
+  // requireConfig() has already enforced it before we reach here.
+  const { serverUrl, token, workspaceId } = cfg;
+  const created = await httpJson(issueCommentsUrl(serverUrl, workspaceId, args.issue), {
     method: 'POST',
     token,
     body: { content: String(args.body) },

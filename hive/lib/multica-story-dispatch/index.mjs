@@ -165,6 +165,43 @@ function shQuoteRef(ref) {
   return `'${String(ref).replace(/'/g, "'\\''")}'`;
 }
 
+// Render the "single shared branch" integration contract that tells a dispatched
+// agent to check out the epic branch (instead of the daemon's throwaway
+// agent/<task> branch) and push its commits back so the next story in the
+// dependency chain builds on real prior work. Exported so the dispatch CLI can
+// inject it into an existing issue body that predates the contract (e.g. issues
+// filed by /plan Phase D before integrationBranch was known).
+export function renderIntegrationContract(branch, storyId = null) {
+  const qBranch = shQuoteRef(branch);
+  const sid = storyId ?? '<story-id>';
+  return [
+    `## Integration Contract — single shared branch`,
+    ``,
+    `Work directly on \`${branch}\` (the epic branch). Do NOT use the daemon's auto-created \`agent/developer/<task>\` worktree branch as your commit target.`,
+    ``,
+    `**First action (overrides daemon checkout):**`,
+    '```sh',
+    `git fetch origin ${qBranch}`,
+    `git checkout ${qBranch}`,
+    `git reset --hard origin/${qBranch}`,
+    '```',
+    ``,
+    `**After completing all acceptance criteria:**`,
+    '```sh',
+    `git add <specific files for this story>`,
+    `git commit -m "[${sid}] <type>(<scope>): <description>"`,
+    `# fetch + rebase to handle peer dispatches landing concurrently`,
+    `git fetch origin ${qBranch}`,
+    `git rebase origin/${qBranch}`,
+    `git push origin HEAD:${qBranch}`,
+    '```',
+    ``,
+    `**If push rejected (non-fast-forward):** re-run \`git fetch + git rebase + git push\`. Retry up to 3 times. If conflict on rebase, STOP and post the conflict diff as a comment — this means the parallel-dispatch gate let an overlapping story through and orchestrator must adjudicate.`,
+    ``,
+    `**Final comment on this issue MUST include:** commit SHA(s) you pushed.`,
+  ].join('\n');
+}
+
 export function serializeStoryBrief(story, options = {}) {
   const { integrationBranch = null } = options;
   const showCodexInstruction = resolveCodexInstruction(options);
@@ -206,35 +243,7 @@ export function serializeStoryBrief(story, options = {}) {
   );
 
   if (integrationBranch) {
-    const qBranch = shQuoteRef(integrationBranch);
-    sections.push(
-      [
-        `## Integration Contract — single shared branch`,
-        ``,
-        `Work directly on \`${integrationBranch}\` (the epic branch). Do NOT use the daemon's auto-created \`agent/developer/<task>\` worktree branch as your commit target.`,
-        ``,
-        `**First action (overrides daemon checkout):**`,
-        '```sh',
-        `git fetch origin ${qBranch}`,
-        `git checkout ${qBranch}`,
-        `git reset --hard origin/${qBranch}`,
-        '```',
-        ``,
-        `**After completing all acceptance criteria:**`,
-        '```sh',
-        `git add <specific files for this story>`,
-        `git commit -m "[${story?.id ?? '<story-id>'}] <type>(<scope>): <description>"`,
-        `# fetch + rebase to handle peer dispatches landing concurrently`,
-        `git fetch origin ${qBranch}`,
-        `git rebase origin/${qBranch}`,
-        `git push origin HEAD:${qBranch}`,
-        '```',
-        ``,
-        `**If push rejected (non-fast-forward):** re-run \`git fetch + git rebase + git push\`. Retry up to 3 times. If conflict on rebase, STOP and post the conflict diff as a comment — this means the parallel-dispatch gate let an overlapping story through and orchestrator must adjudicate.`,
-        ``,
-        `**Final comment on this issue MUST include:** commit SHA(s) you pushed.`,
-      ].join('\n'),
-    );
+    sections.push(renderIntegrationContract(integrationBranch, story?.id ?? null));
   }
 
   sections.push(
@@ -290,6 +299,21 @@ export async function dispatchStoryToAgent(serverUrl, token, workspaceId, issueU
     method: 'PUT',
     token,
     body: { assignee_type: 'agent', assignee_id: agentUuid },
+  });
+}
+
+// Reset a spent issue (one whose only task is terminal) back to a clean,
+// dispatchable state so the daemon spawns a FRESH run on the next assignment.
+// Without this, re-PUTting the same assignee on a done issue is a no-op: the
+// daemon sees no actionable transition and `readTaskSnapshot` keeps returning
+// the stale terminal task — a silent "already done" that masquerades as success.
+// We clear the assignee AND move the issue to `todo`, producing a clear
+// unassign→reassign transition the daemon can act on.
+export async function resetIssueForRerun(serverUrl, token, workspaceId, issueUuid) {
+  return httpJson(issueUrl(serverUrl, workspaceId, issueUuid), {
+    method: 'PUT',
+    token,
+    body: { assignee_type: null, assignee_id: null, status: 'todo' },
   });
 }
 

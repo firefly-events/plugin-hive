@@ -9,6 +9,40 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.13.4] - 2026-06-26
+
+**Capability absorption + visual planning.** Two-epic bundle promoted to `main` via PR #9.
+
+### Added
+
+- **Visual Planning Enrichment** (epic `visual-plan-enrichment`, PLU-446..454, PR #5).
+  Python cutover of the Mermaid CDN to build-time inline SVG, titled + annotated
+  diagrams, a 0-KB visual shine layer, and configurable retention via sidecar
+  shine/serve. (`version_bump: patch` — drove this release.)
+
+### Changed
+
+- **Absorb validated Claude Code capability shifts into Hive** (epic `meta-epic-1`,
+  PR #7→develop). Folds five upstream Claude Code shifts into Hive's reference
+  surfaces (`version_bump: none`):
+  - **TeamCreate/TeamDelete removal migration** — migrated ~30 call sites across
+    hooks, skills, references, and tests from the removed `TeamCreate`/`TeamDelete`
+    tools to the `Agent(name:)` teammate mechanism, with flag-aware sequential
+    fallback (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`). Updated the
+    `check-agent-misuse.sh` hook and plan-wire tests; recorded a call-site inventory.
+  - **Ephemeral working-memory tier** — `.pHive/task-notes/{story-id}/`, written
+    during execution and discarded at story close (non-promotion invariant);
+    wired into classic/tdd/meta-team implement steps.
+  - **Parameter-level permission matching** — `Tool(param:value)` granular
+    permission patterns + role-to-deny-list guidance.
+  - **PostToolUse `updatedToolOutput` conventions** — new `hooks-conventions.md`
+    reference + Sandcastle-hooks disambiguation note.
+  - **Security + performance review dimensions** — opt-in `--security` /
+    `--performance` / `--all-dimensions` flags for `/review`, default-off,
+    regression-free baseline.
+
+## [2.13.3] - 2026-06-24
+
 ### Added
 
 - **`/plan` DAG executor routing** (epic `plan-dag-cutover`, PR #327). Routes `/plan`

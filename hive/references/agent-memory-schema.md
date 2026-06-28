@@ -53,6 +53,37 @@ This ensures:
 
 Each agent on the roster has their own memory directory. Memories are markdown files with YAML frontmatter.
 
+## Ephemeral Working Memory
+
+The two tiers above are **durable** — they survive across sessions and feed future work. Working memory is a third, **ephemeral** tier with the opposite lifecycle: it exists only for the duration of a single story's execution and is thrown away when that story closes.
+
+```
+.pHive/task-notes/{story-id}/
+```
+
+Working notes are a scratchpad a developer agent maintains while executing a multi-phase story. They let the agent keep its own running state — decisions taken so far, partial progress, open questions, intermediate findings — so it stays coherent across phases without re-deriving context each time. This is a general long-horizon-agent practice: an agent working a task over many steps maintains better continuity when it can write down and re-read its own working notes rather than holding everything in volatile context.
+
+- **Location:** `.pHive/task-notes/{story-id}/`
+- **Scope:** a single story, a single execution — never shared across stories or sessions
+- **Lifecycle:** WRITE-during-execution, DISCARD-at-story-close
+- **Written by:** the developer agent executing the story, during implementation
+- **Read by:** the same agent, within the same story execution — nobody else
+- **Bootstrapped by:** the executing agent creates `.pHive/task-notes/{story-id}/` on first write
+
+### Story-close
+
+Story-close is the point at which working notes are discarded. A story is closed when **the integrate step completes** for that story — equivalently, when the story's episode reaches `status: completed`. At that moment the `.pHive/task-notes/{story-id}/` directory is no longer needed and should be removed.
+
+### Non-promotion invariant
+
+Working notes are **not memory** and never become memory. This is a hard invariant:
+
+- Task-notes NEVER enter the insight-staging pipeline (`.pHive/insights/...`).
+- Task-notes NEVER enter the memory-promotion pipeline — Session-End Evaluation does not scan, read, or promote them.
+- Task-notes cannot be read as a source feeding insight staging. If an insight is worth keeping, the agent must stage it explicitly via the insight-staging path; copying it out of working notes is the agent's deliberate act, not an automatic flow.
+
+The two pipelines are strictly separate: durable insights flow through staging and promotion; working notes flow through write-then-discard and terminate at story-close. There is no bridge between them.
+
 ## Memory File Format
 
 ```markdown

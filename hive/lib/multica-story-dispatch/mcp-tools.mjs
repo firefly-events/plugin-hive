@@ -34,7 +34,8 @@ const TOOL_DEFINITIONS = [
     name: 'multica_dispatch_story',
     description:
       'Dispatch a story issue to an agent or squad. Returns {status, issue_id, task_id}. ' +
-      'status is "dispatched" on a new dispatch or "already_dispatched" on an idempotent call.',
+      'status is "dispatched" on a new dispatch, "already_dispatched" on an idempotent call, ' +
+      'or "redispatched" when rerun=true forced a fresh run on a spent (terminal-task) issue.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -49,6 +50,26 @@ const TOOL_DEFINITIONS = [
         squad_name: {
           type: 'string',
           description: 'Name of the squad to assign. Mutually exclusive with agent_name.',
+        },
+        integration_branch: {
+          type: 'string',
+          description:
+            'Epic branch the agent must work on and push back to (single-shared-branch contract). ' +
+            'When set, the issue body is updated with an Integration Contract instructing the agent to ' +
+            'check out this branch instead of the daemon default and push its commits so dependent ' +
+            'stories build on real prior work. Omit to keep legacy throwaway-branch behavior.',
+        },
+        story_id: {
+          type: 'string',
+          description: 'Story ID used in the integration contract commit-message template (optional).',
+        },
+        rerun: {
+          type: 'boolean',
+          description:
+            'Force a fresh run when the issue already has a terminal task. Without this, dispatching a ' +
+            'spent issue (latest task completed/failed/cancelled) fails with STALE_TERMINAL_TASK rather ' +
+            'than silently no-opping. With rerun=true, the issue is reset to a clean dispatchable state ' +
+            'so the daemon spawns a new task; the result reports status "redispatched".',
         },
       },
       required: ['issue_id'],
@@ -270,6 +291,9 @@ async function invokeTool(name, args) {
       const flags = ['--issue', String(a.issue_id)];
       if (a.agent_name) flags.push('--agent', String(a.agent_name));
       if (a.squad_name) flags.push('--squad', String(a.squad_name));
+      if (a.integration_branch) flags.push('--integration-branch', String(a.integration_branch));
+      if (a.story_id) flags.push('--story-id', String(a.story_id));
+      if (a.rerun) flags.push('--rerun');
       return callCli('dispatch', flags);
     }
 

@@ -29,7 +29,7 @@ carries the epic id and any scope notes.
 3b. **Cross-Cutting Concerns** (~80 lines) — error handling, migration, rollback, performance, documentation impact, security.
 4. **File Change Manifest** (~150 lines) — every CREATE / MODIFY / DELETE / UNCHANGED-but-affected file, real paths only.
 5. **Risk Registry** (~100 lines) — table (risk / severity / likelihood / mitigation / owner); detailed mitigation for high-severity risks.
-6. **Dependency Map** (~50 lines) — internal + external dependencies + blocking questions. Render as a fenced `mermaid` block using `graph TD` per `hive/references/planning-format-contract.md §3`; do not use ASCII art or plain-text dependency lists.
+6. **Dependency Map** (~50 lines) — internal + external dependencies + blocking questions. Render as a fenced `mermaid` block using `graph TD` per `hive/references/planning-format-contract.md §3`; do not use ASCII art or plain-text dependency lists. Include `accTitle` and `accDescr` directives at the top of the block (e.g. `accTitle: Dependency Map\naccDescr: Internal and external dependencies for this plan`).
 7. **Elicitation — Stress-Testing the Plan** (~200 lines) — **the most important section.** The team answers adversarial questions about its own plan: Why won't this work? · What assumptions (VERIFIED/ASSUMED/RISKY)? · What's the simplest version? · What will we wish we'd thought of? · Where are we over-engineering? **For "Why won't this work?", each failure mode is a reasoned paragraph with explicit `Failure:` / `Trigger:` / `Impact:` / `Signal:` / `Our answer:` — not a flat bullet list of one-liners.**
 8. **Decision Points for Sign-Off** (~50 lines) — split into **two groups, not one flat numbered list:** (a) **Decisions already locked** — settled at the design gate or standing policy (storage choice, audits, hard-bail, isolation policies); affirmed as a group, never re-asked. (b) **Open decisions** — each leads with a **recommended default + one-line rationale + an override** ("Default: X (why). Override for Y."), and **★-flag only the few that genuinely need a fresh judgment call.** Do NOT cast process commitments or already-approved design-gate forks as open decisions, and do not enumerate every implementation micro-choice — a 20-item cold-decision list is a defect. End with a one-line "affirm the locked group, accept the defaults, weigh in on the ★ items" net.
 9. **Multi-Epic Coordination** — OPTIONAL; include only when the plan crosses epic boundaries.
@@ -69,7 +69,7 @@ Write to `.pHive/epics/{epic-id}/docs/structured-outline.md` (or as the task spe
 After writing the markdown file, invoke the sidecar HTML generator to produce a `.html` sibling for browser preview:
 
 ```
-lib/html-sidecar-gen generateSidecar(".pHive/epics/{epic-id}/docs/structured-outline.md")
+python -m hive.lib.html_sidecar_gen ".pHive/epics/{epic-id}/docs/structured-outline.md"
 ```
 
 The generator is non-blocking — if it fails, log a warning and continue. The `.html` file is not committed to git by default (generated on-demand).

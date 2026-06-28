@@ -5,7 +5,7 @@ Defines SSE stuck detection and session retry for Managed Agent session executio
 mechanisms that replace the respawn skill when sessions are active.
 
 **Respawn vs Session Retry:** The respawn skill (`skills/hive/skills/respawn/SKILL.md`)
-is for TeamCreate execution (step 6). When sessions are active (step 6c), use this
+is for `Agent(name:)` execution (step 6). When sessions are active (step 6c), use this
 document instead. Both mechanisms share the same goal — recover from degraded execution
 with minimal context loss — but the mechanics differ.
 
@@ -157,7 +157,7 @@ Activate the session and update its status to `active` once SSE events begin flo
 
 ## How Session Retry Differs from Respawn
 
-| Aspect | Respawn (TeamCreate) | Session Retry |
+| Aspect | Respawn (`Agent(name:)`) | Session Retry |
 |--------|---------------------|---------------|
 | Trigger | Orchestrator detects quality degradation via behavioral signals | SSE silence exceeds stuck_timeout_ms |
 | Signal mechanism | `SendMessage` RESPAWN SIGNAL to old agent | No signal — orchestrator reads registry directly |
@@ -181,5 +181,5 @@ Controlled by `hive.config.yaml sessions.*` block (see `hive/references/configur
 - `hive/references/session-registry-schema.md` — `sse_last_event_at` field; status lifecycle including `stuck`
 - `skills/execute/SKILL.md` — step 6c resilience monitoring paragraph references this doc
 - `hive/references/configuration.md` — `sessions.stuck_timeout_ms` and `sessions.max_retries`
-- `skills/hive/skills/respawn/SKILL.md` — TeamCreate respawn; use that doc for step 6 execution
+- `skills/hive/skills/respawn/SKILL.md` — `Agent(name:)` respawn; use that doc for step 6 execution
 - `hive/references/episode-schema.md` — episode records used to populate continuation context

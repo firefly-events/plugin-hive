@@ -28,6 +28,18 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 **Pre-flight:** If the argument starts with `#` or looks like a PR URL, verify `gh auth status` succeeds. If `gh` is not authenticated, report the error and suggest using a branch name instead.
 
+### Review dimension flags (additive, opt-in)
+
+The baseline code review always runs. These flags **add** specialist review dimensions on top of it. They are **opt-in (default-off)**: when none are passed, the baseline path runs exactly as before — no extra subagents, no behavior change.
+
+| Flag | Adds | Persona | Reference workflow |
+|------|------|---------|--------------------|
+| `--security` | A security review dimension | `hive/agents/security-reviewer.md` | `hive/workflows/security-audit.workflow.yaml` |
+| `--performance` | A performance review dimension | `hive/agents/performance-reviewer.md` | `hive/workflows/performance-audit.workflow.yaml` |
+| `--all-dimensions` | Both of the above | — | — |
+
+Flags are parsed out of `$ARGUMENTS` before resolving the diff target — strip them, then interpret the remaining argument per the table above (so `/review #123 --security` reviews PR 123 with the added security dimension). Each selected dimension produces its **own labeled feedback block** (see Phase 1, step 6b); dimensions never merge into or overwrite the baseline code-review verdict.
+
 ## Process
 
 ### Phase 0 — Resolve dispatch mode
@@ -153,6 +165,34 @@ calling orchestrator retains all gate checks and the final verdict presentation.
    - **needs_optimization** — No blockers, but improvements recommended
    - **needs_revision** — Critical issues that must be addressed before merge
 
+6b. **Run additional review dimensions (opt-in).** This step executes **only** when a dimension flag from the Argument Parsing table was passed (`--security`, `--performance`, or `--all-dimensions`). **When no dimension flag is present, skip this step entirely — the baseline path above is unchanged.**
+
+   For each selected dimension, spawn one subagent on the **same diff** already obtained in step 1, using the dimension's persona as system context and its reference workflow's `*-critique` + `synthesis` task description as the instruction:
+
+   - **`--security`** → persona `hive/agents/security-reviewer.md`, tasks from `hive/workflows/security-audit.workflow.yaml`. The reviewer stays strictly in the security lane (auth, secrets, injection, input-validation, PII, misconfiguration).
+   - **`--performance`** → persona `hive/agents/performance-reviewer.md`, tasks from `hive/workflows/performance-audit.workflow.yaml`. The reviewer stays strictly in the performance lane (complexity, allocation, I/O, caching, bundle size, lazy-loading) and quantifies every finding.
+
+   Write each dimension's output to its own episode under `.pHive/episodes/review/{timestamp}/dimension-{security|performance}.yaml`.
+
+   **Append** each dimension as a separate, attributed feedback block **below** the baseline `## Code Review Results` — do not interleave, merge, or overwrite the baseline verdict:
+
+   ```
+   ### Security Review (security-reviewer)  ← only when --security
+   **Security Verdict: {passed | needs_revision}**
+   #### Critical
+   - **[{security category}]** `{file}:{line}` — {finding}
+     Suggestion: {remediation}
+   #### Informational
+   - **[{security category}]** `{file}:{line}` — {hardening note}
+
+   ### Performance Review (performance-reviewer)  ← only when --performance
+   **Performance Verdict: {approved | needs_revision | needs_redesign}**
+   #### Findings
+   - `{file}:{line}` — {finding} [severity: major | moderate | minor] [impact: {quantified delta}]
+   ```
+
+   Each dimension carries its **own** verdict. These dimension verdicts are advisory and are **not** inputs to step 7's status projection or step 8's scope-drift verdict — only the baseline reviewer verdict from step 6 owns those. Security/performance findings are surfaced to the operator as labeled blocks, never folded into the baseline pass/fail.
+
 7. **Project review verdict status.** After the review verdict is recorded successfully, write only the status transition owned by that verdict:
 
    - `passed`: update the resolved story YAML's `status:` projection from `in_review` to `complete`.
@@ -184,6 +224,10 @@ calling orchestrator retains all gate checks and the final verdict presentation.
 ## Key References
 
 - `hive/agents/reviewer.md` — reviewer persona and verdict format
+- `hive/agents/security-reviewer.md` — security dimension persona (`--security`)
+- `hive/agents/performance-reviewer.md` — performance dimension persona (`--performance`)
+- `hive/workflows/security-audit.workflow.yaml` — security dimension task definition
+- `hive/workflows/performance-audit.workflow.yaml` — performance dimension task definition
 - [code-review-integration.md](../../hive/references/code-review-integration.md) — Hive verdict mapping and ACR coexistence guidance
 - `hive/agents/researcher.md` — analysis persona
 - `hive/references/episode-schema.md` — episode record format

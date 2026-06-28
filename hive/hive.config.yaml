@@ -224,7 +224,7 @@ external_models:
 
 # Per-agent spawn backend (PoC — external-model-integration epic)
 # Lets the orchestrator route specific agent personas through an external
-# model instead of Claude. Unset agents default to `claude` (TeamCreate path).
+# model instead of Claude. Unset agents default to `claude` (`Agent(name:)` path).
 # Supported backends: claude | codex
 # - `codex` requires Codex CLI authentication plus the external model flag,
 #   codex login. macOS-only during PoC (cmux constraint). See
@@ -343,7 +343,7 @@ execution:
     timeout_seconds: 1800  # 30 min per sub-invocation; dispatch.mjs reads this key
   # Optional maintainer-only execution tuning — consumers do NOT need these
   # keys. Uncomment in your root `hive.config.yaml` to override:
-  #   terminal_mux: auto           # tmux | cmux | auto  (default: TeamCreate's built-in tmux)
+  #   terminal_mux: auto           # tmux | cmux | auto  (default: the Agent tool's built-in tmux pane)
   #   interactive_panes: true      # visible agent conversation (cmux only)
   #   idle_timeout_seconds: 300    # 5-min idle reaper for persistent Codex panes
 
@@ -355,7 +355,7 @@ cloud-adapter:
 
 # Session-based execution (Phase 2 of memory-autonomy-foundation)
 # When enabled, the execute skill uses the Claude Agent SDK /v1/sessions API
-# (one session per story) instead of TeamCreate. See step 6c in
+# (one session per story) instead of `Agent(name:)`. See step 6c in
 # skills/execute/SKILL.md and hive/references/session-resilience.md.
 # Default OFF — opt-in only. Activate via this flag OR HIVE_SESSIONS_ENABLED=1.
 sessions:
