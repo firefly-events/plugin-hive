@@ -1,0 +1,182 @@
+id: s2-skill-instruction-rewrite
+epic: teamcreate-migration
+title: "Rewrite TeamCreate dispatch verbs in skill instructions to natural-language spawn model"
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+  - s1-tool-grant-removal
+
+description: |
+  After the runtime-breaking tool grant is removed (s1), this story rewrites every
+  skill instruction that tells the model to "Invoke TeamCreate(...)". These are
+  behavioral instructions — they tell the AI what tool to call — so leaving them
+  stale causes the model to attempt calls to a deleted tool.
+
+  This story covers Area B (skill instructions) and the two folded test fixes that
+  assert mechanism-level behavior (test_plan_wire.py, execute-parallel-gate.test.js).
+  Tests co-ship with their source per design-discussion: "test updates must ship in
+  the same story as the doc/code they assert against."
+
+  Files in scope:
+  - skills/execute/SKILL.md (lines 34, 36, 38, 135, 197, 273+): rewrite every
+    "Invoke TeamCreate(team_config=..., workflow=...)" to the natural-language spawn pattern.
+    Specialist-phase loops ("Invoke TeamCreate(team_config=…)") become natural-language
+    team descriptions. The canonical replacement phrase is "natural-language teammate spawn."
+  - skills/hive/skills/planning-routing/SKILL.md: keep the routing path named "direct" —
+    rename only the mechanism parenthetical from "(TeamCreate)" to "(natural-language teammate
+    spawn)". The four-way routing model (cc-workflows | multica | codex | direct) is unchanged.
+  - skills/hive/skills/codex-invoke/SKILL.md: update TeamCreate references to auto-spawn.
+  - skills/hive/skills/backend-dispatch/SKILL.md: update TeamCreate dispatch references.
+  - skills/hive/skills/agent-spawn/SKILL.md: update TeamCreate references.
+  - hive/references/team-execution.md: rewrite the TeamCreate prompt template section
+    to a natural-language team-spawn prompt pattern. The "TeamCreate prompt template"
+    becomes the "natural-language team-spawn prompt."
+
+  Folded test fixes (Area D, partial):
+  - hive/lib/dag_executor/tests/test_plan_wire.py (lines 101-121): re-point the
+    direct-route assertion from asserting "TeamCreate" in text to asserting "direct" in
+    the routing output. The stable routing-path name is the durable contract; asserting
+    mechanism wording would re-couple the test to the prose this migration is freeing.
+    Decision U1 from design-discussion: assert "direct", not any mechanism phrase.
+  - tests/execute-parallel-gate.test.js (line 254): re-word "fan out as TeamCreates"
+    to assert the auto-spawn fan-out model.
+
+  After this story: no skill in skills/ or hive/references/ instructs the model to
+  call TeamCreate. planning-routing still routes to "direct" as a path name, but the
+  mechanism is described as natural-language spawn everywhere.
+
+acceptance_criteria:
+  - "Given skills/execute/SKILL.md is rewritten, then grep 'TeamCreate' skills/execute/SKILL.md returns zero hits"
+  - "Given skills/hive/skills/planning-routing/SKILL.md is updated, then the 'direct' routing path name is preserved and the mechanism parenthetical no longer says 'TeamCreate'"
+  - "Given codex-invoke, backend-dispatch, and agent-spawn SKILL.md files are updated, then grep 'TeamCreate' across those files returns zero hits"
+  - "Given hive/references/team-execution.md is rewritten, then the document no longer contains a 'TeamCreate prompt template' section and instead describes a natural-language team-spawn prompt pattern"
+  - "Given test_plan_wire.py is updated, then the direct-route assertion checks for 'direct' in the routing output rather than 'TeamCreate'"
+  - "Given tests/execute-parallel-gate.test.js is updated, then line 254 no longer contains 'TeamCreate' and instead asserts the auto-spawn fan-out behavior"
+  - "Given all changes are committed, then python -m pytest hive/lib/dag_executor/tests/test_plan_wire.py passes green"
+  - "Given all changes are committed, then node --test tests/execute-parallel-gate.test.js passes green"
+  - "Given a whole-file grep, then grep -rn 'TeamCreate' skills/ returns zero hits (excluding historical .pHive artifacts)"
+
+steps:
+  - id: research
+    description: |
+      Read each in-scope file fully to map every TeamCreate reference:
+        - skills/execute/SKILL.md: note every line containing "TeamCreate" or "TeamCreate(...)"
+        - skills/hive/skills/planning-routing/SKILL.md: note the "direct" route mechanism description
+        - skills/hive/skills/codex-invoke/SKILL.md, backend-dispatch/SKILL.md, agent-spawn/SKILL.md
+        - hive/references/team-execution.md: read the TeamCreate prompt template section
+        - hive/lib/dag_executor/tests/test_plan_wire.py lines 101-121
+        - tests/execute-parallel-gate.test.js line 254
+      Produce a per-file change map (line number → old text → proposed new text).
+      Confirm the canonical replacement phrase: "natural-language teammate spawn"
+      Confirm the planning-routing path name "direct" is preserved as the routing token.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Apply all changes from the research change map:
+      1. skills/execute/SKILL.md: replace every "Invoke TeamCreate(...)" with a
+         natural-language team description pattern. Do NOT mechanically find-and-replace
+         just the string — rewrite the surrounding sentence so the pattern reads naturally
+         in the auto-spawn model (the lead writes a prose description; the runtime spawns
+         teammates). After editing, grep the file for residual "TeamCreate" and verify zero.
+      2. skills/hive/skills/planning-routing/SKILL.md: find the mechanism parenthetical
+         for the "direct" path and rename it. Keep "direct" as the routing token everywhere.
+         After editing, grep for "TeamCreate" — must be zero.
+      3. codex-invoke, backend-dispatch, agent-spawn SKILL.md files: update each reference.
+      4. hive/references/team-execution.md: rewrite the prompt-template section. After editing,
+         grep for "TeamCreate" — must be zero.
+      5. hive/lib/dag_executor/tests/test_plan_wire.py: change the assertion at lines 101-121
+         from checking 'TeamCreate' in text to checking 'direct' in the routing output.
+         Do not change the semantic intent of the test — it must still prove the direct/local
+         fallback path survives. Only the asserted token changes.
+      6. tests/execute-parallel-gate.test.js line 254: re-word the assertion from
+         "fan out as TeamCreates" to assert auto-spawn fan-out behavior.
+    agent: developer
+    depends_on:
+      - research
+
+  - id: test
+    description: |
+      Run the two affected test suites:
+        python -m pytest hive/lib/dag_executor/tests/test_plan_wire.py — must pass green
+        node --test tests/execute-parallel-gate.test.js — must pass green
+      Then run the grep acceptance gate:
+        grep -rn "TeamCreate" skills/ — must return zero hits
+        grep -rn "TeamCreate" hive/references/team-execution.md — must return zero hits
+      Confirm planning-routing/SKILL.md still contains "direct" as a routing token.
+      Document pass/fail for each AC.
+    agent: tester
+    depends_on:
+      - implement
+
+  - id: review
+    description: |
+      Verify: (1) every former "TeamCreate(...)" call site in execute/SKILL.md now reads
+      as a coherent natural-language spawn instruction — not a stub or placeholder.
+      (2) The planning-routing "direct" path name is preserved; only the mechanism
+      description changed. (3) test_plan_wire.py still tests routing correctness; the
+      assert token ("direct") is a stable contract, not a mechanism phrase. (4) No
+      skill now instructs the model to call a non-existent tool. (5) Historical
+      CHANGELOG or .pHive/epics/* files were not modified — diff must be limited to
+      skills/, hive/references/, and two test files.
+    agent: reviewer
+    depends_on:
+      - test
+
+  - id: integrate
+    description: |
+      Commit all changed files on feat/teamcreate-migration. Commit message prefix
+      [plan-graph]. Push to origin. Verify CI test suite runs cleanly.
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  codebase: plugin-hive
+  key_files:
+    - path: skills/execute/SKILL.md
+      purpose: "Primary dispatch surface — invokes TeamCreate 6+ times as the story-parallelism verb"
+    - path: "skills/hive/skills/planning-routing/SKILL.md"
+      purpose: "Routing decision value 'direct' must be preserved; only mechanism description changes"
+    - path: hive/references/team-execution.md
+      purpose: "Contains the TeamCreate prompt template that becomes the natural-language spawn pattern"
+    - path: hive/lib/dag_executor/tests/test_plan_wire.py
+      purpose: "Asserts 'TeamCreate' at lines 101-121 to prove direct path survives — must shift to 'direct'"
+    - path: tests/execute-parallel-gate.test.js
+      purpose: "Line 254 asserts 'fan out as TeamCreates' — must assert auto-spawn fan-out instead"
+
+design_decisions:
+  - decision: "Preserve 'direct' as the routing path name; rename only the mechanism"
+    rationale: "Design discussion grill U1: the routing identity is the durable contract. Asserting mechanism wording re-couples the test to prose the migration is freeing. 'direct' also appears in config keys and operator mental models."
+  - decision: "Use 'natural-language teammate spawn' as the canonical replacement phrase everywhere"
+    rationale: "Design discussion grill V1: one phrasing applied uniformly avoids trading one inconsistency for another. Chosen for accuracy (describes the v2.1.178 runtime behavior) and distinctiveness (no ambiguity with old model)."
+  - decision: "Co-ship test_plan_wire.py and execute-parallel-gate.test.js fixes in this story"
+    rationale: "Design discussion: test updates must ship with the doc/code they assert against. Splitting into a later cleanup story leaves a red build between stories."
+
+cross_cutting:
+  - concern: documentation
+    action: "Skill files are the primary artifact; hive/references/team-execution.md is a reference doc. No additional high-level doc update required — CONTEXT.md rewrite is scoped to s3."
+
+metric:
+  applies: false
+  justification: "Accuracy migration — removes stale tool-call instructions from skills. Outcome correctness is verified by the grep gate and test suite, not a measurable throughput metric."
+
+risks:
+  - severity: medium
+    description: "Blind find-and-replace of 'TeamCreate' in execute/SKILL.md could erase surrounding context needed for natural-language pattern to read coherently"
+    mitigation: "Implement step requires whole-sentence rewrites, not string substitution. Reviewer verifies each rewritten call site reads naturally."
+  - severity: low
+    description: "planning-routing 'direct' token may appear in config keys or operator runbooks outside this repo"
+    mitigation: "Story only touches the mechanism description, not the 'direct' token itself. Config key changes are explicitly out of scope."
+
+references:
+  - path: .pHive/epics/teamcreate-migration/docs/design-discussion.md
+    relevant_excerpt: |
+      Role 2 — TeamCreate as a conceptual dispatch-path label (semantic, often test-asserted).
+      planning-routing/SKILL.md uses "direct TeamCreate path" as a routing-decision value...
+      the test literally requires "TeamCreate" in text to prove the direct/local fallback path survives.
+  - path: .pHive/epics/teamcreate-migration/docs/design-discussion.md
+    relevant_excerpt: |
+      The right fix (grill U1) is to re-point that assertion at the stable routing-path name "direct",
+      not at any spawn-mechanism phrase: the routing identity is the durable contract.

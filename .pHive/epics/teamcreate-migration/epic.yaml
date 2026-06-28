@@ -1,0 +1,95 @@
+name: teamcreate-migration
+title: "Migrate plugin-hive from TeamCreate/TeamDelete to v2.1.178+ auto-spawn agent teams"
+description: |
+  Claude Code v2.1.178 removed the TeamCreate and TeamDelete tools outright. Teammates
+  now spawn automatically via natural-language prompts; SendMessage survives for intra-team
+  messaging; team_name is deprecated and ignored; team config is auto-managed at
+  ~/.claude/teams/{team-name}/. Hive still references TeamCreate in 17+ files across
+  two distinct roles that must be treated differently.
+
+  This epic migrates all live references: removes the deleted tool from agent tool[] arrays
+  (runtime-breaking fix first), rewrites skill instruction dispatch verbs, updates reference
+  docs and vocabulary, removes the stale CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS env gate,
+  redesigns the check-agent-misuse hook, and authors the missing trust-boundary
+  documentation for SendMessage vs filesystem handoffs.
+
+  Methodology resolved: classic (source: config default_methodology)
+
+methodology: classic
+version_bump: patch
+git_flow:
+  base_branch: feat/teamcreate-migration
+  pr_into: develop
+
+stories:
+  - id: s1-tool-grant-removal
+    title: "Remove TeamCreate from agent tool[] arrays and inline prose hints (runtime-breaking fix)"
+    complexity: low
+    depends_on: []
+  - id: s2-skill-instruction-rewrite
+    title: "Rewrite TeamCreate dispatch verbs in skill instructions to natural-language spawn model"
+    complexity: medium
+    depends_on:
+      - s1-tool-grant-removal
+  - id: s3-reference-docs-rewrite
+    title: "Rewrite reference docs and CONTEXT.md vocabulary to v2.1.178 auto-spawn model"
+    complexity: medium
+    depends_on:
+      - s1-tool-grant-removal
+  - id: s4-env-gate-removal
+    title: "Remove CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS gate — teams GA, fail-open by default"
+    complexity: medium
+    depends_on:
+      - s3-reference-docs-rewrite
+  - id: s5-hook-redesign
+    title: "Redesign check-agent-misuse hook for natural-language spawn model (Q1-gated)"
+    complexity: medium
+    depends_on:
+      - s2-skill-instruction-rewrite
+  - id: s6-trust-boundary-doc
+    title: "Document SendMessage vs filesystem handoff trust boundary and add swarm glossary entry"
+    complexity: low
+    depends_on:
+      - s3-reference-docs-rewrite
+
+acceptance_gate: |
+  Whole-repo grep for TeamCreate, TeamDelete, and team_name (as active fields):
+    grep -rn "TeamCreate" . (excluding node_modules, .git, CHANGELOG.md, .pHive/epics/*/docs/*)
+    → every remaining hit must be classified as intentional-historical (CHANGELOG, prior-epic docs)
+    → zero hits in: hive/agents/, skills/, hive/references/, tests/, hooks/, hive/workflows/
+  Grep for CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:
+    grep -rn "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" skills/ hive/workflows/ tests/
+    → zero hits as a live dispatch gate
+  Test suites all green:
+    python -m pytest hive/lib/dag_executor/tests/test_plan_wire.py
+    node --test tests/execute-parallel-gate.test.js
+    node --test tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.js
+    node --test tests/hive-hooks/check-agent-misuse.state-dir.behavior.test.js
+    node --test tests/execute-dispatch-sandcastle.test.js
+  Content checks:
+    hive/references/cross-swarm-handoff.md contains a Trust Boundary section
+    CONTEXT.md contains a Swarm glossary entry
+    hive/agents/orchestrator.md and team-lead.md have no TeamCreate in tools: arrays
+    SendMessage is present in both tools: arrays
+
+planning_artifacts:
+  - docs/design-discussion.md
+  - docs/grill-record.md
+
+open_questions:
+  - id: Q1
+    description: "Should check-agent-misuse hook be updated (new guidance string), narrowed (substrate-agnostic), or retired? Gating s5."
+    status: pending
+    resolves_in: s5-hook-redesign
+  - id: Q2
+    description: "Env-flag disposition: compat no-op (readable-but-ignored) vs full removal. Design discussion recommends compat no-op."
+    status: recommended
+    recommendation: "Compat no-op — keeps CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS readable but ignored; execution.parallel_teams becomes sole gate."
+    resolves_in: s4-env-gate-removal
+
+out_of_scope:
+  - "CHANGELOG.md and historical .pHive/epics/*/docs/* artifacts — immutable historical records"
+  - "Live multi-teammate parallel run end-to-end (no CI harness spins real teammates)"
+  - "team_name field schema deletion — field is deprecated-and-ignored; annotation only this epic"
+  - "cmux/session substrate paths beyond demoting cmux to variant status in agent-teams-guide.md"
+  - "New runtime code (this is docs/skill/config migration only)"

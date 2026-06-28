@@ -1,0 +1,157 @@
+id: s6-trust-boundary-doc
+epic: teamcreate-migration
+title: "Document SendMessage vs filesystem handoff trust boundary and add swarm glossary entry"
+status: pending
+complexity: low
+methodology: classic
+depends_on:
+  - s3-reference-docs-rewrite
+
+description: |
+  Area E: Net-new authoring — this story pays down PLAN-Q-006, a documented debt from
+  the planning requirement. cross-swarm-handoff.md defines the filesystem handoff schema
+  but never explains WHY filesystem is used (vs SendMessage). The "why" is a trust-boundary
+  distinction that operators need to understand routing decisions.
+
+  This story adds one new section to cross-swarm-handoff.md and one glossary entry to
+  CONTEXT.md. No existing content is deleted or migrated.
+
+  New section in hive/references/cross-swarm-handoff.md:
+  "Trust Boundary: SendMessage vs Filesystem Handoff"
+  The section must explain:
+  - team ⊂ swarm containment: a team is an ephemeral, session-bound intra-session
+    coordination unit; a swarm is the wider, phase-level unit (planning → dev → test →
+    security) whose artifacts are durable
+  - SendMessage: intra-team, ephemeral, session-bound, not auditable (message is
+    gone when the session ends)
+  - Filesystem handoffs: cross-swarm, durable, auditable (persisted to disk;
+    survives session boundaries; reviewable in the git log)
+  - When to use each: same-session teammates → SendMessage; phase-to-phase handoff
+    → filesystem
+
+  New entry in CONTEXT.md glossary:
+  *Swarm* — the wider, phase-level coordination unit spanning multiple teams and
+  phases (planning → dev → test → security). A team is a strict subset of a swarm:
+  team ⊂ swarm. Swarm artifacts are cross-session and durable (filesystem-persisted);
+  intra-team coordination is session-bound and ephemeral (via SendMessage).
+
+  This story depends on s3 to avoid concurrent CONTEXT.md edits (s3 modifies CONTEXT.md;
+  s6 adds to it after s3 is complete).
+
+acceptance_criteria:
+  - "Given cross-swarm-handoff.md is updated, then it contains a 'Trust Boundary' section that explicitly contrasts SendMessage (intra-team, ephemeral, session-bound) with filesystem handoffs (cross-swarm, durable, auditable)"
+  - "Given the trust-boundary section is written, then it defines the team-subset-of-swarm containment relationship explicitly (team ⊂ swarm)"
+  - "Given the trust-boundary section is written, then it includes guidance on when to use each mechanism (intra-team teammates vs cross-phase handoff)"
+  - "Given CONTEXT.md is updated, then it contains a 'Swarm' glossary entry that defines the swarm as the wider phase-level unit and explicitly states team ⊂ swarm"
+  - "Given both files are updated, then a reader of cross-swarm-handoff.md understands why filesystem handoffs are used for cross-swarm coordination rather than SendMessage"
+  - "Given all changes are committed, then the new content does not introduce any TeamCreate references (this is net-new authoring, not migration)"
+
+steps:
+  - id: research
+    description: |
+      Read hive/references/cross-swarm-handoff.md fully to:
+        - Understand the existing filesystem handoff schema and structure
+        - Identify the best insertion point for the new trust-boundary section
+        - Note any existing vocabulary that references team vs swarm, so the new
+          section is internally consistent with existing terminology
+      Read CONTEXT.md to:
+        - Find the glossary section and identify the correct alphabetical insertion point
+          for the new *Swarm* entry
+        - Verify the *Backend* and *Team* entries (updated by s3) for vocabulary consistency
+      No new information to gather — the design-discussion provides the content; this
+      step is to understand insertion points and ensure consistency.
+    agent: researcher
+
+  - id: implement
+    description: |
+      1. hive/references/cross-swarm-handoff.md:
+         Add a new section "Trust Boundary: SendMessage vs Filesystem Handoff" at the
+         identified insertion point (likely after the schema definition, before or as
+         a top-level section). Write the section per the story description:
+           - Define team ⊂ swarm containment
+           - Contrast SendMessage properties (intra-team, ephemeral, session-bound,
+             not auditable) vs filesystem handoff properties (cross-swarm, durable,
+             auditable, git-reviewable)
+           - Provide routing guidance: same-session teammates → SendMessage;
+             phase-to-phase handoff → filesystem
+         Use direct prose. No placeholders. This is net-new content — do not paraphrase
+         existing sections or reference TeamCreate (which is irrelevant to this section).
+
+      2. CONTEXT.md:
+         Add the *Swarm* entry to the glossary in the correct alphabetical position.
+         Content: define swarm as the wider, phase-level unit; state team ⊂ swarm
+         explicitly; contrast session-bound ephemeral (intra-team) with cross-session
+         durable (swarm artifacts).
+    agent: developer
+    depends_on:
+      - research
+
+  - id: test
+    description: |
+      Verify acceptance criteria:
+        1. Read cross-swarm-handoff.md — confirm the Trust Boundary section is present
+           and covers both SendMessage and filesystem properties
+        2. Confirm "team ⊂ swarm" or equivalent explicit containment statement is present
+        3. Confirm routing guidance (when to use each) is present
+        4. Read CONTEXT.md — confirm the Swarm entry is present and defines the team⊂swarm
+           relationship
+        5. grep "TeamCreate" cross-swarm-handoff.md — must return zero hits in the new section
+        6. Confirm no existing sections of cross-swarm-handoff.md or CONTEXT.md were modified
+           (diff should be additive only)
+    agent: tester
+    depends_on:
+      - implement
+
+  - id: review
+    description: |
+      Verify: (1) The trust-boundary section in cross-swarm-handoff.md is coherent and
+      actionable — an operator reading it can decide which mechanism to use without
+      additional context. (2) The team⊂swarm relationship is stated explicitly and matches
+      the CONTEXT.md swarm definition. (3) The swarm glossary entry in CONTEXT.md is
+      consistent with the updated *Backend* and *Team* entries from s3. (4) No existing
+      content was deleted or modified — this is additive-only authoring.
+    agent: reviewer
+    depends_on:
+      - test
+
+  - id: integrate
+    description: |
+      Commit both changes on feat/teamcreate-migration. Commit message prefix [plan-graph].
+      Push to origin.
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  codebase: plugin-hive
+  key_files:
+    - path: hive/references/cross-swarm-handoff.md
+      purpose: "Defines filesystem handoff schema but lacks the trust-boundary section that explains WHY filesystem vs SendMessage"
+    - path: CONTEXT.md
+      purpose: "Glossary; needs a Swarm entry so 'intra-team-vs-cross-swarm' is grounded before the handoff doc references the term"
+
+design_decisions:
+  - decision: "Net-new authoring only — no existing content deleted"
+    rationale: "Design discussion: area E is a doc debt, not a migration. The trust-boundary content is genuinely absent, not just stale — so add, don't replace."
+  - decision: "team ⊂ swarm containment must be stated explicitly"
+    rationale: "Design discussion grill V2: the 'intra-team ephemeral' vs 'cross-swarm durable' boundary is assumed, not stated, in the existing doc. Making the containment explicit is the whole point of this section."
+  - decision: "Depends on s3 to avoid concurrent CONTEXT.md edits"
+    rationale: "s3 modifies CONTEXT.md's Backend and team_name entries; s6 adds the Swarm entry. Sequential ordering avoids merge conflicts."
+
+cross_cutting:
+  - concern: documentation
+    action: "This story IS the documentation deliverable. No additional doc update needed."
+
+metric:
+  applies: false
+  justification: "Doc debt payment — net-new section authoring. No measurable outcome moves; verification is a content-presence check, not a quantitative metric."
+
+references:
+  - path: .pHive/epics/teamcreate-migration/docs/design-discussion.md
+    relevant_excerpt: |
+      For E, this is net-new authoring, not migration. Add a "SendMessage vs filesystem handoff"
+      trust-boundary section to cross-swarm-handoff.md explaining the durability/auditability/scope
+      distinction — and (grill V2) state the team ⊂ swarm relationship explicitly so "intra-team
+      ephemeral" vs "cross-swarm durable" is unambiguous rather than assumed.
+  - path: hive/references/cross-swarm-handoff.md
+    relevant_excerpt: "[data not provided — file defines filesystem handoff schema but never contrasts it with SendMessage]"

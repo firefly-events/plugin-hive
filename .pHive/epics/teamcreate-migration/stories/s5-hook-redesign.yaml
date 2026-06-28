@@ -1,0 +1,174 @@
+id: s5-hook-redesign
+epic: teamcreate-migration
+title: "Redesign check-agent-misuse hook for natural-language spawn model (Q1-gated)"
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+  - s2-skill-instruction-rewrite
+
+description: |
+  Area D (partial): The check-agent-misuse hook guards story-level delegation — it blocks
+  `Agent` calls that look like whole-story execution and says "Use TeamCreate for story
+  execution." With TeamCreate deleted, both the block message and the hook's conceptual
+  model are stale.
+
+  This story is gated on design question Q1 (from design-discussion open questions):
+  "Should check-agent-misuse block-message and allow-logic be rewritten to key on
+  natural-language spawn intent, or is the hook now obsolete given there's no tool
+  to permit?"
+
+  The hook's current structure:
+  - hooks/check-agent-misuse.sh: blocks Agent calls matching story-execution patterns
+    and emits "Use TeamCreate for story execution" and similar messages
+  - tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.js: asserts
+    TeamCreate tool calls are ALLOWED and the block message reads "Use TeamCreate"
+  - tests/hive-hooks/check-agent-misuse.state-dir.behavior.test.js: state-dir variant tests
+
+  The core Q1 problem:
+  Natural-language spawn emits NO tool call — the lead just writes prose and Claude Code
+  spawns teammates implicitly. The hook's positive signal (allowing TeamCreate tool calls)
+  therefore disappears. The hook was designed to steer orchestrators away from using Agent
+  for story-sized work; that concern still exists. But the replacement guidance ("describe
+  the team in natural language") cannot be expressed as a tool-call allowance.
+
+  Pre-implementation decision required (Q1):
+  The implementing agent must resolve Q1 before touching code. Options:
+  A. Update hook: remove TeamCreate from allow-list; update block message to
+     "Use natural-language team spawn instead — describe the team and its tasks in your prompt"
+     (the hook still blocks Agent-for-stories, just with updated guidance)
+  B. Retire hook: if natural-language spawn makes the Agent-for-stories misuse pattern
+     undetectable or uncommon, deprecate and disable the hook
+  C. Narrow scope: keep the structural Agent-misuse check but make it
+     substrate-agnostic (block story-level Agent delegation regardless of spawn model)
+
+  Recommendation (from design-discussion): Option A (update, don't retire) — the routing
+  concern (don't use Agent for whole-story execution) persists regardless of the spawn model.
+  The block message and guidance string change; the detection heuristics remain.
+
+  The hook and its tests MUST be updated in the same story. Never split them.
+
+acceptance_criteria:
+  - "Given the Q1 decision is made and documented, then the hook's block message no longer says 'Use TeamCreate' in any code path"
+  - "Given the hook is updated, then hooks/check-agent-misuse.sh correctly allows or blocks Agent calls under the v2.1.178+ model"
+  - "Given the hook is updated, then tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.js is updated to assert the new block message and allow/block behavior (test and source ship together)"
+  - "Given tests are updated, then node --test tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.js passes green"
+  - "Given tests are updated, then node --test tests/hive-hooks/check-agent-misuse.state-dir.behavior.test.js passes green"
+  - "Given all changes are committed, then grep 'Use TeamCreate' hooks/check-agent-misuse.sh returns zero hits"
+
+steps:
+  - id: research
+    description: |
+      1. Read hooks/check-agent-misuse.sh fully to understand:
+         - Every block message that says "TeamCreate"
+         - The allow-list logic (what was permitted via TeamCreate positive signal)
+         - The detection heuristics (story-yaml patterns, epic-execution language, description patterns)
+      2. Read tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.js fully:
+         - Identify assertions that check for "TeamCreate" in block messages
+         - Identify assertions that verify TeamCreate tool calls are allowed
+      3. Read tests/hive-hooks/check-agent-misuse.state-dir.behavior.test.js for related assertions.
+      4. Resolve Q1: pick and document one of the three options (A/B/C from the story description).
+         Default to Option A unless there is a specific reason to retire or narrow. Document
+         the decision in the research findings.
+      5. Draft the new block message string (if Option A or C): it must be chosen ONCE
+         and used in both hook and test together.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Based on the Q1 decision from research:
+      If Option A (update hook):
+        - hooks/check-agent-misuse.sh: remove TeamCreate from any allow-list or positive-signal
+          check. Update every block message to the new guidance string. Keep the structural
+          Agent-for-stories detection heuristics (story-yaml path patterns, epic-execution
+          language, description patterns) — these remain valid.
+        - tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.js:
+          Update all assertions that check for "TeamCreate" in block messages.
+          Remove or update assertions that verify TeamCreate tool calls are allowed.
+          Add assertions for the new guidance behavior.
+        - tests/hive-hooks/check-agent-misuse.state-dir.behavior.test.js: update any
+          TeamCreate references.
+      If Option B (retire hook): document deprecation, disable the hook, update tests to
+        reflect retired status.
+      If Option C (narrow scope): rewrite hook to be substrate-agnostic, update tests.
+      In all cases: hook and tests ship together in the same commit.
+    agent: developer
+    depends_on:
+      - research
+
+  - id: test
+    description: |
+      Run both test files:
+        node --test tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.js
+        node --test tests/hive-hooks/check-agent-misuse.state-dir.behavior.test.js
+      Both must pass green.
+      Run grep 'Use TeamCreate' hooks/check-agent-misuse.sh — must return zero hits.
+      Run grep 'TeamCreate' tests/hive-hooks/ — must return zero hits in test assertions.
+      Document results.
+    agent: tester
+    depends_on:
+      - implement
+
+  - id: review
+    description: |
+      Verify: (1) Q1 decision is documented (in research comment or story update).
+      (2) Hook and tests are consistent — every block message in the hook matches what
+      the tests assert. (3) Detection heuristics are still meaningful under the new model
+      (the hook does not accidentally block legitimate inline Agent use within teammates).
+      (4) Both test files pass and the tests remain meaningful (not trivially weakened).
+    agent: reviewer
+    depends_on:
+      - test
+
+  - id: integrate
+    description: |
+      Commit hook and test changes together on feat/teamcreate-migration.
+      Commit message prefix [plan-graph]. Push to origin.
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  codebase: plugin-hive
+  key_files:
+    - path: hooks/check-agent-misuse.sh
+      purpose: "PreToolUse hook that blocks Agent calls matching story-execution patterns; block messages reference TeamCreate"
+    - path: tests/hive-hooks/check-agent-misuse.orchestrator-pattern.behavior.test.js
+      purpose: "Asserts TeamCreate tool calls are ALLOWED and block message says 'Use TeamCreate'"
+    - path: tests/hive-hooks/check-agent-misuse.state-dir.behavior.test.js
+      purpose: "State-dir variant of hook behavior tests"
+
+design_decisions:
+  - decision: "Gate this story on Q1 resolution in the research step"
+    rationale: "Q1 is the genuinely-blocking design question per design-discussion. The research agent must make and document the call before implementation begins."
+  - decision: "Hook and tests must ship in the same commit"
+    rationale: "Design discussion: test updates must ship with the source they assert against. A split commit would leave a red build."
+  - decision: "Depends on s2 (skill instruction rewrite)"
+    rationale: "The canonical replacement phrase ('natural-language teammate spawn') must be established in s2 before the hook's new block message can be authored consistently."
+
+cross_cutting:
+  - concern: documentation
+    action: "If Q1 resolves to Option A, the GUIDE or agent-teams-guide.md may need a note that the hook now guides toward natural-language spawn. Flagged for doc-check step."
+
+metric:
+  applies: false
+  justification: "Hook correctness fix. No measurable throughput or error-rate outcome moves independently; hook correctness is verified by the test suite."
+
+risks:
+  - severity: high
+    description: "Q1 is unresolved at planning time — the implementing agent may make the wrong call and retire a still-valuable hook"
+    mitigation: "Research step must document Q1 reasoning explicitly. Reviewer verifies the detection heuristics remain meaningful post-update."
+  - severity: medium
+    description: "Updated hook may over-block legitimate inline Agent calls within a teammate's scope"
+    mitigation: "Reviewer specifically checks that the updated detection heuristics target whole-story delegation patterns, not fine-grained sub-step Agent use."
+
+references:
+  - path: .pHive/epics/teamcreate-migration/docs/design-discussion.md
+    relevant_excerpt: |
+      Open Question 2: check-agent-misuse guidance string — What exactly should the hook's
+      block message say now? "Use natural-language team spawn" is wordier than "Use TeamCreate."
+      The new string must be chosen once and applied to both the hook and its test together.
+  - path: hooks/check-agent-misuse.sh
+    relevant_excerpt: |
+      echo "BLOCKED: Agent tool used to execute story-level work. Use TeamCreate for story execution."
+      (line ~68 — the block message to replace)

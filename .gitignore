@@ -88,6 +88,8 @@ state/
 !.pHive/epics/substrate-coverage-and-test-cleanup/**
 !.pHive/episodes/substrate-coverage-and-test-cleanup/
 !.pHive/episodes/substrate-coverage-and-test-cleanup/**
+!.pHive/epics/teamcreate-migration/
+!.pHive/epics/teamcreate-migration/**
 # Test scenarios (.pHive/test-scenarios/) — referenced by autonomous-cycle-loop
 # config + simulated-manual cross-cutting concern. Per-story scenarios shipped
 # alongside the stories that need them.

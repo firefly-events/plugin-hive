@@ -1,0 +1,177 @@
+id: s3-reference-docs-rewrite
+epic: teamcreate-migration
+title: "Rewrite reference docs and CONTEXT.md vocabulary to v2.1.178 auto-spawn model"
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+  - s1-tool-grant-removal
+
+description: |
+  Area C: reference docs that describe TeamCreate mechanics end-to-end and the
+  CONTEXT.md glossary that defines "direct backend" as "Claude via TeamCreate."
+  These don't break live runs but ship an internally contradictory documentation
+  state — a developer reading them receives wrong instructions.
+
+  Files in scope:
+  - hive/references/agent-teams-guide.md: full section rewrite to the v2.1.178
+    auto-spawn model. The guide describes "agent teams created via the TeamCreate
+    tool with natural language prompts" (line 40+ already mixes old and new in one
+    sentence — canonical failure mode). Rewrite all mechanics sections. The cmux
+    path (orchestrator poll-loop via surface.split/send_text/read_text) is a separate
+    variant — demote it to a clearly-labeled subsection and do NOT present it as the
+    default model. Derive the default-path prose from v2.1.178 auto-spawn semantics
+    directly. NOTE: lines covering CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS detection
+    (approximately lines 12 and 70) are intentionally left for s4 (env-gate removal)
+    to avoid concurrent edit conflicts on this file.
+  - hive/references/parallel-call-sites.md: update the mechanism column for all four
+    call sites (execute:team, plan:design-discussion-team, planning-routing:mixed-team,
+    execute:specialist-phases). Keep the trigger IDs verbatim — they are referenced by
+    gate code. Change only the mechanism description from "TeamCreate" to
+    "natural-language teammate spawn."
+  - CONTEXT.md: redefine the *Backend* entry (line 17) so "direct" means
+    "Claude via auto-spawned agent teams (natural-language prompt)" not "via TeamCreate."
+    Rewrite the Agent(team_name=) warning (line 63): team_name is now deprecated/ignored,
+    but the routing concern the warning guards (spawn through agent-spawn, not raw Agent)
+    still applies — preserve the intent, drop the dead field reference.
+    Note: the *swarm* glossary entry is added in s6 (trust-boundary-doc), which depends
+    on this story, avoiding concurrent CONTEXT.md edits.
+
+  After this story: agent-teams-guide.md describes the auto-spawn model accurately
+  (with cmux clearly subordinated); parallel-call-sites.md catalog IDs are stable;
+  CONTEXT.md's glossary no longer defines "direct backend" via a deleted tool.
+
+acceptance_criteria:
+  - "Given agent-teams-guide.md is rewritten, then it no longer contains any sentence instructing a reader to call the TeamCreate tool for the default execution path"
+  - "Given agent-teams-guide.md is rewritten, then the cmux path is labeled as a separate variant (not the default model)"
+  - "Given agent-teams-guide.md is rewritten, then a post-edit grep for 'TeamCreate' returns zero hits in the sections handling default team creation (env-gate lines intentionally untouched per s4 scope)"
+  - "Given parallel-call-sites.md is updated, then the trigger IDs (execute:team, plan:design-discussion-team, planning-routing:mixed-team, execute:specialist-phases) are unchanged"
+  - "Given parallel-call-sites.md is updated, then the mechanism description for each entry no longer says 'TeamCreate'"
+  - "Given CONTEXT.md is updated, then the Backend entry no longer defines 'direct' as 'Claude via TeamCreate'"
+  - "Given CONTEXT.md is updated, then the Agent(team_name=) warning preserves its routing intent but does not reference the deprecated team_name field as an active signal"
+  - "Given all files are edited, then a whole-section grep for 'TeamCreate' in hive/references/ (excluding env-gate lines, CHANGELOG, and .pHive historical docs) returns zero hits"
+
+steps:
+  - id: research
+    description: |
+      Read the three in-scope documents fully:
+        - hive/references/agent-teams-guide.md: map every TeamCreate mention by line number
+          and role (default path description vs cmux variant vs env-gate detection). Mark
+          which lines are for s4 (env-gate: lines 12 and ~70).
+        - hive/references/parallel-call-sites.md: read the catalog structure and mechanism
+          column for all four entries.
+        - CONTEXT.md: read the Backend definition (line 17) and the Agent(team_name=) warning
+          (line 63). Note surrounding context to preserve intent when rewriting.
+      Produce a per-file rewrite plan with before/after text for each section.
+    agent: researcher
+
+  - id: implement
+    description: |
+      1. hive/references/agent-teams-guide.md:
+         - Rewrite every mechanics section that instructs readers to use TeamCreate for
+           the default path, using the v2.1.178 auto-spawn model (lead writes prose,
+           runtime spawns teammates, no tool call).
+         - Demote the cmux path to a clearly-labeled "Alternative: cmux orchestrator variant"
+           subsection.
+         - After edits, grep for "TeamCreate" — only env-gate lines (s4 scope) may survive;
+           all other matches must be resolved.
+         - DO NOT edit the env-gate detection lines (lines 12 and ~70); those are reserved
+           for s4 to avoid merge conflicts.
+      2. hive/references/parallel-call-sites.md:
+         - For each of the four entries, update the mechanism column text.
+         - Do NOT change trigger IDs (execute:team etc.).
+      3. CONTEXT.md:
+         - Rewrite the Backend entry to: "direct — Claude via auto-spawned agent teams
+           (natural-language prompt). The lead describes the team and its tasks; the
+           Claude Code runtime materializes teammates automatically. No TeamCreate tool
+           call is required."
+         - Rewrite the Agent(team_name=) warning to preserve the routing intent without
+           referencing team_name as an active signal (it is deprecated and ignored).
+         - Do NOT add the swarm glossary entry — that is s6's scope.
+    agent: developer
+    depends_on:
+      - research
+
+  - id: test
+    description: |
+      Verify each acceptance criterion:
+        1. grep -n "TeamCreate" hive/references/agent-teams-guide.md — only env-gate lines
+           may remain (confirm line numbers match expected s4 scope); zero hits in default-path sections
+        2. grep -n "TeamCreate" hive/references/parallel-call-sites.md — must be zero
+        3. Check parallel-call-sites.md trigger IDs are unchanged: grep for execute:team,
+           plan:design-discussion-team, planning-routing:mixed-team, execute:specialist-phases
+        4. grep -n "TeamCreate" CONTEXT.md — must be zero
+        5. Read the Backend definition in CONTEXT.md and confirm it describes auto-spawn
+        6. Read the team_name warning in CONTEXT.md and confirm routing intent is preserved
+        7. grep -rn "TeamCreate" hive/references/ — document any remaining hits and classify
+           each as intentional-historical or a missed migration target
+    agent: tester
+    depends_on:
+      - implement
+
+  - id: review
+    description: |
+      Verify: (1) agent-teams-guide.md is internally consistent — no sentence mixes the
+      old TeamCreate invocation with natural-language spawn in the same breath (the
+      "half-migrated sentence" failure mode from the design-discussion). (2) cmux section
+      is clearly a labeled variant, not the default. (3) parallel-call-sites.md catalog IDs
+      are unchanged. (4) CONTEXT.md Backend definition accurately reflects v2.1.178.
+      (5) CHANGELOG and historical .pHive/epics/*/docs/* were NOT touched.
+      (6) The env-gate lines in agent-teams-guide.md were NOT touched (those belong to s4).
+    agent: reviewer
+    depends_on:
+      - test
+
+  - id: integrate
+    description: |
+      Commit all changed files on feat/teamcreate-migration. Commit message prefix
+      [plan-graph]. Push to origin.
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  codebase: plugin-hive
+  key_files:
+    - path: hive/references/agent-teams-guide.md
+      purpose: "Built end-to-end around TeamCreate mechanics; already contains mixed-model sentence at line 40+"
+    - path: hive/references/parallel-call-sites.md
+      purpose: "Catalogs four call sites by TeamCreate name; IDs referenced by gate code — IDs must not change"
+    - path: CONTEXT.md
+      purpose: "Glossary defines Backend as 'direct (Claude via TeamCreate)' — the definition to fix"
+
+design_decisions:
+  - decision: "Derive default-path prose from v2.1.178 auto-spawn semantics directly, not from the cmux section"
+    rationale: "Design discussion grill H1: cmux is an orchestrator poll-loop, a different mechanism. Lifting from cmux would make it look like the default path, not the auto-spawn default."
+  - decision: "Keep parallel-call-sites.md trigger IDs unchanged"
+    rationale: "Trigger IDs (execute:team etc.) are referenced by gate code. Renaming them requires a coordinated code change, which is out of scope for a doc migration."
+  - decision: "Leave env-gate lines in agent-teams-guide.md for s4"
+    rationale: "s3 and s4 both touch agent-teams-guide.md. Explicit file-level scope boundary prevents concurrent edit conflicts on the branch."
+
+cross_cutting:
+  - concern: documentation
+    action: "These files ARE the documentation being corrected. No separate doc update needed."
+
+metric:
+  applies: false
+  justification: "Documentation accuracy migration. Verification is the grep gate: zero TeamCreate hits in rewritten sections. Not a measurable throughput or coverage outcome."
+
+risks:
+  - severity: medium
+    description: "Half-migrated sentences in agent-teams-guide.md — editing one section while missing another produces the same failure mode the migration is supposed to fix"
+    mitigation: "Post-edit grep for 'TeamCreate' across the whole file; review step specifically checks for mixed-model sentences."
+  - severity: low
+    description: "Concurrent edit risk: s3 and s4 both modify agent-teams-guide.md"
+    mitigation: "Explicit scope boundary: s3 handles all sections EXCEPT env-gate lines (lines 12 and ~70). s4 depends on s3 being done first."
+
+references:
+  - path: .pHive/epics/teamcreate-migration/docs/design-discussion.md
+    relevant_excerpt: |
+      agent-teams-guide.md is built end-to-end around TeamCreate mechanics — yet it already
+      documents (lines 40+) that "agent teams are created via the TeamCreate tool with
+      natural language prompts" — a half-migrated sentence.
+  - path: .pHive/epics/teamcreate-migration/docs/design-discussion.md
+    relevant_excerpt: |
+      Third, tier E — vocabulary. Redefine Backend in CONTEXT.md so "direct" means
+      "Claude via auto-spawned agent teams (natural-language prompt)" rather than
+      "via TeamCreate."

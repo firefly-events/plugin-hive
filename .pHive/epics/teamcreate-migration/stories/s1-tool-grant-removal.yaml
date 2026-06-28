@@ -1,0 +1,136 @@
+id: s1-tool-grant-removal
+epic: teamcreate-migration
+title: "Remove TeamCreate from agent tool[] arrays and inline prose hints (runtime-breaking fix)"
+status: pending
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  Claude Code v2.1.178 deleted the TeamCreate tool. Two agent persona files still
+  list it in their tools: arrays — this is the only change that actively breaks a
+  live run because the runtime rejects or silently drops tool declarations for
+  deleted tools.
+
+  Scope (strictly atomic per design-discussion §Scope discipline grill P1):
+  - hive/agents/orchestrator.md line 14: remove "TeamCreate" from tools: array; SendMessage stays
+  - hive/agents/team-lead.md line 10: remove "TeamCreate" from tools: array; SendMessage stays
+  - hive/agents/orchestrator.md line 13 (knowledge use-when hint): rewrite "spawning roster agents
+    ... via TeamCreate" to use natural-language spawn description
+  - hive/agents/team-lead.md line 36 (prose hint): rewrite "Use TeamCreate for sub-workers" to
+    describe the auto-spawn model
+
+  DO NOT touch any other files. Broader guidance rewrites and reference doc updates are
+  intentionally deferred to s2 (skill instructions) and s3 (reference docs) to keep this
+  story atomic and de-risk-first.
+
+  Verification: grep for TeamCreate in tools: arrays across hive/agents/ returns zero hits.
+  SendMessage must survive in both arrays.
+
+acceptance_criteria:
+  - "Given hive/agents/orchestrator.md is edited, then TeamCreate no longer appears inside the tools: array at line 14"
+  - "Given hive/agents/team-lead.md is edited, then TeamCreate no longer appears inside the tools: array at line 10"
+  - "Given both persona files are edited, then SendMessage still appears in the tools: array in both files"
+  - "Given the implementation is complete, then grep -rn 'TeamCreate' hive/agents/ returns zero matches inside any tools: block"
+  - "Given orchestrator.md line 13 knowledge hint is rewritten, then the rewritten text describes natural-language spawn (not a TeamCreate call) and contains no reference to the deleted tool name"
+  - "Given team-lead.md prose hint (formerly line 36) is rewritten, then the guidance instructs the lead to describe the team in natural language rather than invoking TeamCreate"
+
+steps:
+  - id: research
+    description: |
+      Read hive/agents/orchestrator.md and hive/agents/team-lead.md in full. Locate and
+      note the exact line numbers for: (a) the tools: array entries, (b) the knowledge
+      use-when hint in orchestrator.md, (c) the TeamCreate prose hint in team-lead.md.
+      Confirm SendMessage appears in both tools: arrays so it is not accidentally removed.
+      Run grep -rn "TeamCreate" hive/agents/ to establish the baseline count.
+    agent: researcher
+
+  - id: implement
+    description: |
+      Edit hive/agents/orchestrator.md:
+        - Remove "TeamCreate" from the tools: array (SendMessage stays)
+        - Rewrite the knowledge use-when hint (formerly line 13) to describe
+          natural-language teammate spawn instead of "via TeamCreate"
+      Edit hive/agents/team-lead.md:
+        - Remove "TeamCreate" from the tools: array (SendMessage stays)
+        - Rewrite the prose hint (formerly line 36) from "Use TeamCreate for sub-workers"
+          to describe describing the team in natural language so Claude Code spawns them
+      Do NOT touch any other files.
+    agent: developer
+    depends_on:
+      - research
+
+  - id: test
+    description: |
+      Verify the implementation against all acceptance criteria:
+        1. grep -n "TeamCreate" hive/agents/orchestrator.md — must return zero hits inside
+           the tools: block; knowledge hint rewrite must not contain "TeamCreate"
+        2. grep -n "TeamCreate" hive/agents/team-lead.md — must return zero hits inside
+           the tools: block; prose hint must not contain "TeamCreate"
+        3. grep -n "SendMessage" hive/agents/orchestrator.md — must find SendMessage in tools:
+        4. grep -n "SendMessage" hive/agents/team-lead.md — must find SendMessage in tools:
+        5. grep -rn "TeamCreate" hive/agents/ — total hits must be zero
+      Document results per acceptance criterion.
+    agent: tester
+    depends_on:
+      - implement
+
+  - id: review
+    description: |
+      Verify the two persona files are internally consistent: the remaining tools: entries
+      are valid tool names (no typos, no accidental deletions of SendMessage or other
+      legitimate tools). Verify the rewritten prose hints read naturally and accurately
+      describe the v2.1.178 auto-spawn model (the lead describes the team; Claude Code
+      spawns teammates automatically — no tool call required). Confirm no other files
+      were modified (diff must be limited to hive/agents/orchestrator.md and
+      hive/agents/team-lead.md). Approve or return with findings.
+    agent: reviewer
+    depends_on:
+      - test
+
+  - id: integrate
+    description: |
+      Commit both edited persona files on the feat/teamcreate-migration branch.
+      Commit message prefix: [plan-graph]. Verify no other files are staged.
+      Push to origin.
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  codebase: plugin-hive
+  key_files:
+    - path: hive/agents/orchestrator.md
+      purpose: "Runtime-breaking: line 14 lists TeamCreate in tools:; line 13 knowledge hint references it"
+    - path: hive/agents/team-lead.md
+      purpose: "Runtime-breaking: line 10 lists TeamCreate in tools:; line 36 prose instructs using TeamCreate"
+
+design_decisions:
+  - decision: Remove TeamCreate from tools[] without replacement
+    rationale: "Auto-spawn model requires no tool grant — the lead describes the team in natural language and the runtime materializes teammates. Adding a placeholder would be misleading."
+  - decision: Keep SendMessage in tools[] unchanged
+    rationale: "SendMessage survives v2.1.178 and is still the intra-team messaging mechanism. The migration must not break team messaging."
+  - decision: Scope this story strictly to the two persona files
+    rationale: "Design discussion grill P1: Story A must stay atomic. Broader guidance rewrites in other files belong in s2 and s3 to preserve atomicity and enable parallel development."
+
+cross_cutting:
+  - concern: documentation
+    action: "The persona files ARE the configuration artifacts being fixed. No separate doc update needed for this story — the broader reference doc updates are scoped to s3."
+  - concern: versioning
+    action: "Consumer-visible behavior change: agents no longer declare a deleted tool. Versioning concern handled at epic level (patch bump covers correctness fix)."
+
+metric:
+  applies: false
+  justification: "Correctness fix only — removes a broken tool declaration. No measurable throughput, latency, or coverage outcome moves independently from this story; the broader migration outcome is tracked at the epic acceptance-gate grep."
+
+references:
+  - path: hive/agents/orchestrator.md
+    relevant_excerpt: |
+      tools: ["Grep","Glob","Read","Write","Edit","Bash","TeamCreate","SendMessage"]
+      (line 14 — TeamCreate is the deleted tool to remove)
+  - path: hive/agents/team-lead.md
+    relevant_excerpt: |
+      tools: ["Grep","Glob","Read","Bash","TeamCreate","SendMessage"]
+      (line 10 — TeamCreate is the deleted tool to remove)
+  - path: .pHive/epics/teamcreate-migration/docs/design-discussion.md
+    relevant_excerpt: "Role 1 — TeamCreate as a live tool name (runtime-breaking). Only two files put the literal string in a tool-grant array."

@@ -1,0 +1,181 @@
+id: s4-env-gate-removal
+epic: teamcreate-migration
+title: "Remove CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS gate — teams GA, fail-open by default"
+status: pending
+complexity: medium
+methodology: classic
+depends_on:
+  - s3-reference-docs-rewrite
+
+description: |
+  Area F: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 was the experimental gate for agent
+  teams before v2.1.172. Teams are GA since that version; the gate is now stale and
+  misleading. This story removes the gate from every live reader and specifies the
+  post-removal detection behavior.
+
+  Scope — every live reader of CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:
+  - skills/hive/skills/execute-dispatch/SKILL.md (~line 29 and ~line 153)
+  - skills/hive/skills/design-dispatch/SKILL.md (~line 29 and ~line 153)
+  - skills/hive/skills/review-dispatch/SKILL.md (~line 29 and ~line 153)
+  - skills/hive/skills/design-review-dispatch/SKILL.md (~line 29 and ~line 153)
+  - skills/review/SKILL.md (env gate reference)
+  - hive/references/agent-teams-guide.md lines ~12 and ~70 (detection section)
+    [NOTE: this is the only remaining TeamCreate-related edit to this file after s3]
+  - hive/workflows/steps/daily-ceremony/step-07-kick-off.md
+  - tests/execute-dispatch-sandcastle.test.js (asserts on the var)
+
+  Post-removal behavior (design discussion grill H2):
+  - Parallelism defaults ON (teams GA — no env gate needed)
+  - The ONLY gate is hive.config.yaml → execution.parallel_teams: false (or --sequential)
+  - The fail-closed trap in agent-teams-guide.md line 70 ("if not 1, falls back to
+    sequential") must be explicitly rewritten to fail-open: parallel is default, opt-out
+    via execution.parallel_teams only
+  - Operators who still have CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS in .env files must
+    NOT get errors — the variable should be silently ignored (compat no-op disposition
+    per design-discussion Q2 recommendation)
+
+  Compat no-op disposition (recommended per design-discussion Q2):
+  Keep CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS readable but ignored — do not emit an error
+  if it is set. Remove its role as a required condition for parallel dispatch. Document
+  it as deprecated/ignored in the guide's detection section. This is safer than full
+  removal for existing .env files.
+
+  This story depends on s3 to avoid concurrent edits to agent-teams-guide.md.
+
+acceptance_criteria:
+  - "Given each dispatch skill (execute-dispatch, design-dispatch, review-dispatch, design-review-dispatch) is updated, then CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS no longer appears as a required condition for parallel dispatch in any of those files"
+  - "Given skills/review/SKILL.md is updated, then its env gate reference is removed"
+  - "Given agent-teams-guide.md detection section is rewritten, then it no longer states that parallel execution falls back to sequential when the env var is unset"
+  - "Given agent-teams-guide.md is updated, then the variable is documented as deprecated and ignored (compat no-op), not as an active gate"
+  - "Given step-07-kick-off.md is updated, then it no longer lists CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS as a required precondition for parallel execution"
+  - "Given tests/execute-dispatch-sandcastle.test.js is updated, then the test no longer asserts on CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS and instead asserts on the execution.parallel_teams config gate"
+  - "Given all changes are committed, then grep -rn 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' across skills/ hive/workflows/ tests/ returns zero hits that treat it as a live dispatch gate (deprecated/ignored doc mentions in the guide are acceptable)"
+  - "Given a project with execution.parallel_teams: false in hive.config.yaml, then dispatch skills route to sequential — and do NOT require the env var to be set"
+  - "Given a project with no execution.parallel_teams setting, then dispatch skills default to parallel execution"
+
+steps:
+  - id: research
+    description: |
+      Audit every live reader of CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:
+        grep -rn "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" . --include="*.md" --include="*.yaml" --include="*.sh" --include="*.mjs" --include="*.js"
+      For each hit: record file path, line number, and role (required gate vs detection vs
+      just a mention). Classify each as: (a) must remove the gate logic, (b) rewrite to
+      deprecated-notice, or (c) leave unchanged if it is a historical/CHANGELOG mention.
+      Also read the dispatch logic around line 29 and line 153 in each dispatch skill to
+      understand the conditional structure before removing the gate.
+    agent: researcher
+
+  - id: implement
+    description: |
+      For each dispatch skill (execute-dispatch, design-dispatch, review-dispatch,
+      design-review-dispatch) SKILL.md:
+        - Remove the env-gate condition (~line 29: the env check before allowing parallel)
+        - Rewrite the dispatch logic so parallel is the default; sequential is triggered
+          only by execution.parallel_teams: false in hive.config.yaml
+        - Remove or rewrite any remaining env-var references (~line 153 if present)
+        - Do NOT change any other logic
+      For skills/review/SKILL.md: remove env gate reference.
+      For hive/references/agent-teams-guide.md detection section (lines ~12 and ~70):
+        - Line ~12: mark CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS as deprecated and ignored
+        - Line ~70: rewrite the fail-closed behavior ("if not 1, falls back to sequential")
+          to the fail-open post-GA behavior (parallel is default; opt out via
+          execution.parallel_teams: false)
+      For hive/workflows/steps/daily-ceremony/step-07-kick-off.md:
+        - Remove the env var from the precondition checklist
+      For tests/execute-dispatch-sandcastle.test.js:
+        - Update the test to assert against execution.parallel_teams config, not the env var
+        - The test must still exercise the sequential/parallel routing decision
+
+      After all edits: run the whole-tree grep to verify no live gate references remain.
+    agent: developer
+    depends_on:
+      - research
+
+  - id: test
+    description: |
+      Run the relevant test suite: node --test tests/execute-dispatch-sandcastle.test.js
+      (and any other execute-dispatch tests if they exist).
+      Then run the acceptance gate grep:
+        grep -rn "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" skills/ hive/workflows/ tests/
+        — classify every hit: deprecated-notice in guide = acceptable; live gate = not acceptable
+      Verify step-07-kick-off.md: read the precondition checklist, confirm env var is absent.
+      Document pass/fail for each AC.
+    agent: tester
+    depends_on:
+      - implement
+
+  - id: review
+    description: |
+      Verify: (1) every dispatch skill now defaults parallel ON with only
+      execution.parallel_teams: false as the opt-out gate. (2) No dispatch skill silently
+      flips to sequential when the env var is unset. (3) agent-teams-guide.md detection
+      section accurately reflects GA status and compat no-op disposition. (4) Tests pass
+      and still exercise the sequential/parallel routing decision. (5) No CHANGELOG or
+      historical docs were modified.
+    agent: reviewer
+    depends_on:
+      - test
+
+  - id: integrate
+    description: |
+      Commit all changed files on feat/teamcreate-migration. Commit message prefix
+      [plan-graph]. Push to origin.
+    agent: developer
+    depends_on:
+      - review
+
+context:
+  codebase: plugin-hive
+  key_files:
+    - path: "skills/hive/skills/execute-dispatch/SKILL.md"
+      purpose: "Primary parallel-dispatch skill; env gate appears at ~line 29 and ~line 153"
+    - path: "skills/hive/skills/design-dispatch/SKILL.md"
+      purpose: "Parallel pattern mirrors execute-dispatch; same env gate positions"
+    - path: "skills/hive/skills/review-dispatch/SKILL.md"
+      purpose: "Env gate reference to remove"
+    - path: "skills/hive/skills/design-review-dispatch/SKILL.md"
+      purpose: "Env gate reference to remove"
+    - path: hive/references/agent-teams-guide.md
+      purpose: "Detection section at lines ~12 and ~70 — fail-closed trap to rewrite to fail-open"
+    - path: hive/workflows/steps/daily-ceremony/step-07-kick-off.md
+      purpose: "Env var listed as precondition for parallel kick-off — must be removed"
+    - path: tests/execute-dispatch-sandcastle.test.js
+      purpose: "Asserts on env var — must shift assertion to execution.parallel_teams config"
+
+design_decisions:
+  - decision: "Compat no-op disposition: keep the var readable-but-ignored, not an error"
+    rationale: "Design discussion Q2 recommendation. Safer for existing .env files; full removal is cleaner but risks breaking projects that still set the var. Compat no-op avoids the behavior change risk while still removing the gate."
+  - decision: "Fail-open default: parallel is ON unless execution.parallel_teams: false"
+    rationale: "Design discussion grill H2: with teams GA, parallel should be the default. The existing fail-closed behavior (sequential when env var is unset) is the trap to close."
+  - decision: "s4 depends on s3 to avoid concurrent agent-teams-guide.md edits"
+    rationale: "Both s3 and s4 touch agent-teams-guide.md. s3 handles the general doc rewrite; s4 handles only the env-gate sections. Sequential ordering prevents branch-level merge conflicts."
+
+cross_cutting:
+  - concern: documentation
+    action: "agent-teams-guide.md detection section update IS the documentation change. Dispatch skill changes are behavioral but self-documenting via SKILL.md inline prose."
+
+metric:
+  applies: false
+  justification: "Stale-gate removal — correctness fix. The behavioral outcome (parallel by default) is already the GA behavior since v2.1.172; we are removing the dead gate, not changing the behavior."
+
+risks:
+  - severity: high
+    description: "Env-gate removal changes detection behavior for any project relying on the unset env var to force sequential execution"
+    mitigation: "Compat no-op disposition: var is ignored if present (no error), and removal of the var as a REQUIRED gate adds execution.parallel_teams: false as the correct sequential opt-out. Documentation in agent-teams-guide.md explains the migration."
+  - severity: medium
+    description: "Dead env-var conditionals may remain in runtime code outside this story's audit scope"
+    mitigation: "Research step performs a whole-tree grep before implement begins. Any code-path hits (not just docs) are flagged for review."
+
+references:
+  - path: .pHive/epics/teamcreate-migration/docs/design-discussion.md
+    relevant_excerpt: |
+      For F, this is bigger than the draft first assumed. A whole-tree grep for
+      CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS turns up live readers well beyond
+      agent-teams-guide.md: hive/workflows/steps/daily-ceremony/step-07-kick-off.md,
+      four dispatch skills (execute-dispatch, design-dispatch, design-review-dispatch,
+      review-dispatch), skills/review/SKILL.md, and tests/execute-dispatch-sandcastle.test.js.
+  - path: .pHive/epics/teamcreate-migration/docs/design-discussion.md
+    relevant_excerpt: |
+      (grill H2) it must specify the post-removal detection behavior: with teams GA,
+      parallelism should default ON, gated only by hive.config.yaml → execution.parallel_teams,
+      never silently fail closed to sequential because a now-deleted env var reads empty.
