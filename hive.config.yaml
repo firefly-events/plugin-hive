@@ -192,7 +192,7 @@ model_overrides:
 #   Codex token budget nearly exhausted — use Codex SPARSELY, reviews only.
 #   Claude (Fable 5 / Sonnet 4.6) on all creator + sequencing roles.
 #   Cross-LLM verification direction flipped: Claude creates, Codex reviews.
-# Personas omitted from this map default to direct TeamCreate (Claude). The plan
+# Personas omitted from this map default to direct auto-spawned agent team (v2.1.178+ auto-spawn on the Claude runtime). The plan
 # skill emits one INFO-log line per persona at spawn time documenting the route.
 agent_backends:
   reviewer: codex
@@ -250,7 +250,7 @@ external_models:
 
 # Planning substrate routing (multica-plan-test-cycles epic).
 # Routes /plan Phase 0 persona dispatch through the Multica daemon instead of
-# direct TeamCreate. Per-persona fan-out (one Multica issue + agent UUID per
+# direct auto-spawned agent team (v2.1.178+ auto-spawn). Per-persona fan-out (one Multica issue + agent UUID per
 # planning persona); Hive owns mode-resolve, polling, episode markers, and all
 # user review/sign-off gates (gates never advance from the Multica side).
 # Prereq: `/hive:multica-init` bootstrap. Env override: HIVE_PLANNING_MODE=multica.
