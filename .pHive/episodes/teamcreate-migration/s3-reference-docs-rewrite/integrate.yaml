@@ -1,7 +1,5 @@
-step_id: integrate
-status: completed
-timestamp: "2026-06-29T06:19:14Z"
-artifacts:
-  - hive/references/agent-teams-guide.md
-  - hive/references/parallel-call-sites.md
-  - .pHive/CONTEXT.md
+attempt: 1
+epic: teamcreate-migration
+phase: integrate
+story: s3-reference-docs-rewrite
+verdict: passed
