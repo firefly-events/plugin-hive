@@ -675,6 +675,23 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Store the answer on the planning context as `${version_bump}`. The value MUST be exactly one of `major`, `minor`, `patch`, or `none`; if the answer is missing or ambiguous, ask once for clarification before writing `epic.yaml`. If the clarification answer is STILL not exactly one of the four literals, default `${version_bump}` to `none`, record `version_bump_defaulted: true` on the planning context and in `epic.yaml`, and surface a user-facing warning: `version_bump answer not recognized — defaulted to none; re-run /plan or edit epic.yaml to change.` Only those four literal values may be written to `epic.yaml`. Use `none` when the user explicitly selects it, when a re-plan preserves an existing `version_bump: none`, or via this default-on-invalid path.
 
+14c. **Capture sidecar retention intent.** Ask the user exactly:
+
+    > Retain planning sidecars? committed | transient | commit-docs-only
+
+    **Resolution precedence (first match wins):**
+
+    1. User's answer to this question (per-epic override).
+    2. `planning.sidecar_retention` in root-resolved `hive.config.yaml`.
+    3. Shipped default: `committed`.
+
+    The value MUST be exactly one of `committed`, `transient`, or `commit-docs-only`. If the answer is missing, unrecognized, or the user skips, fall through to the config key, then the default. Store the resolved value on the planning context as `${sidecar_retention}`.
+
+    **Solo vs group guidance** (shown to user when they skip or are unsure):
+    - Solo project → `transient` (generated HTML is clutter; re-run to regenerate)
+    - Group / shared project → `committed` (committed sidecars make the plan easy to share without a re-run)
+    - Docs-heavy project wanting to commit story docs but skip the index → `commit-docs-only`
+
 15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories. The emitted YAML MUST include `version_bump: <major|minor|patch|none>` populated from `${version_bump}`, plus the `git_flow:` block populated from the `${git_flow_resolution}` value captured in Phase A step 0a (pe-5):
 
     ```yaml
@@ -683,6 +700,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     target_codebase: <abs path>
     methodology: <classic|tdd|bdd>
     version_bump: <major|minor|patch|none>
+    sidecar_retention: <committed|transient|commit-docs-only>
 
     git_flow:
       base_branch: <resolved>          # from Phase A 0a — `develop` if origin/develop existed at plan time, else `main`, else the explicit override
@@ -711,8 +729,37 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
       - if it does not, insert a fresh `git_flow:` block immediately after `version_bump:`;
       - if it already has a `planning_team:` block, overwrite it with the current classification output (do NOT duplicate the block);
       - if it does not, insert a fresh `planning_team:` block immediately after `git_flow:`;
-      - canonical field order owned by /plan is `methodology` → `version_bump` → `git_flow` → `planning_team`; insert to preserve that order.
+      - if it already has a `sidecar_retention:` field, update that field in place from `${sidecar_retention}`;
+      - if it does not, insert `sidecar_retention:` immediately after `version_bump:`;
+      - canonical field order owned by /plan is `methodology` → `version_bump` → `sidecar_retention` → `git_flow` → `planning_team`; insert to preserve that order.
       - all other fields not owned by /plan (e.g. `source_issue`, `description`, free-form notes) are preserved untouched.
+
+    **`.gitignore` policy — drive from `${sidecar_retention}`** immediately after writing `epic.yaml`. The epic docs dir is `.pHive/epics/{epic-id}/docs/`. Locate the `.gitignore` in the repo root and apply the matching block:
+
+    - `committed`: Ensure the epic dir is un-ignored. Append (or confirm already present):
+      ```gitignore
+      !.pHive/epics/{epic-id}/
+      !.pHive/epics/{epic-id}/**
+      ```
+      The existing `.pHive/epics/*` pattern already re-ignores children; these two negations allowlist the full epic subtree (HTML sidecars, index.html, PNGs, and all docs). If the epic's block already exists, skip (idempotent).
+
+    - `transient`: Do NOT add an epic allowlist block. The existing `.pHive/epics/*` re-ignore covers the epic dir. If an epic allowlist block for this epic already exists (from a previous `committed` run), remove it and append instead:
+      ```gitignore
+      # sidecar_retention=transient: HTML sidecars regenerated on demand
+      .pHive/epics/{epic-id}/docs/*.html
+      .pHive/epics/{epic-id}/index.html
+      ```
+
+    - `commit-docs-only`: Allowlist story doc sidecars but exclude `index.html` and PNGs. Append (or confirm):
+      ```gitignore
+      !.pHive/epics/{epic-id}/
+      !.pHive/epics/{epic-id}/**
+      # sidecar_retention=commit-docs-only: exclude index and illustrations
+      .pHive/epics/{epic-id}/index.html
+      .pHive/epics/{epic-id}/docs/*.png
+      ```
+
+    After applying the policy, surface a one-line confirmation to the user: `sidecar_retention: <value> — .gitignore updated for epic {epic-id}.`
 
     Schema reference: `hive/references/story-yaml-schema.md` §6 "Epic index (`epic.yaml`)" documents the canonical block shape.
 
@@ -726,7 +773,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     1. **Build the prompt** from the finalized planning context: epic title + the design-discussion goal + the resolved scale assessment + the principal slices/changes (from H/V or the story list). Ask for a conceptual scene or diagram of the change — not a literal UI screenshot. Keep it one paragraph.
     2. **Invoke** the `openai-image` MCP tool `generate_image` with that prompt, `output_dir` = `.pHive/epics/{epic-id}/docs`, and `output_prefix: concept`. The tool writes `concept-illustration.png` (n=1, opaque). It requires `OPENAI_API_KEY`; `gpt-image-2` may return `403` without a verified OpenAI org.
-    3. **Embed** a trailing section on the design-discussion (the always-present primary artifact) and regenerate its `.html` sidecar via `lib/html-sidecar-gen`:
+    3. **Embed** a trailing section on the design-discussion (the always-present primary artifact) and regenerate its `.html` sidecar via `python -m hive.lib.html_sidecar_gen`:
 
        ```html
        <figure data-src="concept-illustration.png" data-alt="Concept illustration of the planned change">
@@ -1209,7 +1256,7 @@ additional error handling.
 - `hive/references/agent-ready-checklist.md` — 9-point story validation
 - `hive/references/cross-cutting-concerns.md` — per-project concern evaluation
 - `hive/references/wireframe-protocol.md` — UI wireframe approval touchpoints
-- `hive/references/agent-teams-guide.md` — TeamCreate mechanics and coordination patterns
+- `hive/references/agent-teams-guide.md` — Agent(name:) teammate mechanics and coordination patterns
 - `hive/agents/researcher.md` — raw data gathering (core team)
 - `hive/agents/technical-writer.md` — document production (core team)
 - `hive/agents/tpm.md` — delivery sequencing (core team)

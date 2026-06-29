@@ -31,11 +31,11 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
 | Scope | Tool | Why |
 |---|---|---|
-| **Parallelizing stories across the epic** | `TeamCreate` or cmux panes | Stories run in separate tmux panes via `TeamCreate`, or separate cmux panes when `execution.terminal_mux: cmux` |
+| **Parallelizing stories across the epic** | `Agent(name:)` or cmux panes | Stories run as named teammates via `Agent(name:)` — one call per story — or in separate cmux panes when `execution.terminal_mux: cmux`. Parallel teammates require `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (research preview, NOT GA); sequential is the guaranteed floor when the flag is unset. |
 | **Sequential workflow steps within a single story** | `Agent` | Steps within a teammate's pane run inline — this is correct |
-| **Specialist phase teams (pre-exec, post-exec)** | `TeamCreate` | Specialist teams are independent coordination units |
+| **Specialist phase teams (pre-exec, post-exec)** | `Agent(name:)` | Specialist teams are independent coordination units — one `Agent(name:)` call per specialist team |
 
-**Using `Agent` to execute stories is a protocol violation.** `Agent` is only correct for workflow steps *within* an already-spawned teammate. If the orchestrator finds itself about to call `Agent` with a story's worth of work, it MUST use `TeamCreate` instead.
+Spawn each story as a named teammate via `Agent(name:)`. Sequential execution (no flag needed) is always available and is the guaranteed floor. Parallel teammates across stories require `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (research preview, NOT GA).
 
 ## Process
 
@@ -125,14 +125,14 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
 4a. **Pre-exec phase loop.** If `pre_exec[]` is empty, skip this step entirely — zero behavior change for escalation-free epics.
 
-   > **Parallel-call-site annotation (audit pass):** `parallel_rationale: bounded-slice` — each specialist team writes to a declared phase-output directory at `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/`. The loop iterates triggers sequentially (one `TeamCreate` per trigger), so this is *not* story-level fan-out and is out-of-scope for the `ed-7` parallel gate; catalogued in [`hive/references/parallel-call-sites.md`](../../hive/references/parallel-call-sites.md) §3 (`execute:specialist-phases`). The annotation also applies to the symmetric post-exec loop in step 7a below.
+   > **Parallel-call-site annotation (audit pass):** `parallel_rationale: bounded-slice` — each specialist team writes to a declared phase-output directory at `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/`. The loop iterates triggers sequentially (one `Agent(name:)` call per trigger), so this is *not* story-level fan-out and is out-of-scope for the `ed-7` parallel gate; catalogued in [`hive/references/parallel-call-sites.md`](../../hive/references/parallel-call-sites.md) §3 (`execute:specialist-phases`). The annotation also applies to the symmetric post-exec loop in step 7a below.
 
    For each trigger in `pre_exec[]`, ordered by `raised_at` ASC (severity DESC as tiebreak), look up the trigger's catalog entry in `hive/references/specialist-triggers.md` (loaded in step 2b) to resolve `responds_with.id` and `workflow` fields. Then apply the three-condition branch:
 
    **Prerequisite — team_memory_path validation:** Before spawning, verify the team config's `team_memory_path` directory exists on disk. If it does not, emit an actionable error — e.g., `[error] pre-exec: team_memory_path "${HIVE_STATE_DIR}/team-memories/security-team/" does not exist — create it before running specialist phases` — skip the trigger, and continue. Do not crash execute.
 
    **(i) workflow field set AND workflow file exists on disk:**
-   Invoke `TeamCreate(team_config=team_yaml, workflow=entry.workflow)`. Write phase output to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/` (where `{trigger}` is the trigger ID string, e.g., `security:plan-audit`). If `TeamCreate` errors: log the failure (e.g., `[error] pre-exec: TeamCreate failed for {trigger-id} — {error}`), write a failure marker to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
+   Invoke `Agent(name:)` with the team config and workflow fields from the trigger's catalog entry. Write phase output to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/` (where `{trigger}` is the trigger ID string, e.g., `security:plan-audit`). If the `Agent(name:)` call errors: log the failure (e.g., `[error] pre-exec: Agent(name:) failed for {trigger-id} — {error}`), write a failure marker to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
 
    **(ii) workflow field set AND workflow file MISSING from disk:**
    Log `[info] pre-exec: specialist workflow not yet built — skipping {trigger-id}` → no-op. Continue to next trigger.
@@ -194,7 +194,7 @@ Graph completion is an **artifact-readiness signal only** — not a per-story do
 
 **Local fallback (backend unset).** When `mode_decision != multica`, this step is skipped entirely. Existing paths (sessions → 6c, team-cmux → 6b, team → 6, sequential → 7, sandcastle → 6d, cc-workflows → 6f) are unchanged — no regression.
 
-6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
+6. **Agent team execution.** Follow **`references/team-execution.md`** for the full `Agent(name:)` prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
 
 6b. **Agent team execution (cmux path).** Use this path when all four step-5 conditions are true and `execution.terminal_mux` resolves to `cmux`.
    Invoke `skills/hive/skills/execute-mode-team-cmux/SKILL.md` with:
@@ -202,9 +202,9 @@ Graph completion is an **artifact-readiness signal only** — not a per-story do
    - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
    - `appends_map`: the review-phase sidecar map from step 2b
    - `epic_handle`: the current epic identifier
-   See `references/team-execution.md` for cmux-variant TeamCreate prompt details.
+   See `references/team-execution.md` for cmux-variant `Agent(name:)` prompt details.
 
-6c. **Session-based execution** (used when `HIVE_SESSIONS_ENABLED` or `sessions.enabled: true`). Replaces the TeamCreate path with the Claude Agent SDK `/v1/sessions` API for story-level execution.
+6c. **Session-based execution** (used when `HIVE_SESSIONS_ENABLED` or `sessions.enabled: true`). Replaces the `Agent(name:)` path with the Claude Agent SDK `/v1/sessions` API for story-level execution.
    Invoke `skills/hive/skills/execute-mode-session/SKILL.md` with:
    - `workflow_path`: the workflow loaded in step 3
    - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
@@ -270,7 +270,7 @@ Graph completion is an **artifact-readiness signal only** — not a per-story do
    **Prerequisite — team_memory_path validation:** Before spawning, verify the team config's `team_memory_path` directory exists on disk. If it does not, emit an actionable error — e.g., `[error] post-exec: team_memory_path "${HIVE_STATE_DIR}/team-memories/security-team/" does not exist — create it before running specialist phases` — skip the trigger, and continue. Do not crash execute.
 
    **(i) workflow field set AND workflow file exists on disk:**
-   Invoke `TeamCreate(team_config=team_yaml, workflow=entry.workflow)`. Write phase output to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/`. If `TeamCreate` errors: log the failure (e.g., `[error] post-exec: TeamCreate failed for {trigger-id} — {error}`), write a failure marker to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
+   Invoke `Agent(name:)` with the team config and workflow fields from the trigger's catalog entry. Write phase output to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/`. If the `Agent(name:)` call errors: log the failure (e.g., `[error] post-exec: Agent(name:) failed for {trigger-id} — {error}`), write a failure marker to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
 
    **(ii) workflow field set AND workflow file MISSING from disk:**
    Log `[info] post-exec: specialist workflow not yet built — skipping {trigger-id}` → no-op. Continue to next trigger.
@@ -507,7 +507,7 @@ greenfield/early projects and logs once per run. No new error handling
 
 ## Key References
 
-- **`references/team-execution.md`** — TeamCreate prompt template, sidecar injection, per-story commits, respawn monitoring
+- **`references/team-execution.md`** — `Agent(name:)` prompt template, sidecar injection, per-story commits, respawn monitoring
 - **`references/sequential-execution.md`** — Per-story workflow steps, sidecar injection at review, episode records, gate checks
 - `hive/references/agent-teams-guide.md` — Team mechanics and limitations
 - `hive/references/methodology-routing.md` — Methodology selection

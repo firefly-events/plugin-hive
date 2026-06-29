@@ -9,7 +9,7 @@ Atomic skill, NOT inline agent-spawn prose. Resolves which provider serves a giv
 
 ## Invocation contract
 
-Call this skill after `memory-loading` returned `prior_knowledge_block` and the caller has assembled the full prompt structure, but BEFORE invoking the actual `Agent`/`TeamCreate`/`codex-invoke` surface.
+Call this skill after `memory-loading` returned `prior_knowledge_block` and the caller has assembled the full prompt structure, but BEFORE invoking the actual `Agent`/`codex-invoke` surface.
 
 **Inputs:**
 - `persona_context` — output of `persona-resolve` (carries `agent_name`, `frontmatter.model`).
@@ -50,7 +50,7 @@ If the resolved backend is `codex`:
     - **No surface_id (initial):** open pane, start codex interactive, return `surface_id` to caller. Do NOT send the task prompt or close the pane.
     - **Surface_id provided (follow-up):** send the prompt to the existing pane, poll for completion, capture output. Do NOT close the pane.
 - Build the full prompt structure from `prompt_parts` exactly as the agent-spawn prompt-layout reference describes for one-shot mode and persistent follow-up mode. Skip prompt building for persistent initial mode because that call only opens the pane and returns `surface_id`.
-- Do NOT call Agent/TeamCreate. Delegate to the `codex-invoke` skill with the built prompt, `pane_mode`, and optional `existing_surface_id`. Return its report as `dispatch_result`. All subsequent steps in the caller (respawn continuation, episode reporting) still apply — codex-invoke is the dispatch surface, not a replacement for the surrounding procedure.
+- Do NOT call `Agent` directly. Delegate to the `codex-invoke` skill with the built prompt, `pane_mode`, and optional `existing_surface_id`. Return its report as `dispatch_result`. All subsequent steps in the caller (respawn continuation, episode reporting) still apply — codex-invoke is the dispatch surface, not a replacement for the surrounding procedure.
 
 ### Step 3: Claude branch
 
@@ -58,6 +58,6 @@ If the resolved backend is `claude`, use this flow in order:
 
 1. **Capability-check first:** initialize the Claude client/session substrate needed for story-level dispatch. If the client cannot be initialized, treat that as a substrate capability miss rather than a story failure.
 2. **Messages-API substrate by default:** when the capability-check passes, route the spawn through `hive/lib/messages-session.js`. This is the default Claude path for direct story-level dispatch because it keeps the spawn on the Messages-API loop instead of opening a tmux pane first. Return `dispatch_decision=messages-api`.
-3. **tmux fallback when client init fails:** if the Messages-API client init fails, log the failure and fall back to the existing tmux `Agent`/`TeamCreate` path. Do not modify the prompt shape during fallback; only the transport changes. Return `dispatch_decision=tmux-fallback`.
+3. **tmux fallback when client init fails:** if the Messages-API client init fails, log the failure and fall back to the existing tmux `Agent(name:)` path. Do not modify the prompt shape during fallback; only the transport changes. Return `dispatch_decision=tmux-fallback`.
 
 Note: the cmux variant (visible split panes) is owned by agent-spawn §7.3 because it is a presentation-layer concern coupled to the orchestrator's pane lifecycle, not a backend choice. This skill returns Claude as the resolved backend and the caller decides cmux-vs-tmux via `execution.terminal_mux`.

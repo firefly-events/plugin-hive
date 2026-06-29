@@ -23,7 +23,7 @@ discussion. `$ARGUMENTS` carries the epic id.
 1. **Layer Inventory** (~30 lines) — every layer the requirement touches (backend, frontend, data, infra, etc.), one line each.
 2. **Per-Layer Requirements** (~100–200 lines) — for EACH layer: responsibility, key files/seams (real paths), what it must do overall, dependencies. This is the bulk of the document.
 3. **Cross-Layer Dependencies** (~50 lines) — how the layers depend on each other; the integration seams.
-4. **Layer Map Diagram** (~30 lines) — a Mermaid `graph TD` map of the layers and their relationships. Use standard fenced ` ```mermaid ``` ` blocks per `hive/references/planning-format-contract.md §3`.
+4. **Layer Map Diagram** (~30 lines) — a Mermaid `graph TD` map of the layers and their relationships. Use standard fenced ` ```mermaid ``` ` blocks per `hive/references/planning-format-contract.md §3`. Include `accTitle` and `accDescr` directives at the top of each block (e.g. `accTitle: Layer Map Diagram\naccDescr: Relationships between architectural layers`).
 5. **Scope Summary** (~20 lines) — overall LOC/complexity sense and which layers carry the most weight.
 
 ## Completeness gate (do not skip)
@@ -44,7 +44,7 @@ Write to `.pHive/epics/{epic-id}/docs/horizontal-plan.md`.
 After writing the markdown file, invoke the sidecar HTML generator to produce a `.html` sibling for browser preview:
 
 ```
-lib/html-sidecar-gen generateSidecar(".pHive/epics/{epic-id}/docs/horizontal-plan.md")
+python -m hive.lib.html_sidecar_gen ".pHive/epics/{epic-id}/docs/horizontal-plan.md"
 ```
 
 The generator is non-blocking — if it fails, log a warning and continue. The `.html` file is not committed to git by default (generated on-demand).

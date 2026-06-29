@@ -89,7 +89,7 @@ Use `data-src` for a known Frame0 PNG path; use `data-placeholder="description"`
 After writing the markdown file, invoke the sidecar HTML generator to produce a `.html` sibling for browser preview:
 
 ```
-lib/html-sidecar-gen generateSidecar(".pHive/epics/{epic-id}/docs/design-discussion.md")
+python -m hive.lib.html_sidecar_gen ".pHive/epics/{epic-id}/docs/design-discussion.md"
 ```
 
 The generator is non-blocking — if it fails, log a warning and continue. The `.html` file is not committed to git by default (generated on-demand).

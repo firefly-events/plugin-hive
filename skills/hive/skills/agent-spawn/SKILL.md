@@ -1,6 +1,6 @@
 # Agent Spawn Skill
 
-Spawn a roster agent with full config validation, persona injection, and memory loading. This skill enforces the pre-spawn checklist from the orchestrator persona — use it instead of raw TeamCreate or Agent calls for story-level work.
+Spawn a roster agent with full config validation, persona injection, and memory loading. This skill enforces the pre-spawn checklist from the orchestrator persona — use it instead of calling the `Agent` tool directly for story-level work.
 
 **Input:** `$ARGUMENTS` contains the agent name and story context.
 
@@ -61,7 +61,7 @@ Consume `resolved_backend`, `dispatch_decision`, and `dispatch_result`. When `re
 
 Read `hive.config.yaml` → `execution.terminal_mux`. Values:
 
-- `tmux` (default): use TeamCreate/Agent which spawns tmux panes natively
+- `tmux` (default): use `Agent(name:)` which spawns tmux panes natively
 - `cmux`: spawn the agent in a cmux split pane via the cmux CLI
 - `auto`: check `which cmux` first; if available, use cmux; otherwise tmux
 
@@ -74,9 +74,9 @@ interactive mode or one-shot mode:
 - `false`: launch in one-shot mode (`claude -p` / `codex exec`). Agent
   receives one prompt, runs, exits. No follow-up messaging possible.
 
-#### 7.2 Agent/TeamCreate call (claude backend, tmux path)
+#### 7.2 `Agent(name:)` call (claude backend, tmux path)
 
-When `terminal_mux` resolves to `tmux`, use the standard Agent/TeamCreate call:
+When `terminal_mux` resolves to `tmux`, use the standard `Agent(name:)` call:
 
 ```
 Agent(
@@ -88,7 +88,7 @@ Agent(
 ```
 #### 7.3 cmux pane spawn (claude backend, cmux path)
 When `terminal_mux` resolves to `cmux`, spawn the agent in a visible cmux
-split pane instead of using TeamCreate:
+split pane instead of using the `Agent` tool:
 1. **Pre-flight:** `which cmux` — if missing, fall back to tmux path with a
    warning (not a hard-fail; cmux is a visibility preference, not a backend).
 2. **Open pane:** `cmux new-split right` in the current workspace.
@@ -108,7 +108,7 @@ split pane instead of using TeamCreate:
    - Continuation context (respawn only)
    - Task — the story spec, step instructions, and inputs from prior steps
    This split matters: with `--append-system-prompt-file`, the persona is
-   injected as a system instruction with full authority. With TeamCreate/Agent,
+   injected as a system instruction with full authority. With `Agent(name:)`,
    the `prompt` parameter handled this implicitly. In cmux panes, we must be
    explicit — persona-as-user-message loses authority and agents drift.
 
@@ -154,7 +154,7 @@ split pane instead of using TeamCreate:
    and may mangle special characters.
    **Note:** cmux team execution (execute step 6b) requires `interactive_panes: true`.
    If the orchestrator detects `interactive_panes: false` with `terminal_mux: cmux`
-   and parallel stories, it should warn and fall back to TeamCreate (tmux path).
+   and parallel stories, it should warn and fall back to the `Agent(name:)` tmux path.
 7. **Clean up temp files** after delivery. Remove both `<persona-tempfile>` and
    `<task-tempfile>`.
 8. **Record in episode:** surface_id, terminal_mux: cmux, pane direction,
@@ -193,7 +193,7 @@ while skills, continuation context, and the task go as the first user message.
 Memory loading, skill injection, and respawn continuation are identical in
 content — only the injection point differs.
 **Prompt structure (shared by both paths):**
-For the **tmux path** (TeamCreate/Agent), all six parts are concatenated into
+For the **tmux path** (`Agent(name:)`), all six parts are concatenated into
 the single `prompt` parameter — the framework handles system-level injection:
 1. **Persona** — `persona_context.persona_text`
 2. **Domain note** — "You may modify files matching: {allow patterns}."
@@ -239,8 +239,8 @@ If `respawn_summary_path` is NOT provided, skip this step entirely — behavior 
 
 After spawning, report:
 - Agent name and model tier used
-- Backend: claude (Agent/TeamCreate) | codex (cmux pane via codex-invoke)
-- Terminal mux: tmux (TeamCreate) | cmux (surface id: X)
+- Backend: claude (`Agent(name:)`) | codex (cmux pane via codex-invoke)
+- Terminal mux: tmux (`Agent(name:)`) | cmux (surface id: X)
 - Respawn: yes (iteration {N} of 3) | no (fresh spawn)
 - Required tools: `persona_context.validated_tools` available / missing (with fallback)
 - Memories loaded: count and names
