@@ -1,20 +1,20 @@
 # Agent Teams Guide
 
-Agent teams are Claude Code's multi-agent system for parallel task execution. When available, Hive uses agent teams to run independent stories from an epic concurrently: the lead describes the work in natural language, and the Claude Code runtime materializes teammates automatically. Each story becomes a task assigned to a separate teammate with its own context window. When agent teams are unavailable, Hive falls back to sequential story execution.
+Agent teams are Claude Code's multi-agent system for parallel task execution. Hive uses agent teams to run independent stories from an epic concurrently: the lead describes the work in natural language, and the Claude Code runtime materializes teammates automatically. Each story becomes a task assigned to a separate teammate with its own context window. Parallel execution is the default for eligible story sets; projects opt out with `hive.config.yaml` → `execution.parallel_teams: false` or with the `--sequential` flag.
 
 Reference: https://code.claude.com/docs/en/agent-teams
 
 ## Detection
 
-Check whether agent teams are enabled by reading the environment variable:
+Agent teams are GA. Do not gate parallel execution on the legacy experimental environment variable:
 
 ```
-CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1    # or "true"
+CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
 ```
 
-If this env var is not set (or is `0`/`false`), agent teams are unavailable. The execute command must always fall back to sequential execution gracefully — no error messages, no warnings. Agent teams are an optimization, not a requirement.
+If this env var is present in an existing `.env` file, Hive treats it as deprecated and ignored for compatibility. It must not produce an error, warning, or sequential fallback.
 
-Also check `hive.config.yaml` → `execution.parallel_teams: true`. Both the env var AND the config must be enabled.
+Check `hive.config.yaml` → `execution.parallel_teams`. Parallel dispatch is enabled by default when the setting is absent. Only `execution.parallel_teams: false` opts out and routes eligible story sets to sequential execution.
 
 ## Mapping Epics to Teams
 
@@ -69,7 +69,7 @@ This is a separate variant, not the default auto-spawn path. The default path as
 ## Execution Flow
 
 1. **Lead reads the epic** — loads all story YAMLs, builds the dependency graph
-2. **Lead checks detection** — if `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is not `1`, falls back to sequential
+2. **Lead checks dispatch config** — if `execution.parallel_teams: false` or `--sequential` is set, falls back to sequential
 3. **Lead spawns the team** — describes tasks and dependencies in natural language
 4. **Teammates self-claim work** — each teammate picks the next available unblocked task
 5. **Dependencies auto-unblock** — when a task completes, tasks that depended on it become available

@@ -17,7 +17,7 @@
  *   AC-2  config execution.mode=sandcastle (env unset) → source=config
  *   AC-3  neither env nor config → source=default, existing resolution unchanged
  *   AC-4  no-regression: sessions mode still wins when sessions_enabled=true
- *   AC-5  no-regression: sequential mode when agent-teams disabled
+ *   AC-5  no-regression: sequential mode when execution.parallel_teams=false
  *   AC-6  telemetry line includes execution_mode={source}
  *   AC-7  env HIVE_EXECUTION_MODE set to unknown value → not sandcastle (ignored)
  */
@@ -74,9 +74,9 @@ function resolveDispatch(env = {}, config = {}) {
   const sessionsSource = env.HIVE_SESSIONS_ENABLED != null ? 'env'
     : (config.sessions && config.sessions.enabled != null ? 'config' : 'default');
 
-  const agentTeamsEnabled =
-    env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS === '1' ||
-    env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS === 'true';
+  const parallelTeams =
+    config.parallel_teams != null ? config.parallel_teams
+      : (config.execution && config.execution.parallel_teams != null ? config.execution.parallel_teams : true);
 
   // Step 1 – standard mode resolution (sandcastle already excluded above)
   let mode_decision;
@@ -85,9 +85,9 @@ function resolveDispatch(env = {}, config = {}) {
   if (sessionsEnabled) {
     mode_decision = 'sessions';
     mode_reason = 'sessions-enabled';
-  } else if (!agentTeamsEnabled) {
+  } else if (parallelTeams !== true) {
     mode_decision = 'sequential';
-    mode_reason = 'agent-teams-env-disabled';
+    mode_reason = 'parallel-teams-disabled';
   } else {
     // Simplified: no depth/cmux checks in this fixture — return team
     mode_decision = 'team';
@@ -156,10 +156,19 @@ test('AC-4b (no-regression): sessions wins when sessions.enabled:true in config'
   assert.equal(result.field_sources.execution_mode, 'default');
 });
 
-test('AC-5 (no-regression): sequential when agent-teams env disabled', () => {
-  const result = resolveDispatch({}, {});
+test('AC-5 (no-regression): sequential when execution.parallel_teams=false', () => {
+  const result = resolveDispatch(
+    {},
+    { execution: { parallel_teams: false } }
+  );
   assert.equal(result.mode_decision, 'sequential');
-  assert.equal(result.mode_reason, 'agent-teams-env-disabled');
+  assert.equal(result.mode_reason, 'parallel-teams-disabled');
+});
+
+test('AC-5b (no-regression): default parallel teams route does not require env gate', () => {
+  const result = resolveDispatch({}, {});
+  assert.equal(result.mode_decision, 'team');
+  assert.equal(result.mode_reason, 'team-checks-pass');
 });
 
 test('AC-6: telemetry line includes execution_mode={source}', () => {

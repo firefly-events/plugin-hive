@@ -31,11 +31,11 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
 | Scope | Tool | Why |
 |---|---|---|
-| **Parallelizing stories across the epic** | `Agent(name:)` or cmux panes | Stories run as named teammates via `Agent(name:)` — one call per story — or in separate cmux panes when `execution.terminal_mux: cmux`. Parallel teammates require `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (research preview, NOT GA); sequential is the guaranteed floor when the flag is unset. |
+| **Parallelizing stories across the epic** | `Agent(name:)` or cmux panes | Stories run as named teammates via `Agent(name:)` — one call per story — or in separate cmux panes when `execution.terminal_mux: cmux`. Parallel teammates are the default for eligible story sets; `execution.parallel_teams: false` or `--sequential` forces sequential execution. |
 | **Sequential workflow steps within a single story** | `Agent` | Steps within a teammate's pane run inline — this is correct |
 | **Specialist phase teams (pre-exec, post-exec)** | `Agent(name:)` | Specialist teams are independent coordination units — one `Agent(name:)` call per specialist team |
 
-Spawn each story as a named teammate via `Agent(name:)`. Sequential execution (no flag needed) is always available and is the guaranteed floor. Parallel teammates across stories require `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (research preview, NOT GA).
+Spawn each story as a named teammate via `Agent(name:)`. Sequential execution remains available through `execution.parallel_teams: false` or `--sequential`.
 
 ## Process
 

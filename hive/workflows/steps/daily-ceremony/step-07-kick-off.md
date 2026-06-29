@@ -41,7 +41,7 @@ Analyze the approved stories for independence:
 - **Dependent stories:** must execute in dependency order
 
 Decision matrix:
-- If 2+ independent stories AND `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`: use TeamCreate for parallel execution
+- If 2+ independent stories and `execution.parallel_teams` is not `false`: use parallel execution
 - If all stories are dependent (chain): execute sequentially using the Agent tool
 - If mixed: group independent stories into a parallel batch, chain dependent stories sequentially
 

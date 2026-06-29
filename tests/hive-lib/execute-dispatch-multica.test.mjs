@@ -49,9 +49,6 @@ function resolveExecutionMode({
     ) {
       modeDecision = "sessions";
       modeReason = "sessions-enabled";
-    } else if (!truthy(env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS)) {
-      modeDecision = "sequential";
-      modeReason = "agent-teams-env-disabled";
     } else if (config.execution?.parallel_teams === false) {
       modeDecision = "sequential";
       modeReason = "parallel-teams-disabled";
@@ -110,11 +107,12 @@ test("AC3: env multica wins over config sandcastle", () => {
 test("AC4: unknown config execution.mode falls through without error", () => {
   const result = resolveExecutionMode({
     config: { execution: { mode: "bogus" } },
+    hasPeerDepth: true,
   });
 
   assert.equal(result.field_sources.execution_mode, "default");
-  assert.equal(result.mode_decision, "sequential");
-  assert.equal(result.mode_reason, "agent-teams-env-disabled");
+  assert.equal(result.mode_decision, "team");
+  assert.equal(result.mode_reason, "team-checks-pass");
 });
 
 test("AC5: multica participates in the Step 1.5 parallel gate", () => {
@@ -127,10 +125,21 @@ test("AC5: multica participates in the Step 1.5 parallel gate", () => {
   assert.equal(result.parallel_gate_runs, true);
 });
 
-test("AC6: no execution_mode override defaults through to sequential", () => {
-  const result = resolveExecutionMode();
+test("AC6: no execution_mode override defaults to parallel when peer depth exists", () => {
+  const result = resolveExecutionMode({ hasPeerDepth: true });
+
+  assert.equal(result.field_sources.execution_mode, "default");
+  assert.equal(result.mode_decision, "team");
+  assert.equal(result.mode_reason, "team-checks-pass");
+});
+
+test("AC7: execution.parallel_teams=false routes to sequential", () => {
+  const result = resolveExecutionMode({
+    config: { execution: { parallel_teams: false } },
+    hasPeerDepth: true,
+  });
 
   assert.equal(result.field_sources.execution_mode, "default");
   assert.equal(result.mode_decision, "sequential");
-  assert.equal(result.mode_reason, "agent-teams-env-disabled");
+  assert.equal(result.mode_reason, "parallel-teams-disabled");
 });
