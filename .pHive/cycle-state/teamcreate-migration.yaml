@@ -2,7 +2,7 @@ hermes_reconciler:
   epic: teamcreate-migration
   gate_state: null
   epic_of_record: teamcreate-migration
-  current_phase: execution_ready
+  current_phase: complete
   planning_gate_state: complete
   planning_issue_id: 2ba9b1cf-c153-4ecb-8524-6c5dd5181b5f
   planning_completed_at: '2026-06-29T09:30:00Z'
