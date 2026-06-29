@@ -328,7 +328,7 @@ execution:
   idle_timeout_seconds: 300
 ```
 
-`agent_backends` controls per-agent backend selection. Unset agents stay on the default Claude path; configured agents can route through Codex instead of `TeamCreate`.
+`agent_backends` controls per-agent backend selection. Unset agents stay on the default Claude path; configured agents can route through Codex instead of the default auto-spawned Claude path.
 
 `execution.terminal_mux` controls how visible panes are opened for agent execution:
 - `tmux` uses the standard tmux path
