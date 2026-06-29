@@ -1,0 +1,5 @@
+story: s4-env-gate-removal
+epic: teamcreate-migration
+verdict: passed
+attempt: 1
+phase: integrate
