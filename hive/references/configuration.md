@@ -94,7 +94,7 @@ steps, see `hive/references/state-relocation.md`.
 
 ### Sessions (Managed Agent Execution)
 
-When `sessions.enabled: true` (or `HIVE_SESSIONS_ENABLED=1` env var), the execute skill uses the Claude Agent SDK `/v1/sessions` API instead of `TeamCreate` for story-level execution. The session registry at `${HIVE_STATE_DIR}/sessions/index.yaml` tracks all active sessions.
+When `sessions.enabled: true` (or `HIVE_SESSIONS_ENABLED=1` env var), the execute skill uses the Claude Agent SDK `/v1/sessions` API for story-level execution (v2.1.178+ auto-spawn model). The session registry at `${HIVE_STATE_DIR}/sessions/index.yaml` tracks all active sessions.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
