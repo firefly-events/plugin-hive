@@ -19,6 +19,7 @@ This file is the project's domain glossary. Schema: [`hive/references/context-md
 - **Episode** — a step-completion record at `.pHive/episodes/{epic-id}/{story-id}/{step-id}.yaml`. Marks a workflow step's status.
 - **Cycle state** — accumulated cross-phase decisions for an epic at `.pHive/cycle-state/{epic-id}.yaml`. Includes escalations consumed by specialist teams.
 - **Specialist team** — pre-exec or post-exec team triggered by escalations (e.g., `security:plan-audit`, `performance:audit`). Defined in `hive/references/specialist-triggers.md`.
+- **Swarm** — the wider, phase-level coordination unit spanning multiple teams and phases (planning → development → testing → security). A team is a strict subset of a swarm: team ⊂ swarm. Swarm artifacts are cross-session and durable because they are filesystem-persisted; intra-team coordination is session-bound and ephemeral via `SendMessage`.
 - **Sidecar** — an append-placement specialist that runs alongside a story's main steps rather than as a separate phase.
 - **Skill** — an auto-discovered capability at `skills/{name}/SKILL.md`. The user-invocable surface (`/plan`, `/execute`, etc.).
 - **Reference** — a non-skill canonical doc at `hive/references/`. Cited by skills/agents but not directly invocable.
