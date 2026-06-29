@@ -6,7 +6,7 @@
  *
  * Three cases:
  *   a) Messages-API spawn with structured bypass marker — ALLOW
- *   b) TeamCreate spawn — ALLOW
+ *   b) Natural-language teammate spawn emits no tool call, so unrelated tools remain ALLOW
  *   c) Existing orchestrator-pattern catalog match — BLOCK
  */
 
@@ -19,6 +19,7 @@ const { spawnSync } = require('node:child_process');
 
 const REPO_ROOT = path.join(__dirname, '..', '..');
 const HOOK_PATH = path.join(REPO_ROOT, 'hooks', 'check-agent-misuse.sh');
+const SPAWN_GUIDANCE = /Use natural-language teammate spawn instead: describe the team and each teammate's tasks in your prompt/;
 
 function runHook(payload) {
   const result = spawnSync(HOOK_PATH, {
@@ -70,14 +71,14 @@ test('case a — Messages-API bypass requires the structured marker', async (t) 
 });
 
 // ---------------------------------------------------------------------------
-// Case (b): TeamCreate fallback path — ALLOW
+// Case (b): Natural-language teammate spawn has no positive tool signal.
 // ---------------------------------------------------------------------------
-test('case b — TeamCreate fallback path remains allowed', () => {
+test('case b — unrelated tools remain allowed because only Agent calls are checked', () => {
   const result = runHook({
-    tool_name: 'TeamCreate',
+    tool_name: 'SendMessage',
     tool_input: {
-      prompt: 'Execute story from .pHive/epics/cwc-2026-integration/stories/s10-a7-agent-spawn-flow-hook-relax.yaml via team workflow.',
-      description: 'team create for full story execution fallback',
+      prompt: 'Ask an existing teammate for status on a story workflow.',
+      description: 'message existing teammate',
     },
   });
 
@@ -100,7 +101,7 @@ test('case c — existing orchestrator-pattern catalog still blocks story execut
     });
 
     assert.equal(result.status, 2, `expected BLOCK, got exit=${result.status} stdout=${result.stdout} stderr=${result.stderr}`);
-    assert.match(result.stderr, /Use TeamCreate/, 'block reason should direct caller to TeamCreate');
+    assert.match(result.stderr, SPAWN_GUIDANCE, 'block reason should direct caller to natural-language teammate spawn');
   });
 
   await t.test('description catalog: whole-story delegation phrasing blocks', () => {
@@ -114,6 +115,7 @@ test('case c — existing orchestrator-pattern catalog still blocks story execut
 
     assert.equal(result.status, 2, `expected BLOCK, got exit=${result.status} stdout=${result.stdout} stderr=${result.stderr}`);
     assert.match(result.stderr, /whole-story delegation/i);
+    assert.match(result.stderr, SPAWN_GUIDANCE, 'block reason should use the shared spawn guidance');
   });
 
   await t.test('epic execution catalog still blocks', () => {
@@ -127,5 +129,6 @@ test('case c — existing orchestrator-pattern catalog still blocks story execut
 
     assert.equal(result.status, 2, `expected BLOCK, got exit=${result.status} stdout=${result.stdout} stderr=${result.stderr}`);
     assert.match(result.stderr, /epic-level execution/i);
+    assert.match(result.stderr, SPAWN_GUIDANCE, 'block reason should use the shared spawn guidance');
   });
 });

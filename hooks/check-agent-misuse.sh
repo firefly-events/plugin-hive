@@ -2,8 +2,8 @@
 # check-agent-misuse.sh — PreToolUse hook for Agent tool
 #
 # Detects when the orchestrator is likely using Agent to execute
-# full stories (should use TeamCreate instead). Checks the Agent
-# tool_input.prompt for story-level delegation patterns.
+# full stories. Checks the Agent tool_input.prompt for story-level
+# delegation patterns and points callers to natural-language teammate spawn.
 #
 # Exit codes:
 #   0 = allow (no story-level patterns detected)
@@ -17,6 +17,7 @@ HIVE_ROOT="${HIVE_ROOT:-$(dirname "$SCRIPT_DIR")}"
 . "$HIVE_ROOT/hooks/common.sh"
 
 BYPASS_MARKER="__MESSAGES_SESSION_BYPASS__"
+SPAWN_GUIDANCE="Use natural-language teammate spawn instead: describe the team and each teammate's tasks in your prompt."
 
 # Escape a literal string for safe use inside an ERE alternative.
 _escape_ere() {
@@ -66,9 +67,9 @@ if echo "$prompt" | grep -qiE "$story_regex"; then
   if [ "$story_count" -ge 1 ]; then
     # Check for workflow execution signals (not just reading a story for context)
     if echo "$prompt" | grep -qiE '(execute.*stor|implement.*stor|workflow.*phase|development.*workflow|research.*implement.*test|review.*integrate)'; then
-      echo "BLOCKED: Agent tool used to execute story-level work. Use TeamCreate for story execution." >&2
+      echo "BLOCKED: Agent tool used to execute story-level work. $SPAWN_GUIDANCE" >&2
       echo "Detected $story_count story reference(s) with workflow execution patterns." >&2
-      echo "The orchestrator must delegate stories via TeamCreate, not Agent." >&2
+      echo "The orchestrator must delegate stories via natural-language teammate spawn, not Agent." >&2
       exit 2
     fi
   fi
@@ -76,8 +77,8 @@ fi
 
 # Pattern 2: Agent prompt contains epic execution language
 if echo "$prompt" | grep -qiE '(execute.*epic|epic.*execution|execute all stories|run the stories)'; then
-  echo "BLOCKED: Agent tool used for epic-level execution. Use TeamCreate instead." >&2
-  echo "The orchestrator delegates epics and stories via TeamCreate, not Agent." >&2
+  echo "BLOCKED: Agent tool used for epic-level execution. $SPAWN_GUIDANCE" >&2
+  echo "The orchestrator delegates epics and stories via natural-language teammate spawn, not Agent." >&2
   exit 2
 fi
 
@@ -87,7 +88,7 @@ fi
 # `Agent` path documented in SKILL.md is "Sequential workflow steps within a
 # single story" — those descriptions name the step, not the whole story.
 if echo "$description" | grep -qiE '(story execution|execute (the )?(entire|full|whole) story|run (the )?(entire|full|whole) story|implement (the )?(entire|full|whole) story|execute all steps)'; then
-  echo "BLOCKED: Agent description indicates whole-story delegation. Use TeamCreate." >&2
+  echo "BLOCKED: Agent description indicates whole-story delegation. $SPAWN_GUIDANCE" >&2
   exit 2
 fi
 
