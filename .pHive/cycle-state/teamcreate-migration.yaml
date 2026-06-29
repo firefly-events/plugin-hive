@@ -1,0 +1,37 @@
+hermes_reconciler:
+  epic: teamcreate-migration
+  gate_state: null
+  epic_of_record: teamcreate-migration
+  current_phase: execution_ready
+  planning_gate_state: complete
+  planning_issue_id: 2ba9b1cf-c153-4ecb-8524-6c5dd5181b5f
+  planning_completed_at: '2026-06-29T09:30:00Z'
+  in_flight_story_id: null
+  in_flight_task_id: null
+  dispatched_at: null
+  stuck_after_seconds: 1800
+  stories:
+  - story_id: s1-tool-grant-removal
+    phase_position: done
+    attempt: 1
+    verdict: passed
+  - story_id: s2-skill-instruction-rewrite
+    phase_position: done
+    attempt: 1
+    verdict: passed
+  - story_id: s3-reference-docs-rewrite
+    phase_position: done
+    attempt: 1
+    verdict: passed
+  - story_id: s4-env-gate-removal
+    phase_position: done
+    attempt: 1
+    verdict: passed
+  - story_id: s5-hook-redesign
+    phase_position: done
+    attempt: 1
+    verdict: passed
+  - story_id: s6-trust-boundary-doc
+    phase_position: done
+    attempt: 1
+    verdict: passed
