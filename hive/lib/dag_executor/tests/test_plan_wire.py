@@ -98,16 +98,16 @@ def test_multica_example_log_uses_dag_plan_graph():
 
 
 def test_default_mode_routes_to_direct_not_dag():
-    """When backend is unset, routing falls through to direct/TeamCreate."""
+    """When backend is unset, routing falls through to direct (auto-spawn)."""
     text = skill_text()
-    # The `agent_backends-unset` reason should still route to TeamCreate (direct)
+    # The `agent_backends-unset` reason should still route to direct (auto-spawn)
     assert "agent_backends-unset" in text, (
         "planning-routing must still define agent_backends-unset fallback reason "
         "for default (unset backend) mode"
     )
     # The default path must not be removed
-    assert "Direct path" in text or "TeamCreate" in text, (
-        "planning-routing must preserve the direct/TeamCreate path for default mode"
+    assert "direct" in text, (
+        "planning-routing must preserve the direct path for default mode"
     )
 
 
@@ -116,9 +116,9 @@ def test_local_fallback_not_dag_when_unset():
     text = skill_text()
     # The `resolve_spawn_binding` / DAG dispatch appears only in the multica branch
     # Confirm the default/local path section does not mention DAG dispatch
-    # The TeamCreate path should still exist for direct-routed personas
-    assert "TeamCreate" in text, (
-        "Direct path (TeamCreate) must be preserved for local fallback when "
+    # The direct (auto-spawn) path should still exist for direct-routed personas
+    assert "direct" in text, (
+        "Direct path (auto-spawn) must be preserved for local fallback when "
         "planning.mode is unset or default"
     )
 

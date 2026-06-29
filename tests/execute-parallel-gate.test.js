@@ -251,7 +251,7 @@ const readOnlyResearchSwarm = [
 // Tests
 // ---------------------------------------------------------------------------
 
-test('AC-1: 3 disjoint bounded-slice peers fan out as TeamCreates', () => {
+test('AC-1: 3 disjoint bounded-slice peers fan out as auto-spawned teammates', () => {
   const result = runParallelGate(threeDisjointBoundedSlice, 'team');
   assert.equal(result.mode_decision, 'team', 'mode preserved');
   assert.equal(result.gate_violations.length, 0, 'no violations');
