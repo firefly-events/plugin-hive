@@ -115,7 +115,7 @@ Use `routing_decisions` to assemble one conceptual planning team:
   H/V, structured-outline sign-off) and MUST present and wait at them locally
   after the graph completes. Do not also create local teammates for a
   multica-routed persona unless DAG fallback is triggered.
-- **Direct path (`Agent(name:)`):** collect every persona routed `direct` and spawn each as an `Agent(name:)` teammate. Parallel dispatch requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (research preview, NOT GA); without the flag, execution is SEQUENTIAL — the guaranteed floor. Use Step 0.4 and include only direct-routed personas in `## Team Members`.
+- **Direct path (`Agent(name:)`):** collect every persona routed `direct` and spawn each as an `Agent(name:)` teammate. Parallel dispatch is the default for eligible teammate sets; `execution.parallel_teams: false` or `--sequential` forces sequential execution. Use Step 0.4 and include only direct-routed personas in `## Team Members`.
 - **Codex path (`agent-spawn` -> `codex-invoke`):** for each persona routed `codex`, create a separate persistent-pane teammate through `agent-spawn`, passing full persona context, resolved paths, memory loading context, and the same planning-team coordination context direct teammates receive.
 
 Mixed teams are valid. Some planning personas may come from

@@ -14,7 +14,7 @@ Atomic skill, NOT inline `/review` prose. It resolves the pre-execution dispatch
 
 Call this skill once at the single `/review` dispatch point where the caller has both the story execution context and the current workflow handoff context.
 
-**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, `HIVE_REVIEW_MODE`, and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; `epic_id` when known; `arguments` containing the `--sequential` flag state and dependency-depth summary; and `unblocked_stories[]` — the depth-0 ready stories at this dispatch tick, each carrying at minimum `id`, `parallel_allowed`, `parallel_rationale`, and (for `parallel_rationale: bounded-slice`) `files_to_modify[]` whose entries name the declared touch-set. Empty or single-element `unblocked_stories[]` is valid: the parallel-dispatch gate (Step 1.5) skips when there is no peer set to gate.
+**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, and `HIVE_REVIEW_MODE`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; `epic_id` when known; `arguments` containing the `--sequential` flag state and dependency-depth summary; and `unblocked_stories[]` — the depth-0 ready stories at this dispatch tick, each carrying at minimum `id`, `parallel_allowed`, `parallel_rationale`, and (for `parallel_rationale: bounded-slice`) `files_to_modify[]` whose entries name the declared touch-set. Empty or single-element `unblocked_stories[]` is valid: the parallel-dispatch gate (Step 1.5) skips when there is no peer set to gate.
 
 **Flag pass-through:** `--sequential` must be forwarded verbatim to the resolved mode atom (`review-mode-multica` or `review-mode-cc-workflows`). This dispatch skill does NOT consume or strip that flag — it captures it from `arguments` and passes it along unchanged so the receiving atom can apply the same gate-check and pipeline-skipping logic as the inline path.
 
@@ -31,11 +31,10 @@ Call this skill once at the single `/review` dispatch point where the caller has
 The mode selection uses these exact match conditions, in precedence order:
 
 1. **Sessions check:** match when `env.HIVE_SESSIONS_ENABLED` is exactly truthy by string normalization (`1`, `true`, or `"true"`) OR root `hive.config.yaml` has `sessions.enabled: true`. This wins over every team or sequential input.
-2. **Teams availability check:** match only when `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is exactly truthy by string normalization (`1`, `true`, or `"true"`).
-3. **Parallel teams config check:** evaluate the resolved `parallel_teams` boolean from Step 0 below. The legacy reads (root `hive.config.yaml` `parallel_teams: true` or `execution.parallel_teams: true`) become the config-source path inside Step 0; this step matches whenever the resolved boolean is `true`.
-4. **Concurrency and flag check:** match only when the dependency-depth summary shows more than one story at the same depth AND `arguments` does not contain `--sequential`.
+2. **Parallel teams config check:** evaluate the resolved `parallel_teams` boolean from Step 0 below. The legacy reads (root `hive.config.yaml` `parallel_teams` or `execution.parallel_teams`) become the config-source path inside Step 0; this step matches whenever the resolved boolean is `true`.
+3. **Concurrency and flag check:** match only when the dependency-depth summary shows more than one story at the same depth AND `arguments` does not contain `--sequential`.
 
-The cmux variant is not a separate team gate. After all four team checks match, return `team-cmux` when the resolved `terminal_mux` from Step 0 equals `cmux`; otherwise return `team`.
+The cmux variant is not a separate team gate. After the parallel config and concurrency checks match, return `team-cmux` when the resolved `terminal_mux` from Step 0 equals `cmux`; otherwise return `team`.
 
 ## Sane Defaults
 
@@ -153,12 +152,11 @@ When the first branch above selects `mode_decision ∈ {cc-workflows, multica}`,
 Evaluate in this order and stop at the first selected path:
 
 1. If the sessions check matches, return `mode_decision=sessions` and `mode_reason=sessions-enabled`.
-2. If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is not truthy, return `mode_decision=sequential` and `mode_reason=agent-teams-env-disabled`.
-3. If parallel teams config is not true, return `mode_decision=sequential` and `mode_reason=parallel-teams-disabled`.
-4. If the dependency-depth summary does not show multiple stories at the same depth, return `mode_decision=sequential` and `mode_reason=no-peer-depth`.
-5. If `--sequential` is present in `arguments`, return `mode_decision=sequential` and `mode_reason=sequential-flag`.
-6. When the resolved `terminal_mux` field (from Step 0, env > config > default) equals `cmux`, return `mode_decision=team-cmux` and `mode_reason=team-checks-pass-cmux`.
-7. Otherwise return `mode_decision=team` and `mode_reason=team-checks-pass`.
+2. If parallel teams config is not true, return `mode_decision=sequential` and `mode_reason=parallel-teams-disabled`.
+3. If the dependency-depth summary does not show multiple stories at the same depth, return `mode_decision=sequential` and `mode_reason=no-peer-depth`.
+4. If `--sequential` is present in `arguments`, return `mode_decision=sequential` and `mode_reason=sequential-flag`.
+5. When the resolved `terminal_mux` field (from Step 0, env > config > default) equals `cmux`, return `mode_decision=team-cmux` and `mode_reason=team-checks-pass-cmux`.
+6. Otherwise return `mode_decision=team` and `mode_reason=team-checks-pass`.
 
 This preserves precedence: `sessions > team-cmux > team > sequential`.
 

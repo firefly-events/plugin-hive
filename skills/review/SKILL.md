@@ -34,7 +34,7 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 Call `skills/hive/skills/review-dispatch/SKILL.md` once before doing any other work. Pass:
 
-- `env` — current process environment (at minimum `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, `HIVE_REVIEW_MODE`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`)
+- `env` — current process environment (at minimum `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, `HIVE_REVIEW_MODE`)
 - `rootConfig` — parsed root `hive.config.yaml`
 - `consumerConfig` — parsed `.pHive/hive.config.yaml` or `None`
 - `graduationRegistry` — parsed graduation registry workflow list or `None`
