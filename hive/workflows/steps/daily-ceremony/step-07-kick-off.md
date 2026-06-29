@@ -47,9 +47,9 @@ Decision matrix:
 
 ### 2. Set up parallel execution (if applicable)
 For parallel teams:
-- Use `TeamCreate` to create a team for the session
+- Describe the team in natural language; the runtime materializes teammates automatically
 - Create tasks for each independent story using `TaskCreate`
-- Spawn teammates using the Agent tool with `team_name` and `name` parameters
+- Spawn teammates using the Agent tool with `name` parameters
 - Each teammate receives: story spec, cycle state, relevant agent memories, development workflow
 
 ### 3. Execute each story through its development workflow

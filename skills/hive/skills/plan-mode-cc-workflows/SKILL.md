@@ -19,7 +19,7 @@ HIVE_STATE_DIR = hive_config.paths.state_dir || ".pHive"
 
 All episode markers, messages sidecars, transcript references, and run summaries are rooted under that resolved state dir unless the Workflow tool returns an absolute transcript path.
 
-Kickoff-gate fall-through behavior is explicit: if the runtime precondition gate rejects this mode, emit a structured `precondition_failed` error with `field_sources` and return control to `planning-routing`; do not silently fall through to direct `TeamCreate`, Codex, or Multica planning paths. Fallback to those paths is the caller's responsibility (`planning-routing` Step 0.5) and is gated on this skill returning a structured rejection, not on a silent partial dispatch.
+Kickoff-gate fall-through behavior is explicit: if the runtime precondition gate rejects this mode, emit a structured `precondition_failed` error with `field_sources` and return control to `planning-routing`; do not silently fall through to direct natural-language spawn, Codex, or Multica planning paths. Fallback to those paths is the caller's responsibility (`planning-routing` Step 0.5) and is gated on this skill returning a structured rejection, not on a silent partial dispatch.
 
 Delegation rules: the orchestrator coordinates Workflow script assembly, Workflow invocation, polling, episode marker writes, and summary return; it does not write planning documents itself. Workflow agents execute assigned persona steps and return structured planning-artifact payloads (paths plus brief content summaries). Persona behavior is loaded from `hive/agents/<persona>.md`; do not improvise inline personas. **All workflow agents run on the default workflow subagent (no Codex `agentType`)** — cc-workflows mode is intentionally an inline-Claude substrate so the returned `<result>` IS the work product. `agentType: "codex:codex-rescue"` is forbidden here because it forwards to a separate Codex CLI run and returns a status report immediately, breaking the dispatch → immediate file-list return → episode marker write → reconcile contract. Codex routing belongs to the other planning paths (`planning-routing`'s `codex-invoke` route via cmux panes); cc-workflows mode is an inline-Claude substrate and intentionally does not overlap.
 
@@ -38,7 +38,7 @@ The resolver lives in `/plan` Phase 0c and mirrors the multica resolver shape:
 - Any other value falls through to the existing planning-routing path (multica, codex, direct).
 - Env wins over config.
 
-On selection, `/plan` Phase 0 routes the assembled planning cell here instead of spawning direct `TeamCreate`, Codex, or Multica teammates.
+On selection, `/plan` Phase 0 routes the assembled planning cell here instead of spawning direct natural-language spawn, Codex, or Multica teammates.
 
 **Inputs:**
 - `assembled_personas[]` — ordered final planning persona names (e.g. `researcher`, `technical-writer`, `architect`, `tpm`, `ui-designer`).
