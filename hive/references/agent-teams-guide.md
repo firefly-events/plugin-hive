@@ -1,6 +1,6 @@
 # Agent Teams Guide
 
-Agent teams are Claude Code's experimental multi-agent system for parallel task execution. When available, Hive uses agent teams to run independent stories from an epic concurrently — each story becomes a task assigned to a separate teammate with its own context window. When agent teams are unavailable, Hive falls back to sequential story execution.
+Agent teams are Claude Code's multi-agent system for parallel task execution. When available, Hive uses agent teams to run independent stories from an epic concurrently: the lead describes the work in natural language, and the Claude Code runtime materializes teammates automatically. Each story becomes a task assigned to a separate teammate with its own context window. When agent teams are unavailable, Hive falls back to sequential story execution.
 
 Reference: https://code.claude.com/docs/en/agent-teams
 
@@ -37,15 +37,11 @@ Rules:
 
 ## Team Prompt Generation
 
-Agent teams are created via the `TeamCreate` tool with natural language prompts, not by writing JSON config files.
+Agent teams are created from natural-language prompts. The lead describes the team, tasks, dependencies, and handoff requirements; the Claude Code runtime reads that prose and auto-spawns the teammates. There is no explicit team-creation tool call and no JSON team config to author in Hive.
 
-**Tool hierarchy:**
-- **Orchestrator → stories:** `TeamCreate` spawns each story-level teammate in a separate tmux pane by default.
-- **Teammates → workflow steps:** Each teammate uses the `Agent` tool internally to spawn sub-workers (researcher, developer, tester) for individual workflow steps. These run inline within the teammate's pane — this is correct.
-
-### cmux in the tool hierarchy
-
-When `execution.terminal_mux` resolves to `cmux`, Hive keeps the same story-level delegation rules but changes the dispatch mechanism. The orchestrator no longer relies on a single `TeamCreate` call to manage panes. Instead, it spawns each story through the agent-spawn skill, which opens a cmux split pane, launches `claude` directly, and returns a `surface_id` for later messaging and polling.
+**Spawn hierarchy:**
+- **Orchestrator → stories:** the orchestrator describes each story-level task and dependency in prose. The runtime creates a teammate for each unblocked story and gives each teammate an isolated context window.
+- **Teammates → workflow steps:** each teammate uses the `Agent` tool internally to spawn sub-workers (researcher, developer, tester) for individual workflow steps. These run inline within the teammate's pane; nested story-level teams are still forbidden.
 
 The execute command describes the team structure and dependencies in prose:
 
@@ -64,6 +60,12 @@ Each task prompt includes:
 - The agent persona to use for each phase
 - Episode write instructions so downstream tasks receive handoff context
 
+### Alternative: cmux Orchestrator Variant
+
+When `execution.terminal_mux` resolves to `cmux`, Hive keeps the same story-level delegation rules but changes the dispatch mechanism. The orchestrator manages panes itself: it spawns each story through the agent-spawn skill, which opens a cmux split pane, launches `claude` directly, and returns a `surface_id` for later messaging and polling.
+
+This is a separate variant, not the default auto-spawn path. The default path asks Claude Code to materialize teammates from the lead's prose; the cmux variant makes Hive own pane creation and completion polling.
+
 ## Execution Flow
 
 1. **Lead reads the epic** — loads all story YAMLs, builds the dependency graph
@@ -78,7 +80,7 @@ Each teammate operates in its own context window. The shared task list with depe
 
 ## cmux Native Execution
 
-Overview: when `terminal_mux` is `cmux`, the orchestrator replaces `TeamCreate` as the parallelism manager. Stories run in cmux panes, coordinated by the orchestrator's poll loop.
+Overview: when `terminal_mux` is `cmux`, the orchestrator becomes the parallelism manager. Stories run in cmux panes, coordinated by the orchestrator's poll loop.
 
 v2 API primitives:
 
@@ -89,19 +91,19 @@ v2 API primitives:
 - `surface.close` — close the pane after completion or failure
 - `notification.create_for_surface` — target notifications to a specific pane
 
-Differences from TeamCreate:
+Differences from the default auto-spawn path:
 
-| Aspect | TeamCreate | cmux native |
+| Aspect | Default auto-spawn | cmux native |
 |--------|-----------|-------------|
-| Dispatch | Single TeamCreate call | Orchestrator loops, spawns per story |
+| Dispatch | Natural-language team description materialized by the runtime | Orchestrator loops, spawns per story |
 | Dependency mgmt | Framework-managed | Orchestrator-managed (poll + spawn) |
 | Messaging | SendMessage(to: name) | surface.send_text to surface_id |
 | Completion | Task result returned | [STORY-COMPLETE:{story-id}] marker + surface.health |
-| Pane type | tmux | cmux |
+| Pane type | runtime-managed | cmux |
 
 When to prefer cmux: the user is already working in cmux, wants direct pane interaction, or wants to inspect and message agents mid-execution.
 
-Limitations: polling adds latency versus event-driven TeamCreate; the orchestrator must stay alive to manage the loop; nested teams are still not allowed.
+Limitations: polling adds latency versus runtime-managed auto-spawn; the orchestrator must stay alive to manage the loop; nested teams are still not allowed.
 
 ## Fallback: Sequential Execution
 

@@ -14,7 +14,7 @@ This file is the project's domain glossary. Schema: [`hive/references/context-md
 - **Kickoff Gate** — initialization check that skills perform before running (verifies `.pHive/project-profile.yaml` + `hive.config.yaml`). See [`hive/references/skill-prelude.md`](../hive/references/skill-prelude.md). Five read-only-shaped skill modes (status, review, test, standup, design-review implementation target) lift the gate to a warning instead of hard-blocking — see story `w1-warning-lift`.
 - **Persona** — an agent identity defined at `hive/agents/{name}.md`. Roster includes researcher, developer (frontend/backend), tester, reviewer, peer-validator, architect, analyst, tpm, ui-designer, technical-writer, pair-programmer, team-lead, plus specialists.
 - **Roster** — the set of personas available to spawn. Agents off the roster are forbidden — see `feedback_use_roster_agents` memo.
-- **Backend** — execution backend for an agent. Either direct (Claude via TeamCreate) or `codex` (codex-rescue subagent). Routing controlled by `agent_backends` in root `hive.config.yaml`.
+- **Backend** — execution backend for an agent. Either direct (Claude via auto-spawned agent teams from a natural-language prompt) or `codex` (codex-rescue subagent). In the direct path, the lead describes the team and its tasks; the Claude Code runtime materializes teammates automatically. No explicit team-creation tool call is required. Routing controlled by `agent_backends` in root `hive.config.yaml`.
 - **Substrate** — a foundational layer that other things depend on. Examples: skill-prelude.md (W0 substrate for W1/W2), CONTEXT.md (substrate for Grill atomic skill).
 - **Episode** — a step-completion record at `.pHive/episodes/{epic-id}/{story-id}/{step-id}.yaml`. Marks a workflow step's status.
 - **Cycle state** — accumulated cross-phase decisions for an epic at `.pHive/cycle-state/{epic-id}.yaml`. Includes escalations consumed by specialist teams.
@@ -60,7 +60,7 @@ This file is the project's domain glossary. Schema: [`hive/references/context-md
 - **Codex for work, Claude for verification.** Researcher / developer(s) / technical-writer / architect spawn through Codex; reviewer / tester / peer-validator / specialists / TPM / analyst stay on Claude. See `feedback_codex_general_backend`.
 - **Codex returns file lists; the orchestrator commits.** Codex sandbox cannot acquire `.git/index.lock`. See `feedback_codex_sandbox_commit_block`.
 - **Serial Codex dispatch.** `Agent(isolation: worktree)` does NOT isolate codex-rescue subagents — parallel dispatch races. See `feedback_codex_parallel_race`.
-- **Orchestrator must honor `agent_backends`.** Raw `Agent(team_name=)` bypasses Codex routing; spawn through the agent-spawn pathway. See `feedback_orchestrator_must_honor_backend_routing`.
+- **Orchestrator must honor `agent_backends`.** Raw `Agent` spawns bypass Codex routing and can ignore the configured backend path; spawn through the agent-spawn pathway. See `feedback_orchestrator_must_honor_backend_routing`.
 - **Story status YAMLs lag reality.** Trust git + disk over the `status:` field in story YAMLs. See `feedback_story_status_stale`.
 - **Don't paper-over disagreements via counting.** When numbers disagree because of granularity mismatch, reconcile inline rather than flagging. See `feedback_paper_over_via_counting`.
 - **Hook gotcha.** `check-agent-misuse.sh` blocks Agent prompts with `.pHive/epics/.../stories/X.yaml` + execution verbs. Reword to avoid proximity. See `feedback_execute_epic_regex_false_positive`.
