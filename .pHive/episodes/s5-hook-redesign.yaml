@@ -1,0 +1,7 @@
+episode:
+  issue_id: 556b68ab-e0ea-475d-8f05-46408d975e9d
+  epic: teamcreate-migration
+  story: s5-hook-redesign
+  status: completed
+  verdict: passed
+  completed_at: 2026-06-29T01:03:34-05:00

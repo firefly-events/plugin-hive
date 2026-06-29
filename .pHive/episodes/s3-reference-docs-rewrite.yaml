@@ -1,0 +1,7 @@
+episode:
+  issue_id: 03d4e6fc-8f02-4cd1-a671-8566dc97f3af
+  epic: teamcreate-migration
+  story: s3-reference-docs-rewrite
+  status: completed
+  verdict: passed
+  completed_at: 2026-06-29T00:58:51-05:00
