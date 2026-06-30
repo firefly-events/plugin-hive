@@ -1,0 +1,158 @@
+id: q011-fable5-orchestrator
+epic: model-routing-claude5
+title: "Designate Fable 5 as Hive's default orchestrator and architect model"
+status: pending
+complexity: small
+methodology: classic
+wave: W2
+action_id: PLAN-Q-011
+depends_on:
+  - q019-classify-sonnet5
+parallel_allowed: true
+parallel_rationale: bounded-slice
+files_to_modify:
+  - file: hive/agents/orchestrator.md
+    change: "Update frontmatter model: from opus to fable; update routing table top tier"
+  - file: hive/agents/architect.md
+    change: "Update frontmatter model: from sonnet to fable"
+  - file: hive/references/configuration.md
+    change: "Add Fable 5 context/output limit guidance (advertised 1M-context / 128K-output)"
+  - file: hive/references/agent-config-schema.md
+    change: "Add fable tier alias row to model tier table"
+  - file: hive/hive.config.yaml
+    change: "Add fable tier alias mapping to claude-fable-5 in model_tiers"
+
+description: |
+  Designate claude-fable-5 as Hive's preferred top-tier orchestration and architecture
+  model. This story builds on Story A's tier vocabulary. It flips orchestrator and
+  architect frontmatter, adds the fable tier alias to all tier tables, and documents
+  Fable 5's advertised context/output limits (1M-context / 128K-output as published
+  2026-06) in configuration.md for long-context planning steps.
+
+  GUARDRAIL 1 — Opus is NOT removed: Opus (claude-opus-4-8) stays as a documented
+  fallback rung below Fable. The tier vocabulary becomes "Fable preferred, Opus fallback"
+  not "Opus replaced." All tier tables must retain the Opus row.
+
+  GUARDRAIL 2 — Fable limits are documented as ADVERTISED: Write limits as
+  "advertised 1M-context / 128K-output (as published 2026-06), re-verify at implement
+  time." Do NOT write them as an absolute contract.
+
+  GUARDRAIL 3 — Investigate the June 2026 revert before re-designating: Root
+  hive.config.yaml comments show a Fable 5 trial was reverted 2026-06-12 for architect,
+  tpm, tester, peer-validator. The research step must surface the revert reason
+  (or note it was not documented) before the implement step re-designates Fable.
+
+  NOTE: This story edits configuration.md, orchestrator.md, and agent-config-schema.md —
+  the same files edited by Story C (PLAN-Q-014). Run this story before C to avoid
+  merge conflicts.
+
+acceptance_criteria:
+  - "hive/agents/orchestrator.md frontmatter contains model: fable: grep -n 'model: fable' hive/agents/orchestrator.md returns a hit"
+  - "hive/agents/architect.md frontmatter contains model: fable: grep -n 'model: fable' hive/agents/architect.md returns a hit"
+  - "hive/references/agent-config-schema.md tier table contains a fable row: grep -n 'fable\\|claude-fable-5' hive/references/agent-config-schema.md returns a hit"
+  - "hive/references/configuration.md contains Fable 5 limit guidance with an 'advertised' qualifier and a date: grep -n 'advertised.*1M\\|1M.*advertised' hive/references/configuration.md returns a hit"
+  - "hive/hive.config.yaml shipped baseline model_tiers includes fable alias: grep -n 'fable' hive/hive.config.yaml returns a hit"
+  - "hive/agents/orchestrator.md routing table retains the Opus row (claude-opus-4-8 still present): grep -n 'claude-opus-4-8' hive/agents/orchestrator.md returns a hit"
+  - "No file edited by this story states Fable limits as absolute fact without an 'advertised' qualifier and publication date"
+
+steps:
+  - id: research
+    description: |
+      1. Read root hive.config.yaml lines 179-186 to extract the Fable trial revert comment.
+         Document the revert reason or note it is undocumented.
+      2. Verify the advertised claude-fable-5 context/output limits (1M/128K) against
+         current Anthropic docs or the system reminder model ID list.
+      3. Confirm the exact GATING Q4 scope: does "Fable as default orchestrator/architect"
+         mean ONLY those two frontmatter files, or also tpm/tester/peer-validator
+         (the maintainer's reverted trial touched those too)?
+    agent: researcher
+  - id: implement
+    description: |
+      Based on research findings:
+      1. Add fable tier alias and claude-fable-5 to all tier tables (agent-config-schema.md,
+         orchestrator.md routing table, hive.config.yaml model_tiers) — keep Opus row.
+      2. Update hive/agents/orchestrator.md frontmatter: model: fable
+      3. Update hive/agents/architect.md frontmatter: model: fable
+      4. Add Fable 5 limit guidance to hive/references/configuration.md:
+         "advertised 1M-context / 128K-output (as published 2026-06); re-verify at
+         implement time before relying on these limits in production planning steps."
+      5. If Q4 scope includes tpm/tester/peer-validator: update those frontmatter files
+         too (if the research step confirms this is in scope).
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Run grep assertions per acceptance criteria. Specifically verify: (1) Opus row is still present in every table that gains a Fable row; (2) the limit guidance uses 'advertised' and a date, not an absolute claim."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for three things: (1) Opus retained as documented fallback; (2) Fable limits written with 'advertised' qualifier; (3) tier tables consistent across orchestrator.md, agent-config-schema.md, and hive.config.yaml."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit with prefix [plan-q-011]. Document the revert investigation outcome in commit body. Push to feat/model-routing-claude5."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: plugin-hive
+  tech_stack: [markdown, yaml]
+  key_files:
+    - file: hive/agents/orchestrator.md
+      purpose: "Frontmatter model: opus (line 4) and routing table (lines 171-175). Both must be updated to designate Fable as preferred top tier."
+      relevant_excerpt: |
+        # frontmatter (lines 1-4):
+        ---
+        name: orchestrator
+        model: opus
+        ---
+        # routing table (lines 171-175) — three-tier table, no fable row currently
+    - file: hive/agents/architect.md
+      purpose: "Frontmatter model: sonnet (line 4). Must be updated to fable."
+      relevant_excerpt: |
+        # frontmatter (lines 1-4):
+        ---
+        name: architect
+        model: sonnet
+        ---
+    - file: hive.config.yaml
+      purpose: "Root maintainer override layer. Contains evidence of the 2026-06-12 Fable revert at lines 179-186. Read this to understand WHY the trial was reverted before re-designating."
+      relevant_excerpt: |
+        # lines 179-186 (approximate):
+        # model_overrides (reverted from fable 2026-06-12):
+        #   architect: opus
+        #   tpm: opus
+        #   tester: opus
+        #   peer-validator: opus
+    - file: hive/references/configuration.md
+      purpose: "Sessions model docs (lines 95-109). Add Fable 5 context/output limits here with the 'advertised' qualifier."
+      relevant_excerpt: |
+        # lines 95-109 — sessions config section
+        # sessions.model inherits from model_tiers when unset.
+        # No Fable 5 context/output limit guidance currently.
+    - file: hive/references/agent-config-schema.md
+      purpose: "Model tier table (lines 54-59) plus precedence note (lines 188-211). The fable row must be added to the tier table."
+
+risks:
+  - severity: high
+    description: "Repeating the June 2026 Fable revert. The revert reason is undocumented in hive.config.yaml. Re-designating without understanding why it was reverted risks the same failure."
+    mitigation: "Research step must surface the revert reason. If undocumented, note that explicitly in the commit and leave a comment in hive.config.yaml for future context."
+  - severity: high
+    description: "Fable 5 model ID or capability limits may differ from what the user provided. 1M context and 128K output are cited from user context only."
+    mitigation: "Implement step must write limits as 'advertised / as published 2026-06' and note they should be re-verified at implementation time. Do NOT write as absolute fact."
+  - severity: medium
+    description: "configuration.md hot-file: this story and Stories C and D all edit configuration.md. Story D depends_on this story, ensuring serial execution. Story C must also run after this story."
+    mitigation: "dependency graph (A->B->C, A->B->D) ensures serial execution of configuration.md edits. The implementer must confirm no concurrent editing before starting."
+
+cross_cutting:
+  - concern: documentation
+    applies: true
+    notes: "Edits orchestrator.md, architect.md, configuration.md, agent-config-schema.md — all consumer-facing references. Tier table coherence is the primary check."
+  - concern: versioning
+    applies: true
+    notes: "Adding fable to shipped hive/hive.config.yaml baseline is an additive consumer-visible change. Semver minor. Versioning story owns the actual bump commit."
+  - concern: metrics
+    applies: false
+
+metric:
+  applies: false
+  justification: "Pure documentation story — designates preferred top-tier model in reference tables and frontmatter with no measurable runtime outcome."

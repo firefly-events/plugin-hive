@@ -1,0 +1,157 @@
+id: q012-fallback-chain
+epic: model-routing-claude5
+title: "Pass configured fallback model chains through session dispatch"
+status: pending
+complexity: medium
+methodology: classic
+wave: W3
+action_id: PLAN-Q-012
+depends_on:
+  - q019-classify-sonnet5
+  - q011-fable5-orchestrator
+files_to_modify:
+  - file: hive/references/configuration.md
+    change: "Document new sessions.fallback_model config key"
+  - file: skills/hive/skills/execute-mode-session/SKILL.md
+    change: "Update session model resolution to read and pass sessions.fallback_model"
+  - file: hive/lib/messages-session.js
+    change: "Update DEFAULT_MODEL constant and session invocation to pass --fallback-model when configured"
+
+description: |
+  Define a new shipped-safe config key (sessions.fallback_model) and wire it through
+  the session dispatch path so the Claude CLI's --fallback-model capability is used
+  when a fallback chain is configured. This is the only runtime story in the epic;
+  all others are documentation only.
+
+  SCOPE CLARIFICATION — this story DEFINES THEN WIRES, not extends:
+  The requirement mentioned "extending agent_backends.fallback_model" but grep confirms
+  that key does not exist anywhere in the codebase. This story:
+  (a) defines a new config surface under sessions.fallback_model (the shipped-safe
+      namespace, not agent_backends which is intentionally excluded from consumer docs)
+  (b) extends execute-mode-session to read the key and pass it to the Claude invocation
+  (c) documents the key in configuration.md
+
+  GATING DECISION (Q2): The config key must live under sessions.fallback_model, NOT
+  agent_backends.fallback_model. Rationale: configuration.md:117 explicitly excludes
+  agent_backends from consumer docs; a fallback key there would either violate that
+  contract or need to hide in a maintainer-only section, making the feature invisible
+  to consumers.
+
+  GATING DECISION (Q3): The research step must verify whether --fallback-model accepts
+  a single value or an ordered list. If it accepts a single value, the config key holds
+  the first-choice fallback; if it accepts a list, the key holds the ordered chain.
+
+  OPEN QUESTION (Q6): Does this story cover the default Messages-API substrate (the
+  default caller-side loop in hive.config.yaml execution.substrate=messages), or is
+  it session-only for v1? The implementer must make an explicit choice:
+  - "session-only-for-v1": only execute-mode-session is updated; a follow-on story
+    covers the messages substrate. Clearly note the gap in the commit and docs.
+  - "both-substrates": also update hive/lib/messages-session.js to pass --fallback-model
+    when sessions.fallback_model is configured.
+  The recommended default is "session-only-for-v1" to keep scope contained; document
+  the gap explicitly.
+
+acceptance_criteria:
+  - "hive/references/configuration.md documents sessions.fallback_model with its type, default (empty/absent = no fallback), and an example value: grep -n 'fallback_model' hive/references/configuration.md returns a hit"
+  - "skills/hive/skills/execute-mode-session/SKILL.md reads sessions.fallback_model and passes --fallback-model to the Claude CLI when the key is set: grep -n 'fallback_model' skills/hive/skills/execute-mode-session/SKILL.md returns a hit"
+  - "A unit test exists that verifies the fallback-chain resolution helper: (a) returns no --fallback-model flag when sessions.fallback_model is absent; (b) returns --fallback-model <value> when the key is a single string; (c) handles the ordered-list case per the Q3 resolution"
+  - "The test for the execute-mode-session path asserts that --fallback-model is emitted in the Claude invocation when sessions.fallback_model is configured and is absent when not configured"
+  - "If session-only-for-v1: configuration.md notes that the default Messages-API substrate does not yet support fallback chains and a follow-on story is planned"
+  - "No code references agent_backends.fallback_model (the key must live under sessions)"
+
+steps:
+  - id: research
+    description: |
+      1. Verify the exact --fallback-model flag name and behavior against Anthropic CLI
+         docs (context7 or web). Answer Q3: does it accept a single value or an ordered list?
+      2. Read skills/hive/skills/execute-mode-session/SKILL.md lines 12-21 and 37-39 to
+         understand how session model is currently resolved and passed.
+      3. Read hive/lib/messages-session.js line 36 and surrounding context (DEFAULT_MODEL).
+      4. Read hive/references/configuration.md lines 95-117 to understand the sessions
+         config schema and the agent_backends exclusion rule.
+      5. Produce a concrete design for sessions.fallback_model: schema, type (string or list),
+         and how the session skill should resolve and pass it.
+    agent: researcher
+  - id: implement
+    description: |
+      1. Add sessions.fallback_model to hive/references/configuration.md:
+         - Type: string (single fallback) or list (ordered chain) per Q3 resolution
+         - Default: absent = no --fallback-model passed
+         - Example: sessions.fallback_model: claude-sonnet-5 (or [claude-sonnet-5, claude-haiku-4-5-20251001])
+         - Note if session-only-for-v1: document the gap for the messages substrate
+      2. Update skills/hive/skills/execute-mode-session/SKILL.md:
+         - After resolving the session model, check sessions.fallback_model
+         - If set (and non-empty), append --fallback-model <value> to the Claude invocation
+         - Omit the flag when the key is absent or empty
+      3. Optionally update hive/lib/messages-session.js if Q6 resolution = "both-substrates":
+         - Add fallback model resolution from config
+         - Pass to the messages API caller loop
+      4. Write unit tests per acceptance criteria item 3.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Run the unit tests written in the implement step. Verify:
+      (a) absent config → no --fallback-model in invocation
+      (b) sessions.fallback_model set → --fallback-model present in invocation
+      (c) grep -rn 'agent_backends.fallback_model' returns 0 hits (key must not exist)
+      (d) grep -n 'fallback_model' hive/references/configuration.md returns a hit
+      (e) grep -n 'fallback_model' skills/hive/skills/execute-mode-session/SKILL.md returns a hit
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review the config key design, session-skill wiring, and unit tests. Verify the Q2 decision (sessions. not agent_backends.) is respected. Verify the Q6 decision (scope) is documented. Check that --fallback-model is not emitted when the key is absent."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit with prefix [plan-q-012]. Document Q3 and Q6 resolution in commit body. Push to feat/model-routing-claude5."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: plugin-hive
+  tech_stack: [markdown, javascript, yaml]
+  key_files:
+    - file: skills/hive/skills/execute-mode-session/SKILL.md
+      purpose: "Session model resolution (lines 12-21, 37-39). Currently resolves a single model from sessions.model or model_tiers inheritance. This is where --fallback-model passthrough must be added."
+      relevant_excerpt: |
+        # lines 37-39 (approximate):
+        # Use the model from hive_config.sessions.model (or inherit from model_tiers
+        # for the story's primary agent). Single model only; no ordered fallback chain.
+    - file: hive/lib/messages-session.js
+      purpose: "Messages-API session library. Line 36: const DEFAULT_MODEL = 'claude-opus-4-8' — hardcoded, not config-driven. Relevant if Q6 resolution includes the messages substrate."
+      relevant_excerpt: |
+        # line 36:
+        const DEFAULT_MODEL = 'claude-opus-4-8';
+    - file: hive/references/configuration.md
+      purpose: "Sessions config documentation (lines 95-109). sessions.{enabled,model,timeout_ms,stuck_timeout_ms,max_retries} currently. sessions.fallback_model must be added here. Line 117 explicitly excludes agent_backends."
+      relevant_excerpt: |
+        # lines 95-109:
+        # sessions.enabled, sessions.model, sessions.timeout_ms,
+        # sessions.stuck_timeout_ms, sessions.max_retries
+        # line 117: agent_backends excluded from consumer docs
+
+risks:
+  - severity: high
+    description: "--fallback-model Claude CLI flag may not exist or may not support chained fallbacks. The research step must verify before implementing the wiring."
+    mitigation: "Research step must confirm the flag name and behavior. If the flag does not exist, the implement step should stub the config key with a TODO comment and note the blocker in the commit."
+  - severity: high
+    description: "Fallback wired only into the opt-in session substrate. CONTEXT.md says messages substrate is the default. If Story D only covers sessions, most runs get no fallback."
+    mitigation: "Q6 must be explicitly decided. If session-only-for-v1: document the gap in configuration.md and in the commit message. Create a follow-on task in the epic tracker."
+  - severity: medium
+    description: "configuration.md hot-file — fourth edit in the sequence (after A, B, C). The depends_on chain enforces serial execution."
+    mitigation: "Confirm Story C is complete before starting. The dependency on q011-fable5-orchestrator (which precedes q014-org-restrictions in the wave) means C should be complete first."
+
+cross_cutting:
+  - concern: documentation
+    applies: true
+    notes: "Adds new consumer-facing config key sessions.fallback_model to configuration.md. Also updates session skill documentation."
+  - concern: versioning
+    applies: true
+    notes: "Adding a new shipped config key is a minor additive change. Semver minor. Versioning story owns the actual bump commit."
+  - concern: metrics
+    applies: false
+
+metric:
+  applies: false
+  justification: "This story wires a passthrough capability; no measurable outcome until the fallback actually fires in production, which is outside this epic's scope."

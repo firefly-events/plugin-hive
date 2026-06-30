@@ -1,0 +1,53 @@
+name: model-routing-claude5
+title: "Modernize Hive model routing for the Claude 5 generation"
+target_codebase: /Users/hive/multica_workspaces/7ba0ade0-21cd-4e54-98a0-72a242ddf9e9/48399733/workdir/plugin-hive
+methodology: classic
+version_bump: minor
+
+git_flow:
+  base_branch: feat/model-routing-claude5
+  branch_strategy: per-epic
+
+planning_team:
+  matched_tags: [documentation, model-routing, governance]
+  roster: [researcher, technical-writer, architect]
+  per_tag_reasoning:
+    documentation: "All five stories modify consumer-facing reference docs and configuration surfaces"
+    model-routing: "Epic updates model tier map, fallback chain wiring, and agent defaults for Claude 5"
+    governance: "Story PLAN-Q-007 adds model-gating permission examples to governance docs"
+  confidence: matched
+  gate_decisions:
+    documentation: included
+    model-routing: included
+    governance: included
+
+stories:
+  - id: q019-classify-sonnet5
+    title: "Classify Claude Sonnet 5 in Hive model routing and agent defaults"
+    complexity: small
+    depends_on: []
+
+  - id: q011-fable5-orchestrator
+    title: "Designate Fable 5 as Hive's default orchestrator and architect model"
+    complexity: small
+    depends_on:
+      - q019-classify-sonnet5
+
+  - id: q007-permission-routing
+    title: "Document Tool(param:value) model-routing permission rules for Hive governance"
+    complexity: small
+    depends_on:
+      - q019-classify-sonnet5
+
+  - id: q014-org-restrictions
+    title: "Document org model restrictions as overriding Hive agent defaults"
+    complexity: small
+    depends_on:
+      - q011-fable5-orchestrator
+
+  - id: q012-fallback-chain
+    title: "Pass configured fallback model chains through session dispatch"
+    complexity: medium
+    depends_on:
+      - q019-classify-sonnet5
+      - q011-fable5-orchestrator

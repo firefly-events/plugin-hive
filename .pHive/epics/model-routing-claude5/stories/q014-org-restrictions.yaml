@@ -1,0 +1,126 @@
+id: q014-org-restrictions
+epic: model-routing-claude5
+title: "Document org model restrictions as overriding Hive agent defaults"
+status: pending
+complexity: small
+methodology: classic
+wave: W3
+action_id: PLAN-Q-014
+depends_on:
+  - q011-fable5-orchestrator
+parallel_allowed: true
+parallel_rationale: bounded-slice
+files_to_modify:
+  - file: hive/references/agent-config-schema.md
+    change: "Extend precedence chain (lines 188-211) with org-level restriction note"
+  - file: hive/references/configuration.md
+    change: "Add explicit org-restriction precedence note"
+  - file: hive/agents/orchestrator.md
+    change: "Add a note that org-level restrictions override Hive model preferences"
+
+description: |
+  Add explicit documentation that Hive model values (frontmatter, hive.config.yaml,
+  env vars, CLI model selection) are preferences only — organization-level restrictions
+  set by the Anthropic operator policy override all of them. This story serializes after
+  Story B because it edits the same configuration.md, agent-config-schema.md, and
+  orchestrator.md paragraphs that Story B just rewrote, avoiding merge conflicts.
+
+  The precedence chain in agent-config-schema.md (lines 188-211) currently reads:
+    model_overrides > model_tiers > agent frontmatter
+  After this story it reads:
+    org restrictions > model_overrides > model_tiers > agent frontmatter
+
+  The note should cite: "Organization-level model restrictions (set via Anthropic's
+  operator controls) override every Hive-side preference — frontmatter model:,
+  hive.config.yaml model_tiers, env vars, and --model CLI flags. When a model is
+  org-restricted, Hive's value is silently ignored and the org's policy applies."
+
+  External reference: This documentation should point to Anthropic's operator docs
+  for org-level restrictions. If the exact URL is unavailable at implement time,
+  note "see Anthropic operator docs for model access control" as a placeholder.
+
+acceptance_criteria:
+  - "hive/references/agent-config-schema.md precedence section mentions org-level restrictions at the top of the chain: grep -n 'org\\|organization\\|restrict' hive/references/agent-config-schema.md returns a hit"
+  - "hive/references/configuration.md contains an org-restriction precedence note: grep -n 'org\\|organization\\|restrict' hive/references/configuration.md returns a hit"
+  - "hive/agents/orchestrator.md contains an org-restriction caveat: grep -n 'org\\|organization\\|restrict' hive/agents/orchestrator.md returns a hit"
+  - "At least one edited file uses the word 'override' in the context of org restrictions vs Hive preferences"
+  - "No file states that Hive model preferences are absolute — every model-preference statement is qualified with org-restriction caveat"
+
+steps:
+  - id: research
+    description: |
+      1. Read hive/references/agent-config-schema.md lines 188-211 to understand the
+         current precedence chain.
+      2. Read hive/references/configuration.md lines 95-117 for the sessions model context.
+      3. Read hive/agents/orchestrator.md lines 167-184 for the routing table and any
+         existing override notes.
+      4. Search for any existing org-restriction documentation: grep -rn 'org\|restrict'
+         across hive/references/ and hive/agents/.
+      5. Note the Anthropic operator docs URL if available; otherwise note the placeholder.
+    agent: researcher
+  - id: implement
+    description: |
+      Add org-restriction precedence notes to three files, in this order:
+      1. hive/references/agent-config-schema.md — extend the precedence chain at
+         lines 188-211 to prepend "org restrictions" above model_overrides.
+      2. hive/references/configuration.md — add a short paragraph in the sessions
+         model section that clarifies org restrictions override sessions.model.
+      3. hive/agents/orchestrator.md — add a brief caveat paragraph near the routing
+         table stating org-level restrictions take precedence over this table.
+      Use consistent language across all three files. Point to Anthropic operator docs
+      (or placeholder URL) in at least one location.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Run grep assertions per acceptance criteria. Read the three files to confirm the notes are consistent with each other and use the same terminology."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review for consistency: the org-restriction framing must be identical across the three files. Check that no model-preference statement in any updated section omits the org-override caveat."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit with prefix [plan-q-014]. Push to feat/model-routing-claude5."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: plugin-hive
+  tech_stack: [markdown]
+  key_files:
+    - file: hive/references/agent-config-schema.md
+      purpose: "Contains the precedence chain at lines 188-211. This is where the org-restriction note slots in as the highest-precedence entry."
+      relevant_excerpt: |
+        # lines 188-211 (approximate) — precedence note:
+        # model_overrides wins at spawn time over frontmatter.
+        # No mention of org-level restrictions currently.
+    - file: hive/references/configuration.md
+      purpose: "Sessions model documentation (lines 95-109). The org-restriction note must be added here to cover the sessions model surface."
+      relevant_excerpt: |
+        # lines 95-109:
+        # sessions.model inherits from model_tiers when unset.
+        # agent_backends excluded from consumer docs (line 117).
+    - file: hive/agents/orchestrator.md
+      purpose: "Model routing table (lines 167-184). An org-restriction caveat paragraph is needed near this table to alert orchestrator consumers."
+
+risks:
+  - severity: low
+    description: "Org-level restriction documentation may reference Anthropic operator APIs or UI paths that change. Pointing to an external URL that can shift."
+    mitigation: "Write as 'see Anthropic operator docs for model access control' rather than a specific page URL. Placeholder is acceptable; implementer can fill if URL is known."
+  - severity: medium
+    description: "configuration.md hot-file: this is the third story to edit configuration.md (after B and will precede D). Serial execution is enforced by the depends_on chain (A->B->C->D)."
+    mitigation: "Run after Story B completes. Confirm no concurrent editing before starting."
+
+cross_cutting:
+  - concern: documentation
+    applies: true
+    notes: "All three edited files are consumer-facing references. The precedence chain update is an important safety note for any operator deploying Hive with org-level model controls."
+  - concern: versioning
+    applies: false
+    notes: "This story adds informational notes only — no new config keys, no behavior change. Pure documentation; no semver bump triggered by this story alone."
+  - concern: metrics
+    applies: false
+
+metric:
+  applies: false
+  justification: "Pure documentation story — adds precedence notes to reference docs with no measurable runtime outcome."

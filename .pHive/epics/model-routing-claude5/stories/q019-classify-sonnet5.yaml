@@ -1,0 +1,136 @@
+id: q019-classify-sonnet5
+epic: model-routing-claude5
+title: "Classify Claude Sonnet 5 in Hive model routing and agent defaults"
+status: pending
+complexity: small
+methodology: classic
+wave: W1
+action_id: PLAN-Q-019
+depends_on: []
+parallel_allowed: true
+parallel_rationale: bounded-slice
+files_to_modify:
+  - file: hive/references/agent-config-schema.md
+    change: "Add claude-sonnet-5 row to model tier table"
+  - file: hive/agents/orchestrator.md
+    change: "Add claude-sonnet-5 to model tier routing table"
+  - file: hive/hive.config.yaml
+    change: "Add sonnet5 tier alias mapping to claude-sonnet-5"
+  - file: hive/references/configuration.md
+    change: "Add fallback-chain example prose for Sonnet 5"
+  - file: hive/GUIDE.md
+    change: "Update consumer-facing model tier routing table to include claude-sonnet-5"
+  - file: .pHive/multica/agents.yaml
+    change: "Update model IDs for sonnet-tier agents per Q1 resolution"
+
+description: |
+  Add Claude Sonnet 5 (claude-sonnet-5) to Hive's model tier map, persona guidance,
+  fallback-chain examples, and operator docs. Decide whether claude-sonnet-5 replaces
+  claude-sonnet-4-6 for the 26 sonnet-tier agents (the GATING Q1 question) or is added
+  as a distinct higher-capability option. Update all documentation surfaces that cite
+  the three-tier model table so they are coherent with the new model ID.
+
+  This story is the foundation for all other stories in this epic; B, C, D, and E
+  consume the vocabulary and tier names established here.
+
+  GATING DECISION (Q1): Does claude-sonnet-5 REPLACE claude-sonnet-4-6 for all 26
+  sonnet-tier personas, or is it ADDED as a higher-quality option some roles opt into?
+  The implementer must resolve this with the maintainer before making edits, since a
+  blanket find-replace re-tiers two dozen personas silently. Recommended default: replace
+  (simpler), with per-persona exceptions documented in the story commit message.
+
+acceptance_criteria:
+  - "hive/references/agent-config-schema.md tier table (lines 54-59) contains a row for claude-sonnet-5 with its use case documented: grep -n 'claude-sonnet-5' hive/references/agent-config-schema.md returns a hit"
+  - "hive/agents/orchestrator.md model tier routing table (lines 171-175) references claude-sonnet-5: grep -n 'claude-sonnet-5' hive/agents/orchestrator.md returns a hit"
+  - "hive/GUIDE.md consumer model table (lines 205-215) lists claude-sonnet-5: grep -n 'claude-sonnet-5' hive/GUIDE.md returns a hit"
+  - "hive/references/configuration.md contains a prose fallback-chain example that names claude-sonnet-5 in an example sequence: grep -n 'claude-sonnet-5' hive/references/configuration.md returns a hit"
+  - "hive/hive.config.yaml shipped baseline model_tiers section includes a mapping for the sonnet5 tier alias or equivalent: grep -n 'sonnet5\\|claude-sonnet-5' hive/hive.config.yaml returns a hit"
+  - ".pHive/multica/agents.yaml model field for at least one sonnet-tier agent has been updated to reflect the Q1 decision: grep -n 'claude-sonnet-5' .pHive/multica/agents.yaml returns a hit (if replace) or the file is annotated with the decision (if add)"
+  - "No stale claude-sonnet-4-6 references remain in any file updated by this story without an explicit comment justifying the retention"
+
+steps:
+  - id: research
+    description: "Confirm the canonical claude-sonnet-5 model ID against current Anthropic docs (context7 or web). Enumerate every file that references claude-sonnet-4-6 or the three-tier model table. Surface the Q1 replace-vs-add decision as a concrete recommendation with a one-paragraph rationale."
+    agent: researcher
+  - id: implement
+    description: |
+      Resolve Q1 (replace vs add) — document the decision in the commit message.
+      Then update all five documentation surfaces in this order:
+      1. hive/references/agent-config-schema.md — add claude-sonnet-5 row to tier table
+      2. hive/agents/orchestrator.md — add claude-sonnet-5 to routing table
+      3. hive/hive.config.yaml shipped baseline — add tier alias for sonnet5
+      4. hive/references/configuration.md — add fallback-chain prose example
+      5. hive/GUIDE.md — update consumer-facing table
+      6. .pHive/multica/agents.yaml — update model IDs per Q1 decision
+      Update sub-steps in this order (tier-map/schema first, operator-docs/examples second)
+      to ensure the vocabulary is established before examples consume it.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Run grep assertions per acceptance criteria. Verify no stale claude-sonnet-4-6 references remain in updated files (unless retained with an explicit comment). Verify the tier table is consistent across all three reference docs."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: "Review all edited docs for coherence across the five surfaces. Check that the tier table in agent-config-schema.md, orchestrator.md, and GUIDE.md are consistent. Verify the Q1 decision is documented in the commit message. Confirm no stale IDs."
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit all changed files with message prefix [plan-q-019]. Document the Q1 resolution in the commit body. Push to feat/model-routing-claude5."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: plugin-hive
+  tech_stack: [markdown, yaml]
+  key_files:
+    - file: hive/references/agent-config-schema.md
+      purpose: "Contains the authoritative model tier table (lines 54-59) mapping alias to concrete ID. This is the schema source of truth that all other references should match."
+      relevant_excerpt: |
+        # lines 54-59 (approximate):
+        | `opus`   | `claude-opus-4-8`          | Complex reasoning, planning tasks  |
+        | `sonnet` | `claude-sonnet-4-6`        | Balanced capability and cost       |
+        | `haiku`  | `claude-haiku-4-5-20251001`| Fast, lightweight tasks            |
+    - file: hive/agents/orchestrator.md
+      purpose: "Contains a model tier routing table (lines 171-175) that must stay in sync with agent-config-schema.md. Also has frontmatter model: opus."
+      relevant_excerpt: |
+        # lines 171-175 (approximate) — tier routing table
+        # references claude-opus-4-8, claude-sonnet-4-6
+    - file: hive/GUIDE.md
+      purpose: "Consumer-facing model tier routing table at lines 205-215. All agents mapped to claude-sonnet-4-6 or claude-opus-4-8. This is what end-users read."
+      relevant_excerpt: |
+        # lines 205-215 (approximate) — consumer tier table
+        # references claude-sonnet-4-6 and claude-opus-4-8 only
+    - file: hive/hive.config.yaml
+      purpose: "Shipped baseline model tier map (lines 150-175). Uses tier aliases (opus/sonnet/haiku), not concrete IDs. Adding sonnet5 alias follows this pattern."
+      relevant_excerpt: |
+        # lines 150-175 (approximate) — model_tiers shipped baseline
+        # model_tiers: opus: [orchestrator], sonnet: [...], haiku: [test-worker]
+    - file: .pHive/multica/agents.yaml
+      purpose: "Per-agent Multica model pins with hardcoded concrete IDs. Must stay in sync with hive.config.yaml. Currently uses claude-sonnet-4-6 for researcher, developer, etc."
+      relevant_excerpt: |
+        # line 53 comment: "architect on Fable 5" but model: claude-opus-4-8 (reverted)
+        # researcher, developer, etc.: model: claude-sonnet-4-6
+    - file: hive/references/configuration.md
+      purpose: "Sessions model documentation (lines 95-109). Needs a fallback-chain prose example added."
+
+risks:
+  - severity: high
+    description: "Q1 replace-vs-add decision: blanket claude-sonnet-4-6 replacement re-tiers 26 agents silently. Research must produce a concrete recommendation before implementation starts."
+    mitigation: "Resolve Q1 in the research step. Document the decision in the commit message. If replacing, scan for all 26 agents to confirm none have a specialty reason to stay on 4-6."
+  - severity: medium
+    description: ".pHive/multica/agents.yaml drift: agents.yaml has no enforced link to hive.config.yaml. The Fable trial left this file in an inconsistent state (comment says Fable, value says Opus)."
+    mitigation: "Update agents.yaml in the same commit as hive.config.yaml. Grep both files after update to confirm parity."
+
+cross_cutting:
+  - concern: documentation
+    applies: true
+    notes: "All five surfaces edited by this story are consumer-facing documentation. Every doc section that references old model IDs must be updated."
+  - concern: versioning
+    applies: true
+    notes: "Adding claude-sonnet-5 to the shipped hive/hive.config.yaml baseline is an additive consumer-visible change. Semver bump: minor. Versioning story owns the actual bump commit."
+  - concern: metrics
+    applies: false
+
+metric:
+  applies: false
+  justification: "Pure documentation story — adds model ID to reference tables and prose examples with no measurable runtime outcome."

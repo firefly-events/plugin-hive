@@ -1,0 +1,136 @@
+id: q007-permission-routing
+epic: model-routing-claude5
+title: "Document Tool(param:value) model-routing permission rules for Hive governance"
+status: pending
+complexity: small
+methodology: classic
+wave: W2
+action_id: PLAN-Q-007
+depends_on:
+  - q019-classify-sonnet5
+parallel_allowed: true
+parallel_rationale: bounded-slice
+files_to_modify:
+  - file: hive/references/permission-patterns.md
+    change: "Add Agent(model:...) model-routing permission examples section"
+  - file: hive/references/hooks-conventions.md
+    change: "Add one-line note that permission rules are preferred over hooks for model gating"
+
+description: |
+  Expand Hive's permission guidance with model-routing examples using the
+  Tool(param:value) / Agent(model:...) syntax. Add examples for:
+  1. Denying Fable 5 for low-priority background agents
+  2. Allowing only Haiku or other low-cost models for test-worker-style roles
+  3. Hard-denying restricted enterprise/government models (generic pattern, not
+     naming specific real restricted model IDs — see risk note)
+
+  Also add a one-line note to hooks-conventions.md that permission rules are the
+  preferred mechanism for model gating, not PostToolUse hooks.
+
+  PREREQUISITE: This story depends on Story A (PLAN-Q-019) because the model-routing
+  examples reference claude-fable-5 and claude-sonnet-5 IDs that Story A establishes.
+
+  GATING QUESTION (Q5): Do we name specific enterprise/government models to hard-deny,
+  or keep the example generic (Agent(model:claude-*-gov))? The research step must verify
+  whether naming real restricted model IDs in docs would be sensitive. Recommended
+  default: use a glob pattern (Agent(model:*-gov)) rather than specific IDs.
+
+  GATING QUESTION: Is Agent(model:...) a valid Claude Code permission rule? The existing
+  permission-patterns.md only shows Tool(param:value) with conventional tool names
+  (Bash, Edit, Write, mcp__*). This story must VERIFY this syntax against Claude Code
+  docs before documenting it. If unverified, the story must note that status explicitly.
+
+acceptance_criteria:
+  - "hive/references/permission-patterns.md contains an Agent(model:...) example section: grep -n 'Agent(model' hive/references/permission-patterns.md returns a hit"
+  - "hive/references/permission-patterns.md contains a deny example for claude-fable-5 for background agents: grep -n 'fable' hive/references/permission-patterns.md returns a hit"
+  - "hive/references/permission-patterns.md contains an allow-only-haiku (or equivalent low-cost model) example for test-worker-style roles: grep -n 'haiku\\|test-worker' hive/references/permission-patterns.md returns a hit"
+  - "hive/references/permission-patterns.md contains a hard-deny example for restricted models using a glob pattern (not specific real restricted IDs): the example uses a wildcard or placeholder"
+  - "hive/references/hooks-conventions.md contains a note that permission rules are preferred over hooks for model gating: grep -n 'permission\\|prefer' hive/references/hooks-conventions.md returns a hit"
+  - "If Agent(model:...) syntax is unverified: permission-patterns.md notes the verification status alongside the examples (not silently treated as confirmed)"
+
+steps:
+  - id: research
+    description: |
+      1. Verify whether Agent(model:...) is a valid Claude Code permission syntax against
+         current Claude Code / Anthropic docs (context7 or web). Search for "Agent" as
+         a permission tool name. Note the verification result.
+      2. Read hive/references/permission-patterns.md lines 94-174 to understand the
+         existing Tool(param:value) examples and the role-to-deny-list table.
+      3. Read hive/references/hooks-conventions.md lines 108-116 to understand where the
+         one-line note should be inserted.
+      4. Resolve Q5: glob pattern vs specific IDs for restricted enterprise/government
+         model examples. Recommend the glob approach.
+    agent: researcher
+  - id: implement
+    description: |
+      1. Add an "Agent model-routing permission examples" section to
+         hive/references/permission-patterns.md after the existing Tool(param:value)
+         examples. Include:
+         - Deny example: "deny Agent(model:claude-fable-5) for low-priority background agents"
+         - Allow-only example: "allow only Agent(model:claude-haiku-*) for test-worker roles"
+         - Hard-deny example: "deny Agent(model:*-gov) for all agents" (glob, not specific IDs)
+         - If Agent(model:...) is unverified: prefix each example with a verification note
+           ("Syntax pending verification against Claude Code runtime — validate before enforcing")
+      2. Add one-line note to hive/references/hooks-conventions.md (near lines 108-116):
+         "Permission rules (Tool(param:value) / Agent(model:...)) are preferred over
+         PostToolUse hooks for model gating — hooks intercept after invocation; permission
+         rules block at dispatch time."
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: "Run grep assertions per acceptance criteria. Verify the verification status of Agent(model:...) syntax is reflected in the docs (either confirmed or explicitly noted as unverified)."
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: |
+      Review for two things:
+      1. The permission examples use the correct syntax (or clearly flag unverified status)
+      2. No specific real restricted enterprise/government model IDs are named (use glob
+         patterns only)
+      3. The one-line note in hooks-conventions.md is accurate and appropriately placed
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: "Commit with prefix [plan-q-007]. Document Q5 resolution and Agent(model:...) verification status in commit body. Push to feat/model-routing-claude5."
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: plugin-hive
+  tech_stack: [markdown]
+  key_files:
+    - file: hive/references/permission-patterns.md
+      purpose: "Contains Tool(param:value) syntax documentation (lines 94-174) and a role-to-deny-list table. Currently has Bash/Edit/Write/MCP examples but NO Agent(model:...) model-routing examples."
+      relevant_excerpt: |
+        # lines 99-155 (approximate) — Tool(param:value) syntax:
+        # Examples: Bash(command:...), Edit(file_path:...), mcp__*
+        # lines 159-174 — role-to-deny-list table
+        # No Agent(model:...) examples exist currently
+    - file: hive/references/hooks-conventions.md
+      purpose: "PostToolUse hook conventions (lines 1-116). Lines 108-116 are 'convention text only' posture — no mention of permission rules as preferred alternative for model gating."
+      relevant_excerpt: |
+        # lines 108-116 (approximate):
+        # PostToolUse hook conventions...
+        # No mention of permissions as preferred mechanism for model control
+
+risks:
+  - severity: medium
+    description: "Agent(model:...) permission syntax may not exist in Claude Code. The existing permission-patterns.md only shows Tool(param:value) with verified tool names."
+    mitigation: "Research step must verify this syntax before implementation. If unverified, all examples must be labeled 'unverified syntax — validate before enforcing' rather than presented as confirmed working examples."
+  - severity: medium
+    description: "Naming specific enterprise/government restricted model IDs in public docs could be sensitive or expose Anthropic's internal model naming conventions."
+    mitigation: "Use glob patterns only (Agent(model:*-gov)). Research step resolves Q5. Do not name specific real restricted model IDs."
+
+cross_cutting:
+  - concern: documentation
+    applies: true
+    notes: "Both permission-patterns.md and hooks-conventions.md are consumer-facing governance references. The new section establishes a new doc category (agent model-routing permissions)."
+  - concern: versioning
+    applies: false
+    notes: "Pure documentation addition to reference docs — no new config keys or behavior changes. No semver bump triggered by this story alone."
+  - concern: metrics
+    applies: false
+
+metric:
+  applies: false
+  justification: "Pure documentation story — adds model-routing permission examples to reference docs with no measurable runtime outcome."
