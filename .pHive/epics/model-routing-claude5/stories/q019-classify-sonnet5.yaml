@@ -11,33 +11,32 @@ parallel_allowed: true
 parallel_rationale: bounded-slice
 files_to_modify:
   - file: hive/references/agent-config-schema.md
-    change: "Add claude-sonnet-5 row to model tier table"
+    change: "Replace claude-sonnet-4-6 with claude-sonnet-5 in model tier table"
   - file: hive/agents/orchestrator.md
-    change: "Add claude-sonnet-5 to model tier routing table"
+    change: "Replace claude-sonnet-4-6 with claude-sonnet-5 in model tier routing table"
   - file: hive/hive.config.yaml
-    change: "Add sonnet5 tier alias mapping to claude-sonnet-5"
+    change: "Update sonnet tier alias to map to claude-sonnet-5 (replacing claude-sonnet-4-6)"
   - file: hive/references/configuration.md
     change: "Add fallback-chain example prose for Sonnet 5"
   - file: hive/GUIDE.md
     change: "Update consumer-facing model tier routing table to include claude-sonnet-5"
   - file: .pHive/multica/agents.yaml
-    change: "Update model IDs for sonnet-tier agents per Q1 resolution"
+    change: "Replace claude-sonnet-4-6 with claude-sonnet-5 for all sonnet-tier agents"
 
 description: |
   Add Claude Sonnet 5 (claude-sonnet-5) to Hive's model tier map, persona guidance,
-  fallback-chain examples, and operator docs. Decide whether claude-sonnet-5 replaces
-  claude-sonnet-4-6 for the 26 sonnet-tier agents (the GATING Q1 question) or is added
-  as a distinct higher-capability option. Update all documentation surfaces that cite
-  the three-tier model table so they are coherent with the new model ID.
+  fallback-chain examples, and operator docs. Replace claude-sonnet-4-6 with
+  claude-sonnet-5 across all 26 sonnet-tier agents and documentation surfaces.
+  Update all three-tier model tables so they are coherent with the new model ID.
 
   This story is the foundation for all other stories in this epic; B, C, D, and E
   consume the vocabulary and tier names established here.
 
-  GATING DECISION (Q1): Does claude-sonnet-5 REPLACE claude-sonnet-4-6 for all 26
-  sonnet-tier personas, or is it ADDED as a higher-quality option some roles opt into?
-  The implementer must resolve this with the maintainer before making edits, since a
-  blanket find-replace re-tiers two dozen personas silently. Recommended default: replace
-  (simpler), with per-persona exceptions documented in the story commit message.
+  DECIDED (Q1, confirmed 2026-06-30): claude-sonnet-5 REPLACES claude-sonnet-4-6 for
+  all 26 sonnet-tier personas. Rationale: Sonnet 4.6 will likely be superseded/removed
+  after Claude Code updates; Sonnet 5 is the forward-looking Sonnet-tier default.
+  Document the decision in the commit message. No per-persona exceptions expected;
+  if a persona has a specialty reason to stay on 4.6, note it explicitly in the commit.
 
 acceptance_criteria:
   - "hive/references/agent-config-schema.md tier table (lines 54-59) contains a row for claude-sonnet-5 with its use case documented: grep -n 'claude-sonnet-5' hive/references/agent-config-schema.md returns a hit"
@@ -45,7 +44,7 @@ acceptance_criteria:
   - "hive/GUIDE.md consumer model table (lines 205-215) lists claude-sonnet-5: grep -n 'claude-sonnet-5' hive/GUIDE.md returns a hit"
   - "hive/references/configuration.md contains a prose fallback-chain example that names claude-sonnet-5 in an example sequence: grep -n 'claude-sonnet-5' hive/references/configuration.md returns a hit"
   - "hive/hive.config.yaml shipped baseline model_tiers section includes a mapping for the sonnet5 tier alias or equivalent: grep -n 'sonnet5\\|claude-sonnet-5' hive/hive.config.yaml returns a hit"
-  - ".pHive/multica/agents.yaml model field for at least one sonnet-tier agent has been updated to reflect the Q1 decision: grep -n 'claude-sonnet-5' .pHive/multica/agents.yaml returns a hit (if replace) or the file is annotated with the decision (if add)"
+  - ".pHive/multica/agents.yaml model field for all sonnet-tier agents has been updated to claude-sonnet-5: grep -n 'claude-sonnet-5' .pHive/multica/agents.yaml returns a hit for each sonnet-tier agent"
   - "No stale claude-sonnet-4-6 references remain in any file updated by this story without an explicit comment justifying the retention"
 
 steps:
@@ -54,16 +53,16 @@ steps:
     agent: researcher
   - id: implement
     description: |
-      Resolve Q1 (replace vs add) — document the decision in the commit message.
-      Then update all five documentation surfaces in this order:
-      1. hive/references/agent-config-schema.md — add claude-sonnet-5 row to tier table
-      2. hive/agents/orchestrator.md — add claude-sonnet-5 to routing table
-      3. hive/hive.config.yaml shipped baseline — add tier alias for sonnet5
-      4. hive/references/configuration.md — add fallback-chain prose example
-      5. hive/GUIDE.md — update consumer-facing table
-      6. .pHive/multica/agents.yaml — update model IDs per Q1 decision
-      Update sub-steps in this order (tier-map/schema first, operator-docs/examples second)
-      to ensure the vocabulary is established before examples consume it.
+      Q1 is DECIDED: replace claude-sonnet-4-6 with claude-sonnet-5 everywhere.
+      Update all six surfaces in this order:
+      1. hive/references/agent-config-schema.md — replace claude-sonnet-4-6 with claude-sonnet-5 in tier table
+      2. hive/agents/orchestrator.md — replace claude-sonnet-4-6 with claude-sonnet-5 in routing table
+      3. hive/hive.config.yaml shipped baseline — add/update sonnet tier alias to claude-sonnet-5
+      4. hive/references/configuration.md — add fallback-chain prose example referencing claude-sonnet-5
+      5. hive/GUIDE.md — update consumer-facing table to claude-sonnet-5
+      6. .pHive/multica/agents.yaml — replace claude-sonnet-4-6 with claude-sonnet-5 for all sonnet-tier agents
+      Update in this order (tier-map/schema first, operator-docs/examples second) so vocabulary is
+      established before examples consume it. Document Q1 decision in the commit message.
     agent: developer
     depends_on: [research]
   - id: test
