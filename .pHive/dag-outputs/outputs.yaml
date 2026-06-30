@@ -1,2 +1,8 @@
-confidence: 82
+open_questions:
+  - "Q1 unresolved: claude-sonnet-5 replace-vs-add for 26 sonnet-tier agents requires explicit maintainer decision before implementation begins (PLAN-Q-019)"
+  - "Fable 5 revert reason is undocumented in hive.config.yaml; re-designating Fable 5 as default orchestrator/architect without knowing why the June 2026 trial was reverted risks the same failure (PLAN-Q-011 GUARDRAIL 3)"
+  - "Q4 scope unresolved: Fable 5 designation applies to orchestrator/architect only, or also tpm/tester/peer-validator — all of which were part of the reverted June 2026 trial (PLAN-Q-011)"
+  - "fable tier placement unresolved: add claude-fable-5 to shipped baseline hive/hive.config.yaml (consumer-visible, triggers semver minor) or keep as maintainer-only override in root hive.config.yaml (versioning scope depends on this decision) (PLAN-Q-011, PLAN-Q-019)"
+  - "Q6 substrate scope unresolved: fallback chain session-only-for-v1 or both-substrates; session-only leaves messages substrate (the current default) without fallback coverage (PLAN-Q-012)"
+open_questions_count: 5
 first_run: true
