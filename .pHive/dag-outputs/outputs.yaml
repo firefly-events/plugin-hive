@@ -1,8 +1,6 @@
 open_questions:
-  - "Q1 unresolved: claude-sonnet-5 replace-vs-add for 26 sonnet-tier agents requires explicit maintainer decision before implementation begins (PLAN-Q-019)"
-  - "Fable 5 revert reason is undocumented in hive.config.yaml; re-designating Fable 5 as default orchestrator/architect without knowing why the June 2026 trial was reverted risks the same failure (PLAN-Q-011 GUARDRAIL 3)"
-  - "Q4 scope unresolved: Fable 5 designation applies to orchestrator/architect only, or also tpm/tester/peer-validator — all of which were part of the reverted June 2026 trial (PLAN-Q-011)"
-  - "fable tier placement unresolved: add claude-fable-5 to shipped baseline hive/hive.config.yaml (consumer-visible, triggers semver minor) or keep as maintainer-only override in root hive.config.yaml (versioning scope depends on this decision) (PLAN-Q-011, PLAN-Q-019)"
-  - "Q6 substrate scope unresolved: fallback chain session-only-for-v1 or both-substrates; session-only leaves messages substrate (the current default) without fallback coverage (PLAN-Q-012)"
-open_questions_count: 5
+  - "Missing versioning story: q019, q011, and q012 each state 'Versioning story owns the actual bump commit' for a semver minor bump, but no versioning story or step exists in the epic — the version bump will not happen without an explicit owner."
+  - "q012 (fallback-chain) and q014 (org-restrictions) both edit hive/references/configuration.md at wave W3 with no serial depends_on between them — concurrent execution will produce a merge conflict on this hot-file."
+  - "q012 Q6 is explicitly OPEN: session-only-for-v1 vs both-substrates — determines whether hive/lib/messages-session.js is modified; the story recommends session-only but no choice is recorded in the story or epic."
+open_questions_count: 3
 first_run: true
