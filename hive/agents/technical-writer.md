@@ -1,7 +1,7 @@
 ---
 name: technical-writer
 description: "Transforms raw data into structured documents. Short-lived — writes the document, records insights, shuts down."
-model: sonnet
+model: claude-sonnet-5
 color: magenta
 knowledge:
   - path: ~/.claude/hive/memories/technical-writer/

@@ -178,6 +178,44 @@ def test_short_circuit_or(monkeypatch):
     assert rhs_touched["called"] is False
 
 
+def test_or_chain_mid_chain_missing_round_does_not_poison_later_true_term():
+    """pr20-fable-review T1: an OR-chain gate over rounds
+    (`$r1... || $r2... || $r3...`, the shape unroll.py emits for
+    rec-1 last-successful-round convergence gates) must not let a
+    PredicateEvalError raised while resolving one term (a round that
+    optional-failed with ``outputs={}`` — the node id IS recorded but its
+    ``output`` dict is missing/empty) abort evaluation of a LATER term that
+    would resolve True. Round 2 here has no recorded output; round 3 emits
+    x=true. Before the fix, the error raised evaluating round 2's operand
+    propagated past round 3's `||` term straight to `evaluate()`'s
+    top-level catch, forcing the whole gate False even though round 3
+    converged.
+    """
+    graph = {
+        "r1": {"output": {"x": False}},
+        # r2 optional-failed: node id present (dispatched) but no "output"
+        # key recorded — resolving $r2.output.x raises PredicateEvalError.
+        "r2": {},
+        "r3": {"output": {"x": True}},
+    }
+    ast = parse(
+        "$r1.output.x == true || $r2.output.x == true || $r3.output.x == true"
+    )
+    assert evaluate(ast, graph) is True
+
+
+def test_and_chain_mid_chain_missing_operand_still_fails_closed_false():
+    """Companion to the OR-chain fix above: an AND chain with a missing
+    operand must still evaluate False overall (fail-closed direction for
+    AND is unchanged — only OR's sibling-branch isolation is new)."""
+    graph = {
+        "r1": {"output": {"x": True}},
+        "r2": {},
+    }
+    ast = parse("$r1.output.x == true && $r2.output.x == true")
+    assert evaluate(ast, graph) is False
+
+
 def test_combined_and_or_evaluation():
     graph = {
         "a": {"output": {"x": True}},

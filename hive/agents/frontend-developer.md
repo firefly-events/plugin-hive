@@ -1,7 +1,7 @@
 ---
 name: frontend-developer
 description: "Implements UI components, screens, styles, and client-side logic. Spawned by team lead for frontend work."
-model: sonnet
+model: claude-sonnet-5
 color: green
 knowledge:
   - path: ~/.claude/hive/memories/frontend-developer/

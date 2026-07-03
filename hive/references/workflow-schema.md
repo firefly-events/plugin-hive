@@ -57,8 +57,9 @@ Step files live at `hive/workflows/steps/{workflow-name}/step-{NN}-{kebab-name}.
 | Source | Required Fields | Description |
 |--------|----------------|-------------|
 | `literal` | `value` | Hardcoded string value |
-| `step_output` | `step_id`, `output_name` | Output from a previous step |
+| `step_output` | `step_id`, `output_name` | Output from a previous step (typed point-to-point binding) |
 | `context` | `context_key` | Value from workflow execution context |
+| `reference` | `reference_pointer` | **Additive lean-flow layer.** Content read lazily from a filesystem pointer at resolution time. See [Reference-Passing](#reference-passing-source-reference). |
 
 ## Output Types
 
@@ -312,6 +313,129 @@ semantics through a remote Multica UI or API surface.
 This preserves the gate-ownership invariant from `/plan`: external execution
 substrates may produce artifacts, but user review and sign-off remains owned by
 the orchestrator/operator boundary.
+
+## Bounded Converge-Loop (`node_type: loop`)
+
+`LOOP` is an **authoring-time keyword, not a runtime node type.** A workflow
+author writes `node_type: loop` with a `loop_config`, but the load-time
+expander (`hive/lib/dag_executor/graph/unroll.py`, `expand_loops`, called from
+`load_workflow`) rewrites it into a pure acyclic DAG of deterministic
+round-copy nodes (`<node>__r1 .. __rN`) **before** the executor ever sees it.
+After loading, the graph contains **zero** `LOOP`-type nodes; the executor
+walker has no loop primitive and never iterates anything at runtime — it just
+walks a plain DAG. See [`loop-unroll-migration.md`](loop-unroll-migration.md)
+for the full rationale and migration history (this section previously
+described the retired runtime model, where the executor intercepted LOOP
+nodes and iterated the sub-graph in place at execution time — that model no
+longer exists).
+
+**Opt-in.** Only a LOOP node whose `loop_config.feature` is set is expanded by
+`expand_loops`; a LOOP with no `feature` is left untouched (an
+authoring-only/not-yet-activated loop). `feature` maps to `loops.<feature>`
+in `hive.config.yaml` (`enabled` + `max_rounds`, resolved via
+`hive.lib.config.resolve_loop_config`); an env var
+(`HIVE_LOOPS_<FEATURE>_ENABLED` / `HIVE_LOOPS_<FEATURE>_MAX_ROUNDS`) overrides
+the config value. Disabled, or `max_rounds == 1`, collapses to a single
+degenerate pass — the body runs once, in the same order as if there were no
+loop at all (see the "declared ids" caveat in
+[`workflow-authoring.md`](workflow-authoring.md)).
+
+```yaml
+steps:
+  # Loop-body members: any node whose `sub_graph:` matches the LOOP node's
+  # loop_config.sub_graph. Members are the loop's iterated body — the
+  # expander deletes their bare declared ids from the graph and replaces
+  # them with round-copy ids (fix-cycle-implement -> fix-cycle-implement__r1,
+  # __r2, ...); they are never scheduled at the top level under their bare id.
+  - id: fix-cycle-implement
+    agent: developer
+    sub_graph: review-fix-cycle
+    depends_on: [review]
+
+  - id: fix-cycle-review
+    agent: reviewer
+    sub_graph: review-fix-cycle
+    depends_on: [fix-cycle-implement]
+    outputs:
+      - name: review_passed       # BOOLEAN convergence signal — see note below
+        type: json
+
+  - id: review-converge-loop
+    node_type: loop
+    loop_config:
+      feature: review_converge                  # opt-in tag -> loops.review_converge
+      sub_graph: review-fix-cycle                # which members to iterate
+      convergence_signal: review_passed          # boolean signal a body node emits
+      gate_predicate: "review_verdict not equals needs_revision"  # legacy prose fallback
+      max_rounds: 3
+    depends_on: [review]
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `node_type` | string | `agent` | Set to `loop` for a bounded converge-loop. |
+| `loop_config.sub_graph` | string | — | Required, non-empty. Identifies the loop body: every node whose `sub_graph:` equals this value. |
+| `loop_config.feature` | string | null | Opt-in tag. A LOOP with no `feature` is left unexpanded (authoring-only); `expand_loops` only unrolls feature-tagged loops. A feature-tagged loop with zero matching body nodes is a **load-time error** (`GraphLoadError`) — it can never be unrolled and would otherwise survive to the walker as a raw LOOP node. |
+| `loop_config.convergence_signal` | string | null | Name of a boolean `type: json` output a body node produces. When set, the expander emits a grammar-legal `skip_when` OR-chain (`$<producer>__r{j}.output.<signal> == true` over all prior rounds) that short-circuits later rounds once the signal fires. Validated at load time: a declared `convergence_signal` with no producing body node is a `GraphLoadError`. |
+| `loop_config.gate_predicate` | string | — | Required, non-empty. Legacy prose fallback used only when `convergence_signal` is absent or has no producer — in that case it is copied verbatim into `skip_when`, which the strict predicate grammar cannot parse (no string-literal support), so it fail-closes to "never skip" (every round runs to `max_rounds`). Prefer `convergence_signal` for a functioning early-exit. |
+| `loop_config.max_rounds` | int | — | Required positive integer. Hard iteration ceiling (prevents non-termination). Validated at graph-parse time (`LoopConfigError`). |
+| `sub_graph` (on a member node) | string | null | Loop-body membership tag. Additive; absent on all non-loop nodes. Cleared on the emitted round copies (they are ordinary top-level nodes after expansion). |
+
+**Convergence signal grammar.** `convergence_signal` must name a boolean
+(`type: json`) output — the expander only ever emits `== true` dotpath
+comparisons for it. The strict predicate grammar has **no string literals**
+(see [`predicate-grammar.md`](./predicate-grammar.md)), so a *converging* loop
+must gate on a boolean or numeric signal field, never a string verdict.
+`development.classic.workflow.yaml`'s `review-converge-loop` and
+`test-swarm.workflow.yaml`'s `swarm-rounds-loop` both declare
+`convergence_signal` alongside a human-readable `gate_predicate` fallback
+string (`review_verdict not equals needs_revision`, `coverage satisfied`) —
+the fallback is legacy/unused for skip purposes once `convergence_signal` has
+a producer; it exists for backward-compat with loops that predate s3
+(convergence-signal support) and have not yet been given one.
+
+**Multi-exit loops.** Post-loop nodes are rewired to depend on ALL of the
+last round's body exit nodes (nodes no other body node depends on). A loop
+body with more than one exit, combined with a declared `convergence_signal`
+and `max_rounds > 1`, is rejected at load time (`GraphLoadError`) — early
+convergence can leave every last-round exit SKIPPED, which can cause a
+downstream multi-upstream join to be SKIPPED-not-evaluated instead of
+blocking (see pr20-fable-review finding S3). Keep loop bodies single-exit, or
+add a trivial join step inside the `sub_graph` that unifies multiple internal
+branches into one exit.
+
+## Reference-Passing (`source: reference`)
+
+An **additive** lean-flow layer alongside the typed point-to-point
+`step_output` binding (the primary, audited wiring, which is unchanged). A node
+may write an output to a filesystem **pointer** — a plain path relative to the
+run working directory — and a downstream node may declare a `source: reference`
+binding that resolves the pointer **lazily**, reading the content at
+input-resolution time.
+
+```yaml
+  - id: consumer
+    agent: developer
+    inputs:
+      - name: review_notes
+        source: reference
+        reference_pointer: refs/review.md   # path relative to run working dir
+```
+
+- **Pointer format:** filesystem path relative to the run working directory
+  (`run_working_dir` in the run context; absolute paths are honored as-is).
+- **Lazy resolution:** the pointer is read when the downstream node's inputs are
+  resolved, not when the producer runs.
+- **Missing pointer:** raises a clear `MissingReferenceError` naming the pointer
+  at resolution time — never a silent `None`.
+- **No SDK dependency:** the concept (filesystem pointer + lazy resolution) is
+  adopted with the Python standard library only; there is no Open-Prose SDK
+  import. Producing helpers live in `hive/lib/dag_executor/executor/reference.py`
+  (`write_reference` / `read_reference`).
+
+The typed `step_output` contract remains the primary wiring and the audit
+surface; `reference` is opt-in for nodes that want to pass large or
+loosely-typed outputs without threading them through a typed binding.
 
 ## Scheduler Overrides (`under_scheduler`)
 

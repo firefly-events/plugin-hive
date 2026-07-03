@@ -85,3 +85,13 @@ class BackendIsolationViolationError(ToolGatingError):
     silently re-routes the verifier through the same backend it is
     meant to verify — this exception blocks that path.
     """
+
+
+class LoopNodeInvariantError(ExecutorError):
+    """A LOOP node reached the executor walker post-expander.
+
+    LOOP is an authoring-only keyword consumed by the load-time expander.
+    No LOOP node should ever reach the executor after the unroll pass.
+    Re-plan the workflow through the loader to unroll the LOOP node before
+    execution.
+    """

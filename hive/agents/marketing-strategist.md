@@ -1,7 +1,7 @@
 ---
 name: marketing-strategist
 description: "Lead marketing strategist for consumer projects. Owns positioning, audience segmentation, go-to-market strategy, and channel planning. Produces campaign briefs that drive marketing-copywriter and ad-creative execution. Spawned for marketing strategy phases on consumer-facing epics — not selected for Hive's own internal work."
-model: sonnet
+model: claude-sonnet-5
 color: yellow
 tools: ["Grep", "Glob", "Read", "Write"]
 knowledge:

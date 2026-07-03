@@ -4,7 +4,7 @@
 >
 > **Parallel-dispatch gate (ed-7):** `Agent(name:)` (this section) and the cmux variant (below) are two of the four in-scope dispatch points for the parallel gate. Each story listed in the prompt must already carry the `parallel_allowed: true` + `parallel_rationale ∈ {variation, read-only, bounded-slice}` pair emitted by `/plan` Phase C step 13, with `bounded-slice` stories declaring disjoint `files_to_modify[]`. The gate runs in `execute-dispatch` Step 1.5 *before* this section's prompt is generated — by the time you arrive here, the depth-0 `unblocked_stories[]` set has already been validated and `mode_decision` was downgraded to `sequential` on any violation. See [`hive/references/parallel-call-sites.md`](../../../hive/references/parallel-call-sites.md) §2 for the catalog of in-scope sites.
 
-Spawn each story as a named teammate via `Agent(name: "{story-id}")` — one `Agent(name:)` call per story, and each call's prompt carries ONLY that one story's scope. Never combine two or more stories into a single teammate's prompt. Parallel teammates require `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (research preview, NOT GA); sequential is the guaranteed floor when the flag is unset. Generate a natural-language prompt per story that describes that single story's task:
+Describe each story as a named teammate in the team prompt — one teammate per story, each carrying ONLY that story's scope. Never combine two or more stories into a single teammate's scope description. The runtime materializes teammates automatically from the natural-language team description; parallel execution is the default for eligible story sets; `execution.parallel_teams: false` or `--sequential` forces sequential execution. Generate a natural-language prompt per story that describes that single story's task:
 
 ```
 Execute story "{story-id}" of the "{epic-id}" epic.
@@ -31,7 +31,7 @@ completes, report back.
 ```
 
 Rules for generating each per-story prompt:
-- Emit exactly one prompt per story, addressed to that single story only — never name a second story's scope inside a teammate's prompt. Use the story ID as the teammate name (`Agent(name: "{story-id}")`).
+- Emit exactly one prompt per story, addressed to that single story only — never name a second story's scope inside a teammate's prompt. Use the story ID as the teammate name.
 - Stories with no `depends_on` say "start immediately"; stories with dependencies list them explicitly so the teammate blocks correctly.
 - Do NOT inline the full story content — each teammate reads its own story YAML file directly.
 - For large epics (10+ stories), keep each prompt minimal (ID + title + deps only) — but still one scoped prompt per story.
@@ -48,7 +48,7 @@ After building each story's task block, check if that story's ID is present in t
   {agent-name} reads hive/agents/{agent-name}.md and participates in code review.
   ```
 
-- Epics with no `appends[]` entries produce an `Agent(name:)` prompt that is byte-for-byte identical to pre-sidecar behavior — this is the primary constraint.
+- Epics with no `appends[]` entries produce a story prompt that is byte-for-byte identical to pre-sidecar behavior — this is the primary constraint.
 
 > **Pattern note:** This is the sidecar-within-named-teammate pattern — sidecar runs within the dev teammate's pane, not as a separate `Agent(name:)` call.
 
@@ -72,7 +72,7 @@ Ensure `${HIVE_STATE_DIR}/respawn-summaries/` exists before epic execution begin
 
 When active: `execution.terminal_mux` resolves to `cmux` (explicit setting, or `auto` with cmux detected).
 
-Dispatch: same as the `Agent(name:)` path — the orchestrator loops through stories — but delivers each story prompt to a cmux pane via agent-spawn instead.
+Dispatch: same as the auto-spawn path — the orchestrator loops through stories — but delivers each story prompt to a cmux pane via agent-spawn instead.
 
 - Topologically sorted stories with no unmet dependencies are spawned immediately.
 - Each spawn goes through the agent-spawn skill (section 7.3), which opens a cmux pane, launches `claude` in interactive mode, and delivers the prompt.

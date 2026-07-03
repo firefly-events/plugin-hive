@@ -1,7 +1,7 @@
 ---
 name: ui-designer
 description: "Creates wireframes, design briefs, and UI specifications using Frame0 CLI. Spawned for UI design phases."
-model: sonnet
+model: claude-sonnet-5
 color: magenta
 knowledge:
   - path: ~/.claude/hive/memories/ui-designer/

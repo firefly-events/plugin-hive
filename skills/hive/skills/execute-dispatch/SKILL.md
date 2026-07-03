@@ -11,7 +11,7 @@ Atomic skill, NOT inline `/execute` prose. It resolves the pre-execution dispatc
 
 Call this skill once at the single `/execute` dispatch point where the caller has both the story execution context and the current workflow handoff context.
 
-**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, `HIVE_EXECUTION_MODE`, and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; `epic_id` when known; `arguments` containing the `--sequential` flag state plus dependency-depth summary; and `unblocked_stories[]` — the depth-0 ready stories at this dispatch tick, each carrying at minimum `id`, `parallel_allowed`, `parallel_rationale`, and (for `parallel_rationale: bounded-slice`) `files_to_modify[]` whose entries name the declared touch-set. Empty or single-element `unblocked_stories[]` is valid: the parallel-dispatch gate (Step 1.5) skips when there is no peer set to gate.
+**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, and `HIVE_EXECUTION_MODE`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; `epic_id` when known; `arguments` containing the `--sequential` flag state plus dependency-depth summary; and `unblocked_stories[]` — the depth-0 ready stories at this dispatch tick, each carrying at minimum `id`, `parallel_allowed`, `parallel_rationale`, and (for `parallel_rationale: bounded-slice`) `files_to_modify[]` whose entries name the declared touch-set. Empty or single-element `unblocked_stories[]` is valid: the parallel-dispatch gate (Step 1.5) skips when there is no peer set to gate.
 
 **Outputs:** `mode_decision` enum `sessions | team | team-cmux | sequential | sandcastle | multica | cc-workflows`; `mode_reason` as a one-line string explaining the selected mode; `runner_path` enum `hive-dag | orchestrator-narrated`; `runner_reason` as a one-line string explaining the selected runner path; `field_sources` map covering `sessions_enabled`, `parallel_teams`, `terminal_mux`, `executor`, `execution_mode`, and `execution_runtime` so callers can attribute every resolution; `field_sources.execution_runtime.epic_override` as a `<path>` traceability field when a per-epic disposition file overrode the auto heuristic, otherwise `null`; and `gate_violations[]` — a list of `{story_id, reason}` records emitted by Step 1.5 when the parallel-dispatch gate refuses fan-out. `gate_violations[]` is `[]` on healthy runs and on any `mode_decision` other than `team | team-cmux | sessions | sandcastle | multica | cc-workflows`.
 
@@ -26,11 +26,10 @@ Call this skill once at the single `/execute` dispatch point where the caller ha
 The mode selection uses these exact match conditions, in precedence order:
 
 1. **Sessions check:** match when `env.HIVE_SESSIONS_ENABLED` is exactly truthy by string normalization (`1`, `true`, or `"true"`) OR root `hive.config.yaml` has `sessions.enabled: true`. This wins over every team or sequential input.
-2. **Teams availability check:** match only when `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is exactly truthy by string normalization (`1`, `true`, or `"true"`).
-3. **Parallel teams config check:** evaluate the resolved `parallel_teams` boolean from Step 0 below. The legacy reads (root `hive.config.yaml` `parallel_teams: true` or `execution.parallel_teams: true`) become the config-source path inside Step 0; this step matches whenever the resolved boolean is `true`.
-4. **Concurrency and flag check:** match only when the dependency-depth summary shows more than one story at the same depth AND `arguments` does not contain `--sequential`.
+2. **Parallel teams config check:** evaluate the resolved `parallel_teams` boolean from Step 0 below. The legacy reads (root `hive.config.yaml` `parallel_teams` or `execution.parallel_teams`) become the config-source path inside Step 0; this step matches whenever the resolved boolean is `true`.
+3. **Concurrency and flag check:** match only when the dependency-depth summary shows more than one story at the same depth AND `arguments` does not contain `--sequential`.
 
-The cmux variant is not a separate team gate. After all four team checks match, return `team-cmux` when the resolved `terminal_mux` from Step 0 equals `cmux`; otherwise return `team`.
+The cmux variant is not a separate team gate. After the parallel config and concurrency checks match, return `team-cmux` when the resolved `terminal_mux` from Step 0 equals `cmux`; otherwise return `team`.
 
 ## Sane Defaults
 
@@ -40,6 +39,20 @@ When neither env nor config sets a value, apply these defaults — better baseli
 - `terminal_mux` → `tmux` (broadest compat across consumers)
 - `sessions_enabled` → `false` (sessions remain opt-in)
 - `executor` → `orchestrator-narrated` (fail-closed per Q4 lock; hive-dag requires explicit consumer flag plus registry)
+
+## Pre-flight Checks
+
+### Fallback Model Check
+
+1. Read `agent_backends.fallback_model` from root `hive.config.yaml`. Treat absent, `null`, or an empty list as **unset**.
+2. For each story in `unblocked_stories[]`, read the optional `expected_token_budget` field. Skip any story where the field is absent or `null`.
+3. If `fallback_model` is **unset** AND any story has `expected_token_budget > 200_000`, emit:
+
+```
+WARNING: fallback_model is not configured and one or more stories have an expected token budget exceeding 200k tokens. A rate-limit or model-unavailability event mid-execute will stall the run with no automatic recovery. Configure agent_backends.fallback_model in hive.config.yaml with one or more backup models (see hive/references/configuration.md §Agent Backends).
+```
+
+4. If `fallback_model` is set, OR if no story's `expected_token_budget` exceeds 200 k (or the field is absent on every story), emit no warning — silence is the correct no-noise state.
 
 ## Process
 
@@ -150,12 +163,11 @@ When the first branch above selects `mode_decision ∈ {cc-workflows, multica}`,
 Evaluate in this order and stop at the first selected path:
 
 1. If the sessions check matches, return `mode_decision=sessions` and `mode_reason=sessions-enabled`.
-2. If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is not truthy, return `mode_decision=sequential` and `mode_reason=agent-teams-env-disabled`.
-3. If parallel teams config is not true, return `mode_decision=sequential` and `mode_reason=parallel-teams-disabled`.
-4. If the dependency-depth summary does not show multiple stories at the same depth, return `mode_decision=sequential` and `mode_reason=no-peer-depth`.
-5. If `--sequential` is present in `arguments`, return `mode_decision=sequential` and `mode_reason=sequential-flag`.
-6. When the resolved `terminal_mux` field (from Step 0, env > config > default) equals `cmux`, return `mode_decision=team-cmux` and `mode_reason=team-checks-pass-cmux`.
-7. Otherwise return `mode_decision=team` and `mode_reason=team-checks-pass`.
+2. If parallel teams config is not true, return `mode_decision=sequential` and `mode_reason=parallel-teams-disabled`.
+3. If the dependency-depth summary does not show multiple stories at the same depth, return `mode_decision=sequential` and `mode_reason=no-peer-depth`.
+4. If `--sequential` is present in `arguments`, return `mode_decision=sequential` and `mode_reason=sequential-flag`.
+5. When the resolved `terminal_mux` field (from Step 0, env > config > default) equals `cmux`, return `mode_decision=team-cmux` and `mode_reason=team-checks-pass-cmux`.
+6. Otherwise return `mode_decision=team` and `mode_reason=team-checks-pass`.
 
 This preserves precedence: `sessions > team-cmux > team > sequential`.
 

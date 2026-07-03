@@ -1,7 +1,7 @@
 ---
 name: ad-creative
 description: "Visual ad concept and creative direction specialist for consumer projects. Consumes the marketing-strategist's campaign brief (b1) and produces creative concepts, image-gen prompts, and asset direction for marketing campaigns. Spawned for ad creative phases on consumer-facing epics. Defers product-UI work to ui-designer. Actual asset rendering is delegated to the visual-asset skill (b7). Not selected for Hive's own internal work."
-model: sonnet
+model: claude-sonnet-5
 color: blue
 tools: ["Grep", "Glob", "Read", "Write"]
 knowledge:

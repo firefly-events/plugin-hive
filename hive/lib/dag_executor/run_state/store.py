@@ -41,6 +41,7 @@ from .schema import (
     RunState,
     RunStatus,
     from_dict,
+    migrate_v0_to_v1,
     to_dict,
 )
 
@@ -142,11 +143,58 @@ def load(run_id: str, root: Path | None = None) -> RunState:
     with path.open("r", encoding="utf-8") as handle:
         payload = yaml.safe_load(handle) or {}
     schema_version = payload.get("schema_version", SCHEMA_VERSION)
+    # b2: transparently migrate a v0 (pre-memoization) run state up to v1 so
+    # it stays readable. Unknown FUTURE versions still raise loudly.
+    if schema_version == 0:
+        payload = migrate_v0_to_v1(payload)
+        schema_version = payload.get("schema_version", SCHEMA_VERSION)
     if schema_version != SCHEMA_VERSION:
         raise SchemaVersionMismatchError(
             f"unsupported schema_version {schema_version!r}; expected {SCHEMA_VERSION}"
         )
     return from_dict(payload)
+
+
+def find_latest_successful(
+    workflow_slug: str,
+    root: Path | None = None,
+    exclude_run_id: str | None = None,
+) -> RunState | None:
+    """Return the most recent COMPLETED run for ``workflow_slug`` (b2).
+
+    Scans ``<root>/`` for run directories, loads each readable run_state
+    (migrating v0→v1 transparently), and returns the COMPLETED one with
+    the newest ``last_updated_at`` (ISO-8601, lexicographically ordered),
+    skipping ``exclude_run_id``. Returns None when none qualifies. This is
+    how the public ``run_workflow`` front door discovers the prior
+    successful run to memoize against — without it b2 is inert in
+    production (a fresh run has no in-hand prior state).
+
+    Malformed/unreadable run dirs are skipped, never raised — a corrupt
+    sibling run must not break a live run's memo lookup.
+    """
+
+    base = runs_root(root)
+    if not base.exists():
+        return None
+    best: RunState | None = None
+    for child in sorted(base.iterdir()):
+        if not child.is_dir():
+            continue
+        run_id = child.name
+        if exclude_run_id is not None and run_id == exclude_run_id:
+            continue
+        try:
+            state = load(run_id, root=base)
+        except Exception:
+            continue
+        if state.workflow_slug != workflow_slug:
+            continue
+        if state.status != RunStatus.COMPLETED:
+            continue
+        if best is None or state.last_updated_at > best.last_updated_at:
+            best = state
+    return best
 
 
 def save(state: RunState, root: Path | None = None) -> None:
@@ -179,6 +227,25 @@ def set_node_output(state: RunState, node_id: str, output: dict[str, Any]) -> Ru
     return replace(
         state,
         output_graph=new_outputs,
+        last_updated_at=_now_iso(),
+    )
+
+
+def set_node_hash(state: RunState, node_id: str, node_hash: str) -> RunState:
+    """Record the b2 memoization hash for ``node_id`` (schema v1).
+
+    Returns a new RunState; the input's ``node_hashes`` map is never
+    mutated in place (narrow-mutation discipline). A subsequent run reuses
+    this node's output_graph entry only when its recomputed hash matches
+    the value stored here.
+    """
+
+    _check_not_frozen(state)
+    new_hashes = dict(state.node_hashes)
+    new_hashes[node_id] = node_hash
+    return replace(
+        state,
+        node_hashes=new_hashes,
         last_updated_at=_now_iso(),
     )
 

@@ -1,7 +1,7 @@
 ---
 name: architect
 description: "Designs technical solutions with rationale for every decision. Spawned for architecture and technology evaluation."
-model: sonnet
+model: gpt-5.5
 color: blue
 knowledge:
   - path: ~/.claude/hive/memories/architect/

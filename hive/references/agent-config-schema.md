@@ -193,6 +193,17 @@ Reusable prompt-language slots live in the agent body, not in frontmatter. This 
 
 Agent frontmatter `model_tier` must match `hive.config.yaml` tiers. If `model_overrides` exists for an agent, the override wins at spawn time.
 
+## Nesting Depth Ceiling (max_spawn_depth)
+
+Claude Code enforces a hard maximum spawn depth of **5**. This is a runtime constraint, not a configurable field — there is no `max_spawn_depth` key in agent frontmatter or `hive.config.yaml` to set.
+
+| Depth | Agent tool present | Notes |
+|-------|-------------------|-------|
+| 1–4 | Yes | Agent can spawn children |
+| 5 | **No** | Tool omitted; spawning silently unavailable |
+
+Design agent trees so that any agent needing to spawn children sits at depth ≤ 4. The depth ceiling applies to recursive `Agent(name:)` calls (see [`agent-teams-guide.md`](agent-teams-guide.md) for the teammate mechanism). It is independent of `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`, which gates only parallel dispatch.
+
 ## Interaction with Team Config
 
 Team configs (at `.pHive/teams/{team-name}.yaml`) can override agent-level domains for project-specific scoping:

@@ -1,7 +1,7 @@
 ---
 name: security-reviewer
 description: "Reviews code for security vulnerabilities using OWASP Top 10 as the framework. Binary verdicts only — passed or needs_revision."
-model: sonnet
+model: claude-sonnet-5
 color: red
 knowledge:
   - path: ~/.claude/hive/memories/security-reviewer/

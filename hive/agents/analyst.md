@@ -1,7 +1,7 @@
 ---
 name: analyst
 description: "Transforms raw ideas into precise, testable requirements. Spawned for requirements analysis and gap detection."
-model: sonnet
+model: claude-sonnet-5
 color: blue
 knowledge:
   - path: ~/.claude/hive/memories/analyst/

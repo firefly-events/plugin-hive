@@ -1,7 +1,7 @@
 ---
 name: developer
 description: "General-purpose developer. Deprecated — use frontend-developer or backend-developer instead."
-model: sonnet
+model: claude-sonnet-5
 color: green
 knowledge:
   - path: ~/.claude/hive/memories/developer/

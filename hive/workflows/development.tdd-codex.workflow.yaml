@@ -9,13 +9,13 @@ methodology: tdd
 
 # AGENT ROUTING:
 # Steps with `backend: codex` route through codex-invoke (cmux pane).
-# Steps with `backend: claude` (or unset) use the standard `Agent(name:)` teammate surface.
+# Steps with `backend: claude` (or unset) use standard Agent natural-language spawn.
 # The persistent Codex pane opens once and stays alive across implement + fix-loop.
 
 # PARALLELISM:
 # Within a story: steps are sequential (test → implement → review → fix loop).
 # Between stories: each story gets its own Claude+Codex pair. Independent stories
-# spin up concurrent pairs — same as the existing `Agent(name:)` teammate pattern.
+# spin up concurrent pairs — same as existing natural-language agent-teams pattern.
 
 steps:
   - id: research

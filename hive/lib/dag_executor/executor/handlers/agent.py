@@ -19,6 +19,8 @@ spy that records the exact invocation shape (asserted by
 from __future__ import annotations
 
 import json
+import os
+import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -84,6 +86,54 @@ def _output_contract_preamble(output_names: list[str]) -> str:
     )
 
 
+def _output_contract_closer(output_names: list[str]) -> str:
+    """A terminal restatement of the #13 output contract, appended as the LAST
+    thing in a Multica node's brief.
+
+    The prepended preamble alone left a gap: an agent reads it up front, works a
+    long task, and ends its turn without writing ``outputs.yaml`` — the write was
+    most due exactly when the instruction was least fresh (observed on the test
+    node, which ran dev-supplied passing tests and stopped without emitting
+    ``test_results``/``test_artifacts``). Restating the obligation at the stop
+    boundary closes that gap; it is cheap, additive, and applies to every node
+    that declares semantic outputs.
+    """
+    keys = ", ".join(f"`{n}`" for n in output_names)
+    return (
+        "\n\n---\n\n"
+        "## ⛔ STOP GATE (#13 — DO THIS LAST, BEFORE YOU END YOUR TURN)\n\n"
+        f"Your turn is NOT complete until `.pHive/dag-outputs/outputs.yaml` exists "
+        f"in your work_dir with EVERY key: {keys}. Writing your work report or "
+        "committing code is NOT a substitute. Self-check now: does that file exist "
+        "with every key set to a real value (not a placeholder)? If not, write it "
+        "and only then stop. A missing or partial file means your work is "
+        "DISCARDED and the node fails.\n"
+    )
+
+
+def _rlm_opt_in(node: Any) -> bool:
+    """The a-rlm-recursive-node opt-in gate — a MINIMAL, dependency-free check on
+    ``node.config.rlm`` so the flag-OFF path decides WITHOUT importing rlm.py
+    (codex finding 2).
+
+    Activation (codex finding 3 — no truthiness footgun):
+      * scalar ``rlm: true``  -> ON
+      * block  ``rlm: {enabled: true, ...}`` -> ON (explicit ``enabled: true``)
+      * ``rlm: false`` / ``rlm: {}`` / ``rlm: {enabled: false}`` / absent /
+        non-dict config -> OFF
+
+    An empty ``rlm: {}`` block therefore does NOT activate: the dict form REQUIRES
+    an explicit ``enabled: true``.
+    """
+    config = getattr(node, "config", None)
+    if not isinstance(config, dict):
+        return False
+    rlm = config.get("rlm")
+    if isinstance(rlm, dict):
+        return rlm.get("enabled") is True
+    return bool(rlm)
+
+
 @dataclass
 class NodeOutput:
     """Materialised outputs from a single node, keyed by output name.
@@ -122,6 +172,16 @@ class StubAgentSpawn:
 
     Returns canned outputs keyed by `step_id`. Records every invocation
     in `self.calls` so unit tests can spy on the call shape.
+
+    Loop-aware lookup: the static unroll expander rewrites a looped body
+    node ``X`` into round copies ``X__r1 … X__rN``.  A real agent produces
+    its declared outputs on every round regardless of the round-copy id, so
+    the stub must too.  Lookup therefore tries the exact ``step_id`` first
+    (letting convergence fixtures supply *per-round* outputs keyed by
+    ``X__rk``) and, only on a miss, falls back to the declared id with the
+    ``__r<k>`` suffix stripped (letting declared-id-keyed fixtures feed every
+    round of a loop).  This keeps round copies transparent to the agent layer
+    exactly as the retired runtime LOOP node was.
     """
 
     def __init__(self, canned_outputs: dict[str, dict[str, Any]] | None = None):
@@ -145,7 +205,12 @@ class StubAgentSpawn:
                 "step_id": step_id,
             }
         )
-        return dict(self.canned_outputs.get(step_id, {}))
+        if step_id in self.canned_outputs:
+            return dict(self.canned_outputs[step_id])
+        # Round-copy fallback: strip a trailing ``__r<k>`` and retry under the
+        # declared body-node id.
+        declared_id = re.sub(r"__r\d+$", "", step_id)
+        return dict(self.canned_outputs.get(declared_id, {}))
 
 
 class LocalAgentSpawn:
@@ -341,7 +406,12 @@ class MulticaAgentSpawn:
         tracker_id = self._resolve_tracker_id(
             run_id, step_id, agent, step_file_content, inputs
         )
-        self._dispatch(tracker_id, agent)
+        story_id = inputs.get("story_id")
+        self._dispatch(
+            tracker_id,
+            agent,
+            story_id=story_id if isinstance(story_id, str) and story_id else None,
+        )
         terminal = self._poll(tracker_id)
         status = terminal.get("status", "")
         if status != "completed":
@@ -662,18 +732,25 @@ class MulticaAgentSpawn:
                 )
         return out
 
-    @staticmethod
-    def _harvest_git_state(work_dir: str | None) -> dict[str, Any]:
-        """Derive the agent's commit metadata from the git HEAD of its work_dir
-        checkout (#7).
+    def _harvest_git_state(self, work_dir: str | None) -> dict[str, Any]:
+        """Derive the agent's commit metadata from its work_dir checkout (#7).
 
         Multica's task API does not report what the agent committed/pushed, so
         the poll terminal has no sha/branch/repo. The agent's isolated work_dir
-        IS a real git checkout sitting on the branch + commit it produced, so we
-        read it directly:
+        IS a real git checkout, so we read it directly.
 
-        - ``code_push_sha`` / ``commit_sha`` <- ``git rev-parse HEAD``
-        - ``branch`` <- ``git rev-parse --abbrev-ref HEAD``
+        Ref selection (the bake-in): the Multica daemon auto-checks-out its own
+        ``agent/<persona>/<task>`` branch; agents commit to the epic branch
+        ``feat/<epic>`` per the Repo branch contract, but HEAD is frequently left
+        on the daemon branch at the BASE sha. Reading HEAD blindly then harvested
+        the base sha + the wrong branch, and the reconcile node ff-merged
+        nothing — the agent's work stranded in the workdir. So when the executor
+        has a target (epic) branch and that branch carries the agent's commit, we
+        treat ITS tip as authoritative; HEAD remains the fallback for an agent
+        that committed on HEAD/the daemon branch and for the local binding.
+
+        - ``code_push_sha`` / ``commit_sha`` <- the chosen ref's tip
+        - ``branch`` <- the chosen ref's name
         - ``repo`` / ``work_dir`` <- the checkout path, so the reconcile node
           fetches the branch from this LOCAL checkout (no remote-push
           dependency; reconcileBranch accepts a local repo path).
@@ -682,7 +759,7 @@ class MulticaAgentSpawn:
         masks a real task result.
         """
         out: dict[str, Any] = {}
-        repo_dir = MulticaAgentSpawn._find_repo_checkout(work_dir)
+        repo_dir = self._find_repo_checkout(work_dir)
         if repo_dir is None:
             return out
 
@@ -700,13 +777,46 @@ class MulticaAgentSpawn:
                 return None
             return result.stdout.strip() or None
 
-        sha = _git("rev-parse", "HEAD")
-        branch = _git("rev-parse", "--abbrev-ref", "HEAD")
-        if sha:
-            out["code_push_sha"] = sha
-            out["commit_sha"] = sha
-        if branch and branch != "HEAD":
-            out["branch"] = branch
+        head_sha = _git("rev-parse", "HEAD")
+        head_branch = _git("rev-parse", "--abbrev-ref", "HEAD")
+
+        target = self._target_branch()
+        target_sha = (
+            _git("rev-parse", "--verify", "--quiet", target) if target else None
+        )
+
+        chosen_sha = head_sha
+        chosen_branch = head_branch
+        # Only arbitrate when the epic branch resolves AND differs from HEAD. When
+        # they coincide (or there is no epic branch), HEAD is already correct —
+        # preserving the prior behavior for the default-branch / local cases.
+        if target_sha and head_sha and target_sha != head_sha:
+            base = _git("merge-base", head_sha, target_sha)
+
+            def _ahead(tip: str | None) -> bool:
+                if not base or not tip:
+                    return False
+                count = _git("rev-list", "--count", f"{base}..{tip}")
+                return bool(count and count.isdigit() and int(count) > 0)
+
+            if _ahead(target_sha):
+                # Agent committed on the epic branch (the contract path) — trust
+                # it even though HEAD drifted to the daemon branch.
+                chosen_sha, chosen_branch = target_sha, target
+            elif _ahead(head_sha):
+                # Agent ignored the contract and committed on HEAD/daemon branch.
+                chosen_sha, chosen_branch = head_sha, head_branch
+            else:
+                # Neither ref carries a commit beyond base — no agent work to
+                # harvest. Emit no sha so reconcile no-ops as a clean local
+                # binding rather than silently ff-merging the base.
+                chosen_sha, chosen_branch = None, None
+
+        if chosen_sha:
+            out["code_push_sha"] = chosen_sha
+            out["commit_sha"] = chosen_sha
+        if chosen_branch and chosen_branch != "HEAD":
+            out["branch"] = chosen_branch
         out["repo"] = str(repo_dir)
         out["work_dir"] = str(repo_dir)
         return out
@@ -725,17 +835,19 @@ class MulticaAgentSpawn:
             / "tracker.json"
         )
 
-    def _branch_contract(self) -> str:
-        """Brief preamble telling the agent to base its work on the executor's
-        target branch (#15), when ``repo_root`` is on a non-default (epic)
-        branch. Empty on the default branch (e.g. plan, which creates its own
-        epic branch) — preserving that flow. Best-effort: returns "" if git
-        can't resolve the branch.
+    def _target_branch(self) -> str:
+        """The executor's epic/integration branch — ``repo_root``'s current
+        branch when it is a NON-default branch. Returns "" on the default branch
+        (e.g. plan, which creates its own epic branch), when no origin default
+        resolves, or for a non-git ``repo_root`` (unit tests / local binding) —
+        preserving those flows.
+
+        This is both the branch the Repo branch contract tells agents to commit
+        to AND the branch the harvest treats as authoritative for the agent's
+        commit (a drifted HEAD on the daemon's auto-branch must not strand it).
+        Best-effort: returns "" if git can't resolve the branch.
         """
         if self._repo_root is None or not (self._repo_root / ".git").exists():
-            # No git checkout (e.g. unit tests with a plain tmp repo_root) — skip
-            # entirely so we don't issue subprocess calls a test's mock expects
-            # to be cli.mjs invocations.
             return ""
 
         def _git(*args: str) -> str | None:
@@ -769,6 +881,18 @@ class MulticaAgentSpawn:
             return ""
         if branch == default:
             return ""  # default branch — no epic-branch directive
+        return branch
+
+    def _branch_contract(self) -> str:
+        """Brief preamble telling the agent to base its work on the executor's
+        target branch (#15), when ``repo_root`` is on a non-default (epic)
+        branch. Empty on the default branch (e.g. plan, which creates its own
+        epic branch) — preserving that flow. Best-effort: returns "" if git
+        can't resolve the branch.
+        """
+        branch = self._target_branch()
+        if not branch:
+            return ""
         return (
             "## Repo branch contract — FIRST ACTION (overrides the daemon's auto-checkout)\n\n"
             f"The DAG executor reconciles your commit FROM the `{branch}` branch (the epic "
@@ -776,7 +900,7 @@ class MulticaAgentSpawn:
             f"move to `{branch}` before doing any work:\n\n"
             "```bash\n"
             f"git fetch origin {branch}\n"
-            f"git checkout {branch} 2>/dev/null || git checkout -b {branch} origin/{branch}\n"
+            f"git checkout -B {branch} origin/{branch}\n"
             "```\n\n"
             f"Do ALL work and commits on `{branch}`. Do NOT commit on the daemon's "
             "auto-created `agent/<persona>/<task>` branch — commits there will not reconcile "
@@ -852,9 +976,15 @@ class MulticaAgentSpawn:
         # --dedup-title makes the Multica server the authoritative idempotency source:
         # cli.mjs lists existing issues and returns the matching one instead of creating
         # a duplicate. This is the primary guard for cross-machine resume (H2).
-        result = self._run_cli_fast(
-            ["create-issue", "--title", title, "--body", body, "--dedup-title", title]
-        )
+        create_args = ["create-issue", "--title", title, "--body", body, "--dedup-title", title]
+        # Bind the issue to the epic branch at creation so the daemon can key
+        # branch-shared worktree reuse off the structured integration_branch column
+        # (the body contract alone is not machine-readable). Empty on the default
+        # branch / non-git repo_root — preserves those flows.
+        create_branch = self._target_branch()
+        if create_branch:
+            create_args += ["--integration-branch", create_branch]
+        result = self._run_cli_fast(create_args)
         tracker_id = result.get("id")
         if not tracker_id:
             raise AgentHandlerError(
@@ -874,10 +1004,39 @@ class MulticaAgentSpawn:
     # CLI dispatch + poll
     # ------------------------------------------------------------------
 
-    def _dispatch(self, tracker_id: str, agent: str) -> None:
-        self._run_cli_fast(
-            ["dispatch", "--issue", tracker_id, "--agent", agent]
-        )
+    def _dispatch(
+        self, tracker_id: str, agent: str, story_id: str | None = None
+    ) -> None:
+        args = ["dispatch", "--issue", tracker_id, "--agent", agent]
+        # Single-shared-branch contract (t-007): when the executor is on an epic
+        # branch, tell the agent to base its work on AND push back to that branch
+        # (origin/{branch}) rather than committing to the daemon's throwaway
+        # agent/<persona>/<task> branch. cli.mjs injects renderIntegrationContract
+        # into the issue body idempotently. Every agent then resets to origin tip
+        # and pushes its commit there, so downstream nodes/stories build on real
+        # prior work and reconcile stays a clean fast-forward (no stale base, no
+        # detached-HEAD harvest). Empty branch (default-branch flows, non-git
+        # repo_root) → omit, preserving the harvest fallback.
+        branch = self._target_branch()
+        if branch:
+            args += ["--integration-branch", branch]
+            if story_id:
+                args += ["--story-id", story_id]
+        # Node issue ids are deterministic per (epic, story, node), so RESTARTING
+        # a previously-failed run re-targets the same issue — whose latest task is
+        # terminal from the prior run, making a plain dispatch a no-op
+        # (STALE_TERMINAL_TASK). HIVE_MULTICA_FORCE_RERUN opts a restart into
+        # resetting such a terminal issue to a fresh dispatchable state. It is a
+        # no-op on a fresh issue (cli.mjs only resets when the latest task is
+        # terminal; an in_progress same-assignee issue still short-circuits as
+        # already_dispatched), so it is safe to pass for every node of a rerun.
+        if os.environ.get("HIVE_MULTICA_FORCE_RERUN", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            args.append("--rerun")
+        self._run_cli_fast(args)
 
     def _poll(self, tracker_id: str) -> dict[str, Any]:
         poll_timeout_s = self._timeout_ms / 1000.0 + 120.0
@@ -938,9 +1097,20 @@ class AgentHandler:
         spawn: AgentSpawn,
         repo_root: Path | str | None = None,
         plugin_root: Path | str | None = None,
+        *,
+        rlm_binding_resolver: Callable[[str], Any] | None = None,
+        rlm_metric_writer: Callable[[dict[str, Any], str], None] | None = None,
     ) -> None:
         self._spawn = spawn
         self._repo_root = Path(repo_root) if repo_root is not None else None
+        # a-rlm-recursive-node A (EXPERIMENTAL, flag-gated): injection seams for
+        # the RLM recursive wrapper. Both default None and are consulted ONLY on
+        # the ``node.config.rlm`` opt-in path, so a non-rlm node never touches
+        # them and the handler stays byte-identical to pre-A.
+        self._rlm_binding_resolver = rlm_binding_resolver
+        self._rlm_metric_writer = rlm_metric_writer
+        # Inspection handle: the wrapper built for the most recent rlm node.
+        self._last_rlm_wrapper: Any = None
         # step_files are plugin-shipped content (e.g.
         # ``hive/workflows/step-files/plan/research.md``) installed WITH the
         # plugin — they do NOT live inside a consumer project's ``repo_root``.
@@ -1057,8 +1227,16 @@ class AgentHandler:
         # and test spawns consume canned outputs and get no contract.
         effective_step_file = step_file_content
         if is_multica and semantic_outputs:
+            # Bracket the brief: the prepended preamble is read FIRST and then
+            # forgotten by turn-end after a long task (observed: the tester ran
+            # the dev-supplied passing tests, reported done, and skated past the
+            # gitignored outputs.yaml write). Appending the same obligation as the
+            # LAST thing the agent sees keeps it salient at the stop boundary —
+            # the moment the write is actually due.
             effective_step_file = (
-                _output_contract_preamble(semantic_outputs) + step_file_content
+                _output_contract_preamble(semantic_outputs)
+                + step_file_content
+                + _output_contract_closer(semantic_outputs)
             )
 
         def _filled(o: dict[str, Any]) -> int:
@@ -1066,6 +1244,28 @@ class AgentHandler:
 
         def _missing(o: dict[str, Any]) -> list[str]:
             return [n for n in semantic_outputs if _output_is_empty(o.get(n))]
+
+        # a-rlm-recursive-node A: flag-gate. When node.config.rlm opts in, run the
+        # spawn through the RLM recursive harness (constrained toolset + depth-1
+        # register_binding sub-call + measured metric). When the flag is
+        # absent/false, ``active_spawn is self._spawn`` — the SAME object called
+        # with the SAME args, so the non-rlm path is byte-identical to pre-A.
+        #
+        # codex finding 2: the opt-in decision is a MINIMAL inline config check
+        # (``_rlm_opt_in``, no rlm.py import) so a flag-off node NEVER imports the
+        # RLM module — pre-A had no such dependency. The heavy wrapper is imported
+        # ONLY inside the true (opt-in) branch.
+        active_spawn: Any = self._spawn
+        if _rlm_opt_in(node):
+            from .rlm import RLMRecursiveWrapper
+
+            active_spawn = RLMRecursiveWrapper(
+                self._spawn,
+                node,
+                binding_resolver=self._rlm_binding_resolver,
+                metric_writer=self._rlm_metric_writer,
+            )
+            self._last_rlm_wrapper = active_spawn
 
         outputs: dict[str, Any] = {}
         attempt_work_dirs: list[str] = []
@@ -1075,7 +1275,7 @@ class AgentHandler:
         attempt_outputs_by_work_dir: dict[str, dict[str, Any]] = {}
         for attempt in range(1, max_under_run_attempts + 1):
             try:
-                outputs = self._spawn(
+                outputs = active_spawn(
                     agent=node.agent,
                     step_file_content=effective_step_file,
                     inputs=dict(inputs),

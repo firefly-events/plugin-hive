@@ -135,12 +135,16 @@ def test_harvest_git_state_derives_sha_branch_repo(tmp_path: Path):
     git("add", "-A")
     git("commit", "-q", "-m", "c")
 
-    state = MulticaAgentSpawn._harvest_git_state(str(work_dir))
+    # _harvest_git_state is an instance method (it consults self._target_branch).
+    # With repo_root unset the target is "" so it falls back to HEAD — which here
+    # IS feat/my-epic, preserving the original assertions.
+    spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs")
+    state = spawn._harvest_git_state(str(work_dir))
     assert state["branch"] == "feat/my-epic"
     assert state["commit_sha"] == state["code_push_sha"]
     assert len(state["commit_sha"]) == 40
     assert state["repo"] == str(repo)
-    assert MulticaAgentSpawn._harvest_git_state(None) == {}
+    assert spawn._harvest_git_state(None) == {}
 
 
 def test_step_file_outside_all_roots_raises(tmp_path: Path):

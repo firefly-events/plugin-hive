@@ -1,7 +1,7 @@
 ---
 name: test-inspector
 description: "Coverage analyst that evaluates whether tests are sufficient, correct, and aligned with requirements."
-model: sonnet
+model: claude-sonnet-5
 color: yellow
 knowledge:
   - path: ~/.claude/hive/memories/test-inspector/

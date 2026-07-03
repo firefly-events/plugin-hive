@@ -1,8 +1,23 @@
 name: review
 description: >
-  Review flow graph — reviewer producer → reconcile → validation gate over
-  the committed review artifact. Bounded retry on reviewer node (no LOOP primitive).
-  Shape mirrors plan.workflow.yaml and test-swarm.workflow.yaml conventions.
+  Review flow graph — reviewer → reconcile-review → gate-review-artifact.
+  This is the DAG front-door graph for `/review` (see skills/review/SKILL.md
+  Phase 0b): it is artifact-readiness only. There is no in-graph fix/implement
+  agent here — a needs_revision verdict is handled OUTSIDE this graph by
+  re-triggering pickup through the same dispatch path `/execute` uses (see
+  skills/review/SKILL.md step 7). Bounded retry on the reviewer node covers
+  individual review-attempt flakiness (see reviewer.md "Retry" — no LOOP
+  primitive needed). A prior draft of this file carried a disconnected
+  `review-converge-loop` LOOP node (no feature/convergence_signal, zero body
+  nodes) intended for an in-graph review<->fix cycle that was never built for
+  this workflow; it was removed as vestigial dead code (pr20-fable-review M1) —
+  it had no `depends_on` and nothing depended on it, so it never participated
+  in the reviewer -> reconcile-review -> gate-review-artifact chain and only
+  existed to crash the walker (LoopNodeInvariantError) once loaded. The
+  in-graph converge-loop pattern IS used for real fix cycles elsewhere, e.g.
+  development.classic.workflow.yaml's `review-converge-loop`
+  (feature: review_converge, sub_graph: review-fix-cycle), which has a real
+  `developer` agent to apply fixes in-graph.
 version: "1.0.0"
 
 steps:
@@ -34,6 +49,12 @@ steps:
         type: string
       - name: commit_sha
         type: string
+      # s3-convergence-signal: boolean convergence signal. True when the review
+      # passes (verdict = passed or needs_optimization); false when it requires
+      # a fix (verdict = needs_revision). Consumed by the review-converge-loop's
+      # skip_when predicate to short-circuit subsequent rounds.
+      - name: review_passed
+        type: json
     retry:
       max_attempts: 3
     timeout_ms: 1800000

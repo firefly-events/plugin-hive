@@ -9,6 +9,93 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+**DAG executor re-platform — contract-derived scheduling + static loop unroll.**
+Headline is the two-epic bundle promoted via PR #20 (`version_bump: minor` —
+drove this release); the release train also promotes several `version_bump: none`
+epics that accumulated on `develop` since 2.13.4 (see "Also in this release").
+
+### Added
+
+- **RLM/Open-Prose-informed DAG evolution** (epic `rlm-openprose-dag`, PR #20,
+  `version_bump: minor`). Layers four capabilities on Hive's deterministic DAG
+  spine while keeping it the audit/observability backbone:
+  - **Contract-derived DAG + reconcile-on-drift memoization** (`b`) — the graph
+    is derived from declared node contracts; unchanged upstream contracts skip
+    re-execution (drift-memoized scheduling).
+  - **Reference-based cross-node data passing** (`c`) — nodes pass data by
+    reference across the graph instead of inline copy.
+  - **Configurable hive-dag executor binding** (`p`) — all flows resolve their
+    spawn binding via `resolve_spawn_binding` (local / multica / sandcastle /
+    cc-workflows).
+  - **Bounded converge-loop primitive** (`t-005`/`t-006`) — the LOOP NodeType and
+    a converge-loop `review.workflow.yaml` (superseded at execution time by the
+    static unroll below, retained as an authoring keyword).
+  - **RLM-style recursive node** (`a`) — experimental, feature-flagged spike.
+- **Static loop unroll + configurable loop templates** (epic
+  `loop-unroll-templates`, PR #20, `version_bump: none`). Bounded LOOP nodes are
+  unrolled at **load time** into conditional DAG round-copies — the runtime LOOP
+  engine is retired; the executor walks a pure acyclic graph.
+  - **Load-time unroll expander** (`s2`) — `node_type: loop` → `<node>__r<k>`
+    round-copies + terminal gate; authoring keyword preserved, zero author-facing
+    change.
+  - **Boolean convergence-signal contract** (`s3`) — unrolled loops short-circuit
+    on a declared boolean (`review_passed`/`tests_green`/`behavior_satisfied`/
+    `coverage_satisfied`) via a converged-latch `skip_when` OR-chain.
+  - **Per-feature `loops:` config** (`s1`) — `loops.<feature>.{enabled,max_rounds}`
+    with `env > root > baseline` precedence and `HIVE_LOOPS_<FEATURE>_*` overrides.
+  - **First-class loop templates** — TDD red-green (`s5`), BDD converge (`s6`),
+    test-swarm rounds (`s7`), and a skill-level grill loop (`s8`). `review_converge`
+    / `tdd_red_green` / `bdd_converge` default **on**; `test_swarm` / `grill`
+    default **off** (opt-in — "turn grill on, set N rounds").
+  - **Load-time guards** — unbounded, nested, dep-less, and empty-body featured
+    loops, plus compound-gate/multi-exit early-convergence hazards, are rejected
+    at load (`GraphLoadError`) instead of surfacing as runtime surprises.
+
+### Changed
+
+- **Retire runtime LOOP machinery** (`s4`) — `NodeType.LOOP` runtime dispatch,
+  the in-place `sub_graph` iterator, and the loop handler are removed from the
+  executor. `node_type: loop` remains a parse-time authoring keyword only.
+- **Reconcile emits declared `reconcile_status`** — the real-sha merge path now
+  returns `reconcile_status: "merged"` (previously only the no-op path emitted it),
+  matching the 8 workflow bindings that consume it.
+- **Classic workflow empty-domain skip cascade** — `fix-cycle-review` gained the
+  `when: "$test.output.test_artifacts != null"` twin so review rounds skip
+  cleanly when there is no implementation to review.
+
+### Fixed
+
+- **27 pre-existing PR #20 test-suite failures** resolved (metric-signal routing,
+  meta-team-cycle drift, scan-roots frozen-clock, parity bar, reconcile status,
+  decomposition joins) — full suite green (**1522 passed / 0 failed / 3 skipped**).
+- **Version sources back in lockstep** — `marketplace.json` (2.13.3) and
+  `plugin.json` (2.13.4) reconciled to **2.14.0**.
+
+### Also in this release
+
+Co-shipped epics that landed on `develop` since 2.13.4 (all `version_bump: none`
+— reference/roster/skill surfaces, no core-engine semver impact):
+
+- **External model integration — roster re-pin** (PR #24). Re-pins the agent
+  roster to Sonnet 5 / Fable 5 across the dispatchable personas and wires the
+  `/plan` grill (Phase A2) model selection to match.
+- **Actual-manual test tier** (PR #17). Adds a manual-test execution mode
+  (`test-mode-actual`) and registers it in test dispatch — the SimMan spin-out
+  bridge seam for vision-cursor manual runs.
+- **Auto-spawn migration follow-on** (PR #16). Completes the TeamCreate/TeamDelete
+  retirement begun in 2.13.4's `meta-epic-1`: migrates remaining call sites to the
+  `Agent(name:)` auto-spawn mechanism (agent-teams guide, orchestrator/team-lead,
+  `hive.config.yaml`).
+- **LSP suggestion + kickoff discovery** (PR #14). Suggests an LSP on language
+  detection and adds kickoff discovery questions.
+- **Absorb 5 Claude Code capability shifts** (epic `meta-epic-2`, PR #11):
+  nested-subagent depth, fallback-model routing, cost-USD in `/standup`,
+  domain-native permissions, and marketplace tags folded into Hive's reference
+  surfaces.
+
+Not release-noted (internal only): idea-digest housekeeping (PRs #4/#8) touching
+`.pHive/meta-team` files.
+
 ## [2.13.4] - 2026-06-26
 
 **Capability absorption + visual planning.** Two-epic bundle promoted to `main` via PR #9.

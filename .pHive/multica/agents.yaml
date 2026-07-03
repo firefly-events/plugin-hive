@@ -1,288 +1,289 @@
 schema_version: 1
 agents:
-  # Creators — provider: claude (2026-06-09 policy: Fable 5 trial on developer,
-  # Sonnet 4.6 elsewhere; Codex reserved for reviews only)
-  - name: developer
-    description: General-purpose code implementation. Deprecated — prefer backend-developer or frontend-developer.
-    provider: claude
-    model: "claude-sonnet-4-6"
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/developer.md
-    custom_env: {}
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: backend-developer
-    description: Implements APIs, services, database logic, and other server-side code.
-    provider: claude
-    model: "claude-sonnet-4-6"
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/backend-developer.md
-    custom_env: {}
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: frontend-developer
-    description: Implements UI components, screens, styles, and client-side logic.
-    provider: claude
-    model: "claude-sonnet-4-6"
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/frontend-developer.md
-    custom_env: {}
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: researcher
-    description: Gathers research data from the codebase and external sources to inform planning.
-    provider: claude
-    model: "claude-sonnet-4-6"
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/researcher.md
-    custom_env: {}
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  # architect on Fable 5 (2026-06-09 opus-tier policy); technical-writer on Sonnet
-  # for prose-heavy planning docs — codex produced bullet-fragment design docs.
-  - name: architect
-    description: Designs technical solutions and evaluates technology choices, with rationale for each decision.
-    provider: claude
-    model: "claude-opus-4-8"
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/architect.md
-    custom_env: {}
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: technical-writer
-    description: Transforms raw material into structured documentation, references, and guides.
-    provider: claude
-    model: "claude-sonnet-4-6"
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/technical-writer.md
-    custom_env: {}
-    custom_args: []
-    mcp_config: null
-    skills: [design-discussion, structured-outline, horizontal-plan, vertical-plan, greenfield-discovery-brief, pr-body, story-writing, architecture-doc, readme, adr, research-brief, runbook]
-    visibility: workspace
-
-  # Verifiers — reviewer on codex (gpt-5.4, sole Codex role per 2026-06-09 policy);
-  # peer-validator/tester/tpm on claude-fable-5
-  - name: reviewer
-    description: Independent fresh-context code reviewer; evaluates diffs for correctness and risk.
-    provider: codex
-    model: "gpt-5.4"
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/reviewer.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: peer-validator
-    description: Cross-story validator for consistency, convention compliance, and integration risk.
-    provider: claude
-    model: "claude-opus-4-8"
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/peer-validator.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: tester
-    description: Writes and runs test suites against story specs and acceptance criteria.
-    provider: claude
-    model: "claude-opus-4-8"
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/tester.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: tpm
-    description: Technical program manager; sequences cross-system work and owns horizontal/vertical planning.
-    provider: claude
-    model: "claude-opus-4-8"
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/tpm.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  # Remaining specialists — provider: claude, model: claude-sonnet-4-6
-  - name: analyst
-    description: Turns raw ideas into precise, testable requirements and detects gaps.
-    provider: claude
-    model: claude-sonnet-4-6
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/analyst.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: accessibility-specialist
-    description: Remediates accessibility issues — ARIA, keyboard navigation, focus management, contrast.
-    provider: claude
-    model: claude-sonnet-4-6
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/accessibility-specialist.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: animations-specialist
-    description: Implements and optimizes animations, transitions, and motion across web and native.
-    provider: claude
-    model: claude-sonnet-4-6
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/animations-specialist.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: idiomatic-reviewer
-    description: Reviews code for language idioms, anti-patterns, and community best practices (narrow focus).
-    provider: claude
-    model: claude-sonnet-4-6
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/idiomatic-reviewer.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: performance-reviewer
-    description: Reviews algorithmic complexity, memory, and I/O for performance impact (narrow focus).
-    provider: claude
-    model: claude-sonnet-4-6
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/performance-reviewer.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: security-reviewer
-    description: Reviews changes for security vulnerabilities using the OWASP Top 10; binary verdict.
-    provider: claude
-    model: claude-sonnet-4-6
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/security-reviewer.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: test-architect
-    description: Designs test strategy mapping acceptance criteria to concrete test cases.
-    provider: claude
-    model: claude-sonnet-4-6
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/test-architect.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: test-inspector
-    description: Coverage analyst — judges whether tests are sufficient, correct, and aligned to requirements.
-    provider: claude
-    model: claude-sonnet-4-6
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/test-inspector.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: test-scout
-    description: Gathers full test context across the change surface before testing begins.
-    provider: claude
-    model: claude-sonnet-4-6
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/test-scout.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: test-sentinel
-    description: Quality gate — triages test failures with evidence, hypotheses, and severity routing.
-    provider: claude
-    model: claude-sonnet-4-6
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/test-sentinel.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: test-worker
-    description: Executes test scripts and captures results and screenshots; fast mechanical runs.
-    provider: claude
-    model: claude-sonnet-4-6
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/test-worker.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
-
-  - name: ui-designer
-    description: Creates wireframes, design briefs, and UI specifications (Frame0).
-    provider: claude
-    model: claude-sonnet-4-6
-    max_concurrent_tasks: 1
-    persona_ref: hive/agents/ui-designer.md
-    custom_env:
-      CLAUDE_PLUGIN_PATH: "${HOME}/.claude/plugins"
-    custom_args: []
-    mcp_config: null
-    skills: []
-    visibility: workspace
+- name: developer
+  description: "General-purpose code implementation. Deprecated \u2014 prefer backend-developer\
+    \ or frontend-developer."
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/developer.md
+  custom_env: {}
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: backend-developer
+  description: Implements APIs, services, database logic, and other server-side code.
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/backend-developer.md
+  custom_env: {}
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: frontend-developer
+  description: Implements UI components, screens, styles, and client-side logic.
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/frontend-developer.md
+  custom_env: {}
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: researcher
+  description: Gathers research data from the codebase and external sources to inform
+    planning.
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/researcher.md
+  custom_env: {}
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: architect
+  description: Designs technical solutions and evaluates technology choices, with
+    rationale for each decision.
+  provider: claude
+  model: claude-opus-4-8
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/architect.md
+  custom_env: {}
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: technical-writer
+  description: Transforms raw material into structured documentation, references,
+    and guides.
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/technical-writer.md
+  custom_env: {}
+  custom_args: []
+  mcp_config: null
+  skills:
+  - design-discussion
+  - structured-outline
+  - horizontal-plan
+  - vertical-plan
+  - greenfield-discovery-brief
+  - pr-body
+  - story-writing
+  - architecture-doc
+  - readme
+  - adr
+  - research-brief
+  - runbook
+  visibility: workspace
+- name: reviewer
+  description: Independent fresh-context code reviewer; evaluates diffs for correctness
+    and risk.
+  provider: codex
+  model: gpt-5.4
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/reviewer.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: peer-validator
+  description: Cross-story validator for consistency, convention compliance, and integration
+    risk.
+  provider: claude
+  model: claude-opus-4-8
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/peer-validator.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: tester
+  description: Writes and runs test suites against story specs and acceptance criteria.
+  provider: claude
+  model: claude-opus-4-8
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/tester.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: tpm
+  description: Technical program manager; sequences cross-system work and owns horizontal/vertical
+    planning.
+  provider: claude
+  model: claude-opus-4-8
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/tpm.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: analyst
+  description: Turns raw ideas into precise, testable requirements and detects gaps.
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/analyst.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: accessibility-specialist
+  description: "Remediates accessibility issues \u2014 ARIA, keyboard navigation,\
+    \ focus management, contrast."
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/accessibility-specialist.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: animations-specialist
+  description: Implements and optimizes animations, transitions, and motion across
+    web and native.
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/animations-specialist.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: idiomatic-reviewer
+  description: Reviews code for language idioms, anti-patterns, and community best
+    practices (narrow focus).
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/idiomatic-reviewer.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: performance-reviewer
+  description: Reviews algorithmic complexity, memory, and I/O for performance impact
+    (narrow focus).
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/performance-reviewer.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: security-reviewer
+  description: Reviews changes for security vulnerabilities using the OWASP Top 10;
+    binary verdict.
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/security-reviewer.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: test-architect
+  description: Designs test strategy mapping acceptance criteria to concrete test
+    cases.
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/test-architect.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: test-inspector
+  description: "Coverage analyst \u2014 judges whether tests are sufficient, correct,\
+    \ and aligned to requirements."
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/test-inspector.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: test-scout
+  description: Gathers full test context across the change surface before testing
+    begins.
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/test-scout.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: test-sentinel
+  description: "Quality gate \u2014 triages test failures with evidence, hypotheses,\
+    \ and severity routing."
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/test-sentinel.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: test-worker
+  description: Executes test scripts and captures results and screenshots; fast mechanical
+    runs.
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/test-worker.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace
+- name: ui-designer
+  description: Creates wireframes, design briefs, and UI specifications (Frame0).
+  provider: claude
+  model: claude-sonnet-4-6
+  max_concurrent_tasks: 1
+  persona_ref: hive/agents/ui-designer.md
+  custom_env:
+    CLAUDE_PLUGIN_PATH: ${HOME}/.claude/plugins
+  custom_args: []
+  mcp_config: null
+  skills: []
+  visibility: workspace

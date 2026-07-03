@@ -1,7 +1,7 @@
 ---
 name: marketing-copywriter
 description: "Persuasive copy specialist for consumer projects. Consumes the marketing-strategist's campaign brief and produces ad copy, landing page copy, email sequences, social posts, taglines, and CTAs. Spawned for copy execution phases on consumer-facing epics — not selected for Hive's own internal work."
-model: sonnet
+model: claude-sonnet-5
 color: cyan
 tools: ["Grep", "Glob", "Read", "Write"]
 knowledge:

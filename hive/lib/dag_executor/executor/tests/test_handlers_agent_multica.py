@@ -531,7 +531,9 @@ def test_branch_contract_targets_epic_branch(tmp_path):
     spawn_epic = MulticaAgentSpawn(cli_path=tmp_path/"cli.mjs", repo_root=repo)
     contract = spawn_epic._branch_contract()
     assert "feat/my-epic" in contract
-    assert "git checkout" in contract
+    # Force-sync contract: hard-reset local branch to origin tip (works even when a
+    # stale local branch exists) — avoids the salvage-induced lineage divergence.
+    assert "git checkout -B feat/my-epic origin/feat/my-epic" in contract
     assert "auto-created" in contract  # warns against the agent/<persona>/<task> branch
 
 
@@ -556,6 +558,145 @@ def test_branch_contract_empty_without_resolvable_remote(tmp_path):
 
     spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs", repo_root=repo)
     assert spawn._branch_contract() == "", "no resolvable remote default -> no directive"
+
+
+# ── single-shared-branch contract: --integration-branch on dispatch (t-007) ──
+
+def test_dispatch_passes_integration_branch_on_epic_branch(tmp_path):
+    """On an epic branch, _dispatch tells cli.mjs to inject the single-shared-
+    branch contract (agent works on AND pushes origin/{branch}) and forwards the
+    story id for the contract's commit-message template."""
+    spawn = _make_spawn(tmp_path)
+    captured: list[list[str]] = []
+    with patch.object(spawn, "_target_branch", return_value="feat/my-epic"), \
+         patch.object(spawn, "_run_cli_fast", side_effect=lambda a: captured.append(a)):
+        spawn._dispatch("tracker-1", "developer", story_id="s-42")
+
+    args = captured[0]
+    assert "--integration-branch" in args
+    assert args[args.index("--integration-branch") + 1] == "feat/my-epic"
+    assert "--story-id" in args
+    assert args[args.index("--story-id") + 1] == "s-42"
+
+
+def test_dispatch_omits_integration_branch_on_default_branch(tmp_path):
+    """Empty target branch (default-branch flows / non-git repo_root) → no
+    --integration-branch, preserving the harvest fallback."""
+    spawn = _make_spawn(tmp_path)
+    captured: list[list[str]] = []
+    with patch.object(spawn, "_target_branch", return_value=""), \
+         patch.object(spawn, "_run_cli_fast", side_effect=lambda a: captured.append(a)):
+        spawn._dispatch("tracker-1", "developer", story_id="s-42")
+
+    assert "--integration-branch" not in captured[0]
+    assert "--story-id" not in captured[0]
+
+
+# ---------------------------------------------------------------------------
+# Authoritative epic-branch harvest (bake-in): the daemon leaves HEAD on its
+# agent/<persona> branch at base while the agent commits to the epic branch.
+# Harvest must follow the epic branch the contract named, not a drifted HEAD.
+# ---------------------------------------------------------------------------
+
+def _init_repo(repo, sp):
+    repo.mkdir()
+    def git(*a):
+        return sp.run(
+            ["git", "-C", str(repo), *a], check=True, capture_output=True, text=True
+        )
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    git("branch", "-m", "main")
+    return git
+
+
+def test_harvest_prefers_epic_branch_tip_over_drifted_head(tmp_path):
+    """The core regression: HEAD is left on the daemon branch at base while the
+    agent committed to feat/<epic>. Harvest must return the EPIC branch tip +
+    name, not the drifted HEAD / base sha."""
+    import subprocess as sp
+
+    # Executor checkout on the epic branch so _target_branch resolves.
+    exu_git = _init_repo(tmp_path / "exu", sp)
+    exu = tmp_path / "exu"
+    (exu / "f").write_text("base")
+    exu_git("add", "-A"); exu_git("commit", "-q", "-m", "base")
+    exu_git("remote", "add", "origin", str(exu)); exu_git("fetch", "-q", "origin")
+    exu_git("checkout", "-q", "-b", "feat/my-epic")
+
+    # Agent workdir: feat/my-epic ahead with the agent commit; HEAD drifted to a
+    # daemon branch at base.
+    awd_git = _init_repo(tmp_path / "awd", sp)
+    awd = tmp_path / "awd"
+    (awd / "f").write_text("base")
+    awd_git("add", "-A"); awd_git("commit", "-q", "-m", "base")
+    base_sha = awd_git("rev-parse", "HEAD").stdout.strip()
+    awd_git("checkout", "-q", "-b", "feat/my-epic")
+    (awd / "impl.py").write_text("real work")
+    awd_git("add", "-A"); awd_git("commit", "-q", "-m", "agent work")
+    epic_sha = awd_git("rev-parse", "feat/my-epic").stdout.strip()
+    awd_git("checkout", "-q", "-b", "agent/dev/x", "main")  # HEAD drifts to base
+
+    spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs", repo_root=exu)
+    out = spawn._harvest_git_state(str(awd))
+    assert out["commit_sha"] == epic_sha
+    assert out["code_push_sha"] == epic_sha
+    assert out["branch"] == "feat/my-epic"
+    assert out["commit_sha"] != base_sha
+
+
+def test_harvest_falls_back_to_head_on_default_branch(tmp_path):
+    """No epic branch (executor on the default branch) → harvest HEAD, unchanged
+    from the prior behavior."""
+    import subprocess as sp
+
+    exu_git = _init_repo(tmp_path / "exu", sp)
+    exu = tmp_path / "exu"
+    (exu / "f").write_text("x")
+    exu_git("add", "-A"); exu_git("commit", "-q", "-m", "c")
+    exu_git("remote", "add", "origin", str(exu)); exu_git("fetch", "-q", "origin")
+    # repo_root stays on main (default) → _target_branch() == ""
+
+    awd_git = _init_repo(tmp_path / "awd", sp)
+    awd = tmp_path / "awd"
+    awd_git("checkout", "-q", "-b", "work")
+    (awd / "f").write_text("y")
+    awd_git("add", "-A"); awd_git("commit", "-q", "-m", "c")
+    head_sha = awd_git("rev-parse", "HEAD").stdout.strip()
+
+    spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs", repo_root=exu)
+    out = spawn._harvest_git_state(str(awd))
+    assert out["commit_sha"] == head_sha
+    assert out["branch"] == "work"
+
+
+def test_harvest_uses_head_when_agent_ignored_contract(tmp_path):
+    """Agent committed on HEAD/the daemon branch and left the epic branch at base
+    → harvest HEAD (the ref that actually carries the commit)."""
+    import subprocess as sp
+
+    exu_git = _init_repo(tmp_path / "exu", sp)
+    exu = tmp_path / "exu"
+    (exu / "f").write_text("x")
+    exu_git("add", "-A"); exu_git("commit", "-q", "-m", "c")
+    exu_git("remote", "add", "origin", str(exu)); exu_git("fetch", "-q", "origin")
+    exu_git("checkout", "-q", "-b", "feat/my-epic")
+
+    awd_git = _init_repo(tmp_path / "awd", sp)
+    awd = tmp_path / "awd"
+    (awd / "f").write_text("base")
+    awd_git("add", "-A"); awd_git("commit", "-q", "-m", "base")
+    awd_git("branch", "feat/my-epic")  # epic branch at base — no agent commit
+    awd_git("checkout", "-q", "-b", "agent/dev/x")  # HEAD on daemon branch
+    (awd / "impl").write_text("work")
+    awd_git("add", "-A"); awd_git("commit", "-q", "-m", "work")
+    head_sha = awd_git("rev-parse", "HEAD").stdout.strip()
+
+    spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs", repo_root=exu)
+    out = spawn._harvest_git_state(str(awd))
+    assert out["commit_sha"] == head_sha
+    assert out["branch"] == "agent/dev/x"
 
 
 # NOTE: a prior #21 attempt keyed agent failure off a `.pHive/interrupts/*.yaml`
@@ -706,6 +847,13 @@ def test_output_contract_injected_into_multica_brief(tmp_path):
     # commit_sha is spawn metadata (derived from git HEAD), not a SEMANTIC output
     # the agent writes — it must NOT appear in the contract's required keys.
     assert "`commit_sha`" not in body
+    # Bracketing: the contract is restated as a terminal STOP GATE at the end of
+    # the brief (read last, when the outputs.yaml write is actually due), so the
+    # semantic key appears both up front (preamble) and at the close.
+    assert "STOP GATE" in body
+    assert body.count("`epic_dir`") >= 2
+    assert body.rindex("`epic_dir`") > body.index("OUTPUT CONTRACT")
+    assert "`commit_sha`" not in body  # metadata stays out of the closer too
 
 
 def test_output_contract_absent_for_metadata_only_node(tmp_path):

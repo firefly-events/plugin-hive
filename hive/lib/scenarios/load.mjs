@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Scenario YAML loader + validator for simulated-manual testing.
  *
@@ -14,6 +12,8 @@
  *   title: string (required, non-empty)
  *   description: string (optional)
  *   mode: 'spec-walk' | 'implementation-walk' (required)
+ *   NOTE: 'live-walk' was removed in M2 — actual/vision-cursor scenarios are now
+ *   SimMan-format and are NOT loaded by this function (SimMan owns their parsing).
  *   story: string (optional — required for implementation-walk marker check)
  *   epic: string (optional — required for implementation-walk marker check)
  *   preconditions: string[] (optional)

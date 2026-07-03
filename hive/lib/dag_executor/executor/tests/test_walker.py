@@ -156,12 +156,69 @@ def test_required_step_failure_propagates():
     assert "node_failed" in _emit_types(tel)
 
 
-def test_skip_when_present_emits_node_skipped():
-    """skip_when predicate evaluation is hde-3a; presence triggers skip."""
+def test_skip_when_non_parseable_fails_closed_to_run():
+    """skip_when with a non-parseable predicate fails-closed-to-run (not Skipped).
+
+    s3-convergence-signal: skip_when is now evaluated as a routing grammar
+    predicate. Fail-closed-to-RUN semantics: if the predicate cannot be parsed
+    (e.g. a bareword like 'some_predicate' that is not a dotpath reference),
+    the node RUNS rather than being silently skipped. This is the inverse of
+    `when:` fail-closed semantics — we must never drop a round that hasn't
+    converged. A predicate_evaluated event with fail_closed=True is emitted.
+    """
     g = _graph_with([_agent_node("a", skip_when="some_predicate")])
     tel = Telemetry(run_id="rid-1")
-    Walker().walk(g, _stub_dispatcher({}), "rid-1", tel)
-    assert _emit_types(tel) == ["node_skipped"]
+    Walker().walk(g, _stub_dispatcher({"a": {}}), "rid-1", tel)
+    types = _emit_types(tel)
+    # Node must run (not be skipped): events include node_started + node_completed
+    assert "node_completed" in types, (
+        f"Node with non-parseable skip_when must run (fail-closed-to-run); "
+        f"got events: {types}"
+    )
+    assert "node_skipped" not in types, (
+        f"Node with non-parseable skip_when must NOT be skipped; got events: {types}"
+    )
+    # predicate_evaluated event with fail_closed=True must be emitted
+    pred_events = [e for e in tel.events if e["event_type"] == "predicate_evaluated"]
+    assert pred_events, "predicate_evaluated event must be emitted for skip_when evaluation"
+    fail_closed_events = [e for e in pred_events if e.get("payload", {}).get("fail_closed")]
+    assert fail_closed_events, (
+        "predicate_evaluated event must carry fail_closed=True for non-parseable skip_when"
+    )
+
+
+def test_skip_when_grammar_legal_true_emits_node_skipped():
+    """skip_when with a grammar-legal predicate that evaluates True → node is Skipped.
+
+    s3-convergence-signal: when the upstream node produces the convergence signal
+    (e.g. review_passed=True), the skip_when predicate evaluates True and the
+    downstream round node is Skipped (not run).
+    """
+    from hive.lib.dag_executor.graph import ConditionalEdge, OutputRef
+
+    # upstream produces review_passed=True
+    upstream = _agent_node("upstream", outputs=[OutputRef(name="review_passed", type="json")])
+    # candidate has skip_when referencing upstream's output
+    candidate = _agent_node(
+        "candidate",
+        depends_on=["upstream"],
+        skip_when="$upstream.output.review_passed == true",
+    )
+    g = _graph_with([upstream, candidate])
+    tel = Telemetry(run_id="rid-sk")
+
+    # upstream emits review_passed=True → candidate should be Skipped
+    Walker().walk(g, _stub_dispatcher({"upstream": {"review_passed": True}}), "rid-sk", tel)
+
+    # Check candidate-specific events (step_id == "candidate")
+    candidate_events = [e for e in tel.events if e.get("step_id") == "candidate"]
+    candidate_types = [e["event_type"] for e in candidate_events]
+    assert "node_skipped" in candidate_types, (
+        f"candidate must emit node_skipped when skip_when is True; got: {candidate_types}"
+    )
+    assert "node_completed" not in candidate_types, (
+        f"candidate must NOT complete when skip_when is True; got: {candidate_types}"
+    )
 
 
 def test_every_emitted_event_carries_run_id():

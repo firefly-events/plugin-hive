@@ -173,6 +173,98 @@ steps:
     optional: false
     timeout_ms: 600000
 
+  # ── bdd-converge-cycle body nodes ──────────────────────────────────────────
+  # These two steps form the iterated body of bdd-converge-loop. The loop
+  # iterates bdd-implement→bdd-test until bdd-test emits behavior_satisfied=true
+  # or max_rounds is exhausted. s3-convergence-signal: each round k>1 carries
+  # skip_when referencing the prior round's bdd-test output so that once
+  # behavior_satisfied=true the remaining rounds are short-circuited.
+
+  - id: bdd-implement
+    agent: developer
+    sub_graph: bdd-converge-cycle
+    task: >
+      Implement or refine the code to satisfy the behavior specifications. Each
+      Given/When/Then scenario must pass. In rounds after the first, address the
+      failing scenarios reported by the tester. Commit the updated implementation.
+    depends_on:
+      - implement
+    inputs:
+      - name: behavior_specs
+        source: step_output
+        step_id: behavior-spec
+        output_name: behavior_specs
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+        optional: true
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: implementation
+        type: string
+    optional: false
+    timeout_ms: 600000
+
+  - id: bdd-test
+    agent: tester
+    sub_graph: bdd-converge-cycle
+    task: >
+      Verify the implementation satisfies all Given/When/Then behavior specifications.
+      Run the full scenario suite. Emit behavior_satisfied=true when ALL scenarios
+      pass; emit behavior_satisfied=false when any scenario fails. Report failing
+      scenarios so the next round's implementer can address them.
+    depends_on:
+      - bdd-implement
+    inputs:
+      - name: behavior_specs
+        source: step_output
+        step_id: behavior-spec
+        output_name: behavior_specs
+      - name: implementation
+        source: step_output
+        step_id: bdd-implement
+        output_name: implementation
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: test_results
+        type: string
+      - name: behavior_satisfied
+        type: json
+    optional: false
+    timeout_ms: 600000
+
+  # s6: BDD convergence loop — the implement→test cycle iterates until
+  # bdd-test emits behavior_satisfied=true or max_rounds is exhausted.
+  # Static unroll (s2): each round-copy carries skip_when that short-circuits
+  # when behavior_satisfied was achieved in the prior round.
+  - id: bdd-converge-loop
+    node_type: loop
+    loop_config:
+      sub_graph: bdd-converge-cycle
+      feature: bdd_converge
+      convergence_signal: behavior_satisfied
+      max_rounds: 3
+    depends_on:
+      - implement
+
+  # Terminal gate (s6): after the convergence loop, blocks integrate when
+  # behavior_satisfied is not true at the ceiling. The predicate is rewritten
+  # after unrolling to reference the last round's bdd-test output (s3).
+  - id: gate-bdd
+    node_type: gate
+    gate: "$bdd-converge-loop.output.behavior_satisfied == true"
+    depends_on:
+      - bdd-converge-loop
+    outputs:
+      - name: gate_passed
+        type: json
+    timeout_ms: 30000
+
   - id: review
     agent: reviewer
     task: >
@@ -277,6 +369,8 @@ steps:
     depends_on:
       - review
       - gate-review
+      - bdd-converge-loop
+      - gate-bdd
     inputs:
       - name: implementation
         source: step_output

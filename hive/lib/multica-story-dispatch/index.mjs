@@ -587,15 +587,19 @@ async function findIssueByTitle(serverUrl, token, workspaceId, titleKey) {
 // When `dedupTitle` is provided, lists existing issues first and returns any matching
 // one instead of creating a duplicate (server-side idempotency guard for cross-machine
 // resume). Returns {id, url, ...} from the API response.
-export async function createIssue(serverUrl, token, workspaceId, title, description, { dedupTitle = null } = {}) {
+export async function createIssue(serverUrl, token, workspaceId, title, description, { dedupTitle = null, integrationBranch = null } = {}) {
   if (dedupTitle) {
     const existing = await findIssueByTitle(serverUrl, token, workspaceId, dedupTitle);
     if (existing?.id) return existing;
   }
+  const body = { title, description };
+  // Bind the issue to the epic's shared integration branch (structured field the
+  // daemon reads to key branch-shared worktree reuse — NOT just the body contract).
+  if (integrationBranch) body.integration_branch = String(integrationBranch);
   const created = await httpJson(issuesCreateUrl(serverUrl, workspaceId), {
     method: 'POST',
     token,
-    body: { title, description },
+    body,
   });
   return created;
 }

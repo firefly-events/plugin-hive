@@ -17,6 +17,13 @@ from pathlib import Path
 
 import yaml
 
+from hive.lib.dag_executor.executor.dispatcher import Dispatcher
+from hive.lib.dag_executor.executor.handlers import AgentHandler, StubAgentSpawn
+from hive.lib.dag_executor.executor.run_id import make_run_id
+from hive.lib.dag_executor.executor.telemetry import Telemetry
+from hive.lib.dag_executor.executor.walker import Walker
+from hive.lib.dag_executor.graph import NodeType, load_workflow
+
 REPO_ROOT = Path(__file__).resolve().parents[4]
 REVIEW_SKILL = REPO_ROOT / "skills" / "review" / "SKILL.md"
 REVIEW_WORKFLOW = REPO_ROOT / "hive" / "workflows" / "review.workflow.yaml"
@@ -154,12 +161,27 @@ def test_review_workflow_reviewer_has_retry():
     )
 
 
-def test_review_workflow_no_loop_node():
-    """review.workflow.yaml must NOT contain a LOOP node type."""
+def test_review_workflow_has_no_loop_node():
+    """pr20-fable-review M1: review.workflow.yaml previously carried a
+    disconnected `review-converge-loop` LOOP node — no `feature:`, no
+    `convergence_signal:`, and zero body nodes tagged `sub_graph:
+    review-fix-cycle`. It had empty `depends_on` and nothing depended on it,
+    so it never participated in the reviewer -> reconcile-review ->
+    gate-review-artifact chain; its only effect was to survive
+    `expand_loops` (which only unrolls feature-tagged loops) and crash the
+    walker with `LoopNodeInvariantError` on any real run. This workflow has
+    no in-graph fix/implement agent — a needs_revision verdict is handled
+    OUTSIDE this graph (skills/review/SKILL.md step 7 re-triggers /execute
+    pickup) — so the vestigial loop was removed rather than wired. Assert it
+    never comes back without a deliberate, wired re-introduction."""
     data = review_workflow_data()
     loop_steps = [s for s in data["steps"] if s.get("node_type") == "loop"]
     assert not loop_steps, (
-        "review.workflow.yaml must not contain a LOOP node (loop primitive is forbidden)"
+        f"review.workflow.yaml must contain zero LOOP nodes; got {loop_steps!r}. "
+        "If reintroducing an in-graph review<->fix loop, wire it properly: "
+        "loop_config.feature + convergence_signal, and tag real body nodes "
+        "`sub_graph: <name>` (see development.classic.workflow.yaml's "
+        "review-converge-loop for the pattern)."
     )
 
 
@@ -242,3 +264,55 @@ def test_fallback_on_daemon_down_described():
         "skills/review/SKILL.md must describe local fallback behavior "
         "when dag-multica daemon is down or dispatch fails"
     )
+
+
+# ── pr20-fable-review M1 regression guard: end-to-end Walker().walk() ───────
+
+
+def test_review_workflow_walks_end_to_end_without_loop_invariant_error():
+    """pr20-fable-review M1: this is the crash the review-converge-loop bug
+    class produced — `load_workflow` + `expand_loops` used to leave
+    ['review-converge-loop'] as a surviving LOOP node, and no test ever
+    actually ran `Walker().walk()` against review.workflow.yaml (the old
+    `test_review_wire.py` suite only checked YAML structure), so the crash
+    stayed latent behind a green suite. Drive the real walker end-to-end with
+    a canned reviewer output and assert it completes cleanly with no
+    LoopNodeInvariantError (or any other exception) and no surviving LOOP
+    nodes in the loaded graph."""
+    graph = load_workflow(REVIEW_WORKFLOW)
+
+    # Zero LOOP nodes must survive load_workflow's expand_loops pass.
+    loop_nodes = [n for n in graph.nodes.values() if n.node_type == NodeType.LOOP]
+    assert not loop_nodes, (
+        f"review.workflow.yaml must have zero surviving LOOP nodes after "
+        f"load_workflow; got {[n.id for n in loop_nodes]!r}"
+    )
+
+    canned = {
+        "reviewer": {
+            "review_artifact": "verdict: passed\nfindings: []\n",
+            "commit_sha": "deadbeef",
+            "review_passed": True,
+        },
+    }
+    spy = StubAgentSpawn(canned_outputs=canned)
+    dispatcher = Dispatcher()
+    dispatcher.register(NodeType.AGENT, AgentHandler(spawn=spy).handle)
+    run_id = make_run_id("review")
+    tel = Telemetry(run_id=run_id)
+
+    result = Walker().walk(
+        graph,
+        dispatcher,
+        run_id,
+        tel,
+        context={
+            "diff_target": "main..feature",
+            "pr_number": None,
+            "branch": "feature",
+            "review_artifact_path": "/tmp/review.yaml",
+        },
+    )
+
+    assert "reviewer" in result
+    assert "gate-review-artifact" in result

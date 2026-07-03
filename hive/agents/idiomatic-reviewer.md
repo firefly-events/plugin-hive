@@ -1,7 +1,7 @@
 ---
 name: idiomatic-reviewer
 description: "Reviews code for language-specific idioms, anti-patterns, and community best practices. Narrow focus only — not a general reviewer."
-model: sonnet
+model: claude-sonnet-5
 color: yellow
 knowledge:
   - path: ~/.claude/hive/memories/idiomatic-reviewer/

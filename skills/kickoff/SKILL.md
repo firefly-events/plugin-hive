@@ -48,3 +48,28 @@ For a brownfield re-kickoff where `hive/hive.config.yaml` already has `metrics.e
 - If the user explicitly changes it, write only the new value to `metrics.enabled` using the kickoff protocol's existing config write pattern.
 
 **Instructions:** Read `hive/references/kickoff-protocol.md` for the full protocol. Shared resources are in `hive/`.
+
+**LSP suggestion (brownfield only):** After Phase 3 resolves `tech_stack` and writes
+`.pHive/project-profile.yaml`, check `hive/references/lsp-suggestions.md` for any
+applicable LSP suggestions. Read the resolved `tech_stack` from the profile (the
+tolerant reader handles both flat-list and nested `languages[]` shapes). If the
+detected languages include a confirmed plugin that is not already enabled in
+`~/.claude/settings.json`, emit the one-line suggestion from the reference doc. This
+step is **non-blocking and text-only** — the `LSP` tool is never invoked and Hive
+behavior is byte-identical whether or not the plugin is enabled. Suppress the
+suggestion when: the plugin is already enabled, no confirmed plugin exists for the
+detected language, or the kickoff is greenfield (no existing tech_stack to read).
+Full invariants and suppress-when rules: `hive/references/lsp-suggestions.md` →
+§Invariants (single source — do not restate here).
+
+**Discovery Questions (brownfield and greenfield):** After Phase 3 (and after the LSP
+suggestion step for brownfield), run the Discovery Questions step to capture a
+`north_star` block in `.pHive/project-profile.yaml`. This step runs for both brownfield
+and greenfield. Every question is individually skippable — kickoff MUST NOT hard-fail.
+
+See `hive/references/kickoff-protocol.md` Phase 3b for the full protocol: adaptive skip
+rules (do not re-ask what current-state discovery already answered), the 4 core
+questions (audience, scale, goal, pain points) plus 2 optional follow-ups
+(success, avoid), persistence rules (`unknown` for skipped core fields), the north-star
+summary and suggested-next-steps output, and the shared `tech_stack` tolerant reader
+(flat-list and nested shapes) used by both this step and the LSP suggestion step.

@@ -47,6 +47,12 @@ class _Canned:
 
 def _run(workflow_path: Path, verdict: str) -> tuple[list[str], BaseException | None]:
     graph = load_workflow(workflow_path)
+
+    # s3-convergence-signal: the boolean convergence signal for review-fix-cycle
+    # body nodes. True = converged (round k+1..N will be Skipped); False = still
+    # needs_revision (all max_rounds run, terminal gate blocks integrate).
+    review_passed = verdict != "needs_revision"
+
     spawn = _Canned(
         {
             # classic nodes
@@ -71,6 +77,51 @@ def _run(workflow_path: Path, verdict: str) -> tuple[list[str], BaseException | 
             },
             "review": {"review_verdict": verdict, "review_findings": "..."},
             "integrate": {"commit_ref": "deadbeef"},
+            # s3-convergence-signal: classic review-fix-cycle body round copies.
+            # fix-cycle-implement rounds are body steps (no required outputs).
+            "fix-cycle-implement__r1": {},
+            "fix-cycle-implement__r2": {},
+            "fix-cycle-implement__r3": {},
+            # fix-cycle-review rounds emit review_passed (bool convergence signal).
+            # When review_passed=True, rounds k+1..N are Skipped (skip_when fires).
+            # When False, all max_rounds run and the terminal gate blocks.
+            "fix-cycle-review__r1": {
+                "review_verdict": verdict,
+                "review_findings": "...",
+                "review_passed": review_passed,
+            },
+            "fix-cycle-review__r2": {
+                "review_verdict": verdict,
+                "review_findings": "...",
+                "review_passed": review_passed,
+            },
+            "fix-cycle-review__r3": {
+                "review_verdict": verdict,
+                "review_findings": "...",
+                "review_passed": review_passed,
+            },
+            # rec-1: tdd-red-green-loop body round copies.
+            # implement__r{k} produce the implementation artifact needed by gate-tests.
+            # tdd-tester__r1 and __r2 always return False so rounds 2 and 3 run
+            # (avoids early-convergence skip that would make implement__r3 absent).
+            # tdd-tester__r3 uses review_passed so gate-tests-green passes on
+            # "passed" verdict and blocks on "needs_revision" (bug-#26 preserved).
+            "implement__r1": {"implementation": "function makeMove(){}"},
+            "implement__r2": {"implementation": "function makeMove(){}"},
+            "implement__r3": {"implementation": "function makeMove(){}"},
+            "tdd-tester__r1": {"tests_green": False},
+            "tdd-tester__r2": {"tests_green": False},
+            "tdd-tester__r3": {"tests_green": review_passed},
+            # rec-1: bdd-converge-loop body round copies.
+            # bdd-implement__r{k} produce implementation for bdd-test inputs.
+            # bdd-test__r3 uses review_passed so gate-bdd passes on "passed" and
+            # blocks on "needs_revision".
+            "bdd-implement__r1": {"implementation": "function makeMove(){}"},
+            "bdd-implement__r2": {"implementation": "function makeMove(){}"},
+            "bdd-implement__r3": {"implementation": "function makeMove(){}"},
+            "bdd-test__r1": {"behavior_satisfied": False},
+            "bdd-test__r2": {"behavior_satisfied": False},
+            "bdd-test__r3": {"behavior_satisfied": review_passed},
         }
     )
     dispatcher = Dispatcher()
@@ -108,14 +159,23 @@ def test_gate_review_allows_integrate_on_passed(workflow_path):
 
 _CANONICAL_PREDICATE = "review_verdict must not equal needs_revision"
 
+# s3-convergence-signal: classic workflow's gate-review predicate changed from
+# the prose form to a grammar-legal dotpath predicate. After unrolling (which
+# rewrites $review-converge-loop → $fix-cycle-review__rN), the gate predicate
+# in the expanded graph references the actual last-round body reviewer node.
+_CLASSIC_PREDICATE_PREFIX = "$fix-cycle-review__r"  # rewired to last round
+
 
 @pytest.mark.parametrize("workflow_path", METHODOLOGIES)
 def test_gate_review_predicate_matches_classic_verbatim(workflow_path):
-    """AC-1/AC-2: gate-review predicate must be byte-for-byte the classic string.
+    """AC-1/AC-2: gate-review predicate must be well-formed.
 
-    Guards the medium-risk "subtle predicate difference passes on a lenient
-    matcher" gap: assert the exact predicate text, not just that a gate exists.
+    For TDD/BDD: predicate must be byte-for-byte the classic prose string.
+    For CLASSIC: predicate was changed to a grammar-legal dotpath boolean predicate
+    (s3-convergence-signal) — assert it references review_passed and is parseable.
     """
+    from hive.lib.dag_executor.routing import Skipped, parse
+
     graph = load_workflow(workflow_path)
     node = graph.nodes.get("gate-review")
     assert node is not None, (
@@ -124,10 +184,29 @@ def test_gate_review_predicate_matches_classic_verbatim(workflow_path):
     assert node.node_type is NodeType.GATE, (
         f"gate-review must be a gate node in {workflow_path.name}; got {node.node_type}"
     )
-    assert node.gate == _CANONICAL_PREDICATE, (
-        f"gate-review predicate in {workflow_path.name} must match classic "
-        f"verbatim {_CANONICAL_PREDICATE!r}; got {node.gate!r}"
-    )
+
+    if workflow_path == CLASSIC:
+        # s3-convergence-signal: classic gate-review uses a grammar-legal dotpath
+        # predicate ($fix-cycle-review__rN.output.review_passed == true) that the
+        # unroller rewrites from $review-converge-loop.output.review_passed == true.
+        gate_pred = node.gate or ""
+        assert "review_passed" in gate_pred, (
+            f"classic gate-review predicate must reference 'review_passed'; got {gate_pred!r}"
+        )
+        assert _CLASSIC_PREDICATE_PREFIX in gate_pred, (
+            f"classic gate-review predicate must reference a fix-cycle-review__rN node "
+            f"(unrolled from review-converge-loop); got {gate_pred!r}"
+        )
+        result = parse(gate_pred)
+        assert not isinstance(result, Skipped), (
+            f"classic gate-review predicate must be grammar-legal (parseable); "
+            f"got Skipped for {gate_pred!r}"
+        )
+    else:
+        assert node.gate == _CANONICAL_PREDICATE, (
+            f"gate-review predicate in {workflow_path.name} must match classic "
+            f"verbatim {_CANONICAL_PREDICATE!r}; got {node.gate!r}"
+        )
 
 
 @pytest.mark.parametrize("workflow_path", METHODOLOGIES)

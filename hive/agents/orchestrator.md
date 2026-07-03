@@ -10,8 +10,8 @@ knowledge:
     use-when: "Read agent memories when assigning agents to stories to understand their capabilities, past performance, and successful team groupings."
 skills:
   - path: ${CLAUDE_PLUGIN_ROOT}/skills/hive/skills/agent-spawn/SKILL.md
-    use-when: "spawning roster agents for story execution via the Agent tool (pass name:)"
-tools: ["Grep", "Glob", "Read", "Write", "Edit", "Bash", "Agent", "SendMessage"]
+    use-when: "spawning roster agents for story execution via natural-language teammate spawn"
+tools: ["Grep", "Glob", "Read", "Write", "Edit", "Bash", "SendMessage"]
 domain:
   - path: .pHive/**
     read: true

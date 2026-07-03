@@ -30,6 +30,8 @@ hde-3a additions:
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
@@ -50,6 +52,7 @@ from hive.lib.dag_executor.routing import (
 from .dispatcher import Dispatcher
 from .errors import (
     HandlerError,
+    LoopNodeInvariantError,
     WalkerCycleError,
     WalkerOptionalStepFailure,
 )
@@ -74,6 +77,158 @@ def _normalise_scheduler_flag(raw: Any) -> bool:
     if isinstance(raw, int):
         return raw != 0
     return False
+
+
+def _b2_memoization_enabled(context: dict[str, Any]) -> bool:
+    """Whether b2 reconcile-on-drift memoization is enabled for this run.
+
+    Gated behind an explicit run/config flag (``memoize`` or the more
+    explicit ``b2_memoization``) that defaults OFF — with it absent the
+    walker's behaviour is byte-for-byte identical to pre-b2. Enable only
+    when measured (design-discussion §4: cache-invalidation correctness is
+    the load-bearing risk). Mirrors the ``scheduler`` flag coercion.
+    """
+
+    return _normalise_scheduler_flag(
+        context.get("memoize")
+    ) or _normalise_scheduler_flag(context.get("b2_memoization"))
+
+
+def _step_file_digest(node: Node, context: dict[str, Any]) -> str | None:
+    """Stable sha256 of a node's ``step_file`` CONTENT (b2), or a signal.
+
+    Returns:
+      * ``""`` when the node declares no ``step_file`` (nothing to read —
+        a deterministic empty contribution, memoization still allowed);
+      * the hex sha256 of the file content when it resolves and reads;
+      * ``None`` when a declared ``step_file`` cannot be resolved/read —
+        the caller treats this as a hard "do not memoize" (fail-safe).
+
+    Resolution mirrors ``AgentHandler._read_step_file``: relative paths
+    resolve against the plugin root (``_REPO_ROOT`` == that handler's
+    ``default_plugin_root()``) then any run-context root, staying inside
+    the matched root; absolute paths are read as-given (rootless legacy).
+    The handler reads ``step_file`` at dispatch time, so its content is a
+    real behaviour dimension — omitting it would let a prompt edit slip
+    past the hash and serve a stale cache hit.
+    """
+
+    step_file = getattr(node, "step_file", None)
+    if not step_file:
+        return ""
+
+    path = Path(step_file)
+    roots: list[Path] = [_REPO_ROOT]
+    for key in ("repo_root", "work_dir", "run_working_dir"):
+        value = context.get(key)
+        if value:
+            roots.append(Path(value))
+
+    for root in roots:
+        try:
+            root_resolved = Path(root).resolve()
+        except OSError:
+            continue
+        candidate = (path if path.is_absolute() else (root_resolved / path)).resolve()
+        try:
+            candidate.relative_to(root_resolved)
+        except ValueError:
+            continue  # escapes this root — try the next
+        try:
+            content = candidate.read_text(encoding="utf-8")
+        except (FileNotFoundError, OSError):
+            continue
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    # Rootless legacy: an absolute path read as-given (matches the handler's
+    # no-configured-root branch). Unreadable → fail-safe MISS.
+    if path.is_absolute():
+        try:
+            return hashlib.sha256(
+                path.read_text(encoding="utf-8").encode("utf-8")
+            ).hexdigest()
+        except (FileNotFoundError, OSError):
+            return None
+    return None
+
+
+def _compute_memo_hash(
+    node: Node,
+    inputs: dict[str, Any],
+    graph: Graph,
+    context: dict[str, Any] | None = None,
+) -> str | None:
+    """Conservative memo hash over ALL drift dimensions (b2), or None.
+
+    Covers (design-discussion §4/§6 Q4):
+      * resolved inputs — the node's materialised input values;
+      * node config — the full node definition (agent, task, tools,
+        node_type, retry, …) via ``Node.to_dict``;
+      * step_file CONTENT — a sha256 of the prompt the handler will read
+        at dispatch (an edit to the step's prompt changes real behaviour
+        and MUST invalidate the cache);
+      * workflow/skill version — the workflow name + its ``version:``.
+
+    Returns ``None`` when a declared ``step_file`` cannot be read — the
+    caller then treats the node as a cache MISS and never memoizes it
+    (fail-safe: better a spurious re-run than a false hit on stale output).
+
+    The hash MUST over-invalidate before it under-invalidates, so every
+    dimension is included and serialization is canonical (sorted keys,
+    ``default=str`` so any non-JSON value degrades to a stable repr rather
+    than dropping out of the digest). The reserved user_gate output-graph
+    injection is excluded — it is a materialised-graph snapshot, not a
+    node input.
+    """
+
+    ctx = context or {}
+    step_digest = _step_file_digest(node, ctx)
+    if step_digest is None:
+        # Declared step_file could not be read — refuse to memoize.
+        return None
+
+    memo_inputs = {
+        name: value
+        for name, value in inputs.items()
+        if name != _USER_GATE_OUTPUT_GRAPH_INPUT
+    }
+    payload = {
+        "inputs": memo_inputs,
+        "node": node.to_dict(),
+        "step_file_digest": step_digest,
+        "workflow_name": graph.workflow_name,
+        "workflow_version": graph.version,
+    }
+    encoded = json.dumps(payload, sort_keys=True, default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _memo_reuse_lookup(
+    prior_state: Any,
+    node_id: str,
+    memo_hash: str | None,
+) -> dict[str, Any] | None:
+    """Return the prior run's cached outputs iff this node is a cache HIT.
+
+    A hit requires ALL of: a prior state, a computed hash, a stored hash
+    for this node that EQUALS the computed one, a persisted output_graph
+    entry, and a prior node status of COMPLETED/REUSED (never reuse a
+    failed/skipped node). Any miss returns None so the node runs normally.
+    """
+
+    if prior_state is None or memo_hash is None:
+        return None
+    stored_hash = getattr(prior_state, "node_hashes", {}).get(node_id)
+    if stored_hash is None or stored_hash != memo_hash:
+        return None
+    if node_id not in getattr(prior_state, "output_graph", {}):
+        return None
+    from hive.lib.dag_executor.run_state import NodeStatus
+
+    prior_status = prior_state.node_statuses.get(node_id)
+    if prior_status not in (NodeStatus.COMPLETED, NodeStatus.REUSED):
+        return None
+    return dict(prior_state.output_graph[node_id])
 
 
 def _workflow_step_metadata(
@@ -233,6 +388,58 @@ def _output_graph_view(
     }
 
 
+def _evaluate_skip_when_predicate(
+    node: Node,
+    materialised: dict[str, NodeOutput],
+    telemetry: Telemetry,
+) -> bool:
+    """Return True if the node's ``skip_when:`` predicate holds (node should be skipped).
+
+    Fail-closed-to-RUN: a missing/empty predicate returns False (don't skip).
+    A parse failure or a missing-field eval failure also returns False (run the node)
+    — this is intentionally the inverse of ``when:`` fail-closed semantics. We must
+    never silently drop a round that hasn't converged yet.
+
+    s3-convergence-signal: the expander emits grammar-legal dotpath predicates of the
+    form ``$<producer>__r{k-1}.output.<signal> == true``. This function evaluates them
+    against the materialised output graph view so a round that already converged
+    (review_passed=true at round k-1) skips round k's body nodes.
+    """
+
+    predicate_text = getattr(node, "skip_when", None)
+    if not predicate_text:
+        return False  # no predicate → always run
+
+    ast = parse_predicate(predicate_text)
+    if isinstance(ast, Skipped):
+        # Parse failure → fail-closed-to-run (do NOT skip).
+        telemetry.emit(
+            "predicate_evaluated",
+            node.id,
+            {
+                "expr": predicate_text,
+                "result": False,
+                "fail_closed": True,
+                "reason": ast.reason,
+                "predicate_field": "skip_when",
+            },
+        )
+        return False
+
+    output_graph = _output_graph_view(materialised)
+    result = eval_predicate(ast, output_graph)
+    telemetry.emit(
+        "predicate_evaluated",
+        node.id,
+        {
+            "expr": predicate_text,
+            "result": bool(result),
+            "predicate_field": "skip_when",
+        },
+    )
+    return bool(result)
+
+
 def _evaluate_when_predicate(
     node: Node,
     materialised: dict[str, NodeOutput],
@@ -293,18 +500,30 @@ def _user_gate_will_halt(node: Node, materialised: dict[str, NodeOutput]) -> boo
     return not bool(eval_predicate(ast, _output_graph_view(materialised)))
 
 
+_GATE_OUTPUT_GRAPH_INPUT = "__output_graph"
+
+
 def _resolve_dispatch_inputs(
     node: Node,
     materialised: dict[str, NodeOutput],
     context: dict[str, Any],
     skipped: set[str] | None = None,
 ) -> dict[str, Any]:
-    """Resolve inputs, adding the output-graph view needed by user_gate."""
+    """Resolve inputs, adding the output-graph view needed by user_gate and gate nodes."""
 
     inputs = _resolve_inputs(node, materialised, context, skipped)
     if _is_user_gate_node(node):
         inputs = dict(inputs)
         inputs[_USER_GATE_OUTPUT_GRAPH_INPUT] = _output_graph_view(materialised)
+    # s3-convergence-signal: inject the full output-graph view into GATE node
+    # inputs so GateHandler can evaluate grammar-legal dotpath predicates of the
+    # form ``$<node>.output.<field> == <value>`` against the materialised outputs.
+    # The unroller rewrites the predicate to reference the actual last-round
+    # body node (e.g. ``$review__r3.output.review_passed``); this view lets
+    # the gate resolve that reference at execution time.
+    if _is_gate_node(node):
+        inputs = dict(inputs)
+        inputs[_GATE_OUTPUT_GRAPH_INPUT] = _output_graph_view(materialised)
     return inputs
 
 
@@ -396,12 +615,47 @@ def _resolve_one(
         if binding.context_key is None:
             return None
         return context.get(binding.context_key)
+    if binding.source == "reference":
+        # c-generalize-loop C2: additive lean-flow layer. Resolve the
+        # filesystem pointer lazily (read content now). A missing pointer
+        # raises MissingReferenceError naming it — never a silent None.
+        # This branch is only reached for source=="reference"; the typed
+        # point-to-point paths below are untouched.
+        from .reference import read_reference
+
+        base_dir = (
+            context.get("run_working_dir")
+            or context.get("work_dir")
+            or context.get("repo_root")
+        )
+        return read_reference(base_dir, binding.reference_pointer or "")
     if binding.source == "step_output":
         # SKIPPED upstreams auto-resolve to None (hde-4 join semantics
         # under `none_failed_min_one_success`). The trigger_rule has
         # already decided RUN despite this upstream not producing
         # outputs — refusing here would contradict that decision.
+        #
+        # rec-1 last-successful-round: when the primary step_id is skipped
+        # (early convergence caused later rounds to be skipped), try each
+        # fallback_step_id in order (rN-1, rN-2, … r1) and use the first
+        # materialised one.  This lets post-loop nodes resolve non-signal
+        # outputs (commit_sha, implementation, …) from the last round that
+        # actually ran rather than always needing rN to be materialised.
         if binding.step_id and binding.step_id in skipped:
+            for fallback_id in getattr(binding, "fallback_step_ids", []):
+                if fallback_id not in skipped:
+                    fb_upstream = materialised.get(fallback_id)
+                    if fb_upstream is not None:
+                        if binding.output_name is None:
+                            return fb_upstream.outputs
+                        if binding.output_name in fb_upstream.outputs:
+                            return fb_upstream.outputs[binding.output_name]
+                        if binding.optional:
+                            return None
+                        raise HandlerError(
+                            f"input {binding.name!r} requires output {binding.output_name!r} "
+                            f"from fallback {fallback_id!r}, but that output was not produced"
+                        )
             return None
         upstream = materialised.get(binding.step_id) if binding.step_id else None
         if upstream is None:
@@ -475,10 +729,19 @@ class Walker:
         context: dict[str, Any] | None = None,
         run_state_path: Path | None = None,
         worktree_manager: Any | None = None,
+        prior_state: Any | None = None,
     ) -> dict[str, NodeOutput]:
-        """Walk the graph; persist state if `run_state_path` is set; isolate in a worktree if `worktree_manager` is set."""
+        """Walk the graph; persist state if `run_state_path` is set; isolate in a worktree if `worktree_manager` is set.
+
+        ``prior_state`` (b2) is the last successful run's RunState. When b2
+        memoization is enabled (``context['memoize']``), a node whose memo
+        hash matches ``prior_state``'s stored hash is skipped and its cached
+        ``output_graph`` entry is reused. Absent ``prior_state`` (or with b2
+        off) the walk runs every node normally — byte-for-byte pre-b2.
+        """
 
         ctx = context or {}
+        b2_enabled = _b2_memoization_enabled(ctx)
         step_metadata = _workflow_step_metadata(graph, ctx)
         order = _topological_order(graph)
         materialised: dict[str, NodeOutput] = {}
@@ -509,6 +772,8 @@ class Walker:
                 skipped=skipped,
                 state=state,
                 save_state=save_state,
+                b2_enabled=b2_enabled,
+                prior_state=prior_state,
             )
         except BaseException:
             run_failed = True
@@ -533,6 +798,8 @@ class Walker:
         skipped,
         state,
         save_state,
+        b2_enabled=False,
+        prior_state=None,
     ):
         from hive.lib.dag_executor.run_state import NodeStatus
 
@@ -576,6 +843,8 @@ class Walker:
                     node_statuses=node_statuses,
                     state=state,
                     save_state=save_state,
+                    b2_enabled=b2_enabled,
+                    prior_state=prior_state,
                 )
                 if processed_one:
                     processed.add(node_id)
@@ -588,7 +857,11 @@ class Walker:
             # first; the remainder runs under ParallelScheduler.
             sequential_ids = [
                 nid for nid in wave
-                if _is_pause_node(graph.nodes[nid]) or _is_user_gate_node(graph.nodes[nid])
+                if _is_pause_node(graph.nodes[nid])
+                or _is_user_gate_node(graph.nodes[nid])
+                # LOOP nodes raise LoopNodeInvariantError in _dispatch_one_sequential;
+                # route them there (not the thread pool) so the error is clean.
+                or graph.nodes[nid].node_type == NodeType.LOOP
             ]
             parallel_ids = [nid for nid in wave if nid not in sequential_ids]
 
@@ -606,6 +879,8 @@ class Walker:
                     node_statuses=node_statuses,
                     state=state,
                     save_state=save_state,
+                    b2_enabled=b2_enabled,
+                    prior_state=prior_state,
                 )
                 if processed_one:
                     processed.add(node_id)
@@ -628,6 +903,8 @@ class Walker:
                     node_statuses=node_statuses,
                     state=state,
                     save_state=save_state,
+                    b2_enabled=b2_enabled,
+                    prior_state=prior_state,
                 )
                 if processed_one:
                     processed.add(node_id)
@@ -668,21 +945,28 @@ class Walker:
         node_statuses,
         state,
         save_state,
+        b2_enabled=False,
+        prior_state=None,
     ):
         """Run a single node through the legacy hde-2 sequential path.
 
         Returns (state, processed) where ``processed`` is True iff the
         node reached a terminal status (COMPLETED, SKIPPED, FAILED-but-
-        optional). A non-optional FAILED node raises before returning,
-        same as the hde-2 path.
+        optional, or b2 REUSED). A non-optional FAILED node raises before
+        returning, same as the hde-2 path.
+
+        b2: when ``b2_enabled`` and the node's memo hash matches
+        ``prior_state``'s stored hash, the node is skipped and its cached
+        output_graph entry is reused (status=REUSED). With b2 off this
+        method is byte-for-byte the pre-b2 sequential path.
         """
 
         from hive.lib.dag_executor.run_state import NodeStatus
 
         node = graph.nodes[node_id]
 
-        if node.skip_when:
-            skip_info = {"reason": "skip_when present (hde-3a evaluation pending)"}
+        if node.skip_when and _evaluate_skip_when_predicate(node, materialised, telemetry):
+            skip_info = {"reason": f"skip_when predicate true: {node.skip_when!r}"}
             telemetry.emit(
                 "node_skipped",
                 node.id,
@@ -722,6 +1006,39 @@ class Walker:
 
         inputs = _resolve_dispatch_inputs(node, materialised, ctx, skipped)
 
+        # b2 reconcile-on-drift memoization. Compute the conservative memo
+        # hash (resolved inputs + node config + workflow version). On a cache
+        # HIT against the prior successful run, reuse the cached output_graph
+        # entry and record status=REUSED — the node is NEVER absent from
+        # RunState (audit invariant). Pause/user_gate nodes are excluded:
+        # they halt for humans / carry suspend side effects that must never
+        # be skipped. With b2 off (memo_hash stays None) nothing changes.
+        memo_hash: str | None = None
+        if b2_enabled and not (_is_pause_node(node) or _is_user_gate_node(node)):
+            memo_hash = _compute_memo_hash(node, inputs, graph, ctx)
+            reused_outputs = _memo_reuse_lookup(prior_state, node_id, memo_hash)
+            if reused_outputs is not None:
+                output = NodeOutput(
+                    outputs=reused_outputs,
+                    meta={"reused": True, "memo_hash": memo_hash},
+                )
+                materialised[node_id] = output
+                # Local scheduling mirror: a reused node is a successful
+                # checkpoint, so downstream trigger_rule treats it as
+                # COMPLETED. The DURABLE audit record is REUSED (persisted
+                # by _record_reused below) — the two views are intentional.
+                node_statuses[node_id] = NodeStatus.COMPLETED
+                telemetry.emit(
+                    "node_reused",
+                    node.id,
+                    {"outputs": list(output.outputs.keys()), "memo_hash": memo_hash},
+                )
+                state = _record_reused(
+                    state, node_id, output, memo_hash, source_epic=_source_epic(ctx)
+                )
+                save_state(state)
+                return state, True
+
         telemetry.emit("node_started", node.id, {})
         state = _record_running(state, node_id, source_epic=_source_epic(ctx))
         save_state(state)
@@ -733,7 +1050,17 @@ class Walker:
         ) and scheduler_pause is None
 
         try:
-            if scheduler_pause == "auto_approve":
+            if node.node_type == NodeType.LOOP:
+                # s4-retire-runtime-loop: LOOP is an authoring-only keyword.
+                # No LOOP node should ever reach the executor after the unroll
+                # pass. Raise the invariant guard immediately — loud rejection,
+                # no silent execution.
+                raise LoopNodeInvariantError(
+                    f"LOOP node {node.id!r} reached the executor walker — "
+                    "LOOP is an authoring keyword only; re-plan the workflow "
+                    "through the loader to unroll it before execution."
+                )
+            elif scheduler_pause == "auto_approve":
                 output = NodeOutput(
                     outputs={},
                     meta={"under_scheduler": "auto_approved"},
@@ -815,7 +1142,9 @@ class Walker:
             {"outputs": list(output.outputs.keys())},
         )
         node_statuses[node_id] = NodeStatus.COMPLETED
-        state = _record_completion(state, node_id, output, source_epic=_source_epic(ctx))
+        state = _record_completion(
+            state, node_id, output, source_epic=_source_epic(ctx), memo_hash=memo_hash
+        )
         save_state(state)
         return state, True
 
@@ -862,8 +1191,8 @@ class Walker:
         for node_id in wave_ids:
             node = graph.nodes[node_id]
 
-            if node.skip_when:
-                skip_info = {"reason": "skip_when present (hde-3a evaluation pending)"}
+            if node.skip_when and _evaluate_skip_when_predicate(node, materialised, telemetry):
+                skip_info = {"reason": f"skip_when predicate true: {node.skip_when!r}"}
                 telemetry.emit(
                     "node_skipped",
                     node.id,
@@ -1056,9 +1385,32 @@ class Walker:
         ctx = context or {}
         step_metadata = _workflow_step_metadata(graph, ctx)
         order = _topological_order(graph)
+
+        # AC-4 (s4-retire-runtime-loop): detect legacy LOOP RunState.
+        # A RunState that carries node IDs absent from the current graph
+        # signals a pre-retire in-flight run whose LOOP nodes have since
+        # been unrolled away. Replaying such a state against the new
+        # round-node graph would silently complete while leaving the old
+        # LOOP node IDs as ghost-PENDING entries — exactly the silent
+        # corruption AC-4 forbids. Fail fast with an actionable message
+        # so the operator knows to re-plan and start a fresh run.
+        _ghost_node_ids = {
+            nid for nid in state.node_statuses if nid not in graph.nodes
+        }
+        if _ghost_node_ids:
+            raise LoopNodeInvariantError(
+                f"RunState contains node IDs absent from the current graph: "
+                f"{sorted(_ghost_node_ids)!r}. This indicates a legacy LOOP "
+                "RunState from before the loop-unroll migration (s4). "
+                "Re-plan the workflow through the loader to generate a fresh run; "
+                "the in-flight run cannot be safely resumed against the expanded graph."
+            )
+
         materialised: dict[str, NodeOutput] = {}
         for node_id, status in state.node_statuses.items():
-            if status == NodeStatus.COMPLETED:
+            # b2: a REUSED node is as done as a COMPLETED one — reload its
+            # cached output so downstream replay nodes can consume it.
+            if status in (NodeStatus.COMPLETED, NodeStatus.REUSED):
                 output_payload = state.output_graph.get(node_id, {})
                 materialised[node_id] = NodeOutput(outputs=dict(output_payload))
 
@@ -1076,8 +1428,8 @@ class Walker:
         for node_id in order[start_index:]:
             node = graph.nodes[node_id]
 
-            if node.skip_when:
-                skip_info = {"reason": "skip_when present (hde-3a evaluation pending)"}
+            if node.skip_when and _evaluate_skip_when_predicate(node, materialised, telemetry):
+                skip_info = {"reason": f"skip_when predicate true: {node.skip_when!r}"}
                 telemetry.emit(
                     "node_skipped",
                     node.id,
@@ -1115,6 +1467,15 @@ class Walker:
                 continue
 
             inputs = _resolve_dispatch_inputs(node, materialised, ctx, skipped_set)
+
+            # s4-retire-runtime-loop: LOOP nodes must never reach the replay
+            # path. Check before any state write (save validates run_id).
+            if node.node_type == NodeType.LOOP:
+                raise LoopNodeInvariantError(
+                    f"LOOP node {node.id!r} found in replay RunState — "
+                    "LOOP is an authoring keyword only; re-plan the workflow "
+                    "through the loader to unroll it before execution."
+                )
 
             telemetry.emit("node_started", node.id, {"replay": True})
             _emit_phase_started(node_id, _source_epic(ctx))
@@ -1423,6 +1784,7 @@ def _record_completion(
     output: NodeOutput,
     *,
     source_epic: str | None = None,
+    memo_hash: str | None = None,
 ):
     _emit_phase_complete(node_id, source_epic)
     if state is None:
@@ -1430,12 +1792,51 @@ def _record_completion(
     from hive.lib.dag_executor.run_state import (
         NodeStatus,
         set_last_successful_node,
+        set_node_hash,
         set_node_output,
         set_node_status,
     )
 
     state = set_node_output(state, node_id, dict(output.outputs))
+    # b2: persist the memo hash on normal completion (only when b2 computed
+    # one) so a subsequent run can memoize against this node. None with b2
+    # off — no node_hashes write, state stays pre-b2 identical.
+    if memo_hash is not None:
+        state = set_node_hash(state, node_id, memo_hash)
     state = set_node_status(state, node_id, NodeStatus.COMPLETED)
+    return set_last_successful_node(state, node_id)
+
+
+def _record_reused(
+    state,
+    node_id: str,
+    output: NodeOutput,
+    memo_hash: str,
+    *,
+    source_epic: str | None = None,
+):
+    """Persist a b2 cache-hit reuse: outputs + hash + status=REUSED.
+
+    A reused node is a successful checkpoint (it advances
+    ``last_successful_node_id``) but carries the distinct REUSED status so
+    audit/replay can tell reuse from fresh execution. Never leaves the node
+    absent from RunState.
+    """
+
+    _emit_phase_complete(node_id, source_epic)
+    if state is None:
+        return None
+    from hive.lib.dag_executor.run_state import (
+        NodeStatus,
+        set_last_successful_node,
+        set_node_hash,
+        set_node_output,
+        set_node_status,
+    )
+
+    state = set_node_output(state, node_id, dict(output.outputs))
+    state = set_node_hash(state, node_id, memo_hash)
+    state = set_node_status(state, node_id, NodeStatus.REUSED)
     return set_last_successful_node(state, node_id)
 
 

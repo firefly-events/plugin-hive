@@ -32,7 +32,7 @@ The resolver is intentionally thin and mirrors `/execute`:
 - Env wins over config.
 
 On selection, `/plan` Phase 0 routes the assembled planning cell here instead of
-spawning direct `TeamCreate` or `agent-spawn` teammates.
+spawning direct natural-language spawn or `agent-spawn` teammates.
 
 **Inputs:**
 - `assembled_personas[]` - ordered final planning persona names, for example

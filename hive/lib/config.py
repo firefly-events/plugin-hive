@@ -13,6 +13,18 @@ except Exception:  # pragma: no cover - exercised when PyYAML unavailable
 
 
 EMIT_LIFECYCLE_AT_VALUES = frozenset({"phase", "story", "step", "off"})
+
+LOOP_FEATURES = frozenset({
+    "review_converge",
+    "tdd_red_green",
+    "bdd_converge",
+    "test_swarm",
+    "grill",
+})
+
+
+class LoopConfigError(ValueError):
+    """Raised when loop feature config fails validation."""
 DEFAULT_PROJECT_CONFIG_PATH = Path.cwd() / "hive.config.yaml"
 DEFAULT_BASELINE_CONFIG_PATH = Path(__file__).resolve().parents[1] / "hive.config.yaml"
 
@@ -205,6 +217,77 @@ def _clean_paths_scalar(value: Any) -> str | None:
     if text == "" or text == "null":
         return None
     return text
+
+
+def resolve_loop_config(
+    feature: str,
+    *,
+    project_config_path: str | os.PathLike[str] | None = None,
+    baseline_config_path: str | os.PathLike[str] | None = None,
+) -> dict[str, Any]:
+    """Resolve loop config for *feature* with precedence: env > project > baseline.
+
+    Returns ``{"enabled": bool, "max_rounds": int}``.
+    Raises :class:`LoopConfigError` when validation fails.
+    """
+    baseline_path = baseline_config_path or DEFAULT_BASELINE_CONFIG_PATH
+    project_path = project_config_path or DEFAULT_PROJECT_CONFIG_PATH
+
+    baseline_cfg = read_config_file(baseline_path)
+    project_cfg = read_config_file(project_path)
+
+    baseline_feature = (baseline_cfg.get("loops") or {}).get(feature) or {}
+    project_feature = (project_cfg.get("loops") or {}).get(feature) or {}
+
+    # Merge: project fields override baseline fields individually
+    enabled = project_feature.get("enabled", baseline_feature.get("enabled"))
+    max_rounds = project_feature.get("max_rounds", baseline_feature.get("max_rounds"))
+
+    # Env var overrides (highest precedence)
+    feature_env = feature.upper()  # tdd_red_green -> TDD_RED_GREEN
+    env_key_enabled = f"HIVE_LOOPS_{feature_env}_ENABLED"
+    env_key_max_rounds = f"HIVE_LOOPS_{feature_env}_MAX_ROUNDS"
+
+    env_enabled = os.environ.get(env_key_enabled)
+    if env_enabled is not None:
+        lc = env_enabled.strip().lower()
+        if lc == "true":
+            enabled = True
+        elif lc == "false":
+            enabled = False
+        else:
+            raise LoopConfigError(
+                f"loops.{feature}.enabled: {env_key_enabled} must be 'true' or 'false',"
+                f" got {env_enabled!r}"
+            )
+
+    env_max_rounds = os.environ.get(env_key_max_rounds)
+    if env_max_rounds is not None:
+        try:
+            max_rounds = int(env_max_rounds)
+        except (ValueError, TypeError) as exc:
+            raise LoopConfigError(
+                f"loops.{feature}.max_rounds: {env_key_max_rounds} must be a positive integer,"
+                f" got {env_max_rounds!r}"
+            ) from exc
+
+    # Validate enabled: must be a strict bool
+    if not isinstance(enabled, bool):
+        raise LoopConfigError(
+            f"loops.{feature}.enabled must be a bool (true/false), got {enabled!r}"
+        )
+
+    # Validate max_rounds: must be int (not bool subclass) and >= 1
+    if isinstance(max_rounds, bool) or not isinstance(max_rounds, int):
+        raise LoopConfigError(
+            f"loops.{feature}.max_rounds must be a positive integer, got {max_rounds!r}"
+        )
+    if max_rounds < 1:
+        raise LoopConfigError(
+            f"loops.{feature}.max_rounds must be a positive integer (>= 1), got {max_rounds!r}"
+        )
+
+    return {"enabled": enabled, "max_rounds": max_rounds}
 
 
 def read_emit_lifecycle_at(

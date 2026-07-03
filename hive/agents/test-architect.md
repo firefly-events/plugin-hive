@@ -1,7 +1,7 @@
 ---
 name: test-architect
 description: "Designs test strategies mapping acceptance criteria to test cases. Spawned by test swarm for test authoring."
-model: sonnet
+model: claude-sonnet-5
 color: cyan
 knowledge:
   - path: ~/.claude/hive/memories/test-architect/

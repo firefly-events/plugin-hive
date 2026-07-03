@@ -681,10 +681,11 @@ async function cmdCreateIssue(args, cfg) {
 
   const { serverUrl, token, workspaceId } = cfg;
   const dedupTitle = typeof args['dedup-title'] === 'string' ? String(args['dedup-title']) : null;
+  const integrationBranch = typeof args['integration-branch'] === 'string' ? String(args['integration-branch']) : null;
   const created = await createIssue(
     serverUrl, token, workspaceId,
     String(args.title), String(args.body),
-    { dedupTitle },
+    { dedupTitle, integrationBranch },
   );
 
   const id = created?.id ?? null;

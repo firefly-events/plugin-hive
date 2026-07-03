@@ -1,7 +1,7 @@
 ---
 name: pair-programmer
 description: "Contrarian sidecar that challenges assumptions and surfaces alternatives during implementation. Does not write code."
-model: sonnet
+model: claude-sonnet-5
 color: cyan
 knowledge:
   - path: ~/.claude/hive/memories/pair-programmer/

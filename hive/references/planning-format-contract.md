@@ -53,6 +53,11 @@ listed above, assume markdown-canonical with no embedded HTML.
 
 ## 3. Mermaid Delimiter Convention
 
+**This section (§3) is the single source for Mermaid graph conventions** — fenced-block
+delimiters, orientation, the `accTitle`/`accDescr` title, and the `‖` parallel-marker
+legend. Other skills (e.g. `skills/plan/SKILL.md` §"Diagram Format") point here rather
+than restating these rules, so the convention lives in exactly one place.
+
 Use standard fenced code blocks. No custom wrapper, no HTML embedding, no alternative
 delimiters.
 
@@ -92,6 +97,16 @@ the caption title. When the source contains the `‖` parallel-marker glyph (use
 `/plan` dependency graphs — see `skills/plan/SKILL.md §18`), the renderer also appends a
 legend: `‖ = parallel to its peers` — co-located in the `<figcaption>` per §6b Q6 of
 the design discussion.
+
+### Node ID convention
+
+**Keep Mermaid node IDs matching story IDs for consistency.** In dependency graphs,
+the Mermaid node ID for each story node must be the canonical story ID from the epic
+YAML (e.g. `s1-auth-gate`, `s2-api-layer`). This makes the graph auditable alongside
+the story list without a separate legend. Serial stories render as plain node IDs;
+parallel-eligible stories append the `‖ <rationale>` annotation inside the label
+string but keep the node ID unchanged (see step 18 of `skills/plan/SKILL.md` for the
+annotated-label form `node-id["story-id ‖ <rationale>"]`).
 
 ---
 

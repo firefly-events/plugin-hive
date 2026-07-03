@@ -129,6 +129,10 @@ def test_reserved_event_types_are_authoritative():
         "pause_timeout",
         # C2: bounded retry re-dispatch
         "node_retry",
+        # c-generalize-loop C1: LOOP converge-loop round
+        "loop_round",
+        # b-contract-derived-dag b2: memoized cache-hit skip
+        "node_reused",
     }
     assert RESERVED_EVENT_TYPES == expected
 

@@ -4,7 +4,7 @@
   "owner": {
     "name": "Firefly Events"
   },
-  "version": "2.13.3",
+  "version": "2.14.0",
   "plugins": [
     {
       "name": "plugin-hive",
@@ -19,9 +19,12 @@
         "planning",
         "testing",
         "code-review",
-        "claude-code"
+        "claude-code",
+        "team",
+        "quality-gates",
+        "TDD"
       ],
-      "version": "2.13.3"
+      "version": "2.14.0"
     }
   ]
 }

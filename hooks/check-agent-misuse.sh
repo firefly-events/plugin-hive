@@ -78,9 +78,8 @@ if echo "$prompt" | grep -qiE "$story_regex"; then
   if [ "$story_count" -ge 1 ]; then
     # Check for workflow execution signals (not just reading a story for context)
     if echo "$prompt" | grep -qiE '(execute.*stor|implement.*stor|workflow.*phase|development.*workflow|research.*implement.*test|review.*integrate)'; then
-      echo "BLOCKED: Agent tool used to execute story-level work. Use Agent(name:) for story execution." >&2
+      echo "BLOCKED: Agent tool used to execute story-level work. Use natural-language teammate spawn instead: describe the team and each teammate's tasks in your prompt" >&2
       echo "Detected $story_count story reference(s) with workflow execution patterns." >&2
-      echo "The orchestrator must delegate stories via Agent(name:), not bare Agent." >&2
       exit 2
     fi
   fi
@@ -88,8 +87,7 @@ fi
 
 # Pattern 2: Agent prompt contains epic execution language
 if echo "$prompt" | grep -qiE '(execute.*epic|epic.*execution|execute all stories|run the stories)'; then
-  echo "BLOCKED: Agent tool used for epic-level execution. Use Agent(name:) instead." >&2
-  echo "The orchestrator delegates epics and stories via Agent(name:), not bare Agent." >&2
+  echo "BLOCKED: Agent tool used for epic-level execution. Use natural-language teammate spawn instead: describe the team and each teammate's tasks in your prompt" >&2
   exit 2
 fi
 
@@ -99,7 +97,7 @@ fi
 # `Agent` path documented in SKILL.md is "Sequential workflow steps within a
 # single story" — those descriptions name the step, not the whole story.
 if echo "$description" | grep -qiE '(story execution|execute (the )?(entire|full|whole) story|run (the )?(entire|full|whole) story|implement (the )?(entire|full|whole) story|execute all steps)'; then
-  echo "BLOCKED: Agent description indicates whole-story delegation. Use Agent(name:)." >&2
+  echo "BLOCKED: Agent description indicates whole-story delegation. Use natural-language teammate spawn instead: describe the team and each teammate's tasks in your prompt" >&2
   exit 2
 fi
 

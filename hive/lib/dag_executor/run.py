@@ -13,9 +13,10 @@ caller supplies that. This module is that caller, made reusable so every skill
 
 Binding selection honours (in precedence order):
   1. explicit ``binding`` arg
-  2. ``HIVE_EXECUTION_MODE`` env var
-  3. ``{flow}.mode`` knob in root ``hive.config.yaml`` (s14 — config unification)
-  4. default ``"local"``
+  2. ``HIVE_{FLOW}_MODE`` per-flow env var (e.g. ``HIVE_PLANNING_MODE``) (C4)
+  3. ``HIVE_EXECUTION_MODE`` env var
+  4. ``{flow}.mode`` knob in root ``hive.config.yaml`` (s14 — config unification)
+  5. default ``"local"``
 
 ``flow`` is ``"planning"`` for the plan flow and ``"execution"`` for
 execute/test/review. The precedence above is the single shared resolver that all
@@ -48,6 +49,17 @@ _BINDING_FACTORIES: dict[str, Callable[..., Any]] = {}
 def register_binding(name: str, factory: Callable[..., Any]) -> None:
     """Register a spawn-binding factory under `name` (e.g. "multica")."""
     _BINDING_FACTORIES[name.strip().lower()] = factory
+
+
+def get_binding_factory(name: str) -> Callable[..., Any] | None:
+    """Look up a registered spawn-binding factory by `name` (the register_binding
+    seam), or ``None`` when nothing is registered.
+
+    a-rlm-recursive-node A's RLM recursive wrapper routes its depth=1 recursive
+    sub-calls through THIS accessor so they reuse the SAME binding registry that
+    ``register_binding`` populates — no new binding mechanism is introduced.
+    """
+    return _BINDING_FACTORIES.get(name.strip().lower())
 
 
 def _read_mode_knob(
@@ -92,8 +104,8 @@ def resolve_spawn_binding(
 ) -> tuple[str, Any]:
     """Resolve the AgentSpawn binding.
 
-    Precedence: explicit ``binding`` arg > ``HIVE_EXECUTION_MODE`` env >
-    ``{flow}.mode`` config knob > ``"local"``.
+    Precedence: explicit ``binding`` arg > ``HIVE_{FLOW}_MODE`` per-flow env >
+    ``HIVE_EXECUTION_MODE`` env > ``{flow}.mode`` config knob > ``"local"``.
 
     ``flow`` is ``"planning"`` for the plan flow and ``"execution"`` for
     execute/test/review. This is the single shared resolver for all four

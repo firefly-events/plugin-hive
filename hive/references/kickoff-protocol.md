@@ -740,7 +740,100 @@ existing_knowledge:
   mcp_servers: [list from settings]
   existing_skills: [list from .claude/skills]
   existing_hooks: [list from settings]
+
+north_star:
+  # Written during Phase 3b Discovery Questions (both brownfield and greenfield).
+  # Fields set to `unknown` when operator skips. Block omitted only for pre-existing
+  # profiles written before this schema version (consumers must tolerate absence).
+  goal: "stated product goal or unknown"
+  audience: "who this is for or unknown"
+  expected_scale: "concurrent user expectation or unknown"
+  pain_points: "major pain points or unknown"
+  success: "what success looks like or unknown"  # optional follow-up; omit if skipped
+  avoid: "what to avoid or unknown"              # optional follow-up; omit if skipped
 ```
+
+### Phase 3b: Discovery Questions
+
+After Phase 3 writes `.pHive/project-profile.yaml`, run the Discovery Questions step to capture the `north_star` block. This step applies to **both brownfield and greenfield** projects. It is **non-blocking** — every question is individually skippable and kickoff MUST NOT hard-fail if all are skipped.
+
+#### Adaptive question set
+
+Before asking, check what current-state discovery already surfaced. Do NOT re-ask items already answered:
+
+| # | Question | Field | Skip if already captured |
+|---|----------|-------|--------------------------|
+| 1 | Who is this for? (audience) | `audience` | Users/personas identified in current-state discovery |
+| 2 | How many concurrent users are you expecting? (scale) | `expected_scale` | Load/infra context already captured |
+| 3 | What is the overall goal of the product? | `goal` | Rarely redundant — ask unless product-vision doc was read and summarized |
+| 4 | What are your major pain points right now? | `pain_points` | Always ask — operational pain is not derivable from tech-stack scans |
+
+After the 4 core questions, offer 2 optional follow-ups (clearly marked optional; skip on empty reply or explicit no):
+
+| # | Question | Field |
+|---|----------|-------|
+| 5 | What does success look like? *(optional)* | `success` |
+| 6 | What should we avoid? *(optional)* | `avoid` |
+
+#### Persistence rule
+
+Write the `north_star` block to `.pHive/project-profile.yaml` at the end of Phase 3b. Use the canonical try/except pattern from `hive/lib/config.py:9-12` (`try: import yaml / except Exception: yaml = None`) — PyYAML is an optional third-party dependency, not stdlib. If PyYAML is unavailable, append the block as plain `key: value` lines rather than hard-failing:
+
+- Answered questions: write the operator's answer verbatim (or a concise paraphrase).
+- Skipped/deferred questions: write `unknown`.
+- Optional follow-ups skipped: omit the field rather than writing `unknown`.
+- Skip-all case: write the `north_star` block with all four core fields set to `unknown`. Do NOT omit the block when the operator engaged (even with all skips).
+- **Hard-fail rule:** kickoff MUST continue normally after Phase 3b regardless of how many questions were skipped.
+
+#### North-star summary and suggested next steps
+
+After writing `north_star`, emit a summary to the operator:
+
+```
+**North Star captured**
+Goal:      {goal}
+Audience:  {audience}
+Scale:     {expected_scale}
+Pain:      {pain_points}
+```
+
+Omit any line whose value is `unknown`. Then emit **Suggested next steps** derived from the combined `north_star` + current-state profile:
+
+- If `expected_scale` is answered and indicates high concurrency: suggest capacity planning / load testing stories.
+- If `pain_points` are answered: suggest "address top pain point" as the first recommended story.
+- If `goal` is answered: suggest alignment check — does the current architecture serve the stated goal?
+
+Suggested next steps are informational output only — they do not create issues or trigger any downstream action.
+
+#### north_star schema (single source of truth)
+
+The `north_star` block schema is defined here as the single authoritative source. Consumers of `north_star` MUST tolerate the block being absent entirely (pre-existing profiles written before Phase 3b was added).
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `goal` | string | yes (core) | Overall product goal; `unknown` if skipped |
+| `audience` | string | yes (core) | Primary users/personas; `unknown` if skipped |
+| `expected_scale` | string | yes (core) | Concurrent user expectation; `unknown` if skipped |
+| `pain_points` | string | yes (core) | Major current pain points; `unknown` if skipped |
+| `success` | string | no (optional) | What success looks like; omit field if follow-up skipped |
+| `avoid` | string | no (optional) | What to avoid; omit field if follow-up skipped |
+
+#### tech_stack reader: tolerant of both shapes
+
+Any reader that consumes `tech_stack` from `project-profile.yaml` MUST tolerate both the flat-list shape (`tech_stack: [node, bash, python]`) and the nested-object shape (`tech_stack: {languages: [...], frameworks: [...], ...}`). Normalize to a flat language list before use — do NOT rewrite the profile field:
+
+```python
+def resolve_languages(tech_stack):
+    """Tolerate flat-list and nested tech_stack shapes. Normalize to lowercase list."""
+    if isinstance(tech_stack, list):
+        return [str(x).lower() for x in tech_stack]
+    if isinstance(tech_stack, dict):
+        langs = tech_stack.get("languages") or []
+        return [str(x).lower() for x in langs]
+    return []
+```
+
+This normalization is the **reference pattern** for all tech_stack consumers. The LSP suggestion reader (`hive/references/lsp-suggestions.md`) implements the same logic under `get_tech_stack_languages(profile)` with a profile-dict signature — the two are aligned implementations, not a shared import. Never hard-fail on an unexpected shape — return `[]` and degrade gracefully.
 
 ### Phase 4: hive.config.yaml
 

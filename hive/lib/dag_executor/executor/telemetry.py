@@ -67,6 +67,10 @@ RESERVED_EVENT_TYPES = frozenset(
         "pause_timeout",
         # C2: bounded retry re-dispatch (one event per retry attempt)
         "node_retry",
+        # c-generalize-loop C1: one event per LOOP converge-loop round
+        "loop_round",
+        # b-contract-derived-dag b2: one event per memoized cache-hit skip
+        "node_reused",
     }
 )
 

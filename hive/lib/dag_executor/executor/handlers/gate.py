@@ -1,9 +1,15 @@
-"""Gate handler — declarative presence/non-empty checks.
+"""Gate handler — declarative presence/non-empty checks + strict predicate grammar.
 
 Initial implementation handles the `must not be empty` predicate
 shipping today (e.g., `development.classic.workflow.yaml:166` —
 `test_artifacts must not be empty`). Richer predicate languages land
 in hde-3a; this handler intentionally stays narrow.
+
+s3-convergence-signal: also handles grammar-legal dotpath predicates of the
+form ``$<node>.output.<field> == true|false``. When the walker injects the
+full ``__output_graph`` view into the gate's inputs (same mechanism as
+user_gate), the handler evaluates these strict predicates directly against
+the materialised output graph — no prose parsing needed.
 
 The gate's predicate string lives on `node.gate`. Inputs to the gate
 are the resolved input values from the materialised output graph.
@@ -17,6 +23,10 @@ from typing import Any
 
 from ..errors import GateFailedError
 from .agent import NodeOutput
+
+# Key used to pass the materialised output-graph view into gate inputs.
+# Injected by the walker (same mechanism as user_gate's __output_graph).
+_GATE_OUTPUT_GRAPH_INPUT = "__output_graph"
 
 
 _NOT_EMPTY = re.compile(r"^(?P<name>[\w.-]+)\s+must\s+not\s+be\s+empty$", re.IGNORECASE)
@@ -181,6 +191,36 @@ class GateHandler:
                 outputs={"gate_passed": True},
                 meta={"predicate": predicate, "target": target},
             )
+
+        # s3-convergence-signal: try strict predicate grammar (dotpath == bool/value).
+        # The walker injects ``__output_graph`` into gate inputs so we can evaluate
+        # grammar-legal predicates like ``$review__r3.output.review_passed == true``
+        # against the full materialised output. Fail-closed-to-block: if the output
+        # graph is absent, the predicate fails (gate blocks) rather than silently
+        # passing, preserving bug-#26 safety semantics.
+        output_graph = inputs.get(_GATE_OUTPUT_GRAPH_INPUT)
+        if output_graph is not None:
+            try:
+                from hive.lib.dag_executor.routing import evaluate as eval_predicate
+                from hive.lib.dag_executor.routing import parse as parse_predicate
+                from hive.lib.dag_executor.routing.errors import Skipped
+
+                ast = parse_predicate(predicate)
+                if not isinstance(ast, Skipped):
+                    result = eval_predicate(ast, output_graph)
+                    if not result:
+                        raise GateFailedError(
+                            f"gate node {node.id!r}: predicate {predicate!r} evaluated False "
+                            f"(convergence signal not true — integrate blocked, bug-#26 preserved)"
+                        )
+                    return NodeOutput(
+                        outputs={"gate_passed": True},
+                        meta={"predicate": predicate, "grammar": "dotpath"},
+                    )
+            except GateFailedError:
+                raise
+            except Exception:
+                pass  # fall through to the final unknown-predicate error
 
         raise GateFailedError(
             f"gate node {node.id!r} predicate not understood by hde-2 gate handler "

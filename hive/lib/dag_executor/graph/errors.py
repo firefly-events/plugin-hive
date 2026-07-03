@@ -70,3 +70,40 @@ class InvalidInputSourceError(GraphLoadError):
             f"node '{node_id}' input '{input_name}' has invalid source "
             f"'{bad_source}' (expected: literal, step_output, context)"
         )
+
+
+class LoopConfigError(GraphLoadError):
+    """A LOOP node is missing required loop_config fields.
+
+    Raised at graph-parse time so non-termination is caught before
+    any execution begins.
+    """
+
+    def __init__(self, node_id: str, reason: str):
+        self.node_id = node_id
+        self.reason = reason
+        super().__init__(
+            f"LOOP node '{node_id}' has invalid loop_config: {reason}"
+        )
+
+
+class DuplicateEnsuresError(GraphLoadError):
+    """Two steps declare `ensures:` for the same output key (b1).
+
+    Contract-derived DAG synthesis requires each output key be produced
+    by exactly one step; two producers make the `Requires`-side edge
+    ambiguous. Per design-discussion §6 Q5 this fails the WHOLE plan
+    loudly (not just the ambiguous subgraph) and names BOTH conflicting
+    steps plus the duplicated key — never a silent resolution.
+    """
+
+    def __init__(self, output_key: str, first_node_id: str, second_node_id: str):
+        self.output_key = output_key
+        self.first_node_id = first_node_id
+        self.second_node_id = second_node_id
+        super().__init__(
+            f"duplicate ensures for output key {output_key!r}: "
+            f"produced by both step {first_node_id!r} and step "
+            f"{second_node_id!r} (each output must be ensured by exactly "
+            f"one step for contract-derived edge synthesis)"
+        )

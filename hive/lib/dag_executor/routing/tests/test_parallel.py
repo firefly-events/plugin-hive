@@ -247,6 +247,12 @@ def _stub_canned_for_test_swarm() -> dict[str, dict[str, Any]]:
         "triage-failures": {"routing_decisions": "none"},
         "compile-report": {"session_report": "report"},
         "promote-baseline": {"promotion_summary": "ok"},
+        # s7 test-swarm loop body round copies. test_swarm feature defaults to
+        # disabled (single degenerate pass) so only __r1 copies exist. These
+        # supply the required swarm_test_manifest input for swarm-assess__r1
+        # so it runs to completion rather than being skipped on a resolve error.
+        "swarm-generate__r1": {"swarm_test_manifest": "manifest"},
+        "swarm-assess__r1": {"coverage_satisfied": False},
     }
 
 
@@ -283,6 +289,10 @@ def test_test_swarm_executes_e2e_with_parallel_platforms(tmp_path):
         "scenario-replay",
         "reconcile-report",
         "gate-test-report",
+        # s7 test-swarm loop body (degenerate single pass — feature disabled by
+        # default; expander still emits __r1 copies for structural consistency).
+        "swarm-generate__r1",
+        "swarm-assess__r1",
     }
     assert set(out.keys()) == expected_steps
     # file-bugs ran (≥1 platform succeeded) — barrier-join activated.

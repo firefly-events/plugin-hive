@@ -94,7 +94,7 @@ steps, see `hive/references/state-relocation.md`.
 
 ### Sessions (Managed Agent Execution)
 
-When `sessions.enabled: true` (or `HIVE_SESSIONS_ENABLED=1` env var), the execute skill uses the Claude Agent SDK `/v1/sessions` API instead of `Agent(name:)` teammate dispatch for story-level execution. The session registry at `${HIVE_STATE_DIR}/sessions/index.yaml` tracks all active sessions.
+When `sessions.enabled: true` (or `HIVE_SESSIONS_ENABLED=1` env var), the execute skill uses the Claude Agent SDK `/v1/sessions` API for story-level execution (v2.1.178+ auto-spawn model). The session registry at `${HIVE_STATE_DIR}/sessions/index.yaml` tracks all active sessions.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -108,13 +108,32 @@ When `sessions.enabled: true` (or `HIVE_SESSIONS_ENABLED=1` env var), the execut
 **Bootstrap skill:** See `skills/hive/skills/session-registry/SKILL.md`.
 **Resilience:** See `hive/references/session-resilience.md` for stuck detection and retry.
 
+### Agent Backends
+
+`agent_backends` is a maintainer-controlled section for model-level execution resilience. Consumer installs normally omit it; set it in your root `hive.config.yaml` when you need model-level fallback.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `agent_backends.fallback_model` | `[]` | Ordered list of backup models tried sequentially when the primary model is rate-limited or unavailable. Models are attempted left-to-right until one succeeds or the list is exhausted. When absent or empty, no fallback occurs and a rate-limit or availability error surfaces directly to the operator. See also: `hive/references/token-management.md` for context-health tracking. |
+
+Example:
+
+```yaml
+agent_backends:
+  fallback_model:
+    - claude-opus-4-5
+    - claude-sonnet-4-5
+```
+
+When `fallback_model` is unset and a story's expected token budget exceeds 200 k tokens, the execute-dispatch skill emits an operator warning (see `skills/hive/skills/execute-dispatch/SKILL.md` §Pre-flight Checks).
+
 ## Maintainer Boundary
 
 Some Hive assets are maintainer-only and are used to improve the plugin itself rather than support marketplace consumers. Those assets do not belong in marketplace consumer installs, and consumers receive only the neutral baseline configuration plus any repo-local override they choose to add.
 
 The `maintainer-skills/` directory is excluded from marketplace distribution via `marketplace.json` under the Slice 5 story `marketplace-exclude-maintainer-skills`.
 
-Maintainer defaults such as Codex backends, Opus routing, and `cmux` terminal mux preferences do not ship. For the same reason, maintainer-only keys are intentionally absent from the shipped settings reference, including `execution.terminal_mux`, `execution.idle_timeout_seconds`, and external model routing such as `agent_backends`.
+Maintainer defaults such as Codex backends, Opus routing, and `cmux` terminal mux preferences do not ship. For the same reason, maintainer-only keys are intentionally absent from the shipped settings reference, including `execution.terminal_mux` and `execution.idle_timeout_seconds`. External model routing under `agent_backends` is documented in the `### Agent Backends` section above.
 
 See also:
 - `hive/references/state-boundary.md`

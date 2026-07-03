@@ -1,7 +1,7 @@
 ---
 name: test-worker
 description: "Reliable test executor. Runs test scripts, captures results and screenshots. Fast mechanical execution."
-model: haiku
+model: claude-haiku-4-5-20251001
 color: green
 knowledge:
   - path: ~/.claude/hive/memories/test-worker/

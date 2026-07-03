@@ -21,7 +21,7 @@ HIVE_STATE_DIR = hive_config.paths.state_dir || ".pHive"
 
 All episode markers, messages sidecars, transcript references, and run summaries are rooted under that resolved state dir unless the Workflow tool returns an absolute transcript path.
 
-Kickoff-gate fall-through behavior is explicit: if the runtime precondition gate rejects this mode, emit a structured `precondition_failed` error with `field_sources` and return control to `test-dispatch`; do not silently fall through to direct `TeamCreate`, Codex, or Multica test paths. Fallback to those paths is the caller's responsibility and is gated on this skill returning a structured rejection, not on a silent partial dispatch.
+Kickoff-gate fall-through behavior is explicit: if the runtime precondition gate rejects this mode, emit a structured `precondition_failed` error with `field_sources` and return control to `test-dispatch`; do not silently fall through to direct natural-language spawn, Codex, or Multica test paths. Fallback to those paths is the caller's responsibility and is gated on this skill returning a structured rejection, not on a silent partial dispatch.
 
 Delegation rules: the orchestrator coordinates Workflow script assembly, Workflow invocation, polling, episode marker writes, and summary return; it does not run scenarios itself. Workflow agents execute the assigned scenario steps and return structured verdict payloads. Scenario behavior is loaded from the canonical `loadScenario(scenario_path)` result; do not improvise inline scenarios. **All workflow agents run on the default workflow subagent (no Codex `agentType`)** — cc-workflows mode is intentionally an inline-Claude substrate so the returned `<result>` IS the verdict payload. Codex routing belongs to other test paths; cc-workflows mode is an inline-Claude substrate and intentionally does not overlap.
 
@@ -40,7 +40,7 @@ The resolver lives in `test-dispatch` Step 0 and mirrors the execute-dispatch re
 - Any other value falls through to the existing test path (multica, local simulated-manual).
 - Env wins over config.
 
-On selection, `/test` resolves the story and scenario exactly as it already does, then routes here instead of spawning direct `TeamCreate`, Multica, or local-executor test runs.
+On selection, `/test` resolves the story and scenario exactly as it already does, then routes here instead of spawning direct natural-language spawn, Multica, or local-executor test runs.
 
 **Inputs:**
 - `scenario_path` — repo-relative path to the canonical simulated-manual scenario.

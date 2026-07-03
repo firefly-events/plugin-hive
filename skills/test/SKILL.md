@@ -26,11 +26,11 @@ When `mode_decision == multica`, route the test run through the DAG front door i
 **DAG front-door invocation:**
 
 ```python
-from hive.lib.dag_executor.run import run
+from hive.lib.dag_executor.run import run, resolve_spawn_binding
 
 result = run(
     "hive/workflows/test-swarm.workflow.yaml",
-    binding="multica",
+    binding=resolve_spawn_binding(flow="execution")[0],
     context={
         "story_spec": story_spec,
         "baseline_path": baseline_path,

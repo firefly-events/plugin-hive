@@ -183,21 +183,42 @@ def run_workflow(
     # and free of side effects for callers that only need the config
     # readers (e.g., the gating tests).
     from hive.lib.dag_executor.executor import Telemetry, Walker, make_run_id
+    from hive.lib.dag_executor.executor.walker import _b2_memoization_enabled
     from hive.lib.dag_executor.graph import load_workflow
 
     graph = load_workflow(Path(workflow_path))
 
     effective_run_id = run_id or make_run_id(graph.workflow_name)
     effective_telemetry = telemetry or Telemetry(run_id=effective_run_id)
+    effective_context = context or {}
+    effective_run_state_path = Path(run_state_path) if run_state_path else None
+
+    # b2: when memoization is enabled AND run state is persisted (the
+    # dag-multica flow always persists to run_state_path), load the prior
+    # successful run for this workflow and hand it to the walker so the
+    # walk can reuse unchanged nodes end-to-end. Without this the public
+    # front door never supplies a prior state and b2 would be inert in
+    # production. No persisted state / flag off → prior_state stays None
+    # and behaviour is byte-for-byte pre-b2.
+    prior_state = None
+    if effective_run_state_path is not None and _b2_memoization_enabled(effective_context):
+        from hive.lib.dag_executor.run_state import find_latest_successful
+
+        prior_state = find_latest_successful(
+            graph.workflow_name,
+            root=effective_run_state_path,
+            exclude_run_id=effective_run_id,
+        )
 
     return Walker().walk(
         graph,
         dispatcher,
         effective_run_id,
         effective_telemetry,
-        context=context or {},
-        run_state_path=Path(run_state_path) if run_state_path else None,
+        context=effective_context,
+        run_state_path=effective_run_state_path,
         worktree_manager=worktree_manager,
+        prior_state=prior_state,
     )
 
 

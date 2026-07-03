@@ -49,21 +49,21 @@ def _fail_result(stderr: str = "NON_FF: fast-forward merge failed") -> SimpleNam
 def test_local_noop_when_sha_absent(tmp_path):
     handler = _make_handler(tmp_path)
     out = handler.handle(_reconcile_node(), inputs={}, run_id="run-1")
-    assert out.outputs == {}
+    assert out.outputs == {"reconcile_status": "noop"}
     assert out.meta.get("reconcile") == "noop"
 
 
 def test_local_noop_when_sha_empty_string(tmp_path):
     handler = _make_handler(tmp_path)
     out = handler.handle(_reconcile_node(), inputs={"sha": ""}, run_id="run-1")
-    assert out.outputs == {}
+    assert out.outputs == {"reconcile_status": "noop"}
     assert out.meta.get("reconcile") == "noop"
 
 
 def test_local_noop_when_sha_none(tmp_path):
     handler = _make_handler(tmp_path)
     out = handler.handle(_reconcile_node(), inputs={"sha": None}, run_id="run-1")
-    assert out.outputs == {}
+    assert out.outputs == {"reconcile_status": "noop"}
     assert out.meta.get("reconcile") == "noop"
 
 
@@ -93,6 +93,10 @@ def test_ff_merge_invokes_cli_with_correct_args(tmp_path):
 
     assert out.outputs["merged"] is True
     assert out.outputs["sha"] == "abc123"
+    # pr20-fable-review M2: the real-sha ff-merge path must ALSO declare
+    # reconcile_status (the noop path at line ~52 above already does) —
+    # 8 workflow bindings consume $<reconcile-node>.output.reconcile_status.
+    assert out.outputs["reconcile_status"] == "merged"
 
 
 def test_ff_merge_passes_work_dir_when_provided(tmp_path):

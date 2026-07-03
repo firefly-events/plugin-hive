@@ -123,14 +123,19 @@ def test_tdd_step_order_test_spec_before_implement():
     graph = load_workflow(TDD_PATH)
     order = _topo_order(graph)
     assert "test-spec" in order
-    assert "implement" in order
-    assert order.index("test-spec") < order.index("implement")
+    # After loop unrolling, implement becomes implement__r1 (first round copy).
+    assert "implement__r1" in order, (
+        f"implement__r1 must be in the topo order after tdd-red-green-loop unrolls; "
+        f"got: {order}"
+    )
+    assert order.index("test-spec") < order.index("implement__r1")
 
 
 def test_tdd_step_order_implement_before_review():
     graph = load_workflow(TDD_PATH)
     order = _topo_order(graph)
-    assert order.index("implement") < order.index("review")
+    # After loop unrolling, implement becomes implement__r1 (first round copy).
+    assert order.index("implement__r1") < order.index("review")
 
 
 def test_tdd_step_order_review_before_integrate():
@@ -221,11 +226,47 @@ def test_tdd_gate_has_bounded_retry():
         assert node.retry["max_attempts"] <= 10, "max_attempts should be bounded (≤10)"
 
 
-def test_no_loop_node_type_in_classic():
-    """No LOOP primitive exists in classic — model.py:34 locks it out."""
+def test_classic_has_well_formed_converge_loop():
+    """t-006 / s3: classic now ships the review-converge-loop LOOP with a body
+    (fix-cycle-implement + fix-cycle-review). After loading, expand_loops unrolls
+    the LOOP into round copies — no LOOP nodes remain in the expanded graph but
+    round copies (fix-cycle-review__r1..rN) must exist.
+
+    Also validates the raw YAML has a well-formed loop_config: gate_predicate,
+    max_rounds, sub_graph, feature, and convergence_signal.
+    """
+    import yaml
+
+    # Raw YAML check: loop_config fields
+    with open(CLASSIC_PATH, encoding="utf-8") as fh:
+        raw = yaml.safe_load(fh)
+    steps_raw = {s["id"]: s for s in raw.get("steps", [])}
+    assert "review-converge-loop" in steps_raw, "review-converge-loop must exist in YAML"
+    lc_raw = steps_raw["review-converge-loop"].get("loop_config", {})
+    assert lc_raw.get("gate_predicate", "").strip(), "gate_predicate must be non-empty"
+    assert isinstance(lc_raw.get("max_rounds"), int) and lc_raw["max_rounds"] > 0, (
+        "max_rounds must be a positive int"
+    )
+    assert lc_raw.get("sub_graph", "").strip(), "sub_graph reference must be non-empty"
+    assert lc_raw.get("feature", "").strip(), "feature must be set (required for unrolling)"
+    assert lc_raw.get("convergence_signal", "").strip(), (
+        "convergence_signal must be declared (s3-convergence-signal)"
+    )
+
+    # Expanded graph check: LOOP was unrolled into round copies
+    from hive.lib.dag_executor.graph import NodeType
     graph = load_workflow(CLASSIC_PATH)
-    for node in graph.nodes.values():
-        assert node.node_type != "loop", f"LOOP primitive forbidden (node {node.id!r})"
+    loop_nodes = [n for n in graph.nodes.values() if n.node_type == NodeType.LOOP]
+    assert len(loop_nodes) == 0, (
+        f"After expand_loops, zero LOOP nodes should remain; got {[n.id for n in loop_nodes]}"
+    )
+    # Round copies of the producer (fix-cycle-review) must exist
+    max_rounds = lc_raw["max_rounds"]
+    for k in range(1, max_rounds + 1):
+        assert f"fix-cycle-review__r{k}" in graph.nodes, (
+            f"Expected fix-cycle-review__r{k} in expanded graph but not found; "
+            f"nodes={list(graph.nodes)}"
+        )
 
 
 def test_no_loop_node_type_in_tdd():
@@ -325,7 +366,10 @@ def _ancestors(graph: Graph, node_id: str) -> set[str]:
 @pytest.mark.parametrize("workflow_path,implement_id", [
     pytest.param(CLASSIC_PATH, "backend-implement", id="classic-backend"),
     pytest.param(CLASSIC_PATH, "frontend-implement", id="classic-frontend"),
-    pytest.param(TDD_PATH, "implement", id="tdd"),
+    # After tdd-red-green-loop unrolls, the bare 'implement' body node is
+    # replaced by implement__r1 .. implement__r{N}. Use r1 as the canonical
+    # representative to check the reconcile wiring chain.
+    pytest.param(TDD_PATH, "implement__r1", id="tdd"),
     pytest.param(BDD_PATH, "implement", id="bdd"),
 ])
 def test_reconcile_wired_between_implement_and_review(workflow_path, implement_id):

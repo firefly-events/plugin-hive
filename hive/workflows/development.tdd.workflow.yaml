@@ -80,6 +80,7 @@ steps:
 
   - id: implement
     agent: developer
+    sub_graph: tdd-red-green-cycle
     step_file: hive/workflows/steps/development-tdd/step-03-implement.md
     task: >
       Implement the story to make all failing tests pass. You receive the test
@@ -103,7 +104,61 @@ steps:
     outputs:
       - name: implementation
         type: string
+      # C2: emit commit metadata so the unroller's output_producers map maps
+      # commit_sha/branch/repo/work_dir → implement__rN (not the tester exit
+      # node fallback). Agents populate these on Multica remote execution;
+      # local runs leave them absent and ReconcileHandler no-ops cleanly.
+      - name: commit_sha
+        type: string
+      - name: branch
+        type: string
+      - name: repo
+        type: string
+      - name: work_dir
+        type: string
     optional: false
+    timeout_ms: 600000
+
+  # tdd-tester: body node that runs the tests against the current implementation
+  # and emits tests_green (boolean convergence signal). Tagged sub_graph so the
+  # loop expander includes it in the unrolled round copies.
+  - id: tdd-tester
+    agent: tester
+    sub_graph: tdd-red-green-cycle
+    task: >
+      Run the failing tests against the current implementation. Determine whether
+      all tests pass (emit tests_green: true) or any still fail (emit
+      tests_green: false). Do NOT modify the tests.
+    depends_on:
+      - implement
+    inputs:
+      - name: implementation
+        source: step_output
+        step_id: implement
+        output_name: implementation
+      - name: test_files
+        source: step_output
+        step_id: test-spec
+        output_name: test_files
+    outputs:
+      - name: tests_green
+        type: json
+    optional: false
+    timeout_ms: 300000
+
+  # tdd-red-green-loop: LOOP node — expander unrolls implement→tdd-tester up to
+  # max_rounds times. Converges when tdd-tester emits tests_green: true.
+  # Disabled (loops.tdd_red_green.enabled=false) → single degenerate pass.
+  - id: tdd-red-green-loop
+    node_type: loop
+    depends_on:
+      - test-spec
+    loop_config:
+      feature: tdd_red_green
+      convergence_signal: tests_green
+      sub_graph: tdd-red-green-cycle
+      max_rounds: 3
+      gate_predicate: "tests_green must equal true"
     timeout_ms: 600000
 
   # Reconcile node (s7) after implement — materialise the developer's committed
@@ -117,26 +172,26 @@ steps:
     task: >
       Materialise the implement agent's commit so the gate validates committed code.
     depends_on:
-      - implement
+      - tdd-red-green-loop
     inputs:
       - name: sha
         source: step_output
-        step_id: implement
+        step_id: tdd-red-green-loop
         output_name: commit_sha
         optional: true
       - name: branch
         source: step_output
-        step_id: implement
+        step_id: tdd-red-green-loop
         output_name: branch
         optional: true
       - name: repo
         source: step_output
-        step_id: implement
+        step_id: tdd-red-green-loop
         output_name: repo
         optional: true
       - name: work_dir
         source: step_output
-        step_id: implement
+        step_id: tdd-red-green-loop
         output_name: work_dir
         optional: true
     outputs:
@@ -168,7 +223,7 @@ steps:
     inputs:
       - name: implementation
         source: step_output
-        step_id: implement
+        step_id: tdd-red-green-loop
         output_name: implementation
     outputs:
       - name: gate_passed
@@ -190,7 +245,7 @@ steps:
     inputs:
       - name: implementation
         source: step_output
-        step_id: implement
+        step_id: tdd-red-green-loop
         output_name: implementation
       - name: test_files
         source: step_output
@@ -241,6 +296,26 @@ steps:
         type: json
     timeout_ms: 30000
 
+  # gate-tests-green: terminal gate that blocks integrate when the TDD red-green
+  # loop did not achieve tests_green=true within max_rounds.  Depends on the
+  # reconcile-implement node (ensuring a RECONCILE node precedes this gate in
+  # topological order) as well as the loop node (rewired to last round exit by
+  # the expander).
+  - id: gate-tests-green
+    node_type: gate
+    gate: "$tdd-red-green-loop.output.tests_green == true"
+    retry:
+      max_attempts: 1
+      on: gate_failed
+      retry_node: tdd-red-green-loop
+    depends_on:
+      - tdd-red-green-loop
+      - reconcile-implement
+    outputs:
+      - name: gate_passed
+        type: json
+    timeout_ms: 60000
+
   - id: optimize
     agent: developer
     step_file: hive/workflows/steps/development-classic/step-07-optimize.md
@@ -257,7 +332,7 @@ steps:
         output_name: review_findings
       - name: implementation
         source: step_output
-        step_id: implement
+        step_id: tdd-red-green-loop
         output_name: implementation
       - name: story_spec
         source: context
@@ -277,12 +352,13 @@ steps:
       feature branch. Verify CI passes if available. Report the commit hash and
       files changed.
     depends_on:
-      - review
+      - tdd-red-green-loop
+      - gate-tests-green
       - gate-review
     inputs:
       - name: implementation
         source: step_output
-        step_id: implement
+        step_id: tdd-red-green-loop
         output_name: implementation
       - name: review_verdict
         source: step_output

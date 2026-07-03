@@ -74,11 +74,11 @@ s9 (planning-routing), s11 (execute), and s12 (test) DAG front-door paths.
 **DAG front-door invocation:**
 
 ```python
-from hive.lib.dag_executor.run import run
+from hive.lib.dag_executor.run import run, resolve_spawn_binding
 
 result = run(
     "hive/workflows/review.workflow.yaml",
-    binding="multica",
+    binding=resolve_spawn_binding(flow="execution")[0],
     context={
         "diff_target": diff_target,
         "pr_number": pr_number,

@@ -146,12 +146,55 @@ class ReconcileHandler:
         if not sha:
             copied = self._materialize_epic_if_missing(node.id, work_dir, epic_dir)
             return NodeOutput(
-                outputs={}, meta={"reconcile": "noop", "epic_copied": copied}
+                outputs={"reconcile_status": "noop"},
+                meta={"reconcile": "noop", "epic_copied": copied},
             )
 
         if not branch:
+            # The Multica poll-terminal path can omit `branch` even when the
+            # agent committed (agent.py:366 — terminal carries no branch). The
+            # agent works on a dedicated branch, so recover it from the agent
+            # repo's HEAD symbolic name rather than failing the reconcile.
+            derive_src = repo or work_dir
+            if derive_src:
+                try:
+                    probe = subprocess.run(
+                        ["git", "-C", derive_src, "rev-parse", "--abbrev-ref", "HEAD"],
+                        text=True,
+                        capture_output=True,
+                        timeout=30,
+                        check=False,
+                    )
+                    candidate = probe.stdout.strip()
+                    if probe.returncode == 0 and candidate and candidate != "HEAD":
+                        branch = candidate
+                except (OSError, subprocess.SubprocessError):
+                    pass
+            if not branch and derive_src and sha:
+                # The agent committed on a DETACHED HEAD (e.g. the epic branch was
+                # already checked out in a sibling worktree, so the daemon left this
+                # worktree detached). The commit object is still reachable by sha in
+                # `derive_src`; mint a stable ephemeral branch at it so the reconcile
+                # CLI — which fetches `refs/heads/<branch>` — can pull it. The name is
+                # sha-derived so retries are idempotent and it cannot collide with the
+                # epic branch or an `agent/<persona>/<task>` branch.
+                ephemeral = f"reconcile-harvest/{sha[:12]}"
+                try:
+                    minted = subprocess.run(
+                        ["git", "-C", derive_src, "branch", "-f", ephemeral, sha],
+                        text=True,
+                        capture_output=True,
+                        timeout=30,
+                        check=False,
+                    )
+                    if minted.returncode == 0:
+                        branch = ephemeral
+                except (OSError, subprocess.SubprocessError):
+                    pass
+        if not branch:
             raise ReconcileHandlerError(
-                f"reconcile node {node.id!r}: 'branch' input required when sha is set"
+                f"reconcile node {node.id!r}: 'branch' input required when sha is set "
+                f"(and could not be derived from the agent repo HEAD)"
             )
         if not repo:
             raise ReconcileHandlerError(
@@ -213,8 +256,18 @@ class ReconcileHandler:
         # (idempotent: skipped when git already materialised the committed epic).
         copied = self._materialize_epic_if_missing(node.id, work_dir, epic_dir)
 
+        # pr20-fable-review M2: cli.mjs's real-sha response shape is
+        # {merged, sha, output} (index.mjs) — it never carries a
+        # `reconcile_status` key, but every reconcile node in every workflow
+        # declares `outputs: [reconcile_status]` (8 bindings across
+        # bdd/review/tdd/plan/classic/test-swarm) and the noop path above
+        # already emits it. Merge it in here too so the real-sha path honors
+        # the same declared-output contract; a successful ff-merge is
+        # "merged" regardless of the raw cli.mjs payload shape.
+        merged_outputs = {**data, "reconcile_status": "merged"}
+
         return NodeOutput(
-            outputs=data,
+            outputs=merged_outputs,
             meta={
                 "returncode": result.returncode,
                 "stderr": result.stderr,

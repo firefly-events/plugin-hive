@@ -31,11 +31,11 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
 | Scope | Tool | Why |
 |---|---|---|
-| **Parallelizing stories across the epic** | `Agent(name:)` or cmux panes | Stories run as named teammates via `Agent(name:)` — one call per story — or in separate cmux panes when `execution.terminal_mux: cmux`. Parallel teammates require `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (research preview, NOT GA); sequential is the guaranteed floor when the flag is unset. |
+| **Parallelizing stories across the epic** | Natural-language team description or cmux panes | Stories run as named teammates described in the team prompt — one teammate per story — or in separate cmux panes when `execution.terminal_mux: cmux`. Parallel teammates are the default for eligible story sets; `execution.parallel_teams: false` or `--sequential` forces sequential execution. |
 | **Sequential workflow steps within a single story** | `Agent` | Steps within a teammate's pane run inline — this is correct |
-| **Specialist phase teams (pre-exec, post-exec)** | `Agent(name:)` | Specialist teams are independent coordination units — one `Agent(name:)` call per specialist team |
+| **Specialist phase teams (pre-exec, post-exec)** | Natural-language team description | Specialist teams are independent coordination units — describe each as a named teammate in the team prompt |
 
-Spawn each story as a named teammate via `Agent(name:)`. Sequential execution (no flag needed) is always available and is the guaranteed floor. Parallel teammates across stories require `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (research preview, NOT GA).
+Describe each story as a named teammate in the team prompt; the runtime materializes teammates automatically. Sequential execution remains available through `execution.parallel_teams: false` or `--sequential`.
 
 ## Process
 
@@ -164,11 +164,11 @@ If the target graph file does not exist, report an error and list available grap
 **DAG front-door invocation.** For each story in `unblocked_stories[]`:
 
 ```python
-from hive.lib.dag_executor.run import run
+from hive.lib.dag_executor.run import run, resolve_spawn_binding
 
 result = run(
     workflow_path,        # resolved methodology graph above
-    binding="multica",
+    binding=resolve_spawn_binding(flow="execution")[0],
     context={
         "epic_id": epic_id,
         "story_id": story.id,

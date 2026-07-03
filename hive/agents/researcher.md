@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: "Gathers raw research data from codebases and external sources. Spawned by orchestrator or team lead for research phases."
-model: sonnet
+model: claude-sonnet-5
 color: cyan
 knowledge:
   - path: ~/.claude/hive/memories/researcher/

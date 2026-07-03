@@ -188,19 +188,26 @@ model_overrides:
   # Fable creates, Codex reviews)
 
 # Per-persona backend routing.
-# 2026-06-09 policy (supersedes 2026-05-01 codex-creates policy):
-#   Codex token budget nearly exhausted — use Codex SPARSELY, reviews only.
-#   Claude (Fable 5 / Sonnet 4.6) on all creator + sequencing roles.
-#   Cross-LLM verification direction flipped: Claude creates, Codex reviews.
+# 2026-06-28 policy (supersedes 2026-06-09 reviewer-on-codex):
+#   Claude on ALL creator + sequencing + PRIMARY-REVIEW roles. Codex is review-ONLY,
+#   used via a SINGLE adversarial pass (external_models.codex `codex-review` node) —
+#   NOT as the primary reviewer. Why: reviewer-on-codex made the primary `review` node
+#   a Codex call, so it (a) ran TWO Codex passes per story (review + codex-review) and
+#   (b) HARD-FAILED the whole run when Codex hit its usage limit. Primary review on
+#   Claude never blocks; Codex stays the read-only second opinion that auto-skips when
+#   credits/auth are unavailable. Codex NEVER fixes — optimize/dev-standby (fix nodes)
+#   run on `developer` (Claude). Verify Codex credit health before re-pinning it.
 # Personas omitted from this map default to direct `Agent(name:)` (Claude). The plan
 # skill emits one INFO-log line per persona at spawn time documenting the route.
 agent_backends:
-  reviewer: codex
-  # researcher/developer(s)/technical-writer/architect moved OFF codex
-  # 2026-06-09 (token budget); Multica agent pins updated to match:
-  # developer/architect/tester/peer-validator/tpm -> claude-fable-5,
-  # researcher/frontend-developer/backend-developer -> claude-sonnet-4-6,
-  # reviewer -> gpt-5.4 (codex runtime)
+  reviewer: codex              # reviewer-ONLY on Codex (gpt-5.4). Dev/fixes/research on Claude.
+  # 2026-06-30: reverted architect+researcher off Codex back to Claude after the
+  # rlm-openprose-dag planning run (execution wants Codex as reviewer-only).
+  # NOTE: with codex as primary reviewer AND external_models.codex below enabled, every
+  # story runs TWO Codex passes (primary review + adversarial codex-review) and the run
+  # hard-fails if Codex hits its usage limit (the failure that triggered the 2026-06-28
+  # switch to Claude). Verify Codex credit health before relying on this; disable the
+  # external_models.codex `codex-review` node if a single Codex pass is intended.
 
 # Circuit breakers — prevent wasted time and tokens
 circuit_breakers:
@@ -235,9 +242,19 @@ example_codebases: []
 # Requires: npm install -g @openai/codex && codex login
 external_models:
   codex:
-    enabled: true               # codex-cli 0.118+ installed + ChatGPT auth active (verified 2026-05-07)
+    enabled: false              # 2026-06-30: disabled to avoid the DOUBLE Codex pass.
+                                # With agent_backends.reviewer:codex (PRIMARY review on Codex),
+                                # this adversarial codex-review node would be a 2nd Codex pass per
+                                # story → usage-limit hard-fail risk. Codex stays reviewer-only via
+                                # the primary review node. Re-enable (true) for a 2nd adversarial pass.
     use_for:
-      - adversarial-review      # run after Claude review, before optimize/integrate
+      - adversarial-review      # the ONLY Codex role: read-only 2nd-opinion review after
+                                # Claude's primary review, before optimize/integrate.
+    # Codex is REVIEW-ONLY here — it never fixes/implements (fixes run on `developer`=Claude).
+    # VERIFY-AND-SKIP contract: the `codex-review` node is optional + skip_when not
+    # installed/authenticated/enabled. A Codex usage-limit ("hit your usage limit … chatgpt.com")
+    # must be treated as a SKIP, never a run-fatal error — primary review already passed on Claude.
+    # Set enabled:false to disable the Codex pass entirely (e.g. while credits are exhausted).
     # companion_path is auto-detected from the codex plugin if installed
 
 # Git workflow settings (per-epic-branch-pr-flow epic, story pe-1)
