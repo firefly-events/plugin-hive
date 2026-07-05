@@ -352,6 +352,14 @@ async function invokeTool(name, args) {
 }
 
 // ── MCP JSON-RPC 2.0 transport ──────────────────────────────────────────────
+// Stateless MCP compat guard (PLU-542, epic mcp-stateless-behavior, cutover
+// 2026-07-28): handleRpcMessage below dispatches purely on `message.method`
+// per call and stores no session state. The `initialize` handler is a
+// spec-compliance flag, not a live handshake gate — tools/list and tools/call
+// work identically whether or not `initialize` was ever received. Do NOT add
+// session/connection state keyed off `initialize`, and do NOT add an
+// `Mcp-Session-Id` header or equivalent to this transport. See README.md
+// "Stateless MCP compat note" for the full audit.
 
 function writeMessage(msg) {
   process.stdout.write(`${JSON.stringify(msg)}\n`);

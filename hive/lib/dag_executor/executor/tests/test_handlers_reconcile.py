@@ -383,6 +383,170 @@ def test_materialise_idempotent_when_epic_already_present(tmp_path):
     assert out.meta.get("epic_copied") is False
 
 
+# ── s2: marker-driven correlation + failure-detection ─────────────────────────
+
+def _write_marker(state_dir, agent_id, *, verdict="success", cwd="", written_at=None):
+    marker_dir = state_dir / "agent-complete" / agent_id
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    payload = {"agent_id": agent_id, "verdict": verdict, "cwd": cwd}
+    if written_at is not None:
+        payload["written_at"] = written_at
+    (marker_dir / "complete.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _make_handler_with_state_dir(tmp_path, state_dir):
+    from pathlib import Path
+    return ReconcileHandler(cli_path=tmp_path / "cli.mjs", state_dir=state_dir)
+
+
+def test_marker_success_ff_merges(tmp_path):
+    state_dir = tmp_path / "state"
+    _write_marker(state_dir, "agent-1", verdict="success", cwd="/work/agent-1")
+    handler = _make_handler_with_state_dir(tmp_path, state_dir)
+    inputs = {
+        "sha": "abc123",
+        "branch": "agent/dev/branch",
+        "repo": "git@github.com:org/repo.git",
+        "agent_id": "agent-1",
+        "tracker_id": "PLU-1",
+    }
+    with patch("subprocess.run", return_value=_ok_result()) as mock_run:
+        out = handler.handle(_reconcile_node(), inputs=inputs, run_id="run-marker")
+    assert out.outputs["reconcile_status"] == "merged"
+    # branch already bound — the git rev-parse HEAD probe must not run.
+    assert mock_run.call_count == 1
+
+
+def test_marker_untracked_agent_ignored_and_treated_as_failure(tmp_path):
+    """A complete.json from some OTHER (untracked) subagent must not be
+    picked up: reading an agent_id with no marker of its own must fail, not
+    silently fall through to a merge (R2)."""
+    state_dir = tmp_path / "state"
+    _write_marker(state_dir, "researcher-9", verdict="success", cwd="/work/researcher-9")
+    handler = _make_handler_with_state_dir(tmp_path, state_dir)
+    inputs = {
+        "sha": "abc123",
+        "branch": "agent/dev/branch",
+        "repo": "git@github.com:org/repo.git",
+        "agent_id": "agent-1",  # no marker written for this agent_id
+        "tracker_id": "PLU-1",
+    }
+    with pytest.raises(ReconcileHandlerError, match="no successful complete.json marker"):
+        handler.handle(_reconcile_node(), inputs=inputs, run_id="run-untracked")
+
+
+def test_marker_failure_verdict_not_merged(tmp_path):
+    state_dir = tmp_path / "state"
+    _write_marker(state_dir, "agent-1", verdict="failure", cwd="/work/agent-1")
+    handler = _make_handler_with_state_dir(tmp_path, state_dir)
+    inputs = {
+        "sha": "abc123",
+        "branch": "agent/dev/branch",
+        "repo": "git@github.com:org/repo.git",
+        "agent_id": "agent-1",
+        "tracker_id": "PLU-1",
+    }
+    with patch("subprocess.run") as mock_run:
+        with pytest.raises(ReconcileHandlerError, match="verdict='failure'"):
+            handler.handle(_reconcile_node(), inputs=inputs, run_id="run-fail")
+    mock_run.assert_not_called()
+
+
+def test_marker_no_branch_field_derives_from_cwd(tmp_path):
+    state_dir = tmp_path / "state"
+    _write_marker(state_dir, "agent-1", verdict="success", cwd="/work/agent-1")
+    handler = _make_handler_with_state_dir(tmp_path, state_dir)
+    inputs = {
+        "sha": "abc123",
+        "repo": "git@github.com:org/repo.git",
+        "agent_id": "agent-1",
+        "tracker_id": "PLU-1",
+    }
+
+    def _side_effect(cmd, **kwargs):
+        if "rev-parse" in cmd:
+            assert cmd[cmd.index("-C") + 1] == "/work/agent-1"
+            return SimpleNamespace(stdout="agent/dev/from-marker\n", stderr="", returncode=0)
+        return _ok_result()
+
+    with patch("subprocess.run", side_effect=_side_effect) as mock_run:
+        handler.handle(_reconcile_node(), inputs=inputs, run_id="run-derive")
+
+    cmd = mock_run.call_args_list[-1][0][0]
+    branch_idx = cmd.index("--branch") + 1
+    assert cmd[branch_idx] == "agent/dev/from-marker"
+
+
+# ── Critical #2 (PLU-577 revision): freshness guard + consume-on-read ─────────
+
+def test_marker_success_deletes_marker_after_consumption(tmp_path):
+    state_dir = tmp_path / "state"
+    _write_marker(state_dir, "agent-1", verdict="success", cwd="/work/agent-1")
+    handler = _make_handler_with_state_dir(tmp_path, state_dir)
+    inputs = {
+        "sha": "abc123",
+        "branch": "agent/dev/branch",
+        "repo": "git@github.com:org/repo.git",
+        "agent_id": "agent-1",
+        "tracker_id": "PLU-1",
+    }
+    marker_path = state_dir / "agent-complete" / "agent-1" / "complete.json"
+    assert marker_path.exists()
+    with patch("subprocess.run", return_value=_ok_result()):
+        handler.handle(_reconcile_node(), inputs=inputs, run_id="run-marker-consume")
+    assert not marker_path.exists(), "marker must be deleted once read so a later, recycled agent_id can't reuse it"
+
+
+def test_marker_stale_older_than_task_start_is_rejected(tmp_path):
+    """A leftover complete.json from an earlier story dispatched under the
+    same (recycled) persona agent_id must not be accepted for a later story
+    whose task started AFTER that marker was written."""
+    state_dir = tmp_path / "state"
+    _write_marker(
+        state_dir,
+        "agent-1",
+        verdict="success",
+        cwd="/work/agent-1",
+        written_at="2026-05-21T00:00:05.000Z",
+    )
+    handler = _make_handler_with_state_dir(tmp_path, state_dir)
+    inputs = {
+        "sha": "abc123",
+        "branch": "agent/dev/branch",
+        "repo": "git@github.com:org/repo.git",
+        "agent_id": "agent-1",
+        "tracker_id": "PLU-1",
+        "started_at": "2026-05-21T01:00:00.000Z",  # this task started AFTER the stale marker
+    }
+    with pytest.raises(ReconcileHandlerError, match="no successful complete.json marker"):
+        handler.handle(_reconcile_node(), inputs=inputs, run_id="run-stale")
+    marker_path = state_dir / "agent-complete" / "agent-1" / "complete.json"
+    assert not marker_path.exists(), "stale marker must still be consumed/deleted"
+
+
+def test_marker_fresh_relative_to_task_start_is_accepted(tmp_path):
+    state_dir = tmp_path / "state"
+    _write_marker(
+        state_dir,
+        "agent-1",
+        verdict="success",
+        cwd="/work/agent-1",
+        written_at="2026-05-21T01:00:05.000Z",
+    )
+    handler = _make_handler_with_state_dir(tmp_path, state_dir)
+    inputs = {
+        "sha": "abc123",
+        "branch": "agent/dev/branch",
+        "repo": "git@github.com:org/repo.git",
+        "agent_id": "agent-1",
+        "tracker_id": "PLU-1",
+        "started_at": "2026-05-21T01:00:00.000Z",  # marker written AFTER this task started — fresh
+    }
+    with patch("subprocess.run", return_value=_ok_result()):
+        out = handler.handle(_reconcile_node(), inputs=inputs, run_id="run-fresh")
+    assert out.outputs["reconcile_status"] == "merged"
+
+
 @pytest.mark.parametrize("evil", ["/etc/cron.d/x", "../../escape", "../sibling"])
 def test_materialise_rejects_unsafe_epic_dir(tmp_path, evil):
     """epic_dir is upstream agent output (#13 outputs.yaml / harvest). An absolute

@@ -89,12 +89,21 @@ Poll loop (replaces `Agent(name:)`'s internal monitoring):
 ```
 Every 10 seconds:
   for each active surface:
-    cmux read-screen --surface <id> --scrollback
-    - Search output for [STORY-COMPLETE:{story-id}]
-    - Persist last-read line count per surface to avoid reprocessing
-    - If marker found: mark complete, check dependents
-    - If surface.health fails: mark failed, capture scrollback, log error
+    - First check for the s1 SubagentStop marker:
+      ${HIVE_STATE_DIR}/agent-complete/<agent_id>/complete.json
+      If present: mark complete/failed per its `verdict`, check dependents,
+      and skip the scrollback scan for this surface this tick.
+    - Otherwise (no marker yet — event-driven completion supersedes the
+      timer for Agent(name:)-dispatched work, but the scan stays as the
+      bounded fallback so a hook failure or crashed agent can't hang the
+      loop): cmux read-screen --surface <id> --scrollback
+      - Search output for [STORY-COMPLETE:{story-id}]
+      - Persist last-read line count per surface to avoid reprocessing
+      - If marker found: mark complete, check dependents
+      - If surface.health fails: mark failed, capture scrollback, log error
 ```
+
+**Carve-out (do NOT try to fix):** a story dispatched via Bash `run_in_background` has no completion hook in this runtime — `SubagentStop` never fires for it, so no `complete.json` is ever written. Tracking for a Bash-bg story MUST keep using the scrollback scan (or an equivalent poll) unconditionally; only `Agent(name:)`/cmux `Agent(name:)`-dispatched work is eligible for the marker fast path above.
 
 Dependency unblocking: when `story-a` completes, scan the tracking map for stories whose `depends_on` lists are now fully satisfied, then spawn those stories.
 

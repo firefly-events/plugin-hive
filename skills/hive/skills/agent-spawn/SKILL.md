@@ -80,12 +80,36 @@ When `terminal_mux` resolves to `tmux`, use the standard `Agent(name:)` call:
 
 ```
 Agent(
-  prompt: [persona_context.persona_text + story context + memories + skills + domain note],
+  prompt: [persona_context.persona_text + story context + memories + skills + domain note + completion contract],
   model: "{persona_context.frontmatter.model}",  // opus, sonnet, or haiku
   name: "{agent-name}-{story-id}",
   description: "{agent-name} working on {story-id}"
 )
 ```
+
+**Completion contract (tmux/`Agent(name:)` path only — E5 s1):** this is the
+only dispatch path `SubagentStop` fires for, and `hooks/notify-agent-complete.sh`
+derives its verdict solely from a self-written `<cwd>/.hive-task-status.json`
+marker (no exit-status field exists in the payload — see
+`.pHive/epics/e5-execution-loop/docs/design-discussion.md` §2, §4 R1). Append
+this instruction to the assembled task prompt so every tmux-dispatched agent
+writes the marker as its last action:
+
+```
+## Completion Contract
+Before you finish, as your LAST action, run exactly one of:
+  bash "${CLAUDE_PLUGIN_ROOT}/hooks/write-task-status.sh" success
+  bash "${CLAUDE_PLUGIN_ROOT}/hooks/write-task-status.sh" failure
+Use "success" only if every acceptance criterion for this task was met and
+all required tests pass. Use "failure" otherwise. A missing marker is always
+read downstream as failure, never success — so skipping this step silently
+fails the story even if your work was correct.
+```
+
+Not required on the cmux path (no `SubagentStop` binding; completion is
+detected via the `[STORY-COMPLETE:{story-id}]` scrollback marker instead —
+see §7.3 step 11) or for Bash `run_in_background` dispatch (no completion
+hook exists for that path at all — carve-out, not fixed).
 #### 7.3 cmux pane spawn (claude backend, cmux path)
 When `terminal_mux` resolves to `cmux`, spawn the agent in a visible cmux
 split pane instead of using the `Agent` tool:
@@ -200,7 +224,8 @@ the single `prompt` parameter — the framework handles system-level injection:
 3. **Prior knowledge** — relevant memories from the agent's memory directory
 4. **Applicable skills** — skill content if any matched
 5. **Continuation Context** (respawn only) — see step 7b below
-6. **Task** — the story spec, step instructions, and any inputs from prior steps
+6. **Task** — the story spec, step instructions, any inputs from prior steps,
+   and (tmux/`Agent(name:)` path only) the Completion Contract from §7.2
 For the **cmux path**, the same content is split across two injection points:
 *System prompt file* (via `--append-system-prompt-file`):
 1. **Persona** — `persona_context.persona_text`

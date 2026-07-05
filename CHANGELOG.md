@@ -9,6 +9,47 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-07-05
+
+**Event-driven execution, effort-adaptive runs, and a metric-capture harness — plus MCP-stateless readiness and a config-reference refresh.**
+
+### Added
+
+- **Event-driven execution loop** (epic `e5-execution-loop`, PR #29). Replaces
+  timer-polling of background-agent completion with a `SubagentStop` hook that writes
+  a `complete.json` marker; reconcile and the execution loop now consume the marker
+  instead of polling for terminal state, and Hive skips creating a duplicate PR when a
+  dispatched background agent already opened its own draft PR. Bash `run_in_background`
+  work has no completion hook in this runtime and is deliberately left on the poll path.
+- **Metric capture harness** (epic `metric-capture-harness`, PR #33). Instruments Hive
+  runs to reconstruct the build journey as visual aids — durable human-gate-time capture
+  from the DAG's `user_gate` handler, before/after run-boundary snapshots with a diff
+  helper, a collector that rolls metrics/episodes/snapshots into a single report, and a
+  self-contained HTML dashboard renderer with mermaid/SVG exports — first exercised
+  end-to-end on `/design-system`.
+- **`$CLAUDE_EFFORT`-aware execution + 1M-context personas** (epic
+  `context-effort-adaptation`, PR #31). A new session-start gate resolves the
+  `$CLAUDE_EFFORT` tier (low/medium/high/xhigh) so `low` effort skips the test-swarm and
+  `xhigh` escalates to forced security/performance audits; the orchestrator and
+  researcher personas also gained prompt-level guidance to exploit the 1M-context window
+  (read more before summarizing) within existing scope/time tiers.
+
+### Changed
+
+- **MCP stateless-behavior audit** (epic `mcp-stateless-behavior`, PR #28). Audited
+  Hive's MCP-touching surfaces ahead of the 2026-07-28 stateless-MCP cutover; corrected
+  session-affinity wording in `session-resilience.md` and added a stateless
+  session-taxonomy note, and audited the `multica-story-dispatch` Node bridge for
+  compliance with the no-session-handshake spec.
+- **Config reference refresh** (epic `config-reference-refresh`, PR #30). Doc-only
+  refresh of `hive/references/configuration.md` and related reference docs — QA'd the
+  `fallbackModel` section against current Claude Code behavior, added a `/config`
+  shortcut reference, an `anthropicAws` stub, and a `denyTools` cross-reference, and
+  documented `claude mcp login --no-browser` for headless MCP setup, keeping the file
+  scoped to Hive-owned `hive.config.yaml` surfaces.
+
+## [2.14.0] - 2026-07-03
+
 **DAG executor re-platform — contract-derived scheduling + static loop unroll.**
 Headline is the two-epic bundle promoted via PR #20 (`version_bump: minor` —
 drove this release); the release train also promotes several `version_bump: none`

@@ -77,6 +77,10 @@ Worktree isolation is the repo-isolation mechanism. It does not replace adjacent
 - It does **not** commit the system to a single filesystem path. Implementations may override `.pHive/meta-team/worktrees/{experiment_id}/` if they preserve one-worktree-per-experiment isolation.
 - It does **not** commit the system to a specific orchestration mechanism. Shell wrappers, git libraries, or other adapters are all acceptable if they preserve the same worktree semantics.
 
+## Stateless server
+
+The worker process is treated as disposable/restartable. Tool and agent state must be written to `.pHive/` (or the configured state dir), not held in the server process's memory — a restart must not lose in-flight state.
+
 ## Cross-links
 
 - Shared safety constraints: `hive/references/meta-safety-constraints.md`

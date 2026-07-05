@@ -112,6 +112,30 @@ test('tools/list returns all seven hermes-multica tools', async () => {
   }
 });
 
+test('stateless MCP compat (PLU-542): tools/list works without an initialize handshake', async (t) => {
+  // Characterizes the `initialize` handler's post-cutover disposition: it is
+  // a spec-compliance flag, not a gate. Skip startMcpServer() (which sends
+  // initialize) and go straight to tools/list on a fresh process — the
+  // handler never fires, which must be a no-op, not a broken tools/list.
+  const proc = spawn(process.execPath, [MCP_SERVER], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const client = new McpClient(proc);
+  try {
+    const resp = await client.send('tools/list', {});
+    const names = (resp.result?.tools ?? []).map((t) => t.name).sort();
+    assert.deepEqual(names, [
+      'multica_cancel',
+      'multica_dispatch_story',
+      'multica_epic_status',
+      'multica_episode',
+      'multica_poll_task',
+      'multica_post_comment',
+      'multica_write_state',
+    ]);
+  } finally {
+    await client.close();
+  }
+});
+
 test('tool definitions include required fields (name, description, inputSchema)', async () => {
   const { client } = await startMcpServer();
   try {

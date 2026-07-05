@@ -2,7 +2,7 @@
 
 Produced by Slice 6 of substrate-coverage-and-test-cleanup; canonical reference for what's wired across substrates. Each cell carries either a relative path to the active mode-atom skill, the marker `inline` for default-path dispatch through the orchestrator skill itself, or `N/A — reasoning` when the cell has no shipped substrate.
 
-## Last verified: 2026-06-21
+## Last verified: 2026-07-04
 
 ## Matrix
 
@@ -37,6 +37,26 @@ Note: `execute-mode-sandcastle/SKILL.md` exists as an Epic D candidate but the f
 Run `node hive/scripts/verify-dispatch-parity.mjs` from repo root. Exit 0 = all cited paths resolve on disk AND `git ls-files` confirms tracking. Exit 1 = at least one path missing/untracked; checker prints the failing rows. CI runs this on every PR; PRs that move/remove a cited path fail until the matrix is updated.
 
 Pass `--no-bump` to skip the automatic date-stamp update on the `## Last verified:` line.
+
+## Config-knob dispatch impact (config-reference-refresh)
+
+The Bucket A config knobs documented in `hive/references/configuration.md` (see
+s1-configuration-md-refresh) are explanatory only here — they do not alter the
+substrate matrix above and get no matrix row, since the matrix's columns are
+substrates (default/multica/cc-workflows), not config keys.
+
+- **`agent_backends.fallback_model`** (distinct from CC-native `fallbackModel`;
+  see configuration.md) — affects agent-backend resolution at dispatch time,
+  across all three substrate columns equally (default, multica, cc-workflows);
+  it does not change which mode-atom file a substrate dispatches to, only
+  which model backend answers once dispatch has already resolved.
+- **`/config key=value`** — a Claude Code operator shortcut for editing
+  `settings.json` (CC v2.1.181+). It is not Hive dynamic config and does not
+  touch `hive.config.yaml`, so it affects none of the dispatch paths in this
+  matrix.
+- **`anthropicAws` (aspirational stub)** — proposed/not-yet-implemented; no
+  provider reader, credential/security review, or parse/precedence tests exist
+  yet. It affects none of the dispatch paths in this matrix today.
 
 ## Cross-references
 

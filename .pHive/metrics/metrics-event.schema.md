@@ -155,6 +155,10 @@ The MVP event schema must represent these metric types and no extra registry sha
   - Expected `value` type: boolean
   - Expected `unit`: `bool`
   - Source note: emitted when a run records escalation to a human path.
+- `human_gate_ms`
+  - Expected `value` type: number
+  - Expected `unit`: `ms`
+  - Source note: emitted from `hive/lib/dag_executor/executor/handlers/user_gate.py` (story `s1-gate-timing-metric`) when a `user_gate` node's pause-suspend resolves via an approve/reject sentinel. `value` is the elapsed milliseconds between the gate opening (pause-suspend) and closing (sentinel resolved). `dimensions.node_id` and `dimensions.decision` (`approve`/`reject`) travel alongside the top-level `run_id`. Gated behind the same `metrics.enabled` opt-in as the other emitters — no row is written when metrics are off.
 - `scope_drift_score`
   - Expected `value` type: number (ordinal `0..3`)
   - Expected `unit`: `bucket`

@@ -4,7 +4,7 @@
   "owner": {
     "name": "Firefly Events"
   },
-  "version": "2.14.0",
+  "version": "2.15.0",
   "plugins": [
     {
       "name": "plugin-hive",
@@ -24,7 +24,7 @@
         "quality-gates",
         "TDD"
       ],
-      "version": "2.14.0"
+      "version": "2.15.0"
     }
   ]
 }

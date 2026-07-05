@@ -11,6 +11,7 @@ External research is triggered when:
 1. **Schema drift:** A reference doc describes a Claude Code feature (e.g., agent frontmatter fields) and the actual Claude Code API may have changed since the doc was written.
 2. **Missing reference class:** A category of best practices (e.g., token management, parallel agent patterns) is referenced by step files but no authoritative reference doc exists.
 3. **TTL expiry on a reference memory:** A `reference` type memory's `last_updated` is > 90 days old and covers an evolving topic.
+4. **MCP-spec-TTL:** Reference material documenting the MCP protocol/spec (e.g., `claude mcp login` behavior, `/config key=value` semantics) approaches or exceeds its TTL, per the same TTL-expiry-on-reference-memory concept as trigger 3.
 
 External research is NOT warranted for:
 - Internal consistency issues (broken cross-references, missing step file sections)

@@ -211,6 +211,34 @@ while the planned bump is unverified.
 `/ship` is a verifier and safety net. The normal owner of the planned version bump
 is still `/execute`.
 
+### 4b. Cut the Changelog (stamp the release)
+
+After the version is verified (step 4) and before the ship action runs, promote the
+staged `## [Unreleased]` section in `CHANGELOG.md` to a dated version heading so the
+released changelog reflects the version that actually ships. **Skipping this is what
+strands release notes under `[Unreleased]` while `plugin.json` moves ahead** — the
+newest *versioned* changelog entry then drifts behind the real version (this is
+exactly how the 2.14.0 notes were left under `[Unreleased]` while `plugin.json` read
+2.14.0).
+
+Skip this step only for a pure none-bump run — when every target epic is
+`version_bump: none` and no version is being cut. Then leave `[Unreleased]` in place
+so the none-bump notes accumulate for the next versioned release.
+
+When a version IS being cut:
+
+1. Rename the current `## [Unreleased]` heading to `## [{version}] - {YYYY-MM-DD}`,
+   using the verified version from step 4 and the ship date (UTC). The date is the
+   release date, not the date the `[Unreleased]` content was first authored.
+2. Insert a fresh, empty `## [Unreleased]` heading immediately above it so the next
+   cycle's step 3 has a staging section to write into.
+3. Never edit an already-released entry below — `CHANGELOG.md` stays append-only
+   (`hive/references/changelog-entry-format.md` §1). This step only promotes the
+   staging section to a versioned heading; it never rewrites released history.
+4. Commit the stamp on the release branch (`develop`, per step 6a) so the promotion
+   PR carries it to `main` and the public sync publishes the correctly-versioned
+   changelog.
+
 ### 5. Resolve Ship Target And Dry Run
 
 Read `${HIVE_STATE_DIR}/project-profile.yaml` and require a valid `ship_target`
@@ -274,6 +302,41 @@ This command is project-defined and may have high blast radius.
 Do not execute unless the typed confirmation exactly matches `ship {release-id}`.
 
 ### 6. Execute Ship Action
+
+#### 6a. Release branch flow — promote develop → main (no backmerge)
+
+For `github-release` (and any `main`-tagged target), the release tag must be cut
+on `main`, and `main` must already contain the release commits authored in steps
+2–4 (reconcile, changelog, version bump). Those steps write to the working branch,
+which for a release is `develop`. Reach `main` with a **single promotion PR** — do
+not backmerge afterward.
+
+Canonical flow:
+
+1. Ensure the version bump (step 4), the changelog entry (step 3) **stamped to its
+   version heading (step 4b)**, and the story reconcile (step 2) are committed **on
+   `develop`** (open a normal PR to `develop` if they are not already merged there).
+2. Open **one** promotion PR with **`head=develop`, `base=main`**:
+
+   ```bash
+   gh pr create --base main --head develop \
+     --title "release: promote develop → main (v{version})" \
+     --body "Promotes v{version}: {epic list}. Merging makes main == develop — no backmerge."
+   ```
+3. Merge that PR. Because `head=develop`, merging leaves `main` and `develop`
+   identical — **`develop` never falls behind, so no separate develop←main
+   backmerge PR is required.**
+4. Only then cut the tag/release on `main` (the resolved command below).
+
+**Anti-pattern (do not do this):** cutting a throwaway `release/<v>` branch off
+`develop` and merging it **only** to `main`. That leaves the version bump and
+changelog on `main` but not `develop`, forcing a follow-up develop←main backmerge
+PR (the debt this flow removes). Author on `develop`; promote `develop → main`.
+
+Skip this sub-step for targets that do not tag `main` (e.g. `vercel`, `npm` from
+the working branch, or `custom` commands that manage their own refs).
+
+#### 6b. Run the ship command
 
 Run the resolved command from the repository root.
 

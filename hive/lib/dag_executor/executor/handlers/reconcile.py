@@ -17,11 +17,13 @@ raised loud; the gate must never run against a stale tree.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
 
+from hive.lib.config import resolve_state_dir
 from ..errors import ReconcileHandlerError
 from .agent import NodeOutput
 
@@ -51,6 +53,7 @@ class ReconcileHandler:
         node_bin: str = "node",
         timeout_ms: int = _DEFAULT_TIMEOUT_MS,
         repo_root: Path | str | None = None,
+        state_dir: Path | str | None = None,
     ) -> None:
         self._cli_path = Path(cli_path) if cli_path else self._default_cli_path()
         self._node_bin = node_bin
@@ -59,6 +62,12 @@ class ReconcileHandler:
         # SOURCE. See handle() / #8.
         self._repo_root = Path(repo_root).resolve() if repo_root is not None else None
         self._timeout_ms = timeout_ms
+        # s2: root of the s1 SubagentStop marker tree
+        # (<state_dir>/agent-complete/<agent_id>/complete.json). Explicit
+        # override for tests/non-standard layouts; production wiring resolves
+        # it the same way the hook does (resolve_state_dir, HIVE_STATE_DIR /
+        # hive.config.yaml precedence) so both sides agree on one path.
+        self._state_dir = Path(state_dir) if state_dir is not None else None
 
     @staticmethod
     def _default_cli_path() -> Path:
@@ -66,6 +75,122 @@ class ReconcileHandler:
         # cli.mjs  is at hive/lib/multica-story-dispatch/cli.mjs
         here = Path(__file__).resolve().parent
         return (here / "../../../multica-story-dispatch/cli.mjs").resolve()
+
+    def _marker_root(self) -> Path:
+        if self._state_dir is not None:
+            state_dir = self._state_dir
+        else:
+            cwd = self._repo_root if self._repo_root is not None else Path.cwd()
+            state_dir = Path(resolve_state_dir(cwd=cwd, env=dict(os.environ)))
+        return state_dir / "agent-complete"
+
+    def _read_marker(self, agent_id: str) -> dict[str, Any] | None:
+        """Read the s1 complete.json marker for one exact agent_id.
+
+        Keyed lookup, not a directory scan: complete.json fires for EVERY
+        subagent (researchers, reviewers, ...), but `agent_id` here comes
+        1:1 from the SAME upstream AgentHandler step that produced this
+        node's sha/branch/repo (agent.py's poll terminal resolves agent_id
+        for the dispatched tracker_id). Reading only that key naturally
+        ignores every other subagent's marker (R2) without needing a
+        separate tracker_id cross-check.
+        """
+        marker_path = self._marker_root() / agent_id / "complete.json"
+        try:
+            raw = marker_path.read_text(encoding="utf-8")
+        except OSError:
+            return None
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            return None
+        return data if isinstance(data, dict) else None
+
+    def _delete_marker(self, agent_id: str) -> None:
+        """Consume (delete) a marker once read.
+
+        Critical #2: `agent_id` is a stable persona UUID reused across every
+        story that persona ever runs, not a per-run id. An unconsumed marker
+        left on disk would be available for a LATER reconcile call (a
+        different tracker_id, same recycled agent_id) to read and mistake for
+        its own — best-effort cleanup here closes that window. Never raises;
+        a failed cleanup must not fail an otherwise-successful reconcile.
+        """
+        marker_path = self._marker_root() / agent_id / "complete.json"
+        try:
+            marker_path.unlink()
+        except OSError:
+            pass
+
+    @staticmethod
+    def _marker_is_fresh(marker: dict[str, Any], started_at: Any) -> bool:
+        """Guard against a marker written before this dispatch even started
+        (Critical #2b). `started_at` is optional — older callers/tests that
+        don't wire it through get the pre-existing (accept) behavior rather
+        than a spurious rejection.
+        """
+        if not started_at:
+            return True
+        written_at = marker.get("written_at")
+        if not written_at:
+            return True
+        from datetime import datetime
+
+        def _parse(value: str) -> datetime | None:
+            try:
+                return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                return None
+
+        written = _parse(written_at)
+        started = _parse(started_at)
+        if written is None or started is None:
+            return True
+        return written >= started
+
+    @staticmethod
+    def _derive_branch_from_repo(derive_src: str, sha: str) -> str:
+        """Resolve a branch name from a repo path's HEAD, minting a stable
+        sha-derived ephemeral branch when HEAD is detached. Shared by both the
+        marker path (derive_src = complete.json's cwd) and the legacy
+        poll-terminal fallback (derive_src = repo/work_dir input).
+        """
+        if not derive_src:
+            return ""
+        try:
+            probe = subprocess.run(
+                ["git", "-C", derive_src, "rev-parse", "--abbrev-ref", "HEAD"],
+                text=True,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+            candidate = probe.stdout.strip()
+            if probe.returncode == 0 and candidate and candidate != "HEAD":
+                return candidate
+        except (OSError, subprocess.SubprocessError):
+            pass
+        if not sha:
+            return ""
+        # Detached HEAD (e.g. the epic branch already checked out in a sibling
+        # worktree) — the commit is still reachable by sha; mint a stable
+        # ephemeral branch at it so the reconcile CLI (which fetches
+        # refs/heads/<branch>) can pull it. sha-derived name keeps retries
+        # idempotent and collision-free with the epic/agent branches.
+        ephemeral = f"reconcile-harvest/{sha[:12]}"
+        try:
+            minted = subprocess.run(
+                ["git", "-C", derive_src, "branch", "-f", ephemeral, sha],
+                text=True,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+            if minted.returncode == 0:
+                return ephemeral
+        except (OSError, subprocess.SubprocessError):
+            pass
+        return ""
 
     @staticmethod
     def _find_epic_source(work_dir: str, epic_dir: str) -> Path | None:
@@ -150,47 +275,45 @@ class ReconcileHandler:
                 meta={"reconcile": "noop", "epic_copied": copied},
             )
 
+        # s2: marker-driven correlation + failure-detection for Agent-based
+        # dispatches. agent_id is bound from the same upstream AgentHandler
+        # step that produced sha/branch/repo, so its complete.json is the
+        # authoritative "did this tracked story agent actually finish"
+        # signal — independent of whatever the poll-terminal path returned.
+        # A missing marker or a non-success verdict means the story failed;
+        # reconcile must not silently ff-merge a stale/absent commit.
+        agent_id = inputs.get("agent_id") or ""
+        if agent_id:
+            marker = self._read_marker(agent_id)
+            fresh = marker is not None and self._marker_is_fresh(marker, inputs.get("started_at"))
+            verdict = marker.get("verdict") if fresh else None
+            # Consume the marker now that it's been read (fresh or not) so a
+            # later reconcile call for this same recycled agent_id can never
+            # read it again (Critical #2).
+            if marker is not None:
+                self._delete_marker(agent_id)
+            if verdict != "success":
+                raise ReconcileHandlerError(
+                    f"reconcile node {node.id!r}: agent {agent_id!r} "
+                    f"(tracker {inputs.get('tracker_id') or 'unknown'!r}) has no "
+                    f"successful complete.json marker (verdict={verdict!r}) — "
+                    "treating as failed, not merging"
+                )
+            if not branch:
+                # complete.json has no branch key (frozen CC 2.1.200 payload
+                # shape) — derive it from the marker's recorded cwd (the
+                # agent's worktree), not a subprocess probe against repo/work_dir.
+                branch = self._derive_branch_from_repo(marker.get("cwd") or "", sha)
+
         if not branch:
-            # The Multica poll-terminal path can omit `branch` even when the
-            # agent committed (agent.py:366 — terminal carries no branch). The
-            # agent works on a dedicated branch, so recover it from the agent
-            # repo's HEAD symbolic name rather than failing the reconcile.
+            # Legacy poll-terminal fallback (no agent_id wired to this node —
+            # pre-s2 workflows, or non-Multica local bindings): the Multica
+            # poll-terminal path can omit `branch` even when the agent
+            # committed (agent.py:366 — terminal carries no branch). Recover
+            # it from the agent repo's HEAD symbolic name rather than failing
+            # the reconcile. Retained as the s4 carve-out fallback.
             derive_src = repo or work_dir
-            if derive_src:
-                try:
-                    probe = subprocess.run(
-                        ["git", "-C", derive_src, "rev-parse", "--abbrev-ref", "HEAD"],
-                        text=True,
-                        capture_output=True,
-                        timeout=30,
-                        check=False,
-                    )
-                    candidate = probe.stdout.strip()
-                    if probe.returncode == 0 and candidate and candidate != "HEAD":
-                        branch = candidate
-                except (OSError, subprocess.SubprocessError):
-                    pass
-            if not branch and derive_src and sha:
-                # The agent committed on a DETACHED HEAD (e.g. the epic branch was
-                # already checked out in a sibling worktree, so the daemon left this
-                # worktree detached). The commit object is still reachable by sha in
-                # `derive_src`; mint a stable ephemeral branch at it so the reconcile
-                # CLI — which fetches `refs/heads/<branch>` — can pull it. The name is
-                # sha-derived so retries are idempotent and it cannot collide with the
-                # epic branch or an `agent/<persona>/<task>` branch.
-                ephemeral = f"reconcile-harvest/{sha[:12]}"
-                try:
-                    minted = subprocess.run(
-                        ["git", "-C", derive_src, "branch", "-f", ephemeral, sha],
-                        text=True,
-                        capture_output=True,
-                        timeout=30,
-                        check=False,
-                    )
-                    if minted.returncode == 0:
-                        branch = ephemeral
-                except (OSError, subprocess.SubprocessError):
-                    pass
+            branch = self._derive_branch_from_repo(derive_src, sha)
         if not branch:
             raise ReconcileHandlerError(
                 f"reconcile node {node.id!r}: 'branch' input required when sha is set "

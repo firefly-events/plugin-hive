@@ -115,6 +115,14 @@ Describe each story as a named teammate in the team prompt; the runtime material
    - `pre_exec[]`, `post_exec[]`, and `appends[]` are built in memory but not yet consumed. Downstream stories add consumption logic.
    - If a trigger's `responds_with.id` does not resolve to an existing agent file (`hive/agents/{id}.md`) or team config (`${HIVE_STATE_DIR}/teams/{id}.yaml`): log `[warn] step 2b: responds_with.id "{id}" — referenced agent/team file not found on disk — continuing` and continue.
 
+2c. **xhigh-effort audit escalation.** Read `${HIVE_STATE_DIR}/session-effort.txt` (see `hive/references/configuration.md` — Effort & Context Adaptation). This file holds one of `low | medium | high | xhigh`, written by `hooks/effort-gate.sh`.
+
+   - **Effort == `xhigh`:** if `pre_exec[]` does not already contain a record for trigger `security:plan-audit` (i.e. it was not already raised by a real escalation in step 2b), synthesize one in memory — `{trigger: security:plan-audit, placement: pre-exec, severity: xhigh-forced, stories: [], reason: "xhigh effort escalation", raised_by: effort-gate, raised_at: now}` — and append it to `pre_exec[]`. This reuses the existing `security:plan-audit` catalog entry (`hive/references/specialist-triggers.md`) and its bound `hive/workflows/security-audit.workflow.yaml` runner — no bespoke audit runner is introduced. Emit:
+     ```
+     [info] step 2c: effort=xhigh — forcing security:plan-audit into pre-exec specialist phase loop
+     ```
+   - **Effort == `medium` / `high` / `low`, or the file is absent/unreadable:** this gate is a no-op — `pre_exec[]` passes through unchanged from step 2b. Never force audits below `xhigh`.
+
 3. **Load the workflow definition.** Based on the `--methodology` parameter (default: `classic`), load:
    ```
    hive/workflows/development.{methodology}.workflow.yaml
@@ -430,19 +438,34 @@ Graph completion is an **artifact-readiness signal only** — not a per-story do
 
 8. After step 6g exits with `next_unblocked` empty AND `in-flight` empty, produce summary + audit + PR:
 
-   0. **Epic PR.** If `task_tracking.adapter` does not own PR creation AND `failed` is empty (full-pass run), open one PR per the branch + worktree + PR convention (step 6h):
+   0. **Epic PR.** If `task_tracking.adapter` does not own PR creation AND `failed` is empty (full-pass run), open one PR per the branch + worktree + PR convention (step 6h) — but first check whether a dispatched background agent already opened one.
+
+      **Adopt-if-exists check (bg Auto-PR).** A story dispatched via `--bg`/`--background` (Multica or sessions binding) may have already opened its own draft PR under its own account and be auto-fixing CI on it. Hive must not create a second PR for the same branch. Before creating, query for an existing open PR on the epic's head branch:
 
       ```sh
-      gh pr create \
-        --base ${epic.git_flow.base_branch:-develop} \
-        --head ${epic.git_flow.branch:-feat/<epic-id>} \
-        --title "feat(<epic-id>): <epic.title>" \
-        --body "Closes epic <epic-id>. Stories: <comma-list of completed story-ids>."
+      existing_pr=$(gh pr list \
+        --head "${epic.git_flow.branch:-feat/<epic-id>}" \
+        --state open \
+        --json url,number,isDraft \
+        --jq '.[0]')
       ```
 
-      Capture the returned PR URL in the run summary. If `failed` is non-empty (partial-epic), skip PR open and surface unreachable downstream stories per step 6g's partial-epic verdict.
+      - **If `existing_pr` is non-empty:** skip creation — do not run `gh pr create`. Adopt the found PR's `url`/`number` as this epic's PR record (this is what step 8's story tracker/PR linkage points at). Log `[info] finalize: existing PR #<number> (draft=<isDraft>) found on <branch> — adopting, skipping Hive PR creation`.
+      - **If `existing_pr` is empty:** create as before:
 
-   1. **Run summary** — existing behavior: list completed stories, any failed/blocked, and final status. Include PR URL when step 8.0 opened one.
+        ```sh
+        gh pr create \
+          --base ${epic.git_flow.base_branch:-develop} \
+          --head ${epic.git_flow.branch:-feat/<epic-id>} \
+          --title "feat(<epic-id>): <epic.title>" \
+          --body "Closes epic <epic-id>. Stories: <comma-list of completed story-ids>."
+        ```
+
+        **Race guard — idempotent on create-conflict.** A bg agent can open its PR in the window between the check above and this create call. If `gh pr create` fails with a "already exists" error (`GraphQL: A pull request already exists for <owner>:<branch>`), do not treat this as a run failure — re-run the `gh pr list` query above and adopt the now-existing PR instead, using the same log line as the adopt branch.
+
+      Capture the returned or adopted PR URL in the run summary. If `failed` is non-empty (partial-epic), skip PR open/adopt and surface unreachable downstream stories per step 6g's partial-epic verdict.
+
+   1. **Run summary** — existing behavior: list completed stories, any failed/blocked, and final status. Include PR URL when step 8.0 opened or adopted one.
 
    2. **Post-run audit** — scan this run's resolved state per `hive/references/gate-lift-telemetry.md`:
       - `gate_lift_fired` (true if step 1 took the warning branch and synthesized an ad-hoc plan)

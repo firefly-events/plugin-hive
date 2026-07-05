@@ -26,6 +26,9 @@ EVENT_METRIC_TYPES = {
     "fix_loop_iterations": ("number", "iterations"),
     "first_attempt_pass": ("bool", "bool"),
     "human_escalation": ("bool", "bool"),
+    # human_gate_ms (story s1-gate-timing-metric): elapsed ms between a
+    # user_gate suspend and its approve/reject sentinel resolving.
+    "human_gate_ms": ("number", "ms"),
     # scope_drift_score (story ed-3-drift-metric-emit): bucketed v1.
     # value is the ordinal 0..3 — 0=none, 1=minor, 2=major, 3=divergent.
     # The bucket label travels in dimensions.bucket so it can be filtered

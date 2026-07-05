@@ -43,6 +43,11 @@ function normalizeList(body, key) {
   return [];
 }
 
+// Stateless MCP compat guard (PLU-542, epic mcp-stateless-behavior, cutover
+// 2026-07-28): this REST+Bearer wire is not MCP transport, but it is audited
+// to the same stateless bar — every call below is a fresh per-request fetch.
+// Do NOT add an `Mcp-Session-Id` header, a cookie jar, or any sticky-routing
+// header/state here. See README.md "Stateless MCP compat note".
 async function httpJson(url, opts = {}) {
   const { method = 'GET', token, body } = opts;
   const headers = { Accept: 'application/json', 'User-Agent': USER_AGENT };

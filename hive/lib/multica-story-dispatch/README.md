@@ -39,3 +39,39 @@ This module reuses the direct-fetch, timeout, JSON parsing, response error envel
 ## Forward Link
 
 The per-story execute-mode caller is expected to be documented in [`skills/hive/skills/execute-mode-multica/SKILL.md`](../../../skills/hive/skills/execute-mode-multica/SKILL.md) in the s3 follow-up.
+
+## Stateless MCP compat note
+
+This bridge has two distinct wires, governed by two different contracts. Both are
+already tolerant of the stateless MCP spec cutover (effective 2026-07-28); this
+note records the audit (PLU-542) so a future edit doesn't reintroduce session
+affinity on either wire.
+
+- **stdio JSON-RPC** (`mcp-tools.mjs`, `handleRpcMessage` / `writeMessage`) — the
+  local MCP client transport. `handleRpcMessage` dispatches purely on
+  `message.method` per call; it stores no session state anywhere, so an
+  `initialize` call never gates or unlocks any other method. The server does
+  implement an `initialize` method handler (returns `protocolVersion` /
+  `capabilities` / `serverInfo`) and silently ignores
+  `notifications/initialized`, but this is a **spec-compliance flag, not a live
+  handshake**: `tools/list` and `tools/call` work identically whether or not
+  `initialize` was ever sent first. Post-cutover, if a client stops sending
+  `initialize`, the bridge's behavior is unchanged — the handler just never
+  fires, which is a no-op, not a break.
+- **REST + Bearer** (`httpJson`, duplicated in `index.mjs`, `cli.mjs`, and
+  `episode-sync.mjs` — all three hit the same Multica server and must stay
+  session-header-free) — the wire to the Multica server.
+  This is not MCP transport; `Mcp-Session-Id` / sticky-routing semantics do not
+  apply here regardless of spec version. Every call is a fresh
+  `fetch(url, { headers, signal })` carrying only `Accept`, `User-Agent`, and
+  (when present) `Authorization: Bearer <token>` / `Content-Type` — no session
+  or affinity header is ever set or read. On the response side,
+  `__tests__/index-stateless.test.mjs` simulates a legacy endpoint that DOES
+  send Set-Cookie / Mcp-Session-Id and asserts resolution succeeds
+  unchanged — `httpJson` never reads response headers, demonstrating
+  stateless tolerance on this wire.
+
+Guard: do not add an `Mcp-Session-Id` header, a cookie jar, or any per-connection
+state to either wire. If a future Multica API version requires session
+continuity, that is a deliberate protocol change requiring its own story — not
+something to bolt onto `httpJson` or the JSON-RPC handler incidentally.

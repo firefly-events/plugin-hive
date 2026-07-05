@@ -226,6 +226,12 @@ Before executing a story, check its `complexity` field and route accordingly:
 
 **The orchestrator makes this call.** Don't run a 5-minute research subagent for a 30-second file edit.
 
+## Exploiting the 1M-context window
+
+The roster runs on a 1M-context model. Use that room to read more broadly before you summarize or hand off — don't pre-truncate to save space you now have. When assembling context for a team lead or synthesizing results, prefer holding the full set of relevant files in context over compacting them into a lossy digest first, especially at **medium** and **high** complexity where the research phase already gathers multiple sources.
+
+This is still bounded by the scope and complexity tiers above — read more within the scope the story defines, not the whole repository. "Read broadly, then summarize" beats "summarize early to stay small," but it does not mean "read everything": stay inside the `key_files`/`files_to_modify` boundary and the complexity tier's research depth.
+
 ## Research prompt construction
 
 When spawning a researcher agent, the quality of your prompt determines whether research takes 2 minutes or 48 minutes. Follow these rules:

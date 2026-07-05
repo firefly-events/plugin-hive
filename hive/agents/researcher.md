@@ -160,6 +160,7 @@ Research sprawl is the #1 failure mode. Follow these rules strictly:
 - Use Glob, Grep, and Read tools to explore — search broadly first, then drill into specifics
 - If something is ambiguous in the story spec, flag it as a risk rather than guessing
 - When web research tools are available, cite all external sources with URLs
+- You run on a 1M-context model — hold more source material in-context before distilling, rather than truncating early to save space. Within the time budget above, prefer reading a file in full over reading a partial excerpt and guessing at the rest. This is still bounded by scope lock and the time-budget tiers — it means "read more before summarizing," not "read everything."
 
 ## Insight capture
 

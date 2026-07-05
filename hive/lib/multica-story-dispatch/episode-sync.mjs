@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { runMulticaInsightDistill } from './distill.mjs';
+import { resolveStateDir } from '../config.js';
 
 const HTTP_TIMEOUT_MS = 30_000;
 const USER_AGENT = 'hive-multica-episode-sync/0.1.0';
@@ -34,6 +35,12 @@ function normalizeList(body, key) {
   return [];
 }
 
+// Stateless MCP compat guard (PLU-542, epic mcp-stateless-behavior, cutover
+// 2026-07-28): this REST+Bearer wire is not MCP transport, but it is audited
+// to the same stateless bar — every call below is a fresh per-request fetch.
+// Do NOT add an `Mcp-Session-Id` header, a cookie jar, or any sticky-routing
+// header/state here. This is a duplicated copy of index.mjs's httpJson — see
+// README.md "Stateless MCP compat note" (also mirrored in cli.mjs).
 async function httpJson(url, opts = {}) {
   const { method = 'GET', token, body } = opts;
   const headers = { Accept: 'application/json', 'User-Agent': USER_AGENT };
@@ -124,6 +131,59 @@ function normalizeMessages(body) {
   return normalizeList(body, 'messages');
 }
 
+// s4: the s1 SubagentStop hook (hooks/notify-agent-complete.sh) writes
+// `<state_dir>/agent-complete/<agent_id>/complete.json` the instant a
+// dispatched agent's Claude Code session stops. Reading it is a filesystem
+// stat, not a 5s-interval HTTP round trip. Scoped to Agent-based bg dispatch
+// only — the ONLY kind a Multica task is; Bash `run_in_background` has no
+// such hook and is out of scope for this loop entirely (that carve-out lives
+// in the DAG executor / cmux dispatch paths that can reach a Bash-bg node,
+// not here).
+// Critical #2 (PLU-577 revision): `task.agent_id` is a stable persona UUID,
+// not a per-run id — the SAME agent_id is reused across every story a given
+// persona ever runs. A leftover complete.json from an EARLIER story (never
+// deleted after that story consumed it) would otherwise short-circuit a
+// LATER story's poll on its very first marker check, returning a stale
+// verdict/completed_at while the new task is still running. Guard with a
+// freshness check (marker.written_at must be >= the current task's
+// started_at) before trusting a marker at all, and delete it once consumed
+// so it can never be read twice.
+//
+// NOTE (flagged, not verified): this assumes the SubagentStop payload's
+// `agent_id` and Multica's `task.agent_id` share the same namespace/value.
+// No integration probe has confirmed that equivalence for this runtime: if
+// they ever diverge, the marker fast path below silently never matches and
+// this loop falls back to the (correct, just slower) HTTP poll — it does not
+// mis-fire on the wrong agent's marker. Re-verify next time the Multica
+// agent-dispatch payload shape changes.
+function isMarkerFresh(marker, task) {
+  const startedAt = task?.started_at;
+  if (!startedAt) return true; // nothing to compare against — accept (legacy behavior)
+  const writtenAtMs = Date.parse(marker?.written_at ?? '');
+  const startedAtMs = Date.parse(startedAt);
+  if (!Number.isFinite(writtenAtMs) || !Number.isFinite(startedAtMs)) return true;
+  return writtenAtMs >= startedAtMs;
+}
+
+async function readCompletionMarker(markerRoot, agentId) {
+  if (!agentId) return null;
+  try {
+    const raw = await fs.readFile(path.join(markerRoot, agentId, 'complete.json'), 'utf8');
+    const data = JSON.parse(raw);
+    return data && typeof data === 'object' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+async function deleteCompletionMarker(markerRoot, agentId) {
+  try {
+    await fs.unlink(path.join(markerRoot, agentId, 'complete.json'));
+  } catch {
+    // best-effort — a failed cleanup must not fail the poll
+  }
+}
+
 export async function pollTaskUntilTerminal(opts) {
   const {
     serverUrl,
@@ -134,14 +194,63 @@ export async function pollTaskUntilTerminal(opts) {
     pollIntervalMs = 5_000,
     messagesCaptureMax = 200,
     onStateTransition,
+    stateDir,
   } = opts;
 
   const started = Date.now();
   let consecutiveFailures = 0;
   let previousStatus;
   let currentTask = null;
+  const markerRoot = path.join(stateDir ?? resolveStateDir(), 'agent-complete');
 
   while (Date.now() - started < maxWallClockMs) {
+    // Check the marker BEFORE paying for another network poll — this is the
+    // event-driven fast path. Only possible once a prior HTTP round trip has
+    // told us the task's agent_id, so the very first iteration always falls
+    // through to the ordinary fetch below.
+    if (currentTask?.agent_id) {
+      const marker = await readCompletionMarker(markerRoot, currentTask.agent_id);
+      if (marker && !isMarkerFresh(marker, currentTask)) {
+        // Stale leftover from an earlier story that reused this persona's
+        // agent_id — do not trust it. Delete so it can't confuse a later
+        // iteration either, and fall through to the ordinary HTTP poll below.
+        await deleteCompletionMarker(markerRoot, currentTask.agent_id);
+      } else if (marker) {
+        await deleteCompletionMarker(markerRoot, currentTask.agent_id);
+        const status = marker.verdict === 'success' ? 'completed' : 'failed';
+        if (previousStatus !== undefined && status !== previousStatus) {
+          onStateTransition?.(previousStatus, status);
+        }
+        const id = taskId(currentTask);
+        let messages = [];
+        if (id) {
+          try {
+            messages = normalizeMessages(
+              await httpJson(taskMessagesUrl(serverUrl, workspaceId, id), { token }),
+            ).slice(-messagesCaptureMax);
+          } catch {
+            // The marker verdict is authoritative, not message capture — a
+            // transient fetch failure here must not fail a SUCCEEDED task.
+            messages = [];
+          }
+        }
+        return {
+          status,
+          notes:
+            status === 'failed'
+              ? `agent-complete marker verdict=${marker.verdict ?? 'unknown'}`
+              : taskNotes(currentTask),
+          messages,
+          task_id: id,
+          agent_id: currentTask?.agent_id ?? null,
+          agent_name: currentTask?.agent_name ?? currentTask?.agent?.name ?? null,
+          work_dir: currentTask?.work_dir ?? null,
+          attempts: currentTask?.attempts ?? 1,
+          started_at: currentTask?.started_at ?? null,
+          completed_at: marker.written_at || new Date().toISOString(),
+        };
+      }
+    }
     try {
       const [activeBody, runsBody] = await Promise.all([
         httpJson(issueTaskUrl(serverUrl, workspaceId, issueUuid, '/active-task'), { token }),

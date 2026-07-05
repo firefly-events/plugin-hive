@@ -15,6 +15,22 @@ Parse `$ARGUMENTS` as natural language. Flags are optional; all have defined def
 
 ## Phase 0 — Substrate Selection
 
+### Phase 0a — Low-Effort Skip Gate
+
+Evaluate this gate **first, before any substrate selection or dispatch** — it must short-circuit every route (local pipeline and the Phase 0b Multica DAG front door alike).
+
+Read `${HIVE_STATE_DIR}/session-effort.txt` (see State Directory Resolution). This file is written by `hooks/effort-gate.sh` and holds one of `low | medium | high | xhigh`.
+
+- **Effort == `low`:** skip test-swarm dispatch entirely — this covers both the local swarm pipeline (steps 1–8) and the Phase 0b DAG front-door route — and fall back to a minimal check (or no-op). Emit one loud log line naming the tier and the skip reason, plus how to force a full run:
+
+  ```
+  [warn] test skip: effort=low reason=low-effort-swarm-skip — skipping full test-swarm dispatch. Force a full run with CLAUDE_EFFORT=medium (or higher), or remove ${HIVE_STATE_DIR}/session-effort.txt.
+  ```
+
+  Do not proceed to Phase 0b or invoke `skills/hive/skills/test-dispatch/SKILL.md` when this branch fires.
+
+- **Effort == `medium` / `high` / `xhigh`, or the file is absent/unreadable:** this gate is a no-op — proceed to substrate selection below exactly as today. Never skip at `medium` or above.
+
 Before entering the swarm pipeline, invoke `skills/hive/skills/test-dispatch/SKILL.md` with the parsed `$ARGUMENTS`, root `hive.config.yaml`, consumer `${HIVE_STATE_DIR}/hive.config.yaml`, and current integration branch. Consume `mode_decision`, `mode_reason`, and `runner_path`.
 
 Switch `mode_decision` to the appropriate execution path. The swarm pipeline below is the default (`local`) path.

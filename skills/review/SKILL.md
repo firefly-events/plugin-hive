@@ -40,6 +40,14 @@ The baseline code review always runs. These flags **add** specialist review dime
 
 Flags are parsed out of `$ARGUMENTS` before resolving the diff target — strip them, then interpret the remaining argument per the table above (so `/review #123 --security` reviews PR 123 with the added security dimension). Each selected dimension produces its **own labeled feedback block** (see Phase 1, step 6b); dimensions never merge into or overwrite the baseline code-review verdict.
 
+#### xhigh-effort escalation
+
+After parsing explicit dimension flags, read `${HIVE_STATE_DIR}/session-effort.txt` (see `hive/references/configuration.md` — Effort & Context Adaptation). If effort == `xhigh`, force both `--security` and `--performance` on for this run exactly as if the operator had passed them — even if neither flag (nor `--all-dimensions`) was present. Emit:
+```
+[info] review: effort=xhigh — forcing --security --performance dimensions
+```
+At `medium` / `high` / `low`, or when the file is absent/unreadable, this is a no-op — only explicitly-passed flags select dimensions.
+
 ## Process
 
 ### Phase 0 — Resolve dispatch mode
@@ -165,7 +173,7 @@ calling orchestrator retains all gate checks and the final verdict presentation.
    - **needs_optimization** — No blockers, but improvements recommended
    - **needs_revision** — Critical issues that must be addressed before merge
 
-6b. **Run additional review dimensions (opt-in).** This step executes **only** when a dimension flag from the Argument Parsing table was passed (`--security`, `--performance`, or `--all-dimensions`). **When no dimension flag is present, skip this step entirely — the baseline path above is unchanged.**
+6b. **Run additional review dimensions (opt-in).** This step executes **only** when a dimension flag from the Argument Parsing table was passed (`--security`, `--performance`, or `--all-dimensions`), OR when the xhigh-effort escalation above forced `--security`/`--performance` on. **When no dimension flag is present and effort is not `xhigh`, skip this step entirely — the baseline path above is unchanged.**
 
    For each selected dimension, spawn one subagent on the **same diff** already obtained in step 1, using the dimension's persona as system context and its reference workflow's `*-critique` + `synthesis` task description as the instruction:
 

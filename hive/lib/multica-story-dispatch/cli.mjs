@@ -78,6 +78,12 @@ function trimTrailingSlash(url) {
   return String(url ?? '').replace(/\/+$/, '');
 }
 
+// Stateless MCP compat guard (PLU-542, epic mcp-stateless-behavior, cutover
+// 2026-07-28): this REST+Bearer wire is not MCP transport, but it is audited
+// to the same stateless bar — every call below is a fresh per-request fetch.
+// Do NOT add an `Mcp-Session-Id` header, a cookie jar, or any sticky-routing
+// header/state here. This is a duplicated copy of index.mjs's httpJson — see
+// README.md "Stateless MCP compat note" (also mirrored in episode-sync.mjs).
 async function httpJson(url, opts = {}) {
   const { method = 'GET', token, body } = opts;
   const headers = { Accept: 'application/json', 'User-Agent': USER_AGENT };
@@ -208,6 +214,48 @@ async function readTaskSnapshot(serverUrl, token, workspaceId, issueUuid) {
     status: resolveTaskStatus(task) || 'idle',
     started_at: task.started_at ?? null,
     task_id: resolveTaskId(task),
+  };
+}
+
+// s4: same two non-blocking GETs as readTaskSnapshot, but shaped like
+// readTaskWithMessages minus the messages fetch — cmdStatus's `status`
+// subcommand is the only NON-CANCELLING way to learn a task's agent_id and
+// work_dir (pollTaskUntilTerminal cancels the task when its timeout-ms
+// elapses, so it cannot be used as a cheap probe). Currently unconsumed:
+// no caller (agent.py or otherwise) invokes the `status` subcommand today —
+// this is exposed for a future non-cancelling probe consumer, not an
+// existing poll loop.
+async function readTaskSnapshotFull(serverUrl, token, workspaceId, issueUuid) {
+  const [activeBody, runsBody] = await Promise.all([
+    httpJson(issueTaskUrl(serverUrl, workspaceId, issueUuid, '/active-task'), { token }),
+    httpJson(issueTaskUrl(serverUrl, workspaceId, issueUuid, '/task-runs'), { token }),
+  ]);
+
+  const task = unwrapTask(activeBody) ?? latestTaskRun(runsBody);
+  if (!task) {
+    return {
+      status: 'idle',
+      started_at: null,
+      task_id: null,
+      agent_id: null,
+      agent_name: null,
+      work_dir: null,
+      notes: '',
+      attempts: 1,
+      completed_at: null,
+    };
+  }
+
+  return {
+    status: resolveTaskStatus(task) || 'idle',
+    started_at: task.started_at ?? null,
+    task_id: resolveTaskId(task),
+    agent_id: task?.agent_id ?? null,
+    agent_name: task?.agent_name ?? task?.agent?.name ?? null,
+    work_dir: task?.work_dir ?? null,
+    notes: String(task?.notes ?? task?.error ?? task?.error_message ?? task?.message ?? ''),
+    attempts: task?.attempts ?? 1,
+    completed_at: task?.completed_at ?? null,
   };
 }
 
@@ -412,7 +460,7 @@ async function cmdStatus(args, cfg) {
   requireUuid('--issue', args.issue);
 
   const { serverUrl, token, workspaceId } = cfg;
-  const snapshot = await readTaskSnapshot(serverUrl, token, workspaceId, args.issue);
+  const snapshot = await readTaskSnapshotFull(serverUrl, token, workspaceId, args.issue);
   succeed(snapshot);
 }
 

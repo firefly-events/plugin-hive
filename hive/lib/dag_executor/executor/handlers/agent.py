@@ -1039,6 +1039,24 @@ class MulticaAgentSpawn:
         self._run_cli_fast(args)
 
     def _poll(self, tracker_id: str) -> dict[str, Any]:
+        """Terminal status for a dispatched tracker issue.
+
+        s4: `cli.mjs poll` (episode-sync.mjs `pollTaskUntilTerminal`) is
+        event-driven for Agent-based bg dispatch — each iteration of its
+        network-poll loop checks the s1 SubagentStop complete.json marker
+        for the task's agent_id FIRST and returns the instant it appears
+        (a filesystem stat), rather than waiting out the full HTTP poll
+        interval. The marker check lives there, not here, because that is
+        where the existing bounded wait loop already runs (this call's
+        `timeout_ms` is the same bound that governed the pre-s4 timer-poll,
+        so a missing/late marker still falls back to plain polling within
+        the SAME bound — never an unbounded wait). This method's shape is
+        otherwise unchanged: one call, one terminal-shaped result.
+
+        Carve-out: Bash `run_in_background` work has no completion hook in
+        this runtime and cannot use the marker — out of scope here because
+        MulticaAgentSpawn only ever dispatches Agent-based work.
+        """
         poll_timeout_s = self._timeout_ms / 1000.0 + 120.0
         return self._run_cli(
             ["poll", "--issue", tracker_id, "--timeout-ms", str(self._timeout_ms)],
