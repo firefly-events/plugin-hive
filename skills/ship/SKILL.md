@@ -174,7 +174,10 @@ For each epic where `version_bump` is `major`, `minor`, or `patch`, verify that
    - root `plugin.json` when present.
 2. Parse JSON with a structured parser. Collect every recursive `version` field.
 3. Verify all collected version values are in lockstep. If not, stop and report
-   the mismatched path/key/value set.
+   the mismatched path/key/value set. Also check the **`README.md` version badge**
+   (the `img.shields.io/badge/version-<x.y.z>-...` URL) — it is a version surface
+   too, and a common drift point (not JSON, so structured collection misses it).
+   A stale badge is a lockstep failure to report and fix, not a pass.
 4. Verify `CHANGELOG.md` contains an `## [Unreleased]` entry for the epic that
    names the planned bump level. The prose entry was just authored in-flow by
    step 3, so the section is expected to exist by now; the bump-level
@@ -197,6 +200,7 @@ in `skills/execute/SKILL.md` step 7e:
 
 - compute the next SemVer from the current lockstep version;
 - update every discovered `version` field in every version source;
+- update the `README.md` version badge URL to the same version;
 - add the version-accounting changelog line under `## [Unreleased]` (the
   human-readable prose entry was already authored in step 3);
 - commit the version-source and changelog changes with:
@@ -323,10 +327,20 @@ Canonical flow:
      --title "release: promote develop → main (v{version})" \
      --body "Promotes v{version}: {epic list}. Merging makes main == develop — no backmerge."
    ```
-3. Merge that PR. Because `head=develop`, merging leaves `main` and `develop`
-   identical — **`develop` never falls behind, so no separate develop←main
-   backmerge PR is required.**
-4. Only then cut the tag/release on `main` (the resolved command below).
+3. **Open the PR and STOP — this is the release gate.** `/ship` opens the promotion
+   PR and does **not** merge it. Report:
+
+   ```text
+   Release PR opened: {url}
+   Review the full develop→main diff and merge it when ready to publish v{version}.
+   /ship does not merge, tag, or publish on your behalf.
+   ```
+
+   The operator reviews the diff and merges when ready. Because `head=develop`,
+   merging leaves `main` == `develop`, so no backmerge is ever needed. **For a
+   `main`-tagged target, `/ship` ends here.** Everything downstream — tag/release,
+   Announce, Mark Shipped — is the post-merge finalize (step 6b) and runs only after
+   the human has merged the promotion PR.
 
 **Anti-pattern (do not do this):** cutting a throwaway `release/<v>` branch off
 `develop` and merging it **only** to `main`. That leaves the version bump and
@@ -336,22 +350,32 @@ PR (the debt this flow removes). Author on `develop`; promote `develop → main`
 Skip this sub-step for targets that do not tag `main` (e.g. `vercel`, `npm` from
 the working branch, or `custom` commands that manage their own refs).
 
-#### 6b. Run the ship command
+> **Hard gate — `/ship` never publishes autonomously.** For any target that tags or
+> publishes from `main`, `/ship`'s terminal action for the run is *opening* the
+> promotion PR. It MUST NOT merge that PR, push to `main`, create the tag or GitHub
+> release, trigger the public sync, or mark stories shipped as part of the same run.
+> The operator's merge of the promotion PR is the sole release trigger. Only after
+> that merge does the finalize (6b) run.
 
-Run the resolved command from the repository root.
+#### 6b. Finalize the release (post-merge only)
 
-If the command exits non-zero, stop and report the command, exit code, and the
-first useful error output. Do not generate release artifacts and do not mark any
-story shipped.
+For a `main`-tagged target, this runs **only after the operator has merged the
+promotion PR from 6a** and `main` contains the release commits. Resume `/ship` (or
+re-invoke it in finalize mode) once the merge has landed:
 
-If the command succeeds, capture:
+1. Confirm `main` is at the promoted tip — the promotion PR is merged and, if a
+   public-sync workflow exists, it has run.
+2. Cut the tag/release on `main` with the resolved command (e.g.
+   `gh release create v{version} --target main --generate-notes`).
+3. Proceed to Announce (step 7) and Mark Shipped (step 8).
 
-- command;
-- exit code;
-- timestamp;
-- release ID;
-- target epics;
-- shipped story IDs.
+For non-`main`-tagged targets (`vercel`, `npm`, `custom`), 6a is skipped and this
+step runs the resolved ship command directly from the working branch.
+
+Run the resolved command from the repository root. If it exits non-zero, stop and
+report the command, exit code, and the first useful error output; do not generate
+release artifacts and do not mark any story shipped. On success, capture: command,
+exit code, timestamp, release ID, target epics, and shipped story IDs.
 
 ### 7. Announce
 
