@@ -1,7 +1,7 @@
 ---
 name: tester
 description: "Writes and runs test suites from story specs and acceptance criteria. Spawned by team lead for test phases."
-model: gpt-5.4
+model: claude-fable-5
 color: yellow
 knowledge:
   - path: ~/.claude/hive/memories/tester/

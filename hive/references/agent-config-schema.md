@@ -53,6 +53,7 @@ Which model the agent runs on.
 
 | Value | Model | Use for |
 |-------|-------|---------|
+| `fable` | claude-fable-5 | Default for opus-level runs since 2026-07-10 — hardest reasoning, coordination, long-horizon work |
 | `opus` | claude-opus-4-8 | Complex reasoning, coordination, architecture, requirements |
 | `sonnet` | claude-sonnet-4-6 | Analytical work, implementation, review, test design |
 | `haiku` | claude-haiku-4-5-20251001 | Fast mechanical execution (running tests, collecting results) |

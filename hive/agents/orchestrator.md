@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: "Hive orchestrator — coordinates epics, assigns work to team leads, synthesizes results. Spawned by the Hive skill system, not auto-triggered."
-model: opus
+model: claude-fable-5
 color: blue
 knowledge:
   - path: ~/.claude/hive/memories/orchestrator/

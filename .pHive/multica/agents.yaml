@@ -50,7 +50,7 @@ agents:
   description: Designs technical solutions and evaluates technology choices, with
     rationale for each decision.
   provider: claude
-  model: claude-opus-4-8
+  model: claude-fable-5
   max_concurrent_tasks: 1
   persona_ref: hive/agents/architect.md
   custom_env: {}
@@ -99,7 +99,7 @@ agents:
   description: Cross-story validator for consistency, convention compliance, and integration
     risk.
   provider: claude
-  model: claude-opus-4-8
+  model: claude-fable-5
   max_concurrent_tasks: 1
   persona_ref: hive/agents/peer-validator.md
   custom_env:
@@ -111,7 +111,7 @@ agents:
 - name: tester
   description: Writes and runs test suites against story specs and acceptance criteria.
   provider: claude
-  model: claude-opus-4-8
+  model: claude-fable-5
   max_concurrent_tasks: 1
   persona_ref: hive/agents/tester.md
   custom_env:
@@ -124,7 +124,7 @@ agents:
   description: Technical program manager; sequences cross-system work and owns horizontal/vertical
     planning.
   provider: claude
-  model: claude-opus-4-8
+  model: claude-fable-5
   max_concurrent_tasks: 1
   persona_ref: hive/agents/tpm.md
   custom_env:

@@ -1,7 +1,7 @@
 ---
 name: peer-validator
 description: "Cross-story validator checking consistency, convention compliance, and integration risk at the project level."
-model: claude-opus-4-8
+model: claude-fable-5
 color: yellow
 knowledge:
   - path: ~/.claude/hive/memories/peer-validator/
