@@ -142,13 +142,14 @@ task_tracking:
   branch_prefix: "acme"
 
 # Model tier routing
-# Only the orchestrator runs on Opus by default — planning + process
+# The orchestrator (top-level coordination) runs on Fable 5 (claude-fable-5),
+# the default/working model — see model_overrides below. Planning + process
 # discipline carry most of the load, so the downstream roster is on Sonnet.
 # Haiku is reserved for purely mechanical execution. Research/exploration
 # personas (researcher, technical-writer, etc.) MUST stay on Sonnet at
 # minimum — never demote them to Haiku.
 model_tiers:
-  opus:                          # top-level coordination only
+  opus:                          # top-level coordination only (overridden to Fable 5 below)
     - orchestrator
   sonnet:                        # planning, analytical, implementation, review, writing, test design
     - team-lead
@@ -178,9 +179,10 @@ model_tiers:
 # horsepower. Never demote below the default — research/exploration personas
 # in particular must stay on Sonnet at minimum.
 model_overrides:
-  reviewer: opus               # promoted: Opus 4.7 reviews Codex-produced work as the cross-LLM verification gate
-  peer-validator: opus         # promoted: runs alongside reviewer — same cross-LLM gate, same tier
-  # example: architect: opus     # promote architect to Opus for architecturally complex projects
+  orchestrator: fable          # default/working model: Fable 5 (claude-fable-5) replaces Opus for opus-level runs
+  reviewer: fable              # Fable 5 reviews Codex-produced work as the cross-LLM verification gate
+  peer-validator: fable        # runs alongside reviewer — same cross-LLM gate, same tier (Fable 5)
+  # example: architect: fable     # promote architect to Fable 5 for architecturally complex projects
 
 # Circuit breakers — prevent wasted time and tokens
 circuit_breakers:

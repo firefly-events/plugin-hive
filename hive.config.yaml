@@ -176,16 +176,21 @@ model_tiers:
     - test-worker
 
 # Override a specific agent's model (takes precedence over tier)
-# 2026-06-09 policy update: Fable 5 (claude-fable-5) replaces Opus for all
-# opus-level runs. Trialing Fable on the generic developer role for this repo.
+# 2026-07-10 policy (re-affirms 2026-06-09, undoes the 2026-06-12 revert):
+# Fable 5 (`fable` = claude-fable-5) is the DEFAULT/WORKING model — it replaces
+# Opus for ALL opus-level (heavy reasoning / coordination) runs. Sonnet/Haiku
+# stay as the cheaper tiers below Fable for analytical/implementation and
+# mechanical work; never route primary work to a fallback provider.
 model_overrides:
-  peer-validator: opus         # reverted from fable 2026-06-12
-  tpm: opus                    # reverted from fable 2026-06-12
-  tester: opus                 # reverted from fable 2026-06-12
-  architect: opus              # reverted from fable 2026-06-12
-  # developer: fable trial ended 2026-06-12 — no override, falls to base tier
-  # reviewer: routed to codex backend below (cross-LLM gate flips direction:
-  # Fable creates, Codex reviews)
+  orchestrator: fable          # opus-level → Fable 5 (claude-fable-5)
+  team-lead: fable             # opus-level → Fable 5
+  architect: fable             # opus-level → Fable 5 (was opus, reverted 2026-06-12)
+  analyst: fable               # opus-level → Fable 5
+  tpm: fable                   # opus-level → Fable 5 (was opus, reverted 2026-06-12)
+  peer-validator: fable        # cross-LLM gate creator side → Fable 5
+  tester: fable                # opus-level → Fable 5 (was opus, reverted 2026-06-12)
+  # developer: no override — falls to base sonnet tier (cheaper implementation)
+  # reviewer: routed to codex backend below (Codex is review-ONLY, not primary)
 
 # Per-persona backend routing.
 # 2026-06-28 policy (supersedes 2026-06-09 reviewer-on-codex):
