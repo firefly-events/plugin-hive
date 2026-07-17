@@ -81,23 +81,25 @@ nav{position:sticky;top:0;z-index:50;
 .nav-links a{color:var(--txt-2);font-size:14px;font-weight:500;transition:color .15s}
 .nav-links a:hover{color:var(--txt)}
 .nav-links .btn{padding:9px 18px}
+.nav-links .btn-primary{background:linear-gradient(120deg,#FFC24D,#FFD980);color:#100a01;font-weight:700}
+.nav-links .btn-primary:hover{color:#100a01}
 @media(max-width:760px){.nav-links a:not(.btn){display:none}}
 
 /* ============ buttons ============ */
 .btn{display:inline-flex;align-items:center;gap:8px;font-family:'Space Grotesk';font-weight:500;
   font-size:15px;border-radius:10px;padding:13px 24px;cursor:pointer;border:1px solid transparent;
   transition:transform .15s var(--ease),box-shadow .2s,border-color .2s,background .2s;position:relative}
-.btn-primary{color:#1a1206;background:linear-gradient(120deg,var(--ember),var(--amber));
+.btn-primary{color:#100a01;font-weight:700;background:linear-gradient(120deg,var(--ember),var(--amber));
   box-shadow:0 0 0 rgba(255,205,97,0);}
 .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 34px rgba(255,205,97,.34)}
 .btn-ghost{color:var(--txt);background:var(--glass);border-color:var(--glass-border)}
 .btn-ghost:hover{border-color:rgba(255,205,97,.35);color:var(--txt);transform:translateY(-2px)}
 
 /* ============ hero ============ */
-.hero{padding:0;min-height:88vh;display:flex;align-items:center;overflow:hidden}
+.hero{position:relative;padding:0;min-height:88vh;display:flex;align-items:center;overflow:hidden}
 .hero-lattice{position:absolute;inset:0;z-index:0;pointer-events:none}
 .hero-fade{position:absolute;inset:0;z-index:1;pointer-events:none;
-  background:radial-gradient(120% 90% at 30% 40%, transparent 30%, var(--obsidian) 82%);}
+  background:radial-gradient(120% 90% at 30% 42%, transparent 32%, var(--obsidian) 84%);}
 .hero-in{position:relative;z-index:2;padding:80px 0}
 .hero h1{font-size:clamp(40px,7vw,76px);font-weight:700;margin:18px 0 22px;max-width:16ch}
 .hero .sub{font-size:clamp(17px,2.1vw,21px);max-width:56ch;color:var(--txt-2)}
@@ -154,7 +156,7 @@ nav{position:sticky;top:0;z-index:50;
 /* ============ pipeline ============ */
 .pipe{display:grid;grid-template-columns:repeat(6,1fr);gap:0;margin-top:20px}
 @media(max-width:860px){.pipe{grid-template-columns:repeat(2,1fr);gap:22px}}
-.step{position:relative;padding:0 14px;text-align:center;opacity:.35;transition:opacity .5s var(--ease);
+.step{position:relative;padding:0 14px;text-align:center;opacity:1;transition:opacity .5s var(--ease);
   display:flex;flex-direction:column;height:100%}
 .step.lit{opacity:1}
 .step .node{width:66px;height:74px;margin:0 auto 16px;position:relative}
@@ -186,6 +188,12 @@ nav{position:sticky;top:0;z-index:50;
   padding:26px;min-height:170px;gap:6px}
 .art-slot .tag{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.1em;color:var(--amber);text-transform:uppercase}
 .art-slot .desc{font-size:12.5px;color:var(--txt-faint);max-width:34ch}
+/* real art */
+.art-band{border-radius:16px;overflow:hidden;border:1px solid var(--glass-border);box-shadow:0 20px 60px rgba(0,0,0,.55)}
+.art-band img{display:block;width:100%;height:clamp(190px,26vw,360px);object-fit:cover}
+.art-frame{border-radius:16px;overflow:hidden;border:1px solid var(--glass-border);
+  box-shadow:0 16px 48px rgba(0,0,0,.5),0 0 60px rgba(255,205,97,.06)}
+.art-frame img{display:block;width:100%;height:auto}
 
 /* ============ cta band ============ */
 .band{text-align:center;padding:96px 0;position:relative;overflow:hidden}
@@ -268,7 +276,7 @@ footer{border-top:1px solid var(--glass-border);padding:52px 0}
 .lattice-drift{animation:drift 9s ease-in-out infinite alternate}
 /* reveal is opt-in: visible by default, only hidden once JS "arms" it → no permanent dimness if JS/observer misses */
 .reveal{opacity:1;transform:none;transition:opacity .7s var(--ease),transform .7s var(--ease)}
-.js-armed .reveal:not(.in){opacity:0;transform:translateY(20px)}
+.js-armed .reveal:not(.in){transform:translateY(16px)}
 @media(prefers-reduced-motion:reduce){
   *{animation:none!important;scroll-behavior:auto}
   .reveal{opacity:1;transform:none}
@@ -397,10 +405,8 @@ footer{border-top:1px solid var(--glass-border);padding:52px 0}
 <!-- ================= AGENT SWARM ART BAND ================= -->
 <section style="padding:0">
   <div class="wrap">
-    <!-- ART SLOT: replace with generated raster (see .pHive/brand/landing/art-prompts.md » agent-swarm-graphic) -->
-    <figure class="art-slot reveal" data-slot="agent-swarm-graphic" data-ar="1440x360">
-      <span class="tag">◇ art slot · agent-swarm-graphic · 1440×360</span>
-      <span class="desc">Wide hex-lattice band, 25 cells as a constellation, a handful lit amber with role glyphs faintly etched. Drop generated raster here (→ art-prompts.md).</span>
+    <figure class="art-band reveal">
+      <img src="assets/art-swarm-band.png" alt="A hive of specialist agents — a honeycomb lattice with cells lit amber as work flows between them" loading="lazy"/>
     </figure>
   </div>
 </section>
@@ -436,9 +442,8 @@ footer{border-top:1px solid var(--glass-border);padding:52px 0}
         <li><b>Extensible by contract.</b> New harnesses, new agents, new skills — added at the edges, without touching core.</li>
       </ul>
     </div>
-    <figure class="art-slot reveal" data-slot="harness-split" data-ar="720x560" style="min-height:300px">
-      <span class="tag">◇ art slot · harness-split · 720×560</span>
-      <span class="desc">Claude-direct vs. meta-harness split visual — one plugin fanning out to Codex + other harness nodes (→ art-prompts-v2.md).</span>
+    <figure class="art-frame reveal">
+      <img src="assets/art-harness-split.png" alt="Two luminous hex nodes exchanging a braided stream — Claude orchestrating, Codex implementing, each fanning out to agents" loading="lazy"/>
     </figure>
   </div>
 </section>
@@ -478,9 +483,8 @@ footer{border-top:1px solid var(--glass-border);padding:52px 0}
         <h2 class="display" style="font-size:clamp(28px,4vw,42px);margin:14px 0 16px">Your agents stop forgetting.</h2>
         <p>Most agent teams wake up with amnesia. Hive's memory is layered — each level optional, each compounding on the last. Session insights become team knowledge; team knowledge becomes queryable provenance. Ask <span class="mono" style="color:var(--cyan)">/hive:why</span> and the knowledge graph answers with the decision, the context, and the chain of reasoning behind it — no git archaeology. And memory travels across projects, so lessons from one product make the next one faster.</p>
       </div>
-      <figure class="art-slot reveal" data-slot="knowledge-graph" data-ar="720x560" style="min-height:300px">
-        <span class="tag">◇ art slot · knowledge-graph · 720×560</span>
-        <span class="desc">Knowledge-graph constellation — nodes + provenance edges in magenta/violet (→ art-prompts-v2.md).</span>
+      <figure class="art-frame reveal">
+        <img src="assets/art-memory-layers.png" alt="Four translucent hexagonal memory layers stacked in depth — L0 session to L3 semantic index — joined by a rising signal thread" loading="lazy"/>
       </figure>
     </div>
     <div class="layers reveal" style="margin-top:44px">
@@ -553,17 +557,12 @@ footer{border-top:1px solid var(--glass-border);padding:52px 0}
 </footer>
 
 <script>
-// scroll reveal — opt-in enhancement; page is fully visible without it
+// scroll reveal — subtle upward settle only; content is ALWAYS fully visible (no opacity hiding)
 const reveals=[...document.querySelectorAll('.reveal')];
 if('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches){
-  document.documentElement.classList.add('js-armed');          // now hide un-revealed items
-  const rearm=()=>{
-    const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.1,rootMargin:'0px 0px -4% 0px'});
-    reveals.forEach(el=>{if(el.getBoundingClientRect().top<innerHeight)el.classList.add('in');else io.observe(el);});
-  };
-  rearm();
-  // hard safety net: nothing stays hidden past 1.6s
-  window.addEventListener('load',()=>setTimeout(()=>reveals.forEach(el=>el.classList.add('in')),1600));
+  document.documentElement.classList.add('js-armed');
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:0,rootMargin:'0px 0px -8% 0px'});
+  reveals.forEach(el=>{if(el.getBoundingClientRect().top < innerHeight*1.1)el.classList.add('in');else io.observe(el);});
 }
 // pipeline sequential light-up
 const steps=[...document.querySelectorAll('#pipe .step')];
