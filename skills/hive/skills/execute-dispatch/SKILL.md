@@ -219,6 +219,17 @@ When `runner_path=hive-dag`, the caller invokes `hive.lib.dag_executor.run_workf
 
 **Missing-registry distinction:** a missing graduation registry is a normal fail-closed state and means no workflows are graduated. Do not warn for that case. Warn only when `executor` is set to an unknown non-empty value, for example `executor: hive-fast`.
 
+## Lean Agent Prompt Contract
+
+This skill resolves *which* dispatch mode and runner path a story uses; it does not
+assemble the actual agent prompt. Whichever downstream surface builds the prompt for
+the resolved `mode_decision` (team template, solo spawn template, or a
+sandcastle/multica/cc-workflows dispatch payload) MUST shape that prompt per
+[`hive/references/lean-agent-prompt.md`](../../../../hive/references/lean-agent-prompt.md):
+read only named files, at most one named build/test invocation, write the output
+artifact before reporting completion, hard scope box to `files_to_modify`, no
+sub-spawning.
+
 ## Single Dispatch Point
 
 This skill is the single dispatch point for `/execute` mode selection, the parallel-dispatch gate (Step 1.5, `ed-7`), and the executor-vs-orchestrator runner cutover. Callers must consume `mode_decision`, `mode_reason`, `gate_violations[]`, `runner_path`, and `runner_reason` from this skill instead of re-implementing any of those decisions in another skill or workflow step. Other surfaces may use `hive.lib.dag_executor.executor_enabled_for(workflow_name)` only as the reader helper for the same runner gate, not as a separate policy layer.

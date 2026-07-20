@@ -9,6 +9,15 @@
 #   HIVE_AGENT        — required; the spawned agent persona (e.g. "developer")
 #   HIVE_PHASE        — optional; lifecycle phase at spawn time (e.g. "implement")
 #   HIVE_CONFIG       — optional; path to hive.config.yaml (default: ./hive.config.yaml)
+#   HIVE_PRIOR_EXPERIENCE_INJECTED — optional; "true"/"false". Set ONLY when the caller
+#     knows whether the memory-loading skill injected a Prior Knowledge block (warm) or
+#     found nothing to inject (cold). CAVEAT: only the classic tmux Agent(name:) spawn
+#     path (skills/hive/skills/agent-spawn/SKILL.md) sets this today — Hermes/multica-
+#     dispatched respawns are cold by construction and do not set it yet. Omit rather
+#     than guess.
+#   HIVE_PRIOR_EXPERIENCE_COUNT — optional; non-negative integer. Number of prior-
+#     knowledge memories injected (0 when HIVE_PRIOR_EXPERIENCE_INJECTED=false).
+#     Ignored unless HIVE_PRIOR_EXPERIENCE_INJECTED is also set.
 #
 # Exit codes:
 #   0 — event emitted (or metrics disabled — silent no-op)
@@ -114,6 +123,28 @@ fi
 # Optional fields
 swarm_id="${HIVE_SWARM_ID:-}"
 phase="${HIVE_PHASE:-}"
+prior_experience_injected="${HIVE_PRIOR_EXPERIENCE_INJECTED:-}"
+prior_experience_count="${HIVE_PRIOR_EXPERIENCE_COUNT:-}"
+
+if [[ -n "$prior_experience_injected" ]]; then
+  if [[ "$prior_experience_injected" != "true" && "$prior_experience_injected" != "false" ]]; then
+    echo "metrics-agent-spawn: invalid HIVE_PRIOR_EXPERIENCE_INJECTED: must be 'true' or 'false'" >&2
+    exit 1
+  fi
+  prior_experience_count="${prior_experience_count:-0}"
+  if ! [[ "$prior_experience_count" =~ ^[0-9]+$ ]]; then
+    echo "metrics-agent-spawn: invalid HIVE_PRIOR_EXPERIENCE_COUNT: must be a non-negative integer" >&2
+    exit 1
+  fi
+  if [[ "$prior_experience_injected" == "false" && "$prior_experience_count" -gt 0 ]]; then
+    echo "metrics-agent-spawn: invalid prior_experience pair: injected=false but count>0" >&2
+    exit 1
+  fi
+  if [[ "$prior_experience_injected" == "true" && "$prior_experience_count" -eq 0 ]]; then
+    echo "metrics-agent-spawn: invalid prior_experience pair: injected=true but count=0" >&2
+    exit 1
+  fi
+fi
 
 # Build event_id using PID + RANDOM for same-second uniqueness (I-2)
 # macOS date does not support %N; PID+RANDOM gives sufficient uniqueness
@@ -137,6 +168,12 @@ jq_filter='
   | if $proposal_id != "" then . + {proposal_id: $proposal_id} else . end
   | if $swarm_id    != "" then . + {swarm_id:    $swarm_id}    else . end
   | if $phase       != "" then . + {phase:       $phase}       else . end
+  | if $prior_injected != "" then
+      .dimensions += {
+        prior_experience_injected: ($prior_injected == "true"),
+        prior_experience_count: ($prior_count | tonumber)
+      }
+    else . end
 '
 
 event_row=$(jq -cn \
@@ -148,6 +185,8 @@ event_row=$(jq -cn \
   --arg swarm_id    "$swarm_id" \
   --arg phase       "$phase" \
   --arg agent_name  "$agent_name" \
+  --arg prior_injected "$prior_experience_injected" \
+  --arg prior_count    "${prior_experience_count:-0}" \
   "$jq_filter")
 
 # Ensure events directory exists and write

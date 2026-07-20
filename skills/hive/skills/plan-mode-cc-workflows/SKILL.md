@@ -91,8 +91,10 @@ The process below mirrors `execute-mode-cc-workflows`: precondition gate, per-pe
 // Worktree-isolation check — must be the first action in this gate.
 // Rejects before any field resolution if the skill is not running inside
 // a `.claude/worktrees/<name>/` checkout.
-import { assertWorktreeIsolation } from '../../../hive/lib/cc-workflows-preconditions.mjs';
-assertWorktreeIsolation(); // throws precondition_failed if cwd is not a worktree
+import { execFileSync } from 'node:child_process';
+const precondition = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_preconditions.py'], { input: JSON.stringify({ cwd: process.cwd() }), encoding: 'utf8' }));
+// Python equivalent of assertWorktreeIsolation(); this must remain first.
+if (!precondition.ok) throw Object.assign(new Error(precondition.error), precondition);
 ```
 
 Resolve runtime and tooling before dispatching any persona: verify CC runtime version `>= 2.1.154`; read `claude --version` when available; otherwise rely on Workflow tool presence as proxy. Verify `planning.mode` resolves to `"cc-workflows"` OR `HIVE_PLANNING_MODE=cc-workflows` is set. Resolve `${HIVE_STATE_DIR}` from `hive_config.paths.state_dir`, then default to `.pHive`, and confirm `assembled_personas[]` plus `planning_story` are present.
@@ -153,8 +155,8 @@ For each persona in `assembled_personas[]`:
    - Persona files are referenced at `hive/agents/<persona>.md`; prompts carry the integration branch and no-git contracts.
    - **`opts.model` is REQUIRED on every `agent()` call.** Before assembling the Workflow script, import and call the model-tier resolver for each persona:
      ```js
-     import { resolveModelTier } from 'hive/lib/cc-workflows-model-tier.mjs';
-     const { tier, source } = resolveModelTier(persona, { config: hive_config });
+     const { tier, source } = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_model_tier.py'], { input: JSON.stringify({ persona, config: hive_config }), encoding: 'utf8' }));
+     // Python equivalent of resolveModelTier(persona, { config: hive_config }).
      // assembled agent() call must carry opts.model:
      // agent(prompt, { schema, phase, label, model: tier })
      ```

@@ -225,15 +225,10 @@ existing `.pHive/epics/{epic-id}/docs/research-brief.md` if present. The
 pre-flight substeps below (0a git_flow resolution, 0 prior-decision query) still
 run — they are not research and downstream phases depend on them.
 
-0a. **Pre-flight: resolve git_flow (pe-5).** Immediately after the kickoff gate passes (and before any researcher / writer dispatch), call `resolveGitFlow({ cwd })` from `hive/lib/git_flow.mjs` (pe-1) and store the result on the planning context as `${git_flow_resolution}`. The two fields you persist downstream are `base_branch` and `branch_strategy`:
+0a. **Pre-flight: resolve git_flow (pe-5).** Immediately after the kickoff gate passes (and before any researcher / writer dispatch), invoke `hive/lib/git_flow.py` (pe-1) and store the result on the planning context as `${git_flow_resolution}`. The two fields you persist downstream are `base_branch` and `branch_strategy`:
 
    ```bash
-   node --input-type=module -e "
-     import('./hive/lib/git_flow.mjs').then(m => {
-       const r = m.resolveGitFlow({ cwd: process.cwd() });
-       process.stdout.write(JSON.stringify(r));
-     });
-   "
+   printf '%s' '{"cwd":"."}' | python3 hive/lib/git_flow.py
    ```
 
    The resolution is pinned at plan time — even if `hive.config.yaml` drifts later, every downstream sandcastle dispatch for this epic uses the value captured here (see step 15 below). On import failure (helper not vendored), fall back to `{ base_branch: 'main', branch_strategy: 'per-epic' }` and add a one-line note to the design discussion §0 prelude so reviewers know the helper was unavailable.
@@ -348,72 +343,9 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
    Full invariants and suppress-when rules: `hive/references/lsp-suggestions.md` →
    §Invariants (single source — do not restate here).
 
-### Phase B2: Horizontal + Vertical Planning (medium and large scope)
-
-6. **TPM plans the delivery.** `SendMessage` to the TPM with the design discussion, user feedback, research brief, and any architect outputs. The TPM:
-   a. Maps all architectural layers and cross-layer dependencies (horizontal thinking)
-   b. Cuts vertical slices — minimum cross-stack increments that each produce a working state
-   c. Directs the technical writer to produce both documents using the horizontal-plan and vertical-plan skills
-
-   The TPM is the owner of this step. The architect (if present) has already contributed their perspective in earlier phases — the TPM now sequences their inputs into an executable delivery plan.
-
-7. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the H/V outputs. `SendMessage` both documents to all active team agents. The researcher verifies findings are accurately reflected, the architect (if present) validates technical soundness, and the UI designer (if present) flags any UI layer gaps. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly. Also skip if `--lite` is active (equivalent to `planning.collaborative_review = false` for this run).
-
-8. **H/V gate (conditional).** Behavior depends on scope and flags:
-
-   - **Large scope:** Always present both documents to the user for review. Collect feedback, incorporate, then proceed to Phase B3.
-   - **Medium scope + `--gate-hv`:** Present both documents to the user for review. Collect feedback, incorporate, then proceed to Phase C.
-   - **Medium scope (default, no `--gate-hv`):** Auto-proceed to Phase C without presenting a gate — the collaborative review in step 7 is sufficient.
-   - **Medium scope + `--fast`:** H/V planning was skipped entirely at step 5 — this step is never reached.
-
-   When this gate runs, it is local to the orchestrator even if the H/V docs
-   were produced or revised by CC-Workflows-dispatched or Multica-dispatched
-   planning personas. Workflow tool completion and Multica completion are
-   artifact-readiness signals, not user review approvals.
-
-   **When the gate runs (large or medium + `--gate-hv`), the user reviews:**
-   - Are the layers correctly identified? (horizontal)
-   - Are the slice boundaries logical? (vertical)
-   - Is the first slice thin enough to be a real proof of concept?
-   - Does each slice produce a genuinely working state?
-   - Are deferred items acceptable?
-
-### Phase B3: Structured Outline (large scope only)
-
-9. **Produce structured outline.** `SendMessage` to the technical writer with the `structured-outline` skill (`skills/hive/skills/structured-outline/SKILL.md`, which enforces all mandatory parts and the completeness gate — Risk Registry and Elicitation are not optional). Input: H/V plans + design discussion + user feedback + research brief. Output: a ~1000-line structured outline with detailed approach, file manifest, risk registry, and elicitation questions. The outline now builds ON the vertical slice plan — each phase in the outline maps to a vertical slice.
-
-9b. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), and `--lite` is NOT active, run the collaborative review gate on the structured outline. This is the most critical review — all active team agents review the full outline. The TPM validates sequencing, the researcher confirms technical accuracy, the architect (if present) stress-tests feasibility, and the UI designer (if present) validates UI approach. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
-
-   **UI Designer SCALE_CALL revision (step 9b only) — two-gate precedence rule:** If ui-designer emits a `SCALE_CALL` field in their step 9b review response, apply **last gate wins**:
-   - **Revised to `pre-exec`:** delete any existing ui-designer escalation entry in cycle state, then write the step 9b `ESCALATION:` block as a fresh entry. Log: `"ui-designer scale call revised at step 9b to pre-exec — writing fresh escalation"`
-   - **Revised to `in-planning`:** delete any existing ui-designer escalation entry in cycle state (step 4b pre-exec call is superseded). Log: `"ui-designer scale call revised at step 9b to in-planning — escalation removed"`
-   - **No step 9b revision:** step 4b value stands unchanged; no action needed
-
-10. **Present structured outline to user.** Show the full document, including a summary of team review findings. The elicitation section (Part 7) contains the agent team's own stress-test of the plan — the user reads the team's answers to evaluate whether the thinking is sound. The user then:
-    - Flags any elicitation answers that seem weak or wrong
-    - Responds to the decision points (Part 8) — numbered affirm/change items
-    - Provides final sign-off or requests revisions
-
-    This sign-off gate is always local to the orchestrator, including when the
-    structured outline was produced by CC-Workflows-dispatched or
-    Multica-dispatched planning personas. Do not let Workflow tool completion,
-    Multica issue completion, or episode markers imply sign-off.
-
-    Incorporate feedback into the planning context before proceeding.
-
-    **S2.1 seam 3 — waiting-on-user `phase_blocked` emission.** Before presenting the document and pausing for input, emit one `phase_blocked` triple keyed to this gate. The emit is fire-and-forget (CLI swallows knob==off + missing-sqlite; do NOT branch on its exit code):
-
-    ```bash
-    python3 -m hive.lib.kg_emit_cli \
-      --subject "{epic_id}" \
-      --predicate "phase_blocked" \
-      --object "waiting-user-input-structured-outline-sign-off" \
-      --source-epic "{epic_id}" \
-      --source-agent "orchestrator"
-    ```
-
-    Apply the same pattern at the two other waiting-on-user pauses in /plan: design-discussion review (Phase B) gate uses `--object "waiting-user-input-design-discussion"`, and H/V plan review gate uses `--object "waiting-user-input-hv-plan-review"`. Gate-name slugs are kebab-stable so /meta-optimize can group by gate. Add no new error handling — the CLI is silent on failure by design.
-
+### Phase B2/B3: Horizontal + Vertical Planning, Structured Outline
+- Medium/Large scope: Read `references/horizontal-vertical-planning.md` and follow it — steps 6-8 (TPM delivery plan, collaborative review gate, H/V gate).
+- Large scope only: Read `references/structured-outline-phase.md` and follow it — steps 9-10 (structured outline, collaborative review gate, user sign-off gate).
 ### Phase C: Story Decomposition
 
 10c. **Resolve methodology.** Before decomposing stories, determine the development methodology with strict 4-tier precedence:
@@ -682,17 +614,30 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
        The `implement` step's `depends_on` must be updated to reference `scenario` (BDD/TDD) or the `test` step must reference `scenario` (classic) so execution order is preserved.
 
-    3. **Seed `manual_verdict.scenario_ref`** on the story YAML as a placeholder:
+    3. **Seed `manual_verdict.scenario_ref` and `required`** on the story YAML as a placeholder:
 
        ```yaml
        manual_verdict:
          scenario_ref: .pHive/test-scenarios/<story-id>-manual.yaml
+         required: true | false   # plan-derived — see below; NOT an operator prompt
          verdict: null       # written by /test --simulated-manual at execution time
          timestamp: null
          agent: null
        ```
 
        The tester who executes the `scenario` step replaces the placeholder path with the real scenario file they author.
+
+       **Deriving `required`** (story wr-3-manual-verdict-aging, REVISION-1b): "required device-pass" is
+       not derivable from any other field — the `simulated-manual` concern applies to non-UI stories too,
+       and no separate device/UI tier field exists in the schema (see
+       [`story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §9.1b). Set `required: true`
+       only when the story you are evaluating is itself a genuine UI/device-pass gate — i.e. the concern
+       applied because the story changes user-facing UI/interaction behavior that a real device or manual
+       pass is needed to validate (e.g. a new screen, a gesture flow, a rendering change). Set
+       `required: false` for every other story where the concern merely applies for scenario-replay
+       coverage but no device/UI validation gate is warranted (e.g. a backend story that happens to also
+       carry a simulated-manual scenario for regression coverage). This is a plan-time judgment call by the
+       planning persona — do not ask the operator, and do not leave it for `/ship` to infer.
 
     4. The concern's `implementation_checklist` flows through to execute via the generic concern-loop — its bullets reach the developer/reviewer alongside other concerns.
 

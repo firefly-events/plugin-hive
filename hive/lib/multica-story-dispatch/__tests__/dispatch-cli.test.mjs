@@ -4,6 +4,9 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 const execFileAsync = promisify(execFile);
 const CLI = fileURLToPath(new URL('../cli.mjs', import.meta.url));
@@ -417,6 +420,84 @@ test('dispatch: spent issue with --rerun resets and reports redispatched with a 
     assert.equal(result.task_id, 'task-fresh-999', 'must report the fresh task, not the stale terminal one');
     assert.ok(resetSeen, 'a reset PUT (assignee cleared + status todo) must fire');
     assert.ok(assignSeen, 'an assignment PUT must fire after reset');
+  } finally {
+    await close();
+  }
+});
+
+test('dispatch: production route (cmdDispatch) stamps persona + injects Prior Experience section', async (t) => {
+  // rev1-multica-learning-loop FIX 1: multica_dispatch_story → cmdDispatch is the
+  // real story-execution route (not the plan-mode fan-out that buildStoryBrief
+  // already covered) — it must also carry the persona stamp + Prior Experience
+  // section so S2 harvest can attribute memories and later stories in the same
+  // epic see earlier learnings when dispatched through this path.
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'dispatch-cli-prior-exp-'));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+
+  const fakePython = path.join(dir, 'fake-python.sh');
+  await fs.writeFile(
+    fakePython,
+    '#!/bin/sh\nprintf \'## Prior Experience\\n\\n- **widget-cache-fix** (team-memory): invalidate before reread\\n\'\n',
+    { mode: 0o755 },
+  );
+
+  let putBody = null;
+  const { serverUrl, close } = await startMockServer((req, res, body) => {
+    const ws = 'workspace_id=test-ws';
+
+    if (req.method === 'GET' && req.url === `/api/agents?${ws}`) {
+      sendJson(res, 200, { agents: [{ id: 'agent-dev-uuid', name: 'developer' }] });
+      return;
+    }
+
+    if (req.url === `/api/issues/${ISSUE_UUID}?${ws}`) {
+      if (req.method === 'GET') {
+        sendJson(res, 200, {
+          id: ISSUE_UUID,
+          status: 'todo',
+          assignee_id: null,
+          description: '## Goal\nDo the thing.\n\n## Insight Capture\nWrite insights here.\n',
+        });
+        return;
+      }
+      if (req.method === 'PUT') {
+        if (body?.description !== undefined) putBody = body.description;
+        sendJson(res, 200, { id: ISSUE_UUID, status: 'in_progress', assignee_type: 'agent', assignee_id: 'agent-dev-uuid', description: body?.description });
+        return;
+      }
+    }
+
+    if (req.method === 'GET' && req.url === `/api/issues/${ISSUE_UUID}/active-task?${ws}`) {
+      sendJson(res, 200, { task: { id: 'task-abc-123', status: 'running', started_at: '2026-01-01T00:00:00Z' } });
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === `/api/issues/${ISSUE_UUID}/task-runs?${ws}`) {
+      sendJson(res, 200, { task_runs: [] });
+      return;
+    }
+
+    sendJson(res, 500, { error: `unexpected: ${req.method} ${req.url}` });
+  });
+
+  try {
+    const { stdout } = await runCli(
+      [
+        'dispatch', '--issue', ISSUE_UUID, '--agent', 'developer',
+        '--epic', 'multica-learning-loop', '--story-id', 's-b',
+        '--python-bin', fakePython,
+      ],
+      serverUrl,
+    );
+    const result = JSON.parse(stdout);
+    assert.equal(result.status, 'dispatched');
+
+    assert.ok(putBody, 'a PUT with an updated description must fire');
+    assert.match(putBody, /<!-- persona: developer -->/);
+    assert.match(putBody, /## Prior Experience/);
+    assert.match(putBody, /widget-cache-fix/);
+    // Prior Experience must land before Insight Capture, mirroring serializeStoryBrief's section order.
+    assert.ok(putBody.indexOf('## Prior Experience') < putBody.indexOf('## Insight Capture'));
   } finally {
     await close();
   }

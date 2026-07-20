@@ -340,9 +340,212 @@ class CollectReportTest(unittest.TestCase):
         )
 
 
+    def test_collect_report_skips_foreign_executor_rows_sharing_the_events_stream(self) -> None:
+        # hive/lib/dag_executor/executor/telemetry.py appends its own
+        # {run_id, step_id, event_type, timestamp, payload} rows to the SAME
+        # events/*.jsonl stream as the metrics collector. Those rows carry no
+        # metric_type and must be skipped without crashing, while a valid
+        # metrics row alongside them is still parsed.
+        self._write_events(
+            [
+                {
+                    "run_id": "run-1",
+                    "step_id": "s3-collector",
+                    "event_type": "node_completed",
+                    "timestamp": "2026-07-04T00:00:00Z",
+                    "payload": {},
+                },
+                {"story_id": "design-system", "metric_type": "wall_clock_ms", "value": 500},
+            ]
+        )
+
+        report = collect.collect_report("design-system", self.repo)
+
+        self.assertEqual(report["wall_ms_total"], 500)
+
     def test_collect_report_rejects_traversal_deliverable(self) -> None:
         with self.assertRaises(MetricsValidationError):
             collect.collect_report("../../x", self.repo)
+
+    # ── mo-2 REVISION 1: tokens_by_skill selectability + legacy separation ──
+
+    def test_collect_tokens_by_skill_sums_per_skill_and_tracks_last_run(self) -> None:
+        rows = [
+            {
+                "run_id": "run1",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "metric_type": "tokens",
+                "value": 100,
+                "dimensions": {"attribution": "skill_boundary", "skill": "plan"},
+            },
+            {
+                "run_id": "run2",
+                "timestamp": "2026-01-02T00:00:00Z",
+                "metric_type": "tokens",
+                "value": 50,
+                "dimensions": {"attribution": "skill_boundary", "skill": "plan"},
+            },
+            {
+                "run_id": "run3",
+                "timestamp": "2026-01-01T12:00:00Z",
+                "metric_type": "tokens",
+                "value": 30,
+                "dimensions": {"attribution": "skill_boundary", "skill": "review"},
+            },
+        ]
+
+        result = collect.collect_tokens_by_skill(rows)
+
+        self.assertEqual(result["by_skill"], {"plan": 150, "review": 30})
+        self.assertEqual(result["last_run"]["plan"], {"run_id": "run2", "timestamp": "2026-01-02T00:00:00Z", "value": 50})
+        self.assertEqual(result["last_run"]["review"]["run_id"], "run3")
+
+    def test_collect_tokens_by_skill_excludes_legacy_whole_session_rows(self) -> None:
+        # Legacy metrics-stop-dispatch.sh / metrics-token-capture.sh rows carry
+        # no dimensions.attribution at all — they must never be mistaken for a
+        # skill-boundary row, and must never double-count against collect_tokens.
+        rows = [
+            {"story_id": "session-end", "metric_type": "tokens", "value": 999, "dimensions": {"input_tokens": 900, "output_tokens": 99}},
+            {
+                "metric_type": "tokens",
+                "value": 100,
+                "run_id": "r1",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "dimensions": {"attribution": "skill_boundary", "skill": "plan"},
+            },
+        ]
+
+        result = collect.collect_tokens_by_skill(rows)
+
+        self.assertEqual(result["by_skill"], {"plan": 100})
+        self.assertNotIn("session-end", result["by_skill"])
+
+    def test_collect_tokens_by_skill_ignores_malformed_rows(self) -> None:
+        rows = [
+            {"metric_type": "tokens", "dimensions": {"attribution": "skill_boundary"}},  # no skill name
+            {"metric_type": "tokens", "dimensions": "not-a-dict"},
+            {"metric_type": "wall_clock_ms", "dimensions": {"attribution": "skill_boundary", "skill": "plan"}, "value": 50},
+            None,
+        ]
+
+        result = collect.collect_tokens_by_skill([r for r in rows if isinstance(r, dict)])
+
+        self.assertEqual(result["by_skill"], {})
+        self.assertEqual(result["last_run"], {})
+
+    def test_collect_report_selects_unscoped_skill_boundary_rows_for_any_deliverable(self) -> None:
+        # AC3/AC4: a direct `/plan` invocation with no HIVE_STORY_ID tags
+        # story_id="unscoped". _select_events (epic/story scoped) never matches
+        # that literal string, so without the explicit unscoped query path this
+        # row would be silently invisible to every /metrics call.
+        self._write_epic(
+            "totally-unrelated-epic",
+            """
+            stories:
+              - id: s1
+                depends_on: []
+            """,
+        )
+        self._write_events(
+            [
+                {
+                    "story_id": "unscoped",
+                    "run_id": "run_skill_plan_1",
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "metric_type": "tokens",
+                    "value": 700,
+                    "dimensions": {"attribution": "skill_boundary", "skill": "plan", "input_tokens": 500, "output_tokens": 200},
+                },
+            ]
+        )
+
+        report = collect.collect_report("totally-unrelated-epic", self.repo)
+
+        self.assertEqual(report["tokens_by_skill"]["by_skill"], {"plan": 700})
+        # Must not leak into the deliverable's own scoped token total.
+        self.assertEqual(report["tokens"]["input"], 0)
+
+    def test_collect_report_does_not_double_count_scoped_and_unscoped_skill_rows(self) -> None:
+        self._write_epic(
+            "metrics-observability",
+            """
+            stories:
+              - id: mo-2-per-skill-token-sensor
+                depends_on: []
+            """,
+        )
+        self._write_events(
+            [
+                {
+                    "story_id": "mo-2-per-skill-token-sensor",
+                    "run_id": "run_scoped",
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "metric_type": "tokens",
+                    "value": 40,
+                    "dimensions": {"attribution": "skill_boundary", "skill": "plan"},
+                },
+                {
+                    "story_id": "unscoped",
+                    "run_id": "run_unscoped",
+                    "timestamp": "2026-01-02T00:00:00Z",
+                    "metric_type": "tokens",
+                    "value": 60,
+                    "dimensions": {"attribution": "skill_boundary", "skill": "plan"},
+                },
+            ]
+        )
+
+        report = collect.collect_report("metrics-observability", self.repo)
+
+        self.assertEqual(report["tokens_by_skill"]["by_skill"], {"plan": 100})
+        self.assertEqual(report["tokens_by_skill"]["last_run"]["plan"]["run_id"], "run_unscoped")
+
+    def test_collect_report_tokens_excludes_skill_boundary_rows_from_aggregate(self) -> None:
+        # t-011: a scoped skill-boundary row (mo-2 hook) and the legacy
+        # per-story capture both cover the same underlying assistant usage.
+        # report["tokens"] must equal the legacy total only — the
+        # skill-boundary row is an attribution overlay, not additive spend.
+        self._write_epic(
+            "metrics-observability",
+            """
+            stories:
+              - id: mo-2-per-skill-token-sensor
+                depends_on: []
+            """,
+        )
+        self._write_events(
+            [
+                {
+                    "story_id": "mo-2-per-skill-token-sensor",
+                    "run_id": "run_legacy",
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "metric_type": "tokens",
+                    "value": 30,
+                    "dimensions": {"input_tokens": 20, "output_tokens": 10},
+                },
+                {
+                    "story_id": "mo-2-per-skill-token-sensor",
+                    "run_id": "run_scoped_skill",
+                    "timestamp": "2026-01-01T00:00:05Z",
+                    "metric_type": "tokens",
+                    "value": 30,
+                    "dimensions": {
+                        "attribution": "skill_boundary",
+                        "skill": "plan",
+                        "input_tokens": 20,
+                        "output_tokens": 10,
+                    },
+                },
+            ]
+        )
+
+        report = collect.collect_report("metrics-observability", self.repo)
+
+        self.assertEqual(report["tokens"]["input"], 20)
+        self.assertEqual(report["tokens"]["output"], 10)
+        self.assertEqual(report["tokens"]["total"], 30)
+        # Skill-boundary view is unaffected — it still sees its own row.
+        self.assertEqual(report["tokens_by_skill"]["by_skill"], {"plan": 30})
 
 
 if __name__ == "__main__":

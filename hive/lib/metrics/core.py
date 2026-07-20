@@ -34,6 +34,11 @@ EVENT_METRIC_TYPES = {
     # The bucket label travels in dimensions.bucket so it can be filtered
     # without re-deriving from the ordinal. See hive/lib/scope_drift.py.
     "scope_drift_score": ("number", "bucket"),
+    # plan_drift_delta_count (story wr-6-plan-drift-instrument): value is
+    # the raw count of {planned, actual, stories_touched} deltas recorded
+    # in an epic's reconciliation artifact. See hive/lib/plan_drift.py.
+    "plan_drift_delta_count": ("number", "deltas"),
+    "agent_spawn": ("number", "count"),
 }
 
 CREATE_REQUIRED_ENVELOPE_FIELDS = {

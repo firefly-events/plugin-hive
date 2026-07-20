@@ -93,6 +93,17 @@ class SnapshotFileLoadingTest(unittest.TestCase):
         out_path.write_text(json.dumps(payload), encoding="utf-8")
         return out_path
 
+    def test_snapshot_state_resolution_delegates_to_config_resolver(self) -> None:
+        with patch.object(snapshot, "resolve_state_dir", return_value=str(self.state_dir)) as resolver:
+            self.assertEqual(
+                snapshot.snapshot_dir(self.repo),
+                self.state_dir / "harness" / "snapshots",
+            )
+
+        self.assertEqual(resolver.call_args.kwargs["cwd"], self.repo)
+        self.assertIs(resolver.call_args.kwargs["env"], os.environ)
+        self.assertNotIn("paths_scanner", resolver.call_args.kwargs)
+
     def test_load_snapshot_missing_file_raises_clear_error(self) -> None:
         missing = "kickoff-before"
 

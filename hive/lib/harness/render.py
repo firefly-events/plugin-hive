@@ -280,10 +280,17 @@ def exports_dir(deliverable: str, repo: Path) -> Path:
     return Path(state_dir) / "harness" / "exports" / deliverable
 
 
-def write_exports(report: dict[str, Any], repo: Path) -> dict[str, Path]:
-    """Write standalone mermaid/.md exports for ``report``; return path map."""
+def write_exports(
+    report: dict[str, Any], repo: Path, out_dir: Path | None = None
+) -> dict[str, Path]:
+    """Write standalone mermaid/.md exports for ``report``; return path map.
+
+    ``out_dir`` overrides the default ``<state-dir>/harness/exports/<deliverable>``
+    location — callers that must not write into Hive state (e.g. the /metrics
+    command, which is read-only) pass a caller-owned artifact directory instead.
+    """
     deliverable = report.get("deliverable") or "unknown"
-    out_dir = exports_dir(deliverable, repo)
+    out_dir = out_dir if out_dir is not None else exports_dir(deliverable, repo)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     flow_path = out_dir / "flow.mermaid.md"
@@ -297,13 +304,22 @@ def write_exports(report: dict[str, Any], repo: Path) -> dict[str, Path]:
     return {"flow": flow_path, "file_tree": tree_path, "stats": stats_path}
 
 
-def render(report: dict[str, Any], repo: Path, out_html: Path | None = None) -> dict[str, Any]:
-    """Render the HTML dashboard + write standalone exports; return a summary dict."""
+def render(
+    report: dict[str, Any],
+    repo: Path,
+    out_html: Path | None = None,
+    exports_dir: Path | None = None,
+) -> dict[str, Any]:
+    """Render the HTML dashboard + write standalone exports; return a summary dict.
+
+    ``exports_dir`` overrides the default state-dir export location — see
+    ``write_exports``.
+    """
     html_body = render_html(report)
     if out_html is not None:
         out_html.parent.mkdir(parents=True, exist_ok=True)
         out_html.write_text(html_body, encoding="utf-8")
-    export_paths = write_exports(report, repo)
+    export_paths = write_exports(report, repo, exports_dir)
     return {"html": html_body, "exports": export_paths}
 
 

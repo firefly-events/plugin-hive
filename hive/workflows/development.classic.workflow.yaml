@@ -137,12 +137,22 @@ steps:
     agent: backend-developer
     step_file: hive/workflows/steps/development-classic/step-03-implement-backend.md
     task: >
-      Implement the BACKEND scope of the story per the research brief.
-      APIs, server logic, database, services, infrastructure ONLY.
+      Implement the story per the research brief. Primary scope is the
+      BACKEND (APIs, server logic, database, services, infrastructure), but
+      this lane is ALSO the general/default implementer: when preflight
+      classifies a story as neither backend-code nor frontend-code (e.g.
+      docs, analysis, config, or a research deliverable), the work still
+      belongs to a developer and lands here rather than being skipped.
     depends_on:
       - preflight
       - write-brief
-    when: "$preflight.output.needs_backend == true"
+    # Default-lane predicate: run when backend work is needed OR when the story
+    # needs NEITHER backend nor frontend code (analysis/doc/config deliverables).
+    # A story with a deliverable must never skip every implement lane and still
+    # report "completed" (the ph-6 false-green class). Only a frontend-ONLY story
+    # (needs_frontend && !needs_backend) skips this lane. Grammar: && binds tighter
+    # than ||, no parens -> parses as (nb==true) || (nb==false && nf==false).
+    when: "$preflight.output.needs_backend == true || $preflight.output.needs_backend == false && $preflight.output.needs_frontend == false"
     inputs:
       - name: research_brief
         source: step_output
@@ -204,7 +214,10 @@ steps:
       Materialise the backend-implement agent's commit before tests run.
     depends_on:
       - backend-implement
-    when: "$preflight.output.needs_backend == true"
+    # Mirror backend-implement's default-lane predicate so the reconcile+test+
+    # review+integrate chain runs for analysis/doc stories too (they route
+    # through backend-implement as the general lane).
+    when: "$preflight.output.needs_backend == true || $preflight.output.needs_backend == false && $preflight.output.needs_frontend == false"
     inputs:
       - name: sha
         source: step_output
@@ -453,6 +466,13 @@ steps:
       The reviewer MUST be a different agent instance than the developer.
 
       Produce a verdict: passed, needs_optimization, or needs_revision.
+
+      EMIT review_passed (the convergence signal consumed by gate-review):
+      set review_passed=true only when the verdict is exactly passed; set it
+      false for needs_revision and needs_optimization. This MUST match
+      review_verdict — the terminal gate permits integration only when both
+      values agree on explicit passed output. Missing, malformed, or
+      inconsistent values fail closed.
     depends_on:
       - gate-code
       - platform-verify
@@ -497,6 +517,8 @@ steps:
         type: string
       - name: review_findings
         type: string
+      - name: review_passed
+        type: json
     optional: false
     timeout_ms: 300000
 
@@ -665,8 +687,9 @@ steps:
     timeout_ms: 600000
 
   # fix-cycle-review: reviewer checks the updated implementation and emits
-  # review_passed (bool) as the convergence signal. True → rounds K+1..N skip;
-  # False → the loop continues (up to max_rounds ceiling).
+  # review_passed (bool) as the convergence signal. True only for an exact
+  # passed verdict → rounds K+1..N skip; false for either non-passing verdict
+  # → the loop continues (up to max_rounds ceiling).
   - id: fix-cycle-review
     agent: reviewer
     sub_graph: review-fix-cycle
@@ -674,8 +697,9 @@ steps:
       Review the updated implementation committed by fix-cycle-implement.
       Check that all needs_revision findings from the previous round have been
       addressed. Produce a verdict: passed or needs_revision.
-      Set review_passed=true when the verdict is passed or needs_optimization;
-      set review_passed=false when the verdict is needs_revision.
+      Set review_passed=true only when the verdict is exactly passed; set it
+      false for needs_revision or needs_optimization. The two outputs must
+      agree; malformed or inconsistent output is rejected by gate-review.
     depends_on:
       - fix-cycle-implement
     # pr20-fable-review M3: single-upstream twin of fix-cycle-implement's
@@ -737,26 +761,20 @@ steps:
         type: json
 
   # ── Terminal safety gate (prod bug #26): after the bounded converge-loop, a
-  # final verdict still at needs_revision must BLOCK integrate — bounded retries
+  # final verdict is not exactly passed must BLOCK integrate — bounded retries
   # do not license silent integration of an unresolved review. Single-shot
   # (max_attempts: 1) — re-evaluating an unchanged verdict just fails identically.
-  # review_verdict is sourced from `review-converge-loop`: as of c-generalize-loop
-  # the executor walker RUNS the LOOP node and the loop surfaces the FINAL
-  # (post-convergence) review_verdict as an output — the last round's verdict when
-  # the gate cleans, or the last output at the max_rounds ceiling. The gate must
-  # read that converged verdict, not the stale pre-loop `review` output, so a loop
-  # that revises needs_revision → passed is allowed to integrate (and one that
-  # stays needs_revision at the ceiling is still blocked). This also matches
-  # `integrate`, which already binds review_verdict from review-converge-loop.
+  # review-converge-loop surfaces the last successful round's verdict and
+  # review_passed signal. The grammar gate reads the boolean signal while the
+  # handler validates the paired verdict, so a loop that revises
+  # needs_revision → passed may integrate and every other outcome blocks.
   - id: gate-review
     node_type: gate
-    # s3-convergence-signal: grammar-legal dotpath predicate evaluated against the
-    # last round's materialised output. The unroller rewrites
-    # ``$review-converge-loop.output.review_passed`` →
-    # ``$review__r{N}.output.review_passed`` (pointing to the actual last-round
-    # reviewer node) so the GateHandler evaluator resolves the live boolean value.
-    # Preserves bug-#26: when review_passed != true at the max_rounds ceiling
-    # the gate blocks integrate.
+    # Terminal safety gate (prod bug #26 + the ph-8/ph-9 silent-pass bug).
+    # Grammar-valid boolean gate. GateHandler validates the paired
+    # review_verdict/review_passed outputs before evaluating this predicate,
+    # preserving the explicit-passed, fail-closed policy without adding string
+    # literals to the predicate grammar.
     gate: "$review-converge-loop.output.review_passed == true"
     retry:
       max_attempts: 1

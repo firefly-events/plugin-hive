@@ -57,9 +57,18 @@ def _iter_event_rows(events_dir: Path) -> list[dict[str, Any]]:
                 if not stripped:
                     continue
                 try:
-                    rows.append(json.loads(stripped))
+                    row = json.loads(stripped)
                 except json.JSONDecodeError:
                     continue
+                # Executor telemetry (hive/lib/dag_executor/executor/telemetry.py)
+                # shares this same metrics-root events/ directory but writes a
+                # foreign schema (run_id/step_id/event_type/timestamp/payload)
+                # with no metric_type key. Same stream, different validator —
+                # skip those rows explicitly rather than let them get
+                # misparsed downstream.
+                if not isinstance(row, dict) or "metric_type" not in row:
+                    continue
+                rows.append(row)
     return rows
 
 
@@ -124,12 +133,77 @@ def collect_tokens(rows: list[dict[str, Any]]) -> dict[str, Any]:
         if row.get("metric_type") != "tokens":
             continue
         dims = row.get("dimensions") or {}
+        if dims.get("attribution") == "skill_boundary":
+            continue
         totals["input"] += _as_number(dims.get("input_tokens"))
         totals["output"] += _as_number(dims.get("output_tokens"))
         totals["cache_read"] += _as_number(dims.get("cache_read_input_tokens"))
         totals["cache_creation"] += _as_number(dims.get("cache_creation_input_tokens"))
     totals["total"] = totals["input"] + totals["output"]
     return totals
+
+
+def _select_unscoped_skill_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Skill-boundary rows with no resolvable story/epic (``story_id ==
+    "unscoped"``, mo-2's fallback for a direct ``/plan``-style invocation with
+    no ``HIVE_STORY_ID``/``HIVE_SWARM_ID`` in the environment).
+
+    ``_select_events`` matches rows against ONE epic's story-id set, so an
+    unscoped row never matches any deliverable and would otherwise be
+    silently dropped before ``collect_tokens_by_skill`` ever saw it — the
+    collector would look like it "worked" while actually excluding every
+    directly-invoked skill run. This is the explicit query path for that
+    case: unscoped skill-boundary rows are attributed to *every* deliverable's
+    tokens_by_skill view (there is no narrower scope to attribute them to),
+    so a direct ``/plan`` run is visible from any `/metrics` invocation.
+    """
+    out = []
+    for row in rows:
+        if row.get("story_id") != "unscoped":
+            continue
+        dims = row.get("dimensions")
+        if isinstance(dims, dict) and dims.get("attribution") == "skill_boundary":
+            out.append(row)
+    return out
+
+
+def collect_tokens_by_skill(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Per-skill token rollup from mo-2 skill-boundary-attributed rows.
+
+    Only rows with dimensions.attribution == "skill_boundary" count here —
+    the legacy whole-session bundle rows (metrics-stop-dispatch.sh /
+    metrics-token-capture.sh) carry no skill dimension and are excluded. The
+    guard is bidirectional: ``collect_tokens``' aggregate total excludes
+    skill-boundary rows, and this view excludes legacy rows, so neither
+    double-counts the other.
+    Returns {"by_skill": {skill: total_tokens}, "last_run": {skill: {run_id,
+    timestamp, value}}} where "last_run" tracks the most recent (by
+    timestamp) invocation per skill — e.g. "tokens for the last /plan run".
+    """
+    by_skill: dict[str, float] = {}
+    last_run: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if row.get("metric_type") != "tokens":
+            continue
+        dims = row.get("dimensions")
+        if not isinstance(dims, dict):
+            continue
+        if dims.get("attribution") != "skill_boundary":
+            continue
+        skill = dims.get("skill")
+        if not skill:
+            continue
+        value = _as_number(row.get("value"))
+        by_skill[skill] = by_skill.get(skill, 0) + value
+        timestamp = row.get("timestamp") or ""
+        current = last_run.get(skill)
+        if current is None or timestamp >= current.get("timestamp", ""):
+            last_run[skill] = {
+                "run_id": row.get("run_id"),
+                "timestamp": timestamp,
+                "value": value,
+            }
+    return {"by_skill": by_skill, "last_run": last_run}
 
 
 def collect_human_gate(rows: list[dict[str, Any]]) -> tuple[Any, int]:
@@ -256,8 +330,10 @@ def collect_report(deliverable: str, repo: Path | None = None) -> dict[str, Any]
     repo = repo or Path.cwd()
     epic = _load_epic(deliverable, repo)
     story_ids = _epic_story_ids(epic)
-    rows = _select_events(_iter_event_rows(_events_dir()), deliverable, story_ids)
+    all_rows = _iter_event_rows(_events_dir())
+    rows = _select_events(all_rows, deliverable, story_ids)
     human_gate_ms_total, gate_count = collect_human_gate(rows)
+    skill_rows = rows + _select_unscoped_skill_rows(all_rows)
 
     return {
         "deliverable": deliverable,
@@ -265,6 +341,7 @@ def collect_report(deliverable: str, repo: Path | None = None) -> dict[str, Any]
         "human_gate_ms_total": human_gate_ms_total,
         "gate_count": gate_count,
         "tokens": collect_tokens(rows),
+        "tokens_by_skill": collect_tokens_by_skill(skill_rows),
         "flow": build_flow(deliverable, repo, epic=epic),
         "files": build_files(deliverable, repo),
     }

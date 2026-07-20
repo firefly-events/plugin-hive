@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 const HTTP_TIMEOUT_MS = 30_000;
 const USER_AGENT = 'hive-multica-story-dispatch/0.1.0';
@@ -208,9 +209,17 @@ export function renderIntegrationContract(branch, storyId = null) {
 }
 
 export function serializeStoryBrief(story, options = {}) {
-  const { integrationBranch = null } = options;
+  const { integrationBranch = null, priorExperienceSection = null, dispatchingPersona = null } = options;
   const showCodexInstruction = resolveCodexInstruction(options);
   const sections = [];
+
+  // Machine-readable persona stamp (locked decision #1) — lets downstream
+  // harvest (S2) attribute memories to the dispatched persona without a
+  // daemon-agent-name reverse-lookup. HTML comment keeps it out of the
+  // rendered issue view.
+  if (dispatchingPersona) {
+    sections.push(`<!-- persona: ${dispatchingPersona} -->`);
+  }
 
   if (story?.description) {
     sections.push(`## Goal\n${cleanText(story.description)}`);
@@ -238,6 +247,10 @@ export function serializeStoryBrief(story, options = {}) {
     sections.push(`## References\n${story.references.map(formatReference).join('\n')}`);
   }
 
+  if (priorExperienceSection) {
+    sections.push(priorExperienceSection.trim());
+  }
+
   sections.push(
     [
       `## Insight Capture`,
@@ -256,6 +269,53 @@ export function serializeStoryBrief(story, options = {}) {
   );
 
   return `${sections.join('\n\n')}\n`;
+}
+
+const MEMORY_BRIEF_TIMEOUT_MS = 10_000;
+// fileURLToPath (not .pathname) so this survives on a repo checked out under
+// a path containing spaces or other percent-encoded characters.
+const MEMORY_BRIEF_SCRIPT_PATH = fileURLToPath(new URL('../memory_brief.py', import.meta.url));
+
+// Bridge glue only (Python-first policy, .pHive/proposals/language-strategy-adr.md):
+// shell to hive/lib/memory_brief.py and hand back its stdout verbatim. No
+// memory selection, ranking, or budget logic lives here — that is entirely
+// in the Python module.
+export async function fetchPriorExperienceSection(persona, epic, storyId, options = {}) {
+  if (!persona) return null;
+  const { tokenBudget, pythonBin = 'python3' } = options;
+
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const execAsync = promisify(execFile);
+
+  const args = [MEMORY_BRIEF_SCRIPT_PATH, '--persona', persona];
+  if (epic) args.push('--epic', epic);
+  if (storyId) args.push('--story', storyId);
+  if (tokenBudget) args.push('--token-budget', String(tokenBudget));
+
+  try {
+    const { stdout } = await execAsync(pythonBin, args, { timeout: MEMORY_BRIEF_TIMEOUT_MS });
+    const trimmed = stdout.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  } catch {
+    // Prior-experience injection is advisory — a missing interpreter, absent
+    // memory stores, or a KG read failure must never block dispatch.
+    return null;
+  }
+}
+
+// Compose the story brief with the (best-effort) Prior Experience section.
+// This is the seam story spec calls `buildStoryBrief`: it wraps the pure,
+// synchronous serializeStoryBrief with the one async, best-effort step
+// (shelling to Python for prior-experience memories).
+export async function buildStoryBrief(story, options = {}) {
+  const priorExperienceSection = await fetchPriorExperienceSection(
+    options.dispatchingPersona,
+    story?.epic,
+    story?.id,
+    { tokenBudget: options.memoryTokenBudget, pythonBin: options.pythonBin },
+  );
+  return serializeStoryBrief(story, { ...options, priorExperienceSection });
 }
 
 export async function resolveAgentUuidByName(serverUrl, token, workspaceId, agentName) {
@@ -376,7 +436,7 @@ export async function dispatchStoryToPersonas(
       resolvedAgents.length > 0
         ? resolvedAgents
         : AGENT_CACHE.get(cacheKey(serverUrl, workspaceId, token)) ?? [];
-    const brief = serializeStoryBrief(story, {
+    const brief = await buildStoryBrief(story, {
       dispatchingPersona: persona,
       agents: briefAgents,
       agentBackends,

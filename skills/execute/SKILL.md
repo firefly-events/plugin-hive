@@ -80,6 +80,20 @@ Describe each story as a named teammate in the team prompt; the runtime material
 
    6. Proceed to step 2 (cycle state) as normal.
 
+1b. **Reconciliation gate (auto-firing, story `wr-6-plan-drift-instrument`).** Read the loaded epic's `depends_on_epic:` and `planned_base_ref:` fields (`hive/references/story-yaml-schema.md` § 6.5). This gate REQUIRES a reconciliation artifact when the epic's dependency has moved since planning — it does not hard-block; it is a warn-then-require, same posture as the wr-1 completion-record detector.
+
+   Compute the gate decision by invoking `hive.lib.plan_drift.check_reconciliation_required(epic_dict, cwd=<repo root>)` (Python — charter C1: marker/validator logic lives in Python, not inline shell). This returns a dict with `required: bool` and `reason:` one of `not-tracked`, `legacy-non-sha-placeholder`, `cannot-resolve`, `base-unchanged`, `base-moved`.
+
+   - **`required: false`** (any of `not-tracked` / `legacy-non-sha-placeholder` / `cannot-resolve` / `base-unchanged`): proceed silently to step 2. `cannot-resolve` fails open — a broken git state must never block execute — but emit `[warn] step 1b: plan-drift check could not resolve current ref — skipping gate` so the failure-open path is visible in logs, not silent.
+   - **`required: true`** (`base-moved`): before proceeding to story 1 (i.e. before step 4's topological sort begins any story), require `${HIVE_STATE_DIR}/epics/{epic-id}/reconciliation.md` to exist (template: `hive/references/reconciliation-artifact-template.md`).
+     - If it already exists (a prior run reconciled this exact `planned_base_ref` -> `current_base_ref` transition), read its `## Deltas` section and proceed — do not re-require.
+     - If it does not exist, emit:
+       ```
+       [warn] step 1b: {epic-id} depends_on_epic={depends_on_epic} — base moved since planning (planned_base_ref={planned_base_ref}, current={current_base_ref}). Reconciliation artifact required before story 1.
+       ```
+       and produce the artifact: for each delta the dependency's actual delivery introduces versus what `/plan` assumed, record `{planned, actual, stories_touched}` per the template. Zero deltas is valid — write the artifact with an empty `## Deltas` list rather than skip it, so the gate has evidence reconciliation ran.
+     - Once the artifact exists (freshly written or pre-existing), count its `## Deltas` entries and call `hive.lib.plan_drift.emit_plan_drift(run_id, epic_id, delta_count)` to record the plan-drift metric (`hive/references/metrics-event.schema.md` — `plan_drift_delta_count`), then proceed to step 2.
+
 2. **Load or create cycle state.** Check `${HIVE_STATE_DIR}/cycle-state/{epic-id}.yaml`. If it doesn't exist, create a minimal one with `epic_id` and `created` timestamp. The cycle state accumulates decisions across phases — see `hive/references/cycle-state-schema.md`. Include the cycle state in all downstream agent prompts as system-level constraints.
 
 2b. **Read and partition escalations.** Inspect the `escalations:` field of the loaded cycle state.
@@ -192,6 +206,8 @@ Emit one INFO log line at dispatch:
 ```
 
 Graph completion is an **artifact-readiness signal only** — not a per-story done signal. Per-story completion tracking (episode markers, `completed`/`failed` sets) remains the orchestrator's responsibility per the episode-schema contract.
+
+Completion here is a convention, not a gate: no tool boundary lets a hook intercept the orchestrator writing a story's files, so `/execute` cannot structurally refuse an incomplete completion. The standard record it converges on (episode markers per step, OR a schema-conformant cycle-state persona_dispatch+verdict block) is a **documented expectation**, not an enforced one. `hive/lib/completion_record_detector.py`, wired to SubagentStop/Stop via `hooks/completion-record-detect.sh`, is the DETECTOR half of that contract: it inspects the current epic/story post-hoc and WARNS loudly when the standard record is missing or malformed — including when an epic has no cycle-state file at all. It never blocks.
 
 **Depth advancement.** Collect story results and proceed to step 6g (depth-advancement loop) with `completed`/`failed` sets populated from `result`.
 

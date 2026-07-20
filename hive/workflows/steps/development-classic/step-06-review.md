@@ -6,7 +6,8 @@ Step output is a JSON object matching this schema. The DAG executor binds
 the gate-review node and downstream `when:` predicates to these fields. The
 field names below are the SINGLE canonical schema — they match the `review`
 node's declared outputs in `development.classic.workflow.yaml`
-(`review_verdict`, `review_findings`). A missing `review_verdict` fail-closes:
+(`review_verdict`, `review_findings`, `review_passed`). A missing
+`review_verdict` or `review_passed` fail-closes:
 gate-review BLOCKS integrate rather than shipping an unreviewed change (see
 `hive/references/predicate-grammar.md`).
 
@@ -14,13 +15,13 @@ gate-review BLOCKS integrate rather than shipping an unreviewed change (see
 output_format:
   review_verdict: str    # one of: passed | needs_optimization | needs_revision
   review_findings: str   # human-readable findings, each citing file:line
+  review_passed: bool    # true only when review_verdict is exactly passed
 ```
 
-Predicates and the gate-review node reference `$step.output.review_verdict` —
-the classic workflow gates integrate on
-`review_verdict must not equal needs_revision`. Bare `$step.output.verdict`
-is undefined under this contract and fail-closes to False — see
-predicate-grammar.md Risk #13.
+The classic terminal gate references the grammar-valid boolean
+`$step.output.review_passed == true`; GateHandler validates the paired verdict
+before allowing it to pass. Bare `$step.output.verdict` is undefined under
+this contract and fail-closes to False — see predicate-grammar.md Risk #13.
 
 ## MANDATORY EXECUTION RULES (READ FIRST)
 
@@ -121,13 +122,21 @@ predicates skip with a warning — see `hive/references/predicate-grammar.md`.
 ```json
 {
   "review_verdict": "passed | needs_optimization | needs_revision",
-  "review_findings": "security — file.ts:42 — <message>; convention — other.ts:10 — <message>"
+  "review_findings": "security — file.ts:42 — <message>; convention — other.ts:10 — <message>",
+  "review_passed": true
 }
 ```
 
-`review_verdict` drives the gate-review node — a `needs_revision` verdict
-BLOCKS integrate. The orchestrator-narrated path consumes the prose section;
-the executor path binds to this JSON. Both must agree.
+`review_passed` is the convergence signal the terminal gate (`gate-review`)
+evaluates. It MUST be true only for an exact `passed` verdict:
+- `passed`            → `review_passed: true`  (permits integrate)
+- `needs_optimization` → `review_passed: false` (blocks integrate)
+- `needs_revision`     → `review_passed: false` (blocks integrate)
+
+The orchestrator-narrated path consumes the prose section; the executor path
+binds to this JSON. Both must agree. Missing, malformed, or inconsistent
+values are rejected by the terminal gate — never infer approval from a
+non-empty or merely non-`needs_revision` verdict.
 
 ## SUCCESS METRICS
 
@@ -150,7 +159,8 @@ the executor path binds to this JSON. Both must agree.
 
 **Gating:** Verdict produced.
 - If **passed**: skip step 7 (optimize), go to `step-08-integrate.md`
-- If **needs_optimization**: go to `step-07-optimize.md`
+- If **needs_optimization**: go to `step-07-optimize.md`, then remain blocked
+  at the terminal gate until a subsequent review emits `passed`
 - If **needs_revision**: route to fix loop (orchestrator handles)
 
 
@@ -166,6 +176,7 @@ fails. This file is gitignored execution scratch — do not commit it.
 ```yaml
 review_verdict: <value>
 review_findings: <value>
+review_passed: <true|false>
 ```
 
 Use concrete values: for path/artifact outputs give the repo-relative path you

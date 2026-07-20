@@ -39,13 +39,45 @@ _MUST_BE_VALID = re.compile(
 _MUST_EQUAL = re.compile(
     r"^(?P<name>[\w.-]+)\s+must\s+equal\s+(?P<expected>[\w.-]+)$", re.IGNORECASE
 )
-# #16: negated form — "review_verdict must not equal needs_revision". Blocks only
-# the named bad value (a needs_revision review must not silently integrate) while
-# letting every other verdict (passed, needs_optimization) proceed.
+# Legacy negated form retained for non-review gates. Live review integration
+# gates use the explicit-passed form below rather than a partial exclusion.
 _MUST_NOT_EQUAL = re.compile(
     r"^(?P<name>[\w.-]+)\s+must\s+not\s+equal\s+(?P<expected>[\w.-]+)$",
     re.IGNORECASE,
 )
+
+_REVIEW_VERDICTS = {"passed", "needs_revision", "needs_optimization"}
+_MISSING = object()
+
+
+def _validate_review_signal(node: Any, inputs: dict[str, Any]) -> None:
+    """Validate the review verdict/signal contract before evaluating a gate.
+
+    ``review_passed`` is intentionally a boolean convergence signal rather
+    than a second approval decision.  Only the exact ``passed`` verdict may
+    produce ``True``; all other known verdicts must produce ``False``.  This
+    check also rejects missing, malformed, or inconsistent agent output before
+    a grammar predicate could accidentally accept it.
+    """
+
+    verdict = inputs.get("review_verdict", _MISSING)
+    signal = inputs.get("review_passed", _MISSING)
+    if not isinstance(verdict, str) or verdict not in _REVIEW_VERDICTS:
+        raise GateFailedError(
+            f"gate node {node.id!r}: review_verdict must be one of "
+            f"{sorted(_REVIEW_VERDICTS)!r}; got {verdict!r}"
+        )
+    if type(signal) is not bool:
+        raise GateFailedError(
+            f"gate node {node.id!r}: review_passed must be a boolean; "
+            f"got {signal!r}"
+        )
+    expected = verdict == "passed"
+    if signal != expected:
+        raise GateFailedError(
+            f"gate node {node.id!r}: review_passed={signal!r} is inconsistent "
+            f"with review_verdict={verdict!r}"
+        )
 
 
 def _is_empty(value: Any) -> bool:
@@ -205,6 +237,8 @@ class GateHandler:
                 from hive.lib.dag_executor.routing import parse as parse_predicate
                 from hive.lib.dag_executor.routing.errors import Skipped
 
+                if node.id == "gate-review" and "review_passed" in predicate:
+                    _validate_review_signal(node, inputs)
                 ast = parse_predicate(predicate)
                 if not isinstance(ast, Skipped):
                     result = eval_predicate(ast, output_graph)

@@ -123,19 +123,71 @@ Added by story `c-2-test-simulated-manual-mode` in the `autonomous-cycle-loop` e
 ```yaml
 manual_verdict:
   scenario_ref: <repo-relative path>   # path to .pHive/test-scenarios/<id>.yaml
+  required: true | false               # default false — see 9.1b
   verdict: pass | fail | inconclusive  # written by /test --simulated-manual
   timestamp: <ISO 8601>                # when the verdict was rendered (null = not yet run)
   agent: <agent-name>                  # persona that executed the scenario (null = not yet run)
+  waived:                              # optional — see 9.1a
+    reason: <string>
+    timestamp: <ISO 8601>
+    owner: <string>
 ```
+
+### 9.1b The `required:` field (story wr-3-manual-verdict-aging, REVISION-1b)
+
+"Required device-pass" is not derivable from any other existing story/epic data —
+the `simulated-manual` concern can apply to non-UI stories too, and no separate
+device/UI tier field exists elsewhere in the schema. `required` is therefore
+**plan-owned and derived at plan time**, never a human-set field at ship time:
+
+- **Who writes:** `/plan` step 14, when seeding `manual_verdict` for the
+  `simulated-manual` concern (see [`skills/plan/SKILL.md`](../../skills/plan/SKILL.md)
+  step 14 "Simulated-manual concern"). The planning persona sets `required: true`
+  only when the story is judged a genuine UI/device-pass gate (a real device or
+  manual pass is needed to validate it); otherwise `required: false`. This is
+  automatic during planning — no operator prompt at ship time, no ship-time toggle.
+- **Default:** `false` when absent, for byte-compatibility with every
+  pre-existing `manual_verdict` block seeded before this field existed.
+- **Who honors:** `/ship`'s UI-done-done refusal
+  (`hive/lib/manual_verdict_status.py:epic_has_required_device_pass` /
+  `blocking_pending_verdicts`) blocks done-done ONLY for a PENDING, non-waived
+  verdict with `required: true`. `required: false`/absent is never a blocker —
+  this corrects the round-1 bug that keyed blocking off mere `manual_verdict`
+  presence, which wrongly blocked non-UI epics. `/status`'s PENDING aging
+  section is unaffected by `required` — it surfaces every PENDING block
+  regardless of the flag (broad nag).
+
+### 9.1a The optional `waived:` sub-field (story wr-3-manual-verdict-aging)
+
+Added by story `wr-3-manual-verdict-aging` in the `wfd-retro-hardening` epic. Reuses
+the existing `manual_verdict` block — this is NOT a new top-level schema block (per
+the grill-reduced scope of proposals (b)+(i); see
+`.pHive/epics/wfd-retro-hardening/docs/design-discussion.md` sec 0b).
+
+| Sub-field | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `waived.reason` | string | — | Required when `waived` is present. Human-readable reason the PENDING verdict is being waived. |
+| `waived.timestamp` | ISO 8601 | — | Required when `waived` is present. When the waive was recorded. |
+| `waived.owner` | string | — | Required when `waived` is present. Who recorded the waive. |
+
+**Who writes:** an operator, via `/ship`'s waive path (`hive/lib/manual_verdict_status.py:waive_pending_verdict`), only while `verdict` is still `null` (PENDING). Writing a waive never mutates `verdict`, `timestamp`, or `agent` — those still update normally if `/test --simulated-manual` later runs for real.
+
+**Who honors:** `/status`'s PENDING aging section (still lists a waived entry, labeled `waived (aging)`, not hidden) and `/ship`'s UI-done-done refusal (a waived PENDING no longer blocks shipping).
+
+**Absence semantics:** `waived` absent (the common case, and the only case for every pre-existing story) means "not waived" — identical behavior to before this field existed. No migration needed for existing epics.
+
+**Audit posture (grill T3):** a waive is additive, never a deletion of the PENDING signal — it must not become a new silent indefinite-PENDING. `/status` keeps surfacing a waived entry with its aging, so a waive is a visible, owned decision, not a bypass.
 
 ### 9.2 Field semantics
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `scenario_ref` | string | — | Repo-relative path to the scenario YAML; must resolve to a file conforming to [`test-scenario-schema.md`](test-scenario-schema.md). Set at plan time; updated by the tester if the scenario file is renamed. |
+| `required` | bool | `false` | Plan-derived flag marking a UI/device-pass gate that must render a passing (or waived) verdict before `/ship` may mark the epic done-done. See 9.1b. |
 | `verdict` | enum \| null | `null` | The outcome of the last `/test --simulated-manual` run: `pass`, `fail`, or `inconclusive`. `null` = not yet run. |
 | `timestamp` | ISO 8601 \| null | `null` | Wall-clock time when the verdict was recorded. `null` = not yet run. |
 | `agent` | string \| null | `null` | Persona name that executed the scenario (e.g., `tester`). `null` = not yet run. |
+| `waived` | mapping \| absent | absent | See 9.1a. Only meaningful while `verdict` is `null`. |
 
 ### 9.3 Lifecycle
 
@@ -146,9 +198,10 @@ manual_verdict:
 ### 9.4 Worked example
 
 ```yaml
-# story YAML — seeded by /plan at planning time
+# story YAML — seeded by /plan at planning time for a UI/device-pass story
 manual_verdict:
   scenario_ref: .pHive/test-scenarios/c-2-test-simulated-manual-mode-manual.yaml
+  required: true
   verdict: null
   timestamp: null
   agent: null
@@ -156,9 +209,18 @@ manual_verdict:
 # same story YAML — after /test --simulated-manual runs successfully
 manual_verdict:
   scenario_ref: .pHive/test-scenarios/c-2-test-simulated-manual-mode-manual.yaml
+  required: true
   verdict: pass
   timestamp: "2026-05-21T20:45:00Z"
   agent: tester
+
+# a non-UI story that also opts into simulated-manual — required stays false
+manual_verdict:
+  scenario_ref: .pHive/test-scenarios/some-backend-story-manual.yaml
+  required: false
+  verdict: null
+  timestamp: null
+  agent: null
 ```
 
 ## 3. The `metric:` field group
@@ -490,13 +552,16 @@ target_codebase: <abs path>      # absolute path to the codebase /plan targeted
 methodology: <classic|tdd|bdd>   # selected in /plan; can be overridden per-story
 version_bump: <major|minor|patch|none>  # selected in /plan; consumed by /execute finalize
 
-# pe-5: pinned at plan time from `hive/lib/git_flow.mjs` (pe-1). The
+# pe-5: pinned at plan time from `hive/lib/git_flow.py` (pe-1). The
 # sandcastle bridge (pe-2) and dispatch workflow (pe-3) prefer these
 # pinned values over the live `hive.config.yaml`, so a config drift
 # after plan does not retroactively shift the epic's branching target.
 git_flow:
   base_branch: <resolved>        # e.g. `develop` or `main` or `dev/hive-2.0`
   branch_strategy: <resolved>    # `per-epic` (default) | `per-story`
+
+depends_on_epic: <epic-id | [epic-ids]>  # optional; see 6.5
+planned_base_ref: <sha>          # optional; see 6.5
 
 source_issue: <gh-issue-number>  # optional; tracker linkage
 
@@ -601,6 +666,68 @@ planning_team:
   gate_decisions:
     architecture: included
     security: included
+```
+
+### 6.5 The `depends_on_epic:` / `planned_base_ref:` field group
+
+Added by story `wr-6-plan-drift-instrument`. Canonicalizes a field that
+existed ad-hoc on exactly one prior epic (`skill-ergo-may2026`, plan-dated
+2026-05-17) before this story — absent from this schema, and absent from
+`/plan`'s emit path. These two fields are the input the `/execute`
+auto-firing reconciliation gate (§ below, see `skills/execute/SKILL.md`)
+reads to decide whether an epic's dependency has moved since planning.
+
+#### 6.5.1 Shape
+
+```yaml
+depends_on_epic: <epic-id>              # scalar form, OR:
+depends_on_epic: [<epic-id>, ...]       # list form — both are canonical
+
+planned_base_ref: <sha>                  # resolved merge-base SHA, pinned at plan time
+```
+
+#### 6.5.2 Field semantics
+
+| Field | Type | Allowed values | Source |
+|---|---|---|---|
+| `depends_on_epic` | string \| list of strings | one or more `epic-id`s this epic's stories depend on | operator-declared during `/plan`, when the requirement names a real prerequisite epic rather than honor-system sequencing |
+| `planned_base_ref` | string | a resolved git commit SHA | pinned by `/plan` as the resolved merge-base SHA of `git_flow.base_branch` and the dependency ref (`git merge-base <base_branch> <dependency-ref>`) at the moment this epic's branch forked from it, mirroring the `git_flow` pinning rationale in § 6.2 |
+
+Both fields are independent: an epic may declare `depends_on_epic` for
+documentation/audit purposes without `planned_base_ref` (no reconciliation
+tracking), though `/plan` sets both together going forward when a real
+dependency is declared.
+
+#### 6.5.3 Who-writes / who-honors / absence-semantics
+
+| Field | Who writes | Who honors | Absence semantics |
+|---|---|---|---|
+| `depends_on_epic` | `/plan`, at epic-creation time, when the operator confirms a real prerequisite epic (gate decision, not inferred) | `/execute` preamble (reconciliation gate), `/status` (dependency display) | Absent means "no declared epic-level dependency" — treated identically to an epic that pre-dates this story. Never inferred from `depends_on` story-level fields or narrative description text. |
+| `planned_base_ref` | `/plan`, at the same time as `depends_on_epic`, resolved via `git merge-base <base_branch> <dependency-ref>` | `/execute` preamble (reconciliation gate) — compared against the CURRENT resolved `git merge-base <base_branch> <dependency-ref>` | Absent (or present on `depends_on_epic` alone) means "dependency declared but not tracked for drift" — the gate never fires; no reconciliation is ever required. A present-but-non-SHA value (a bare branch name such as `develop`, written before this story canonicalized the field) is a **legacy placeholder**: the gate skips with a one-line info log rather than treating it as a resolvable ref — no migration is forced on pre-dating epics. |
+
+#### 6.5.4 Idempotency on re-plan
+
+If `epic.yaml` already contains `depends_on_epic:`/`planned_base_ref:`,
+`/plan` re-resolves `planned_base_ref` in place on a re-plan (the pinned
+merge-base may have shifted since the last plan pass); `depends_on_epic`
+is left untouched unless the operator explicitly changes the dependency.
+Canonical field order in `epic.yaml` is `git_flow` → `depends_on_epic` →
+`planned_base_ref` → `planning_team`; insert immediately after `git_flow:`
+when absent.
+
+#### 6.5.5 Back-compat
+
+Epics that pre-date this story (including `skill-ergo-may2026`'s ad-hoc
+list-form usage) validate as-is — both scalar and list forms of
+`depends_on_epic` are canonical, and a non-SHA `planned_base_ref` is a
+legacy placeholder rather than a validation error. No existing epic
+requires a migration to keep validating.
+
+#### 6.5.6 Worked example
+
+```yaml
+depends_on_epic: skill-footprint
+planned_base_ref: a35c3c3e1b2d4e5f6a7b8c9d0e1f2a3b4c5d6e7f
 ```
 
 ## 7. The `test_scenario` field group

@@ -152,3 +152,39 @@ does not need to handle parse errors.
 See [`hive/references/metrics-event.schema.md`](../../hive/references/metrics-event.schema.md)
 for row shape, bucketing rules, and the maturity gate that govern
 these events.
+
+### 10. PENDING manual_verdict aging (story wr-3-manual-verdict-aging)
+
+Every story's `manual_verdict` block (see
+[`hive/references/story-yaml-schema.md §9`](../../hive/references/story-yaml-schema.md))
+still PENDING (`verdict: null`) is a device pass someone owes an epic — left un-nagged,
+it rots silently (see the campaign evidence in
+`.pHive/epics/wfd-retro-hardening/docs/design-discussion.md` sec 2, wr-2). Surface the
+trend by shelling out to the read-only helper from story `wr-3-manual-verdict-aging`:
+
+```python
+from pathlib import Path
+from hive.lib.manual_verdict_status import find_pending_manual_verdicts, format_pending_aging_section
+
+print(format_pending_aging_section(find_pending_manual_verdicts(repo_root, state_dir)))
+```
+
+or equivalently `python3 -m hive.lib.manual_verdict_status` from the repo root.
+
+Render the helper's output verbatim as a section after the drift-trend block:
+
+```
+---
+
+PENDING manual_verdict aging:
+  wfd-e9 / e9-auth-flow — PENDING (12d)
+  wfd-e9 / e9-checkout-flow — PENDING, waived (31d) by dana: device unavailable this cycle
+```
+
+A waived entry is never hidden — it still shows with its aging so a waive stays a
+visible, owned decision rather than a silent bypass (grill T3).
+
+**Silent on absence.** If no story anywhere has a PENDING `manual_verdict`, the helper
+prints nothing and this section is omitted entirely — same posture as the drift-trend
+section above. This also covers projects that never use the `simulated-manual`/actual
+concern at all: no `manual_verdict` blocks anywhere means nothing to surface.

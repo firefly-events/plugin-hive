@@ -95,8 +95,10 @@ resolver shape:
 // Worktree-isolation check — must be the first action in this gate.
 // Rejects before any field resolution if the skill is not running inside
 // a `.claude/worktrees/<name>/` checkout.
-import { assertWorktreeIsolation } from '../../../hive/lib/cc-workflows-preconditions.mjs';
-assertWorktreeIsolation(); // throws precondition_failed if cwd is not a worktree
+import { execFileSync } from 'node:child_process';
+const precondition = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_preconditions.py'], { input: JSON.stringify({ cwd: process.cwd() }), encoding: 'utf8' }));
+// Python equivalent of assertWorktreeIsolation(); this must remain first.
+if (!precondition.ok) throw Object.assign(new Error(precondition.error), precondition);
 ```
 
 Resolve runtime and tooling before dispatching any design-review work: verify CC runtime
@@ -165,16 +167,13 @@ design-review 4-step sequence is ONE Workflow run.
 1. **Resolve model tiers for all four roles before assembly.**
 
    ```js
-   import { resolveModelTier } from '../../../hive/lib/cc-workflows-model-tier.mjs';
-
-   const { tier: accessTier, source: accessSource } =
-     resolveModelTier('accessibility-specialist', { config: hive_config });
-   const { tier: animTier, source: animSource } =
-     resolveModelTier('animations-specialist', { config: hive_config });
-   const { tier: criTier, source: criSource } =
-     resolveModelTier('ui-designer', { config: hive_config });
-   const { tier: synTier, source: synSource } =
-     resolveModelTier('ui-designer', { config: hive_config });
+   const { tier: accessTier, source: accessSource } = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_model_tier.py'], { input: JSON.stringify({ persona: 'accessibility-specialist', config: hive_config }), encoding: 'utf8' }));
+   // Python equivalent of resolveModelTier('accessibility-specialist', { config: hive_config }).
+   const { tier: animTier, source: animSource } = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_model_tier.py'], { input: JSON.stringify({ persona: 'animations-specialist', config: hive_config }), encoding: 'utf8' }));
+   // Python equivalent of resolveModelTier('animations-specialist', { config: hive_config }).
+   const { tier: criTier, source: criSource } = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_model_tier.py'], { input: JSON.stringify({ persona: 'ui-designer', config: hive_config }), encoding: 'utf8' }));
+   // Python equivalent of resolveModelTier('ui-designer', { config: hive_config }).
+   const { tier: synTier, source: synSource } = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_model_tier.py'], { input: JSON.stringify({ persona: 'ui-designer', config: hive_config }), encoding: 'utf8' }));
    ```
 
    No `agent()` call may omit `opts.model`. The resolver reads `model_overrides` (runtime
@@ -508,8 +507,8 @@ HIVE_DESIGN_REVIEW_MODE=cc-workflows
   (lines 8-81) defines the canonical step order and dependency shape.
 - `hive/references/ui-prompts/design-review-design-critique.md` — step_file for Step C.
 - `hive/references/ui-prompts/design-review-synthesis.md` — step_file for Step D.
-- `hive/lib/cc-workflows-preconditions.mjs` — `assertWorktreeIsolation()` called at Step 0.
-- `hive/lib/cc-workflows-model-tier.mjs` — model-tier resolver; consumed at Step 1 for
+- `hive/lib/cc_workflows_preconditions.py` — worktree-isolation precondition called at Step 0.
+- `hive/lib/cc_workflows_model_tier.py` — model-tier resolver; consumed at Step 1 for
   all four `agent()` calls.
 - `hive/lib/mode-resolver.mjs` — 5-tier `resolveMode('HIVE_DESIGN_REVIEW_MODE', ctx)`.
 - `skills/hive/skills/design-review-dispatch/SKILL.md` (dr-1) — router that dispatches
@@ -537,9 +536,9 @@ Key references:
 | --skip flag forwarded verbatim | Optional steps A+B only; required steps C+D cannot be skipped |
 | --artifact-target forwarded verbatim | Injected into Steps C+D agent prompts via `a.artifact_target` |
 | 5-tier mode resolution | `resolveMode('HIVE_DESIGN_REVIEW_MODE', ctx)` via mode-resolver.mjs |
-| assertWorktreeIsolation() at Step 0 | Import from `hive/lib/cc-workflows-preconditions.mjs`; must be first action |
+| worktree isolation at Step 0 | Invoke `hive/lib/cc_workflows_preconditions.py`; must be first action |
 | No Codex routing | Zero `agentType` literals in code blocks; zero `codex:codex-rescue` references; zero `agent_backends` keys |
-| opts.model REQUIRED on every agent() call | resolveModelTier() from cc-workflows-model-tier.mjs for all 4 roles |
+| opts.model REQUIRED on every agent() call | Python model-tier resolver for all 4 roles |
 | Defensive args parse contract | `const a = typeof args === 'string' ? JSON.parse(args) : args;` at script-body top |
 | Insight-capture suffix on every agent() prompt | Per execute-mode-cc-workflows mandatory clause; persona substituted per call |
 | completion_kind: doc-verdict | Design-review produces a verdict document, not code commits |

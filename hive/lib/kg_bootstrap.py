@@ -29,6 +29,7 @@ SEED_PREDICATES: tuple[str, ...] = (
     "assigned_to",
     "blocked_by",
     "depends_on",
+    "insight",
     "phase_started",
     "phase_complete",
     "phase_failed",

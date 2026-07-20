@@ -1,15 +1,37 @@
+"""Read Hive's intentionally separate three-file configuration layers.
+
+The root ``hive.config.yaml`` is the consumer override layer, located from
+the invoking project (normally the current working directory; ``HIVE_CONFIG``
+can override this path for emit-lifecycle reads).  The shipped
+``hive/hive.config.yaml`` is the package baseline, located relative to this
+installed module.  For loop configuration, root values override baseline
+values per field, with the corresponding environment variables taking final
+precedence.  For the ``emit_lifecycle_at`` setting, the first file containing
+the key wins (root over baseline), so a root value replaces the whole scalar.
+
+The third file, ``.pHive/hive.config.yaml``, is not part of this baseline
+fallback.  It is a separate consumer-local executor graduation flag and is
+read by the executor integration.  Keeping it isolated prevents that
+maintainer-only opt-in from being accidentally shipped with the package.
+"""
+
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+
+_log = logging.getLogger(__name__)
 
 try:  # pragma: no cover - depends on local optional dependency set
     import yaml  # type: ignore
 except Exception:  # pragma: no cover - exercised when PyYAML unavailable
     yaml = None
+
+from hive.lib.paths_scan import scan_paths_block
 
 
 EMIT_LIFECYCLE_AT_VALUES = frozenset({"phase", "story", "step", "off"})
@@ -37,7 +59,8 @@ def read_config_file(file_path: str | os.PathLike[str] | None) -> dict[str, Any]
         return {}
     try:
         return parse_config_text(path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as exc:
+        _log.debug("read_config_file: error reading %s: %s", path, exc)
         return {}
 
 
@@ -48,7 +71,7 @@ def parse_config_text(raw: str) -> dict[str, Any]:
     try:
         parsed = json.loads(raw)
         return parsed if isinstance(parsed, dict) else {}
-    except Exception:
+    except json.JSONDecodeError:
         pass
 
     narrow = parse_top_level_emit_lifecycle_at(raw)
@@ -89,6 +112,7 @@ def resolve_state_dir(
     *,
     cwd: str | os.PathLike[str],
     env: dict[str, str],
+    paths_scanner: Callable[[str, str], str | None] = scan_paths_block,
 ) -> str:
     """Resolve the Hive state directory to an absolute, canonicalized path.
 
@@ -123,12 +147,15 @@ def resolve_state_dir(
     # only config-sourced values go through scalar cleaning.
     state_dir = env.get("HIVE_STATE_DIR") or None
     if state_dir is None:
-        state_dir = _read_paths_value(config_path, "state_dir") or ".pHive"
+        state_dir = (
+            _read_paths_value(config_path, "state_dir", paths_scanner)
+            or ".pHive"
+        )
 
     if os.path.isabs(state_dir):
         return _canonicalize_path(state_dir)
 
-    target_project = _read_paths_value(config_path, "target_project")
+    target_project = _read_paths_value(config_path, "target_project", paths_scanner)
     if target_project is None:
         base = str(cwd_path)
     elif os.path.isabs(target_project):
@@ -146,7 +173,9 @@ def _canonicalize_path(value: str) -> str:
 
 
 def _read_paths_value(
-    config_path: str | os.PathLike[str], key: str
+    config_path: str | os.PathLike[str],
+    key: str,
+    paths_scanner: Callable[[str, str], str | None] = scan_paths_block,
 ) -> str | None:
     """Read one ``paths.<key>`` scalar from a hive.config.yaml file: JSON
     first, then PyYAML when available, then the line-oriented block fallback.
@@ -156,7 +185,8 @@ def _read_paths_value(
         return None
     try:
         raw = path.read_text(encoding="utf-8")
-    except Exception:
+    except Exception as exc:
+        _log.debug("_read_paths_value: error reading %s: %s", config_path, exc)
         return None
 
     parsed: dict[str, Any] | None = None
@@ -164,7 +194,7 @@ def _read_paths_value(
         candidate = json.loads(raw)
         if isinstance(candidate, dict):
             parsed = candidate
-    except Exception:
+    except json.JSONDecodeError:
         pass
 
     if parsed is None and yaml is not None:
@@ -172,36 +202,20 @@ def _read_paths_value(
             candidate = yaml.safe_load(raw)
             if isinstance(candidate, dict):
                 parsed = candidate
-        except Exception:
-            pass
+        except Exception as exc:
+            _log.debug("_read_paths_value: yaml parse error in %s: %s", config_path, exc)
 
     if parsed is not None:
         paths = parsed.get("paths")
         value = paths.get(key) if isinstance(paths, dict) else None
         return _clean_paths_scalar(value)
 
-    return _clean_paths_scalar(_parse_paths_block_value(raw, key))
+    return _clean_paths_scalar(paths_scanner(raw, key))
 
 
 def _parse_paths_block_value(raw: str, key: str) -> str | None:
-    """Line-oriented fallback mirroring the awk parse in hooks/common.sh.
-
-    Scans the ``paths:`` block for ``key`` when neither JSON nor PyYAML
-    parsing applies. Inline ``# comments`` are stripped from the value,
-    matching YAML parsers.
-    """
-    in_paths = False
-    for line in raw.splitlines():
-        if re.match(r"^paths:\s*(?:#.*)?$", line):
-            in_paths = True
-            continue
-        if in_paths and re.match(r"^[^\s#][^:]*:", line):
-            in_paths = False
-        if in_paths:
-            match = re.match(rf"^\s+{re.escape(key)}:\s*(.*)$", line)
-            if match:
-                return re.sub(r"\s*#.*$", "", match.group(1))
-    return None
+    """Backward-compatible wrapper around the shared paths-block scanner."""
+    return scan_paths_block(raw, key)
 
 
 def _clean_paths_scalar(value: Any) -> str | None:

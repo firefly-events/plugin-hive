@@ -9,6 +9,29 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.15.1] - 2026-07-20
+
+### Version
+
+- **patch bump `2.15.0` → `2.15.1`.** This release promotes **all development merged to `develop` since 2.15.0 went live (2026-07-05)** — 7 epics in total. The two planned `minor` epics were reconciled to `patch` for a single consolidated patch release. Version sources (plugin.json, marketplace.json, README badge) in lockstep.
+- The 07-13 batch (`wfd-retro-hardening` #63, `metrics-observability` #64, `skill-footprint` #65, `cmux-modernization` #66) was planned and executed this ship cycle. Three more epics merged to `develop` earlier in the same post-2.15.0 window and ship now as part of the same promotion: `python-hardening` (#53), `sandcastle-stub-hygiene` (#61), `multica-learning-loop` (#45). All seven are documented below so the published changelog matches the full `develop → main` diff.
+
+### Added
+
+- **WFD-retro-hardening: process-visibility detectors + deterministic ship checks + plan-drift instrument (7 stories).** completion-record detector (SubagentStop/Stop), `/ship` no-squash merge-shape check, plan-derived `manual_verdict` aging + required-device-pass gate, narrowed check-agent-misuse Pattern-1, completion-marker contract wired into the operative team-prompt assembler, plan-drift instrument (depends_on_epic/planned_base_ref + merge-base reconciliation gate + metric), and lean-agent-prompt reference + override incident-field validation (moved to `hive/lib/insight_validation.py` on merge to avoid a filename collision with the learning-loop harvest module).
+- **Metrics-observability: expose the pipeline + per-skill token sensor (4 stories).** `/metrics` read-only command over the collect+render pipeline (mo-1); per-skill token sensor attributing token spend at the `Stop` hook boundary with a `/metrics` rollup view (mo-2, with the collect_tokens double-count fixed on merge); events gitignore taxonomy + collector foreign-row guard + `agent_spawn` validator (mo-3); learning-loop cold/warm dimension with a classic-path-only caveat (mo-4).
+
+- **Skill-footprint: safe conditional extractions + regression lint (4 stories).** Agent-skills best-practices grounding + corpus audit (sf-0); extracted the scope-conditional H/V + Structured-Outline plan phases to `skills/plan/references/` behind conditional reads (sf-1); CI `skill-size-lint` job with an 800-line cap + grandfather-ratchet allowlist (sf-2); read-only Phase-C compression-scope classification doc for a future epic (sf-3).
+- **Cmux-modernization: hook-correlation spike -> NO-GO (spike only).** cm-1 proved event-driven codex completion is infeasible in Hive's `interactive_panes` dispatch mode (notification id is panel-scoped, not the dispatch-time `CMUX_SURFACE_ID`; cmux drops codex's native `turn_id` before the event bus). cm-2 not built; poll/`report_shell_state` retained. Recorded as `outcome: stop-after-spike`.
+
+### Also shipped this release (merged to develop earlier in the same post-2.15.0 window)
+
+These epics merged to `develop` after 2.15.0 but before the 07-13 batch above. They ship in the same `develop → main` promotion; recording them here keeps the released changelog matched to the full diff.
+
+- **Python-hardening: tighten the canonical `hive/lib` runtime (9 stories, PR #53).** `config.py` fallback-path characterization tests (ph-1) + log-first `except` hardening with narrowed JSON probes (ph-2); documented + conformance-tested the 3-file config precedence (ph-3); KG-emit consolidation audit + parity fixture + plan, no code swap (ph-4); deduped the paths-block YAML scanner shared by `config.py` and `harness/snapshot.py` (ph-5); read-and-confirm analysis of the 9-file hand-rolled-YAML consolidation candidates (ph-6); `dag_executor` boundary analysis + written extraction plan, no code moves (ph-7); confirmed + deleted orphan Node files (ph-8); ported a 3-file Node tranche — `git_flow`, cc-workflows model-tier, cc-workflows preconditions — to Python (ph-9). Advances the Python-first charter without touching the named bridge surfaces.
+- **Sandcastle-stub-hygiene: repo hygiene (2 stories, PR #61).** Root-caused and fixed a `TMPDIR`→repo-root leak at the confirmed layer with a `.gitignore` backstop (hy-1); direct-execution repo tidy — worktree prune + proposals archive (hy-2). Sandcastle extraction itself remains deferred to an external-repo spinout.
+- **Multica agent learning loop: dispatched agents build on prior experience (3 stories, PR #45).** Read side — stamp the persona on dispatch and inject Prior Experience into the Multica story brief (s1); write side — curated harvest of self-capture into committed team-memories + KG at episode close (s2); verified the loop end-to-end on the studio daemon and settled the KG learning predicate (s3).
+
 ## [2.15.0] - 2026-07-05
 
 **Event-driven execution, effort-adaptive runs, and a metric-capture harness — plus MCP-stateless readiness and a config-reference refresh.**

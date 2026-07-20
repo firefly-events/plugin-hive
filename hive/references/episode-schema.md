@@ -150,11 +150,11 @@ field_sources:
 
 ### Resolution contract
 
-The tier is resolved by `hive/lib/cc-workflows-model-tier.mjs` at `workflow_assembly` time, before the Workflow tool is invoked. Precedence:
+The tier is resolved by `hive/lib/cc_workflows_model_tier.py` at `workflow_assembly` time, before the Workflow tool is invoked. Precedence:
 
 1. `model_overrides[persona]` — runtime promotion wins
 2. `model_tiers[tier]` — iterate tiers looking for persona inclusion
-3. Default — `sonnet` with `console.warn` naming the unmapped persona
+3. Default — `sonnet` with a stderr warning naming the unmapped persona
 
 The helper MUST NOT read persona frontmatter `model:` fields from `hive/agents/*.md`. Frontmatter is documentation (base tier annotation); `hive.config.yaml` is the sole runtime source of truth (per `feedback_frontmatter_base_tier_not_override`).
 

@@ -76,8 +76,14 @@ if echo "$prompt" | grep -qiE "$story_regex"; then
   # Check if it's a single story being fully delegated
   story_count=$(echo "$prompt" | grep -oiE "$story_regex" | sort -u | wc -l | tr -d ' ')
   if [ "$story_count" -ge 1 ]; then
-    # Check for workflow execution signals (not just reading a story for context)
-    if echo "$prompt" | grep -qiE '(execute.*stor|implement.*stor|workflow.*phase|development.*workflow|research.*implement.*test|review.*integrate)'; then
+    # Check for workflow execution signals (not just reading a story for context).
+    # NOTE: bare `execute.*stor|implement.*stor` was dropped — any story-YAML path
+    # already contains the literal substring "stories/", so those two alternatives
+    # matched on a lone "execute"/"implement" verb plus the path itself, tripping on
+    # legitimate single-step prompts that merely reference a story file. Collapsed
+    # do-everything prompts are still caught by the multi-phase/multi-verb signals
+    # below (workflow+phase, research+implement+test, review+integrate).
+    if echo "$prompt" | grep -qiE '(workflow.*phase|development.*workflow|research.*implement.*test|review.*integrate)'; then
       echo "BLOCKED: Agent tool used to execute story-level work. Use natural-language teammate spawn instead: describe the team and each teammate's tasks in your prompt" >&2
       echo "Detected $story_count story reference(s) with workflow execution patterns." >&2
       exit 2

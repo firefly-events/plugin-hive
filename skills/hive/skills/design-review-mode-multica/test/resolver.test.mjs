@@ -417,8 +417,8 @@ describe('no-codex scope — dr-2 is a *-mode-multica atom', () => {
   // targets *-mode-cc-workflows/SKILL.md files only. dr-2 is a *-mode-multica atom
   // and is out of scope for that lint script. The checks above cover the equivalent
   // constraints for the multica side. See reviewer memory: no-codex-lint-scope-is-code-blocks-only.
-  it('SKILL.md documents cc-workflows-preconditions.mjs as NOT required (multica atom, not cc-workflows)', () => {
-    // dr-2 is a Multica atom — it MUST NOT require cc-workflows-preconditions.mjs.
+  it('SKILL.md documents the Python preconditions helper as NOT required (multica atom, not cc-workflows)', () => {
+    // dr-2 is a Multica atom — it MUST NOT require the Python preconditions helper.
     // The assertWorktreeIsolation contract is for cc-workflows atoms only.
     const content = fs.readFileSync(ATOM_SKILL_MD_PATH, 'utf8');
     // Multica atom uses multica-story-dispatch helpers, not cc-workflows-preconditions

@@ -13,7 +13,7 @@
  *     - when decision === 'multica', test-dispatch SKILL.md routes to test-mode-multica
  *   - No-codex assertions: test-mode-cc-workflows/SKILL.md must not contain agentType
  *     literal, codex:codex-rescue, or agent_backends in code blocks; must contain
- *     hive/lib/cc-workflows-preconditions.mjs helper import
+ *     Python preconditions helper invocation
  *   - Structural mirror assertion: test-dispatch SKILL.md documents Steps 0/1/2
  *     matching execute-dispatch structural anchor
  */
@@ -199,9 +199,9 @@ describe('no-codex compliance — test-mode-cc-workflows SKILL.md', () => {
     expect(atomContent.length).toBeGreaterThan(0);
   });
 
-  it('SKILL.md contains hive/lib/cc-workflows-preconditions.mjs helper import (Check 4)', () => {
+  it('SKILL.md invokes the Python preconditions helper (Check 4)', () => {
     const content = fs.readFileSync(ATOM_SKILL_MD_PATH, 'utf8');
-    expect(content).toContain('hive/lib/cc-workflows-preconditions.mjs');
+    expect(content).toContain('hive/lib/cc_workflows_preconditions.py');
   });
 
   it('SKILL.md does not contain agentType: codex:codex-rescue literal in code blocks (Check 1)', () => {

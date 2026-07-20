@@ -488,6 +488,14 @@ export async function writeMulticaRunEpisode(opts) {
         messagesPath,
         ...distill,
       });
+      // S2-AC4: the Python bridge degrades to a raw-capture write (rather than
+      // throwing) when curated distillation is unavailable — surface that as a
+      // one-line warning instead of letting it pass silently as a normal result.
+      if (distillResult?.degraded) {
+        process.stderr.write(
+          `[multica-distill] ${storyId}: degraded to raw-capture — ${distillResult.error ?? 'unknown reason'}\n`,
+        );
+      }
     } catch (error) {
       process.stderr.write(
         `[multica-distill] ${storyId}: distill failed — ${error?.message ?? error}\n`,

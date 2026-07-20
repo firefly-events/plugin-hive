@@ -1,7 +1,7 @@
 {
   "name": "plugin-hive",
   "description": "Hive \u2014 workflow orchestration for Claude Code. Multi-agent swarms for planning, development, testing, and code review with quality gates, agent memories, and daily ceremony workflow.",
-  "version": "2.15.0",
+  "version": "2.15.1",
   "skills": "./skills/",
   "hooks": {
     "PreToolUse": [
@@ -12,6 +12,28 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/check-agent-misuse.sh\"",
             "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/metrics-skill-token-capture.sh\" --phase pre || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/metrics-skill-token-capture.sh\" --phase promptstart || true",
+            "timeout": 3
           }
         ]
       }
@@ -46,6 +68,11 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/metrics-stop-dispatch.sh\" || true",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/metrics-skill-token-capture.sh\" --phase stop || true",
+            "timeout": 5
           }
         ]
       }

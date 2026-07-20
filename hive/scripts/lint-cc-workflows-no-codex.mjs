@@ -35,10 +35,10 @@
  *
  *   Check 4 (cc-workflows-preconditions-import):
  *     Asserts every scoped SKILL.md contains the helper-import module path
- *     fragment `hive/lib/cc-workflows-preconditions.mjs` anywhere in the
+ *     fragment `hive/lib/cc_workflows_preconditions.py` anywhere in the
  *     file (typically in a Step 0 code block).
  *     Limit: transitive imports beyond depth 1 are NOT checked. If a future
- *     helper module itself imports cc-workflows-preconditions.mjs, the chain
+ *     helper module itself imports cc_workflows_preconditions.py, the chain
  *     is not followed. Code-review discipline covers depth 2+.
  *
  * Exit codes:
@@ -207,7 +207,7 @@ function grepAgentBackends(content, filePath) {
 // ---------------------------------------------------------------------------
 // Check 4: cc-workflows-preconditions-import (full file)
 // ---------------------------------------------------------------------------
-const HELPER_IMPORT_FRAGMENT = 'hive/lib/cc-workflows-preconditions.mjs';
+const HELPER_IMPORT_FRAGMENT = 'hive/lib/cc_workflows_preconditions.py';
 
 function assertHelperImport(content, filePath) {
   if (content.includes(HELPER_IMPORT_FRAGMENT)) return { ok: true };
@@ -216,7 +216,7 @@ function assertHelperImport(content, filePath) {
     message:
       `Check 4 (cc-workflows-preconditions-import): missing helper import in ${filePath}\n` +
       `  Expected to find: ${HELPER_IMPORT_FRAGMENT}\n` +
-      `  Add at Step 0: import { assertWorktreeIsolation } from '../../../hive/lib/cc-workflows-preconditions.mjs';`,
+      `  Add at Step 0: invoke python3 hive/lib/cc_workflows_preconditions.py with the current cwd.`,
   };
 }
 

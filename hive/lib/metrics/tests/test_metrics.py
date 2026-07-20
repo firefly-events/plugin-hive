@@ -54,6 +54,40 @@ class MetricsRuntimeTests(unittest.TestCase):
 
         self.assertEqual([event], rows)
 
+    def test_append_event_agent_spawn_round_trip(self) -> None:
+        event = {
+            "event_id": "evt_002",
+            "timestamp": "2026-04-20T14:03:11Z",
+            "run_id": "run_002",
+            "story_id": "C1.4",
+            "metric_type": "agent_spawn",
+            "value": 3,
+            "unit": "count",
+            "dimensions": {"persona": "developer"},
+            "source": "unit-test",
+        }
+
+        append_event(event, "run_002")
+        rows = read_run_events("run_002")
+
+        self.assertEqual([event], rows)
+
+    def test_append_event_agent_spawn_rejects_non_numeric_value(self) -> None:
+        event = {
+            "event_id": "evt_003",
+            "timestamp": "2026-04-20T14:03:11Z",
+            "run_id": "run_003",
+            "story_id": "C1.4",
+            "metric_type": "agent_spawn",
+            "value": "three",
+            "unit": "count",
+            "dimensions": {},
+            "source": "unit-test",
+        }
+
+        with self.assertRaises(MetricsValidationError):
+            append_event(event, "run_003")
+
     def test_create_envelope_round_trip(self) -> None:
         envelope = self._base_envelope()
 

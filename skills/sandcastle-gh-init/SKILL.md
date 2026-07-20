@@ -96,8 +96,8 @@ node skills/sandcastle-gh-init/scaffold.mjs \
      because GitHub Actions evaluates `concurrency.group` before any
      step in the consuming job runs, so step env or step outputs of the
      same job are not available.
-   - **`Resolve base branch` step.** A Node one-liner inside the `run`
-     job dynamically imports `hive/lib/git_flow.mjs` (vendored from
+   - **`Resolve base branch` step.** A Python helper invocation inside the
+     `run` job invokes `hive/lib/git_flow.py` (vendored from
      plugin-hive's pe-1 helper) and prints the resolved `base_branch`,
      stored as `steps.base.outputs.base_branch`. Falls back to
      `github.event.repository.default_branch` when the helper module is
@@ -150,16 +150,15 @@ node skills/sandcastle-gh-init/scaffold.mjs \
    - Fetches the issue's labels via the GitHub REST API (uses `GH_TOKEN`
      and `GITHUB_REPOSITORY` — never shells out, preserving the AC-7
      no-child_process invariant).
-   - Looks for a `hive:epic:<epic-id>` label and dynamically imports
-     `hive/lib/git_flow.mjs` (when vendored) to read the resolved
-     `branch_strategy`.
+   - Looks for a `hive:epic:<epic-id>` label and consumes the
+     `HIVE_BRANCH_STRATEGY` value resolved by the workflow's Python helper.
    - When `branch_strategy: per-epic` (default per pe-1) and an epic
      label is present, the branch is `feat/<epic-id>`. Otherwise — no
      epic label, or `branch_strategy: per-story` configured — it falls
      back to the legacy `agent/issue-<n>` form.
-   - When the helper module is absent (consumer has not vendored
-     plugin-hive's `hive/lib/`), the bridge defaults to `per-epic`
-     semantics so epic-labeled issues still consolidate onto
+   - When the helper is absent (consumer has not vendored plugin-hive's
+     `hive/lib/`), the workflow defaults to `per-epic` semantics so
+     epic-labeled issues still consolidate onto
      `feat/<epic-id>`.
 3. Reads the sandcastle version pin from
    `node_modules/@ai-hero/sandcastle/package.json`, with `npm ls

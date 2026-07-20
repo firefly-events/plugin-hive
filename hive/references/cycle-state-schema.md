@@ -182,6 +182,52 @@ When a planning swarm hands off to a dev swarm, the cycle state transfers as par
 | `routing_decisions` | list | Per-item routing records written by `/standup --interactive` Phase 1.5. See `Interactive routing decisions` below. |
 | `autonomous_cycle` | object | Per-cycle bookkeeping written by the autonomous-cycle-loop runner. Foundation field — see `Autonomous cycle bookkeeping` below. |
 | `hermes_reconciler` | object | Cross-tick persistent memory for the Hermes reconciler. Additive + absence-tolerant — see `Hermes reconciler state` below. |
+| `persona_dispatch` | object | Per-story alternative completion record, keyed by story ID. See `Persona dispatch alternative completion record` below. |
+
+## Persona dispatch alternative completion record
+
+Per story `wr-1-completion-record-detector` (`hive/lib/completion_record_detector.py`),
+a story with **no** `.pHive/episodes/{epic-id}/{story-id}/` directory at all is still
+accepted as having a completion record when the cycle state carries a conformant
+`persona_dispatch.<story-id>` entry. This is the OR-fallback: the detector evaluates
+the episode directory and this cycle-state entry **independently** and warns only when
+**neither** is conformant. It exists for dialects (e.g. `cc-workflows-run.yaml`,
+`dag-run.yaml`) that record per-agent completion directly on the cycle state instead of
+writing a per-story episode marker file.
+
+### Shape
+
+```yaml
+persona_dispatch:
+  <story-id>:
+    agents:
+      - persona: developer
+        verdict: pass
+      - persona: reviewer
+        verdict: pass
+```
+
+### Field semantics
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `persona_dispatch.<story-id>` | object | — | Present only for stories using the alternative record; absent stories fall through to the episode-directory check. |
+| `persona_dispatch.<story-id>.agents` | list | yes | One entry per dispatched agent for this story. Must be non-empty. |
+| `persona_dispatch.<story-id>.agents[].persona` | string | yes | Non-empty persona name (e.g. `developer`, `reviewer`). |
+| `persona_dispatch.<story-id>.agents[].verdict` | enum | yes | `pass`, `fail`, or `needs-revision`. |
+
+### Writer / honorer / absence semantics
+
+- **Writer:** the orchestrator (or dispatch tooling for `cc-workflows-run.yaml`/`dag-run.yaml`-style
+  flows) appends one `agents[]` entry per dispatched agent as each agent reaches a terminal verdict.
+- **Honorer:** `hive/lib/completion_record_detector.py` reads this block only when the story's episode
+  directory is missing, empty, or fails validation — it never overrides a conformant episode-directory
+  record.
+- **Absence:** no `persona_dispatch` key, or no entry for a given story ID, is not itself a malformed
+  record — it means "this story doesn't use the alternative record," and the detector falls back to the
+  episode-directory check as the sole source of truth. A **present but invalid** entry (e.g. empty
+  `agents[]`, missing `persona`, or an out-of-enum `verdict`) is malformed and warns, even when the
+  episode directory is also missing.
 
 ## Interactive routing decisions
 

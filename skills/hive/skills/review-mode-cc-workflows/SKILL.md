@@ -75,8 +75,10 @@ Precedence: **env > root\_config > shipped\_baseline > skill\_override > default
 
 ```js
 // Worktree-isolation check — must be the first action in this gate.
-import { assertWorktreeIsolation } from '../../../hive/lib/cc-workflows-preconditions.mjs';
-assertWorktreeIsolation(); // throws precondition_failed if cwd is not a worktree
+import { execFileSync } from 'node:child_process';
+const precondition = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_preconditions.py'], { input: JSON.stringify({ cwd: process.cwd() }), encoding: 'utf8' }));
+// Python equivalent of assertWorktreeIsolation(); this must remain first.
+if (!precondition.ok) throw Object.assign(new Error(precondition.error), precondition);
 ```
 
 Resolve runtime and tooling: verify CC runtime `>= 2.1.154`; read `claude --version` or proxy on
@@ -122,9 +124,8 @@ the Workflow TOOL, and tracks it. Dispatch granularity is per-review: one review
 1. **Resolve model tier before assembly.**
 
    ```js
-   import { resolveModelTier } from '../../../hive/lib/cc-workflows-model-tier.mjs';
-   const { tier: reviewerTier, source: reviewerSource } =
-     resolveModelTier('reviewer', { config: hive_config });
+   const { tier: reviewerTier, source: reviewerSource } = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_model_tier.py'], { input: JSON.stringify({ persona: 'reviewer', config: hive_config }), encoding: 'utf8' }));
+   // Python equivalent of resolveModelTier('reviewer', { config: hive_config }).
    ```
 
    No `agent()` call may omit `opts.model`. Resolver reads `model_overrides` then `model_tiers`
@@ -334,8 +335,8 @@ Environment override: `HIVE_REVIEW_MODE=cc-workflows`
 
 ## Reuses (atomic deps)
 
-- `hive/lib/cc-workflows-preconditions.mjs` — `assertWorktreeIsolation()` at Step 0.
-- `hive/lib/cc-workflows-model-tier.mjs` — model-tier resolver; consumed at Step 1.
+- `hive/lib/cc_workflows_preconditions.py` — worktree-isolation precondition at Step 0.
+- `hive/lib/cc_workflows_model_tier.py` — model-tier resolver; consumed at Step 1.
 - `hive/lib/mode-resolver.mjs` — 5-tier `resolveMode('HIVE_REVIEW_MODE', ctx)`.
 - `hive/lib/task-tracking-dispatch` — reserved for future tracker integration; not consumed in v1.
 - `hive/references/episode-schema.md` — episode marker format family.
@@ -354,10 +355,10 @@ Environment override: `HIVE_REVIEW_MODE=cc-workflows`
 | scope_drift emit at review:complete owned by dispatched reviewer agent | `scope_drift_observed: true` in marker; reviewer agent instructed to emit |
 | No Codex routing | Default workflow subagent only; Codex agentType forbidden |
 | No-git contract enforced via reviewer prompt | Agent prompt carries "do not run git commit/add/push"; orchestrator commits after return |
-| opts.model REQUIRED on every agent() call | `resolveModelTier('reviewer', ...)` from cc-workflows-model-tier.mjs |
+| opts.model REQUIRED on every agent() call | Python model-tier resolver for `reviewer` |
 | Defensive args parse contract | `const a = typeof args === 'string' ? JSON.parse(args) : args;` at script-body top |
 | Insight-capture suffix on agent() prompt | Per execute-mode-cc-workflows mandatory clause; persona = reviewer |
-| assertWorktreeIsolation() at Step 0 | Import from `hive/lib/cc-workflows-preconditions.mjs`; first action |
+| worktree isolation at Step 0 | Invoke `hive/lib/cc_workflows_preconditions.py`; first action |
 | No fallback inside this skill | Step 0 reject returns structured error; `review-dispatch` owns fallback |
 | Fixed outer seam | `arguments`, `field_sources`, `epic_id`, `hive_config`, `integration_branch` |
 | completion_kind: doc-verdict | Review produces a verdict document, not code commits |

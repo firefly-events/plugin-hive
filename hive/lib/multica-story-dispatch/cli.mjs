@@ -13,6 +13,7 @@ import {
   reconcileBranch,
   renderIntegrationContract,
   resetIssueForRerun,
+  fetchPriorExperienceSection,
 } from './index.mjs';
 
 import { pollTaskUntilTerminal, writeMulticaRunEpisode } from './episode-sync.mjs';
@@ -403,18 +404,63 @@ async function cmdDispatch(args, cfg) {
   // default base (main) and commit to a throwaway agent/<task> branch that never pushes —
   // breaking the dependency chain. Append idempotently (skip if already present).
   const integrationBranch = args['integration-branch'] ?? null;
+  let currentDesc = String(issue?.description ?? '');
+  let descChanged = false;
+
   if (integrationBranch) {
     const contractHeading = '## Integration Contract — single shared branch';
-    const currentDesc = String(issue?.description ?? '');
     if (!currentDesc.includes(contractHeading)) {
       const contract = renderIntegrationContract(integrationBranch, args['story-id'] ?? null);
-      const newDesc = `${currentDesc.trimEnd()}\n\n${contract}\n`;
-      await httpJson(issueUrl(serverUrl, workspaceId, issueUuid), {
-        method: 'PUT',
-        token,
-        body: { description: newDesc },
-      });
+      currentDesc = `${currentDesc.trimEnd()}\n\n${contract}\n`;
+      descChanged = true;
     }
+  }
+
+  // Persona stamp + Prior Experience injection (rev1-multica-learning-loop FIX 1):
+  // this is the production dispatch route (multica_dispatch_story → cmdDispatch),
+  // which previously sent the existing issue body unchanged. Without the stamp,
+  // S2 harvest can't attribute a memory to the dispatched persona; without the
+  // Prior Experience section, a later story dispatched via this route never sees
+  // an earlier story's learning. Only applies to agent dispatch — the persona
+  // concept is the assigned agent's name; squad dispatch has no single persona.
+  if (requestedType === 'agent') {
+    const persona = agentName;
+    const stampRe = /<!--\s*persona:\s*.+?\s*-->\n*/;
+    const desiredStamp = `<!-- persona: ${persona} -->`;
+    if (!currentDesc.includes(desiredStamp)) {
+      currentDesc = `${desiredStamp}\n\n${currentDesc.replace(stampRe, '').trimStart()}`;
+      descChanged = true;
+    }
+
+    const priorSection = await fetchPriorExperienceSection(
+      persona,
+      typeof args.epic === 'string' ? args.epic : null,
+      typeof args['story-id'] === 'string' ? args['story-id'] : null,
+      { pythonBin: typeof args['python-bin'] === 'string' ? args['python-bin'] : undefined },
+    );
+    const sectionRe = /\n*## Prior Experience\n[\s\S]*?(?=\n## |\n---\n|$)/;
+    const hasExistingSection = /## Prior Experience\n/.test(currentDesc);
+
+    if (priorSection && !currentDesc.includes(priorSection.trim())) {
+      currentDesc = currentDesc.replace(sectionRe, '');
+      const insightIdx = currentDesc.indexOf('## Insight Capture');
+      currentDesc =
+        insightIdx >= 0
+          ? `${currentDesc.slice(0, insightIdx)}${priorSection.trim()}\n\n${currentDesc.slice(insightIdx)}`
+          : `${currentDesc.trimEnd()}\n\n${priorSection.trim()}\n`;
+      descChanged = true;
+    } else if (!priorSection && hasExistingSection) {
+      currentDesc = currentDesc.replace(sectionRe, '');
+      descChanged = true;
+    }
+  }
+
+  if (descChanged) {
+    await httpJson(issueUrl(serverUrl, workspaceId, issueUuid), {
+      method: 'PUT',
+      token,
+      body: { description: currentDesc },
+    });
   }
 
   await moveOutOfBacklogIfNeeded(serverUrl, token, workspaceId, issueUuid);
@@ -505,6 +551,12 @@ async function cmdEpisode(args, cfg) {
 
   const issue = await httpJson(issueUrl(serverUrl, workspaceId, issueUuid), { token });
   const identifier = String(issue?.identifier ?? issue?.number ?? issueUuid);
+  // Persona stamp (locked decision #1, s1-brief-memory-injection): the issue
+  // description carries `<!-- persona: <name> -->` from serializeStoryBrief.
+  // Harvest keys the curated team-memory by this same persona. Match to the
+  // closing `-->` (not `\S+`) so a multi-word persona name isn't truncated.
+  const personaMatch = /<!--\s*persona:\s*(.+?)\s*-->/.exec(String(issue?.description ?? ''));
+  const distillPersona = personaMatch ? personaMatch[1] : null;
 
   const terminal = await readTaskWithMessages(serverUrl, token, workspaceId, issueUuid);
 
@@ -517,6 +569,10 @@ async function cmdEpisode(args, cfg) {
     identifier,
     terminal,
     messagesCaptureMax: 200,
+    // Enabled by default (no flag needed) — harvest runs before the caller's
+    // worktree cleanup; a failed/unavailable distill degrades gracefully and
+    // never fails this episode write (see writeMulticaRunEpisode).
+    distill: { persona: distillPersona },
   });
 
   succeed({ written: result.markerPath, status: result.status });

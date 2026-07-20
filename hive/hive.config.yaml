@@ -295,7 +295,7 @@ dreaming:
 
 # Git workflow settings (per-epic-branch-pr-flow epic, story pe-1)
 # Controls how Hive epics branch + open PRs. Resolved by
-# `hive/lib/git_flow.mjs` (`resolveGitFlow`).
+# `hive/lib/git_flow.py` (`resolve_git_flow`).
 #
 # default_pr_base:
 #   auto                — develop if origin/develop exists, else main (default)

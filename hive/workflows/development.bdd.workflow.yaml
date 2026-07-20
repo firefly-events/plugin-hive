@@ -300,18 +300,18 @@ steps:
         type: string
       - name: review_findings
         type: string
+      - name: review_passed
+        type: json
     optional: false
     timeout_ms: 300000
 
-  # #16: enforce the review verdict. A needs_revision review must NOT silently
-  # integrate. This gate fails the run when review_verdict == needs_revision,
-  # surfacing the review findings. (Auto-fix-and-re-review is the bounded
+  # Enforce the shared review contract: only an explicit passed verdict may
+  # integrate. needs_revision, needs_optimization, and missing/malformed
+  # values all fail closed. (Auto-fix-and-re-review is the bounded
   # converge-loop follow-on, t-005/t-006.)
   - id: gate-review
     node_type: gate
-    # needs_revision BLOCKS integrate; passed and needs_optimization both proceed
-    # (optimize is a refinement path, not a blocker).
-    gate: "review_verdict must not equal needs_revision"
+    gate: "$review.output.review_passed == true"
     # Bounded-retry contract (test_classic_gate_has_bounded_retry). The walker
     # re-dispatches the SAME gate node, so re-evaluating an unchanged verdict
     # just fails identically — max_attempts:1 = fail loud immediately, no wasted
@@ -328,6 +328,11 @@ steps:
         source: step_output
         step_id: review
         output_name: review_verdict
+      - name: review_passed
+        source: step_output
+        step_id: review
+        output_name: review_passed
+        optional: true
     outputs:
       - name: gate_passed
         type: json

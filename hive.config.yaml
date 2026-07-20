@@ -258,7 +258,7 @@ external_models:
     # companion_path is auto-detected from the codex plugin if installed
 
 # Git workflow settings (per-epic-branch-pr-flow epic, story pe-1)
-# Resolved by `hive/lib/git_flow.mjs` (`resolveGitFlow`). Uncomment to override
+# Resolved by `hive/lib/git_flow.py` (`resolve_git_flow`). Uncomment to override
 # the plugin defaults shipped at `hive/hive.config.yaml`.
 #
 # git_flow:

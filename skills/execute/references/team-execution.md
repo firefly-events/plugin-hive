@@ -28,6 +28,15 @@ Follow the development workflow phases from the loaded methodology
 Write episode records after each step to
 ${HIVE_STATE_DIR}/episodes/{epic-id}/{story-id}/. When this story
 completes, report back.
+
+## Completion Contract
+Before you finish, as your LAST action, run exactly one of:
+  bash "${CLAUDE_PLUGIN_ROOT}/hooks/write-task-status.sh" success
+  bash "${CLAUDE_PLUGIN_ROOT}/hooks/write-task-status.sh" failure
+Use "success" only if every acceptance criterion for this task was met and
+all required tests pass. Use "failure" otherwise. A missing marker is always
+read downstream as failure, never success — so skipping this step silently
+fails the story even if your work was correct.
 ```
 
 Rules for generating each per-story prompt:
@@ -35,6 +44,7 @@ Rules for generating each per-story prompt:
 - Stories with no `depends_on` say "start immediately"; stories with dependencies list them explicitly so the teammate blocks correctly.
 - Do NOT inline the full story content — each teammate reads its own story YAML file directly.
 - For large epics (10+ stories), keep each prompt minimal (ID + title + deps only) — but still one scoped prompt per story.
+- The `## Completion Contract` block above is REQUIRED in every teammate prompt this template emits (tmux/`Agent(name:)` team dispatch is a `SubagentStop`-bound path — see `hive/references/completion-contract.md`). Emit it verbatim, byte-identical to the canonical block in that file. This is the only path the wr-5 investigation found delivering named-teammate prompts with the contract silently absent — do not drop it in future edits to this template.
 
 ## Sidecar injection (append-placement triggers)
 
@@ -93,6 +103,11 @@ Every 10 seconds:
       ${HIVE_STATE_DIR}/agent-complete/<agent_id>/complete.json
       If present: mark complete/failed per its `verdict`, check dependents,
       and skip the scrollback scan for this surface this tick.
+      (wr-5: cmux panes launch `claude` in an interactive terminal pane, not
+      via the `Agent` tool, so `SubagentStop` does not bind here in practice —
+      this check is a defensive fast path in case that ever changes, not a
+      relied-upon signal. The scrollback scan below is the real completion
+      source for cmux and must not be removed.)
     - Otherwise (no marker yet — event-driven completion supersedes the
       timer for Agent(name:)-dispatched work, but the scan stays as the
       bounded fallback so a hook failure or crashed agent can't hang the

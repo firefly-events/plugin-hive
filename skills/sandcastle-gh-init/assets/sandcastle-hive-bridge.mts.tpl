@@ -11,7 +11,8 @@
  *      on absence — never silent).
  *   2. Resolve the branch name: when the issue carries a
  *      `hive:epic:<epic-id>` label AND the repo's resolved
- *      `branch_strategy` (from `hive/lib/git_flow.mjs`) is `per-epic`,
+ *      `branch_strategy` (resolved by the workflow's Python helper) is
+ *      `per-epic`,
  *      use `feat/<epic-id>`; otherwise fall back to `agent/issue-<n>`.
  *   3. Build a prompt that delegates to `/hive:execute` against the
  *      labeled issue.
@@ -45,7 +46,6 @@
 
 import { run, claudeCode } from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
-import path from "node:path";
 
 const issueNumberRaw = process.env.ISSUE_NUMBER;
 if (!issueNumberRaw || !/^\d+$/.test(issueNumberRaw)) {
@@ -135,26 +135,11 @@ if (epicId !== undefined && !/^[a-zA-Z0-9._-]+$/.test(epicId)) {
   process.exit(2);
 }
 
-// Resolve branch_strategy from the consumer repo's hive config. The
-// helper is part of plugin-hive and only present when the consumer has
-// vendored it; absence is normal and defaults to per-epic semantics so
-// epic-labeled issues continue to use feat/<epic-id>.
-async function resolveBranchStrategy(): Promise<"per-epic" | "per-story"> {
-  const helperPath = path.resolve(repoRoot, "hive/lib/git_flow.mjs");
-  try {
-    const mod = (await import(helperPath)) as {
-      resolveGitFlow?: (opts: { cwd: string }) => { branch_strategy?: string };
-    };
-    if (typeof mod.resolveGitFlow !== "function") return "per-epic";
-    const out = mod.resolveGitFlow({ cwd: repoRoot });
-    return out?.branch_strategy === "per-story" ? "per-story" : "per-epic";
-  } catch {
-    // hive/lib/git_flow.mjs not vendored in this repo — default to per-epic.
-    return "per-epic";
-  }
-}
-
-const branchStrategyMode = await resolveBranchStrategy();
+// The workflow resolves branch_strategy with the Python helper before this
+// bridge runs. Keeping the bridge free of subprocess calls is important:
+// it is executed inside the already-isolated Sandcastle container.
+const branchStrategyMode: "per-epic" | "per-story" =
+  process.env.HIVE_BRANCH_STRATEGY === "per-story" ? "per-story" : "per-epic";
 
 let branch: string;
 if (!epicId) {

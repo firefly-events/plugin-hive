@@ -19,6 +19,7 @@ Call this skill after persona-resolve has returned `persona_context` and before 
 **Outputs:**
 - `prior_knowledge_block` — formatted markdown ready to inject as the "Prior Knowledge" section.
 - `staleness_signals` — count of override-type memories loaded, oldest `last_verified` age, and per-entry `⚠ last verified: N days ago` prefix where applicable.
+- `memory_count` — total number of L0/L1/L3 memory entries loaded into `prior_knowledge_block` (override/pitfall count + capped remaining; excludes the KG Decision Context block, which is not a memory entry). `0` when nothing was loaded. This is the ground-truth warm/cold signal for the caller — see `agent-spawn` SKILL.md §5 for how it feeds `prior_experience_injected`/`prior_experience_count`.
 
 **Side effects:** none beyond reads. Memory files are read-only here; emission happens in the caller.
 

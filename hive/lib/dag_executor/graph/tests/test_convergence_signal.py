@@ -418,8 +418,8 @@ def test_classic_gate_review_predicate_is_grammar_legal():
     predicate (a dotpath == bool literal form) so it actually evaluates the
     convergence signal. A prose predicate fails-closed to False and always blocks.
 
-    Fails RED because the current gate-review gate is prose:
-    'review_verdict must not equal needs_revision'
+    The raw workflow uses a dotpath boolean; unroll.py rewrites the loop
+    reference to the concrete reviewer round(s).
     """
     with open(CLASSIC_PATH, encoding="utf-8") as fh:
         raw = yaml.safe_load(fh)
@@ -441,7 +441,7 @@ def test_classic_gate_review_predicate_references_review_passed():
     """gate-review in classic must reference review_passed (the boolean output),
     not review_verdict (a string field, which fails string-equality in grammar).
 
-    Fails RED because the current gate-review gate references review_verdict prose.
+    The string verdict remains a paired safety input validated by GateHandler.
     """
     with open(CLASSIC_PATH, encoding="utf-8") as fh:
         raw = yaml.safe_load(fh)
@@ -723,8 +723,8 @@ def test_loader_fails_loud_for_nested_loops(tmp_path: Path):
 def _executor_workflow_yaml(max_rounds: int = 3) -> str:
     """Minimal workflow for executor-level convergence tests.
 
-    Includes a terminal gate using the GateHandler-supported prose form
-    ``review_passed must equal true`` so the gate actually evaluates the
+    Includes a terminal gate using the grammar-supported dotpath form
+    ``$review-converge-loop.output.review_passed == true`` so the gate evaluates the
     last round's boolean convergence signal (bug-#26 preserved).
     """
     return f"""

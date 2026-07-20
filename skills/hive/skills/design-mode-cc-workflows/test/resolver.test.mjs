@@ -16,7 +16,7 @@
  *     - SKILL.md prescribes ONE Workflow run per persona (N runs, N markers)
  *   - Toggle ON → 3 phases (accessibility-specialist, animations-specialist, ui-designer)
  *   - Toggle OFF → 1 phase (ui-designer only)
- *   - cc-workflows-model-tier.mjs import + opts.model on EVERY documented agent() call
+ *   - Python model-tier helper invocation + opts.model on EVERY documented agent() call
  *   - Step 0 helper import — assertWorktreeIsolation imported + invoked
  *   - Insight-capture suffix template on every documented agent() prompt
  *   - No-codex code-block checks (s-3 lint checks 1-3)
@@ -371,13 +371,13 @@ describe('d-4 per-persona episode markers — cc-workflows-run.yaml', () => {
 });
 
 // ---------------------------------------------------------------------------
-// cc-workflows-preconditions.mjs import assertion (s-3 lint Check 4)
+// Python preconditions helper invocation assertion (s-3 lint Check 4)
 // ---------------------------------------------------------------------------
 
-describe('cc-workflows-preconditions.mjs import — Step 0 contract', () => {
-  it('SKILL.md contains import from hive/lib/cc-workflows-preconditions.mjs (Check 4)', () => {
+describe('Python preconditions helper — Step 0 contract', () => {
+  it('SKILL.md invokes the Python preconditions helper (Check 4)', () => {
     const content = fs.readFileSync(ATOM_SKILL_MD_PATH, 'utf8');
-    expect(content).toContain('hive/lib/cc-workflows-preconditions.mjs');
+    expect(content).toContain('hive/lib/cc_workflows_preconditions.py');
   });
 
   it('SKILL.md documents assertWorktreeIsolation() invocation', () => {
@@ -393,13 +393,13 @@ describe('cc-workflows-preconditions.mjs import — Step 0 contract', () => {
 });
 
 // ---------------------------------------------------------------------------
-// cc-workflows-model-tier.mjs import + opts.model on every agent() call
+// Python model-tier helper + opts.model on every agent() call
 // ---------------------------------------------------------------------------
 
-describe('resolveModelTier — cc-workflows-model-tier.mjs import + opts.model contract', () => {
-  it('SKILL.md imports cc-workflows-model-tier.mjs', () => {
+describe('resolveModelTier — Python helper + opts.model contract', () => {
+  it('SKILL.md invokes the Python model-tier helper', () => {
     const content = fs.readFileSync(ATOM_SKILL_MD_PATH, 'utf8');
-    expect(content).toContain('cc-workflows-model-tier.mjs');
+    expect(content).toContain('cc_workflows_model_tier.py');
   });
 
   it('SKILL.md documents resolveModelTier() call', () => {

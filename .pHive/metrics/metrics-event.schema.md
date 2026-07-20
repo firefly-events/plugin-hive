@@ -163,6 +163,10 @@ The MVP event schema must represent these metric types and no extra registry sha
   - Expected `value` type: number (ordinal `0..3`)
   - Expected `unit`: `bucket`
   - Source note: emitted by `hive/lib/scope_drift.py` (story `ed-3-drift-metric-emit`) at three high-signal boundaries — `/plan` Phase C close (`plan:phase-c`), `/execute` story close (`execute:story`), and `/review` verdict (`review:complete`). Earlier per-phase emits (plan A/B/B2/B3, per-story-phase, standup) were dropped during ed-3 retune: planning phase artifacts churn as a feature of the methodology and per-phase execution drift is dominated by story-level signal — the three retained sites are the moments where divergence would change what a human or aggregator does next. Scores a boundary's `expected_scope` vs `delivered_scope` (and any `delta_reasons`) into one of four buckets — `none` (0), `minor` (1), `major` (2), `divergent` (3). The string bucket label travels in `dimensions.bucket`; the `value` field carries the ordinal so consumers that bucket-aggregate (sum, average) get useful arithmetic on the row set. Emits are skipped on `project_maturity ∈ {greenfield, early}` per story `ed-1-maturity-helper`. See [`../../hive/references/cycle-state-schema.md`](../../hive/references/cycle-state-schema.md) § Phase records for the scope-field shape the helper consumes, and [`../../hive/references/cross-swarm-handoff.md`](../../hive/references/cross-swarm-handoff.md) § `delta_reasons` enum for the enum values that cap or accent the score (`blocked` caps at `minor`).
+- `plan_drift_delta_count`
+  - Expected `value` type: number
+  - Expected `unit`: `deltas`
+  - Source note: emitted by `hive/lib/plan_drift.py` (`emit_plan_drift`, story `wr-6-plan-drift-instrument`) after `/execute`'s reconciliation gate fires — `value` is the raw count of `{planned, actual, stories_touched}` deltas recorded in the epic's reconciliation artifact (see [`../../hive/references/reconciliation-artifact-template.md`](../../hive/references/reconciliation-artifact-template.md)). `proposal_id` carries the epic identity (not `dimensions` — an epic id is a high-cardinality identifier per §5's anti-bloat rule, and `proposal_id` is the approved top-level field for stable identity); `dimensions` carries only genuinely low-cardinality grouping labels, if any.
 
 ## 5. Dimensions
 
@@ -173,6 +177,17 @@ Anti-bloat rule:
 - use `dimensions` for small grouping labels that remain stable across many rows
 - do not place high-cardinality identifiers in `dimensions`
 - if context needs stable identity, use a dedicated top-level field from the approved field list instead
+
+### 5.1 `prior_experience_injected` / `prior_experience_count` (story `mo-4-learning-loop-dimension`)
+
+- **Purpose:** distinguishes a warm spawn (the multica-learning-loop injected prior-experience memories into the agent's brief) from a cold spawn (nothing was injected), so a future view can ask "did prior-experience injection change outcomes."
+- **Data shape:** `prior_experience_injected` is a JSON boolean; `prior_experience_count` is a non-negative JSON integer (`0` when `prior_experience_injected` is `false`).
+- **Cardinality:** optional dimension pair on `agent_spawn` rows. Present together or absent together — never one without the other.
+- **Emit sites:** set by `skills/hive/skills/agent-spawn/SKILL.md` §5 from the `memory_count` output of `skills/hive/skills/memory-loading/SKILL.md`, then passed through `hooks/metrics-agent-spawn.sh` via `HIVE_PRIOR_EXPERIENCE_INJECTED` / `HIVE_PRIOR_EXPERIENCE_COUNT` onto the emitted `agent_spawn` row's `dimensions`.
+- **Example snippet:** `"dimensions": {"kind": "spawn_marker", "prior_experience_injected": true, "prior_experience_count": 3}`
+- **⚠ CAVEAT — classic warm path only, read before building anything on this data:** this dimension is populated ONLY on the classic tmux `Agent(name:)` spawn path. The Hermes/multica-dispatched execution loop respawns agents cold today and does not go through `memory-loading`, so it never sets these dimensions — rows from that path simply omit them. **Absence of this dimension (or `prior_experience_injected: false`) on a Hermes-dispatched row does NOT mean the learning loop is ineffective — it means that dispatch path isn't wired warm yet.** Wiring the Hermes path warm is deferred to a Hermes-era follow-up story; do not treat data gathered under this dimension as representative of "the whole learning loop" until that follow-up lands.
+- **Explicitly out of scope for this dimension:** no efficacy comparison view (warm-vs-cold outcome delta) is built by the story that introduces this dimension. The dimension only makes correctly-attributed data start accruing for a future view — see `.pHive/epics/metrics-observability/docs/design-discussion.md` §(d) and `docs/grill-record.md` for the data-dead rationale.
+- **B0 query readers:** may be read by `run-over-run` once enough warm/cold rows accrue; not yet consumed by any shipped B0 query.
 
 ## 6. Examples
 
