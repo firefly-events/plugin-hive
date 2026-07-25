@@ -9,6 +9,30 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-07-22
+
+### Version
+
+- **minor bump `2.15.1` → `2.16.0`.** Anchored by `mcp-rc-bridge-compat`. This release promotes the full `develop → main` diff merged since 2.15.1 went live (2026-07-20): `mcp-rc-bridge-compat` (#77), `agent-skill-adaptation` (#74), `multica-review-convergence` (#78), `multica-substrate-deepen` (#81), `cc-regression-hardening` (#80), and the Multica execute-reliability fixes (#71/#73/#75). All are documented here so the published changelog matches the full diff. Version sources (plugin.json, marketplace.json top-level + `plugins[0]`, README badge) in lockstep at `2.16.0`.
+
+### Added
+
+- **Agent-assigned skill adaptation (6 stories, #74).** Wires Hive personas to **actually invoke** their bound skills through a shared resolve→load→invoke seam instead of trusting inert step-file prose. Ships the seam, packages four skills as authoritative invoked skills, proves cross-language invocation, and closes discovery with a prioritized backlog.
+- **Multica substrate-deepen (19 stories, #81).** Expands Multica integration from ~15% toward substrate-first coverage across the dispatch/execute surfaces.
+
+### Fixed
+
+- **MCP bridge compat: published-version negotiation + Claude Code min-version gate.** Both hand-rolled MCP servers now share a published-version allowlist, echo supported client versions, and fall back to `2025-11-25` for omitted or unsupported versions. The SessionStart gate (floor `2.1.217`) also fails loudly when the installed version is too old or cannot be verified. Full surface-by-surface verdicts live in `.pHive/epics/mcp-rc-bridge-compat/docs/compat-audit.md`.
+- **DAG-multica review loop converges without hand-adjudication (5 stories, #78).** Closes the review-loop churn that drove multi-story Multica `/execute` runs to the fix-cycle cap — review scope and per-round commit/verdict correlation now reach a converged verdict without manual branch adjudication.
+- **Multica execute reliability: fatal reconcile barriers + exact-commit harvest (#71/#73/#75).** Failed non-optional reconcile nodes now halt instead of degrading into downstream skips and hollow-green completion (#71); harvest no longer trusts reused daemon-local integration refs — it correlates HEAD and the local target against the executor snapshot, waits until the exact task commit is reachable from a stable origin integration ref, and preserves the exact per-task SHA when the shared branch advances again (#73/#75).
+- **Claude Code compatibility boundary hardened (`cc-regression-hardening`, #80).** Centralizes the supported Claude Code floor at `2.1.217` with a policy-driven hook gate, corrects recursive-permission guidance, adds fail-loud pre-graph worktree isolation checks (pinned-ref + symlink-escape defenses), preserves explicit reviewer model identity across follow-up/rerun/resume dispatches, and adds hermetic Python regression suites plus a compatibility matrix. Covers triage items t-010, t-012, t-013, t-016, t-017, t-018, t-021.
+- **Version drift reconciled.** `plugin.json`, `marketplace.json` (top-level + `plugins[0]`), and the README badge were three-way inconsistent (`2.15.1` / `2.16.0` split); all now read `2.16.0` in lockstep.
+
+### Compat notes
+
+- **BC2 (SDK sub-package split): n-a.** Repo-wide verdict — no surface imports the affected `@modelcontextprotocol/sdk` sub-packages.
+- **BC3 (SEP-2577 capability deprecations): unaffected.** All in-repo MCP surfaces advertise `capabilities: { tools: {} }` only; `sampling`/`roots`/`logging` are not used.
+
 ## [2.15.1] - 2026-07-20
 
 ### Version

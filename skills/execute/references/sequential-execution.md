@@ -20,6 +20,17 @@ Spawn a subagent with:
 - Any `inputs` from previous steps, resolved **directly from prior step outputs** (as configured in the workflow's `inputs` section) and any referenced artifacts on disk. Inter-phase context must be passed in the subagent prompt — do **not** attempt to reconstruct it by reading episode records.
 - The story's specification (description + acceptance criteria).
 
+## b-0. Skill binding resolution (match-resolve-load-invoke)
+
+Before spawning the subagent in **b**, check the step's agent persona frontmatter for a `skills:` entry (`hive/references/agent-config-schema.md`). A binding is a declaration only — it is inert until this step actually resolves and loads it.
+
+- Call `hive.lib.skill_binding.resolve_skill_binding(persona_path, trigger)`, where `trigger` is the step's `id` or a short description of the current step (e.g. `"running any code review"` for the `review` step, which binds `hive/agents/reviewer.md` to `skills/review/SKILL.md`). **When the persona declares more than one `skills:` binding, do NOT pass the bare step `id` as the trigger** — the resolver matches by bidirectional case-insensitive substring, so a short token like `review` can match two distinct bindings whose `use-when` strings both contain it, raising an ambiguous-authority `SkillBindingError` that fails the step closed on every retry. Pass the full `use-when` phrase of the intended binding instead, so exactly one binding resolves.
+- If a binding matches: load the resolved skill file and inject its full content into the subagent prompt as the governing procedure for this step — the persona supplies identity/rubric/output-format only, not a competing inline procedure. Record the resolved path as `skill_invoked: {path}` on the step's captured output (the `AgentHandler`'s `NodeOutput.outputs`, per `hive/lib/dag_executor/executor/handlers/agent.py`) and carry it forward via inter-phase prompt context to downstream steps — it is **not** written onto the base episode marker, which stays limited to the four fields in `hive/references/episode-schema.md` (`step_id`, `status`, `timestamp`, `artifacts`).
+- If no `skills:` entry's `use-when` matches this step: proceed with persona-only context exactly as before — zero behavior change for steps with no applicable binding.
+- **Fail closed on a matching-but-broken binding.** If `resolve_skill_binding` raises `SkillBindingError` (declared binding present but the target file is missing/unreadable), do not spawn the subagent against inline persona prose as a fallback. Treat it as a step failure subject to the same gate/retry handling as any other failed step (see **f**).
+
+This is the one shared seam sequential and team execution both call — `team-execution.md` points back here rather than re-implementing its own resolver.
+
 ## b-i. Sidecar injection (append-placement triggers)
 
 For the current story, check if its ID is present in the story→sidecar_agents map (populated in step 2b from `appends[]` records).
@@ -36,6 +47,21 @@ For the current story, check if its ID is present in the story→sidecar_agents 
 
     The warning must include the workflow filename and the full list of scanned step IDs. This fallback path is the primary mitigation for deep-coupling risk — implement it with the same care as the happy path.
 - For all steps other than the injection target: proceed with step execution unchanged.
+
+## b-ii. Implementation-sidecar advisor invocation
+
+For the `implement` step specifically, when a pair-programmer sidecar is configured for the current story (the same story→sidecar_agents map used in **b-i**, filtered to advisor-placement entries), resolve and invoke the bound observe skill using the same shared resolver as **b-0** — this is not a second resolver, it is the identical `hive.lib.skill_binding.resolve_skill_binding` call applied to a different persona/trigger pair:
+
+- Call `hive.lib.skill_binding.resolve_skill_binding("hive/agents/pair-programmer.md", "advising during an implementation-sidecar session")`.
+- Spawn the advisor as a **separate subagent instance**, distinct from the `implement` step's developer instance and distinct from the later `review` step's reviewer instance. Distinct instance IDs are load-bearing: the advisor instance MUST NOT be reused as, or influence the selection of, the reviewer instance for the same story.
+- Load the resolved `skills/observe/SKILL.md` content into the advisor's subagent prompt as the governing procedure — the persona supplies identity/tone only, not a competing inline procedure.
+- Attach the advisor's output to the `implement` step's captured output as **advisory-only** context (see **c** below). It is never treated as a step gate: it does not block step advancement, does not feed the `review` step's `change_verdict` computation, and does not get written as a gate artifact.
+- Record the resolved path as `skill_invoked: skills/observe/SKILL.md` on the step's captured output (`NodeOutput.outputs`), same as **b-0** — not on the base episode marker, which stays limited to `hive/references/episode-schema.md`'s four fields.
+- **Contract validation.** Before attaching advisor output downstream, call `hive.lib.observe_contract.validate_observe_output` and reject any payload outside its strict advisor schema: verdict/gate/review/blocking fields, machine verdicts, gate-artifact shapes, and pipeline-control instructions must not be forwarded as advice. Ordinary evidence phrases such as “tests passed” remain valid; they are not gate decisions.
+- **Fail closed on a matching-but-broken binding**, identically to **b-0**: `SkillBindingError` is a step failure, not a fallback to inline persona prose.
+- If no pair-programmer sidecar is configured for the current story: the `implement` step executes exactly as described in **b** — zero diff from pre-story behavior (hard constraint, same as **b-i**).
+
+This seam is independent of **b-i**. **b-i** injects sidecar agents into the `review` step (or after the final step as a fallback); **b-ii** invokes the advisor at the `implement` step, on its own distinct agent instance, ahead of and structurally separate from review. The `review` step's reviewer instance and gate (`skills/review/SKILL.md`'s `passed | needs_optimization | needs_revision`) are unchanged by this seam — observe output is never consulted for that verdict.
 
 ## c. Capture the output
 

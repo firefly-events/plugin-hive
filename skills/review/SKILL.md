@@ -128,6 +128,8 @@ calling orchestrator retains all gate checks and the final verdict presentation.
    - **Researcher** (`hive/agents/researcher.md`) — analyzes scope, complexity, and affected modules
    - **Reviewer** (`hive/agents/reviewer.md`) — evaluates correctness, security, conventions, and performance
 
+   **a-i.** For the `review` step specifically: this file (`skills/review/SKILL.md`) is the skill bound to `hive/agents/reviewer.md`'s `skills:` frontmatter entry — resolve that binding via `hive.lib.skill_binding.resolve_skill_binding("hive/agents/reviewer.md", "running any code review")` and confirm it resolves here before spawning. The reviewer persona supplies identity/rubric/output-format; this Process is what governs the review. A missing or unreadable binding fails the step closed — do not spawn the reviewer against inline persona prose alone.
+
    **b.** Spawn a subagent with:
    - The agent persona as system context
    - The step's `task` description (or step file if available)
@@ -140,6 +142,7 @@ calling orchestrator retains all gate checks and the final verdict presentation.
    ```
    .pHive/episodes/review/{timestamp}/{step-id}.yaml
    ```
+   For the `review` step, include the skill-owned marker from step 4a-i as `skill_invoked: skills/review/SKILL.md` on that episode — this is the durable evidence that the bound skill, not persona prose, governed the run.
 
 6. **Display structured findings:**
 
@@ -228,6 +231,20 @@ calling orchestrator retains all gate checks and the final verdict presentation.
    ```
 
    The maturity gate from story `ed-1-maturity-helper` skips emit on greenfield/early projects and logs once per run. Fire-and-forget — no new error handling.
+
+## What this skill is NOT
+
+- **Not the reviewer persona.** `hive/agents/reviewer.md` supplies identity, the review-dimension rubric, and output-format/verdict contracts. This skill is the procedure; the persona is not a substitute procedure and must not be spawned in its place without loading this file.
+- **Not a security or performance audit by default.** `--security` / `--performance` add opt-in, additive dimensions (Phase 1 step 6b) on top of the baseline verdict — they never replace or merge into it.
+- **Not the DAG executor, sequential-execution, or team-execution seam itself.** Those callers resolve and load this file via the shared `hive.lib.skill_binding.resolve_skill_binding` contract; this skill only defines what runs once loaded.
+
+## See also
+
+- [`hive/agents/reviewer.md`](../../hive/agents/reviewer.md) — bound persona (identity, rubric, output format)
+- [`hive/workflows/step-files/review/reviewer.md`](../../hive/workflows/step-files/review/reviewer.md) — DAG review node that resolves this binding
+- [`skills/execute/references/sequential-execution.md`](../execute/references/sequential-execution.md) — shared match-resolve-load-invoke seam (§b-0)
+- [`skills/execute/references/team-execution.md`](../execute/references/team-execution.md) — team-execution parity note for the same seam
+- [`hive/lib/skill_binding.py`](../../hive/lib/skill_binding.py) — the resolver both paths call
 
 ## Key References
 

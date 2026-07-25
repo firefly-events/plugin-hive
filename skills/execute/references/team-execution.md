@@ -46,17 +46,33 @@ Rules for generating each per-story prompt:
 - For large epics (10+ stories), keep each prompt minimal (ID + title + deps only) — but still one scoped prompt per story.
 - The `## Completion Contract` block above is REQUIRED in every teammate prompt this template emits (tmux/`Agent(name:)` team dispatch is a `SubagentStop`-bound path — see `hive/references/completion-contract.md`). Emit it verbatim, byte-identical to the canonical block in that file. This is the only path the wr-5 investigation found delivering named-teammate prompts with the contract silently absent — do not drop it in future edits to this template.
 
-## Sidecar injection (append-placement triggers)
+## Skill binding resolution (match-resolve-load-invoke)
+
+Each teammate's per-story prompt above says "Follow the development workflow phases from the loaded methodology" — that phrase carries the same obligation as sequential execution's step **b-0**: `skills/execute/references/sequential-execution.md` §b-0 defines the one shared match-resolve-load-invoke contract (`hive.lib.skill_binding.resolve_skill_binding`). When a workflow phase's agent persona (e.g. `hive/agents/reviewer.md` for the `review` phase) declares a matching `skills:` binding, the teammate resolves and loads that skill as the governing procedure for that phase — a frontmatter entry alone does not satisfy this. Team execution does not re-implement its own resolver; it defers to the same seam so sequential, team, and DAG entry paths cannot silently diverge. A binding that is declared but unreadable fails that phase closed, same as sequential execution.
+
+## Sidecar injection (placement-aware)
 
 After building each story's task block, check if that story's ID is present in the story→sidecar_agents map (populated in step 2b from `appends[]` records).
 
-- If the story ID is **not** in the map: the task block is emitted byte-for-byte as described above — no changes.
-- If the story ID **is** in the map: append the following to that story's task block (one line-pair per agent in the list):
+**Placement determines the step a sidecar attaches to — it is NOT uniform.** A sidecar's placement comes from its trigger's catalog `responds_with` (step 2b): an **append/review-placement** agent participates in the `review` step; an **advisor-placement** agent (the implementation sidecar, e.g. `pair-programmer`) participates in the `implement` step and is **never** attached to review. Routing every sidecar into review would violate the advisor's implementation-only, never-gating contract (`skills/observe/SKILL.md` "What this skill is NOT"; sequential-execution.md **b-ii**). Team mode must mirror the sequential split, not collapse it.
 
-  ```
-  Also spawn {agent-name} as a sidecar for the review step.
-  {agent-name} reads hive/agents/{agent-name}.md and participates in code review.
-  ```
+- If the story ID is **not** in the map: the task block is emitted byte-for-byte as described above — no changes.
+- If the story ID **is** in the map, append **per agent, keyed by placement**:
+
+  - **Review-placement (append) agents** → attach to the review step:
+
+    ```
+    Also spawn {agent-name} as a sidecar for the review step.
+    {agent-name} reads hive/agents/{agent-name}.md and participates in code review.
+    ```
+
+  - **Advisor-placement agents** (e.g. `pair-programmer`) → attach to the implement step as a **distinct advisor instance**, using the same shared resolver as sequential **b-ii** (`resolve_skill_binding("hive/agents/{agent-name}.md", "advising during an implementation-sidecar session")` → `skills/observe/SKILL.md`):
+
+    ```
+    Also spawn {agent-name} as an implementation-sidecar advisor for the implement step ONLY.
+    {agent-name} reads hive/agents/{agent-name}.md, loads skills/observe/SKILL.md as its governing procedure, and gives advisory-only feedback.
+    It is a DISTINCT instance from the developer and from the later reviewer. Its output is advisory only — it MUST NOT gate, block, produce a change_verdict, or be reused as/influence the reviewer instance for this story.
+    ```
 
 - Epics with no `appends[]` entries produce a story prompt that is byte-for-byte identical to pre-sidecar behavior — this is the primary constraint.
 
@@ -125,13 +141,19 @@ Dependency unblocking: when `story-a` completes, scan the tracking map for stori
 Messaging: the orchestrator can send messages to any active pane.
 
 - Respawn signal: `cmux send --surface <id> "Your context is degrading. Write a respawn summary to ${HIVE_STATE_DIR}/respawn-summaries/{story-id}.md and exit."`
-- Sidecar injection: `cmux send --surface <id> "Also spawn {agent-name} as a sidecar for the review step. Read hive/agents/{agent-name}.md."`
+- Sidecar injection is placement-aware here too. Prefer appending the matching
+  instruction from **Sidecar injection (placement-aware)** to the per-story
+  prompt before spawn. If a sidecar is discovered only after the pane starts,
+  send exactly the placement-matching instruction: review-placement agents go
+  to the review step; advisor-placement agents go to the implement step ONLY
+  as a distinct advisor instance. Never send a generic review-sidecar command
+  for an advisor-placement agent.
 
 Completion marker convention: agents must emit `[STORY-COMPLETE:{story-id}]` as the last line of their workflow output. Add this to the per-story prompt template.
 
 Cleanup: after all stories complete, close all surfaces: `cmux close-surface --surface <id>` for each tracked surface.
 
-Sidecar injection: same logic as the `Agent(name:)` variant. Check the story→sidecar_agents map and append sidecar instructions to the story prompt before spawn.
+Sidecar injection: same placement-keyed logic as the `Agent(name:)` variant. Check the story→sidecar_agents map and append the matching review-placement or advisor-placement instruction to the story prompt before spawn.
 
 Per-story commits: same as the `Agent(name:)` variant. Stories commit independently on feature branches.
 

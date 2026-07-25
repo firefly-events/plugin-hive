@@ -19,7 +19,7 @@ type: reference
 ```yaml
 planning_composition:
   schema_version: "1.0.0"
-  spine: [researcher, technical-writer, tpm]
+  spine: [researcher, technical-writer, tpm, architect]
   work_types:
     - tag: architecture
       specialists: [architect]

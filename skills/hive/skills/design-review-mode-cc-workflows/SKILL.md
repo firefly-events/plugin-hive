@@ -102,7 +102,7 @@ if (!precondition.ok) throw Object.assign(new Error(precondition.error), precond
 ```
 
 Resolve runtime and tooling before dispatching any design-review work: verify CC runtime
-version `>= 2.1.154`; read `claude --version` when available; otherwise rely on Workflow
+version `>= 2.1.217`; read `claude --version` when available; otherwise rely on Workflow
 tool presence as proxy. Verify `design_review.mode` resolves to `"cc-workflows"` OR
 `HIVE_DESIGN_REVIEW_MODE=cc-workflows` is set. Resolve `${HIVE_STATE_DIR}` from
 `hive_config.paths.state_dir`, then default to `.pHive`, and confirm `workflow_path`,
@@ -141,7 +141,7 @@ field_sources:
     value: .pHive
   cc_runtime:
     source: claude --version | Workflow tool presence proxy
-    value: 2.1.154
+    value: 2.1.217
 ```
 
 On reject, exit with a structured error and do not dispatch:
@@ -149,7 +149,7 @@ On reject, exit with a structured error and do not dispatch:
 ```json
 {
   "error": "precondition_failed",
-  "message": "CC Workflows design-review mode requires runtime cc-workflows and Claude Code >= 2.1.154 or Workflow tool presence.",
+  "message": "CC Workflows design-review mode requires runtime cc-workflows and Claude Code >= 2.1.217 or Workflow tool presence.",
   "field_sources": {}
 }
 ```

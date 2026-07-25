@@ -267,11 +267,15 @@ steps:
 
   - id: review
     agent: reviewer
+    step_file: hive/workflows/steps/development-classic/step-06-review.md
     task: >
       Review the implementation, tests, and behavior specs for correctness,
       security, performance, and convention compliance. Check that all behavior
       scenarios are covered by tests and satisfied by implementation. Produce
-      a verdict: passed, needs_optimization, or needs_revision.
+      a verdict: passed, needs_optimization, or needs_revision. EMIT the paired
+      review_passed convergence signal: true when the verdict is passed OR
+      needs_optimization (non-blocking), false only for needs_revision. It MUST
+      match review_verdict — inconsistent values fail closed at gate-review.
     depends_on:
       - test
       - reconcile-implement
@@ -305,10 +309,10 @@ steps:
     optional: false
     timeout_ms: 300000
 
-  # Enforce the shared review contract: only an explicit passed verdict may
-  # integrate. needs_revision, needs_optimization, and missing/malformed
-  # values all fail closed. (Auto-fix-and-re-review is the bounded
-  # converge-loop follow-on, t-005/t-006.)
+  # Enforce the shared review contract: passed and needs_optimization (Hive's
+  # own non-blocking verdict) both satisfy the gate; needs_revision and
+  # missing/malformed values fail closed. (Auto-fix-and-re-review is the
+  # bounded converge-loop follow-on, t-005/t-006.)
   - id: gate-review
     node_type: gate
     gate: "$review.output.review_passed == true"

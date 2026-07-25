@@ -293,6 +293,7 @@ def test_review_workflow_walks_end_to_end_without_loop_invariant_error():
             "review_artifact": "verdict: passed\nfindings: []\n",
             "commit_sha": "deadbeef",
             "review_passed": True,
+            "verify_evidence": {"status": "verified"},
         },
     }
     spy = StubAgentSpawn(canned_outputs=canned)

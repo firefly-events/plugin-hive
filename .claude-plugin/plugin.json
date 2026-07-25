@@ -1,7 +1,7 @@
 {
   "name": "plugin-hive",
   "description": "Hive \u2014 workflow orchestration for Claude Code. Multi-agent swarms for planning, development, testing, and code review with quality gates, agent memories, and daily ceremony workflow.",
-  "version": "2.15.1",
+  "version": "2.16.0",
   "skills": "./skills/",
   "hooks": {
     "PreToolUse": [
@@ -50,6 +50,11 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/effort-gate.sh\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/mcp-min-version-gate.sh\"",
             "timeout": 5
           }
         ]

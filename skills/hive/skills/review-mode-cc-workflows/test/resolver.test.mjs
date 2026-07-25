@@ -340,9 +340,10 @@ describe('resolveModelTier — Python helper + opts.model contract', () => {
     expect(content).toContain('cc_workflows_model_tier.py');
   });
 
-  it('SKILL.md documents resolveModelTier() call for reviewer persona', () => {
+  it('SKILL.md passes the reviewer persona to the Python helper', () => {
     const content = fs.readFileSync(ATOM_SKILL_MD_PATH, 'utf8');
-    expect(content).toContain("resolveModelTier('reviewer'");
+    expect(content).toContain("persona: 'reviewer'");
+    expect(content).toContain('const reviewerOpts = reviewerResolution.agent_options');
   });
 
   it('SKILL.md documents opts.model on agent() calls', () => {

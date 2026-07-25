@@ -47,6 +47,12 @@ _MUST_NOT_EQUAL = re.compile(
 )
 
 _REVIEW_VERDICTS = {"passed", "needs_revision", "needs_optimization"}
+# s2-needs-optimization-passes-gate: the pass-set for convergence. Hive's own
+# reviewer contract treats needs_optimization as non-blocking (nits/suggestions,
+# not defects), so it must satisfy the gate exactly like an explicit passed
+# verdict. needs_revision is a genuine blocking verdict and stays excluded —
+# widening this set to include it would reintroduce the #26 hollow-green bug.
+_PASS_VERDICTS = {"passed", "needs_optimization"}
 _MISSING = object()
 
 
@@ -54,10 +60,11 @@ def _validate_review_signal(node: Any, inputs: dict[str, Any]) -> None:
     """Validate the review verdict/signal contract before evaluating a gate.
 
     ``review_passed`` is intentionally a boolean convergence signal rather
-    than a second approval decision.  Only the exact ``passed`` verdict may
-    produce ``True``; all other known verdicts must produce ``False``.  This
-    check also rejects missing, malformed, or inconsistent agent output before
-    a grammar predicate could accidentally accept it.
+    than a second approval decision.  Only verdicts in ``_PASS_VERDICTS``
+    (``passed`` and ``needs_optimization``) may produce ``True``; every other
+    known verdict (``needs_revision``) must produce ``False``.  This check
+    also rejects missing, malformed, or inconsistent agent output before a
+    grammar predicate could accidentally accept it.
     """
 
     verdict = inputs.get("review_verdict", _MISSING)
@@ -72,7 +79,7 @@ def _validate_review_signal(node: Any, inputs: dict[str, Any]) -> None:
             f"gate node {node.id!r}: review_passed must be a boolean; "
             f"got {signal!r}"
         )
-    expected = verdict == "passed"
+    expected = verdict in _PASS_VERDICTS
     if signal != expected:
         raise GateFailedError(
             f"gate node {node.id!r}: review_passed={signal!r} is inconsistent "

@@ -14,6 +14,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from hive.lib.dag_executor.graph import NodeType, load_workflow
+from hive.lib.dag_executor.executor.handlers import NodeOutput
+from hive.lib.dag_executor.executor.walker import _resolve_inputs
 
 
 _WORKFLOWS = Path(__file__).resolve().parents[5] / "hive" / "workflows"
@@ -132,3 +134,30 @@ def test_classic_review_converge_loop_depends_on_review():
     assert "review" in loop_deps, (
         f"review-converge-loop must depend on review (pre-unroll); got {loop_deps!r}"
     )
+
+
+def test_each_fix_cycle_review_receives_its_round_commit_sha(monkeypatch):
+    """Every unrolled review round must inspect the commit produced by the
+    implement node from that same round, never a stale prior SHA."""
+    monkeypatch.setenv("HIVE_LOOPS_REVIEW_CONVERGE_ENABLED", "true")
+    monkeypatch.setenv("HIVE_LOOPS_REVIEW_CONVERGE_MAX_ROUNDS", "3")
+    graph = load_workflow(CLASSIC_PATH)
+
+    resolved_shas = []
+    for round_number in range(1, 4):
+        implement_id = f"fix-cycle-implement__r{round_number}"
+        review = graph.nodes[f"fix-cycle-review__r{round_number}"]
+        binding = next((item for item in review.inputs if item.name == "reviewed_sha"), None)
+        assert binding is not None
+        assert binding.source == "step_output"
+        assert binding.step_id == implement_id
+        assert binding.output_name == "commit_sha"
+
+        inputs = _resolve_inputs(
+            review,
+            {implement_id: NodeOutput(outputs={"commit_sha": f"sha-r{round_number}"})},
+            {},
+        )
+        resolved_shas.append(inputs["reviewed_sha"])
+
+    assert resolved_shas == ["sha-r1", "sha-r2", "sha-r3"]

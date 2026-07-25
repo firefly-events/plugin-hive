@@ -37,6 +37,7 @@ from typing import Any, Callable
 
 import yaml
 
+from hive.lib.config import resolve_state_dir
 from hive.lib.dag_executor.graph import NodeType
 
 
@@ -44,6 +45,58 @@ from hive.lib.dag_executor.graph import NodeType
 # so this module never imports the Node bridge directly (keeps the Python<-Node
 # seam contained behind the binding).
 _BINDING_FACTORIES: dict[str, Callable[..., Any]] = {}
+
+
+def _story_spec_is_empty(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, (dict, list, tuple, set)):
+        return not value
+    return False
+
+
+def _hydrate_story_spec(
+    context: dict[str, Any] | None,
+    *,
+    repo_root: Path | str | None,
+    env: dict[str, str] | None,
+) -> dict[str, Any]:
+    """Re-read a missing story spec before every front-door execution.
+
+    Rerun/resume callers commonly retain only the story identity. Resolve the
+    current story YAML again so orchestrator edits are injected exactly as they
+    are on a first run. Missing/empty files remain empty and are rejected by the
+    AgentHandler pre-dispatch guard with the story-specific fatal error.
+    """
+    hydrated = dict(context or {})
+    if not _story_spec_is_empty(hydrated.get("story_spec")):
+        return hydrated
+
+    epic_id = hydrated.get("epic_id")
+    story_id = hydrated.get("story_id")
+    if not isinstance(epic_id, str) or not epic_id.strip():
+        return hydrated
+    if not isinstance(story_id, str) or not story_id.strip():
+        return hydrated
+
+    root = Path(repo_root) if repo_root is not None else Path.cwd()
+    effective_env = env if env is not None else dict(os.environ)
+    state_dir = Path(resolve_state_dir(cwd=root, env=effective_env))
+    epics_dir = (state_dir / "epics").resolve()
+    stories_dir = (epics_dir / epic_id / "stories").resolve()
+    story_path = (stories_dir / f"{story_id}.yaml").resolve()
+    try:
+        stories_dir.relative_to(epics_dir)
+        story_path.relative_to(stories_dir)
+        loaded = yaml.safe_load(story_path.read_text(encoding="utf-8"))
+    except (ValueError, OSError, yaml.YAMLError):
+        return hydrated
+
+    if not _story_spec_is_empty(loaded):
+        hydrated["story_spec"] = loaded
+    return hydrated
 
 
 def register_binding(name: str, factory: Callable[..., Any]) -> None:
@@ -209,6 +262,7 @@ def run(
     env: dict[str, str] | None = None,
     flow: str = "execution",
     episode_hook: Callable[..., Any] | None = None,
+    worktree_manager: Any | None = None,
 ) -> dict[str, Any]:
     """Assemble a dispatcher and run ``workflow_path`` through the executor.
 
@@ -243,6 +297,9 @@ def run(
         ``(run_id, workflow, flow, outputs, status)``. Use
         ``hive.lib.dag_executor.episode.emit_run_episode`` to write the
         standard DAG-run episode marker (s14 AC2).
+    worktree_manager:
+        Optional isolation manager. When supplied, its security preflight runs
+        before this public front door reads the workflow YAML.
     """
     if spawn is None:
         _, spawn = resolve_spawn_binding(binding, env=env, repo_root=repo_root, flow=flow)
@@ -253,8 +310,18 @@ def run(
     from hive.lib.dag_executor.graph import load_workflow
 
     wf_path = Path(workflow_path)
+    worktree_preparation = (
+        worktree_manager.preflight()
+        if worktree_manager is not None
+        else None
+    )
     graph = load_workflow(wf_path)
     effective_run_id = run_id or make_run_id(graph.workflow_name)
+    effective_context = _hydrate_story_spec(
+        context,
+        repo_root=repo_root,
+        env=env,
+    )
 
     try:
         outputs = run_workflow(
@@ -262,7 +329,9 @@ def run(
             dispatcher,
             run_id=effective_run_id,
             run_state_path=run_state_path,
-            context=context,
+            worktree_manager=worktree_manager,
+            worktree_preparation=worktree_preparation,
+            context=effective_context,
         )
     except Exception:
         if episode_hook is not None:

@@ -160,6 +160,7 @@ def run_workflow(
     telemetry: Any | None = None,
     run_state_path: Path | str | None = None,
     worktree_manager: Any | None = None,
+    worktree_preparation: Any | None = None,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Invoke the executor for `workflow_path`.
@@ -185,6 +186,14 @@ def run_workflow(
     from hive.lib.dag_executor.executor import Telemetry, Walker, make_run_id
     from hive.lib.dag_executor.executor.walker import _b2_memoization_enabled
     from hive.lib.dag_executor.graph import load_workflow
+
+    # Public-front-door scheduler barrier: pin and audit the worktree source
+    # before workflow YAML is read or parsed. ``run(...)`` may supply an
+    # already-completed preparation because it also needs this ordering before
+    # its own workflow-name load.
+    effective_preparation = worktree_preparation
+    if worktree_manager is not None and effective_preparation is None:
+        effective_preparation = worktree_manager.preflight()
 
     graph = load_workflow(Path(workflow_path))
 
@@ -218,6 +227,7 @@ def run_workflow(
         context=effective_context,
         run_state_path=effective_run_state_path,
         worktree_manager=worktree_manager,
+        worktree_preparation=effective_preparation,
         prior_state=prior_state,
     )
 

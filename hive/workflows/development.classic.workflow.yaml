@@ -468,11 +468,11 @@ steps:
       Produce a verdict: passed, needs_optimization, or needs_revision.
 
       EMIT review_passed (the convergence signal consumed by gate-review):
-      set review_passed=true only when the verdict is exactly passed; set it
-      false for needs_revision and needs_optimization. This MUST match
-      review_verdict — the terminal gate permits integration only when both
-      values agree on explicit passed output. Missing, malformed, or
-      inconsistent values fail closed.
+      set review_passed=true when the verdict is passed OR needs_optimization
+      (needs_optimization is non-blocking nits/suggestions, not a defect);
+      set it false only for needs_revision. This MUST match review_verdict —
+      the terminal gate permits integration only when both values agree.
+      Missing, malformed, or inconsistent values fail closed.
     depends_on:
       - gate-code
       - platform-verify
@@ -687,18 +687,20 @@ steps:
     timeout_ms: 600000
 
   # fix-cycle-review: reviewer checks the updated implementation and emits
-  # review_passed (bool) as the convergence signal. True only for an exact
-  # passed verdict → rounds K+1..N skip; false for either non-passing verdict
-  # → the loop continues (up to max_rounds ceiling).
+  # review_passed (bool) as the convergence signal. True for passed or
+  # needs_optimization (Hive's own non-blocking verdict) → rounds K+1..N
+  # skip; false only for needs_revision → the loop continues (up to
+  # max_rounds ceiling).
   - id: fix-cycle-review
     agent: reviewer
     sub_graph: review-fix-cycle
     task: >
-      Review the updated implementation committed by fix-cycle-implement.
+      Review the exact updated implementation commit identified by reviewed_sha
+      and produced by this round's fix-cycle-implement step.
       Check that all needs_revision findings from the previous round have been
-      addressed. Produce a verdict: passed or needs_revision.
-      Set review_passed=true only when the verdict is exactly passed; set it
-      false for needs_revision or needs_optimization. The two outputs must
+      addressed. Produce a verdict: passed, needs_optimization, or needs_revision.
+      Set review_passed=true when the verdict is passed or needs_optimization;
+      set it false only for needs_revision. The two outputs must
       agree; malformed or inconsistent output is rejected by gate-review.
     depends_on:
       - fix-cycle-implement
@@ -712,6 +714,13 @@ steps:
     # `integrate`'s join.
     when: "$test.output.test_artifacts != null"
     inputs:
+      - name: reviewed_sha
+        source: step_output
+        step_id: fix-cycle-implement
+        output_name: commit_sha
+        # Local bindings can modify the shared tree without emitting git
+        # metadata; Multica supplies this from its harvested work_dir HEAD.
+        optional: true
       - name: fix_implementation
         source: step_output
         step_id: fix-cycle-implement
@@ -761,20 +770,29 @@ steps:
         type: json
 
   # ── Terminal safety gate (prod bug #26): after the bounded converge-loop, a
-  # final verdict is not exactly passed must BLOCK integrate — bounded retries
-  # do not license silent integration of an unresolved review. Single-shot
-  # (max_attempts: 1) — re-evaluating an unchanged verdict just fails identically.
+  # final verdict that is neither passed NOR needs_optimization must BLOCK
+  # integrate — bounded retries do not license silent integration of an
+  # unresolved (needs_revision) review. Single-shot (max_attempts: 1) —
+  # re-evaluating an unchanged verdict just fails identically.
   # review-converge-loop surfaces the last successful round's verdict and
   # review_passed signal. The grammar gate reads the boolean signal while the
   # handler validates the paired verdict, so a loop that revises
-  # needs_revision → passed may integrate and every other outcome blocks.
+  # needs_revision → passed (or → needs_optimization) may integrate and
+  # needs_revision alone blocks.
+  #
+  # s2-needs-optimization-passes-gate: needs_optimization is Hive's own
+  # non-blocking verdict (nits/suggestions, not defects) and SATISFIES this
+  # gate exactly like passed; only needs_revision (or a missing/malformed
+  # signal) blocks. Pass-set is exactly {passed, needs_optimization} — see
+  # gate.py's _PASS_VERDICTS.
   - id: gate-review
     node_type: gate
     # Terminal safety gate (prod bug #26 + the ph-8/ph-9 silent-pass bug).
     # Grammar-valid boolean gate. GateHandler validates the paired
-    # review_verdict/review_passed outputs before evaluating this predicate,
-    # preserving the explicit-passed, fail-closed policy without adding string
-    # literals to the predicate grammar.
+    # review_verdict/review_passed outputs before evaluating this predicate:
+    # review_passed must be true iff review_verdict is passed OR
+    # needs_optimization, preserving the fail-closed policy without adding
+    # string literals to the predicate grammar.
     gate: "$review-converge-loop.output.review_passed == true"
     retry:
       max_attempts: 1

@@ -433,6 +433,7 @@ def test_parallel_branches_invoke_disambiguation_with_run_id_suffix():
         enriched = dict(inputs)
         enriched["epic_id"] = "epic-test"
         enriched["story_id"] = "story-1"
+        enriched["story_spec"] = {"id": "story-1"}
         return real_handler.handle(node, enriched, rid)
 
     dispatcher = Dispatcher(handlers={NodeType.AGENT: wrapping_handler})

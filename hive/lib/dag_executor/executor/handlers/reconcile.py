@@ -151,9 +151,10 @@ class ReconcileHandler:
     @staticmethod
     def _derive_branch_from_repo(derive_src: str, sha: str) -> str:
         """Resolve a branch name from a repo path's HEAD, minting a stable
-        sha-derived ephemeral branch when HEAD is detached. Shared by both the
-        marker path (derive_src = complete.json's cwd) and the legacy
-        poll-terminal fallback (derive_src = repo/work_dir input).
+        sha-derived ephemeral branch when HEAD is detached or on a daemon-owned
+        ``agent/*`` ref. Shared by both the marker path (derive_src =
+        complete.json's cwd) and the legacy poll-terminal fallback (derive_src
+        = repo/work_dir input).
         """
         if not derive_src:
             return ""
@@ -166,17 +167,21 @@ class ReconcileHandler:
                 check=False,
             )
             candidate = probe.stdout.strip()
-            if probe.returncode == 0 and candidate and candidate != "HEAD":
+            if (
+                probe.returncode == 0
+                and candidate
+                and candidate != "HEAD"
+                and not candidate.startswith("agent/")
+            ):
                 return candidate
         except (OSError, subprocess.SubprocessError):
             pass
         if not sha:
             return ""
-        # Detached HEAD (e.g. the epic branch already checked out in a sibling
-        # worktree) — the commit is still reachable by sha; mint a stable
-        # ephemeral branch at it so the reconcile CLI (which fetches
-        # refs/heads/<branch>) can pull it. sha-derived name keeps retries
-        # idempotent and collision-free with the epic/agent branches.
+        # Detached or daemon-owned agent/* HEAD — the commit is still reachable
+        # by sha; mint a stable ephemeral branch at it so the reconcile CLI
+        # (which fetches refs/heads/<branch>) can pull it. sha-derived naming
+        # keeps retries idempotent and collision-free with epic/agent branches.
         ephemeral = f"reconcile-harvest/{sha[:12]}"
         try:
             minted = subprocess.run(

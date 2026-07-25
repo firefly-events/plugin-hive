@@ -51,6 +51,7 @@ from hive.lib.dag_executor.routing import (
 
 from .dispatcher import Dispatcher
 from .errors import (
+    FatalAgentHandlerError,
     HandlerError,
     LoopNodeInvariantError,
     WalkerCycleError,
@@ -685,11 +686,13 @@ def _dispatch_with_retry(
     run_id: str,
     telemetry: Telemetry,
 ) -> "NodeOutput":
-    """Dispatch a node, retrying on HandlerError up to node.retry.max_attempts.
+    """Dispatch a node, retrying recoverable HandlerError failures.
 
     C2: bounded retry per hde-architect design — no LOOP primitive, just
     per-node re-dispatch. Both sequential and parallel walk paths use this
     helper so retry semantics are identical regardless of wave size.
+    FatalAgentHandlerError bypasses retries because it represents invalid
+    execution state, not a transient dispatch failure.
     """
     max_attempts = 1
     if node.retry and isinstance(node.retry, dict):
@@ -702,6 +705,8 @@ def _dispatch_with_retry(
         try:
             return dispatcher.dispatch(node, inputs, run_id)
         except HandlerError as exc:
+            if isinstance(exc, FatalAgentHandlerError):
+                raise
             if attempt >= max_attempts:
                 raise
             telemetry.emit(
@@ -729,6 +734,7 @@ class Walker:
         context: dict[str, Any] | None = None,
         run_state_path: Path | None = None,
         worktree_manager: Any | None = None,
+        worktree_preparation: Any | None = None,
         prior_state: Any | None = None,
     ) -> dict[str, NodeOutput]:
         """Walk the graph; persist state if `run_state_path` is set; isolate in a worktree if `worktree_manager` is set.
@@ -740,26 +746,29 @@ class Walker:
         off) the walk runs every node normally — byte-for-byte pre-b2.
         """
 
-        ctx = context or {}
-        b2_enabled = _b2_memoization_enabled(ctx)
-        step_metadata = _workflow_step_metadata(graph, ctx)
-        order = _topological_order(graph)
-        materialised: dict[str, NodeOutput] = {}
-        skipped: set[str] = set()
-
+        # Scheduler step zero: establish the isolation/security boundary before
+        # graph metadata reads, topology validation, run-state, or dispatch.
         worktree_path, owns_worktree = _maybe_open_worktree(
             worktree_manager=worktree_manager,
             run_id=run_id,
-        )
-
-        state, save_state = _maybe_open_run_state(
-            run_id=run_id,
-            workflow_slug=graph.workflow_name,
-            run_state_path=run_state_path,
+            worktree_preparation=worktree_preparation,
         )
 
         run_failed = False
         try:
+            ctx = context or {}
+            b2_enabled = _b2_memoization_enabled(ctx)
+            step_metadata = _workflow_step_metadata(graph, ctx)
+            order = _topological_order(graph)
+            materialised: dict[str, NodeOutput] = {}
+            skipped: set[str] = set()
+
+            state, save_state = _maybe_open_run_state(
+                run_id=run_id,
+                workflow_slug=graph.workflow_name,
+                run_state_path=run_state_path,
+            )
+
             return self._walk_loop(
                 order=order,
                 graph=graph,
@@ -1080,7 +1089,7 @@ class Walker:
                     save_state(state)
                 output = _dispatch_with_retry(dispatcher, node, inputs, run_id, telemetry)
         except HandlerError as exc:
-            if node.optional:
+            if node.optional and not isinstance(exc, FatalAgentHandlerError):
                 telemetry.emit(
                     "node_failed",
                     node.id,
@@ -1260,11 +1269,11 @@ class Walker:
 
         # Apply results serially in deterministic node-id order so
         # state, materialised, and telemetry mutations are reproducible.
-        # #26 / CodeRabbit: a fatal non-optional gate failure is deferred until
-        # AFTER every sibling result in this wave is recorded — the siblings
-        # already executed, so their completion/skip state must persist for
-        # resume + telemetry before we halt the run.
-        fatal_gate_error: BaseException | None = None
+        # Fatal failures are deferred until AFTER every sibling result in this
+        # wave is recorded — the siblings already executed, so their
+        # completion/skip state must persist for resume + telemetry before we
+        # halt the run.
+        fatal_wave_error: BaseException | None = None
         for node_id in sorted(results):
             result: ScheduleResult = results[node_id]
             node = graph.nodes[node_id]
@@ -1299,15 +1308,32 @@ class Walker:
             # integrate's none_failed_min_one_success join ran anyway, shipping a
             # needs_revision review. Re-raise so the gate is fatal, matching the
             # sequential path's non-optional behaviour.
-            if (
+            #
+            # A non-optional RECONCILE node has the same barrier semantics: it
+            # materialises the agent's commit into repo_root so review/test/gate
+            # see real code. If it raises (bad branch ref, non-ff merge) and is
+            # degraded to SKIPPED, every downstream node skips on the join rule
+            # and the run reports "completed" with NOTHING integrated — a hollow
+            # green. Treat a failed non-optional reconcile as fatal too, so the
+            # failure surfaces loudly instead of masquerading as success.
+            is_fatal_agent_error = isinstance(err, FatalAgentHandlerError)
+            is_required_barrier_error = (
                 err is not None
-                and _is_gate_node(node)
+                and (_is_gate_node(node) or node.node_type == NodeType.RECONCILE)
                 and not getattr(node, "optional", False)
+            )
+            if err is not None and (
+                is_fatal_agent_error or is_required_barrier_error
             ):
                 telemetry.emit(
                     "node_failed",
                     node.id,
-                    {"optional": False, "error": str(err), "parallel": True},
+                    {
+                        "optional": bool(getattr(node, "optional", False)),
+                        "fatal": True,
+                        "error": str(err),
+                        "parallel": True,
+                    },
                 )
                 node_statuses[node_id] = NodeStatus.FAILED
                 state = _record_failure(
@@ -1321,8 +1347,8 @@ class Walker:
                     source_epic=_source_epic(ctx),
                 )
                 save_state(state)
-                if fatal_gate_error is None:
-                    fatal_gate_error = err
+                if fatal_wave_error is None:
+                    fatal_wave_error = err
                 continue
 
             payload = {
@@ -1348,9 +1374,9 @@ class Walker:
                     )
 
         # All sibling results are now recorded; halt the run on the first fatal
-        # non-optional gate failure observed in this wave (#26 / CodeRabbit).
-        if fatal_gate_error is not None:
-            raise fatal_gate_error
+        # failure observed in this wave.
+        if fatal_wave_error is not None:
+            raise fatal_wave_error
 
         return state
 
@@ -1505,7 +1531,7 @@ class Walker:
                         save(state, root=runs_root)
                     output = dispatcher.dispatch(node, inputs, run_id)
             except HandlerError as exc:
-                if node.optional:
+                if node.optional and not isinstance(exc, FatalAgentHandlerError):
                     telemetry.emit(
                         "node_failed",
                         node.id,
@@ -1653,7 +1679,11 @@ def _per_node_reconcile(
         )
 
 
-def _maybe_open_worktree(worktree_manager: Any | None, run_id: str):
+def _maybe_open_worktree(
+    worktree_manager: Any | None,
+    run_id: str,
+    worktree_preparation: Any | None = None,
+):
     """Decide whether to create a fresh worktree or reuse an outer one.
 
     Returns `(path, owned_by_us)` — `owned_by_us=False` means an outer
@@ -1672,7 +1702,7 @@ def _maybe_open_worktree(worktree_manager: Any | None, run_id: str):
     )
     if decision.reused_outer:
         return decision.path, False
-    worktree_manager.create(run_id)
+    worktree_manager.create(run_id, preparation=worktree_preparation)
     return decision.path, True
 
 

@@ -8,6 +8,7 @@ one list entry away.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -57,7 +58,9 @@ def _run(
     # s3-convergence-signal: the boolean convergence signal for review-fix-cycle
     # body nodes. True = converged (round k+1..N will be Skipped); False = still
     # needs_revision (all max_rounds run, terminal gate blocks integrate).
-    review_passed = first_verdict == "passed"
+    # s2-needs-optimization-passes-gate: needs_optimization is non-blocking and
+    # converges just like passed — only needs_revision keeps the loop running.
+    review_passed = first_verdict in ("passed", "needs_optimization")
 
     spawn = _Canned(
         {
@@ -98,17 +101,17 @@ def _run(
             "fix-cycle-review__r1": {
                 "review_verdict": verdicts[0],
                 "review_findings": "...",
-                "review_passed": verdicts[0] == "passed",
+                "review_passed": verdicts[0] in ("passed", "needs_optimization"),
             },
             "fix-cycle-review__r2": {
                 "review_verdict": verdicts[1],
                 "review_findings": "...",
-                "review_passed": verdicts[1] == "passed",
+                "review_passed": verdicts[1] in ("passed", "needs_optimization"),
             },
             "fix-cycle-review__r3": {
                 "review_verdict": verdicts[2],
                 "review_findings": "...",
-                "review_passed": verdicts[2] == "passed",
+                "review_passed": verdicts[2] in ("passed", "needs_optimization"),
             },
             # rec-1: tdd-red-green-loop body round copies.
             # implement__r{k} produce the implementation artifact needed by gate-tests.
@@ -168,13 +171,15 @@ def test_gate_review_allows_integrate_on_passed(workflow_path):
 
 
 @pytest.mark.parametrize("workflow_path", METHODOLOGIES)
-def test_gate_review_blocks_integrate_on_needs_optimization(workflow_path):
+def test_gate_review_allows_integrate_on_needs_optimization(workflow_path):
+    """s2-needs-optimization-passes-gate: needs_optimization is Hive's own
+    non-blocking verdict (nits/suggestions, not defects) and must SATISFY
+    the convergence gate exactly like an explicit passed verdict."""
     calls, err = _run(workflow_path, "needs_optimization")
-    assert isinstance(err, GateFailedError), (
-        f"needs_optimization must BLOCK under the explicit-passed policy; "
-        f"got err={err!r}, calls={calls}"
+    assert err is None, (
+        f"needs_optimization must not block integrate; got err={err!r}, calls={calls}"
     )
-    assert "integrate" not in calls
+    assert "integrate" in calls, "integrate must run when review is needs_optimization"
 
 
 def test_classic_gate_review_allows_revised_needs_revision_to_passed():
@@ -205,6 +210,13 @@ def _runtime_review_gate(verdict: object, signal: object):
 
 def test_classic_gate_review_runtime_accepts_only_consistent_explicit_passed():
     out = _runtime_review_gate("passed", True)
+    assert out.outputs["gate_passed"] is True
+
+
+def test_classic_gate_review_runtime_accepts_consistent_needs_optimization():
+    """s2-needs-optimization-passes-gate: needs_optimization + review_passed=True
+    is a consistent, satisfying pair — the gate must pass."""
+    out = _runtime_review_gate("needs_optimization", True)
     assert out.outputs["gate_passed"] is True
 
 
@@ -284,6 +296,66 @@ def test_integrate_depends_on_gate_review(workflow_path):
     assert "gate-review" in integrate.depends_on, (
         f"integrate.depends_on in {workflow_path.name} must include 'gate-review'; "
         f"got {integrate.depends_on!r}"
+    )
+
+
+_STEP_06_REVIEW = (
+    Path(__file__).resolve().parents[4]
+    / "workflows"
+    / "steps"
+    / "development-classic"
+    / "step-06-review.md"
+)
+
+_MAPPING_LINE_RE = re.compile(
+    r"^- `(?P<verdict>\w+)`\s*→\s*`review_passed: (?P<signal>true|false)`",
+    re.MULTILINE,
+)
+
+
+def test_review_producer_contract_matches_gate_pass_set():
+    """test-coverage improvement (review-report.md): the canned tests above
+    hard-code review_passed from the verdict, which would keep passing even
+    if the real reviewer-facing producer instructions drifted from
+    GateHandler's _PASS_VERDICTS. Assert the shared step file's mapping
+    table agrees with the gate's actual pass-set, so a future edit to either
+    side that breaks the pairing fails loudly here instead of only in
+    production."""
+    from hive.lib.dag_executor.executor.handlers.gate import _PASS_VERDICTS
+
+    text = _STEP_06_REVIEW.read_text(encoding="utf-8")
+    mapping = {
+        m.group("verdict"): m.group("signal") == "true"
+        for m in _MAPPING_LINE_RE.finditer(text)
+    }
+    assert mapping, f"no review_passed mapping table found in {_STEP_06_REVIEW}"
+    assert set(mapping) >= {"passed", "needs_optimization", "needs_revision"}, (
+        f"mapping table must cover all three verdicts; got {mapping!r}"
+    )
+    for verdict, expect_true in mapping.items():
+        assert expect_true == (verdict in _PASS_VERDICTS), (
+            f"step-06-review.md maps {verdict!r} -> review_passed={expect_true}, "
+            f"but gate._PASS_VERDICTS={_PASS_VERDICTS!r} disagrees"
+        )
+
+
+def test_classic_fix_cycle_review_task_matches_gate_pass_set():
+    """Same drift guard as above, for the classic loop-body producer
+    (fix-cycle-review) whose free-text task instructs the reviewer directly."""
+    graph = load_workflow(CLASSIC)
+    # the loop template is unrolled into per-round copies (__r1/__r2/__r3);
+    # they share the same task text, so checking round 1 suffices.
+    node = graph.nodes.get("fix-cycle-review__r1")
+    assert node is not None, "fix-cycle-review__r1 node must exist in classic workflow"
+    task = node.task or ""
+    assert "needs_optimization" in task, (
+        "fix-cycle-review task must mention needs_optimization as a producible verdict"
+    )
+    assert "review_passed=true when the verdict is passed or needs_optimization" in task, (
+        f"fix-cycle-review task must instruct the widened pass-set; got: {task!r}"
+    )
+    assert "false for needs_revision or needs_optimization" not in task, (
+        "fix-cycle-review task must not still map needs_optimization to review_passed=false"
     )
 
 

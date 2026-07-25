@@ -9,12 +9,13 @@
     "@ai-hero/sandcastle": "0.5.10",
     "@anthropic-ai/sdk": "0.102.0",
     "better-sqlite3": "12.10.0",
-    "js-yaml": "^4.2.0",
+    "js-yaml": "^4.3.0",
     "openai": "6.42.0",
     "tsx": "4.22.4",
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "markdownlint-cli2": "^0.17.2"
+    "markdownlint-cli2": "^0.17.2",
+    "vitest": "^4.1.10"
   }
 }

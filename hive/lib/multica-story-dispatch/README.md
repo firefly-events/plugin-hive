@@ -71,6 +71,13 @@ affinity on either wire.
   unchanged — `httpJson` never reads response headers, demonstrating
   stateless tolerance on this wire.
 
+When a client's `initialize` call omits `protocolVersion`, the stdio JSON-RPC
+handler negotiates against the shared supported-version list in
+[`../mcp-protocol-version.js`](../mcp-protocol-version.js). A supported client
+version is echoed; an omitted or unsupported version resolves to the newest
+published version the server supports. The same helper is used by
+`openai-image-mcp-server.js`, so both hand-rolled servers move together.
+
 Guard: do not add an `Mcp-Session-Id` header, a cookie jar, or any per-connection
 state to either wire. If a future Multica API version requires session
 continuity, that is a deliberate protocol change requiring its own story — not

@@ -122,7 +122,7 @@ const precondition = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_
 if (!precondition.ok) throw Object.assign(new Error(precondition.error), precondition);
 ```
 
-Resolve runtime and tooling before dispatching the scenario: verify CC runtime version `>= 2.1.154`; read `claude --version` when available; otherwise rely on Workflow tool presence as proxy. Verify `test.mode` resolves to `"cc-workflows"` OR `HIVE_TEST_MODE=cc-workflows` is set. Resolve `${HIVE_STATE_DIR}` from `hive_config.paths.state_dir`, then default to `.pHive`, and confirm `scenario_path`, `scenario`, `story`, and `story_path` are present.
+Resolve runtime and tooling before dispatching the scenario: verify CC runtime version `>= 2.1.217`; read `claude --version` when available; otherwise rely on Workflow tool presence as proxy. Verify `test.mode` resolves to `"cc-workflows"` OR `HIVE_TEST_MODE=cc-workflows` is set. Resolve `${HIVE_STATE_DIR}` from `hive_config.paths.state_dir`, then default to `.pHive`, and confirm `scenario_path`, `scenario`, `story`, and `story_path` are present.
 
 Runtime field resolution must preserve source attribution:
 
@@ -139,7 +139,7 @@ field_sources:
     value: .pHive
   cc_runtime:
     source: claude --version | Workflow tool presence proxy
-    value: 2.1.154
+    value: 2.1.217
 ```
 
 On reject, exit with a structured error and do not dispatch:
@@ -147,7 +147,7 @@ On reject, exit with a structured error and do not dispatch:
 ```json
 {
   "error": "precondition_failed",
-  "message": "CC Workflows test mode requires runtime cc-workflows and Claude Code >= 2.1.154 or Workflow tool presence.",
+  "message": "CC Workflows test mode requires runtime cc-workflows and Claude Code >= 2.1.217 or Workflow tool presence.",
   "field_sources": {}
 }
 ```
@@ -358,7 +358,7 @@ Runtime and branch configuration:
 | `test.mode` | `"cc-workflows"` |
 | `HIVE_TEST_MODE` | `cc-workflows` |
 | `HIVE_STATE_DIR` | `hive_config.paths.state_dir \|\| ".pHive"` |
-| Minimum CC runtime version | `2.1.154` |
+| Minimum CC runtime version | `2.1.217` |
 | Integration branch convention | `feat/<epic-id>` |
 
 Runtime source priority is resolver-owned (`test-dispatch` Step 0), but every reject must report the consulted source in `field_sources`. Test agent routing uses `hive/lib/cc_workflows_model_tier.py`; the behavior contract follows `hive/workflows/steps/test/simulated-manual.md`.

@@ -7,10 +7,16 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 const execFileAsync = promisify(execFile);
 const CLI = fileURLToPath(new URL('../cli.mjs', import.meta.url));
 const ISSUE_UUID = '11111111-2222-3333-4444-555555555555';
+
+function descriptionWithProvenance(description, taskId) {
+  const digest = createHash('sha256').update(description, 'utf8').digest('hex');
+  return `<!-- hive-dispatch-provenance: brief-sha256=${digest}; task-id=${taskId} -->\n${description}`;
+}
 
 async function startMockServer(handler) {
   const server = http.createServer(async (req, res) => {
@@ -53,7 +59,8 @@ async function runCli(argv, serverUrl) {
 
 test('dispatch: freshly assigned issue returns {status, issue_id, task_id}', async () => {
   let getCount = 0;
-  const { serverUrl, close } = await startMockServer((req, res) => {
+  const descriptions = [];
+  const { serverUrl, close } = await startMockServer((req, res, body) => {
     const ws = 'workspace_id=test-ws';
 
     if (req.method === 'GET' && req.url === `/api/agents?${ws}`) {
@@ -69,6 +76,7 @@ test('dispatch: freshly assigned issue returns {status, issue_id, task_id}', asy
         return;
       }
       if (req.method === 'PUT') {
+        if (body?.description !== undefined) descriptions.push(body.description);
         sendJson(res, 200, { id: ISSUE_UUID, status: 'in_progress', assignee_type: 'agent', assignee_id: 'agent-dev-uuid' });
         return;
       }
@@ -93,12 +101,15 @@ test('dispatch: freshly assigned issue returns {status, issue_id, task_id}', asy
     assert.equal(result.status, 'dispatched');
     assert.equal(result.issue_id, ISSUE_UUID);
     assert.equal(result.task_id, 'task-abc-123');
+    assert.match(descriptions.at(-1), /task-id=task-abc-123/, 'final provenance must bind the spawned task id');
   } finally {
     await close();
   }
 });
 
-test('dispatch: already_dispatched idempotent call returns {status, issue_id, task_id}', async () => {
+test('dispatch: matching --body and task-bound provenance returns already_dispatched', async () => {
+  const requestedBody = '## Goal\nBuild the current behavior.\n';
+  const renderedBody = `<!-- persona: developer -->\n\n${requestedBody}`;
   const { serverUrl, close } = await startMockServer((req, res) => {
     const ws = 'workspace_id=test-ws';
 
@@ -108,7 +119,13 @@ test('dispatch: already_dispatched idempotent call returns {status, issue_id, ta
     }
 
     if (req.url === `/api/issues/${ISSUE_UUID}?${ws}` && req.method === 'GET') {
-      sendJson(res, 200, { id: ISSUE_UUID, status: 'in_progress', assignee_id: 'agent-dev-uuid', assignee_type: 'agent' });
+      sendJson(res, 200, {
+        id: ISSUE_UUID,
+        status: 'in_progress',
+        assignee_id: 'agent-dev-uuid',
+        assignee_type: 'agent',
+        description: descriptionWithProvenance(renderedBody, 'task-existing-456'),
+      });
       return;
     }
 
@@ -126,11 +143,84 @@ test('dispatch: already_dispatched idempotent call returns {status, issue_id, ta
   });
 
   try {
-    const { stdout } = await runCli(['dispatch', '--issue', ISSUE_UUID, '--agent', 'developer'], serverUrl);
+    const { stdout } = await runCli(
+      [
+        'dispatch', '--issue', ISSUE_UUID, '--agent', 'developer', '--body', requestedBody,
+        '--python-bin', process.execPath,
+      ],
+      serverUrl,
+    );
     const result = JSON.parse(stdout);
     assert.equal(result.status, 'already_dispatched');
     assert.equal(result.issue_id, ISSUE_UUID);
     assert.equal(result.task_id, 'task-existing-456');
+  } finally {
+    await close();
+  }
+});
+
+test('dispatch: stale --body on a cached active task fails instead of refreshing after start', async () => {
+  const consumedBody = '<!-- persona: developer -->\n\n## Goal\nOld behavior.\n';
+  let putCalled = false;
+  const { serverUrl, close } = await startMockServer((req, res) => {
+    const ws = 'workspace_id=test-ws';
+
+    if (req.method === 'GET' && req.url === `/api/agents?${ws}`) {
+      sendJson(res, 200, { agents: [{ id: 'agent-dev-uuid', name: 'developer' }] });
+      return;
+    }
+
+    if (req.url === `/api/issues/${ISSUE_UUID}?${ws}`) {
+      if (req.method === 'GET') {
+        sendJson(res, 200, {
+          id: ISSUE_UUID,
+          status: 'in_progress',
+          assignee_id: 'agent-dev-uuid',
+          assignee_type: 'agent',
+          description: descriptionWithProvenance(consumedBody, 'task-existing-456'),
+        });
+        return;
+      }
+      if (req.method === 'PUT') {
+        putCalled = true;
+        sendJson(res, 200, { id: ISSUE_UUID });
+        return;
+      }
+    }
+
+    if (req.method === 'GET' && req.url === `/api/issues/${ISSUE_UUID}/active-task?${ws}`) {
+      sendJson(res, 200, {
+        task: { id: 'task-existing-456', status: 'running', started_at: '2026-01-01T00:00:00Z' },
+      });
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === `/api/issues/${ISSUE_UUID}/task-runs?${ws}`) {
+      sendJson(res, 200, { task_runs: [] });
+      return;
+    }
+
+    sendJson(res, 500, { error: `unexpected: ${req.method} ${req.url}` });
+  });
+
+  try {
+    await assert.rejects(
+      runCli(
+        [
+          'dispatch', '--issue', ISSUE_UUID, '--agent', 'developer',
+          '--body', '## Goal\nNew behavior.\n', '--python-bin', process.execPath,
+        ],
+        serverUrl,
+      ),
+      (err) => {
+        assert.equal(err.code, 1);
+        const parsed = JSON.parse(err.stderr);
+        assert.equal(parsed.code, 'STALE_ACTIVE_BRIEF');
+        assert.match(parsed.message, /Refusing to report already_dispatched/);
+        return true;
+      },
+    );
+    assert.equal(putCalled, false, 'an active task brief must never be rewritten after it starts');
   } finally {
     await close();
   }
@@ -372,6 +462,8 @@ test('dispatch: in_progress + same assignee but terminal latest task is NOT alre
 test('dispatch: spent issue with --rerun resets and reports redispatched with a fresh task_id', async () => {
   let resetSeen = false;
   let assignSeen = false;
+  let integrationDescription = null;
+  const putOrder = [];
   let activeTaskCalls = 0;
   const { serverUrl, close } = await startMockServer((req, res, body) => {
     const ws = 'workspace_id=test-ws';
@@ -387,8 +479,16 @@ test('dispatch: spent issue with --rerun resets and reports redispatched with a 
         return;
       }
       if (req.method === 'PUT') {
-        if (body && body.assignee_id === null && body.status === 'todo') resetSeen = true;
-        else if (body && body.assignee_id === 'agent-dev-uuid') assignSeen = true;
+        if (body && body.assignee_id === null && body.status === 'todo') {
+          resetSeen = true;
+          putOrder.push('reset');
+        } else if (body?.description !== undefined) {
+          integrationDescription = body.description;
+          putOrder.push('description');
+        } else if (body && body.assignee_id === 'agent-dev-uuid') {
+          assignSeen = true;
+          putOrder.push('assign');
+        }
         sendJson(res, 200, { id: ISSUE_UUID });
         return;
       }
@@ -413,13 +513,22 @@ test('dispatch: spent issue with --rerun resets and reports redispatched with a 
   });
 
   try {
-    const { stdout } = await runCli(['dispatch', '--issue', ISSUE_UUID, '--agent', 'developer', '--rerun'], serverUrl);
+    const { stdout } = await runCli([
+      'dispatch', '--issue', ISSUE_UUID, '--agent', 'developer', '--rerun',
+      '--integration-branch', 'feat/my-epic', '--story-id', 's-42',
+    ], serverUrl);
     const result = JSON.parse(stdout);
     assert.equal(result.status, 'redispatched');
     assert.equal(result.issue_id, ISSUE_UUID);
     assert.equal(result.task_id, 'task-fresh-999', 'must report the fresh task, not the stale terminal one');
     assert.ok(resetSeen, 'a reset PUT (assignee cleared + status todo) must fire');
     assert.ok(assignSeen, 'an assignment PUT must fire after reset');
+    assert.match(integrationDescription, /git fetch origin 'feat\/my-epic'/);
+    assert.match(integrationDescription, /git reset --hard origin\/'feat\/my-epic'/);
+    assert.ok(
+      putOrder.indexOf('description') < putOrder.indexOf('assign'),
+      `integration contract must be written before reassignment; got ${putOrder.join(' -> ')}`,
+    );
   } finally {
     await close();
   }

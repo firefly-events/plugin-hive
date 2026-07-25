@@ -28,6 +28,17 @@ class AgentHandlerError(HandlerError):
     """The agent handler failed to invoke the agent-spawn chain."""
 
 
+class FatalAgentHandlerError(AgentHandlerError):
+    """A dispatch-time failure that must halt the graph unconditionally.
+
+    Unlike a plain `AgentHandlerError`, the walker's optional-node recovery
+    path (`node.optional=True` swallows `HandlerError` and continues) does
+    NOT apply here — s4-null-spec-fail-loud-guard requires a missing
+    story_spec to stop the graph even when the guarded node is optional, so
+    a spec-less agent can never be fabricated by a downstream node.
+    """
+
+
 class ScriptHandlerError(HandlerError):
     """Script handler subprocess failed or exceeded its timeout."""
 

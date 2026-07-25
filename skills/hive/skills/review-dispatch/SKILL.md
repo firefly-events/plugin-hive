@@ -14,7 +14,17 @@ Atomic skill, NOT inline `/review` prose. It resolves the pre-execution dispatch
 
 Call this skill once at the single `/review` dispatch point where the caller has both the story execution context and the current workflow handoff context.
 
-**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, and `HIVE_REVIEW_MODE`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; `epic_id` when known; `arguments` containing the `--sequential` flag state and dependency-depth summary; and `unblocked_stories[]` — the depth-0 ready stories at this dispatch tick, each carrying at minimum `id`, `parallel_allowed`, `parallel_rationale`, and (for `parallel_rationale: bounded-slice`) `files_to_modify[]` whose entries name the declared touch-set. Empty or single-element `unblocked_stories[]` is valid: the parallel-dispatch gate (Step 1.5) skips when there is no peer set to gate.
+**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, and `HIVE_REVIEW_MODE`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; `epic_id` when known; `arguments` containing the `--sequential` flag state and dependency-depth summary; optional `review_dispatch_context` with `kind: initial | follow_up | rerun | resume`, `prior_reviewer_model`, and `prior_reviewer_source`; and `unblocked_stories[]` — the depth-0 ready stories at this dispatch tick, each carrying at minimum `id`, `parallel_allowed`, `parallel_rationale`, and (for `parallel_rationale: bounded-slice`) `files_to_modify[]` whose entries name the declared touch-set. Empty or single-element `unblocked_stories[]` is valid: the parallel-dispatch gate (Step 1.5) skips when there is no peer set to gate.
+
+**Reviewer continuity producer:** when no prior CC-workflows review marker exists,
+set `review_dispatch_context={kind: initial, prior_reviewer_model: null, prior_reviewer_source: null}`. For a
+follow-up, rerun, or resume, read the last successful
+`cc-workflows-run.yaml` marker for the same review unit and copy
+`field_sources.agent_models.Review.tier` into `prior_reviewer_model` and
+`field_sources.agent_models.Review.source` into `prior_reviewer_source`. Missing or
+invalid prior model attribution on a non-initial dispatch is a fail-loud routing error; never substitute
+the parent session model. Forward this resolved context unchanged to
+`review-mode-cc-workflows`.
 
 **Flag pass-through:** `--sequential` must be forwarded verbatim to the resolved mode atom (`review-mode-multica` or `review-mode-cc-workflows`). This dispatch skill does NOT consume or strip that flag — it captures it from `arguments` and passes it along unchanged so the receiving atom can apply the same gate-check and pipeline-skipping logic as the inline path.
 
@@ -218,6 +228,6 @@ Any downstream `review-mode-*` atom that handles the `/review` workflow **MUST**
 
 This skill is the single dispatch point for `/review` mode selection, the parallel-dispatch gate (Step 1.5, `ed-7`), and the executor-vs-orchestrator runner cutover for review workflows. Callers must consume `mode_decision`, `mode_reason`, `gate_violations[]`, `runner_path`, and `runner_reason` from this skill instead of re-implementing any of those decisions in another skill or workflow step.
 
-When `mode_decision` resolves to `multica`, route to `skills/hive/skills/review-mode-multica/SKILL.md`. When `mode_decision` resolves to `cc-workflows`, route to `skills/hive/skills/review-mode-cc-workflows/SKILL.md`. Both atoms ship in later slices — references by skill-path here serve as forward declarations; their absence does not break this dispatch skill.
+When `mode_decision` resolves to `multica`, route to `skills/hive/skills/review-mode-multica/SKILL.md`. When `mode_decision` resolves to `cc-workflows`, route to `skills/hive/skills/review-mode-cc-workflows/SKILL.md` and pass the resolved `review_dispatch_context` as `dispatch_kind` plus `prior_reviewer_model`. Both atoms ship in later slices — references by skill-path here serve as forward declarations; their absence does not break this dispatch skill.
 
 The parallel-dispatch gate is reachable from no other surface: any future skill that wants to fan review stories out concurrently MUST do so through this dispatch point so the gate inspects its `unblocked_stories[]` set, and MUST add a row to [`hive/references/parallel-call-sites.md`](../../../hive/references/parallel-call-sites.md) §2 for the new dispatch shape.

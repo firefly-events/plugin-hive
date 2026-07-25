@@ -1,6 +1,8 @@
 # Permission Patterns
 
-Per-workflow recommendations for minimizing permission prompts during Hive execution. These are recommendations for users to add to their project's `.claude/settings.json` — Hive does not configure permissions automatically.
+Per-workflow recommendations for minimizing permission prompts during Hive execution. These
+are recommendations for users to add to their project's `.claude/settings.json` — Hive does
+not configure permissions automatically. Hive does not ship a project settings file.
 
 ## Why Permission Prompts Happen
 
@@ -108,6 +110,13 @@ Tool(param:value)
   tool-name patterns like `Bash(npm test*)`).
 - Multiple constraints can target the same tool across separate rules; deny rules win over
   allow rules.
+- File rules are resolved from the Claude Code process's current working directory. For a
+  recursive project-relative path, use `dir/**/*` (for example,
+  `Edit(file_path:hive/**/*)`). Do not use the legacy single-segment `dir/**` form: current
+  Claude Code narrows that form to the directory itself rather than all descendants.
+- Keep `file_path:` on Edit, Write, NotebookEdit, and Glob permission rules. Bare tool rules
+  such as `"Write"`, `"NotebookEdit"`, or `"Glob"` are deprecated because they grant the
+  entire tool instead of expressing the intended path boundary.
 
 ### Worked Hive Examples
 
@@ -117,16 +126,16 @@ These use real Hive tooling and the paths Hive agents actually touch.
 {
   "permissions": {
     "allow": [
-      "Edit(file_path:.pHive/**)",
-      "Edit(file_path:hive/references/**)",
-      "Write(file_path:.pHive/episodes/**)",
-      "Write(file_path:.pHive/cycle-state/**)",
+      "Edit(file_path:.pHive/**/*)",
+      "Edit(file_path:hive/references/**/*)",
+      "Write(file_path:.pHive/episodes/**/*)",
+      "Write(file_path:.pHive/cycle-state/**/*)",
       "Bash(command:git status*)",
       "Bash(command:./gradlew test*)",
       "mcp__plugin_context-mode_context-mode__ctx_execute(language:shell)"
     ],
     "deny": [
-      "Edit(file_path:hive/lib/dag_executor/**)",
+      "Edit(file_path:hive/lib/dag_executor/**/*)",
       "Edit(file_path:**/.claude/settings.json)",
       "Write(file_path:**/.env*)",
       "Bash(command:git push*)",
@@ -138,11 +147,11 @@ These use real Hive tooling and the paths Hive agents actually touch.
 
 What each rule does, in Hive terms:
 
-- `Edit(file_path:.pHive/**)` — let a planning agent freely edit epic/story YAML and
+- `Edit(file_path:.pHive/**/*)` — let a planning agent freely edit epic/story YAML and
   cycle-state under `.pHive/` without prompting on every file.
-- `Write(file_path:.pHive/episodes/**)` — allow episode markers (the artifacts
+- `Write(file_path:.pHive/episodes/**/*)` — allow episode markers (the artifacts
   `multica_episode` and ship reconciliation write) without approval.
-- `Edit(file_path:hive/lib/dag_executor/**)` in **deny** — protect the canonical Python DAG
+- `Edit(file_path:hive/lib/dag_executor/**/*)` in **deny** — protect the canonical Python DAG
   executor from incidental edits by a docs- or planning-scoped agent.
 - `Bash(command:git push*)` in **deny** — keeps outbound publishing gated even when a broad
   `Bash(command:git *)` allow exists elsewhere (deny precedence).
@@ -160,10 +169,10 @@ keep a tight blast radius. Recommended baselines:
 
 | Role | Recommended deny-listed parameter patterns | Why |
 |---|---|---|
-| `orchestrator` | `Edit(file_path:hive/lib/**)`, `Write(file_path:hive/lib/**)`, `Bash(command:git commit*)`, `Bash(command:git push*)` | Orchestrators dispatch and reconcile; they should not be hand-editing canonical runtime code or publishing. |
-| `developer` | `Edit(file_path:.pHive/cycle-state/**)`, `Edit(file_path:**/.claude/settings.json)`, `Bash(command:git push*)`, `Write(file_path:**/.env*)` | Devs write code, not orchestration state or host permission config; push stays human-gated. |
+| `orchestrator` | `Edit(file_path:hive/lib/**/*)`, `Write(file_path:hive/lib/**/*)`, `Bash(command:git commit*)`, `Bash(command:git push*)` | Orchestrators dispatch and reconcile; they should not be hand-editing canonical runtime code or publishing. |
+| `developer` | `Edit(file_path:.pHive/cycle-state/**/*)`, `Edit(file_path:**/.claude/settings.json)`, `Bash(command:git push*)`, `Write(file_path:**/.env*)` | Devs write code, not orchestration state or host permission config; push stays human-gated. |
 | `reviewer` | `Edit(file_path:**)`, `Write(file_path:**)`, `Bash(command:git commit*)`, `Bash(command:git push*)` | Reviewers are read-and-comment only; deny all mutation so a review pass cannot alter the tree. |
-| `planner` | `Edit(file_path:hive/lib/**)`, `Edit(file_path:src/**)`, `Bash(command:git commit*)`, `Bash(command:git push*)` | Planners produce `.pHive/` epics and stories, not implementation code or commits. |
+| `planner` | `Edit(file_path:hive/lib/**/*)`, `Edit(file_path:src/**/*)`, `Bash(command:git commit*)`, `Bash(command:git push*)` | Planners produce `.pHive/` epics and stories, not implementation code or commits. |
 
 Deny rules are evaluated before allow rules, so these patterns hold even when a broad
 allowlist (`Bash(command:git *)`, `Edit(file_path:**)`) is also configured for convenience.
@@ -172,6 +181,27 @@ Note: as with the tool-name allowlists, `git commit` and `git push` are intentio
 **out of every allowlist and inside the deny lists above**. Mutating history and publishing
 remain human-gated at the parameter level too — a `Bash(command:git *)` allow must always be
 paired with explicit `Bash(command:git commit*)` / `Bash(command:git push*)` denies.
+
+## Auto Mode Configuration Boundary
+
+Project `.claude/settings.json` permissions and model preferences are advisory convenience
+in auto mode. Claude Code auto-mode launch paths have not consistently honored project
+settings or project-scoped plugin configuration, so no safety or correctness requirement may
+depend only on those settings.
+
+Behavior-critical Hive controls belong to tracked, plugin-owned surfaces or to an explicit
+supported invocation path. In the Claude plugin these include the hooks registered in
+`.claude-plugin/plugin.json` (the SessionStart version/effort gates and the PreToolUse agent
+misuse gate), plus command and skill contracts shipped with the plugin. An unattended caller
+must load the plugin explicitly, pass required invocation options explicitly, and fail closed
+when the expected plugin gates are unavailable; copying an allowlist into project settings is
+not a substitute.
+
+The 2.16 compatibility audit found no tracked production `--auto` launcher outside the
+excluded Hermes/lights-on integration. Therefore t-013 requires no production runtime change
+for this release. Adding a non-Hermes auto-mode launcher reopens that disposition: its tests
+must prove the supported invocation path loads the required plugin-owned gates without
+relying on project settings.
 
 ## Command Pattern Rules for Step Files
 

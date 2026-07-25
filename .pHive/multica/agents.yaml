@@ -37,8 +37,8 @@ agents:
 - name: researcher
   description: Gathers research data from the codebase and external sources to inform
     planning.
-  provider: claude
-  model: claude-sonnet-4-6
+  provider: codex
+  model: gpt-5.6-terra
   max_concurrent_tasks: 1
   persona_ref: hive/agents/researcher.md
   custom_env: {}

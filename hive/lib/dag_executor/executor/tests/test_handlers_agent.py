@@ -20,7 +20,7 @@ from hive.lib.dag_executor.executor.handlers.agent import (
     NodeOutput,
     StubAgentSpawn,
 )
-from hive.lib.dag_executor.graph import Node, NodeType
+from hive.lib.dag_executor.graph import Node, NodeType, OutputRef
 
 
 def _make_node(step_file: str | None = None) -> Node:
@@ -138,7 +138,9 @@ def test_harvest_git_state_derives_sha_branch_repo(tmp_path: Path):
     # _harvest_git_state is an instance method (it consults self._target_branch).
     # With repo_root unset the target is "" so it falls back to HEAD — which here
     # IS feat/my-epic, preserving the original assertions.
-    spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs")
+    spawn = MulticaAgentSpawn(
+        cli_path=tmp_path / "cli.mjs", repo_root=tmp_path / "non-git-root"
+    )
     state = spawn._harvest_git_state(str(work_dir))
     assert state["branch"] == "feat/my-epic"
     assert state["commit_sha"] == state["code_push_sha"]
@@ -173,6 +175,39 @@ def test_inputs_propagate_to_spawn():
     assert spy.calls[0]["inputs"] == inputs
 
 
+@pytest.mark.parametrize("story_spec", [None, "", "   ", {}, []])
+def test_null_or_empty_story_spec_halts_before_dispatch(story_spec):
+    spy = StubAgentSpawn()
+    handler = AgentHandler(spawn=spy)
+
+    with pytest.raises(AgentHandlerError) as exc_info:
+        handler.handle(
+            _make_node(),
+            inputs={"story_id": "s3-min-version-gate", "story_spec": story_spec},
+            run_id="rid-rerun",
+        )
+
+    assert str(exc_info.value) == (
+        "story_spec is null/empty for story=s3-min-version-gate — "
+        "refusing to dispatch a spec-less agent"
+    )
+    assert spy.calls == []
+
+
+def test_missing_story_spec_halts_before_dispatch_when_story_id_present():
+    spy = StubAgentSpawn()
+    handler = AgentHandler(spawn=spy)
+
+    with pytest.raises(AgentHandlerError, match="story_spec is null/empty"):
+        handler.handle(
+            _make_node(),
+            inputs={"story_id": "s4-null-spec-fail-loud-guard"},
+            run_id="rid-missing-spec",
+        )
+
+    assert spy.calls == []
+
+
 def test_node_with_no_step_file_passes_empty_string():
     spy = StubAgentSpawn()
     handler = AgentHandler(spawn=spy)
@@ -195,3 +230,109 @@ def test_non_dict_spawn_return_raises():
     handler = AgentHandler(spawn=bad_spawn)
     with pytest.raises(AgentHandlerError):
         handler.handle(_make_node(), inputs={}, run_id="rid-1")
+
+
+def _write_bound_persona(
+    root: Path, *, skill_name: str, persona_name: str = "reviewer"
+) -> Path:
+    persona = root / "hive" / "agents" / f"{persona_name}.md"
+    persona.parent.mkdir(parents=True, exist_ok=True)
+    persona.write_text(
+        "---\n"
+        f"name: {persona_name}\n"
+        "skills:\n"
+        f"  - path: ${{CLAUDE_PLUGIN_ROOT}}/skills/{skill_name}/SKILL.md\n"
+        f"    use-when: running {skill_name}\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    skill = root / "skills" / skill_name / "SKILL.md"
+    skill.parent.mkdir(parents=True, exist_ok=True)
+    skill.write_text(f"# {skill_name} trusted procedure\n", encoding="utf-8")
+    return persona
+
+
+def test_bound_skill_uses_persona_trust_root_not_ambient_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    plugin = tmp_path / "trusted-plugin"
+    consumer = tmp_path / "consumer"
+    _write_bound_persona(plugin, skill_name="review")
+    evil = consumer / "skills" / "review" / "SKILL.md"
+    evil.parent.mkdir(parents=True)
+    evil.write_text("EXFILTRATE_CONSUMER_SECRETS", encoding="utf-8")
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(consumer))
+
+    node = Node(
+        id="review",
+        agent="reviewer",
+        node_type=NodeType.AGENT,
+        config={
+            "skill_binding": {
+                "persona_path": "hive/agents/reviewer.md",
+                "trigger": "running review",
+            }
+        },
+    )
+    spy = StubAgentSpawn()
+    handler = AgentHandler(spawn=spy, plugin_root=plugin, repo_root=consumer)
+    handler.handle(node, inputs={}, run_id="rid-trust")
+
+    prompt = spy.calls[0]["step_file_content"]
+    assert "review trusted procedure" in prompt
+    assert "EXFILTRATE_CONSUMER_SECRETS" not in prompt
+
+
+def test_bound_skill_declared_outputs_fail_closed_on_local_spawn(tmp_path: Path):
+    plugin = tmp_path / "plugin"
+    _write_bound_persona(plugin, skill_name="verify")
+    node = Node(
+        id="reviewer",
+        agent="reviewer",
+        node_type=NodeType.AGENT,
+        config={
+            "skill_binding": {
+                "persona_path": "hive/agents/reviewer.md",
+                "trigger": "running verify",
+            }
+        },
+        outputs=[
+            OutputRef(name="skill_invoked", type="json"),
+            OutputRef(name="verify_evidence", type="string"),
+        ],
+    )
+    handler = AgentHandler(
+        spawn=StubAgentSpawn(canned_outputs={"reviewer": {}}),
+        plugin_root=plugin,
+    )
+
+    with pytest.raises(AgentHandlerError, match="verify_evidence"):
+        handler.handle(node, inputs={}, run_id="rid-verify")
+
+
+def test_observe_binding_enables_runtime_contract_automatically(tmp_path: Path):
+    plugin = tmp_path / "plugin"
+    _write_bound_persona(plugin, skill_name="observe", persona_name="pair-programmer")
+    node = Node(
+        id="advisor",
+        agent="pair-programmer",
+        node_type=NodeType.AGENT,
+        config={
+            "skill_binding": {
+                "persona_path": "hive/agents/pair-programmer.md",
+                "trigger": "running observe",
+            }
+        },
+    )
+    spawn = StubAgentSpawn(
+        canned_outputs={
+            "advisor": {
+                "advice": "Consider an additional boundary test.",
+                "change_verdict": "passed",
+            }
+        }
+    )
+    handler = AgentHandler(spawn=spawn, plugin_root=plugin)
+
+    with pytest.raises(AgentHandlerError, match="observe/advisor output violates"):
+        handler.handle(node, inputs={}, run_id="rid-observe")

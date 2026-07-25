@@ -97,7 +97,7 @@ const precondition = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_
 if (!precondition.ok) throw Object.assign(new Error(precondition.error), precondition);
 ```
 
-Resolve runtime and tooling before dispatching any persona: verify CC runtime version `>= 2.1.154`; read `claude --version` when available; otherwise rely on Workflow tool presence as proxy. Verify `planning.mode` resolves to `"cc-workflows"` OR `HIVE_PLANNING_MODE=cc-workflows` is set. Resolve `${HIVE_STATE_DIR}` from `hive_config.paths.state_dir`, then default to `.pHive`, and confirm `assembled_personas[]` plus `planning_story` are present.
+Resolve runtime and tooling before dispatching any persona: verify CC runtime version `>= 2.1.217`; read `claude --version` when available; otherwise rely on Workflow tool presence as proxy. Verify `planning.mode` resolves to `"cc-workflows"` OR `HIVE_PLANNING_MODE=cc-workflows` is set. Resolve `${HIVE_STATE_DIR}` from `hive_config.paths.state_dir`, then default to `.pHive`, and confirm `assembled_personas[]` plus `planning_story` are present.
 
 Runtime field resolution must preserve source attribution:
 
@@ -114,7 +114,7 @@ field_sources:
     value: .pHive
   cc_runtime:
     source: claude --version | Workflow tool presence proxy
-    value: 2.1.154
+    value: 2.1.217
 ```
 
 On reject, exit with a structured error and do not dispatch:
@@ -122,7 +122,7 @@ On reject, exit with a structured error and do not dispatch:
 ```json
 {
   "error": "precondition_failed",
-  "message": "CC Workflows planning mode requires runtime cc-workflows and Claude Code >= 2.1.154 or Workflow tool presence.",
+  "message": "CC Workflows planning mode requires runtime cc-workflows and Claude Code >= 2.1.217 or Workflow tool presence.",
   "field_sources": {}
 }
 ```
@@ -320,7 +320,7 @@ Runtime and branch configuration:
 | `planning.mode` | `"cc-workflows"` |
 | `HIVE_PLANNING_MODE` | `cc-workflows` |
 | `HIVE_STATE_DIR` | `hive_config.paths.state_dir \|\| ".pHive"` |
-| Minimum CC runtime version | `2.1.154` |
+| Minimum CC runtime version | `2.1.217` |
 | Integration branch convention | `feat/<epic-id>` |
 
 Runtime source priority is resolver-owned (`/plan` Phase 0c), but every reject must report the consulted source in `field_sources`. Persona routing uses the same roster as `/plan`; the behavior file remains `hive/agents/<persona>.md`, and the routing backend determines only Workflow `agentType`.

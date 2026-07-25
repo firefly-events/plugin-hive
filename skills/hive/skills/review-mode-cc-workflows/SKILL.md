@@ -41,8 +41,15 @@ Called once per `/review` when r-1 returns `mode_decision == cc-workflows`.
 - `epic_id` — parent epic identifier when known; used for episode paths.
 - `hive_config` — parsed root `hive.config.yaml`, including `review.cc-workflows.*` and `paths.state_dir`.
 - `integration_branch` — current epic branch/ref for shared-branch contract.
+- `dispatch_kind` — `initial | follow_up | rerun | resume`, resolved by `review-dispatch`.
+- `prior_reviewer_model` — null for `initial`; required for every non-initial
+  dispatch and copied from the prior review marker's
+  `field_sources.agent_models.Review.tier`.
+- `prior_reviewer_source` — null for `initial`; required for every non-initial
+  dispatch and copied from the prior review marker's
+  `field_sources.agent_models.Review.source`.
 
-Fixed call signature: `invoked with arguments, field_sources, epic_id, hive_config, integration_branch`
+Fixed call signature: `invoked with arguments, field_sources, epic_id, hive_config, integration_branch, dispatch_kind, prior_reviewer_model, prior_reviewer_source`
 
 OUTER SEAM INVARIANT: internal `workflow_assembly` changes never affect HOW `review-dispatch` calls
 this skill. The fixed call signature is the outer seam.
@@ -81,7 +88,7 @@ const precondition = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_
 if (!precondition.ok) throw Object.assign(new Error(precondition.error), precondition);
 ```
 
-Resolve runtime and tooling: verify CC runtime `>= 2.1.154`; read `claude --version` or proxy on
+Resolve runtime and tooling: verify CC runtime `>= 2.1.217`; read `claude --version` or proxy on
 Workflow tool presence. Verify `review.mode == "cc-workflows"` OR `HIVE_REVIEW_MODE=cc-workflows`.
 Resolve `${HIVE_STATE_DIR}` from `hive_config.paths.state_dir`, default `.pHive`. Confirm `arguments` present.
 
@@ -100,7 +107,7 @@ field_sources:
     value: .pHive
   cc_runtime:
     source: claude --version | Workflow tool presence proxy
-    value: 2.1.154
+    value: 2.1.217
 ```
 
 On reject, exit with a structured error — do not dispatch:
@@ -108,7 +115,7 @@ On reject, exit with a structured error — do not dispatch:
 ```json
 {
   "error": "precondition_failed",
-  "message": "CC Workflows review mode requires runtime cc-workflows and Claude Code >= 2.1.154 or Workflow tool presence.",
+  "message": "CC Workflows review mode requires runtime cc-workflows and Claude Code >= 2.1.217 or Workflow tool presence.",
   "field_sources": {}
 }
 ```
@@ -123,13 +130,39 @@ the Workflow TOOL, and tracks it. Dispatch granularity is per-review: one review
 
 1. **Resolve model tier before assembly.**
 
+   Consume the `dispatch_kind`, `prior_reviewer_model`, and `prior_reviewer_source`
+   values produced by r-1,
+   then build the actual agent options:
+
    ```js
-   const { tier: reviewerTier, source: reviewerSource } = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_model_tier.py'], { input: JSON.stringify({ persona: 'reviewer', config: hive_config }), encoding: 'utf8' }));
-   // Python equivalent of resolveModelTier('reviewer', { config: hive_config }).
+   const reviewerResolution = JSON.parse(execFileSync(
+     'python3',
+     ['hive/lib/cc_workflows_model_tier.py'],
+     {
+       input: JSON.stringify({
+         persona: 'reviewer',
+         config: hive_config,
+         dispatch_kind,
+         prior_model: prior_reviewer_model,
+         prior_source: prior_reviewer_source,
+       }),
+       encoding: 'utf8',
+     },
+   ));
+   const reviewerTier = reviewerResolution.tier;
+   const reviewerSource = reviewerResolution.source;
+   const reviewerOpts = reviewerResolution.agent_options;
    ```
 
    No `agent()` call may omit `opts.model`. Resolver reads `model_overrides` then `model_tiers`
    from `hive.config.yaml` — never from agent frontmatter. Unmapped agents default to `sonnet` with WARN.
+   This applies to every follow-up, rerun, and resumed reviewer dispatch as well as the first call:
+   call the options builder and pass `reviewerOpts` (which contains
+   `model: reviewerTier`) explicitly. Non-initial dispatches preserve the prior
+   marker's reviewer model even if current config or the parent model differs.
+   Never rely on the resumed
+   Workflow or parent session to retain/inherit reviewer model identity. Record the resolved
+   `{tier, source}` for each dispatch in `field_sources.agent_models`.
 
 2. **Brief assembly.** Derive `unit_id` from the argument (PR number, branch name, or `ad-hoc`).
    Build the Workflow script in memory:
@@ -141,7 +174,7 @@ the Workflow TOOL, and tracks it. Dispatch granularity is per-review: one review
    **Solo reviewer call** (required):
 
    ```text
-   agent(reviewer, task=<solo review brief>, opts.model=reviewerTier)
+   agent(reviewer, task=<solo review brief>, opts=reviewerOpts)
    ```
 
    The reviewer agent prompt must instruct the agent to:
@@ -242,8 +275,8 @@ verdict:
   reviewer_findings: <string>
 field_sources:
   agent_models:
-    Review/reviewer:
-      role: reviewer
+    Review:
+      persona: reviewer
       tier: sonnet | opus | haiku
       source: model_overrides | model_tiers | default
 ```
@@ -330,7 +363,7 @@ Environment override: `HIVE_REVIEW_MODE=cc-workflows`
 | `execution.review_mode` | `"cc-workflows"` |
 | `HIVE_REVIEW_MODE` | `cc-workflows` |
 | `HIVE_STATE_DIR` | `hive_config.paths.state_dir \|\| ".pHive"` |
-| Minimum CC runtime | `2.1.154` |
+| Minimum CC runtime | `2.1.217` |
 | Integration branch convention | `feat/<epic-id>` |
 
 ## Reuses (atomic deps)
@@ -360,5 +393,5 @@ Environment override: `HIVE_REVIEW_MODE=cc-workflows`
 | Insight-capture suffix on agent() prompt | Per execute-mode-cc-workflows mandatory clause; persona = reviewer |
 | worktree isolation at Step 0 | Invoke `hive/lib/cc_workflows_preconditions.py`; first action |
 | No fallback inside this skill | Step 0 reject returns structured error; `review-dispatch` owns fallback |
-| Fixed outer seam | `arguments`, `field_sources`, `epic_id`, `hive_config`, `integration_branch` |
+| Fixed outer seam | `arguments`, `field_sources`, `epic_id`, `hive_config`, `integration_branch`, `dispatch_kind`, `prior_reviewer_model`, `prior_reviewer_source` |
 | completion_kind: doc-verdict | Review produces a verdict document, not code commits |

@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 import {
   resolveAgentUuidByName,
@@ -26,6 +27,27 @@ import {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HTTP_TIMEOUT_MS = 30_000;
 const USER_AGENT = 'hive-multica-story-dispatch-cli/0.1.0';
+const BRIEF_PROVENANCE_RE =
+  /<!--\s*hive-dispatch-provenance:\s*brief-sha256=([0-9a-f]{64});\s*task-id=([^\s]+)\s*-->\n*/i;
+
+function stripBriefProvenance(description) {
+  return String(description ?? '').replace(BRIEF_PROVENANCE_RE, '');
+}
+
+function briefDigest(description) {
+  return createHash('sha256').update(stripBriefProvenance(description), 'utf8').digest('hex');
+}
+
+function readBriefProvenance(description) {
+  const match = BRIEF_PROVENANCE_RE.exec(String(description ?? ''));
+  return match ? { digest: match[1].toLowerCase(), taskId: match[2] } : null;
+}
+
+function writeBriefProvenance(description, digest, taskId) {
+  const marker =
+    `<!-- hive-dispatch-provenance: brief-sha256=${digest}; task-id=${taskId} -->`;
+  return `${marker}\n${stripBriefProvenance(description)}`;
+}
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -383,20 +405,17 @@ async function cmdDispatch(args, cfg) {
     priorTaskId = snapshot0.task_id ?? null;
     await resetIssueForRerun(serverUrl, token, workspaceId, issueUuid);
     didReset = true;
-  } else if (
-    // Idempotent ONLY when the issue is already in_progress, assigned to the SAME
-    // assignee requested, AND its latest task is non-terminal (terminal handled above).
+  }
+
+  // Assignee identity alone cannot prove idempotency: a cached issue may point at
+  // an older, still-running task whose brief predates the caller's current body.
+  // Delay the no-op decision until the complete desired brief has been rendered so
+  // it can be checked against task-bound provenance stored before dispatch.
+  const sameActiveAssignee =
+    !didReset &&
     issue?.status === 'in_progress' &&
     issue?.assignee_type === requestedType &&
-    issue?.assignee_id === requestedUuid
-  ) {
-    succeed({
-      status: 'already_dispatched',
-      issue_id: issueUuid,
-      task_id: snapshot0?.task_id ?? null,
-    });
-    return;
-  }
+    issue?.assignee_id === requestedUuid;
 
   // Integration contract injection: when --integration-branch is passed, ensure the
   // issue body carries the single-shared-branch contract before dispatch. Issues filed
@@ -404,8 +423,14 @@ async function cmdDispatch(args, cfg) {
   // default base (main) and commit to a throwaway agent/<task> branch that never pushes —
   // breaking the dependency chain. Append idempotently (skip if already present).
   const integrationBranch = args['integration-branch'] ?? null;
-  let currentDesc = String(issue?.description ?? '');
-  let descChanged = false;
+  const existingDesc = String(issue?.description ?? '');
+  // DAG Python owns brief construction and sends --body on every dispatch.
+  // Refresh reused issues before adding bridge-owned integration/persona
+  // sections; otherwise an issue created by an older executor permanently
+  // misses the current declared-output contract.
+  const suppliedBody = typeof args.body === 'string' ? String(args.body) : null;
+  let currentDesc = suppliedBody ?? stripBriefProvenance(existingDesc);
+  let descChanged = suppliedBody !== null && suppliedBody !== stripBriefProvenance(existingDesc);
 
   if (integrationBranch) {
     const contractHeading = '## Integration Contract — single shared branch';
@@ -455,6 +480,37 @@ async function cmdDispatch(args, cfg) {
     }
   }
 
+  const desiredDigest = briefDigest(currentDesc);
+  if (sameActiveAssignee) {
+    const provenance = readBriefProvenance(existingDesc);
+    const activeTaskId = snapshot0?.task_id ?? null;
+    if (
+      !provenance ||
+      !activeTaskId ||
+      provenance.taskId !== activeTaskId ||
+      provenance.digest !== desiredDigest
+    ) {
+      fail(
+        'STALE_ACTIVE_BRIEF',
+        `issue ${issueUuid} already has active task ${activeTaskId ?? '(unknown)'}, but its ` +
+          `brief provenance does not match the requested dispatch. Refusing to report ` +
+          `already_dispatched; pass --rerun after the active task is stopped to start a fresh run.`,
+      );
+    }
+    succeed({
+      status: 'already_dispatched',
+      issue_id: issueUuid,
+      task_id: activeTaskId,
+    });
+    return;
+  }
+
+  // Stage the exact rendered brief identity before assignment. The task id is bound
+  // after Multica creates the run; until then a concurrent retry sees `pending` and
+  // conservatively refuses reuse instead of attaching to an unproven task.
+  currentDesc = writeBriefProvenance(currentDesc, desiredDigest, 'pending');
+  descChanged = currentDesc !== existingDesc;
+
   if (descChanged) {
     await httpJson(issueUrl(serverUrl, workspaceId, issueUuid), {
       method: 'PUT',
@@ -492,6 +548,18 @@ async function cmdDispatch(args, cfg) {
         `(last task_id=${task_id ?? '(none)'}, prior=${priorTaskId ?? '(none)'}). ` +
         `Reset succeeded — re-run \`dispatch --rerun\` or poll the issue.`,
     );
+  }
+
+  if (task_id) {
+    // Complete the durable association only after the daemon exposes the task id.
+    // A later cached dispatch must match both this id and the rendered brief hash;
+    // issue description equality by itself is not evidence that the active task
+    // consumed that description.
+    await httpJson(issueUrl(serverUrl, workspaceId, issueUuid), {
+      method: 'PUT',
+      token,
+      body: { description: writeBriefProvenance(currentDesc, desiredDigest, task_id) },
+    });
   }
 
   succeed({

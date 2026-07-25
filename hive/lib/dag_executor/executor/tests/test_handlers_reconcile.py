@@ -12,6 +12,7 @@ Acceptance criteria:
 from __future__ import annotations
 
 import json
+import subprocess
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -114,6 +115,58 @@ def test_ff_merge_passes_work_dir_when_provided(tmp_path):
     assert "--work-dir" in cmd
     wd_idx = cmd.index("--work-dir") + 1
     assert cmd[wd_idx] == "/some/work/dir"
+
+
+def test_ff_merge_from_named_origin_materialises_remote_tip(tmp_path):
+    """Fix 6 contract: ``repo=origin`` is fetched in repo_root and the real
+    bridge CLI fast-forwards the executor checkout to the harvested SHA."""
+    origin = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    target = tmp_path / "target"
+
+    subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", str(seed)], check=True)
+
+    def git(repo, *args):
+        return subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    git(seed, "config", "user.email", "t@t")
+    git(seed, "config", "user.name", "t")
+    (seed / "base.txt").write_text("base\n", encoding="utf-8")
+    git(seed, "add", "-A")
+    git(seed, "commit", "-q", "-m", "base")
+    git(seed, "remote", "add", "origin", str(origin))
+    git(seed, "push", "-q", "-u", "origin", "main")
+    git(seed, "checkout", "-q", "-b", "feat/my-epic")
+    git(seed, "push", "-q", "-u", "origin", "feat/my-epic")
+
+    subprocess.run(["git", "clone", "-q", str(origin), str(target)], check=True)
+    git(target, "checkout", "-q", "feat/my-epic")
+
+    (seed / "implementation.py").write_text("done = True\n", encoding="utf-8")
+    git(seed, "add", "-A")
+    git(seed, "commit", "-q", "-m", "implementation")
+    pushed_sha = git(seed, "rev-parse", "HEAD").stdout.strip()
+    git(seed, "push", "-q", "origin", "feat/my-epic")
+
+    out = ReconcileHandler(repo_root=target).handle(
+        _reconcile_node(),
+        inputs={
+            "sha": pushed_sha,
+            "branch": "feat/my-epic",
+            "repo": "origin",
+        },
+        run_id="run-origin",
+    )
+
+    assert out.outputs["reconcile_status"] == "merged"
+    assert git(target, "rev-parse", "HEAD").stdout.strip() == pushed_sha
+    assert (target / "implementation.py").read_text(encoding="utf-8") == "done = True\n"
 
 
 def test_repo_root_is_merge_target_overriding_work_dir_input(tmp_path):
@@ -467,6 +520,9 @@ def test_marker_no_branch_field_derives_from_cwd(tmp_path):
         if "rev-parse" in cmd:
             assert cmd[cmd.index("-C") + 1] == "/work/agent-1"
             return SimpleNamespace(stdout="agent/dev/from-marker\n", stderr="", returncode=0)
+        if "branch" in cmd and "-f" in cmd:
+            assert cmd[-2:] == ["reconcile-harvest/abc123", "abc123"]
+            return SimpleNamespace(stdout="", stderr="", returncode=0)
         return _ok_result()
 
     with patch("subprocess.run", side_effect=_side_effect) as mock_run:
@@ -474,7 +530,94 @@ def test_marker_no_branch_field_derives_from_cwd(tmp_path):
 
     cmd = mock_run.call_args_list[-1][0][0]
     branch_idx = cmd.index("--branch") + 1
-    assert cmd[branch_idx] == "agent/dev/from-marker"
+    assert cmd[branch_idx] == "reconcile-harvest/abc123"
+
+
+def test_derive_branch_mints_ephemeral_for_agent_head(tmp_path):
+    """A daemon agent/* HEAD is not a stable integration ref. Reconcile must
+    mint a SHA-derived local branch at the exact harvested commit instead."""
+    import subprocess as sp
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    def git(*args):
+        return sp.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    git("checkout", "-q", "-b", "agent/dev/task")
+    (repo / "impl.py").write_text("work", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "agent work")
+    sha = git("rev-parse", "HEAD").stdout.strip()
+
+    branch = ReconcileHandler._derive_branch_from_repo(str(repo), sha)
+
+    assert branch == f"reconcile-harvest/{sha[:12]}"
+    assert git("rev-parse", branch).stdout.strip() == sha
+
+
+def test_derive_branch_preserves_non_daemon_named_branch(tmp_path):
+    """Only the exact agent/ namespace is daemon-owned; similarly named user
+    branches must continue to pass through unchanged."""
+    import subprocess as sp
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    def git(*args):
+        return sp.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    git("checkout", "-q", "-b", "agentic/feature")
+    (repo / "impl.py").write_text("work", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "work")
+    sha = git("rev-parse", "HEAD").stdout.strip()
+
+    assert ReconcileHandler._derive_branch_from_repo(str(repo), sha) == "agentic/feature"
+
+
+def test_derive_branch_still_mints_ephemeral_for_detached_head(tmp_path):
+    """The agent/* guard extends the established detached-HEAD fallback; it
+    must not regress that original reconciliation path."""
+    import subprocess as sp
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    def git(*args):
+        return sp.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    (repo / "impl.py").write_text("work", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "work")
+    sha = git("rev-parse", "HEAD").stdout.strip()
+    git("checkout", "-q", "--detach", sha)
+
+    branch = ReconcileHandler._derive_branch_from_repo(str(repo), sha)
+
+    assert branch == f"reconcile-harvest/{sha[:12]}"
+    assert git("rev-parse", branch).stdout.strip() == sha
 
 
 # ── Critical #2 (PLU-577 revision): freshness guard + consume-on-read ─────────
@@ -495,6 +638,28 @@ def test_marker_success_deletes_marker_after_consumption(tmp_path):
     with patch("subprocess.run", return_value=_ok_result()):
         handler.handle(_reconcile_node(), inputs=inputs, run_id="run-marker-consume")
     assert not marker_path.exists(), "marker must be deleted once read so a later, recycled agent_id can't reuse it"
+
+
+def test_marker_success_survives_concurrent_delete_race(tmp_path):
+    """t-008: a concurrent cleanup (e.g. a second reconcile racing the same
+    recycled agent_id) may unlink the marker file between our read and our
+    own consume-on-read delete. That race must not fail an otherwise-
+    successful reconcile — `_delete_marker` swallows OSError precisely for
+    this case."""
+    state_dir = tmp_path / "state"
+    _write_marker(state_dir, "agent-1", verdict="success", cwd="/work/agent-1")
+    handler = _make_handler_with_state_dir(tmp_path, state_dir)
+    inputs = {
+        "sha": "abc123",
+        "branch": "agent/dev/branch",
+        "repo": "git@github.com:org/repo.git",
+        "agent_id": "agent-1",
+        "tracker_id": "PLU-1",
+    }
+    with patch("subprocess.run", return_value=_ok_result()), \
+        patch("pathlib.Path.unlink", side_effect=FileNotFoundError):
+        out = handler.handle(_reconcile_node(), inputs=inputs, run_id="run-delete-race")
+    assert out.outputs["reconcile_status"] == "merged", "delete race on marker cleanup must not fail the reconcile"
 
 
 def test_marker_stale_older_than_task_start_is_rejected(tmp_path):

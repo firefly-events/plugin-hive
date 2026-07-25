@@ -21,6 +21,8 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 
+import { MCP_PROTOCOL_VERSION } from '../../mcp-protocol-version.js';
+
 const execAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MCP_SERVER = path.join(__dirname, '..', 'mcp-tools.mjs');
@@ -131,6 +133,42 @@ test('stateless MCP compat (PLU-542): tools/list works without an initialize han
       'multica_post_comment',
       'multica_write_state',
     ]);
+  } finally {
+    await client.close();
+  }
+});
+
+test('initialize echoes a supported client protocolVersion unchanged', async () => {
+  const { client } = await startMcpServer();
+  try {
+    // startMcpServer() already sent initialize with '2024-11-05'; assert the
+    // echo on that response directly.
+    const resp = await client.send('initialize', { protocolVersion: '2024-11-05' });
+    assert.equal(resp.result.protocolVersion, '2024-11-05');
+  } finally {
+    await client.close();
+  }
+});
+
+test('initialize returns the latest supported version when protocolVersion is omitted', async () => {
+  const proc = spawn(process.execPath, [MCP_SERVER], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const client = new McpClient(proc);
+  try {
+    const resp = await client.send('initialize', { clientInfo: { name: 'test', version: '0.0.0' } });
+    assert.equal(resp.result.protocolVersion, MCP_PROTOCOL_VERSION);
+    assert.equal(resp.result.protocolVersion, '2025-11-25');
+    assert.notEqual(resp.result.protocolVersion, '2024-11-05');
+  } finally {
+    await client.close();
+  }
+});
+
+test('initialize negotiates an unsupported client version to the latest supported version', async () => {
+  const proc = spawn(process.execPath, [MCP_SERVER], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const client = new McpClient(proc);
+  try {
+    const resp = await client.send('initialize', { protocolVersion: '2099-01-01' });
+    assert.equal(resp.result.protocolVersion, MCP_PROTOCOL_VERSION);
   } finally {
     await client.close();
   }

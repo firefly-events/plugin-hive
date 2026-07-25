@@ -15,7 +15,7 @@ gate-review BLOCKS integrate rather than shipping an unreviewed change (see
 output_format:
   review_verdict: str    # one of: passed | needs_optimization | needs_revision
   review_findings: str   # human-readable findings, each citing file:line
-  review_passed: bool    # true only when review_verdict is exactly passed
+  review_passed: bool    # true when review_verdict is passed or needs_optimization
 ```
 
 The classic terminal gate references the grammar-valid boolean
@@ -128,9 +128,11 @@ predicates skip with a warning — see `hive/references/predicate-grammar.md`.
 ```
 
 `review_passed` is the convergence signal the terminal gate (`gate-review`)
-evaluates. It MUST be true only for an exact `passed` verdict:
-- `passed`            → `review_passed: true`  (permits integrate)
-- `needs_optimization` → `review_passed: false` (blocks integrate)
+evaluates. It MUST be true for `passed` and `needs_optimization` (Hive's own
+non-blocking verdict — nits/suggestions, not defects) and false only for
+`needs_revision`:
+- `passed`             → `review_passed: true`  (permits integrate)
+- `needs_optimization` → `review_passed: true`  (permits integrate)
 - `needs_revision`     → `review_passed: false` (blocks integrate)
 
 The orchestrator-narrated path consumes the prose section; the executor path
@@ -159,8 +161,9 @@ non-empty or merely non-`needs_revision` verdict.
 
 **Gating:** Verdict produced.
 - If **passed**: skip step 7 (optimize), go to `step-08-integrate.md`
-- If **needs_optimization**: go to `step-07-optimize.md`, then remain blocked
-  at the terminal gate until a subsequent review emits `passed`
+- If **needs_optimization**: satisfies the terminal gate (permits integrate);
+  go to `step-07-optimize.md` for the recommended follow-ups, then
+  `step-08-integrate.md`
 - If **needs_revision**: route to fix loop (orchestrator handles)
 
 
@@ -182,3 +185,26 @@ review_passed: <true|false>
 Use concrete values: for path/artifact outputs give the repo-relative path you
 wrote; for verdict/status give the literal string; for summaries give a short
 string (or a path to the file you wrote). Do not omit a declared key.
+
+### Findings report (required — s3-persist-review-findings)
+
+In ADDITION to `outputs.yaml`, write the full prose verdict from step 5
+("Produce a verdict") to `.pHive/dag-outputs/review-report.md` in your
+working copy, on EVERY review round (the initial `review` step and every
+`fix-cycle-review` round). This is the auditable surface an operator reads
+when a round blocks — a blocked story must never resolve to an empty or
+missing report.
+
+The report MUST be non-blank and MUST name a verdict and the reviewed SHA
+(e.g. `## Review Verdict: needs_revision` and a `Reviewed SHA: <sha>` line).
+When the verdict carries findings, each one MUST still cite `file:line`
+per the MANDATORY EXECUTION RULES above. A clean `passed` round with no
+findings is still non-empty — record the verdict, the reviewed SHA, and an
+explicit "no findings" statement.
+
+The executor reads this file directly and uses its validated content —
+not the terse `review_findings` scalar above — as the authoritative
+`review_findings` value. A missing, blank, or structurally invalid report
+is treated as an incomplete round and retried, exactly like any other
+missing declared output; do not substitute a path string for the report's
+actual content in `outputs.yaml`.

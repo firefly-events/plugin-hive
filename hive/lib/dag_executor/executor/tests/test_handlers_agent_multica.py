@@ -24,6 +24,20 @@ from hive.lib.dag_executor.executor.errors import AgentHandlerError
 from hive.lib.dag_executor.executor.handlers.agent import MulticaAgentSpawn
 
 
+@pytest.fixture(autouse=True)
+def _collapse_reharvest_backoff(monkeypatch):
+    """Production waits up to 7.75s for late worktree flushes; unit tests drive
+    the same pass count without wall-clock sleeping."""
+    monkeypatch.setattr(
+        "hive.lib.dag_executor.executor.handlers.agent._REHARVEST_DELAYS_S",
+        (0.0,) * 6,
+    )
+    monkeypatch.setattr(
+        "hive.lib.dag_executor.executor.handlers.agent._REMOTE_LOOKUP_DELAYS_S",
+        (0.0,) * 6,
+    )
+
+
 # ── helpers ────────────────────────────────────────────────────────────────────
 
 def _make_spawn(tmp_path: Path, **kwargs) -> MulticaAgentSpawn:
@@ -60,6 +74,81 @@ def _dispatch_result() -> dict:
 
 def _create_issue_result(issue_id: str = "issue-uuid-1") -> dict:
     return {"id": issue_id, "url": f"https://example.com/issues/{issue_id}"}
+
+
+def test_advisor_and_reviewer_use_distinct_multica_task_instances(tmp_path):
+    """The production Multica adapter must not reuse the advisor task as the
+    later reviewer gate when both run under one DAG run id."""
+    from hive.lib.dag_executor.executor.handlers.agent import AgentHandler
+
+    plugin_root = Path(__file__).resolve().parents[5]
+    advisor_work = tmp_path / "advisor-work"
+    advisor_outputs = advisor_work / ".pHive" / "dag-outputs"
+    advisor_outputs.mkdir(parents=True)
+    (advisor_outputs / "outputs.yaml").write_text(
+        'advice: "Consider one additional boundary test."\n', encoding="utf-8"
+    )
+    reviewer_work = tmp_path / "reviewer-work"
+    reviewer_work.mkdir()
+
+    spawn = _make_spawn(tmp_path)
+    advisor = SimpleNamespace(
+        id="implement-advisor",
+        agent="pair-programmer",
+        step_file="",
+        outputs=[],
+        config={
+            "skill_binding": {
+                "persona_path": "hive/agents/pair-programmer.md",
+                "trigger": "advising during an implementation-sidecar session",
+            }
+        },
+    )
+    reviewer = SimpleNamespace(
+        id="reviewer",
+        agent="reviewer",
+        step_file="",
+        outputs=[],
+        config={
+            "skill_binding": {
+                "persona_path": "hive/agents/reviewer.md",
+                "trigger": "running any code review",
+                "in_graph": True,
+            }
+        },
+    )
+    side_effects = [
+        _make_subprocess_result(_create_issue_result("issue-advisor")),
+        _make_subprocess_result(
+            {"status": "dispatched", "issue_id": "issue-advisor", "task_id": "task-advisor"}
+        ),
+        _make_subprocess_result(
+            _completed_poll_result(
+                task_id="task-advisor",
+                agent_id="agent-instance-advisor",
+                work_dir=str(advisor_work),
+            )
+        ),
+        _make_subprocess_result(_create_issue_result("issue-reviewer")),
+        _make_subprocess_result(
+            {"status": "dispatched", "issue_id": "issue-reviewer", "task_id": "task-reviewer"}
+        ),
+        _make_subprocess_result(
+            _completed_poll_result(
+                task_id="task-reviewer",
+                agent_id="agent-instance-reviewer",
+                work_dir=str(reviewer_work),
+            )
+        ),
+    ]
+    handler = AgentHandler(spawn=spawn, plugin_root=plugin_root)
+    with patch("subprocess.run", side_effect=side_effects):
+        advisor_result = handler.handle(advisor, inputs={}, run_id="shared-run")
+        reviewer_result = handler.handle(reviewer, inputs={}, run_id="shared-run")
+
+    assert advisor_result.outputs["task_id"] != reviewer_result.outputs["task_id"]
+    assert advisor_result.outputs["agent_id"] != reviewer_result.outputs["agent_id"]
+    assert advisor_result.outputs["tracker_id"] != reviewer_result.outputs["tracker_id"]
 
 
 # ── call shape ─────────────────────────────────────────────────────────────────
@@ -505,6 +594,63 @@ def test_harvest_node_outputs_reads_declared_outputs(tmp_path):
     assert MulticaAgentSpawn._harvest_node_outputs(None) == {}
 
 
+def test_harvest_review_report_returns_validated_content(tmp_path):
+    work_dir = tmp_path / "task-work"
+    output_dir = work_dir / "the-project" / ".pHive" / "dag-outputs"
+    output_dir.mkdir(parents=True)
+    report = (
+        "VERDICT: needs_revision\n"
+        "REVIEWED SHA: abc123\n"
+        "FINDINGS:\n- agent.py:800: preserve the full report\n"
+    )
+    (output_dir / "review-report.md").write_text(report, encoding="utf-8")
+
+    got = MulticaAgentSpawn._harvest_review_report(str(work_dir))
+
+    assert got == {"review_findings": report}
+
+
+@pytest.mark.parametrize(
+    "report",
+    [
+        "",
+        "   \n",
+        "VERDICT: passed\nFINDINGS: none\n",
+        "REVIEWED SHA: abc123\nFINDINGS: none\n",
+        "The reviewer shall document a verdict after checking the hash.\n",
+        "Verdictual prose is not a key.\nThe artifact was washed before review.\n",
+    ],
+)
+def test_harvest_review_report_rejects_incomplete_content(tmp_path, report):
+    work_dir = tmp_path / "task-work"
+    output_dir = work_dir / ".pHive" / "dag-outputs"
+    output_dir.mkdir(parents=True)
+    (output_dir / "review-report.md").write_text(report, encoding="utf-8")
+
+    assert MulticaAgentSpawn._harvest_review_report(str(work_dir)) == {
+        "review_findings": ""
+    }
+
+
+def test_reharvest_review_report_overrides_path_scalar(tmp_path, monkeypatch):
+    work_dir = tmp_path / "task-work"
+    output_dir = work_dir / ".pHive" / "dag-outputs"
+    output_dir.mkdir(parents=True)
+    (output_dir / "outputs.yaml").write_text(
+        "review_findings: .pHive/dag-outputs/review-report.md\n",
+        encoding="utf-8",
+    )
+    report = "VERDICT: passed\nREVIEWED SHA: abc123\nFINDINGS: []\n"
+    (output_dir / "review-report.md").write_text(report, encoding="utf-8")
+    spawn = _make_spawn(tmp_path)
+    monkeypatch.setattr(spawn, "_harvest_git_state", lambda _work_dir: {})
+    monkeypatch.setattr(spawn, "_harvest_artifacts", lambda _work_dir: {})
+
+    got = spawn.reharvest(str(work_dir))
+
+    assert got["review_findings"] == report
+
+
 def test_branch_contract_targets_epic_branch(tmp_path):
     """#15: on a non-default (epic) branch, the binding injects a checkout
     directive so the agent bases its commit on that branch (not the daemon's
@@ -592,6 +738,24 @@ def test_dispatch_omits_integration_branch_on_default_branch(tmp_path):
     assert "--story-id" not in captured[0]
 
 
+def test_force_rerun_preserves_integration_branch_contract(tmp_path, monkeypatch):
+    """A forced rerun must reset the spent issue without dropping the epic
+    integration branch that force-syncs the fresh workspace to the current tip."""
+    spawn = _make_spawn(tmp_path)
+    captured: list[list[str]] = []
+    monkeypatch.setenv("HIVE_MULTICA_FORCE_RERUN", "1")
+
+    with patch.object(spawn, "_target_branch", return_value="feat/my-epic"), patch.object(
+        spawn, "_run_cli_fast", side_effect=lambda args: captured.append(args)
+    ):
+        spawn._dispatch("tracker-1", "developer", story_id="s-42")
+
+    args = captured[0]
+    assert args[args.index("--integration-branch") + 1] == "feat/my-epic"
+    assert args[args.index("--story-id") + 1] == "s-42"
+    assert "--rerun" in args
+
+
 # ---------------------------------------------------------------------------
 # Authoritative epic-branch harvest (bake-in): the daemon leaves HEAD on its
 # agent/<persona> branch at base while the agent commits to the epic branch.
@@ -612,38 +776,182 @@ def _init_repo(repo, sp):
 
 
 def test_harvest_prefers_epic_branch_tip_over_drifted_head(tmp_path):
-    """The core regression: HEAD is left on the daemon branch at base while the
-    agent committed to feat/<epic>. Harvest must return the EPIC branch tip +
-    name, not the drifted HEAD / base sha."""
+    """Fix 6: a reused daemon checkout can leave its local feat/<epic> ref stale
+    while the agent pushes the real commit to origin. Harvest must resolve the
+    executor's authoritative remote ref and make reconcile fetch that source."""
     import subprocess as sp
 
-    # Executor checkout on the epic branch so _target_branch resolves.
-    exu_git = _init_repo(tmp_path / "exu", sp)
-    exu = tmp_path / "exu"
-    (exu / "f").write_text("base")
-    exu_git("add", "-A"); exu_git("commit", "-q", "-m", "base")
-    exu_git("remote", "add", "origin", str(exu)); exu_git("fetch", "-q", "origin")
-    exu_git("checkout", "-q", "-b", "feat/my-epic")
+    origin = tmp_path / "origin.git"
+    sp.run(["git", "init", "-q", "--bare", str(origin)], check=True)
 
-    # Agent workdir: feat/my-epic ahead with the agent commit; HEAD drifted to a
-    # daemon branch at base.
+    seed_git = _init_repo(tmp_path / "seed", sp)
+    seed = tmp_path / "seed"
+    (seed / "f").write_text("base")
+    seed_git("add", "-A"); seed_git("commit", "-q", "-m", "base")
+    seed_git("remote", "add", "origin", str(origin))
+    seed_git("push", "-q", "-u", "origin", "main")
+    seed_git("checkout", "-q", "-b", "feat/my-epic")
+    seed_git("push", "-q", "-u", "origin", "feat/my-epic")
+
+    sp.run(["git", "clone", "-q", str(origin), str(tmp_path / "exu")], check=True)
+    exu = tmp_path / "exu"
+    exu_git = lambda *a: sp.run(
+        ["git", "-C", str(exu), *a], check=True, capture_output=True, text=True
+    )
+    exu_git("checkout", "-q", "feat/my-epic")
+
+    sp.run(["git", "clone", "-q", str(origin), str(tmp_path / "awd")], check=True)
+    awd = tmp_path / "awd"
+    awd_git = lambda *a: sp.run(
+        ["git", "-C", str(awd), *a], check=True, capture_output=True, text=True
+    )
+    awd_git("config", "user.email", "t@t")
+    awd_git("config", "user.name", "t")
+    awd_git("checkout", "-q", "feat/my-epic")
+    stale_local_sha = awd_git("rev-parse", "feat/my-epic").stdout.strip()
+    awd_git("checkout", "-q", "-b", "agent/backend/task")
+    (awd / "impl.py").write_text("real work")
+    awd_git("add", "-A"); awd_git("commit", "-q", "-m", "agent work")
+    pushed_sha = awd_git("rev-parse", "HEAD").stdout.strip()
+    awd_git("push", "-q", "origin", "HEAD:feat/my-epic")
+
+    # A later task may advance the shared branch before this harvest runs. The
+    # node must retain its own candidate SHA, not claim the later task's tip.
+    seed_git("pull", "-q", "--ff-only")
+    (seed / "later.py").write_text("later")
+    seed_git("add", "-A"); seed_git("commit", "-q", "-m", "later task")
+    later_sha = seed_git("rev-parse", "HEAD").stdout.strip()
+    seed_git("push", "-q", "origin", "feat/my-epic")
+
+    assert awd_git("rev-parse", "feat/my-epic").stdout.strip() == stale_local_sha
+    assert pushed_sha != stale_local_sha
+    assert later_sha != pushed_sha
+
+    spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs", repo_root=exu)
+    out = spawn._harvest_git_state(str(awd))
+    assert out["commit_sha"] == pushed_sha
+    assert out["code_push_sha"] == pushed_sha
+    assert out["branch"] == "feat/my-epic"
+    assert out["repo"] == "origin"
+    exu_git("fetch", "-q", out["repo"], out["branch"])
+    assert exu_git("merge-base", "--is-ancestor", out["commit_sha"], "FETCH_HEAD")
+
+
+def test_harvest_uses_pushed_local_target_when_daemon_head_is_base(tmp_path):
+    """The inverse Multica topology also occurs: the task commit updates the
+    local integration ref, then daemon HEAD drifts back to an agent ref at base."""
+    import subprocess as sp
+
+    origin = tmp_path / "origin.git"
+    sp.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+    seed_git = _init_repo(tmp_path / "seed", sp)
+    seed = tmp_path / "seed"
+    (seed / "f").write_text("base")
+    seed_git("add", "-A"); seed_git("commit", "-q", "-m", "base")
+    base_sha = seed_git("rev-parse", "HEAD").stdout.strip()
+    seed_git("remote", "add", "origin", str(origin))
+    seed_git("push", "-q", "-u", "origin", "main")
+    seed_git("checkout", "-q", "-b", "feat/my-epic")
+    seed_git("push", "-q", "-u", "origin", "feat/my-epic")
+
+    sp.run(["git", "clone", "-q", str(origin), str(tmp_path / "exu")], check=True)
+    exu = tmp_path / "exu"
+    sp.run(["git", "-C", str(exu), "checkout", "-q", "feat/my-epic"], check=True)
+    sp.run(["git", "clone", "-q", str(origin), str(tmp_path / "awd")], check=True)
+    awd = tmp_path / "awd"
+    awd_git = lambda *a: sp.run(
+        ["git", "-C", str(awd), *a], check=True, capture_output=True, text=True
+    )
+    awd_git("config", "user.email", "t@t")
+    awd_git("config", "user.name", "t")
+    awd_git("checkout", "-q", "feat/my-epic")
+    (awd / "impl.py").write_text("work")
+    awd_git("add", "-A"); awd_git("commit", "-q", "-m", "task")
+    candidate = awd_git("rev-parse", "HEAD").stdout.strip()
+    awd_git("push", "-q", "origin", "feat/my-epic")
+    awd_git("checkout", "-q", "-b", "agent/backend/task", base_sha)
+
+    out = MulticaAgentSpawn(
+        cli_path=tmp_path / "cli.mjs", repo_root=exu
+    )._harvest_git_state(str(awd))
+
+    assert awd_git("rev-parse", "HEAD").stdout.strip() == base_sha
+    assert out["commit_sha"] == candidate
+    assert out["repo"] == "origin"
+
+
+def test_harvest_waits_for_valid_old_tip_to_advance(tmp_path, monkeypatch):
+    """A completed poll can precede the push. Keep polling when origin exists
+    but does not yet contain the exact task candidate."""
+    import subprocess as sp
+    import threading
+    import time
+
+    origin = tmp_path / "origin.git"
+    sp.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+    seed_git = _init_repo(tmp_path / "seed", sp)
+    seed = tmp_path / "seed"
+    (seed / "f").write_text("base")
+    seed_git("add", "-A"); seed_git("commit", "-q", "-m", "base")
+    seed_git("remote", "add", "origin", str(origin))
+    seed_git("push", "-q", "-u", "origin", "main")
+    seed_git("checkout", "-q", "-b", "feat/my-epic")
+    seed_git("push", "-q", "-u", "origin", "feat/my-epic")
+
+    sp.run(["git", "clone", "-q", str(origin), str(tmp_path / "exu")], check=True)
+    exu = tmp_path / "exu"
+    sp.run(["git", "-C", str(exu), "checkout", "-q", "feat/my-epic"], check=True)
+    sp.run(["git", "clone", "-q", str(origin), str(tmp_path / "awd")], check=True)
+    awd = tmp_path / "awd"
+    awd_git = lambda *a: sp.run(
+        ["git", "-C", str(awd), *a], check=True, capture_output=True, text=True
+    )
+    awd_git("config", "user.email", "t@t")
+    awd_git("config", "user.name", "t")
+    awd_git("checkout", "-q", "feat/my-epic")
+    awd_git("checkout", "-q", "-b", "agent/backend/task")
+    (awd / "impl.py").write_text("work")
+    awd_git("add", "-A"); awd_git("commit", "-q", "-m", "task")
+    candidate = awd_git("rev-parse", "HEAD").stdout.strip()
+
+    monkeypatch.setattr(
+        "hive.lib.dag_executor.executor.handlers.agent._REMOTE_LOOKUP_DELAYS_S",
+        (0.0, 0.1, 0.2),
+    )
+
+    def delayed_push():
+        time.sleep(0.05)
+        awd_git("push", "-q", "origin", "HEAD:feat/my-epic")
+
+    push = threading.Thread(target=delayed_push)
+    push.start()
+    try:
+        out = MulticaAgentSpawn(
+            cli_path=tmp_path / "cli.mjs", repo_root=exu
+        )._harvest_git_state(str(awd))
+    finally:
+        push.join()
+
+    assert out["commit_sha"] == candidate
+    assert out["repo"] == "origin"
+
+
+def test_harvest_fails_loud_when_integration_remote_cannot_resolve(tmp_path):
+    """An integration-branch run must never fall back to a stale daemon-local
+    feat ref when the authoritative remote cannot be queried."""
+    import subprocess as sp
+
     awd_git = _init_repo(tmp_path / "awd", sp)
     awd = tmp_path / "awd"
     (awd / "f").write_text("base")
     awd_git("add", "-A"); awd_git("commit", "-q", "-m", "base")
-    base_sha = awd_git("rev-parse", "HEAD").stdout.strip()
-    awd_git("checkout", "-q", "-b", "feat/my-epic")
-    (awd / "impl.py").write_text("real work")
-    awd_git("add", "-A"); awd_git("commit", "-q", "-m", "agent work")
-    epic_sha = awd_git("rev-parse", "feat/my-epic").stdout.strip()
-    awd_git("checkout", "-q", "-b", "agent/dev/x", "main")  # HEAD drifts to base
 
-    spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs", repo_root=exu)
-    out = spawn._harvest_git_state(str(awd))
-    assert out["commit_sha"] == epic_sha
-    assert out["code_push_sha"] == epic_sha
-    assert out["branch"] == "feat/my-epic"
-    assert out["commit_sha"] != base_sha
+    spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs", repo_root=tmp_path)
+    with patch.object(spawn, "_target_branch", return_value="feat/my-epic"), patch.object(
+        spawn, "_remote_target_commit", return_value=None
+    ):
+        with pytest.raises(AgentHandlerError, match="authoritative remote"):
+            spawn._harvest_git_state(str(awd))
 
 
 def test_harvest_falls_back_to_head_on_default_branch(tmp_path):
@@ -671,9 +979,9 @@ def test_harvest_falls_back_to_head_on_default_branch(tmp_path):
     assert out["branch"] == "work"
 
 
-def test_harvest_uses_head_when_agent_ignored_contract(tmp_path):
-    """Agent committed on HEAD/the daemon branch and left the epic branch at base
-    → harvest HEAD (the ref that actually carries the commit)."""
+def test_harvest_fails_loud_for_unpushed_task_commit(tmp_path):
+    """A valid-but-old remote tip must not turn a new local task commit into a
+    hollow no-op merely because the push has not landed yet."""
     import subprocess as sp
 
     exu_git = _init_repo(tmp_path / "exu", sp)
@@ -694,9 +1002,9 @@ def test_harvest_uses_head_when_agent_ignored_contract(tmp_path):
     head_sha = awd_git("rev-parse", "HEAD").stdout.strip()
 
     spawn = MulticaAgentSpawn(cli_path=tmp_path / "cli.mjs", repo_root=exu)
-    out = spawn._harvest_git_state(str(awd))
-    assert out["commit_sha"] == head_sha
-    assert out["branch"] == "agent/dev/x"
+    with pytest.raises(AgentHandlerError, match="verify the task commit"):
+        spawn._harvest_git_state(str(awd))
+    assert exu_git("rev-parse", "HEAD").stdout.strip() != head_sha
 
 
 # NOTE: a prior #21 attempt keyed agent failure off a `.pHive/interrupts/*.yaml`
@@ -759,17 +1067,40 @@ def test_under_run_recovers_via_reharvest_without_redispatch(tmp_path):
         MulticaAgentSpawn,
     )
 
-    (tmp_path / "wd").mkdir()
+    work_dir = tmp_path / "wd"
+    output_dir = work_dir / ".pHive" / "dag-outputs"
+    output_dir.mkdir(parents=True)
+    persona = tmp_path / "hive" / "agents" / "technical-writer.md"
+    persona.parent.mkdir(parents=True)
+    persona.write_text(
+        "---\nname: technical-writer\nskills:\n"
+        "  - path: ${CLAUDE_PLUGIN_ROOT}/skills/review/SKILL.md\n"
+        "    use-when: recovering late output\n---\n",
+        encoding="utf-8",
+    )
+    trusted_skill = tmp_path / "skills" / "review" / "SKILL.md"
+    trusted_skill.parent.mkdir(parents=True)
+    trusted_skill.write_text("# Trusted review procedure\n", encoding="utf-8")
 
     class _RaceSpawn(MulticaAgentSpawn):
-        """__call__ harvests empty (race); a later re-read of the SAME work_dir
-        surfaces the declared outputs that the agent committed post-terminal."""
+        """The output file is initially malformed, then becomes valid on the
+        third read as the worktree flush completes."""
+
+        reharvest_calls = 0
 
         def reharvest(self, work_dir, base=None):
-            out = dict(base or {})
-            out["epic_dir"] = ".pHive/epics/execute-flow-followons-converge-loop"
-            out["commit_sha"] = "4dcd26e"
-            return out
+            self.reharvest_calls += 1
+            if self.reharvest_calls < 3:
+                (output_dir / "outputs.yaml").write_text(
+                    "epic_dir: [invalid\n", encoding="utf-8"
+                )
+            else:
+                (output_dir / "outputs.yaml").write_text(
+                    "epic_dir: .pHive/epics/execute-flow-followons-converge-loop\n"
+                    "skill_invoked: skills/evil/SKILL.md\n",
+                    encoding="utf-8",
+                )
+            return super().reharvest(work_dir, base=base)
 
     spawn = _RaceSpawn(cli_path=tmp_path / "cli.mjs", repo_root=tmp_path)
 
@@ -783,24 +1114,36 @@ def test_under_run_recovers_via_reharvest_without_redispatch(tmp_path):
             dispatch_count[0] += 1
             return _make_subprocess_result(_dispatch_result())
         return _make_subprocess_result(
-            _completed_poll_result(work_dir=str(tmp_path / "wd"))
+            _completed_poll_result(work_dir=str(work_dir), code_push_sha="attempt-sha")
         )
 
     node = SimpleNamespace(
         id="author",
         agent="technical-writer",
         step_file="",
-        outputs=[SimpleNamespace(name="epic_dir"), SimpleNamespace(name="commit_sha")],
+        outputs=[
+            SimpleNamespace(name="epic_dir"),
+            SimpleNamespace(name="commit_sha"),
+            SimpleNamespace(name="skill_invoked"),
+        ],
+        config={
+            "skill_binding": {
+                "persona_path": "hive/agents/technical-writer.md",
+                "trigger": "recovering late output",
+            }
+        },
     )
-    handler = AgentHandler(spawn=spawn)
-    with patch("subprocess.run", side_effect=side_effect):
+    handler = AgentHandler(spawn=spawn, plugin_root=tmp_path)
+    with patch("subprocess.run", side_effect=side_effect), patch("time.sleep"):
         result = handler.handle(node, inputs={}, run_id="run-1")
 
     # Recovered on the FIRST attempt — the re-harvest surfaced the good output,
     # so NO second dispatch was spent abandoning the work_dir that held it.
     assert dispatch_count[0] == 1, "reharvest must recover before re-dispatching"
+    assert spawn.reharvest_calls == 3
     assert result.outputs["epic_dir"].endswith("execute-flow-followons-converge-loop")
-    assert result.outputs["commit_sha"] == "4dcd26e"
+    assert result.outputs["commit_sha"] == "attempt-sha"
+    assert result.outputs["skill_invoked"] == str(trusted_skill)
 
 
 def test_output_contract_injected_into_multica_brief(tmp_path):

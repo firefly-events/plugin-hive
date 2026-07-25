@@ -14,6 +14,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { negotiateMcpProtocolVersion } from '../mcp-protocol-version.js';
 
 const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -394,7 +395,7 @@ async function handleRpcMessage(message) {
         jsonrpc: '2.0',
         id: message.id,
         result: {
-          protocolVersion: message.params?.protocolVersion ?? '2024-11-05',
+          protocolVersion: negotiateMcpProtocolVersion(message.params?.protocolVersion),
           capabilities: { tools: {} },
           serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
         },

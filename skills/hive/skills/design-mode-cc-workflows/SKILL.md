@@ -94,7 +94,7 @@ const precondition = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_
 if (!precondition.ok) throw Object.assign(new Error(precondition.error), precondition);
 ```
 
-Resolve runtime and tooling: verify CC runtime `>= 2.1.154`; read `claude --version` when
+Resolve runtime and tooling: verify CC runtime `>= 2.1.217`; read `claude --version` when
 available; otherwise rely on Workflow tool presence as proxy. Verify `execution.mode`
 resolves to `"cc-workflows"` OR `HIVE_DESIGN_MODE=cc-workflows` is set. Confirm
 `include_constraints`, `design_context`, and `epic_handle` are present.
@@ -114,7 +114,7 @@ field_sources:
     value: .pHive
   cc_runtime:
     source: claude --version | Workflow tool presence proxy
-    value: 2.1.154
+    value: 2.1.217
 ```
 
 On reject, exit with a structured error and do not dispatch:
@@ -122,7 +122,7 @@ On reject, exit with a structured error and do not dispatch:
 ```json
 {
   "error": "precondition_failed",
-  "message": "CC Workflows design mode requires runtime cc-workflows and Claude Code >= 2.1.154 or Workflow tool presence.",
+  "message": "CC Workflows design mode requires runtime cc-workflows and Claude Code >= 2.1.217 or Workflow tool presence.",
   "field_sources": {}
 }
 ```
@@ -371,7 +371,7 @@ HIVE_DESIGN_MODE=cc-workflows
 | `execution.mode` | `"cc-workflows"` |
 | `HIVE_DESIGN_MODE` | `cc-workflows` |
 | `HIVE_STATE_DIR` | `hive_config.paths.state_dir \|\| ".pHive"` |
-| Minimum CC runtime version | `2.1.154` |
+| Minimum CC runtime version | `2.1.217` |
 | Integration branch convention | `feat/<epic-id>` |
 
 ## Reuses (atomic deps)
