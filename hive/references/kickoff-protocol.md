@@ -13,15 +13,20 @@ Initialize Hive for a project. Detects brownfield vs greenfield automatically.
 ## Headless Mode
 
 Epic `headless-question-protocol`, story `hqp-3-kickoff-headless-integration`. Before
-any "Ask the user" / "Ask:" instruction below, call
-`hive/lib/runtime_mode.{py,js}`'s `detect_interactive_mode()`.
+any "Ask the user" / "Ask:" instruction below, call `hive/lib/runtime_mode.py`'s
+`detect_interactive_mode()` (Python) — or `hive/lib/runtime_mode.js`'s
+`detectInteractiveMode()` (JS; camelCase, this repo's existing per-language naming
+convention — see `hive/lib/config.py`/`hive/lib/config.js` for prior art). Both take
+the same shape of input and return the same `{mode, source}` shape.
 
 **Interactive** (the common case — `mode: "interactive"`): no change. Ask exactly as
 written below.
 
 **Headless** (`mode: "headless"`): instead of prompting inline, call
-`hive/lib/question_gateway.{py,js}`'s `ask_or_emit(skill="kickoff", phase="<phase-id>",
-questions=[...])`, batching every question for that phase boundary into one call (see
+`hive/lib/question_gateway.py`'s `ask_or_emit(skill="kickoff", phase="<phase-id>",
+questions=[...])` (Python) — or `hive/lib/question_gateway.js`'s
+`askOrEmit({skill: "kickoff", phase: "<phase-id>", questions: [...]})` (JS) —
+batching every question for that phase boundary into one call (see
 `hive/references/question-envelope-schema.md` for why phase-batching, not
 per-question). Two outcomes:
 
@@ -43,7 +48,7 @@ headings):
 | `1a` | Step 1a: Metrics Opt-In / Preservation | Fresh opt-in OR re-kickoff change prompt (same phase id either way — mutually exclusive paths) |
 | `1b` | Step 1b: Ship Target Elicitation / Preservation | Fresh elicitation OR re-kickoff change prompt |
 | `project-classification` | `skills/kickoff/SKILL.md` only — not documented as a numbered Step in this file (see note below) | `project_type` + `has_ui` |
-| `2b-ii` | Phase 2b-ii: Developer Discovery, Step 2 | All 7 numbered elicitation items (the section is titled "5 Questions" but the actual prompt template presents 7 — see the note at that section) |
+| `2b-ii` | Phase 2b-ii: Developer Discovery, Step 2 | All 7 numbered elicitation items (see that section's qid table) |
 | `4b` | Phase 4b: Scaffold CONTEXT.md | The backfill opt-in prompt |
 
 **`project-classification` note:** `skills/kickoff/SKILL.md` asks `project_type` and
@@ -154,11 +159,18 @@ If `hive.config.yaml` already contains `metrics.enabled`:
      exclusive):** ask the change-decision and the replacement value **in the same
      envelope**, as two qids (`change_metrics: yes/no` and
      `replacement_metrics_value: yes/no`), not as a decision followed by a
-     conditional follow-up round. `ask_or_emit()` returns one answered envelope per
-     phase; a second "if yes, what's the replacement" round for the *same* phase id
-     would just re-match the already-answered envelope from step 3, not prompt
-     again. Batching avoids that — the orchestrator answers both up front, and
-     `replacement_metrics_value` is simply ignored when `change_metrics: no`.
+     conditional follow-up round. Consumed envelopes are deleted on extraction (see
+     `hive/references/question-envelope-schema.md`'s "Deletion on consume"), so a
+     hypothetical second "if yes, what's the replacement" call for phase `1a` after
+     the decision envelope was already consumed would find nothing to match and
+     write a **brand-new** envelope — it would NOT re-match the (now-deleted)
+     prior answer, and the skill has no separate qid defined for that follow-up
+     anyway. Avoiding that path entirely (rather than adding a `1a-round-2`
+     envelope, the pattern used elsewhere in this protocol for genuine
+     validation-failure retries) is why both values are batched up front instead:
+     it saves the extra round trip a round-2 envelope would cost, not because of
+     any stale-match risk. `replacement_metrics_value` is simply ignored when
+     `change_metrics: no`.
 4. If the user keeps the existing value, preserve it as-is and do not write
    `hive.config.yaml`.
 5. If the user explicitly chooses to change it, collect the replacement setting
@@ -214,11 +226,12 @@ Present the allowed kinds in the prompt:
 **Headless:** batch the kind selection, the optional note, and the custom command
 into the **same** `1b` envelope — three qids (`ship_kind`, `ship_notes`,
 `custom_command`); validation of the answers happens on resume, not via a
-follow-up round (see below), rather than asking `ship_kind` first and conditionally following up for
-`custom_command` in a second round. As with `1a`'s change/replacement pair, a
-second round for the same phase id would just re-match the already-answered
-envelope, not prompt again. `custom_command` is ignored when `ship_kind` isn't
-`custom`.
+follow-up round (see below), rather than asking `ship_kind` first and conditionally
+following up for `custom_command` in a second round. As with `1a`'s
+change/replacement pair, this avoids the extra round trip a `1b-round-2` envelope
+would cost for the common case where `custom_command` is answered correctly the
+first time — see step 4 below for what actually happens when it isn't.
+`custom_command` is ignored when `ship_kind` isn't `custom`.
 
 Then:
 
@@ -232,9 +245,14 @@ Then:
    **Headless:** the batched `custom_command` qid was already asked up front (see
    above); if the orchestrator's answer was still empty, write a **new** envelope
    at phase `1b-round-2` (same round-suffix convention as design's touchpoints —
-   see `hive/references/wireframe-protocol.md`) asking only for `custom_command`,
-   rather than re-using phase `1b` (which would just re-match the prior, now-empty
-   answer).
+   see `hive/references/wireframe-protocol.md`) asking only for `custom_command`.
+   Reusing phase `1b` for the retry would not work regardless of the empty
+   answer's content: the `1b` envelope was already consumed and deleted (see
+   `hive/references/question-envelope-schema.md`'s "Deletion on consume") the
+   moment its answers were extracted, so a second `ask_or_emit()` call for phase
+   `1b` at this point would just write a **fresh, unrelated** `1b` envelope — not
+   recover or re-ask the specific missing `custom_command` value. The `-round-2`
+   suffix is what makes this retry a distinct, addressable phase.
 5. Do not write a `custom` ship target until a non-empty command is collected.
 6. Security note: a `custom` command runs in a shell at ship time. Kickoff only
    enforces the non-empty check; command sanitization and injection safety are

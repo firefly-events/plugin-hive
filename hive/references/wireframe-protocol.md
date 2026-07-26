@@ -14,16 +14,19 @@ See [`skills/design/SKILL.md`](../../skills/design/SKILL.md) for the full skill 
 ## Headless Mode
 
 Epic `headless-question-protocol`, story `hqp-4-design-headless-integration`. Before
-either touchpoint below, call `hive/lib/runtime_mode.{py,js}`'s
-`detect_interactive_mode()`.
+either touchpoint below, call `hive/lib/runtime_mode.py`'s
+`detect_interactive_mode()` (Python) or `hive/lib/runtime_mode.js`'s
+`detectInteractiveMode()` (JS).
 
 **Interactive** (`mode: "interactive"`): unchanged — both touchpoints call
 `AskUserQuestion` exactly as written below. The "direct user access, not a background
 teammate" constraint (see "Touchpoint Execution Context" below) applies to this path
 only.
 
-**Headless** (`mode: "headless"`): call `hive/lib/question_gateway.{py,js}`'s
-`ask_or_emit(skill="design", phase="<phase-id>", questions=[...])` instead of
+**Headless** (`mode: "headless"`): call `hive/lib/question_gateway.py`'s
+`ask_or_emit(skill="design", phase="<phase-id>", questions=[...])` (Python) or
+`hive/lib/question_gateway.js`'s
+`askOrEmit({skill: "design", phase: "<phase-id>", questions: [...]})` (JS) instead of
 `AskUserQuestion`. On `resolved: false`, print the `AWAITING_ANSWERS` status and stop
 `/design` here; the orchestrator answers the envelope and re-invokes `/design`, which
 resumes at this phase. On `resolved: true`, use the answer exactly as if the user had
@@ -67,21 +70,41 @@ the very first attempt at a touchpoint, for the topic currently being resolved),
 determine the round to use by probing starting at round 1:
 
 1. Call `find_envelope_for_phase(skill="design", phase="touchpoint-<N>-round-1-<topic>")`.
+   This is a **read-only reconnaissance call** — `find_envelope_for_phase` never
+   mutates or deletes anything; only `ask_or_emit` does that, on successful answer
+   extraction. The probe is purely for choosing WHICH round-suffixed phase id to
+   pass to `ask_or_emit` next — it is never a substitute for calling it.
 2. If no envelope exists yet, this is a fresh touchpoint — use round 1.
 3. If an envelope exists and is `answered`:
    - Selection/approval answer ("Rendition K" / "Approve") → the touchpoint is
-     resolved; do not open a new round.
+     resolved at this round; do not open a new round.
    - Iteration answer ("Request changes" / "More options" / "Edit") → advance to
      round 2 and repeat this probe (`find_envelope_for_phase` for
      `touchpoint-<N>-round-2-<topic>`), continuing until an unanswered or
      nonexistent round is found.
 4. If an envelope exists and is still `pending`, that round is the current one —
    resume there (per Headless Mode above), don't start a new round.
+5. Once the current round is determined, call `ask_or_emit()` for that exact
+   round-suffixed phase id — the same call the skill would make in any other
+   headless flow. `ask_or_emit`'s own `resolved: true` return (with the answer)
+   is what actually consumes and deletes the envelope; the probe above never
+   reads `questions[].answer` directly off the raw envelope it inspected. This
+   keeps a single code path (`ask_or_emit`) as the only place closure-invariant
+   validation and deletion happen, regardless of how many probe rounds ran first.
 
 This probe is O(rounds so far), which is bounded in practice (iteration loops don't
 run indefinitely) and mirrors how the gateway itself already resolves a single
 phase — it's just applied repeatedly across the round sequence, scoped to one
 topic.
+
+**Out of scope: mid-flow process restart before reaching a touchpoint.** This
+protocol governs resumption exactly at a blocking touchpoint (the skill wrote an
+envelope and exited; a later invocation picks up from there). It does NOT change
+what happens if a headless `/design` process is killed and restarted **before**
+reaching Touchpoint 1 — e.g. mid-Phase-A wireframe generation. Whether such a
+restart re-runs generation from scratch or detects and reuses partial artifacts is
+pre-existing `/design` behavior, identical in interactive and headless mode, and
+this epic does not change it.
 
 **Kickoff and plan are not topic-scoped (known v1 limitation).** Their phase ids
 (`1a`, `1b`, `branch-switch-confirm`, etc.) assume at most one invocation in flight

@@ -99,13 +99,16 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 Epic `headless-question-protocol`, story `hqp-5-plan-headless-integration`. This
 skill has two blocking prompt points: the branch-switch confirmation (Phase 0 step
 0) and step 14b's release-intent question. Before either, call
-`hive/lib/runtime_mode.{py,js}`'s `detect_interactive_mode()`.
+`hive/lib/runtime_mode.py`'s `detect_interactive_mode()` (Python) or
+`hive/lib/runtime_mode.js`'s `detectInteractiveMode()` (JS).
 
 **Interactive** (`mode: "interactive"`): unchanged — prompt exactly as written at
 each site below.
 
-**Headless** (`mode: "headless"`): call `hive/lib/question_gateway.{py,js}`'s
-`ask_or_emit(skill="plan", phase="<phase-id>", questions=[...])` instead. On
+**Headless** (`mode: "headless"`): call `hive/lib/question_gateway.py`'s
+`ask_or_emit(skill="plan", phase="<phase-id>", questions=[...])` (Python) or
+`hive/lib/question_gateway.js`'s
+`askOrEmit({skill: "plan", phase: "<phase-id>", questions: [...]})` (JS) instead. On
 `resolved: false`, print the `AWAITING_ANSWERS` status and stop this `/hive:plan`
 invocation here; the orchestrator answers the envelope and re-invokes `/hive:plan`,
 which resumes at this phase. On `resolved: true`, use the answer exactly as if typed

@@ -122,8 +122,9 @@ The ui-designer produces renditions per the wireframe-protocol — `.f0` files (
 
 Apply the two touchpoints from [`hive/references/wireframe-protocol.md`](../../hive/references/wireframe-protocol.md) — Touchpoint 1 (rendition selection via `AskUserQuestion`) and Touchpoint 2 (brief sign-off). These are blocking touchpoints when interactive; `/design` halts until the user responds.
 
-**Headless mode.** When `hive/lib/runtime_mode.{py,js}`'s `detect_interactive_mode()`
-resolves headless, both touchpoints route through `hive/lib/question_gateway.{py,js}`
+**Headless mode.** When `hive/lib/runtime_mode.py`'s `detect_interactive_mode()`
+(Python) / `hive/lib/runtime_mode.js`'s `detectInteractiveMode()` (JS) resolves
+headless, both touchpoints route through `hive/lib/question_gateway.{py,js}`
 instead of `AskUserQuestion` — see wireframe-protocol.md's "Headless Mode" section
 (epic `headless-question-protocol`, story `hqp-4-design-headless-integration`) for the
 phase-id/round-counter convention. Interactive behavior is unchanged.
