@@ -1,0 +1,90 @@
+id: hqp-5-plan-headless-integration
+epic: headless-question-protocol
+title: Route plan's release/sidecar/branch prompts through the question gateway
+status: pending
+complexity: low
+methodology: classic
+depends_on: [hqp-2-question-gateway-envelope]
+
+description: |
+  /hive:plan has three blocking prompt points: the branch-switch confirmation
+  (skills/plan/SKILL.md:106), step 14b's version_bump question
+  (skills/plan/SKILL.md:707, "Does this epic bump the version? major | minor | patch |
+  none"), and step 14c's sidecar_retention question (skills/plan/SKILL.md:713,
+  "Retain planning sidecars? committed | transient | commit-docs-only"). Route all
+  three through question_gateway.ask_or_emit() (hqp-2).
+
+  This exact epic's own planning session (the one that produced this story) is the
+  live interactive-mode regression baseline — both 14b and 14c were answered
+  interactively during this planning run via AskUserQuestion, and that exact
+  behavior must be unchanged by this story.
+
+acceptance_criteria:
+  - "Given HIVE_HEADLESS unset, when /hive:plan reaches the branch-switch confirm, 14b, or 14c, then each behaves exactly as it did during this epic's own planning session (unchanged prompts)"
+  - "Given HIVE_HEADLESS=1 and a branch switch is needed, when /hive:plan reaches step 0, then it writes an envelope for the branch-switch confirmation, exits with AWAITING_ANSWERS, and does not switch branches until answered"
+  - "Given HIVE_HEADLESS=1, when /hive:plan reaches step 14b, then it writes a version_bump envelope with the exact four literal options (major|minor|patch|none) and validates the answer against those four literals on resume, applying the same default-to-none-with-warning fallback the skill already has for an unrecognized interactive answer"
+  - "Given HIVE_HEADLESS=1, when /hive:plan reaches step 14c, then it writes a sidecar_retention envelope with the exact three literal options and falls through to the existing config-then-default resolution precedence if unanswered, exactly as the interactive path already does when the user skips"
+  - "epic.yaml produced by a headless run with fixture answers is byte-identical (aside from timestamps) to one produced interactively with the same answers"
+
+steps:
+  - id: research
+    description: Re-read skills/plan/SKILL.md:106,707,713 against current HEAD, including the existing fallback/default behaviors for unrecognized or skipped answers (already specified in the skill for 14b/14c) that must be preserved on the headless path too.
+    agent: researcher
+  - id: implement
+    description: Wire all three prompt points to question_gateway.ask_or_emit(), preserving the exact literal option sets and existing fallback/default logic for unanswered or invalid responses.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Headless run hitting all three prompt points with fixture answers, plus a fixture run exercising the existing unrecognized-answer-defaults-to-none fallback headlessly; interactive-mode regression against this epic's own planning transcript as the baseline.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm the version_bump default-on-invalid and sidecar_retention resolution-precedence logic (root config -> shipped baseline -> default) are preserved unchanged on the headless path.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feat/headless-question-protocol.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/dostal/Documents/work/dostal/code/plugin-hive-fork
+  tech_stack: {}
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Contains all three prompt points at the line numbers cited above, plus the existing version_bump/sidecar_retention fallback logic that must be preserved.
+
+files_to_modify:
+  - file: skills/plan/SKILL.md
+    change: Route lines 106, 707, and 713 through question_gateway.ask_or_emit(), preserving existing option literals and fallback behavior.
+
+cross_cutting:
+  - concern: documentation
+    action: "skills/plan/SKILL.md's own prose IS the documentation for these three prompt points; no separate doc file needed."
+  - concern: versioning
+    action: "Consumer-visible new behavior — covered by the epic-level minor version bump."
+
+metric:
+  applies: true
+  name: plan.headless_prompt_completion_rate
+  direction: up
+  unit: ratio
+  baseline: 0
+  target: 1.0
+  window: "story integrate step"
+  source:
+    kind: manual
+    ref: "Headless fixture run through all three prompt points, described in the test step, including the invalid-answer-defaults-to-none fallback case"
+  verify_at: "story integrate step"
+  owner: tester
+
+risks:
+  - severity: medium
+    description: The 14b/14c prompts already carry non-trivial default/fallback logic (default-to-none-with-warning, config-precedence fallthrough) that's easy to accidentally drop when re-routing through a new gateway call.
+    mitigation: Explicit acceptance criteria and a dedicated fixture test for the fallback paths, not just the happy path.
+
+references:
+  - path: .pHive/epics/headless-question-protocol/docs/design-discussion.md
+    relevant_excerpt: |
+      Plan integration (`skills/plan/SKILL.md` steps 0/14b/14c) route their prose
+      prompts through the gateway.

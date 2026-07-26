@@ -1,0 +1,78 @@
+name: headless-question-protocol
+title: Headless Question Protocol + Bounded Stop Hook
+description: >
+  Structured, machine-readable question emission (with symmetric answer intake) so
+  kickoff, design, and plan are drivable by a headless orchestrator instead of
+  degrading to unparseable prose when AskUserQuestion is unavailable. Bundled with an
+  independent fix bounding the global Stop hook's unbounded transcript slurp so it
+  can't tax claude --bg sessions. Source: docs/scope/plugin-hive-headless-question-protocol.md.
+target_codebase: /Users/dostal/Documents/work/dostal/code/plugin-hive-fork
+methodology: classic
+version_bump: minor
+sidecar_retention: committed
+
+git_flow:
+  base_branch: develop
+  branch_strategy: per-epic
+  # NOTE (2026-07-25): feat/headless-question-protocol is branched cleanly from
+  # origin/develop, per hive/lib/git_flow.mjs's auto-resolution (origin/develop
+  # exists). An earlier attempt in this planning session branched from `main`
+  # instead — corrected after discovering `main` is NOT a normal sibling branch:
+  # its "release: sync runtime from hive-workshop@..." commits make it a curated
+  # export of just the plugin runtime (skills/, hive/, hooks/, .claude-plugin/),
+  # missing .gitignore, .github/workflows/, .coderabbit.yaml, and .hive/insights/
+  # entirely. A test merge of main into develop deleted 1,461 files from develop
+  # before being caught and reverted (never pushed). `develop` is the real
+  # source-of-truth working branch (confirmed: it carries the correct
+  # per-epic .gitignore allowlist pattern this epic itself needed). The eventual
+  # PR targets whatever integration branch firefly-events/plugin-hive has set up
+  # upstream (their develop-equivalent, if one exists, else their main) — not
+  # assumed here; confirm at PR-open time.
+
+planning_team:
+  matched_tags: []
+  roster: []
+  per_tag_reasoning: {}
+  confidence: n/a
+  gate_decisions: {}
+  # NOTE: this epic was planned in "lightweight, in-session" mode per maintainer
+  # choice at kickoff of this /plan run — no live Multica/CC-Workflows persona
+  # roster was dispatched (planning.mode: multica in hive.config.yaml was
+  # deliberately bypassed for planning; Phase D still publishes stories to the
+  # configured Multica tracker). Research, design discussion, grill (adversarial
+  # self-review), horizontal/vertical planning, and story decomposition were all
+  # produced directly in-session rather than through routed personas.
+
+stories:
+  - id: hqp-1-runtime-mode-detection
+    title: Runtime-mode detection helper (interactive vs headless)
+    complexity: low
+    depends_on: []
+  - id: hqp-2-question-gateway-envelope
+    title: Question-gateway primitive + question-envelope schema
+    complexity: medium
+    depends_on: [hqp-1-runtime-mode-detection]
+  - id: hqp-3-kickoff-headless-integration
+    title: Route kickoff's prose prompts through the question gateway
+    complexity: medium
+    depends_on: [hqp-2-question-gateway-envelope]
+  - id: hqp-4-design-headless-integration
+    title: Route design's AskUserQuestion touchpoints through the question gateway
+    complexity: low
+    depends_on: [hqp-2-question-gateway-envelope]
+  - id: hqp-5-plan-headless-integration
+    title: Route plan's release/sidecar/branch prompts through the question gateway
+    complexity: low
+    depends_on: [hqp-2-question-gateway-envelope]
+  - id: hqp-6-stop-hook-bound
+    title: Bound the global Stop hook (streaming rewrite + size guard)
+    complexity: medium
+    depends_on: []
+  - id: hqp-7-docs-pr-polish
+    title: Finalize question-envelope schema doc and PR narrative for upstream submission
+    complexity: low
+    depends_on:
+      - hqp-3-kickoff-headless-integration
+      - hqp-4-design-headless-integration
+      - hqp-5-plan-headless-integration
+      - hqp-6-stop-hook-bound

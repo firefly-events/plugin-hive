@@ -1,0 +1,81 @@
+id: hqp-7-docs-pr-polish
+epic: headless-question-protocol
+title: Finalize question-envelope schema doc and PR narrative for upstream submission
+status: pending
+complexity: low
+methodology: classic
+depends_on:
+  - hqp-3-kickoff-headless-integration
+  - hqp-4-design-headless-integration
+  - hqp-5-plan-headless-integration
+  - hqp-6-stop-hook-bound
+
+description: |
+  Close the epic: reconcile hive/references/question-envelope-schema.md against the
+  actual shipped behavior of hqp-2 through hqp-6 (schema docs drift from
+  implementation if written before integration lands and never revisited), and
+  produce the PR description for `firefly-events/plugin-hive` covering:
+
+  - What changed (headless question protocol + bounded Stop hook), summarized from
+    docs/scope/plugin-hive-headless-question-protocol.md's "What to build" list,
+    marked against what actually shipped.
+  - The Minerva-compatible answer-submission shape (`answer:` + `status: answered`
+    written in place, mirroring `submitAnswers`) — explicit enough that Minerva's own
+    maintainers can implement against it without reading this repo's source.
+  - The `HIVE_HEADLESS` env var contract (explicit override, `CI=true` fallback,
+    default interactive) and the renewable-`deadline` answer-intake shape.
+  - Explicit sequencing note per the scope doc: "PR-only to firefly-events/plugin-hive;
+    never touch Don's live deployment" — state this plainly in the PR description so
+    reviewers don't need to infer it.
+
+acceptance_criteria:
+  - "hive/references/question-envelope-schema.md accurately describes the envelope shape actually produced by hqp-2's implementation (field-for-field, no drift)"
+  - "The PR description explicitly documents the HIVE_HEADLESS contract, the submitAnswers-compatible answer shape, and the renewable deadline mechanism in language a Minerva maintainer could implement against without reading plugin-hive source"
+  - "The PR description states the PR-only-to-firefly-events sequencing constraint from the scope doc"
+  - "PR file count stays under 150 per this repo's documented CodeRabbit-review-threshold convention (.pHive/CONTEXT.md 'Conventions' section) — if not, the PR description notes the file count and confirms it's under the threshold"
+
+steps:
+  - id: research
+    description: Read the actual merged state of hqp-2 through hqp-6's changes (diff against feat/headless-question-protocol's base) to catch any drift between the schema doc as originally written and what the implementation stories actually shipped.
+    agent: researcher
+  - id: implement
+    description: Update question-envelope-schema.md for any drift found; draft the PR description per the acceptance criteria.
+    agent: developer
+    depends_on: [research]
+  - id: review
+    description: Cross-check every claim in the PR description against the actual shipped code (no aspirational claims about behavior that didn't land).
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: Final commit on the epic branch; PR opened against firefly-events/plugin-hive per the ship-time flow.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/dostal/Documents/work/dostal/code/plugin-hive-fork
+  tech_stack: {}
+  key_files:
+    - path: docs/scope/plugin-hive-headless-question-protocol.md
+      purpose: Original scope doc — the "What to build" list is the checklist the PR description reconciles against.
+    - path: hive/references/question-envelope-schema.md
+      purpose: Written in hqp-2, before the skill-integration stories landed — this story is the drift-check pass.
+
+files_to_modify:
+  - file: hive/references/question-envelope-schema.md
+    change: Reconcile against actual shipped behavior; fix any drift.
+
+cross_cutting:
+  - concern: documentation
+    action: "This story IS the documentation cross-cutting concern's terminal check for the epic — confirms nothing drifted across the whole epic's docs."
+  - concern: versioning
+    action: "Per this epic's version_bump: minor answer, confirm .claude-plugin/plugin.json and .claude-plugin/marketplace.json versions are bumped, README badge updated, and CHANGELOG.md gains a dated entry summarizing this epic's consumer-visible changes, as the LAST commit on the epic branch — per the versioning concern's implementation_checklist in .pHive/cross-cutting-concerns.yaml."
+
+metric:
+  applies: false
+  justification: "Docs-reconciliation and PR-narrative story with no independent falsifiable outcome of its own — it verifies the claims made by hqp-2 through hqp-6, whose metrics are declared on those stories."
+
+references:
+  - path: docs/scope/plugin-hive-headless-question-protocol.md
+    relevant_excerpt: |
+      5. **PR back to `firefly-events/plugin-hive`** (PR-only to FFE; never touch
+      Don's live).
