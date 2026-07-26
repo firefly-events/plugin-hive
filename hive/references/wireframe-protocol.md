@@ -11,6 +11,38 @@ This document defines the human-in-the-loop approval flow for wireframes. The UI
 
 See [`skills/design/SKILL.md`](../../skills/design/SKILL.md) for the full skill contract. This document defines the touchpoint protocol that skill applies.
 
+## Headless Mode
+
+Epic `headless-question-protocol`, story `hqp-4-design-headless-integration`. Before
+either touchpoint below, call `hive/lib/runtime_mode.{py,js}`'s
+`detect_interactive_mode()`.
+
+**Interactive** (`mode: "interactive"`): unchanged — both touchpoints call
+`AskUserQuestion` exactly as written below. The "direct user access, not a background
+teammate" constraint (see "Touchpoint Execution Context" below) applies to this path
+only.
+
+**Headless** (`mode: "headless"`): call `hive/lib/question_gateway.{py,js}`'s
+`ask_or_emit(skill="design", phase="<phase-id>", questions=[...])` instead of
+`AskUserQuestion`. On `resolved: false`, print the `AWAITING_ANSWERS` status and stop
+`/design` here; the orchestrator answers the envelope and re-invokes `/design`, which
+resumes at this phase. On `resolved: true`, use the answer exactly as if the user had
+selected it interactively. Writing an envelope and returning control is not "running
+in a background teammate" — the constraint above doesn't apply to the headless path.
+
+**Phase ids and the iteration loop.** Both touchpoints can loop (Touchpoint 1's
+"Request changes" / "More options", Touchpoint 2's "Edit") — the user is asked the
+same conceptual question multiple times across rounds. Each round is a **distinct**
+phase id, suffixed with a 1-based round counter, so a re-prompt after feedback writes
+a fresh envelope rather than matching a stale already-answered one:
+
+| Phase id | Touchpoint | Round |
+|---|---|---|
+| `touchpoint-1-round-1` | Rendition selection | First presentation |
+| `touchpoint-1-round-2`, `-round-3`, … | Rendition selection | After "Request changes" / "More options" |
+| `touchpoint-2-round-1` | Brief sign-off | First presentation |
+| `touchpoint-2-round-2`, … | Brief sign-off | After "Edit" |
+
 ## When This Runs
 
 Whenever `/hive:design` runs — either standalone or delegated from `/hive:plan` during planning of a net-new UI story. The UI designer agent runs through the touchpoints below; wireframes are produced and approved **before** stories are finalized so by execution time developers already have the approved design context.
@@ -35,12 +67,12 @@ After the UI designer produces renditions:
    ```
    If Claude Code can read images (Read tool on PNG), present them inline.
 
-2. **Ask for selection.** Use AskUserQuestion with options:
+2. **Ask for selection.** Use AskUserQuestion (headless: phase `touchpoint-1-round-<N>` — see Headless Mode above) with options:
    - "Rendition 1" / "Rendition 2" / "Rendition N" — approve that version
    - "Request changes" — provide feedback, re-run UI designer with context
    - "More options" — generate additional renditions
 
-3. **Iterate if needed.** On "Request changes" or "More options", pass the user's feedback to the UI designer and repeat from step 1. No limit on iterations — the user decides when to approve.
+3. **Iterate if needed.** On "Request changes" or "More options", pass the user's feedback to the UI designer and repeat from step 1, incrementing the round counter (headless: next envelope is `touchpoint-1-round-<N+1>`). No limit on iterations — the user decides when to approve.
 
 4. **Lock selection.** Once approved, record the selected rendition index.
 
@@ -55,9 +87,9 @@ After wireframe selection:
    - Accessibility notes
    - Export command for downstream agents
 
-2. **Ask for approval.** Use AskUserQuestion:
+2. **Ask for approval.** Use AskUserQuestion (headless: phase `touchpoint-2-round-<N>` — see Headless Mode above):
    - "Approve" — embed in story YAML
-   - "Edit" — collect changes via Other/free-text, update brief, re-present
+   - "Edit" — collect changes via Other/free-text, update brief, re-present (headless: next envelope is `touchpoint-2-round-<N+1>`)
 
 3. **Embed in story.** Once approved, append the `wireframes` section to the story YAML file.
 
