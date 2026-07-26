@@ -10,6 +10,48 @@ Initialize Hive for a project. Detects brownfield vs greenfield automatically.
 
 **Input:** `$ARGUMENTS` optionally describes the project or intent.
 
+## Headless Mode
+
+Epic `headless-question-protocol`, story `hqp-3-kickoff-headless-integration`. Before
+any "Ask the user" / "Ask:" instruction below, call
+`hive/lib/runtime_mode.{py,js}`'s `detect_interactive_mode()`.
+
+**Interactive** (the common case — `mode: "interactive"`): no change. Ask exactly as
+written below.
+
+**Headless** (`mode: "headless"`): instead of prompting inline, call
+`hive/lib/question_gateway.{py,js}`'s `ask_or_emit(skill="kickoff", phase="<phase-id>",
+questions=[...])`, batching every question for that phase boundary into one call (see
+`hive/references/question-envelope-schema.md` for why phase-batching, not
+per-question). Two outcomes:
+
+- `resolved: false` — print the envelope's `AWAITING_ANSWERS` status (its
+  `envelope_path` and `deadline`) and **stop this kickoff invocation here**. Do not
+  proceed past this phase. The driving orchestrator answers the envelope
+  (`.pHive/questions/kickoff-<invocation-id>.yaml`) and re-invokes `/hive:kickoff`,
+  which resumes at this phase (`find_envelope_for_phase` matches the answered
+  envelope) instead of re-asking.
+- `resolved: true` — use `answers["<qid>"]` exactly as if the user had typed that
+  answer interactively, and continue immediately without prompting.
+
+**Phase-id table** (used by both the gateway calls above and this document's
+headings):
+
+| Phase id | Section | Questions batched |
+|---|---|---|
+| `scenario-detect` | Step 1: Detect Scenario | The rare "ambiguous brownfield vs greenfield" prompt |
+| `1a` | Step 1a: Metrics Opt-In / Preservation | Fresh opt-in OR re-kickoff change prompt (same phase id either way — mutually exclusive paths) |
+| `1b` | Step 1b: Ship Target Elicitation / Preservation | Fresh elicitation OR re-kickoff change prompt |
+| `2b-ii` | Phase 2b-ii: Developer Discovery, Step 2 | The 5-question elicitation block |
+| `4b` | Phase 4b: Scaffold CONTEXT.md | The backfill opt-in prompt |
+
+**Out of scope for this protocol:** Step 2B's greenfield **Product Discovery**
+(delegated to the analyst persona's Socratic conversation) is a multi-turn, free-form
+dialogue, not a discrete question/option prompt — it is not covered by the
+question-gateway, which is designed for structured, enumerable questions. A headless
+greenfield kickoff still reaches that step; it is unaffected by (and untouched by)
+this integration.
+
 ## Step 0: Legacy state/ Migration Check
 
 Before any other work:
@@ -42,7 +84,7 @@ This step is idempotent — safe to re-run on any project.
 Check the current working directory:
 - **Has existing source code** (src/, lib/, app/, package.json, build.gradle, etc.) → **Brownfield**
 - **Empty or minimal** (just a README, no source) → **Greenfield**
-- **Ambiguous** → Ask the user
+- **Ambiguous** → Ask the user (headless: phase `scenario-detect` — see Headless Mode above)
 
 ## Step 1a: Metrics Opt-In / Preservation
 
@@ -55,7 +97,7 @@ existing `metrics.enabled` value.
 
 ### Fresh kickoff path
 
-Ask the user:
+Ask the user (headless: phase `1a` — see Headless Mode above):
 
 `Enable metrics tracking?`
 
@@ -96,7 +138,8 @@ If `hive.config.yaml` already contains `metrics.enabled`:
    prompting.
 2. Show the current value explicitly to the user, for example: `Metrics tracking is
    currently enabled.` or `Metrics tracking is currently disabled.`
-3. Ask a change prompt, not the fresh opt-in question. Example: `Do you want to
+3. Ask a change prompt, not the fresh opt-in question (headless: phase `1a` — same
+   phase id as the fresh path, since the two are mutually exclusive). Example: `Do you want to
    change metrics tracking from its current setting?`
 4. If the user keeps the existing value, preserve it as-is and do not write
    `hive.config.yaml`.
@@ -142,7 +185,7 @@ GitHub releases.
 
 ### Fresh kickoff path
 
-Ask the user:
+Ask the user (headless: phase `1b` — see Headless Mode above):
 
 `What does shipping mean for this project?`
 
@@ -179,7 +222,7 @@ ship_target:
 If `.pHive/project-profile.yaml` already contains a valid `ship_target` block:
 
 1. Read and show the current value to the user.
-2. Ask a change prompt, for example:
+2. Ask a change prompt (headless: phase `1b`, same phase id as the fresh path), for example:
    `Shipping is currently configured as github-release. Do you want to change it?`
 3. If the user keeps the existing value, preserve it exactly and do not rewrite
    `ship_target`.
@@ -320,6 +363,13 @@ Also infer a PR style default from recent git history:
 ##### Step 2: Present Elicitation (5 Questions)
 
 Present the questions as a single conversational block. The tone should feel like a colleague asking preferences, not a form to fill out.
+
+**Headless (phase `2b-ii` — see Headless Mode above):** batch all 5 questions (plus
+the inferred defaults as each question's implicit "accept default" option) into one
+`ask_or_emit()` call rather than presenting the conversational block. There is no
+headless equivalent of "press Enter to accept all" — an orchestrator answers each
+`qid` explicitly (it may simply echo back the inferred default as the answer, which
+has the same effect).
 
 **Prompt template:**
 
@@ -810,7 +860,7 @@ Bootstrap `.pHive/CONTEXT.md` — the project's single-file domain glossary. Sch
 
 **Backfill path** (existing kickoff, CONTEXT.md missing):
 - Detect: `.pHive/project-profile.yaml` exists AND `.pHive/CONTEXT.md` does NOT.
-- Prompt the user opt-in: "CONTEXT.md (domain glossary) was added in Hive 2.0. Want me to scaffold it now from your existing codebase? [yes / skip]". Skip leaves the project unmodified — CONTEXT.md is silent-on-absence per skill-prelude contract, so nothing breaks.
+- Prompt the user opt-in (headless: phase `4b` — see Headless Mode above): "CONTEXT.md (domain glossary) was added in Hive 2.0. Want me to scaffold it now from your existing codebase? [yes / skip]". Skip leaves the project unmodified — CONTEXT.md is silent-on-absence per skill-prelude contract, so nothing breaks.
 - On yes: run the brownfield path above.
 
 **Idempotent:** if `.pHive/CONTEXT.md` already exists with non-empty content, skip Phase 4b entirely. Do not overwrite a maintained glossary.
