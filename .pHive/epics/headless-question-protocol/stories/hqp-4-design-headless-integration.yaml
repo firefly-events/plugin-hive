@@ -1,0 +1,113 @@
+id: hqp-4-design-headless-integration
+epic: headless-question-protocol
+title: Route design's AskUserQuestion touchpoints through the question gateway
+status: completed
+complexity: low
+methodology: classic
+depends_on: [hqp-2-question-gateway-envelope]
+
+description: |
+  Design's wireframe protocol has two hard-blocking `AskUserQuestion` touchpoints
+  (skills/design/SKILL.md:123; hive/references/wireframe-protocol.md:38 Touchpoint 1
+  "rendition selection", :58 Touchpoint 2 "brief sign-off"), explicitly documented as
+  blocking ("/design halts until the user responds") with no headless fallback today.
+  This is the site the scope doc's own "Why" section cites as evidence of the gap,
+  even though the literal request named only kickoff+plan — included per your
+  confirmation during planning (open question 1).
+
+  Route both touchpoints through question_gateway.ask_or_emit() (hqp-2). The existing
+  constraint at wireframe-protocol.md:91-92 ("touchpoints require direct user access —
+  must run in the main session or team lead, not a background teammate") is a
+  constraint on the INTERACTIVE path and is unaffected by this story: the headless
+  path never runs in a background teammate either, it writes an envelope and returns
+  control to whatever invoked /design.
+
+  IMPLEMENTATION NOTE (post-hoc correction, CodeRabbit review on PR #341): the plan
+  as originally written treated each touchpoint as a single phase id
+  (touchpoint-1, touchpoint-2). Two corrections landed during implementation:
+  (1) both touchpoints can LOOP (Touchpoint 1's "Request changes"/"More options",
+  Touchpoint 2's "Edit") — each round needs its own phase id
+  (touchpoint-N-round-M) with an explicit resume-time probe algorithm to determine
+  the current round, since a freshly resumed process can't derive the round from
+  control flow alone; (2) unlike kickoff/plan, /design explicitly supports multiple
+  CONCURRENT topics — phase ids must embed the topic slug
+  (touchpoint-N-round-M-<topic>) or two unrelated /design runs could match each
+  other's envelopes. See hive/references/wireframe-protocol.md's "Headless Mode"
+  section for the corrected, authoritative phase-id convention and resume
+  algorithm.
+
+acceptance_criteria:
+  - "Given HIVE_HEADLESS unset, when /design reaches Touchpoint 1 or 2, then AskUserQuestion is called exactly as before this story (unchanged blocking behavior)"
+  - "Given HIVE_HEADLESS=1, when /design reaches Touchpoint 1 (rendition selection), then it writes an envelope with the rendition options, exits with AWAITING_ANSWERS, and does not proceed past that touchpoint"
+  - "Given a Touchpoint 1 envelope answered externally, when /design is re-invoked with HIVE_HEADLESS=1, then it consumes the selected rendition and proceeds to Touchpoint 2, writing a new envelope"
+  - "Given both touchpoints answered across re-invocations, when /design completes headlessly, then the resulting design brief/handoff artifact is equivalent to what an interactive run with the same selections would produce"
+  - "Given a 'Request changes' answer on Touchpoint 1 round 1, when /design is re-invoked, then it writes a NEW envelope at phase touchpoint-1-round-2-<topic> rather than re-matching the round-1 envelope (which is already consumed/deleted anyway per hqp-2's delete-on-consume)"
+  - "Given two concurrent /design invocations for different topics both mid-Touchpoint-1, their envelopes never collide (distinct phase ids via the <topic> suffix) and each resumes independently"
+
+steps:
+  - id: research
+    description: Re-read skills/design/SKILL.md:123 and hive/references/wireframe-protocol.md's two touchpoint definitions against current HEAD.
+    agent: researcher
+  - id: implement
+    description: Wire both touchpoints to question_gateway.ask_or_emit(), preserving the exact option sets and text currently passed to AskUserQuestion.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Headless run through both touchpoints with fixture answers; interactive-mode regression confirming AskUserQuestion still fires unchanged.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm the main-session/background-teammate constraint (wireframe-protocol.md:91-92) is unaffected and correctly scoped to the interactive path only.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feat/headless-question-protocol.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/dostal/Documents/work/dostal/code/plugin-hive-fork
+  tech_stack: {}
+  key_files:
+    - path: skills/design/SKILL.md
+      purpose: Calls AskUserQuestion for Touchpoint 1/2 per hive/references/wireframe-protocol.md.
+    - path: hive/references/wireframe-protocol.md
+      purpose: Defines both touchpoints' exact prompts/options and the blocking-gate contract.
+
+files_to_modify:
+  - file: skills/design/SKILL.md
+    change: Route the AskUserQuestion call at line 123 through question_gateway.ask_or_emit().
+  - file: hive/references/wireframe-protocol.md
+    change: Document the headless path for Touchpoint 1 (line 38) and Touchpoint 2 (line 58); clarify the main-session constraint is interactive-path-only.
+
+cross_cutting:
+  - concern: documentation
+    action: "wireframe-protocol.md update IS the doc update for this story's behavior change."
+  - concern: versioning
+    action: "Consumer-visible new behavior — covered by epic.yaml's version_bump: minor flag, consumed at actual release-cutting time by /hive:ship (which may bundle multiple epics into one plugin.json/marketplace.json bump, per this repo's accumulate-then-release convention). This epic's own CHANGELOG.md bullet is added now under ## [Unreleased] (see the plan-dag-cutover bullets already there as precedent)."
+
+metric:
+  applies: true
+  name: design.headless_touchpoint_completion_rate
+  direction: up
+  unit: ratio
+  baseline: 0
+  target: 1.0
+  window: "story integrate step"
+  source:
+    kind: manual
+    ref: "Headless fixture run through both touchpoints, described in the test step"
+  verify_at: "story integrate step"
+  owner: tester
+
+risks:
+  - severity: low
+    description: Misreading the main-session-vs-background-teammate constraint as something the headless path also needs to enforce (it doesn't — that's an interactive-session placement rule, orthogonal to headless detection).
+    mitigation: Explicit review-step check called out above.
+
+references:
+  - path: .pHive/epics/headless-question-protocol/docs/research-brief.md
+    relevant_excerpt: |
+      hive/references/wireframe-protocol.md:91-92 — "Touchpoints are blocking...
+      require direct user access — they must run in the main session or team lead,
+      not in a background teammate."

@@ -10,6 +10,63 @@ Initialize Hive for a project. Detects brownfield vs greenfield automatically.
 
 **Input:** `$ARGUMENTS` optionally describes the project or intent.
 
+## Headless Mode
+
+Epic `headless-question-protocol`, story `hqp-3-kickoff-headless-integration`. Before
+any "Ask the user" / "Ask:" instruction below, call `hive/lib/runtime_mode.py`'s
+`detect_interactive_mode()` (Python) — or `hive/lib/runtime_mode.js`'s
+`detectInteractiveMode()` (JS; camelCase, this repo's existing per-language naming
+convention — see `hive/lib/config.py`/`hive/lib/config.js` for prior art). Both take
+the same shape of input and return the same `{mode, source}` shape.
+
+**Interactive** (the common case — `mode: "interactive"`): no change. Ask exactly as
+written below.
+
+**Headless** (`mode: "headless"`): instead of prompting inline, call
+`hive/lib/question_gateway.py`'s `ask_or_emit(skill="kickoff", phase="<phase-id>",
+questions=[...])` (Python) — or `hive/lib/question_gateway.js`'s
+`askOrEmit({skill: "kickoff", phase: "<phase-id>", questions: [...]})` (JS) —
+batching every question for that phase boundary into one call (see
+`hive/references/question-envelope-schema.md` for why phase-batching, not
+per-question). Two outcomes:
+
+- `resolved: false` — print the envelope's `AWAITING_ANSWERS` status (its
+  `envelope_path` and `deadline`) and **stop this kickoff invocation here**. Do not
+  proceed past this phase. The driving orchestrator answers the envelope
+  (`.pHive/questions/kickoff-<invocation-id>.yaml`) and re-invokes `/hive:kickoff`,
+  which resumes at this phase (`find_envelope_for_phase` matches the answered
+  envelope) instead of re-asking.
+- `resolved: true` — use `answers["<qid>"]` exactly as if the user had typed that
+  answer interactively, and continue immediately without prompting.
+
+**Phase-id table** (used by both the gateway calls above and this document's
+headings):
+
+| Phase id | Section | Questions batched |
+|---|---|---|
+| `scenario-detect` | Step 1: Detect Scenario | The rare "ambiguous brownfield vs greenfield" prompt |
+| `1a` | Step 1a: Metrics Opt-In / Preservation | Fresh opt-in OR re-kickoff change prompt (same phase id either way — mutually exclusive paths) |
+| `1b` | Step 1b: Ship Target Elicitation / Preservation | Fresh elicitation OR re-kickoff change prompt |
+| `project-classification` | `skills/kickoff/SKILL.md` only — not documented as a numbered Step in this file (see note below) | `project_type` + `has_ui` |
+| `2b-ii` | Phase 2b-ii: Developer Discovery, Step 2 | All 7 numbered elicitation items (see that section's qid table) |
+| `4b` | Phase 4b: Scaffold CONTEXT.md | The backfill opt-in prompt |
+
+**`project-classification` note:** `skills/kickoff/SKILL.md` asks `project_type` and
+`has_ui` for every kickoff, but before this protocol was added, this document had no
+corresponding numbered Step or detailed contract for them — no validation rules,
+config-write pattern, or re-kickoff handling was specified here, only in `SKILL.md`.
+That's a pre-existing gap between the two files, not introduced by this protocol.
+Registered as a phase id here (the two terms now appear in the table row above)
+so the phase-id namespace stays centrally discoverable even though the detailed
+contract still lives only in `SKILL.md`.
+
+**Out of scope for this protocol:** Step 2B's greenfield **Product Discovery**
+(delegated to the analyst persona's Socratic conversation) is a multi-turn, free-form
+dialogue, not a discrete question/option prompt — it is not covered by the
+question-gateway, which is designed for structured, enumerable questions. A headless
+greenfield kickoff still reaches that step; it is unaffected by (and untouched by)
+this integration.
+
 ## Step 0: Legacy state/ Migration Check
 
 Before any other work:
@@ -42,7 +99,7 @@ This step is idempotent — safe to re-run on any project.
 Check the current working directory:
 - **Has existing source code** (src/, lib/, app/, package.json, build.gradle, etc.) → **Brownfield**
 - **Empty or minimal** (just a README, no source) → **Greenfield**
-- **Ambiguous** → Ask the user
+- **Ambiguous** → Ask the user (headless: phase `scenario-detect` — see Headless Mode above)
 
 ## Step 1a: Metrics Opt-In / Preservation
 
@@ -55,7 +112,7 @@ existing `metrics.enabled` value.
 
 ### Fresh kickoff path
 
-Ask the user:
+Ask the user (headless: phase `1a` — see Headless Mode above):
 
 `Enable metrics tracking?`
 
@@ -98,6 +155,22 @@ If `hive.config.yaml` already contains `metrics.enabled`:
    currently enabled.` or `Metrics tracking is currently disabled.`
 3. Ask a change prompt, not the fresh opt-in question. Example: `Do you want to
    change metrics tracking from its current setting?`
+   - **Headless (phase `1a`, same phase id as the fresh path — the two are mutually
+     exclusive):** ask the change-decision and the replacement value **in the same
+     envelope**, as two qids (`change_metrics: yes/no` and
+     `replacement_metrics_value: yes/no`), not as a decision followed by a
+     conditional follow-up round. Consumed envelopes are deleted on extraction (see
+     `hive/references/question-envelope-schema.md`'s "Deletion on consume"), so a
+     hypothetical second "if yes, what's the replacement" call for phase `1a` after
+     the decision envelope was already consumed would find nothing to match and
+     write a **brand-new** envelope — it would NOT re-match the (now-deleted)
+     prior answer, and the skill has no separate qid defined for that follow-up
+     anyway. Avoiding that path entirely (rather than adding a `1a-round-2`
+     envelope, the pattern used elsewhere in this protocol for genuine
+     validation-failure retries) is why both values are batched up front instead:
+     it saves the extra round trip a round-2 envelope would cost, not because of
+     any stale-match risk. `replacement_metrics_value` is simply ignored when
+     `change_metrics: no`.
 4. If the user keeps the existing value, preserve it as-is and do not write
    `hive.config.yaml`.
 5. If the user explicitly chooses to change it, collect the replacement setting
@@ -142,13 +215,23 @@ GitHub releases.
 
 ### Fresh kickoff path
 
-Ask the user:
+Ask the user (headless: phase `1b` — see Headless Mode above):
 
 `What does shipping mean for this project?`
 
 Present the allowed kinds in the prompt:
 
 `Choose one: app-store, vercel, github-release, npm, custom.`
+
+**Headless:** batch the kind selection, the optional note, and the custom command
+into the **same** `1b` envelope — three qids (`ship_kind`, `ship_notes`,
+`custom_command`); validation of the answers happens on resume, not via a
+follow-up round (see below), rather than asking `ship_kind` first and conditionally
+following up for `custom_command` in a second round. As with `1a`'s
+change/replacement pair, this avoids the extra round trip a `1b-round-2` envelope
+would cost for the common case where `custom_command` is answered correctly the
+first time — see step 4 below for what actually happens when it isn't.
+`custom_command` is ignored when `ship_kind` isn't `custom`.
 
 Then:
 
@@ -159,6 +242,17 @@ Then:
    ship action.
 4. If `kind == custom` and the command is empty or missing, re-prompt:
    `Custom shipping requires a command string. What command should /ship run?`
+   **Headless:** the batched `custom_command` qid was already asked up front (see
+   above); if the orchestrator's answer was still empty, write a **new** envelope
+   at phase `1b-round-2` (same round-suffix convention as design's touchpoints —
+   see `hive/references/wireframe-protocol.md`) asking only for `custom_command`.
+   Reusing phase `1b` for the retry would not work regardless of the empty
+   answer's content: the `1b` envelope was already consumed and deleted (see
+   `hive/references/question-envelope-schema.md`'s "Deletion on consume") the
+   moment its answers were extracted, so a second `ask_or_emit()` call for phase
+   `1b` at this point would just write a **fresh, unrelated** `1b` envelope — not
+   recover or re-ask the specific missing `custom_command` value. The `-round-2`
+   suffix is what makes this retry a distinct, addressable phase.
 5. Do not write a `custom` ship target until a non-empty command is collected.
 6. Security note: a `custom` command runs in a shell at ship time. Kickoff only
    enforces the non-empty check; command sanitization and injection safety are
@@ -179,7 +273,7 @@ ship_target:
 If `.pHive/project-profile.yaml` already contains a valid `ship_target` block:
 
 1. Read and show the current value to the user.
-2. Ask a change prompt, for example:
+2. Ask a change prompt (headless: phase `1b`, same phase id as the fresh path), for example:
    `Shipping is currently configured as github-release. Do you want to change it?`
 3. If the user keeps the existing value, preserve it exactly and do not rewrite
    `ship_target`.
@@ -317,9 +411,25 @@ Also infer a PR style default from recent git history:
 - Squash merge messages (e.g., "Squashed commit of…") → `squash-merge`
 - No clear pattern or fresh repo → `single-commit` (safe default)
 
-##### Step 2: Present Elicitation (5 Questions)
+##### Step 2: Present Elicitation (7 Questions)
 
 Present the questions as a single conversational block. The tone should feel like a colleague asking preferences, not a form to fill out.
+
+**Headless (phase `2b-ii` — see Headless Mode above):** batch all 7 qids below into
+one `ask_or_emit()` call, each `answer` defaulting to the listed inferred default
+when the orchestrator has no preference — there is no headless equivalent of
+"press Enter to accept all," so every qid must receive an explicit answer (echoing
+back the default has the same effect as accepting it):
+
+| qid | Options | Inferred default | Config field (Step 3) |
+|---|---|---|---|
+| `methodology` | `classic` \| `tdd` \| `bdd` | Per the Priority table above | `execution.default_methodology` |
+| `pr_style` | `single-commit` \| `squash-merge` \| `atomic-prs` \| `bundled` | Per git-history inference above | `developer.pr_style` |
+| `commit_granularity` | `fine` \| `medium` \| `coarse` | `medium` (feature-scoped) | `developer.commit_granularity` |
+| `review_depth` | `thorough` \| `standard` \| `light` | `standard` | `developer.review_depth` |
+| `collaborative_reviews` | `on` \| `off` | `on` | `planning.collaborative_review` (`on`→`true`, `off`→`false`) |
+| `github_sync` | `on` \| `off` | `off` | `meta_team.github_forwarding` (`on`→`true`, `off`→`false`) |
+| `notes` | free text | `""` (none) | `developer.notes` (`null` if empty) |
 
 **Prompt template:**
 
@@ -810,7 +920,7 @@ Bootstrap `.pHive/CONTEXT.md` — the project's single-file domain glossary. Sch
 
 **Backfill path** (existing kickoff, CONTEXT.md missing):
 - Detect: `.pHive/project-profile.yaml` exists AND `.pHive/CONTEXT.md` does NOT.
-- Prompt the user opt-in: "CONTEXT.md (domain glossary) was added in Hive 2.0. Want me to scaffold it now from your existing codebase? [yes / skip]". Skip leaves the project unmodified — CONTEXT.md is silent-on-absence per skill-prelude contract, so nothing breaks.
+- Prompt the user opt-in (headless: phase `4b` — see Headless Mode above): "CONTEXT.md (domain glossary) was added in Hive 2.0. Want me to scaffold it now from your existing codebase? [yes / skip]". Skip leaves the project unmodified — CONTEXT.md is silent-on-absence per skill-prelude contract, so nothing breaks.
 - On yes: run the brownfield path above.
 
 **Idempotent:** if `.pHive/CONTEXT.md` already exists with non-empty content, skip Phase 4b entirely. Do not overwrite a maintained glossary.

@@ -1,0 +1,116 @@
+id: hqp-1-runtime-mode-detection
+epic: headless-question-protocol
+title: Runtime-mode detection helper (interactive vs headless)
+status: completed
+complexity: low
+methodology: classic
+depends_on: []
+
+description: |
+  Add a shared runtime-mode detection primitive that any skill can call to decide
+  whether it is running interactively (a human is present, AskUserQuestion is usable)
+  or headlessly (driven by an orchestrator like Minerva via `claude -p`). This is the
+  foundational layer for the question-gateway primitive (hqp-2) and every downstream
+  skill integration (hqp-3/4/5) — nothing else in this epic can be built without it.
+
+  Precedence, matching this repo's existing env > config > default idiom (see
+  `planning.mode` resolution in hive.config.yaml):
+  1. `HIVE_HEADLESS=1` forces headless; `HIVE_HEADLESS=0` forces interactive.
+  2. `CI=true` is treated as headless.
+  3. Default: interactive (backward-compatibility guarantee — an unrecognized
+     environment never silently switches behavior).
+
+  Explicitly do NOT add a TTY-probe fallback tier — this was proposed and rejected
+  during planning (grill finding H1): a Bash-tool subprocess's stdio does not reliably
+  reflect whether a human is present in the Claude Code session, and using it would
+  risk misclassifying sessions in either direction. Only the three tiers above.
+
+acceptance_criteria:
+  - "Given HIVE_HEADLESS=1, when detect_interactive_mode() is called, then it returns {mode: 'headless', source: 'env'}"
+  - "Given HIVE_HEADLESS=0, when detect_interactive_mode() is called, then it returns {mode: 'interactive', source: 'env'}"
+  - "Given no HIVE_HEADLESS and CI=true, when detect_interactive_mode() is called, then it returns {mode: 'headless', source: 'ci'}"
+  - "Given no HIVE_HEADLESS and no CI, when detect_interactive_mode() is called, then it returns {mode: 'interactive', source: 'default'}"
+  - "Given HIVE_HEADLESS=1 AND CI=true, when detect_interactive_mode() is called, then HIVE_HEADLESS wins (returns source: 'env')"
+  - "The Python and JS implementations return identical {mode, source} values for the same environment across a shared fixture matrix"
+
+steps:
+  - id: research
+    description: Read hive/lib/config.py and hive/lib/config.js to confirm the exact dual-implementation and env/config precedence pattern to mirror. Confirm no existing runtime-mode helper already exists (research brief already covers this, but re-verify against current HEAD before writing).
+    agent: researcher
+  - id: implement
+    description: Add hive/lib/runtime_mode.py and hive/lib/runtime_mode.js, each exporting one function equivalent to `detect_interactive_mode() -> {mode, source}` per the precedence in the description. No TTY tier.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Write unit tests (pytest for .py, the existing JS test runner convention under hive/lib/test/ or hive/lib/__tests__/ for .js) covering every acceptance criterion, including the HIVE_HEADLESS-wins-over-CI precedence case.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review both implementations for identical behavior across the fixture matrix and confirm no TTY-probe tier was reintroduced.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feat/headless-question-protocol.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/dostal/Documents/work/dostal/code/plugin-hive-fork
+  tech_stack: {}
+  key_files:
+    - path: hive/lib/config.py
+      purpose: Existing dual-implementation (py/js) config-resolution primitive to mirror for module shape and precedence-documentation style.
+    - path: hive/lib/config.js
+      purpose: JS-side counterpart to config.py — same job, same convention to follow.
+
+files_to_modify:
+  - file: hive/lib/runtime_mode.py
+    change: New module. Export detect_interactive_mode() -> dict with mode/source per the precedence above.
+  - file: hive/lib/runtime_mode.js
+    change: New module. Same contract as the Python side.
+  - file: hive/lib/test/runtime_mode.test.mjs
+    change: New. Unit tests for the JS implementation.
+  - file: hive/lib/test/runtime_mode_test.py
+    change: New. Unit tests for the Python implementation (pytest).
+
+code_examples:
+  - title: Dual py/js implementation + env precedence convention to mirror
+    file: hive/lib/config.py
+    snippet: |
+      DEFAULT_PROJECT_CONFIG_PATH = Path.cwd() / "hive.config.yaml"
+      DEFAULT_BASELINE_CONFIG_PATH = Path(__file__).resolve().parents[1] / "hive.config.yaml"
+
+      def read_config_file(file_path):
+          if not file_path:
+              return {}
+          path = Path(file_path)
+          if not path.exists():
+              return {}
+          return parse_config_text(path.read_text(encoding="utf-8"))
+
+design_decisions:
+  - decision: No TTY-probe fallback tier.
+    rationale: Bash-tool subprocess stdio is not a reliable signal for "is a human present in this session" — grill finding H1 during planning. Only explicit env (HIVE_HEADLESS) and CI=true are decisive; everything else defaults safely to interactive.
+
+cross_cutting:
+  - concern: documentation
+    action: "Add hive/lib/runtime_mode.{py,js} to the key-paths inventory this epic's docs/PR polish story (hqp-7) will finalize; no standalone doc needed for this story alone since question-envelope-schema.md (hqp-2) is where the contract is documented for consumers."
+
+metric:
+  applies: false
+  justification: "Pure infrastructure primitive with no directly observable outcome of its own — its correctness is fully covered by the unit-test acceptance criteria above; the falsifiable claim this epic makes (headless drivability) is measured at the hqp-3/4/5 integration level, not here."
+
+risks:
+  - severity: low
+    description: A future call site could bypass this helper and re-implement its own ad hoc headless check, reintroducing the exact drift this epic is trying to eliminate.
+    mitigation: hqp-7 (docs/PR polish) documents this as the single required entry point in question-envelope-schema.md; code review on hqp-3/4/5 checks that call sites import runtime_mode rather than reimplementing detection.
+
+references:
+  - path: .pHive/epics/headless-question-protocol/docs/design-discussion.md
+    relevant_excerpt: |
+      Precedence (matches this repo's existing env > config > default idiom used for
+      `planning.mode` resolution):
+      1. Explicit override — `HIVE_HEADLESS=1` forces headless, `HIVE_HEADLESS=0` forces
+         interactive.
+      2. `CI=true` — treated as headless (standard CI convention).
+      3. **Default: interactive.**

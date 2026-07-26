@@ -1,0 +1,155 @@
+id: hqp-6-stop-hook-bound
+epic: headless-question-protocol
+title: Bound the global Stop hook (streaming rewrite + size guard)
+status: completed
+complexity: medium
+methodology: classic
+depends_on: []
+parallel_allowed: true
+parallel_rationale: bounded-slice
+
+description: |
+  `.claude-plugin/plugin.json:36-51` registers metrics-stop-dispatch.sh on `matcher: ""`
+  — every session Stop, unconditionally. Its hot path
+  (hooks/metrics-stop-dispatch.sh:111-130, `_extract_tokens`) uses `jq -c -s` (slurp)
+  to load the ENTIRE JSONL transcript into memory before aggregating token counts —
+  O(n) time and memory in transcript size, with zero size guard, zero line cap, zero
+  streaming. The only existing cost bound is the harness-level `timeout: 15` wrapper
+  in plugin.json, whose enforcement reliability is unverified from inside this repo.
+  On large transcripts this is a real per-session tax that can make `claude --bg`
+  sessions (exactly the kind a headless orchestrator drives) slow to close.
+
+  Two independent, defense-in-depth fixes:
+
+  1. Replace the `jq -c -s` slurp with a true streaming pass (`jq -c` without `-s`,
+     or an incremental awk/sum pass) that never holds the full transcript in memory.
+     The transcript is already one JSON object per line — slurp mode was never
+     required for this aggregation.
+  2. Add an in-script size guard before any parse is attempted: a new
+     `metrics.stop_dispatch_max_transcript_bytes` config key (root `hive.config.yaml`
+     -> shipped `hive/hive.config.yaml` baseline -> hardcoded default — root-first
+     precedence, no env tier, matching every other knob added in this epic). If the
+     transcript exceeds it, skip the parse, log one line to the existing
+     metrics-events stream noting the skip (not silent), and exit 0.
+
+  This design deliberately does NOT try to detect "is this a `claude --bg` session"
+  and skip the hook only for those — no such signal exists anywhere in this repo
+  today (confirmed by research), and bounding cost for every session is a strict
+  superset of protecting background ones specifically (confirmed acceptable with the
+  user during planning — open question 4).
+
+  The default byte threshold must be derived from a benchmark, not guessed — build a
+  synthetic large-transcript fixture, time the streaming rewrite against it, and pick
+  a threshold with measured margin under the 15s harness timeout.
+
+acceptance_criteria:
+  - "Given a normal-size fixture transcript, when the rewritten _extract_tokens runs, then its output (input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, model, TOTAL_TOKENS) is byte-for-byte identical to the current jq -c -s implementation's output on the same fixture"
+  - "Given a synthetic transcript larger than metrics.stop_dispatch_max_transcript_bytes, when the hook runs, then it skips the parse, appends one log line to the metrics-events stream noting the skip (session id + byte size), and exits 0 without attempting jq at all"
+  - "Given the synthetic large-transcript benchmark fixture, when the streaming rewrite parses a transcript just under the configured threshold, then it completes with measured wall-clock time under the 15s plugin.json timeout with a documented margin (not asserted, benchmarked and recorded in the story's episode notes)"
+  - "Given metrics.enabled: false, when the hook runs, then it exits 0 immediately exactly as it does today (existing short-circuit at hooks/metrics-stop-dispatch.sh:65-74 is unchanged)"
+  - "The existing || true + trap 'exit 0' ERR safety net (hooks/metrics-stop-dispatch.sh:25, .claude-plugin/plugin.json:49) is unchanged — this story extends the cheap-normal-path guarantee, it does not remove the failure-path guarantee"
+  - "ADDED (CodeRabbit review, PR #341): a transcript with many distinct model values does not grow the streaming aggregator's memory/sort cost unboundedly — model cardinality is capped (20 distinct values) with a deterministic '+more' overflow marker"
+  - "ADDED (CodeRabbit review): a malformed JSON line partway through an otherwise-valid transcript emits exactly ONE payload (the codex_gap:true fallback) — never a partial-totals blob followed by a second fallback blob"
+  - "ADDED (CodeRabbit review): a model name containing a double-quote character round-trips through valid JSON in the final events row (final JSON is built via jq -nc, not manual printf string interpolation)"
+  - "ADDED (CodeRabbit review): the transcript_skipped skip-row includes run_id (a REQUIRED_EVENT_FIELDS entry per hive/lib/metrics/core.py) and metric_type transcript_skipped is registered in EVENT_METRIC_TYPES as (number, bytes) — without both, hive/lib/metrics ingestion would reject the row"
+
+steps:
+  - id: research
+    description: Re-read hooks/metrics-stop-dispatch.sh:111-130 and hooks/common.sh's _resolve_state_dir against current HEAD. Confirm the exact jq filter (select(.type == "assistant" and .message.usage != null)) to preserve semantics for.
+    agent: researcher
+  - id: implement
+    description: Rewrite _extract_tokens to stream instead of slurp; add the size guard ahead of it; add metrics.stop_dispatch_max_transcript_bytes to hive.config.yaml (root override) and hive/hive.config.yaml (shipped baseline) with root-first precedence.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Build a normal-size fixture transcript and a synthetic large one (for both the byte-for-byte regression and the timing benchmark). Run the byte-for-byte regression, the size-guard-skip test, and the benchmark; record the measured timing margin.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm the streaming rewrite's jq filter is semantically identical to the original (not just "looks similar"), and that the benchmark's measured margin under 15s is real, not asserted.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feat/headless-question-protocol.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/dostal/Documents/work/dostal/code/plugin-hive-fork
+  tech_stack: {}
+  key_files:
+    - path: hooks/metrics-stop-dispatch.sh
+      purpose: The 228-line script being rewritten; _extract_tokens (lines 111-130) is the hot path.
+    - path: .claude-plugin/plugin.json
+      purpose: Registers the Stop hook with matcher:"" and the 15s timeout that bounds worst-case cost today.
+    - path: hooks/common.sh
+      purpose: Shared _resolve_state_dir helper this hook already sources; the new config key follows the same three-tier (yq/python3 yaml/awk) config reader already used in this script (lines 29-62).
+
+files_to_modify:
+  - file: hooks/metrics-stop-dispatch.sh
+    change: Replace jq -c -s slurp in _extract_tokens with a streaming pass; add an in-script size guard reading metrics.stop_dispatch_max_transcript_bytes before any parse.
+  - file: hive.config.yaml
+    change: No change required unless overriding the shipped default — this is the maintainer override layer, left as-is unless the benchmark suggests plugin-hive itself needs a custom threshold.
+  - file: hive/hive.config.yaml
+    change: Add metrics.stop_dispatch_max_transcript_bytes with the benchmark-derived default.
+
+code_examples:
+  - title: Existing three-tier config reader convention in this script (mirror for the new key)
+    file: hooks/metrics-stop-dispatch.sh
+    snippet: |
+      # yq -> python3 yaml.safe_load -> awk-scoped grep, in that order
+      # (hooks/metrics-stop-dispatch.sh:29-62, existing metrics.enabled reader)
+
+design_decisions:
+  - decision: No background-session-specific detection; bound cost universally instead.
+    rationale: No reliable "is this a claude --bg session" signal exists anywhere in this repo (grill finding U1); a universal bound is a strict superset of the literal request and was explicitly confirmed acceptable during planning.
+  - decision: Benchmark-derived default threshold, not an asserted number.
+    rationale: Grill finding H2 — an earlier draft asserted "10MB stays well under 15s" with no measurement; this story requires an actual timed benchmark before picking the shipped default. Actual benchmark (884MB/3M-line synthetic transcript, streaming rewrite) measured ~9.5s / ~2.8MB peak memory vs. the old slurp implementation's 13.57s / ~7.5GB peak RSS on the same fixture; 300MB default threshold measured at ~3.1s, ~12s margin under the 15s hook timeout.
+  - decision: Capture the full jq | awk pipeline into one variable and check its exit status once, rather than streaming partial awk output directly.
+    rationale: Not part of the original plan — added in CodeRabbit review round 3 on PR #341. The original streaming design let a jq failure partway through a transcript still allow awk's END block to run on partial data, printing a partial-totals JSON blob; the `|| echo <fallback>` then appended a SECOND JSON blob after it, corrupting the caller's single-value parse on any malformed transcript line.
+  - decision: Build the final token-row JSON via `jq -nc`, not manual printf string interpolation.
+    rationale: Not part of the original plan — added in CodeRabbit review round 3. A model name containing a literal `"` character, interpolated directly into a printf-built JSON string, produced invalid JSON; jq's own escaping handles this correctly.
+  - decision: Cap distinct model-name cardinality at 20 with a deterministic overflow marker.
+    rationale: Not part of the original plan — added in CodeRabbit review round 3. The streaming aggregator's model-tracking array and its O(n^2) insertion sort (needed to match the original jq `unique` implementation's sorted-join byte-for-byte) could otherwise grow unboundedly against a pathological transcript with many distinct model values, working against the very goal of this story.
+
+cross_cutting:
+  - concern: documentation
+    action: "Add a short note to hooks/metrics-stop-dispatch.sh's header comment (currently describes the slurp mechanism at lines 10-11 as the 'C2.0 chosen mechanism') updating it to describe the streaming approach + size guard as the current mechanism."
+  - concern: versioning
+    action: "Consumer-visible new behavior — covered by epic.yaml's version_bump: minor flag, consumed at actual release-cutting time by /hive:ship (which may bundle multiple epics into one plugin.json/marketplace.json bump, per this repo's accumulate-then-release convention). This epic's own CHANGELOG.md bullet is added now under ## [Unreleased] (see the plan-dag-cutover bullets already there as precedent)."
+
+metric:
+  applies: true
+  name: hooks.stop_dispatch_p99_wall_clock_ms
+  direction: down
+  unit: milliseconds
+  baseline: null
+  target: 3000
+  window: "story integrate step (benchmark), 7d post-merge (real-session confirmation)"
+  source:
+    kind: manual
+    ref: "Benchmark fixture timing recorded at integrate; spot-check against real .pHive/metrics/events/stop-*.jsonl wall_clock_ms rows for 7 days post-merge to confirm no regression in typical sessions"
+  verify_at: "story integrate step"
+  owner: developer
+  # NOTE (honesty check, not a target miss): this target describes TYPICAL
+  # session p99, not the deliberately-near-the-cap boundary case. The
+  # streaming pipeline measured ~3.1s (slightly over 3000ms) on a 295MB
+  # fixture chosen specifically to sit just under the 300MB size-guard
+  # threshold — an edge case by construction, not a typical transcript. The
+  # metric that actually matters for the size guard's own correctness is
+  # margin under the 15s hook timeout (~12s margin measured), not this
+  # p99 target. Real transcripts (typically low tens of MB) will be far
+  # under both numbers.
+
+risks:
+  - severity: medium
+    description: The streaming rewrite could subtly change what gets counted if the jq filter isn't preserved exactly (e.g. edge cases in the assistant/usage selector).
+    mitigation: Mandatory byte-for-byte regression test against the current implementation's output on a shared fixture, before cutover — not a "looks equivalent" review.
+
+references:
+  - path: .pHive/epics/headless-question-protocol/docs/research-brief.md
+    relevant_excerpt: |
+      hooks/metrics-stop-dispatch.sh:111-130 (_extract_tokens) — the hot path: jq -c
+      -s '[...]' "$jsonl". The -s (slurp) flag loads the entire JSONL transcript into
+      memory as one array before filtering/summing. O(n) time and memory in
+      transcript size, no size guard, no line cap, no streaming.

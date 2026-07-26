@@ -9,8 +9,17 @@ Initialize Hive for a project. Detects brownfield vs greenfield automatically.
 
 **Input:** `$ARGUMENTS` optionally describes the project or intent.
 
+**Headless mode.** Every "Ask:" below is a blocking interactive prompt. When
+`hive/lib/runtime_mode.py`'s `detect_interactive_mode()` (Python) or
+`hive/lib/runtime_mode.js`'s `detectInteractiveMode()` (JS) resolves headless,
+route it through `hive/lib/question_gateway.py`'s `ask_or_emit()` (Python) or
+`hive/lib/question_gateway.js`'s `askOrEmit()` (JS) instead — see
+`hive/references/kickoff-protocol.md`'s "Headless Mode" section (epic
+`headless-question-protocol`, story `hqp-3-kickoff-headless-integration`) for the
+phase-id table and the full protocol. Interactive behavior is unchanged.
+
 For a fresh kickoff, include the metrics opt-in question before scenario-specific work:
-- Ask: `Enable metrics tracking?`
+- Ask (headless: phase `1a`): `Enable metrics tracking?`
 - Keep the trade-off inline and short: opting in enables metric-driven meta-optimization later; opting out keeps metrics off and future meta runs fall back to qualitative/backlog-fallback mode.
 - Clearly label the opt-out consequence: `Consequence of opting out: metrics stay off. Meta work will use qualitative/backlog mode, and future metric-driven optimization features won't be available.`
 - State the companion future-facing clause: `Opting in is what would unlock metric-driven behavior for those future skills.`
@@ -19,11 +28,11 @@ For a fresh kickoff, include the metrics opt-in question before scenario-specifi
 
 For every kickoff, populate project classification fields in `.pHive/project-profile.yaml`:
 
-- Ask: `What type of project is this?` Allowed values: `framework`, `consumer-app`, `service`.
-- A `project_type` value is **valid** only when it is exactly one of `framework`, `consumer-app`, or `service`. If the user supplies anything else, re-prompt with the allowed values until one is chosen; do not persist an out-of-set value.
-- Ask: `Does this project have a UI?` (yes/no). Persist as `has_ui: true/false`.
+- Ask (headless: phase `project-classification` — not documented in kickoff-protocol.md's Step 1a, which is metrics-only; this pair gets its own phase id): `What type of project is this?` Allowed values: `framework`, `consumer-app`, `service`.
+- A `project_type` value is **valid** only when it is exactly one of `framework`, `consumer-app`, or `service`. If the user supplies anything else, re-prompt with the allowed values until one is chosen; do not persist an out-of-set value. **Headless:** an out-of-set answer means the `project-classification` envelope was answered but invalid — write a **new** envelope at `project-classification-round-2` (same round-suffix convention as design's touchpoints, `hive/references/wireframe-protocol.md`) asking only for `project_type` again. Reusing the `project-classification` phase id for this retry would not work: the round-1 envelope was already consumed and deleted (see `hive/references/question-envelope-schema.md`'s "Deletion on consume") the moment its answers were extracted, so a second call for that phase id would just write a fresh, unrelated envelope, not recover or re-ask the specific invalid value — the `-round-2` suffix is what makes the retry addressable. **Persist `has_ui` immediately upon consuming the round-1 envelope**, even though `project_type` still needs a retry round — a valid `has_ui` answer must be written to `.pHive/project-profile.yaml` right away rather than held in memory waiting for `project_type` to also become valid; a fresh round-2 process has no other way to recover it.
+- Ask (headless: phase `project-classification`): `Does this project have a UI?` (yes/no). Persist as `has_ui: true/false`.
 - Persist both fields to `.pHive/project-profile.yaml`.
-- On re-kickoff, if these fields already exist show them and ask whether to keep or change.
+- On re-kickoff, if these fields already exist show them and ask whether to keep or change (headless: phase `project-classification`).
 
 **Absent-field contract:** When `has_ui` is missing from a profile it is treated as *unknown* — a conservative default. Skills that gate on `project_gate: requires_ui` must not crash; they should apply a tech-stack heuristic fallback (e.g. check `tech_stack` for `react`, `vue`, `svelte`, etc.) or leave the slot empty rather than erroring. The field is optional in the file; the absence is meaningful and documented.
 
@@ -33,17 +42,17 @@ For every kickoff, populate project classification fields in `.pHive/project-pro
 - `service` — a backend service / API with no direct UI
 
 For every kickoff, make sure the project has a concrete ship target:
-- Ask: `What does shipping mean for this project?`
+- Ask (headless: phase `1b`): `What does shipping mean for this project?`
 - Offer the allowed kinds: `app-store`, `vercel`, `github-release`, `npm`, `custom`.
 - Persist the answer to `.pHive/project-profile.yaml` under `ship_target.kind`, with optional `ship_target.notes`.
-- If the user chooses `custom`, require a non-empty shell command and persist it to `ship_target.command`; if no command is provided, re-prompt until one is provided or the user chooses a non-custom kind.
+- If the user chooses `custom`, require a non-empty shell command and persist it to `ship_target.command`; if no command is provided, re-prompt until one is provided or the user chooses a non-custom kind. **Headless:** the custom command is collected up front in the same `1b` envelope (see kickoff-protocol.md's Headless note under Step 1b); if it's still missing on resume, write a new envelope at `1b-round-2` asking only for the command. Reusing phase `1b` for this retry would not work: that envelope was already consumed and deleted the moment its answers were extracted, so a second call for phase `1b` would just write a fresh, unrelated envelope, not recover the missing value. **Persist `ship_target.kind` and `ship_target.notes` immediately** upon consuming the round-1 envelope, even though `custom_command` still needs a retry round — `kind`/`notes` must be written to `.pHive/project-profile.yaml` right away rather than held pending the command also becoming valid.
 - A `ship_target` block is **valid** when `kind` is one of the allowed values AND, when `kind: custom`, `command` is a non-empty, non-whitespace string. (Deeper command sanitization / injection safety is out of scope here — it is the `/ship` executor's responsibility, which dry-runs and confirms the resolved action before running it. This skill performs only the basic non-empty check and re-prompts.)
-- On re-kickoff, if `.pHive/project-profile.yaml` already has a valid `ship_target` block, show it and ask whether to keep or change it. If it is missing, add only that block without clobbering other profile fields.
+- On re-kickoff, if `.pHive/project-profile.yaml` already has a valid `ship_target` block, show it and ask whether to keep or change it (headless: phase `1b`). If it is missing, add only that block without clobbering other profile fields.
 - For Hive itself, use `github-release` because this repo ships through GitHub releases.
 
 For a brownfield re-kickoff where `hive/hive.config.yaml` already has `metrics.enabled` set:
 - Read and show the existing `metrics.enabled` value before asking anything.
-- Ask whether the user wants to change that existing value, using change-prompt wording rather than the fresh opt-in question.
+- Ask whether the user wants to change that existing value, using change-prompt wording rather than the fresh opt-in question (headless: phase `1a`, same phase id as the fresh opt-in — the two paths are mutually exclusive).
 - If the user keeps the existing value, preserve it exactly and do not write `hive/hive.config.yaml`.
 - If the user explicitly changes it, write only the new value to `metrics.enabled` using the kickoff protocol's existing config write pattern.
 

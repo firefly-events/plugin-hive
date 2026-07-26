@@ -264,3 +264,5 @@ tsx-*/
 .pHive/epics/**/docs/*.png
 !.pHive/epics/hermes-production-readiness/
 !.pHive/epics/hermes-production-readiness/**
+!.pHive/epics/headless-question-protocol/
+!.pHive/epics/headless-question-protocol/**

@@ -11,6 +11,27 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- **Headless question protocol** (epic `headless-question-protocol`, PR #341).
+  `/hive:kickoff`, `/hive:design`, and `/hive:plan` no longer block indefinitely
+  (or silently degrade to unparseable prose) when driven by a non-interactive
+  orchestrator like Minerva via `claude -p`. A new `HIVE_HEADLESS`/`CI=true`
+  detection primitive (`hive/lib/runtime_mode.{py,js}`) and a phase-batched
+  question-envelope gateway (`hive/lib/question_gateway.{py,js}`, schema at
+  `hive/references/question-envelope-schema.md`) let those three skills write a
+  structured, resumable question envelope to `.pHive/questions/` instead —
+  answer submission mirrors Minerva's own `submitAnswers` shape, and an
+  answer-deadline is renewable (OAuth-refresh style) rather than a fixed
+  one-shot timeout or a polling loop. Interactive behavior is unchanged; the
+  headless path only activates on explicit signal.
+- **Bounded global Stop hook** (same epic, PR #341). `metrics-stop-dispatch.sh`'s
+  token-extraction step previously slurped the entire session transcript into
+  memory (`jq -c -s`) with no size guard — benchmarked at ~13.6s / ~7.5GB peak
+  RSS on an 884MB synthetic transcript, close to the hook's 15s timeout.
+  Replaced with a streaming `jq | awk` pass (~9.5s / ~2.8MB peak memory on the
+  same fixture) plus a new `metrics.stop_dispatch_max_transcript_bytes` config
+  guard (default 300MB) that skips the parse above threshold rather than
+  relying solely on the harness-level timeout as a backstop.
+
 - **`/plan` DAG executor routing** (epic `plan-dag-cutover`, PR #327). Routes `/plan`
   through the deterministic DAG executor when configured, mirroring the `/execute`
   cutover. Activation is graduation-registry-gated (`planning.mode: hive-dag` or
