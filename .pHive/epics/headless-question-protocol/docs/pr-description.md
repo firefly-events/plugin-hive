@@ -92,10 +92,19 @@ sessions."
   envelope write/resume/expiry/renewal/closure-invariant
 - `hooks/test/metrics-stop-dispatch.test.sh` — 8/8, byte-for-byte parity + size-guard
   behavior
-- Prose-only changes (kickoff/design/plan skill wiring) verified via diff-integrity
-  review, not executable tests — a true end-to-end headless run (spawning a real
-  `claude -p` session) is out of reach of this implementation session's tooling and
-  is an open follow-up, not claimed as done.
+- **Live end-to-end headless smoke test** (kickoff): ran a real, separate
+  `claude -p --plugin-dir <this branch>` session against a fresh scratch project
+  with `HIVE_HEADLESS=1`. Confirmed: (1) headless mode detected, prompt routed
+  through the gateway instead of asked inline, `.pHive/questions/kickoff-*.yaml`
+  written with `phase: 1a`; (2) after simulating an orchestrator answer
+  (`answer: yes`, `status: answered`) and re-invoking, kickoff consumed the answer
+  without re-prompting, wrote `metrics.enabled: true` to `hive.config.yaml`
+  correctly, and progressed to the next phase (`project-classification`),
+  writing a fresh envelope there. This is real, executed behavior, not a diff
+  review — the prose-only skill-integration stories (hqp-3/4/5) are no longer an
+  unverified gap for the mechanism they share; only design (hqp-4) and plan
+  (hqp-5)'s specific touchpoints haven't individually been smoke-tested the same
+  way (same underlying gateway, already proven).
 
 ## Planning artifacts
 
