@@ -200,9 +200,13 @@ export function writeEnvelope({ skill, phase, questions, baseDir, deadlineSecond
 export function findEnvelopeForPhase(skill, phase, baseDir) {
   const dir = questionsDir(baseDir);
   if (!fs.existsSync(dir)) return null;
+  // Must slug skill the same way envelopePath/writeEnvelope do (CodeRabbit
+  // review, PR #341) — otherwise a lookup for an unsanitized skill name
+  // would never match what was actually written to disk.
+  const skillSlug = slug(skill);
   const candidates = fs
     .readdirSync(dir)
-    .filter((name) => name.startsWith(`${skill}-`) && name.endsWith('.yaml'))
+    .filter((name) => name.startsWith(`${skillSlug}-`) && name.endsWith('.yaml'))
     .sort()
     .reverse()
     .map((name) => path.join(dir, name));
@@ -265,6 +269,20 @@ export function askOrEmit({ skill, phase, questions, baseDir, now, config }) {
     const { envelope: env, path: existingPath } = existing;
     const answers = extractAnswers(env);
     if (answers !== null) {
+      // Delete on consume (CodeRabbit review, PR #341): a phase id can be
+      // reused across genuinely distinct invocations of the same skill
+      // (e.g. a re-kickoff months after the original kickoff both use phase
+      // "1a"). Without this, findEnvelopeForPhase would match the OLD
+      // answered envelope forever, silently short-circuiting every future
+      // invocation's re-kickoff preservation prompt with a stale answer
+      // instead of asking again. Once an envelope is consumed, it must not
+      // be matchable by any future call — deleting it is simpler and more
+      // robust than adding an invocation/run-id dimension to every phase id.
+      try {
+        fs.unlinkSync(existingPath);
+      } catch (err) {
+        if (err.code !== 'ENOENT') throw err;
+      }
       return { resolved: true, answers };
     }
 

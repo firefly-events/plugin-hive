@@ -217,7 +217,11 @@ def find_envelope_for_phase(
     base = _questions_dir(base_dir)
     if not base.exists():
         return None
-    candidates = sorted(base.glob(f"{skill}-*.yaml"))
+    # Must slug skill the same way envelope_path/write_envelope do (CodeRabbit
+    # review, PR #341) — otherwise a lookup for an unsanitized skill name
+    # would never match what was actually written to disk, and an
+    # unsanitized value reaches glob() as a pattern rather than a literal.
+    candidates = sorted(base.glob(f"{_slug(skill)}-*.yaml"))
     for path in reversed(candidates):
         env = _read_yaml(path)
         if env and env.get("phase") == phase:
@@ -284,6 +288,20 @@ def ask_or_emit(
         env, path = existing
         answers = _extract_answers(env)
         if answers is not None:
+            # Delete on consume (CodeRabbit review, PR #341): a phase id can
+            # be reused across genuinely distinct invocations of the same
+            # skill (e.g. a re-kickoff months after the original kickoff both
+            # use phase "1a"). Without this, find_envelope_for_phase would
+            # match the OLD answered envelope forever, silently
+            # short-circuiting every future invocation's re-kickoff
+            # preservation prompt with a stale answer instead of asking
+            # again. Once an envelope is consumed, it must not be matchable
+            # by any future call — deleting it is simpler and more robust
+            # than adding an invocation/run-id dimension to every phase id.
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
             return {"resolved": True, "answers": answers}
 
         deadline = _parse_iso(env["deadline"])

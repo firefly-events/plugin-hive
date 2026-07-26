@@ -47,11 +47,13 @@ headings):
 | `4b` | Phase 4b: Scaffold CONTEXT.md | The backfill opt-in prompt |
 
 **`project-classification` note:** `skills/kickoff/SKILL.md` asks `project_type` and
-`has_ui` for every kickoff, but this protocol document has no corresponding numbered
-Step for them (verified: no "project_type"/"has_ui" text anywhere in this file) — a
-pre-existing gap between the two files, not introduced by this protocol. Registered
-here so the phase-id namespace stays centrally discoverable even though the
-underlying content lives only in `SKILL.md`.
+`has_ui` for every kickoff, but before this protocol was added, this document had no
+corresponding numbered Step or detailed contract for them — no validation rules,
+config-write pattern, or re-kickoff handling was specified here, only in `SKILL.md`.
+That's a pre-existing gap between the two files, not introduced by this protocol.
+Registered as a phase id here (the two terms now appear in the table row above)
+so the phase-id namespace stays centrally discoverable even though the detailed
+contract still lives only in `SKILL.md`.
 
 **Out of scope for this protocol:** Step 2B's greenfield **Product Discovery**
 (delegated to the analyst persona's Socratic conversation) is a multi-turn, free-form
@@ -210,9 +212,9 @@ Present the allowed kinds in the prompt:
 `Choose one: app-store, vercel, github-release, npm, custom.`
 
 **Headless:** batch the kind selection, the optional note, and the custom command
-into the **same** `1b` envelope — four qids (`ship_kind`, `ship_notes`,
-`custom_command`, plus validation happens on resume, not via a follow-up round; see
-below) rather than asking `ship_kind` first and conditionally following up for
+into the **same** `1b` envelope — three qids (`ship_kind`, `ship_notes`,
+`custom_command`); validation of the answers happens on resume, not via a
+follow-up round (see below), rather than asking `ship_kind` first and conditionally following up for
 `custom_command` in a second round. As with `1a`'s change/replacement pair, a
 second round for the same phase id would just re-match the already-answered
 envelope, not prompt again. `custom_command` is ignored when `ship_kind` isn't
@@ -391,21 +393,25 @@ Also infer a PR style default from recent git history:
 - Squash merge messages (e.g., "Squashed commit of…") → `squash-merge`
 - No clear pattern or fresh repo → `single-commit` (safe default)
 
-##### Step 2: Present Elicitation (5 Questions)
+##### Step 2: Present Elicitation (7 Questions)
 
 Present the questions as a single conversational block. The tone should feel like a colleague asking preferences, not a form to fill out.
 
-**Headless (phase `2b-ii` — see Headless Mode above):** batch all 7 questions — this
-section is titled "5 Questions" but the prompt template below actually presents 7
-numbered items (methodology, PR style, commit granularity, review depth,
-collaborative reviews, meta-team GitHub sync, notes), and Step 3 persists all 7;
-batching fewer would silently drop collaborative-reviews/GitHub-sync/notes from a
-headless kickoff (plus the inferred defaults as each question's implicit "accept
-default" option) into one `ask_or_emit()` call rather than presenting the
-conversational block. There is no headless equivalent of "press Enter to accept
-all" — an orchestrator answers each
-`qid` explicitly (it may simply echo back the inferred default as the answer, which
-has the same effect).
+**Headless (phase `2b-ii` — see Headless Mode above):** batch all 7 qids below into
+one `ask_or_emit()` call, each `answer` defaulting to the listed inferred default
+when the orchestrator has no preference — there is no headless equivalent of
+"press Enter to accept all," so every qid must receive an explicit answer (echoing
+back the default has the same effect as accepting it):
+
+| qid | Options | Inferred default | Config field (Step 3) |
+|---|---|---|---|
+| `methodology` | `classic` \| `tdd` \| `bdd` | Per the Priority table above | `execution.default_methodology` |
+| `pr_style` | `single-commit` \| `squash-merge` \| `atomic-prs` \| `bundled` | Per git-history inference above | `developer.pr_style` |
+| `commit_granularity` | `fine` \| `medium` \| `coarse` | `medium` (feature-scoped) | `developer.commit_granularity` |
+| `review_depth` | `thorough` \| `standard` \| `light` | `standard` | `developer.review_depth` |
+| `collaborative_reviews` | `on` \| `off` | `on` | `planning.collaborative_review` (`on`→`true`, `off`→`false`) |
+| `github_sync` | `on` \| `off` | `off` | `meta_team.github_forwarding` (`on`→`true`, `off`→`false`) |
+| `notes` | free text | `""` (none) | `developer.notes` (`null` if empty) |
 
 **Prompt template:**
 

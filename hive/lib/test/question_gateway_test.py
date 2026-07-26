@@ -57,9 +57,33 @@ class QuestionGatewayTests(unittest.TestCase):
         self.assertTrue(result["resolved"])
         self.assertEqual(result["answers"], {"metrics-opt-in": "yes"})
 
-        # No new envelope was created by the resume call.
+        # Consumed envelope is deleted (CodeRabbit review, PR #341) — a
+        # future call for the same skill+phase must not be able to match a
+        # stale answered envelope from a genuinely separate invocation.
         candidates = sorted(self.base_dir.glob("kickoff-*.yaml"))
-        self.assertEqual(len(candidates), 1)
+        self.assertEqual(len(candidates), 0)
+
+    def test_a_second_invocation_after_consume_does_not_reuse_the_stale_answer(self) -> None:
+        # Regression for CodeRabbit review (PR #341): before delete-on-consume,
+        # a re-kickoff months later reusing phase "1a" would have silently
+        # matched the FIRST kickoff's already-answered envelope and never
+        # asked again.
+        now = datetime(2026, 7, 25, 22, 10, 0, tzinfo=timezone.utc)
+        ask_or_emit("kickoff", "1a", QUESTIONS, base_dir=self.base_dir, now=now, config=self.default_cfg)
+        env, path = find_envelope_for_phase("kickoff", "1a", base_dir=self.base_dir)
+        env["questions"][0]["answer"] = "yes"
+        env["status"] = "answered"
+        import yaml
+
+        path.write_text(yaml.safe_dump(env, sort_keys=False), encoding="utf-8")
+        first_result = ask_or_emit("kickoff", "1a", QUESTIONS, base_dir=self.base_dir, now=now, config=self.default_cfg)
+        self.assertTrue(first_result["resolved"])
+
+        much_later = now + timedelta(days=180)
+        second_result = ask_or_emit(
+            "kickoff", "1a", QUESTIONS, base_dir=self.base_dir, now=much_later, config=self.default_cfg
+        )
+        self.assertFalse(second_result["resolved"], "a later invocation must ask again, not silently reuse the deleted-and-gone stale answer")
 
     def test_still_pending_and_not_expired_reexits_without_mutating_envelope(self) -> None:
         now = datetime(2026, 7, 25, 22, 10, 0, tzinfo=timezone.utc)

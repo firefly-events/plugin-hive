@@ -181,6 +181,69 @@ else
   fail "events file was not written when stop_dispatch_max_transcript_bytes was non-numeric ($EVENTS_FILE_4)"
 fi
 
+# --- test 5: a malformed line after valid rows emits ONLY the fallback -----
+# --- payload, never a partial-totals blob + fallback both (CodeRabbit ------
+# --- review, PR #341) -------------------------------------------------------
+MALFORMED_FIXTURE="$TMPDIR_BASE/malformed.jsonl"
+cat >"$MALFORMED_FIXTURE" <<'EOF'
+{"type":"assistant","message":{"model":"claude-sonnet-5","usage":{"input_tokens":100,"output_tokens":20,"cache_creation_input_tokens":5,"cache_read_input_tokens":10}}}
+{"type":"assistant","message":{"model":"claude-opus-5","usage":{"input_tokens"
+EOF
+
+CONFIG_DIR_5="$TMPDIR_BASE/proj5"
+mkdir -p "$CONFIG_DIR_5"
+cat >"$CONFIG_DIR_5/hive.config.yaml" <<EOF
+metrics:
+  enabled: true
+  stop_dispatch_max_transcript_bytes: 314572800
+EOF
+
+SESSION_5="test-session-malformed"
+_run_hook "$SESSION_5" "$CONFIG_DIR_5" "$MALFORMED_FIXTURE"
+EVENTS_FILE_5="$CONFIG_DIR_5/.pHive/metrics/events/stop-${SESSION_5}.jsonl"
+if [[ -f "$EVENTS_FILE_5" ]]; then
+  TOKEN_ROWS_5=$(grep -c '"metric_type":"tokens"' "$EVENTS_FILE_5" || true)
+  if [[ "$TOKEN_ROWS_5" -eq 1 ]]; then
+    TOKEN_ROW_5=$(grep '"metric_type":"tokens"' "$EVENTS_FILE_5" | head -1)
+    CODEX_GAP_5=$(echo "$TOKEN_ROW_5" | jq -r '.dimensions.codex_gap')
+    assert_eq "true" "$CODEX_GAP_5" "malformed transcript after valid rows emits exactly one row, and it is the codex_gap:true fallback (not a partial-totals blob)"
+  else
+    fail "malformed transcript emitted $TOKEN_ROWS_5 tokens rows, expected exactly 1 (partial-output-plus-fallback corruption)"
+  fi
+else
+  fail "events file was not written for the malformed-transcript case ($EVENTS_FILE_5)"
+fi
+
+# --- test 6: a model name containing a double quote produces valid JSON ----
+# --- (CodeRabbit review, PR #341) -------------------------------------------
+QUOTED_MODEL_FIXTURE="$TMPDIR_BASE/quoted-model.jsonl"
+cat >"$QUOTED_MODEL_FIXTURE" <<'EOF'
+{"type":"assistant","message":{"model":"weird\"model","usage":{"input_tokens":10,"output_tokens":2,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
+EOF
+
+CONFIG_DIR_6="$TMPDIR_BASE/proj6"
+mkdir -p "$CONFIG_DIR_6"
+cat >"$CONFIG_DIR_6/hive.config.yaml" <<EOF
+metrics:
+  enabled: true
+  stop_dispatch_max_transcript_bytes: 314572800
+EOF
+
+SESSION_6="test-session-quoted-model"
+_run_hook "$SESSION_6" "$CONFIG_DIR_6" "$QUOTED_MODEL_FIXTURE"
+EVENTS_FILE_6="$CONFIG_DIR_6/.pHive/metrics/events/stop-${SESSION_6}.jsonl"
+if [[ -f "$EVENTS_FILE_6" ]]; then
+  TOKEN_ROW_6=$(grep '"metric_type":"tokens"' "$EVENTS_FILE_6" | head -1)
+  if echo "$TOKEN_ROW_6" | jq -e . >/dev/null 2>&1; then
+    MODEL_6=$(echo "$TOKEN_ROW_6" | jq -r '.dimensions.model')
+    assert_eq 'weird"model' "$MODEL_6" "a model name containing a double quote round-trips through valid JSON"
+  else
+    fail "a model name containing a double quote produced invalid JSON in the events file"
+  fi
+else
+  fail "events file was not written for the quoted-model case ($EVENTS_FILE_6)"
+fi
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]

@@ -72,8 +72,30 @@ describe('question_gateway', () => {
     expect(result.resolved).toBe(true);
     expect(result.answers).toEqual({ 'metrics-opt-in': 'yes' });
 
+    // Consumed envelope is deleted (CodeRabbit review, PR #341) — a future
+    // call for the same skill+phase must not be able to match a stale
+    // answered envelope from a genuinely separate invocation.
     const candidates = fs.readdirSync(baseDir).filter((f) => f.startsWith('kickoff-'));
-    expect(candidates).toHaveLength(1);
+    expect(candidates).toHaveLength(0);
+  });
+
+  it('does not let a later invocation reuse a stale answer after consume', () => {
+    // Regression for CodeRabbit review (PR #341): before delete-on-consume, a
+    // re-kickoff months later reusing phase "1a" would have silently matched
+    // the FIRST kickoff's already-answered envelope and never asked again.
+    const now = new Date('2026-07-25T22:10:00Z');
+    askOrEmit({ skill: 'kickoff', phase: '1a', questions: QUESTIONS, baseDir, now, config: DEFAULT_CFG });
+    const { envelope, path: envPath } = findEnvelopeForPhase('kickoff', '1a', baseDir);
+    envelope.questions[0].answer = 'yes';
+    envelope.status = 'answered';
+    fs.writeFileSync(envPath, JSON.stringify(envelope), 'utf8');
+
+    const first = askOrEmit({ skill: 'kickoff', phase: '1a', questions: QUESTIONS, baseDir, now, config: DEFAULT_CFG });
+    expect(first.resolved).toBe(true);
+
+    const muchLater = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000);
+    const second = askOrEmit({ skill: 'kickoff', phase: '1a', questions: QUESTIONS, baseDir, now: muchLater, config: DEFAULT_CFG });
+    expect(second.resolved).toBe(false);
   });
 
   it('re-exits on a still-pending, non-expired envelope without mutating it', () => {

@@ -189,7 +189,17 @@ _extract_tokens() {
     return
   fi
 
-  jq -r '
+  local tsv
+  # Captured into a variable (not streamed straight to stdout) so the whole
+  # jq | awk pipeline's success/failure can be checked ATOMICALLY before any
+  # output is used. Previously, a jq failure partway through a transcript
+  # (e.g. one malformed line) still let awk's END block run on whatever
+  # partial data it had already received, printing a partial-totals JSON
+  # blob; the `|| echo <fallback>` then appended a SECOND JSON blob after
+  # it (pipefail catches jq's failure), corrupting the caller's single-value
+  # parse. Capturing to $tsv and checking $? once avoids ever emitting two
+  # payloads (CodeRabbit review, PR #341).
+  tsv=$(jq -r '
     select(.type == "assistant" and .message.usage != null)
     | [
         (.message.usage.input_tokens // 0),
@@ -202,22 +212,59 @@ _extract_tokens() {
   ' "$jsonl" 2>/dev/null | awk -F'\t' '
     {
       input += $1; output += $2; cache_c += $3; cache_r += $4
-      if (!($5 in seen)) { seen[$5] = 1; n++; models[n] = $5 }
+      # Bounded model cardinality (CodeRabbit review, PR #341): a
+      # pathological transcript with many distinct model values must not
+      # grow this array — and the O(n^2) insertion sort below — unboundedly.
+      # MAX_MODELS distinct values tracked; anything past that collapses
+      # into one deterministic overflow marker.
+      if (n <= MAX_MODELS && !($5 in seen)) {
+        seen[$5] = 1; n++
+        if (n <= MAX_MODELS) { models[n] = $5 }
+      }
     }
     END {
-      # Insertion sort on the (tiny — bounded by distinct model count) models
-      # array, to match the original jq `unique` implementation'"'"'s sorted
-      # join order byte-for-byte.
-      for (i = 2; i <= n; i++) {
+      capped = (n > MAX_MODELS)
+      count = (capped ? MAX_MODELS : n)
+      # Insertion sort on the (small, bounded) models array, to match the
+      # original jq `unique` implementation'"'"'s sorted join order byte-for-byte.
+      for (i = 2; i <= count; i++) {
         key = models[i]; j = i - 1
         while (j >= 1 && models[j] > key) { models[j+1] = models[j]; j-- }
         models[j+1] = key
       }
       joined = ""
-      for (i = 1; i <= n; i++) { joined = (joined == "" ? models[i] : joined "," models[i]) }
-      printf("{\"input_tokens\":%d,\"output_tokens\":%d,\"cache_creation_input_tokens\":%d,\"cache_read_input_tokens\":%d,\"model\":\"%s\",\"codex_gap\":false}\n", input, output, cache_c, cache_r, joined)
+      for (i = 1; i <= count; i++) { joined = (joined == "" ? models[i] : joined "," models[i]) }
+      if (capped) { joined = (joined == "" ? "+more" : joined ",+more") }
+      printf("%d\t%d\t%d\t%d\t%s\n", input, output, cache_c, cache_r, joined)
     }
-  ' || echo '{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"model":"unknown","codex_gap":true}'
+  ' MAX_MODELS=20)
+  local pipe_status=$?
+
+  if [ "$pipe_status" -ne 0 ] || [ -z "$tsv" ]; then
+    echo '{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"model":"unknown","codex_gap":true}'
+    return
+  fi
+
+  # Build the final JSON via jq (not manual string interpolation) so the
+  # model value is properly escaped regardless of its content (CodeRabbit
+  # review, PR #341 — a model name containing a `"` previously produced
+  # invalid JSON).
+  local in_tok out_tok cache_c_tok cache_r_tok model_val
+  IFS=$'\t' read -r in_tok out_tok cache_c_tok cache_r_tok model_val <<<"$tsv"
+  jq -nc \
+    --argjson input_tokens "${in_tok:-0}" \
+    --argjson output_tokens "${out_tok:-0}" \
+    --argjson cache_creation_input_tokens "${cache_c_tok:-0}" \
+    --argjson cache_read_input_tokens "${cache_r_tok:-0}" \
+    --arg model "${model_val:-unknown}" \
+    '{
+      input_tokens: $input_tokens,
+      output_tokens: $output_tokens,
+      cache_creation_input_tokens: $cache_creation_input_tokens,
+      cache_read_input_tokens: $cache_read_input_tokens,
+      model: $model,
+      codex_gap: false
+    }' 2>/dev/null || echo '{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"model":"unknown","codex_gap":true}'
 }
 
 TOKENS_JSON=$(_extract_tokens "$JSONL_PATH")

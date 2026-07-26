@@ -51,7 +51,12 @@ id **always includes the topic slug**:
 `skills/design/SKILL.md` for how the topic is derived from the brief/story). Two
 different topics can never collide, because the phase id itself disambiguates them
 — no gateway code change is needed, `phase` is an opaque string from the gateway's
-perspective already.
+perspective already (it's compared for equality, never used to construct a
+filesystem path — the envelope filename is `<skill>-<invocation-id>.yaml`, with no
+`phase`-derived component). `<topic>` MUST already be a validated slug before
+reaching this protocol — `/design` normalizes/rejects non-kebab-case input (`/`,
+`..`, etc.) at its own `--topic` boundary for `.pHive/design/<topic>/`; this
+protocol relies on that existing validation rather than re-validating here.
 
 **Determining the current round on resume.** Unlike kickoff/plan's phases (each
 asked at most once per invocation, so linear script order alone tells the skill
