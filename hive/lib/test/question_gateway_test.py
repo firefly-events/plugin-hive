@@ -12,6 +12,7 @@ from hive.lib.question_gateway import (
     envelope_path,
     find_envelope_for_phase,
     renew_envelope,
+    resolve_headless_config,
     write_envelope,
 )
 
@@ -110,6 +111,14 @@ class QuestionGatewayTests(unittest.TestCase):
         # renewal hadn't extended the deadline past the original one.
         self.assertFalse(result["resolved"])
         self.assertEqual(result["status"], "pending")
+
+    def test_non_numeric_answer_deadline_seconds_falls_back_to_default(self) -> None:
+        # Regression for CodeRabbit review (PR #341): a non-numeric configured
+        # value must fall back to the default, not raise.
+        root_config = self.base_dir.parent / "hive.config.yaml"
+        root_config.write_text("headless:\n  answer_deadline_seconds: not-a-number\n", encoding="utf-8")
+        cfg = resolve_headless_config(root_config_path=root_config, baseline_config_path="/nonexistent.yaml")
+        self.assertEqual(cfg.answer_deadline_seconds, 1800)
 
     def test_envelope_ids_do_not_collide_within_the_same_wall_clock_second(self) -> None:
         # Regression for CodeRabbit review (PR #341): whole-second invocation

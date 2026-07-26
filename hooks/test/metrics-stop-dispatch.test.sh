@@ -139,6 +139,12 @@ if [[ -f "$EVENTS_FILE_3" ]]; then
   TOKEN_ROW_3=$(grep '"metric_type":"tokens"' "$EVENTS_FILE_3" | head -1)
   if [[ -n "$SKIP_ROW" ]]; then
     pass "size guard logs a transcript_skipped row for an oversized transcript"
+    SKIP_RUN_ID=$(echo "$SKIP_ROW" | jq -r '.run_id // empty')
+    if [[ -n "$SKIP_RUN_ID" ]]; then
+      pass "transcript_skipped row includes run_id (REQUIRED_EVENT_FIELDS)"
+    else
+      fail "transcript_skipped row is missing run_id, a required metrics-event field"
+    fi
   else
     fail "size guard did not log a transcript_skipped row"
   fi

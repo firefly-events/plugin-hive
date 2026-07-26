@@ -30,42 +30,60 @@ resumes at this phase. On `resolved: true`, use the answer exactly as if the use
 selected it interactively. Writing an envelope and returning control is not "running
 in a background teammate" — the constraint above doesn't apply to the headless path.
 
-**Phase ids and the iteration loop.** Both touchpoints can loop (Touchpoint 1's
-"Request changes" / "More options", Touchpoint 2's "Edit") — the user is asked the
-same conceptual question multiple times across rounds. Each round is a **distinct**
-phase id, suffixed with a 1-based round counter, so a re-prompt after feedback writes
-a fresh envelope rather than matching a stale already-answered one:
+**Phase ids are topic-scoped.** The gateway's envelope lookup
+(`find_envelope_for_phase`) is keyed by `skill` + `phase` only — it has no concept
+of "which invocation." Unlike kickoff/plan (effectively one invocation in flight
+per project), `/design` explicitly supports multiple concurrent topics
+(`.pHive/wireframes/{epic}/{story}/`, `.pHive/design/<topic>/`). Two unrelated
+`/design` runs for different topics started close together would both write
+envelopes for phase `touchpoint-1-round-1` (topic-less), and a resume for one topic
+could silently match the other topic's more-recent envelope. To prevent this, the phase
+id **always includes the topic slug**:
 
 | Phase id | Touchpoint | Round |
 |---|---|---|
-| `touchpoint-1-round-1` | Rendition selection | First presentation |
-| `touchpoint-1-round-2`, `-round-3`, … | Rendition selection | After "Request changes" / "More options" |
-| `touchpoint-2-round-1` | Brief sign-off | First presentation |
-| `touchpoint-2-round-2`, … | Brief sign-off | After "Edit" |
+| `touchpoint-1-round-1-<topic>` | Rendition selection | First presentation |
+| `touchpoint-1-round-2-<topic>`, `-round-3-<topic>`, … | Rendition selection | After "Request changes" / "More options" |
+| `touchpoint-2-round-1-<topic>` | Brief sign-off | First presentation |
+| `touchpoint-2-round-2-<topic>`, … | Brief sign-off | After "Edit" |
+
+`<topic>` is the same slug used for `.pHive/design/<topic>/` (see
+`skills/design/SKILL.md` for how the topic is derived from the brief/story). Two
+different topics can never collide, because the phase id itself disambiguates them
+— no gateway code change is needed, `phase` is an opaque string from the gateway's
+perspective already.
 
 **Determining the current round on resume.** Unlike kickoff/plan's phases (each
 asked at most once per invocation, so linear script order alone tells the skill
 where it is), a touchpoint's round number is not derivable from control flow
 alone when `/design` is resumed as a **fresh process** — the round state lives only
 in `.pHive/questions/`, not in any other persisted file. On every resume (including
-the very first attempt at a touchpoint), determine the round to use by probing
-starting at round 1:
+the very first attempt at a touchpoint, for the topic currently being resolved),
+determine the round to use by probing starting at round 1:
 
-1. Call `find_envelope_for_phase(skill="design", phase="touchpoint-<N>-round-1")`.
+1. Call `find_envelope_for_phase(skill="design", phase="touchpoint-<N>-round-1-<topic>")`.
 2. If no envelope exists yet, this is a fresh touchpoint — use round 1.
 3. If an envelope exists and is `answered`:
    - Selection/approval answer ("Rendition K" / "Approve") → the touchpoint is
      resolved; do not open a new round.
    - Iteration answer ("Request changes" / "More options" / "Edit") → advance to
      round 2 and repeat this probe (`find_envelope_for_phase` for
-     `touchpoint-<N>-round-2`), continuing until an unanswered or nonexistent round
-     is found.
+     `touchpoint-<N>-round-2-<topic>`), continuing until an unanswered or
+     nonexistent round is found.
 4. If an envelope exists and is still `pending`, that round is the current one —
    resume there (per Headless Mode above), don't start a new round.
 
 This probe is O(rounds so far), which is bounded in practice (iteration loops don't
 run indefinitely) and mirrors how the gateway itself already resolves a single
-phase — it's just applied repeatedly across the round sequence.
+phase — it's just applied repeatedly across the round sequence, scoped to one
+topic.
+
+**Kickoff and plan are not topic-scoped (known v1 limitation).** Their phase ids
+(`1a`, `1b`, `branch-switch-confirm`, etc.) assume at most one invocation in flight
+per project — reasonable today (kickoff/plan aren't normally run concurrently
+against the same project), but not enforced. If concurrent kickoff/plan
+invocations against the same project ever become a real scenario, their phase ids
+will need the same topic/invocation-scoping treatment as design's.
 
 ## When This Runs
 
@@ -91,12 +109,12 @@ After the UI designer produces renditions:
    ```
    If Claude Code can read images (Read tool on PNG), present them inline.
 
-2. **Ask for selection.** Use AskUserQuestion (headless: phase `touchpoint-1-round-<N>` — see Headless Mode above) with options:
+2. **Ask for selection.** Use AskUserQuestion (headless: phase `touchpoint-1-round-<N>-<topic>` — see Headless Mode above) with options:
    - "Rendition 1" / "Rendition 2" / "Rendition N" — approve that version
    - "Request changes" — provide feedback, re-run UI designer with context
    - "More options" — generate additional renditions
 
-3. **Iterate if needed.** On "Request changes" or "More options", pass the user's feedback to the UI designer and repeat from step 1, incrementing the round counter (headless: next envelope is `touchpoint-1-round-<N+1>`). No limit on iterations — the user decides when to approve.
+3. **Iterate if needed.** On "Request changes" or "More options", pass the user's feedback to the UI designer and repeat from step 1, incrementing the round counter (headless: next envelope is `touchpoint-1-round-<N+1>-<topic>`). No limit on iterations — the user decides when to approve.
 
 4. **Lock selection.** Once approved, record the selected rendition index.
 
@@ -111,9 +129,9 @@ After wireframe selection:
    - Accessibility notes
    - Export command for downstream agents
 
-2. **Ask for approval.** Use AskUserQuestion (headless: phase `touchpoint-2-round-<N>` — see Headless Mode above):
+2. **Ask for approval.** Use AskUserQuestion (headless: phase `touchpoint-2-round-<N>-<topic>` — see Headless Mode above):
    - "Approve" — embed in story YAML
-   - "Edit" — collect changes via Other/free-text, update brief, re-present (headless: next envelope is `touchpoint-2-round-<N+1>`)
+   - "Edit" — collect changes via Other/free-text, update brief, re-present (headless: next envelope is `touchpoint-2-round-<N+1>-<topic>`)
 
 3. **Embed in story.** Once approved, append the `wireframes` section to the story YAML file.
 

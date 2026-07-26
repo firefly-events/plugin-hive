@@ -18,6 +18,7 @@ import {
   envelopePath,
   findEnvelopeForPhase,
   renewEnvelope,
+  resolveHeadlessConfig,
   writeEnvelope,
 } from '../question_gateway.js';
 
@@ -140,6 +141,15 @@ describe('question_gateway', () => {
     // Would have thrown under FAIL_CFG if renewal hadn't extended the deadline.
     expect(result.resolved).toBe(false);
     expect(result.status).toBe('pending');
+  });
+
+  it('falls back to the default when answer_deadline_seconds is non-numeric', () => {
+    // Regression for CodeRabbit review (PR #341): a non-numeric configured
+    // value must fall back to the default, not produce NaN.
+    const rootConfig = path.join(baseDir, '..', 'hive.config.yaml');
+    fs.writeFileSync(rootConfig, 'headless:\n  answer_deadline_seconds: not-a-number\n', 'utf8');
+    const cfg = resolveHeadlessConfig(rootConfig, '/nonexistent.yaml');
+    expect(cfg.answerDeadlineSeconds).toBe(1800);
   });
 
   it('does not collide envelope filenames within the same wall-clock second', () => {

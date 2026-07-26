@@ -91,8 +91,14 @@ export function resolveHeadlessConfig(rootConfigPath, baselineConfigPath) {
     expiredAction = DEFAULT_DEADLINE_EXPIRED_ACTION;
   }
 
+  // A non-numeric configured value must fall back to the default, not
+  // silently produce NaN and propagate into deadline math as an Invalid
+  // Date (CodeRabbit review, PR #341).
+  const numericDeadlineSeconds = Number(deadlineSeconds);
   return {
-    answerDeadlineSeconds: Number(deadlineSeconds),
+    answerDeadlineSeconds: Number.isFinite(numericDeadlineSeconds)
+      ? numericDeadlineSeconds
+      : DEFAULT_ANSWER_DEADLINE_SECONDS,
     deadlineExpiredAction: expiredAction,
   };
 }

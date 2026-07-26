@@ -142,15 +142,24 @@ if [ -n "$JSONL_PATH" ] && [ -f "$JSONL_PATH" ]; then
   TRANSCRIPT_BYTES=$(_transcript_size_bytes "$JSONL_PATH")
   if [ -n "${TRANSCRIPT_BYTES:-}" ] && [ "$TRANSCRIPT_BYTES" -gt "$MAX_TRANSCRIPT_BYTES" ] 2>/dev/null; then
     SKIP_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    SKIP_EVENT_TS=$(date -u +%Y-%m-%dT%H%M%SZ)
+    # run_id is a REQUIRED_EVENT_FIELDS entry (hive/lib/metrics/core.py) —
+    # every row in this file must carry one, matching the TOKEN_ROW/WALL_ROW
+    # convention below (CodeRabbit review, PR #341).
+    SKIP_RUN_ID="run_stop_${SESSION_ID:-unknown}_${SKIP_EVENT_TS}_$$_${RANDOM}"
     SKIP_ROW=$(jq -nc \
-      --arg event_id "evt_$(date -u +%Y-%m-%dT%H%M%SZ)_$$_${RANDOM}_stop_skip" \
+      --arg event_id "evt_${SKIP_EVENT_TS}_$$_${RANDOM}_stop_skip" \
       --arg ts "$SKIP_TS" \
+      --arg run_id "$SKIP_RUN_ID" \
+      --arg swarm_id "meta-improvement-system" \
       --arg session_id "$SESSION_ID" \
       --argjson bytes "$TRANSCRIPT_BYTES" \
       --argjson threshold "$MAX_TRANSCRIPT_BYTES" \
       '{
         event_id: $event_id,
         timestamp: $ts,
+        run_id: $run_id,
+        swarm_id: $swarm_id,
         story_id: "session-end",
         phase: "stop-hook",
         agent: "stop-hook-dispatcher",

@@ -146,9 +146,17 @@ If `hive.config.yaml` already contains `metrics.enabled`:
    prompting.
 2. Show the current value explicitly to the user, for example: `Metrics tracking is
    currently enabled.` or `Metrics tracking is currently disabled.`
-3. Ask a change prompt, not the fresh opt-in question (headless: phase `1a` — same
-   phase id as the fresh path, since the two are mutually exclusive). Example: `Do you want to
+3. Ask a change prompt, not the fresh opt-in question. Example: `Do you want to
    change metrics tracking from its current setting?`
+   - **Headless (phase `1a`, same phase id as the fresh path — the two are mutually
+     exclusive):** ask the change-decision and the replacement value **in the same
+     envelope**, as two qids (`change_metrics: yes/no` and
+     `replacement_metrics_value: yes/no`), not as a decision followed by a
+     conditional follow-up round. `ask_or_emit()` returns one answered envelope per
+     phase; a second "if yes, what's the replacement" round for the *same* phase id
+     would just re-match the already-answered envelope from step 3, not prompt
+     again. Batching avoids that — the orchestrator answers both up front, and
+     `replacement_metrics_value` is simply ignored when `change_metrics: no`.
 4. If the user keeps the existing value, preserve it as-is and do not write
    `hive.config.yaml`.
 5. If the user explicitly chooses to change it, collect the replacement setting
@@ -201,6 +209,15 @@ Present the allowed kinds in the prompt:
 
 `Choose one: app-store, vercel, github-release, npm, custom.`
 
+**Headless:** batch the kind selection, the optional note, and the custom command
+into the **same** `1b` envelope — four qids (`ship_kind`, `ship_notes`,
+`custom_command`, plus validation happens on resume, not via a follow-up round; see
+below) rather than asking `ship_kind` first and conditionally following up for
+`custom_command` in a second round. As with `1a`'s change/replacement pair, a
+second round for the same phase id would just re-match the already-answered
+envelope, not prompt again. `custom_command` is ignored when `ship_kind` isn't
+`custom`.
+
 Then:
 
 1. Record the selected kind as `ship_target.kind`.
@@ -210,6 +227,12 @@ Then:
    ship action.
 4. If `kind == custom` and the command is empty or missing, re-prompt:
    `Custom shipping requires a command string. What command should /ship run?`
+   **Headless:** the batched `custom_command` qid was already asked up front (see
+   above); if the orchestrator's answer was still empty, write a **new** envelope
+   at phase `1b-round-2` (same round-suffix convention as design's touchpoints —
+   see `hive/references/wireframe-protocol.md`) asking only for `custom_command`,
+   rather than re-using phase `1b` (which would just re-match the prior, now-empty
+   answer).
 5. Do not write a `custom` ship target until a non-empty command is collected.
 6. Security note: a `custom` command runs in a shell at ship time. Kickoff only
    enforces the non-empty check; command sanitization and injection safety are

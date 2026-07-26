@@ -91,8 +91,15 @@ def resolve_headless_config(
     if expired_action is None or expired_action not in _VALID_EXPIRED_ACTIONS:
         expired_action = _DEFAULT_DEADLINE_EXPIRED_ACTION
 
+    # A non-numeric configured value must fall back to the default, not raise
+    # (CodeRabbit review, PR #341 — matches the equivalent JS NaN guard).
+    try:
+        resolved_deadline_seconds = int(deadline_seconds)
+    except (TypeError, ValueError):
+        resolved_deadline_seconds = _DEFAULT_ANSWER_DEADLINE_SECONDS
+
     return HeadlessConfig(
-        answer_deadline_seconds=int(deadline_seconds),
+        answer_deadline_seconds=resolved_deadline_seconds,
         deadline_expired_action=str(expired_action),
     )
 
