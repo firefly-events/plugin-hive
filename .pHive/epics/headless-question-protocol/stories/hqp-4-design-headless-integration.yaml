@@ -1,7 +1,7 @@
 id: hqp-4-design-headless-integration
 epic: headless-question-protocol
 title: Route design's AskUserQuestion touchpoints through the question gateway
-status: pending
+status: completed
 complexity: low
 methodology: classic
 depends_on: [hqp-2-question-gateway-envelope]
@@ -22,11 +22,27 @@ description: |
   path never runs in a background teammate either, it writes an envelope and returns
   control to whatever invoked /design.
 
+  IMPLEMENTATION NOTE (post-hoc correction, CodeRabbit review on PR #341): the plan
+  as originally written treated each touchpoint as a single phase id
+  (touchpoint-1, touchpoint-2). Two corrections landed during implementation:
+  (1) both touchpoints can LOOP (Touchpoint 1's "Request changes"/"More options",
+  Touchpoint 2's "Edit") — each round needs its own phase id
+  (touchpoint-N-round-M) with an explicit resume-time probe algorithm to determine
+  the current round, since a freshly resumed process can't derive the round from
+  control flow alone; (2) unlike kickoff/plan, /design explicitly supports multiple
+  CONCURRENT topics — phase ids must embed the topic slug
+  (touchpoint-N-round-M-<topic>) or two unrelated /design runs could match each
+  other's envelopes. See hive/references/wireframe-protocol.md's "Headless Mode"
+  section for the corrected, authoritative phase-id convention and resume
+  algorithm.
+
 acceptance_criteria:
   - "Given HIVE_HEADLESS unset, when /design reaches Touchpoint 1 or 2, then AskUserQuestion is called exactly as before this story (unchanged blocking behavior)"
   - "Given HIVE_HEADLESS=1, when /design reaches Touchpoint 1 (rendition selection), then it writes an envelope with the rendition options, exits with AWAITING_ANSWERS, and does not proceed past that touchpoint"
   - "Given a Touchpoint 1 envelope answered externally, when /design is re-invoked with HIVE_HEADLESS=1, then it consumes the selected rendition and proceeds to Touchpoint 2, writing a new envelope"
   - "Given both touchpoints answered across re-invocations, when /design completes headlessly, then the resulting design brief/handoff artifact is equivalent to what an interactive run with the same selections would produce"
+  - "Given a 'Request changes' answer on Touchpoint 1 round 1, when /design is re-invoked, then it writes a NEW envelope at phase touchpoint-1-round-2-<topic> rather than re-matching the round-1 envelope (which is already consumed/deleted anyway per hqp-2's delete-on-consume)"
+  - "Given two concurrent /design invocations for different topics both mid-Touchpoint-1, their envelopes never collide (distinct phase ids via the <topic> suffix) and each resumes independently"
 
 steps:
   - id: research
@@ -68,7 +84,7 @@ cross_cutting:
   - concern: documentation
     action: "wireframe-protocol.md update IS the doc update for this story's behavior change."
   - concern: versioning
-    action: "Consumer-visible new behavior — covered by the epic-level minor version bump."
+    action: "Consumer-visible new behavior — covered by epic.yaml's version_bump: minor flag, consumed at actual release-cutting time by /hive:ship (which may bundle multiple epics into one plugin.json/marketplace.json bump, per this repo's accumulate-then-release convention). This epic's own CHANGELOG.md bullet is added now under ## [Unreleased] (see the plan-dag-cutover bullets already there as precedent)."
 
 metric:
   applies: true

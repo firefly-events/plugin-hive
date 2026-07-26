@@ -1,35 +1,54 @@
 id: hqp-3-kickoff-headless-integration
 epic: headless-question-protocol
 title: Route kickoff's prose prompts through the question gateway
-status: pending
+status: completed
 complexity: medium
 methodology: classic
 depends_on: [hqp-2-question-gateway-envelope]
 
 description: |
   Kickoff is the largest and most load-bearing prompt surface in this plugin: 7+
-  distinct "Ask the user:" prose prompts across roughly 4 phases (research brief:
+  distinct "Ask the user:" prose prompts (research brief:
   skills/kickoff/SKILL.md:13,22,24,26,36,41,46; hive/references/kickoff-protocol.md:45,
   58,99,145,182,320-363,756-786,906). Route every one of them through
-  hive/lib/question_gateway.py's ask_or_emit() (hqp-2), batched per phase per the
-  mapping in horizontal-plan.md:
+  hive/lib/question_gateway.{py,js}'s ask_or_emit() (hqp-2), batched per phase per the
+  mapping originally sketched in horizontal-plan.md and corrected during
+  implementation:
 
-  - Phase 1a (metrics opt-in, project-type, has-ui) -> one envelope
-  - Phase 1b (ship-target) -> one envelope
-  - Phase 2b-iii elicitation (5 questions) -> one envelope
-  - Phase 3b discovery (north-star, optional) -> one envelope
+  - Phase `scenario-detect` (ambiguous brownfield/greenfield) -> one envelope
+  - Phase `1a` (metrics opt-in) -> one envelope
+  - Phase `1b` (ship-target, kind+notes+custom_command batched) -> one envelope
+  - Phase `project-classification` (project_type + has_ui) -> one envelope
+  - Phase `2b-ii` (developer-discovery elicitation, 7 qids — not 5, see
+    IMPLEMENTATION NOTE below) -> one envelope
+  - Phase `4b` (CONTEXT.md backfill opt-in) -> one envelope
 
   Interactive kickoff must be byte-identical to current behavior — this story only
   adds the headless branch, it does not touch the prose text or question content
   itself. Do NOT change the actual questions being asked, their order, or their
   options — only how they're delivered when headless.
 
+  IMPLEMENTATION NOTE (post-hoc correction, hqp-7 drift-check pass): the plan-time
+  estimate of "4 phases" / "Phase 2b-iii, 5 questions" / "Phase 3b" was wrong —
+  verified against kickoff-protocol.md's real section structure during
+  implementation. The actual phase count is 6 (listed above), the elicitation
+  section is titled "5 Questions" but the prompt template presents 7 numbered
+  items and Step 3 persists all 7 (batching only 5 would have silently dropped
+  collaborative-reviews/GitHub-sync/notes from headless kickoff — caught in
+  CodeRabbit review round 2 on PR #341), "Phase 2b-iii" should have been "2b-ii,"
+  and "Phase 3b" does not exist in this file at all (replaced with "4b" and a new
+  `project-classification` phase for fields that were never documented as a
+  numbered Step to begin with). See
+  hive/references/kickoff-protocol.md's "Headless Mode" section for the
+  authoritative, corrected phase-id table.
+
 acceptance_criteria:
-  - "Given HIVE_HEADLESS unset and no CI, when /hive:kickoff runs against a fresh project, then every prompt point behaves exactly as before this story (prose/AskUserQuestion unchanged, no envelope files written)"
-  - "Given HIVE_HEADLESS=1, when /hive:kickoff runs against a fresh project, then it writes a Phase-1a envelope, exits with AWAITING_ANSWERS, and writes nothing to project-profile.yaml yet"
-  - "Given a Phase-1a envelope answered externally, when /hive:kickoff is re-invoked with HIVE_HEADLESS=1, then it consumes the Phase-1a answers, proceeds to Phase 1b, and writes a new Phase-1b envelope"
-  - "Given all four phase envelopes answered in sequence across repeated re-invocations, when /hive:kickoff completes, then project-profile.yaml is populated identically to what an interactive run with the same answers would produce"
+  - "Given HIVE_HEADLESS unset and no CI, when /hive:kickoff runs against a fresh project, then every prompt point behaves exactly as before this story (prose/AskUserQuestion unchanged, no envelope files written) — VERIFIED via live smoke test (see docs/pr-description.md), not just diff review"
+  - "Given HIVE_HEADLESS=1, when /hive:kickoff runs against a fresh project, then it writes a Phase-1a envelope, exits with AWAITING_ANSWERS, and writes nothing to project-profile.yaml yet — VERIFIED via live smoke test"
+  - "Given a Phase-1a envelope answered externally, when /hive:kickoff is re-invoked with HIVE_HEADLESS=1, then it consumes the Phase-1a answers, deletes the consumed envelope (hqp-2's delete-on-consume, added in CodeRabbit review round 3), proceeds to Phase project-classification, and writes a new envelope there — VERIFIED via live smoke test"
+  - "Given all six phase envelopes answered in sequence across repeated re-invocations, when /hive:kickoff completes, then project-profile.yaml is populated identically to what an interactive run with the same answers would produce"
   - "Re-kickoff (preservation-branch) prompts at kickoff-protocol.md:26,41,46,99,182 also route through the gateway, not just fresh-kickoff prompts"
+  - "Given a much-later re-kickoff reusing phase 1a after the original kickoff's 1a envelope was already consumed, the skill asks again rather than silently reusing the deleted-and-gone stale answer (delete-on-consume correctness fix, hqp-2)"
 
 steps:
   - id: research
@@ -40,7 +59,7 @@ steps:
     agent: developer
     depends_on: [research]
   - id: test
-    description: End-to-end headless run against a scratch project directory driving all 4 phase envelopes to completion via fixture answers; separately, an interactive-mode regression run confirming unchanged prompts/behavior.
+    description: End-to-end headless run against a scratch project directory driving phase envelopes to completion via fixture answers; separately, an interactive-mode regression run confirming unchanged prompts/behavior. COMPLETED via a live claude -p --plugin-dir smoke test (not a mocked/fixture-only run) — see docs/pr-description.md's Testing section for the actual transcript summary.
     agent: tester
     depends_on: [implement]
   - id: review
@@ -59,7 +78,7 @@ context:
     - path: skills/kickoff/SKILL.md
       purpose: Primary skill file with 6 direct "Ask:" prompt points.
     - path: hive/references/kickoff-protocol.md
-      purpose: Detailed protocol doc with the remaining prompt points and phase structure (1a, 1b, 2b-iii, 3b) that defines the envelope-batching boundaries.
+      purpose: Detailed protocol doc with the remaining prompt points and the corrected phase structure (scenario-detect, 1a, 1b, project-classification, 2b-ii, 4b — see this file's "Headless Mode" section) that defines the envelope-batching boundaries.
     - path: hive/lib/question_gateway.py
       purpose: The gateway primitive from hqp-2 that every prompt site now calls instead of prompting directly.
 
@@ -67,17 +86,19 @@ files_to_modify:
   - file: skills/kickoff/SKILL.md
     change: Route lines 13,22,24,26,36,41,46 through question_gateway.ask_or_emit().
   - file: hive/references/kickoff-protocol.md
-    change: Route lines 45,58,99,145,182,320-363,756-786,906 through the gateway, batched per the 4-phase mapping.
+    change: Route lines 45,58,99,145,182,320-363,756-786,906 through the gateway, batched per the corrected 6-phase mapping (see description).
 
 design_decisions:
-  - decision: Batch kickoff's prompts into exactly 4 phase envelopes (1a, 1b, 2b-iii, 3b), not 7 individual ones.
-    rationale: Matches hqp-2's phase-batching contract; keeps a fully headless kickoff run to ~4 round trips instead of 7+.
+  - decision: Batch kickoff's prompts into 6 phase envelopes (scenario-detect, 1a, 1b, project-classification, 2b-ii, 4b), not 7+ individual ones.
+    rationale: Matches hqp-2's phase-batching contract; keeps a fully headless kickoff run to ~6 round trips instead of 7+. (Plan-time estimate was "4 phases" — corrected during implementation, see IMPLEMENTATION NOTE above.)
+  - decision: Delete-on-consume for answered envelopes (owned by hqp-2, exercised here).
+    rationale: Kickoff's phase ids (1a, 1b, etc.) are reused across genuinely separate invocations — a re-kickoff months later uses the same phase id as the original kickoff. Without deletion, that re-kickoff would silently match the ORIGINAL kickoff's stale answered envelope and never ask again. Caught in CodeRabbit review round 3 on PR #341.
 
 cross_cutting:
   - concern: documentation
     action: "kickoff-protocol.md itself is the documentation of kickoff's behavior — this story's changes to that file ARE the doc update. No separate doc needed."
   - concern: versioning
-    action: "Consumer-visible new behavior (headless kickoff) — covered by the epic-level minor version bump."
+    action: "Consumer-visible new behavior — covered by epic.yaml's version_bump: minor flag, consumed at actual release-cutting time by /hive:ship (which may bundle multiple epics into one plugin.json/marketplace.json bump, per this repo's accumulate-then-release convention). This epic's own CHANGELOG.md bullet is added now under ## [Unreleased] (see the plan-dag-cutover bullets already there as precedent)."
 
 metric:
   applies: true
@@ -101,6 +122,14 @@ risks:
 references:
   - path: .pHive/epics/headless-question-protocol/docs/research-brief.md
     relevant_excerpt: |
-      hive/references/kickoff-protocol.md:320-363 — Phase 2b-iii "Step 2: Present
-      Elicitation (5 Questions)" — conversational-block prompt with numbered options,
-      "wait for input" for methodology/PR-style/etc.
+      hive/references/kickoff-protocol.md:320-363 — Phase 2b-ii "Step 2: Present
+      Elicitation (7 Questions)" — conversational-block prompt with numbered options,
+      "wait for input" for methodology/PR-style/etc. (Original research-brief.md text
+      says "Phase 2b-iii" and "5 Questions" — both corrected during implementation;
+      research-brief.md itself is left as the point-in-time planning artifact it was,
+      not retroactively edited.)
+  - path: hive/references/question-envelope-schema.md
+    relevant_excerpt: |
+      Deletion on consume — the gateway deletes an envelope file immediately after
+      successfully extracting its answers... skill phase ids are reused across
+      genuinely separate invocations of the same skill.

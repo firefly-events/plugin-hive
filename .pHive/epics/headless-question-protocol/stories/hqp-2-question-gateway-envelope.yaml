@@ -1,7 +1,7 @@
 id: hqp-2-question-gateway-envelope
 epic: headless-question-protocol
 title: Question-gateway primitive + question-envelope schema
-status: pending
+status: completed
 complexity: medium
 methodology: classic
 depends_on: [hqp-1-runtime-mode-detection]
@@ -38,10 +38,24 @@ description: |
   (`re-emit` default, non-destructive; `fail` for orchestrators that want expiry
   treated as unrecoverable).
 
+  IMPLEMENTATION NOTE (post-hoc correction, CodeRabbit review rounds 1-3 on PR
+  #341): the implementation this AC describes shipped with three fixes beyond
+  what was planned — (1) **delete-on-consume**: the gateway now deletes an
+  envelope file once its answers are extracted, because phase ids are reused
+  across genuinely separate invocations (e.g. a re-kickoff months later reuses
+  phase `1a`) and a surviving answered envelope would silently short-circuit
+  that later invocation with a stale answer forever; (2) both `skill` and
+  `invocation_id` are sanitized when building the on-disk path/glob (an
+  earlier version only sanitized `invocation_id`); (3) invocation ids use
+  millisecond precision, not whole-second, to avoid filename collisions. See
+  hive/references/question-envelope-schema.md's "Deletion on consume" section
+  for the authoritative, corrected mutation-lifecycle description.
+
 acceptance_criteria:
   - "Given interactive mode, when ask_or_emit() is called with a question spec, then it invokes the call site's existing AskUserQuestion/prose path unchanged and does not write an envelope file"
   - "Given headless mode and a batch of N questions for one phase, when ask_or_emit() is called, then exactly one envelope file is written at .pHive/questions/<skill>-<invocation-id>.yaml containing all N questions, with status: pending and a deadline computed from headless.answer_deadline_seconds"
-  - "Given a pending envelope with an orchestrator write of answer: values and status: answered, when the skill re-invokes ask_or_emit() for the same phase, then it returns the answers without re-prompting and without creating a new envelope"
+  - "Given a pending envelope with an orchestrator write of answer: values and status: answered, when the skill re-invokes ask_or_emit() for the same phase, then it returns the answers without re-prompting, without creating a new envelope, AND deletes the consumed envelope file (delete-on-consume, added post-plan — see IMPLEMENTATION NOTE)"
+  - "Given a consumed (and thus deleted) envelope for phase P, when ask_or_emit() is called again for the same skill+phase P at a much later time (simulating a genuinely separate invocation, e.g. a re-kickoff months later), then it does NOT return the stale prior answer — it asks again (writes a fresh pending envelope)"
   - "Given a pending envelope whose deadline has not lapsed, when the skill re-invokes ask_or_emit() for the same phase, then it re-exits with the same AWAITING_ANSWERS status and does not mutate the envelope"
   - "Given a pending envelope whose deadline lapses with no renewal and no answer, when the skill re-invokes ask_or_emit() for the same phase, then it follows headless.deadline_expired_action (default re-emit: writes a fresh envelope with a new deadline; fail: raises a machine-readable error)"
   - "Given a pending envelope, when an external writer updates deadline to a later timestamp and increments renewal_count before the prior deadline lapses, then the envelope remains valid pending (no expiry action fires) on the next re-invocation"
@@ -130,12 +144,16 @@ design_decisions:
     rationale: Grill finding U2 during planning — kickoff alone has 7+ prompt points; per-question envelopes would mean 7+ full skill re-invocations for a headless run, worse than the prose-scraping workaround this epic replaces.
   - decision: Renewable deadline instead of a poll loop.
     rationale: User feedback during planning explicitly rejected a poll-mode design (skill process sitting in a loop) in favor of an OAuth-refresh-style renewable expiry, matching how this repo already tolerates long-running Multica story/persona timeouts (1800s precedent).
+  - decision: Delete the envelope file on consume, rather than leaving it as a permanent answered record.
+    rationale: Not part of the original plan — added in CodeRabbit review round 3 on PR #341 after a real bug was found. Phase ids (1a, 1b, etc.) are reused across genuinely separate invocations of the same skill; without deletion, find_envelope_for_phase would match the OLD answered envelope forever on any later invocation, silently short-circuiting re-kickoff preservation prompts with a stale answer.
+  - decision: detectInteractiveMode/askOrEmit (JS, camelCase) vs detect_interactive_mode/ask_or_emit (Python, snake_case) — no cross-language name aliasing.
+    rationale: Matches this repo's existing per-language convention already established in hive/lib/config.js (camelCase exports) vs hive/lib/config.py (snake_case exports) for the identical job. Flagged twice by CodeRabbit as a "duplicate" finding across review rounds 1-3; held the position each time as intentional, not a bug.
 
 cross_cutting:
   - concern: documentation
     action: "question-envelope-schema.md IS the primary documentation deliverable for this story — no separate doc update needed beyond it and this story's own YAML."
   - concern: versioning
-    action: "New public config keys (headless.answer_deadline_seconds, headless.deadline_expired_action) in the shipped hive/hive.config.yaml baseline are consumer-visible — covered by the epic-level minor version bump (see epic.yaml), not per-story."
+    action: "Consumer-visible new behavior — covered by epic.yaml's version_bump: minor flag, consumed at actual release-cutting time by /hive:ship (which may bundle multiple epics into one plugin.json/marketplace.json bump, per this repo's accumulate-then-release convention). This epic's own CHANGELOG.md bullet is added now under ## [Unreleased] (see the plan-dag-cutover bullets already there as precedent)."
 
 metric:
   applies: true

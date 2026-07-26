@@ -1,7 +1,7 @@
 id: hqp-1-runtime-mode-detection
 epic: headless-question-protocol
 title: Runtime-mode detection helper (interactive vs headless)
-status: pending
+status: completed
 complexity: low
 methodology: classic
 depends_on: []

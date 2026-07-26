@@ -1,7 +1,7 @@
 id: hqp-6-stop-hook-bound
 epic: headless-question-protocol
 title: Bound the global Stop hook (streaming rewrite + size guard)
-status: pending
+status: completed
 complexity: medium
 methodology: classic
 depends_on: []
@@ -48,6 +48,10 @@ acceptance_criteria:
   - "Given the synthetic large-transcript benchmark fixture, when the streaming rewrite parses a transcript just under the configured threshold, then it completes with measured wall-clock time under the 15s plugin.json timeout with a documented margin (not asserted, benchmarked and recorded in the story's episode notes)"
   - "Given metrics.enabled: false, when the hook runs, then it exits 0 immediately exactly as it does today (existing short-circuit at hooks/metrics-stop-dispatch.sh:65-74 is unchanged)"
   - "The existing || true + trap 'exit 0' ERR safety net (hooks/metrics-stop-dispatch.sh:25, .claude-plugin/plugin.json:49) is unchanged — this story extends the cheap-normal-path guarantee, it does not remove the failure-path guarantee"
+  - "ADDED (CodeRabbit review, PR #341): a transcript with many distinct model values does not grow the streaming aggregator's memory/sort cost unboundedly — model cardinality is capped (20 distinct values) with a deterministic '+more' overflow marker"
+  - "ADDED (CodeRabbit review): a malformed JSON line partway through an otherwise-valid transcript emits exactly ONE payload (the codex_gap:true fallback) — never a partial-totals blob followed by a second fallback blob"
+  - "ADDED (CodeRabbit review): a model name containing a double-quote character round-trips through valid JSON in the final events row (final JSON is built via jq -nc, not manual printf string interpolation)"
+  - "ADDED (CodeRabbit review): the transcript_skipped skip-row includes run_id (a REQUIRED_EVENT_FIELDS entry per hive/lib/metrics/core.py) and metric_type transcript_skipped is registered in EVENT_METRIC_TYPES as (number, bytes) — without both, hive/lib/metrics ingestion would reject the row"
 
 steps:
   - id: research
@@ -100,13 +104,19 @@ design_decisions:
   - decision: No background-session-specific detection; bound cost universally instead.
     rationale: No reliable "is this a claude --bg session" signal exists anywhere in this repo (grill finding U1); a universal bound is a strict superset of the literal request and was explicitly confirmed acceptable during planning.
   - decision: Benchmark-derived default threshold, not an asserted number.
-    rationale: Grill finding H2 — an earlier draft asserted "10MB stays well under 15s" with no measurement; this story requires an actual timed benchmark before picking the shipped default.
+    rationale: Grill finding H2 — an earlier draft asserted "10MB stays well under 15s" with no measurement; this story requires an actual timed benchmark before picking the shipped default. Actual benchmark (884MB/3M-line synthetic transcript, streaming rewrite) measured ~9.5s / ~2.8MB peak memory vs. the old slurp implementation's 13.57s / ~7.5GB peak RSS on the same fixture; 300MB default threshold measured at ~3.1s, ~12s margin under the 15s hook timeout.
+  - decision: Capture the full jq | awk pipeline into one variable and check its exit status once, rather than streaming partial awk output directly.
+    rationale: Not part of the original plan — added in CodeRabbit review round 3 on PR #341. The original streaming design let a jq failure partway through a transcript still allow awk's END block to run on partial data, printing a partial-totals JSON blob; the `|| echo <fallback>` then appended a SECOND JSON blob after it, corrupting the caller's single-value parse on any malformed transcript line.
+  - decision: Build the final token-row JSON via `jq -nc`, not manual printf string interpolation.
+    rationale: Not part of the original plan — added in CodeRabbit review round 3. A model name containing a literal `"` character, interpolated directly into a printf-built JSON string, produced invalid JSON; jq's own escaping handles this correctly.
+  - decision: Cap distinct model-name cardinality at 20 with a deterministic overflow marker.
+    rationale: Not part of the original plan — added in CodeRabbit review round 3. The streaming aggregator's model-tracking array and its O(n^2) insertion sort (needed to match the original jq `unique` implementation's sorted-join byte-for-byte) could otherwise grow unboundedly against a pathological transcript with many distinct model values, working against the very goal of this story.
 
 cross_cutting:
   - concern: documentation
     action: "Add a short note to hooks/metrics-stop-dispatch.sh's header comment (currently describes the slurp mechanism at lines 10-11 as the 'C2.0 chosen mechanism') updating it to describe the streaming approach + size guard as the current mechanism."
   - concern: versioning
-    action: "New public config key (metrics.stop_dispatch_max_transcript_bytes) in the shipped baseline is consumer-visible — covered by the epic-level minor version bump."
+    action: "Consumer-visible new behavior — covered by epic.yaml's version_bump: minor flag, consumed at actual release-cutting time by /hive:ship (which may bundle multiple epics into one plugin.json/marketplace.json bump, per this repo's accumulate-then-release convention). This epic's own CHANGELOG.md bullet is added now under ## [Unreleased] (see the plan-dag-cutover bullets already there as precedent)."
 
 metric:
   applies: true
@@ -121,6 +131,15 @@ metric:
     ref: "Benchmark fixture timing recorded at integrate; spot-check against real .pHive/metrics/events/stop-*.jsonl wall_clock_ms rows for 7 days post-merge to confirm no regression in typical sessions"
   verify_at: "story integrate step"
   owner: developer
+  # NOTE (honesty check, not a target miss): this target describes TYPICAL
+  # session p99, not the deliberately-near-the-cap boundary case. The
+  # streaming pipeline measured ~3.1s (slightly over 3000ms) on a 295MB
+  # fixture chosen specifically to sit just under the 300MB size-guard
+  # threshold — an edge case by construction, not a typical transcript. The
+  # metric that actually matters for the size guard's own correctness is
+  # margin under the 15s hook timeout (~12s margin measured), not this
+  # p99 target. Real transcripts (typically low tens of MB) will be far
+  # under both numbers.
 
 risks:
   - severity: medium

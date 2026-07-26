@@ -1,7 +1,7 @@
 id: hqp-7-docs-pr-polish
 epic: headless-question-protocol
 title: Finalize question-envelope schema doc and PR narrative for upstream submission
-status: pending
+status: completed
 complexity: low
 methodology: classic
 depends_on:
